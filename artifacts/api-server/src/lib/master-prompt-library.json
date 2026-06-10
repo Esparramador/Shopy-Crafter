@@ -16,7 +16,7 @@
       "CLIENT_COLORS": "Paleta de colores de la marca",
       "CLIENT_LANGUAGE": "Idioma del contenido"
     },
-    "total_templates": 6013,
+    "total_templates": 6033,
     "libraries": [
       {
         "key": "stitch_bulk_v3",
@@ -99339,7 +99339,7 @@
     },
     "neuform_design_systems": {
       "description": "Neuform Design Systems — 98 sistemas: 71 con tokens YAML + 27 analisis de marcas reales (Binance, Ferrari, BMW, Lamborghini, Mintlify, Shopify, Apple...)",
-      "count": 118,
+      "count": 138,
       "templates": [
         {
           "key": "neuform_longcipher_design",
@@ -103280,6 +103280,1175 @@
               {
                 "name": "rror",
                 "hex": "#EF4444"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_ledgercraft",
+          "name": "LedgerCraft Design System",
+          "description": "LedgerCraft is a utility-first design system built for accounting software and invoice management platforms. It embraces the spreadsheet aesthetic wit",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "ledgercraft",
+            "roboto",
+            "roboto-slab"
+          ],
+          "template": "Design system: LedgerCraft. LedgerCraft is a utility-first design system built for accounting software and invoice management platforms. It embraces the spreadsheet aesthetic with flat surfaces, crisp borders, and tight spacing optimized for dense tabular data. The palette is restrained and professional, using forest green for. Primary: #15803D. Background: #FAFAFA. Fonts: Roboto, Roboto Slab, IBM Plex Mono. Colors: Primary #15803D, Secondary #64748B, Tertiary #B45309, Neutral #9CA3AF, Background #FAFAFA. Guidelines: Do right-align all numerical columns (amounts, quantities, rates) for easy vertical scanning.; Do use consistent decimal places within each column -- two decimals for currency, four for tax rates.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___ledgercraft_1781111298541.md",
+            "primaryColor": "#15803D",
+            "backgroundColor": "#FAFAFA",
+            "fonts": [
+              "Roboto",
+              "Roboto Slab",
+              "IBM Plex Mono"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#15803D"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#64748B"
+              },
+              {
+                "name": "Tertiary",
+                "hex": "#B45309"
+              },
+              {
+                "name": "Neutral",
+                "hex": "#9CA3AF"
+              },
+              {
+                "name": "Background",
+                "hex": "#FAFAFA"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#15803D"
+              },
+              {
+                "name": "Warning",
+                "hex": "#B45309"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_lime_commerce",
+          "name": "Lime Commerce Design System",
+          "description": "Lime Commerce is a merchant-focused design system inspired by the world's leading e-commerce platform builder. It combines trustworthy green tones wit",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "lime-commerce",
+            "inter",
+            "fira-code"
+          ],
+          "template": "Design system: Lime Commerce. Lime Commerce is a merchant-focused design system inspired by the world's leading e-commerce platform builder. It combines trustworthy green tones with clean, professional layouts designed to help entrepreneurs manage their online stores with confidence. The aesthetic is polished yet approachable — . Primary: #008060. Background: #F6F6F7. Fonts: Inter, Fira Code. Colors: Primary #008060, Primary Hover #006E52, Secondary #5C6AC4, Neutral #6D7175, Background #F6F6F7.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___lime-commerce_1781111298568.md",
+            "primaryColor": "#008060",
+            "backgroundColor": "#F6F6F7",
+            "fonts": [
+              "Inter",
+              "Fira Code"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#008060"
+              },
+              {
+                "name": "Primary Hover",
+                "hex": "#006E52"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#5C6AC4"
+              },
+              {
+                "name": "Neutral",
+                "hex": "#6D7175"
+              },
+              {
+                "name": "Background",
+                "hex": "#F6F6F7"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Text Primary",
+                "hex": "#202223"
+              },
+              {
+                "name": "Text Secondary",
+                "hex": "#6D7175"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_localguide",
+          "name": "LocalGuide Design System",
+          "description": "LocalGuide is an authentic, map-forward design system built around insider-tips and local discovery for city guide and experience platforms. Bold red-",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "localguide"
+          ],
+          "template": "Design system: LocalGuide. LocalGuide is an authentic, map-forward design system built around insider-tips and local discovery for city guide and experience platforms. Bold red-orange anchors the visual hierarchy while teal and yellow accent supporting elements.. Primary: #EA580C. Background: #FFFFFF. Fonts: system-ui. Colors: Primary RedOrange #EA580C, Secondary Teal #0D9488, Tertiary Yellow #EAB308, Background #FFFFFF, Surface Default #FFFFFF.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___localguide_1781111298570.md",
+            "primaryColor": "#EA580C",
+            "backgroundColor": "#FFFFFF",
+            "fonts": [],
+            "colorPalette": [
+              {
+                "name": "Primary RedOrange",
+                "hex": "#EA580C"
+              },
+              {
+                "name": "Secondary Teal",
+                "hex": "#0D9488"
+              },
+              {
+                "name": "Tertiary Yellow",
+                "hex": "#EAB308"
+              },
+              {
+                "name": "Background",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Surface Default",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#16A34A"
+              },
+              {
+                "name": "Warning",
+                "hex": "#EAB308"
+              },
+              {
+                "name": "Error",
+                "hex": "#DC2626"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_luxcart",
+          "name": "LuxCart Design System",
+          "description": "LuxCart is a design system for high-end luxury goods and designer fashion retail. It treats whitespace as a luxury material, letting products breathe ",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "luxcart",
+            "raleway",
+            "jetbrains-mono"
+          ],
+          "template": "Design system: LuxCart. LuxCart is a design system for high-end luxury goods and designer fashion retail. It treats whitespace as a luxury material, letting products breathe in an atmosphere of restrained elegance. The very spacious density communicates exclusivity — every pixel earns its place. The warm white foundation p. Primary: #1C1917. Background: #FFFBEB. Fonts: Raleway, JetBrains Mono, Cormorant Garamond. Colors: Primary #1C1917, Secondary #FFFBEB, Tertiary #B8860B, Neutral #D4D4D8, Background #FFFBEB. Guidelines: Do use generous whitespace — luxury is communicated by what you leave out, not what you put in.; Don't use Gold #B8860B for large surfaces; reserve it for fine accents like dividers, icons, and small highlights.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___luxcart_1781111298571.md",
+            "primaryColor": "#1C1917",
+            "backgroundColor": "#FFFBEB",
+            "fonts": [
+              "Raleway",
+              "JetBrains Mono",
+              "Cormorant Garamond"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#1C1917"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#FFFBEB"
+              },
+              {
+                "name": "Tertiary",
+                "hex": "#B8860B"
+              },
+              {
+                "name": "Neutral",
+                "hex": "#D4D4D8"
+              },
+              {
+                "name": "Background",
+                "hex": "#FFFBEB"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#166534"
+              },
+              {
+                "name": "Warning",
+                "hex": "#CA8A04"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_magspread",
+          "name": "MagSpread Design System",
+          "description": "MagSpread is an editorial design system inspired by print magazine layouts, built for digital magazines and longform storytelling. It combines warm cr",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "magspread",
+            "source-code-pro",
+            "playfair-display"
+          ],
+          "template": "Design system: MagSpread. MagSpread is an editorial design system inspired by print magazine layouts, built for digital magazines and longform storytelling. It combines warm cream surfaces with deep teal and rose accents to create a luxurious, full-bleed reading experience. The system rejects shadows and rounded corners in f. Primary: #134E4A. Background: #FDF2E9. Fonts: Source Code Pro, Playfair Display, Manrope. Colors: Color Primary #134E4A, Color Secondary #E11D48, Color Tertiary #FDF2E9, Surface Base #FDF2E9, Color Success #16A34A. Guidelines: Do use Playfair Display at bold or black weights for dramatic, editorial headlines.; Do leverage full-bleed images and color blocks for magazine-style section breaks.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___magspread_1781111298572.md",
+            "primaryColor": "#134E4A",
+            "backgroundColor": "#FDF2E9",
+            "fonts": [
+              "Source Code Pro",
+              "Playfair Display",
+              "Manrope"
+            ],
+            "colorPalette": [
+              {
+                "name": "Color Primary",
+                "hex": "#134E4A"
+              },
+              {
+                "name": "Color Secondary",
+                "hex": "#E11D48"
+              },
+              {
+                "name": "Color Tertiary",
+                "hex": "#FDF2E9"
+              },
+              {
+                "name": "Surface Base",
+                "hex": "#FDF2E9"
+              },
+              {
+                "name": "Color Success",
+                "hex": "#16A34A"
+              },
+              {
+                "name": "Color Warning",
+                "hex": "#D97706"
+              },
+              {
+                "name": "Color Error",
+                "hex": "#DC2626"
+              },
+              {
+                "name": "Color Info",
+                "hex": "#2563EB"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_maptrack",
+          "name": "MapTrack Design System",
+          "description": "MapTrack is a location-aware, overlay-centric design system built for map-based and location tracking mobile apps. It layers informational panels, rou",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "maptrack",
+            "open-sans",
+            "jetbrains-mono"
+          ],
+          "template": "Design system: MapTrack. MapTrack is a location-aware, overlay-centric design system built for map-based and location tracking mobile apps. It layers informational panels, route cards, and point-of-interest markers above a persistent map canvas without obstructing the spatial context. The teal-orange-navy palette provides s. Primary: #0D9488. Background: #FFFFFF. Fonts: Open Sans, JetBrains Mono, Urbanist. Colors: Primary #0D9488, Secondary #F97316, Tertiary #1E3A5F, Background #FFFFFF, Surface #FFFFFF. Guidelines: Do keep the map visible behind overlay elements -- use translucent or partial-height sheets.; Do use the teal primary color for route lines and navigation actions for instant recognition.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___maptrack_1781111298574.md",
+            "primaryColor": "#0D9488",
+            "backgroundColor": "#FFFFFF",
+            "fonts": [
+              "Open Sans",
+              "JetBrains Mono",
+              "Urbanist"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#0D9488"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#F97316"
+              },
+              {
+                "name": "Tertiary",
+                "hex": "#1E3A5F"
+              },
+              {
+                "name": "Background",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#10B981"
+              },
+              {
+                "name": "Warning",
+                "hex": "#F97316"
+              },
+              {
+                "name": "Error",
+                "hex": "#EF4444"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_green_chat",
+          "name": "Green Chat Design System",
+          "description": "Green Chat is a messaging-first design system inspired by the world's most widely used chat application. It prioritizes simplicity, instant familiarit",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "green-chat",
+            "inter",
+            "jetbrains-mono"
+          ],
+          "template": "Design system: Green Chat. Green Chat is a messaging-first design system inspired by the world's most widely used chat application. It prioritizes simplicity, instant familiarity, and effortless conversation flow. The aesthetic is warm and approachable — built around green and teal tones with a distinctive chat-wallpaper back. Primary: #25D366. Background: #ECE5DD. Fonts: Inter, JetBrains Mono. Colors: Primary #25D366, Primary Hover #20BD5A, Secondary #075E54, Neutral #667781, Background #ECE5DD.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___green-chat_1781111298576.md",
+            "primaryColor": "#25D366",
+            "backgroundColor": "#ECE5DD",
+            "fonts": [
+              "Inter",
+              "JetBrains Mono"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#25D366"
+              },
+              {
+                "name": "Primary Hover",
+                "hex": "#20BD5A"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#075E54"
+              },
+              {
+                "name": "Neutral",
+                "hex": "#667781"
+              },
+              {
+                "name": "Background",
+                "hex": "#ECE5DD"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Text Primary",
+                "hex": "#111B21"
+              },
+              {
+                "name": "Text Secondary",
+                "hex": "#667781"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_green_deck",
+          "name": "Green Deck Design System",
+          "description": "A bold, dark-first design system built for immersive audio experiences. Green Deck uses a high-energy green accent against deep black and charcoal sur",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "green-deck",
+            "inter",
+            "dm-sans"
+          ],
+          "template": "Design system: Green Deck. A bold, dark-first design system built for immersive audio experiences. Green Deck uses a high-energy green accent against deep black and charcoal surfaces to create an atmosphere that feels like a late-night concert venue — electric, focused, and alive. The aesthetic is minimal yet punchy, designed. Primary: #1DB954. Background: #121212. Fonts: Inter, DM Sans, JetBrains Mono. Colors: Primary #1DB954, Primary Hover #1ED760, Secondary #535353, Neutral #B3B3B3, Background #121212.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___green-deck_1781111298578.md",
+            "primaryColor": "#1DB954",
+            "backgroundColor": "#121212",
+            "fonts": [
+              "Inter",
+              "DM Sans",
+              "JetBrains Mono"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#1DB954"
+              },
+              {
+                "name": "Primary Hover",
+                "hex": "#1ED760"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#535353"
+              },
+              {
+                "name": "Neutral",
+                "hex": "#B3B3B3"
+              },
+              {
+                "name": "Background",
+                "hex": "#121212"
+              },
+              {
+                "name": "Surface",
+                "hex": "#181818"
+              },
+              {
+                "name": "Text Primary",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Text Secondary",
+                "hex": "#A7A7A7"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_greenearth",
+          "name": "GreenEarth Design System",
+          "description": "GreenEarth is an environmental design system crafted for advocacy organizations and conservation platforms. It draws from nature with forest greens, e",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "greenearth",
+            "raleway",
+            "ibm-plex-mono"
+          ],
+          "template": "Design system: GreenEarth. GreenEarth is an environmental design system crafted for advocacy organizations and conservation platforms. It draws from nature with forest greens, earthy browns, and sky blues while balancing environmental urgency with trustworthy calm. The system uses flat styling with visible borders to create s. Primary: #166534. Background: #F0FDF4. Fonts: Raleway, IBM Plex Mono, Merriweather. Colors: Color Primary #166534, Color Secondary #92400E, Color Tertiary #0284C7, Surface Base #F0FDF4, Color Success #16A34A. Guidelines: Do use the forest green primary for all primary CTAs and headings to anchor the environmental theme.; Do pair data visualizations with the sky blue tertiary for charts, maps, and infographics.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___greenearth_1781111298580.md",
+            "primaryColor": "#166534",
+            "backgroundColor": "#F0FDF4",
+            "fonts": [
+              "Raleway",
+              "IBM Plex Mono",
+              "Merriweather"
+            ],
+            "colorPalette": [
+              {
+                "name": "Color Primary",
+                "hex": "#166534"
+              },
+              {
+                "name": "Color Secondary",
+                "hex": "#92400E"
+              },
+              {
+                "name": "Color Tertiary",
+                "hex": "#0284C7"
+              },
+              {
+                "name": "Surface Base",
+                "hex": "#F0FDF4"
+              },
+              {
+                "name": "Color Success",
+                "hex": "#16A34A"
+              },
+              {
+                "name": "Color Warning",
+                "hex": "#D97706"
+              },
+              {
+                "name": "Color Error",
+                "hex": "#DC2626"
+              },
+              {
+                "name": "Color Info",
+                "hex": "#0284C7"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_greenleaf",
+          "name": "GreenLeaf Design System",
+          "description": "GreenLeaf is a design system rooted in natural aesthetics and sustainability values. Built for eco-friendly product shops, it employs earth tones, org",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "greenleaf",
+            "raleway",
+            "fira-code"
+          ],
+          "template": "Design system: GreenLeaf. GreenLeaf is a design system rooted in natural aesthetics and sustainability values. Built for eco-friendly product shops, it employs earth tones, organic shapes, and generous whitespace that mirrors the breathing room found in nature. The spacious density encourages mindful browsing over impulse pu. Primary: #166534. Background: #FAFAF5. Fonts: Raleway, Fira Code, Merriweather. Colors: Primary #166534, Secondary #86A873, Tertiary #A47148, Neutral #A8A29E, Background #FAFAF5. Guidelines: Do use Forest #166534 only for primary actions and links — it is the anchor of the palette.; Do include eco-certification badges (organic, fair-trade, recyclable) near product titles using Status Chips.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___greenleaf_1781111298583.md",
+            "primaryColor": "#166534",
+            "backgroundColor": "#FAFAF5",
+            "fonts": [
+              "Raleway",
+              "Fira Code",
+              "Merriweather"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#166534"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#86A873"
+              },
+              {
+                "name": "Tertiary",
+                "hex": "#A47148"
+              },
+              {
+                "name": "Neutral",
+                "hex": "#A8A29E"
+              },
+              {
+                "name": "Background",
+                "hex": "#FAFAF5"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#166534"
+              },
+              {
+                "name": "Warning",
+                "hex": "#CA8A04"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_green_trade",
+          "name": "Green Trade Design System",
+          "description": "Green Trade is a minimalist, consumer-finance design system where dark backgrounds meet vivid green accents. It blends the simplicity of consumer apps",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "green-trade",
+            "dm-sans",
+            "jetbrains-mono"
+          ],
+          "template": "Design system: Green Trade. Green Trade is a minimalist, consumer-finance design system where dark backgrounds meet vivid green accents. It blends the simplicity of consumer apps with the precision of trading platforms, creating an approachable yet data-rich experience. Charts and numbers take center stage, with green signalin. Primary: #00C805. Background: #FFFFFF. Fonts: DM Sans, JetBrains Mono. Colors: Primary #00C805, Primary Hover #00A804, Secondary #5AC53A, Neutral #9DA3A6, Background #FFFFFF.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___green-trade_1781111298588.md",
+            "primaryColor": "#00C805",
+            "backgroundColor": "#FFFFFF",
+            "fonts": [
+              "DM Sans",
+              "JetBrains Mono"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#00C805"
+              },
+              {
+                "name": "Primary Hover",
+                "hex": "#00A804"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#5AC53A"
+              },
+              {
+                "name": "Neutral",
+                "hex": "#9DA3A6"
+              },
+              {
+                "name": "Background",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Surface",
+                "hex": "#F4F4F5"
+              },
+              {
+                "name": "Text Primary",
+                "hex": "#1E2124"
+              },
+              {
+                "name": "Text Secondary",
+                "hex": "#6F7378"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_healhub",
+          "name": "HealHub Design System",
+          "description": "HealHub is a vibrant design system for community health platforms and telehealth applications. It embraces color and warmth to make healthcare feel le",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "healhub",
+            "dm-sans",
+            "fira-code"
+          ],
+          "template": "Design system: HealHub. HealHub is a vibrant design system for community health platforms and telehealth applications. It embraces color and warmth to make healthcare feel less intimidating and more inclusive. The system balances professional medical credibility with the approachability of consumer-grade apps, creating int. Primary: #0D9488. Background: #FFFFFF. Fonts: DM Sans, Fira Code, Lexend. Colors: Primary Teal #0D9488, Secondary Orange #FB923C, Tertiary Purple #A855F7, Neutral Gray #6B7280, Background #FFFFFF. Guidelines: Do use inclusive imagery and illustrations that represent diverse communities, ages, and abilities.; Do design clear, step-by-step scheduling flows that minimize the number of taps to book an appointment.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___healhub_1781111298590.md",
+            "primaryColor": "#0D9488",
+            "backgroundColor": "#FFFFFF",
+            "fonts": [
+              "DM Sans",
+              "Fira Code",
+              "Lexend"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary Teal",
+                "hex": "#0D9488"
+              },
+              {
+                "name": "Secondary Orange",
+                "hex": "#FB923C"
+              },
+              {
+                "name": "Tertiary Purple",
+                "hex": "#A855F7"
+              },
+              {
+                "name": "Neutral Gray",
+                "hex": "#6B7280"
+              },
+              {
+                "name": "Background",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#059669"
+              },
+              {
+                "name": "Warning",
+                "hex": "#D97706"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_homenest",
+          "name": "HomeNest Design System",
+          "description": "HomeNest is a warm, aspirational design system that evokes the feeling of finding your dream home. Built for residential real estate and home buying p",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "homenest",
+            "nunito",
+            "source-code-pro"
+          ],
+          "template": "Design system: HomeNest. HomeNest is a warm, aspirational design system that evokes the feeling of finding your dream home. Built for residential real estate and home buying platforms, it uses earthy warm browns, sage greens, and creamy backgrounds to create an inviting, trustworthy aesthetic. The approachable serif headlin. Primary: #92400E. Background: #FEF3C7. Fonts: Nunito, Source Code Pro, Alike. Colors: Primary Warm Brown #92400E, Secondary Sage #84CC16, Tertiary Cream #FEF3C7, Background #FEF3C7, Surface Default #FFFBEB. Guidelines: Do use warm, lifestyle photography that evokes the feeling of home -- avoid sterile staging shots.; Do keep the Cream background (#FEF3C7) as the dominant base; it defines the HomeNest warmth.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___homenest_1781111298593.md",
+            "primaryColor": "#92400E",
+            "backgroundColor": "#FEF3C7",
+            "fonts": [
+              "Nunito",
+              "Source Code Pro",
+              "Alike"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary Warm Brown",
+                "hex": "#92400E"
+              },
+              {
+                "name": "Secondary Sage",
+                "hex": "#84CC16"
+              },
+              {
+                "name": "Tertiary Cream",
+                "hex": "#FEF3C7"
+              },
+              {
+                "name": "Background",
+                "hex": "#FEF3C7"
+              },
+              {
+                "name": "Surface Default",
+                "hex": "#FFFBEB"
+              },
+              {
+                "name": "Success",
+                "hex": "#16A34A"
+              },
+              {
+                "name": "Warning",
+                "hex": "#D97706"
+              },
+              {
+                "name": "Error",
+                "hex": "#DC2626"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_hrflow",
+          "name": "HRFlow Design System",
+          "description": "HRFlow is a people-focused, warm-professional design system built for HR platforms and employee management systems. It balances approachability with t",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "hrflow",
+            "roboto",
+            "dm-sans"
+          ],
+          "template": "Design system: HRFlow. HRFlow is a people-focused, warm-professional design system built for HR platforms and employee management systems. It balances approachability with the professionalism required for sensitive workplace data. The warm purple palette and rounded forms convey trust and care, while clean layouts keep co. Primary: #7C3AED. Background: #FAFAFA. Fonts: Roboto, DM Sans, Lexend. Colors: Primary #7C3AED, Secondary #0D9488, Tertiary #F97316, Background #FAFAFA, Surface #FFFFFF. Guidelines: Do use warm, people-centric language in labels (e.g., \"Team Members\" not \"Users\").; Do pair purple primary with teal for status and progress to keep the palette balanced.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___hrflow_1781111298596.md",
+            "primaryColor": "#7C3AED",
+            "backgroundColor": "#FAFAFA",
+            "fonts": [
+              "Roboto",
+              "DM Sans",
+              "Lexend"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#7C3AED"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#0D9488"
+              },
+              {
+                "name": "Tertiary",
+                "hex": "#F97316"
+              },
+              {
+                "name": "Background",
+                "hex": "#FAFAFA"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#059669"
+              },
+              {
+                "name": "Warning",
+                "hex": "#D97706"
+              },
+              {
+                "name": "Error",
+                "hex": "#EF4444"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_indiecraft",
+          "name": "IndieCraft Design System",
+          "description": "IndieCraft is a pixel-art-inspired design system built for indie game studios and pixel-art game launchers. It channels chunky, 8-bit charm through bo",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "indiecraft",
+            "roboto",
+            "nunito"
+          ],
+          "template": "Design system: IndieCraft. IndieCraft is a pixel-art-inspired design system built for indie game studios and pixel-art game launchers. It channels chunky, 8-bit charm through bold greens, vivid purples, and warm yellows while maintaining modern usability. The system pairs the playful display font Righteous with the friendly b. Primary: #22C55E. Background: #F9FAFB. Fonts: Roboto, Nunito, Righteous. Colors: Color Primary #22C55E, Color Secondary #A855F7, Color Tertiary #FACC15, Surface Base #FAFAFA, Color Success #16A34A. Guidelines: Do use the 8px grid strictly for all spacing and sizing to maintain pixel-aligned layouts.; Do pair Righteous headlines with Nunito body copy for a retro-yet-readable contrast.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___indiecraft_1781111298601.md",
+            "primaryColor": "#22C55E",
+            "backgroundColor": "#F9FAFB",
+            "fonts": [
+              "Roboto",
+              "Nunito",
+              "Righteous"
+            ],
+            "colorPalette": [
+              {
+                "name": "Color Primary",
+                "hex": "#22C55E"
+              },
+              {
+                "name": "Color Secondary",
+                "hex": "#A855F7"
+              },
+              {
+                "name": "Color Tertiary",
+                "hex": "#FACC15"
+              },
+              {
+                "name": "Surface Base",
+                "hex": "#FAFAFA"
+              },
+              {
+                "name": "Color Success",
+                "hex": "#16A34A"
+              },
+              {
+                "name": "Color Warning",
+                "hex": "#FACC15"
+              },
+              {
+                "name": "Color Error",
+                "hex": "#EF4444"
+              },
+              {
+                "name": "Color Info",
+                "hex": "#3B82F6"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_inkwell",
+          "name": "InkWell Design System",
+          "description": "InkWell is a design system crafted for writer portfolios and long-form essay blogs. It draws from print editorial traditions — sharp edges, generous m",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "inkwell",
+            "ibm-plex-mono",
+            "playfair-display"
+          ],
+          "template": "Design system: InkWell. InkWell is a design system crafted for writer portfolios and long-form essay blogs. It draws from print editorial traditions — sharp edges, generous margins, and a typographic hierarchy that guides the eye through thousands of words without fatigue. The warm parchment background and ink-dark text cr. Primary: #1E293B. Background: #FEF3C7. Fonts: IBM Plex Mono, Playfair Display, Source Serif Pro. Colors: | Primary   | `` | Ink — headings, body  #1E293B, | Secondary | `` | Burgundy — links, pul #881337, | Tertiary  | `` | Parchment — backgroun #FEF3C7, | Neutral   | `` | Slate — metadata, cap #94A3B8. Guidelines: Do keep body text line length between 45-75 characters — this is the optimal range for reading comfort.; Don't use border radius on any element — InkWell's sharp edges are a deliberate editorial choice.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___inkwell_1781111298603.md",
+            "primaryColor": "#1E293B",
+            "backgroundColor": "#FEF3C7",
+            "fonts": [
+              "IBM Plex Mono",
+              "Playfair Display",
+              "Source Serif Pro"
+            ],
+            "colorPalette": [
+              {
+                "name": "| Primary   | `` | Ink — headings, body ",
+                "hex": "#1E293B"
+              },
+              {
+                "name": "| Secondary | `` | Burgundy — links, pul",
+                "hex": "#881337"
+              },
+              {
+                "name": "| Tertiary  | `` | Parchment — backgroun",
+                "hex": "#FEF3C7"
+              },
+              {
+                "name": "| Neutral   | `` | Slate — metadata, cap",
+                "hex": "#94A3B8"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_insightdeck",
+          "name": "InsightDeck Design System",
+          "description": "InsightDeck is a design system built for business intelligence and reporting dashboards where data clarity and visual storytelling take center stage. ",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "insightdeck"
+          ],
+          "template": "Design system: InsightDeck. InsightDeck is a design system built for business intelligence and reporting dashboards where data clarity and visual storytelling take center stage. A teal-driven palette conveys analytical trust, while purple and pink accents draw attention to key insights.. Primary: #0D9488. Background: #F8FAFC. Fonts: system-ui. Colors: Primary #0D9488, Secondary #9333EA, Tertiary #EC4899, Background #F8FAFC, Surface #FFFFFF.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___insightdeck_1781111298605.md",
+            "primaryColor": "#0D9488",
+            "backgroundColor": "#F8FAFC",
+            "fonts": [],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#0D9488"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#9333EA"
+              },
+              {
+                "name": "Tertiary",
+                "hex": "#EC4899"
+              },
+              {
+                "name": "Background",
+                "hex": "#F8FAFC"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#10B981"
+              },
+              {
+                "name": "Warning",
+                "hex": "#F59E0B"
+              },
+              {
+                "name": "Error",
+                "hex": "#EF4444"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_insureshield",
+          "name": "InsureShield Design System",
+          "description": "InsureShield is a trustworthy, accessible design system built for insurance quote and claims management platforms. It uses a dependable blue paired wi",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "insureshield",
+            "open-sans",
+            "fira-code"
+          ],
+          "template": "Design system: InsureShield. InsureShield is a trustworthy, accessible design system built for insurance quote and claims management platforms. It uses a dependable blue paired with action-oriented orange and affirming green to guide users through complex policy decisions with confidence. The system prioritizes plain language, . Primary: #2563EB. Background: #F8FAFC. Fonts: Open Sans, Fira Code, Bitter. Colors: Primary #2563EB, Secondary #EA580C, Tertiary #059669, Neutral #64748B, Background #F8FAFC. Guidelines: Do use plain, jargon-free language -- \"What you pay each month\" instead of \"premium.\"; Do structure complex processes as step-by-step wizards with a visible progress bar.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___insureshield_1781111298606.md",
+            "primaryColor": "#2563EB",
+            "backgroundColor": "#F8FAFC",
+            "fonts": [
+              "Open Sans",
+              "Fira Code",
+              "Bitter"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#2563EB"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#EA580C"
+              },
+              {
+                "name": "Tertiary",
+                "hex": "#059669"
+              },
+              {
+                "name": "Neutral",
+                "hex": "#64748B"
+              },
+              {
+                "name": "Background",
+                "hex": "#F8FAFC"
+              },
+              {
+                "name": "Surface",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#059669"
+              },
+              {
+                "name": "Warning",
+                "hex": "#D97706"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_kidlearn",
+          "name": "KidLearn Design System",
+          "description": "KidLearn is a bright, chunky, and friendly design system built for children's educational apps targeting ages 5-12. Every element uses rounded, approa",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "kidlearn",
+            "roboto",
+            "nunito"
+          ],
+          "template": "Design system: KidLearn. KidLearn is a bright, chunky, and friendly design system built for children's educational apps targeting ages 5-12. Every element uses rounded, approachable shapes with generous sizing to ensure comfort and accessibility for young learners. The system prioritizes large touch targets, clear visual hi. Primary: #EF4444. Background: #DBEAFE. Fonts: Roboto, Nunito, Fredoka. Colors: Color Primary #EF4444, Color Secondary #3B82F6, Color Tertiary #FACC15, Surface Base #FFFFFF, Surface Highlight #FEF3C7. Guidelines: Do ensure all interactive elements meet a minimum 48px touch target.; Do use simple, age-appropriate language (aim for a 2nd-grade reading level).",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___kidlearn_1781111298609.md",
+            "primaryColor": "#EF4444",
+            "backgroundColor": "#DBEAFE",
+            "fonts": [
+              "Roboto",
+              "Nunito",
+              "Fredoka"
+            ],
+            "colorPalette": [
+              {
+                "name": "Color Primary",
+                "hex": "#EF4444"
+              },
+              {
+                "name": "Color Secondary",
+                "hex": "#3B82F6"
+              },
+              {
+                "name": "Color Tertiary",
+                "hex": "#FACC15"
+              },
+              {
+                "name": "Surface Base",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Surface Highlight",
+                "hex": "#FEF3C7"
+              },
+              {
+                "name": "Color Success",
+                "hex": "#22C55E"
+              },
+              {
+                "name": "Color Warning",
+                "hex": "#F59E0B"
+              },
+              {
+                "name": "Color Error",
+                "hex": "#EF4444"
+              }
+            ]
+          }
+        },
+        {
+          "key": "neuform_learnflow",
+          "name": "LearnFlow Design System",
+          "description": "LearnFlow is a bright, encouraging, and progress-driven design system built for online learning platforms and learning management systems. Every eleme",
+          "category": "design-system",
+          "tags": [
+            "design-system",
+            "ui",
+            "learnflow",
+            "roboto",
+            "poppins"
+          ],
+          "template": "Design system: LearnFlow. LearnFlow is a bright, encouraging, and progress-driven design system built for online learning platforms and learning management systems. Every element is crafted to motivate learners, celebrate milestones, and make educational journeys feel rewarding. The visual language uses warm orange energy pa. Primary: #F97316. Background: #FFF7ED. Fonts: Roboto, Poppins, Fredoka. Colors: Primary #F97316, Secondary #3B82F6, Tertiary #22C55E, Surface Base #FFFFFF, Success #22C55E. Guidelines: Make progress visible everywhere -- show completion percentages, progress bars, and step indicators prominently on every learning screen.; Celebrate milestones -- use confetti animations, success modals, and badge unlocks when learners complete lessons, modules, or courses.",
+          "variables": [],
+          "metadata": {
+            "source": "neuform",
+            "filename": "chef___learnflow_1781111298616.md",
+            "primaryColor": "#F97316",
+            "backgroundColor": "#FFF7ED",
+            "fonts": [
+              "Roboto",
+              "Poppins",
+              "Fredoka"
+            ],
+            "colorPalette": [
+              {
+                "name": "Primary",
+                "hex": "#F97316"
+              },
+              {
+                "name": "Secondary",
+                "hex": "#3B82F6"
+              },
+              {
+                "name": "Tertiary",
+                "hex": "#22C55E"
+              },
+              {
+                "name": "Surface Base",
+                "hex": "#FFFFFF"
+              },
+              {
+                "name": "Success",
+                "hex": "#22C55E"
+              },
+              {
+                "name": "Warning",
+                "hex": "#EAB308"
+              },
+              {
+                "name": "Error",
+                "hex": "#EF4444"
+              },
+              {
+                "name": "Info",
+                "hex": "#3B82F6"
               }
             ]
           }

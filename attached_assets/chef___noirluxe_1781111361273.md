@@ -1,0 +1,125 @@
+# NoirLuxe Design System
+
+## Overview
+
+NoirLuxe is a dark, gold-accented design system that exudes exclusivity and refined taste. Designed for premium membership platforms and luxury brand experiences, it pairs near-black surfaces with restrained gold accents to convey sophistication. Gold is used with surgical precision -- a single line, a badge, a hover state -- never splashed broadly. Every shadow carries warmth; every surface whispers black-tie elegance.
+
+---
+
+## Colors
+
+- **Gold** (#C9A84C): Accents, CTAs, premium indicators
+- **Near Black** (#0C0C0E): Primary background
+- **Warm White** (#F2F0EB): Primary text, headings
+- **Surface Base** (#0C0C0E): App background
+- **Success** (#4ADE80): Confirmed, approved
+- **Warning** (#FBBF24): Pending, attention needed
+- **Error** (#EF4444): Rejected, failed
+- **Info** (#60A5FA): Informational
+
+## Typography
+
+- **Headline Font**: Dancing Script
+- **Body Font**: Inter
+- **Mono Font**: JetBrains Mono
+
+- **h1**: Dancing Script 40px bold, 1.2 line height
+- **h2**: Dancing Script 32px bold, 1.25 line height
+- **h3**: Dancing Script 24px regular, 1.3 line height
+- **h4**: Inter 18px medium, 1.4 line height
+- **body**: Inter 15px light, 1.6 line height
+- **small**: Inter 13px regular, 1.5 line height
+- **tiny**: Inter 11px regular, 1.4 line height
+- **mono**: JetBrains Mono 13px regular, 1.6 line height
+
+---
+
+## Spacing
+
+Base unit: 4px
+- **sp-1**: 4px
+- **sp-2**: 8px
+- **sp-3**: 12px
+- **sp-4**: 16px
+- **sp-5**: 24px
+- **sp-6**: 32px
+- **sp-7**: 48px
+- **sp-8**: 64px
+
+## Border Radius
+
+- **radius-sm** (4px): Small chips, badges
+- **radius-md** (8px): Cards, inputs, buttons
+- **radius-lg** (12px): Modals, large panels
+- **radius-pill** (9999px): Tags, premium badges
+
+## Elevation (Gold Glow)
+
+- **glow-gold-sm**: Soft 6px gold (#C9A84C) glow at 15% opacity. Subtle hover.
+- **glow-gold-md**: Medium 16px gold (#C9A84C) glow at 20% opacity. Cards, focused.
+- **glow-gold-lg**: Strong 32px gold (#C9A84C) glow at 25% opacity. Hero, modals.
+- **shadow-warm-sm**: Warm 2px vertical, 8px blur, near-black (#0C0C0E) at 60% opacity. Raised elements.
+- **shadow-warm-md**: Warm 4px vertical, 16px blur, near-black (#0C0C0E) at 70% opacity. Cards.
+- **shadow-warm-lg**: Warm 8px vertical, 32px blur, near-black (#0C0C0E) at 80% opacity. Modals, overlays.
+
+## Components
+
+### Buttons
+
+All buttons use 8px rounded corners (radius-md).
+
+- **Primary (Gold)**: Gold (#C9A84C) fill, near-black (#0C0C0E) text, no border, Inter medium (500) with 0.5px letter-spacing. Hover brightens the fill and adds a soft gold glow (glow-gold-sm). Active state slightly dims brightness. Available in small (12px text, 32px tall, 6px 16px padding), medium (14px text, 40px tall, 8px 24px padding), and large (15px text, 48px tall, 12px 32px padding).
+- **Secondary**: Transparent fill, gold text, 1px gold border. Hover tints the background to faint gold (#C9A84C at 8% opacity).
+- **Ghost**: Transparent fill, content-secondary text, no border. Hover tints the background to faint warm-white (#F2F0EB at 5% opacity).
+- **Destructive**: Red (#EF4444) fill, white (#FFFFFF) text, no border. Hover brightens the fill.
+
+Disabled buttons drop to 0.35 opacity with a disabled cursor and no glow effects.
+
+### Cards
+
+- **Default**: Raised surface (#161618) background with a 1px default border, 8px rounded corners, 24px padding, and a warm small shadow (shadow-warm-sm).
+- **Elevated (Premium Card)**: Raised surface background with a 1px gold border, 8px rounded corners, 24px padding, and a medium gold glow (glow-gold-md).
+
+### Inputs
+
+Inputs sit on a sunken surface (#060607) with 8px rounded corners, 10px 16px padding, and Inter 15px light (300) text in content-primary. The border is 1px in the default border color.
+
+In the default state there is no shadow. On hover the border strengthens to border-strong. On focus the border turns gold with a soft gold glow (glow-gold-sm). In the error state the border turns red (error) with a 6px red (#EF4444) glow at 20% opacity. When disabled the border returns to default and opacity drops to 0.35.
+
+Labels are Inter 12px medium (500) uppercase with 1px letter-spacing in content-tertiary with 8px bottom margin. Helper text is Inter 12px light (300) in content-tertiary with 4px top margin; error helper text uses the error color.
+
+### Chips
+
+- **Filter**: Transparent fill, content-secondary text, 1px default border, pill-shaped, 4px 14px padding. When active the background fills with faint gold (#C9A84C at 10% opacity), the border turns gold, and text turns gold.
+- **Status**: Pill-shaped, 11px medium (500) uppercase text with 0.5px letter-spacing, 4px 12px padding. Active shows #4ADE80 at 10% opacity fill with #4ADE80 text. Pending shows #FBBF24 at 10% opacity fill with #FBBF24 text. Expired shows #EF4444 at 10% opacity fill with #EF4444 text. Premium shows #C9A84C at 12% opacity fill with #C9A84C text.
+
+### Lists
+
+Transparent background with 1px default-color dividers. Each item has 12px 16px padding and 15px content-secondary text. On hover the background tints to faint warm-white (#F2F0EB at 3% opacity). The active row fills with faint gold (#C9A84C at 6% opacity). Trailing elements include gold badges and chevrons.
+
+### Checkboxes
+
+18px square with 4px rounded corners and a 1px strong border. Unchecked state is transparent. When checked the box fills gold (#C9A84C) with a near-black 2px-stroke checkmark. Focus adds a soft gold glow (glow-gold-sm). Disabled drops to 0.35 opacity.
+
+### Radio Buttons
+
+18px circular with a 1px strong border. Unchecked state is transparent. When selected the border turns gold and an 8px gold inner dot appears. Focus adds a soft gold glow (glow-gold-sm). Disabled drops to 0.35 opacity.
+
+### Tooltips
+
+Overlay surface (#1E1E21) background with content-primary text at 12px, 4px rounded corners, 6px 12px padding, and a 1px default border. A warm small shadow (shadow-warm-sm) provides lift. A 5px arrow matches the background. Maximum width is 220px.
+
+---
+
+## Do's and Don'ts
+
+1. **Do** use gold exclusively for the single most important action or indicator on any screen.
+2. **Don't** apply gold backgrounds to large areas -- gold is an accent, never a fill.
+3. **Do** maintain warm-tinted shadow blacks (#0C0C0E, #161618) instead of cool greys.
+4. **Don't** use bright white (#FFFFFF); always use warm-white (#F2F0EB) for text.
+5. **Do** use Dancing Script only for headings and display text, never for body copy.
+6. **Don't** combine gold glow with colored semantic states -- let each speak alone.
+7. **Do** keep typography light-weight (300-400) for body text to maintain elegance.
+8. **Do** use generous letter-spacing on uppercase labels to convey luxury.
+9. **Don't** crowd elements; luxury demands whitespace and breathing room.
+10. **Do** ensure gold text passes WCAG AA contrast (minimum 4.5:1) against dark surfaces.

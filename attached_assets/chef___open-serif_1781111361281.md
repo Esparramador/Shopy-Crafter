@@ -1,0 +1,75 @@
+# Open Serif
+
+## Overview
+Open Serif is a text-first, encyclopedia-grade design system designed for maximum readability and information density. It embraces a minimalist, utilitarian aesthetic with serif typography, blue hyperlinks, and virtually no decorative elements. Content is king: the system disappears so the knowledge can shine through, accessible to everyone.
+
+## Colors
+- **Primary** (#3366CC): Hyperlinks, interactive text, navigation anchors — Wiki Blue
+- **Primary Hover** (#2A4D99): Visited-style links, hovered interactive text
+- **Secondary** (#6B4BA1): Visited links, previously read content — Wiki Purple
+- **Neutral** (#72777D): Secondary text, metadata, edit timestamps
+- **Background** (#F6F6F6): Page canvas, content background — Wiki Gray
+- **Surface** (#FFFFFF): Article body, content panels, infoboxes
+- **Text Primary** (#202122): Body text, headings, article content — Near Black
+- **Text Secondary** (#54595D): Captions, references, metadata
+- **Border** (#C8CCD1): Section dividers, table borders, infobox outlines
+- **Success** (#14866D): Good article status, verified content indicators
+- **Warning** (#EDAB00): Content disputes, citation needed tags
+- **Error** (#D33): Deletion warnings, blocked content, vandalism alerts
+
+## Typography
+- **Display Font**: Libre Baskerville — loaded from Google Fonts
+- **Body Font**: Source Serif 4 — loaded from Google Fonts
+- **Code Font**: Source Code Pro — loaded from Google Fonts
+
+Libre Baskerville provides classic, authoritative headings reminiscent of traditional encyclopedias. Source Serif 4 handles body text with excellent readability at long-form reading sizes. Use Libre Baskerville 700 for article titles and section headings. Source Serif 4 400 for body, 400 italic for emphasis, 600 for bold inline text. Letter-spacing 0em throughout. Line height 1.65 for body (optimized for long reading), 1.3 for headings.
+
+Type scale:
+- Article Title: 28px / Libre Baskerville 700
+- H2 Section: 22px / Libre Baskerville 700, bottom 1px #C8CCD1 border
+- H3 Subsection: 18px / Libre Baskerville 700
+- H4: 16px / Source Serif 4 600
+- Body: 16px / Source Serif 4 400
+- Caption: 13px / Source Serif 4 400
+- Reference: 12px / Source Serif 4 400
+- Code: 14px / Source Code Pro 400
+
+## Elevation
+Elevation is essentially nonexistent. This design system relies on borders and background color shifts for visual hierarchy rather than shadows. Infoboxes use 1px #C8CCD1 borders. Tables use 1px borders with alternating row backgrounds (#F6F6F6 and #FFFFFF). The only shadow exists on dropdowns: `0 2px 6px rgba(32,33,34,0.1)` for navigation menus. Content should feel flat and printed, like a reference book.
+
+## Components
+- **Buttons**: 32px height, 12px horizontal padding, 2px border-radius, Source Serif 4 400 at 14px. Primary: #3366CC bg, white text. Secondary: #F6F6F6 bg, #202122 text, 1px #C8CCD1 border. Destructive: #D33 bg, white text. Links styled as buttons are rare; prefer inline text links.
+- **Cards**: Infobox style: white bg, 1px #C8CCD1 border, 2px border-radius, 0px padding-top. Header: #EAECF0 bg, 8px 12px padding, Source Serif 4 600. Body: 12px padding. Image top, key-value pairs below with alternating backgrounds.
+- **Inputs**: 32px height, 8px horizontal padding, 2px border-radius, 1px #C8CCD1 border. Focus: 2px #3366CC border. Search input: full-width in header, Source Serif 4 400 at 14px.
+- **Chips**: Not commonly used. When needed: 24px height, 8px horizontal padding, 2px border-radius, #EAECF0 bg, #202122 text at 12px. Categories use inline bracketed links instead.
+- **Lists**: Article table of contents: nested ordered list, 14px, #3366CC links, indented 20px per level, dotted left border #C8CCD1. Content lists: standard HTML list styling, 20px left padding, disc bullets.
+- **Checkboxes**: 16px square, 2px border-radius, 1px #C8CCD1 border. Checked: #3366CC bg, white checkmark. Used sparingly, mainly in editing interfaces.
+- **Tooltips**: White bg, #202122 text at 13px, 2px border-radius, 1px #C8CCD1 border, 8px 10px padding. Used for reference previews on link hover. Max-width 320px with article excerpt.
+- **Navigation**: Left sidebar 256px wide, #F6F6F6 bg, 1px right #C8CCD1 border. Nav links: 14px Source Serif 4 400, #3366CC color, 8px 12px padding, hover #EAECF0 bg. Top header: 48px, white bg, search bar center, user actions right.
+- **Search**: 36px height, full-width in header, 2px radius, 1px #C8CCD1 border, magnifying glass icon right (not left). Focus: 2px #3366CC border. Autocomplete: white bg, 1px border, article title suggestions with namespace prefix.
+
+## Spacing
+- Base unit: 4px
+- Scale: 4, 8, 12, 16, 20, 24, 32, 40, 48
+- Component padding: Buttons 6px 12px, Infoboxes 0px top/12px sides/12px bottom, Inputs 6px 8px
+- Section spacing: 24px between article sections (marked by h2 with bottom border)
+- Container max width: 960px for article body, left-aligned with sidebar
+- Card grid gap: Not applicable; content is single-column prose
+
+## Border Radius
+- 2px: Buttons, inputs, infoboxes, chips, all elements
+- 4px: Dropdowns, search suggestions
+- 8px: Rarely used; only for user-facing modals
+- 9999px: Not used in this system; rounded elements feel out of place
+
+## Do's and Don'ts
+- Do prioritize content density and readability above all visual flourish
+- Do use blue (#3366CC) for all hyperlinks and interactive text consistently
+- Don't add shadows, gradients, or decorative backgrounds to content areas
+- Do use serif fonts for all content; sans-serif would break the encyclopedic tone
+- Don't use large images or hero sections; information architecture comes first
+- Do maintain the flat, printed-page aesthetic; the UI should feel like a reference book
+- Don't use bright accent colors for UI elements; the palette is deliberately muted
+- Do provide a visible table of contents for long-form articles
+- Don't use more than 2px border-radius; sharp corners reinforce the utilitarian feel
+- Do ensure every piece of text meets WCAG AAA contrast standards
