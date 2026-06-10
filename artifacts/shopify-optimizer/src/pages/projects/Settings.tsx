@@ -7,6 +7,7 @@ import { getGetProjectQueryKey } from "@workspace/api-client-react";
 import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Save, Brain, Eye, EyeOff, Copy, Unplug, PlugZap, Trash2 } from "lucide-react";
 import BrainExtractor from "../../components/BrainExtractor";
 import AICapabilitiesPanel from "../../components/AICapabilitiesPanel";
+import BrandDnaExtractor from "../../components/BrandDnaExtractor";
 
 export default function SettingsPage() {
   const [, params] = useRoute("/projects/:id/settings");
@@ -270,6 +271,20 @@ export default function SettingsPage() {
             {testResult.connected ? `Conexión exitosa a ${testResult.storeName}. ${testResult.productCount} productos encontrados.` : `Error de conexión: ${testResult.error}`}
           </div>
         )}
+      </GlassCard>
+
+      {/* ── ADN DE MARCA ─────────────────────────────────────────────── */}
+      <GlassCard className="p-0 overflow-hidden" style={{ border: "1px solid rgba(212,160,23,0.25)" }}>
+        <BrandDnaExtractor
+          projectId={projectId}
+          initialUrl={project?.shopDomain ? (project.shopDomain.includes("://") ? project.shopDomain : `https://${project.shopDomain}`) : ""}
+          projectName={project?.name}
+          onDnaReady={(dna) => {
+            if (dna.companyInfo?.sector) setFormData(prev => ({ ...prev, storeNiche: dna.companyInfo?.sector ?? prev.storeNiche }));
+            if (dna.brandIdentity?.tone) setFormData(prev => ({ ...prev, brandTone: dna.brandIdentity?.tone ?? prev.brandTone }));
+            if (dna.targetAudience?.primary) setFormData(prev => ({ ...prev, targetAudience: dna.targetAudience?.primary ?? prev.targetAudience }));
+          }}
+        />
       </GlassCard>
 
       <form onSubmit={handleSave}>

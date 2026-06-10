@@ -679,21 +679,120 @@ export async function buildShopyBrainContext(
 
 export async function buildBrandDnaContext(projectId: number): Promise<string> {
   try {
-    const [dna] = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId));
-    if (!dna) return "";
+    const [visualDna, brandDnaRows] = await Promise.all([
+      db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId)).catch(() => []),
+      db.execute(sql`SELECT * FROM brand_dna WHERE project_id = ${projectId} ORDER BY extracted_at DESC LIMIT 1`).catch(() => ({ rows: [] })),
+    ]);
 
-    const lines: string[] = ["\n━━━ BRAND DNA — IDENTIDAD VISUAL DEL PROYECTO ━━━"];
-    if (dna.backgroundStyle) lines.push(`Estilo de fondo: ${dna.backgroundStyle}`);
-    if (dna.lightingStyle) lines.push(`Iluminación: ${dna.lightingStyle}`);
-    if (dna.colorTemp) lines.push(`Temperatura de color: ${dna.colorTemp}`);
-    if (dna.composition) lines.push(`Composición: ${dna.composition}`);
-    if (dna.mood) lines.push(`Mood de marca: ${dna.mood}`);
-    if (dna.humanPresence) lines.push(`Presencia humana: ${dna.humanPresence}`);
-    if (dna.brandColors && dna.brandColors.length > 0) lines.push(`Colores de marca: ${dna.brandColors.join(", ")}`);
-    if (dna.props && dna.props.length > 0) lines.push(`Props/accesorios: ${dna.props.join(", ")}`);
-    if (dna.consistencyScore) lines.push(`Score de consistencia: ${dna.consistencyScore}/100`);
-    lines.push("INSTRUCCIÓN: Usa esta identidad visual en TODAS tus recomendaciones de diseño, imágenes, textos y emails. Mantén coherencia de marca.");
-    lines.push("━━━ FIN BRAND DNA ━━━");
+    const dna = visualDna[0] ?? null;
+    const brandRow = brandDnaRows.rows[0] as Record<string, unknown> | undefined ?? null;
+
+    let fullProfile: Record<string, any> | null = null;
+    if (brandRow?.full_profile_json) {
+      try { fullProfile = JSON.parse(brandRow.full_profile_json as string); } catch { /* ignore */ }
+    }
+
+    const lines: string[] = ["\n━━━ ADN DE MARCA — IDENTIDAD COMPLETA DEL PROYECTO ━━━"];
+
+    // — Comprehensive Brand DNA from real extraction —
+    if (fullProfile) {
+      const ci = fullProfile.companyInfo;
+      const bi = fullProfile.brandIdentity;
+      const vi = fullProfile.visualIdentity;
+      const ta = fullProfile.targetAudience;
+      const mp = fullProfile.marketPosition;
+      const cs = fullProfile.contentStrategy;
+      const dp = fullProfile.digitalPresence;
+      const intel = fullProfile.intelligence;
+
+      if (ci?.name) lines.push(`Marca: ${ci.name}`);
+      if (ci?.sector) lines.push(`Sector: ${ci.sector}`);
+      if (ci?.description) lines.push(`Empresa: ${ci.description}`);
+      if (ci?.location) lines.push(`Ubicación: ${ci.location}`);
+
+      if (fullProfile.services?.length) {
+        lines.push(`Servicios/Productos: ${(fullProfile.services as any[]).map((s: any) => s.name).join(", ")}`);
+      }
+
+      if (bi) {
+        if (bi.archetype) lines.push(`Arquetipo de marca: ${bi.archetype}`);
+        if (bi.tone) lines.push(`Tono de voz: ${bi.tone}`);
+        if (bi.personality?.length) lines.push(`Personalidad: ${bi.personality.join(", ")}`);
+        if (bi.values?.length) lines.push(`Valores de marca: ${bi.values.join(", ")}`);
+        if (bi.uniqueValueProposition) lines.push(`UVP: "${bi.uniqueValueProposition}"`);
+        if (bi.taglines?.length) lines.push(`Taglines: ${bi.taglines.map((t: string) => `"${t}"`).join(", ")}`);
+        if (bi.messagingPillars?.length) lines.push(`Pilares de mensaje: ${bi.messagingPillars.join(" | ")}`);
+      }
+
+      if (vi) {
+        if (vi.primaryColors?.length) lines.push(`Colores primarios: ${vi.primaryColors.join(", ")}`);
+        if (vi.typographyStyle) lines.push(`Tipografía: ${vi.typographyStyle}`);
+        if (vi.layoutPattern) lines.push(`Layout: ${vi.layoutPattern}`);
+        if (vi.photographyStyle) lines.push(`Fotografía: ${vi.photographyStyle}`);
+        if (vi.aestheticKeywords?.length) lines.push(`Estética: ${vi.aestheticKeywords.join(", ")}`);
+      }
+
+      if (ta) {
+        if (ta.primary) lines.push(`Audiencia objetivo: ${ta.primary}`);
+        if (ta.demographics?.ageRange) lines.push(`Edad: ${ta.demographics.ageRange}, Género: ${ta.demographics.gender ?? ""}, Nivel: ${ta.demographics.income ?? ""}`);
+        if (ta.painPoints?.length) lines.push(`Pain points que resuelve: ${ta.painPoints.join(", ")}`);
+        if (ta.desires?.length) lines.push(`Aspiraciones del cliente: ${ta.desires.join(", ")}`);
+      }
+
+      if (mp) {
+        if (mp.pricePoint) lines.push(`Posicionamiento precio: ${mp.pricePoint}`);
+        if (mp.competitiveAdvantage) lines.push(`Ventaja competitiva: ${mp.competitiveAdvantage}`);
+      }
+
+      if (cs) {
+        if (cs.contentPillars?.length) lines.push(`Pilares de contenido: ${cs.contentPillars.join(", ")}`);
+        if (cs.ctaStyle) lines.push(`Estilo CTA: ${cs.ctaStyle}`);
+        if (cs.copywritingStyle) lines.push(`Estilo de copy: ${cs.copywritingStyle}`);
+        if (cs.keyMessages?.length) lines.push(`Mensajes clave: ${cs.keyMessages.join(" | ")}`);
+      }
+
+      if (dp?.socialHandles?.length) {
+        lines.push(`Redes sociales: ${(dp.socialHandles as any[]).map((h: any) => `${h.platform}:${h.handle}`).join(", ")}`);
+      }
+
+      if (intel?.contentPersonalizationGuide) {
+        lines.push(`GUÍA DE CONTENIDO: ${intel.contentPersonalizationGuide}`);
+      }
+    } else {
+      // Fallback to basic brand_dna columns
+      if (brandRow) {
+        if (brandRow.sector) lines.push(`Sector: ${brandRow.sector}`);
+        if (brandRow.tone_of_voice) lines.push(`Tono de voz: ${brandRow.tone_of_voice}`);
+        if (brandRow.brand_personality) lines.push(`Personalidad: ${brandRow.brand_personality}`);
+        if (brandRow.target_audience) lines.push(`Audiencia: ${brandRow.target_audience}`);
+        if (brandRow.unique_value_proposition) lines.push(`UVP: "${brandRow.unique_value_proposition}"`);
+        if (brandRow.brand_archetype) lines.push(`Arquetipo: ${brandRow.brand_archetype}`);
+        if (brandRow.primary_colors && (brandRow.primary_colors as string[]).length) {
+          lines.push(`Colores: ${(brandRow.primary_colors as string[]).join(", ")}`);
+        }
+        if (brandRow.brand_values && (brandRow.brand_values as string[]).length) {
+          lines.push(`Valores: ${(brandRow.brand_values as string[]).join(", ")}`);
+        }
+        if (brandRow.content_pillars && (brandRow.content_pillars as string[]).length) {
+          lines.push(`Pilares de contenido: ${(brandRow.content_pillars as string[]).join(", ")}`);
+        }
+        if (brandRow.competitive_position) lines.push(`Posición competitiva: ${brandRow.competitive_position}`);
+      }
+    }
+
+    // — Visual DNA (photographic style) —
+    if (dna) {
+      if (dna.backgroundStyle) lines.push(`Fondo fotográfico: ${dna.backgroundStyle}`);
+      if (dna.lightingStyle) lines.push(`Iluminación: ${dna.lightingStyle}`);
+      if (dna.colorTemp) lines.push(`Temperatura de color: ${dna.colorTemp}`);
+      if (dna.mood) lines.push(`Mood visual: ${dna.mood}`);
+      if (dna.brandColors?.length) lines.push(`Colores visuales: ${dna.brandColors.join(", ")}`);
+    }
+
+    if (lines.length <= 1) return "";
+
+    lines.push("\nINSTRUCCIÓN CRÍTICA: Usa esta identidad de marca en TODO el contenido generado — textos, imágenes, prompts, emails, anuncios, descripciones. El tono, los colores, los valores y el arquetipo deben estar SIEMPRE presentes. NO generes contenido genérico — personaliza al 100% a este ADN de marca.");
+    lines.push("━━━ FIN ADN DE MARCA ━━━");
     return lines.join("\n");
   } catch {
     return "";

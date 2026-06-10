@@ -53,6 +53,7 @@ import charactersRouter from "./characters.js";
 import cardsRouter from "./cards.js";
 import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
+import brandDnaRouter from "./brand-dna.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -139,5 +140,6 @@ router.use(charactersRouter);
 router.use(cardsRouter);
 router.use(reportTemplatesRouter);
 router.use(billingRouter);
+router.use(brandDnaRouter);
 
 export default router;
