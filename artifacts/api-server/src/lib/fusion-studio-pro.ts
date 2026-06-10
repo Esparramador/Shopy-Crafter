@@ -193,7 +193,9 @@ export async function generateImage(
       model: "gpt-image-1",
       prompt,
       size,
-    });
+      quality: "high",
+      n: 1,
+    } as any);
     const base64 = response.data?.[0]?.b64_json;
     if (!base64) throw new Error("gpt-image-1 no devolvió imagen");
     return { buffer: Buffer.from(base64, "base64"), mimeType: "image/png", model };
@@ -794,7 +796,7 @@ export function modelSupportsTextToVideo(model: VideoModel): boolean {
  *   - removes CTA-shaped imperatives ("buy now", "compra ya", "click here")
  *   - removes price tokens ("$19.99", "19,99 €")
  *   - appends a hard ANTI_TEXT instruction tail
- * It runs once before EVERY provider call so cinematic / hanakaze / quick-ad
+ * It runs once before EVERY provider call so cinematic / quick-ad / custom
  * paths cannot silently regress.
  */
 const FSP_ANTI_TEXT_TAIL = " ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO LOGOS, NO BRAND NAMES, NO CAPTIONS, NO SUBTITLES, NO WATERMARKS, NO TYPOGRAPHY of any kind on any surface. Strict design fidelity, no morphing, no flicker.";
@@ -851,7 +853,7 @@ export async function generateVideoFromImage(
     throw new Error(`Modelo "${model}" requiere imagen origen (no soporta text-to-video puro)`);
   }
   // Centralized anti-text-leak guard — strips brand quotes / CTAs / prices
-  // from ANY upstream prompt (cinematic, hanakaze, custom briefs).
+  // from ANY upstream prompt (cinematic, custom briefs).
   prompt = sanitizeVideoPrompt(prompt);
   // Apply camera preset prompt prefix if requested (Pollo-style cinematic
   // grammar). Preset is a no-op when unknown/empty.

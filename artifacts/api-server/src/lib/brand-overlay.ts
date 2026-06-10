@@ -7,9 +7,9 @@
  *   ONLY reliable production pattern is to forbid text in the AI prompt and
  *   then BURN the brand layer afterwards with FFmpeg drawtext + overlay.
  *
- *   This is exactly the same separation Hanakaze v3 uses, the same pattern
- *   Reels/Shorts/TikTok captions use, the same approach Apple Keynote and
- *   Netflix subtitles use, and the same approach `adstudio.ts` already uses
+ *   This is exactly the same separation Reels/Shorts/TikTok captions use,
+ *   the same approach Apple Keynote and Netflix subtitles use, and the same
+ *   approach `adstudio.ts` already uses
  *   for the brand+CTA pair. This module generalises it for ANY layer set:
  *   brand name, tagline, social handles (@instagram / @tiktok / @x / …),
  *   URL / Shopify store, custom CTA, and a logo PNG composite — each with

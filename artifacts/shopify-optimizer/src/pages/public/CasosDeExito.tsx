@@ -11,7 +11,7 @@ const CASES = [
     highlight: "+340%",
   },
   {
-    name: "Hanakaze Serigrafía",
+    name: "Sakura Studio",
     niche: "Camisetas estampadas Japón-inspired",
     before: "Web sin tráfico orgánico",
     after: "Top 3 Google para 18 keywords del nicho, +210% sesiones, 4× conversión",

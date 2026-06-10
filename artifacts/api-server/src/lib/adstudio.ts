@@ -118,7 +118,7 @@ export interface AdCampaignInput {
 // The AI video models (Runway Gen-4, Kling, Seedance, Hailuo, etc.) routinely
 // hallucinate misspelled text, garbled brand names, and incoherent captions
 // when asked to render typography. To deliver production-grade ads we follow
-// the same rule used by the Hanakaze v3 master pipeline:
+// the same rule used by all production-grade video ad pipelines:
 //   1) instruct the model to render ABSOLUTELY NO text/logos/captions
 //   2) burn the brand label and CTA in afterwards with FFmpeg drawtext using
 //      DejaVu Sans Bold so spelling is guaranteed and typography is crisp.
@@ -126,7 +126,7 @@ export interface AdCampaignInput {
 const DEJAVU_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
 
 /** Strict instruction we append to every video-model prompt to suppress text
- *  hallucinations and design drift. Same wording used by Hanakaze v3 master. */
+ *  hallucinations and design drift. */
 const ANTI_TEXT_AND_FIDELITY = [
   "STRICT DESIGN FIDELITY: every garment, product and surface is a solid",
   "rigid object that never deconstructs, recolors, morphs, melts or redraws",
@@ -156,7 +156,7 @@ const VIDEO_NEGATIVE_PROMPT = [
  * with purely visual cues: tone (atmosphere), category (subject), template
  * camera preset (motion), aspect (framing). The ad's actual message is
  * delivered separately by (a) the voiceover, and (b) the FFmpeg drawtext
- * overlay for brand and CTA. This is the same separation Hanakaze v3 uses.
+ * overlay for brand and CTA.
  */
 function escapeRegexAd(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -183,7 +183,7 @@ function buildVisualVideoPrompt(
   ].filter((s): s is string => typeof s === "string" && s.trim().length >= 2);
 
   // Build raw subject from category, then strip every forbidden token from it
-  // (catalogs commonly stuff "Hanakaze Sakura t-shirt" into productCategory).
+  // (catalogs commonly stuff brand names into productCategory).
   let subject = (input.productCategory || "product").replace(/[^a-zA-Z0-9 ,.-]/g, "").slice(0, 80);
   for (const tk of forbidden) {
     try { subject = subject.replace(new RegExp(escapeRegexAd(tk), "gi"), " "); } catch { /* skip */ }

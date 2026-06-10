@@ -662,6 +662,27 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - generate_export: Generar un informe/export (HTML, CSV, PDF). Params: {projectId, reportType ("seo-audit"|"product-catalog"|"financial"|"brand-brief"|"ab-tests"|"images-gallery"|"competitors"|"consistency"|"inventory"|"redesigns"|"revenue"|"complete-report"|"csv/products")}
   - run_full_audit_report: Ejecutar auditoría completa y guardar informe. Params: {projectId}
   - generate_ai_report: Generar informe estratégico con IA. Params: {projectId, sections?}
+  - create_business_card: Crear tarjeta de presentación profesional con IA (Card Studio). Pipeline 5 capas: fondo IA/CSS, logo overlay, texto vectorial, QR vCard, composición Sharp 300DPI. Exporta PNG + PDF. Params: {projectId, name (nombre de la tarjeta), fullName?, jobTitle?, companyName?, tagline?, email?, phone?, website?, socialHandle?, address?, templateId? ("black-gold"|"white-clean"|"jade-dark"|"minimal-light"|"neon-cyber"|"wood-craft"|"marble-luxury"|"deep-space"), layout? ("centered"|"left"|"grid"), backgroundModel? ("recraft-v3"|"gpt-image-1"|"imagen-4"|"flux-dev"), qrUrl?, generateCard? (default true)}
+  - list_business_cards: Listar tarjetas de presentación de un proyecto. Params: {projectId}
+  - generate_business_card_image: Regenerar imagen de una tarjeta existente con IA. Params: {projectId, cardId, backgroundModel?}
+  
+  ── 🎨 FUSION STUDIO PRO (14 módulos de creación visual IA) ──
+  FusionStudioPro es el estudio creativo completo en /projects/:id/fusion-studio-pro con 14 pestañas:
+  • Quick Image: Generación rápida con cualquier modelo (gpt-image-1, recraft-v3, flux-dev, imagen-4, nano-banana, seedream-4)
+  • Batch Studio: Generación masiva en paralelo (hasta 16 imágenes simultáneas)
+  • Video Studio: Clips de vídeo IA (kling-2.1, kling-master, runway-gen4, seedance-pro, veo-3, hailuo)
+  • Multishot Ad: Anuncio cinematográfico multi-escena con música y voz
+  • Avatar Studio: Personajes fotorealistas y animados con Character Lock
+  • Image Edit: Edición con referencias múltiples (flux-kontext, seedream-4, nano-banana)
+  • Long Ad: Anuncios largos 1-20 min con director IA
+  • Campaign Kit: Kits completos de campaña (hero + post + story + email)
+  • Consistency: Generación consistente con misma identidad visual
+  • Style Transfer: Aplicar estilo de imagen a producto
+  • Product Photo: Estudio de foto de producto profesional
+  • Exploded View: Vista explosionada de componentes
+  • Brand Video: Vídeo de marca con narración y música
+  • Ad Studio: Anuncios rápidos para redes sociales
+  Para generar imágenes/vídeo desde el chatbot usa create_long_ad o create_brand_ad. Para guiar al usuario al studio dile la URL exacta.
   
   ── 🎬 ANUNCIOS LARGOS (3-20 min) Y PERSONAJES BLOQUEADOS ──
   - list_characters: Listar personajes guardados (Character Lock para anuncios). Params: {projectId}
@@ -764,6 +785,10 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Lab web / analizar diseño web / analizar esta web / extraer css de / auditar diseño de / mejorar diseño de / analiza el diseño / extrae el código de / lab de diseño / análisis de diseño web → analyze_web_design (pide la URL si no la proporcionó)
   - Fusion Studio / analizar imagen / descomponer imagen / crear producto desde imagen / imagen de producto → fusion_analyze (analiza imagen y extrae componentes). Params: {imageUrl, projectId?}
   - Crear producto desde imagen / Fusion crear / producto desde foto / producto desde imagen → fusion_create_product (analiza imagen y crea producto en Shopify). Params: {projectId, imageUrl, title?, price?}
+  - Tarjeta de presentación / business card / tarjeta corporativa / tarjeta de visita / tarjeta digital / card studio / diseñar tarjeta / crear tarjeta / generar tarjeta → create_business_card (crea tarjeta profesional con IA, pipeline 5 capas, exporta PNG+PDF). Pide los datos necesarios: nombre completo, cargo, empresa, email, teléfono, web, etc.
+  - Listar tarjetas / ver tarjetas / mis tarjetas / tarjetas del proyecto → list_business_cards
+  - Regenerar imagen tarjeta / nueva imagen tarjeta / actualizar tarjeta / re-generar tarjeta → generate_business_card_image
+  - Ir a Card Studio / abrir Card Studio / quiero ir al studio de tarjetas → directamente di la ruta: /projects/{projectId}/cards
   - Informe por niveles / informe nivel 2 / generar nivel 3 / report nivel / informe profesional / informe enterprise → run_leveled_report (genera informe con sistema de 5 niveles). Params: {projectId, type (tipo de informe), level (1-5), template?}
   - Subir archivo / procesar archivo / analizar archivo / importar archivo / CSV / PDF / Excel → upload_file (procesa archivo subido). Params: {fileContext? (descripción del archivo)}
   
@@ -781,6 +806,8 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   • COLECCIONES TOTAL: Crear/editar/eliminar colecciones (custom y smart), añadir/quitar productos, ver productos, descripción SEO, imagen, ordenación
   • VARIANTES Y STOCK: Ver/añadir/editar/eliminar variantes, actualizar stock individual y masivo, SKU, códigos de barras, precios por variante
   • INVENTARIO: Sincronización, alertas de stock bajo, restock emails a proveedores, analytics de ventas
+  • TARJETAS DE PRESENTACIÓN: Card Studio — diseño profesional 5 capas, QR, logo, 300DPI, exporta PNG+PDF
+  • FUSION STUDIO PRO: 14 módulos creativos IA (imágenes, vídeo, multishot, avatares, batch, brand ads, etc.)
   • PROPUESTAS COMERCIALES: Presupuestos y propuestas para clientes
   • CMS COMPLETO: Editar toda la landing, precios, textos, colores de la app
   • ADMIN TOTAL: Gestión de usuarios/clientes, invitaciones, mensajes, aprobaciones, audit log
@@ -10077,7 +10104,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         // ── ANUNCIO DE MARCA (sin producto Shopify específico) ────────────────
         // Equivalente al script v3 cascada del runner pero invocable desde el chat.
         // Usa cinematic-multishot directamente: refs imagen → N clips → voz → música → concat.
-        // Sirve para campañas brand puras (Hanakaze, drops, branding general) donde no
+        // Sirve para campañas brand puras (drops, branding general) donde no
         // hay productId Shopify pero sí imágenes de referencia y un brief.
         case "create_brand_ad": {
           const projectId = parseInt(String(params?.projectId || ""), 10);
@@ -10158,6 +10185,122 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             };
           } catch (err) {
             result = { error: true, message: `❌ Error generando anuncio brand: ${err instanceof Error ? err.message : String(err)}` };
+          }
+          break;
+        }
+
+        // ── CARD STUDIO ────────────────────────────────────────────────────────
+        case "create_business_card": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          if (!projectId) { result = { error: true, message: "❌ projectId requerido" }; break; }
+          const port = process.env.PORT || "8080";
+          const cookie = req.headers.cookie || "";
+          const cardPayload = {
+            projectId,
+            name: String(params?.name || "Mi tarjeta").slice(0, 80),
+            fullName: params?.fullName ? String(params.fullName) : undefined,
+            jobTitle: params?.jobTitle ? String(params.jobTitle) : undefined,
+            companyName: params?.companyName ? String(params.companyName) : undefined,
+            tagline: params?.tagline ? String(params.tagline) : undefined,
+            email: params?.email ? String(params.email) : undefined,
+            phone: params?.phone ? String(params.phone) : undefined,
+            website: params?.website ? String(params.website) : undefined,
+            socialHandle: params?.socialHandle ? String(params.socialHandle) : undefined,
+            address: params?.address ? String(params.address) : undefined,
+            templateId: params?.templateId ? String(params.templateId) : "black-gold",
+            layout: params?.layout ? String(params.layout) : "centered",
+            qrUrl: params?.qrUrl ? String(params.qrUrl) : undefined,
+          };
+          try {
+            const createRes = await fetch(`http://127.0.0.1:${port}/api/cards`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "cookie": cookie },
+              body: JSON.stringify(cardPayload),
+            });
+            if (!createRes.ok) {
+              const err = await createRes.json().catch(() => ({} as any)) as any;
+              result = { error: true, message: `❌ Error creando tarjeta: ${err.error || createRes.statusText}` };
+              break;
+            }
+            const card = await createRes.json() as any;
+            const shouldGenerate = params?.generateCard !== false;
+            if (shouldGenerate) {
+              const genRes = await fetch(`http://127.0.0.1:${port}/api/cards/${card.id}/generate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "cookie": cookie },
+                body: JSON.stringify({ backgroundModel: params?.backgroundModel }),
+              });
+              if (genRes.ok) {
+                const genData = await genRes.json() as any;
+                result = {
+                  ok: true, cardId: card.id,
+                  frontImageUrl: genData.card?.frontImageUrl,
+                  backImageUrl: genData.card?.backImageUrl,
+                  cost: genData.cost,
+                  message: `🃏✅ **Tarjeta de presentación creada y generada**\n\n📋 Card #${card.id}: "${card.name}"\n👤 ${cardPayload.fullName || "(sin nombre)"} · ${cardPayload.jobTitle || ""} · ${cardPayload.companyName || ""}\n💰 Coste generación: $${genData.cost?.toFixed(4) || "0.00"}\n\n➡️ Ve a **Card Studio** para ver y descargar (PNG + PDF): /projects/${projectId}/cards`,
+                };
+              } else {
+                result = { ok: true, cardId: card.id, message: `🃏 **Tarjeta creada** (Card #${card.id}: "${card.name}"). La generación de imagen falló — ve a **Card Studio** para generarla: /projects/${projectId}/cards` };
+              }
+            } else {
+              result = { ok: true, cardId: card.id, message: `🃏✅ **Tarjeta creada** (Card #${card.id}: "${card.name}"). Usa generate_business_card_image para generar la imagen cuando quieras.` };
+            }
+          } catch (err) {
+            result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` };
+          }
+          break;
+        }
+
+        case "list_business_cards": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          if (!projectId) { result = { error: true, message: "❌ projectId requerido" }; break; }
+          const port = process.env.PORT || "8080";
+          const cookie = req.headers.cookie || "";
+          try {
+            const listRes = await fetch(`http://127.0.0.1:${port}/api/cards?projectId=${projectId}`, {
+              headers: { "cookie": cookie },
+            });
+            if (!listRes.ok) { result = { error: true, message: "❌ Error listando tarjetas" }; break; }
+            const cards = await listRes.json() as any[];
+            result = {
+              ok: true, count: cards.length, cards,
+              message: cards.length === 0
+                ? `🃏 No hay tarjetas de presentación en el proyecto ${projectId}. Usa create_business_card para crear una.`
+                : `🃏 **${cards.length} tarjeta(s) de presentación**:\n\n${cards.slice(0, 10).map((c: any) => `• Card #${c.id}: "${c.name}" — ${c.fullName || "Sin nombre"} · ${c.companyName || "Sin empresa"} · Template: ${c.templateId}`).join("\n")}\n\n➡️ Card Studio: /projects/${projectId}/cards`,
+            };
+          } catch (err) {
+            result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` };
+          }
+          break;
+        }
+
+        case "generate_business_card_image": {
+          const projectId = parseInt(String(params?.projectId || ""), 10);
+          const cardId = parseInt(String(params?.cardId || ""), 10);
+          if (!cardId) { result = { error: true, message: "❌ cardId requerido" }; break; }
+          const port = process.env.PORT || "8080";
+          const cookie = req.headers.cookie || "";
+          try {
+            const genRes = await fetch(`http://127.0.0.1:${port}/api/cards/${cardId}/generate`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "cookie": cookie },
+              body: JSON.stringify({ backgroundModel: params?.backgroundModel }),
+            });
+            if (!genRes.ok) {
+              const err = await genRes.json().catch(() => ({} as any)) as any;
+              result = { error: true, message: `❌ Error generando imagen: ${err.error || genRes.statusText}` };
+              break;
+            }
+            const genData = await genRes.json() as any;
+            result = {
+              ok: true, cardId,
+              cost: genData.cost,
+              frontImageUrl: genData.card?.frontImageUrl,
+              backImageUrl: genData.card?.backImageUrl,
+              message: `🃏✅ **Imagen generada** para Card #${cardId}\n💰 Coste: $${genData.cost?.toFixed(4) || "0.00"}\n\n➡️ Card Studio${projectId ? ` /projects/${projectId}/cards` : ""} para ver y descargar (PNG + PDF).`,
+            };
+          } catch (err) {
+            result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` };
           }
           break;
         }

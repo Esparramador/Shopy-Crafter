@@ -2643,7 +2643,7 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
           />
         </Section>
         <Section title="Marca (opcional)">
-          <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej: Hanakaze, Nike, Apple…" style={inputStyle} />
+          <input value={brand} onChange={e => setBrand(e.target.value)} placeholder="Ej: Zara, Nike, Apple…" style={inputStyle} />
         </Section>
         <Section title="Contexto extra (audiencia, USP, restricciones)">
           <textarea

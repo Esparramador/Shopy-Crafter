@@ -80,6 +80,7 @@ const UniversalGenerator = lazy(() => import("@/pages/projects/UniversalGenerato
 const Suppliers = lazy(() => import("@/pages/projects/Suppliers"));
 const WebLab = lazy(() => import("@/pages/projects/WebLab"));
 const FusionStudio = lazy(() => import("@/pages/projects/FusionStudio"));
+const FusionStudioPro = lazy(() => import("@/pages/projects/FusionStudioPro"));
 const CardStudio = lazy(() => import("@/pages/projects/CardStudio"));
 const CampaignKit = lazy(() => import("@/pages/projects/CampaignKit"));
 const ExplodedViewStudio = lazy(() => import("@/pages/projects/ExplodedViewStudio"));
@@ -453,7 +454,7 @@ function Router() {
           <RequireAdmin><AdminWrapper><AppLayout><S><FusionStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/fusion-studio-pro">
-          <RequireAdmin><AdminWrapper><AppLayout><S><FusionStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><FusionStudioPro /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/ad-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><AdStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
@@ -506,6 +507,9 @@ function Router() {
         </Route>
         <Route path="/fusion-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><FusionStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/fusion-studio-pro">
+          <RequireAdmin><AdminWrapper><AppLayout><S><FusionStudioPro /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/cards">
           <RequireAdmin><AdminWrapper><AppLayout><S><CardStudio /></S></AppLayout></AdminWrapper></RequireAdmin>

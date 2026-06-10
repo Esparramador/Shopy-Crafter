@@ -168,7 +168,7 @@ export default function UniversalSearch() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {[
             { text: "comic-crafter.myshopify.com", icon: "🛒" },
-            { text: "@hanakazeserigraphy", icon: "📸" },
+            { text: "@tu-tienda", icon: "📸" },
             { text: "zara.com/es", icon: "🌐" },
             { text: "Nike España", icon: "🏢" },
           ].map(ex => (
