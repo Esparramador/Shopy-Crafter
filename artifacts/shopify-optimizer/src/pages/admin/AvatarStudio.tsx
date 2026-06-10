@@ -77,7 +77,10 @@ const IMAGE_MODELS = [
   { id: "flux-1.1-pro",           label: "Flux 1.1 Pro ($0.04)" },
   { id: "flux-kontext-pro",       label: "Flux Kontext Pro · consistencia ($0.05)" },
   { id: "flux-kontext-max",       label: "Flux Kontext Max · premium ($0.07)" },
-  { id: "gpt-image-1",            label: "OpenAI gpt-image-1 · alta ($0.04)" },
+  { id: "gpt-image-2",            label: "OpenAI gpt-image-2 · flagship 2026 ($0.05)" },
+  { id: "gpt-image-1.5",         label: "OpenAI gpt-image-1.5 · -20% precio ($0.03)" },
+  { id: "gpt-image-1",           label: "OpenAI gpt-image-1 · clásico ($0.04)" },
+  { id: "gpt-image-1-mini",      label: "OpenAI gpt-image-1 mini · rápido ($0.02)" },
   // Economy / creativo
   { id: "flux-kontext-dev",       label: "Flux Kontext Dev · artístico ($0.03)" },
   { id: "imagen-4-fast",          label: "Imagen 4 Fast ($0.02)" },

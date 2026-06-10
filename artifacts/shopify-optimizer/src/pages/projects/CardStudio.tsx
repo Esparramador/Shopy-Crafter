@@ -87,7 +87,10 @@ const BG_MODELS = [
   { id: "flux-kontext-pro",       label: "Flux Kontext Pro · consistencia ($0.05)", tier: "balanced" },
   { id: "flux-kontext-max",       label: "Flux Kontext Max · premium ($0.07)",      tier: "balanced" },
   { id: "nano-banana",            label: "Gemini 2.5 Flash Image ($0.04)",          tier: "balanced" },
-  { id: "gpt-image-1",            label: "OpenAI gpt-image-1 · alta ($0.04)",       tier: "balanced" },
+  { id: "gpt-image-2",            label: "OpenAI gpt-image-2 · flagship 2026 ($0.05)", tier: "balanced" },
+  { id: "gpt-image-1.5",         label: "OpenAI gpt-image-1.5 · -20% precio ($0.03)", tier: "balanced" },
+  { id: "gpt-image-1",           label: "OpenAI gpt-image-1 · clásico ($0.04)",       tier: "balanced" },
+  { id: "gpt-image-1-mini",      label: "OpenAI gpt-image-1 mini · rápido ($0.02)",   tier: "economy" },
   // Economy / creativo
   { id: "flux-kontext-dev",       label: "Flux Kontext Dev · artístico ($0.03)",    tier: "economy" },
   { id: "imagen-4-fast",          label: "Imagen 4 Fast ($0.02)",                   tier: "economy" },

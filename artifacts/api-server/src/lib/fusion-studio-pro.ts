@@ -121,7 +121,10 @@ export type ImageGenModel =
   | "flux-kontext-pro"          // Flux Kontext Pro — character/style consistency
   | "flux-kontext-max"          // Flux Kontext Max — máxima calidad, consistencia premium
   | "flux-kontext-dev"          // Flux Kontext Dev — open-weights, edición artística
-  | "gpt-image-1";              // OpenAI gpt-image-1 (vía Replit AI Integrations)
+  | "gpt-image-1"              // OpenAI gpt-image-1 (vía Replit AI Integrations)
+  | "gpt-image-2"              // OpenAI gpt-image-2 — flagship abril 2026, razonamiento integrado
+  | "gpt-image-1.5"            // OpenAI gpt-image-1.5 — 20% más barato que v1, misma calidad
+  | "gpt-image-1-mini";        // OpenAI gpt-image-1 mini — presupuesto, alta velocidad
 
 // ImageProvider explícito para health-check / fallback automático en frontend.
 export type ImageProvider = "replicate" | "gemini" | "runway" | "openai";
@@ -145,7 +148,10 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "flux-kontext-dev":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-dev",   description: "Flux Kontext Dev — open-weights, edición artística creativa", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
   "recraft-v4":             { provider: "replicate", replicateId: "recraft-ai/recraft-v4",                description: "Recraft V4 — última generación, texto nítido + realismo máximo", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
   "ideogram-v3-quality":    { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-quality",      description: "Ideogram V3 Quality — máxima calidad texto en imagen + photoreal", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
-  "gpt-image-1":            { provider: "openai",                                                          description: "OpenAI gpt-image-1 — render limpio, manejo de texto, vía Replit AI Integrations", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
+  "gpt-image-1":            { provider: "openai", description: "OpenAI gpt-image-1 — render limpio, manejo de texto", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
+  "gpt-image-2":            { provider: "openai", description: "OpenAI gpt-image-2 — flagship 2026, razonamiento integrado, máxima calidad fotorrealista", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3","21:9"], maxResolution: "1536x864 (flex)" },
+  "gpt-image-1.5":          { provider: "openai", description: "OpenAI gpt-image-1.5 — 20% más barato que v1, calidad equivalente", costPerImage: 0.033, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
+  "gpt-image-1-mini":       { provider: "openai", description: "OpenAI gpt-image-1 mini — presupuesto, alta velocidad, ideal para volumen", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1024x1024" },
 };
 
 // Modelos de edición de imagen mapeados a provider para el health-check.
@@ -175,11 +181,23 @@ export async function generateImage(
   if (!cfg) throw new Error(`Modelo de imagen desconocido: ${model}`);
   const aspect = opts.aspectRatio && cfg.aspectRatios.includes(opts.aspectRatio) ? opts.aspectRatio : cfg.aspectRatios[0];
 
-  // ── OpenAI gpt-image-1 (vía Replit AI Integrations)
-  if (model === "gpt-image-1") {
+  // ── OpenAI GPT Image family (gpt-image-1 / 1.5 / 1-mini / 2) vía Replit AI Integrations
+  if (model === "gpt-image-1" || model === "gpt-image-2" || model === "gpt-image-1.5" || model === "gpt-image-1-mini") {
     const { openai } = await import("@workspace/integrations-openai-ai-server");
-    // gpt-image-1 sólo soporta 1024x1024, 1536x1024 (landscape), 1024x1536 (portrait), auto
-    const sizeMap: Record<string, "1024x1024" | "1536x1024" | "1024x1536"> = {
+
+    // gpt-image-2 soporta tamaños flexibles (WxH divisible por 16, ratio 1:3 a 3:1)
+    // gpt-image-1 / 1.5 / mini: sólo 1024x1024, 1536x1024, 1024x1536
+    const gpt2SizeMap: Record<string, string> = {
+      "1:1":  "1024x1024",
+      "16:9": "1536x864",
+      "3:2":  "1536x1024",
+      "4:3":  "1280x960",
+      "9:16": "864x1536",
+      "2:3":  "1024x1536",
+      "3:4":  "960x1280",
+      "21:9": "2016x864",
+    };
+    const stdSizeMap: Record<string, string> = {
       "1:1":  "1024x1024",
       "16:9": "1536x1024",
       "3:2":  "1536x1024",
@@ -188,16 +206,22 @@ export async function generateImage(
       "2:3":  "1024x1536",
       "3:4":  "1024x1536",
     };
-    const size = sizeMap[aspect] || "1024x1024";
+    const size = model === "gpt-image-2"
+      ? (gpt2SizeMap[aspect] || "1024x1024")
+      : (stdSizeMap[aspect]  || "1024x1024");
+
+    // gpt-image-2 usa quality "medium" por defecto (high=$0.211/img); mini usa "high" (solo $0.052)
+    const quality = model === "gpt-image-2" ? "medium" : "high";
+
     const response = await openai.images.generate({
-      model: "gpt-image-1",
+      model,
       prompt,
       size,
-      quality: "high",
+      quality,
       n: 1,
     } as any);
     const base64 = response.data?.[0]?.b64_json;
-    if (!base64) throw new Error("gpt-image-1 no devolvió imagen");
+    if (!base64) throw new Error(`${model} no devolvió imagen`);
     return { buffer: Buffer.from(base64, "base64"), mimeType: "image/png", model };
   }
 
