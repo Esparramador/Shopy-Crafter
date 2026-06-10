@@ -149,3 +149,212 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ================================================================
+   AI DECORATIVE COLOR TOKENS — Sistema de colores IA (Visme-inspired)
+   Para badges, highlights y elementos de identidad AI en la plataforma
+   ================================================================ */
+:root {
+  --sc-ai-azure: #3b80e4;
+  --sc-ai-azure-light: rgba(59, 128, 228, 0.12);
+  --sc-ai-purple: #9747ff;
+  --sc-ai-purple-light: rgba(151, 71, 255, 0.12);
+  --sc-ai-indigo: #5f46d8;
+  --sc-ai-violet: #462bca;
+  --sc-ai-cyan: #06b6d4;
+  --sc-ai-cyan-light: rgba(6, 182, 212, 0.12);
+  --sc-ai-emerald: #10b981;
+  --sc-ai-emerald-light: rgba(16, 185, 129, 0.12);
+  --sc-ai-gold: #d4a843;
+  --sc-ai-gold-light: rgba(212, 168, 67, 0.12);
+
+  /* Visme Forms Theming Pattern — CSS vars para formularios generados */
+  --sc-forms-button-bg:          #5b4eff;
+  --sc-forms-button-color:       #ffffff;
+  --sc-forms-button-radius:      10px;
+  --sc-forms-button-font-size:   16px;
+  --sc-forms-button-font-weight: 600;
+  --sc-forms-button-padding:     12px 28px;
+  --sc-forms-card-bg:            rgba(15, 15, 26, 0.88);
+  --sc-forms-card-radius:        18px;
+  --sc-forms-card-shadow:        0 8px 32px rgba(0,0,0,0.35);
+  --sc-forms-heading-color:      #ffffff;
+  --sc-forms-heading-font-size:  32px;
+  --sc-forms-heading-font-weight:700;
+  --sc-forms-input-bg:           rgba(255,255,255,0.08);
+  --sc-forms-input-border:       1px solid rgba(255,255,255,0.12);
+  --sc-forms-input-color:        #ffffff;
+  --sc-forms-input-radius:       8px;
+  --sc-forms-bg:                 #08080f;
+}
+
+/* ================================================================
+   MULTI-STEP ANIMATION ENGINE — Motor de animación por pasos
+   Inspirado en el sistema cubic-bezier de Visme (extraído 2026-06)
+   Uso: añadir .step-slide a cada panel, .step-active al visible,
+         .step-past a los completados. El contenedor necesita
+         position:relative + overflow:hidden.
+   ================================================================ */
+
+/* Base — paso oculto fuera de vista (espera desde abajo) */
+.step-slide {
+  width: 100%;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity   0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateY(36px) scale(0.97);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Paso activo — sube y aparece */
+.step-slide.step-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Paso pasado — sube y desaparece */
+.step-slide.step-past {
+  opacity: 0;
+  transform: translateY(-36px) scale(0.97);
+}
+
+/* Variante horizontal — para tabs y wizards side-by-side */
+.step-slide-h {
+  width: 100%;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity   0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateX(28px) scale(0.98);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.step-slide-h.step-active {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+
+.step-slide-h.step-past {
+  opacity: 0;
+  transform: translateX(-28px) scale(0.98);
+}
+
+/* Contenedor del motor — clips los pasos sobrantes */
+.step-container {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Absolute inner (cuando los pasos se superponen) */
+.step-container > .step-slide:not(.step-active) {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* ================================================================
+   AI BADGE UTILITIES — Badges de identidad AI con tokens sc-ai-*
+   ================================================================ */
+.badge-ai-azure  { background: var(--sc-ai-azure-light);  color: var(--sc-ai-azure);  border: 1px solid var(--sc-ai-azure); }
+.badge-ai-purple { background: var(--sc-ai-purple-light); color: var(--sc-ai-purple); border: 1px solid var(--sc-ai-purple); }
+.badge-ai-cyan   { background: var(--sc-ai-cyan-light);   color: var(--sc-ai-cyan);   border: 1px solid var(--sc-ai-cyan); }
+.badge-ai-emerald{ background: var(--sc-ai-emerald-light);color: var(--sc-ai-emerald);border: 1px solid var(--sc-ai-emerald); }
+.badge-ai-gold   { background: var(--sc-ai-gold-light);   color: var(--sc-ai-gold);   border: 1px solid var(--sc-ai-gold); }
+
+/* Hover glow para badges AI */
+.badge-ai-azure:hover  { box-shadow: 0 0 12px var(--sc-ai-azure-light); }
+.badge-ai-purple:hover { box-shadow: 0 0 12px var(--sc-ai-purple-light); }
+.badge-ai-cyan:hover   { box-shadow: 0 0 12px var(--sc-ai-cyan-light); }
+
+/* ================================================================
+   SONNER DARK THEME OVERRIDE — Notificaciones adaptadas al Deep Space
+   ================================================================ */
+[data-sonner-toaster] [data-sonner-toast] {
+  --normal-bg:    hsl(240 25% 8%) !important;
+  --normal-border:hsl(240 25% 18%) !important;
+  --normal-text:  hsl(210 40% 92%) !important;
+  --success-bg:   rgba(16, 185, 129, 0.10) !important;
+  --success-border:rgba(16, 185, 129, 0.30) !important;
+  --error-bg:     rgba(255, 71, 87, 0.10) !important;
+  --error-border: rgba(255, 71, 87, 0.30) !important;
+  --info-bg:      rgba(59, 128, 228, 0.10) !important;
+  --info-border:  rgba(59, 128, 228, 0.30) !important;
+  font-family: var(--font-sans) !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* ================================================================
+   SC FORMS — Clases utilitarias para formularios generados de cliente
+   Usan los tokens --sc-forms-* para tematización consistente
+   ================================================================ */
+.sc-form-card {
+  background: var(--sc-forms-card-bg);
+  border-radius: var(--sc-forms-card-radius);
+  box-shadow: var(--sc-forms-card-shadow);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.sc-form-input {
+  background: var(--sc-forms-input-bg);
+  border: var(--sc-forms-input-border);
+  color: var(--sc-forms-input-color);
+  border-radius: var(--sc-forms-input-radius);
+  padding: 10px 14px;
+  width: 100%;
+  font-family: var(--font-sans);
+  transition: border-color 0.2s ease, background 0.2s ease;
+  outline: none;
+}
+
+.sc-form-input:focus {
+  border-color: rgba(91, 78, 255, 0.60);
+  background: rgba(255,255,255,0.12);
+  box-shadow: 0 0 0 3px rgba(91, 78, 255, 0.10);
+}
+
+.sc-form-input.success {
+  border-color: rgba(16, 185, 129, 0.60);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.08);
+}
+
+.sc-form-button {
+  background: var(--sc-forms-button-bg);
+  color: var(--sc-forms-button-color);
+  border-radius: var(--sc-forms-button-radius);
+  font-size: var(--sc-forms-button-font-size);
+  font-weight: var(--sc-forms-button-font-weight);
+  padding: var(--sc-forms-button-padding);
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+  font-family: var(--font-display);
+  letter-spacing: 0.3px;
+}
+
+.sc-form-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px rgba(91, 78, 255, 0.30);
+}
+
+.sc-form-button:active {
+  transform: scale(0.97) translateY(0);
+  box-shadow: none;
+}
+
+@keyframes checkAppear {
+  0%   { opacity: 0; transform: translateY(-50%) scale(0.4) rotate(-10deg); }
+  70%  { transform: translateY(-50%) scale(1.1) rotate(2deg); }
+  100% { opacity: 1; transform: translateY(-50%) scale(1) rotate(0deg); }
+}
+
+.check-appear {
+  animation: checkAppear 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
