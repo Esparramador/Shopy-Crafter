@@ -2798,7 +2798,7 @@ function PromptLabTab({ onInfo, onError }: { onInfo: (m: string) => void; onErro
           >
             <span>
               🏛 Biblioteca Maestra de la Agencia{" "}
-              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "rgba(200,168,75,0.15)", color: "var(--gold, #fbbf24)", fontWeight: 700 }}>6,110 templates</span>
+              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "rgba(200,168,75,0.15)", color: "var(--gold, #fbbf24)", fontWeight: 700 }}>6,132 templates</span>
             </span>
             <span style={{ color: "var(--t3)" }}>{masterOpen ? "▾" : "▸"}</span>
           </button>

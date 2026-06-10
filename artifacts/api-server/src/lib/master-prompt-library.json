@@ -1,7 +1,7 @@
 {
   "_meta": {
     "name": "Shopy Crafter — Master Prompt Template Library",
-    "version": "3.1.0",
+    "version": "3.2.0",
     "generated": "2026-06-10",
     "description": "Librería maestra de prompts para Shopy Crafter. Combina todas las librerías de la agencia + plantillas internas. Cada template usa {{VARIABLE}} placeholders para adaptarse a cualquier cliente.",
     "dna_variables": {
@@ -16,7 +16,7 @@
       "CLIENT_COLORS": "Paleta de colores de la marca",
       "CLIENT_LANGUAGE": "Idioma del contenido"
     },
-    "total_templates": 6110,
+    "total_templates": 6132,
     "libraries": [
       {
         "key": "stitch_bulk_v3",
@@ -127,6 +127,21 @@
         "key": "design_md_spec",
         "description": "DESIGN.md Format Spec — 1 plantilla maestra para generar archivos DESIGN.md completos con tokens de diseño consumibles por AI, Figma y Tailwind",
         "count": 1
+      },
+      {
+        "key": "card_studio_templates",
+        "description": "Card Studio Templates — 6 sistemas de diseño premium para tarjetas de presentación (luxury, minimalist, creative, corporate, tech)",
+        "count": 6
+      },
+      {
+        "key": "ad_studio_templates",
+        "description": "Ad Studio Templates — 7 géneros de anuncios profesionales (UGC Review, Product Demo, Explainer, News Anchor, Story Cinematic, Music Video, Viral Hook)",
+        "count": 7
+      },
+      {
+        "key": "cinematic_ad_templates",
+        "description": "Cinematic Ad Templates Masterpiece — 9 guiones multi-segmento de nivel cinematográfico (Anatomía, Deconstrucción, Construcción, Exploded View, Apple/Porsche, Presenter Hybrid, Lifestyle Orbit, Talking Head, Action Pulse)",
+        "count": 9
       }
     ],
     "last_updated": "2026-06-10"
@@ -110454,6 +110469,517 @@
             "design-system"
           ],
           "prompt": "Generate a complete DESIGN.md file for {{CLIENT_BRAND}} following the official DESIGN.md format specification.\n\nBrand context:\n- Brand name: {{CLIENT_BRAND}}\n- Industry: {{CLIENT_INDUSTRY}}\n- Primary colors: {{CLIENT_COLORS}}\n- Copy tone: {{CLIENT_COPY_TONE}}\n\nThe DESIGN.md must include:\n1. YAML frontmatter with: version, name, description, colors (primary/secondary/accent/background/surface/text-primary/text-secondary/border), typography (display-lg, h1, h2, body-md, label-md with fontFamily/fontSize/fontWeight/lineHeight), spacing (base, gap, card-padding, section-padding), rounded (card, control, pill), components (card, button, input styles).\n2. Markdown body with: Overview, Color System (rationale + palette table), Typography (scale table + usage), Spacing (scale + usage), Components (Card, Button, Input, Badge specs), Motion (easing curves, duration tokens), Accessibility (contrast ratios), Dark/Light mode tokens.\n\nOutput a production-ready DESIGN.md that can be consumed by AI design agents, Figma token plugins, and Tailwind theme generators.\n\nDESIGN.md Format Spec (reference):\n<!-- Generated from spec.mdx + spec-config.ts | version: alpha -->\n<!-- Do not edit directly. Run `bun run spec:gen` to regenerate. -->\n\n# DESIGN.md Format\n\nDESIGN.md is a self-contained, plain-text representation of a design system. It defines the visual identity of a brand and product, thereby ensuring that these stylistic choices can be followed across design sessions and between different AI agents and tools.  As a human-readable, open-format document, it serves as a living source of truth that both humans and AI can understand and refine.\n\nA DESIGN.md file contains two parts: An optional YAML frontmatter, and a markdown body. The YAML front matter contains machine-readable design tokens. The markdown body sections provide human-readable design rationale and guidance. Prose may use descriptive color names (e.g., \"Midnight Forest Green\") that correspond to systematic token names (e.g., `primary`). The tokens are the normative values; the prose provides context for how to apply them.\n\n# Design Tokens\n\nDESIGN.md may embed design tokens in a structured format. The system that we use to describe design tokens is inspired by the\n[Design Token JSON spec](https://www.designtokens.org/tr/2025.10/format/#abstract). Specifically, we adopt the concept of typed token groups (colors, typography, spacing) and the `{path.to.token}` reference syntax for cross-referencing values.\n\nThese tokens are easily converted from or to `tokens.json`, Figma variables, and Tailwind theme configs.\n\nDesign tokens are embedded as YAML front matter at the beginning of the file. The front matter block must begin with a line containing exactly `---` and end with a line containing exactly `---`. The YAML content between these delimiters is parsed according to the schema defined below.\n\nExample:\n\n```yaml\n---\nversion: alpha\nname: Daylight Prestige\ncolors:\n  primary: \"#1A1C1E\"\n  secondary: \"#6C7278\"\n  tertiary: \"#B8422E\"\ntypography:\n  h1:\n    fontFamily: Public Sans\n    fontSize: 48px\n    fontWeight: 600\n    lineHeight: 1.1\n    letterSpacing: -0.02em\n---\n```\n\n## Schema\n\nBelow is the schema for the design tokens defined in the front matter:\n\n```yaml\nversion: <string>          # optional, current version: \"alpha\"\nname: <string>\ndescription: <string>      # optional\ncolors:\n  <token-name>: <Color>\ntypography:\n  <token-name>: <Typography>\nrounded:\n  <scale-level>: <Dimension>\nspacing:\n  <scale-level>: <Dimension | number>\ncomponents:\n  <component-name>:\n    <token-name>: <string|token reference>\n```\n\nThe `<scale-level>` placeholder represents a named level in a sizing or spacing scale. Common level names include `xs`, `sm`, `md`, `lg`, `xl`, and `full`. Any descriptive string key is valid.\n\n**Color**: A color value must start with \"#\" followed by a hex color code in the SRGB color space.\n\n- `fontFamily` (string)\n- `fontSize` (Dimension)\n- `fontWeight` (number) - A numeric font weight value (e.g., `400`, `700`). In YAML, this may be expressed as either a bare number or a quoted string; b\n...[spec continues]"
+        }
+      ]
+    },
+    "card_studio_templates": {
+      "description": "Plantillas premium de Card Studio para tarjetas de presentación — 6 sistemas de diseño completos con paleta, tipografía, layout y fondos IA.",
+      "count": 6,
+      "templates": [
+        {
+          "id": "card_elite_executive",
+          "name": "Elite Executive",
+          "description": "Negro carbono con tipografía oro foil. Estilo lujo CEO/founder.",
+          "category": "luxury",
+          "palette_bg": "#0a0a0a",
+          "palette_primary": "#d4af37",
+          "palette_accent": "#c8a84b",
+          "fonts": "Cinzel + Montserrat 700/400",
+          "layout": "centered",
+          "background_kind": "ai-texture",
+          "background_prompt": "Premium black carbon fiber texture, deep matte finish with subtle gold flecks, dramatic spotlight from top-right, professional studio lighting, ultra detailed micro-pattern, luxury business card background, no text, no logos, photorealistic, 8k",
+          "qr_fg": "#d4af37",
+          "qr_bg": "#0a0a0a"
+        },
+        {
+          "id": "card_minimalist_mono",
+          "name": "Minimalist Mono",
+          "description": "Blanco puro, tipografía sans precisa. Estilo Apple/Notion.",
+          "category": "minimalist",
+          "palette_bg": "#ffffff",
+          "palette_primary": "#0f0f0f",
+          "palette_accent": "#0a0a0a",
+          "fonts": "Inter 600/400",
+          "layout": "left",
+          "background_kind": "solid",
+          "qr_fg": "#0f0f0f",
+          "qr_bg": "#ffffff"
+        },
+        {
+          "id": "card_luxury_foil",
+          "name": "Luxury Foil",
+          "description": "Cuero negro mate con foil dorado y plata. Estilo joyería/relojería.",
+          "category": "luxury",
+          "palette_bg": "#0d0a08",
+          "palette_primary": "#e6c878",
+          "palette_accent": "#d4af37",
+          "fonts": "Playfair Display + Lato 700/300",
+          "layout": "centered",
+          "background_kind": "ai-texture",
+          "background_prompt": "Luxurious dark leather texture, fine grain detail, embossed pattern, dramatic chiaroscuro lighting from left, deep shadows, gold foil accents glinting in corners, premium business card material, ultra realistic photography, 8k, no text, no logos",
+          "qr_fg": "#e6c878",
+          "qr_bg": "#0d0a08"
+        },
+        {
+          "id": "card_creative_bold",
+          "name": "Creative Bold",
+          "description": "Degradado púrpura→naranja, tipografía display. Estilo agency/designer.",
+          "category": "creative",
+          "palette_bg": "#1a0033",
+          "palette_primary": "#ff6b35",
+          "palette_accent": "#9b5de5",
+          "fonts": "Space Grotesk 700/400",
+          "layout": "left",
+          "background_kind": "gradient",
+          "gradient_angle": 135,
+          "qr_fg": "#ffffff",
+          "qr_bg": "#1a0033"
+        },
+        {
+          "id": "card_corporate_clean",
+          "name": "Corporate Clean",
+          "description": "Blanco con acento navy, grid estructurado. Estilo law/finance/consulting.",
+          "category": "corporate",
+          "palette_bg": "#ffffff",
+          "palette_primary": "#0a2540",
+          "palette_accent": "#635bff",
+          "fonts": "Source Serif Pro + Source Sans Pro 700/400",
+          "layout": "grid",
+          "background_kind": "solid",
+          "qr_fg": "#0a2540",
+          "qr_bg": "#ffffff"
+        },
+        {
+          "id": "card_tech_dark",
+          "name": "Tech Dark",
+          "description": "Azul medianoche con cyan neón. Estilo SaaS/startup tech.",
+          "category": "tech",
+          "palette_bg": "#0b1220",
+          "palette_primary": "#3ddbd9",
+          "palette_accent": "#3ddbd9",
+          "fonts": "JetBrains Mono + Inter 700/400",
+          "layout": "left",
+          "background_kind": "ai-texture",
+          "background_prompt": "Dark navy blue gradient mesh texture with subtle cyan circuit-like patterns, deep space aesthetic, soft glow accents, modern tech background, ultra clean, professional, 8k, no text, no logos",
+          "qr_fg": "#3ddbd9",
+          "qr_bg": "#0b1220"
+        }
+      ]
+    },
+    "ad_studio_templates": {
+      "description": "Plantillas de Ad Studio — 7 géneros de anuncios profesionales (UGC, Product Demo, Explainer, News Anchor, Story Cinematic, Music Video, Viral Hook) con copySystemAddon, heroStyle, cameraPreset y voiceProfile.",
+      "count": 7,
+      "templates": [
+        {
+          "id": "ad_ugc_review",
+          "key": "ugc_review",
+          "label": "UGC Review",
+          "description": "Avatar-creator hablando a cámara reseñando el producto, estilo TikTok orgánico.",
+          "copySystemAddon": "Tono UGC sincero, primera persona, lenguaje casual, hook conversacional en los 3 primeros segundos. CTA suave (link en bio / código en descripción).",
+          "heroStyle": "Foto vertical estilo selfie de creador de contenido sosteniendo el producto, iluminación ring-light suave, fondo de habitación real, autenticidad por encima de perfección publicitaria.",
+          "cameraPreset": "handheld",
+          "voiceProfile": {
+            "gender": "any",
+            "age": "young",
+            "tone": "conversacional, cercano, energía media-alta"
+          },
+          "musicBrief": "Música lo-fi suave de fondo, beat sutil, tipo TikTok ambient, máximo 60 BPM, sin elementos dominantes",
+          "transitionPreset": "hard_cut",
+          "recommendLipSync": true,
+          "burnSubsByDefault": true,
+          "defaultAspect": "9:16",
+          "defaultDurationSec": 8
+        },
+        {
+          "id": "ad_product_demo",
+          "key": "product_demo",
+          "label": "Product Demo",
+          "description": "Demostración cinematográfica del producto en uso, con motion overlays y planos detalle.",
+          "copySystemAddon": "Tono profesional, narración descriptiva del valor del producto. Estructura: problema → producto → beneficio → CTA. Frases cortas para voiceover.",
+          "heroStyle": "Foto de producto cinematográfica, iluminación de estudio, fondo gradiente o bokeh, composición rule-of-thirds, color grading premium tipo Apple ad.",
+          "cameraPreset": "dolly_in",
+          "voiceProfile": {
+            "gender": "any",
+            "age": "mid",
+            "tone": "profesional, claro, autoridad cálida"
+          },
+          "musicBrief": "Música corporativa moderna, build-up sutil hacia el CTA, percusión electrónica suave, tipo Apple keynote",
+          "transitionPreset": "cross_dissolve",
+          "recommendLipSync": false,
+          "burnSubsByDefault": true,
+          "defaultAspect": "16:9",
+          "defaultDurationSec": 10
+        },
+        {
+          "id": "ad_explainer",
+          "key": "explainer",
+          "label": "Explainer",
+          "description": "Vídeo explicativo con narración guiando visuales que ilustran un concepto.",
+          "copySystemAddon": "Tono didáctico, narrador explicando paso a paso. Estructura: Qué es → Cómo funciona → Por qué importa → CTA. Frases declarativas, una idea por frase.",
+          "heroStyle": "Composición clara y limpia mostrando el producto en contexto de uso, iconografía sutil, paleta sobria, estilo SaaS landing-page.",
+          "cameraPreset": "push_in",
+          "voiceProfile": {
+            "gender": "any",
+            "age": "mid",
+            "tone": "didáctico, calmo, articulado"
+          },
+          "musicBrief": "Música ambient cinematic instructiva, tipo TED talk intro, piano + pads, energía contenida",
+          "transitionPreset": "white_flash",
+          "recommendLipSync": false,
+          "burnSubsByDefault": true,
+          "defaultAspect": "16:9",
+          "defaultDurationSec": 10
+        },
+        {
+          "id": "ad_news_anchor",
+          "key": "news_anchor",
+          "label": "News Anchor",
+          "description": "Presentador estilo broadcast anunciando el producto como noticia.",
+          "copySystemAddon": "Tono informativo de noticiero, tercera persona, frases declarativas con autoridad. Hoy presentamos..., Análisis exclusivo.... CTA tipo Más información en...",
+          "heroStyle": "Encuadre tipo broadcast TV, presentador en plano medio sobre fondo de estudio con pantalla LED del producto detrás, iluminación direccional, look profesional periodístico.",
+          "cameraPreset": "static",
+          "voiceProfile": {
+            "gender": "any",
+            "age": "mid",
+            "tone": "broadcast, autoritario, articulación clara"
+          },
+          "musicBrief": "Música de breaking news, fanfarria corta de apertura, percusión orquestal sutil de fondo, tipo CNN intro",
+          "transitionPreset": "white_flash",
+          "recommendLipSync": true,
+          "burnSubsByDefault": true,
+          "defaultAspect": "16:9",
+          "defaultDurationSec": 10
+        },
+        {
+          "id": "ad_story_cinematic",
+          "key": "story_cinematic",
+          "label": "Story Cinematic",
+          "description": "Mini-historia cinematográfica de 8-15s que conecta emocionalmente con el producto.",
+          "copySystemAddon": "Tono narrativo emocional, micro-historia con arc dramático en pocos segundos. Personaje → conflicto → producto resuelve → resolución emotiva. Voiceover poético, frases con peso.",
+          "heroStyle": "Plano cinematográfico anamórfico simulado, color grading tipo film, contraste alto, narrativa visual implícita, calidad de fotograma de cortometraje.",
+          "cameraPreset": "crane_up",
+          "voiceProfile": {
+            "gender": "any",
+            "age": "mid",
+            "tone": "emotivo, íntimo, susurro controlado"
+          },
+          "musicBrief": "Música cinematográfica orquestal mínima, cuerdas + piano, build emocional gradual, tipo trailer indie",
+          "transitionPreset": "fade_to_black",
+          "recommendLipSync": false,
+          "burnSubsByDefault": false,
+          "defaultAspect": "16:9",
+          "defaultDurationSec": 12
+        },
+        {
+          "id": "ad_music_video",
+          "key": "music_video",
+          "label": "Music Video",
+          "description": "Clip estilo videoclip musical, sincronizado con beat, alta energía visual.",
+          "copySystemAddon": "Letra/lyrics cortas y punchy, ritmo marcado. Estructura: gancho repetitivo → verso del producto → coro CTA. Lenguaje urbano/streetwear si aplica.",
+          "heroStyle": "Estética videoclip moderno, color grading saturado/duotone, modelos cool con producto, iluminación neón o golden hour, energía cinética.",
+          "cameraPreset": "orbit_left",
+          "voiceProfile": {
+            "gender": "any",
+            "age": "young",
+            "tone": "rítmico, expresivo, alta energía"
+          },
+          "musicBrief": "Beat hip-hop/electro pop con drop marcado, tempo 110-130 BPM, drums punchy, melódico pegadizo",
+          "transitionPreset": "zoom_punch",
+          "recommendLipSync": true,
+          "burnSubsByDefault": true,
+          "defaultAspect": "9:16",
+          "defaultDurationSec": 12
+        },
+        {
+          "id": "ad_viral_hook",
+          "key": "viral_hook",
+          "label": "Viral Hook",
+          "description": "Formato reels/shorts con hook brutal en 1.5s, diseñado para retención completa.",
+          "copySystemAddon": "HOOK extremo en los primeros 1.5 segundos: pregunta provocadora, dato impactante o reveal visual. Resto = pago de la promesa del hook + CTA en último segundo.",
+          "heroStyle": "Composición vertical agresiva, foco central marcado, color contrastado, texto grande tipo meme overlay sugerido, estética viral TikTok.",
+          "cameraPreset": "crash_zoom",
+          "voiceProfile": {
+            "gender": "any",
+            "age": "young",
+            "tone": "alta energía, urgencia, exclamativo"
+          },
+          "musicBrief": "Trending audio tipo TikTok viral, beat percutido, drop en segundo 2, tempo alto 140+ BPM",
+          "transitionPreset": "zoom_punch",
+          "recommendLipSync": true,
+          "burnSubsByDefault": true,
+          "defaultAspect": "9:16",
+          "defaultDurationSec": 6
+        }
+      ]
+    },
+    "cinematic_ad_templates": {
+      "description": "Templates cinematográficos Masterpiece multi-segmento — 9 guiones profesionales (Anatomía, Deconstrucción, Construcción, Exploded View Técnico, Apple/Porsche/Richard Mille, Presentador Híbrido, Lifestyle Orbit, Talking Head Direct, Action Pulse).",
+      "count": 9,
+      "templates": [
+        {
+          "id": "seed:cinematic_ad_anatomy",
+          "name": "🕰️ Anatomía Completa (4 segmentos × 5s)",
+          "shortDescription": "Deconstrucción → Corazón Mecánico → Re-construcción → Try-On Hero. 20s totales.",
+          "longDescription": "Guion técnico de nivel masterpiece. El producto se desintegra elegantemente, revela su mecanismo interno, se vuelve a ensamblar con destellos y termina con el producto en uso por una persona real. Diseñado para concatenarse perfectamente sin saltos visuales. Inspirado en comerciales de Rolex, Patek Philippe y Apple.",
+          "category": "anatomy",
+          "conceptName": "La Anatomía del {{PRODUCT_NAME}}",
+          "totalDurationSec": 20,
+          "segmentCount": 4,
+          "segments": [
+            "La Deconstrucción (0-5s)",
+            "El Corazón Mecánico (5-10s)",
+            "La Re-construcción (10-15s)",
+            "Hero Shot / Try-On (15-20s)"
+          ],
+          "inspirationReference": "Rolex Datejust 41mm (champagne diamond + Rolesor)",
+          "estimatedCreditsHint": 14,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "flux-1.1-pro",
+          "defaultAspect": "9:16",
+          "motionScore": 5,
+          "styleTag": "luxury",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND",
+            "PRODUCT_MATERIALS",
+            "PRODUCT_COLORS",
+            "INDUSTRY"
+          ],
+          "requiresPresenter": false
+        },
+        {
+          "id": "seed:cinematic_ad_deconstruction",
+          "name": "💥 Deconstrucción Pura (Exploded View · 5s)",
+          "shortDescription": "El producto explota en cámara lenta revelando su ingeniería. Single-shot dramático.",
+          "longDescription": "Single-shot de 5 segundos donde el producto se desensambla en exploded view, ideal como hook inicial de un anuncio o como contenido para Reels. Las piezas flotan en zero-gravity revelando la calidad y complejidad de la ingeniería. Inspirado en el estilo de Apple keynote technical reveals.",
+          "category": "deconstruction",
+          "conceptName": "Anatomy of {{PRODUCT_NAME}}",
+          "totalDurationSec": 5,
+          "segmentCount": 1,
+          "segments": [
+            "Exploded View (0-5s)"
+          ],
+          "inspirationReference": "Apple iPhone exploded view + Porsche engine reveal",
+          "estimatedCreditsHint": 5,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "flux-1.1-pro",
+          "defaultAspect": "9:16",
+          "motionScore": 5,
+          "styleTag": "cinematic",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND",
+            "PRODUCT_MATERIALS",
+            "PRODUCT_COLORS"
+          ],
+          "requiresPresenter": false
+        },
+        {
+          "id": "seed:cinematic_ad_construction",
+          "name": "🧲 Construcción Mágica (Magnetic Assembly · 5s)",
+          "shortDescription": "Las piezas vuelan al centro y forman el producto con destellos. Time-lapse de ensamblaje.",
+          "longDescription": "Inverso del exploded view: las piezas componentes vuelan magnéticamente desde fuera de cámara y se ensamblan con destellos para revelar el producto terminado. Ideal como reveal final o como teaser de lanzamiento. El último frame es el producto íntegro, perfecto para encadenar con un hero shot.",
+          "category": "construction",
+          "conceptName": "The Making of {{PRODUCT_NAME}}",
+          "totalDurationSec": 5,
+          "segmentCount": 1,
+          "segments": [
+            "Magnetic Assembly (0-5s)"
+          ],
+          "inspirationReference": "Apple AirPods reveal + Tesla part assembly",
+          "estimatedCreditsHint": 5,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "flux-1.1-pro",
+          "defaultAspect": "9:16",
+          "motionScore": 6,
+          "styleTag": "cinematic",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND",
+            "PRODUCT_MATERIALS",
+            "PRODUCT_COLORS"
+          ],
+          "requiresPresenter": false
+        },
+        {
+          "id": "seed:cinematic_ad_exploded_view",
+          "name": "📐 Exploded View Técnico (Reveal + Re-assembly · 10s)",
+          "shortDescription": "Schematic 3D explota → componentes etiquetables → re-ensamblaje suave. 10s.",
+          "longDescription": "Estilo CAD/blueprint cinematográfico: las piezas se separan formando un layout técnico ordenado, perfecto para producto tech, joyería de precisión, calzado deportivo o equipo industrial. El segundo segmento las re-ensambla limpiamente. Inspirado en presentaciones de producto de Dyson, Bose y Specialized.",
+          "category": "exploded_view",
+          "conceptName": "{{PRODUCT_NAME}} — Engineered to Perfection",
+          "totalDurationSec": 10,
+          "segmentCount": 2,
+          "segments": [
+            "Technical Disassembly (0-5s)",
+            "Re-Assembly (5-10s)"
+          ],
+          "inspirationReference": "Dyson airblade + Bose QC schematic + Specialized bike reveal",
+          "estimatedCreditsHint": 8,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "flux-1.1-pro",
+          "defaultAspect": "16:9",
+          "motionScore": 4,
+          "styleTag": "editorial",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND",
+            "PRODUCT_MATERIALS",
+            "PRODUCT_COLORS"
+          ],
+          "requiresPresenter": false
+        },
+        {
+          "id": "seed:cinematic_ad_apple_porsche",
+          "name": "🏎️ Estilo Apple / Porsche / Richard Mille (3 segmentos × 5s)",
+          "shortDescription": "Macro PBR + dirección fotográfica de comerciales premium. 15s.",
+          "longDescription": "El máximo nivel de producción: cámara con inercia cinematográfica, luz que baña el metal, polvo flotando con elegancia. Cada plano sigue convenciones de cinematografía de gama alta (Cooke anamorphic, sunset rim light, slow parallax). Adaptado para producto premium, joyería, automoción, electrónica de lujo.",
+          "category": "apple_porsche",
+          "conceptName": "{{PRODUCT_NAME}} — Crafted",
+          "totalDurationSec": 15,
+          "segmentCount": 3,
+          "segments": [
+            "Surface Caress (0-5s)",
+            "Hero Reveal (5-10s)",
+            "Brand Mark (10-15s)"
+          ],
+          "inspirationReference": "Apple iPhone Pro reveal + Porsche 911 commercial + Richard Mille tourbillon",
+          "estimatedCreditsHint": 11,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "flux-1.1-pro",
+          "defaultAspect": "16:9",
+          "motionScore": 4,
+          "styleTag": "luxury",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND",
+            "PRODUCT_MATERIALS",
+            "PRODUCT_COLORS"
+          ],
+          "requiresPresenter": false
+        },
+        {
+          "id": "seed:cinematic_ad_presenter_hybrid",
+          "name": "🎙️ Presentador Híbrido — Luxury Watch (22s)",
+          "shortDescription": "5 segmentos: presentador medio → B-roll deconstrucción → B-roll construcción → detalle/try-on → CTA primer plano. Inspirado en Omneky / Apple keynote / Rolex.",
+          "longDescription": "Formato Tier-1 para anuncios de relojería de lujo. Combina la autoridad de un presentador (host avatar) hablando a cámara con B-roll técnico cinematográfico del producto. Cada segmento tiene su voiceoverLine sincronizado con el motor TTS de ElevenLabs. Character lock SOLO en escenas de presentador (idx 1, 5); las B-roll son producto puro.",
+          "category": "presenter_hybrid",
+          "conceptName": "{{PRODUCT_NAME}} — Presentado por {{BRAND}}",
+          "totalDurationSec": 22,
+          "segmentCount": 5,
+          "segments": [
+            "Presentador Medio Hook (0-3s)",
+            "B-Roll Deconstrucción (3-8s)",
+            "B-Roll Construcción/Detalle (8-13s)",
+            "Try-on/Detalle Humano (13-18s)",
+            "Presentador CTA (18-22s)"
+          ],
+          "inspirationReference": "Rolex Datejust 41mm Presenter Hybrid (Omneky/Apple keynote style)",
+          "estimatedCreditsHint": 17,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "nano-banana",
+          "defaultAspect": "9:16",
+          "motionScore": 4,
+          "styleTag": "luxury",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND",
+            "PRODUCT_MATERIALS",
+            "PRODUCT_COLORS"
+          ],
+          "requiresPresenter": true
+        },
+        {
+          "id": "seed:cinematic_ad_lifestyle_orbit",
+          "name": "🌿 Lifestyle Orbit — Universal Premium B-roll (18s)",
+          "shortDescription": "3 segmentos: orbit hero → dolly-in detalle → parallax lifestyle. Para hogar, decoración, moda, belleza, cosmética.",
+          "longDescription": "Plantilla agnóstica de gama alta inspirada en spots Aesop / Le Labo / Vitra. Tres planos consecutivos sin presentador: hero orbit del producto en escena natural, dolly-in macro al detalle hero, parallax pull-back ambient. Funciona para velas, perfumes, sillones, prendas, productos de skincare, accesorios premium.",
+          "category": "lifestyle",
+          "conceptName": "{{PRODUCT_NAME}} — Crafted by {{BRAND}}",
+          "totalDurationSec": 18,
+          "segmentCount": 3,
+          "segments": [
+            "Hero Orbit (0-6s)",
+            "Macro Detail (6-12s)",
+            "Lifestyle Parallax + CTA (12-18s)"
+          ],
+          "inspirationReference": "Aesop / Le Labo / Vitra / Hermès lifestyle film",
+          "estimatedCreditsHint": 11,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "nano-banana",
+          "defaultAspect": "16:9",
+          "motionScore": 3,
+          "styleTag": "lifestyle",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND",
+            "PRODUCT_MATERIALS",
+            "PRODUCT_COLORS",
+            "INDUSTRY"
+          ],
+          "requiresPresenter": false
+        },
+        {
+          "id": "seed:cinematic_ad_talking_head_direct",
+          "name": "🎤 Talking Head Direct — Personal Brand / Creator (24s)",
+          "shortDescription": "4 segmentos: hook directo a cámara → B-roll conceptual con texto → desarrollo del beneficio → CTA. Para creators, coaches, educadores, consultores.",
+          "longDescription": "Formato Tier-1 para Instagram Reels, TikTok, LinkedIn personal brand y YouTube Shorts. El presentador habla directamente a cámara en idx 1, 3, 4; el segmento idx 2 es un B-roll conceptual con typography animada. No requiere producto físico — solo el avatar del creator y su mensaje.",
+          "category": "personal_brand",
+          "conceptName": "{{BRAND}} — {{CORE_BENEFIT}}",
+          "totalDurationSec": 24,
+          "segmentCount": 4,
+          "segments": [
+            "Hook Directo (0-6s)",
+            "B-Roll Conceptual + Typography (6-12s)",
+            "Desarrollo del Beneficio (12-18s)",
+            "CTA Primer Plano (18-24s)"
+          ],
+          "inspirationReference": "Alex Hormozi / Gary Vee / Steven Bartlett personal brand reel",
+          "estimatedCreditsHint": 14,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "nano-banana",
+          "defaultAspect": "9:16",
+          "motionScore": 2,
+          "styleTag": "documentary",
+          "variables": [
+            "BRAND",
+            "PAIN_POINT",
+            "CORE_BENEFIT",
+            "TARGET_AUDIENCE",
+            "CALL_TO_ACTION"
+          ],
+          "requiresPresenter": true
+        },
+        {
+          "id": "seed:cinematic_ad_action_pulse",
+          "name": "⚡ Action Pulse — High Energy (16s)",
+          "shortDescription": "4 segmentos × 4s: tensión inicial → liberación de energía → impacto hero → CTA. Para fitness, sport, automotive, energy drinks y productos de performance.",
+          "longDescription": "Plantilla de alta energía con cortes rápidos inspirada en spots Nike / Red Bull / Porsche / Ferrari. Cuatro planos consecutivos sin presentador, cada uno con un movimiento de cámara cinético distinto (whip-pan, rack-zoom, crash-zoom, parallax pull-back). Music score sincronizado con drop en idx 3.",
+          "category": "action_pulse",
+          "conceptName": "{{PRODUCT_NAME}} — Built for {{INDUSTRY}}",
+          "totalDurationSec": 16,
+          "segmentCount": 4,
+          "segments": [
+            "Tensión Inicial (0-4s)",
+            "Liberación de Energía (4-8s)",
+            "Impacto Hero (8-12s)",
+            "CTA Logo (12-16s)"
+          ],
+          "inspirationReference": "Nike / Red Bull / Porsche / Gymshark performance reel",
+          "estimatedCreditsHint": 12,
+          "recommendedVideoModel": "kling-2.1",
+          "recommendedImageModel": "nano-banana",
+          "defaultAspect": "9:16",
+          "motionScore": 5,
+          "styleTag": "sport",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND",
+            "PRODUCT_MATERIALS",
+            "PRODUCT_COLORS",
+            "INDUSTRY"
+          ],
+          "requiresPresenter": false
         }
       ]
     }
