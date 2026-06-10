@@ -1062,6 +1062,7 @@ function BackgroundTypeSelector({ sectionId, content, onChange }: { sectionId: s
   const backgrounds = (content as any)?.backgrounds ?? {};
   const sectionBg = backgrounds[sectionId] ?? { type: "none", videoUrl: "", galleryImages: [], particleColor: "#c8a84b" };
   const bgType = sectionBg.type ?? "none";
+  const [galUploading, setGalUploading] = useState(false);
 
   const types = [
     { value: "none", label: "Ninguno", icon: <X size={12} /> },
@@ -1141,12 +1142,48 @@ function BackgroundTypeSelector({ sectionId, content, onChange }: { sectionId: s
         <div>
           <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>Imágenes del carrusel (URLs separadas por coma)</p>
           <textarea
-            value={Array.isArray(sectionBg.galleryImages) ? sectionBg.galleryImages.join(", ") : ""}
+            value={Array.isArray(sectionBg.galleryImages) ? sectionBg.galleryImages.join(", ") : (typeof sectionBg.galleryImages === "string" ? sectionBg.galleryImages : "")}
             onChange={e => onChange(`${bgKey}.galleryImages`, e.target.value)}
             placeholder="/media/img1.webp, /media/img2.webp"
             rows={2}
             style={{ width: "100%", padding: "6px 10px", fontSize: 12, background: "var(--ink3)", border: "1px solid var(--bdr)", borderRadius: 8, color: "var(--t)", outline: "none", resize: "none", boxSizing: "border-box" }}
           />
+          <label style={{
+            marginTop: 6, padding: "6px 12px", fontSize: 11, fontWeight: 600, cursor: galUploading ? "wait" : "pointer",
+            background: "rgba(200,168,75,0.15)", border: "1px solid var(--gold)", borderRadius: 8,
+            color: "var(--gold)", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+            opacity: galUploading ? 0.6 : 1,
+          }}>
+            {galUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+            {galUploading ? "Subiendo..." : "Subir varias imágenes"}
+            <input type="file" accept="image/*" multiple disabled={galUploading} style={{ display: "none" }}
+              onChange={async (e) => {
+                const files = Array.from(e.target.files ?? []);
+                if (files.length === 0) return;
+                setGalUploading(true);
+                const existing: string[] = Array.isArray(sectionBg.galleryImages)
+                  ? (sectionBg.galleryImages as string[])
+                  : (typeof sectionBg.galleryImages === "string" ? sectionBg.galleryImages.split(",").map((s: string) => s.trim()).filter(Boolean) : []);
+                const uploaded: string[] = [];
+                const skipped: string[] = [];
+                for (const file of files) {
+                  if (!file.type.startsWith("image/")) { skipped.push(file.name); continue; }
+                  if (file.size > 5 * 1024 * 1024) { skipped.push(`${file.name} (>5MB)`); continue; }
+                  try {
+                    const form = new FormData();
+                    form.append("file", file);
+                    const resp = await fetch(`${BASE_URL}/api/cms/media/upload`, { method: "POST", body: form, credentials: "include" });
+                    if (!resp.ok) { skipped.push(file.name); continue; }
+                    const data = await resp.json() as { url?: string };
+                    if (data.url) uploaded.push(data.url); else skipped.push(file.name);
+                  } catch { skipped.push(file.name); }
+                }
+                if (uploaded.length > 0) onChange(`${bgKey}.galleryImages`, [...existing, ...uploaded].join(", "));
+                if (skipped.length > 0) alert(`${uploaded.length} imágenes subidas. No se pudieron subir: ${skipped.join(", ")}`);
+                setGalUploading(false);
+                e.target.value = "";
+              }} />
+          </label>
         </div>
       )}
     </div>

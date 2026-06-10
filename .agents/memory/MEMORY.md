@@ -1,0 +1,1 @@
+- [Social/URL ingestion provenance](social-url-ingestion.md) — IG/FB can't be scraped without official APIs; X oEmbed 404s; degrade via oEmbed→OG→AI-inference and LABEL the source honestly.

@@ -21,6 +21,7 @@ import { randomUUID } from "crypto";
 import { desc, eq } from "drizzle-orm";
 import { saveToVault } from "../lib/vault.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { processUploadedFile } from "../lib/file-processor.js";
 
 const router = Router();
 
@@ -32,6 +33,15 @@ const upload = multer({
     if (allowed.test(file.mimetype)) cb(null, true);
     else cb(new Error(`Tipo no soportado: ${file.mimetype}`));
   },
+});
+
+// Multer permisivo (sin fileFilter) para el extractor universal de documentos:
+// acepta CUALQUIER formato (PDF, Word, Excel, PowerPoint, ZIP, HTML, código, audio,
+// vídeo, etc.). Muchos archivos de texto/código llegan con mimetype vacío desde el
+// navegador, así que filtrar por mimetype no es fiable aquí.
+const uploadAny = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
 });
 
 // ─── VISION PROMPT — extracts EVERYTHING ─────────────────────────────────────
@@ -166,11 +176,12 @@ async function saveToShopyBrain(params: {
 }
 
 // ─── HELPER: Classify URL type ────────────────────────────────────────────────
-function classifyUrl(url: string): "social_instagram" | "social_facebook" | "social_x" | "youtube" | "url" {
+function classifyUrl(url: string): "social_instagram" | "social_facebook" | "social_x" | "tiktok" | "youtube" | "url" {
   const u = url.toLowerCase();
   if (u.includes("instagram.com")) return "social_instagram";
   if (u.includes("facebook.com") || u.includes("fb.com")) return "social_facebook";
   if (u.includes("twitter.com") || u.includes("x.com")) return "social_x";
+  if (u.includes("tiktok.com")) return "tiktok";
   if (u.includes("youtube.com") || u.includes("youtu.be")) return "youtube";
   return "url";
 }
@@ -240,6 +251,52 @@ async function fetchUrlContent(url: string): Promise<{ text: string; title: stri
     imageUrls,
   };
 }
+
+// ─── HELPER: open oEmbed (no auth) — X / TikTok / YouTube ─────────────────────
+// Estos proveedores exponen oEmbed público que devuelve autor + texto REALES sin
+// autenticación. Instagram/Facebook requieren un token de app de Meta para oEmbed,
+// así que esos caen a OG tags / inferencia con IA (etiquetada con honestidad).
+async function fetchOEmbed(
+  url: string,
+  urlType: string,
+): Promise<{ provider: string; authorName: string; title: string; caption: string; thumbnailUrl: string } | null> {
+  let endpoint: string | null = null;
+  if (urlType === "social_x") endpoint = `https://publish.twitter.com/oembed?omit_script=1&dnt=true&url=${encodeURIComponent(url)}`;
+  else if (urlType === "tiktok") endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+  else if (urlType === "youtube") endpoint = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`;
+  if (!endpoint) return null;
+  try {
+    const res = await fetch(endpoint, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopyBrainBot/1.0)", "Accept": "application/json" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as Record<string, unknown>;
+    const html = typeof data.html === "string" ? data.html : "";
+    const caption = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const authorName = typeof data.author_name === "string" ? data.author_name : "";
+    const title = typeof data.title === "string" ? data.title : "";
+    if (!caption && !authorName && !title) return null;
+    return {
+      provider: typeof data.provider_name === "string" ? data.provider_name : urlType,
+      authorName,
+      title,
+      caption,
+      thumbnailUrl: typeof data.thumbnail_url === "string" ? data.thumbnail_url : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Nota de procedencia: indica de DÓNDE viene cada dato para no presentar inferencias
+// de IA como si fueran datos extraídos directamente.
+const PROVENANCE_NOTE: Record<string, string> = {
+  oembed: "Datos REALES vía oEmbed oficial de la plataforma (autor y texto verificados).",
+  og_tags: "Datos REALES de las etiquetas Open Graph / meta de la página pública.",
+  ai_search_inference: "⚠️ La plataforma bloquea el acceso público sin API oficial. Esto es una INVESTIGACIÓN con IA + búsqueda web (inferencia), NO datos extraídos directamente — verifícalo antes de usarlo.",
+};
 
 // ─── HELPER: Analyze image with Claude Vision ──────────────────────────────────
 async function analyzeImageWithClaude(
@@ -318,27 +375,77 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
       let rawContent = "";
       let title = label ?? url;
       let memoryId: string;
+      let provenance: "oembed" | "og_tags" | "ai_search_inference" = "og_tags";
+      let confidence = 0.6;
       
       if (urlType === "youtube") {
-        // Gemini can understand YouTube
+        // YouTube: oEmbed da título/autor REALES; Gemini analiza el contenido del video.
+        const yt = await fetchOEmbed(url, "youtube");
         analysis = await analyzeWithGemini(url, "video_url");
-        rawContent = `YouTube video: ${url}`;
-        title = (analysis.title as string) ?? `YouTube: ${url}`;
+        title = label ?? (yt?.title || (analysis.title as string) || `YouTube: ${url}`);
+        rawContent = yt ? `YouTube: ${yt.title} — ${yt.authorName}\n${url}` : `YouTube video: ${url}`;
+        provenance = yt ? "oembed" : "ai_search_inference";
+        confidence = yt ? 0.85 : 0.7;
+        analysis._provenance = provenance;
+        analysis._confidence = confidence;
+        analysis._source_note = PROVENANCE_NOTE[provenance];
       } else {
-        // Fetch URL content
-        const fetched = await fetchUrlContent(url);
-        rawContent = fetched.text;
-        title = label ?? fetched.title;
-        
-        // Analyze with Gemini
+        // 1. oEmbed abierto primero (X, TikTok) → autor + texto REALES, sin auth.
+        const oembed = (urlType === "social_x" || urlType === "tiktok")
+          ? await fetchOEmbed(url, urlType)
+          : null;
+
+        // 2. Siempre intentar la página pública (OG/meta). Los muros de login dan datos pobres.
+        let fetched: { text: string; title: string; description: string; imageUrls: string[] } =
+          { text: "", title: label ?? url, description: "", imageUrls: [] };
+        try { fetched = await fetchUrlContent(url); } catch (e) { logger.warn(e, "URL fetch failed (non-critical)"); }
+
+        const isLoginWall = /(inicia sesión|iniciar sesión|log ?in|sign ?up|create an account|see posts|ver fotos|content isn't available)/i
+          .test(`${fetched.title} ${fetched.description}`);
+
+        let realContent: string;
+        if (oembed && (oembed.caption || oembed.authorName)) {
+          provenance = "oembed"; confidence = 0.9;
+          realContent = `Fuente oEmbed (${oembed.provider})\nAutor: ${oembed.authorName}\nTítulo: ${oembed.title}\nContenido: ${oembed.caption}`;
+          title = label ?? (oembed.title || oembed.authorName || fetched.title);
+          if (oembed.thumbnailUrl) fetched.imageUrls = [oembed.thumbnailUrl, ...fetched.imageUrls];
+        } else if (fetched.text.length > 200 && !isLoginWall) {
+          provenance = "og_tags"; confidence = 0.6;
+          realContent = `Title: ${fetched.title}\nDescription: ${fetched.description}\nContent: ${fetched.text}`;
+          title = label ?? fetched.title;
+        } else if (urlType.startsWith("social") || urlType === "tiktok") {
+          // Instagram/Facebook/TikTok (y social tras muro de login): sin scraping público
+          // fiable sin APIs oficiales. Usar IA + búsqueda web como INFERENCIA, etiquetada con honestidad.
+          provenance = "ai_search_inference"; confidence = 0.4;
+          let investigated = "";
+          try {
+            const search = await askGeminiWithSearch(
+              `Investiga este perfil o publicación de redes sociales y extrae lo que sea públicamente conocido: ${url}\nIncluye: nombre/marca, temática, tipo de contenido, audiencia, productos/servicios, tono y estrategia de marketing aparente. Si no encuentras datos fiables, dilo claramente.`,
+              "Eres el motor de investigación de ShopyBrain. Distingue hechos verificables de suposiciones y sé honesto sobre la incertidumbre.",
+              [url],
+            );
+            investigated = search.text;
+          } catch (e) { logger.warn(e, "Gemini search inference failed (non-critical)"); }
+          realContent = investigated
+            ? `INVESTIGACIÓN IA (inferencia, no scraping directo) de ${url}:\n${investigated}`
+            : `No se pudo extraer contenido público de ${url}. La plataforma requiere API oficial para acceso fiable.`;
+          title = label ?? (fetched.title && !isLoginWall ? fetched.title : url);
+        } else {
+          provenance = "og_tags"; confidence = fetched.text.length > 200 ? 0.6 : 0.4;
+          realContent = `Title: ${fetched.title}\nDescription: ${fetched.description}\nContent: ${fetched.text}`;
+          title = label ?? fetched.title;
+        }
+
+        rawContent = realContent;
+
+        // 3. Analizar el contenido REAL obtenido.
         const textAnalysis = await analyzeWithGemini(
-          `URL: ${url}\nTitle: ${fetched.title}\nDescription: ${fetched.description}\nContent: ${fetched.text}`,
-          urlType.startsWith("social") ? "social" : "url_content"
+          `URL: ${url}\nFUENTE: ${provenance}\n${realContent}`,
+          urlType.startsWith("social") ? "social" : "url_content",
         );
-        
-        analysis = textAnalysis;
-        
-        // If there are images, also analyze them with Claude Vision
+        analysis = { ...textAnalysis, _provenance: provenance, _confidence: confidence, _source_note: PROVENANCE_NOTE[provenance] };
+
+        // 4. Si hay imágenes, analizar la primera con Claude Vision.
         if (fetched.imageUrls.length > 0 && fetched.imageUrls[0]) {
           try {
             const visionAnalysis = await analyzeImageWithClaude(fetched.imageUrls[0], "image/jpeg", true);
@@ -365,13 +472,13 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
         visualComposition: JSON.stringify((analysis as any).visual_composition ?? (analysis as any).visual_from_page?.visual_composition ?? null),
         fullAnalysis: analysis,
         niche: niche ?? null,
-        confidence: 0.75,
+        confidence,
         processingModel: "gemini+claude",
         createdAt: new Date(),
       });
       
       // Save core memory to ShopyBrain
-      const summaryContent = `SOURCE: ${url}\nTYPE: ${urlType}\n\n${JSON.stringify(analysis, null, 2)}`;
+      const summaryContent = `SOURCE: ${url}\nTYPE: ${urlType}\nPROVENANCE: ${provenance} (confianza ${confidence})\nNOTE: ${PROVENANCE_NOTE[provenance]}\n\n${JSON.stringify(analysis, null, 2)}`;
       memoryId = await saveToShopyBrain({
         title: `[${urlType.toUpperCase()}] ${title}`,
         content: summaryContent,
@@ -379,8 +486,8 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
         niche,
         sourceType: urlType,
         sourceUrl: url,
-        confidence: 0.75,
-        tags: [urlType, "absorbed", "url", niche ?? "general"],
+        confidence,
+        tags: [urlType, "absorbed", "url", provenance, niche ?? "general"],
       });
       
       // Update absorbed record with memory ID
@@ -404,7 +511,9 @@ router.post("/shopybrain/absorb-url", requireAdmin, async (req: Request, res: Re
         urlType,
         title,
         analysis,
-        message: `✅ ${urlType} absorbido a Shopy Crafter. Conocimiento guardado permanentemente.`,
+        provenance,
+        confidence,
+        message: `✅ ${urlType} absorbido a Shopy Crafter (fiabilidad ${Math.round(confidence * 100)}%). ${PROVENANCE_NOTE[provenance]}`,
       });
     } catch (err) {
       logger.error(err, "ShopyBrain URL absorb failed");
@@ -597,14 +706,31 @@ router.post("/shopybrain/absorb-text", requireAdmin, async (req: Request, res: R
 });
 
 // ─── POST /api/shopybrain/absorb-document ──────────────────────────────────────
-router.post("/shopybrain/absorb-document", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post("/shopybrain/absorb-document", requireAdmin, uploadAny.single("file"), async (req: Request, res: Response): Promise<void> => {
   enableLongRunning(res);
   try {
-    
-    const { text, fileName, fileType, niche, label } = req.body as {
-      text: string; fileName?: string; fileType?: string; niche?: string; label?: string;
-    };
-  
+
+    const file = req.file;
+    let { text, fileName, fileType } = req.body as { text?: string; fileName?: string; fileType?: string };
+    const { niche, label } = req.body as { niche?: string; label?: string };
+
+    // Si llega un archivo binario (PDF, Word, PowerPoint, Excel, ZIP, HTML, código,
+    // audio, vídeo...), el extractor universal saca el texto en el servidor.
+    if (file) {
+      const processed = await processUploadedFile(file.buffer, file.originalname, file.mimetype);
+      text = processed.textContent ?? "";
+      fileName = fileName ?? file.originalname;
+      fileType = fileType ?? file.mimetype;
+      if (!text.trim()) {
+        res.json({
+          success: false,
+          fileName: file.originalname,
+          message: `⚠️ Recibí "${file.originalname}" (${processed.type}) pero no se pudo extraer contenido textual de este archivo.`,
+        });
+        return;
+      }
+    }
+
     if (!text) { res.status(400).json({ error: "text es requerido" }); return; }
   
     try {

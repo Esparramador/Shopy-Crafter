@@ -1482,21 +1482,16 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
   const absorbFile = async (file: File, niche?: string, signal?: AbortSignal): Promise<AbsorbResult> => {
     try {
-      if (isDocumentFile(file)) {
-        const text = await readFileAsText(file);
-        const res = await fetch(`${API}/api/shopybrain/absorb-document`, {
-          method: "POST", credentials: "include", signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, fileName: file.name, fileType: file.type, niche, label: file.name }),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
-      }
+      // Las imágenes van a visión (Claude). Cualquier otro formato (PDF, Word,
+      // PowerPoint, Excel, ZIP, HTML, CSS, código, audio, vídeo, .txt...) se sube
+      // al extractor universal del servidor, que saca todo el texto/transcripción.
+      const isImage = file.type.startsWith("image/");
+      const endpoint = isImage ? "absorb-image" : "absorb-document";
       const formData = new FormData();
       formData.append("file", file);
       formData.append("label", file.name);
       if (niche) formData.append("niche", niche);
-      const res = await fetch(`${API}/api/shopybrain/absorb-image`, {
+      const res = await fetch(`${API}/api/shopybrain/${endpoint}`, {
         method: "POST", credentials: "include", body: formData, signal,
       });
       if (!res.ok) throw new Error(await res.text());
@@ -1596,7 +1591,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
     const hasAttach = !!(attachFile || attachUrl);
     const attachType = attachFile
-      ? (attachFile.type.startsWith("video/") ? "video" : (isDocumentFile(attachFile) ? "document" : "image"))
+      ? (attachFile.type.startsWith("image/") ? "image" : (attachFile.type.startsWith("video/") ? "video" : "document"))
       : "url";
     const attachName = attachFile?.name ?? attachUrl;
 
@@ -1718,8 +1713,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 fileResults.push({ file: f, error: e instanceof Error ? e.message : String(e) });
               }
             }
-            const successFiles = fileResults.filter(fr => fr.result);
-            const failedFiles = fileResults.filter(fr => fr.error);
+            const successFiles = fileResults.filter(fr => fr.result && fr.result.success !== false);
+            const failedFiles = fileResults.filter(fr => fr.error || (fr.result && fr.result.success === false));
             result = successFiles[0]?.result || { success: false, sourceType: "", title: "", analysis: {} } as AbsorbResult;
             if (successFiles.length === 0) {
               assistantContent = `❌ **0/${filesToProcess.length} archivos procesados** — todos fallaron.\n\n`;
@@ -1729,8 +1724,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               assistantContent = `✅ **${successFiles.length}/${filesToProcess.length} archivos absorbidos a Shopy Crafter**\n\n`;
             }
             for (const fr of fileResults) {
-              if (fr.result) {
+              if (fr.result && fr.result.success !== false) {
                 assistantContent += `✅ **${fr.file.name}** ${fr.result.memoryId ? `(memoria #${fr.result.memoryId.slice(0, 8)})` : ""}\n`;
+              } else if (fr.result && fr.result.success === false) {
+                assistantContent += `⚠️ **${fr.file.name}** — ${fr.result.message ?? "sin contenido textual extraíble"}\n`;
               } else {
                 assistantContent += `❌ **${fr.file.name}** — ${fr.error}\n`;
               }
@@ -1738,22 +1735,30 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             assistantContent += "\n";
           } else if (attachFile) {
             result = await absorbFile(attachFile, undefined, controller.signal);
-            assistantContent = `✅ **Absorbido a Shopy Crafter**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
+            assistantContent = result.success === false
+              ? `${result.message ?? `⚠️ No se pudo extraer contenido de "${attachName}".`}\n\n`
+              : `✅ **Absorbido a Shopy Crafter**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
           } else {
             result = await absorbUrl(attachUrl, undefined, controller.signal);
             assistantContent = `✅ **Absorbido a Shopy Crafter**${result.memoryId ? ` (memoria #${result.memoryId.slice(0, 8)})` : ""}\n\n`;
           }
 
-          const isDocument = attachType === "document";
+          const isDocument = attachType === "document" || attachType === "video";
           const isImage = attachType === "image";
+          const absorbOk = result.success !== false;
 
-          if (isDocument) {
+          if (absorbOk && isDocument) {
             const docAnalysis = typeof result.analysis === "string" ? result.analysis : JSON.stringify(result.analysis, null, 2);
             assistantContent += `📄 **Documento analizado:** ${attachName}\n`;
             assistantContent += `📊 **Tamaño:** ${(result as any).contentLength ?? "?"} caracteres\n\n`;
             assistantContent += `**Análisis:**\n${docAnalysis}\n\n`;
-          } else {
+          } else if (absorbOk) {
             const a = result.analysis as Record<string, Record<string, string[]>>;
+            const sourceNote = (result.analysis as Record<string, unknown> | undefined)?._source_note as string | undefined;
+            const conf = (result.analysis as Record<string, unknown> | undefined)?._confidence as number | undefined;
+            if (sourceNote) {
+              assistantContent += `🔎 **Fuente:** ${sourceNote}${typeof conf === "number" ? ` _(fiabilidad ${Math.round(conf * 100)}%)_` : ""}\n\n`;
+            }
             const angles = a?.ecommerce_conversion_signals?.recommended_marketing_angles ?? a?.actionable_insights_for_shopify?.recommended_marketing_angles as string[] ?? [];
 
             if (isImage && a?.visual_composition) {
@@ -1780,10 +1785,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             }
           }
 
-          if (!isDocument) {
+          if (absorbOk && !isDocument) {
             assistantContent += `\n_Haz clic en "Ver análisis completo" para explorar las ${Object.keys(result.analysis || {}).length} dimensiones analizadas._`;
           }
-          action = { type: "absorb-result", label: isDocument ? "Ver documento completo" : "Ver análisis completo", data: result };
+          if (absorbOk) {
+            action = { type: "absorb-result", label: isDocument ? "Ver documento completo" : "Ver análisis completo", data: result };
+          }
         }
 
       // ── CASE 2: Klaviyo workflow request ──
@@ -2241,7 +2248,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       )}
 
       {/* Hidden file input */}
-      <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,.txt,.md,.csv,.json,.pdf,.doc,.docx,.xls,.xlsx" style={{ display: "none" }} onChange={handleFileSelect} />
+      <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,audio/*,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.ndjson,.xml,.html,.htm,.css,.scss,.sass,.less,.js,.mjs,.cjs,.ts,.tsx,.jsx,.vue,.svelte,.py,.rb,.php,.java,.kt,.c,.cpp,.h,.cs,.go,.rs,.swift,.dart,.yaml,.yml,.toml,.ini,.sql,.graphql,.sh,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.log" style={{ display: "none" }} onChange={handleFileSelect} />
 
       <style>{`
         @keyframes pulseGold {
