@@ -661,8 +661,13 @@ router.post("/fs-pro/cinematic-templates/:id/compose", requireAdmin, async (req,
       productName, brand, productMaterials, productColors, industry, aspect,
       painPoint, coreBenefit, targetAudience, callToAction,
     } = (req.body || {}) as Partial<ComposeVariables> & { aspect?: "9:16" | "16:9" | "1:1" };
-    if (!productName || String(productName).trim().length < 2) {
-      res.status(400).json({ error: "productName requerido (mín 2 caracteres)" });
+    // productName sólo es obligatorio cuando la plantilla declara PRODUCT_NAME en sus variables.
+    // Para plantillas personal_brand / talking_head (sin producto físico) el campo es opcional
+    // y el front envía brand como fallback.
+    const tplVars = new Set(tpl.variables || []);
+    const needsProduct = tplVars.size === 0 || tplVars.has("PRODUCT_NAME");
+    if (needsProduct && (!productName || String(productName).trim().length < 2)) {
+      res.status(400).json({ error: "productName requerido para esta plantilla (mín 2 caracteres)" });
       return;
     }
     if (!brand || String(brand).trim().length < 2) {
@@ -672,7 +677,10 @@ router.post("/fs-pro/cinematic-templates/:id/compose", requireAdmin, async (req,
     const composed = composeCinematicScript(
       tpl,
       {
-        productName: String(productName).trim().slice(0, 200),
+        // Para plantillas sin PRODUCT_NAME (personal_brand), productName puede ser undefined.
+        // En ese caso pasamos brand como nombre de producto para que los placeholders
+        // {{PRODUCT_NAME}} en otros templates no exploten con "undefined".
+        productName: productName ? String(productName).trim().slice(0, 200) : String(brand).trim().slice(0, 200),
         brand: String(brand).trim().slice(0, 120),
         productMaterials: productMaterials ? String(productMaterials).trim().slice(0, 300) : undefined,
         productColors: productColors ? String(productColors).trim().slice(0, 200) : undefined,
@@ -2652,7 +2660,10 @@ router.post(
         productImage = await readVaultContent(row);
         if (row?.mimeType) productMime = row.mimeType;
       }
-      if (!productImage) { res.status(400).json({ error: "Imagen de producto requerida (file o productVaultId)" }); return; }
+      // Para plantillas de marca personal / talking-head sin producto físico, el character
+      // (presenter) sirve de referencia visual cuando no se sube imagen de producto.
+      if (!productImage && characterFile) { productImage = characterFile.buffer; productMime = characterFile.mimetype; }
+      if (!productImage) { res.status(400).json({ error: "Imagen de producto requerida (file o productVaultId). Para plantillas de marca personal, sube al menos la foto del presentador." }); return; }
 
       // Optional pre-rendered/edited script
       let presetScript: CinematicScript | undefined;

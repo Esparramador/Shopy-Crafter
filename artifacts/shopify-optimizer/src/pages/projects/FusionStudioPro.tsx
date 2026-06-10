@@ -3254,7 +3254,9 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
   const launchRender = async () => {
     if (!composed) { onError("Componer el guion primero"); return; }
     if (!selected) return;
-    if (!productFile) { onError("Sube una imagen del producto para renderizar"); return; }
+    // Para plantillas sin producto físico (personal_brand) el presenter sirve de referencia visual
+    if (requiresPhysicalProduct && !productFile) { onError("Sube una imagen del producto para renderizar"); return; }
+    if (!requiresPhysicalProduct && !productFile && !presenterFile) { onError("Sube al menos una imagen de referencia (del presentador o del contexto)"); return; }
     if (requiresPresenter && !presenterFile) {
       onError("Esta plantilla requiere un presentador: sube una foto del host antes de generar");
       return;
@@ -3293,7 +3295,9 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
       fd.append("narrationEnabled", String(enableNarration));
       if (enableNarration && narrationVoiceId.trim()) fd.append("narrationVoiceId", narrationVoiceId.trim());
       fd.append("musicEnabled", "false");
-      fd.append("product", productFile);
+      // Para plantillas sin producto físico (personal_brand), usar presenterFile como referencia visual
+      const productRef = productFile ?? (requiresPresenter ? presenterFile : null);
+      if (productRef) fd.append("product", productRef);
       // Presenter (character lock) — sólo cuando la plantilla lo requiere
       if (requiresPresenter && presenterFile) {
         fd.append("character", presenterFile);
@@ -3661,9 +3665,10 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
             {composed && (
               <Section title="🎬 Lanzar generación real">
                 <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 0, lineHeight: 1.5, marginBottom: 10 }}>
-                  Sube la imagen del producto y lanza la generación. El motor usará el guion compuesto
-                  directamente (sin pasar por Claude para escribir prompts) y producirá un MP4 final
-                  guardado en la bóveda del proyecto.
+                  {requiresPhysicalProduct
+                    ? "Sube la imagen del producto y lanza la generación."
+                    : "Sube una imagen de referencia (fondo, ambiente o contexto visual) — opcional si ya subiste la foto del presentador arriba."
+                  }{" "}El motor usará el guion compuesto directamente (sin pasar por Claude para escribir prompts) y producirá un MP4 final guardado en la bóveda del proyecto.
                 </p>
                 <input
                   type="file"
@@ -3678,7 +3683,7 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
                 )}
                 <button
                   onClick={launchRender}
-                  disabled={rendering || !productFile || (requiresPresenter && !presenterFile)}
+                  disabled={rendering || (requiresPhysicalProduct && !productFile) || (!requiresPhysicalProduct && !productFile && !presenterFile) || (requiresPresenter && !presenterFile)}
                   className="btn btn-gold"
                   style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
                   {rendering ? <Loader2 size={16} className="animate-spin" /> : <Film size={16} />}
