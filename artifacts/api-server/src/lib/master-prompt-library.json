@@ -16,7 +16,7 @@
       "CLIENT_COLORS": "Paleta de colores de la marca",
       "CLIENT_LANGUAGE": "Idioma del contenido"
     },
-    "total_templates": 6167,
+    "total_templates": 6230,
     "libraries": [
       {
         "key": "stitch_bulk_v3",
@@ -111308,6 +111308,1060 @@
           "prompt": "CSS OVERRIDE — React Toastify para Agencia IA (Paleta {{CLIENT_NAME}}):\n\n:root {\n  --bg-primary:   {{CLIENT_COLORS}} deep;    /* ej: #5E2D8B */\n  --card-bg:      rgba(123,76,170,0.92);     /* Adaptar a marca */\n  --cta-color:    {{CLIENT_COLORS}} accent;  /* ej: #29ABE2 */\n  --success:      #4CAF50;\n  --text-white:   #FFFFFF;\n}\n\n/* Contenedor principal */\n.Toastify__toast-container {\n  z-index: 9999 !important; /* Encima de Three.js (z:5) y de la card (z:3) */\n  bottom: 24px !important;\n  left: 50% !important;\n  transform: translateX(-50%) !important;\n  width: auto !important;\n  min-width: 320px !important;\n  max-width: 500px !important;\n}\n\n/* Toast base */\n.agency-toast-success {\n  background-color: var(--card-bg) !important;\n  backdrop-filter: blur(12px) !important;\n  -webkit-backdrop-filter: blur(12px) !important;\n  color: var(--text-white) !important;\n  border: 1px solid rgba(255,255,255,0.20) !important;\n  border-radius: 12px !important;\n  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif !important;\n  font-weight: 600 !important;\n  box-shadow: 0 10px 30px rgba(0,0,0,0.35) !important;\n}\n\n/* Icono del toast */\n.Toastify__toast-icon {\n  color: var(--success) !important;\n  font-size: 20px !important;\n}\n\n/* Barra de progreso */\n.agency-toast-progress {\n  background-color: var(--success) !important;\n  height: 3px !important;\n}\n\n/* Toast de error (para validaciones fallidas) */\n.agency-toast-error {\n  background-color: rgba(180,30,30,0.92) !important;\n  backdrop-filter: blur(12px) !important;\n  border: 1px solid rgba(255,100,100,0.25) !important;\n  border-radius: 12px !important;\n  color: #FFFFFF !important;\n}\n\n/* Campo completado: animación estado success */\n.field-active.success-state {\n  border: 2px solid var(--success) !important;\n  transition: border 0.3s ease;\n  box-shadow: 0 0 0 3px rgba(76,175,80,0.15);\n}\n\n/* Check icon apareciendo */\n@keyframes checkAppear {\n  0%   { opacity: 0; transform: translateY(-50%) scale(0.4) rotate(-10deg); }\n  70%  { transform: translateY(-50%) scale(1.1) rotate(2deg); }\n  100% { opacity: 1; transform: translateY(-50%) scale(1) rotate(0); }\n}\n.check-icon {\n  position: absolute; right: 12px; top: 50%;\n  animation: checkAppear 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards;\n}\n\nINSTALACIÓN:\n  pnpm add react-toastify\n  import { ToastContainer, toast } from 'react-toastify';\n  import 'react-toastify/dist/ReactToastify.css';\n  // Usar className='agency-toast-success' en el toast.success({...})"
         }
       ]
+    },
+    "tripo3d_animations": {
+        "_meta": {
+            "library_id": "tripo3d_animations",
+            "name": "🧊 Tripo3D — Modelos 3D y Animaciones",
+            "description": "Generación de modelos 3D con IA (Tripo3D): texto→3D, imagen→3D, multi-vista, rigging, 58 animaciones preset, estilos artísticos y AR Shopify",
+            "total": 63,
+            "version": "1.0.0",
+            "categories": [
+                "api-guide",
+                "prompting",
+                "image-guide",
+                "batch",
+                "animation-guide",
+                "stylize",
+                "shopify",
+                "animation_locomotion",
+                "animation_idle",
+                "animation_gesture",
+                "animation_dance",
+                "animation_emote",
+                "animation_combat",
+                "animation_sit",
+                "animation_activity"
+            ]
+        },
+        "templates": [
+            {
+                "id": "tripo_master_guide_001",
+                "name": "🧊 Tripo3D — Guía Maestra de Generación 3D",
+                "icon": "🧊",
+                "category": "api-guide",
+                "tags": [
+                    "tripo3d",
+                    "3d",
+                    "api",
+                    "guide",
+                    "workflow"
+                ],
+                "description": "Guía completa del flujo de trabajo Tripo3D: texto→3D, imagen→3D, rigging, animación y exportación",
+                "prompt": "TRIPO3D STUDIO — FLUJO COMPLETO\n\nPIPELINE ESTÁNDAR:\n1. GENERACIÓN: Usa texto (text_to_model) o imagen (image_to_model) con texture:true + pbr:true\n2. REFINADO: Envía draft_model_task_id a refine_model para mayor fidelidad\n3. PRERIG CHECK: Verifica que el modelo soporte rigging con animate_prerigcheck\n4. RIGGING: Crea esqueleto y huesos con animate_rig → guarda el task_id del modelo rigueado\n5. RETARGET: Aplica animación preset con animate_retarget → parámetros: original_model_task_id + animation\n6. EXPORTAR: Usa convert_model para GLB/FBX/OBJ/STL/USDZ\n\nMODEL_VERSION RECOMENDADA: 'default' (siempre la última)\nFORMATOS: GLB para web/Three.js, FBX para Blender/Unity/Unreal, MP4 para preview de animación\nFACE_LIMIT: 10000 para web, sin límite para impresión 3D",
+                "use_case": "workflow_guide",
+                "tripo_type": "guide"
+            },
+            {
+                "id": "tripo_text_prompting_001",
+                "name": "✍️ Tripo3D — Ingeniería de Prompts Texto→3D",
+                "icon": "✍️",
+                "category": "prompting",
+                "tags": [
+                    "tripo3d",
+                    "text",
+                    "prompt",
+                    "engineering"
+                ],
+                "description": "Técnicas de prompt engineering específicas para generación de modelos 3D con Tripo3D",
+                "prompt": "TÉCNICAS DE PROMPT PARA TRIPO3D (text_to_model)\n\nESTRUCTURA ÓPTIMA:\n[objeto] + [estilo visual] + [materiales] + [calidad target]\n\nEJEMPLOS POR CATEGORÍA:\n\nPRODUCTOS SHOPIFY:\n- 'a sleek wireless bluetooth headphones, matte black finish, metallic accents, product photography style, high detail'\n- 'a glass perfume bottle with gold cap, transparent liquid inside, luxury brand aesthetic'\n- 'a running shoe with breathable mesh upper, rubber sole, neon colorway, sport style'\n\nPERSONAJES:\n- 'a cute cartoon fox character with oversized head, wearing a hoodie, game-ready low-poly style'\n- 'a robot mascot with rounded body, LED eyes, metallic sheen, friendly expression'\n\nAMBIENTES:\n- 'a minimalist desk setup, wooden surface, laptop, plant, soft lighting, architectural visualization'\n\nNEGATIVE PROMPT útiles:\n- 'blurry, deformed, broken, low quality, missing textures, floating parts'",
+                "use_case": "prompt_engineering",
+                "tripo_type": "text_to_model"
+            },
+            {
+                "id": "tripo_image_tips_001",
+                "name": "📷 Tripo3D — Guía Imagen→3D",
+                "icon": "📷",
+                "category": "image-guide",
+                "tags": [
+                    "tripo3d",
+                    "image",
+                    "photo",
+                    "tips"
+                ],
+                "description": "Mejores prácticas para fotografías que generan modelos 3D de alta calidad",
+                "prompt": "IMAGEN→3D TRIPO3D — MEJORES PRÁCTICAS\n\nFOTO IDEAL:\n✅ Fondo blanco o neutro uniforme\n✅ Objeto centrado, sin recortes\n✅ Iluminación difusa (no sombras duras)\n✅ Alta resolución (mín. 512×512px)\n✅ Objeto completo visible\n\nFOTO PROBLEMÁTICA:\n❌ Fondo complejo con múltiples objetos\n❌ Iluminación lateral extrema\n❌ Objeto parcialmente fuera de cuadro\n❌ Reflejo especular excesivo\n\nTRICO PARA SHOPIFY:\nUsa la imagen principal del producto en Shopify (ya tiene fondo limpio) → directamente a image_to_model.\nResultado: modelo 3D listo para embed en tu tienda con <model-viewer>.\n\nPARA MULTI-VISTA (multiview_to_model):\n- Foto frontal: el ángulo de producto principal\n- Lateral izquierda: 90° rotación\n- Trasera: vista posterior\n- Lateral derecha: 270° rotación\nMisma iluminación en todas las fotos.",
+                "use_case": "photo_guide",
+                "tripo_type": "image_to_model"
+            },
+            {
+                "id": "tripo_batch_workflow_001",
+                "name": "⚡ Tripo3D — PoliCreación en Lote",
+                "icon": "⚡",
+                "category": "batch",
+                "tags": [
+                    "tripo3d",
+                    "batch",
+                    "ecommerce",
+                    "shopify",
+                    "bulk"
+                ],
+                "description": "Estrategia de generación masiva de modelos 3D para catálogos Shopify",
+                "prompt": "TRIPO3D BATCH — ESTRATEGIA DE CATÁLOGO 3D\n\nCASO DE USO:\nTienes 10 productos Shopify → quieres modelos 3D de todos para vistas 360°.\n\nFLUJO BATCH:\n1. Descarga imagen principal de cada producto (fondo blanco ideal)\n2. Envía todas a POST /api/tripo3d/batch con FormData (key: 'images', max 10 archivos)\n3. El servidor procesa en paralelo → emite SSE con progreso por imagen\n4. Recibe task_id por cada modelo completado\n5. Descarga los GLB y súbelos a tu CDN\n6. Embebe en Shopify con <model-viewer src='...' ar ios-src='...'>\n\nESTIMACIÓN DE TIEMPO:\n- 1 modelo imagen→3D: ~2-4 minutos\n- 10 modelos en lote: ~5-8 minutos (paralelo)\n\nRECOMENDACIÓN FACE_LIMIT:\n- AR móvil: 5000 polígonos\n- Vista 360° desktop: 20000 polígonos\n- Sin compresión: sin límite (máx detalle)",
+                "use_case": "ecommerce_batch",
+                "tripo_type": "batch"
+            },
+            {
+                "id": "tripo_animation_workflow_001",
+                "name": "💃 Tripo3D — Flujo de Animación Completo",
+                "icon": "💃",
+                "category": "animation-guide",
+                "tags": [
+                    "tripo3d",
+                    "animation",
+                    "rig",
+                    "retarget",
+                    "workflow"
+                ],
+                "description": "Guía paso a paso: de modelo estático a personaje animado con Tripo3D",
+                "prompt": "TRIPO3D ANIMACIÓN — FLUJO COMPLETO\n\n1. GENERAR MODELO BASE\n   POST /api/tripo3d/text-to-model\n   { prompt: 'humanoid character, full body, game-ready', texture: true }\n   → guarda el task_id resultante\n\n2. COMPROBAR COMPATIBILIDAD CON RIGGING\n   POST /api/tripo3d/prerig\n   { original_model_task_id: '<task_id>' }\n   → si output.checkpass = true, continúa\n\n3. APLICAR SKELETON (rigging)\n   POST /api/tripo3d/rig\n   { original_model_task_id: '<task_id>' }\n   → guarda el task_id del modelo rigueado\n\n4. RETARGET CON ANIMACIÓN\n   POST /api/tripo3d/retarget\n   { original_model_task_id: '<rigged_task_id>', animation: 'walk', out_format: 'glb' }\n   → descarga el GLB animado\n\nCONSEJOS:\n- Usa personajes humanoides o cuadrúpedos para mejores resultados\n- 'out_format: mp4' genera preview de video de la animación\n- Aplica múltiples retargets al mismo rigued model (no tienes que hacer el rig de nuevo)",
+                "use_case": "animation_workflow",
+                "tripo_type": "animation_guide"
+            },
+            {
+                "id": "tripo_stylize_001",
+                "name": "🎨 Tripo3D — Estilos Artísticos",
+                "icon": "🎨",
+                "category": "stylize",
+                "tags": [
+                    "tripo3d",
+                    "stylize",
+                    "voxel",
+                    "lego",
+                    "minecraft"
+                ],
+                "description": "Aplicar estilos artísticos a modelos 3D: LEGO, Voxel, Voronoi, Minecraft",
+                "prompt": "TRIPO3D STYLIZE — ESTILOS ARTÍSTICOS\n\nCOMO USAR:\nPOST /api/tripo3d/stylize\n{ original_model_task_id: '<task_id>', style: '<estilo>', block_size: <número> }\n\nESTILOS DISPONIBLES:\n- 'lego' — Construye el modelo con piezas LEGO. block_size recomendado: 8-16\n- 'voxel' — Voxelización minecraft-like. block_size: 4-8 para detalle, 16 para chunky\n- 'voronoi' — Patrón de voronoi geométrico orgánico. block_size: 4-12\n- 'minecraft' — Idéntico a voxel pero con texturas estilo Minecraft\n\nCASOS DE USO SHOPIFY:\n- Producto físico → LEGO edition para campaña de marketing\n- Mascota marca → versión Voxel para gaming/metaverso\n- NFT colección → Voronoi para estética cripto-art\n\nblock_size GUÍA:\n- Valor alto (16-32): pixelado grueso, reconocible de lejos\n- Valor bajo (4-8): alta fidelidad al original, detalle fino",
+                "use_case": "stylize_workflow",
+                "tripo_type": "stylize_model"
+            },
+            {
+                "id": "tripo_shopify_ar_001",
+                "name": "🛒 Tripo3D → Shopify AR Integration",
+                "icon": "🛒",
+                "category": "shopify",
+                "tags": [
+                    "tripo3d",
+                    "shopify",
+                    "ar",
+                    "ecommerce",
+                    "3d-viewer"
+                ],
+                "description": "Integrar modelos 3D generados por Tripo3D en productos Shopify con AR nativo",
+                "prompt": "TRIPO3D + SHOPIFY AR — INTEGRACIÓN COMPLETA\n\nPASOS:\n1. Genera modelo con Tripo3D → descarga .glb y .usdz\n   (convert_model con format:'glb' y después format:'usdz' para iOS AR)\n\n2. Sube a Shopify como Media de Producto:\n   PUT /admin/api/2024-01/products/{id}/media.json\n   {\n     'media': [{ 'original_source': 'https://cdn.tudominio.com/model.glb', 'media_content_type': 'MODEL_3D' }]\n   }\n\n3. En el theme Liquid, Shopify renderiza automáticamente con <model-viewer>\n   Si quieres personalizarlo en el tema:\n   <model-viewer src='{{ product.media | where: 'media_type', 'model' | first | product_model_url: 'glb' }}'\n     ios-src='{{ ... | product_model_url: 'usdz' }}'\n     ar ar-modes='webxr scene-viewer quick-look'\n     camera-controls auto-rotate>\n   </model-viewer>\n\n4. Resultado: botón 'Ver en tu espacio' en iOS/Android → AR nativo sin app",
+                "use_case": "shopify_ar",
+                "tripo_type": "integration"
+            },
+            {
+                "id": "tripo_anim_walk_001",
+                "name": "🚶 Animación — Caminar",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "basic",
+                    "loop",
+                    "movement"
+                ],
+                "description": "Ciclo de caminata hacia adelante, perfecta para personajes en movimiento",
+                "prompt": "TRIPO3D ANIMACIÓN: CAMINAR\n\nID DE PRESET: walk\nCATEGORÍA: Locomoción\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nCiclo de caminata hacia adelante, perfecta para personajes en movimiento\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"walk\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Caminar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "walk",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_run_002",
+                "name": "🚶 Animación — Correr",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "basic",
+                    "loop",
+                    "movement",
+                    "fast"
+                ],
+                "description": "Ciclo de carrera hacia adelante, alta energía",
+                "prompt": "TRIPO3D ANIMACIÓN: CORRER\n\nID DE PRESET: run\nCATEGORÍA: Locomoción\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nCiclo de carrera hacia adelante, alta energía\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"run\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Correr'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "run",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_jog_003",
+                "name": "🚶 Animación — Trotar",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "loop",
+                    "movement",
+                    "sport"
+                ],
+                "description": "Trote a ritmo medio entre caminar y correr",
+                "prompt": "TRIPO3D ANIMACIÓN: TROTAR\n\nID DE PRESET: jog\nCATEGORÍA: Locomoción\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nTrote a ritmo medio entre caminar y correr\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"jog\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Trotar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "jog",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_backward_walk_004",
+                "name": "🚶 Animación — Caminar atrás",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "loop",
+                    "movement"
+                ],
+                "description": "Caminar hacia atrás con naturalidad",
+                "prompt": "TRIPO3D ANIMACIÓN: CAMINAR ATRÁS\n\nID DE PRESET: backward_walk\nCATEGORÍA: Locomoción\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nCaminar hacia atrás con naturalidad\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"backward_walk\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Caminar atrás'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "backward_walk",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_sneak_005",
+                "name": "🚶 Animación — Sigilo",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "loop",
+                    "stealth",
+                    "game"
+                ],
+                "description": "Caminar en puntillas, movimiento sigiloso",
+                "prompt": "TRIPO3D ANIMACIÓN: SIGILO\n\nID DE PRESET: sneak\nCATEGORÍA: Locomoción\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nCaminar en puntillas, movimiento sigiloso\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"sneak\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Sigilo'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "sneak",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_jump_006",
+                "name": "🚶 Animación — Saltar",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "basic",
+                    "action",
+                    "game"
+                ],
+                "description": "Salto en el lugar con aterrizaje suave",
+                "prompt": "TRIPO3D ANIMACIÓN: SALTAR\n\nID DE PRESET: jump\nCATEGORÍA: Locomoción\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nSalto en el lugar con aterrizaje suave\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"jump\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Saltar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "jump",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_run_jump_007",
+                "name": "🚶 Animación — Salto en carrera",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "action",
+                    "sport",
+                    "game"
+                ],
+                "description": "Salto largo mientras corre, atletismo",
+                "prompt": "TRIPO3D ANIMACIÓN: SALTO EN CARRERA\n\nID DE PRESET: run_jump\nCATEGORÍA: Locomoción\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nSalto largo mientras corre, atletismo\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"run_jump\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Salto en carrera'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "run_jump",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_strafe_left_008",
+                "name": "🚶 Animación — Paso lateral izq.",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "loop",
+                    "game",
+                    "combat"
+                ],
+                "description": "Desplazamiento lateral hacia la izquierda",
+                "prompt": "TRIPO3D ANIMACIÓN: PASO LATERAL IZQ.\n\nID DE PRESET: strafe_left\nCATEGORÍA: Locomoción\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nDesplazamiento lateral hacia la izquierda\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"strafe_left\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Paso lateral izq.'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "strafe_left",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_strafe_right_009",
+                "name": "🚶 Animación — Paso lateral der.",
+                "icon": "🚶",
+                "category": "animation_locomotion",
+                "tags": [
+                    "loop",
+                    "game",
+                    "combat"
+                ],
+                "description": "Desplazamiento lateral hacia la derecha",
+                "prompt": "TRIPO3D ANIMACIÓN: PASO LATERAL DER.\n\nID DE PRESET: strafe_right\nCATEGORÍA: Locomoción\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nDesplazamiento lateral hacia la derecha\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"strafe_right\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Paso lateral der.'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "strafe_right",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_idle_010",
+                "name": "🧍 Animación — Reposo estándar",
+                "icon": "🧍",
+                "category": "animation_idle",
+                "tags": [
+                    "basic",
+                    "loop",
+                    "default"
+                ],
+                "description": "Pose de reposo con respiración sutil — ideal como animación base de bucle",
+                "prompt": "TRIPO3D ANIMACIÓN: REPOSO ESTÁNDAR\n\nID DE PRESET: idle\nCATEGORÍA: Reposo\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nPose de reposo con respiración sutil — ideal como animación base de bucle\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"idle\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Reposo estándar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "idle",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_idle_hip_hop_011",
+                "name": "🧍 Animación — Reposo Hip Hop",
+                "icon": "🧍",
+                "category": "animation_idle",
+                "tags": [
+                    "loop",
+                    "dance",
+                    "casual"
+                ],
+                "description": "Reposo con bounce hip hop, ritmo y actitud",
+                "prompt": "TRIPO3D ANIMACIÓN: REPOSO HIP HOP\n\nID DE PRESET: idle_hip_hop\nCATEGORÍA: Reposo\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nReposo con bounce hip hop, ritmo y actitud\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"idle_hip_hop\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Reposo Hip Hop'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "idle_hip_hop",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_fidget_012",
+                "name": "🧍 Animación — Inquieto",
+                "icon": "🧍",
+                "category": "animation_idle",
+                "tags": [
+                    "loop",
+                    "emotion",
+                    "NPC"
+                ],
+                "description": "Personaje inquieto, movimientos nerviosos sutiles",
+                "prompt": "TRIPO3D ANIMACIÓN: INQUIETO\n\nID DE PRESET: fidget\nCATEGORÍA: Reposo\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nPersonaje inquieto, movimientos nerviosos sutiles\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"fidget\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Inquieto'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "fidget",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_look_around_013",
+                "name": "🧍 Animación — Mirar alrededor",
+                "icon": "🧍",
+                "category": "animation_idle",
+                "tags": [
+                    "action",
+                    "NPC",
+                    "lookdev"
+                ],
+                "description": "Personaje mira a los lados, detectando entorno",
+                "prompt": "TRIPO3D ANIMACIÓN: MIRAR ALREDEDOR\n\nID DE PRESET: look_around\nCATEGORÍA: Reposo\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nPersonaje mira a los lados, detectando entorno\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"look_around\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Mirar alrededor'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "look_around",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_wave_014",
+                "name": "👋 Animación — Saludar con mano",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "social",
+                    "greeting",
+                    "friendly"
+                ],
+                "description": "Gesto amigable de saludo — perfecto para intros de personaje",
+                "prompt": "TRIPO3D ANIMACIÓN: SALUDAR CON MANO\n\nID DE PRESET: wave\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nGesto amigable de saludo — perfecto para intros de personaje\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"wave\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Saludar con mano'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "wave",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_wave_goodbye_015",
+                "name": "👋 Animación — Adiós",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "social",
+                    "goodbye"
+                ],
+                "description": "Gesto de despedida con la mano",
+                "prompt": "TRIPO3D ANIMACIÓN: ADIÓS\n\nID DE PRESET: wave_goodbye\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nGesto de despedida con la mano\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"wave_goodbye\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Adiós'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "wave_goodbye",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_clap_016",
+                "name": "👋 Animación — Aplaudir",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "social",
+                    "emotion",
+                    "celebration"
+                ],
+                "description": "Palmadas de aplauso — celebración o aprobación",
+                "prompt": "TRIPO3D ANIMACIÓN: APLAUDIR\n\nID DE PRESET: clap\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nPalmadas de aplauso — celebración o aprobación\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"clap\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Aplaudir'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "clap",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_bow_017",
+                "name": "👋 Animación — Reverencia",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "social",
+                    "formal",
+                    "greeting"
+                ],
+                "description": "Inclinación de respeto — saludos formales o japoneses",
+                "prompt": "TRIPO3D ANIMACIÓN: REVERENCIA\n\nID DE PRESET: bow\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nInclinación de respeto — saludos formales o japoneses\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"bow\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Reverencia'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "bow",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_nod_018",
+                "name": "👋 Animación — Asentir",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "social",
+                    "reaction",
+                    "communication"
+                ],
+                "description": "Movimiento de cabeza afirmativo — sí",
+                "prompt": "TRIPO3D ANIMACIÓN: ASENTIR\n\nID DE PRESET: nod\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nMovimiento de cabeza afirmativo — sí\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"nod\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Asentir'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "nod",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_shake_head_019",
+                "name": "👋 Animación — Negar",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "social",
+                    "reaction",
+                    "communication"
+                ],
+                "description": "Movimiento de cabeza negativo — no",
+                "prompt": "TRIPO3D ANIMACIÓN: NEGAR\n\nID DE PRESET: shake_head\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nMovimiento de cabeza negativo — no\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"shake_head\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Negar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "shake_head",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_point_020",
+                "name": "👋 Animación — Señalar",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "action",
+                    "direction",
+                    "presentation"
+                ],
+                "description": "Señalar hacia adelante/arriba — llamada a la acción",
+                "prompt": "TRIPO3D ANIMACIÓN: SEÑALAR\n\nID DE PRESET: point\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nSeñalar hacia adelante/arriba — llamada a la acción\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"point\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Señalar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "point",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_thumbs_up_021",
+                "name": "👋 Animación — Pulgar arriba",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "social",
+                    "positive",
+                    "emoji"
+                ],
+                "description": "Gesto positivo universal — aprobación y optimismo",
+                "prompt": "TRIPO3D ANIMACIÓN: PULGAR ARRIBA\n\nID DE PRESET: thumbs_up\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nGesto positivo universal — aprobación y optimismo\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"thumbs_up\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Pulgar arriba'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "thumbs_up",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_think_022",
+                "name": "👋 Animación — Pensativo",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "emotion",
+                    "intellectual",
+                    "NPC"
+                ],
+                "description": "Pose pensativa con mano en mentón — reflexión o duda",
+                "prompt": "TRIPO3D ANIMACIÓN: PENSATIVO\n\nID DE PRESET: think\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nPose pensativa con mano en mentón — reflexión o duda\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"think\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Pensativo'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "think",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_shrug_023",
+                "name": "👋 Animación — Encogerse de hombros",
+                "icon": "👋",
+                "category": "animation_gesture",
+                "tags": [
+                    "emotion",
+                    "social",
+                    "casual"
+                ],
+                "description": "Expresión de desconocimiento o indiferencia",
+                "prompt": "TRIPO3D ANIMACIÓN: ENCOGERSE DE HOMBROS\n\nID DE PRESET: shrug\nCATEGORÍA: Gestos\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nExpresión de desconocimiento o indiferencia\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"shrug\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Encogerse de hombros'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "shrug",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_hip_hop_dance_024",
+                "name": "💃 Animación — Baile Hip Hop",
+                "icon": "💃",
+                "category": "animation_dance",
+                "tags": [
+                    "dance",
+                    "hiphop",
+                    "party",
+                    "loop"
+                ],
+                "description": "Coreografía hip hop completa — enérgica y moderna",
+                "prompt": "TRIPO3D ANIMACIÓN: BAILE HIP HOP\n\nID DE PRESET: hip_hop_dance\nCATEGORÍA: Baile\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nCoreografía hip hop completa — enérgica y moderna\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"hip_hop_dance\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Baile Hip Hop'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "hip_hop_dance",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_robot_dance_025",
+                "name": "💃 Animación — Baile Robot",
+                "icon": "💃",
+                "category": "animation_dance",
+                "tags": [
+                    "dance",
+                    "robot",
+                    "fun",
+                    "loop"
+                ],
+                "description": "Movimientos mecánicos y robóticos al ritmo de la música",
+                "prompt": "TRIPO3D ANIMACIÓN: BAILE ROBOT\n\nID DE PRESET: robot_dance\nCATEGORÍA: Baile\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nMovimientos mecánicos y robóticos al ritmo de la música\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"robot_dance\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Baile Robot'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "robot_dance",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_salsa_026",
+                "name": "💃 Animación — Salsa",
+                "icon": "💃",
+                "category": "animation_dance",
+                "tags": [
+                    "dance",
+                    "latin",
+                    "party",
+                    "loop"
+                ],
+                "description": "Pasos básicos de salsa, movimiento de caderas y pies",
+                "prompt": "TRIPO3D ANIMACIÓN: SALSA\n\nID DE PRESET: salsa\nCATEGORÍA: Baile\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nPasos básicos de salsa, movimiento de caderas y pies\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"salsa\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Salsa'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "salsa",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_breakdance_027",
+                "name": "💃 Animación — Breakdance",
+                "icon": "💃",
+                "category": "animation_dance",
+                "tags": [
+                    "dance",
+                    "street",
+                    "athletic"
+                ],
+                "description": "Movimientos de street dance con giros y trabajo de piso",
+                "prompt": "TRIPO3D ANIMACIÓN: BREAKDANCE\n\nID DE PRESET: breakdance\nCATEGORÍA: Baile\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nMovimientos de street dance con giros y trabajo de piso\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"breakdance\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Breakdance'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "breakdance",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_gangnam_style_028",
+                "name": "💃 Animación — Caballito",
+                "icon": "💃",
+                "category": "animation_dance",
+                "tags": [
+                    "dance",
+                    "viral",
+                    "fun",
+                    "loop"
+                ],
+                "description": "El icónico movimiento de caballito del Gangnam Style",
+                "prompt": "TRIPO3D ANIMACIÓN: CABALLITO\n\nID DE PRESET: gangnam_style\nCATEGORÍA: Baile\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nEl icónico movimiento de caballito del Gangnam Style\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"gangnam_style\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Caballito'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "gangnam_style",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_angry_029",
+                "name": "😄 Animación — Enojado",
+                "icon": "😄",
+                "category": "animation_emote",
+                "tags": [
+                    "emotion",
+                    "combat-ready",
+                    "NPC"
+                ],
+                "description": "Expresión de enfado — postura agresiva con puños",
+                "prompt": "TRIPO3D ANIMACIÓN: ENOJADO\n\nID DE PRESET: angry\nCATEGORÍA: Emociones\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nExpresión de enfado — postura agresiva con puños\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"angry\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Enojado'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "angry",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_cry_030",
+                "name": "😄 Animación — Llorar",
+                "icon": "😄",
+                "category": "animation_emote",
+                "tags": [
+                    "emotion",
+                    "sad",
+                    "storytelling"
+                ],
+                "description": "Animación de llanto — personaje triste y emotivo",
+                "prompt": "TRIPO3D ANIMACIÓN: LLORAR\n\nID DE PRESET: cry\nCATEGORÍA: Emociones\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nAnimación de llanto — personaje triste y emotivo\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"cry\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Llorar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "cry",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_celebrate_031",
+                "name": "😄 Animación — Celebrar",
+                "icon": "😄",
+                "category": "animation_emote",
+                "tags": [
+                    "emotion",
+                    "positive",
+                    "victory",
+                    "celebration"
+                ],
+                "description": "Celebración eufórica — brazos en alto, victoria",
+                "prompt": "TRIPO3D ANIMACIÓN: CELEBRAR\n\nID DE PRESET: celebrate\nCATEGORÍA: Emociones\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nCelebración eufórica — brazos en alto, victoria\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"celebrate\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Celebrar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "celebrate",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_cheer_032",
+                "name": "😄 Animación — Animar",
+                "icon": "😄",
+                "category": "animation_emote",
+                "tags": [
+                    "emotion",
+                    "positive",
+                    "sport"
+                ],
+                "description": "Animar con energía — apoyo a un equipo o logro",
+                "prompt": "TRIPO3D ANIMACIÓN: ANIMAR\n\nID DE PRESET: cheer\nCATEGORÍA: Emociones\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nAnimar con energía — apoyo a un equipo o logro\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"cheer\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Animar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "cheer",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_surprise_033",
+                "name": "😄 Animación — Sorprendido",
+                "icon": "😄",
+                "category": "animation_emote",
+                "tags": [
+                    "emotion",
+                    "reaction",
+                    "NPC"
+                ],
+                "description": "Reacción de sorpresa genuina — manos en la cara",
+                "prompt": "TRIPO3D ANIMACIÓN: SORPRENDIDO\n\nID DE PRESET: surprise\nCATEGORÍA: Emociones\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nReacción de sorpresa genuina — manos en la cara\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"surprise\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Sorprendido'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "surprise",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_happy_034",
+                "name": "😄 Animación — Feliz",
+                "icon": "😄",
+                "category": "animation_emote",
+                "tags": [
+                    "emotion",
+                    "positive",
+                    "energetic"
+                ],
+                "description": "Salto de alegría o expresión de felicidad intensa",
+                "prompt": "TRIPO3D ANIMACIÓN: FELIZ\n\nID DE PRESET: happy\nCATEGORÍA: Emociones\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nSalto de alegría o expresión de felicidad intensa\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"happy\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Feliz'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "happy",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_laugh_035",
+                "name": "😄 Animación — Reír",
+                "icon": "😄",
+                "category": "animation_emote",
+                "tags": [
+                    "emotion",
+                    "social",
+                    "positive"
+                ],
+                "description": "Carcajada expresiva — personaje riendo a carcajadas",
+                "prompt": "TRIPO3D ANIMACIÓN: REÍR\n\nID DE PRESET: laugh\nCATEGORÍA: Emociones\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nCarcajada expresiva — personaje riendo a carcajadas\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"laugh\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Reír'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "laugh",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_scared_036",
+                "name": "😄 Animación — Asustado",
+                "icon": "😄",
+                "category": "animation_emote",
+                "tags": [
+                    "emotion",
+                    "horror",
+                    "NPC"
+                ],
+                "description": "Reacción de miedo — retroceder y cubrirse",
+                "prompt": "TRIPO3D ANIMACIÓN: ASUSTADO\n\nID DE PRESET: scared\nCATEGORÍA: Emociones\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nReacción de miedo — retroceder y cubrirse\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"scared\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Asustado'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "scared",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_punch_037",
+                "name": "⚔️ Animación — Puñetazo",
+                "icon": "⚔️",
+                "category": "animation_combat",
+                "tags": [
+                    "combat",
+                    "game",
+                    "action",
+                    "attack"
+                ],
+                "description": "Golpe directo de puño derecho — acción de combate básica",
+                "prompt": "TRIPO3D ANIMACIÓN: PUÑETAZO\n\nID DE PRESET: punch\nCATEGORÍA: Combate\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nGolpe directo de puño derecho — acción de combate básica\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"punch\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Puñetazo'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "punch",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_kick_038",
+                "name": "⚔️ Animación — Patada frontal",
+                "icon": "⚔️",
+                "category": "animation_combat",
+                "tags": [
+                    "combat",
+                    "game",
+                    "martial-arts",
+                    "attack"
+                ],
+                "description": "Patada frontal al pecho — combate cuerpo a cuerpo",
+                "prompt": "TRIPO3D ANIMACIÓN: PATADA FRONTAL\n\nID DE PRESET: kick\nCATEGORÍA: Combate\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nPatada frontal al pecho — combate cuerpo a cuerpo\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"kick\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Patada frontal'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "kick",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_slash_039",
+                "name": "⚔️ Animación — Espadazo",
+                "icon": "⚔️",
+                "category": "animation_combat",
+                "tags": [
+                    "combat",
+                    "game",
+                    "weapon",
+                    "attack"
+                ],
+                "description": "Ataque diagonal con espada o arma blanca",
+                "prompt": "TRIPO3D ANIMACIÓN: ESPADAZO\n\nID DE PRESET: slash\nCATEGORÍA: Combate\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nAtaque diagonal con espada o arma blanca\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"slash\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Espadazo'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "slash",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_cast_040",
+                "name": "⚔️ Animación — Lanzar magia",
+                "icon": "⚔️",
+                "category": "animation_combat",
+                "tags": [
+                    "combat",
+                    "magic",
+                    "fantasy",
+                    "RPG"
+                ],
+                "description": "Gesto de lanzamiento de hechizo — fantasy/RPG",
+                "prompt": "TRIPO3D ANIMACIÓN: LANZAR MAGIA\n\nID DE PRESET: cast\nCATEGORÍA: Combate\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nGesto de lanzamiento de hechizo — fantasy/RPG\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"cast\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Lanzar magia'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "cast",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_hit_041",
+                "name": "⚔️ Animación — Recibir golpe",
+                "icon": "⚔️",
+                "category": "animation_combat",
+                "tags": [
+                    "combat",
+                    "reaction",
+                    "game"
+                ],
+                "description": "Reacción de impacto — el personaje absorbe un golpe",
+                "prompt": "TRIPO3D ANIMACIÓN: RECIBIR GOLPE\n\nID DE PRESET: hit\nCATEGORÍA: Combate\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nReacción de impacto — el personaje absorbe un golpe\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"hit\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Recibir golpe'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "hit",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_dodge_042",
+                "name": "⚔️ Animación — Esquivar",
+                "icon": "⚔️",
+                "category": "animation_combat",
+                "tags": [
+                    "combat",
+                    "game",
+                    "agile"
+                ],
+                "description": "Movimiento rápido de evasión lateral",
+                "prompt": "TRIPO3D ANIMACIÓN: ESQUIVAR\n\nID DE PRESET: dodge\nCATEGORÍA: Combate\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nMovimiento rápido de evasión lateral\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"dodge\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Esquivar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "dodge",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_die_043",
+                "name": "⚔️ Animación — Morir / Caer",
+                "icon": "⚔️",
+                "category": "animation_combat",
+                "tags": [
+                    "combat",
+                    "game",
+                    "death",
+                    "cinematic"
+                ],
+                "description": "Caída de muerte hacia atrás — game over, cinemáticas",
+                "prompt": "TRIPO3D ANIMACIÓN: MORIR / CAER\n\nID DE PRESET: die\nCATEGORÍA: Combate\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nCaída de muerte hacia atrás — game over, cinemáticas\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"die\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Morir / Caer'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "die",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_combat_idle_044",
+                "name": "⚔️ Animación — Guardia de combate",
+                "icon": "⚔️",
+                "category": "animation_combat",
+                "tags": [
+                    "combat",
+                    "loop",
+                    "game",
+                    "stance"
+                ],
+                "description": "Postura de combate en alerta — listo para atacar",
+                "prompt": "TRIPO3D ANIMACIÓN: GUARDIA DE COMBATE\n\nID DE PRESET: combat_idle\nCATEGORÍA: Combate\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nPostura de combate en alerta — listo para atacar\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"combat_idle\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Guardia de combate'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "combat_idle",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_sit_down_045",
+                "name": "🪑 Animación — Sentarse",
+                "icon": "🪑",
+                "category": "animation_sit",
+                "tags": [
+                    "activity",
+                    "transition",
+                    "casual"
+                ],
+                "description": "Acción de sentarse en una silla — animación de transición",
+                "prompt": "TRIPO3D ANIMACIÓN: SENTARSE\n\nID DE PRESET: sit_down\nCATEGORÍA: Sentarse\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nAcción de sentarse en una silla — animación de transición\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"sit_down\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Sentarse'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "sit_down",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_sit_idle_046",
+                "name": "🪑 Animación — Sentado en reposo",
+                "icon": "🪑",
+                "category": "animation_sit",
+                "tags": [
+                    "loop",
+                    "casual",
+                    "NPC",
+                    "indoor"
+                ],
+                "description": "Reposo sentado — espera o conversación en silla",
+                "prompt": "TRIPO3D ANIMACIÓN: SENTADO EN REPOSO\n\nID DE PRESET: sit_idle\nCATEGORÍA: Sentarse\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nReposo sentado — espera o conversación en silla\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"sit_idle\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Sentado en reposo'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "sit_idle",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_stand_up_047",
+                "name": "🪑 Animación — Levantarse",
+                "icon": "🪑",
+                "category": "animation_sit",
+                "tags": [
+                    "activity",
+                    "transition"
+                ],
+                "description": "Levantarse desde posición sentada — transición inversa",
+                "prompt": "TRIPO3D ANIMACIÓN: LEVANTARSE\n\nID DE PRESET: stand_up\nCATEGORÍA: Sentarse\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nLevantarse desde posición sentada — transición inversa\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"stand_up\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Levantarse'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "stand_up",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_crouch_048",
+                "name": "🪑 Animación — Agacharse",
+                "icon": "🪑",
+                "category": "animation_sit",
+                "tags": [
+                    "game",
+                    "stealth",
+                    "combat"
+                ],
+                "description": "Postura agachada de combate o sigilo",
+                "prompt": "TRIPO3D ANIMACIÓN: AGACHARSE\n\nID DE PRESET: crouch\nCATEGORÍA: Sentarse\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nPostura agachada de combate o sigilo\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"crouch\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Agacharse'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "crouch",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_crouch_idle_049",
+                "name": "🪑 Animación — Agachado en reposo",
+                "icon": "🪑",
+                "category": "animation_sit",
+                "tags": [
+                    "loop",
+                    "game",
+                    "stealth"
+                ],
+                "description": "Reposo en cuclillas — sigilo mantenido",
+                "prompt": "TRIPO3D ANIMACIÓN: AGACHADO EN REPOSO\n\nID DE PRESET: crouch_idle\nCATEGORÍA: Sentarse\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nReposo en cuclillas — sigilo mantenido\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"crouch_idle\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Agachado en reposo'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "crouch_idle",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_crouch_walk_050",
+                "name": "🪑 Animación — Caminar agachado",
+                "icon": "🪑",
+                "category": "animation_sit",
+                "tags": [
+                    "loop",
+                    "game",
+                    "stealth",
+                    "movement"
+                ],
+                "description": "Avanzar sigilosamente agachado",
+                "prompt": "TRIPO3D ANIMACIÓN: CAMINAR AGACHADO\n\nID DE PRESET: crouch_walk\nCATEGORÍA: Sentarse\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nAvanzar sigilosamente agachado\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"crouch_walk\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Caminar agachado'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "crouch_walk",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_typing_051",
+                "name": "💻 Animación — Escribir teclado",
+                "icon": "💻",
+                "category": "animation_activity",
+                "tags": [
+                    "loop",
+                    "work",
+                    "tech",
+                    "indoor"
+                ],
+                "description": "Personaje tecleando activamente — escenas de oficina/tech",
+                "prompt": "TRIPO3D ANIMACIÓN: ESCRIBIR TECLADO\n\nID DE PRESET: typing\nCATEGORÍA: Actividad\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nPersonaje tecleando activamente — escenas de oficina/tech\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"typing\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Escribir teclado'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "typing",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_phone_052",
+                "name": "💻 Animación — Hablar por teléfono",
+                "icon": "💻",
+                "category": "animation_activity",
+                "tags": [
+                    "loop",
+                    "communication",
+                    "work",
+                    "casual"
+                ],
+                "description": "Conversación telefónica con gesticulación natural",
+                "prompt": "TRIPO3D ANIMACIÓN: HABLAR POR TELÉFONO\n\nID DE PRESET: phone\nCATEGORÍA: Actividad\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nConversación telefónica con gesticulación natural\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"phone\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Hablar por teléfono'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "phone",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_present_053",
+                "name": "💻 Animación — Presentar / Mostrar",
+                "icon": "💻",
+                "category": "animation_activity",
+                "tags": [
+                    "work",
+                    "presentation",
+                    "professional"
+                ],
+                "description": "Gesto de presentación formal — señalar, mostrar contenido",
+                "prompt": "TRIPO3D ANIMACIÓN: PRESENTAR / MOSTRAR\n\nID DE PRESET: present\nCATEGORÍA: Actividad\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nGesto de presentación formal — señalar, mostrar contenido\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"present\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Presentar / Mostrar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "present",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_push_up_054",
+                "name": "💻 Animación — Flexiones",
+                "icon": "💻",
+                "category": "animation_activity",
+                "tags": [
+                    "loop",
+                    "sport",
+                    "fitness"
+                ],
+                "description": "Ejercicio de push-ups — atletismo y fitness",
+                "prompt": "TRIPO3D ANIMACIÓN: FLEXIONES\n\nID DE PRESET: push_up\nCATEGORÍA: Actividad\nMODO: 🔄 Loop (para bucle continuo)\n\nDESCRIPCIÓN:\nEjercicio de push-ups — atletismo y fitness\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"push_up\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Flexiones'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": true,
+                "anim_preset_id": "push_up",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_pick_up_055",
+                "name": "💻 Animación — Recoger objeto",
+                "icon": "💻",
+                "category": "animation_activity",
+                "tags": [
+                    "action",
+                    "game",
+                    "interactive"
+                ],
+                "description": "Agacharse y recoger algo del suelo",
+                "prompt": "TRIPO3D ANIMACIÓN: RECOGER OBJETO\n\nID DE PRESET: pick_up\nCATEGORÍA: Actividad\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nAgacharse y recoger algo del suelo\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"pick_up\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Recoger objeto'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "pick_up",
+                "tripo_type": "animate_retarget"
+            },
+            {
+                "id": "tripo_anim_throw_056",
+                "name": "💻 Animación — Lanzar",
+                "icon": "💻",
+                "category": "animation_activity",
+                "tags": [
+                    "action",
+                    "sport",
+                    "game"
+                ],
+                "description": "Lanzamiento de objeto — deporte o combate",
+                "prompt": "TRIPO3D ANIMACIÓN: LANZAR\n\nID DE PRESET: throw\nCATEGORÍA: Actividad\nMODO: ▶️ One-shot (una sola vez)\n\nDESCRIPCIÓN:\nLanzamiento de objeto — deporte o combate\n\nAPI CALL:\n{\"type\":\"animate_retarget\",\"original_model_task_id\":\"<rigged_task_id>\",\"animation\":\"throw\",\"out_format\":\"glb\"}\n\nFORMATOS RECOMENDADOS:\n- GLB: para web y Three.js/React Three Fiber\n- FBX: para Blender, Unity, Unreal Engine\n- MP4: para preview de video (sin necesidad de visor 3D)\n\nUSOSCREATIVOS EN SHOPY CRAFTER:\n- Presenta tu producto en una escena 3D con un personaje animado\n- Crea videos cortos de producto con el personaje haciendo 'Lanzar'\n- Demos de ropa/accesorios en movimiento real con esta animación",
+                "loop": false,
+                "anim_preset_id": "throw",
+                "tripo_type": "animate_retarget"
+            }
+        ]
     }
   }
 }

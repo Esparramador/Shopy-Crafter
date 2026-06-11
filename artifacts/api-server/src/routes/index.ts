@@ -54,6 +54,7 @@ import cardsRouter from "./cards.js";
 import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
 import brandDnaRouter from "./brand-dna.js";
+import tripo3dRouter from "./tripo3d.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -141,5 +142,6 @@ router.use(cardsRouter);
 router.use(reportTemplatesRouter);
 router.use(billingRouter);
 router.use(brandDnaRouter);
+router.use(tripo3dRouter);
 
 export default router;

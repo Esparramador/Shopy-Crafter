@@ -84,6 +84,7 @@ const FusionStudioPro = lazy(() => import("@/pages/projects/FusionStudioPro"));
 const CardStudio = lazy(() => import("@/pages/projects/CardStudio"));
 const CampaignKit = lazy(() => import("@/pages/projects/CampaignKit"));
 const ExplodedViewStudio = lazy(() => import("@/pages/projects/ExplodedViewStudio"));
+const Tripo3DStudio = lazy(() => import("@/pages/projects/Tripo3DStudio"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -467,6 +468,9 @@ function Router() {
         </Route>
         <Route path="/projects/:id/exploded-view">
           <RequireAdmin><AdminWrapper><AppLayout><S><ExplodedViewStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/tripo3d">
+          <RequireAdmin><AdminWrapper><AppLayout><S><Tripo3DStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         {/* Standalone module routes (sin proyecto) */}
         <Route path="/audit">

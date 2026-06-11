@@ -28,6 +28,7 @@ const DEFAULT_MODULE_NAV = [
   { id: "campaign-kit", label: "Campaign Kit", icon: "🎬" },
   { id: "exploded-view", label: "Exploded View", icon: "💥" },
   { id: "ad-studio", label: "Ad Studio", icon: "📺" },
+  { id: "tripo3d", label: "Tripo 3D Studio", icon: "🧊" },
   { id: "suppliers", label: "Proveedores", icon: "🏭" },
 ];
 
