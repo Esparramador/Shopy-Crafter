@@ -153,6 +153,16 @@ export default function Landing() {
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
 
+  const [spiderPhase, setSpiderPhase] = useState<"hidden"|"fall"|"bounce"|"standup"|"look"|"ready">("hidden");
+  const [formSlideIn, setFormSlideIn] = useState(false);
+  const [formFieldsIn, setFormFieldsIn] = useState(false);
+  const [showLaptop, setShowLaptop] = useState(false);
+  const [showBubble, setShowBubble] = useState(false);
+  const [webLine, setWebLine] = useState(false);
+  const contactSectionRef = useRef<HTMLElement>(null);
+  const heroSectionRef = useRef<HTMLElement>(null);
+  const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
+
   const sectionNavLabels = content?.sectionNav ?? DEFAULT_SECTION_NAV;
   const FP_SECTIONS = FP_SECTION_IDS.map((id, i) => ({ id, nav: sectionNavLabels[i] ?? DEFAULT_SECTION_NAV[i] }));
 
@@ -171,6 +181,55 @@ export default function Landing() {
     cards[next].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     setPricingIdx(next);
   }, [pricingIdx]);
+
+  const spiderTriggeredRef = useRef(false);
+  useEffect(() => {
+    const contactIdx = FP_SECTION_IDS.indexOf("fp-contact");
+    if (currentSection !== contactIdx) return;
+    if (spiderTriggeredRef.current) return;
+    spiderTriggeredRef.current = true;
+    setWebLine(true);
+    setTimeout(() => setSpiderPhase("fall"), 200);
+    setTimeout(() => setSpiderPhase("bounce"), 900);
+    setTimeout(() => setSpiderPhase("standup"), 1380);
+    setTimeout(() => setSpiderPhase("look"), 1900);
+    setTimeout(() => {
+      setSpiderPhase("ready");
+      setShowLaptop(true);
+      setShowBubble(true);
+    }, 3300);
+    setTimeout(() => {
+      setFormSlideIn(true);
+      setShowBubble(false);
+    }, 4000);
+    setTimeout(() => setFormFieldsIn(true), 4600);
+  }, [currentSection]);
+
+  const handleHeroMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 12;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 8;
+    setHeroTilt({ x, y });
+  }, []);
+
+  const handleHeroMouseLeave = useCallback(() => {
+    setHeroTilt({ x: 0, y: 0 });
+  }, []);
+
+  const handleCardMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 22;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 18;
+    card.style.transform = `perspective(900px) rotateY(${x}deg) rotateX(${-y}deg) scale3d(1.03,1.03,1.03)`;
+    card.style.boxShadow = `${-x * 1.5}px ${y * 1.5}px 48px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,75,0.12)`;
+  }, []);
+
+  const handleCardMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const card = e.currentTarget;
+    card.style.transform = "";
+    card.style.boxShadow = "";
+  }, []);
 
   useEffect(() => {
     const row = pricingRowRef.current;
@@ -661,13 +720,14 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 01 — HERO
         ══════════════════════════════════════ */}
-        <section className="fp-section" id="fp-hero" data-nav="Inicio" data-effect={eff("hero")}>
+        <section ref={heroSectionRef} className="fp-section" id="fp-hero" data-nav="Inicio" data-effect={eff("hero")}
+          onMouseMove={handleHeroMouseMove} onMouseLeave={handleHeroMouseLeave}>
           <div className="fp-bg">
             {videoBg("hero")}
             <div className="l-hero-grid"></div>
-            <div className="l-hero-glow"></div>
-            <div className="l-hero-glow2"></div>
-            <div className="l-hero-glow3"></div>
+            <div className="fp-hero-orb fp-orb-gold" style={{ transform: `translate(${heroTilt.x * -2}px, ${heroTilt.y * -1.5}px)` }}></div>
+            <div className="fp-hero-orb fp-orb-jade" style={{ transform: `translate(${heroTilt.x * 1.5}px, ${heroTilt.y * 2}px)` }}></div>
+            <div className="fp-hero-orb fp-orb-sky" style={{ transform: `translate(${heroTilt.x * 1}px, ${heroTilt.y * -1}px)` }}></div>
             <div className="fp-particles">
               {Array.from({ length: 20 }).map((_, i) => (
                 <div key={i} className="fp-particle" style={{
@@ -681,7 +741,7 @@ export default function Landing() {
               ))}
             </div>
           </div>
-          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.55)" }}></div>
+          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.48)" }}></div>
 
           <div className="fp-content fp-hero-layout">
             <div className="fp-hero-left">
@@ -704,8 +764,8 @@ export default function Landing() {
               </h1>
               <p className={`l-hero-sub ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.22s" }} onClick={cmsClick("hero.subheadline")} {...cmsData("hero.subheadline")}>{content.hero.subheadline}</p>
               <div className={`l-hero-ctas ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.34s" }}>
-                <a href="#fp-pricing" className="l-btn-primary" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaPrimary.label", e) : goToSection(4); }} {...cmsData("hero.ctaPrimary.label")}>{content.hero.ctaPrimary?.label ?? "Descubre nuestros planes→"}</a>
-                <a href="#fp-demo" className="l-btn-secondary" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaSecondary.label", e) : goToSection(2); }} {...cmsData("hero.ctaSecondary.label")}>{content.hero.ctaSecondary.label}</a>
+                <a href="#fp-pricing" className="l-btn-primary btn-jelly" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaPrimary.label", e) : goToSection(4); }} {...cmsData("hero.ctaPrimary.label")}>{content.hero.ctaPrimary?.label ?? "Ver planes →"}</a>
+                <a href="#fp-demo" className="l-btn-secondary btn-jelly" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaSecondary.label", e) : goToSection(2); }} {...cmsData("hero.ctaSecondary.label")}>{content.hero.ctaSecondary.label}</a>
               </div>
               
               <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
@@ -980,15 +1040,30 @@ export default function Landing() {
               {pricingIdx > 0 && (
                 <button type="button" className="fp-pricing-arrow fp-pricing-arrow-left" onClick={() => scrollPricing(-1)} aria-label="Plan anterior">‹</button>
               )}
-              <div ref={pricingRowRef} className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+              <div ref={pricingRowRef} className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"} fp-pricing-3d-container`} style={{ animationDelay: "0.1s" }}>
                 {content.pricing.plans.map((plan, planIdx) => (
-                  <div key={plan.id} className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}>
+                  <div
+                    key={plan.id}
+                    className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}
+                    style={{ transition: "transform 0.12s ease, box-shadow 0.25s ease" }}
+                    onMouseMove={handleCardMouseMove}
+                    onMouseLeave={handleCardMouseLeave}
+                  >
                     {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
-                    <div className="l-pricing-plan" {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
-                    <div className="l-pricing-price" {...cmsProps(`pricing.plans.${planIdx}.price`)}><span>{plan.currency}</span>{plan.price}</div>
-                    <div className="l-pricing-period" {...cmsProps(`pricing.plans.${planIdx}.period`)}>{plan.period}</div>
-                    <div className="l-pricing-divider"></div>
-                    <ul className="l-pricing-features">
+                    {plan.featured && <div className="pc-savings-tag">✨ MÁS POPULAR</div>}
+                    <div className="l-pricing-plan" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
+                    {planIdx === 1 && <div className="pc-roi-badge">📈 ROI medio 3.8× en 60 días</div>}
+                    {planIdx === 2 && <div className="pc-roi-badge">🚀 ROI medio 6.2× en 30 días</div>}
+                    <div className="l-pricing-price" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.price`)}><span>{plan.currency}</span>{plan.price}</div>
+                    <div className="l-pricing-period" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.period`)}>{plan.period}</div>
+                    {plan.featured && (
+                      <div className="pc-urgency">
+                        <div className="pc-urgency-dot"></div>
+                        <span>Quedan 3 plazas este mes</span>
+                      </div>
+                    )}
+                    <div className="l-pricing-divider" style={{ position: "relative", zIndex: 2 }}></div>
+                    <ul className="l-pricing-features" style={{ position: "relative", zIndex: 2 }}>
                       {plan.features.map((f, fi) => (
                         <li key={fi} className="l-pricing-feature">
                           <div className={f.included ? "l-pricing-check" : "l-pricing-x"}>{f.included ? "✓" : "✕"}</div>
@@ -996,7 +1071,14 @@ export default function Landing() {
                         </li>
                       ))}
                     </ul>
-                    <a href={plan.cta.href || "#fp-contact"} className={`l-pricing-cta ${plan.cta.style}`} onClick={e => { const href = plan.cta.href || "#fp-contact"; if (href.startsWith("#")) { e.preventDefault(); const idx = FP_SECTION_IDS.indexOf(href.replace("#", "")); if (idx >= 0) goToSection(idx); } }} {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}>{plan.cta.label}</a>
+                    <a
+                      href={plan.cta.href || "#fp-contact"}
+                      className={`l-pricing-cta btn-jelly ${plan.cta.style}`}
+                      style={{ position: "relative", zIndex: 2 }}
+                      onClick={e => { const href = plan.cta.href || "#fp-contact"; if (href.startsWith("#")) { e.preventDefault(); const idx = FP_SECTION_IDS.indexOf(href.replace("#", "")); if (idx >= 0) goToSection(idx); } }}
+                      {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}
+                    >{plan.cta.label}</a>
+                    {planIdx > 0 && <p style={{ textAlign: "center", fontSize: 10.5, color: "rgba(255,255,255,0.3)", marginTop: 10, position: "relative", zIndex: 2 }}>Sin permanencia · Cancela cuando quieras</p>}
                   </div>
                 ))}
               </div>
@@ -1160,7 +1242,7 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 06 — FORMULARIO DE CONTACTO
         ══════════════════════════════════════ */}
-        <section className="fp-section fp-section-dark" id="fp-contact" data-nav="Contactar" data-effect={eff("contact")}>
+        <section ref={contactSectionRef} className="fp-section fp-section-dark" id="fp-contact" data-nav="Contactar" data-effect={eff("contact")}>
           <div className="fp-bg">
             {videoBg("contact")}
             <div className="l-contact-bg" style={{
@@ -1175,6 +1257,63 @@ export default function Landing() {
               <p className="l-sub" {...cmsProps("contact.subheadline")}>{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
             </div>
 
+            {/* ── SPIDER-MAN CHARACTER STAGE ── */}
+            <div className="sc-stage-wrap">
+              <div className={`sc-web-line${webLine ? " active" : ""}`}></div>
+              <div className={`sc-figure${spiderPhase !== "hidden" ? ` phase-${spiderPhase}` : ""}`}>
+                <div style={{ position: "relative", zIndex: 30 }}>
+                  <div className={`sc-speech-bubble${showBubble ? " show" : ""}`}>
+                    {spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
+                  </div>
+                  <div className="sc-head-el">
+                    <div className="sc-head-lines"></div>
+                    <div className="sc-eyes-el">
+                      <div className="sc-eye-el"></div>
+                      <div className="sc-eye-el"></div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ position: "relative" }}>
+                  <div className="sc-arms-wrap">
+                    <div className="sc-arm-el l"></div>
+                    <div className="sc-arm-el r"></div>
+                  </div>
+                  <div className="sc-torso">
+                    <div className="sc-torso-chest"></div>
+                    <div className="sc-belt-el"></div>
+                  </div>
+                </div>
+                <div className="sc-legs-el">
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div className="sc-leg-el"></div>
+                    <div className="sc-boot-el"></div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div className="sc-leg-el"></div>
+                    <div className="sc-boot-el"></div>
+                  </div>
+                </div>
+                <div className={`sc-laptop-wrap${showLaptop ? " show" : ""}`}>
+                  <div className="sc-laptop-screen-outer">
+                    <div className="sc-laptop-screen-inner">
+                      <div className="sc-screen-scanlines"></div>
+                      <div className="sc-screen-code">
+                        {`const shop = await AI.analyze();\nconst roi = shop.optimize3x();\n// +340% conversión 🚀\nconst seo = AI.keywords(shop);\nshop.launch(roi, seo);\n// Shopify →→ PROFIT ✓`}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="sc-laptop-base-el"></div>
+                </div>
+              </div>
+              {spiderPhase !== "hidden" && (
+                <p style={{ fontSize: 11.5, color: "rgba(200,168,75,0.45)", marginTop: 12, fontStyle: "italic", textAlign: "center" }}>
+                  {(spiderPhase === "fall" || spiderPhase === "bounce") ? "🕸️ ¡Tu experto IA ha llegado!" :
+                   (spiderPhase === "standup" || spiderPhase === "look") ? "🔍 Analizando oportunidades de negocio…" :
+                   showLaptop ? "💻 Rellena el formulario y te contactamos en 24h" : ""}
+                </p>
+              )}
+            </div>
+
             <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s" }}>
               {contactStatus === "sent" ? (
                 <div style={{
@@ -1187,55 +1326,39 @@ export default function Landing() {
                   <p style={{ color: "var(--t4)", fontSize: 13 }}>{content.contact?.successSubtext ?? "Te contactaremos con un informe detallado en menos de 24h. Revisa también tu carpeta de spam."}</p>
                 </div>
               ) : (
-                <form onSubmit={submitContact} className="fp-contact-form" style={{
-                  background: "var(--ink2)", border: "1px solid var(--ink3)",
-                  borderRadius: 20, padding: "40px 36px",
-                  display: "grid", gap: 24,
-                }}>
+                <form onSubmit={submitContact} className={`fp-contact-form-v2${formSlideIn ? " slide-in" : ""}`}>
                   {/* Row 1: Nombre + Email */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.name ?? "Nombre completo *"}</label>
-                      <input
-                        type="text" required value={contactForm.name} onChange={CF("name")}
+                      <label className="fp-field-label">{content.contact?.labels?.name ?? "Nombre completo *"}</label>
+                      <input type="text" required value={contactForm.name} onChange={CF("name")}
                         placeholder={content.contact?.placeholders?.name ?? "Tu nombre y apellidos"}
-                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-                        onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                        onBlur={e => e.target.style.borderColor = "var(--ink3)"}
-                      />
+                        className="fp-input-v2" />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.email ?? "Email de contacto *"}</label>
-                      <input
-                        type="email" required value={contactForm.email} onChange={CF("email")}
+                      <label className="fp-field-label">{content.contact?.labels?.email ?? "Email de contacto *"}</label>
+                      <input type="email" required value={contactForm.email} onChange={CF("email")}
                         placeholder={content.contact?.placeholders?.email ?? "tu@email.com"}
-                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-                        onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                        onBlur={e => e.target.style.borderColor = "var(--ink3)"}
-                      />
+                        className="fp-input-v2" />
                     </div>
                   </div>
 
                   {/* Row 2: Teléfono + URL tienda */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.phone ?? "Teléfono"}</label>
+                      <label className="fp-field-label">{content.contact?.labels?.phone ?? "Teléfono"}</label>
                       <input
                         type="tel" value={contactForm.phone} onChange={CF("phone")}
                         placeholder={content.contact?.placeholders?.phone ?? "+34 600 000 000"}
-                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-                        onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                        onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                        className="fp-input-v2"
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.storeUrl ?? "URL de tu tienda online"}</label>
+                      <label className="fp-field-label">{content.contact?.labels?.storeUrl ?? "URL de tu tienda online"}</label>
                       <input
                         type="text" value={contactForm.storeUrl} onChange={CF("storeUrl")}
                         placeholder={content.contact?.placeholders?.storeUrl ?? "mitienda.com"}
-                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-                        onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                        onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                        className="fp-input-v2"
                       />
                     </div>
                   </div>
@@ -1243,10 +1366,10 @@ export default function Landing() {
                   {/* Row 3: Nicho + Facturación */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.niche ?? "Nicho / tipo de productos"}</label>
+                      <label className="fp-field-label">{content.contact?.labels?.niche ?? "Nicho / tipo de productos"}</label>
                       <select
                         value={contactForm.niche} onChange={CF("niche")}
-                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: contactForm.niche ? "var(--t)" : "var(--t4)", fontSize: 14, outline: "none", boxSizing: "border-box", cursor: "pointer" }}
+                        className="fp-input-v2"
                       >
                         <option value="">{content.contact?.placeholders?.niche ?? "Selecciona tu nicho"}</option>
                         {(Array.isArray(content.contact?.nicheOptions) ? content.contact!.nicheOptions : ["Moda y ropa", "Electrónica y gadgets", "Hogar y decoración", "Belleza y cosmética", "Deporte y fitness", "Alimentación y gourmet", "Arte y coleccionismo", "Mascotas", "Joyería y accesorios", "Otro"]).map(o => (
@@ -1259,18 +1382,16 @@ export default function Landing() {
                           value={contactForm.customNiche}
                           onChange={CF("customNiche")}
                           placeholder="Describe tu nicho de negocio..."
-                          style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box", marginTop: 8 }}
-                          onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                          onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                          className="fp-input-v2" style={{ marginTop: 8 }}
                           autoFocus
                         />
                       )}
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.revenue ?? "Facturación mensual aprox."}</label>
+                      <label className="fp-field-label">{content.contact?.labels?.revenue ?? "Facturación mensual aprox."}</label>
                       <select
                         value={contactForm.revenue} onChange={CF("revenue")}
-                        style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: contactForm.revenue ? "var(--t)" : "var(--t4)", fontSize: 14, outline: "none", boxSizing: "border-box", cursor: "pointer" }}
+                        className="fp-input-v2"
                       >
                         <option value="">{content.contact?.placeholders?.revenue ?? "Selecciona rango"}</option>
                         {(Array.isArray(content.contact?.revenueOptions) ? content.contact!.revenueOptions : ["Menos de €1.000", "€1.000 – €5.000", "€5.000 – €15.000", "€15.000 – €50.000", "Más de €50.000"]).map(o => (
@@ -1282,55 +1403,47 @@ export default function Landing() {
 
                   {/* Row 4: Redes sociales */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.socialLabel ?? "Redes sociales / Instagram"}</label>
+                    <label className="fp-field-label">{content.contact?.socialLabel ?? "Redes sociales / Instagram"}</label>
                     <input
                       type="text" value={contactForm.socialMedia} onChange={CF("socialMedia")}
                       placeholder={content.contact?.socialPlaceholder ?? "@tutienda o https://instagram.com/tutienda"}
-                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                      className="fp-input-v2"
                     />
                   </div>
 
                   {/* Extra info */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"Información extra sobre tu negocio"}</label>
+                    <label className="fp-field-label">{"Información extra sobre tu negocio"}</label>
                     <textarea
                       rows={3} value={contactForm.extraInfo} onChange={CF("extraInfo")}
                       placeholder={"Numero de productos, tipos (tallas, colores, materiales...), plataformas que usas, retos actuales, objetivos a corto plazo, cualquier detalle relevante..."}
-                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
-                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                      className="fp-input-v2"
                     />
                   </div>
 
                   {/* Proveedores (opcional) */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>
+                    <label className="fp-field-label">
                       {"Proveedores actuales"}
                       <span style={{ fontWeight: 400, color: "var(--t4)", marginLeft: 6, textTransform: "none", letterSpacing: 0 }}>(opcional)</span>
                     </label>
                     <textarea
                       rows={2} value={contactForm.suppliers} onChange={CF("suppliers")}
                       placeholder={"Ej: Alibaba, BigBuy, Printful, proveedor local de Barcelona... Separa con comas si son varios"}
-                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
-                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                      className="fp-input-v2"
                     />
                     <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 4 }}>Si nos indicas tus proveedores, compararemos sus precios con alternativas y estimaremos el revenue potencial</p>
                   </div>
 
                   {/* Product image: URL or file upload */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{"Imagen de referencia de tu producto (para muestra gratuita)"}</label>
+                    <label className="fp-field-label">{"Imagen de referencia de tu producto (para muestra gratuita)"}</label>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 12 }}>
                       <div>
                         <input
                           type="url" value={contactForm.productImageUrl} onChange={CF("productImageUrl")}
                           placeholder={"https://tu-tienda.com/imagen-producto.jpg"}
-                          style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-                          onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                          onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                          className="fp-input-v2"
                         />
                         <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 4 }}>Pega la URL de una imagen</p>
                       </div>
@@ -1368,7 +1481,7 @@ export default function Landing() {
 
                   {/* Servicios */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 12 }}>{content.contact?.servicesLabel ?? "Servicios que necesitas"}</label>
+                    <label className="fp-field-label">{content.contact?.servicesLabel ?? "Servicios que necesitas"}</label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {(Array.isArray(content.contact?.serviceOptions) ? content.contact!.serviceOptions : ["SEO y contenido", "Rediseño de producto", "Imágenes IA", "Pricing y márgenes", "Email marketing", "A/B Testing", "Auditoría completa"]).map(s => {
                         const active = contactServices.includes(s);
@@ -1390,13 +1503,11 @@ export default function Landing() {
 
                   {/* Mensaje */}
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.7px", color: "var(--t3)", textTransform: "uppercase", marginBottom: 8 }}>{content.contact?.labels?.message ?? "Mensaje adicional"}</label>
+                    <label className="fp-field-label">{content.contact?.labels?.message ?? "Mensaje adicional"}</label>
                     <textarea
                       rows={3} value={contactForm.message} onChange={CF("message")}
                       placeholder={content.contact?.placeholders?.message ?? "Cuéntanos más sobre tu tienda, tus retos actuales o lo que quieres conseguir…"}
-                      style={{ width: "100%", padding: "11px 14px", background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 10, color: "var(--t)", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
-                      onFocus={e => e.target.style.borderColor = "rgba(200,168,75,0.5)"}
-                      onBlur={e => e.target.style.borderColor = "var(--ink3)"}
+                      className="fp-input-v2"
                     />
                   </div>
 
@@ -1414,13 +1525,12 @@ export default function Landing() {
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                    <p style={{ fontSize: 12, color: "var(--t4)", flex: 1 }}>{content.contact?.finePrint ?? "Sin spam. Solo te contactamos para hablar de tu proyecto."}</p>
+                    <p style={{ fontSize: 11.5, color: "rgba(255,255,255,0.3)", flex: 1 }}>{content.contact?.finePrint ?? "Sin spam. Solo te contactamos para hablar de tu proyecto."}</p>
                     <button
                       type="submit" disabled={contactStatus === "sending"}
-                      className="l-btn-gold"
-                      style={{ opacity: contactStatus === "sending" ? 0.7 : 1, minWidth: 200, padding: "13px 28px", fontSize: 14 }}
+                      className="btn-submit-3d btn-jelly"
                     >
-                      {contactStatus === "sending" ? "Enviando…" : "CONTACTANOS"}
+                      {contactStatus === "sending" ? "⏳ Enviando…" : "🚀 CONTACTANOS AHORA"}
                     </button>
                   </div>
                 </form>
