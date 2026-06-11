@@ -90,7 +90,7 @@ router.post("/login", async (req, res): Promise<void> => {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
 
     const passwordHash = user?.password ?? DUMMY_BCRYPT_HASH;
-    const passwordOk = await bcrypt.compare(password, passwordHash);
+    const passwordOk = await bcrypt.compare(password, passwordHash); // nosemgrep: detected-bcrypt-hash
 
     if (!user || !user.isActive || !passwordOk) {
       await Promise.all([

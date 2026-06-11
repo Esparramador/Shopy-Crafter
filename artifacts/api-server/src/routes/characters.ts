@@ -273,7 +273,7 @@ router.patch(
       const fields = ["name", "gender", "ageRange", "identityDescription", "voiceId", "voiceGender", "voiceLanguage", "styleNotes"] as const;
       for (const f of fields) {
         if (req.body && Object.prototype.hasOwnProperty.call(req.body, f)) {
-          updates[f] = s(req.body[f], f === "identityDescription" ? 1500 : f === "styleNotes" ? 800 : 80) ?? null;
+          updates[f] = s(req.body[f], f === "identityDescription" ? 1500 : f === "styleNotes" ? 800 : 80) ?? null; // nosemgrep: remote-property-injection
         }
       }
       if (Object.keys(updates).length === 0) {

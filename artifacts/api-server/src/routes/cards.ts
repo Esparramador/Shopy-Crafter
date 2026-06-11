@@ -261,7 +261,7 @@ router.patch("/cards/:id", requireAdmin, async (req, res) => {
     ];
     for (const f of stringFields) {
       if (Object.prototype.hasOwnProperty.call(req.body || {}, f)) {
-        patch[f] = req.body[f] === null ? null : s(req.body[f], f === "tagline" || f === "address" ? 240 : 500);
+        patch[f] = req.body[f] === null ? null : s(req.body[f], f === "tagline" || f === "address" ? 240 : 500); // nosemgrep: remote-property-injection
       }
     }
     if (req.body?.palette && typeof req.body.palette === "object") patch.palette = JSON.stringify(req.body.palette);

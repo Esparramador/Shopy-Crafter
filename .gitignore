@@ -48,12 +48,51 @@ Thumbs.db
 .cache/
 .local/
 
-# Secretos — NUNCA subir a GitHub
+# ─── SECRETOS — NUNCA subir a GitHub ─────────────────────────────────────────
+# Variables de entorno
 .env
 .env.local
 .env.production
+.env.staging
 .env.*.local
+.env.*
+
+# Claves y certificados
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.ppk
+
+# Archivos de credenciales de servicios
+credentials.json
+service-account*.json
+google-credentials*.json
+firebase-adminsdk*.json
+gcloud-credentials*.json
+*-service-account.json
+secrets.json
+secrets.yaml
+secrets.yml
+.secrets
+
+# Scripts de configuración con credenciales
 .github/setup-github-secrets.sh
+setup-secrets.sh
+
+# Tokens y configuración OAuth
+.shopify
+shopify.app.toml.bak
+# ─────────────────────────────────────────────────────────────────────────────
 
 # Android build artifacts (generados por GitHub Actions, no hace falta subir)
 artifacts/shopify-optimizer/dist/

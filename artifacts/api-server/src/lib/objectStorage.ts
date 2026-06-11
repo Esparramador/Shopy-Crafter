@@ -9,7 +9,7 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106"; // nosemgrep: react-insecure-request — loopback sidecar, not external
 
 export const objectStorageClient = new Storage({
   credentials: {
