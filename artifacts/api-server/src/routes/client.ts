@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
-import { db, approvalsTable, messagesTable, productsTable, auditLogTable } from "@workspace/db";
+import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
+import { logger } from "../lib/logger.js";
+import { askClaude } from "../lib/claude.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -310,6 +312,103 @@ router.get("/products", async (req, res): Promise<void> => {
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
+  }
+});
+
+router.get("/vault-files", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    const pid = parseInt(projectId);
+    if (isNaN(pid)) { res.status(400).json({ error: "Invalid projectId" }); return; }
+
+    const files = await db.select({
+      id: projectFilesTable.id,
+      title: projectFilesTable.title,
+      fileType: projectFilesTable.fileType,
+      category: projectFilesTable.category,
+      description: projectFilesTable.description,
+      createdAt: projectFilesTable.createdAt,
+      objectPath: projectFilesTable.objectPath,
+      hasContent: projectFilesTable.content,
+    }).from(projectFilesTable)
+      .where(eq(projectFilesTable.projectId, pid))
+      .orderBy(desc(projectFilesTable.createdAt))
+      .limit(30);
+
+    const result = files.map(f => ({
+      id: f.id,
+      title: f.title ?? "Archivo sin título",
+      fileType: f.fileType ?? "file",
+      category: f.category ?? "general",
+      description: f.description,
+      createdAt: f.createdAt,
+      downloadUrl: (f.objectPath || f.hasContent)
+        ? `/api/projects/${pid}/vault/${f.id}/download`
+        : undefined,
+    }));
+
+    res.json(result);
+  } catch (err: any) {
+    logger.error({ err: err.message }, "client vault-files error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/ai-chat", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    const pid = parseInt(projectId);
+
+    const { message, history = [] } = req.body as { message: string; history?: Array<{ role: string; content: string }> };
+    if (!message?.trim()) { res.status(400).json({ error: "Message required" }); return; }
+
+    const products = await db.select({
+      id: productsTable.id, title: productsTable.title,
+      price: productsTable.price, auditScore: productsTable.auditScore, auditGrade: productsTable.auditGrade,
+    }).from(productsTable).where(eq(productsTable.projectId, pid)).limit(20);
+
+    const recentActivity = await db.select({
+      action: auditLogTable.action, details: auditLogTable.details, createdAt: auditLogTable.createdAt,
+    }).from(auditLogTable).where(eq(auditLogTable.projectId, projectId)).orderBy(desc(auditLogTable.createdAt)).limit(10);
+
+    const scored = products.filter(p => p.auditScore !== null);
+    const avgScore = scored.length ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length) : null;
+
+    const systemPrompt = `Eres el asistente IA personal de Shopy Crafter para este cliente. Eres experto en ecommerce Shopify y optimización de tiendas online.
+
+DATOS ACTUALES DE LA TIENDA DEL CLIENTE:
+- Total de productos: ${products.length}
+- Productos auditados: ${scored.length}
+- Score promedio de calidad: ${avgScore ?? "Sin datos"}/100
+- Motores IA activos: 7 (Auditoría, Rediseño, Imágenes, Consistencia Visual, A/B Testing, SEO, Precios)
+- Última actividad: ${recentActivity[0]?.details ?? "Sin actividad reciente"}
+
+PRODUCTOS (top 10 por score):
+${products.slice(0, 10).map(p => `- ${p.title}: €${p.price ?? "?"} | Score: ${p.auditScore ?? "?"}/100 (${p.auditGrade ?? "?"})`).join("\n")}
+
+ACTIVIDAD RECIENTE:
+${recentActivity.slice(0, 5).map(a => `- ${a.action}: ${a.details}`).join("\n")}
+
+INSTRUCCIONES:
+- Responde SIEMPRE en español
+- Sé conciso, amigable y profesional
+- Da consejos específicos basados en los datos reales de su tienda
+- Si no tienes datos suficientes, sé honesto pero proporciona asesoramiento general útil
+- Anima al cliente cuando sea apropiado
+- Máximo 200 palabras por respuesta`;
+
+    const messages: Array<{ role: "user" | "assistant"; content: string }> = [
+      ...history.slice(-6).map(m => ({ role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant", content: m.content })),
+      { role: "user", content: message },
+    ];
+
+    const reply = await askClaude(isNaN(pid) ? 0 : pid, messages, systemPrompt, 300, 12000);
+    res.json({ reply });
+  } catch (err: any) {
+    logger.error({ err: err.message }, "client ai-chat error");
+    res.status(500).json({ error: "Error al procesar tu consulta. Por favor inténtalo de nuevo." });
   }
 });
 

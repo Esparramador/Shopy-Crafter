@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";
 import { LogOut, Menu, X } from "lucide-react";
+import { ClientChatbot } from "./ClientChatbot";
 
 const _BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -210,6 +211,9 @@ export function ClientLayout({ children }: { children: ReactNode }) {
           {children}
         </div>
       </div>
+
+      {/* Floating AI Chatbot */}
+      <ClientChatbot />
     </div>
   );
 }
