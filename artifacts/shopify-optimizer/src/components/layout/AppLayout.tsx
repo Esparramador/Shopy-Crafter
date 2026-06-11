@@ -87,6 +87,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { content: cmsContent } = useCms();
   const cmsNav = cmsContent?.adminNav ?? null;
   const cmsPanel = cmsContent?.adminPanel ?? null;
+  const cmsSite = cmsContent?.site ?? null;
+  const siteLogoImageUrl: string | null = cmsSite?.logo?.imageUrl ?? null;
+  const siteLogoEmoji: string = cmsSite?.logo?.value ?? "💎";
+  const siteName: string = cmsSite?.name ?? "Shopy Crafter";
 
   const moduleNav = Array.isArray(cmsNav?.modules)
     ? cmsNav.modules : DEFAULT_MODULE_NAV;
@@ -166,11 +170,21 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* ── SIDEBAR ── */}
       <nav className={`sidebar${sidebarOpen ? " open" : ""}`} role="navigation" aria-label="Navegación principal">
-        {/* Logo */}
+        {/* Logo — driven by CMS site.name / site.logo */}
         <Link href="/home" style={{ textDecoration: "none" }}>
           <div className="sidebar-logo" style={{ cursor: "pointer" }}>
-            <img src="/images/logo-sc-default.png" alt="Shopy Crafter" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-            <span className="logo-text">Shopy<em>Crafter</em></span>
+            {siteLogoImageUrl ? (
+              <img
+                src={`${BASE_URL}${siteLogoImageUrl}`}
+                alt={siteName}
+                style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+              />
+            ) : (
+              <span style={{ fontSize: 26, flexShrink: 0, lineHeight: 1 }}>{siteLogoEmoji}</span>
+            )}
+            <span className="logo-text" style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {siteName}
+            </span>
             <span className="logo-badge">PRO</span>
           </div>
         </Link>
@@ -222,7 +236,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Shopy Brain nav */}
         <div className="sidebar-nav">
           <span className="sidebar-label" style={{ color: "var(--gold)", display: "flex", alignItems: "center", gap: 5 }}>
-            🧠 Shopy Crafter
+            🧠 {siteName}
           </span>
           {shopybrainNav.map((item: any) => (
             <Link key={item.href} href={item.href}>
