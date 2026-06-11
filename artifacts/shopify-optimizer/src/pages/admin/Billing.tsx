@@ -38,10 +38,16 @@ interface Invoice {
   status: string;
 }
 interface UpgradeResponse {
-  subscription: Subscription;
+  subscription?: Subscription;
   message?: string;
   confirmationUrl?: string;
   checkoutUrl?: string;
+  requiresPayment?: boolean;
+  requiresManualPayment?: boolean;
+  contactEmail?: string;
+  price?: number;
+  planName?: string;
+  plan?: Plan;
 }
 
 const billingKeys = {
@@ -56,6 +62,7 @@ export default function Billing() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<"subscription" | "affiliate" | "invoices">("subscription");
   const [copied, setCopied] = useState(false);
+  const [upgradeResult, setUpgradeResult] = useState<{ type: "success" | "manual" | "redirect"; message: string; contactEmail?: string; checkoutUrl?: string } | null>(null);
 
   const sub = useQuery({
     queryKey: billingKeys.subscription,
@@ -77,12 +84,25 @@ export default function Billing() {
   const upgrade = useMutation({
     mutationFn: (planId: string) => apiPost<UpgradeResponse>("/api/billing/upgrade", { plan: planId }),
     onSuccess: (data) => {
-      const redirectUrl = data.confirmationUrl ?? data.checkoutUrl;
-      if (redirectUrl) {
-        if (window.top) window.top.location.href = redirectUrl;
-        else window.location.href = redirectUrl;
+      setUpgradeResult(null);
+      if (data.requiresPayment && data.confirmationUrl) {
+        setUpgradeResult({ type: "redirect", message: data.message ?? "Redirigiendo a pasarela de pago...", checkoutUrl: data.confirmationUrl });
+        setTimeout(() => {
+          if (window.top) window.top.location.href = data.confirmationUrl!;
+          else window.location.href = data.confirmationUrl!;
+        }, 1500);
         return;
       }
+      if (data.requiresManualPayment) {
+        setUpgradeResult({
+          type: "manual",
+          message: data.message ?? `Para activar el plan ${data.planName}, contacta con soporte.`,
+          contactEmail: data.contactEmail,
+          checkoutUrl: data.checkoutUrl,
+        });
+        return;
+      }
+      setUpgradeResult({ type: "success", message: data.message ?? "Plan actualizado correctamente." });
       qc.invalidateQueries({ queryKey: billingKeys.subscription });
       qc.invalidateQueries({ queryKey: billingKeys.invoices });
     },
@@ -180,6 +200,35 @@ export default function Billing() {
         </div>
       )}
 
+      {upgradeResult && (
+        <div className="glass-card" style={{
+          padding: "14px 16px", marginBottom: 16,
+          borderColor: upgradeResult.type === "success" ? "var(--jade)" : upgradeResult.type === "redirect" ? "var(--gold)" : "var(--gold)",
+          background: upgradeResult.type === "success" ? "rgba(45,212,159,0.08)" : "rgba(200,168,75,0.08)",
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>
+              {upgradeResult.type === "success" ? "✅" : upgradeResult.type === "redirect" ? "🔄" : "📩"}
+            </span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 13, color: "var(--t)", fontWeight: 600, marginBottom: 4 }}>{upgradeResult.message}</p>
+              {upgradeResult.type === "manual" && upgradeResult.contactEmail && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  <a href={upgradeResult.checkoutUrl ?? `mailto:${upgradeResult.contactEmail}`}
+                    style={{ fontSize: 12, color: "var(--gold)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    ✉️ Contactar con soporte: {upgradeResult.contactEmail}
+                  </a>
+                </div>
+              )}
+            </div>
+            <button onClick={() => setUpgradeResult(null)} style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "var(--t3)", fontSize: 16, padding: 0, flexShrink: 0,
+            }}>✕</button>
+          </div>
+        </div>
+      )}
+
       {activeTab === "subscription" && (
         <>
           {sub.data?.daysRemaining !== null && sub.data?.daysRemaining !== undefined && currentPlan === "trial" && (
@@ -261,7 +310,7 @@ export default function Billing() {
           <div className="glass-card" style={{ padding: 16, marginTop: 20 }}>
             <p style={{ fontSize: 12, color: "var(--t3)", display: "flex", alignItems: "center", gap: 8 }}>
               <CreditCard size={14} style={{ color: "var(--t4)" }} />
-              Modo demo: los cambios de plan se simulan. Configura Shopify Billing para activar pagos reales.
+              Los admins pueden cambiar su plan directamente. Para usuarios, se genera un enlace de pago o contacto con soporte.
             </p>
           </div>
         </>

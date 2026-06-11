@@ -67,6 +67,12 @@
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "4eabc66183767153e404b39d1b839b1c37f2d82d86f0a0d7e880a579d8d62336"
     },
+    "humanizer": {
+      "source": "softaworks/agent-toolkit",
+      "sourceType": "github",
+      "skillPath": "skills/humanizer/SKILL.md",
+      "computedHash": "34a38e6acc60d4529612d41ffe740bca0060d3c5e89e2a0d24ae795f67157fbb"
+    },
     "next-best-practices": {
       "source": "vercel-labs/next-skills",
       "sourceType": "github",
@@ -103,11 +109,65 @@
       "skillPath": "skills/skill-creator/SKILL.md",
       "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
     },
+    "stitch-loop": {
+      "source": "google-labs-code/stitch-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/stitch-utilities/skills/stitch-loop/SKILL.md",
+      "computedHash": "e04912a9719b855afa733cc928d30dde0b8a5b91707ca27b98f0efcb8d9310a9"
+    },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
       "computedHash": "0d2c4857a7d6fdcd3fbc46e458fa4c497f029cab89a01548b3defce203003932"
+    },
+    "threejs-animation": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-animation/SKILL.md",
+      "computedHash": "8c50b1493812bd88f3ed0637c0c3c5d846afdb322157b67b2ffba4ce8e552835"
+    },
+    "threejs-fundamentals": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-fundamentals/SKILL.md",
+      "computedHash": "e08d49571071f0f54ef2a76fdfcb96c16673e4fda478067727def4659feb80ca"
+    },
+    "threejs-geometry": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-geometry/SKILL.md",
+      "computedHash": "4e5757bf80a329810545c237e557e362fa14fd3a3e6a567ec1d75435be6b2dda"
+    },
+    "threejs-interaction": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-interaction/SKILL.md",
+      "computedHash": "988d235b7ebd85276a584c6f81ce7c801280ebc45b401017b334136dc8a7ec82"
+    },
+    "threejs-lighting": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-lighting/SKILL.md",
+      "computedHash": "9303d1b8a9704e88415e5a98c98ad7b6e0f654f8029a3606af7947c0efcb86cc"
+    },
+    "threejs-loaders": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-loaders/SKILL.md",
+      "computedHash": "f2cceed635fd7a2119acf6e5b1a2fcba63a0e52cf2514c1830a69e4744554fcc"
+    },
+    "threejs-materials": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-materials/SKILL.md",
+      "computedHash": "201cf0f3720c0ea9e415e6376b8ad389aa86b483875e87ca0e51aa2770c856aa"
+    },
+    "threejs-textures": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-textures/SKILL.md",
+      "computedHash": "772a0bfc1d64cfcbc5347d206584a8fa412983201ad7a2cfb8766097b4936db9"
     },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
@@ -133,6 +193,18 @@
       "skillPath": "skills/react-native-skills/SKILL.md",
       "computedHash": "41d24eafa7c3d82e270439808f7cfbc4d51aeb2d14f2809a2267c16275784d06"
     },
+    "web-artifacts-builder": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-artifacts-builder/SKILL.md",
+      "computedHash": "d52d422ead3fa26859a6af129609841a8536b230a2d649f86e61771d063e05e2"
+    },
+    "web-component-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/web-component-design/SKILL.md",
+      "computedHash": "784a5a753400c54579a62974bdd867c6455555d1a7f806de8483ea5da899d154"
+    },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
@@ -144,6 +216,258 @@
       "sourceType": "github",
       "skillPath": "skills/xlsx/SKILL.md",
       "computedHash": "efd0c8011cf0677d8075cf93867ecec804f9a8754a777e1d2fdb46197e9c247f"
+    },
+    "ad-creative": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "ad-creative/SKILL.md",
+      "computedHash": "4bb0d4ee56fe024e0e18adb926816691096589c24e52d08e04a1ded99e0fd75c"
+    },
+    "ai-recruiter": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "ai-recruiter/SKILL.md",
+      "computedHash": "96dfe36d92b6298a8fad2f59d96eeeeebe19bf98fea202984af955b4732f9ea3"
+    },
+    "ai-sdr": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "ai-sdr/SKILL.md",
+      "computedHash": "bebf5dddaf42e4e63a98facf1f5d31a206528120e582e558ca767f9776b35104"
+    },
+    "ai-secretary": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "ai-secretary/SKILL.md",
+      "computedHash": "af04571d947ea79bb38514c726105a608e7922b5bd2dcc3f82f45e3afbef8123"
+    },
+    "branding-generator": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "branding-generator/SKILL.md",
+      "computedHash": "71501508508d5ffe3506211aef97ee67a3a3961021d93dad4ddba93ac44c80e5"
+    },
+    "business-builder": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "business-builder/SKILL.md",
+      "computedHash": "805c91348fe103913a540cbf360c54e14bdf98512731dae2b795e98fbe927a6b"
+    },
+    "competitive-analysis": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "competitive-analysis/SKILL.md",
+      "computedHash": "e0f9f4fcf2a839d1b84a5843de915172fed85ff4071be049c093900bbeeb5c43"
+    },
+    "content-machine": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "content-machine/SKILL.md",
+      "computedHash": "4417ade44a924e205ae377833dbce1b76ac9d41418cb41e43943155f4a70e205"
+    },
+    "deep-research": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "deep-research/SKILL.md",
+      "computedHash": "c920fd049c2d7877b8809c759415e1c25848cfa838969b8874a64d4f86ce6042"
+    },
+    "design-thinker": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "design-thinker/SKILL.md",
+      "computedHash": "79783028b46345eb1d51afdd48a53306937de927c6c6a4af1f253c0a73ad549f"
+    },
+    "excel-generator": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "excel-generator/SKILL.md",
+      "computedHash": "93945816686026c94c03269ae01ddc70921880256bd3710fe8261961a53e38bf"
+    },
+    "file-converter": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "file-converter/SKILL.md",
+      "computedHash": "c35b5ba22bbe487fb8b93ff427e73dd2da5947d7fe899c7af74c5108d32e24f4"
+    },
+    "flashcard-generator": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "flashcard-generator/SKILL.md",
+      "computedHash": "f31723877cff6ecb89cb5355213b2bc256928fb15699f6d00668cb5128014ab9"
+    },
+    "geo": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "geo/SKILL.md",
+      "computedHash": "9e892009e95f367cb0fe1e7ac2698aa403e3cae4281f6cd47a201f6eb0d10a62"
+    },
+    "github-solution-finder": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "github-solution-finder/SKILL.md",
+      "computedHash": "281a97380c680f7587e2543dcade9be81ecf8339675ae8fa576d3fbcc2d74ab6"
+    },
+    "infographic-builder": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "infographic-builder/SKILL.md",
+      "computedHash": "5b1c5fa8c306b6aeb1c2b505a57b24bd8a0b862e30ea296572d1e79101e45730"
+    },
+    "insurance-optimizer": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "insurance-optimizer/SKILL.md",
+      "computedHash": "39e15f2d6e03ff03a77c036c94db89d1fb2455c2dad4c06f3fde5e32d6aef831"
+    },
+    "interview-prep": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "interview-prep/SKILL.md",
+      "computedHash": "93faab57208ec034f726625d018065d45648aad9e6a66156569e653da4a6293e"
+    },
+    "invoice-generator": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "invoice-generator/SKILL.md",
+      "computedHash": "86b7bb5a9442466d891b6e63c364b428d5c16042c02ab9ff6f5f10d991e58090"
+    },
+    "legal-contract": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "legal-contract/SKILL.md",
+      "computedHash": "7eb85b4a948654b0723519912d141ae5b16ab537afc755410d3d7292abae0941"
+    },
+    "meal-planner": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "meal-planner/SKILL.md",
+      "computedHash": "09a8fa6e547ace6d176228299d113ee1dd5bb2366c0802c441055e693df9c458"
+    },
+    "migrate-to-multi-artifact": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "migrate-to-multi-artifact/SKILL.md",
+      "computedHash": "cd9b9ae9a44459a014589f1c2f46775d49442012fb9c1fa1bdf35588e753bfcb"
+    },
+    "personal-shopper": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "personal-shopper/SKILL.md",
+      "computedHash": "7cc653357103c695e38121f279e7257925bc5fbc370bbc4ed5f59294f0749bc8"
+    },
+    "photo-editor": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "photo-editor/SKILL.md",
+      "computedHash": "1755576d3da71977041e81140a11154b7501f6cd7bf8e50270491b96e5a9b5c7"
+    },
+    "podcast-generator": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "podcast-generator/SKILL.md",
+      "computedHash": "26d0ac74e214a2fa05bb5e7e064a49a2c47a55aef68b4f99e2ac16b275042794"
+    },
+    "podcast-marketing": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "podcast-marketing/SKILL.md",
+      "computedHash": "145a7bb19bb72b0464fef001878f1487b1b369e7481c8009f7be349240647ec4"
+    },
+    "product-manager": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "product-manager/SKILL.md",
+      "computedHash": "a1aec0f9491337a7c1a6c092b2ceb2fceee54ebed8c71dca2ac687e7af7f43f6"
+    },
+    "programmatic-seo": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "programmatic-seo/SKILL.md",
+      "computedHash": "6563c96bd9d861e50e0531a1b5e51c6f207aded305f70a9b250b6552da2410c9"
+    },
+    "real-estate-analyzer": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "real-estate-analyzer/SKILL.md",
+      "computedHash": "5f61e5ad9732158cc7ae1e5e603b6976bf1fb8883f1d392a6817b90614d1de69"
+    },
+    "recipe-creator": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "recipe-creator/SKILL.md",
+      "computedHash": "26180705f00b80aa3f329da1d5fb701ffa384144e27748c8460ed3791a04f461"
+    },
+    "recreate-screenshot": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "recreate-screenshot/SKILL.md",
+      "computedHash": "d33c62a5d054d57fde9af7e18ea425790a35b7c77f6bfbe76533cf5d45baa5cf"
+    },
+    "replit-migration-guardrails": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "replit-migration-guardrails/SKILL.md",
+      "computedHash": "44373d986e68a83c842eb70b07ae0b16d88eee515071d774e50cc6eb0dcc7386"
+    },
+    "resume-maker": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "resume-maker/SKILL.md",
+      "computedHash": "9e4367384ff22771829cc75713ea5f619f9ce71d875afa955ac53a7142e2cdf9"
+    },
+    "seo-auditor": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "seo-auditor/SKILL.md",
+      "computedHash": "c3ecec7fb77fc251f4c309d148e983c374492cfea2e5a78733db572bc527652d"
+    },
+    "skill-finder": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "skill-finder/SKILL.md",
+      "computedHash": "3ca199fb693b29e084593a7ee0c2f5905b858abba8433155c22a52f8b398f9a6"
+    },
+    "stock-analyzer": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "stock-analyzer/SKILL.md",
+      "computedHash": "76c91bfd02e3c303814ca2ef4a67787508f59726325026210783f895ade15475"
+    },
+    "storyboard": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "storyboard/SKILL.md",
+      "computedHash": "168d460902a84815bc5d73760d22634c1d1c04c9454a54aa910cfc4a017dbfb3"
+    },
+    "supplier-research": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "supplier-research/SKILL.md",
+      "computedHash": "bff0ce3153ed2e20c1bc66546381974026f4f74dd41559038a9e4882f65d0e32"
+    },
+    "tax-reviewer": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "tax-reviewer/SKILL.md",
+      "computedHash": "bd6126688bea354d69fd4064fbe8a4a48691f7dee04cfcf0f5557d573af74d22"
+    },
+    "travel-assistant": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "travel-assistant/SKILL.md",
+      "computedHash": "f853e912260205895fed7aadb41c94cef19c73dd5c9cce919e881e92040d8805"
+    },
+    "video-editing": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "video-editing/SKILL.md",
+      "computedHash": "ce38f95718f6eee00a60a8d2e5d6418c54b98a5eb042d71899bc58ec1aead333"
+    },
+    "website-cloning": {
+      "source": "replit/secondary-skills",
+      "sourceType": "replit",
+      "skillPath": "website-cloning/SKILL.md",
+      "computedHash": "bb4ae15869a97a1e9e89caae970ac924e6485c80d13dee70fddc1ab2e2802346"
     }
   }
 }
