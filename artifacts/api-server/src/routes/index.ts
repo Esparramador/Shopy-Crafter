@@ -59,6 +59,7 @@ import vismeRouter from "./visme.js";
 import webDesignerRouter from "./web-designer.js";
 import stitchRouter from "./stitch.js";
 import publicQrRouter from "./public-qr.js";
+import publicChatRouter from "./public-chat.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -82,6 +83,7 @@ router.use(storeRouter);
 router.use(contactRouter);
 router.use(apkRouter);
 router.use(publicQrRouter);
+router.use(publicChatRouter);
 
 router.get("/report-templates/:token", (req, res, next) => {
   if (/^[a-f0-9]{64}$/.test(req.params.token)) return next();

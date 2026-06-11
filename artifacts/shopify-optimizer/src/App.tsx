@@ -100,6 +100,7 @@ const CommandPalette = lazy(() => import("@/components/CommandPalette").then(m =
 const OnboardingWidget = lazy(() => import("@/components/OnboardingWidget").then(m => ({ default: m.OnboardingWidget })));
 const CoachMarks = lazy(() => import("@/components/CoachMarks").then(m => ({ default: m.CoachMarks })));
 const OmniChatbot = lazy(() => import("@/components/OmniChatbot"));
+const LandingChatbot = lazy(() => import("@/components/LandingChatbot"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -571,6 +572,16 @@ function Router() {
 
 initGlobalErrorHandlers();
 
+function PublicChatbotSlot() {
+  const { user, loading } = useAuth();
+  if (loading || user) return null;
+  return (
+    <Suspense fallback={null}>
+      <LandingChatbot />
+    </Suspense>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -583,6 +594,7 @@ function App() {
                 <Suspense fallback={null}>
                   <OmniChatbot />
                 </Suspense>
+                <PublicChatbotSlot />
               </WouterRouter>
             </AuthProvider>
           </CmsProvider>
