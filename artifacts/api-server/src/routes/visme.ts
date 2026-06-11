@@ -339,4 +339,108 @@ router.post("/visme/preview", async (req: Request, res: Response): Promise<void>
   }
 });
 
+/**
+ * POST /api/visme/compose
+ * Multi-effect composer: combines selected snippets into a full page with Claude.
+ * Body: { effect_ids: string[], dna?: {...}, page_type?: string }
+ * Returns: { ok: true, html: string }
+ */
+router.post("/visme/compose", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { effect_ids, dna: bodyDna, page_type = "landing", projectId } = req.body as {
+      effect_ids: string[];
+      dna?: Record<string, string>;
+      page_type?: string;
+      projectId?: number;
+    };
+
+    if (!effect_ids?.length) { res.status(400).json({ error: "effect_ids is required" }); return; }
+    const ids = effect_ids.slice(0, 8);
+
+    let dna: DnaVars = DEFAULT_DNA;
+    if (projectId) {
+      try {
+        const { db, projectsTable } = await import("@workspace/db");
+        const { eq } = await import("drizzle-orm");
+        const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, Number(projectId)));
+        if (proj) dna = buildDnaFromProject(proj);
+      } catch { /* use defaults */ }
+    }
+    // Body DNA overrides project DNA
+    if (bodyDna) {
+      if (bodyDna.primary_color)   dna = { ...dna, primary: bodyDna.primary_color };
+      if (bodyDna.secondary_color) dna = { ...dna, secondary: bodyDna.secondary_color };
+      if (bodyDna.bg_color)        dna = { ...dna, bg: bodyDna.bg_color };
+      if (bodyDna.font)            dna = { ...dna, font: bodyDna.font };
+      if (bodyDna.name)            dna = { ...dna, name: bodyDna.name };
+      if (bodyDna.headline)        dna = { ...dna, headline: bodyDna.headline };
+      if (bodyDna.tagline)         dna = { ...dna, tagline: bodyDna.tagline };
+      if (bodyDna.cta)             dna = { ...dna, cta: bodyDna.cta };
+    }
+
+    // Build snippet summaries for the prompt
+    const foundSnippets = ids
+      .map(id => EFFECT_SNIPPETS.find(s => s.id === id))
+      .filter(Boolean) as typeof EFFECT_SNIPPETS;
+
+    const snippetSummaries = foundSnippets.map(s => {
+      const cssLen = s.css?.length ?? 0;
+      const jsLen  = s.js?.length ?? 0;
+      return `- ${s.id} (${s.category}): ${s.description ?? s.name}  [css:${cssLen}ch, js:${jsLen}ch]`;
+    }).join("\n");
+
+    // Inline code for small snippets (≤4KB each) to let Claude understand the techniques
+    const inlineCode = foundSnippets.slice(0, 4).map(s => {
+      const parts: string[] = [`/* == ${s.id} == */`];
+      if (s.css?.trim()) parts.push(`/* CSS */\n${s.css.slice(0, 800)}`);
+      if (s.js?.trim())  parts.push(`/* JS */\n${s.js.slice(0, 800)}`);
+      return parts.join("\n");
+    }).join("\n\n");
+
+    const brandBlock = `
+BRAND DNA — ${dna.name}:
+  Primary: ${dna.primary}  Secondary: ${dna.secondary}  Background: ${dna.bg}
+  Font: ${dna.font}
+  Headline: "${dna.headline}"  Tagline: "${dna.tagline}"  CTA: "${dna.cta}"`;
+
+    const composePrompt = `You are a senior creative front-end developer. Compose a complete, production-ready ${page_type} page in HTML that authentically integrates the following ${foundSnippets.length} visual effects.
+
+${brandBlock}
+
+EFFECTS TO INTEGRATE (${foundSnippets.length}):
+${snippetSummaries}
+
+REFERENCE CODE (for technique guidance):
+${inlineCode}
+
+REQUIREMENTS:
+1. One self-contained HTML file with all CSS and JS inline — NO external imports except Google Fonts.
+2. Apply the brand DNA: use the exact colors, font, and copy provided.
+3. Each effect must be clearly visible and correctly implemented.
+4. The page must be visually stunning and feel premium — agency-quality.
+5. Full height sections, smooth animations, polished typography.
+6. Output ONLY the raw HTML — no markdown, no code fences, no explanation.`;
+
+    const ant = makeAnthropicClient();
+    const msg = await ant.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 8000,
+      messages: [{ role: "user", content: composePrompt }],
+    });
+
+    const raw = (msg.content[0] as any)?.text ?? "";
+    const { stripFences } = await import("../lib/web-designer.js");
+    const html = stripFences(raw);
+
+    if (!html.includes("<")) {
+      res.status(500).json({ ok: false, error: "Claude returned no HTML" });
+      return;
+    }
+    res.json({ ok: true, html, effects: foundSnippets.map(s => s.id) });
+  } catch (err: any) {
+    logger.error({ err }, "visme/compose error");
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 export default router;

@@ -148,6 +148,25 @@ export default function EffectsStudio() {
   const searchRef = useRef<HTMLInputElement>(null);
   const LIMIT = 24;
 
+  // Compose mode
+  const [composeMode, setComposeMode] = useState(false);
+  const [composeSelected, setComposeSelected] = useState<string[]>([]);
+  const [composeLoading, setComposeLoading] = useState(false);
+  const [composeHtml, setComposeHtml] = useState("");
+  const [showComposePrev, setShowComposePrev] = useState(false);
+  const [composePrevMode, setComposePrevMode] = useState<"preview" | "code">("preview");
+  // Compose DNA fields
+  const [cdName, setCdName] = useState("Mi Marca");
+  const [cdSector, setCdSector] = useState("Agency");
+  const [cdFont, setCdFont] = useState("Inter");
+  const [cdPrimary, setCdPrimary] = useState("#6366f1");
+  const [cdSecondary, setCdSecondary] = useState("#ec4899");
+  const [cdBg, setCdBg] = useState("#0d0d1a");
+  const [cdHeadline, setCdHeadline] = useState("Construye algo extraordinario");
+  const [cdTagline, setCdTagline] = useState("La agencia que convierte ideas en experiencias");
+  const [cdCta, setCdCta] = useState("Empezar ahora");
+  const [showComposeDna, setShowComposeDna] = useState(false);
+
   // ── Load data on mount ──────────────────────────────────────────────────────
   useEffect(() => {
     fetch(`${API}/visme/stats`, { credentials: "include" })
@@ -376,6 +395,50 @@ export default function EffectsStudio() {
     URL.revokeObjectURL(u);
   }
 
+  function toggleComposeMode() {
+    const next = !composeMode;
+    setComposeMode(next);
+    if (!next) {
+      setComposeSelected([]);
+      setShowComposePrev(false);
+    } else {
+      if (source !== "effects") switchSource("effects");
+      setSelected(null);
+    }
+  }
+
+  function toggleComposeEffect(id: string) {
+    setComposeSelected(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      if (prev.length >= 8) { showToast("Máximo 8 efectos por composición"); return prev; }
+      return [...prev, id];
+    });
+  }
+
+  async function runCompose() {
+    if (!composeSelected.length || composeLoading) return;
+    setComposeLoading(true);
+    setComposeHtml("");
+    try {
+      const dna = {
+        name: cdName, sector: cdSector, font: cdFont,
+        primary_color: cdPrimary, secondary_color: cdSecondary, bg_color: cdBg,
+        headline: cdHeadline, tagline: cdTagline, cta: cdCta,
+      };
+      const r = await fetch(`${API}/visme/compose`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ effect_ids: composeSelected, dna, page_type: "landing", projectId }),
+      });
+      const d = await r.json();
+      if (!d.ok || !d.html) throw new Error(d.error ?? "Sin respuesta HTML");
+      setComposeHtml(d.html);
+      setShowComposePrev(true);
+      setComposePrevMode("preview");
+    } catch (e: any) { showToast("Error componiendo: " + e.message); }
+    setComposeLoading(false);
+  }
+
   // ── Derived state ───────────────────────────────────────────────────────────
   const sortedItems = [...items].sort((a, b) => {
     if (sortBy === "name") return a.name.localeCompare(b.name);
@@ -456,12 +519,102 @@ export default function EffectsStudio() {
           {source === "visme" && <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 20, background: "rgba(99,102,241,.08)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.2)", fontWeight: 700 }}>594 templates</span>}
         </div>
 
+        {/* Mode tabs */}
+        <div style={{ display: "flex", gap: 3, marginLeft: "auto", background: S.surf2, borderRadius: 8, padding: 3 }}>
+          {([
+            { mode: false, label: "Explorar", icon: "🔍" },
+            { mode: true,  label: "Componer", icon: "🎛️" },
+          ] as const).map(t => (
+            <button key={String(t.mode)} onClick={() => { if (composeMode !== t.mode) toggleComposeMode(); }} style={{
+              padding: "4px 12px", borderRadius: 6, border: "none",
+              background: composeMode === t.mode ? (t.mode ? "rgba(99,102,241,.25)" : "rgba(201,169,97,.15)") : "transparent",
+              color: composeMode === t.mode ? (t.mode ? "#818cf8" : S.gold) : S.t3,
+              fontSize: 11, fontWeight: composeMode === t.mode ? 700 : 400, cursor: "pointer",
+            }}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+
         {/* Project selector */}
-        <select value={projectId ?? ""} onChange={e => setProjectId(e.target.value ? Number(e.target.value) : undefined)} style={{ marginLeft: "auto", background: S.surf2, border: `1px solid ${S.bdr}`, borderRadius: 6, padding: "5px 8px", color: projectId ? S.t1 : S.t3, fontSize: 11, outline: "none", cursor: "pointer", maxWidth: 180 }}>
+        <select value={projectId ?? ""} onChange={e => setProjectId(e.target.value ? Number(e.target.value) : undefined)} style={{ background: S.surf2, border: `1px solid ${S.bdr}`, borderRadius: 6, padding: "5px 8px", color: projectId ? S.t1 : S.t3, fontSize: 11, outline: "none", cursor: "pointer", maxWidth: 180 }}>
           <option value="">🏪 Sin proyecto</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>
+
+      {/* ══ COMPOSE BAR ══════════════════════════════════════════════════════ */}
+      {composeMode && (
+        <div style={{ background: "rgba(99,102,241,.1)", borderBottom: "1px solid rgba(99,102,241,.25)", flexShrink: 0 }}>
+          {/* Selection bar */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", flexWrap: "wrap" }}>
+            <div style={{ width: 22, height: 22, background: "#6366f1", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+              {composeSelected.length}
+            </div>
+            <span style={{ fontSize: 12, color: "#a5b4fc" }}>
+              {composeSelected.length === 0
+                ? "Selecciona hasta 8 efectos para componer una página completa"
+                : composeSelected.length === 1
+                  ? "1 efecto seleccionado"
+                  : `${composeSelected.length} efectos seleccionados`}
+            </span>
+            {composeSelected.length > 0 && (
+              <button onClick={() => setComposeSelected([])} style={{ padding: "2px 8px", background: "transparent", border: "none", color: "#6366f1", fontSize: 11, cursor: "pointer", marginLeft: 2 }}>✕ Limpiar</button>
+            )}
+            <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+              <button onClick={() => setShowComposeDna(d => !d)} style={{ padding: "5px 10px", background: showComposeDna ? "rgba(99,102,241,.3)" : "rgba(99,102,241,.1)", border: "1px solid rgba(99,102,241,.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 11, cursor: "pointer" }}>
+                🧬 DNA {showComposeDna ? "▴" : "▾"}
+              </button>
+              <button
+                onClick={() => void runCompose()}
+                disabled={composeSelected.length === 0 || composeLoading}
+                style={{ padding: "6px 18px", background: composeSelected.length === 0 || composeLoading ? "#1a1a2e" : "linear-gradient(135deg,#6366f1,#4f46e5)", border: "none", borderRadius: 6, color: composeSelected.length === 0 || composeLoading ? "#4a4a6a" : "#fff", fontSize: 12, fontWeight: 700, cursor: composeSelected.length === 0 || composeLoading ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                {composeLoading ? "⏳ Componiendo…" : `🎛️ Componer página ${composeSelected.length > 0 ? `(${composeSelected.length})` : ""} →`}
+              </button>
+            </div>
+          </div>
+
+          {/* DNA fields (collapsible) */}
+          {showComposeDna && (
+            <div style={{ padding: "0 14px 12px", display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 8, borderTop: "1px solid rgba(99,102,241,.15)", paddingTop: 10 }}>
+              {[
+                { label: "Nombre de marca", val: cdName, set: setCdName, ph: "Mi Marca" },
+                { label: "Sector", val: cdSector, set: setCdSector, ph: "moda, SaaS…" },
+                { label: "Google Font", val: cdFont, set: setCdFont, ph: "Inter" },
+                { label: "Headline", val: cdHeadline, set: setCdHeadline, ph: "Tu propuesta de valor" },
+                { label: "Tagline", val: cdTagline, set: setCdTagline, ph: "Tu slogan" },
+                { label: "CTA", val: cdCta, set: setCdCta, ph: "Empezar ahora" },
+              ].map(f => (
+                <div key={f.label}>
+                  <div style={{ fontSize: 9, color: "#6366f1", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700, marginBottom: 3 }}>{f.label}</div>
+                  <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={{ width: "100%", background: "#0d0d1a", border: "1px solid rgba(99,102,241,.25)", borderRadius: 5, padding: "5px 8px", color: "#e2e2ec", fontSize: 11, outline: "none", boxSizing: "border-box" }} />
+                </div>
+              ))}
+              <div>
+                <div style={{ fontSize: 9, color: "#6366f1", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700, marginBottom: 3 }}>Color primario</div>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input type="color" value={cdPrimary} onChange={e => setCdPrimary(e.target.value)} style={{ width: 28, height: 28, border: "none", background: "none", cursor: "pointer", padding: 0, flexShrink: 0 }} />
+                  <input value={cdPrimary} onChange={e => setCdPrimary(e.target.value)} style={{ flex: 1, background: "#0d0d1a", border: "1px solid rgba(99,102,241,.25)", borderRadius: 5, padding: "5px 6px", color: "#e2e2ec", fontSize: 10, outline: "none", fontFamily: "monospace" }} />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: "#6366f1", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700, marginBottom: 3 }}>Color secundario</div>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input type="color" value={cdSecondary} onChange={e => setCdSecondary(e.target.value)} style={{ width: 28, height: 28, border: "none", background: "none", cursor: "pointer", padding: 0, flexShrink: 0 }} />
+                  <input value={cdSecondary} onChange={e => setCdSecondary(e.target.value)} style={{ flex: 1, background: "#0d0d1a", border: "1px solid rgba(99,102,241,.25)", borderRadius: 5, padding: "5px 6px", color: "#e2e2ec", fontSize: 10, outline: "none", fontFamily: "monospace" }} />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: "#6366f1", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700, marginBottom: 3 }}>Fondo</div>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input type="color" value={cdBg} onChange={e => setCdBg(e.target.value)} style={{ width: 28, height: 28, border: "none", background: "none", cursor: "pointer", padding: 0, flexShrink: 0 }} />
+                  <input value={cdBg} onChange={e => setCdBg(e.target.value)} style={{ flex: 1, background: "#0d0d1a", border: "1px solid rgba(99,102,241,.25)", borderRadius: 5, padding: "5px 6px", color: "#e2e2ec", fontSize: 10, outline: "none", fontFamily: "monospace" }} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters bar */}
       {showFilters && (
@@ -613,10 +766,34 @@ export default function EffectsStudio() {
             <div style={{ display: "grid", gridTemplateColumns: source === "effects" ? "repeat(auto-fill,minmax(200px,1fr))" : "repeat(auto-fill,minmax(300px,1fr))", gap: 10, marginBottom: 20 }}>
               {sortedItems.map((item, i) => {
                 const isSelected = selected?.source === item.source && selected?.id === item.id && (selected as any)?.name === item.name;
+                const itemId = (item as any).id as string | undefined;
+                const isComposeSelected = composeMode && !!itemId && composeSelected.includes(itemId);
+                const cardBorder = composeMode
+                  ? (isComposeSelected ? "1px solid #6366f1" : `1px solid ${S.bdr}`)
+                  : (isSelected ? "1px solid rgba(201,169,97,.45)" : `1px solid ${S.bdr}`);
+                const cardBg = composeMode
+                  ? (isComposeSelected ? "rgba(99,102,241,.12)" : S.surf)
+                  : (isSelected ? "rgba(201,169,97,.06)" : S.surf);
                 return (
-                  <button key={`${item.source}-${(item as any).id ?? i}`} onClick={() => void selectItem(item)} style={{ background: isSelected ? "rgba(201,169,97,.06)" : S.surf, border: `1px solid ${isSelected ? "rgba(201,169,97,.45)" : S.bdr}`, borderRadius: 12, padding: "13px 15px", cursor: "pointer", textAlign: "left", transition: "all .15s", position: "relative" }}
-                    onMouseOver={e => { if (!isSelected) e.currentTarget.style.borderColor = "rgba(201,169,97,.25)"; }}
-                    onMouseOut={e => { if (!isSelected) e.currentTarget.style.borderColor = S.bdr; }}>
+                  <button key={`${item.source}-${(item as any).id ?? i}`}
+                    onClick={() => {
+                      if (composeMode && item.source === "effects" && itemId) {
+                        toggleComposeEffect(itemId);
+                      } else if (!composeMode) {
+                        void selectItem(item);
+                      }
+                    }}
+                    style={{ background: cardBg, border: cardBorder, borderRadius: 12, padding: "13px 15px", cursor: "pointer", textAlign: "left", transition: "all .15s", position: "relative" }}
+                    onMouseOver={e => { if (!isSelected && !isComposeSelected) e.currentTarget.style.borderColor = composeMode ? "rgba(99,102,241,.4)" : "rgba(201,169,97,.25)"; }}
+                    onMouseOut={e => { if (!isSelected && !isComposeSelected) e.currentTarget.style.borderColor = S.bdr; }}>
+
+                    {/* Compose checkmark */}
+                    {composeMode && isComposeSelected && (
+                      <div style={{ position: "absolute", top: 8, left: 8, width: 20, height: 20, background: "#6366f1", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", fontWeight: 700, zIndex: 2 }}>✓</div>
+                    )}
+                    {composeMode && !isComposeSelected && item.source === "effects" && (
+                      <div style={{ position: "absolute", top: 8, left: 8, width: 20, height: 20, background: "rgba(99,102,241,.15)", border: "1.5px solid rgba(99,102,241,.4)", borderRadius: "50%", zIndex: 2 }} />
+                    )}
 
                     {/* Source badge */}
                     <span style={{ position: "absolute", top: 8, right: 8, fontSize: 8, fontWeight: 700, textTransform: "uppercase", padding: "2px 5px", borderRadius: 4,
@@ -904,6 +1081,40 @@ export default function EffectsStudio() {
           </div>
         )}
       </div>
+
+      {/* ══ COMPOSE FULLSCREEN PREVIEW ══════════════════════════════════════ */}
+      {showComposePrev && composeHtml && (
+        <div style={{ position: "fixed", inset: 0, background: S.bg, zIndex: 1000, display: "flex", flexDirection: "column" }}>
+          {/* Preview topbar */}
+          <div style={{ height: 50, background: S.surf, borderBottom: `1px solid ${S.bdr}`, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", flexShrink: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#a5b4fc", flex: 1 }}>
+              🎛️ Composición de {composeSelected.length} efecto{composeSelected.length !== 1 ? "s" : ""} — preview
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setComposePrevMode(m => m === "preview" ? "code" : "preview")} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t2, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                {composePrevMode === "preview" ? <><Code2 size={11} /> Código</> : <><Eye size={11} /> Preview</>}
+              </button>
+              <button onClick={() => copyText(composeHtml, "compose-html")} style={{ padding: "5px 12px", background: "rgba(99,102,241,.1)", border: "1px solid rgba(99,102,241,.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                {copied === "compose-html" ? <><Check size={11} /> Copiado</> : <><Copy size={11} /> Copiar HTML</>}
+              </button>
+              <button onClick={() => downloadHtml(composeHtml, `composicion-${composeSelected.length}efectos-${Date.now()}.html`)} style={{ padding: "5px 12px", background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.2)", borderRadius: 6, color: "#22c55e", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                <Download size={11} /> Descargar
+              </button>
+              <button onClick={() => { const url2 = "data:text/html;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(composeHtml))); window.open(url2, "_blank", "noopener,noreferrer"); }} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t2, fontSize: 11, cursor: "pointer" }}>
+                ↗ Nueva pestaña
+              </button>
+              <button onClick={() => setShowComposePrev(false)} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t3, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+                <X size={12} /> Cerrar
+              </button>
+            </div>
+          </div>
+          {/* Preview body */}
+          {composePrevMode === "preview"
+            ? <iframe srcDoc={composeHtml} sandbox="allow-scripts allow-same-origin" style={{ flex: 1, border: "none", width: "100%", background: "#fff" }} title="Compose preview" />
+            : <pre style={{ flex: 1, margin: 0, padding: 20, background: S.surf3, color: "#a8b4d8", fontSize: 11, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowY: "auto", lineHeight: 1.6 }}>{composeHtml}</pre>
+          }
+        </div>
+      )}
 
       {/* ── Toast ── */}
       {toast && (

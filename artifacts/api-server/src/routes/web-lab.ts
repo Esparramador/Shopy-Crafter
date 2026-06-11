@@ -2381,4 +2381,432 @@ INSTRUCCIÓN: Usa los colores reales detectados en los efectos. El sector y esti
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DNA Extractor helpers (TypeScript port of _web_lab_engine.py)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TRIVIAL_COLORS = new Set([
+  "#ffffff","#fff","#000000","#000","#333333","#333","#555555","#555",
+  "#666666","#666","#777777","#777","#888888","#888","#999999","#999",
+  "#aaaaaa","#aaa","#bbbbbb","#bbb","#cccccc","#ccc","#dddddd","#ddd",
+  "#eeeeee","#eee","transparent","inherit","initial","unset",
+]);
+
+function dnaExtractPalette(css: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of css.matchAll(/--[\w-]*(?:color|primary|secondary|accent|brand|bg|background)[\w-]*\s*:\s*(#[0-9a-fA-F]{3,8})/gi)) {
+    const h = m[1].slice(0, 7).toLowerCase();
+    if (!TRIVIAL_COLORS.has(h) && !seen.has(h)) { seen.add(h); out.push(h); }
+  }
+  for (const m of css.matchAll(/(?:background|color|border|fill|stroke)[^:;{]*:\s*(#[0-9a-fA-F]{6})/gi)) {
+    const h = m[1].toLowerCase();
+    if (!TRIVIAL_COLORS.has(h) && !seen.has(h) && out.length < 8) { seen.add(h); out.push(h); }
+  }
+  return out.slice(0, 8);
+}
+
+function dnaExtractFonts(html: string): string[] {
+  const fonts: string[] = [];
+  for (const chunk of html.matchAll(/fonts\.googleapis\.com\/css[^"']*family=([^&"'#\s]+)/gi)) {
+    for (const name of chunk[1].replace(/%7C/gi, "|").split("|")) {
+      const clean = name.replace(/:[^|&\s]*/g, "").replace(/\+/g, " ").trim();
+      if (clean) fonts.push(clean);
+    }
+  }
+  const skip = new Set(["inherit","initial","unset","sans-serif","serif","monospace","cursive","fantasy","system-ui","-apple-system","arial","helvetica","georgia","times new roman","verdana","trebuchet ms","impact","comic sans ms"]);
+  for (const m of html.matchAll(/font-family\s*:\s*['"]?([^,;'"}\n/]+)/gi)) {
+    const clean = m[1].trim().replace(/^['"]/, "").replace(/['"]$/, "").split(",")[0].trim();
+    if (!skip.has(clean.toLowerCase()) && clean.length > 2 && clean.length < 60) fonts.push(clean);
+  }
+  const seen = new Set<string>();
+  return fonts.filter(f => { const k = f.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 4);
+}
+
+function dnaMetaContent(html: string, prop: string): string {
+  for (const pat of [
+    new RegExp(`<meta[^>]+property="${prop}"[^>]+content="([^"]+)"`, "i"),
+    new RegExp(`<meta[^>]+content="([^"]+)"[^>]+property="${prop}"`, "i"),
+    new RegExp(`<meta[^>]+name="${prop}"[^>]+content="([^"]+)"`, "i"),
+    new RegExp(`<meta[^>]+content="([^"]+)"[^>]+name="${prop}"`, "i"),
+  ]) {
+    const m = html.match(pat);
+    if (m) return m[1].replace(/\s+/g, " ").trim();
+  }
+  return "";
+}
+
+function dnaExtractFromHtml(html: string, url: string): Record<string, any> {
+  const dna: Record<string, any> = { source_url: url };
+
+  const ogSite = dnaMetaContent(html, "og:site_name");
+  const appName = dnaMetaContent(html, "application-name");
+  const titleM = html.match(/<title[^>]*>([^<|·–\-—·]+)/i);
+  for (const c of [ogSite, appName, titleM?.[1]].filter(Boolean) as string[]) {
+    const s = c.replace(/\s+/g, " ").trim();
+    if (s.length > 1 && s.length < 80) { dna.name = s; break; }
+  }
+
+  for (const v of [dnaMetaContent(html, "og:description"), dnaMetaContent(html, "description"), dnaMetaContent(html, "twitter:description")].filter(Boolean)) {
+    if (v.length > 8 && v.length < 300) { dna.tagline = v.slice(0, 250); break; }
+  }
+  if (!dna.tagline) {
+    const h1 = html.match(/<h1[^>]*>([^<]{8,200})<\/h1>/i)?.[1];
+    if (h1) dna.tagline = h1.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+  }
+
+  for (const pat of [
+    /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
+    /<link[^>]+rel="(?:shortcut )?icon"[^>]+href="([^"]+)"/i,
+    /<img[^>]+(?:class|id)="[^"]*logo[^"]*"[^>]+src="([^"]+)"/i,
+    /<img[^>]+src="([^"]*logo[^"]*\.(?:png|svg|jpg|webp))"/i,
+  ]) {
+    const m = html.match(pat);
+    if (m) {
+      let logo = m[1];
+      if (!logo.startsWith("http")) { try { logo = new URL(logo, url).href; } catch {} }
+      dna.logo_url = logo; break;
+    }
+  }
+
+  const styles = [...html.matchAll(/<style[^>]*>(.*?)<\/style>/gsi)].map(m => m[1]).join(" ");
+  const inline = [...html.matchAll(/style="([^"]+)"/gi)].map(m => m[1]).join(" ");
+  const palette = dnaExtractPalette(styles + " " + inline);
+  if (palette.length) {
+    dna.primary_color = palette[0];
+    if (palette.length > 1) dna.secondary_color = palette[1];
+    if (palette.length > 2) dna.accent_color = palette[2];
+    dna.palette = palette;
+  }
+
+  const fonts = dnaExtractFonts(html);
+  if (fonts.length) { dna.primary_font = fonts[0]; dna.all_fonts = fonts; }
+
+  const ctaBtns = [...html.matchAll(/<(?:button|a)[^>]*(?:class|id)="[^"]*(?:cta|btn-primary|hero|primary-btn)[^"]*"[^>]*>([\s\S]{2,60}?)<\/(?:button|a)>/gi)];
+  const rawBtns = ctaBtns.length ? ctaBtns.slice(0, 3) : [...html.matchAll(/<button[^>]*>([\s\S]{3,40}?)<\/button>/gi)].slice(0, 4);
+  const ctas = rawBtns.map(m => m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()).filter(t => t && t.length < 60);
+  if (ctas.length) { dna.cta = ctas[0]; dna.cta_list = ctas; }
+
+  const badHandles = new Set(["share","sharer","intent","dialog","login","signup","p","photo","video","posts","pages","groups","hashtag","explore","reel","stories"]);
+  const social: Record<string, string> = {};
+  for (const [plat, pat] of [
+    ["instagram", /instagram\.com\/([a-zA-Z0-9_.]{2,40})/i],
+    ["tiktok",    /tiktok\.com\/@([a-zA-Z0-9_.]{2,40})/i],
+    ["twitter",   /(?:twitter|x)\.com\/([a-zA-Z0-9_]{2,40})/i],
+    ["facebook",  /facebook\.com\/([a-zA-Z0-9_.]{3,60})/i],
+    ["linkedin",  /linkedin\.com\/(?:company\/)?([a-zA-Z0-9_-]{3,60})/i],
+    ["youtube",   /youtube\.com\/(?:@|c\/|channel\/|user\/)?([a-zA-Z0-9_-]{3,60})/i],
+  ] as [string, RegExp][]) {
+    const m = html.match(pat);
+    if (m) { const h = m[1].replace(/\/$/, ""); if (!badHandles.has(h.toLowerCase())) social[plat] = h; }
+  }
+  if (Object.keys(social).length) dna.social_handles = social;
+
+  try { dna.domain = new URL(url).hostname.replace("www.", ""); } catch {}
+
+  const sectorKw: Record<string, string[]> = {
+    restaurante: ["menu","carta","restaurante","gastronomia","reserva","plato"],
+    ecommerce:   ["shop","tienda","cart","carrito","comprar","pedido","envio"],
+    salud:       ["clinica","medico","salud","health","wellness","spa","tratamiento"],
+    tecnologia:  ["software","saas","app","platform","dashboard","api","developer"],
+    moda:        ["moda","fashion","ropa","coleccion","talla","tejido","boutique"],
+    turismo:     ["hotel","viaje","turismo","travel","reserva","alojamiento","vuelo"],
+    educacion:   ["curso","formacion","escuela","academia","aprender","clases","online"],
+    agencia:     ["agencia","studio","branding","marketing","campana","creativo"],
+  };
+  const txt = html.slice(0, 10000).toLowerCase();
+  let bestSector = "";
+  let bestScore = 0;
+  for (const [s, ks] of Object.entries(sectorKw)) {
+    const score = ks.filter(k => txt.includes(k)).length;
+    if (score > bestScore) { bestScore = score; bestSector = s; }
+  }
+  if (bestScore > 0) dna.sector = bestSector;
+
+  return dna;
+}
+
+async function ddgInstant(query: string): Promise<Record<string, any>> {
+  try {
+    const r = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`, {
+      headers: { "User-Agent": BROWSER_UA }, signal: AbortSignal.timeout(12000),
+    });
+    const d = await r.json() as any;
+    const result: Record<string, any> = { source: "ddg_instant", query, items: [] };
+    if (d.AbstractText) { result.abstract = String(d.AbstractText).slice(0, 500); result.abstract_url = d.AbstractURL || ""; }
+    for (const rt of (d.RelatedTopics || []).slice(0, 5)) {
+      if (rt && typeof rt === "object" && rt.Text) result.items.push({ text: String(rt.Text).slice(0, 200) });
+    }
+    return result;
+  } catch (e: any) { return { source: "ddg_instant", query, error: e.message }; }
+}
+
+async function ddgSearch(query: string, n = 5): Promise<Record<string, any>> {
+  try {
+    const r = await fetch(`https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: { "User-Agent": BROWSER_UA, "Referer": "https://duckduckgo.com/" },
+      signal: AbortSignal.timeout(12000),
+    });
+    const html = await r.text();
+    const titles   = [...html.matchAll(/class="result__a"[^>]*>([^<]+)/g)].map(m => m[1]).slice(0, n);
+    const snippets = [...html.matchAll(/class="result__snippet"[^>]*>(.*?)(?:<\/span>|$)/gs)].map(m => m[1]).slice(0, n);
+    const items = snippets.map((s, i) => ({
+      title:   titles[i]?.trim() || "",
+      snippet: s.replace(/<[^>]+>/g, "").trim().slice(0, 280),
+    })).filter(it => it.snippet);
+    return { source: "ddg_search", query, items };
+  } catch (e: any) { return { source: "ddg_search", query, error: e.message }; }
+}
+
+async function scrapeSocial(plat: string, url: string, handle: string): Promise<Record<string, any>> {
+  try {
+    const r = await fetch(url, { headers: { "User-Agent": BROWSER_UA }, signal: AbortSignal.timeout(12000) });
+    const html = await r.text();
+    const d: Record<string, any> = { source: plat, handle, url };
+    const desc = dnaMetaContent(html, "og:description");
+    if (desc) d.description = desc.slice(0, 200);
+    const title = dnaMetaContent(html, "og:title");
+    if (title) d.display_name = title;
+    if (plat === "instagram") {
+      const fm = desc?.match(/([\d,.kKmM]+)\s*Followers/i);
+      if (fm) d.followers = fm[1];
+      const parts = desc?.split(" - ");
+      if (parts && parts.length >= 2) d.bio = parts[parts.length - 1].slice(0, 200);
+    }
+    if (plat === "tiktok") {
+      const fm = html.match(/"followerCount"\s*:\s*(\d+)/);
+      if (fm) { const n = parseInt(fm[1]); d.followers = n >= 1e6 ? `${(n/1e6).toFixed(1)}M` : n >= 1000 ? `${(n/1000).toFixed(0)}K` : String(n); }
+      const bm = html.match(/"signature"\s*:\s*"([^"]{1,300})"/);
+      if (bm) d.bio = bm[1];
+    }
+    return d;
+  } catch (e: any) { return { source: plat, handle, url, error: (e as any).message }; }
+}
+
+async function researchBrand(brand: string, domain: string, social: Record<string, string>): Promise<Record<string, any>> {
+  const slug = brand.toLowerCase().replace(/\s/g, "").replace(/-/g, "").slice(0, 30);
+  const ig = social.instagram || slug;
+  const tt = social.tiktok    || slug;
+  const fb = social.facebook  || slug;
+  const li = social.linkedin  || slug;
+
+  const [ddgGeneral, ddgAbout, ddgSocial, ddgReviews, ddgComp, instagram, tiktok, facebook, linkedin] = await Promise.allSettled([
+    ddgInstant(`${brand} ${domain}`),
+    ddgSearch(`"${brand}" empresa historia about`),
+    ddgSearch(`"${brand}" instagram tiktok twitter redes sociales`),
+    ddgSearch(`"${brand}" reviews opiniones clientes valoracion`),
+    ddgSearch(`"${brand}" ${domain} competitors competencia`),
+    scrapeSocial("instagram", `https://www.instagram.com/${ig}/`, ig),
+    scrapeSocial("tiktok",    `https://www.tiktok.com/@${tt}`,    tt),
+    scrapeSocial("facebook",  `https://www.facebook.com/${fb}`,   fb),
+    scrapeSocial("linkedin",  `https://www.linkedin.com/company/${li}`, li),
+  ]);
+
+  const unwrap = (r: PromiseSettledResult<any>) => r.status === "fulfilled" ? r.value : { error: r.reason?.message };
+  return {
+    ddg_general:   unwrap(ddgGeneral),
+    ddg_about:     unwrap(ddgAbout),
+    ddg_social:    unwrap(ddgSocial),
+    ddg_reviews:   unwrap(ddgReviews),
+    ddg_competitors: unwrap(ddgComp),
+    instagram:     unwrap(instagram),
+    tiktok:        unwrap(tiktok),
+    facebook:      unwrap(facebook),
+    linkedin:      unwrap(linkedin),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SSE routes: /weblab/analyze  /weblab/improve  /weblab/proxy
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get("/weblab/proxy", async (req: Request, res: Response): Promise<void> => {
+  const targetUrl = req.query.url as string;
+  if (!targetUrl) { res.status(400).json({ error: "url param required" }); return; }
+  try {
+    const r = await fetch(targetUrl, {
+      headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
+      signal: AbortSignal.timeout(14000),
+    });
+    const contentType = r.headers.get("content-type") || "text/html";
+    res.set("Content-Type", contentType);
+    res.set("Access-Control-Allow-Origin", "*");
+    const body = await r.text();
+    res.send(body);
+  } catch (e: any) { res.status(502).json({ error: e.message }); }
+});
+
+router.post("/weblab/analyze", async (req: Request, res: Response): Promise<void> => {
+  const { url: targetUrl, deep = true } = req.body as { url: string; deep?: boolean };
+  if (!targetUrl) { res.status(400).json({ error: "url requerida" }); return; }
+
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  const send = (obj: Record<string, any>) => {
+    try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch {}
+  };
+
+  const heartbeat = setInterval(() => { try { res.write(": ping\n\n"); } catch {} }, 20000);
+
+  try {
+    send({ progress: `🌐 Descargando ${targetUrl}…`, status: "working" });
+
+    let html = "";
+    try {
+      const r = await fetch(targetUrl, {
+        headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
+        signal: AbortSignal.timeout(14000),
+      });
+      html = await r.text();
+    } catch (e: any) {
+      send({ progress: `⚠ No se pudo descargar la página directamente: ${e.message}`, status: "warn" });
+      try {
+        const scraped = await scrapeWebsite(targetUrl);
+        html = scraped.html || "";
+      } catch {}
+    }
+
+    if (!html) { send({ error: "No se pudo obtener el HTML de la URL proporcionada." }); res.end(); return; }
+    send({ progress: `✓ HTML descargado (${Math.round(html.length / 1024)}KB)`, status: "done" });
+
+    send({ progress: "🧬 Extrayendo DNA de la marca…", status: "working" });
+    const dna = dnaExtractFromHtml(html, targetUrl);
+    send({ progress: `✓ DNA extraído — Marca: ${dna.name || dna.domain || "?"} · Sector: ${dna.sector || "?"} · ${dna.palette?.length || 0} colores · ${dna.all_fonts?.length || 0} fuentes`, status: "done" });
+    send({ dna });
+
+    if (deep) {
+      send({ progress: "🔍 Lanzando investigación paralela (DDG · IG · TT · FB · LinkedIn)…", status: "working" });
+      const research = await researchBrand(dna.name || dna.domain || "", dna.domain || "", dna.social_handles || {});
+      const sources = Object.values(research).filter((v: any) => !v.error).length;
+      send({ progress: `✓ Investigación completada — ${sources}/9 fuentes con datos`, status: "done" });
+      send({ research });
+    }
+
+    send({ done: true });
+    res.end();
+  } catch (e: any) {
+    clearInterval(heartbeat);
+    send({ error: e.message });
+    res.end();
+  } finally {
+    clearInterval(heartbeat);
+  }
+});
+
+router.post("/weblab/improve", async (req: Request, res: Response): Promise<void> => {
+  const { dna = {}, research = {}, instructions } = req.body as { dna: Record<string, any>; research: Record<string, any>; instructions?: string };
+
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  const send = (obj: Record<string, any>) => { try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch {} };
+  const heartbeat = setInterval(() => { try { res.write(": ping\n\n"); } catch {} }, 20000);
+
+  try {
+    // Summarize research into text snippets
+    const lines: string[] = [];
+    for (const [k, v] of Object.entries(research) as [string, any][]) {
+      if (!v || v.error) continue;
+      if (k === "ddg_general" && v.abstract) lines.push(`[DDG] ${v.abstract.slice(0, 350)}`);
+      else if (["ddg_about","ddg_reviews","ddg_social","ddg_competitors"].includes(k)) {
+        for (const it of (v.items || []).slice(0, 2)) if (it.snippet) lines.push(`[${k}] ${it.snippet.slice(0, 200)}`);
+      } else if (["instagram","tiktok","facebook","linkedin"].includes(k)) {
+        const parts = [`[${v.source?.toUpperCase()} @${v.handle || "?"}]`];
+        if (v.followers) parts.push(`${v.followers} seguidores`);
+        if (v.bio) parts.push(`bio: "${v.bio.slice(0, 120)}"`);
+        if (parts.length > 1) lines.push(parts.join(" · "));
+      }
+    }
+
+    const brand   = dna.name || dna.domain || "Brand";
+    const palette = dna.palette || [dna.primary_color || "#6366f1"];
+    const font    = dna.primary_font || "Inter";
+
+    const systemPrompt = `Eres el mejor diseñador web del mundo. Generas HTML completo, standalone y ejecutable.
+
+REGLAS ABSOLUTAS:
+1. UN ÚNICO archivo HTML — CSS y JS inline. Funciona abriéndolo directamente en el navegador.
+2. requestAnimationFrame para TODAS las animaciones.
+3. will-change: transform en todos los elementos animados.
+4. CSS custom properties para colores y tipografía en :root.
+5. Responsive: mobile-first con media queries.
+6. try/catch alrededor de cualquier librería CDN.
+7. CERO placeholders, CERO "TODO" — contenido REAL de la marca.
+8. Footer con links a redes sociales REALES si se proporcionan handles.
+9. Meta viewport y charset correctos.`;
+
+    const userPrompt = `Crea una landing page premium para la marca "${brand}".
+
+═══ DNA ═══
+Nombre: ${brand}
+Dominio: ${dna.domain || ""}
+Sector: ${dna.sector || "general"}
+Tagline: ${(dna.tagline || "").slice(0, 180) || "no detectado"}
+CTA: ${dna.cta || "Empezar ahora"}
+Paleta: ${palette.slice(0, 6).join(", ")}
+Fuente: ${font}
+Logo URL: ${dna.logo_url || "no detectado — crea logotipo textual"}
+Redes: ${JSON.stringify(dna.social_handles || {})}
+
+═══ INVESTIGACIÓN ═══
+${lines.slice(0, 14).join("\n") || "(sin datos de investigación)"}
+
+═══ INSTRUCCIONES ═══
+${instructions || "Diseño moderno, premium, con efectos visuales avanzados. Mantén identidad de marca pero eleva el nivel estético. Inspírate en Awwwards."}
+
+═══ ESTRUCTURA ═══
+1. HERO — animación de impacto (partículas canvas, gradiente, o Three.js mesh)
+2. PROPUESTA DE VALOR — 3-4 cards glassmorphism o tilt 3D
+3. SOCIAL PROOF — datos reales de redes si disponibles
+4. CTA SECTION — efecto magnético (mousemove JS)
+5. FOOTER — links reales a redes detectadas
+
+Genera el HTML COMPLETO ahora:`;
+
+    let baseURL: string | undefined;
+    let apiKey: string | undefined;
+    if (process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL && process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY) {
+      baseURL = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+      apiKey  = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+    } else {
+      apiKey = process.env.ANTHROPIC_API_KEY;
+    }
+    if (!apiKey) { send({ error: "API key de IA no configurada" }); res.end(); return; }
+
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = baseURL ? new Anthropic({ baseURL, apiKey }) : new Anthropic({ apiKey });
+
+    const stream = await client.messages.stream({
+      model: "claude-sonnet-4-5",
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    send({ status: "streaming" });
+
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        send({ token: event.delta.text });
+      }
+    }
+
+    send({ done: true });
+    res.end();
+  } catch (e: any) {
+    clearInterval(heartbeat);
+    send({ error: e.message });
+    res.end();
+  } finally {
+    clearInterval(heartbeat);
+  }
+});
+
 export default router;

@@ -593,6 +593,19 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [stitchProjectId, setStitchProjectId] = useState<string>("");
   const [stitchStatus, setStitchStatus] = useState<"unknown" | "available" | "unavailable">("unknown");
 
+  // DNA Extractor state
+  const [showDna, setShowDna] = useState(false);
+  const [dnaUrl, setDnaUrl] = useState("");
+  const [dnaDeep, setDnaDeep] = useState(true);
+  const [dnaAnalyzing, setDnaAnalyzing] = useState(false);
+  const [dnaProgress, setDnaProgress] = useState<Array<{ text: string; status: string }>>([]);
+  const [dnaDna, setDnaDna] = useState<Record<string, any> | null>(null);
+  const [dnaResearch, setDnaResearch] = useState<Record<string, any> | null>(null);
+  const [dnaInstructions, setDnaInstructions] = useState("");
+  const [dnaGenerating, setDnaGenerating] = useState(false);
+  const [dnaGenerated, setDnaGenerated] = useState("");
+  const [dnaGenStatus, setDnaGenStatus] = useState("");
+
   const loadHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/web-lab/history/${projectId}`, { credentials: "include" });
@@ -757,6 +770,97 @@ function WebLabInner({ projectId }: { projectId: number }) {
       setStitchLoading(false);
     }
   }, [stitchPrompt, stitchPageType, stitchProjectId, brandName, loadHistory]);
+
+  const analyzeDna = useCallback(async () => {
+    if (!dnaUrl.trim()) return;
+    setDnaAnalyzing(true);
+    setDnaProgress([{ text: "Iniciando análisis…", status: "info" }]);
+    setDnaDna(null);
+    setDnaResearch(null);
+    setDnaGenerated("");
+    setDnaGenStatus("");
+    try {
+      const res = await fetch(`${API_BASE}/api/weblab/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url: dnaUrl.trim(), deep: dnaDeep }),
+      });
+      if (!res.ok || !res.body) {
+        const d = await res.json().catch(() => ({})) as any;
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const evt = JSON.parse(line.slice(6)) as any;
+            if (evt.progress) setDnaProgress(p => [...p, { text: evt.progress, status: evt.status || "working" }]);
+            if (evt.dna) setDnaDna(evt.dna);
+            if (evt.research) setDnaResearch(evt.research);
+            if (evt.done) setDnaProgress(p => [...p, { text: "✓ Extracción completada. Puedes generar el rediseño.", status: "complete" }]);
+            if (evt.error) throw new Error(evt.error);
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      setDnaProgress(p => [...p, { text: `⚠ ${e.message}`, status: "error" }]);
+    } finally {
+      setDnaAnalyzing(false);
+    }
+  }, [dnaUrl, dnaDeep]);
+
+  const generateDnaRedesign = useCallback(async () => {
+    if (!dnaDna) return;
+    setDnaGenerating(true);
+    setDnaGenerated("");
+    setDnaGenStatus("Conectando con Claude…");
+    let html = "";
+    try {
+      const res = await fetch(`${API_BASE}/api/weblab/improve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ dna: dnaDna, research: dnaResearch || {}, instructions: dnaInstructions.trim() || undefined }),
+      });
+      if (!res.ok || !res.body) {
+        const d = await res.json().catch(() => ({})) as any;
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const evt = JSON.parse(line.slice(6)) as any;
+            if (evt.status) setDnaGenStatus(evt.status === "streaming" ? "Generando HTML con Claude…" : evt.status);
+            if (evt.token) { html += evt.token; setDnaGenerated(html); }
+            if (evt.done) setDnaGenStatus("✓ Rediseño generado — listo para descargar o abrir en pestaña");
+            if (evt.error) throw new Error(evt.error);
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      setDnaGenStatus(`⚠ ${e.message}`);
+    } finally {
+      setDnaGenerating(false);
+    }
+  }, [dnaDna, dnaResearch, dnaInstructions]);
 
   const analyze = async () => {
     if (!url.trim()) return;
@@ -1215,6 +1319,23 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
           >
             🪡 Stitch AI
           </button>
+          <button
+            onClick={() => setShowDna(s => !s)}
+            title="Extrae paleta, fuentes, tagline, CTA e investiga la marca en paralelo — genera un rediseño premium con Claude streaming"
+            style={{
+              padding: "12px 16px",
+              background: showDna ? "linear-gradient(135deg, #22c55e, #16a34a)" : "transparent",
+              border: showDna ? "none" : "1px solid var(--border, #333)",
+              borderRadius: 10,
+              color: showDna ? "#000" : "var(--t2, #aaa)",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: showDna ? 700 : 400,
+              whiteSpace: "nowrap",
+            }}
+          >
+            🧬 Extractor DNA
+          </button>
         </div>
       </div>
 
@@ -1378,6 +1499,195 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                 )}
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {showDna && (
+        <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 22, marginBottom: 24, border: "1px solid #22c55e33" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 26, lineHeight: 1 }}>🧬</div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "#22c55e" }}>Extractor DNA — Análisis de Marca + Rediseño Claude</h3>
+              <p style={{ fontSize: 12, color: "#888", marginTop: 4, marginBottom: 0 }}>
+                Introduce la URL del cliente. Extraemos paleta, fuentes, tagline, CTA, redes sociales y sector — luego investigamos la marca en 9 fuentes paralelas y generamos un rediseño premium con Claude streaming.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+            <input
+              type="url"
+              value={dnaUrl}
+              onChange={e => setDnaUrl(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && !dnaAnalyzing && analyzeDna()}
+              placeholder="https://ejemplo.com"
+              disabled={dnaAnalyzing}
+              style={{
+                flex: 1, minWidth: 260, padding: "10px 14px",
+                background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10,
+                color: "#eee", fontSize: 14, outline: "none",
+              }}
+            />
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", cursor: "pointer", whiteSpace: "nowrap" }}>
+              <input
+                type="checkbox"
+                checked={dnaDeep}
+                onChange={e => setDnaDeep(e.target.checked)}
+                disabled={dnaAnalyzing}
+                style={{ accentColor: "#22c55e" }}
+              />
+              Investigación profunda
+            </label>
+            <button
+              onClick={analyzeDna}
+              disabled={dnaAnalyzing || !dnaUrl.trim()}
+              style={{
+                padding: "10px 22px",
+                background: dnaAnalyzing || !dnaUrl.trim() ? "#2a2a30" : "linear-gradient(135deg, #22c55e, #16a34a)",
+                border: "none", borderRadius: 10, color: dnaAnalyzing || !dnaUrl.trim() ? "#666" : "#000",
+                fontWeight: 700, cursor: dnaAnalyzing || !dnaUrl.trim() ? "not-allowed" : "pointer", fontSize: 13,
+                whiteSpace: "nowrap",
+              }}
+            >{dnaAnalyzing ? "⏳ Analizando…" : "⚡ Analizar y Extraer"}</button>
+          </div>
+
+          {dnaProgress.length > 0 && (
+            <div style={{
+              background: "#050508", border: "1px solid #1a1a2e", borderRadius: 10,
+              padding: "12px 14px", marginBottom: 12, maxHeight: 180, overflowY: "auto",
+              display: "flex", flexDirection: "column", gap: 4,
+            }}>
+              {dnaProgress.map((item, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12,
+                  color: item.status === "error" ? "#ef4444" : item.status === "complete" ? "#22c55e" : item.status === "done" ? "#86efac" : item.status === "warn" ? "#eab308" : "#9ca3af",
+                }}>
+                  <span style={{ flexShrink: 0, marginTop: 1 }}>
+                    {item.status === "error" ? "✕" : item.status === "complete" ? "✓" : item.status === "done" ? "✓" : item.status === "working" ? "◌" : "·"}
+                  </span>
+                  <span>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(dnaDna || dnaResearch) && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              {dnaDna && (
+                <div style={{ background: "#050508", border: "1px solid #1a2a1a", borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 10 }}>🧬 DNA Extraído</div>
+                  {dnaDna.name && <div style={{ marginBottom: 6 }}><span style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>Marca</span><div style={{ fontSize: 14, fontWeight: 700, color: "#eee", marginTop: 2 }}>{dnaDna.name}</div></div>}
+                  {dnaDna.domain && <div style={{ marginBottom: 6 }}><span style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>Dominio</span><div style={{ fontSize: 12, fontFamily: "monospace", color: "#aaa", marginTop: 2 }}>{dnaDna.domain}</div></div>}
+                  {dnaDna.sector && <div style={{ marginBottom: 6 }}><span style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>Sector</span><div style={{ marginTop: 4 }}><span style={{ fontSize: 11, padding: "2px 8px", background: "#22c55e22", border: "1px solid #22c55e55", borderRadius: 20, color: "#22c55e" }}>{dnaDna.sector}</span></div></div>}
+                  {dnaDna.tagline && <div style={{ marginBottom: 6 }}><span style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>Tagline</span><div style={{ fontSize: 11, color: "#888", marginTop: 2, lineHeight: 1.4 }}>{dnaDna.tagline.slice(0, 120)}{dnaDna.tagline.length > 120 ? "…" : ""}</div></div>}
+                  {dnaDna.palette?.length > 0 && (
+                    <div style={{ marginBottom: 6 }}>
+                      <span style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>Paleta</span>
+                      <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                        {dnaDna.palette.map((c: string, i: number) => (
+                          <div key={i} title={c} style={{ width: 28, height: 28, borderRadius: 6, background: c, border: "1px solid #333", flexShrink: 0 }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {dnaDna.primary_font && <div style={{ marginBottom: 6 }}><span style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>Tipografía</span><div style={{ fontSize: 13, fontWeight: 600, color: "#d4a843", marginTop: 2 }}>{dnaDna.all_fonts?.join(", ") || dnaDna.primary_font}</div></div>}
+                  {dnaDna.social_handles && Object.keys(dnaDna.social_handles).length > 0 && (
+                    <div style={{ marginBottom: 6 }}>
+                      <span style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>Redes detectadas</span>
+                      <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {Object.entries(dnaDna.social_handles).map(([plat, handle]) => (
+                          <span key={plat} style={{ fontSize: 10, padding: "2px 8px", background: "#0a0a1a", border: "1px solid #333", borderRadius: 20, color: "#888" }}>{plat}: @{handle as string}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {dnaResearch && (
+                <div style={{ background: "#050508", border: "1px solid #1a1a2a", borderRadius: 12, padding: 14, overflowY: "auto", maxHeight: 320 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", marginBottom: 10 }}>🔍 Investigación de Marca</div>
+                  {Object.entries(dnaResearch).map(([k, v]: [string, any]) => {
+                    if (!v || v.error) return null;
+                    const label = k === "ddg_general" ? "DDG General" : k === "ddg_about" ? "DDG About" : k === "ddg_social" ? "DDG Social" : k === "ddg_reviews" ? "DDG Reviews" : k === "ddg_competitors" ? "DDG Competencia" : k.charAt(0).toUpperCase() + k.slice(1);
+                    const color = ["instagram","tiktok","twitter","facebook","linkedin"].includes(k) ? "#a78bfa" : "#60a5fa";
+                    const summary = v.abstract ? v.abstract.slice(0, 150) : (v.items || []).slice(0, 2).map((it: any) => it.snippet || it.text || "").filter(Boolean).join(" · ").slice(0, 200);
+                    const extra = v.followers ? ` · ${v.followers} seguidores` : "";
+                    if (!summary && !extra && !v.bio) return null;
+                    return (
+                      <div key={k} style={{ marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid #111" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 }}>{label}{extra}</div>
+                        {v.bio && <div style={{ fontSize: 11, color: "#9ca3af", lineHeight: 1.4, marginBottom: 2 }}>{v.bio.slice(0, 150)}</div>}
+                        {summary && <div style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>{summary}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {dnaDna && (
+            <div style={{ marginBottom: dnaGenerated ? 12 : 0 }}>
+              <textarea
+                value={dnaInstructions}
+                onChange={e => setDnaInstructions(e.target.value)}
+                placeholder="Instrucciones opcionales para Claude: diseño dark premium, añadir sección de precios, usa Three.js hero, sector lujo…"
+                rows={2}
+                style={{
+                  width: "100%", padding: "10px 14px",
+                  background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10,
+                  color: "#eee", fontSize: 12, resize: "vertical",
+                  boxSizing: "border-box", outline: "none", fontFamily: "inherit", marginBottom: 10,
+                }}
+              />
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  onClick={generateDnaRedesign}
+                  disabled={dnaGenerating}
+                  style={{
+                    padding: "10px 24px",
+                    background: dnaGenerating ? "#2a2a30" : "linear-gradient(135deg, #d4a843, #b8860b)",
+                    border: "none", borderRadius: 10, color: dnaGenerating ? "#666" : "#000",
+                    fontWeight: 700, cursor: dnaGenerating ? "not-allowed" : "pointer", fontSize: 13, whiteSpace: "nowrap",
+                  }}
+                >{dnaGenerating ? "🔄 Generando…" : "🚀 Generar Rediseño"}</button>
+                {dnaGenerated && (
+                  <>
+                    <button
+                      onClick={() => { const b = new Blob([dnaGenerated], { type: "text/html" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `redesign-${dnaDna?.domain || "marca"}-${Date.now()}.html`; a.click(); }}
+                      style={{ padding: "10px 16px", background: "#1a1a2e", border: "1px solid #333", borderRadius: 10, color: "#ccc", cursor: "pointer", fontSize: 12 }}
+                    >⬇ Descargar HTML</button>
+                    <button
+                      onClick={() => { const url2 = "data:text/html;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(dnaGenerated))); window.open(url2, "_blank", "noopener,noreferrer"); }}
+                      style={{ padding: "10px 16px", background: "#1a1a2e", border: "1px solid #d4a84344", borderRadius: 10, color: "#d4a843", cursor: "pointer", fontSize: 12 }}
+                    >↗ Abrir en pestaña</button>
+                    <button
+                      onClick={() => { setEditHtml(dnaGenerated); setEditCss(""); setEditLabel(`dna-redesign · ${dnaDna?.domain || "marca"}`); setTab("edit"); }}
+                      style={{ padding: "10px 16px", background: "#0a2a0a", border: "1px solid #22c55e44", borderRadius: 10, color: "#22c55e", cursor: "pointer", fontSize: 12 }}
+                    >✏ Abrir en Editor</button>
+                  </>
+                )}
+                {dnaGenStatus && (
+                  <span style={{ fontSize: 12, color: dnaGenStatus.startsWith("✓") ? "#22c55e" : dnaGenStatus.startsWith("⚠") ? "#ef4444" : "#888" }}>{dnaGenStatus}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {dnaGenerated && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 12, color: "#555", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: dnaGenerating ? "#eab308" : "#22c55e", animation: dnaGenerating ? "pulse 1.2s infinite" : "none" }} />
+                {dnaGenerating ? `Generando… ${Math.round(dnaGenerated.length / 1024)}KB recibidos` : `✓ ${Math.round(dnaGenerated.length / 1024)}KB generados`}
+              </div>
+              <iframe
+                sandbox="allow-scripts"
+                title="Preview del rediseño generado"
+                style={{ width: "100%", height: 540, border: "1px solid #22c55e22", borderRadius: 12, background: "#fff" }}
+                srcDoc={dnaGenerated}
+              />
+            </div>
           )}
         </div>
       )}
