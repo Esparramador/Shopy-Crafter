@@ -514,6 +514,7 @@ export default function Landing() {
 
   const pad = (n: number) => String(n).padStart(2, "0");
   const isAnimated = (id: string) => animatedSections.has(id);
+  const eff = (sectionKey: string) => (content as any)?.effects?.[sectionKey] ?? "fadeUp";
 
   const parentOrigin = isPreview ? window.location.origin : "";
 
@@ -660,7 +661,7 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 01 — HERO
         ══════════════════════════════════════ */}
-        <section className="fp-section" id="fp-hero" data-nav="Inicio">
+        <section className="fp-section" id="fp-hero" data-nav="Inicio" data-effect={eff("hero")}>
           <div className="fp-bg">
             {videoBg("hero")}
             <div className="l-hero-grid"></div>
@@ -792,7 +793,7 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 02 — ENGINES (6 motors)
         ══════════════════════════════════════ */}
-        <section className="fp-section fp-section-dark" id="fp-engines" data-nav="Motores">
+        <section className="fp-section fp-section-dark" id="fp-engines" data-nav="Motores" data-effect={eff("engines")}>
           <div className="fp-bg-solid">{videoBg("features")}</div>
           <div className="fp-content fp-engines-layout">
             <div className={`fp-section-header ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
@@ -851,7 +852,7 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 03 — DEMO (split layout)
         ══════════════════════════════════════ */}
-        <section className="fp-section" id="fp-demo" data-nav="Demo">
+        <section className="fp-section" id="fp-demo" data-nav="Demo" data-effect={eff("demo")}>
           <div className="fp-bg">
             {videoBg("how")}
             <div className="l-hero-grid" style={{ opacity: 0.3 }}></div>
@@ -919,7 +920,7 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 04 — RESULTS (counters)
         ══════════════════════════════════════ */}
-        <section className="fp-section fp-results-section" id="fp-results" data-nav="Resultados">
+        <section className="fp-section fp-results-section" id="fp-results" data-nav="Resultados" data-effect={eff("results")}>
           <div className="fp-bg">
             {videoBg("results")}
             <div className="fp-results-bg-pattern"></div>
@@ -967,7 +968,7 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 05 — PRICING (3 cards)
         ══════════════════════════════════════ */}
-        <section className="fp-section fp-section-dark" id="fp-pricing" data-nav="Precios">
+        <section className="fp-section fp-section-dark" id="fp-pricing" data-nav="Precios" data-effect={eff("pricing")}>
           <div className="fp-bg-solid">{videoBg("pricing")}</div>
           <div className="fp-content fp-pricing-layout">
             <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
@@ -1016,7 +1017,7 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 06 — CALCULADORA DE PRECIOS
         ══════════════════════════════════════ */}
-        <section className="fp-section" id="fp-calculator" data-nav="Calculadora">
+        <section className="fp-section" id="fp-calculator" data-nav="Calculadora" data-effect={eff("calculator")}>
           <div className="fp-bg">
             {videoBg("calculator")}
             <div className="l-hero-grid" style={{ opacity: 0.2 }}></div>
@@ -1159,7 +1160,7 @@ export default function Landing() {
         {/* ══════════════════════════════════════
             SECTION 06 — FORMULARIO DE CONTACTO
         ══════════════════════════════════════ */}
-        <section className="fp-section fp-section-dark" id="fp-contact" data-nav="Contactar">
+        <section className="fp-section fp-section-dark" id="fp-contact" data-nav="Contactar" data-effect={eff("contact")}>
           <div className="fp-bg">
             {videoBg("contact")}
             <div className="l-contact-bg" style={{

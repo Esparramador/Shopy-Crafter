@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDraftPersistence, useBeforeUnload, useOnlineStatus, useRetryFetch } from "@/hooks/use-draft-persistence";
+import { VISME_EFFECTS, EFFECT_FAMILIES, LANDING_SECTIONS_EFFECTS } from "@/lib/effects-library";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -53,6 +54,10 @@ const SECTIONS: SectionDef[] = [
       { label: "Fuente titulares", path: "site.font_heading", type: "text", placeholder: "Instrument Serif" },
       { label: "Fuente cuerpo", path: "site.font_body", type: "text", placeholder: "Geist" },
     ],
+  },
+  {
+    id: "effects", icon: "✨", label: "Efectos Visme",
+    fields: [],
   },
   {
     id: "backgrounds", icon: "🎨", label: "Fondos",
@@ -1054,6 +1059,141 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
       )}
       <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }}
         onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+    </div>
+  );
+}
+
+/* ── VISME EFFECT SECTION PICKER ──────────────────────────────────────────── */
+function EffectSectionPicker({ content, onChange }: { content: Record<string, unknown>; onChange: (path: string, value: unknown) => void }) {
+  const effects = (content as any)?.effects ?? {};
+  const [activeSec, setActiveSec] = useState(LANDING_SECTIONS_EFFECTS[0].id);
+  const [hoveredFx, setHoveredFx] = useState<string | null>(null);
+  const currentEffect = effects[activeSec] ?? "fadeUp";
+
+  const familyColors: Record<string, string> = {
+    "básico":   "rgba(100,100,120,0.35)",
+    "fade":     "rgba(200,168,75,0.20)",
+    "3D":       "rgba(139,92,246,0.25)",
+    "reveal":   "rgba(45,212,159,0.22)",
+    "escala":   "rgba(59,130,246,0.22)",
+    "especial": "rgba(244,114,182,0.22)",
+  };
+  const familyBorder: Record<string, string> = {
+    "básico":   "rgba(100,100,120,0.4)",
+    "fade":     "rgba(200,168,75,0.35)",
+    "3D":       "rgba(139,92,246,0.4)",
+    "reveal":   "rgba(45,212,159,0.35)",
+    "escala":   "rgba(59,130,246,0.35)",
+    "especial": "rgba(244,114,182,0.4)",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Section tabs */}
+      <div>
+        <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, color: "var(--t3)", marginBottom: 8 }}>
+          Sección
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {LANDING_SECTIONS_EFFECTS.map(sec => {
+            const fx = effects[sec.id] ?? "fadeUp";
+            const fxDef = VISME_EFFECTS.find(e => e.id === fx);
+            const isActive = activeSec === sec.id;
+            return (
+              <button key={sec.id} onClick={() => setActiveSec(sec.id)}
+                title={`${sec.label} — ${fxDef?.label ?? fx}`}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  background: isActive ? "rgba(200,168,75,0.15)" : "var(--ink3)",
+                  border: `1px solid ${isActive ? "var(--gold)" : "var(--bdr)"}`,
+                  color: isActive ? "var(--gold)" : "var(--t2)",
+                  transition: "all 0.12s",
+                }}>
+                <span style={{ fontSize: 13 }}>{sec.icon}</span>
+                <span>{sec.label}</span>
+                {fx !== "none" && <span style={{ fontSize: 10, opacity: 0.7 }}>{fxDef?.icon}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Effect grid */}
+      <div>
+        <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, color: "var(--t3)", marginBottom: 8 }}>
+          Efecto de entrada — <span style={{ color: "var(--gold)", textTransform: "none", fontWeight: 400 }}>
+            {VISME_EFFECTS.find(e => e.id === currentEffect)?.label ?? currentEffect}
+          </span>
+        </div>
+        {EFFECT_FAMILIES.map(family => {
+          const familyEffects = VISME_EFFECTS.filter(e => e.family === family);
+          return (
+            <div key={family} style={{ marginBottom: 10 }}>
+              <div style={{
+                fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
+                color: "var(--t4)", marginBottom: 5, paddingLeft: 2,
+              }}>{family}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {familyEffects.map(fx => {
+                  const isSelected = currentEffect === fx.id;
+                  const isHover = hoveredFx === `${activeSec}:${fx.id}`;
+                  return (
+                    <button
+                      key={fx.id}
+                      onClick={() => onChange(`effects.${activeSec}`, fx.id)}
+                      onMouseEnter={() => setHoveredFx(`${activeSec}:${fx.id}`)}
+                      onMouseLeave={() => setHoveredFx(null)}
+                      title={fx.description}
+                      style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                        padding: "7px 8px", borderRadius: 8, fontSize: 10, fontWeight: 600,
+                        cursor: "pointer", minWidth: 56, transition: "all 0.12s",
+                        background: isSelected
+                          ? `linear-gradient(135deg, rgba(200,168,75,0.18), rgba(200,168,75,0.08))`
+                          : isHover ? familyColors[family] : "var(--ink3)",
+                        border: `1px solid ${isSelected ? "var(--gold)" : isHover ? familyBorder[family] : "var(--bdr)"}`,
+                        color: isSelected ? "var(--gold)" : "var(--t2)",
+                        boxShadow: isSelected ? "0 0 0 1px rgba(200,168,75,0.2)" : "none",
+                        transform: isSelected ? "scale(1.03)" : "scale(1)",
+                      }}>
+                      <span style={{ fontSize: 16, lineHeight: 1 }}>{fx.icon}</span>
+                      <span style={{ fontSize: 9, lineHeight: 1.2, textAlign: "center", maxWidth: 52 }}>{fx.label}</span>
+                      {isSelected && (
+                        <span style={{ fontSize: 8, color: "var(--gold)", opacity: 0.8 }}>✓ activo</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Current effect description */}
+      {(() => {
+        const fxDef = VISME_EFFECTS.find(e => e.id === currentEffect);
+        if (!fxDef) return null;
+        return (
+          <div style={{
+            padding: "8px 12px", borderRadius: 8, fontSize: 11,
+            background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.15)",
+            color: "var(--t2)", display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{ fontSize: 18 }}>{fxDef.icon}</span>
+            <div>
+              <strong style={{ color: "var(--gold)" }}>{fxDef.label}</strong>
+              <span style={{ color: "var(--t3)", marginLeft: 6 }}>—</span>
+              <span style={{ marginLeft: 6 }}>{fxDef.description}</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      <div style={{ fontSize: 10, color: "var(--t4)", paddingTop: 2 }}>
+        💡 Los efectos se aplican al hacer scroll en la landing page. Guarda y recarga la vista previa para verlos.
+      </div>
     </div>
   );
 }
@@ -2191,23 +2331,29 @@ export default function CMSEditor() {
 
                   {isOpen && (
                     <div style={{ padding: "12px 16px 16px", background: "var(--ink3)" }}>
-                      {["site", "backgrounds"].includes(section.id) && ["hero", "features", "pricing", "how", "results", "calculator", "contact"].includes(section.id) && (
-                        <BackgroundTypeSelector sectionId={section.id} content={content} onChange={handleFieldChange} />
-                      )}
-                      {section.id === "adminNav" ? (
+                      {section.id === "effects" ? (
+                        <EffectSectionPicker content={content} onChange={handleFieldChange} />
+                      ) : section.id === "adminNav" ? (
                         <NavSectionEditor content={content} onChange={handleFieldChange} />
-                      ) : section.fields.map(field => {
-                        const raw   = getNestedValue(content, field.path);
-                        const value = typeof raw === "string" ? raw
-                          : typeof raw === "number" ? String(raw)
-                          : typeof raw === "boolean" ? String(raw)
-                          : Array.isArray(raw) ? raw.join(", ") : "";
-                        return (
-                          <div key={field.path} ref={el => { fieldRefs.current[field.path] = el; }}>
-                            <FieldEditor field={field} value={value} onChange={handleFieldChange} />
-                          </div>
-                        );
-                      })}
+                      ) : (
+                        <>
+                          {["hero", "features", "pricing", "how", "results", "calculator", "contact"].includes(section.id) && (
+                            <BackgroundTypeSelector sectionId={section.id} content={content} onChange={handleFieldChange} />
+                          )}
+                          {section.fields.map(field => {
+                            const raw   = getNestedValue(content, field.path);
+                            const value = typeof raw === "string" ? raw
+                              : typeof raw === "number" ? String(raw)
+                              : typeof raw === "boolean" ? String(raw)
+                              : Array.isArray(raw) ? raw.join(", ") : "";
+                            return (
+                              <div key={field.path} ref={el => { fieldRefs.current[field.path] = el; }}>
+                                <FieldEditor field={field} value={value} onChange={handleFieldChange} />
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

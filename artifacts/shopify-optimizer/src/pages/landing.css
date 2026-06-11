@@ -579,6 +579,219 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   VISME EFFECTS LIBRARY — 24 animation effects selectable from CMS
+   Override fp-animated per section via [data-effect="id"]
+═══════════════════════════════════════════════════════════════ */
+
+/* none — disable animation */
+[data-effect="none"] .fp-animate  { opacity: 1; transform: none; }
+[data-effect="none"] .fp-animated { animation: none; opacity: 1; transform: none; }
+
+/* ── fadeDown ─────────────────────────────────────────── */
+[data-effect="fadeDown"] .fp-animated { animation: visme-fadeDown 0.7s ease both; }
+@keyframes visme-fadeDown {
+  from { opacity: 0; transform: translateY(-34px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── fadeLeft ─────────────────────────────────────────── */
+[data-effect="fadeLeft"] .fp-animated { animation: visme-fadeLeft 0.6s ease both; }
+@keyframes visme-fadeLeft {
+  from { opacity: 0; transform: translateX(52px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── fadeRight ────────────────────────────────────────── */
+[data-effect="fadeRight"] .fp-animated { animation: visme-fadeRight 0.6s ease both; }
+@keyframes visme-fadeRight {
+  from { opacity: 0; transform: translateX(-52px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── fadePop ──────────────────────────────────────────── */
+[data-effect="fadePop"] .fp-animated { animation: visme-fadePop 0.6s ease both; }
+@keyframes visme-fadePop {
+  from { opacity: 0; transform: scale(0.86); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── flip3dX (horizontal 3D flip) ─────────────────────── */
+[data-effect="flip3dX"] .fp-animated {
+  animation: visme-flip3dX 0.8s ease both;
+  transform-origin: center bottom;
+}
+@keyframes visme-flip3dX {
+  from { opacity: 0; transform: perspective(800px) rotateX(82deg) translateY(28px); }
+  to   { opacity: 1; transform: perspective(800px) rotateX(0deg) translateY(0); }
+}
+
+/* ── flip3dY (vertical 3D flip) ────────────────────────── */
+[data-effect="flip3dY"] .fp-animated {
+  animation: visme-flip3dY 0.8s ease both;
+}
+@keyframes visme-flip3dY {
+  from { opacity: 0; transform: perspective(800px) rotateY(-78deg) translateX(-24px); }
+  to   { opacity: 1; transform: perspective(800px) rotateY(0deg) translateX(0); }
+}
+
+/* ── tiltPop ──────────────────────────────────────────── */
+[data-effect="tiltPop"] .fp-animated {
+  animation: visme-tiltPop 0.75s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes visme-tiltPop {
+  0%  { opacity: 0; transform: perspective(600px) rotateX(22deg) scale(0.84) translateY(32px); }
+  60% { opacity: 1; transform: perspective(600px) rotateX(-4deg) scale(1.03); }
+  to  { opacity: 1; transform: perspective(600px) rotateX(0deg) scale(1) translateY(0); }
+}
+
+/* ── zDepth (Z-axis depth) ───────────────────────────── */
+[data-effect="zDepth"] .fp-animated {
+  animation: visme-zDepth 0.8s ease both;
+}
+@keyframes visme-zDepth {
+  from { opacity: 0; transform: perspective(1000px) translateZ(-180px) scale(0.82); }
+  to   { opacity: 1; transform: perspective(1000px) translateZ(0) scale(1); }
+}
+
+/* ── rollForward ─────────────────────────────────────── */
+[data-effect="rollForward"] .fp-animated {
+  animation: visme-rollForward 0.75s ease both;
+  transform-origin: center top;
+}
+@keyframes visme-rollForward {
+  from { opacity: 0; transform: perspective(600px) rotateX(-92deg) translateY(-36px); }
+  to   { opacity: 1; transform: perspective(600px) rotateX(0deg) translateY(0); }
+}
+
+/* ── curtainUp (clip-path curtain) ──────────────────── */
+[data-effect="curtainUp"] .fp-animated {
+  animation: visme-curtainUp 0.85s cubic-bezier(.4,0,.2,1) both;
+}
+@keyframes visme-curtainUp {
+  from { clip-path: inset(0 0 100% 0); transform: translateY(18px); opacity: 0.2; }
+  to   { clip-path: inset(0 0 0% 0);   transform: translateY(0);    opacity: 1; }
+}
+
+/* ── slideBlur ───────────────────────────────────────── */
+[data-effect="slideBlur"] .fp-animated {
+  animation: visme-slideBlur 0.72s ease both;
+}
+@keyframes visme-slideBlur {
+  from { opacity: 0; transform: translateX(-48px); filter: blur(9px); }
+  to   { opacity: 1; transform: translateX(0);     filter: blur(0); }
+}
+
+/* ── wipeRight (clip-path wipe) ─────────────────────── */
+[data-effect="wipeRight"] .fp-animated {
+  animation: visme-wipeRight 0.8s cubic-bezier(.4,0,.2,1) both;
+}
+@keyframes visme-wipeRight {
+  from { clip-path: inset(0 100% 0 0); opacity: 0.3; }
+  to   { clip-path: inset(0 0% 0 0);   opacity: 1; }
+}
+
+/* ── scaleSpring ─────────────────────────────────────── */
+[data-effect="scaleSpring"] .fp-animated {
+  animation: visme-scaleSpring 0.72s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes visme-scaleSpring {
+  from { opacity: 0; transform: scale(0.58); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── popBounce ───────────────────────────────────────── */
+[data-effect="popBounce"] .fp-animated {
+  animation: visme-popBounce 0.82s ease both;
+}
+@keyframes visme-popBounce {
+  0%   { opacity: 0; transform: scale(0.48) translateY(22px); }
+  55%  { opacity: 1; transform: scale(1.11) translateY(-7px); }
+  78%  { transform: scale(0.95) translateY(3px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── zoomBlur ────────────────────────────────────────── */
+[data-effect="zoomBlur"] .fp-animated {
+  animation: visme-zoomBlur 0.8s ease both;
+}
+@keyframes visme-zoomBlur {
+  from { opacity: 0; transform: scale(1.28); filter: blur(14px); }
+  to   { opacity: 1; transform: scale(1);    filter: blur(0); }
+}
+
+/* ── glitch ──────────────────────────────────────────── */
+[data-effect="glitch"] .fp-animated {
+  animation: visme-glitch 0.75s ease both;
+}
+@keyframes visme-glitch {
+  0%   { opacity: 0; transform: translate(-7px,0) skewX(-9deg);  filter: hue-rotate(90deg) brightness(1.5); }
+  18%  { opacity: 1; transform: translate(5px,0)  skewX(6deg);   filter: hue-rotate(-45deg); }
+  36%  { transform: translate(-3px,0) skewX(-3deg); filter: hue-rotate(30deg); }
+  55%  { transform: translate(2px,0)  skewX(2deg);  filter: hue-rotate(-10deg); }
+  74%  { transform: translate(-1px,0) skewX(-1deg); filter: hue-rotate(5deg); }
+  100% { opacity: 1; transform: translate(0,0) skewX(0);         filter: hue-rotate(0deg) brightness(1); }
+}
+
+/* ── floatRise ───────────────────────────────────────── */
+[data-effect="floatRise"] .fp-animated {
+  animation: visme-floatRise 0.92s cubic-bezier(.2,.6,.3,1) both;
+}
+@keyframes visme-floatRise {
+  from { opacity: 0; transform: translateY(58px) scale(0.96); }
+  62%  { opacity: 1; transform: translateY(-9px)  scale(1.015); }
+  100% { opacity: 1; transform: translateY(0)      scale(1); }
+}
+
+/* ── blurReveal ──────────────────────────────────────── */
+[data-effect="blurReveal"] .fp-animated {
+  animation: visme-blurReveal 0.85s ease both;
+}
+@keyframes visme-blurReveal {
+  from { opacity: 0; filter: blur(20px) brightness(1.5); }
+  to   { opacity: 1; filter: blur(0)    brightness(1); }
+}
+
+/* ── swingIn (pendulum) ─────────────────────────────── */
+[data-effect="swingIn"] .fp-animated {
+  animation: visme-swingIn 0.82s ease both;
+  transform-origin: top center;
+}
+@keyframes visme-swingIn {
+  0%   { opacity: 0; transform: perspective(500px) rotateX(-72deg) translateY(-28px); }
+  58%  { opacity: 1; transform: perspective(500px) rotateX(11deg); }
+  78%  { transform: perspective(500px) rotateX(-5deg); }
+  100% { opacity: 1; transform: perspective(500px) rotateX(0deg) translateY(0); }
+}
+
+/* ── liquid ──────────────────────────────────────────── */
+[data-effect="liquid"] .fp-animated {
+  animation: visme-liquid 0.85s cubic-bezier(.4,0,.2,1) both;
+}
+@keyframes visme-liquid {
+  0%   { opacity: 0; transform: translateY(42px) skewY(7deg)  scaleX(0.88); }
+  48%  { opacity: 1; transform: translateY(-7px)  skewY(-2deg) scaleX(1.025); }
+  100% { opacity: 1; transform: translateY(0)      skewY(0)     scaleX(1); }
+}
+
+/* ── morph ───────────────────────────────────────────── */
+[data-effect="morph"] .fp-animated {
+  animation: visme-morph 0.72s ease both;
+}
+@keyframes visme-morph {
+  from { opacity: 0; transform: skewX(22deg) scale(0.82) translateX(-22px); filter: blur(5px); }
+  to   { opacity: 1; transform: skewX(0deg)  scale(1)    translateX(0);     filter: blur(0); }
+}
+
+/* ── twist3d ─────────────────────────────────────────── */
+[data-effect="twist3d"] .fp-animated {
+  animation: visme-twist3d 0.82s ease both;
+}
+@keyframes visme-twist3d {
+  from { opacity: 0; transform: perspective(600px) rotate3d(1,1,0,-65deg) scale(0.78); }
+  to   { opacity: 1; transform: perspective(600px) rotate3d(1,1,0,0deg)   scale(1); }
+}
+
 /* ── SCROLL HINT ── */
 .fp-scroll-hint {
   position: absolute;

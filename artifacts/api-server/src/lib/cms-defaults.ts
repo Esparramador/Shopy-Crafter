@@ -953,4 +953,13 @@ export const DEFAULT_CMS_CONTENT = {
     copyright: "© 2026 Shopy Crafter · Agency Platform. Todos los derechos reservados.",
     badges: ["RGPD", "AES-256", "SOC2"],
   },
+  effects: {
+    hero:       "fadeUp",
+    engines:    "flip3dX",
+    demo:       "fadeRight",
+    results:    "scaleSpring",
+    pricing:    "zDepth",
+    calculator: "fadeLeft",
+    contact:    "floatRise",
+  },
 };
