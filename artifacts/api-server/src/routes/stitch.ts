@@ -91,7 +91,7 @@ router.get("/stitch/tools", async (req, res) => {
 
 router.get("/stitch/projects", async (req, res) => {
   try {
-    const result = await callStitchTool("stitch.list_projects");
+    const result = await callStitchTool("list_projects");
     res.json({ projects: result });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -100,9 +100,21 @@ router.get("/stitch/projects", async (req, res) => {
   }
 });
 
+router.post("/stitch/projects", async (req, res) => {
+  const { name, description } = req.body as { name: string; description?: string };
+  if (!name) { res.status(400).json({ error: "name requerido" }); return; }
+  try {
+    const result = await callStitchTool("create_project", { name, description });
+    res.json({ project: result });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(503).json({ error: msg });
+  }
+});
+
 router.get("/stitch/projects/:projectId", async (req, res) => {
   try {
-    const result = await callStitchTool("stitch.get_project", { project_id: req.params.projectId });
+    const result = await callStitchTool("get_project", { project_id: req.params.projectId });
     res.json({ project: result });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -112,7 +124,7 @@ router.get("/stitch/projects/:projectId", async (req, res) => {
 
 router.get("/stitch/projects/:projectId/screens", async (req, res) => {
   try {
-    const result = await callStitchTool("stitch.get_screens", { project_id: req.params.projectId });
+    const result = await callStitchTool("list_screens", { project_id: req.params.projectId });
     res.json({ screens: result });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -120,28 +132,68 @@ router.get("/stitch/projects/:projectId/screens", async (req, res) => {
   }
 });
 
-router.get("/stitch/projects/:projectId/screens/:screenId/html", async (req, res) => {
+router.get("/stitch/projects/:projectId/screens/:screenId", async (req, res) => {
   try {
-    const result = await callStitchTool("stitch.download_asset", {
+    const result = await callStitchTool("get_screen", {
       project_id: req.params.projectId,
       screen_id: req.params.screenId,
-      asset_type: "html",
     });
-    res.json({ html: result });
+    res.json({ screen: result });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(503).json({ error: msg });
   }
 });
 
-router.get("/stitch/projects/:projectId/screens/:screenId/image", async (req, res) => {
+router.post("/stitch/projects/:projectId/screens/:screenId/edit", async (req, res) => {
+  const { prompt } = req.body as { prompt: string };
+  if (!prompt) { res.status(400).json({ error: "prompt requerido" }); return; }
   try {
-    const result = await callStitchTool("stitch.download_asset", {
+    const result = await callStitchTool("edit_screens", {
+      project_id: req.params.projectId,
+      screen_ids: [req.params.screenId],
+      prompt,
+    });
+    res.json({ result });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(503).json({ error: msg });
+  }
+});
+
+router.post("/stitch/projects/:projectId/screens/:screenId/variants", async (req, res) => {
+  const { prompt, count = 3 } = req.body as { prompt?: string; count?: number };
+  try {
+    const result = await callStitchTool("generate_variants", {
       project_id: req.params.projectId,
       screen_id: req.params.screenId,
-      asset_type: "image",
+      prompt,
+      count,
     });
-    res.json({ image: result });
+    res.json({ variants: result });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(503).json({ error: msg });
+  }
+});
+
+router.get("/stitch/projects/:projectId/design-systems", async (req, res) => {
+  try {
+    const result = await callStitchTool("list_design_systems", { project_id: req.params.projectId });
+    res.json({ designSystems: result });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(503).json({ error: msg });
+  }
+});
+
+router.post("/stitch/projects/:projectId/design-systems", async (req, res) => {
+  const { name, description, colors, fonts } = req.body as Record<string, unknown>;
+  try {
+    const result = await callStitchTool("create_design_system", {
+      project_id: req.params.projectId, name, description, colors, fonts,
+    });
+    res.json({ designSystem: result });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(503).json({ error: msg });
@@ -152,39 +204,35 @@ router.post("/stitch/generate", async (req, res) => {
   const {
     prompt,
     projectId,
-    projectName,
-    model = "gemini-3-flash",
-    imageUrl,
+    model = "gemini-2.5-flash",
   } = req.body as {
     prompt: string;
     projectId?: string;
-    projectName?: string;
     model?: string;
-    imageUrl?: string;
   };
 
   if (!prompt || typeof prompt !== "string") {
     res.status(400).json({ error: "prompt requerido" });
     return;
   }
+  if (!projectId) {
+    res.status(400).json({ error: "projectId requerido. Crea un proyecto primero con POST /stitch/projects" });
+    return;
+  }
 
   try {
-    const args: Record<string, unknown> = { prompt, model };
-    if (projectId) args.project_id = projectId;
-    if (projectName) args.project_name = projectName;
-    if (imageUrl) args.image_url = imageUrl;
-
-    const result = await callStitchTool("stitch.generate_screen", args);
+    const args: Record<string, unknown> = { prompt, project_id: projectId, model };
+    const result = await callStitchTool("generate_screen_from_text", args);
     res.json({ result });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error({ err: msg, prompt: prompt.slice(0, 100) }, "Stitch generate_screen failed");
+    logger.error({ err: msg, prompt: prompt.slice(0, 100) }, "Stitch generate_screen_from_text failed");
     res.status(503).json({ error: msg });
   }
 });
 
 router.post("/stitch/generate/shopify-product", async (req, res) => {
-  const { product, projectId, style = "modern ecommerce" } = req.body as {
+  const { product, projectId, style = "modern ecommerce dark" } = req.body as {
     product: { title?: string; description?: string; price?: number; category?: string };
     projectId?: string;
     style?: string;
@@ -194,22 +242,27 @@ router.post("/stitch/generate/shopify-product", async (req, res) => {
     res.status(400).json({ error: "product.title requerido" });
     return;
   }
+  if (!projectId) {
+    res.status(400).json({ error: "projectId requerido. Crea un proyecto primero con POST /stitch/projects" });
+    return;
+  }
 
   const prompt = [
     `Design a high-converting Shopify product page for "${product.title}".`,
     product.category ? `Category: ${product.category}.` : "",
     product.description ? `Description: ${product.description.slice(0, 200)}.` : "",
     product.price ? `Price: €${product.price}.` : "",
-    `Style: ${style}, dark professional UI, gold accent colors (#C8A84B), mobile-responsive.`,
-    "Include: hero image, product title, price, CTA button, description, reviews section.",
-    "Use Tailwind CSS. Generate production-ready HTML.",
+    `Style: ${style}, professional UI, gold accent colors (#C8A84B), mobile-first responsive.`,
+    "Include: hero image placeholder, product title, price, CTA button, description, star reviews, related products row.",
+    "Use Tailwind CSS CDN. Generate production-ready HTML.",
   ].filter(Boolean).join(" ");
 
   try {
-    const args: Record<string, unknown> = { prompt, model: "gemini-3-pro" };
-    if (projectId) args.project_id = projectId;
-
-    const result = await callStitchTool("stitch.generate_screen", args);
+    const result = await callStitchTool("generate_screen_from_text", {
+      prompt,
+      project_id: projectId,
+      model: "gemini-2.5-pro",
+    });
     res.json({ result, prompt });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
