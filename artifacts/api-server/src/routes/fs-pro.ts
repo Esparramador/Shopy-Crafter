@@ -539,7 +539,7 @@ router.post("/fs-pro/prompt-library/seed", requireAdmin, async (_req, res) => {
 let _masterLib: any = null;
 function getMasterLib(): any {
   if (!_masterLib) {
-    const p = resolve(process.cwd(), "artifacts/api-server/src/lib/master-prompt-library.json");
+    const p = resolve(process.cwd(), "src/lib/master-prompt-library.json");
     try {
       _masterLib = JSON.parse(readFileSync(p, "utf-8"));
     } catch {
