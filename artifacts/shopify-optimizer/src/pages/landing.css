@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap');
 
 :root {
   --l-ink:   #080810;
@@ -7,10 +7,10 @@
   --l-ink4:  #1c1c2e;
   --l-ink5:  #242438;
   --l-gold:  #c8a84b;
-  --l-gold2: #e6c668;
-  --l-gold3: #f4dfa0;
+  --l-gold2: #d2b86b;
+  --l-gold3: #e4d4a5;
   --l-jade:  #2dd49f;
-  --l-jade2: #5ee8bc;
+  --l-jade2: #5bddb4;
   --l-sky:   #4a9edd;
   --l-crim:  #e84558;
   --l-t:     #f2f0ff;
