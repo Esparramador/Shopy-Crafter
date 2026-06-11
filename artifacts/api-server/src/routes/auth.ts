@@ -263,6 +263,47 @@ router.post("/invite/:token/setup", async (req, res): Promise<void> => {
   }
 });
 
+router.post("/impersonate/:userId", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const adminId = req.session.userId!;
+    const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, adminId));
+
+    if (!admin || admin.role !== "admin") {
+      res.status(403).json({ error: "Solo el administrador puede impersonar usuarios" });
+      return;
+    }
+
+    const targetId = parseInt(req.params.userId, 10);
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, targetId));
+
+    if (!target) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+    if (target.role === "admin") {
+      res.status(400).json({ error: "No puedes impersonar a un administrador" });
+      return;
+    }
+
+    req.session.impersonating = adminId;
+    req.session.role = "client";
+    req.session.clientId = target.clientId ?? null;
+    req.session.name = target.name;
+
+    await recordAudit({
+      userId: adminId,
+      action: "start_impersonation",
+      details: `Empezó a impersonar usuario ${targetId} (${target.email})`,
+      ipAddress: req.ip ?? "unknown",
+    });
+
+    res.json({ success: true, impersonating: target.email });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
 router.post("/stop-impersonate", requireAuth, async (req, res): Promise<void> => {
   try {
     const adminId = req.session.userId!;

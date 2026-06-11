@@ -153,7 +153,7 @@ function RequireClient({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!user) return <Redirect to="/" />;
-  if (user.role === "admin") return <Redirect to="/" />;
+  // Admin can access client panel in preview / impersonation mode
   return <>{children}</>;
 }
 

@@ -506,6 +506,21 @@ export function AppLayout({ children }: AppLayoutProps) {
             >
               🌐 <span>Ver Landing</span>
             </a>
+            <a
+              href={`${BASE_URL}/client`}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
+                background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.20)",
+                color: "var(--jade)", textDecoration: "none", whiteSpace: "nowrap",
+                transition: "border-color 0.15s, background 0.15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--jade)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(45,212,159,0.12)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(45,212,159,0.20)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(45,212,159,0.06)"; }}
+              title="Ver Panel Cliente (Vista Previa)"
+            >
+              👤 <span>Panel Cliente</span>
+            </a>
             <div className="status-chip">
               <div className="status-pulse" />
               {ap.header?.active ?? "Activo"}

@@ -153,6 +153,35 @@ export function ClientLayout({ children }: { children: ReactNode }) {
 
       {/* ── MAIN AREA ── */}
       <div className="main-area">
+        {/* Admin preview banner */}
+        {user?.role === "admin" && !user?.impersonating && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "7px 16px", fontSize: 11.5, fontWeight: 500,
+            background: "rgba(200,168,75,0.08)", borderBottom: "1px solid rgba(200,168,75,0.20)",
+            color: "var(--gold)", gap: 8,
+          }}>
+            <span>👁 Vista previa del Panel Cliente — estás viendo como Admin</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <a
+                href={`${_BASE_URL}/admin/cms`}
+                style={{
+                  padding: "2px 9px", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                  background: "rgba(200,168,75,0.12)", border: "1px solid rgba(200,168,75,0.30)",
+                  color: "var(--gold)", textDecoration: "none",
+                }}
+              >✏️ Editar en CMS</a>
+              <a
+                href={`${_BASE_URL}/home`}
+                style={{
+                  padding: "2px 9px", borderRadius: 5, fontSize: 11, fontWeight: 600,
+                  background: "var(--ink3)", border: "1px solid var(--bdr2)",
+                  color: "var(--t2)", textDecoration: "none",
+                }}
+              >← Volver al Admin</a>
+            </div>
+          </div>
+        )}
         {/* Topbar */}
         <div className="topbar">
           <button
