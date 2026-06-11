@@ -363,14 +363,14 @@ export default function Landing() {
   }, [isPreview, goToSection]);
 
   const _isFpActive = useCallback(() => {
-    return window.innerWidth > 900 && window.innerHeight > 500;
+    return window.innerWidth > 900 && window.innerHeight > 600;
   }, []);
 
-  const [fpMode, setFpMode] = useState(() => typeof window !== "undefined" && window.innerWidth > 900 && window.innerHeight > 500);
+  const [fpMode, setFpMode] = useState(() => typeof window !== "undefined" && window.innerWidth > 900 && window.innerHeight > 600);
 
   useEffect(() => {
     const check = () => {
-      const active = window.innerWidth > 900 && window.innerHeight > 500;
+      const active = window.innerWidth > 900 && window.innerHeight > 600;
       setFpMode(active);
       if (active) {
         document.body.style.overflow = "hidden";

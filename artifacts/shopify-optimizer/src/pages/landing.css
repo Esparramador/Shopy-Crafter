@@ -26,8 +26,8 @@
   font-family: var(--l-fb);
   background: var(--l-ink);
   color: var(--l-t);
-  overflow: hidden;
-  height: 100vh;
+  overflow-x: hidden;
+  min-height: 100dvh;
   line-height: 1.6;
   cursor: none;
   position: relative;
@@ -44,7 +44,7 @@
 
 /* LOADING */
 .l-loading {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: #080810;
   display: flex; align-items: center; justify-content: center;
 }
@@ -125,7 +125,7 @@
 
 /* HERO */
 .l-hero {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   padding: 120px 48px 80px;
@@ -402,13 +402,13 @@
 /* FULLPAGE CONTAINER */
 .fp-container {
   margin-top: 64px;
-  height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
   overflow-y: hidden;
   overscroll-behavior: none;
 }
 .fp-section {
-  height: calc(100vh - 64px);
-  min-height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
+  min-height: calc(100dvh - 64px);
   position: relative;
   overflow: hidden;
   overflow-y: auto;
@@ -466,7 +466,7 @@
   0% { transform: translateY(0) scale(1); opacity: 0; }
   10% { opacity: 1; }
   90% { opacity: 0.4; }
-  100% { transform: translateY(-110vh) scale(0.3); opacity: 0; }
+  100% { transform: translateY(-110dvh) scale(0.3); opacity: 0; }
 }
 
 /* FP CONTENT */
@@ -1013,7 +1013,7 @@
 .fp-pricing-card .l-pricing-price { font-size: 32px !important; margin-bottom: 0 !important; }
 .fp-pricing-card .l-pricing-period { margin-bottom: 6px !important; font-size: 10px !important; }
 .fp-pricing-card .l-pricing-divider { margin-bottom: 6px !important; }
-.fp-pricing-card .l-pricing-features { gap: 4px !important; margin-bottom: 10px !important; max-height: calc(100vh - 380px); overflow-y: auto; scrollbar-width: thin; }
+.fp-pricing-card .l-pricing-features { gap: 4px !important; margin-bottom: 10px !important; max-height: calc(100dvh - 380px); overflow-y: auto; scrollbar-width: thin; }
 .fp-pricing-card .l-pricing-feature { font-size: 11px !important; line-height: 1.25 !important; }
 .fp-pricing-card .l-pricing-plan { margin-bottom: 4px !important; font-size: 11px !important; letter-spacing: 1.5px !important; }
 .fp-pricing-card .l-pricing-cta { padding: 8px !important; font-size: 12px !important; }
@@ -1108,9 +1108,9 @@
 
 /* ════════════════════════════════════════════════════
    LANDSCAPE MOBILE — content taller than viewport
-   (phones in landscape: width > 900px but height < 500px)
+   (phones in landscape: width > 600px but height < 600px)
 ════════════════════════════════════════════════════ */
-@media (max-height: 500px) and (orientation: landscape) {
+@media (max-height: 600px) and (orientation: landscape) {
   html, body {
     overflow-x: hidden !important;
     max-width: 100vw !important;
