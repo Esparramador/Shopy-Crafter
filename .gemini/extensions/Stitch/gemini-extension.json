@@ -1,0 +1,14 @@
+{
+    "name": "Stitch",
+    "version": "0.1.4",
+    "description": "Integrate Stitch into your workflow: Generate UI from Text, Image. Access Google Stitch AI-powered UI/UX design and code generation tool directly from ShopyBrain.",
+    "mcpServers": {
+        "stitch": {
+            "httpUrl": "https://stitch.googleapis.com/mcp",
+            "headers": {
+                "X-Goog-Api-Key": "${STITCH_API_KEY}"
+            },
+            "timeout": 300000
+        }
+    }
+}
