@@ -659,10 +659,10 @@ export default function CardStudio() {
                   </button>
                   {selected.frontUrl && (
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
-                      <a href={selected.frontUrl} download={`${selected.name}-frente.png`} style={btnSmall}>
+                      <a href={`${API_BASE}${selected.frontUrl}`} download={`${selected.name}-frente.png`} style={btnSmall}>
                         <Download size={12} /> Frente PNG
                       </a>
-                      <a href={selected.backUrl || "#"} download={`${selected.name}-reverso.png`} style={btnSmall}>
+                      <a href={selected.backUrl ? `${API_BASE}${selected.backUrl}` : "#"} download={`${selected.name}-reverso.png`} style={btnSmall}>
                         <Download size={12} /> Reverso PNG
                       </a>
                       {selected.pdfUrl && (
@@ -706,8 +706,8 @@ export default function CardStudio() {
                   )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <PreviewSide label="Frente" url={selected.frontUrl} placeholder="Genera para ver el frente" />
-                  <PreviewSide label="Reverso" url={selected.backUrl} placeholder="Genera para ver el reverso (con QR)" />
+                  <PreviewSide label="Frente" url={selected.frontUrl ? `${API_BASE}${selected.frontUrl}` : null} placeholder="Genera para ver el frente" />
+                  <PreviewSide label="Reverso" url={selected.backUrl ? `${API_BASE}${selected.backUrl}` : null} placeholder="Genera para ver el reverso (con QR)" />
                 </div>
               </div>
             </>
@@ -720,8 +720,8 @@ export default function CardStudio() {
         <CardStudioEditor
           apiBase={API_BASE}
           cardId={selected.id}
-          frontUrl={selected.frontUrl}
-          backUrl={selected.backUrl}
+          frontUrl={selected.frontUrl ? `${API_BASE}${selected.frontUrl}` : null}
+          backUrl={selected.backUrl ? `${API_BASE}${selected.backUrl}` : null}
           initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
           generating={generating}
           onSaveOverrides={async (ov) => {

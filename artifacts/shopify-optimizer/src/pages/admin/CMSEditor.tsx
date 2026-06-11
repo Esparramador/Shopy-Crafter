@@ -1655,7 +1655,14 @@ export default function CMSEditor() {
   const [showVersions, setShowVersions] = useState(false);
   const [iframeKey, setIframeKey]       = useState(0);
   const [mobileTab, setMobileTab]       = useState<MobileTab>("edit");
-  const [sectionOrder, setSectionOrder] = useState<string[]>(SECTIONS.map(s => s.id));
+  const CONTENT_FIRST_ORDER = [
+    "nav", "hero", "features", "stats", "how", "pricing", "testimonials", "cta",
+    "results", "contact", "howCards", "footer", "sectionNav",
+    "adminPanel", "clientPanel", "adminNav", "apkLabels", "errorMessages", "heroDemoTitles",
+    "site", "backgrounds",
+    ...SECTIONS.filter(s => !["nav","hero","features","stats","how","pricing","testimonials","cta","results","contact","howCards","footer","sectionNav","adminPanel","clientPanel","adminNav","apkLabels","errorMessages","heroDemoTitles","site","backgrounds"].includes(s.id)).map(s => s.id),
+  ];
+  const [sectionOrder, setSectionOrder] = useState<string[]>(CONTENT_FIRST_ORDER);
   const [dragIdx, setDragIdx]           = useState<number | null>(null);
   const [customSections, setCustomSections] = useState<SectionDef[]>([]);
   const [showAddSection, setShowAddSection] = useState(false);
@@ -2072,9 +2079,33 @@ export default function CMSEditor() {
         }}>
           {/* panel header */}
           <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--bdr)" }}>
-            <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, color: "var(--t3)" }}>
-              Árbol de contenido
-            </p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, color: "var(--t3)", margin: 0 }}>
+                Secciones de la Landing
+              </p>
+              <a href={previewUrl} target="_blank" rel="noreferrer"
+                style={{ fontSize: 10, color: "var(--jade)", textDecoration: "none", display: "flex", alignItems: "center", gap: 3, padding: "2px 6px", borderRadius: 4, border: "1px solid rgba(45,212,159,0.3)", background: "rgba(45,212,159,0.06)" }}>
+                🔗 Ver landing
+              </a>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {[
+                { id: "fp-hero", icon: "🦸", label: "Hero" },
+                { id: "fp-engines", icon: "⚡", label: "Motores" },
+                { id: "fp-demo", icon: "🎬", label: "Demo" },
+                { id: "fp-results", icon: "📊", label: "Stats" },
+                { id: "fp-pricing", icon: "💰", label: "Precios" },
+                { id: "fp-calculator", icon: "🧮", label: "Calc." },
+                { id: "fp-contact", icon: "📞", label: "Contacto" },
+              ].map(s => (
+                <button key={s.id} onClick={() => scrollPreviewToSection(s.id)}
+                  style={{ fontSize: 9, padding: "3px 6px", borderRadius: 5, border: "1px solid var(--bdr)", background: "var(--ink3)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 3, transition: "all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--gold)"; e.currentTarget.style.color = "var(--gold)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--bdr)"; e.currentTarget.style.color = "var(--t3)"; }}>
+                  {s.icon} {s.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* sections list */}
@@ -2160,7 +2191,7 @@ export default function CMSEditor() {
 
                   {isOpen && (
                     <div style={{ padding: "12px 16px 16px", background: "var(--ink3)" }}>
-                      {["hero", "features", "pricing", "how", "results", "calculator", "contact"].includes(section.id) && (
+                      {["site", "backgrounds"].includes(section.id) && ["hero", "features", "pricing", "how", "results", "calculator", "contact"].includes(section.id) && (
                         <BackgroundTypeSelector sectionId={section.id} content={content} onChange={handleFieldChange} />
                       )}
                       {section.id === "adminNav" ? (

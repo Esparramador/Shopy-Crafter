@@ -885,6 +885,33 @@ const FALLBACK_QUICK_ACTIONS: QuickAction[] = [
   { icon: "🧠", label: "Estado del sistema", prompt: "¿Qué conocimiento ha absorbido Shopy Crafter? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
 ];
 
+interface SlashSkill {
+  cmd: string;
+  icon: string;
+  label: string;
+  desc: string;
+  engine: string;
+  prompt: string;
+  isResearch?: boolean;
+}
+const SLASH_SKILLS: SlashSkill[] = [
+  { cmd: "/audit",    icon: "🔍", label: "Auditoría completa",    desc: "Analiza tienda, SEO, conversión y oportunidades",       engine: "claude",  prompt: "Haz una auditoría completa de mi tienda: SEO, conversión, imágenes, precios y top-3 oportunidades de mejora." },
+  { cmd: "/seo",      icon: "📈", label: "Optimizar SEO",          desc: "Mejora títulos, metadatos y alt texts de productos",    engine: "claude",  prompt: "Optimiza el SEO de todos mis productos: títulos, meta descripciones, alt texts y palabras clave long-tail." },
+  { cmd: "/email",    icon: "📧", label: "Email Marketing",         desc: "Estrategia completa y flujos Klaviyo con HTML",         engine: "claude",  prompt: "Crea una estrategia completa de email marketing con flujos Klaviyo para mi tienda: bienvenida, carrito abandonado, post-compra y winback." },
+  { cmd: "/research", icon: "🔬", label: "Investigar marca",        desc: "Análisis profundo de competidores y benchmarks",        engine: "gemini",  prompt: "", isResearch: true },
+  { cmd: "/pricing",  icon: "💰", label: "Analizar precios",        desc: "Optimización de márgenes, precios y posicionamiento",   engine: "claude",  prompt: "Analiza todos mis precios, compáralos con el mercado y sugiere ajustes para maximizar margen y conversión. Incluye elasticidad precio." },
+  { cmd: "/products", icon: "📦", label: "Auditar catálogo",        desc: "Lista y puntúa todos los productos por calidad",        engine: "claude",  prompt: "Lista todos mis productos con puntuación SEO, precio, estado e imágenes. Identifica los que necesitan mejora urgente e indica por qué." },
+  { cmd: "/klaviyo",  icon: "🎯", label: "Flujos Klaviyo",          desc: "Genera workflows con emails HTML listos para copiar",   engine: "claude",  prompt: "Genera los flujos Klaviyo más importantes: bienvenida (3 emails), carrito abandonado (2 emails), post-compra (2 emails) y winback (2 emails). Incluye HTML completo." },
+  { cmd: "/ads",      icon: "🎬", label: "Crear anuncio IA",        desc: "Creatividad de vídeo con guión, música y efectos",      engine: "auto",    prompt: "Crea un anuncio de vídeo persuasivo para mi producto más vendido: guión completo, voz en off, música de fondo y efectos visuales cinemáticos." },
+  { cmd: "/content",  icon: "✍️", label: "Generar contenido",       desc: "Copy para Instagram, TikTok y landing page",           engine: "claude",  prompt: "Genera contenido de alto impacto para mi marca: 5 posts Instagram, 3 hooks TikTok y copy para la hero section de la landing." },
+  { cmd: "/brand",    icon: "🏷️", label: "Análisis de branding",    desc: "Identidad visual, tono y posicionamiento competitivo",  engine: "gemini",  prompt: "Analiza mi branding en profundidad: identidad visual, tono de comunicación, posicionamiento y 5 oportunidades de diferenciación frente a competidores." },
+  { cmd: "/images",   icon: "🖼️", label: "Generar imágenes",         desc: "Fotos de producto profesionales con IA (4K)",           engine: "auto",    prompt: "Genera imágenes profesionales de producto: fondo blanco limpio, lifestyle en contexto de uso y banner para redes. Modelo: Flux 1.1 Pro Ultra." },
+  { cmd: "/video",    icon: "🎥", label: "Vídeo de producto",        desc: "Vídeo cinematic de 30 segundos con IA",                 engine: "auto",    prompt: "Crea un vídeo de producto cinematic de 30 segundos: planos de producto, música elegante y voz en off persuasiva en español." },
+  { cmd: "/cards",    icon: "💳", label: "Tarjetas de visita",       desc: "Diseño profesional con tipografía e identidad visual",  engine: "claude",  prompt: "Diseña tarjetas de visita profesionales para mi agencia: logo, colores de marca, tipografía premium y datos de contacto completos." },
+  { cmd: "/supply",   icon: "🏭", label: "Buscar proveedores",       desc: "Fabricantes y mayoristas con precios y plazos",         engine: "gemini",  prompt: "Busca los mejores proveedores y fabricantes para mis productos: precios unitarios, MOQ, calidad, certificaciones y tiempos de entrega a España/Europa." },
+  { cmd: "/describe", icon: "🤖", label: "Describir con IA",         desc: "Copy SEO completo y storytelling por producto",         engine: "claude",  prompt: "Crea descripciones de producto de alto impacto: storytelling emocional, beneficios clave, especificaciones técnicas y palabras clave SEO long-tail." },
+];
+
 const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización eCommerce.
 Tienes acceso a tres motores de análisis: investigación de mercado, análisis estratégico y memoria permanente.
 Eres experto en: eCommerce, Klaviyo, email marketing, SEO, pricing, visión de producto, texturas, composición visual, química de materiales, topología 3D, rendering.
@@ -934,10 +961,14 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [urlInput, setUrlInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [slashFilter, setSlashFilter] = useState("");
+  const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const slashMenuRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
@@ -2030,7 +2061,44 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     }
   }, [isListening, sendMessage]);
 
+  const getFilteredSkills = () => SLASH_SKILLS.filter(s =>
+    !slashFilter ||
+    s.cmd.slice(1).startsWith(slashFilter) ||
+    s.label.toLowerCase().includes(slashFilter) ||
+    s.desc.toLowerCase().includes(slashFilter)
+  );
+
+  const handleSlashSelect = (skill: SlashSkill) => {
+    setSlashMenuOpen(false);
+    setSlashFilter("");
+    setInput("");
+    if (skill.isResearch) {
+      const entity = prompt("¿Qué marca, empresa o persona quieres investigar?\n\nPuedes escribir: URL, nombre, @instagram, dominio...");
+      if (entity?.trim()) sendMessage(entity.trim());
+    } else {
+      sendMessage(skill.prompt);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (slashMenuOpen) {
+      const filtered = getFilteredSkills();
+      if (e.key === "ArrowDown") { e.preventDefault(); setSlashSelectedIdx(i => Math.min(i + 1, filtered.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setSlashSelectedIdx(i => Math.max(i - 1, 0)); return; }
+      if (e.key === "Escape") { e.preventDefault(); setSlashMenuOpen(false); setSlashFilter(""); setInput(""); return; }
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        const skill = filtered[slashSelectedIdx];
+        if (skill) handleSlashSelect(skill);
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const skill = filtered[slashSelectedIdx];
+        if (skill) { setInput(skill.cmd + " "); setSlashMenuOpen(false); setSlashFilter(""); }
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
@@ -2257,14 +2325,77 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   </div>
                 )}
 
+                {/* Slash command skill picker */}
+                {slashMenuOpen && (() => {
+                  const filtered = getFilteredSkills();
+                  if (filtered.length === 0) return null;
+                  return (
+                    <div ref={slashMenuRef} style={{
+                      marginBottom: 6, background: "var(--ink)",
+                      border: "1px solid rgba(200,168,75,0.5)", borderRadius: 10,
+                      overflow: "hidden", maxHeight: 280, overflowY: "auto",
+                      boxShadow: "0 -8px 32px rgba(0,0,0,0.5)",
+                    }}>
+                      <div style={{
+                        padding: "6px 12px", borderBottom: "1px solid var(--ink3)",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        background: "rgba(200,168,75,0.06)",
+                      }}>
+                        <span style={{ fontSize: 10, color: "var(--gold)", fontWeight: 700, letterSpacing: 1.2 }}>⚡ SKILLS — {filtered.length} disponibles</span>
+                        <span style={{ fontSize: 9, color: "var(--t4)" }}>↑↓ navegar · Enter ejecutar · Tab completar · Esc cerrar</span>
+                      </div>
+                      {filtered.map((skill, i) => (
+                        <button key={skill.cmd} onClick={() => handleSlashSelect(skill)}
+                          onMouseEnter={() => setSlashSelectedIdx(i)}
+                          style={{
+                            width: "100%", display: "flex", alignItems: "center", gap: 10,
+                            padding: "9px 12px", border: "none", cursor: "pointer", textAlign: "left",
+                            background: i === slashSelectedIdx ? "rgba(200,168,75,0.1)" : "transparent",
+                            borderLeft: `2px solid ${i === slashSelectedIdx ? "var(--gold)" : "transparent"}`,
+                            transition: "all 0.1s",
+                          }}>
+                          <span style={{ fontSize: 20, flexShrink: 0, width: 28, textAlign: "center", lineHeight: 1 }}>{skill.icon}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                              <span style={{
+                                fontSize: 12, fontWeight: 700, fontFamily: "monospace",
+                                color: i === slashSelectedIdx ? "var(--gold)" : "var(--t2)",
+                              }}>{skill.cmd}</span>
+                              <span style={{ fontSize: 11, color: "var(--t)" }}>{skill.label}</span>
+                              <span style={{
+                                fontSize: 9, padding: "1px 5px", borderRadius: 4,
+                                background: skill.engine === "claude" ? "rgba(200,168,75,0.12)" : skill.engine === "gemini" ? "rgba(45,212,159,0.12)" : "rgba(120,120,180,0.12)",
+                                color: skill.engine === "claude" ? "var(--gold)" : skill.engine === "gemini" ? "var(--jade)" : "var(--t3)",
+                                marginLeft: "auto", flexShrink: 0,
+                              }}>{skill.engine}</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 1 }}>{skill.desc}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 {/* Text input row */}
                 <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
                   <button onClick={() => setShowAttach(!showAttach)} aria-label="Adjuntar archivo"
                     style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: `1px solid ${showAttach ? "var(--gold)" : "var(--ink3)"}`, background: showAttach ? "rgba(200,168,75,0.1)" : "var(--ink2)", color: showAttach ? "var(--gold)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: isMobile ? 18 : 15 }}>
                     📎
                   </button>
-                  <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={loading}
-                    placeholder={isListening ? "🎙 Escuchando..." : attachFile || attachUrl ? "Opcional: añade contexto..." : "Escribe, pega una URL, o arrastra un archivo..."}
+                  <textarea ref={inputRef} value={input} onChange={e => {
+                    const val = e.target.value;
+                    setInput(val);
+                    if (val.startsWith("/") && !val.includes(" ") && !val.startsWith("//")) {
+                      setSlashMenuOpen(true);
+                      setSlashFilter(val.slice(1).toLowerCase());
+                      setSlashSelectedIdx(0);
+                    } else {
+                      setSlashMenuOpen(false);
+                      setSlashFilter("");
+                    }
+                  }} onKeyDown={handleKeyDown} disabled={loading}
+                    placeholder={isListening ? "🎙 Escuchando..." : attachFile || attachUrl ? "Opcional: añade contexto..." : "Escribe un mensaje, pega una URL… o pulsa / para ver skills disponibles"}
                     rows={1}
                     style={{ flex: 1, padding: isMobile ? "10px 12px" : "8px 10px", background: isListening ? "rgba(232,69,88,0.08)" : "var(--ink2)", border: `1px solid ${isListening ? "var(--crim)" : "var(--ink3)"}`, borderRadius: 8, color: "var(--t)", fontSize: isMobile ? 16 : 13, resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.4, maxHeight: isMobile ? 100 : 80, overflowY: "auto", transition: "border-color 0.2s, background 0.2s", minHeight: isMobile ? 44 : 36 }}
                     onInput={e => { const el = e.target as HTMLTextAreaElement; el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, isMobile ? 100 : 80)}px`; }}
