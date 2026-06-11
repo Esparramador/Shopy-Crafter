@@ -219,7 +219,10 @@ router.get("/api/tripo3d/task/:taskId", async (req, res) => {
 });
 
 /* POST /api/tripo3d/text-to-model — texto → 3D */
-router.post("/api/tripo3d/text-to-model", enableLongRunning, async (req: Request, res: Response) => {
+router.post("/api/tripo3d/text-to-model", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
   const { prompt, model_version = "default", texture = true, pbr = true, face_limit, negative_prompt } = req.body ?? {};
   if (!prompt) { res.status(400).json({ error: "prompt requerido" }); return; }
   try {
@@ -265,7 +268,10 @@ router.post("/api/tripo3d/text-to-model", enableLongRunning, async (req: Request
 });
 
 /* POST /api/tripo3d/image-to-model — imagen → 3D */
-router.post("/api/tripo3d/image-to-model", upload.single("image"), enableLongRunning, async (req: Request, res: Response) => {
+router.post("/api/tripo3d/image-to-model", upload.single("image"), async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
   if (!req.file) { res.status(400).json({ error: "image requerida" }); return; }
   const { model_version = "default", texture = true, pbr = true, face_limit } = req.body ?? {};
   try {
@@ -315,8 +321,10 @@ router.post(
     { name: "back",  maxCount: 1 },
     { name: "right", maxCount: 1 },
   ]),
-  enableLongRunning,
   async (req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    enableLongRunning(res);
     const files = req.files as Record<string, Express.Multer.File[]>;
     if (!files?.front?.[0]) { res.status(400).json({ error: "Al menos la imagen frontal es requerida" }); return; }
     const { model_version = "default", texture = true, pbr = true } = req.body ?? {};
@@ -370,7 +378,10 @@ router.post(
 );
 
 /* POST /api/tripo3d/refine — refinar borrador */
-router.post("/api/tripo3d/refine", enableLongRunning, async (req: Request, res: Response) => {
+router.post("/api/tripo3d/refine", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
   const { draft_model_task_id, texture = true, pbr = true, face_limit } = req.body ?? {};
   if (!draft_model_task_id) { res.status(400).json({ error: "draft_model_task_id requerido" }); return; }
   try {
@@ -409,7 +420,10 @@ router.post("/api/tripo3d/prerig", async (req: Request, res: Response) => {
 });
 
 /* POST /api/tripo3d/rig — esqueleto y rigging automático */
-router.post("/api/tripo3d/rig", enableLongRunning, async (req: Request, res: Response) => {
+router.post("/api/tripo3d/rig", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
   const { original_model_task_id } = req.body ?? {};
   if (!original_model_task_id) { res.status(400).json({ error: "original_model_task_id requerido" }); return; }
   try {
@@ -445,7 +459,10 @@ router.post("/api/tripo3d/rig", enableLongRunning, async (req: Request, res: Res
 });
 
 /* POST /api/tripo3d/retarget — aplicar animación preset a modelo rigueado */
-router.post("/api/tripo3d/retarget", enableLongRunning, async (req: Request, res: Response) => {
+router.post("/api/tripo3d/retarget", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
   const { original_model_task_id, animation, out_format = "glb" } = req.body ?? {};
   if (!original_model_task_id || !animation) {
     res.status(400).json({ error: "original_model_task_id y animation requeridos" });
@@ -491,8 +508,10 @@ router.post("/api/tripo3d/retarget", enableLongRunning, async (req: Request, res
 router.post(
   "/api/tripo3d/batch",
   multiUpload.array("images", 10),
-  enableLongRunning,
   async (req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    enableLongRunning(res);
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) { res.status(400).json({ error: "Al menos 1 imagen requerida" }); return; }
     const { model_version = "default", texture = true, pbr = true } = req.body ?? {};
@@ -582,7 +601,10 @@ router.post("/api/tripo3d/convert", async (req: Request, res: Response) => {
 });
 
 /* POST /api/tripo3d/stylize — aplicar estilo artístico */
-router.post("/api/tripo3d/stylize", enableLongRunning, async (req: Request, res: Response) => {
+router.post("/api/tripo3d/stylize", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
   const { original_model_task_id, style, block_size } = req.body ?? {};
   if (!original_model_task_id || !style) {
     res.status(400).json({ error: "original_model_task_id y style requeridos" });
