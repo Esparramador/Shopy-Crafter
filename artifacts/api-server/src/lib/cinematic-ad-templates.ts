@@ -1236,9 +1236,13 @@ export function composeCinematicScript(
   // fall back to "kling-2.1". This guarantees /cinematic-multishot
   // never receives an unknown videoModel.
   const KNOWN_VIDEO_MODELS = new Set([
-    "kling-master", "kling-2.1", "seedance-pro", "seedance-fast",
-    "veo-3", "veo-3-fast", "veo-2",
-    "runway-gen3-alpha", "runway-gen4-turbo", "runway-aleph",
+    "kling-master", "kling-2.5-turbo", "kling-2.1",
+    "seedance-pro", "seedance-fast", "seedance-1-lite",
+    "veo-3.1", "veo-3.1-fast", "veo-3", "veo-3-fast", "veo-2",
+    "sora-2",
+    "runway-gen4.5", "runway-seedance2", "runway-seedance2-fast", "runway-gen4-turbo",
+    "hailuo-02", "hailuo-02-fast",
+    "wan-2.5", "wan-2.5-fast", "wan-2.5-t2v",
   ]);
   const safeVideoModel = KNOWN_VIDEO_MODELS.has(template.masterConfig.recommendedVideoModel)
     ? template.masterConfig.recommendedVideoModel

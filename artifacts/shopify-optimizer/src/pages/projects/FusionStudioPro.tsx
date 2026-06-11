@@ -977,7 +977,7 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
   const [voices, setVoices] = useState<any[]>([]);
   const [voiceId, setVoiceId] = useState<string>("");
   const [text, setText] = useState("");
-  const [modelId, setModelId] = useState("eleven_multilingual_v2");
+  const [modelId, setModelId] = useState("eleven_v3");
   const [stability, setStability] = useState(0.5);
   const [similarity, setSimilarity] = useState(0.75);
   const [style, setStyle] = useState(0.3);

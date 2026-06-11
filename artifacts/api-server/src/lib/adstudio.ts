@@ -65,7 +65,17 @@ export const AD_CREDIT_COST = 6;
 
 // ─── TYPES ───────────────────────────────────────────────────────────────
 
-export type VideoProvider = "runway-gen4-turbo" | "runway-gen3" | "replicate-seedance-fast" | "replicate-kling" | "replicate-hailuo";
+export type VideoProvider =
+  | "runway-gen4.5"
+  | "runway-gen4-turbo"
+  | "replicate-seedance-pro"
+  | "replicate-seedance-fast"
+  | "replicate-seedance-lite"
+  | "replicate-kling-master"
+  | "replicate-kling-2.5-turbo"
+  | "replicate-kling"
+  | "replicate-hailuo"
+  | "replicate-wan-2.5";
 export type AdObjective = "awareness" | "conversion" | "retargeting" | "ugc" | "story";
 export type AdAspect = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -314,11 +324,16 @@ async function fetchToBuffer(url: string, timeoutMs = 120_000, opts: { ssrfGuard
 }
 
 const SUPPORTED_VIDEO_PROVIDERS = new Set([
+  "runway-gen4.5",
   "runway-gen4-turbo",
-  "runway-gen3",
+  "replicate-seedance-pro",
   "replicate-seedance-fast",
+  "replicate-seedance-lite",
+  "replicate-kling-master",
+  "replicate-kling-2.5-turbo",
   "replicate-kling",
   "replicate-hailuo",
+  "replicate-wan-2.5",
 ]);
 
 // ─── STEP 1: COPY GENERATION (Claude, reuses existing askClaudeJsonWithBrain) ──
@@ -471,7 +486,7 @@ async function generateVideoRunway(
   // Runway requires image URL or data URI
   const dataUri = `data:${imageMime};base64,${imageBuffer.toString("base64")}`;
 
-  const model = input.videoProvider === "runway-gen3" ? "gen3a_turbo" : "gen4_turbo";
+  const model = input.videoProvider === "runway-gen4.5" ? "gen4_5_turbo" : "gen4_turbo";
   // Per Runway 2024-11-06: ratio is a specific resolution string.
   // Note: Runway does NOT support 4:5 aspect. We map 4:5 → 3:4 (832:1104) as closest.
   const ratioMap: Record<string, string> = {
@@ -554,11 +569,16 @@ async function generateVideoReplicate(
   const dataUri = `data:${imageMime};base64,${imageBuffer.toString("base64")}`;
 
   const modelMap: Record<string, string> = {
-    "replicate-seedance-fast": "bytedance/seedance-1-pro-fast",
-    "replicate-kling": "kwaivgi/kling-v2.1",
-    "replicate-hailuo": "minimax/hailuo-02",
+    "replicate-seedance-pro":     "bytedance/seedance-1-pro",
+    "replicate-seedance-fast":    "bytedance/seedance-1-pro",
+    "replicate-seedance-lite":    "bytedance/seedance-1-lite",
+    "replicate-kling-master":     "kwaivgi/kling-v2-master",
+    "replicate-kling-2.5-turbo":  "kwaivgi/kling-v2.5-turbo",
+    "replicate-kling":            "kwaivgi/kling-v2.1",
+    "replicate-hailuo":           "minimax/hailuo-02",
+    "replicate-wan-2.5":          "wan-ai/wan-2.5-i2v",
   };
-  const modelId = modelMap[input.videoProvider] || modelMap["replicate-seedance-fast"];
+  const modelId = modelMap[input.videoProvider] || modelMap["replicate-seedance-lite"];
 
   const { getTemplate } = await import("./ad-templates.js");
   const { CAMERA_PRESETS } = await import("./fusion-studio-pro.js");

@@ -65,7 +65,7 @@ export type GenerateCardResult = {
   };
 };
 
-const DEFAULT_BG_MODEL: ImageGenModel = "recraft-v3";
+const DEFAULT_BG_MODEL: ImageGenModel = "recraft-v4";
 
 export async function generateBusinessCard(
   input: GenerateCardInput,

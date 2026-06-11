@@ -49,13 +49,18 @@ router.get("/ad-studio/providers", requireAdmin, async (_req, res): Promise<void
   res.json({
     videoProviders: [
       // ── Premium (top calidad) ──
-      { key: "runway-gen4-turbo",     label: "Runway Gen-4 Turbo",     tier: "premium",  costPerAd: 0.60, quality: 10, description: "Calidad cine, máximo control" },
+      { key: "runway-gen4.5",           label: "Runway Gen-4.5 (recomendado)", tier: "premium",  costPerAd: 0.50, quality: 10, description: "Última generación Runway — motion y detalle máximos" },
+      { key: "replicate-kling-master",  label: "Kling Master",                tier: "premium",  costPerAd: 1.20, quality: 10, description: "Cinemático máximo + audio hasta 10s" },
+      { key: "replicate-kling-2.5-turbo",label:"Kling 2.5 Turbo",            tier: "premium",  costPerAd: 0.90, quality: 9,  description: "1080p rápido — top motion realista" },
       // ── Standard ──
-      { key: "runway-gen3",           label: "Runway Gen-3 Alpha",     tier: "standard", costPerAd: 0.40, quality: 8,  description: "Mejor precio que Gen-4" },
-      { key: "replicate-kling",       label: "Kling 2.1",              tier: "standard", costPerAd: 0.90, quality: 9,  description: "1080p motion realista hasta 10s" },
+      { key: "replicate-kling",         label: "Kling 2.1",                   tier: "standard", costPerAd: 0.70, quality: 9,  description: "1080p realista hasta 10s" },
+      { key: "replicate-seedance-pro",  label: "Seedance Pro",                tier: "standard", costPerAd: 0.50, quality: 8,  description: "Multi-referencia cinematográfica, 9 imgs" },
+      { key: "replicate-hailuo",        label: "Hailuo 02",                   tier: "standard", costPerAd: 0.40, quality: 8,  description: "Balance velocidad/calidad, motion suave" },
       // ── Economy ──
-      { key: "replicate-seedance-fast", label: "Seedance Fast",        tier: "economy",  costPerAd: 0.25, quality: 7,  description: "El más rápido a buen precio" },
-      { key: "replicate-hailuo",      label: "Hailuo 02",              tier: "economy",  costPerAd: 0.30, quality: 7,  description: "Motion suave, balance velocidad/calidad" },
+      { key: "replicate-seedance-fast", label: "Seedance Fast",               tier: "economy",  costPerAd: 0.35, quality: 7,  description: "Rápido y económico" },
+      { key: "replicate-seedance-lite", label: "Seedance 1 Lite",             tier: "economy",  costPerAd: 0.20, quality: 6,  description: "Más barato — ideal para bocetos" },
+      { key: "replicate-wan-2.5",       label: "Wan 2.5 I2V",                 tier: "economy",  costPerAd: 0.25, quality: 7,  description: "Open-source image-to-video, artístico" },
+      { key: "runway-gen4-turbo",       label: "Runway Gen-4 Turbo",          tier: "economy",  costPerAd: 0.45, quality: 8,  description: "Gen anterior Runway — todavía sólido" },
     ],
     aspects: ["9:16", "16:9", "1:1", "4:5"],
     durations: [3, 5, 6, 8, 10],

@@ -23,9 +23,10 @@ type Mode = "talking" | "product";
 
 const ASPECTS = ["9:16", "16:9", "1:1"] as const;
 const VOICE_MODELS = [
-  { id: "eleven_multilingual_v2", label: "Multilingual v2 (calidad alta, ES/EN)" },
-  { id: "eleven_turbo_v2_5", label: "Turbo v2.5 (rápido)" },
-  { id: "eleven_flash_v2_5", label: "Flash v2.5 (instantáneo)" },
+  { id: "eleven_v3",              label: "Eleven v3 · latest, 74 idiomas (recomendado)" },
+  { id: "eleven_multilingual_v2", label: "Multilingual v2 · calidad alta, ES/EN" },
+  { id: "eleven_turbo_v2_5",      label: "Turbo v2.5 · rápido" },
+  { id: "eleven_flash_v2_5",      label: "Flash v2.5 · instantáneo" },
 ];
 const VIDEO_MODELS = [
   // Google Veo

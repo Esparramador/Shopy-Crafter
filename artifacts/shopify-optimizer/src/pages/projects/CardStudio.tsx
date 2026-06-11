@@ -642,7 +642,7 @@ export default function CardStudio() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <select
                     id="bg-model-select"
-                    defaultValue="recraft-v3"
+                    defaultValue="recraft-v4"
                     style={inputStyle}
                   >
                     {BG_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -650,7 +650,7 @@ export default function CardStudio() {
                   <button
                     onClick={() => {
                       const sel = document.getElementById("bg-model-select") as HTMLSelectElement | null;
-                      generateCard(selected.id, sel?.value || "recraft-v3");
+                      generateCard(selected.id, sel?.value || "recraft-v4");
                     }}
                     disabled={generating}
                     style={{ ...btnPrimary, padding: "12px 16px" }}
@@ -729,7 +729,7 @@ export default function CardStudio() {
           }}
           onRegenerate={async () => {
             const sel = document.getElementById("bg-model-select") as HTMLSelectElement | null;
-            await generateCard(selected.id, sel?.value || "recraft-v3");
+            await generateCard(selected.id, sel?.value || "recraft-v4");
           }}
           onClose={() => setShowEditor(false)}
         />
