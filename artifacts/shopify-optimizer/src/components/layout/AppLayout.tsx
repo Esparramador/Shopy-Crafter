@@ -489,6 +489,23 @@ export function AppLayout({ children }: AppLayoutProps) {
               >⌘K</kbd>
               <span style={{ fontSize: 11, color: "var(--t4)" }}>{ap.header?.search ?? "Búsqueda"}</span>
             </div>
+            <a
+              href={`${BASE_URL}/landing`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
+                background: "var(--ink3)", border: "1px solid var(--bdr2)",
+                color: "var(--t2)", textDecoration: "none", whiteSpace: "nowrap",
+                transition: "border-color 0.15s, color 0.15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--gold)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--gold)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--bdr2)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--t2)"; }}
+              title="Ver Landing Page"
+            >
+              🌐 <span>Ver Landing</span>
+            </a>
             <div className="status-chip">
               <div className="status-pulse" />
               {ap.header?.active ?? "Activo"}
