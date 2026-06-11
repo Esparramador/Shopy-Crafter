@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useLocation } from "wouter";
 import {
   Monitor, Tablet, Smartphone, Save, Loader2, Sparkles,
   RotateCcw, Eye, X, Check, RefreshCw, ChevronDown, ChevronRight,
   PenLine, LayoutTemplate, Upload, Trash2, Image as ImageIcon, WifiOff,
   GripVertical, ArrowUp, ArrowDown, Film, Images, Atom, Plus,
+  ArrowLeft, Wand2, Layers,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDraftPersistence, useBeforeUnload, useOnlineStatus, useRetryFetch } from "@/hooks/use-draft-persistence";
@@ -1266,6 +1268,370 @@ function FieldEditor({ field, value, onChange }: { field: FieldDef; value: strin
   );
 }
 
+/* ── SECTION TEMPLATES ───────────────────────────────────────────────────── */
+const SECTION_TEMPLATES: Array<{ type: string; icon: string; label: string; desc: string; fields: FieldDef[] }> = [
+  {
+    type: "hero_alt", icon: "🦸", label: "Hero alternativo",
+    desc: "Titular impactante, subtítulo, botón CTA e imagen lateral",
+    fields: [
+      { label: "Titular", path: "SECTIONID.headline", type: "textarea", placeholder: "Transforma tu negocio con IA" },
+      { label: "Highlight", path: "SECTIONID.headlineHighlight", type: "text", placeholder: "con IA" },
+      { label: "Subtítulo", path: "SECTIONID.subheadline", type: "textarea", placeholder: "Descripción..." },
+      { label: "CTA — Texto", path: "SECTIONID.ctaLabel", type: "text", placeholder: "Comenzar gratis" },
+      { label: "CTA — URL", path: "SECTIONID.ctaHref", type: "url", placeholder: "/login" },
+      { label: "Imagen", path: "SECTIONID.imageUrl", type: "image" },
+      { label: "Badge/Pill", path: "SECTIONID.pill", type: "text", placeholder: "Nuevo · IA avanzada" },
+    ],
+  },
+  {
+    type: "features_grid", icon: "⭐", label: "Características",
+    desc: "Grid de características con iconos, título y descripción",
+    fields: [
+      { label: "Titular sección", path: "SECTIONID.headline", type: "text", placeholder: "¿Por qué elegirnos?" },
+      { label: "Subtítulo", path: "SECTIONID.subheadline", type: "textarea", placeholder: "Descripción..." },
+      { label: "Item 1 — Icono", path: "SECTIONID.items.0.icon", type: "text", placeholder: "🚀" },
+      { label: "Item 1 — Título", path: "SECTIONID.items.0.title", type: "text" },
+      { label: "Item 1 — Descripción", path: "SECTIONID.items.0.desc", type: "textarea" },
+      { label: "Item 2 — Icono", path: "SECTIONID.items.1.icon", type: "text", placeholder: "⚡" },
+      { label: "Item 2 — Título", path: "SECTIONID.items.1.title", type: "text" },
+      { label: "Item 2 — Descripción", path: "SECTIONID.items.1.desc", type: "textarea" },
+      { label: "Item 3 — Icono", path: "SECTIONID.items.2.icon", type: "text", placeholder: "🎯" },
+      { label: "Item 3 — Título", path: "SECTIONID.items.2.title", type: "text" },
+      { label: "Item 3 — Descripción", path: "SECTIONID.items.2.desc", type: "textarea" },
+    ],
+  },
+  {
+    type: "testimonials_extra", icon: "💬", label: "Testimonios extra",
+    desc: "Reseñas y testimonios adicionales de clientes",
+    fields: [
+      { label: "Titular", path: "SECTIONID.headline", type: "text", placeholder: "Lo que dicen nuestros clientes" },
+      { label: "T1 — Texto", path: "SECTIONID.items.0.text", type: "textarea" },
+      { label: "T1 — Autor", path: "SECTIONID.items.0.author", type: "text" },
+      { label: "T1 — Rol", path: "SECTIONID.items.0.role", type: "text" },
+      { label: "T1 — Avatar foto", path: "SECTIONID.items.0.avatarUrl", type: "image" },
+      { label: "T2 — Texto", path: "SECTIONID.items.1.text", type: "textarea" },
+      { label: "T2 — Autor", path: "SECTIONID.items.1.author", type: "text" },
+      { label: "T2 — Rol", path: "SECTIONID.items.1.role", type: "text" },
+      { label: "T2 — Avatar foto", path: "SECTIONID.items.1.avatarUrl", type: "image" },
+    ],
+  },
+  {
+    type: "cta_banner", icon: "📣", label: "Banner CTA",
+    desc: "Banner de llamada a la acción con titular y botón destacado",
+    fields: [
+      { label: "Titular", path: "SECTIONID.headline", type: "textarea", placeholder: "¿Listo para empezar?" },
+      { label: "Highlight", path: "SECTIONID.headlineHighlight", type: "text", placeholder: "empezar" },
+      { label: "Subtítulo", path: "SECTIONID.subheadline", type: "textarea" },
+      { label: "Botón — Texto", path: "SECTIONID.buttonLabel", type: "text", placeholder: "Solicitar demo" },
+      { label: "Botón — URL", path: "SECTIONID.buttonHref", type: "url" },
+      { label: "Color fondo", path: "SECTIONID.bgColor", type: "color" },
+      { label: "Nota pie", path: "SECTIONID.finePrint", type: "text", placeholder: "Sin tarjeta de crédito" },
+    ],
+  },
+  {
+    type: "stats_counter", icon: "📊", label: "Estadísticas",
+    desc: "Contadores animados con métricas de impacto",
+    fields: [
+      { label: "Titular", path: "SECTIONID.headline", type: "text", placeholder: "Nuestros resultados" },
+      { label: "Stat 1 — Número", path: "SECTIONID.stats.0.num", type: "text", placeholder: "+500" },
+      { label: "Stat 1 — Label", path: "SECTIONID.stats.0.label", type: "text", placeholder: "Tiendas optimizadas" },
+      { label: "Stat 2 — Número", path: "SECTIONID.stats.1.num", type: "text", placeholder: "3.2×" },
+      { label: "Stat 2 — Label", path: "SECTIONID.stats.1.label", type: "text", placeholder: "Incremento conversión" },
+      { label: "Stat 3 — Número", path: "SECTIONID.stats.2.num", type: "text", placeholder: "98%" },
+      { label: "Stat 3 — Label", path: "SECTIONID.stats.2.label", type: "text", placeholder: "Satisfacción cliente" },
+      { label: "Stat 4 — Número", path: "SECTIONID.stats.3.num", type: "text", placeholder: "24/7" },
+      { label: "Stat 4 — Label", path: "SECTIONID.stats.3.label", type: "text", placeholder: "Monitorización activa" },
+    ],
+  },
+  {
+    type: "faq_extra", icon: "❓", label: "FAQ extra",
+    desc: "Preguntas frecuentes adicionales con acordeón",
+    fields: [
+      { label: "Titular", path: "SECTIONID.headline", type: "text", placeholder: "Preguntas frecuentes" },
+      { label: "P1 — Pregunta", path: "SECTIONID.items.0.question", type: "text" },
+      { label: "P1 — Respuesta", path: "SECTIONID.items.0.answer", type: "textarea" },
+      { label: "P2 — Pregunta", path: "SECTIONID.items.1.question", type: "text" },
+      { label: "P2 — Respuesta", path: "SECTIONID.items.1.answer", type: "textarea" },
+      { label: "P3 — Pregunta", path: "SECTIONID.items.2.question", type: "text" },
+      { label: "P3 — Respuesta", path: "SECTIONID.items.2.answer", type: "textarea" },
+      { label: "P4 — Pregunta", path: "SECTIONID.items.3.question", type: "text" },
+      { label: "P4 — Respuesta", path: "SECTIONID.items.3.answer", type: "textarea" },
+    ],
+  },
+  {
+    type: "gallery_media", icon: "🖼️", label: "Galería / Media",
+    desc: "Grid de imágenes o logos de partners/clientes",
+    fields: [
+      { label: "Titular", path: "SECTIONID.headline", type: "text", placeholder: "Galería" },
+      { label: "Subtítulo", path: "SECTIONID.subheadline", type: "text" },
+      { label: "Imagen 1", path: "SECTIONID.images.0", type: "image" },
+      { label: "Imagen 2", path: "SECTIONID.images.1", type: "image" },
+      { label: "Imagen 3", path: "SECTIONID.images.2", type: "image" },
+      { label: "Imagen 4", path: "SECTIONID.images.3", type: "image" },
+      { label: "Imagen 5", path: "SECTIONID.images.4", type: "image" },
+      { label: "Imagen 6", path: "SECTIONID.images.5", type: "image" },
+    ],
+  },
+  {
+    type: "team_section", icon: "👥", label: "Equipo",
+    desc: "Miembros del equipo con foto, nombre y rol",
+    fields: [
+      { label: "Titular", path: "SECTIONID.headline", type: "text", placeholder: "Conoce al equipo" },
+      { label: "Subtítulo", path: "SECTIONID.subheadline", type: "textarea" },
+      { label: "M1 — Nombre", path: "SECTIONID.members.0.name", type: "text" },
+      { label: "M1 — Rol", path: "SECTIONID.members.0.role", type: "text" },
+      { label: "M1 — Foto", path: "SECTIONID.members.0.photo", type: "image" },
+      { label: "M2 — Nombre", path: "SECTIONID.members.1.name", type: "text" },
+      { label: "M2 — Rol", path: "SECTIONID.members.1.role", type: "text" },
+      { label: "M2 — Foto", path: "SECTIONID.members.1.photo", type: "image" },
+      { label: "M3 — Nombre", path: "SECTIONID.members.2.name", type: "text" },
+      { label: "M3 — Rol", path: "SECTIONID.members.2.role", type: "text" },
+      { label: "M3 — Foto", path: "SECTIONID.members.2.photo", type: "image" },
+    ],
+  },
+  {
+    type: "logos_partners", icon: "🤝", label: "Logos / Partners",
+    desc: "Carrusel de logos de clientes o partners",
+    fields: [
+      { label: "Titular", path: "SECTIONID.headline", type: "text", placeholder: "Confían en nosotros" },
+      { label: "Logo 1", path: "SECTIONID.logos.0.imageUrl", type: "image" },
+      { label: "Logo 1 — Nombre", path: "SECTIONID.logos.0.name", type: "text" },
+      { label: "Logo 2", path: "SECTIONID.logos.1.imageUrl", type: "image" },
+      { label: "Logo 2 — Nombre", path: "SECTIONID.logos.1.name", type: "text" },
+      { label: "Logo 3", path: "SECTIONID.logos.2.imageUrl", type: "image" },
+      { label: "Logo 3 — Nombre", path: "SECTIONID.logos.2.name", type: "text" },
+      { label: "Logo 4", path: "SECTIONID.logos.3.imageUrl", type: "image" },
+      { label: "Logo 4 — Nombre", path: "SECTIONID.logos.3.name", type: "text" },
+    ],
+  },
+];
+
+/* ── ADD SECTION MODAL ───────────────────────────────────────────────────── */
+function AddSectionModal({
+  onAdd, onClose,
+}: {
+  onAdd: (section: SectionDef, defaultContent: Record<string, unknown>) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode]                   = useState<"templates" | "ai">("templates");
+  const [selectedTemplate, setSelected]   = useState<string | null>(null);
+  const [aiPrompt, setAiPrompt]           = useState("");
+  const [aiName, setAiName]               = useState("");
+  const [generating, setGenerating]       = useState(false);
+  const [aiResult, setAiResult]           = useState<{ section: SectionDef; defaultContent: Record<string, unknown> } | null>(null);
+  const { toast } = useToast();
+
+  const selectedTpl = SECTION_TEMPLATES.find(t => t.type === selectedTemplate);
+
+  const buildSectionFromTemplate = (tpl: typeof SECTION_TEMPLATES[0]): { section: SectionDef; defaultContent: Record<string, unknown> } => {
+    const id = `custom_${tpl.type}_${Date.now()}`;
+    const fields = tpl.fields.map(f => ({ ...f, path: f.path.replace("SECTIONID", id) }));
+    return { section: { id, icon: tpl.icon, label: tpl.label, fields }, defaultContent: {} };
+  };
+
+  const generateWithAI = async () => {
+    if (!aiPrompt.trim()) return;
+    setGenerating(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/cms/ai/generate-section`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: aiPrompt, name: aiName || undefined }),
+      });
+      const data = await res.json() as { section?: Record<string, unknown>; error?: string };
+      if (!res.ok || data.error) { toast({ title: "Error IA", description: data.error, variant: "destructive" }); return; }
+      const raw = data.section!;
+      const id  = String(raw.id);
+      const fields: FieldDef[] = Array.isArray(raw.fields)
+        ? (raw.fields as Record<string, string>[]).map(f => ({ label: f.label, path: f.path, type: (f.type as FieldType) || "text", placeholder: f.placeholder }))
+        : [];
+      const defaultContent = raw.defaultContent && typeof raw.defaultContent === "object"
+        ? Object.fromEntries(Object.entries(raw.defaultContent as Record<string, unknown>).map(([k, v]) => [`${id}.${k}`, v]))
+        : {};
+      setAiResult({ section: { id, icon: String(raw.icon || "✨"), label: String(raw.label || "Sección IA"), fields }, defaultContent });
+    } catch {
+      toast({ title: "Error de conexión", variant: "destructive" });
+    } finally { setGenerating(false); }
+  };
+
+  const handleAdd = () => {
+    if (mode === "ai" && aiResult) { onAdd(aiResult.section, aiResult.defaultContent); return; }
+    if (selectedTpl) { const r = buildSectionFromTemplate(selectedTpl); onAdd(r.section, r.defaultContent); }
+  };
+
+  const canAdd = mode === "ai" ? !!aiResult : !!selectedTemplate;
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: "min(760px, 95vw)", maxHeight: "90vh", background: "var(--ink)",
+          borderRadius: 20, border: "1px solid var(--bdr2)", display: "flex", flexDirection: "column",
+          boxShadow: "0 24px 64px rgba(0,0,0,.6)", overflow: "hidden",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid var(--bdr)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: "linear-gradient(135deg,var(--gold),#e6c668)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+              <Layers size={16} style={{ color: "#000" }} />
+            </div>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: 15, color: "var(--t)" }}>Agregar sección</p>
+              <p style={{ fontSize: 11, color: "var(--t3)" }}>Elige una plantilla o genera con IA</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", padding: 6, borderRadius: 8 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Mode tabs */}
+        <div style={{ display: "flex", padding: "0 20px", borderBottom: "1px solid var(--bdr)", flexShrink: 0 }}>
+          {([["templates", "🗂️ Plantillas"], ["ai", "✨ Generar con IA"]] as const).map(([m, label]) => (
+            <button key={m} onClick={() => { setMode(m); setAiResult(null); }}
+              style={{
+                padding: "10px 16px", fontSize: 13, fontWeight: 600, background: "none", border: "none",
+                cursor: "pointer", color: mode === m ? "var(--gold)" : "var(--t3)",
+                borderBottom: mode === m ? "2px solid var(--gold)" : "2px solid transparent",
+                transition: "all .15s",
+              }}
+            >{label}</button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+          {mode === "templates" && (
+            <>
+              <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 14 }}>
+                Selecciona el tipo de sección que quieres añadir a tu landing. Podrás editar todo el contenido después.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+                {SECTION_TEMPLATES.map(tpl => (
+                  <button key={tpl.type} onClick={() => setSelected(tpl.type)}
+                    style={{
+                      padding: "14px 14px", textAlign: "left", cursor: "pointer", borderRadius: 14, transition: "all .15s",
+                      background: selectedTemplate === tpl.type ? "rgba(200,168,75,0.12)" : "var(--ink2)",
+                      border: `1.5px solid ${selectedTemplate === tpl.type ? "var(--gold)" : "var(--bdr)"}`,
+                    }}
+                  >
+                    <div style={{ fontSize: 22, marginBottom: 6 }}>{tpl.icon}</div>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>{tpl.label}</p>
+                    <p style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.45 }}>{tpl.desc}</p>
+                    <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 6 }}>{tpl.fields.length} campos</p>
+                  </button>
+                ))}
+              </div>
+              {selectedTpl && (
+                <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(200,168,75,0.07)", borderRadius: 12, border: "1px solid rgba(200,168,75,0.2)" }}>
+                  <p style={{ fontSize: 12, color: "var(--gold)", fontWeight: 700, marginBottom: 6 }}>
+                    {selectedTpl.icon} {selectedTpl.label} — campos incluidos:
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {selectedTpl.fields.map(f => (
+                      <span key={f.path} style={{ fontSize: 11, background: "var(--ink3)", border: "1px solid var(--bdr)", borderRadius: 6, padding: "2px 8px", color: "var(--t2)" }}>
+                        {f.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {mode === "ai" && (
+            <div>
+              <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 14 }}>
+                Describe la sección que necesitas y la IA generará todos los campos de configuración de forma automática.
+              </p>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, color: "var(--t3)", display: "block", marginBottom: 6 }}>
+                  Nombre de la sección (opcional)
+                </label>
+                <input
+                  value={aiName} onChange={e => setAiName(e.target.value)}
+                  placeholder="Ej: Nuestros Valores"
+                  style={{ width: "100%", padding: "9px 12px", fontSize: 13, background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 10, color: "var(--t)", outline: "none", boxSizing: "border-box" }}
+                  onFocus={e => (e.currentTarget.style.borderColor = "var(--gold)")}
+                  onBlur={e => (e.currentTarget.style.borderColor = "var(--bdr)")}
+                />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, color: "var(--t3)", display: "block", marginBottom: 6 }}>
+                  Descripción de la sección *
+                </label>
+                <textarea
+                  value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}
+                  placeholder="Ej: Una sección de valores de empresa con 4 pilares: Innovación, Transparencia, Resultados y Confianza. Cada valor tiene un icono emoji, título y descripción corta."
+                  rows={4}
+                  style={{ width: "100%", padding: "9px 12px", fontSize: 13, background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 10, color: "var(--t)", outline: "none", resize: "none", lineHeight: 1.5, boxSizing: "border-box" }}
+                  onFocus={e => (e.currentTarget.style.borderColor = "var(--gold)")}
+                  onBlur={e => (e.currentTarget.style.borderColor = "var(--bdr)")}
+                />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                  {["Sección de valores de empresa con 4 pilares", "Comparativa antes/después de usar el servicio", "Línea de tiempo de historia de la empresa", "Proceso de trabajo en 5 pasos", "Beneficios para partners y afiliados"].map(ex => (
+                    <button key={ex} onClick={() => setAiPrompt(ex)}
+                      style={{ fontSize: 11, padding: "4px 10px", background: "var(--ink3)", border: "1px solid var(--bdr)", borderRadius: 8, cursor: "pointer", color: "var(--t3)", transition: "all .15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--gold)"; e.currentTarget.style.color = "var(--gold)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--bdr)"; e.currentTarget.style.color = "var(--t3)"; }}
+                    >{ex}</button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={generateWithAI} disabled={generating || !aiPrompt.trim()}
+                style={{
+                  width: "100%", padding: "11px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: generating || !aiPrompt.trim() ? "not-allowed" : "pointer",
+                  background: "linear-gradient(135deg,var(--gold),#e6c668)", color: "#000", border: "none",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: generating || !aiPrompt.trim() ? 0.5 : 1, transition: "opacity .2s",
+                }}
+              >
+                {generating ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
+                {generating ? "Generando sección..." : "Generar con IA"}
+              </button>
+
+              {aiResult && (
+                <div style={{ marginTop: 16, padding: 14, background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.25)", borderRadius: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 22 }}>{aiResult.section.icon}</span>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "var(--t)" }}>{aiResult.section.label}</p>
+                      <p style={{ fontSize: 11, color: "var(--jade)" }}>{aiResult.section.fields.length} campos generados</p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {aiResult.section.fields.map(f => (
+                      <span key={f.path} style={{ fontSize: 11, background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 6, padding: "2px 8px", color: "var(--t2)" }}>
+                        {f.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "14px 20px", borderTop: "1px solid var(--bdr)", display: "flex", gap: 10, justifyContent: "flex-end", flexShrink: 0 }}>
+          <button onClick={onClose}
+            style={{ padding: "9px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600, background: "var(--ink2)", border: "1px solid var(--bdr)", color: "var(--t2)", cursor: "pointer" }}
+          >Cancelar</button>
+          <button onClick={handleAdd} disabled={!canAdd}
+            style={{ padding: "9px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: canAdd ? "var(--gold)" : "var(--ink3)", border: "none", color: canAdd ? "#000" : "var(--t4)", cursor: canAdd ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6, transition: "all .15s" }}
+          >
+            <Plus size={14} />Agregar sección
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── VERSION ENTRY ───────────────────────────────────────────────────────── */
 interface VersionEntry {
   id: number;
@@ -1279,6 +1645,7 @@ interface VersionEntry {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════════════════ */
 export default function CMSEditor() {
+  const [, navigate]                    = useLocation();
   const [content, setContent]           = useState<Record<string, unknown> | null>(null);
   const [pending, setPending]           = useState<Map<string, unknown>>(new Map());
   const [saving, setSaving]             = useState(false);
@@ -1290,6 +1657,8 @@ export default function CMSEditor() {
   const [mobileTab, setMobileTab]       = useState<MobileTab>("edit");
   const [sectionOrder, setSectionOrder] = useState<string[]>(SECTIONS.map(s => s.id));
   const [dragIdx, setDragIdx]           = useState<number | null>(null);
+  const [customSections, setCustomSections] = useState<SectionDef[]>([]);
+  const [showAddSection, setShowAddSection] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { toast } = useToast();
@@ -1321,10 +1690,64 @@ export default function CMSEditor() {
       if (Array.isArray(data.sectionOrder) && data.sectionOrder.length > 0) {
         setSectionOrder(data.sectionOrder as string[]);
       }
+      if (Array.isArray(data.customSections)) {
+        setCustomSections(data.customSections as SectionDef[]);
+      }
     } catch {
       toast({ title: "Error de conexión", description: "No se pudo cargar el contenido. Reintentando...", variant: "destructive" });
     }
   }, [retryFetch, toast]);
+
+  const addCustomSection = useCallback((section: SectionDef, defaultContent: Record<string, unknown>) => {
+    setCustomSections(prev => {
+      const updated = [...prev, section];
+      setPending(p => {
+        const n = new Map(p);
+        n.set("customSections", updated);
+        const newOrder = [...sectionOrder, section.id];
+        n.set("sectionOrder", newOrder);
+        setSectionOrder(newOrder);
+        return n;
+      });
+      return updated;
+    });
+    if (Object.keys(defaultContent).length > 0) {
+      setContent(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev };
+        for (const [path, value] of Object.entries(defaultContent)) {
+          const keys = path.split(".");
+          let cur: Record<string, unknown> = updated;
+          for (let i = 0; i < keys.length - 1; i++) {
+            if (!(keys[i] in cur) || typeof cur[keys[i]] !== "object") cur[keys[i]] = {};
+            cur = cur[keys[i]] as Record<string, unknown>;
+          }
+          cur[keys[keys.length - 1]] = value;
+        }
+        return updated;
+      });
+    }
+    setOpenSections(prev => new Set([...prev, section.id]));
+    setShowAddSection(false);
+    toast({ title: "✅ Sección añadida", description: `"${section.label}" lista para editar. Guarda para publicar.` });
+  }, [sectionOrder, toast]);
+
+  const removeCustomSection = useCallback((sectionId: string) => {
+    if (!confirm("¿Eliminar esta sección personalizada?")) return;
+    setCustomSections(prev => {
+      const updated = prev.filter(s => s.id !== sectionId);
+      setPending(p => {
+        const n = new Map(p);
+        n.set("customSections", updated);
+        const newOrder = sectionOrder.filter(id => id !== sectionId);
+        n.set("sectionOrder", newOrder);
+        setSectionOrder(newOrder);
+        return n;
+      });
+      return updated;
+    });
+    toast({ title: "Sección eliminada" });
+  }, [sectionOrder, toast]);
 
   const moveSection = useCallback((fromIdx: number, toIdx: number) => {
     setSectionOrder(prev => {
@@ -1531,15 +1954,28 @@ export default function CMSEditor() {
         padding: "0 16px", height: 56, gap: 12,
         borderBottom: "1px solid var(--bdr)", background: "var(--ink)",
       }}>
-        {/* Left: title + badge */}
+        {/* Left: back + title + badge */}
         <div className="flex items-center gap-3" style={{ minWidth: 0 }}>
+          <button
+            onClick={() => navigate("/home")}
+            title="Volver al panel"
+            style={{
+              width: 32, height: 32, borderRadius: 9, background: "var(--ink2)", border: "1px solid var(--bdr)",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, color: "var(--t3)", transition: "all .15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--gold)"; e.currentTarget.style.color = "var(--gold)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--bdr)"; e.currentTarget.style.color = "var(--t3)"; }}
+          >
+            <ArrowLeft size={15} />
+          </button>
           <div className="flex items-center gap-2">
             <div style={{
               width: 32, height: 32, borderRadius: 10,
               background: "linear-gradient(135deg,var(--gold),#e6c668)",
               display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
             }}>✏️</div>
-            <span style={{ fontWeight: 700, fontSize: 15, color: "var(--t)" }}>Editor Landing</span>
+            <span style={{ fontWeight: 700, fontSize: 15, color: "var(--t)" }}>CMS Editor</span>
           </div>
           {!isOnline && (
             <span style={{
@@ -1644,12 +2080,13 @@ export default function CMSEditor() {
           {/* sections list */}
           <div style={{ flex: 1, overflowY: "auto" }}>
             {sectionOrder.map((sectionId, orderIdx) => {
-              const section = SECTIONS.find(s => s.id === sectionId);
+              const section = [...SECTIONS, ...customSections].find(s => s.id === sectionId);
               if (!section) return null;
               const isOpen = openSections.has(section.id);
               const canMoveUp = orderIdx > 0;
               const canMoveDown = orderIdx < sectionOrder.length - 1;
               const isDragging = dragIdx === orderIdx;
+              const isCustom = customSections.some(s => s.id === sectionId);
               return (
                 <div key={section.id}
                   ref={el => { fieldRefs.current[`section-${section.id}`] = el; }}
@@ -1686,23 +2123,39 @@ export default function CMSEditor() {
                       <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <span style={{ fontSize: 16 }}>{section.icon}</span>
                         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--t)" }}>{section.label}</span>
+                        {isCustom && (
+                          <span style={{ fontSize: 9, background: "rgba(200,168,75,0.15)", color: "var(--gold)", padding: "1px 6px", borderRadius: 6, border: "1px solid rgba(200,168,75,0.3)", letterSpacing: "0.05em", fontWeight: 700, textTransform: "uppercase" }}>custom</span>
+                        )}
                       </span>
                       {isOpen
                         ? <ChevronDown size={13} style={{ color: "var(--gold)" }} />
                         : <ChevronRight size={13} style={{ color: "var(--t4)" }} />}
                     </button>
-                    <button
-                      onClick={() => {
-                        const map: Record<string, string> = { site: "fp-hero", hero: "fp-hero", features: "fp-engines", stats: "fp-results", how: "fp-demo", pricing: "fp-pricing", calculator: "fp-calculator", contact: "fp-contact", footer: "fp-contact" };
-                        scrollPreviewToSection(map[section.id] || "fp-hero");
-                      }}
-                      title="Ver en preview"
-                      style={{ padding: "8px 10px", background: "none", border: "none", cursor: "pointer", color: "var(--t4)", transition: "color .15s" }}
-                      onMouseEnter={e => (e.currentTarget.style.color = "var(--gold)")}
-                      onMouseLeave={e => (e.currentTarget.style.color = "var(--t4)")}
-                    >
-                      <Eye size={13} />
-                    </button>
+                    {!isCustom && (
+                      <button
+                        onClick={() => {
+                          const map: Record<string, string> = { site: "fp-hero", hero: "fp-hero", features: "fp-engines", stats: "fp-results", how: "fp-demo", pricing: "fp-pricing", calculator: "fp-calculator", contact: "fp-contact", footer: "fp-contact" };
+                          scrollPreviewToSection(map[section.id] || "fp-hero");
+                        }}
+                        title="Ver en preview"
+                        style={{ padding: "8px 10px", background: "none", border: "none", cursor: "pointer", color: "var(--t4)", transition: "color .15s" }}
+                        onMouseEnter={e => (e.currentTarget.style.color = "var(--gold)")}
+                        onMouseLeave={e => (e.currentTarget.style.color = "var(--t4)")}
+                      >
+                        <Eye size={13} />
+                      </button>
+                    )}
+                    {isCustom && (
+                      <button
+                        onClick={() => removeCustomSection(section.id)}
+                        title="Eliminar sección personalizada"
+                        style={{ padding: "8px 10px", background: "none", border: "none", cursor: "pointer", color: "var(--t4)", transition: "color .15s" }}
+                        onMouseEnter={e => (e.currentTarget.style.color = "#e84558")}
+                        onMouseLeave={e => (e.currentTarget.style.color = "var(--t4)")}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
 
                   {isOpen && (
@@ -1729,6 +2182,23 @@ export default function CMSEditor() {
                 </div>
               );
             })}
+
+            {/* Add section button */}
+            <div style={{ padding: "10px 12px", borderTop: "1px solid var(--bdr)" }}>
+              <button
+                onClick={() => setShowAddSection(true)}
+                style={{
+                  width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  background: "rgba(200,168,75,0.08)", border: "1.5px dashed rgba(200,168,75,0.4)",
+                  color: "var(--gold)", cursor: "pointer", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 8, transition: "all .2s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(200,168,75,0.14)"; e.currentTarget.style.borderColor = "var(--gold)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(200,168,75,0.08)"; e.currentTarget.style.borderColor = "rgba(200,168,75,0.4)"; }}
+              >
+                <Plus size={14} />Agregar sección
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1810,6 +2280,13 @@ export default function CMSEditor() {
             ))}
           </div>
         </div>
+      )}
+
+      {showAddSection && (
+        <AddSectionModal
+          onAdd={addCustomSection}
+          onClose={() => setShowAddSection(false)}
+        />
       )}
 
       <style>{`

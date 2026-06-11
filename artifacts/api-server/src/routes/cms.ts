@@ -344,6 +344,64 @@ router.post("/ai/improve", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/ai/generate-section", async (req: Request, res: Response) => {
+  enableLongRunning(res);
+  try {
+    const { description, name } = req.body as { description: string; name?: string };
+    if (!description || description.length < 5) {
+      return res.status(400).json({ error: "Descripción requerida" });
+    }
+    const sectionId = `custom_${Date.now()}`;
+    const systemPrompt = `Eres un experto en UX y diseño web para plataformas SaaS en español. Generas configuraciones de secciones web en JSON. Responde ÚNICAMENTE con JSON válido y nada más.`;
+    const userPrompt = `Crea la configuración completa de una sección web para una landing page SaaS.
+
+Descripción del usuario: "${description}"
+Nombre sugerido: "${name || "Sección personalizada"}"
+ID único que debes usar: "${sectionId}"
+
+Responde SOLO con este JSON (sin markdown, sin explicaciones):
+{
+  "id": "${sectionId}",
+  "icon": "<emoji relevante al tipo de sección>",
+  "label": "<nombre de la sección, máximo 25 caracteres>",
+  "fields": [
+    {"label": "<etiqueta visible en español>", "path": "${sectionId}.<clave_snake_case>", "type": "<text|textarea|color|boolean|image|url>", "placeholder": "<ejemplo realista en español>"}
+  ],
+  "defaultContent": {
+    "<clave_snake_case>": "<valor por defecto en español realista>"
+  }
+}
+
+Reglas:
+- Incluye entre 5 y 12 campos relevantes
+- Tipos disponibles: text (línea corta), textarea (párrafo largo), color (#hex), boolean (true/false), image (url imagen), url (enlace)
+- Los valores por defecto deben ser contenido real y profesional para una agencia de marketing digital
+- El icon debe ser un emoji apropiado para el tipo de sección`;
+
+    const raw = await askClaudeWithBrain(0, [{ role: "user", content: userPrompt }], systemPrompt, "general", undefined, 2048);
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON in AI response");
+    const config = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+
+    if (!config.id || !config.fields || !Array.isArray(config.fields)) {
+      throw new Error("Invalid section structure");
+    }
+    config.id = sectionId;
+
+    learnFromOperation({
+      operationType: "cms_section_generated",
+      title: `Nueva sección CMS: ${String(config.label || "custom")}`,
+      content: `Descripción: ${description}. Campos: ${(config.fields as unknown[]).length}`,
+      tags: ["cms", "section", "ai-generated"],
+    });
+
+    res.json({ section: config });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    res.status(500).json({ error: `Section generation failed: ${msg}` });
+  }
+});
+
 // ─── PÁGINAS EXTERNAS ────────────────────────────────────────────────────────
 //
 // Sistema de páginas independientes (descongesta la landing).
