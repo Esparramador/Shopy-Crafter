@@ -9,7 +9,7 @@
 import { Router, type Request, type Response } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  EFFECT_SNIPPETS, loadVismeTemplates, applyDna, buildDnaFromProject, buildEffectPreviewHtml,
+  EFFECT_SNIPPETS, loadVismeTemplates, loadEffectsPrompts, applyDna, buildDnaFromProject, buildEffectPreviewHtml,
   type DnaVars, DEFAULT_DNA,
 } from "../lib/visme-effects.js";
 import { streamHtmlClaude } from "../lib/web-designer.js";
@@ -27,6 +27,27 @@ function makeAnthropicClient(): Anthropic {
 }
 
 const router = Router();
+
+// ── Effects prompts endpoint (used by Web Designer → Effects tab) ────────────
+router.get("/prompts/effects", (_req: Request, res: Response) => {
+  try {
+    const data = loadEffectsPrompts();
+    res.json({ templates: data, count: data.length });
+  } catch (err: any) {
+    logger.error({ err }, "prompts/effects error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Alias: /api/designer/effects (fallback from Claude Designer HTML) ─────────
+router.get("/designer/effects", (_req: Request, res: Response) => {
+  try {
+    const data = loadEffectsPrompts();
+    res.json({ templates: data, count: data.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.get("/visme/stats", (_req: Request, res: Response) => {
   const templates = loadVismeTemplates();

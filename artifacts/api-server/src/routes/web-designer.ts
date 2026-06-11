@@ -127,6 +127,23 @@ router.post("/web-designer/generate", async (req: Request, res: Response): Promi
   }
 });
 
+router.post("/web-designer/import-url", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { url } = req.body as { url: string };
+    if (!url?.trim()) { res.status(400).json({ error: "url is required" }); return; }
+    const resp = await fetch(url, {
+      signal: AbortSignal.timeout(15_000),
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopyCrafter/1.0 Web Designer)" },
+    });
+    if (!resp.ok) { res.status(400).json({ error: `HTTP ${resp.status} fetching URL` }); return; }
+    const html = await resp.text();
+    res.json({ ok: true, html: html.slice(0, 200_000), chars: html.length, url });
+  } catch (err: any) {
+    logger.error({ err }, "web-designer/import-url error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post("/web-designer/deploy", async (req: Request, res: Response): Promise<void> => {
   try {
     const { html, projectId, pageName = "design", sessionId } = req.body as {

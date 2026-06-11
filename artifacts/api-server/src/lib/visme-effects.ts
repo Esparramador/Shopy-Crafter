@@ -435,6 +435,22 @@ export function loadVismeTemplates() {
   return _vismeCache;
 }
 
+// ── Effects prompts (24 FX templates, loaded lazily) ─────────────────────────
+let _effectsPromptsCache: Array<{id: string; name: string; icon?: string; category: string; tags?: string[]; description?: string; prompt: string}> | null = null;
+
+export function loadEffectsPrompts() {
+  if (_effectsPromptsCache) return _effectsPromptsCache;
+  try {
+    const raw = readFileSync(join(_dataDir, "effects_prompts.json"), "utf-8");
+    const parsed = JSON.parse(raw);
+    const templates = Array.isArray(parsed) ? parsed : (parsed.templates ?? []);
+    _effectsPromptsCache = Array.isArray(templates) ? templates : [];
+  } catch {
+    _effectsPromptsCache = [];
+  }
+  return _effectsPromptsCache;
+}
+
 export function buildEffectPreviewHtml(snippet: EffectSnippet, dna: DnaVars = DEFAULT_DNA): string {
   const libs = snippet.libs.map(url =>
     url.endsWith(".js") ? `<script src="${url}"></script>` : `<link rel="stylesheet" href="${url}">`

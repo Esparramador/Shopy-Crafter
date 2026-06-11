@@ -5,6 +5,7 @@ import { useParams } from "wouter";
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 interface DesignerTemplate { id: string; name: string; icon: string; category: string; prompt: string; }
+interface EffectTemplate { id: string; name: string; icon?: string; category: string; tags?: string[]; description?: string; prompt: string; }
 interface DemoItem { id: string; name: string; category: string; file: string; }
 interface DesignSession { id: string; title: string; currentHtml: string; history: Array<{role:string;content:string}>; model: string; updatedAt: string; }
 interface Project { id: number; name: string; }
@@ -12,11 +13,12 @@ interface Project { id: number; name: string; }
 type ViewportSize = "desktop" | "tablet" | "mobile";
 const VIEWPORT_WIDTHS = { desktop: "100%", tablet: "768px", mobile: "390px" };
 const MODELS = [
-  { id: "claude-sonnet-4-5", label: "Claude Sonnet (Rápido)", provider: "claude" },
-  { id: "claude-opus-4-5", label: "Claude Opus (Mejor)", provider: "claude" },
-  { id: "gemini-2.5-flash", label: "Gemini Flash", provider: "gemini" },
-  { id: "gemini-2.5-pro", label: "Gemini Pro", provider: "gemini" },
-  { id: "gpt-4.1", label: "GPT-4.1", provider: "openai" },
+  { id: "claude-haiku-4-5",  label: "Claude Haiku (Rápido)", provider: "claude" },
+  { id: "claude-sonnet-4-5", label: "Claude Sonnet (Balanceado)", provider: "claude" },
+  { id: "claude-opus-4-5",   label: "Claude Opus (Mejor)", provider: "claude" },
+  { id: "gemini-2.5-flash",  label: "Gemini Flash", provider: "gemini" },
+  { id: "gemini-2.5-pro",    label: "Gemini Pro", provider: "gemini" },
+  { id: "gpt-4.1",           label: "GPT-4.1", provider: "openai" },
 ];
 
 export default function WebDesigner() {
@@ -35,9 +37,15 @@ export default function WebDesigner() {
   const [error, setError] = useState("");
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const [rightPanel, setRightPanel] = useState<"chat" | "code">("chat");
-  const [leftTab, setLeftTab] = useState<"templates" | "sessions" | "demos">("templates");
+  const [leftTab, setLeftTab] = useState<"templates" | "sessions" | "demos" | "effects">("templates");
   const [deployMsg, setDeployMsg] = useState("");
   const [streamText, setStreamText] = useState("");
+
+  // Import URL modal
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState("");
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -47,6 +55,11 @@ export default function WebDesigner() {
   const { data: templates = [] } = useQuery<DesignerTemplate[]>({
     queryKey: ["web-designer-templates"],
     queryFn: () => fetch(`${API}/web-designer/templates`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  const { data: effects = [] } = useQuery<EffectTemplate[]>({
+    queryKey: ["web-designer-effects"],
+    queryFn: () => fetch(`${API}/prompts/effects`, { credentials: "include" }).then(r => r.json()).then(d => d.templates ?? []),
   });
 
   const { data: demos = [] } = useQuery<DemoItem[]>({
@@ -61,7 +74,7 @@ export default function WebDesigner() {
 
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects-list-designer"],
-    queryFn: () => fetch(`${API}/projects`, { credentials: "include" }).then(r => r.json()).then(d => Array.isArray(d) ? d : d.projects ?? []),
+    queryFn: () => fetch(`${API}/projects`, { credentials: "include" }).then(d => d.json()).then(d => Array.isArray(d) ? d : d.projects ?? []),
   });
 
   useEffect(() => {
@@ -70,9 +83,7 @@ export default function WebDesigner() {
 
   const updateIframe = useCallback((html: string) => {
     if (!iframeRef.current) return;
-    try {
-      iframeRef.current.srcdoc = html;
-    } catch { /* cross-origin */ }
+    try { iframeRef.current.srcdoc = html; } catch { }
   }, []);
 
   useEffect(() => { if (currentHtml) updateIframe(currentHtml); }, [currentHtml, updateIframe]);
@@ -146,7 +157,7 @@ export default function WebDesigner() {
     }
   }
 
-  function loadTemplate(t: DesignerTemplate) {
+  function loadTemplate(t: DesignerTemplate | EffectTemplate) {
     setPrompt(t.prompt);
     setRightPanel("chat");
     promptRef.current?.focus();
@@ -181,17 +192,87 @@ export default function WebDesigner() {
     setTimeout(() => setDeployMsg(""), 4000);
   }
 
-  const st = { bg: "#0a0a0f", surface: "#111118", surface2: "#1a1a26", border: "rgba(255,255,255,.07)", gold: "#c9a961", jade: "#2a7a4b", t1: "#e2e2ec", t2: "rgba(255,255,255,.5)", t3: "rgba(255,255,255,.25)" };
+  async function handleImportUrl() {
+    if (!importUrl.trim()) return;
+    setImportLoading(true);
+    setImportError("");
+    try {
+      const res = await fetch(`${API}/web-designer/import-url`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: importUrl }),
+      });
+      const d = await res.json();
+      if (!d.ok) throw new Error(d.error ?? "Error al importar");
+      setCurrentHtml(d.html);
+      updateIframe(d.html);
+      setShowImportModal(false);
+      setImportUrl("");
+      setPrompt(`Esta es la página importada de ${importUrl}. ¿Cómo quieres modificarla?`);
+      setRightPanel("chat");
+    } catch (e: any) {
+      setImportError(e.message);
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  const st = {
+    bg: "#0a0a0f", surface: "#111118", surface2: "#1a1a26",
+    border: "rgba(255,255,255,.07)", gold: "#c9a961", jade: "#2a7a4b",
+    t1: "#e2e2ec", t2: "rgba(255,255,255,.5)", t3: "rgba(255,255,255,.25)",
+  };
+
+  const LEFT_TABS = [
+    { id: "templates", label: "Plantillas" },
+    { id: "effects", label: "FX" },
+    { id: "sessions", label: "Historial" },
+    { id: "demos", label: "Demos" },
+  ] as const;
+
+  // Group effects by category
+  const effectsByCategory = effects.reduce<Record<string, EffectTemplate[]>>((acc, e) => {
+    const cat = e.category ?? "otros";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(e);
+    return acc;
+  }, {});
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: st.bg, color: st.t1, fontFamily: "Inter,sans-serif", overflow: "hidden" }}>
+
+      {/* ── Import URL Modal ── */}
+      {showImportModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={e => { if (e.target === e.currentTarget) setShowImportModal(false); }}>
+          <div style={{ background: st.surface, border: `1px solid ${st.border}`, borderRadius: 12, padding: 24, width: 440, maxWidth: "90vw" }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>🔗 Importar URL</div>
+            <div style={{ fontSize: 12, color: st.t3, marginBottom: 16 }}>Importa cualquier página web para editarla con IA</div>
+            <input
+              value={importUrl}
+              onChange={e => setImportUrl(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && void handleImportUrl()}
+              placeholder="https://ejemplo.com"
+              autoFocus
+              style={{ width: "100%", padding: "10px 12px", background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 8, color: st.t1, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 8 }}
+            />
+            {importError && <div style={{ color: "#fca5a5", fontSize: 12, marginBottom: 8 }}>✗ {importError}</div>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => { setShowImportModal(false); setImportError(""); }} style={{ padding: "8px 16px", background: "transparent", border: `1px solid ${st.border}`, borderRadius: 6, color: st.t2, fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+              <button onClick={() => void handleImportUrl()} disabled={importLoading || !importUrl.trim()} style={{ padding: "8px 16px", background: importUrl.trim() ? "rgba(201,169,97,.2)" : "transparent", border: `1px solid ${importUrl.trim() ? "rgba(201,169,97,.5)" : st.border}`, borderRadius: 6, color: importUrl.trim() ? st.gold : st.t3, fontSize: 12, fontWeight: 600, cursor: importUrl.trim() ? "pointer" : "not-allowed" }}>
+                {importLoading ? "Importando…" : "↗ Importar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Top bar ── */}
-      <div style={{ height: 48, background: st.surface, borderBottom: `1px solid ${st.border}`, display: "flex", alignItems: "center", gap: 12, padding: "0 16px", flexShrink: 0, zIndex: 10 }}>
+      <div style={{ height: 48, background: st.surface, borderBottom: `1px solid ${st.border}`, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", flexShrink: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 14 }}>
           <span style={{ fontSize: 18 }}>🎨</span>
           <span>AI Web <span style={{ color: st.gold }}>Designer</span></span>
         </div>
-        <div style={{ width: 1, height: 20, background: st.border, marginLeft: 4 }} />
+        <div style={{ width: 1, height: 20, background: st.border }} />
         <select value={model} onChange={e => setModel(e.target.value)} style={{ background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 6, padding: "4px 8px", color: st.t1, fontSize: 12, outline: "none", cursor: "pointer" }}>
           {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
         </select>
@@ -199,13 +280,16 @@ export default function WebDesigner() {
           <option value="">Sin proyecto (DNA genérico)</option>
           {projects.map((p: Project) => <option key={p.id} value={p.id}>🏪 {p.name}</option>)}
         </select>
+        <button onClick={() => setShowImportModal(true)} title="Importar página desde URL" style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${st.border}`, borderRadius: 6, color: st.t2, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>
+          🔗 Import URL
+        </button>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           {deployMsg && <span style={{ fontSize: 12, color: deployMsg.startsWith("✓") ? "#22c55e" : deployMsg.startsWith("✗") ? "#ef4444" : st.t2 }}>{deployMsg}</span>}
           <button onClick={deployHtml} disabled={!currentHtml} style={{ padding: "5px 14px", background: currentHtml ? `rgba(201,169,97,.15)` : "transparent", border: `1px solid ${currentHtml ? "rgba(201,169,97,.4)" : st.border}`, borderRadius: 6, color: currentHtml ? st.gold : st.t3, fontSize: 12, fontWeight: 600, cursor: currentHtml ? "pointer" : "not-allowed" }}>
-            ↗ Deployer a Bóveda
+            ↗ Bóveda
           </button>
           {currentHtml && (
-            <button onClick={() => { const b = new Blob([currentHtml], { type: "text/html" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "design.html"; a.click(); URL.revokeObjectURL(u); }} style={{ padding: "5px 14px", background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 6, color: st.t1, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            <button onClick={() => { const b = new Blob([currentHtml], { type: "text/html" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "design.html"; a.click(); URL.revokeObjectURL(u); }} style={{ padding: "5px 10px", background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 6, color: st.t1, fontSize: 12, cursor: "pointer" }}>
               ⬇ HTML
             </button>
           )}
@@ -216,13 +300,15 @@ export default function WebDesigner() {
         {/* ── Left sidebar ── */}
         <div style={{ width: 240, flexShrink: 0, background: st.surface, borderRight: `1px solid ${st.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ display: "flex", borderBottom: `1px solid ${st.border}`, flexShrink: 0 }}>
-            {(["templates", "sessions", "demos"] as const).map(tab => (
-              <button key={tab} onClick={() => setLeftTab(tab)} style={{ flex: 1, padding: "9px 4px", background: leftTab === tab ? `rgba(201,169,97,.1)` : "transparent", border: "none", borderBottom: leftTab === tab ? `2px solid ${st.gold}` : "2px solid transparent", color: leftTab === tab ? st.gold : st.t2, fontSize: 11, fontWeight: leftTab === tab ? 600 : 400, cursor: "pointer", transition: "all .15s" }}>
-                {tab === "templates" ? "Plantillas" : tab === "sessions" ? "Historial" : "Demos"}
+            {LEFT_TABS.map(tab => (
+              <button key={tab.id} onClick={() => setLeftTab(tab.id)} style={{ flex: 1, padding: "9px 2px", background: leftTab === tab.id ? `rgba(201,169,97,.1)` : "transparent", border: "none", borderBottom: leftTab === tab.id ? `2px solid ${st.gold}` : "2px solid transparent", color: leftTab === tab.id ? st.gold : st.t2, fontSize: 10, fontWeight: leftTab === tab.id ? 600 : 400, cursor: "pointer", transition: "all .15s" }}>
+                {tab.label}
               </button>
             ))}
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+
+            {/* Templates tab */}
             {leftTab === "templates" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {["landing", "dashboard", "3d", "form", "app"].map(cat => {
@@ -245,6 +331,35 @@ export default function WebDesigner() {
                 })}
               </div>
             )}
+
+            {/* Effects tab */}
+            {leftTab === "effects" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <div style={{ fontSize: 11, color: st.t3, padding: "4px 6px 8px", lineHeight: 1.5 }}>
+                  {effects.length} plantillas FX — efectos visuales, 3D y animaciones premium
+                </div>
+                {Object.keys(effectsByCategory).sort().map(cat => (
+                  <div key={cat}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: st.t3, padding: "8px 6px 4px" }}>{cat}</div>
+                    {effectsByCategory[cat].map(e => (
+                      <button key={e.id} onClick={() => loadTemplate(e)} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 8, padding: "7px 8px", borderRadius: 6, border: "none", background: "transparent", color: st.t1, fontSize: 12, cursor: "pointer", textAlign: "left", transition: "background .12s" }}
+                        onMouseEnter={el => el.currentTarget.style.background = "rgba(255,255,255,.05)"}
+                        onMouseLeave={el => el.currentTarget.style.background = "transparent"}
+                      >
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{e.icon ?? "✨"}</span>
+                        <div>
+                          <div style={{ lineHeight: 1.3 }}>{e.name}</div>
+                          {e.description && <div style={{ fontSize: 10, color: st.t3, marginTop: 1, lineHeight: 1.4 }}>{e.description}</div>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                {effects.length === 0 && <div style={{ fontSize: 12, color: st.t3, padding: "8px 0" }}>Cargando efectos…</div>}
+              </div>
+            )}
+
+            {/* Sessions tab */}
             {leftTab === "sessions" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <button onClick={() => { setSessionId(""); setCurrentHtml(""); setHistory([]); updateIframe(""); }} style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: `1px dashed ${st.border}`, background: "transparent", color: st.t2, fontSize: 12, cursor: "pointer", textAlign: "left", marginBottom: 6 }}>
@@ -262,16 +377,18 @@ export default function WebDesigner() {
                 ))}
               </div>
             )}
+
+            {/* Demos tab */}
             {leftTab === "demos" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ fontSize: 11, color: st.t3, padding: "4px 6px 8px" }}>26 páginas de referencia generadas por AI — úsalas como inspiración</div>
+                <div style={{ fontSize: 11, color: st.t3, padding: "4px 6px 8px" }}>26 páginas de referencia generadas con IA — úsalas como inspiración</div>
                 {demos.map(d => (
                   <button key={d.id} onClick={() => loadDemo(d)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 8px", borderRadius: 6, border: "none", background: "transparent", color: st.t1, fontSize: 12, cursor: "pointer", textAlign: "left", transition: "background .12s" }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.05)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
                     <span>{d.id}. {d.name}</span>
-                    <span style={{ fontSize: 10, background: "rgba(255,255,255,.07)", padding: "1px 6px", borderRadius: 100, color: st.t3 }}>{d.category}</span>
+                    <span style={{ fontSize: 10, background: "rgba(255,255,255,.07)", padding: "1px 6px", borderRadius: 100, color: st.t3, flexShrink: 0 }}>{d.category}</span>
                   </button>
                 ))}
               </div>
@@ -295,7 +412,7 @@ export default function WebDesigner() {
                 ↗ Abrir
               </button>
             )}
-            {isGenerating && <div style={{ marginLeft: currentHtml ? 0 : "auto", fontSize: 12, color: st.gold, animation: "pulse 1s infinite" }}>⚡ Generando…</div>}
+            {isGenerating && <div style={{ marginLeft: currentHtml ? 0 : "auto", fontSize: 12, color: st.gold }}>⚡ Generando…</div>}
           </div>
           <div style={{ flex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", overflow: "hidden", background: "#0a0a0a", padding: viewport === "desktop" ? 0 : "16px 0" }}>
             {currentHtml || streamText ? (
@@ -310,7 +427,7 @@ export default function WebDesigner() {
                 <div style={{ fontSize: 48 }}>🎨</div>
                 <div style={{ fontSize: 16, fontWeight: 600, color: st.t2 }}>AI Web Designer</div>
                 <div style={{ fontSize: 13, textAlign: "center", maxWidth: 360, lineHeight: 1.6 }}>
-                  Selecciona una plantilla en la izquierda o escribe un prompt en el chat para generar tu primera página web.
+                  Selecciona una plantilla o efecto en la izquierda, o escribe un prompt en el chat para generar tu primera página web.
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
                   {templates.slice(0, 4).map(t => (
@@ -339,7 +456,7 @@ export default function WebDesigner() {
               <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
                 {history.length === 0 && !streamText && (
                   <div style={{ fontSize: 12, color: st.t3, textAlign: "center", padding: "20px 0" }}>
-                    Escribe un prompt para generar tu página web con IA.<br/>
+                    Escribe un prompt para generar tu página web con IA.<br />
                     Puedes hacer preguntas, pedir ediciones o modificar partes específicas.
                   </div>
                 )}
@@ -362,7 +479,7 @@ export default function WebDesigner() {
               </div>
               <div style={{ padding: 12, borderTop: `1px solid ${st.border}`, flexShrink: 0 }}>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                  {["Hacer más premium", "Añadir animaciones 3D", "Versión dark/light", "Añadir sección precios"].map(q => (
+                  {["Hacer más premium", "Añadir 3D", "Dark/light toggle", "Sección precios", "Micro-interacciones", "Animaciones GSAP"].map(q => (
                     <button key={q} onClick={() => setPrompt(q)} style={{ padding: "3px 8px", borderRadius: 100, border: `1px solid ${st.border}`, background: "transparent", color: st.t3, fontSize: 10, cursor: "pointer" }}
                       onMouseEnter={e => e.currentTarget.style.color = st.t1}
                       onMouseLeave={e => e.currentTarget.style.color = st.t3}
