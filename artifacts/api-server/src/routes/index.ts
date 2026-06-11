@@ -55,6 +55,8 @@ import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
 import brandDnaRouter from "./brand-dna.js";
 import tripo3dRouter from "./tripo3d.js";
+import vismeRouter from "./visme.js";
+import webDesignerRouter from "./web-designer.js";
 import stitchRouter from "./stitch.js";
 import publicQrRouter from "./public-qr.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
@@ -146,6 +148,8 @@ router.use(reportTemplatesRouter);
 router.use(billingRouter);
 router.use(brandDnaRouter);
 router.use(tripo3dRouter);
+router.use(vismeRouter);
+router.use(webDesignerRouter);
 router.use("/stitch", stitchRouter);
 
 export default router;

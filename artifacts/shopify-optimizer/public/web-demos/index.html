@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Demo Library — Crafter Agency AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#050508;--surface:#0c0c14;--surface2:#12121e;
+  --accent:#6366f1;--accent2:#a855f7;--accent3:#06b6d4;
+  --success:#22c55e;--warning:#f59e0b;
+  --text:#f0f0ff;--muted:rgba(240,240,255,.5);--border:rgba(255,255,255,.07);
+  --font-h:'Space Grotesk',sans-serif;--font-b:'Plus Jakarta Sans',sans-serif;
+  --r:12px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-b);min-height:100vh}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+
+/* NAV */
+#top-nav{
+  position:sticky;top:0;z-index:200;
+  background:rgba(5,5,8,.92);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  padding:.9rem 2rem;
+  display:flex;align-items:center;gap:1rem;
+}
+.nav-logo{font-family:var(--font-h);font-weight:800;font-size:1rem;letter-spacing:-.02em}
+.nav-logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.nav-actions{margin-left:auto;display:flex;gap:.75rem;align-items:center}
+.nav-link{padding:.35rem .85rem;border-radius:6px;font-size:.78rem;font-weight:600;text-decoration:none;color:var(--muted);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);transition:all .2s}
+.nav-link:hover{color:var(--text);background:rgba(255,255,255,.08)}
+.search-box{
+  padding:.38rem .9rem;border-radius:8px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);color:var(--text);font-size:.82rem;
+  outline:none;width:240px;transition:all .2s;font-family:var(--font-b);
+}
+.search-box::placeholder{color:var(--muted)}
+.search-box:focus{background:rgba(255,255,255,.08);border-color:rgba(99,102,241,.4);width:300px}
+
+/* HERO */
+.hero{
+  padding:5rem 2rem 3rem;text-align:center;position:relative;overflow:hidden;
+}
+.hero::before{
+  content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);
+  width:700px;height:400px;
+  background:conic-gradient(from 250deg at 50% 0%,transparent 0deg,rgba(99,102,241,.15) 20deg,transparent 40deg);
+  filter:blur(60px);pointer-events:none;
+}
+.hero-tag{
+  display:inline-flex;align-items:center;gap:.5rem;margin-bottom:1.25rem;
+  padding:.3rem 1rem;border-radius:50px;
+  background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);
+  font-size:.72rem;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;
+}
+.hero-tag::before{content:'●';font-size:.5rem;animation:blink 2s step-start infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.hero h1{font-family:var(--font-h);font-size:clamp(2.2rem,5vw,3.8rem);font-weight:800;line-height:1.05;letter-spacing:-.03em;margin-bottom:1rem}
+.hero h1 span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{color:var(--muted);font-size:1rem;line-height:1.7;max-width:580px;margin:0 auto 2rem}
+.stats-bar{display:flex;align-items:center;justify-content:center;gap:2.5rem;flex-wrap:wrap;margin-top:2rem;padding:1.25rem;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;max-width:700px;margin-left:auto;margin-right:auto}
+.stat-item{text-align:center}
+.stat-num{font-family:var(--font-h);font-size:1.6rem;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-label{font-size:.72rem;color:var(--muted);margin-top:.1rem}
+
+/* FILTERS */
+.filters{
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+  padding:1.5rem 2rem;max-width:1300px;margin:0 auto;
+}
+.filter-label{font-size:.78rem;font-weight:600;color:var(--muted);margin-right:.25rem}
+.filter-btn{
+  padding:.35rem .9rem;border-radius:6px;font-size:.75rem;font-weight:600;
+  cursor:pointer;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);
+  color:var(--muted);transition:all .2s;
+}
+.filter-btn:hover,.filter-btn.active{background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.3);color:var(--accent)}
+
+/* DEMO GRID */
+.demo-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+  gap:1.5rem;padding:0 2rem 6rem;max-width:1300px;margin:0 auto;
+}
+.demo-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  overflow:hidden;text-decoration:none;color:inherit;
+  transition:transform .3s,box-shadow .3s,border-color .3s;
+  display:flex;flex-direction:column;
+}
+.demo-card:hover{
+  transform:translateY(-6px);
+  box-shadow:0 24px 48px rgba(0,0,0,.4);
+  border-color:rgba(99,102,241,.3);
+}
+.demo-thumb{
+  width:100%;aspect-ratio:16/9;
+  position:relative;overflow:hidden;
+  background:var(--surface2);
+}
+.demo-thumb-bg{
+  width:100%;height:100%;
+  background-size:cover;background-position:center;
+  transition:transform .5s ease;
+}
+.demo-card:hover .demo-thumb-bg{transform:scale(1.05)}
+.demo-badge{
+  position:absolute;top:.75rem;left:.75rem;
+  padding:.22rem .65rem;border-radius:4px;
+  font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+}
+.badge-new{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#22c55e}
+.badge-hot{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#ef4444}
+.badge-3d{background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:var(--accent)}
+.badge-fx{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);color:var(--accent2)}
+.badge-ui{background:rgba(6,182,212,.15);border:1px solid rgba(6,182,212,.3);color:var(--accent3)}
+.demo-card-body{padding:1.4rem;flex:1;display:flex;flex-direction:column}
+.demo-num{font-size:.68rem;font-weight:700;color:var(--muted);letter-spacing:.1em;margin-bottom:.35rem;font-family:var(--font-h)}
+.demo-title{font-family:var(--font-h);font-size:1.05rem;font-weight:700;margin-bottom:.5rem;line-height:1.3}
+.demo-desc{font-size:.82rem;color:var(--muted);line-height:1.6;flex:1}
+.demo-tags{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:1rem}
+.demo-tag{padding:.2rem .6rem;border-radius:4px;font-size:.67rem;font-weight:600;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);color:var(--muted)}
+.demo-footer{padding:.9rem 1.4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.demo-line-count{font-size:.72rem;color:var(--muted)}
+.demo-open{
+  padding:.32rem .85rem;border-radius:6px;background:rgba(99,102,241,.1);
+  border:1px solid rgba(99,102,241,.2);color:var(--accent);font-size:.75rem;font-weight:700;
+  transition:all .2s;
+}
+.demo-card:hover .demo-open{background:var(--accent);color:#fff}
+
+/* COMING SOON CARD */
+.demo-card.coming{opacity:.5;pointer-events:none}
+.demo-card.coming .demo-thumb-bg{filter:grayscale(1) opacity(.3)}
+
+/* EMPTY STATE */
+.empty-state{grid-column:1/-1;text-align:center;padding:4rem;color:var(--muted)}
+.empty-state .big{font-size:3rem;margin-bottom:.75rem}
+</style>
+</head>
+<body>
+
+<nav id="top-nav">
+  <div class="nav-logo"><span>Crafter</span> Demo Library</div>
+  <input class="search-box" id="search" placeholder="🔍 Buscar demos..." oninput="filterDemos()">
+  <div class="nav-actions">
+    <a class="nav-link" href="/admin">← Admin</a>
+    <a class="nav-link" href="/admin/explode-studio.html">Explode Studio</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-tag">Demo Library actualizada</div>
+  <h1>Efectos <span>premium</span><br>listos para producción</h1>
+  <p>Todos los componentes visuales construidos sobre la arquitectura Crafter AI. Sin placeholders. 100% real.</p>
+  <div class="stats-bar">
+    <div class="stat-item"><div class="stat-num" id="stat-demos">0</div><div class="stat-label">Demos</div></div>
+    <div class="stat-item"><div class="stat-num" id="stat-effects">50+</div><div class="stat-label">Efectos únicos</div></div>
+    <div class="stat-item"><div class="stat-num">Vanilla</div><div class="stat-label">Sin React ni Build steps</div></div>
+    <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Real, sin mocks</div></div>
+  </div>
+</div>
+
+<div class="filters">
+  <span class="filter-label">Filtrar:</span>
+  <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
+  <button class="filter-btn" onclick="setFilter('3d',this)">3D / WebGL</button>
+  <button class="filter-btn" onclick="setFilter('scroll',this)">Scroll</button>
+  <button class="filter-btn" onclick="setFilter('ui',this)">UI Components</button>
+  <button class="filter-btn" onclick="setFilter('landing',this)">Landing</button>
+  <button class="filter-btn" onclick="setFilter('video',this)">Video / Imagen</button>
+  <button class="filter-btn" onclick="setFilter('effects',this)">Effects</button>
+</div>
+
+<div class="demo-grid" id="demo-grid">
+  <!-- Populated by JS -->
+</div>
+
+<script>
+const DEMOS=[
+  {
+    num:'01',file:'01-particle-saas.html',
+    title:'Particle SaaS Landing',
+    desc:'Hero con sistema de partículas WebGL, animaciones de entrada y secciones de producto.',
+    thumb:'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['Three.js','Particles','Hero','SaaS'],
+    lines:'~900',cats:['3d','landing','effects']
+  },
+  {
+    num:'02',file:'02-cinematic-agency.html',
+    title:'Cinematic Agency',
+    desc:'Landing de agencia con efectos cinematográficos, tipografía animada y reveal de secciones.',
+    thumb:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&q=75',
+    badge:'fx',badgeLabel:'FX',
+    tags:['GSAP','Cinema','Agency','Reveal'],
+    lines:'~1100',cats:['landing','effects','scroll']
+  },
+  {
+    num:'03',file:'03-glass-product-3d.html',
+    title:'Glass Product 3D',
+    desc:'Producto en 3D con material glass/liquid, iluminación dinámica y orbit controls.',
+    thumb:'https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['Three.js','Glass','MeshPhysical','Product'],
+    lines:'~850',cats:['3d','effects']
+  },
+  {
+    num:'04',file:'04-disassembly-scroll.html',
+    title:'GSAP Disassembly Scroll',
+    desc:'Explosión de producto en scroll. 500vh sticky section con ScrollTrigger, ripple shader y export a landing.',
+    thumb:'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['GSAP','ScrollTrigger','Explode','Shader'],
+    lines:'1091',cats:['3d','scroll','effects']
+  },
+  {
+    num:'05',file:'05-21stdev-effects.html',
+    title:'21st.dev Effects (8 bloques)',
+    desc:'Aurora, Lamp, Container Scroll, Chatbot, Text Effects, Spotlight Cards, Bento, Sticky Scroll y más.',
+    thumb:'https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=700&q=75',
+    badge:'hot',badgeLabel:'HOT',
+    tags:['Aurora','Chatbot','Scramble','Bento','Gooey'],
+    lines:'1747',cats:['effects','ui','landing','3d']
+  },
+  {
+    num:'06',file:'06-shaders-particles.html',
+    title:'Shaders & Particles',
+    desc:'Plasma GLSL (FBM 5 octavas), Galaxia espiral 8k puntos, DNA Helix, Holographic Card, Matrix Rain, Blob Morph.',
+    thumb:'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['GLSL','Galaxy','DNA','Matrix','WebGL'],
+    lines:'982',cats:['3d','effects']
+  },
+  {
+    num:'07',file:'07-landing-sections.html',
+    title:'Landing Sections Completas',
+    desc:'Pricing toggle animado, Testimonials marquee doble fila, Stats count-up, FAQ accordion, Logo strip, CTA partículas.',
+    thumb:'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['Pricing','Marquee','CountUp','FAQ','CTA'],
+    lines:'~1250',cats:['landing','ui']
+  },
+  {
+    num:'08',file:'08-micro-interactions.html',
+    title:'Micro-interactions & UI',
+    desc:'Toast system, Skeleton loading, Toggles, Progress wizard, Tooltips, Confetti, Search bar, Drag-to-reorder.',
+    thumb:'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=700&q=75',
+    badge:'ui',badgeLabel:'UI',
+    tags:['Toast','Skeleton','Tooltip','Confetti','Drag'],
+    lines:'~1300',cats:['ui','effects']
+  },
+  {
+    num:'10',file:'10-3d-product-viewer.html',
+    title:'3D Product Viewer — GLB Real',
+    desc:'DamagedHelmet (PBR textures), RobotExpressive (rigged + animaciones), Flamingo, LittlestTokyo. importmap + GLTFLoader + RoomEnvironment + UnrealBloom. CERO geometría básica.',
+    thumb:'https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['GLTFLoader','RoomEnvironment','PBR','Animations','Bloom'],
+    lines:'~1000',cats:['3d','effects']
+  },
+  {
+    num:'11',file:'11-immersive-scroll-lenis.html',
+    title:'Immersive Scroll + Lenis',
+    desc:'Lenis smooth scroll + GSAP ScrollTrigger. Hero 3D (RobotExpressive reacciona al scroll), scroll horizontal pinned, clip-path reveal, video fullscreen, scramble text.',
+    thumb:'https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['Lenis','Horizontal','3D Hero','Scramble','Pin'],
+    lines:'~1000',cats:['scroll','3d','effects']
+  },
+  {
+    num:'12',file:'12-explode-view-glb.html',
+    title:'Explode View 3D — GLB Real',
+    desc:'RobotExpressive.glb con explode scroll-driven. mesh.traverse() detecta todas las partes. Labels SVG con project3DToScreen. Ficha técnica estilo Apple/Dyson.',
+    thumb:'https://images.unsplash.com/photo-1555421689-d68471e189f2?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['GLTFLoader','Explode','SVG Labels','ScrollTrigger','PBR'],
+    lines:'~950',cats:['3d','scroll','effects']
+  },
+  {
+    num:'13',file:'13-scroll-media-expansion.html',
+    title:'Scroll Media Expansion',
+    desc:'El efecto más icónico de 21st.dev: media card 72vw→100vw, altura 55vh→100vh, border-radius 18px→0 en scroll scrub. Video real. Media cards, strip, split hero, masonry.',
+    thumb:'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=700&q=75',
+    badge:'hot',badgeLabel:'HOT',
+    tags:['ScrollTrigger','Expansion','Video','Strip','Masonry'],
+    lines:'~750',cats:['scroll','video','effects']
+  },
+  {
+    num:'09',file:'09-video-image-effects.html',
+    title:'Video & Image Effects',
+    desc:'Video hero con controles, Parallax multi-capa, Scroll reveal clip-path, Zoom magnético, Carousel 3D, Before/After slider, Masonry stagger, Video dialog modal.',
+    thumb:'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['Video','Parallax','Reveal','Carousel','B/A'],
+    lines:'~900',cats:['video','effects','scroll']
+  },
+  {
+    num:'14',file:'14-3d-globe-world.html',
+    title:'3D Globe World — NASA Textures',
+    desc:'Globo terráqueo con texturas NASA reales (earth_atmos, lights, specular, normal, clouds). Atmosphere glow shader, 8 ciudades con halos pulsantes, 10 arcos CatmullRomCurve3. 3 escenas Three.js.',
+    thumb:'https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['Globe','NASA','Three.js','CatmullRom','Atmosphere'],
+    lines:'~950',cats:['3d','effects']
+  },
+  {
+    num:'15',file:'15-ui-premium-components.html',
+    title:'UI Premium Components',
+    desc:'MacOS Dock con magnification, Command Palette (Ctrl+K) con highlight, Terminal typer JetBrains Mono, Sound Wave 64 barras, Notification Bell spring, Context Menu.',
+    thumb:'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=700&q=75',
+    badge:'ui',badgeLabel:'UI',
+    tags:['Dock','CommandPalette','Terminal','SoundWave','Bell'],
+    lines:'~1050',cats:['ui','effects']
+  },
+  {
+    num:'16',file:'16-spline-hero-fluid.html',
+    title:'Spline Hero + Fluid GLSL',
+    desc:'Doble renderer Three.js: fluid GLSL FBM warp reactivo al mouse + DamagedHelmet GLB con rotación suave. Custom cursor con ring lag, badges flotantes, App demo window con typewriter.',
+    thumb:'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=700&q=75',
+    badge:'hot',badgeLabel:'HOT',
+    tags:['GLSL','FBM','GLTFLoader','Fluid','SplineHero'],
+    lines:'~800',cats:['3d','effects','landing']
+  },
+  {
+    num:'17',file:'17-morphing-text-particles.html',
+    title:'Morphing Text Particles',
+    desc:'6000 partículas Three.js que morphean entre palabras (DESIGN→BUILD→LAUNCH→CRAFT) via Canvas2D getImageData sampling. Text Scramble, Kinetic Scroll, Gooey SVG filter, Split Char Reveal, Typewriter CTA.',
+    thumb:'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=700&q=75',
+    badge:'hot',badgeLabel:'HOT',
+    tags:['Particles','Morph','Scramble','Gooey','SVG Filter'],
+    lines:'1370',cats:['effects','landing','3d']
+  },
+  {
+    num:'18',file:'18-3d-scroll-narrative.html',
+    title:'3D Scroll Narrative — Apple Style',
+    desc:'RobotExpressive GLB con 5 actos scroll-driven (camera orbit, anim clips, fade panels). Horizontal product showcase (4 panels × 100vw). Parallax reveal grid. Stats arcos SVG. DamagedHelmet CTA.',
+    thumb:'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['GLTFLoader','ScrollNarrative','Lenis','Horizontal','AnimationMixer'],
+    lines:'~950',cats:['3d','scroll','effects','landing']
+  },
+  {
+    num:'19',file:'19-gradient-mesh-backgrounds.html',
+    title:'Gradient Mesh Backgrounds',
+    desc:'7 secciones: Conic gradient mesh CSS animado, WebGL FBM noise 6 octavas reactivo al mouse, Dot Matrix interactivo, Aurora Borealis GLSL, SVG Mesh animado, Bokeh bokeh Canvas2D, Scroll color shift.',
+    thumb:'https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['GLSL','FBM','DotMatrix','Aurora','Bokeh'],
+    lines:'~850',cats:['effects','3d','landing']
+  },
+  {
+    num:'20',file:'20-magnetic-cursor-effects.html',
+    title:'Magnetic Cursor Effects',
+    desc:'Custom cursor dot+ring con 4 estados. Botones magnéticos con lerp dual-layer. Tilt cards 3D perspectiva + radial highlight. Liquid blob trail 12 esferas. 8 estilos de underline hover. Scroll zoom reveal.',
+    thumb:'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=700&q=75',
+    badge:'ui',badgeLabel:'UI',
+    tags:['Cursor','Magnetic','Tilt3D','Trail','Underline'],
+    lines:'~800',cats:['ui','effects','scroll']
+  },
+  {
+    num:'21',file:'21-data-visualization.html',
+    title:'Data Visualization',
+    desc:'Dashboard KPI cards con sparklines, SVG line chart stroke-dashoffset, Bar+Donut Chart, Canvas live streaming chart con random-walk, Heatmap calendar 52 semanas, Funnel + Cohort retention table.',
+    thumb:'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['SVG Charts','Canvas','KPI','Heatmap','Funnel'],
+    lines:'1908',cats:['ui','effects']
+  },
+  {
+    num:'22',file:'22-3d-carousel-gallery.html',
+    title:'3D Carousel & Gallery',
+    desc:'CSS 3D carousel cilíndrico 8 cards. Three.js GLB showcase 3 sub-viewports en un canvas (LittlestTokyo+RobotExpressive+DamagedHelmet). Masonry lightbox con GSAP flip. Horizontal scroll gallery parallax. Stacked card scroll.',
+    thumb:'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['CSS3D','GLTFLoader','Lightbox','HorizontalScroll','StackedCards'],
+    lines:'1897',cats:['3d','scroll','effects','ui']
+  },
+  {
+    num:'23',file:'23-page-transitions.html',
+    title:'Page Transitions & Loaders',
+    desc:'6 transiciones: Curtain Split, Gradient Wipe, Iris Open, Pixel Dissolve, Vertical Split, Glitch. 9 loaders CSS. 4 preloaders full-screen. Stagger reveals: fade-up, clip-path, letra-a-letra, count-up. 4 progress indicators.',
+    thumb:'https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['Transitions','Loaders','Preloaders','Stagger','Progress'],
+    lines:'~900',cats:['effects','ui']
+  },
+  {
+    num:'24',file:'24-infinite-scroll-feed.html',
+    title:'Infinite Scroll & Feeds',
+    desc:'Social feed con IntersectionObserver lazy load + new posts badge. Pinterest masonry columns. E-commerce product grid con load-more. News editorial layout. Todo con imágenes reales Unsplash, cero placeholders.',
+    thumb:'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=700&q=75',
+    badge:'ui',badgeLabel:'UI',
+    tags:['InfiniteScroll','Masonry','Feed','LazyLoad','E-Commerce'],
+    lines:'~750',cats:['ui','scroll']
+  },
+  {
+    num:'25',file:'25-hero-sections.html',
+    title:'Hero Sections — 6 Tipos Premium',
+    desc:'6 hero sections de producción: Split + Three.js DamagedHelmet, Cinematic Video fullscreen, SaaS Gradient + Floating UI, Luxury Editorial Cormorant serif, Technical Dark + Typewriter, Bold Type + Marquee strip infinito. Lenis + GSAP + SplitType.',
+    thumb:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&q=75',
+    badge:'hot',badgeLabel:'HOT',
+    tags:['Hero','Three.js','Lenis','SplitType','Typewriter','Marquee'],
+    lines:'~700',cats:['landing','effects','3d','ui']
+  },
+  {
+    num:'26',file:'26-bento-grids.html',
+    title:'Bento Grid Layouts — 5 Sistemas',
+    desc:'5 sistemas de bento grid: SaaS Feature Grid (12 columnas), Agency Portfolio masonry con hover 3D tilt, Analytics Dashboard (KPIs+sparklines+donut+barras), Social iOS-style con imágenes reales, Pricing 3 tiers con featured highlight. Todo GSAP ScrollTrigger.',
+    thumb:'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['BentoGrid','Dashboard','Portfolio','Pricing','Analytics'],
+    lines:'~650',cats:['ui','landing','effects']
+  },
+];
+
+let activeFilter='all';
+let searchQuery='';
+
+function setFilter(f,btn){
+  activeFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderDemos();
+}
+
+function filterDemos(){
+  searchQuery=document.getElementById('search').value.toLowerCase();
+  renderDemos();
+}
+
+function renderDemos(){
+  const grid=document.getElementById('demo-grid');
+  const filtered=DEMOS.filter(d=>{
+    const matchFilter=activeFilter==='all'||d.cats.includes(activeFilter);
+    const matchSearch=!searchQuery||
+      d.title.toLowerCase().includes(searchQuery)||
+      d.desc.toLowerCase().includes(searchQuery)||
+      d.tags.some(t=>t.toLowerCase().includes(searchQuery));
+    return matchFilter&&matchSearch;
+  });
+
+  document.getElementById('stat-demos').textContent=DEMOS.length;
+
+  if(!filtered.length){
+    grid.innerHTML=`<div class="empty-state"><div class="big">🔍</div><div>No se encontraron demos para "${searchQuery}"</div></div>`;
+    return;
+  }
+
+  grid.innerHTML=filtered.map(d=>`
+    <a class="demo-card" href="${d.file}" target="_blank">
+      <div class="demo-thumb">
+        <div class="demo-thumb-bg" style="background-image:url('${d.thumb}')"></div>
+        <span class="demo-badge badge-${d.badge}">${d.badgeLabel}</span>
+      </div>
+      <div class="demo-card-body">
+        <div class="demo-num">DEMO ${d.num}</div>
+        <div class="demo-title">${d.title}</div>
+        <div class="demo-desc">${d.desc}</div>
+        <div class="demo-tags">${d.tags.map(t=>`<span class="demo-tag">${t}</span>`).join('')}</div>
+      </div>
+      <div class="demo-footer">
+        <span class="demo-line-count">📄 ${d.lines} líneas</span>
+        <span class="demo-open">Abrir demo →</span>
+      </div>
+    </a>
+  `).join('');
+}
+
+// Initial render with counter animation
+renderDemos();
+
+// Animate stat counter on load
+(function(){
+  const el=document.getElementById('stat-demos');
+  let i=0;
+  const iv=setInterval(()=>{
+    i++;
+    el.textContent=i;
+    if(i>=DEMOS.length)clearInterval(iv);
+  },120);
+})();
+
+// Keyboard shortcut: / to focus search
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&document.activeElement!==document.getElementById('search')){
+    e.preventDefault();
+    document.getElementById('search').focus();
+  }
+});
+</script>
+</body>
+</html>

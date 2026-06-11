@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Globe World — Crafter Agency</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #050508;
+      --surface: #0c0c14;
+      --accent: #6366f1;
+      --accent2: #a855f7;
+      --accent3: #06b6d4;
+      --text: #f0f0ff;
+      --muted: rgba(240, 240, 255, 0.5);
+      --font-h: 'Space Grotesk', sans-serif;
+      --font-b: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-b);
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ───────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 48px;
+      background: transparent;
+      transition: background 0.4s;
+    }
+    nav.scrolled {
+      background: rgba(5, 5, 8, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+    }
+    .nav-logo {
+      font-family: var(--font-h);
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      padding: 8px 22px;
+      border-radius: 100px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .nav-cta:hover { opacity: 0.85; transform: translateY(-1px); }
+
+    /* ── SECTION 1 — HERO GLOBE ────────────────────────── */
+    #hero {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    #globe-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 10;
+      max-width: 520px;
+      margin-left: 8vw;
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 100px;
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      background: rgba(99, 102, 241, 0.1);
+      font-size: 0.78rem;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .hero-badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent3);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.4); }
+    }
+
+    .hero-title {
+      font-family: var(--font-h);
+      font-size: clamp(2.8rem, 5vw, 4.5rem);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      margin-bottom: 20px;
+    }
+    .hero-title span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: 1.1rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 40px;
+      max-width: 400px;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 28px;
+    }
+    .hero-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .hero-stat-value {
+      font-family: var(--font-h);
+      font-size: 1.6rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--text), var(--accent3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-stat-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .hero-scroll-hint {
+      position: absolute;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .scroll-line {
+      width: 1px;
+      height: 48px;
+      background: linear-gradient(to bottom, var(--accent), transparent);
+      animation: scroll-line 2s ease-in-out infinite;
+    }
+    @keyframes scroll-line {
+      0%, 100% { opacity: 0.4; transform: scaleY(1); }
+      50% { opacity: 1; transform: scaleY(0.6); }
+    }
+
+    /* ── SECTION 2 — GLOBE + CONTENT ──────────────────── */
+    #features {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 120px 8vw;
+      overflow: hidden;
+    }
+    #features::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 10% 50%, rgba(99,102,241,0.07) 0%, transparent 60%),
+                  radial-gradient(ellipse 50% 60% at 90% 20%, rgba(168,85,247,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    #globe-canvas-small {
+      width: 100%;
+      aspect-ratio: 1;
+      max-width: 480px;
+      border-radius: 50%;
+      box-shadow: 0 0 80px rgba(99, 102, 241, 0.2), 0 0 160px rgba(168, 85, 247, 0.1);
+    }
+
+    .features-content {
+      display: flex;
+      flex-direction: column;
+      gap: 48px;
+    }
+
+    .features-heading {
+      font-family: var(--font-h);
+      font-size: clamp(2rem, 3vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+    .features-heading span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .features-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 20px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+      background: rgba(255,255,255,0.02);
+      transition: border-color 0.3s, background 0.3s, transform 0.3s;
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    .feature-item:hover {
+      border-color: rgba(99, 102, 241, 0.3);
+      background: rgba(99, 102, 241, 0.05);
+      transform: translateX(0) translateY(-2px);
+    }
+    .feature-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+    .feature-icon.indigo { background: rgba(99, 102, 241, 0.15); }
+    .feature-icon.purple { background: rgba(168, 85, 247, 0.15); }
+    .feature-icon.cyan   { background: rgba(6, 182, 212, 0.15); }
+    .feature-icon.green  { background: rgba(34, 197, 94, 0.15); }
+
+    .feature-text h4 {
+      font-family: var(--font-h);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .feature-text p {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .check-icon {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+    .check-icon svg { width: 10px; height: 10px; }
+
+    /* ── SECTION 3 — NIGHT SATELLITE ───────────────────── */
+    #satellite {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #000005;
+    }
+
+    #globe-canvas-night {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(90vw, 800px);
+      height: min(90vw, 800px);
+      border-radius: 50%;
+    }
+
+    .satellite-content {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      pointer-events: none;
+      max-width: 680px;
+      padding: 0 24px;
+    }
+
+    .satellite-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: 100px;
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      background: rgba(6, 182, 212, 0.08);
+      font-size: 0.78rem;
+      color: var(--accent3);
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .sat-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent3);
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+
+    .satellite-title {
+      font-family: var(--font-h);
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+    .satellite-title .glow {
+      color: var(--accent3);
+      text-shadow: 0 0 40px rgba(6, 182, 212, 0.6);
+    }
+
+    .satellite-desc {
+      font-size: 1.1rem;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 48px;
+    }
+
+    .uptime-grid {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+    .uptime-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .uptime-value {
+      font-family: var(--font-h);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent3);
+      text-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+    }
+    .uptime-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .satellite-rings {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .sat-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(6, 182, 212, 0.08);
+      transform: translate(-50%, -50%);
+    }
+
+    /* ── SECTION 4 — CTA ────────────────────────────────── */
+    #cta {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #cta-particles {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+
+    .cta-glow-top {
+      position: absolute;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(99,102,241,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-glow-bottom {
+      position: absolute;
+      bottom: -10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 300px;
+      background: radial-gradient(ellipse, rgba(168,85,247,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .cta-content {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      max-width: 700px;
+      padding: 0 24px;
+    }
+
+    .cta-label {
+      font-size: 0.78rem;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .cta-title {
+      font-family: var(--font-h);
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      margin-bottom: 24px;
+    }
+    .cta-title span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .cta-desc {
+      font-size: 1.1rem;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 48px;
+    }
+
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      padding: 16px 40px;
+      border-radius: 100px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      text-decoration: none;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 8px 32px rgba(99, 102, 241, 0.35);
+    }
+    .btn-primary::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, white, transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 48px rgba(99, 102, 241, 0.5); }
+    .btn-primary:hover::after { opacity: 0.1; }
+
+    .btn-secondary {
+      padding: 16px 40px;
+      border-radius: 100px;
+      background: transparent;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 1rem;
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.15);
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
+    }
+    .btn-secondary:hover {
+      border-color: rgba(99, 102, 241, 0.5);
+      background: rgba(99, 102, 241, 0.08);
+      transform: translateY(-2px);
+    }
+
+    .cta-footer-note {
+      margin-top: 24px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .cta-footer-note span { color: var(--accent3); font-weight: 600; }
+
+    /* ── LOADER ─────────────────────────────────────────── */
+    #loader {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      transition: opacity 0.6s, visibility 0.6s;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; }
+    .loader-globe {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      animation: loader-spin 1.2s ease-in-out infinite;
+      box-shadow: 0 0 30px rgba(99,102,241,0.4);
+    }
+    @keyframes loader-spin {
+      0%   { transform: scale(0.8) rotate(0deg); opacity: 0.6; }
+      50%  { transform: scale(1.1) rotate(180deg); opacity: 1; }
+      100% { transform: scale(0.8) rotate(360deg); opacity: 0.6; }
+    }
+    .loader-text {
+      font-family: var(--font-h);
+      font-size: 0.85rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ── MISC ───────────────────────────────────────────── */
+    .section-divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(to right, transparent, rgba(99,102,241,0.25), rgba(168,85,247,0.25), transparent);
+    }
+
+    @media (max-width: 900px) {
+      .features-grid { grid-template-columns: 1fr; gap: 48px; }
+      #globe-canvas-small { max-width: 320px; margin: 0 auto; display: block; }
+      nav { padding: 16px 24px; }
+      .nav-links { display: none; }
+      .hero-content { margin-left: 5vw; }
+      .hero-stats { gap: 20px; }
+      #features { padding: 80px 6vw; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-globe"></div>
+  <div class="loader-text">Cargando mundo 3D…</div>
+</div>
+
+<!-- NAV -->
+<nav id="navbar">
+  <div class="nav-logo">Crafter Agency</div>
+  <ul class="nav-links">
+    <li><a href="#hero">Inicio</a></li>
+    <li><a href="#features">Funciones</a></li>
+    <li><a href="#satellite">Global</a></li>
+    <li><a href="#cta">Contacto</a></li>
+  </ul>
+  <a href="#cta" class="nav-cta">Empezar ahora</a>
+</nav>
+
+<!-- ══ SECCIÓN 1 — HERO GLOBE ══════════════════════════════ -->
+<section id="hero">
+  <canvas id="globe-canvas"></canvas>
+
+  <div class="hero-content">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      Red Global Activa
+    </div>
+
+    <h1 class="hero-title">
+      Alcance global,<br />
+      <span>impacto local</span>
+    </h1>
+
+    <p class="hero-subtitle">
+      Conectamos marcas con audiencias en cualquier rincón del mundo.
+      Tecnología de punta, resultados que se miden en cada mercado.
+    </p>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-value" data-target="42">0</div>
+        <div class="hero-stat-label">Países</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value" data-target="10000" data-suffix="+">0</div>
+        <div class="hero-stat-label">Clientes</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value">24/7</div>
+        <div class="hero-stat-label">Activo</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-scroll-hint">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ══ SECCIÓN 2 — GLOBE PEQUEÑO + CONTENT ══════════════════ -->
+<section id="features">
+  <div class="features-grid">
+    <!-- Globe pequeño (reutilizamos canvas) -->
+    <div style="display:flex;justify-content:center;align-items:center;">
+      <canvas id="globe-canvas-small"></canvas>
+    </div>
+
+    <div class="features-content">
+      <h2 class="features-heading">
+        Despliega tu marca en<br />
+        <span>cualquier mercado</span>
+      </h2>
+
+      <div class="features-list">
+        <div class="feature-item">
+          <div class="feature-icon indigo">🌐</div>
+          <div class="feature-text">
+            <h4>Localización inteligente</h4>
+            <p>Adapta contenido y campañas automáticamente a cada región, idioma y cultura con IA avanzada.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon purple">⚡</div>
+          <div class="feature-text">
+            <h4>Red de distribución CDN global</h4>
+            <p>Latencia inferior a 50ms en 42 países. Infraestructura optimizada para máxima velocidad de entrega.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon cyan">📊</div>
+          <div class="feature-text">
+            <h4>Analytics en tiempo real</h4>
+            <p>Dashboard unificado con métricas de todas tus regiones. Insights accionables al instante.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon green">🔒</div>
+          <div class="feature-text">
+            <h4>Cumplimiento regulatorio</h4>
+            <p>GDPR, CCPA, LGPD y normativas locales gestionadas automáticamente en cada jurisdicción.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ══ SECCIÓN 3 — SATELLITE / NIGHT VIEW ══════════════════ -->
+<section id="satellite">
+  <!-- Anillos decorativos -->
+  <div class="satellite-rings">
+    <div class="sat-ring" style="width:650px;height:650px;top:50%;left:50%;"></div>
+    <div class="sat-ring" style="width:820px;height:820px;top:50%;left:50%;opacity:0.5;"></div>
+    <div class="sat-ring" style="width:1000px;height:1000px;top:50%;left:50%;opacity:0.3;"></div>
+  </div>
+
+  <canvas id="globe-canvas-night"></canvas>
+
+  <div class="satellite-content">
+    <div class="satellite-badge">
+      <div class="sat-dot"></div>
+      Vista desde órbita
+    </div>
+    <h2 class="satellite-title">
+      Activo las<br />
+      <span class="glow">24 horas</span><br />
+      del planeta
+    </h2>
+    <p class="satellite-desc">
+      Nuestros sistemas operan sin pausa. Desde el espacio, las luces de cada ciudad
+      representan millones de conexiones activas con tu marca, en tiempo real.
+    </p>
+    <div class="uptime-grid">
+      <div class="uptime-item">
+        <div class="uptime-value">99.99%</div>
+        <div class="uptime-label">Uptime</div>
+      </div>
+      <div class="uptime-item">
+        <div class="uptime-value">&lt;40ms</div>
+        <div class="uptime-label">Latencia media</div>
+      </div>
+      <div class="uptime-item">
+        <div class="uptime-value">8</div>
+        <div class="uptime-label">Data centers</div>
+      </div>
+      <div class="uptime-item">
+        <div class="uptime-value">365</div>
+        <div class="uptime-label">Días al año</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ══ SECCIÓN 4 — CTA ════════════════════════════════════ -->
+<section id="cta">
+  <canvas id="cta-particles"></canvas>
+  <div class="cta-glow-top"></div>
+  <div class="cta-glow-bottom"></div>
+
+  <div class="cta-content">
+    <div class="cta-label">Empieza hoy</div>
+    <h2 class="cta-title">
+      Tu marca merece<br />
+      <span>presencia mundial</span>
+    </h2>
+    <p class="cta-desc">
+      Únete a más de 10,000 empresas que ya están conquistando mercados globales
+      con la plataforma más avanzada del sector.
+    </p>
+    <div class="cta-buttons">
+      <a href="#" class="btn-primary">Comenzar gratis</a>
+      <a href="#" class="btn-secondary">Ver demo en vivo →</a>
+    </div>
+    <p class="cta-footer-note">
+      Sin tarjeta de crédito · <span>14 días gratis</span> · Cancela cuando quieras
+    </p>
+  </div>
+</section>
+
+<!-- ══ IMPORTMAP + THREE.JS MODULE ═══════════════════════ -->
+<script type="importmap">
+  {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const gsap = window.gsap;
+gsap.registerPlugin(window.ScrollTrigger);
+
+/* ════════════════════════════════════════════
+   TEXTURES — NASA / three.js public CDN
+   ════════════════════════════════════════════ */
+const EARTH_DAY   = 'https://raw.githubusercontent.com/mrdoob/three.js/r158/examples/textures/planets/earth_atmos_2048.jpg';
+const EARTH_NIGHT = 'https://raw.githubusercontent.com/mrdoob/three.js/r158/examples/textures/planets/earth_lights_2048.png';
+const EARTH_SPEC  = 'https://raw.githubusercontent.com/mrdoob/three.js/r158/examples/textures/planets/earth_specular_2048.jpg';
+const EARTH_BUMP  = 'https://raw.githubusercontent.com/mrdoob/three.js/r158/examples/textures/planets/earth_normal_2048.jpg';
+const CLOUDS      = 'https://raw.githubusercontent.com/mrdoob/three.js/r158/examples/textures/planets/earth_clouds_1024.png';
+
+/* ════════════════════════════════════════════
+   UTILITIES
+   ════════════════════════════════════════════ */
+function latLonToVec3(lat, lon, radius = 2.0) {
+  const phi   = (90 - lat)  * (Math.PI / 180);
+  const theta = (lon + 180) * (Math.PI / 180);
+  return new THREE.Vector3(
+    -radius * Math.sin(phi) * Math.cos(theta),
+     radius * Math.cos(phi),
+     radius * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+const CITIES = [
+  { name: 'New York',  lat:  40.7, lon:  -74.0, color: '#6366f1' },
+  { name: 'London',    lat:  51.5, lon:   -0.12, color: '#a855f7' },
+  { name: 'Tokyo',     lat:  35.7, lon:  139.7,  color: '#06b6d4' },
+  { name: 'Sydney',    lat: -33.9, lon:  151.2,  color: '#22c55e' },
+  { name: 'São Paulo', lat: -23.5, lon:  -46.6,  color: '#f59e0b' },
+  { name: 'Dubai',     lat:  25.2, lon:   55.3,  color: '#ec4899' },
+  { name: 'Barcelona', lat:  41.4, lon:    2.15, color: '#6366f1' },
+  { name: 'Singapore', lat:   1.35, lon: 103.8,  color: '#06b6d4' },
+];
+
+const ARC_PAIRS = [[0,1],[1,2],[2,3],[0,4],[5,6],[6,7],[3,7],[1,5],[0,6],[2,7]];
+
+/* ─── crear arco entre dos ciudades ─── */
+function createArc(from, to, color, height = 0.8) {
+  const mid = from.clone().add(to).multiplyScalar(0.5);
+  mid.normalize().multiplyScalar(from.length() + height);
+  const curve  = new THREE.CatmullRomCurve3([from, mid, to]);
+  const points = curve.getPoints(80);
+  const geo    = new THREE.BufferGeometry().setFromPoints(points);
+  const mat    = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 });
+  return new THREE.Line(geo, mat);
+}
+
+/* ─── punto + halo para ciudades ─── */
+function addCityMarkers(earthMesh, cities) {
+  cities.forEach((city, i) => {
+    const pos = latLonToVec3(city.lat, city.lon);
+
+    // Dot
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.028, 8, 8),
+      new THREE.MeshBasicMaterial({ color: city.color })
+    );
+    dot.position.copy(pos);
+    earthMesh.add(dot);
+
+    // Halo ring
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.045, 0.065, 20),
+      new THREE.MeshBasicMaterial({
+        color: city.color,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide,
+      })
+    );
+    ring.position.copy(pos.clone().multiplyScalar(1.001));
+    ring.lookAt(new THREE.Vector3(0, 0, 0));
+    ring.userData.isHalo = true;
+    ring.userData.index  = i;
+    earthMesh.add(ring);
+  });
+}
+
+/* ════════════════════════════════════════════
+   SHARED TEXTURE LOADER
+   ════════════════════════════════════════════ */
+const loader = new THREE.TextureLoader();
+let texturesLoaded = 0;
+const TOTAL_TEXTURES = 5;
+
+const texDay   = loader.load(EARTH_DAY,   onLoad);
+const texNight = loader.load(EARTH_NIGHT, onLoad);
+const texSpec  = loader.load(EARTH_SPEC,  onLoad);
+const texBump  = loader.load(EARTH_BUMP,  onLoad);
+const texCloud = loader.load(CLOUDS,      onLoad);
+
+function onLoad() {
+  texturesLoaded++;
+  if (texturesLoaded >= TOTAL_TEXTURES) initAll();
+}
+
+/* ════════════════════════════════════════════
+   GLOBE FACTORY — builds a complete globe set
+   ════════════════════════════════════════════ */
+function buildGlobe(scene, useDayTexture = true) {
+  // Earth
+  const earthGeo = new THREE.SphereGeometry(2, 64, 64);
+  const earthMat = new THREE.MeshPhongMaterial({
+    map:         useDayTexture ? texDay   : texNight,
+    specularMap: texSpec,
+    specular:    new THREE.Color(0x333333),
+    normalMap:   texBump,
+    normalScale: new THREE.Vector2(0.85, 0.85),
+    bumpMap:     texBump,
+    bumpScale:   0.015,
+  });
+  const earth = new THREE.Mesh(earthGeo, earthMat);
+
+  // Clouds
+  const cloudGeo = new THREE.SphereGeometry(2.022, 64, 64);
+  const cloudMat = new THREE.MeshPhongMaterial({
+    map: texCloud,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+  });
+  const clouds = new THREE.Mesh(cloudGeo, cloudMat);
+
+  // Atmosphere glow
+  const atmGeo = new THREE.SphereGeometry(2.15, 64, 64);
+  const atmMat = new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec3 vNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vNormal;
+      void main() {
+        float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
+        gl_FragColor = vec4(0.3, 0.6, 1.0, 1.0) * intensity;
+      }
+    `,
+    blending:    THREE.AdditiveBlending,
+    side:        THREE.FrontSide,
+    transparent: true,
+  });
+  const atmosphere = new THREE.Mesh(atmGeo, atmMat);
+
+  scene.add(earth);
+  scene.add(clouds);
+  scene.add(atmosphere);
+
+  return { earth, clouds, atmosphere };
+}
+
+/* ─── Starfield ─── */
+function buildStarfield(scene, radius = 90, count = 3000) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const r     = radius + Math.random() * 40;
+    pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i*3+2] = r * Math.cos(phi);
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, sizeAttenuation: true });
+  scene.add(new THREE.Points(geo, mat));
+}
+
+/* ─── Lights ─── */
+function buildLights(scene, ambientIntensity = 0.4) {
+  const ambient = new THREE.AmbientLight(0x333344, ambientIntensity);
+  scene.add(ambient);
+  const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+  sun.position.set(5, 3, 5);
+  scene.add(sun);
+}
+
+/* ════════════════════════════════════════════
+   INIT ALL — called once textures are ready
+   ════════════════════════════════════════════ */
+function initAll() {
+  initHeroGlobe();
+  initSmallGlobe();
+  initNightGlobe();
+  initCtaParticles();
+  initScrollAnimations();
+  initNavScroll();
+  animateCounters();
+  hideLoader();
+}
+
+/* ════════════════════════════════════════════
+   HERO GLOBE (Section 1) — fullscreen
+   ════════════════════════════════════════════ */
+let heroRenderer, heroScene, heroCamera, heroControls;
+let heroEarth, heroClouds, heroAtm;
+
+function initHeroGlobe() {
+  const canvas = document.getElementById('globe-canvas');
+  heroScene  = new THREE.Scene();
+  heroCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+  heroCamera.position.set(0, 0, 6);
+
+  heroRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  heroRenderer.setSize(window.innerWidth, window.innerHeight);
+  heroRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  heroRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+  heroRenderer.toneMappingExposure = 0.9;
+  heroRenderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  buildStarfield(heroScene);
+  buildLights(heroScene);
+
+  const g = buildGlobe(heroScene, true);
+  heroEarth = g.earth;
+  heroClouds = g.clouds;
+  heroAtm    = g.atmosphere;
+
+  addCityMarkers(heroEarth, CITIES);
+
+  ARC_PAIRS.forEach(([a, b]) => {
+    const arc = createArc(
+      latLonToVec3(CITIES[a].lat, CITIES[a].lon),
+      latLonToVec3(CITIES[b].lat, CITIES[b].lon),
+      CITIES[a].color
+    );
+    heroScene.add(arc);
+  });
+
+  heroControls = new OrbitControls(heroCamera, canvas);
+  heroControls.enableDamping    = true;
+  heroControls.dampingFactor    = 0.05;
+  heroControls.enableZoom       = false;
+  heroControls.enablePan        = false;
+  heroControls.autoRotate       = false;
+  heroControls.minPolarAngle    = Math.PI * 0.2;
+  heroControls.maxPolarAngle    = Math.PI * 0.8;
+
+  // Entrance animation
+  gsap.fromTo(heroCamera.position,
+    { z: 10 },
+    { z: 6, duration: 2.2, ease: 'power3.out' }
+  );
+  gsap.fromTo(heroEarth.scale,
+    { x: 0.6, y: 0.6, z: 0.6 },
+    { x: 1, y: 1, z: 1, duration: 2, ease: 'back.out(1.3)' }
+  );
+
+  window.addEventListener('resize', () => {
+    heroCamera.aspect = window.innerWidth / window.innerHeight;
+    heroCamera.updateProjectionMatrix();
+    heroRenderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  animateHero();
+}
+
+function animateHero() {
+  requestAnimationFrame(animateHero);
+  heroEarth.rotation.y  += 0.0008;
+  heroClouds.rotation.y += 0.001;
+  heroAtm.rotation.y    += 0.0008;
+  pulsateHalos(heroEarth);
+  heroControls.update();
+  heroRenderer.render(heroScene, heroCamera);
+}
+
+/* ════════════════════════════════════════════
+   SMALL GLOBE (Section 2)
+   ════════════════════════════════════════════ */
+let smallRenderer, smallScene, smallCamera, smallEarth, smallClouds, smallAtm, smallControls;
+
+function initSmallGlobe() {
+  const canvas = document.getElementById('globe-canvas-small');
+  const w = canvas.clientWidth || 480;
+  const h = canvas.clientHeight || 480;
+
+  smallScene  = new THREE.Scene();
+  smallCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+  smallCamera.position.set(0, 0, 6);
+
+  smallRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  smallRenderer.setSize(w, h);
+  smallRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  smallRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+  smallRenderer.toneMappingExposure = 0.9;
+  smallRenderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  buildStarfield(smallScene, 80, 1500);
+  buildLights(smallScene);
+
+  const g = buildGlobe(smallScene, true);
+  smallEarth  = g.earth;
+  smallClouds = g.clouds;
+  smallAtm    = g.atmosphere;
+
+  addCityMarkers(smallEarth, CITIES);
+
+  ARC_PAIRS.slice(0, 6).forEach(([a, b]) => {
+    const arc = createArc(
+      latLonToVec3(CITIES[a].lat, CITIES[a].lon),
+      latLonToVec3(CITIES[b].lat, CITIES[b].lon),
+      CITIES[a].color, 0.6
+    );
+    smallScene.add(arc);
+  });
+
+  smallControls = new OrbitControls(smallCamera, canvas);
+  smallControls.enableDamping = true;
+  smallControls.dampingFactor = 0.05;
+  smallControls.enableZoom    = false;
+  smallControls.enablePan     = false;
+  smallControls.autoRotate    = true;
+  smallControls.autoRotateSpeed = 0.5;
+
+  // Resize observer
+  new ResizeObserver(() => {
+    const w2 = canvas.clientWidth;
+    const h2 = canvas.clientHeight;
+    smallRenderer.setSize(w2, h2);
+  }).observe(canvas);
+
+  animateSmall();
+}
+
+function animateSmall() {
+  requestAnimationFrame(animateSmall);
+  smallEarth.rotation.y  += 0.001;
+  smallClouds.rotation.y += 0.0013;
+  smallAtm.rotation.y    += 0.001;
+  pulsateHalos(smallEarth);
+  smallControls.update();
+  smallRenderer.render(smallScene, smallCamera);
+}
+
+/* ════════════════════════════════════════════
+   NIGHT GLOBE (Section 3) — satellite view
+   ════════════════════════════════════════════ */
+let nightRenderer, nightScene, nightCamera, nightEarth, nightClouds, nightAtm;
+
+function initNightGlobe() {
+  const canvas = document.getElementById('globe-canvas-night');
+
+  nightScene  = new THREE.Scene();
+  nightCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+  nightCamera.position.set(0, 0, 6);
+
+  nightRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  nightRenderer.setSize(700, 700);
+  nightRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  nightRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+  nightRenderer.toneMappingExposure = 1.2;
+  nightRenderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  // Dim ambient for night
+  const ambient = new THREE.AmbientLight(0x111133, 0.15);
+  nightScene.add(ambient);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+  sun.position.set(5, 3, 5);
+  nightScene.add(sun);
+
+  buildStarfield(nightScene, 80, 4000);
+
+  // Night globe uses night texture
+  const earthGeo = new THREE.SphereGeometry(2, 64, 64);
+  const earthMat = new THREE.MeshPhongMaterial({
+    map:         texNight,
+    specularMap: texSpec,
+    specular:    new THREE.Color(0x444455),
+    normalMap:   texBump,
+    normalScale: new THREE.Vector2(0.5, 0.5),
+    bumpMap:     texBump,
+    bumpScale:   0.01,
+    emissiveMap: texNight,
+    emissive:    new THREE.Color(0x222244),
+    emissiveIntensity: 0.35,
+  });
+  nightEarth = new THREE.Mesh(earthGeo, earthMat);
+  nightScene.add(nightEarth);
+
+  // Cloud layer semi-transparent over night
+  const cloudGeo = new THREE.SphereGeometry(2.022, 64, 64);
+  const cloudMat = new THREE.MeshPhongMaterial({
+    map: texCloud, transparent: true, opacity: 0.25, depthWrite: false,
+  });
+  nightClouds = new THREE.Mesh(cloudGeo, cloudMat);
+  nightScene.add(nightClouds);
+
+  // Atmosphere (cyan tint for night)
+  const atmGeo = new THREE.SphereGeometry(2.15, 64, 64);
+  const atmMat = new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec3 vNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vNormal;
+      void main() {
+        float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
+        gl_FragColor = vec4(0.1, 0.5, 0.9, 1.0) * intensity;
+      }
+    `,
+    blending:    THREE.AdditiveBlending,
+    side:        THREE.FrontSide,
+    transparent: true,
+  });
+  nightAtm = new THREE.Mesh(atmGeo, atmMat);
+  nightScene.add(nightAtm);
+
+  addCityMarkers(nightEarth, CITIES);
+  ARC_PAIRS.forEach(([a, b]) => {
+    const arc = createArc(
+      latLonToVec3(CITIES[a].lat, CITIES[a].lon),
+      latLonToVec3(CITIES[b].lat, CITIES[b].lon),
+      CITIES[a].color, 0.7
+    );
+    nightScene.add(arc);
+  });
+
+  new ResizeObserver(() => {
+    const size = Math.min(canvas.clientWidth, canvas.clientHeight);
+    nightRenderer.setSize(size, size);
+  }).observe(canvas);
+
+  // Entry animation via ScrollTrigger
+  gsap.fromTo(nightCamera.position,
+    { z: 10 },
+    {
+      z: 6, duration: 1.5, ease: 'power2.out',
+      scrollTrigger: {
+        trigger: '#satellite',
+        start: 'top 80%',
+      }
+    }
+  );
+
+  animateNight();
+}
+
+function animateNight() {
+  requestAnimationFrame(animateNight);
+  nightEarth.rotation.y  += 0.0006;
+  nightClouds.rotation.y += 0.0009;
+  nightAtm.rotation.y    += 0.0006;
+  pulsateHalos(nightEarth);
+  nightRenderer.render(nightScene, nightCamera);
+}
+
+/* ════════════════════════════════════════════
+   PULSATE HALOS (shared helper)
+   ════════════════════════════════════════════ */
+function pulsateHalos(earthMesh) {
+  const t = Date.now() * 0.003;
+  earthMesh.children.forEach((child) => {
+    if (child.userData.isHalo) {
+      const i = child.userData.index || 0;
+      const s = 1 + 0.35 * Math.sin(t + i * 0.9);
+      child.material.opacity = 0.3 + 0.45 * Math.abs(Math.sin(t + i * 0.9));
+      child.scale.set(s, s, 1);
+    }
+  });
+}
+
+/* ════════════════════════════════════════════
+   CTA PARTICLES (Section 4)
+   ════════════════════════════════════════════ */
+function initCtaParticles() {
+  const canvas = document.getElementById('cta-particles');
+  const scene  = new THREE.Scene();
+  const w = canvas.clientWidth  || window.innerWidth;
+  const h = canvas.clientHeight || window.innerHeight;
+  const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 1000);
+  camera.position.z = 30;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  // Particle field
+  const count = 1800;
+  const geo   = new THREE.BufferGeometry();
+  const pos   = new Float32Array(count * 3);
+  const cols  = new Float32Array(count * 3);
+  const palette = [
+    [0.388, 0.400, 0.945],
+    [0.659, 0.333, 0.969],
+    [0.024, 0.714, 0.831],
+  ];
+
+  for (let i = 0; i < count; i++) {
+    pos[i*3]   = (Math.random() - 0.5) * 80;
+    pos[i*3+1] = (Math.random() - 0.5) * 50;
+    pos[i*3+2] = (Math.random() - 0.5) * 40;
+    const c = palette[Math.floor(Math.random() * palette.length)];
+    cols[i*3]   = c[0];
+    cols[i*3+1] = c[1];
+    cols[i*3+2] = c[2];
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(cols, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 0.12, vertexColors: true, sizeAttenuation: true,
+    transparent: true, opacity: 0.7,
+  });
+  scene.add(new THREE.Points(geo, mat));
+
+  window.addEventListener('resize', () => {
+    const nw = canvas.clientWidth;
+    const nh = canvas.clientHeight;
+    camera.aspect = nw / nh;
+    camera.updateProjectionMatrix();
+    renderer.setSize(nw, nh);
+  });
+
+  (function loop() {
+    requestAnimationFrame(loop);
+    const t = Date.now() * 0.0001;
+    camera.position.x = Math.sin(t) * 2;
+    camera.position.y = Math.cos(t * 0.7) * 1.5;
+    camera.lookAt(scene.position);
+    renderer.render(scene, camera);
+  })();
+}
+
+/* ════════════════════════════════════════════
+   SCROLL ANIMATIONS (GSAP + ScrollTrigger)
+   ════════════════════════════════════════════ */
+function initScrollAnimations() {
+  // Hero content entrance
+  gsap.fromTo('.hero-badge',
+    { opacity: 0, y: 20 },
+    { opacity: 1, y: 0, duration: 0.8, delay: 0.3, ease: 'power2.out' }
+  );
+  gsap.fromTo('.hero-title',
+    { opacity: 0, y: 30 },
+    { opacity: 1, y: 0, duration: 1, delay: 0.5, ease: 'power3.out' }
+  );
+  gsap.fromTo('.hero-subtitle',
+    { opacity: 0, y: 20 },
+    { opacity: 1, y: 0, duration: 0.8, delay: 0.8, ease: 'power2.out' }
+  );
+  gsap.fromTo('.hero-stats',
+    { opacity: 0, y: 20 },
+    { opacity: 1, y: 0, duration: 0.8, delay: 1.1, ease: 'power2.out' }
+  );
+  gsap.fromTo('.hero-scroll-hint',
+    { opacity: 0 },
+    { opacity: 1, duration: 1, delay: 1.8 }
+  );
+
+  // Features section heading
+  gsap.fromTo('.features-heading',
+    { opacity: 0, x: 30 },
+    {
+      opacity: 1, x: 0, duration: 1, ease: 'power3.out',
+      scrollTrigger: { trigger: '#features', start: 'top 70%' }
+    }
+  );
+
+  // Feature items stagger
+  document.querySelectorAll('.feature-item').forEach((el, i) => {
+    gsap.to(el, {
+      opacity: 1,
+      x: 0,
+      duration: 0.7,
+      ease: 'power2.out',
+      delay: i * 0.12,
+      scrollTrigger: { trigger: '#features', start: 'top 65%' }
+    });
+  });
+
+  // Small globe entrance
+  gsap.fromTo('#globe-canvas-small',
+    { opacity: 0, scale: 0.85 },
+    {
+      opacity: 1, scale: 1, duration: 1.2, ease: 'back.out(1.2)',
+      scrollTrigger: { trigger: '#features', start: 'top 70%' }
+    }
+  );
+
+  // Satellite section
+  gsap.fromTo('.satellite-badge',
+    { opacity: 0, y: 20 },
+    {
+      opacity: 1, y: 0, duration: 0.7,
+      scrollTrigger: { trigger: '#satellite', start: 'top 70%' }
+    }
+  );
+  gsap.fromTo('.satellite-title',
+    { opacity: 0, y: 30 },
+    {
+      opacity: 1, y: 0, duration: 1, ease: 'power3.out',
+      scrollTrigger: { trigger: '#satellite', start: 'top 65%' }
+    }
+  );
+  gsap.fromTo('.satellite-desc',
+    { opacity: 0, y: 20 },
+    {
+      opacity: 1, y: 0, duration: 0.8,
+      scrollTrigger: { trigger: '#satellite', start: 'top 60%' }
+    }
+  );
+  gsap.fromTo('.uptime-item',
+    { opacity: 0, y: 20 },
+    {
+      opacity: 1, y: 0, duration: 0.7, stagger: 0.1,
+      scrollTrigger: { trigger: '#satellite', start: 'top 55%' }
+    }
+  );
+
+  // CTA section
+  gsap.fromTo('.cta-label',
+    { opacity: 0, y: 20 },
+    {
+      opacity: 1, y: 0, duration: 0.6,
+      scrollTrigger: { trigger: '#cta', start: 'top 75%' }
+    }
+  );
+  gsap.fromTo('.cta-title',
+    { opacity: 0, y: 30 },
+    {
+      opacity: 1, y: 0, duration: 1, ease: 'power3.out',
+      scrollTrigger: { trigger: '#cta', start: 'top 70%' }
+    }
+  );
+  gsap.fromTo('.cta-desc',
+    { opacity: 0, y: 20 },
+    {
+      opacity: 1, y: 0, duration: 0.8,
+      scrollTrigger: { trigger: '#cta', start: 'top 65%' }
+    }
+  );
+  gsap.fromTo('.cta-buttons',
+    { opacity: 0, y: 20 },
+    {
+      opacity: 1, y: 0, duration: 0.8,
+      scrollTrigger: { trigger: '#cta', start: 'top 60%' }
+    }
+  );
+  gsap.fromTo('.cta-footer-note',
+    { opacity: 0 },
+    {
+      opacity: 1, duration: 0.8, delay: 0.3,
+      scrollTrigger: { trigger: '#cta', start: 'top 55%' }
+    }
+  );
+
+  // Satellite rings pulse
+  gsap.fromTo('.sat-ring',
+    { opacity: 0, scale: 0.8 },
+    {
+      opacity: 1, scale: 1, duration: 1.5, stagger: 0.2, ease: 'power2.out',
+      scrollTrigger: { trigger: '#satellite', start: 'top 80%' }
+    }
+  );
+}
+
+/* ════════════════════════════════════════════
+   NAV SCROLL BEHAVIOR
+   ════════════════════════════════════════════ */
+function initNavScroll() {
+  const nav = document.getElementById('navbar');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 60);
+  });
+}
+
+/* ════════════════════════════════════════════
+   ANIMATED COUNTERS
+   ════════════════════════════════════════════ */
+function animateCounters() {
+  document.querySelectorAll('[data-target]').forEach(el => {
+    const target = parseInt(el.dataset.target, 10);
+    const suffix = el.dataset.suffix || '';
+    gsap.to({ val: 0 }, {
+      val: target,
+      duration: 2.5,
+      delay: 1.2,
+      ease: 'power2.out',
+      onUpdate: function () {
+        el.textContent = Math.round(this.targets()[0].val).toLocaleString() + suffix;
+      },
+    });
+  });
+}
+
+/* ════════════════════════════════════════════
+   HIDE LOADER
+   ════════════════════════════════════════════ */
+function hideLoader() {
+  const loader = document.getElementById('loader');
+  gsap.to(loader, {
+    opacity: 0,
+    duration: 0.7,
+    delay: 0.3,
+    onComplete: () => loader.classList.add('hidden'),
+  });
+}
+
+/* ════════════════════════════════════════════
+   FALLBACK — show loader for max 8s
+   ════════════════════════════════════════════ */
+setTimeout(() => {
+  if (document.getElementById('loader') &&
+      !document.getElementById('loader').classList.contains('hidden')) {
+    initAll();
+  }
+}, 8000);
+
+</script>
+</body>
+</html>

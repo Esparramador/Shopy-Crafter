@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shaders &amp; Particles — Crafter Agency AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══ RESET + VARS ═══════════════════════════════════════════════════════ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#050508;--surface:#0c0c14;--surface2:#12121e;
+  --accent:#6366f1;--accent2:#a855f7;--accent3:#06b6d4;
+  --text:#f0f0ff;--muted:rgba(240,240,255,.5);--border:rgba(255,255,255,.07);
+  --font-h:'Space Grotesk',sans-serif;--font-b:'Plus Jakarta Sans',sans-serif;
+  --r:12px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-b);overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+.hl{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* ═══ TOP NAV ════════════════════════════════════════════════════════════ */
+#top-nav{
+  position:sticky;top:0;z-index:200;
+  background:rgba(5,5,8,.85);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+  padding:.75rem 1.5rem;
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+}
+.nav-logo{font-family:var(--font-h);font-weight:800;font-size:.95rem;letter-spacing:-.02em;margin-right:.75rem;white-space:nowrap}
+.nav-logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.nav-tab{
+  padding:.38rem .9rem;border-radius:6px;font-size:.75rem;font-weight:600;
+  cursor:pointer;border:none;background:rgba(255,255,255,.04);color:var(--muted);
+  transition:all .2s;white-space:nowrap;text-decoration:none;display:inline-block;
+}
+.nav-tab:hover{background:rgba(99,102,241,.12);color:var(--text)}
+.nav-tab.active{background:rgba(99,102,241,.18);color:var(--accent)}
+
+/* ═══ SECTION SHELL ══════════════════════════════════════════════════════ */
+.fx-section{
+  min-height:100vh;padding:5rem 2rem;
+  display:flex;flex-direction:column;align-items:center;
+}
+.section-header{text-align:center;margin-bottom:3.5rem;max-width:700px}
+.section-tag{
+  display:inline-block;margin-bottom:.85rem;
+  padding:.28rem .85rem;border-radius:50px;
+  background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.22);
+  font-size:.68rem;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;
+}
+.section-header h2{font-family:var(--font-h);font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.1;letter-spacing:-.025em;margin-bottom:.75rem}
+.section-header p{color:var(--muted);font-size:.95rem;line-height:1.7}
+.fx-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;position:relative;width:100%;max-width:900px;
+}
+.fx-card-label{
+  font-size:.7rem;font-weight:700;letter-spacing:.1em;color:var(--accent);
+  text-transform:uppercase;padding:1rem 1.5rem .5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BLOQUE 1 — PLASMA SHADER
+═══════════════════════════════════════════════════════════════════════ */
+#plasma-section{background:var(--bg)}
+#plasma-canvas{
+  width:100%;height:380px;display:block;cursor:crosshair;
+}
+.plasma-info{
+  padding:1rem 1.5rem 1.25rem;display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;
+}
+.plasma-info span{font-size:.78rem;color:var(--muted)}
+.plasma-info strong{color:var(--text);font-family:var(--font-h)}
+.plasma-badge{
+  padding:.2rem .7rem;border-radius:50px;background:rgba(99,102,241,.12);
+  border:1px solid rgba(99,102,241,.2);font-size:.65rem;font-weight:700;
+  color:var(--accent);letter-spacing:.08em;text-transform:uppercase;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BLOQUE 2 — GALAXY PARTICLE SYSTEM
+═══════════════════════════════════════════════════════════════════════ */
+#galaxy-section{background:linear-gradient(to bottom,var(--bg),#06060d)}
+#galaxy-canvas{
+  width:100%;height:380px;display:block;cursor:grab;touch-action:none;
+}
+#galaxy-canvas:active{cursor:grabbing}
+.galaxy-hud{
+  padding:.85rem 1.5rem 1.1rem;display:flex;gap:1.75rem;flex-wrap:wrap;
+}
+.hud-item{display:flex;flex-direction:column;gap:.2rem}
+.hud-val{font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--text)}
+.hud-key{font-size:.68rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BLOQUE 3 — DNA HELIX
+═══════════════════════════════════════════════════════════════════════ */
+#dna-section{background:linear-gradient(to bottom,#06060d,var(--bg))}
+#dna-canvas{
+  width:100%;height:380px;display:block;cursor:grab;
+}
+#dna-canvas:active{cursor:grabbing}
+.dna-legend{
+  padding:.9rem 1.5rem 1.1rem;display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;
+}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.legend-label{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:.5rem}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BLOQUE 4 — HOLOGRAPHIC CARD
+═══════════════════════════════════════════════════════════════════════ */
+#holo-section{background:var(--bg)}
+.holo-stage{
+  width:100%;max-width:900px;
+  min-height:520px;
+  display:flex;align-items:center;justify-content:center;
+  padding:3rem 2rem;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  overflow:visible;
+}
+.holo-card{
+  width:280px;height:380px;border-radius:18px;
+  background:var(--surface2);
+  border:1px solid rgba(255,255,255,.12);
+  position:relative;overflow:hidden;cursor:pointer;
+  transform-style:preserve-3d;
+  transition:transform .15s ease,box-shadow .15s ease;
+  box-shadow:0 4px 24px rgba(0,0,0,.6);
+}
+.holo-card:hover{
+  box-shadow:0 12px 48px rgba(99,102,241,.3),0 0 80px rgba(168,85,247,.15);
+}
+.holo-card::before{
+  content:'';position:absolute;inset:0;border-radius:18px;
+  background:linear-gradient(
+    135deg,
+    rgba(99,102,241,.2),
+    rgba(168,85,247,.2),
+    rgba(6,182,212,.2),
+    rgba(99,102,241,.2)
+  );
+  background-size:400% 400%;
+  opacity:0;transition:opacity .3s;
+  z-index:1;
+}
+.holo-card:hover::before{
+  opacity:1;
+  animation:holoShift 3s ease infinite;
+}
+@keyframes holoShift{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+.holo-card::after{
+  content:'';position:absolute;inset:0;border-radius:18px;
+  background:linear-gradient(
+    calc(var(--mx,0.5) * 180deg + 90deg),
+    transparent 0%,
+    rgba(255,255,255,.04) calc(var(--my,0.5) * 60% + 10%),
+    rgba(255,255,255,.18) calc(var(--my,0.5) * 60% + 20%),
+    rgba(255,255,255,.04) calc(var(--my,0.5) * 60% + 30%),
+    transparent 100%
+  );
+  opacity:0;transition:opacity .3s;
+  z-index:2;pointer-events:none;
+}
+.holo-card:hover::after{opacity:1}
+.holo-card-inner{position:relative;z-index:3;height:100%;display:flex;flex-direction:column;padding:1.5rem}
+.holo-badge{
+  align-self:flex-start;padding:.22rem .65rem;border-radius:50px;
+  background:linear-gradient(135deg,rgba(99,102,241,.25),rgba(168,85,247,.25));
+  border:1px solid rgba(99,102,241,.35);
+  font-size:.6rem;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;
+  margin-bottom:1rem;
+}
+.holo-img-placeholder{
+  width:100%;height:130px;border-radius:10px;margin-bottom:1rem;
+  background:linear-gradient(135deg,rgba(99,102,241,.2),rgba(168,85,247,.2),rgba(6,182,212,.15));
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-h);font-size:2rem;font-weight:800;
+  border:1px solid rgba(255,255,255,.07);
+  position:relative;overflow:hidden;
+}
+.holo-img-placeholder::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(
+    -45deg,transparent,transparent 8px,rgba(255,255,255,.02) 8px,rgba(255,255,255,.02) 16px
+  );
+}
+.holo-product-name{
+  font-family:var(--font-h);font-size:1.2rem;font-weight:800;
+  margin-bottom:.25rem;letter-spacing:-.01em;
+}
+.holo-product-desc{font-size:.78rem;color:var(--muted);margin-bottom:.75rem;line-height:1.5}
+.holo-stars{display:flex;gap:3px;margin-bottom:auto}
+.holo-stars svg{width:14px;height:14px;fill:#fbbf24}
+.holo-footer{display:flex;justify-content:space-between;align-items:flex-end;margin-top:1rem}
+.holo-price{font-family:var(--font-h);font-size:1.6rem;font-weight:800;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.holo-price-label{font-size:.65rem;color:var(--muted);margin-bottom:.2rem}
+.holo-btn{
+  padding:.5rem 1.1rem;border-radius:8px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-size:.75rem;font-weight:700;
+  transition:transform .2s,box-shadow .2s;
+}
+.holo-btn:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(99,102,241,.4)}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BLOQUE 5 — MATRIX RAIN
+═══════════════════════════════════════════════════════════════════════ */
+#matrix-section{background:var(--bg)}
+.matrix-wrap{
+  width:100%;max-width:900px;
+  background:#000;border:1px solid rgba(0,255,0,.12);
+  border-radius:var(--r);overflow:hidden;position:relative;
+}
+#matrix-canvas{width:100%;height:380px;display:block}
+.matrix-overlay{
+  position:absolute;top:1rem;left:1rem;right:1rem;
+  display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;
+}
+.matrix-title{
+  font-family:'Courier New',monospace;font-size:.8rem;color:#0f0;
+  text-shadow:0 0 8px #0f0;letter-spacing:.15em;
+}
+.matrix-status{
+  display:flex;flex-direction:column;gap:.3rem;align-items:flex-end;
+}
+.matrix-status span{
+  font-family:'Courier New',monospace;font-size:.65rem;color:rgba(0,255,0,.6);
+  letter-spacing:.1em;
+}
+.matrix-status .live{color:#0f0;text-shadow:0 0 6px #0f0}
+.matrix-bottom{
+  padding:.85rem 1.5rem 1.1rem;background:#000;
+  display:flex;gap:2rem;border-top:1px solid rgba(0,255,0,.08);flex-wrap:wrap;
+}
+.matrix-stat{display:flex;flex-direction:column;gap:.15rem}
+.matrix-stat-val{font-family:'Courier New',monospace;font-size:1rem;color:#0f0;text-shadow:0 0 8px #0f0}
+.matrix-stat-key{font-family:'Courier New',monospace;font-size:.6rem;color:rgba(0,255,0,.4);letter-spacing:.1em}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BLOQUE 6 — MORPHING BLOB
+═══════════════════════════════════════════════════════════════════════ */
+#blob-section{background:linear-gradient(to bottom,var(--bg),#060610)}
+.blob-stage{
+  width:100%;max-width:900px;
+  min-height:520px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  gap:3rem;padding:3rem 2rem;
+  position:relative;overflow:hidden;
+}
+.blob-stage::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 70% 60% at 50% 50%,rgba(99,102,241,.06),transparent);
+  pointer-events:none;
+}
+.blob-container{position:relative;display:flex;flex-direction:column;align-items:center;gap:2rem}
+.blob-wrap{
+  width:300px;height:300px;position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.morphing-blob{
+  width:300px;height:300px;
+  background:radial-gradient(ellipse at 35% 35%,#a855f7,#6366f1 45%,#4f46e5 75%,#3730a3);
+  clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);
+  animation:blob-morph 7s ease-in-out infinite;
+  box-shadow:0 0 80px rgba(99,102,241,.4),0 0 140px rgba(168,85,247,.2),inset 0 0 60px rgba(255,255,255,.05);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+@keyframes blob-morph{
+  0%  {clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%)}
+  20% {clip-path:polygon(50% 5%,95% 30%,88% 78%,55% 98%,10% 72%,12% 28%)}
+  40% {clip-path:polygon(45% 2%,90% 20%,96% 70%,60% 100%,5% 80%,8% 22%)}
+  60% {clip-path:polygon(55% 0%,92% 28%,90% 80%,48% 99%,8% 68%,15% 30%)}
+  80% {clip-path:polygon(50% 3%,88% 22%,94% 76%,52% 100%,6% 74%,10% 26%)}
+  100%{clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%)}
+}
+.blob-text{
+  font-family:var(--font-h);font-size:1.15rem;font-weight:800;
+  letter-spacing:.12em;color:#fff;text-align:center;line-height:1.25;
+  text-shadow:0 0 20px rgba(255,255,255,.5);
+  position:absolute;z-index:2;user-select:none;
+}
+.blob-ring{
+  position:absolute;inset:-20px;border-radius:50%;
+  border:1px solid rgba(99,102,241,.25);
+  animation:blob-ring 7s ease-in-out infinite;
+}
+.blob-ring-2{
+  position:absolute;inset:-40px;border-radius:50%;
+  border:1px solid rgba(168,85,247,.12);
+  animation:blob-ring 7s ease-in-out infinite reverse;
+}
+@keyframes blob-ring{
+  0%,100%{transform:scale(1);opacity:.6}
+  50%{transform:scale(1.08);opacity:.3}
+}
+.blob-info{text-align:center;max-width:480px}
+.blob-info h3{font-family:var(--font-h);font-size:1.25rem;font-weight:700;margin-bottom:.5rem}
+.blob-info p{font-size:.85rem;color:var(--muted);line-height:1.6}
+.blob-specs{
+  display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:center;
+}
+.blob-spec{
+  padding:.6rem 1.2rem;border-radius:8px;
+  background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.15);
+  display:flex;flex-direction:column;gap:.2rem;align-items:center;
+}
+.blob-spec-val{font-family:var(--font-h);font-size:1rem;font-weight:800;color:var(--accent)}
+.blob-spec-key{font-size:.65rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+
+/* ═══ FOOTER ═════════════════════════════════════════════════════════════ */
+.page-footer{
+  text-align:center;padding:3rem 2rem;border-top:1px solid var(--border);
+  font-size:.78rem;color:var(--muted);
+}
+.page-footer strong{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- ═══ TOP NAV ═══════════════════════════════════════════════════════════ -->
+<nav id="top-nav">
+  <div class="nav-logo">Crafter <span>Agency AI</span></div>
+  <a class="nav-tab active" href="#plasma-section">01 Plasma</a>
+  <a class="nav-tab" href="#galaxy-section">02 Galaxy</a>
+  <a class="nav-tab" href="#dna-section">03 DNA Helix</a>
+  <a class="nav-tab" href="#holo-section">04 Holo Card</a>
+  <a class="nav-tab" href="#matrix-section">05 Matrix Rain</a>
+  <a class="nav-tab" href="#blob-section">06 Morph Blob</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     BLOQUE 1 — PLASMA SHADER
+═══════════════════════════════════════════════════════════════════════ -->
+<section class="fx-section" id="plasma-section">
+  <div class="section-header">
+    <span class="section-tag">WebGL / GLSL</span>
+    <h2>Plasma <span class="hl">Shader</span></h2>
+    <p>Fragment shader con FBM noise de 5 octavas, mezcla de colores indigo/purple/cyan en tiempo real. Mueve el cursor sobre el canvas para hacer zoom dinámico.</p>
+  </div>
+  <div class="fx-card" style="max-width:900px">
+    <div class="fx-card-label">Three.js ShaderMaterial + GLSL FBM Noise</div>
+    <canvas id="plasma-canvas"></canvas>
+    <div class="plasma-info">
+      <span><strong id="plasma-time">0.00</strong> s uTime</span>
+      <span><strong>5</strong> octavas FBM</span>
+      <span class="plasma-badge">Indigo Mix</span>
+      <span class="plasma-badge">Hover Zoom</span>
+      <span class="plasma-badge">Real-time GLSL</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     BLOQUE 2 — GALAXY PARTICLE SYSTEM
+═══════════════════════════════════════════════════════════════════════ -->
+<section class="fx-section" id="galaxy-section">
+  <div class="section-header">
+    <span class="section-tag">Three.js Particles</span>
+    <h2>Galaxy <span class="hl">Particle System</span></h2>
+    <p>8.000 partículas distribuidas en 3 brazos espirales con colores HSL por brazo. Arrastra el canvas para rotar la galaxia manualmente.</p>
+  </div>
+  <div class="fx-card" style="max-width:900px">
+    <div class="fx-card-label">BufferGeometry · 8 000 pts · 3 brazos espirales</div>
+    <canvas id="galaxy-canvas"></canvas>
+    <div class="galaxy-hud">
+      <div class="hud-item"><span class="hud-val">8 000</span><span class="hud-key">Partículas</span></div>
+      <div class="hud-item"><span class="hud-val">3</span><span class="hud-key">Brazos</span></div>
+      <div class="hud-item"><span class="hud-val" id="galaxy-fps">60</span><span class="hud-key">FPS</span></div>
+      <div class="hud-item"><span class="hud-val">HSL</span><span class="hud-key">Colorspace</span></div>
+      <div class="hud-item"><span class="hud-val">Drag</span><span class="hud-key">Para rotar</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     BLOQUE 3 — DNA HELIX
+═══════════════════════════════════════════════════════════════════════ -->
+<section class="fx-section" id="dna-section">
+  <div class="section-header">
+    <span class="section-tag">Three.js Geometry</span>
+    <h2>DNA <span class="hl">Double Helix</span></h2>
+    <p>Doble hélice generada con TubeGeometry, 4 giros completos. Escalones de conexión con CylinderGeometry. Rotación automática + drag para orbitar.</p>
+  </div>
+  <div class="fx-card" style="max-width:900px">
+    <div class="fx-card-label">TubeGeometry + CylinderGeometry · Auto-rotate + OrbitControls</div>
+    <canvas id="dna-canvas"></canvas>
+    <div class="dna-legend">
+      <div class="legend-label">
+        <div class="legend-dot" style="background:#6366f1;box-shadow:0 0 6px #6366f1"></div>
+        Hebra alfa (indigo)
+      </div>
+      <div class="legend-label">
+        <div class="legend-dot" style="background:#a855f7;box-shadow:0 0 6px #a855f7"></div>
+        Hebra beta (purple)
+      </div>
+      <div class="legend-label">
+        <div class="legend-dot" style="background:rgba(255,255,255,.8)"></div>
+        Escalones de conexión
+      </div>
+      <div class="legend-label" style="margin-left:auto;font-size:.68rem;color:rgba(240,240,255,.35)">
+        Arrastra para orbitar
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     BLOQUE 4 — HOLOGRAPHIC CARD
+═══════════════════════════════════════════════════════════════════════ -->
+<section class="fx-section" id="holo-section">
+  <div class="section-header">
+    <span class="section-tag">CSS Holographic</span>
+    <h2>Holographic <span class="hl">Card Effect</span></h2>
+    <p>Efecto holográfico puro CSS. Gradiente animado en hover, shimmer diagonal que responde a la posición del cursor con CSS custom properties.</p>
+  </div>
+  <div class="holo-stage">
+    <div class="holo-card" id="holo-card">
+      <div class="holo-card-inner">
+        <span class="holo-badge">Holographic</span>
+        <div class="holo-img-placeholder">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="position:relative;z-index:1">
+            <path d="M24 4L4 14v20l20 10 20-10V14L24 4z" stroke="rgba(99,102,241,.6)" stroke-width="1.5" fill="rgba(99,102,241,.08)"/>
+            <path d="M24 4v36M4 14l20 10 20-10" stroke="rgba(168,85,247,.5)" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="holo-product-name">Crafter Pro</div>
+        <div class="holo-product-desc">Suite completa de herramientas de diseño con IA generativa integrada.</div>
+        <div class="holo-stars">
+          <svg viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+        </div>
+        <div class="holo-footer">
+          <div>
+            <div class="holo-price-label">Precio mensual</div>
+            <div class="holo-price">$49</div>
+          </div>
+          <button class="holo-btn">Obtener Pro</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     BLOQUE 5 — MATRIX RAIN
+═══════════════════════════════════════════════════════════════════════ -->
+<section class="fx-section" id="matrix-section">
+  <div class="section-header">
+    <span class="section-tag">Canvas 2D</span>
+    <h2>Matrix <span class="hl">Rain</span></h2>
+    <p>Lluvia de caracteres katakana y hexadecimales en Canvas 2D. Velocidad aleatoria por columna, fade natural con fillRect semitransparente, primer char más brillante.</p>
+  </div>
+  <div class="matrix-wrap">
+    <canvas id="matrix-canvas"></canvas>
+    <div class="matrix-overlay">
+      <div class="matrix-title">CRAFTER_MATRIX_v2.0</div>
+      <div class="matrix-status">
+        <span class="live">● LIVE</span>
+        <span id="matrix-cols">-- COLS</span>
+        <span id="matrix-chars">-- CHARS/S</span>
+      </div>
+    </div>
+    <div class="matrix-bottom">
+      <div class="matrix-stat"><span class="matrix-stat-val" id="mat-fps">60</span><span class="matrix-stat-key">FPS</span></div>
+      <div class="matrix-stat"><span class="matrix-stat-val" id="mat-drops">0</span><span class="matrix-stat-key">Drops activos</span></div>
+      <div class="matrix-stat"><span class="matrix-stat-val">25 FPS</span><span class="matrix-stat-key">Refresh rate</span></div>
+      <div class="matrix-stat"><span class="matrix-stat-val">Katakana</span><span class="matrix-stat-key">Charset</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     BLOQUE 6 — MORPHING BLOB
+═══════════════════════════════════════════════════════════════════════ -->
+<section class="fx-section" id="blob-section">
+  <div class="section-header">
+    <span class="section-tag">CSS Animation</span>
+    <h2>Morphing <span class="hl">Blob</span></h2>
+    <p>Blob orgánico animado con clip-path polygon entre 5 formas. Gradiente radial indigo-purple, glow exterior y anillos de energía pulsantes.</p>
+  </div>
+  <div class="blob-stage">
+    <div class="blob-container">
+      <div class="blob-wrap">
+        <div class="blob-ring"></div>
+        <div class="blob-ring-2"></div>
+        <div class="morphing-blob">
+          <span class="blob-text">CRAFTER<br>AI</span>
+        </div>
+      </div>
+      <div class="blob-info">
+        <h3>Forma Orgánica Generativa</h3>
+        <p>Animación CSS pura con clip-path polygon. 5 keyframes de formas distintas en bucle suave de 7 segundos.</p>
+      </div>
+    </div>
+    <div class="blob-specs">
+      <div class="blob-spec"><span class="blob-spec-val">5</span><span class="blob-spec-key">Keyframes</span></div>
+      <div class="blob-spec"><span class="blob-spec-val">7s</span><span class="blob-spec-key">Duración</span></div>
+      <div class="blob-spec"><span class="blob-spec-val">CSS</span><span class="blob-spec-key">Motor</span></div>
+      <div class="blob-spec"><span class="blob-spec-val">clip-path</span><span class="blob-spec-key">Técnica</span></div>
+      <div class="blob-spec"><span class="blob-spec-val">0 JS</span><span class="blob-spec-key">Sin script</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═════════════════════════════════════════════════════════════ -->
+<footer class="page-footer">
+  <p>Demo 06 — WebGL Shaders &amp; Particles &nbsp;·&nbsp; <strong>Crafter Agency AI</strong> &nbsp;·&nbsp; Three.js 0.158 + GSAP 3.12.5</p>
+</footer>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SCRIPTS
+═══════════════════════════════════════════════════════════════════════ -->
+<script>
+/* ─────────────────────────────────────────────────────────────────────────
+   NAV ACTIVE STATE — IntersectionObserver
+───────────────────────────────────────────────────────────────────────── */
+(function(){
+  const tabs = document.querySelectorAll('.nav-tab');
+  const sections = document.querySelectorAll('.fx-section');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        tabs.forEach(t => t.classList.remove('active'));
+        const active = document.querySelector('.nav-tab[href="#'+e.target.id+'"]');
+        if(active) active.classList.add('active');
+      }
+    });
+  },{threshold:0.35});
+  sections.forEach(s => obs.observe(s));
+})();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BLOQUE 1 — PLASMA SHADER
+   Three.js PlaneGeometry + ShaderMaterial + FBM noise GLSL
+───────────────────────────────────────────────────────────────────────── */
+(function initPlasma(){
+  const canvas = document.getElementById('plasma-canvas');
+  const timeEl = document.getElementById('plasma-time');
+
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+
+  const vertexShader = `
+    varying vec2 vUv;
+    void main(){
+      vUv = uv;
+      gl_Position = vec4(position,1.0);
+    }
+  `;
+
+  const fragmentShader = `
+    uniform float uTime;
+    uniform float uZoom;
+    varying vec2 vUv;
+    float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+    float noise(vec2 p){
+      vec2 i=floor(p),f=fract(p);
+      f=f*f*(3.0-2.0*f);
+      float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));
+      return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+    }
+    float fbm(vec2 p){
+      float v=0.0,a=0.5;
+      for(int i=0;i<5;i++){v+=a*noise(p);p*=2.0;a*=0.5;}
+      return v;
+    }
+    void main(){
+      vec2 uv = (vUv - 0.5) * uZoom + 0.5;
+      uv *= 3.0;
+      float n  = fbm(uv + uTime*0.18);
+      float n2 = fbm(uv*1.5 - uTime*0.13 + n);
+      float n3 = fbm(uv*0.7 + uTime*0.09 + n2*0.5);
+      vec3 c1=vec3(0.392,0.400,0.945);
+      vec3 c2=vec3(0.659,0.333,0.969);
+      vec3 c3=vec3(0.024,0.714,0.831);
+      vec3 col=mix(c1,c2,n2);
+      col=mix(col,c3,n3*0.5);
+      col*=0.8+0.2*n;
+      gl_FragColor=vec4(col,1.0);
+    }
+  `;
+
+  const uniforms = {
+    uTime:  { value: 0.0 },
+    uZoom:  { value: 1.0 }
+  };
+
+  const geo = new THREE.PlaneGeometry(2,2);
+  const mat = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms });
+  scene.add(new THREE.Mesh(geo, mat));
+
+  let targetZoom = 1.0;
+  canvas.addEventListener('mouseenter', () => { targetZoom = 1.5; });
+  canvas.addEventListener('mouseleave', () => { targetZoom = 1.0; });
+
+  function resizePlasma(){
+    const w = canvas.parentElement.clientWidth;
+    const h = 380;
+    renderer.setSize(w, h, false);
+    canvas.style.width  = '100%';
+    canvas.style.height = h + 'px';
+  }
+  resizePlasma();
+  window.addEventListener('resize', resizePlasma);
+
+  const clock = new THREE.Clock();
+  function animatePlasma(){
+    requestAnimationFrame(animatePlasma);
+    const t = clock.getElapsedTime();
+    uniforms.uTime.value = t;
+    uniforms.uZoom.value += (targetZoom - uniforms.uZoom.value) * 0.06;
+    timeEl.textContent = t.toFixed(2);
+    renderer.render(scene, camera);
+  }
+  animatePlasma();
+})();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BLOQUE 2 — GALAXY PARTICLE SYSTEM
+───────────────────────────────────────────────────────────────────────── */
+(function initGalaxy(){
+  const canvas = document.getElementById('galaxy-canvas');
+  const fpsEl  = document.getElementById('galaxy-fps');
+
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:false, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(0x000000,0);
+
+  function resizeGalaxy(){
+    const w = canvas.parentElement.clientWidth;
+    renderer.setSize(w, 380, false);
+    camera.aspect = w / 380;
+    camera.updateProjectionMatrix();
+  }
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
+  camera.position.set(0, 90, 220);
+  camera.lookAt(0,0,0);
+
+  // Build galaxy
+  const N = 8000;
+  const pos  = new Float32Array(N*3);
+  const cols = new Float32Array(N*3);
+
+  for(let i=0;i<N;i++){
+    const arm    = Math.floor(Math.random()*3);
+    const t      = Math.pow(Math.random(), 0.5);
+    const angle  = arm*(Math.PI*2/3) + t*Math.PI*4 + Math.random()*0.4;
+    const radius = t*180 + Math.random()*15;
+    const spread = (1-t)*12 + 3;
+    pos[i*3]   = Math.cos(angle)*radius + (Math.random()-.5)*spread;
+    pos[i*3+1] = (Math.random()-.5)*18*(1-t*0.75);
+    pos[i*3+2] = Math.sin(angle)*radius + (Math.random()-.5)*spread;
+    const color = new THREE.Color().setHSL(arm/3*0.3+0.62, 0.85, 0.5+t*0.3);
+    cols[i*3]  = color.r;
+    cols[i*3+1]= color.g;
+    cols[i*3+2]= color.b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(cols,3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 1.6,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.88,
+    sizeAttenuation: true,
+    depthWrite: false,
+  });
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  // Drag rotation
+  let isDragging=false, prevX=0, prevY=0;
+  let rotY=0, rotX=0, velY=0, velX=0;
+
+  canvas.addEventListener('mousedown',  e=>{ isDragging=true; prevX=e.clientX; prevY=e.clientY; });
+  canvas.addEventListener('touchstart', e=>{ isDragging=true; prevX=e.touches[0].clientX; prevY=e.touches[0].clientY; },{passive:true});
+  window.addEventListener('mouseup',  ()=>{ isDragging=false; });
+  window.addEventListener('touchend', ()=>{ isDragging=false; });
+
+  window.addEventListener('mousemove', e=>{
+    if(!isDragging) return;
+    const dx=e.clientX-prevX, dy=e.clientY-prevY;
+    velY=dx*0.004; velX=dy*0.004;
+    rotY+=velY; rotX+=velX;
+    prevX=e.clientX; prevY=e.clientY;
+  });
+  window.addEventListener('touchmove', e=>{
+    if(!isDragging) return;
+    const dx=e.touches[0].clientX-prevX, dy=e.touches[0].clientY-prevY;
+    velY=dx*0.004; velX=dy*0.004;
+    rotY+=velY; rotX+=velX;
+    prevX=e.touches[0].clientX; prevY=e.touches[0].clientY;
+  },{passive:true});
+
+  resizeGalaxy();
+  window.addEventListener('resize', resizeGalaxy);
+
+  let lastTime=performance.now(), frameCount=0;
+  function animateGalaxy(){
+    requestAnimationFrame(animateGalaxy);
+    if(!isDragging){ rotY+=0.0018; velY*=0.92; velX*=0.92; rotY+=velY; rotX+=velX; }
+    rotX = Math.max(-0.5, Math.min(0.5, rotX));
+    points.rotation.y = rotY;
+    points.rotation.x = rotX;
+    renderer.render(scene, camera);
+    frameCount++;
+    const now=performance.now();
+    if(now-lastTime>1000){ fpsEl.textContent=frameCount; frameCount=0; lastTime=now; }
+  }
+  animateGalaxy();
+})();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BLOQUE 3 — DNA HELIX
+───────────────────────────────────────────────────────────────────────── */
+(function initDNA(){
+  const canvas = document.getElementById('dna-canvas');
+
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(0x000000,0);
+
+  function resizeDNA(){
+    const w = canvas.parentElement.clientWidth;
+    renderer.setSize(w, 380, false);
+    camera.aspect = w/380;
+    camera.updateProjectionMatrix();
+  }
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+  camera.position.set(0, 0, 18);
+  camera.lookAt(0,0,0);
+
+  // Ambient + directional light
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(5,8,5);
+  scene.add(dirLight);
+  const ptLight1 = new THREE.PointLight(0x6366f1, 2, 30);
+  ptLight1.position.set(-5, 0, 5);
+  scene.add(ptLight1);
+  const ptLight2 = new THREE.PointLight(0xa855f7, 2, 30);
+  ptLight2.position.set(5, 0, 5);
+  scene.add(ptLight2);
+
+  const helixGroup = new THREE.Group();
+  scene.add(helixGroup);
+
+  // Generate helix curve
+  const TURNS  = 4;
+  const HEIGHT = 8;
+  const RADIUS = 1.5;
+  const STEPS  = 200;
+
+  function makeHelixCurve(phaseOffset){
+    const points = [];
+    for(let i=0;i<=STEPS;i++){
+      const t = i/STEPS;
+      const angle = t * Math.PI*2*TURNS + phaseOffset;
+      points.push(new THREE.Vector3(
+        Math.cos(angle)*RADIUS,
+        (t-0.5)*HEIGHT,
+        Math.sin(angle)*RADIUS
+      ));
+    }
+    return new THREE.CatmullRomCurve3(points);
+  }
+
+  const curve1 = makeHelixCurve(0);
+  const curve2 = makeHelixCurve(Math.PI);
+
+  const tubeMat1 = new THREE.MeshPhongMaterial({color:0x6366f1, emissive:0x3335a0, shininess:80});
+  const tubeMat2 = new THREE.MeshPhongMaterial({color:0xa855f7, emissive:0x602090, shininess:80});
+  const stepMat  = new THREE.MeshPhongMaterial({color:0xffffff, emissive:0x444466, shininess:60, transparent:true, opacity:0.85});
+
+  const tube1 = new THREE.TubeGeometry(curve1, 200, 0.06, 8, false);
+  const tube2 = new THREE.TubeGeometry(curve2, 200, 0.06, 8, false);
+  helixGroup.add(new THREE.Mesh(tube1, tubeMat1));
+  helixGroup.add(new THREE.Mesh(tube2, tubeMat2));
+
+  // Connection rungs every ~8 steps
+  const RUNG_STEP = 8;
+  for(let i=0; i<=STEPS; i+=RUNG_STEP){
+    const t = i/STEPS;
+    const p1 = curve1.getPoint(t);
+    const p2 = curve2.getPoint(t);
+    const mid = new THREE.Vector3().addVectors(p1,p2).multiplyScalar(0.5);
+    const dist = p1.distanceTo(p2);
+    const dir  = new THREE.Vector3().subVectors(p2,p1).normalize();
+
+    const rungGeo = new THREE.CylinderGeometry(0.03, 0.03, dist, 6);
+    const rung    = new THREE.Mesh(rungGeo, stepMat);
+
+    // Orient rung from p1 to p2
+    const axis = new THREE.Vector3(0,1,0).cross(dir).normalize();
+    const angle = Math.acos(new THREE.Vector3(0,1,0).dot(dir));
+    if(axis.lengthSq() > 0.001){
+      rung.quaternion.setFromAxisAngle(axis, angle);
+    }
+    rung.position.copy(mid);
+    helixGroup.add(rung);
+
+    // Sphere knots at attachment points
+    const knot1 = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, 8, 8),
+      new THREE.MeshPhongMaterial({color:0x6366f1, emissive:0x3335a0})
+    );
+    knot1.position.copy(p1);
+    helixGroup.add(knot1);
+
+    const knot2 = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, 8, 8),
+      new THREE.MeshPhongMaterial({color:0xa855f7, emissive:0x602090})
+    );
+    knot2.position.copy(p2);
+    helixGroup.add(knot2);
+  }
+
+  // Manual orbit drag
+  let isDragging=false, prevX=0;
+  let rotY=0, velY=0;
+
+  canvas.addEventListener('mousedown',  e=>{ isDragging=true; prevX=e.clientX; });
+  canvas.addEventListener('touchstart', e=>{ isDragging=true; prevX=e.touches[0].clientX; },{passive:true});
+  window.addEventListener('mouseup',  ()=>{ isDragging=false; });
+  window.addEventListener('touchend', ()=>{ isDragging=false; });
+  window.addEventListener('mousemove', e=>{
+    if(!isDragging) return;
+    velY=(e.clientX-prevX)*0.005;
+    rotY+=velY;
+    prevX=e.clientX;
+  });
+  window.addEventListener('touchmove', e=>{
+    if(!isDragging) return;
+    velY=(e.touches[0].clientX-prevX)*0.005;
+    rotY+=velY;
+    prevX=e.touches[0].clientX;
+  },{passive:true});
+
+  resizeDNA();
+  window.addEventListener('resize', resizeDNA);
+
+  function animateDNA(){
+    requestAnimationFrame(animateDNA);
+    if(!isDragging){ rotY+=0.008; velY*=0.9; rotY+=velY; }
+    helixGroup.rotation.y = rotY;
+    renderer.render(scene, camera);
+  }
+  animateDNA();
+})();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BLOQUE 4 — HOLOGRAPHIC CARD (CSS mouse tracking)
+───────────────────────────────────────────────────────────────────────── */
+(function initHoloCard(){
+  const card = document.getElementById('holo-card');
+  card.addEventListener('mousemove', e=>{
+    const rect = card.getBoundingClientRect();
+    const mx   = (e.clientX - rect.left) / rect.width;
+    const my   = (e.clientY - rect.top)  / rect.height;
+    card.style.setProperty('--mx', mx);
+    card.style.setProperty('--my', my);
+    // Subtle 3D tilt
+    const rx = (my - 0.5) * -14;
+    const ry = (mx - 0.5) *  14;
+    card.style.transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg) scale(1.03)`;
+  });
+  card.addEventListener('mouseleave', ()=>{
+    card.style.transform = '';
+  });
+})();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BLOQUE 5 — MATRIX RAIN (Canvas 2D)
+───────────────────────────────────────────────────────────────────────── */
+(function initMatrix(){
+  const canvas  = document.getElementById('matrix-canvas');
+  const ctx     = canvas.getContext('2d');
+  const colsEl  = document.getElementById('matrix-cols');
+  const charsEl = document.getElementById('matrix-chars');
+  const fpsEl   = document.getElementById('mat-fps');
+  const dropsEl = document.getElementById('mat-drops');
+
+  function resizeMatrix(){
+    const w = canvas.parentElement.clientWidth;
+    canvas.width  = w;
+    canvas.height = 380;
+    canvas.style.width  = '100%';
+    canvas.style.height = '380px';
+    rebuildDrops();
+  }
+
+  let drops = [];
+  let speeds = [];
+
+  function rebuildDrops(){
+    const cols = Math.floor(canvas.width / 20);
+    drops  = Array.from({length:cols}, ()=>Math.random()*-100);
+    speeds = Array.from({length:cols}, ()=>0.6 + Math.random()*0.8);
+    colsEl.textContent  = cols + ' COLS';
+    charsEl.textContent = Math.round(cols * (1000/40)) + ' C/S';
+    dropsEl.textContent = cols;
+  }
+
+  resizeMatrix();
+  window.addEventListener('resize', resizeMatrix);
+
+  const chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789ABCDEF';
+
+  let lastTime=performance.now(), frameCount=0;
+
+  function drawMatrix(){
+    ctx.fillStyle = 'rgba(5,5,8,0.05)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    drops.forEach((y, i)=>{
+      const ch = chars[Math.floor(Math.random()*chars.length)];
+      // Leading char is bright white, rest green
+      const isLead = (y*20) < canvas.height * 0.12;
+      ctx.fillStyle = isLead ? '#ffffff' : '#00ff00';
+      ctx.font      = 'bold 16px monospace';
+      ctx.shadowColor = '#00ff00';
+      ctx.shadowBlur  = isLead ? 8 : 4;
+      ctx.fillText(ch, i*20, y*20);
+      ctx.shadowBlur  = 0;
+
+      if(y*20 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i] += speeds[i];
+    });
+
+    frameCount++;
+    const now = performance.now();
+    if(now - lastTime > 1000){
+      fpsEl.textContent  = frameCount;
+      frameCount = 0;
+      lastTime   = now;
+      const active = drops.filter(d=>d*20 > 0 && d*20 < canvas.height).length;
+      dropsEl.textContent = active;
+    }
+  }
+
+  setInterval(drawMatrix, 40);
+})();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   GSAP ScrollTrigger — fade-in sections on scroll
+───────────────────────────────────────────────────────────────────────── */
+gsap.registerPlugin(ScrollTrigger);
+document.querySelectorAll('.fx-section').forEach(sec=>{
+  gsap.from(sec.querySelector('.section-header'), {
+    scrollTrigger:{trigger:sec, start:'top 80%', once:true},
+    y:40, opacity:0, duration:0.7, ease:'power3.out'
+  });
+});
+</script>
+</body>
+</html>

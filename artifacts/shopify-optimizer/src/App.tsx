@@ -86,6 +86,8 @@ const CardStudio = lazy(() => import("@/pages/projects/CardStudio"));
 const CampaignKit = lazy(() => import("@/pages/projects/CampaignKit"));
 const ExplodedViewStudio = lazy(() => import("@/pages/projects/ExplodedViewStudio"));
 const Tripo3DStudio = lazy(() => import("@/pages/projects/Tripo3DStudio"));
+const WebDesigner = lazy(() => import("@/pages/admin/WebDesigner"));
+const EffectsStudio = lazy(() => import("@/pages/admin/EffectsStudio"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -475,6 +477,18 @@ function Router() {
         </Route>
         <Route path="/projects/:id/tripo3d">
           <RequireAdmin><AdminWrapper><AppLayout><S><Tripo3DStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/web-designer">
+          <RequireAdmin><AdminWrapper><AppLayout><S><WebDesigner /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/web-designer">
+          <RequireAdmin><AdminWrapper><AppLayout><S><WebDesigner /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/effects-studio">
+          <RequireAdmin><AdminWrapper><AppLayout><S><EffectsStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/effects-studio">
+          <RequireAdmin><AdminWrapper><AppLayout><S><EffectsStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         {/* Standalone module routes (sin proyecto) */}
         <Route path="/audit">

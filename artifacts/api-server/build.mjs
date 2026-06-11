@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, cp, mkdir } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -120,7 +120,21 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   });
 }
 
-buildAll().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+buildAll()
+  .then(async () => {
+    // Copy static data files (JSON libraries, etc.) to dist/data/
+    const srcData = path.resolve(artifactDir, "src/lib/data");
+    const distData = path.resolve(artifactDir, "dist/data");
+    try {
+      await mkdir(distData, { recursive: true });
+      await cp(srcData, distData, { recursive: true });
+      console.log("✓ Static data files copied to dist/data/");
+    } catch (e) {
+      // data dir may not exist
+      if (e.code !== "ENOENT") console.warn("Warning: could not copy data files:", e.message);
+    }
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

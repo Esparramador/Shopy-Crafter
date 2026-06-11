@@ -30,6 +30,8 @@ const DEFAULT_MODULE_NAV = [
   { id: "exploded-view", label: "Exploded View", icon: "💥" },
   { id: "ad-studio", label: "Ad Studio", icon: "📺" },
   { id: "tripo3d", label: "Tripo 3D Studio", icon: "🧊" },
+  { id: "web-designer", label: "AI Web Designer", icon: "🎨" },
+  { id: "effects-studio", label: "Effects Studio", icon: "✦" },
   { id: "suppliers", label: "Proveedores", icon: "🏭" },
 ];
 

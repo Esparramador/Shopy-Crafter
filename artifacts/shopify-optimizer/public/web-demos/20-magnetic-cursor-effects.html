@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Magnetic Cursor Effects — Crafter Agency AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;cursor:none!important}
+:root{
+  --accent:#6366f1;--accent2:#a855f7;--accent3:#06b6d4;--pink:#ec4899;
+  --bg:#050508;--surface:#0c0c14;
+  --font-h:'Space Grotesk',sans-serif;--font-b:'Plus Jakarta Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:#f0f0ff;font-family:var(--font-b);overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+
+/* CUSTOM CURSOR */
+#cursor-dot{
+  position:fixed;width:10px;height:10px;border-radius:50%;
+  background:var(--accent);pointer-events:none;z-index:9999;
+  transform:translate(-50%,-50%);transition:background .15s,transform .15s;
+  mix-blend-mode:normal;
+}
+#cursor-ring{
+  position:fixed;width:40px;height:40px;border-radius:50%;
+  border:1.5px solid rgba(99,102,241,.7);pointer-events:none;z-index:9998;
+  transform:translate(-50%,-50%);transition:border-color .2s,transform .3s,width .3s,height .3s,border-radius .3s;
+}
+#cursor-dot.hover{background:var(--accent2);transform:translate(-50%,-50%) scale(1.5)}
+#cursor-ring.hover{width:60px;height:60px;border-color:rgba(168,85,247,.8)}
+#cursor-ring.drag{width:56px;height:56px;border-radius:6px;border-color:rgba(6,182,212,.8)}
+#cursor-ring.text-cur{width:3px;height:28px;border-radius:2px;border-color:rgba(240,240,255,.7)}
+#cursor-dot.hidden,#cursor-ring.hidden{opacity:0}
+
+/* NAV */
+#nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:.85rem 2rem;display:flex;align-items:center;justify-content:space-between;background:rgba(5,5,8,.85);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.06)}
+.nav-logo{font-family:var(--font-h);font-weight:900;font-size:1rem;letter-spacing:-.02em;text-decoration:none;color:#f0f0ff}
+.nav-logo em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.nav-links{display:flex;gap:1.5rem}.nav-links a{font-size:.8rem;font-weight:600;color:rgba(240,240,255,.5);text-decoration:none;transition:color .2s}
+.nav-badge{padding:.28rem .75rem;border-radius:50px;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);font-size:.7rem;font-weight:700;color:var(--accent);letter-spacing:.05em}
+.section-label{display:inline-block;padding:.3rem .9rem;border-radius:50px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);font-size:.7rem;font-weight:700;letter-spacing:.12em;color:var(--accent);text-transform:uppercase;margin-bottom:1.25rem}
+
+/* S1 CURSOR HERO */
+#s1{min-height:100vh;display:flex;align-items:center;justify-content:center;padding-top:80px;padding:80px 2rem 4rem;position:relative;overflow:hidden;background:var(--bg)}
+.s1-hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 50%,rgba(99,102,241,.08),transparent);pointer-events:none}
+.s1-content{text-align:center;max-width:700px}
+.s1-content h1{font-family:var(--font-h);font-size:clamp(2.5rem,6vw,5rem);font-weight:900;line-height:1.05;letter-spacing:-.04em;margin-bottom:1.5rem}
+.s1-content h1 span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.s1-content p{color:rgba(240,240,255,.6);font-size:1rem;line-height:1.7;max-width:500px;margin:0 auto 2.5rem}
+.cursor-states{display:flex;flex-wrap:wrap;justify-content:center;gap:1rem;margin-top:2rem}
+.state-chip{padding:.5rem 1.25rem;border-radius:50px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);font-size:.78rem;font-weight:600;color:rgba(240,240,255,.7)}
+
+/* S2 MAGNETIC BUTTONS */
+#s2{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6rem 2rem;background:#030306}
+.s2-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:1.5rem;max-width:800px;margin-top:3rem}
+.mag-btn{
+  padding:.85rem 2.25rem;border-radius:12px;font-family:var(--font-h);font-size:.9rem;font-weight:700;letter-spacing:-.01em;
+  display:inline-block;position:relative;transform:translate(0,0);will-change:transform;
+  transition:box-shadow .3s;
+}
+.mag-btn.filled{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 8px 30px rgba(99,102,241,.35)}
+.mag-btn.filled:hover{box-shadow:0 12px 40px rgba(99,102,241,.5)}
+.mag-btn.outline{background:transparent;color:#f0f0ff;border:1.5px solid rgba(255,255,255,.2)}
+.mag-btn.outline:hover{border-color:rgba(255,255,255,.5)}
+.mag-btn.ghost{background:rgba(255,255,255,.04);color:rgba(240,240,255,.8);border:1px solid rgba(255,255,255,.07)}
+.mag-btn.cyan{background:linear-gradient(135deg,var(--accent3),#0891b2);color:#fff;box-shadow:0 8px 30px rgba(6,182,212,.3)}
+.mag-btn.pink{background:linear-gradient(135deg,var(--pink),#be185d);color:#fff;box-shadow:0 8px 30px rgba(236,72,153,.3)}
+.mag-btn .inner{position:relative;pointer-events:none}
+
+/* S3 TILT CARDS */
+#s3{min-height:100vh;padding:6rem 2rem;background:var(--bg);display:flex;flex-direction:column;align-items:center}
+.cards-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;max-width:1000px;width:100%;margin-top:3rem}
+@media(max-width:768px){.cards-grid{grid-template-columns:1fr 1fr}}
+.tilt-card{
+  border-radius:20px;overflow:hidden;position:relative;
+  transform-style:preserve-3d;perspective:800px;
+  background:var(--surface);border:1px solid rgba(255,255,255,.07);
+  will-change:transform;transition:box-shadow .3s;
+}
+.tilt-card:hover{box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.tilt-card-img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;pointer-events:none}
+.tilt-card-shine{position:absolute;inset:0;pointer-events:none;border-radius:20px}
+.tilt-card-info{padding:1rem 1.25rem}
+.tilt-card-info h4{font-family:var(--font-h);font-size:.95rem;font-weight:700}
+.tilt-card-info .tilt-tag{font-size:.7rem;color:rgba(240,240,255,.4);margin-top:.25rem}
+
+/* S4 GOOEY BLOB CURSOR TRAIL */
+#s4{height:100vh;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#000}
+#trail-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+.s4-text{position:relative;z-index:3;text-align:center;pointer-events:none}
+.s4-text h2{font-family:var(--font-h);font-size:clamp(3rem,7vw,6rem);font-weight:900;letter-spacing:-.04em;line-height:1}
+.s4-text p{color:rgba(240,240,255,.45);font-size:.9rem;margin-top:1rem;letter-spacing:.05em;text-transform:uppercase}
+
+/* S5 LINK HOVER UNDERLINES */
+#s5{min-height:100vh;padding:6rem 2rem;background:var(--bg);display:flex;flex-direction:column;align-items:flex-start;justify-content:center;max-width:900px;margin:0 auto}
+.underline-links{display:flex;flex-direction:column;gap:.5rem;margin-top:2rem;width:100%}
+.ul-row{display:flex;align-items:center;gap:1.5rem;padding:1rem 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ul-label{font-size:.68rem;font-weight:700;letter-spacing:.1em;color:rgba(240,240,255,.25);text-transform:uppercase;width:160px;flex-shrink:0}
+.ul-link{font-family:var(--font-h);font-size:clamp(1.5rem,3.5vw,2.2rem);font-weight:800;color:#f0f0ff;text-decoration:none;display:inline-block;position:relative;padding-bottom:4px;letter-spacing:-.02em}
+
+/* 1. Expand from center */
+.ul-1::after{content:'';position:absolute;bottom:0;left:50%;right:50%;height:2px;background:var(--accent);transition:left .3s,right .3s}
+.ul-1:hover::after{left:0;right:0}
+/* 2. Slide from left */
+.ul-2::after{content:'';position:absolute;bottom:0;left:0;width:0;height:2px;background:var(--accent2);transition:width .35s cubic-bezier(.77,0,.175,1)}
+.ul-2:hover::after{width:100%}
+/* 3. Double lines */
+.ul-3{padding-bottom:6px}
+.ul-3::before,.ul-3::after{content:'';position:absolute;height:1.5px;background:var(--accent3);transition:transform .3s}
+.ul-3::before{top:0;left:0;right:0;transform:scaleX(0);transform-origin:right}
+.ul-3::after{bottom:0;left:0;right:0;transform:scaleX(0);transform-origin:left}
+.ul-3:hover::before,.ul-3:hover::after{transform:scaleX(1)}
+/* 4. Dot expand */
+.ul-4::after{content:'';position:absolute;bottom:0;left:0;width:8px;height:2px;background:var(--pink);border-radius:2px;transition:width .4s cubic-bezier(.77,0,.175,1)}
+.ul-4:hover::after{width:100%}
+/* 5. Glow */
+.ul-5::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent),0 0 16px var(--accent);transform:scaleX(0);transition:transform .3s}
+.ul-5:hover::after{transform:scaleX(1)}
+/* 6. Gradient wipe */
+.ul-6::after{content:'';position:absolute;bottom:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--pink));transform:scaleX(0);transform-origin:left;transition:transform .4s cubic-bezier(.77,0,.175,1)}
+.ul-6:hover::after{transform:scaleX(1)}
+/* 7. Strikethrough */
+.ul-7::before{content:'';position:absolute;top:50%;left:0;width:0;height:1.5px;background:rgba(240,240,255,.4);transition:width .25s}
+.ul-7::after{content:'';position:absolute;bottom:0;left:0;width:0;height:2px;background:var(--accent2);transition:width .35s .2s}
+.ul-7:hover::before,.ul-7:hover::after{width:100%}
+/* 8. 3D flip */
+.ul-8{perspective:400px;display:inline-block}
+.ul-8 .ul-inner{display:inline-block;transition:transform .5s cubic-bezier(.23,1,.32,1)}
+.ul-8:hover .ul-inner{transform:rotateX(360deg)}
+
+/* S6 IMAGE HOVER REVEAL */
+#s6{padding:4rem 0;background:#030306}
+.s6-imgs{display:flex;flex-direction:column;gap:2px}
+.s6-img-wrap{position:relative;overflow:hidden;height:35vh;cursor:none}
+.s6-img-wrap img{width:100%;height:100%;object-fit:cover;transition:transform .7s cubic-bezier(.25,.8,.25,1);transform:scale(1.08);display:block}
+.s6-img-wrap.revealed img{transform:scale(1.02)}
+.s6-img-wrap:hover img{transform:scale(1.07)!important}
+.s6-img-caption{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 50%);opacity:0;transition:opacity .4s;display:flex;align-items:flex-end;padding:2rem}
+.s6-img-wrap:hover .s6-img-caption{opacity:1}
+.s6-img-caption h3{font-family:var(--font-h);font-size:clamp(1.2rem,2.5vw,2rem);font-weight:800;color:#fff}
+
+/* SECTION HEADERS */
+.sec-header{text-align:center;padding:5rem 2rem 1rem}
+.sec-header h2{font-family:var(--font-h);font-size:clamp(1.8rem,4vw,3rem);font-weight:900;letter-spacing:-.03em;margin-bottom:.75rem}
+.sec-header p{color:rgba(240,240,255,.55);font-size:.95rem;line-height:1.6;max-width:520px;margin:0 auto}
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div id="cursor-dot"></div>
+<div id="cursor-ring"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="index.html" class="nav-logo"><em>CRAFTER</em> DEMOS</a>
+  <div class="nav-links">
+    <a href="index.html">← All Demos</a>
+    <a href="19-gradient-mesh-backgrounds.html">Demo 19</a>
+  </div>
+  <div class="nav-badge">DEMO 20 — Magnetic Cursor</div>
+</nav>
+
+<!-- S1: CURSOR HERO -->
+<section id="s1">
+  <div class="s1-hero-bg"></div>
+  <div class="s1-content">
+    <div class="section-label">01 — Custom Cursor System</div>
+    <h1>Cursor as <span>Interface</span></h1>
+    <p>The cursor is the user's hand. When it transforms in response to context, the entire experience feels more alive, intentional, and designed.</p>
+    <div class="cursor-states">
+      <span class="state-chip">Dot + Ring</span>
+      <span class="state-chip">Hover Expand</span>
+      <span class="state-chip">Drag Square</span>
+      <span class="state-chip">Text Caret</span>
+      <span class="state-chip">Hidden on Video</span>
+    </div>
+    <!-- Text area to trigger text cursor -->
+    <p style="margin-top:3rem;padding:1.5rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;color:rgba(240,240,255,.5);font-size:.88rem;line-height:1.7" class="text-zone">
+      Hover over this paragraph to see the cursor transform into a text caret shape. Move to the buttons below to see the hover state. Drag on the card section for the square drag cursor.
+    </p>
+  </div>
+</section>
+
+<!-- S2: MAGNETIC BUTTONS -->
+<section id="s2">
+  <div class="sec-header">
+    <div class="section-label">02 — Magnetic Buttons</div>
+    <h2>Buttons That Follow</h2>
+    <p>Each button magnetizes toward your cursor when you enter its proximity. The inner text moves at greater intensity than the border, creating depth.</p>
+  </div>
+  <div class="s2-grid">
+    <button class="mag-btn filled"><span class="inner">Start Project</span></button>
+    <button class="mag-btn outline"><span class="inner">View Portfolio</span></button>
+    <button class="mag-btn cyan"><span class="inner">Book a Call</span></button>
+    <button class="mag-btn ghost"><span class="inner">See Pricing</span></button>
+    <button class="mag-btn pink"><span class="inner">Our Work</span></button>
+    <button class="mag-btn outline"><span class="inner">Meet the Team</span></button>
+    <button class="mag-btn ghost"><span class="inner">Get in Touch</span></button>
+    <button class="mag-btn filled"><span class="inner">Read the Blog</span></button>
+  </div>
+</section>
+
+<!-- S3: 3D TILT CARDS -->
+<section id="s3">
+  <div class="sec-header">
+    <div class="section-label">03 — 3D Perspective Tilt</div>
+    <h2>Cards With Depth</h2>
+    <p>Every card tracks your cursor and applies rotateX/rotateY with a dynamic radial highlight that follows the light source.</p>
+  </div>
+  <div class="cards-grid">
+    <div class="tilt-card" data-tilt>
+      <img class="tilt-card-img" src="https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?w=500&q=80" alt="3D Globe">
+      <div class="tilt-card-shine"></div>
+      <div class="tilt-card-info"><h4>3D Globe</h4><div class="tilt-tag">Three.js · NASA Textures</div></div>
+    </div>
+    <div class="tilt-card" data-tilt>
+      <img class="tilt-card-img" src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=500&q=80" alt="AI Systems">
+      <div class="tilt-card-shine"></div>
+      <div class="tilt-card-info"><h4>AI Systems</h4><div class="tilt-tag">Machine Learning · Neural Net</div></div>
+    </div>
+    <div class="tilt-card" data-tilt>
+      <img class="tilt-card-img" src="https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=500&q=80" alt="Fluid Design">
+      <div class="tilt-card-shine"></div>
+      <div class="tilt-card-info"><h4>Fluid Design</h4><div class="tilt-tag">GLSL · FBM Shaders</div></div>
+    </div>
+    <div class="tilt-card" data-tilt>
+      <img class="tilt-card-img" src="https://images.unsplash.com/photo-1555421689-d68471e189f2?w=500&q=80" alt="Tech Products">
+      <div class="tilt-card-shine"></div>
+      <div class="tilt-card-info"><h4>Tech Products</h4><div class="tilt-tag">PBR · GLTFLoader</div></div>
+    </div>
+    <div class="tilt-card" data-tilt>
+      <img class="tilt-card-img" src="https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=500&q=80" alt="Dev Tools">
+      <div class="tilt-card-shine"></div>
+      <div class="tilt-card-info"><h4>Dev Tools</h4><div class="tilt-tag">Terminal · CLI</div></div>
+    </div>
+    <div class="tilt-card" data-tilt>
+      <img class="tilt-card-img" src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&q=80" alt="Code Matrix">
+      <div class="tilt-card-shine"></div>
+      <div class="tilt-card-info"><h4>Code Matrix</h4><div class="tilt-tag">Canvas 2D · Animation</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- S4: GOOEY TRAIL -->
+<section id="s4">
+  <canvas id="trail-canvas"></canvas>
+  <div class="s4-text">
+    <div class="section-label">04 — Liquid Trail</div>
+    <h2>Liquid<br>Motion</h2>
+    <p>Move your cursor — 12 lerped blobs create a gooey fluid trail</p>
+  </div>
+</section>
+
+<!-- S5: UNDERLINE ANIMATIONS -->
+<section id="s5">
+  <div class="section-label">05 — Link Underline Animations</div>
+  <h2 style="font-family:var(--font-h);font-size:clamp(1.8rem,4vw,3rem);font-weight:900;letter-spacing:-.03em;margin-bottom:.5rem">8 Hover Styles</h2>
+  <p style="color:rgba(240,240,255,.55);font-size:.95rem">Hover each link to trigger its underline effect.</p>
+  <div class="underline-links">
+    <div class="ul-row">
+      <span class="ul-label">Expand Center</span>
+      <a class="ul-link ul-1" href="#">Immersive Design</a>
+    </div>
+    <div class="ul-row">
+      <span class="ul-label">Slide Left</span>
+      <a class="ul-link ul-2" href="#">Scroll Interactions</a>
+    </div>
+    <div class="ul-row">
+      <span class="ul-label">Double Lines</span>
+      <a class="ul-link ul-3" href="#">Motion Language</a>
+    </div>
+    <div class="ul-row">
+      <span class="ul-label">Dot Expand</span>
+      <a class="ul-link ul-4" href="#">Product Craft</a>
+    </div>
+    <div class="ul-row">
+      <span class="ul-label">Glow Stroke</span>
+      <a class="ul-link ul-5" href="#">Visual Systems</a>
+    </div>
+    <div class="ul-row">
+      <span class="ul-label">Gradient Wipe</span>
+      <a class="ul-link ul-6" href="#">Creative Code</a>
+    </div>
+    <div class="ul-row">
+      <span class="ul-label">Strikethrough +</span>
+      <a class="ul-link ul-7" href="#">Build Better</a>
+    </div>
+    <div class="ul-row">
+      <span class="ul-label">3D Flip</span>
+      <a class="ul-link ul-8" href="#"><span class="ul-inner">Launch Faster</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- S6: IMAGE HOVER ZOOM -->
+<section id="s6">
+  <div class="sec-header">
+    <div class="section-label">06 — Scroll Reveal + Hover Zoom</div>
+    <h2>Images That Breathe</h2>
+  </div>
+  <div class="s6-imgs">
+    <div class="s6-img-wrap" data-reveal>
+      <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1400&q=85" alt="Chapter One">
+      <div class="s6-img-caption"><h3>Chapter One</h3></div>
+    </div>
+    <div class="s6-img-wrap" data-reveal>
+      <img src="https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=1400&q=85" alt="The Build">
+      <div class="s6-img-caption"><h3>The Build</h3></div>
+    </div>
+    <div class="s6-img-wrap" data-reveal>
+      <img src="https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=1400&q=85" alt="Mobile First">
+      <div class="s6-img-caption"><h3>Mobile First</h3></div>
+    </div>
+    <div class="s6-img-wrap" data-reveal>
+      <img src="https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=1400&q=85" alt="The Launch">
+      <div class="s6-img-caption"><h3>The Launch</h3></div>
+    </div>
+  </div>
+</section>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+// ─── CUSTOM CURSOR ───
+const dot=document.getElementById('cursor-dot');
+const ring=document.getElementById('cursor-ring');
+let rx=0,ry=0,mx=window.innerWidth/2,my=window.innerHeight/2;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px';});
+(function ringLoop(){
+  rx+=(mx-rx)*0.12;ry+=(my-ry)*0.12;
+  ring.style.left=rx+'px';ring.style.top=ry+'px';
+  requestAnimationFrame(ringLoop);
+})();
+// Cursor states
+document.querySelectorAll('a,button').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{dot.classList.add('hover');ring.classList.add('hover');});
+  el.addEventListener('mouseleave',()=>{dot.classList.remove('hover');ring.classList.remove('hover');});
+});
+document.querySelectorAll('.text-zone,p,textarea').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ring.classList.add('text-cur');});
+  el.addEventListener('mouseleave',()=>{ring.classList.remove('text-cur');});
+});
+document.querySelectorAll('[data-tilt]').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ring.classList.add('drag');});
+  el.addEventListener('mouseleave',()=>{ring.classList.remove('drag');});
+});
+
+// ─── MAGNETIC BUTTONS ───
+document.querySelectorAll('.mag-btn').forEach(btn=>{
+  const inner=btn.querySelector('.inner');
+  btn.addEventListener('mousemove',e=>{
+    const r=btn.getBoundingClientRect();
+    const dx=e.clientX-r.left-r.width/2;
+    const dy=e.clientY-r.top-r.height/2;
+    const dist=Math.hypot(dx,dy);
+    const threshold=90;
+    if(dist<threshold){
+      gsap.to(btn,{x:dx*.35,y:dy*.35,duration:.4,ease:'power2.out'});
+      gsap.to(inner,{x:dx*.55,y:dy*.55,duration:.4,ease:'power2.out'});
+    }
+  });
+  btn.addEventListener('mouseleave',()=>{
+    gsap.to(btn,{x:0,y:0,duration:.7,ease:'back.out(2.5)'});
+    gsap.to(inner,{x:0,y:0,duration:.7,ease:'back.out(2.5)'});
+  });
+});
+
+// ─── 3D TILT CARDS ───
+document.querySelectorAll('[data-tilt]').forEach(card=>{
+  const shine=card.querySelector('.tilt-card-shine');
+  card.addEventListener('mousemove',e=>{
+    const r=card.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width;
+    const y=(e.clientY-r.top)/r.height;
+    const rx2=(y-.5)*-22;
+    const ry2=(x-.5)*22;
+    gsap.to(card,{rotateX:rx2,rotateY:ry2,duration:.15,ease:'none'});
+    if(shine)shine.style.background=`radial-gradient(circle at ${x*100}% ${y*100}%,rgba(255,255,255,0.18),transparent 60%)`;
+  });
+  card.addEventListener('mouseleave',()=>{
+    gsap.to(card,{rotateX:0,rotateY:0,duration:.7,ease:'back.out(1.5)'});
+    if(shine)shine.style.background='none';
+  });
+});
+
+// ─── GOOEY TRAIL CANVAS ───
+(function(){
+  const cv=document.getElementById('trail-canvas');
+  const ctx=cv.getContext('2d');
+  let W,H;
+  function resize(){W=cv.width=window.innerWidth;H=cv.height=window.innerHeight;}
+  resize();window.addEventListener('resize',resize);
+  const N=12;
+  const blobs=Array.from({length:N},()=>({x:W/2,y:H/2}));
+  const lerps=Array.from({length:N},(_,i)=>0.25-i*0.02);
+  let cmx=W/2,cmy=H/2;
+  document.getElementById('s4').addEventListener('mousemove',e=>{cmx=e.clientX;cmy=e.clientY;});
+  function lerp(a,b,t){return a+(b-a)*t;}
+  function loop(){
+    ctx.clearRect(0,0,W,H);
+    // update
+    blobs[0].x=lerp(blobs[0].x,cmx,lerps[0]);
+    blobs[0].y=lerp(blobs[0].y,cmy,lerps[0]);
+    for(let i=1;i<N;i++){
+      blobs[i].x=lerp(blobs[i].x,blobs[i-1].x,lerps[i]);
+      blobs[i].y=lerp(blobs[i].y,blobs[i-1].y,lerps[i]);
+    }
+    // draw — apply SVG goo filter via composite
+    for(let i=0;i<N;i++){
+      const t=i/(N-1);
+      const r=9-t*5;
+      const alpha=0.85-t*.4;
+      // Lerp color: front=#6366f1, back=#a855f7
+      const ri=Math.round(99+(168-99)*t);
+      const gi=Math.round(102+(85-102)*t);
+      const bi=Math.round(241+(247-241)*t);
+      ctx.beginPath();
+      ctx.arc(blobs[i].x,blobs[i].y,r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${ri},${gi},${bi},${alpha})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ─── SCROLL REVEAL IMAGES ───
+document.querySelectorAll('[data-reveal]').forEach((el,i)=>{
+  ScrollTrigger.create({
+    trigger:el,start:'top 85%',
+    onEnter:()=>{
+      gsap.to(el.querySelector('img'),{scale:1.02,duration:1.2,ease:'power2.out',delay:i*0.1});
+      el.classList.add('revealed');
+    }
+  });
+});
+</script>
+</body>
+</html>
