@@ -1,117 +1,274 @@
-import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useParams } from "wouter";
+/**
+ * Effects Studio — Unified Creative Library
+ * Combines: 6,230 Master Prompts + 30 CSS/JS Effects + 594 Visme Templates
+ * Features: Brand DNA Adapter · AI Generator · Live Preview · Copy/Export
+ */
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Search, Copy, Check, Zap, Filter, ChevronDown, BookOpen,
+         Sparkles, Star, Hash, Wand2, Play, Download, X, ChevronRight,
+         Code2, Eye, RefreshCw } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+type Source = "prompts" | "effects" | "visme";
+type OutputType = "copy" | "html" | "image" | "video" | "social" | "email";
+
+interface MasterItem {
+  id?: string; name: string; description?: string; prompt?: string;
+  category?: string; engine?: string; useCase?: string; style?: string; tags?: string[];
+  source: "prompts";
+}
 interface EffectItem {
   id: string; name: string; category: string; description: string;
-  source: "builtin" | "visme"; libs?: string[]; hasJs?: boolean; previewCss?: string;
-  icon?: string; tags?: string[]; prompt?: string;
+  source: "effects"; libs?: string[]; hasJs?: boolean; previewCss?: string;
 }
-interface VismeTemplate {
+interface VismeItem {
   id: string; name: string; icon: string; category: string;
-  tags: string[]; description: string; prompt: string;
+  tags: string[]; description: string; prompt: string; source: "visme";
 }
-interface DnaVars {
-  name: string; sector: string; font: string; primary: string; secondary: string;
-  bg: string; surface: string; text: string; headline: string; tagline: string; cta: string;
-}
+type AnyItem = MasterItem | EffectItem | VismeItem;
+
 interface SnippetDetail {
-  id: string; name: string; html: string; css: string; js: string; previewHtml: string; dna: DnaVars;
+  id: string; name: string; html: string; css: string; js: string; previewHtml: string;
 }
 interface Project { id: number; name: string; }
-interface StatsResponse { builtinSnippets: number; vismeTemplates: number; categories: number; snippetCategories: string[]; vismeCategories: string[]; }
+interface StatsResponse {
+  builtinSnippets: number; vismeTemplates: number; categories: number;
+  snippetCategories: string[]; vismeCategories: string[];
+}
 
-type ActiveSource = "builtin" | "visme";
-
-const VISME_CAT_LABELS: Record<string, string> = {
-  "3d_effects": "Efectos 3D", "animated_characters": "Personajes", "animated_icons": "Iconos",
-  "background_effects": "Fondos", "charts": "Gráficos", "data_viz": "Data Viz",
-  "forms_surveys": "Formularios", "infographics": "Infografías", "landing_pages": "Landings",
-  "micro_interactions": "Micro-Interactions", "motion_graphics": "Motion Graphics",
-  "particle_effects": "Partículas", "presentations": "Presentaciones", "social_media": "Social Media",
-  "text_effects": "Texto", "transition_effects": "Transiciones", "typography_effects": "Tipografía",
-  "ui_components": "Componentes UI", "video_effects": "Video", "web_graphics": "Web Graphics",
-};
+// ── Constants ─────────────────────────────────────────────────────────────────
+const PROMPT_CATEGORIES = [
+  { key: "", label: "Todos", icon: "🌐", color: "#c9a961", desc: "Explorar toda la librería" },
+  { key: "product_photography", label: "Fotografía", icon: "📸", color: "#f59e0b", desc: "Composiciones para e-commerce" },
+  { key: "lifestyle", label: "Lifestyle", icon: "🌿", color: "#4ade80", desc: "Escenas de vida real" },
+  { key: "seo_copy", label: "SEO & Copy", icon: "🔍", color: "#60a5fa", desc: "Textos optimizados" },
+  { key: "email", label: "Email", icon: "📧", color: "#a78bfa", desc: "Campañas y flujos" },
+  { key: "ad_creative", label: "Ads", icon: "📺", color: "#f87171", desc: "Facebook, Instagram, TikTok" },
+  { key: "brand_voice", label: "Brand Voice", icon: "🎯", color: "#fbbf24", desc: "Tono de marca" },
+  { key: "product_description", label: "Producto", icon: "📦", color: "#2a7a4b", desc: "Fichas persuasivas" },
+  { key: "storytelling", label: "Storytelling", icon: "📖", color: "#ec4899", desc: "Narrativas de impacto" },
+  { key: "video_script", label: "Vídeo", icon: "🎬", color: "#06b6d4", desc: "Scripts y guiones" },
+  { key: "social_media", label: "Social", icon: "📱", color: "#f97316", desc: "Posts y captions" },
+  { key: "upsell", label: "CRO", icon: "📈", color: "#34d399", desc: "Conversión y upsell" },
+];
 const SNIPPET_CAT_LABELS: Record<string, string> = {
-  "particle_effects": "Partículas", "background_effects": "Fondos", "micro_interactions": "Micro-Interactions",
-  "text_effects": "Texto", "cards": "Tarjetas", "3d_effects": "Efectos 3D",
-  "typography_effects": "Tipografía", "logo_animations": "Logos", "celebration_effects": "Celebración",
-  "animated_icons": "Iconos", "loaders": "Loaders", "scroll_indicators": "Scroll",
-  "charts": "Contadores", "transition_effects": "Transiciones", "interactive_effects": "Interactivo",
-  "parallax_effects": "Parallax",
+  particle_effects: "Partículas", background_effects: "Fondos", micro_interactions: "Micro-Interactions",
+  text_effects: "Texto", cards: "Tarjetas", "3d_effects": "Efectos 3D", typography_effects: "Tipografía",
+  logo_animations: "Logos", celebration_effects: "Celebración", animated_icons: "Iconos",
+  loaders: "Loaders", scroll_indicators: "Scroll", charts: "Contadores",
+  transition_effects: "Transiciones", interactive_effects: "Interactivo", parallax_effects: "Parallax",
 };
+const VISME_CAT_LABELS: Record<string, string> = {
+  "3d_effects": "Efectos 3D", animated_characters: "Personajes", animated_icons: "Iconos",
+  background_effects: "Fondos", charts: "Gráficos", data_viz: "Data Viz",
+  forms_surveys: "Formularios", infographics: "Infografías", landing_pages: "Landings",
+  micro_interactions: "Micro-Interactions", motion_graphics: "Motion Graphics",
+  particle_effects: "Partículas", presentations: "Presentaciones", social_media: "Social Media",
+  text_effects: "Texto", transition_effects: "Transiciones", typography_effects: "Tipografía",
+  ui_components: "Componentes UI", video_effects: "Video", web_graphics: "Web Graphics",
+};
+const ENGINE_COLORS: Record<string, string> = {
+  claude: "#fbbf24", gpt: "#4ade80", gemini: "#60a5fa",
+  midjourney: "#a78bfa", flux: "#f87171", default: "rgba(255,255,255,.4)",
+};
+const OUTPUT_TYPES: { key: OutputType; label: string; icon: string; color: string }[] = [
+  { key: "copy", label: "Copy/Texto", icon: "✍️", color: "#c9a961" },
+  { key: "html", label: "HTML", icon: "💻", color: "#60a5fa" },
+  { key: "image", label: "Imagen IA", icon: "🎨", color: "#a78bfa" },
+  { key: "video", label: "Video", icon: "🎬", color: "#f87171" },
+  { key: "social", label: "Social", icon: "📱", color: "#4ade80" },
+  { key: "email", label: "Email", icon: "📧", color: "#f59e0b" },
+];
 
+// ── Small helpers ─────────────────────────────────────────────────────────────
+function EngineTag({ engine }: { engine?: string }) {
+  if (!engine) return null;
+  const c = ENGINE_COLORS[engine.toLowerCase()] ?? ENGINE_COLORS.default;
+  return (
+    <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3,
+      background: `${c}18`, color: c, fontWeight: 700, letterSpacing: ".3px",
+      textTransform: "uppercase", flexShrink: 0 }}>
+      {engine}
+    </span>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function EffectsStudio() {
-  const params = useParams<{ id?: string }>();
-  const urlProjectId = params.id ? Number(params.id) : undefined;
-
-  const [projectId, setProjectId] = useState<number | undefined>(urlProjectId);
-  const [source, setSource] = useState<ActiveSource>("builtin");
-  const [category, setCategory] = useState("all");
+  // Source & category
+  const [source, setSource] = useState<Source>("prompts");
+  const [category, setCategory] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<EffectItem | null>(null);
+  const [sortBy, setSortBy] = useState<"default" | "name" | "engine">("default");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Data
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [libIndex, setLibIndex] = useState<Array<{ key: string; count: number }>>([]);
+  const [items, setItems] = useState<AnyItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [vismePage, setVismePage] = useState(1);
+  const [vismePages, setVismePages] = useState(1);
+
+  // Projects
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState<number | undefined>();
+
+  // Selected item & detail panel
+  const [selected, setSelected] = useState<AnyItem | null>(null);
   const [snippetDetail, setSnippetDetail] = useState<SnippetDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [generatePrompt, setGeneratePrompt] = useState("");
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // DNA Adapter
+  const [outputType, setOutputType] = useState<OutputType>("copy");
+  const [clientContext, setClientContext] = useState("");
+  const [isAdapting, setIsAdapting] = useState(false);
+  const [adaptedPrompt, setAdaptedPrompt] = useState("");
+
+  // Generator
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedHtml, setGeneratedHtml] = useState("");
+  const [generatedOutput, setGeneratedOutput] = useState("");
+  const [outputMode, setOutputMode] = useState<"preview" | "code">("preview");
+
+  // Custom generator (bottom of main area)
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [customOutputType, setCustomOutputType] = useState<OutputType>("html");
+  const [customIsGenerating, setCustomIsGenerating] = useState(false);
+  const [customOutput, setCustomOutput] = useState("");
+
+  // UI
   const [copied, setCopied] = useState("");
-  const [composing, setComposing] = useState<EffectItem[]>([]);
+  const [toast, setToast] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const LIMIT = 24;
 
-  const { data: stats } = useQuery<StatsResponse>({
-    queryKey: ["visme-stats"],
-    queryFn: () => fetch(`${API}/visme/stats`, { credentials: "include" }).then(r => r.json()),
-  });
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ["projects-list-effects"],
-    queryFn: () => fetch(`${API}/projects`, { credentials: "include" }).then(r => r.json()).then(d => Array.isArray(d) ? d : d.projects ?? []),
-  });
+  // ── Load data on mount ──────────────────────────────────────────────────────
+  useEffect(() => {
+    fetch(`${API}/visme/stats`, { credentials: "include" })
+      .then(r => r.json()).then(setStats).catch(() => {});
+    fetch(`${API}/fs-pro/prompt-library-master?indexOnly=1`, { credentials: "include" })
+      .then(r => r.json()).then((d: any) => {
+        let idx: Array<{ key: string; count: number }> = [];
+        if (Array.isArray(d)) { idx = d; }
+        else if (Array.isArray(d.libraries)) {
+          idx = d.libraries.map((l: any) => ({ key: l.key ?? l.name ?? "", count: l.count ?? 0 }));
+        } else if (d.libraries && typeof d.libraries === "object") {
+          idx = Object.entries(d.libraries).map(([k, v]: [string, any]) => ({
+            key: k, count: Array.isArray(v?.templates) ? v.templates.length : (v?.count ?? 0),
+          }));
+        }
+        setLibIndex(idx);
+      }).catch(() => {});
+    fetch(`${API}/projects`, { credentials: "include" })
+      .then(r => r.json()).then((d: any) => setProjects(Array.isArray(d) ? d : (d.projects ?? []))).catch(() => {});
+  }, []);
 
-  const { data: snippetsData } = useQuery({
-    queryKey: ["visme-snippets", category, search, projectId],
-    queryFn: () => {
-      const p = new URLSearchParams({ category, search, ...(projectId ? { projectId: String(projectId) } : {}) });
-      return fetch(`${API}/visme/snippets?${p}`, { credentials: "include" }).then(r => r.json());
-    },
-    enabled: source === "builtin",
-  });
-  const { data: templatesData, isLoading: loadingTemplates } = useQuery({
-    queryKey: ["visme-templates", category, search, page],
-    queryFn: () => {
-      const p = new URLSearchParams({ category, search, page: String(page), limit: "24" });
-      return fetch(`${API}/visme/templates?${p}`, { credentials: "include" }).then(r => r.json());
-    },
-    enabled: source === "visme",
-  });
-
-  const snippets: EffectItem[] = (snippetsData?.items ?? []).map((s: any) => ({ ...s, source: "builtin" as const }));
-  const vismeItems: EffectItem[] = (templatesData?.items ?? []).map((t: VismeTemplate) => ({
-    id: t.id, name: t.name, icon: t.icon, category: t.category, description: t.description, source: "visme" as const, tags: t.tags, prompt: t.prompt,
-  }));
-  const items = source === "builtin" ? snippets : vismeItems;
-
-  const loadSnippetDetail = useCallback(async (item: EffectItem) => {
-    if (item.source !== "builtin") { setSnippetDetail(null); return; }
-    setLoadingDetail(true);
+  // ── Load items per source ───────────────────────────────────────────────────
+  const loadPrompts = useCallback(async (cat: string, q: string, off: number, append = false) => {
+    if (!cat && !q.trim()) {
+      if (!append) { setItems([]); setHasMore(false); setTotalCount(0); }
+      return;
+    }
+    setLoading(true);
     try {
-      const p = new URLSearchParams(projectId ? { projectId: String(projectId) } : {});
-      const d = await fetch(`${API}/visme/snippets/${item.id}?${p}`, { credentials: "include" }).then(r => r.json());
-      setSnippetDetail(d);
-    } catch { /* ignore */ }
-    setLoadingDetail(false);
+      const p = new URLSearchParams({ limit: String(LIMIT), offset: String(off) });
+      if (cat) p.set("library", cat);
+      if (q.trim()) p.set("search", q.trim());
+      const d = await fetch(`${API}/fs-pro/prompt-library-master?${p}`, { credentials: "include" }).then(r => r.json());
+      const list: MasterItem[] = (Array.isArray(d) ? d : (d.items ?? [])).map((x: any) => ({ ...x, source: "prompts" as const }));
+      const total = d.total ?? list.length;
+      setTotalCount(total);
+      setHasMore(off + list.length < total);
+      setItems(prev => append ? [...prev, ...list] : list);
+    } catch { if (!append) setItems([]); }
+    setLoading(false);
+  }, []);
+
+  const loadEffects = useCallback(async (cat: string, q: string) => {
+    setLoading(true);
+    try {
+      const p = new URLSearchParams({ category: cat || "all", search: q, ...(projectId ? { projectId: String(projectId) } : {}) });
+      const d = await fetch(`${API}/visme/snippets?${p}`, { credentials: "include" }).then(r => r.json());
+      const list: EffectItem[] = (d.items ?? []).map((x: any) => ({ ...x, source: "effects" as const }));
+      setItems(list); setTotalCount(list.length); setHasMore(false);
+    } catch { setItems([]); }
+    setLoading(false);
   }, [projectId]);
 
-  async function generateEffect() {
-    if (!generatePrompt.trim() || isGenerating) return;
-    setIsGenerating(true);
-    setGeneratedHtml("");
+  const loadVisme = useCallback(async (cat: string, q: string, page: number) => {
+    setLoading(true);
     try {
-      const res = await fetch(`${API}/visme/generate`, {
-        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: generatePrompt, projectId }),
+      const p = new URLSearchParams({ category: cat || "all", search: q, page: String(page), limit: "36" });
+      const d = await fetch(`${API}/visme/templates?${p}`, { credentials: "include" }).then(r => r.json());
+      const list: VismeItem[] = (d.items ?? []).map((x: any) => ({ ...x, source: "visme" as const }));
+      setItems(list); setTotalCount(d.total ?? list.length);
+      setVismePages(d.pages ?? 1); setHasMore(page < (d.pages ?? 1));
+    } catch { setItems([]); }
+    setLoading(false);
+  }, []);
+
+  const reloadItems = useCallback(() => {
+    setOffset(0); setItems([]);
+    if (source === "prompts") void loadPrompts(category, search, 0);
+    else if (source === "effects") void loadEffects(category, search);
+    else void loadVisme(category, search, 1);
+  }, [source, category, search, loadPrompts, loadEffects, loadVisme]);
+
+  useEffect(() => { reloadItems(); }, [source, category, search, projectId]); // eslint-disable-line
+
+  // ── Event handlers ──────────────────────────────────────────────────────────
+  function switchSource(s: Source) {
+    setSource(s); setCategory(""); setSearchInput(""); setSearch(""); setSelected(null);
+    setSnippetDetail(null); setAdaptedPrompt(""); setGeneratedOutput(""); setItems([]);
+    setOffset(0); setVismePage(1);
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setSearch(searchInput.trim());
+    setOffset(0);
+  }
+
+  function handleCategoryClick(key: string) {
+    setCategory(key); setSearch(""); setSearchInput(""); setOffset(0); setSelected(null);
+  }
+
+  async function selectItem(item: AnyItem) {
+    setSelected(item); setAdaptedPrompt(""); setGeneratedOutput("");
+    if (item.source === "effects") {
+      setDetailLoading(true);
+      try {
+        const p = new URLSearchParams(projectId ? { projectId: String(projectId) } : {});
+        const d = await fetch(`${API}/visme/snippets/${item.id}?${p}`, { credentials: "include" }).then(r => r.json());
+        setSnippetDetail(d);
+      } catch {}
+      setDetailLoading(false);
+    } else {
+      setSnippetDetail(null);
+    }
+  }
+
+  function closeDetail() { setSelected(null); setSnippetDetail(null); setAdaptedPrompt(""); setGeneratedOutput(""); }
+
+  async function adaptPrompt() {
+    const rawPrompt = selected?.source === "prompts"
+      ? ((selected as MasterItem).prompt ?? selected.name)
+      : selected?.source === "visme"
+        ? (selected as VismeItem).prompt
+        : selected?.name ?? "";
+    if (!rawPrompt) return;
+    setIsAdapting(true); setAdaptedPrompt("");
+    try {
+      const res = await fetch(`${API}/visme/adapt`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: rawPrompt, projectId, outputType, clientContext }),
       });
       const reader = res.body!.getReader();
       const dec = new TextDecoder();
@@ -120,251 +277,647 @@ export default function EffectsStudio() {
         const { done, value } = await reader.read();
         if (done) break;
         buf += dec.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
+        const parts = buf.split("\n\n"); buf = parts.pop() ?? "";
         for (const p of parts) {
           if (!p.startsWith("data: ")) continue;
           try {
             const ev = JSON.parse(p.slice(6));
-            if (ev.done && ev.html) setGeneratedHtml(ev.html);
+            if (ev.chunk) setAdaptedPrompt(prev => prev + ev.chunk);
           } catch {}
         }
       }
-    } catch (e: any) { console.error(e); }
+    } catch (e: any) { showToast("Error al adaptar: " + e.message); }
+    setIsAdapting(false);
+  }
+
+  async function generateFromAdapted() {
+    const prompt = adaptedPrompt || getItemPrompt(selected);
+    if (!prompt || isGenerating) return;
+    setIsGenerating(true); setGeneratedOutput("");
+    try {
+      if (outputType === "html" || selected?.source === "effects") {
+        await streamGenerate(`${API}/visme/generate`, { prompt, projectId }, (chunk: string) => {
+          setGeneratedOutput(prev => prev + chunk);
+        }, (ev: any) => { if (ev.done && ev.html) setGeneratedOutput(ev.html); });
+      } else {
+        // Text generation via visme/adapt with generate flag
+        await streamGenerate(`${API}/visme/adapt`, { prompt, projectId, outputType, clientContext, generate: true }, (chunk: string) => {
+          setGeneratedOutput(prev => prev + chunk);
+        });
+      }
+    } catch (e: any) { showToast("Error al generar: " + e.message); }
     setIsGenerating(false);
   }
 
-  function copyCode(code: string, key: string) {
-    navigator.clipboard.writeText(code);
-    setCopied(key);
-    setTimeout(() => setCopied(""), 2000);
+  async function runCustomGenerator() {
+    if (!customPrompt.trim() || customIsGenerating) return;
+    setCustomIsGenerating(true); setCustomOutput("");
+    try {
+      const endpoint = customOutputType === "html" ? `${API}/visme/generate` : `${API}/visme/adapt`;
+      await streamGenerate(endpoint, { prompt: customPrompt, projectId, outputType: customOutputType }, (chunk: string) => {
+        setCustomOutput(prev => prev + chunk);
+      }, (ev: any) => { if (ev.done && ev.html) setCustomOutput(ev.html); });
+    } catch {}
+    setCustomIsGenerating(false);
   }
 
-  const st = { bg: "#0a0a0f", surface: "#111118", surface2: "#1a1a26", border: "rgba(255,255,255,.07)", gold: "#c9a961", jade: "#2a7a4b", t1: "#e2e2ec", t2: "rgba(255,255,255,.5)", t3: "rgba(255,255,255,.25)" };
+  async function streamGenerate(
+    url: string, body: object,
+    onChunk: (t: string) => void,
+    onEvent?: (ev: any) => void
+  ) {
+    const res = await fetch(url, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const reader = res.body!.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split("\n\n"); buf = parts.pop() ?? "";
+      for (const p of parts) {
+        if (!p.startsWith("data: ")) continue;
+        try {
+          const ev = JSON.parse(p.slice(6));
+          if (ev.chunk) onChunk(ev.chunk);
+          onEvent?.(ev);
+        } catch {}
+      }
+    }
+  }
 
-  const cats = source === "builtin"
+  function getItemPrompt(item: AnyItem | null): string {
+    if (!item) return "";
+    if (item.source === "prompts") return (item as MasterItem).prompt ?? item.name;
+    if (item.source === "visme") return (item as VismeItem).prompt;
+    return item.name;
+  }
+
+  function copyText(text: string, key: string) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(key);
+    setTimeout(() => setCopied(""), 2000);
+    showToast("Copiado al portapapeles ✓");
+  }
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2800);
+  }
+
+  function downloadHtml(html: string, filename = "output.html") {
+    const b = new Blob([html], { type: "text/html" });
+    const u = URL.createObjectURL(b);
+    const a = document.createElement("a"); a.href = u; a.download = filename; a.click();
+    URL.revokeObjectURL(u);
+  }
+
+  // ── Derived state ───────────────────────────────────────────────────────────
+  const sortedItems = [...items].sort((a, b) => {
+    if (sortBy === "name") return a.name.localeCompare(b.name);
+    if (sortBy === "engine" && a.source === "prompts" && b.source === "prompts")
+      return ((a as MasterItem).engine ?? "").localeCompare((b as MasterItem).engine ?? "");
+    return 0;
+  });
+
+  const totalTemplates = libIndex.reduce((s, l) => s + l.count, 0) || 6132;
+  const showCategoryGrid = source === "prompts" && items.length === 0 && !loading && !search;
+  const currentCats = source === "effects"
     ? (stats?.snippetCategories ?? [])
-    : (stats?.vismeCategories ?? []).slice(0, 40);
+    : source === "visme"
+      ? (stats?.vismeCategories ?? []).slice(0, 50)
+      : PROMPT_CATEGORIES.slice(1).map(c => c.key);
+
+  // ── Styles ──────────────────────────────────────────────────────────────────
+  const S = {
+    bg: "#0a0a0f", surf: "#111118", surf2: "#16161f", surf3: "#1e1e2a",
+    bdr: "rgba(255,255,255,.06)", gold: "#c9a961", jade: "#2a7a4b",
+    t1: "#e2e2ec", t2: "rgba(255,255,255,.65)", t3: "rgba(255,255,255,.38)", t4: "rgba(255,255,255,.2)",
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: st.bg, color: st.t1, fontFamily: "Inter,sans-serif", overflow: "hidden" }}>
-      {/* ── Top bar ── */}
-      <div style={{ height: 48, background: st.surface, borderBottom: `1px solid ${st.border}`, display: "flex", alignItems: "center", gap: 12, padding: "0 16px", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 14 }}>
-          <span style={{ fontSize: 18 }}>✦</span>
-          <span>Effects <span style={{ color: st.gold }}>Studio</span></span>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: S.bg, color: S.t1, fontFamily: "Inter,sans-serif", overflow: "hidden" }}>
+
+      {/* ══ TOP BAR ══════════════════════════════════════════════════════════════ */}
+      <div style={{ height: 52, background: S.surf, borderBottom: `1px solid ${S.bdr}`, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", flexShrink: 0, zIndex: 10 }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>
+          <Sparkles size={15} style={{ color: S.gold }} />
+          <span>Effects <span style={{ color: S.gold }}>Studio</span></span>
         </div>
-        <div style={{ display: "flex", gap: 4, marginLeft: 8 }}>
-          {(["builtin", "visme"] as const).map(s => (
-            <button key={s} onClick={() => { setSource(s); setCategory("all"); setSearch(""); setPage(1); setSelected(null); setSnippetDetail(null); }} style={{ padding: "4px 14px", borderRadius: 100, border: `1px solid ${source === s ? "rgba(201,169,97,.5)" : st.border}`, background: source === s ? "rgba(201,169,97,.12)" : "transparent", color: source === s ? st.gold : st.t2, fontSize: 12, fontWeight: source === s ? 600 : 400, cursor: "pointer" }}>
-              {s === "builtin" ? `⚡ 30 Snippets` : `✦ ${stats?.vismeTemplates ?? 594} Visme`}
+
+        {/* Source tabs */}
+        <div style={{ display: "flex", gap: 3, marginLeft: 8, background: S.surf2, borderRadius: 8, padding: 3 }}>
+          {([
+            { s: "prompts" as Source, label: `📚 Prompts`, count: totalTemplates.toLocaleString("es-ES") },
+            { s: "effects" as Source, label: `⚡ Efectos`, count: stats?.builtinSnippets ?? 30 },
+            { s: "visme" as Source, label: `✦ Visme`, count: stats?.vismeTemplates ?? 594 },
+          ] as const).map(t => (
+            <button key={t.s} onClick={() => switchSource(t.s)} style={{
+              padding: "4px 12px", borderRadius: 6, border: "none",
+              background: source === t.s ? "rgba(201,169,97,.15)" : "transparent",
+              color: source === t.s ? S.gold : S.t3,
+              fontSize: 11, fontWeight: source === t.s ? 700 : 400, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 5, transition: "all .15s",
+            }}>
+              {t.label}
+              <span style={{ fontSize: 10, background: source === t.s ? "rgba(201,169,97,.2)" : S.surf3, padding: "0 5px", borderRadius: 10, color: source === t.s ? S.gold : S.t4 }}>
+                {t.count}
+              </span>
             </button>
           ))}
         </div>
-        <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
-          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Buscar efectos…" style={{ width: "100%", background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 6, padding: "5px 10px 5px 28px", color: st.t1, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-          <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: st.t3, fontSize: 13 }}>⌕</span>
+
+        {/* Search */}
+        <form onSubmit={handleSearch} style={{ flex: 1, maxWidth: 380, position: "relative" }}>
+          <Search size={12} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: S.t4, pointerEvents: "none" }} />
+          <input
+            ref={searchRef}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            placeholder={source === "prompts" ? "Buscar en 6.2K prompts…" : source === "effects" ? "Buscar efectos…" : "Buscar templates Visme…"}
+            style={{ width: "100%", background: S.surf2, border: `1px solid ${S.bdr}`, borderRadius: 7, padding: "6px 10px 6px 28px", color: S.t1, fontSize: 11, outline: "none", boxSizing: "border-box" }}
+          />
+        </form>
+
+        {/* Filters toggle */}
+        <button onClick={() => setShowFilters(f => !f)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", background: showFilters ? "rgba(201,169,97,.1)" : "transparent", border: `1px solid ${showFilters ? "rgba(201,169,97,.3)" : S.bdr}`, borderRadius: 6, color: showFilters ? S.gold : S.t3, fontSize: 11, cursor: "pointer" }}>
+          <Filter size={11} /> Filtros
+        </button>
+
+        {/* Stats pills */}
+        <div style={{ display: "flex", gap: 5, marginLeft: 4 }}>
+          {source === "prompts" && <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 20, background: "rgba(201,169,97,.08)", color: S.gold, border: "1px solid rgba(201,169,97,.2)", fontWeight: 700, whiteSpace: "nowrap" }}>{totalTemplates.toLocaleString("es-ES")} prompts</span>}
+          {source === "effects" && <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 20, background: "rgba(34,197,94,.08)", color: "#22c55e", border: "1px solid rgba(34,197,94,.2)", fontWeight: 700 }}>30 snippets CSS/JS</span>}
+          {source === "visme" && <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 20, background: "rgba(99,102,241,.08)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.2)", fontWeight: 700 }}>594 templates</span>}
         </div>
-        {composing.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 12px", background: "rgba(201,169,97,.1)", border: "1px solid rgba(201,169,97,.3)", borderRadius: 20, fontSize: 12, color: st.gold }}>
-            <span style={{ width: 20, height: 20, background: st.gold, color: "#000", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{composing.length}</span>
-            <span>seleccionados</span>
-            <button onClick={() => setComposing([])} style={{ background: "transparent", border: "none", color: st.t3, cursor: "pointer", padding: "0 2px", fontSize: 12 }}>✕</button>
-          </div>
-        )}
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          <select value={projectId ?? ""} onChange={e => setProjectId(e.target.value ? Number(e.target.value) : undefined)} style={{ background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 6, padding: "4px 8px", color: projectId ? st.t1 : st.t2, fontSize: 12, outline: "none", cursor: "pointer" }}>
-            <option value="">Sin proyecto (DNA genérico)</option>
-            {projects.map((p: Project) => <option key={p.id} value={p.id}>🏪 {p.name}</option>)}
-          </select>
-        </div>
+
+        {/* Project selector */}
+        <select value={projectId ?? ""} onChange={e => setProjectId(e.target.value ? Number(e.target.value) : undefined)} style={{ marginLeft: "auto", background: S.surf2, border: `1px solid ${S.bdr}`, borderRadius: 6, padding: "5px 8px", color: projectId ? S.t1 : S.t3, fontSize: 11, outline: "none", cursor: "pointer", maxWidth: 180 }}>
+          <option value="">🏪 Sin proyecto</option>
+          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
       </div>
 
+      {/* Filters bar */}
+      {showFilters && (
+        <div style={{ padding: "8px 14px", background: S.surf2, borderBottom: `1px solid ${S.bdr}`, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
+          <span style={{ fontSize: 10, color: S.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em" }}>Ordenar</span>
+          {(["default", "name", "engine"] as const).map(opt => (
+            <button key={opt} onClick={() => setSortBy(opt)} style={{ padding: "3px 10px", background: sortBy === opt ? "rgba(201,169,97,.12)" : "transparent", border: `1px solid ${sortBy === opt ? "rgba(201,169,97,.4)" : S.bdr}`, borderRadius: 5, color: sortBy === opt ? S.gold : S.t3, fontSize: 10, cursor: "pointer" }}>
+              {opt === "default" ? "Relevancia" : opt === "name" ? "Nombre A-Z" : "Motor IA"}
+            </button>
+          ))}
+          {libIndex.length > 0 && source === "prompts" && (
+            <>
+              <span style={{ width: 1, height: 16, background: S.bdr }} />
+              <span style={{ fontSize: 10, color: S.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em" }}>Librería</span>
+              <select value={category} onChange={e => handleCategoryClick(e.target.value)} style={{ background: S.surf3, border: `1px solid ${S.bdr}`, borderRadius: 5, padding: "3px 8px", color: S.t2, fontSize: 10, outline: "none" }}>
+                <option value="">— Todas —</option>
+                {libIndex.map(l => <option key={l.key} value={l.key}>{l.key.replace(/_/g, " ")} ({l.count})</option>)}
+              </select>
+            </>
+          )}
+        </div>
+      )}
+
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {/* ── Sidebar: categories ── */}
-        <div style={{ width: 200, flexShrink: 0, background: st.surface, borderRight: `1px solid ${st.border}`, overflowY: "auto", padding: "8px 0" }}>
-          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: st.t3, padding: "6px 14px 4px" }}>Categorías</div>
-          <button onClick={() => { setCategory("all"); setPage(1); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 14px", border: "none", background: category === "all" ? "rgba(201,169,97,.1)" : "transparent", color: category === "all" ? st.gold : st.t2, fontSize: 12, cursor: "pointer", textAlign: "left" }}>
-            <span>Todos</span>
-            <span style={{ fontSize: 10, background: "rgba(255,255,255,.06)", padding: "1px 6px", borderRadius: 100, color: st.t3 }}>
-              {source === "builtin" ? stats?.builtinSnippets : stats?.vismeTemplates}
+
+        {/* ══ SIDEBAR ══════════════════════════════════════════════════════════ */}
+        <div style={{ width: 180, flexShrink: 0, background: S.surf, borderRight: `1px solid ${S.bdr}`, overflowY: "auto", padding: "8px 0" }}>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: S.t4, padding: "6px 12px 4px" }}>Categorías</div>
+
+          {/* "Todos" button */}
+          <button onClick={() => handleCategoryClick("")} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", border: "none", background: category === "" ? "rgba(201,169,97,.1)" : "transparent", color: category === "" ? S.gold : S.t3, fontSize: 11, cursor: "pointer", textAlign: "left" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {source === "prompts" ? "🌐" : source === "effects" ? "⚡" : "✦"}
+              <span>Todos</span>
+            </span>
+            <span style={{ fontSize: 10, background: "rgba(255,255,255,.05)", padding: "0 5px", borderRadius: 8, color: S.t4 }}>
+              {source === "prompts" ? totalTemplates.toLocaleString("es-ES") : source === "effects" ? (stats?.builtinSnippets ?? 30) : (stats?.vismeTemplates ?? 594)}
             </span>
           </button>
-          {cats.map((cat: string) => (
-            <button key={cat} onClick={() => { setCategory(cat); setPage(1); }} style={{ width: "100%", display: "flex", alignItems: "center", padding: "6px 14px", border: "none", background: category === cat ? "rgba(201,169,97,.1)" : "transparent", color: category === cat ? st.gold : st.t2, fontSize: 12, cursor: "pointer", textAlign: "left" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {source === "builtin" ? (SNIPPET_CAT_LABELS[cat] ?? cat) : (VISME_CAT_LABELS[cat] ?? cat.replace(/_/g, " "))}
-              </span>
+
+          {/* Category list */}
+          {source === "prompts" && PROMPT_CATEGORIES.slice(1).map(cat => (
+            <button key={cat.key} onClick={() => handleCategoryClick(cat.key)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 7, padding: "6px 12px", border: "none", background: category === cat.key ? `${cat.color}10` : "transparent", color: category === cat.key ? cat.color : S.t3, fontSize: 11, cursor: "pointer", textAlign: "left", transition: "all .1s" }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>{cat.icon}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
+            </button>
+          ))}
+          {source === "effects" && (stats?.snippetCategories ?? []).map(cat => (
+            <button key={cat} onClick={() => handleCategoryClick(cat)} style={{ width: "100%", display: "flex", alignItems: "center", padding: "6px 12px", border: "none", background: category === cat ? "rgba(201,169,97,.1)" : "transparent", color: category === cat ? S.gold : S.t3, fontSize: 11, cursor: "pointer", textAlign: "left" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{SNIPPET_CAT_LABELS[cat] ?? cat.replace(/_/g, " ")}</span>
+            </button>
+          ))}
+          {source === "visme" && (stats?.vismeCategories ?? []).slice(0, 50).map(cat => (
+            <button key={cat} onClick={() => handleCategoryClick(cat)} style={{ width: "100%", display: "flex", alignItems: "center", padding: "6px 12px", border: "none", background: category === cat ? "rgba(99,102,241,.12)" : "transparent", color: category === cat ? "#a5b4fc" : S.t3, fontSize: 11, cursor: "pointer", textAlign: "left" }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{VISME_CAT_LABELS[cat] ?? cat.replace(/_/g, " ")}</span>
             </button>
           ))}
         </div>
 
-        {/* ── Main grid ── */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+        {/* ══ MAIN CONTENT ═════════════════════════════════════════════════════ */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 40px" }}>
+
+          {/* Results header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <div>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>
-                {category === "all" ? (source === "builtin" ? "Todos los snippets" : "Todos los templates") : (source === "builtin" ? SNIPPET_CAT_LABELS[category] ?? category : VISME_CAT_LABELS[category] ?? category.replace(/_/g, " "))}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                {search ? `"${search}"` : category
+                  ? (source === "prompts" ? PROMPT_CATEGORIES.find(c => c.key === category)?.label : source === "effects" ? (SNIPPET_CAT_LABELS[category] ?? category) : (VISME_CAT_LABELS[category] ?? category.replace(/_/g, " "))) ?? category
+                  : source === "prompts" ? "Librería Maestra de Prompts" : source === "effects" ? "Efectos CSS/JS" : "Templates Visme"
+                }
               </span>
-              <span style={{ fontSize: 12, color: st.t3, marginLeft: 8 }}>
-                {source === "builtin" ? `${snippets.length} efectos` : `${templatesData?.total ?? 0} templates`}
-              </span>
+              {totalCount > 0 && !showCategoryGrid && (
+                <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: "rgba(201,169,97,.1)", color: S.gold }}>{totalCount.toLocaleString("es-ES")}</span>
+              )}
             </div>
-            {source === "visme" && templatesData && templatesData.pages > 1 && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              {search && <button onClick={() => { setSearch(""); setSearchInput(""); }} style={{ fontSize: 10, padding: "3px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t3, cursor: "pointer" }}>✕ Limpiar</button>}
+              {source === "visme" && vismePages > 1 && (
+                <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                  <button onClick={() => { const p = Math.max(1, vismePage - 1); setVismePage(p); void loadVisme(category, search, p); }} disabled={vismePage === 1} style={{ padding: "3px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t2, fontSize: 11, cursor: "pointer" }}>‹</button>
+                  <span style={{ fontSize: 10, color: S.t4 }}>{vismePage}/{vismePages}</span>
+                  <button onClick={() => { const p = Math.min(vismePages, vismePage + 1); setVismePage(p); void loadVisme(category, search, p); }} disabled={vismePage === vismePages} style={{ padding: "3px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t2, fontSize: 11, cursor: "pointer" }}>›</button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Category grid (Prompts, no search active) ── */}
+          {showCategoryGrid && (
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", color: S.t4, marginBottom: 10 }}>CATEGORÍAS</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(155px,1fr))", gap: 8, marginBottom: 20 }}>
+                {PROMPT_CATEGORIES.slice(1).map(cat => {
+                  const libInfo = libIndex.find(l => l.key === cat.key);
+                  const isAct = category === cat.key;
+                  return (
+                    <button key={cat.key} onClick={() => handleCategoryClick(cat.key)} style={{ padding: "14px 12px", borderRadius: 12, cursor: "pointer", background: isAct ? `${cat.color}12` : S.surf2, border: `1px solid ${isAct ? cat.color + "50" : S.bdr}`, textAlign: "left", transition: "all .15s" }}
+                      onMouseOver={e => { if (!isAct) { e.currentTarget.style.borderColor = `${cat.color}35`; e.currentTarget.style.background = `${cat.color}08`; } }}
+                      onMouseOut={e => { if (!isAct) { e.currentTarget.style.borderColor = S.bdr; e.currentTarget.style.background = S.surf2; } }}>
+                      <div style={{ fontSize: 22, marginBottom: 8 }}>{cat.icon}</div>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: isAct ? cat.color : S.t1, marginBottom: 3 }}>{cat.label}</p>
+                      <p style={{ fontSize: 9, color: S.t4, lineHeight: 1.4, marginBottom: 6 }}>{cat.desc}</p>
+                      {libInfo && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, background: `${cat.color}15`, color: cat.color, fontWeight: 700 }}>{libInfo.count} templates</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Info stats row */}
+              <div style={{ display: "flex", gap: 20, padding: "14px 18px", background: S.surf, borderRadius: 12, border: `1px solid ${S.bdr}`, flexWrap: "wrap" }}>
+                {[
+                  { icon: <BookOpen size={14} />, label: "Total prompts", value: `${totalTemplates.toLocaleString("es-ES")}`, color: S.gold },
+                  { icon: <Zap size={14} />, label: "Effects snippets", value: `${stats?.builtinSnippets ?? 30} CSS/JS`, color: "#22c55e" },
+                  { icon: <Sparkles size={14} />, label: "Templates Visme", value: `${stats?.vismeTemplates ?? 594}`, color: "#a5b4fc" },
+                  { icon: <Star size={14} />, label: "Motores IA", value: "Claude · GPT · Gemini · Flux", color: S.jade },
+                  { icon: <Hash size={14} />, label: "Con DNA Adapter", value: "Cualquier cliente", color: "#f59e0b" },
+                ].map(item => (
+                  <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 140 }}>
+                    <div style={{ color: item.color }}>{item.icon}</div>
+                    <div>
+                      <p style={{ fontSize: 9, color: S.t4, marginBottom: 1 }}>{item.label}</p>
+                      <p style={{ fontSize: 11, fontWeight: 700 }}>{item.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Skeleton loaders ── */}
+          {loading && items.length === 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 10 }}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="skeleton" style={{ height: 86, borderRadius: 12 }} />
+              ))}
+            </div>
+          )}
+
+          {/* ── Empty state ── */}
+          {!loading && items.length === 0 && !showCategoryGrid && (
+            <div style={{ padding: 48, textAlign: "center", color: S.t3 }}>
+              <p style={{ fontSize: 32, marginBottom: 10 }}>🔍</p>
+              <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Sin resultados</p>
+              <p style={{ fontSize: 12 }}>{search ? `No hay resultados para "${search}".` : "Selecciona una categoría o busca."}</p>
+            </div>
+          )}
+
+          {/* ── Items grid ── */}
+          {sortedItems.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: source === "effects" ? "repeat(auto-fill,minmax(200px,1fr))" : "repeat(auto-fill,minmax(300px,1fr))", gap: 10, marginBottom: 20 }}>
+              {sortedItems.map((item, i) => {
+                const isSelected = selected?.source === item.source && selected?.id === item.id && (selected as any)?.name === item.name;
+                return (
+                  <button key={`${item.source}-${(item as any).id ?? i}`} onClick={() => void selectItem(item)} style={{ background: isSelected ? "rgba(201,169,97,.06)" : S.surf, border: `1px solid ${isSelected ? "rgba(201,169,97,.45)" : S.bdr}`, borderRadius: 12, padding: "13px 15px", cursor: "pointer", textAlign: "left", transition: "all .15s", position: "relative" }}
+                    onMouseOver={e => { if (!isSelected) e.currentTarget.style.borderColor = "rgba(201,169,97,.25)"; }}
+                    onMouseOut={e => { if (!isSelected) e.currentTarget.style.borderColor = S.bdr; }}>
+
+                    {/* Source badge */}
+                    <span style={{ position: "absolute", top: 8, right: 8, fontSize: 8, fontWeight: 700, textTransform: "uppercase", padding: "2px 5px", borderRadius: 4,
+                      background: item.source === "prompts" ? "rgba(201,169,97,.12)" : item.source === "effects" ? "rgba(34,197,94,.12)" : "rgba(99,102,241,.12)",
+                      color: item.source === "prompts" ? S.gold : item.source === "effects" ? "#22c55e" : "#818cf8",
+                    }}>
+                      {item.source === "prompts" ? "prompt" : item.source === "effects" ? "snippet" : "visme"}
+                    </span>
+
+                    {/* Icon for Visme */}
+                    {item.source === "visme" && (item as VismeItem).icon && (
+                      <span style={{ fontSize: 18, marginBottom: 5, display: "block" }}>{(item as VismeItem).icon}</span>
+                    )}
+
+                    {/* Header row */}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 5, paddingRight: 40 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 3 }}>
+                          {item.source === "prompts" && <EngineTag engine={(item as MasterItem).engine} />}
+                          {item.category && (
+                            <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: "rgba(99,102,241,.1)", color: "#a5b4fc", fontWeight: 600 }}>
+                              {item.category.replace(/_/g, " ")}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 12, fontWeight: 700, color: S.t1, lineHeight: 1.3, marginBottom: 3 }}>{item.name}</p>
+                        {item.description && (
+                          <p style={{ fontSize: 10, color: S.t3, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as any }}>
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tags for Visme */}
+                    {item.source === "visme" && (item as VismeItem).tags?.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 5 }}>
+                        {(item as VismeItem).tags.slice(0, 4).map(tag => (
+                          <span key={tag} style={{ fontSize: 9, background: "rgba(255,255,255,.04)", color: S.t4, padding: "1px 5px", borderRadius: 3 }}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Quick copy for prompts */}
+                    {item.source === "prompts" && (
+                      <div style={{ marginTop: 8, display: "flex", gap: 5 }}>
+                        <button onClick={e => { e.stopPropagation(); copyText((item as MasterItem).prompt ?? item.name, `q-${i}`); }} style={{ fontSize: 10, padding: "3px 8px", background: "rgba(255,255,255,.04)", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t3, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+                          {copied === `q-${i}` ? <Check size={10} /> : <Copy size={10} />} Copiar
+                        </button>
+                        <button onClick={e => { e.stopPropagation(); void selectItem(item); }} style={{ fontSize: 10, padding: "3px 8px", background: "rgba(201,169,97,.06)", border: "1px solid rgba(201,169,97,.2)", borderRadius: 4, color: S.gold, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+                          <Wand2 size={10} /> Adaptar
+                        </button>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Load more */}
+          {hasMore && source === "prompts" && (
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <button onClick={() => { const next = offset + LIMIT; setOffset(next); void loadPrompts(category, search, next, true); }} disabled={loading} style={{ padding: "10px 28px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 8, color: S.t2, fontSize: 12, cursor: "pointer", opacity: loading ? .5 : 1 }}>
+                {loading ? "Cargando…" : `Cargar más (${items.length.toLocaleString("es-ES")} de ${totalCount.toLocaleString("es-ES")})`}
+              </button>
+            </div>
+          )}
+
+          {/* ══ CUSTOM AI GENERATOR ═══════════════════════════════════════════ */}
+          <div style={{ marginTop: 32, padding: 20, background: S.surf, border: "1px solid rgba(201,169,97,.2)", borderRadius: 16 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 800, color: S.gold, marginBottom: 3, display: "flex", alignItems: "center", gap: 6 }}><Wand2 size={13} /> Generador Personalizado</p>
+                <p style={{ fontSize: 11, color: S.t3 }}>Describe lo que quieres. Claude lo genera con el DNA de tu cliente aplicado.</p>
+              </div>
+              {/* Output type */}
               <div style={{ display: "flex", gap: 4 }}>
-                <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1} style={{ padding: "3px 10px", background: "transparent", border: `1px solid ${st.border}`, borderRadius: 4, color: st.t2, fontSize: 11, cursor: "pointer" }}>‹</button>
-                <span style={{ fontSize: 11, color: st.t3, padding: "4px 8px" }}>{page}/{templatesData.pages}</span>
-                <button onClick={() => setPage(p => Math.min(templatesData.pages, p+1))} disabled={page === templatesData.pages} style={{ padding: "3px 10px", background: "transparent", border: `1px solid ${st.border}`, borderRadius: 4, color: st.t2, fontSize: 11, cursor: "pointer" }}>›</button>
+                {OUTPUT_TYPES.map(ot => (
+                  <button key={ot.key} onClick={() => setCustomOutputType(ot.key)} title={ot.label} style={{ padding: "4px 8px", background: customOutputType === ot.key ? `${ot.color}18` : "transparent", border: `1px solid ${customOutputType === ot.key ? ot.color + "50" : S.bdr}`, borderRadius: 6, color: customOutputType === ot.key ? ot.color : S.t4, fontSize: 11, cursor: "pointer" }}>
+                    {ot.icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} onKeyDown={e => e.key === "Enter" && !e.shiftKey && void runCustomGenerator()} placeholder={customOutputType === "html" ? "Ej: hero animado con partículas doradas y CTA de la marca…" : customOutputType === "image" ? "Ej: foto producto flotando con fondo degradado marca…" : "Ej: email de recuperación de carrito con oferta 15% descuento…"} style={{ flex: 1, background: S.surf2, border: `1px solid ${S.bdr}`, borderRadius: 8, padding: "10px 13px", color: S.t1, fontSize: 11, outline: "none", fontFamily: "inherit" }} />
+              <button onClick={() => void runCustomGenerator()} disabled={customIsGenerating || !customPrompt.trim()} style={{ padding: "10px 18px", background: !customIsGenerating && customPrompt.trim() ? "linear-gradient(135deg,#c9a961,#b8860b)" : S.surf2, border: "none", borderRadius: 8, color: !customIsGenerating && customPrompt.trim() ? "#000" : S.t4, fontWeight: 700, fontSize: 12, cursor: !customIsGenerating && customPrompt.trim() ? "pointer" : "not-allowed", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5 }}>
+                {customIsGenerating ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Generando…</> : <><Play size={12} /> Generar</>}
+              </button>
+            </div>
+            {customOutput && (
+              <div style={{ marginTop: 14, borderRadius: 10, overflow: "hidden", border: "1px solid rgba(34,197,94,.25)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", background: "rgba(34,197,94,.07)", borderBottom: "1px solid rgba(34,197,94,.15)" }}>
+                  <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}><Check size={12} /> Output generado</span>
+                  <div style={{ display: "flex", gap: 5 }}>
+                    {(customOutputType === "html") && (
+                      <button onClick={() => setOutputMode(m => m === "preview" ? "code" : "preview")} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t2, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+                        {outputMode === "preview" ? <Code2 size={10} /> : <Eye size={10} />} {outputMode === "preview" ? "Código" : "Preview"}
+                      </button>
+                    )}
+                    <button onClick={() => copyText(customOutput, "custom-out")} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t2, fontSize: 10, cursor: "pointer" }}>{copied === "custom-out" ? "✓" : "📋"} Copiar</button>
+                    {customOutputType === "html" && <button onClick={() => downloadHtml(customOutput)} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t2, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><Download size={10} /> HTML</button>}
+                  </div>
+                </div>
+                {customOutputType === "html" && outputMode === "preview"
+                  ? <iframe srcDoc={customOutput} sandbox="allow-scripts allow-same-origin" style={{ width: "100%", height: 300, border: "none" }} title="Preview" />
+                  : <pre style={{ margin: 0, padding: 12, background: S.surf3, color: "#a8b4d8", fontSize: 10, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 300, overflowY: "auto", lineHeight: 1.6 }}>{customOutput}</pre>
+                }
               </div>
             )}
           </div>
+        </div>
 
-          {loadingTemplates && <div style={{ color: st.t3, fontSize: 13, padding: "20px 0" }}>⏳ Cargando templates…</div>}
+        {/* ══ DETAIL PANEL (DNA ADAPTER + GENERATOR) ═══════════════════════════ */}
+        {selected && (
+          <div style={{ width: 380, flexShrink: 0, background: S.surf, borderLeft: `1px solid ${S.bdr}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
-            {items.map(item => {
-              const isSelected = selected?.id === item.id;
-              const isComposing = composing.some(c => c.id === item.id);
-              return (
-                <div key={item.id} onClick={() => { setSelected(isSelected ? null : item); if (!isSelected) void loadSnippetDetail(item); setGeneratedHtml(""); }} style={{ background: st.surface, border: `1px solid ${isSelected ? "rgba(201,169,97,.5)" : isComposing ? "rgba(42,122,75,.5)" : st.border}`, borderRadius: 12, padding: 16, cursor: "pointer", transition: "all .2s", position: "relative", ...(isSelected ? { background: "rgba(201,169,97,.06)" } : {}) }}
-                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = "rgba(201,169,97,.3)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = isComposing ? "rgba(42,122,75,.5)" : st.border; e.currentTarget.style.transform = "translateY(0)"; }}
-                >
-                  <div style={{ position: "absolute", top: 8, right: 8, fontSize: 9, fontWeight: 700, textTransform: "uppercase", padding: "2px 6px", borderRadius: 100, background: item.source === "builtin" ? "rgba(34,197,94,.15)" : "rgba(99,102,241,.15)", color: item.source === "builtin" ? "#22c55e" : "#818cf8" }}>
-                    {item.source === "builtin" ? "snippet" : "visme"}
+            {/* Panel header */}
+            <div style={{ padding: "14px 16px", borderBottom: `1px solid ${S.bdr}`, flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {selected.source === "visme" && (selected as VismeItem).icon && (
+                    <span style={{ fontSize: 22, display: "block", marginBottom: 4 }}>{(selected as VismeItem).icon}</span>
+                  )}
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+                    {selected.source === "prompts" && <EngineTag engine={(selected as MasterItem).engine} />}
+                    <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: selected.source === "effects" ? "rgba(34,197,94,.1)" : selected.source === "visme" ? "rgba(99,102,241,.1)" : "rgba(201,169,97,.1)", color: selected.source === "effects" ? "#22c55e" : selected.source === "visme" ? "#a5b4fc" : S.gold, fontWeight: 700, textTransform: "uppercase" }}>
+                      {selected.source}
+                    </span>
                   </div>
-                  {item.icon && <div style={{ fontSize: 20, marginBottom: 8 }}>{item.icon}</div>}
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, lineHeight: 1.3, paddingRight: 40 }}>{item.name}</div>
-                  <div style={{ fontSize: 11, color: st.t3, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.description}</div>
-                  {item.tags && item.tags.length > 0 && (
+                  <p style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>{selected.name}</p>
+                  {selected.description && <p style={{ fontSize: 11, color: S.t3, marginTop: 4, lineHeight: 1.5 }}>{selected.description}</p>}
+                </div>
+                <button onClick={closeDetail} style={{ background: "transparent", border: "none", color: S.t4, cursor: "pointer", padding: 2, flexShrink: 0 }}><X size={15} /></button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto" }}>
+
+              {/* ── Effects snippet: live preview + code ── */}
+              {selected.source === "effects" && (
+                <>
+                  {detailLoading && <p style={{ padding: 16, fontSize: 12, color: S.t3 }}>⏳ Cargando preview…</p>}
+                  {snippetDetail?.previewHtml && (
+                    <>
+                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: S.t4, padding: "10px 14px 4px" }}>PREVIEW EN VIVO</div>
+                      <iframe srcDoc={snippetDetail.previewHtml} sandbox="allow-scripts allow-same-origin" style={{ width: "100%", height: 200, border: "none", borderBottom: `1px solid ${S.bdr}` }} title="Effect preview" />
+                    </>
+                  )}
+                  {snippetDetail && (
+                    <div style={{ padding: 14 }}>
+                      {[
+                        { label: "HTML", code: snippetDetail.html, key: "d-html", color: "#f59e0b" },
+                        { label: "CSS", code: snippetDetail.css, key: "d-css", color: "#60a5fa" },
+                        ...(snippetDetail.js ? [{ label: "JS", code: snippetDetail.js, key: "d-js", color: "#22c55e" }] : []),
+                      ].filter(c => c.code?.trim()).map(c => (
+                        <div key={c.key} style={{ marginBottom: 10 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                            <span style={{ fontSize: 9, fontWeight: 700, color: c.color, letterSpacing: ".1em" }}>{c.label}</span>
+                            <button onClick={() => copyText(c.code, c.key)} style={{ padding: "1px 7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer" }}>{copied === c.key ? "✓" : "📋"}</button>
+                          </div>
+                          <textarea readOnly value={c.code} style={{ width: "100%", height: 80, padding: 8, background: S.surf3, border: `1px solid ${S.bdr}`, borderRadius: 6, color: "#a8b4d8", fontSize: 9.5, fontFamily: "monospace", resize: "vertical", boxSizing: "border-box", outline: "none", lineHeight: 1.5 }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Prompt / Visme: show full prompt ── */}
+              {(selected.source === "prompts" || selected.source === "visme") && (
+                <div style={{ padding: "10px 14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: S.t4 }}>PROMPT ORIGINAL</span>
+                    <button onClick={() => copyText(getItemPrompt(selected), "orig-p")} style={{ padding: "1px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer" }}>{copied === "orig-p" ? "✓ Copiado" : "📋 Copiar"}</button>
+                  </div>
+                  <div style={{ fontSize: 11, color: S.t2, lineHeight: 1.6, padding: 10, background: S.surf3, borderRadius: 8, border: `1px solid ${S.bdr}`, maxHeight: 140, overflowY: "auto", wordBreak: "break-word" }}>
+                    {getItemPrompt(selected)}
+                  </div>
+                  {/* Tags */}
+                  {selected.source === "visme" && (selected as VismeItem).tags?.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 8 }}>
-                      {item.tags.slice(0, 3).map(tag => (
-                        <span key={tag} style={{ fontSize: 10, background: "rgba(255,255,255,.05)", color: st.t3, padding: "1px 6px", borderRadius: 4 }}>{tag}</span>
+                      {(selected as VismeItem).tags.map(tag => (
+                        <span key={tag} style={{ fontSize: 9, background: "rgba(255,255,255,.04)", color: S.t4, padding: "1px 5px", borderRadius: 3 }}>{tag}</span>
                       ))}
                     </div>
                   )}
                 </div>
-              );
-            })}
-          </div>
-
-          {/* ── AI Custom Generator ── */}
-          <div style={{ marginTop: 32, padding: 24, background: st.surface, border: `1px solid rgba(201,169,97,.2)`, borderRadius: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: st.gold, marginBottom: 4 }}>⚡ Generar Efecto Personalizado con IA</div>
-            <div style={{ fontSize: 12, color: st.t3, marginBottom: 14 }}>Describe el efecto que quieres y Claude lo generará con tu Brand DNA aplicado automáticamente</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input value={generatePrompt} onChange={e => setGeneratePrompt(e.target.value)} onKeyDown={e => e.key === "Enter" && void generateEffect()} placeholder="Ej: partículas de oro flotando que reaccionan al cursor, tarjeta de producto 3D con vidrio, marquee con logos de clientes…" style={{ flex: 1, background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 8, padding: "10px 14px", color: st.t1, fontSize: 12, outline: "none", fontFamily: "inherit" }} />
-              <button onClick={() => void generateEffect()} disabled={isGenerating || !generatePrompt.trim()} style={{ padding: "10px 20px", background: !isGenerating && generatePrompt.trim() ? "linear-gradient(135deg,#c9a961,#b8860b)" : st.surface2, border: "none", borderRadius: 8, color: !isGenerating && generatePrompt.trim() ? "#000" : st.t3, fontWeight: 700, fontSize: 12, cursor: !isGenerating && generatePrompt.trim() ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}>
-                {isGenerating ? "⏳ Generando…" : "✦ Generar"}
-              </button>
-            </div>
-            {generatedHtml && (
-              <div style={{ marginTop: 16, borderRadius: 10, overflow: "hidden", border: `1px solid rgba(34,197,94,.3)` }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "rgba(34,197,94,.08)", borderBottom: `1px solid rgba(34,197,94,.2)` }}>
-                  <span style={{ fontSize: 12, color: "#22c55e", fontWeight: 600 }}>✓ Efecto generado</span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => copyCode(generatedHtml, "gen")} style={{ padding: "3px 10px", background: "transparent", border: `1px solid rgba(255,255,255,.15)`, borderRadius: 4, color: st.t1, fontSize: 11, cursor: "pointer" }}>{copied === "gen" ? "✓ Copiado" : "📋 Copiar"}</button>
-                    <button onClick={() => { const b = new Blob([generatedHtml], { type: "text/html" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = "effect.html"; a.click(); URL.revokeObjectURL(u); }} style={{ padding: "3px 10px", background: "transparent", border: `1px solid rgba(255,255,255,.15)`, borderRadius: 4, color: st.t1, fontSize: 11, cursor: "pointer" }}>⬇ HTML</button>
-                  </div>
-                </div>
-                <iframe srcDoc={generatedHtml} sandbox="allow-scripts allow-same-origin" style={{ width: "100%", height: 320, border: "none" }} title="Generated Effect Preview" />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Detail panel ── */}
-        {selected && (
-          <div style={{ width: 360, flexShrink: 0, background: st.surface, borderLeft: `1px solid ${st.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ padding: "14px 16px", borderBottom: `1px solid ${st.border}`, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexShrink: 0 }}>
-              <div>
-                {selected.icon && <span style={{ fontSize: 20, marginRight: 6 }}>{selected.icon}</span>}
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{selected.name}</span>
-                <div style={{ fontSize: 11, color: st.t3, marginTop: 4, lineHeight: 1.5 }}>{selected.description}</div>
-              </div>
-              <button onClick={() => { setSelected(null); setSnippetDetail(null); }} style={{ background: "transparent", border: "none", color: st.t3, cursor: "pointer", fontSize: 16, flexShrink: 0, lineHeight: 1 }}>✕</button>
-            </div>
-
-            <div style={{ flex: 1, overflowY: "auto" }}>
-              {/* Preview */}
-              {loadingDetail && <div style={{ padding: 20, color: st.t3, fontSize: 12 }}>⏳ Cargando preview…</div>}
-              {snippetDetail && snippetDetail.previewHtml && (
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: st.t3, padding: "10px 14px 4px" }}>PREVIEW (DNA aplicado)</div>
-                  <iframe srcDoc={snippetDetail.previewHtml} sandbox="allow-scripts allow-same-origin" style={{ width: "100%", height: 220, border: "none", borderBottom: `1px solid ${st.border}` }} title="Effect Preview" />
-                </div>
               )}
 
-              {/* Visme prompt */}
-              {selected.source === "visme" && selected.prompt && (
-                <div style={{ padding: 14 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: st.t3, marginBottom: 6 }}>PROMPT VISME</div>
-                  <div style={{ fontSize: 11, color: st.t2, lineHeight: 1.6, padding: 12, background: st.surface2, borderRadius: 8, border: `1px solid ${st.border}` }}>{selected.prompt}</div>
-                  <button onClick={() => copyCode(selected.prompt ?? "", "prompt")} style={{ marginTop: 8, width: "100%", padding: "7px", background: "transparent", border: `1px solid ${st.border}`, borderRadius: 6, color: st.t2, fontSize: 11, cursor: "pointer" }}>
-                    {copied === "prompt" ? "✓ Copiado" : "📋 Copiar prompt"}
-                  </button>
-                </div>
-              )}
+              {/* ══ DNA ADAPTER SECTION ════════════════════════════════════════ */}
+              <div style={{ margin: "0 14px 14px", padding: 14, background: "rgba(201,169,97,.04)", border: "1px solid rgba(201,169,97,.15)", borderRadius: 12 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: S.gold, marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}>
+                  <Wand2 size={12} /> Adaptar con Brand DNA
+                  {!projectId && <span style={{ fontSize: 9, color: S.t4, fontWeight: 400 }}>— selecciona un proyecto arriba</span>}
+                </p>
 
-              {/* Code sections for builtin snippets */}
-              {snippetDetail && (
-                <div style={{ padding: "0 14px 14px" }}>
-                  {[
-                    { label: "HTML", code: snippetDetail.html, key: "html", color: "#f59e0b" },
-                    { label: "CSS", code: snippetDetail.css, key: "css", color: "#3b82f6" },
-                    ...(snippetDetail.js ? [{ label: "JavaScript", code: snippetDetail.js, key: "js", color: "#22c55e" }] : []),
-                  ].filter(c => c.code.trim()).map(c => (
-                    <div key={c.key} style={{ marginBottom: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: c.color, letterSpacing: ".1em" }}>{c.label}</span>
-                        <button onClick={() => copyCode(c.code, c.key)} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${st.border}`, borderRadius: 4, color: st.t2, fontSize: 10, cursor: "pointer" }}>
-                          {copied === c.key ? "✓" : "📋 Copiar"}
-                        </button>
-                      </div>
-                      <textarea readOnly value={c.code} style={{ width: "100%", height: 90, padding: 8, background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 6, color: "#a8b4d8", fontSize: 10, fontFamily: "JetBrains Mono,monospace", resize: "vertical", boxSizing: "border-box", lineHeight: 1.5, outline: "none" }} />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Tags */}
-              {selected.tags && selected.tags.length > 0 && (
-                <div style={{ padding: "0 14px 14px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: st.t3, letterSpacing: ".1em", marginBottom: 6, textTransform: "uppercase" }}>Tags</div>
+                {/* Output type */}
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 9, color: S.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 6 }}>Tipo de output</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {selected.tags.map(tag => (
-                      <span key={tag} style={{ fontSize: 11, background: "rgba(255,255,255,.05)", color: st.t3, padding: "2px 8px", borderRadius: 4 }}>{tag}</span>
+                    {OUTPUT_TYPES.map(ot => (
+                      <button key={ot.key} onClick={() => setOutputType(ot.key)} style={{ padding: "4px 9px", background: outputType === ot.key ? `${ot.color}18` : "transparent", border: `1px solid ${outputType === ot.key ? ot.color + "50" : S.bdr}`, borderRadius: 6, color: outputType === ot.key ? ot.color : S.t3, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
+                        {ot.icon} {ot.label}
+                      </button>
                     ))}
                   </div>
                 </div>
+
+                {/* Extra context */}
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 9, color: S.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 4 }}>Contexto extra (opcional)</p>
+                  <textarea value={clientContext} onChange={e => setClientContext(e.target.value)} placeholder="Ej: campaña Black Friday, tono urgente, descuento 30%…" rows={2} style={{ width: "100%", background: S.surf3, border: `1px solid ${S.bdr}`, borderRadius: 6, padding: "7px 9px", color: S.t1, fontSize: 10, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5 }} />
+                </div>
+
+                {/* Adapt button */}
+                <button onClick={() => void adaptPrompt()} disabled={isAdapting} style={{ width: "100%", padding: "9px", background: isAdapting ? S.surf3 : "linear-gradient(135deg,rgba(201,169,97,.25),rgba(201,169,97,.12))", border: `1px solid ${isAdapting ? S.bdr : "rgba(201,169,97,.4)"}`, borderRadius: 8, color: isAdapting ? S.t4 : S.gold, fontWeight: 700, fontSize: 11, cursor: isAdapting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  {isAdapting ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Adaptando con Claude…</> : <><Wand2 size={12} /> Adaptar Prompt para {projects.find(p => p.id === projectId)?.name ?? "cliente"}</>}
+                </button>
+              </div>
+
+              {/* ── Adapted prompt result ── */}
+              {(adaptedPrompt || isAdapting) && (
+                <div style={{ margin: "0 14px 14px", padding: 12, background: S.surf3, border: "1px solid rgba(201,169,97,.2)", borderRadius: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: S.gold, letterSpacing: ".1em", textTransform: "uppercase" }}>PROMPT ADAPTADO</span>
+                    {adaptedPrompt && (
+                      <button onClick={() => copyText(adaptedPrompt, "adapted")} style={{ padding: "1px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer" }}>{copied === "adapted" ? "✓" : "📋"}</button>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: S.t1, lineHeight: 1.6, maxHeight: 180, overflowY: "auto", wordBreak: "break-word" }}>
+                    {adaptedPrompt || <span style={{ color: S.t4 }}>Generando adaptación…</span>}
+                  </div>
+                  {adaptedPrompt && (
+                    <button onClick={() => void generateFromAdapted()} disabled={isGenerating} style={{ width: "100%", marginTop: 10, padding: "9px", background: isGenerating ? S.surf2 : "linear-gradient(135deg,#c9a961,#b8860b)", border: "none", borderRadius: 7, color: isGenerating ? S.t4 : "#000", fontWeight: 800, fontSize: 11, cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                      {isGenerating ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Generando…</> : <><Play size={12} /> Generar {OUTPUT_TYPES.find(o => o.key === outputType)?.label}</>}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* ── Generated output ── */}
+              {generatedOutput && (
+                <div style={{ margin: "0 14px 14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: "#22c55e", letterSpacing: ".1em", textTransform: "uppercase" }}>OUTPUT GENERADO</span>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {outputType === "html" && <button onClick={() => setOutputMode(m => m === "preview" ? "code" : "preview")} style={{ padding: "1px 7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer" }}>{outputMode === "preview" ? "Código" : "Preview"}</button>}
+                      <button onClick={() => copyText(generatedOutput, "gen-out")} style={{ padding: "1px 7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer" }}>{copied === "gen-out" ? "✓" : "📋"}</button>
+                      {outputType === "html" && <button onClick={() => downloadHtml(generatedOutput, `${selected?.name ?? "output"}.html`)} style={{ padding: "1px 7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer", display: "flex", alignItems: "center", gap: 2 }}><Download size={9} /></button>}
+                    </div>
+                  </div>
+                  <div style={{ border: `1px solid rgba(34,197,94,.2)`, borderRadius: 8, overflow: "hidden" }}>
+                    {outputType === "html" && outputMode === "preview"
+                      ? <iframe srcDoc={generatedOutput} sandbox="allow-scripts allow-same-origin" style={{ width: "100%", height: 260, border: "none" }} title="Generated preview" />
+                      : <pre style={{ margin: 0, padding: 10, background: S.surf3, color: "#a8b4d8", fontSize: 9.5, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 260, overflowY: "auto", lineHeight: 1.5 }}>{generatedOutput}</pre>
+                    }
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* Actions */}
-            <div style={{ padding: 12, borderTop: `1px solid ${st.border}`, display: "flex", gap: 6, flexShrink: 0 }}>
-              {selected.source === "builtin" && snippetDetail && (
-                <>
-                  <button onClick={() => copyCode(snippetDetail.html + (snippetDetail.css ? `\n<style>${snippetDetail.css}</style>` : "") + (snippetDetail.js ? `\n<script>${snippetDetail.js}</script>` : ""), "all")} style={{ flex: 1, padding: "7px", background: "rgba(201,169,97,.12)", border: "1px solid rgba(201,169,97,.3)", borderRadius: 6, color: st.gold, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                    {copied === "all" ? "✓ Copiado" : "📋 Copiar todo"}
-                  </button>
-                  <button onClick={() => {
-                    const b = new Blob([snippetDetail.previewHtml], { type: "text/html" });
-                    const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `${selected.id}.html`; a.click(); URL.revokeObjectURL(u);
-                  }} style={{ padding: "7px 12px", background: st.surface2, border: `1px solid ${st.border}`, borderRadius: 6, color: st.t2, fontSize: 11, cursor: "pointer" }}>⬇</button>
-                </>
+            {/* Panel footer actions */}
+            <div style={{ padding: 10, borderTop: `1px solid ${S.bdr}`, flexShrink: 0, display: "flex", gap: 6 }}>
+              {selected.source === "prompts" && (
+                <button onClick={() => copyText(getItemPrompt(selected), "footer-copy")} style={{ flex: 1, padding: "7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t2, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                  {copied === "footer-copy" ? <Check size={11} /> : <Copy size={11} />} Copiar prompt
+                </button>
+              )}
+              {selected.source === "effects" && snippetDetail && (
+                <button onClick={() => copyText(snippetDetail.html + (snippetDetail.css ? `\n<style>${snippetDetail.css}</style>` : "") + (snippetDetail.js ? `\n<script>${snippetDetail.js}</script>` : ""), "eff-copy")} style={{ flex: 1, padding: "7px", background: "rgba(201,169,97,.1)", border: "1px solid rgba(201,169,97,.25)", borderRadius: 6, color: S.gold, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                  {copied === "eff-copy" ? "✓ Copiado" : "📋 Copiar código"}
+                </button>
               )}
               {selected.source === "visme" && (
-                <button onClick={() => {
-                  setGeneratePrompt(`Generar un componente web usando este concepto de Visme "${selected.name}": ${selected.prompt?.slice(0, 200)}`);
-                  setSelected(null);
-                }} style={{ flex: 1, padding: "7px", background: "rgba(201,169,97,.12)", border: "1px solid rgba(201,169,97,.3)", borderRadius: 6, color: st.gold, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={() => { setCustomPrompt(`Generar componente web basado en "${selected.name}": ${getItemPrompt(selected).slice(0, 180)}`); setCustomOutputType("html"); closeDetail(); setTimeout(() => window.scrollTo(0, 99999), 100); }} style={{ flex: 1, padding: "7px", background: "rgba(99,102,241,.1)", border: "1px solid rgba(99,102,241,.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
                   ⚡ Generar con IA
                 </button>
               )}
+              <button onClick={closeDetail} style={{ padding: "7px 10px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t4, fontSize: 10, cursor: "pointer" }}>
+                <X size={11} />
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: S.surf2, border: "1px solid rgba(74,222,128,.3)", borderRadius: 10, padding: "10px 18px", fontSize: 12, color: "#4ade80", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, boxShadow: "0 8px 24px rgba(0,0,0,.5)", zIndex: 9999 }}>
+          <Check size={14} /> {toast}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeSlideUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        .skeleton { background: linear-gradient(90deg, #16161f 25%, #1e1e2a 50%, #16161f 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+      `}</style>
     </div>
   );
 }

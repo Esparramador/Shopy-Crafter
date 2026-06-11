@@ -7,12 +7,24 @@
  * POST /api/visme/preview        — HTML preview with DNA applied
  */
 import { Router, type Request, type Response } from "express";
+import Anthropic from "@anthropic-ai/sdk";
 import {
   EFFECT_SNIPPETS, loadVismeTemplates, applyDna, buildDnaFromProject, buildEffectPreviewHtml,
   type DnaVars, DEFAULT_DNA,
 } from "../lib/visme-effects.js";
 import { streamHtmlClaude } from "../lib/web-designer.js";
 import { logger } from "../lib/logger.js";
+
+/** Same pattern as claude.ts getDefaultClient — prefers AI Integrations proxy */
+function makeAnthropicClient(): Anthropic {
+  if (process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL && process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY) {
+    return new Anthropic({
+      baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+      apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+    });
+  }
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 const router = Router();
 
@@ -178,6 +190,110 @@ router.post("/visme/generate", async (req: Request, res: Response): Promise<void
     }
   } catch (err: any) {
     logger.error({ err }, "visme/generate error");
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+    else { try { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); res.end(); } catch {} }
+  }
+});
+
+/**
+ * POST /api/visme/adapt
+ * Adapts ANY prompt (from master library, Visme, or custom) to a specific client
+ * using Brand DNA injection via Claude streaming.
+ * Body: { prompt, projectId?, outputType?, clientContext? }
+ */
+router.post("/visme/adapt", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { prompt, projectId, outputType = "copy", clientContext = "" } = req.body as {
+      prompt: string; projectId?: number; outputType?: string; clientContext?: string;
+    };
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt is required" }); return; }
+
+    let dna: DnaVars = DEFAULT_DNA;
+    let projectName = "tu marca";
+    let sector = "e-commerce";
+    if (projectId) {
+      try {
+        const { db, projectsTable } = await import("@workspace/db");
+        const { eq } = await import("drizzle-orm");
+        const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, Number(projectId)));
+        if (proj) {
+          dna = buildDnaFromProject(proj);
+          projectName = (proj as any).name ?? projectName;
+          sector = (proj as any).sector ?? sector;
+        }
+      } catch { /* use defaults */ }
+    }
+
+    const dnaContext = `
+BRAND DNA — ${projectName}:
+- Colores: primario=${dna.primary}, secundario=${dna.secondary}, fondo=${dna.bg}
+- Tipografía: ${dna.font}
+- Sector: ${sector}
+- Headline de marca: "${dna.headline}"
+- Tagline: "${dna.tagline}"
+- CTA principal: "${dna.cta}"
+- USP: ${dna.usp1 || "propuesta de valor única"}
+${clientContext ? `\nContexto adicional del cliente: ${clientContext}` : ""}`;
+
+    const outputTypeInstructions: Record<string, string> = {
+      copy: "Reescribe este prompt adaptándolo para generar COPY/TEXTO persuasivo de marketing para esta marca. Devuelve el prompt adaptado listo para usar en Claude/GPT.",
+      html: "Reescribe este prompt adaptándolo para generar un COMPONENTE HTML/CSS/JS completo para esta marca. Incluye instrucciones de colores, tipografía y estilo de marca. Devuelve el prompt adaptado.",
+      image: "Reescribe este prompt adaptándolo para generar IMÁGENES con IA (Flux/Midjourney/Ideogram) para esta marca. Incluye paleta de colores, estilo visual y estética. Devuelve el prompt de imagen adaptado.",
+      video: "Reescribe este prompt adaptándolo para generar un VÍDEO/SCRIPT para esta marca. Adapta el tono, estilo y mensajes a la identidad de marca. Devuelve el prompt adaptado.",
+      social: "Reescribe este prompt adaptándolo para generar CONTENIDO SOCIAL MEDIA para esta marca. Adapta el tono, hashtags sugeridos y estilo de comunicación. Devuelve el prompt adaptado.",
+      email: "Reescribe este prompt adaptándolo para generar un EMAIL MARKETING para esta marca. Adapta el asunto, tono y estructura. Devuelve el prompt adaptado.",
+    };
+    const instruction = outputTypeInstructions[outputType] ?? outputTypeInstructions.copy;
+
+    const systemPrompt = `Eres un experto en marketing digital y branding especializado en adaptar prompts de IA para marcas específicas.
+Tu tarea: tomar un prompt genérico y adaptarlo con el DNA de la marca para que el output generado refleje perfectamente la identidad, colores, tono y valores de la marca.
+REGLAS:
+- Mantén la esencia y objetivo del prompt original
+- Inyecta los colores de marca en referencias visuales
+- Usa el tono y voz de la marca
+- Incluye el nombre de la marca donde sea natural
+- Adapta referencias de sector/industria
+- El output DEBE SER el prompt adaptado DIRECTAMENTE (no expliques, no añadas comentarios extra)
+- Escribe en español si el original está en español, en inglés si está en inglés`;
+
+    const userPrompt = `PROMPT ORIGINAL:
+${prompt}
+
+${dnaContext}
+
+TAREA: ${instruction}
+
+PROMPT ADAPTADO PARA ${projectName.toUpperCase()}:`;
+
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    let fullText = "";
+    const heartbeat = setInterval(() => { try { res.write(": ping\n\n"); } catch {} }, 20000);
+
+    try {
+      const client = makeAnthropicClient();
+      const stream = await client.messages.stream({
+        model: "claude-haiku-4-5",
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          fullText += event.delta.text;
+          res.write(`data: ${JSON.stringify({ chunk: event.delta.text })}\n\n`);
+        }
+      }
+      res.write(`data: ${JSON.stringify({ done: true, adapted: fullText, dna })}\n\n`);
+    } finally {
+      clearInterval(heartbeat);
+      res.end();
+    }
+  } catch (err: any) {
+    logger.error({ err }, "visme/adapt error");
     if (!res.headersSent) res.status(500).json({ error: err.message });
     else { try { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); res.end(); } catch {} }
   }
