@@ -3,8 +3,8 @@
  *
  * Flujo:
  *  1. Lista de tarjetas del proyecto (sidebar izquierda)
- *  2. Editor de la tarjeta seleccionada (centro): datos, paleta, fonts, layout, fondo
- *  3. Preview live de FRONT + BACK (derecha) + acciones (Generar, Descargar PNG/PDF/SVG)
+ *  2. Editor de la tarjeta seleccionada (centro): datos, paleta, fonts, layout, fondo, QR
+ *  3. Preview LIVE en CSS (derecha) + preview PNG generado + acciones
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRoute } from "wouter";
@@ -12,6 +12,7 @@ import {
   Loader2, Sparkles, Plus, Trash2, Download, Wand2, Save,
   CreditCard, RefreshCw, AlertCircle, CheckCircle2, Upload,
   Image as ImageIcon, FileText, QrCode, Palette, Move,
+  Link2, Video, Frame, Smartphone, Eye, EyeOff, Copy, ExternalLink,
 } from "lucide-react";
 import CardStudioEditor, { type LayoutOverrides } from "./CardStudioEditor";
 
@@ -48,6 +49,8 @@ interface BusinessCard {
   socialHandle?: string | null;
   address?: string | null;
   qrUrl?: string | null;
+  qrType?: string | null;
+  qrContentUrl?: string | null;
   palette: Palette;
   fonts: Fonts;
   layout: "centered" | "left" | "grid";
@@ -69,38 +72,33 @@ interface BusinessCard {
 }
 
 const BG_MODELS = [
-  // Premium — máxima calidad
-  { id: "nano-banana-pro",        label: "Gemini 3 Pro Image · 4K ($0.12)",        tier: "premium" },
-  { id: "imagen-4-ultra",         label: "Imagen 4 Ultra · 2K ($0.06)",            tier: "premium" },
-  { id: "flux-1.1-pro-ultra",     label: "Flux 1.1 Pro Ultra · 4MP ($0.06)",       tier: "premium" },
-  { id: "flux-1.1-pro-ultra-raw", label: "Flux Pro Ultra RAW · natural ($0.06)",   tier: "premium" },
-  { id: "ideogram-v3-quality",    label: "Ideogram v3 Quality · texto max ($0.06)", tier: "premium" },
-  // Best — texto nítido / vector / identidad
-  { id: "recraft-v4",             label: "Recraft v4 · latest, texto+real ($0.05)", tier: "best" },
-  { id: "recraft-v3",             label: "Recraft v3 · texto en imagen ($0.04)",    tier: "best" },
-  { id: "recraft-v3-svg",         label: "Recraft v3 SVG · vectorial ($0.08)",      tier: "best" },
-  { id: "seedream-4",             label: "Seedream 4 · ByteDance ($0.04)",          tier: "best" },
-  { id: "ideogram-v3-turbo",      label: "Ideogram v3 Turbo · texto ($0.03)",       tier: "best" },
-  // Balanced
-  { id: "imagen-4",               label: "Imagen 4 · estándar ($0.04)",             tier: "balanced" },
-  { id: "flux-1.1-pro",           label: "Flux 1.1 Pro ($0.04)",                    tier: "balanced" },
-  { id: "flux-kontext-pro",       label: "Flux Kontext Pro · consistencia ($0.05)", tier: "balanced" },
-  { id: "flux-kontext-max",       label: "Flux Kontext Max · premium ($0.07)",      tier: "balanced" },
-  { id: "nano-banana",            label: "Gemini 2.5 Flash Image ($0.04)",          tier: "balanced" },
-  { id: "gpt-image-2",            label: "OpenAI gpt-image-2 · flagship 2026 ($0.05)", tier: "balanced" },
-  { id: "gpt-image-1.5",         label: "OpenAI gpt-image-1.5 · -20% precio ($0.03)", tier: "balanced" },
-  { id: "gpt-image-1",           label: "OpenAI gpt-image-1 · clásico ($0.04)",       tier: "balanced" },
-  { id: "gpt-image-1-mini",      label: "OpenAI gpt-image-1 mini · rápido ($0.02)",   tier: "economy" },
-  // Economy / creativo
-  { id: "flux-kontext-dev",       label: "Flux Kontext Dev · artístico ($0.03)",    tier: "economy" },
-  { id: "imagen-4-fast",          label: "Imagen 4 Fast ($0.02)",                   tier: "economy" },
-  { id: "flux-schnell",           label: "Flux Schnell ($0.003)",                   tier: "economy" },
+  { id: "recraft-v4",             label: "Recraft v4 · recomendado ($0.05)",         tier: "best" },
+  { id: "recraft-v3",             label: "Recraft v3 · texto en imagen ($0.04)",      tier: "best" },
+  { id: "ideogram-v3-quality",    label: "Ideogram v3 Quality · texto max ($0.06)",   tier: "premium" },
+  { id: "imagen-4-ultra",         label: "Imagen 4 Ultra · 2K ($0.06)",               tier: "premium" },
+  { id: "flux-1.1-pro-ultra",     label: "Flux 1.1 Pro Ultra · 4MP ($0.06)",          tier: "premium" },
+  { id: "flux-kontext-max",       label: "Flux Kontext Max · premium ($0.07)",        tier: "balanced" },
+  { id: "flux-1.1-pro",           label: "Flux 1.1 Pro ($0.04)",                      tier: "balanced" },
+  { id: "nano-banana",            label: "Gemini 2.5 Flash Image ($0.04)",            tier: "balanced" },
+  { id: "imagen-4",               label: "Imagen 4 · estándar ($0.04)",               tier: "balanced" },
+  { id: "gpt-image-2",            label: "OpenAI gpt-image-2 ($0.05)",                tier: "balanced" },
+  { id: "seedream-4",             label: "Seedream 4 · ByteDance ($0.04)",            tier: "balanced" },
+  { id: "imagen-4-fast",          label: "Imagen 4 Fast ($0.02)",                     tier: "economy" },
+  { id: "flux-schnell",           label: "Flux Schnell · rápido ($0.003)",            tier: "economy" },
+];
+
+const QR_TYPES = [
+  { id: "vcard",     label: "vCard",     icon: <Smartphone size={13}/>, desc: "Añade el contacto directo a la agenda" },
+  { id: "url",       label: "URL",       icon: <Link2 size={13}/>,      desc: "Redirige a un sitio web" },
+  { id: "video",     label: "Video",     icon: <Video size={13}/>,      desc: "Reproduce un video (YouTube o MP4)" },
+  { id: "image",     label: "Imagen",    icon: <ImageIcon size={13}/>,  desc: "Muestra una imagen en pantalla completa" },
+  { id: "animation", label: "Animación", icon: <Frame size={13}/>,      desc: "Tarjeta animada premium" },
 ];
 
 const LAYOUTS: Array<{ id: "centered" | "left" | "grid"; label: string; desc: string }> = [
-  { id: "centered", label: "Centrado",   desc: "Texto centrado · estilo lujo / clásico" },
-  { id: "left",     label: "Izquierda",  desc: "Alineado izq · estilo moderno / agency" },
-  { id: "grid",     label: "Grid",       desc: "Estructura 2 col · estilo corporate" },
+  { id: "centered", label: "Centrado",  desc: "Texto centrado · estilo lujo / clásico" },
+  { id: "left",     label: "Izquierda", desc: "Alineado izq · estilo moderno / agency" },
+  { id: "grid",     label: "Grid",      desc: "Estructura 2 col · estilo corporate" },
 ];
 
 const POPULAR_FONTS = [
@@ -121,88 +119,65 @@ export default function CardStudio() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  // Editor visual de posiciones
   const [showEditor, setShowEditor] = useState(false);
-
-  // Auto-design dialog state
   const [showAutoDesign, setShowAutoDesign] = useState(false);
   const [autoIndustry, setAutoIndustry] = useState("");
   const [autoVibe, setAutoVibe] = useState("");
   const [autoColor, setAutoColor] = useState("");
   const [autoBrand, setAutoBrand] = useState("");
   const [autoBusy, setAutoBusy] = useState(false);
+  const [bgModel, setBgModel] = useState("recraft-v4");
+  const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
+  const [showGenerated, setShowGenerated] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
-  // ── Cargar catálogo y lista ──────────────────────────────────────────
+  const selected = useMemo(() => cards.find((c) => c.id === selectedId) ?? null, [cards, selectedId]);
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
+    if (!projectId) { setLoading(false); return; }
+    const load = async () => {
       try {
-        const [tplRes, listRes] = await Promise.all([
+        const [tRes, cRes] = await Promise.all([
           fetch(`${API_BASE}/api/cards/templates`, { credentials: "include" }),
           fetch(`${API_BASE}/api/projects/${projectId}/cards`, { credentials: "include" }),
         ]);
-        if (cancelled) return;
-        const tplData = await tplRes.json();
-        const listData = await listRes.json();
-        setTemplates(tplData.templates || []);
-        setCards(listData.cards || []);
-        if (listData.cards?.length && selectedId === null) {
-          setSelectedId(listData.cards[0].id);
-        }
+        if (tRes.ok) { const d = await tRes.json(); setTemplates(d.templates || []); }
+        if (cRes.ok) { const d = await cRes.json(); setCards(d.cards || []); }
       } catch (err: any) {
         setError(err?.message || "Error cargando datos");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      } finally { setLoading(false); }
+    };
+    load();
   }, [projectId]);
 
-  const selected = useMemo(
-    () => cards.find((c) => c.id === selectedId) ?? null,
-    [cards, selectedId],
-  );
-
-  // ── Crear nueva tarjeta ──────────────────────────────────────────────
   const createCard = useCallback(async (templateId: string) => {
     setError(null);
     try {
-      const tpl = templates.find((t) => t.id === templateId);
       const res = await fetch(`${API_BASE}/api/projects/${projectId}/cards`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: `Nueva tarjeta · ${tpl?.name || templateId}`,
           templateId,
-          fullName: "Nombre Apellido",
-          jobTitle: "Cargo / Posición",
-          companyName: "Tu Marca",
-          tagline: "Descripción breve de tu propuesta de valor.",
-          email: "hola@tumarca.com",
-          phone: "+34 600 000 000",
-          website: "tumarca.com",
-          socialHandle: "@tumarca",
+          fullName: "Tu Nombre Aquí",
+          name: "Nueva tarjeta",
+          qrType: "vcard",
+          qrContentUrl: "",
           qrUrl: "",
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Error creando tarjeta");
-      const created: BusinessCard = await res.json();
-      setCards((prev) => [created, ...prev]);
-      setSelectedId(created.id);
+      const card: BusinessCard = await res.json();
+      setCards((prev) => [...prev, card]);
+      setSelectedId(card.id);
+      setShowGenerated(false);
     } catch (err: any) {
       setError(err?.message || "Error");
     }
-  }, [projectId, templates]);
+  }, [projectId]);
 
-  // ── Guardar cambios ──────────────────────────────────────────────────
-  const updateCard = useCallback(async (id: number, patch: Partial<BusinessCard>) => {
+  const updateCard = useCallback(async (id: number, patch: Partial<BusinessCard> & Record<string, any>) => {
     setSaving(true);
-    setError(null);
     try {
       const res = await fetch(`${API_BASE}/api/cards/${id}`, {
         method: "PATCH",
@@ -215,9 +190,7 @@ export default function CardStudio() {
       setCards((prev) => prev.map((c) => (c.id === id ? updated : c)));
     } catch (err: any) {
       setError(err?.message || "Error");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }, []);
 
   const updateLocal = useCallback((patch: Partial<BusinessCard>) => {
@@ -225,13 +198,11 @@ export default function CardStudio() {
     setCards((prev) => prev.map((c) => (c.id === selected.id ? { ...c, ...patch } : c)));
   }, [selected]);
 
-  // ── Generar tarjeta ──────────────────────────────────────────────────
-  const generateCard = useCallback(async (id: number, bgModel?: string) => {
+  const generateCard = useCallback(async (id: number) => {
     setGenerating(true);
     setError(null);
     setSuccess(null);
     try {
-      // Primero guarda el estado actual (abortar si falla para no generar con datos viejos)
       const current = cards.find((c) => c.id === id);
       if (current) {
         const saveRes = await fetch(`${API_BASE}/api/cards/${id}`, {
@@ -250,6 +221,8 @@ export default function CardStudio() {
             socialHandle: current.socialHandle,
             address: current.address,
             qrUrl: current.qrUrl,
+            qrType: current.qrType || "vcard",
+            qrContentUrl: current.qrContentUrl || null,
             templateId: current.templateId,
             layout: current.layout,
             palette: current.palette,
@@ -259,7 +232,7 @@ export default function CardStudio() {
         });
         if (!saveRes.ok) {
           const errBody = await saveRes.json().catch(() => ({}));
-          throw new Error(`No se pudo autoguardar antes de generar: ${errBody.error || saveRes.statusText}`);
+          throw new Error(`No se pudo guardar antes de generar: ${errBody.error || saveRes.statusText}`);
         }
       }
 
@@ -273,15 +246,13 @@ export default function CardStudio() {
       const data = await res.json();
       setCards((prev) => prev.map((c) => (c.id === id ? data.card : c)));
       setSuccess(`✓ Tarjeta generada (coste: $${data.cost?.toFixed(4) || "0.00"})`);
+      setShowGenerated(true);
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
       setError(err?.message || "Error generando");
-    } finally {
-      setGenerating(false);
-    }
-  }, [cards]);
+    } finally { setGenerating(false); }
+  }, [cards, bgModel]);
 
-  // ── Eliminar ─────────────────────────────────────────────────────────
   const deleteCard = useCallback(async (id: number) => {
     if (!confirm("¿Eliminar esta tarjeta?")) return;
     try {
@@ -293,7 +264,6 @@ export default function CardStudio() {
     }
   }, [selectedId]);
 
-  // ── Subir logo ───────────────────────────────────────────────────────
   const uploadLogo = useCallback(async (id: number, file: File) => {
     setError(null);
     try {
@@ -312,7 +282,6 @@ export default function CardStudio() {
     }
   }, []);
 
-  // ── Auto-design ──────────────────────────────────────────────────────
   const runAutoDesign = useCallback(async () => {
     if (!selected) return;
     setAutoBusy(true);
@@ -321,16 +290,10 @@ export default function CardStudio() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          industry: autoIndustry,
-          vibe: autoVibe,
-          preferredColor: autoColor,
-          brandName: autoBrand,
-        }),
+        body: JSON.stringify({ industry: autoIndustry, vibe: autoVibe, preferredColor: autoColor, brandName: autoBrand }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Error");
       const data = await res.json();
-      // Aplica al estado local + persiste
       const patch: Partial<BusinessCard> = {
         templateId: data.templateId,
         palette: data.palette,
@@ -344,10 +307,17 @@ export default function CardStudio() {
       setTimeout(() => setSuccess(null), 8000);
     } catch (err: any) {
       setError(err?.message || "Error en auto-design");
-    } finally {
-      setAutoBusy(false);
-    }
+    } finally { setAutoBusy(false); }
   }, [autoIndustry, autoVibe, autoColor, autoBrand, selected, updateLocal, updateCard]);
+
+  const copyLandingUrl = useCallback(() => {
+    if (!selected) return;
+    const url = `${window.location.origin}${API_BASE}/api/public/qr/${selected.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    });
+  }, [selected]);
 
   if (loading) {
     return (
@@ -356,6 +326,9 @@ export default function CardStudio() {
       </div>
     );
   }
+
+  const qrTypeLandingNeeded = selected && ["video", "image", "animation"].includes(selected.qrType || "vcard");
+  const qrContentNeeded = selected && ["url", "video", "image"].includes(selected.qrType || "vcard");
 
   return (
     <div style={{ padding: "16px 20px 60px", maxWidth: 1600, margin: "0 auto" }}>
@@ -367,15 +340,11 @@ export default function CardStudio() {
             Card Studio
           </h1>
           <p style={{ fontSize: 12, color: "var(--t3)", margin: "4px 0 0" }}>
-            Tarjetas de presentación profesionales · 300 DPI · 85×55mm + 3mm sangrado · QR funcional · texto vectorial perfecto
+            Tarjetas profesionales · 300 DPI · 85×55mm · QR inteligente · live preview
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setShowAutoDesign(true)}
-            disabled={!selected}
-            style={btnSecondary}
-          >
+          <button onClick={() => setShowAutoDesign(true)} disabled={!selected} style={btnSecondary}>
             <Wand2 size={14} /> Auto-design IA
           </button>
         </div>
@@ -393,20 +362,19 @@ export default function CardStudio() {
       )}
 
       {/* GRID 3-col */}
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 580px", gap: 16, alignItems: "start" }}>
-        {/* ── COL 1: Lista de tarjetas + crear nueva ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 560px", gap: 16, alignItems: "start" }}>
+
+        {/* ── COL 1: Lista + crear ── */}
         <div style={panelStyle}>
           <h3 style={panelTitle}>Tarjetas ({cards.length})</h3>
           <div style={{ maxHeight: 360, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
             {cards.length === 0 && (
-              <p style={{ fontSize: 12, color: "var(--t3)", textAlign: "center", padding: 20 }}>
-                Sin tarjetas todavía. Crea una abajo.
-              </p>
+              <p style={{ fontSize: 12, color: "var(--t3)", textAlign: "center", padding: 20 }}>Sin tarjetas. Crea una abajo.</p>
             )}
             {cards.map((c) => (
               <div
                 key={c.id}
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => { setSelectedId(c.id); setShowGenerated(c.status === "ready"); }}
                 style={{
                   padding: 10, borderRadius: 6, cursor: "pointer",
                   background: selectedId === c.id ? "rgba(212,175,55,0.12)" : "rgba(255,255,255,0.02)",
@@ -415,9 +383,7 @@ export default function CardStudio() {
                 }}
               >
                 <div style={{ overflow: "hidden", flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {c.name}
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
                   <div style={{ fontSize: 11, color: "var(--t3)", display: "flex", alignItems: "center", gap: 6 }}>
                     {c.fullName} · <StatusBadge status={c.status} />
                   </div>
@@ -426,34 +392,25 @@ export default function CardStudio() {
                   onClick={(e) => { e.stopPropagation(); deleteCard(c.id); }}
                   style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer", padding: 4 }}
                   title="Eliminar"
-                >
-                  <Trash2 size={14} />
-                </button>
+                ><Trash2 size={14} /></button>
               </div>
             ))}
           </div>
           <h4 style={{ fontSize: 11, color: "var(--t3)", margin: "0 0 8px", letterSpacing: 1.4, textTransform: "uppercase" }}>
-            Crear nueva con plantilla
+            Nueva con plantilla
           </h4>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
             {templates.map((t) => (
               <button
                 key={t.id}
                 onClick={() => createCard(t.id)}
-                style={{
-                  padding: "8px 10px", textAlign: "left", background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, color: "var(--t1)",
-                  cursor: "pointer", fontSize: 12,
-                }}
+                style={{ padding: "8px 10px", textAlign: "left", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, color: "var(--t1)", cursor: "pointer", fontSize: 12 }}
                 title={t.description}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Plus size={12} />
-                  <span style={{ fontWeight: 500 }}>{t.name}</span>
+                  <Plus size={12} /><span style={{ fontWeight: 500 }}>{t.name}</span>
                 </div>
-                <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>
-                  {t.category}
-                </div>
+                <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{t.category}</div>
               </button>
             ))}
           </div>
@@ -506,9 +463,89 @@ export default function CardStudio() {
               <Field label="Dirección">
                 <input value={selected.address ?? ""} onChange={(e) => updateLocal({ address: e.target.value })} onBlur={() => updateCard(selected.id, { address: selected.address })} style={inputStyle} />
               </Field>
-              <Field label={<>QR URL <span style={{ color: "var(--t3)" }}>(vacío → vCard auto)</span></>}>
-                <input value={selected.qrUrl ?? ""} onChange={(e) => updateLocal({ qrUrl: e.target.value })} onBlur={() => updateCard(selected.id, { qrUrl: selected.qrUrl })} placeholder="https://… (opcional)" style={inputStyle} />
+            </Section>
+
+            {/* ── QR DESTINATION ── */}
+            <Section title="QR Destination">
+              <Field label="Qué hace el QR al escanearse:">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+                  {QR_TYPES.map((qt) => (
+                    <button
+                      key={qt.id}
+                      onClick={() => {
+                        updateLocal({ qrType: qt.id, qrContentUrl: selected.qrContentUrl });
+                        updateCard(selected.id, { qrType: qt.id, qrContentUrl: selected.qrContentUrl || null });
+                      }}
+                      title={qt.desc}
+                      style={{
+                        padding: "7px 8px", fontSize: 11, borderRadius: 5, display: "flex", alignItems: "center", gap: 6,
+                        background: (selected.qrType || "vcard") === qt.id ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)",
+                        border: (selected.qrType || "vcard") === qt.id ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
+                        color: "var(--t1)", cursor: "pointer", fontWeight: (selected.qrType || "vcard") === qt.id ? 600 : 400,
+                      }}
+                    >
+                      {qt.icon} {qt.label}
+                    </button>
+                  ))}
+                </div>
               </Field>
+
+              {qrContentNeeded && (
+                <Field label={
+                  selected.qrType === "url" ? "URL de destino" :
+                  selected.qrType === "video" ? "URL del video (YouTube, MP4, etc.)" :
+                  "URL de la imagen"
+                }>
+                  <input
+                    value={selected.qrContentUrl ?? ""}
+                    onChange={(e) => updateLocal({ qrContentUrl: e.target.value })}
+                    onBlur={() => updateCard(selected.id, { qrType: selected.qrType || "vcard", qrContentUrl: selected.qrContentUrl || null })}
+                    placeholder={
+                      selected.qrType === "url" ? "https://tuwebsite.com" :
+                      selected.qrType === "video" ? "https://youtube.com/watch?v=… o URL de .mp4" :
+                      "https://… (imagen PNG/JPG/WebP)"
+                    }
+                    style={inputStyle}
+                  />
+                </Field>
+              )}
+
+              {qrTypeLandingNeeded && (
+                <div style={{ background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.2)", borderRadius: 6, padding: 10, fontSize: 11 }}>
+                  <div style={{ color: "var(--gold)", marginBottom: 6, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                    <QrCode size={12} /> Landing page del QR
+                  </div>
+                  <div style={{ color: "var(--t3)", marginBottom: 8, wordBreak: "break-all" }}>
+                    {`${window.location.origin}${API_BASE}/api/public/qr/${selected.id}`}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={copyLandingUrl} style={{ ...btnSmall, fontSize: 10 }}>
+                      <Copy size={10} /> {copiedUrl ? "¡Copiado!" : "Copiar URL"}
+                    </button>
+                    <a
+                      href={`${window.location.origin}${API_BASE}/api/public/qr/${selected.id}`}
+                      target="_blank"
+                      rel="noopener"
+                      style={{ ...btnSmall, textDecoration: "none", fontSize: 10 }}
+                    >
+                      <ExternalLink size={10} /> Vista previa
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {(selected.qrType === "vcard" || !selected.qrType) && (
+                <div style={{ fontSize: 11, color: "var(--t3)", padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 5 }}>
+                  El QR contendrá tu contacto completo (vCard 3.0) para añadir directamente a la agenda.
+                </div>
+              )}
+
+              {/* QR Download (only when generated) */}
+              {selected.status === "ready" && (
+                <a href={`${API_BASE}/api/cards/${selected.id}/qr.svg`} download={`${selected.name}-qr.svg`} style={{ ...btnSmall, textDecoration: "none" }}>
+                  <QrCode size={12} /> Descargar QR SVG
+                </a>
+              )}
             </Section>
 
             <Section title="Diseño">
@@ -539,10 +576,7 @@ export default function CardStudio() {
                       <input
                         type="color"
                         value={selected.palette?.[k] || "#000000"}
-                        onChange={(e) => {
-                          const newPal = { ...selected.palette, [k]: e.target.value };
-                          updateLocal({ palette: newPal });
-                        }}
+                        onChange={(e) => updateLocal({ palette: { ...selected.palette, [k]: e.target.value } })}
                         onBlur={() => updateCard(selected.id, { palette: selected.palette as any })}
                         style={{ width: "100%", height: 32, border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
                       />
@@ -550,20 +584,12 @@ export default function CardStudio() {
                   ))}
                 </div>
               </Field>
-              <Field label="Tipografías (Google Fonts)">
+              <Field label="Tipografías">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                  <select
-                    value={selected.fonts?.heading || "Inter"}
-                    onChange={(e) => { const newF = { ...selected.fonts, heading: e.target.value }; updateLocal({ fonts: newF }); updateCard(selected.id, { fonts: newF as any }); }}
-                    style={inputStyle}
-                  >
+                  <select value={selected.fonts?.heading || "Inter"} onChange={(e) => { const f = { ...selected.fonts, heading: e.target.value }; updateLocal({ fonts: f }); updateCard(selected.id, { fonts: f as any }); }} style={inputStyle}>
                     {POPULAR_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
                   </select>
-                  <select
-                    value={selected.fonts?.body || "Inter"}
-                    onChange={(e) => { const newF = { ...selected.fonts, body: e.target.value }; updateLocal({ fonts: newF }); updateCard(selected.id, { fonts: newF as any }); }}
-                    style={inputStyle}
-                  >
+                  <select value={selected.fonts?.body || "Inter"} onChange={(e) => { const f = { ...selected.fonts, body: e.target.value }; updateLocal({ fonts: f }); updateCard(selected.id, { fonts: f as any }); }} style={inputStyle}>
                     {POPULAR_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
                   </select>
                 </div>
@@ -571,20 +597,8 @@ export default function CardStudio() {
               <Field label="Fondo">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
                   {(["solid","gradient","ai-texture"] as const).map((k) => (
-                    <button
-                      key={k}
-                      onClick={() => {
-                        const newBg = { ...selected.backgroundConfig, kind: k };
-                        updateLocal({ backgroundConfig: newBg });
-                        updateCard(selected.id, { backgroundConfig: newBg as any });
-                      }}
-                      style={{
-                        padding: 8, fontSize: 11, borderRadius: 4,
-                        background: selected.backgroundConfig?.kind === k ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)",
-                        border: selected.backgroundConfig?.kind === k ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
-                        color: "var(--t1)", cursor: "pointer",
-                      }}
-                    >
+                    <button key={k} onClick={() => { const b = { ...selected.backgroundConfig, kind: k }; updateLocal({ backgroundConfig: b }); updateCard(selected.id, { backgroundConfig: b as any }); }}
+                      style={{ padding: 8, fontSize: 11, borderRadius: 4, background: selected.backgroundConfig?.kind === k ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)", border: selected.backgroundConfig?.kind === k ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)", color: "var(--t1)", cursor: "pointer" }}>
                       {k === "solid" ? "Sólido" : k === "gradient" ? "Degradado" : "IA Textura"}
                     </button>
                   ))}
@@ -592,12 +606,9 @@ export default function CardStudio() {
                 {selected.backgroundConfig?.kind === "ai-texture" && (
                   <textarea
                     value={selected.backgroundConfig?.prompt || ""}
-                    onChange={(e) => {
-                      const newBg = { ...selected.backgroundConfig, prompt: e.target.value };
-                      updateLocal({ backgroundConfig: newBg });
-                    }}
+                    onChange={(e) => updateLocal({ backgroundConfig: { ...selected.backgroundConfig, prompt: e.target.value } })}
                     onBlur={() => updateCard(selected.id, { backgroundConfig: selected.backgroundConfig as any })}
-                    placeholder="Prompt para IA (sin texto/letras): premium leather texture, fine grain, dramatic lighting…"
+                    placeholder="Prompt IA: premium leather texture, fine grain, dramatic lighting…"
                     style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
                   />
                 )}
@@ -606,12 +617,7 @@ export default function CardStudio() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <label style={{ ...btnSecondary, cursor: "pointer" }}>
                     <Upload size={14} /> {selected.logoUrl ? "Cambiar logo" : "Subir logo"}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                      style={{ display: "none" }}
-                      onChange={(e) => { if (e.target.files?.[0]) uploadLogo(selected.id, e.target.files[0]); }}
-                    />
+                    <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) uploadLogo(selected.id, e.target.files[0]); }} />
                   </label>
                   {selected.logoUrl && (
                     <img src={selected.logoUrl} alt="logo" style={{ height: 32, maxWidth: 80, objectFit: "contain", background: "#fff", padding: 2, borderRadius: 4 }} />
@@ -626,96 +632,127 @@ export default function CardStudio() {
           <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
             <CreditCard size={32} style={{ color: "var(--t3)", marginBottom: 12 }} />
             <p style={{ color: "var(--t3)", fontSize: 13, margin: 0 }}>
-              {cards.length === 0
-                ? "Crea tu primera tarjeta seleccionando una plantilla a la izquierda."
-                : "Selecciona una tarjeta de la lista o crea una nueva."}
+              {cards.length === 0 ? "Crea tu primera tarjeta seleccionando una plantilla." : "Selecciona una tarjeta."}
             </p>
           </div>
         )}
 
-        {/* ── COL 3: Preview + Acciones ── */}
+        {/* ── COL 3: Live Preview + Acciones ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {selected && (
             <>
+              {/* Live Preview panel */}
               <div style={panelStyle}>
-                <h3 style={panelTitle}>Acciones</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <select
-                    id="bg-model-select"
-                    defaultValue="recraft-v4"
-                    style={inputStyle}
-                  >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <h3 style={{ ...panelTitle, margin: 0 }}>
+                    {showGenerated && selected.frontUrl ? "Vista generada" : "Live Preview"}
+                  </h3>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {showGenerated && selected.frontUrl && (
+                      <button onClick={() => setShowGenerated(false)} style={{ ...btnSmall, fontSize: 10, color: "var(--t3)" }} title="Ver live preview">
+                        <Eye size={10} /> Live
+                      </button>
+                    )}
+                    {!showGenerated && selected.frontUrl && (
+                      <button onClick={() => setShowGenerated(true)} style={{ ...btnSmall, fontSize: 10, color: "var(--gold)" }} title="Ver imagen generada">
+                        <ImageIcon size={10} /> Generada
+                      </button>
+                    )}
+                    {(selected.frontUrl || selected.backUrl) && (
+                      <button onClick={() => setShowEditor(true)} style={{ ...btnSmall, color: "var(--gold)", borderColor: "rgba(212,175,55,0.4)" }} title="Editor visual de posiciones">
+                        <Move size={12} /> Editor
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Side toggle */}
+                <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                  {(["front","back"] as const).map((side) => (
+                    <button key={side} onClick={() => setPreviewSide(side)}
+                      style={{ flex: 1, padding: "6px 10px", fontSize: 11, borderRadius: 4, cursor: "pointer",
+                        background: previewSide === side ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.03)",
+                        border: previewSide === side ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
+                        color: "var(--t1)" }}>
+                      {side === "front" ? "Frente" : "Reverso"}
+                    </button>
+                  ))}
+                </div>
+
+                {showGenerated && selected.frontUrl ? (
+                  <div style={{ aspectRatio: "1080/720", width: "100%", background: "rgba(0,0,0,0.3)", borderRadius: 8, overflow: "hidden" }}>
+                    <img
+                      src={previewSide === "front" ? `${API_BASE}${selected.frontUrl}` : (selected.backUrl ? `${API_BASE}${selected.backUrl}` : `${API_BASE}${selected.frontUrl}`)}
+                      alt={previewSide}
+                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                    />
+                  </div>
+                ) : (
+                  <CardLivePreview card={selected} side={previewSide} />
+                )}
+
+                {selected.status === "generating" && (
+                  <div style={{ textAlign: "center", padding: "10px 0", fontSize: 12, color: "var(--t3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    <Loader2 size={14} className="animate-spin" style={{ color: "var(--gold)" }} /> Generando en servidor…
+                  </div>
+                )}
+              </div>
+
+              {/* Acciones */}
+              <div style={panelStyle}>
+                <h3 style={panelTitle}>Generar</h3>
+                <Field label="Modelo IA para el fondo:">
+                  <select value={bgModel} onChange={(e) => setBgModel(e.target.value)} style={inputStyle}>
                     {BG_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
-                  <button
-                    onClick={() => {
-                      const sel = document.getElementById("bg-model-select") as HTMLSelectElement | null;
-                      generateCard(selected.id, sel?.value || "recraft-v4");
-                    }}
-                    disabled={generating}
-                    style={{ ...btnPrimary, padding: "12px 16px" }}
-                  >
-                    {generating ? <><Loader2 size={14} className="animate-spin" /> Generando (1-2 min)…</> : <><Sparkles size={14} /> Generar tarjeta</>}
-                  </button>
-                  {selected.frontUrl && (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
-                      <a href={`${API_BASE}${selected.frontUrl}`} download={`${selected.name}-frente.png`} style={btnSmall}>
+                </Field>
+                <button
+                  onClick={() => generateCard(selected.id)}
+                  disabled={generating}
+                  style={{ ...btnPrimary, padding: "12px 16px", width: "100%", marginTop: 8 }}
+                >
+                  {generating ? <><Loader2 size={14} className="animate-spin" /> Generando (1-2 min)…</> : <><Sparkles size={14} /> Generar tarjeta</>}
+                </button>
+
+                {selected.lastError && (
+                  <div style={{ fontSize: 11, color: "#e84558", padding: 8, background: "rgba(232,69,88,0.08)", borderRadius: 4, marginTop: 8 }}>
+                    <strong>Error:</strong> {selected.lastError}
+                  </div>
+                )}
+                {selected.generationCost && (
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 6 }}>
+                    Coste última generación: ${selected.generationCost}
+                  </div>
+                )}
+
+                {selected.frontUrl && (
+                  <>
+                    <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "12px 0" }} />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      <a href={`${API_BASE}${selected.frontUrl}`} download={`${selected.name}-frente.png`} style={{ ...btnSmall, textDecoration: "none" }}>
                         <Download size={12} /> Frente PNG
                       </a>
-                      <a href={selected.backUrl ? `${API_BASE}${selected.backUrl}` : "#"} download={`${selected.name}-reverso.png`} style={btnSmall}>
+                      <a href={selected.backUrl ? `${API_BASE}${selected.backUrl}` : "#"} download={`${selected.name}-reverso.png`} style={{ ...btnSmall, textDecoration: "none" }}>
                         <Download size={12} /> Reverso PNG
                       </a>
                       {selected.pdfUrl && (
-                        <a href={selected.pdfUrl} download={`${selected.name}-print.pdf`} style={btnSmall}>
+                        <a href={selected.pdfUrl} download={`${selected.name}-print.pdf`} style={{ ...btnSmall, textDecoration: "none" }}>
                           <FileText size={12} /> PDF Print
                         </a>
                       )}
-                      <a
-                        href={`${API_BASE}/api/cards/${selected.id}/qr.svg`}
-                        download={`${selected.name}-qr.svg`}
-                        style={btnSmall}
-                      >
+                      <a href={`${API_BASE}/api/cards/${selected.id}/qr.svg`} download={`${selected.name}-qr.svg`} style={{ ...btnSmall, textDecoration: "none" }}>
                         <QrCode size={12} /> QR SVG
                       </a>
                     </div>
-                  )}
-                  {selected.lastError && (
-                    <div style={{ fontSize: 11, color: "#e84558", padding: 6, background: "rgba(232,69,88,0.08)", borderRadius: 4 }}>
-                      {selected.lastError}
-                    </div>
-                  )}
-                  {selected.generationCost && (
-                    <div style={{ fontSize: 11, color: "var(--t3)" }}>
-                      Coste última generación: ${selected.generationCost}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div style={panelStyle}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <h3 style={{ ...panelTitle, margin: 0 }}>Preview · 85×55mm @ 300 DPI</h3>
-                  {(selected.frontUrl || selected.backUrl) && (
-                    <button
-                      onClick={() => setShowEditor(true)}
-                      style={{ ...btnSmall, color: "var(--gold)", borderColor: "var(--gold)" }}
-                      title="Reposicionar elementos / añadir textos"
-                    >
-                      <Move size={12} /> Editor
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <PreviewSide label="Frente" url={selected.frontUrl ? `${API_BASE}${selected.frontUrl}` : null} placeholder="Genera para ver el frente" />
-                  <PreviewSide label="Reverso" url={selected.backUrl ? `${API_BASE}${selected.backUrl}` : null} placeholder="Genera para ver el reverso (con QR)" />
-                </div>
+                  </>
+                )}
               </div>
             </>
           )}
         </div>
       </div>
 
-      {/* EDITOR VISUAL DE POSICIONES */}
+      {/* EDITOR VISUAL */}
       {showEditor && selected && (
         <CardStudioEditor
           apiBase={API_BASE}
@@ -724,13 +761,8 @@ export default function CardStudio() {
           backUrl={selected.backUrl ? `${API_BASE}${selected.backUrl}` : null}
           initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
           generating={generating}
-          onSaveOverrides={async (ov) => {
-            await updateCard(selected.id, { layoutOverrides: ov } as any);
-          }}
-          onRegenerate={async () => {
-            const sel = document.getElementById("bg-model-select") as HTMLSelectElement | null;
-            await generateCard(selected.id, sel?.value || "recraft-v4");
-          }}
+          onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
+          onRegenerate={async () => { await generateCard(selected.id); }}
           onClose={() => setShowEditor(false)}
         />
       )}
@@ -743,11 +775,11 @@ export default function CardStudio() {
               <Wand2 size={18} style={{ color: "var(--gold)" }} /> Auto-design IA
             </h3>
             <p style={{ fontSize: 12, color: "var(--t3)", margin: "0 0 14px" }}>
-              Claude propondrá la plantilla, paleta, tipografías y prompt de fondo a partir de estos inputs.
+              Claude propondrá la plantilla, paleta, tipografías y prompt de fondo.
             </p>
-            <Field label="Industria"><input value={autoIndustry} onChange={(e) => setAutoIndustry(e.target.value)} placeholder="ej: relojería de lujo, agencia creativa, abogacía" style={inputStyle} /></Field>
-            <Field label="Vibe / Personalidad"><input value={autoVibe} onChange={(e) => setAutoVibe(e.target.value)} placeholder="ej: lujo discreto, audaz, minimalista" style={inputStyle} /></Field>
-            <Field label="Color preferido"><input value={autoColor} onChange={(e) => setAutoColor(e.target.value)} placeholder="ej: oro, azul medianoche, verde bosque" style={inputStyle} /></Field>
+            <Field label="Industria"><input value={autoIndustry} onChange={(e) => setAutoIndustry(e.target.value)} placeholder="ej: relojería de lujo, agencia creativa" style={inputStyle} /></Field>
+            <Field label="Vibe"><input value={autoVibe} onChange={(e) => setAutoVibe(e.target.value)} placeholder="ej: lujo discreto, audaz, minimalista" style={inputStyle} /></Field>
+            <Field label="Color preferido"><input value={autoColor} onChange={(e) => setAutoColor(e.target.value)} placeholder="ej: oro, azul medianoche" style={inputStyle} /></Field>
             <Field label="Marca"><input value={autoBrand} onChange={(e) => setAutoBrand(e.target.value)} placeholder="nombre de marca" style={inputStyle} /></Field>
             <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
               <button onClick={() => setShowAutoDesign(false)} style={btnSecondary}>Cancelar</button>
@@ -762,14 +794,216 @@ export default function CardStudio() {
   );
 }
 
-// ── Subcomponents ──────────────────────────────────────────────────────
+// ── Live CSS preview ────────────────────────────────────────────────────────
+
+function CardLivePreview({ card, side }: { card: BusinessCard; side: "front" | "back" }) {
+  const pal = card.palette || {} as Palette;
+  const bg = pal.bg || "#141414";
+  const primary = pal.primary || "#c9a227";
+  const accent = pal.accent || "#d4af37";
+  const textColor = pal.text || "#f0f0f0";
+  const secondary = pal.secondary || "#888";
+  const bgCfg = card.backgroundConfig || { kind: "solid" } as BackgroundConfig;
+  const layout = card.layout || "centered";
+  const headFont = card.fonts?.heading || "Inter";
+  const bodyFont = card.fonts?.body || "Inter";
+
+  const bgStyle: React.CSSProperties = bgCfg.kind === "gradient"
+    ? { background: `linear-gradient(135deg, ${bg} 0%, ${accent}55 100%)` }
+    : bgCfg.kind === "ai-texture"
+    ? { background: `linear-gradient(160deg, ${bg} 0%, ${primary}30 60%, ${accent}18 100%)` }
+    : { background: bg };
+
+  const isLeft = layout === "left";
+  const isGrid = layout === "grid";
+  const textAlign = isLeft || isGrid ? "left" : "center";
+
+  const containerStyle: React.CSSProperties = {
+    ...bgStyle,
+    aspectRatio: "1080/720",
+    width: "100%",
+    borderRadius: 8,
+    overflow: "hidden",
+    position: "relative",
+    display: "flex",
+    flexDirection: isGrid ? "row" : "column",
+    alignItems: isGrid ? "stretch" : (isLeft ? "flex-start" : "center"),
+    justifyContent: isGrid ? "stretch" : "center",
+    padding: isGrid ? 0 : "8% 8%",
+    gap: 6,
+    fontFamily: `'${bodyFont}', sans-serif`,
+    boxSizing: "border-box",
+  };
+
+  const accentLineStyle: React.CSSProperties = {
+    position: "absolute",
+    top: 0, left: 0, right: 0,
+    height: "3px",
+    background: `linear-gradient(90deg, transparent, ${accent}, transparent)`,
+  };
+
+  const bottomLineStyle: React.CSSProperties = {
+    position: "absolute",
+    bottom: 0, left: 0, right: 0,
+    height: "2px",
+    background: `linear-gradient(90deg, transparent, ${accent}44, transparent)`,
+  };
+
+  if (side === "front") {
+    return (
+      <div style={containerStyle}>
+        <div style={accentLineStyle} />
+        <div style={bottomLineStyle} />
+
+        {isGrid ? (
+          <>
+            {/* Grid: left column accent bar */}
+            <div style={{ width: "30%", background: `${accent}18`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "8% 5%", borderRight: `1px solid ${accent}22` }}>
+              {card.logoUrl ? (
+                <img src={card.logoUrl} alt="logo" style={{ maxWidth: "80%", maxHeight: 48, objectFit: "contain", marginBottom: 12 }} />
+              ) : (
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: `${accent}25`, border: `2px solid ${accent}44`, marginBottom: 12 }} />
+              )}
+              <div style={{ fontSize: "clamp(7px,1.5vw,10px)", color: accent, letterSpacing: 2, textTransform: "uppercase", textAlign: "center", fontWeight: 600 }}>
+                {card.companyName || "EMPRESA"}
+              </div>
+            </div>
+            {/* Right column: text */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "8% 6%", gap: 4 }}>
+              <div style={{ fontFamily: `'${headFont}', serif`, fontSize: "clamp(12px,2.5vw,18px)", fontWeight: 700, color: textColor, lineHeight: 1.2 }}>
+                {card.fullName || "Tu Nombre"}
+              </div>
+              {card.jobTitle && <div style={{ fontSize: "clamp(8px,1.5vw,11px)", color: accent, letterSpacing: 0.5 }}>{card.jobTitle}</div>}
+              {card.tagline && <div style={{ fontSize: "clamp(7px,1.3vw,10px)", color: secondary, marginTop: 4, lineHeight: 1.4 }}>{card.tagline}</div>}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Centered or Left layout */}
+            {card.logoUrl ? (
+              <img src={card.logoUrl} alt="logo" style={{ maxWidth: isLeft ? 80 : 60, maxHeight: isLeft ? 36 : 28, objectFit: "contain", marginBottom: 8 }} />
+            ) : null}
+            {card.companyName && (
+              <div style={{ fontSize: "clamp(6px,1.2vw,9px)", color: accent, letterSpacing: 2.5, textTransform: "uppercase", fontWeight: 700, textAlign, marginBottom: 4 }}>
+                {card.companyName}
+              </div>
+            )}
+            <div style={{ fontFamily: `'${headFont}', serif`, fontSize: "clamp(13px,2.8vw,20px)", fontWeight: 700, color: textColor, lineHeight: 1.2, textAlign }}>
+              {card.fullName || "Tu Nombre"}
+            </div>
+            {card.jobTitle && (
+              <div style={{ fontSize: "clamp(8px,1.6vw,12px)", color: accent, letterSpacing: 0.5, textAlign, marginTop: 2 }}>
+                {card.jobTitle}
+              </div>
+            )}
+            {card.tagline && (
+              <div style={{ fontSize: "clamp(7px,1.3vw,10px)", color: `${textColor}80`, lineHeight: 1.5, textAlign, marginTop: 6, maxWidth: "80%" }}>
+                {card.tagline}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Back side
+  const contactItems = [
+    { icon: "✉", val: card.email },
+    { icon: "✆", val: card.phone },
+    { icon: "🌐", val: card.website },
+    { icon: "@", val: card.socialHandle },
+    { icon: "📍", val: card.address },
+  ].filter((x) => x.val);
+
+  const qrType = card.qrType || "vcard";
+
+  return (
+    <div style={{ ...containerStyle, flexDirection: "row", alignItems: "stretch", padding: 0 }}>
+      <div style={accentLineStyle} />
+      <div style={bottomLineStyle} />
+
+      {/* Contact info */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "6% 7%", gap: 5 }}>
+        <div style={{ fontFamily: `'${headFont}', serif`, fontSize: "clamp(9px,1.8vw,13px)", fontWeight: 700, color: textColor, marginBottom: 6 }}>
+          {card.fullName || "Tu Nombre"}
+        </div>
+        {card.companyName && (
+          <div style={{ fontSize: "clamp(6px,1.1vw,9px)", color: accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4, fontWeight: 600 }}>
+            {card.companyName}
+          </div>
+        )}
+        {contactItems.map((item, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "clamp(6px,1.2vw,9px)", color: `${textColor}90` }}>
+            <span style={{ color: accent, fontSize: "0.9em" }}>{item.icon}</span>
+            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{item.val}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* QR placeholder */}
+      <div style={{ width: "32%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4%", gap: 4 }}>
+        <QrPlaceholder accentColor={accent} bg={bg} qrType={qrType} size={70} />
+        <div style={{ fontSize: "clamp(5px,0.9vw,7px)", color: `${textColor}55`, letterSpacing: 0.5, textTransform: "uppercase", textAlign: "center", marginTop: 4 }}>
+          {qrType === "vcard" ? "Escanea · Contacto" :
+           qrType === "url" ? "Escanea · Web" :
+           qrType === "video" ? "Escanea · Video" :
+           qrType === "image" ? "Escanea · Imagen" :
+           "Escanea · Animación"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const QR_PATTERN = [
+  1,1,1,1,0, 1,0,0,1,1, 1,0,1,0,1,
+  1,0,0,0,1, 0,1,0,1,0, 1,1,0,0,1,
+  0,1,1,0,1, 1,0,1,1,0, 1,0,0,1,1,
+  1,0,0,0,1, 0,0,1,0,1, 1,1,0,1,0,
+  1,1,1,1,0, 1,0,1,1,0, 0,0,1,0,1,
+];
+
+function QrPlaceholder({ accentColor, bg, qrType, size = 60 }: { accentColor: string; bg: string; qrType: string; size?: number }) {
+  const icons: Record<string, string> = {
+    vcard: "👤", url: "🔗", video: "▶", image: "🖼", animation: "✨",
+  };
+  const iconChar = icons[qrType] || "⬛";
+  return (
+    <div style={{
+      width: size, height: size, background: "#fff", borderRadius: 4, padding: 4,
+      display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 2, boxSizing: "border-box",
+      position: "relative", overflow: "hidden",
+    }}>
+      {QR_PATTERN.map((on, i) => {
+        const r = Math.floor(i / 5);
+        const c = i % 5;
+        const isCorner = (r < 2 && c < 2) || (r < 2 && c > 2) || (r > 2 && c < 2);
+        return (
+          <div key={i} style={{
+            background: isCorner ? accentColor : (on ? "#111" : "transparent"),
+            borderRadius: 1,
+          }} />
+        );
+      })}
+      <div style={{
+        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+        fontSize: size * 0.28, lineHeight: 1,
+      }}>
+        {iconChar}
+      </div>
+    </div>
+  );
+}
+
+// ── Sub-components ──────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, { bg: string; color: string; label: string }> = {
-    draft: { bg: "rgba(150,150,150,0.2)", color: "#999", label: "borrador" },
-    generating: { bg: "rgba(82,160,255,0.2)", color: "#52a0ff", label: "generando" },
-    ready: { bg: "rgba(34,197,94,0.2)", color: "#22c55e", label: "lista" },
-    failed: { bg: "rgba(232,69,88,0.2)", color: "#e84558", label: "error" },
+    draft:      { bg: "rgba(150,150,150,0.2)", color: "#999",    label: "borrador" },
+    generating: { bg: "rgba(82,160,255,0.2)",  color: "#52a0ff", label: "generando" },
+    ready:      { bg: "rgba(34,197,94,0.2)",   color: "#22c55e", label: "lista" },
+    failed:     { bg: "rgba(232,69,88,0.2)",   color: "#e84558", label: "error" },
   };
   const s = styles[status] || styles.draft;
   return (
@@ -797,39 +1031,7 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
   );
 }
 
-function PreviewSide({ label, url, placeholder }: { label: string; url?: string | null; placeholder: string }) {
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 11, color: "var(--t3)", letterSpacing: 1.2, textTransform: "uppercase" }}>{label}</span>
-      </div>
-      <div
-        style={{
-          aspectRatio: "1080/720",
-          width: "100%",
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 8,
-          overflow: "hidden",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          backgroundImage: "linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,0.04) 25%, transparent 25%)",
-          backgroundSize: "20px 20px",
-        }}
-      >
-        {url ? (
-          <img src={url} alt={label} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, color: "var(--t3)", fontSize: 11 }}>
-            <ImageIcon size={28} />
-            {placeholder}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Estilos compartidos ─────────────────────────────────────────────────
+// ── Estilos ─────────────────────────────────────────────────────────────────
 
 const panelStyle: React.CSSProperties = {
   background: "rgba(255,255,255,0.02)",
@@ -844,58 +1046,31 @@ const panelTitle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 10px",
-  fontSize: 12,
-  background: "rgba(0,0,0,0.3)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: 4,
-  color: "var(--t1)",
-  outline: "none",
-  fontFamily: "inherit",
+  width: "100%", padding: "8px 10px", fontSize: 12,
+  background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 4, color: "var(--t1)", outline: "none", fontFamily: "inherit",
 };
 
 const btnPrimary: React.CSSProperties = {
-  padding: "8px 12px",
-  fontSize: 12,
-  fontWeight: 600,
+  padding: "8px 12px", fontSize: 12, fontWeight: 600,
   background: "linear-gradient(135deg, var(--gold), #b8941e)",
-  color: "#0a0a0a",
-  border: "none",
-  borderRadius: 6,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  justifyContent: "center",
+  color: "#0a0a0a", border: "none", borderRadius: 6, cursor: "pointer",
+  display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "center",
 };
 
 const btnSecondary: React.CSSProperties = {
-  padding: "8px 12px",
-  fontSize: 12,
-  background: "rgba(255,255,255,0.05)",
-  color: "var(--t1)",
-  border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 6,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
+  padding: "8px 12px", fontSize: 12,
+  background: "rgba(255,255,255,0.05)", color: "var(--t1)",
+  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, cursor: "pointer",
+  display: "inline-flex", alignItems: "center", gap: 6,
 };
 
 const btnSmall: React.CSSProperties = {
-  padding: "6px 8px",
-  fontSize: 11,
-  background: "rgba(255,255,255,0.04)",
-  color: "var(--t1)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: 4,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  textDecoration: "none",
-  justifyContent: "center",
+  padding: "6px 8px", fontSize: 11,
+  background: "rgba(255,255,255,0.04)", color: "var(--t1)",
+  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, cursor: "pointer",
+  display: "inline-flex", alignItems: "center", gap: 4,
+  textDecoration: "none", justifyContent: "center",
 };
 
 const modalBackdrop: React.CSSProperties = {
@@ -905,6 +1080,6 @@ const modalBackdrop: React.CSSProperties = {
 };
 
 const modalContent: React.CSSProperties = {
-  background: "var(--ink)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
-  padding: 24, maxWidth: 480, width: "100%",
+  background: "var(--ink)", border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 10, padding: 24, maxWidth: 480, width: "100%",
 };

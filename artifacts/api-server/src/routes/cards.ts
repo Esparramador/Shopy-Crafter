@@ -17,7 +17,7 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { db, businessCardsTable, projectsTable, projectFilesTable } from "@workspace/db";
-import { eq, and, ne, desc, inArray } from "drizzle-orm";
+import { eq, and, ne, desc, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
@@ -31,6 +31,21 @@ import { listTemplates, getTemplate } from "../lib/card-templates.js";
 import { generateQrSvg, buildVCard } from "../lib/card-qr.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { learnFromOperation } from "../lib/claude.js";
+
+/** Añade qr_type y qr_content_url si no existen (idempotente). */
+async function ensureCardQrColumns() {
+  try {
+    await db.execute(sql`
+      ALTER TABLE business_cards
+        ADD COLUMN IF NOT EXISTS qr_type        text NOT NULL DEFAULT 'vcard',
+        ADD COLUMN IF NOT EXISTS qr_content_url text;
+    `);
+    logger.info("card-qr columns ensured");
+  } catch (err: any) {
+    logger.warn({ err: err?.message }, "ensureCardQrColumns: non-fatal");
+  }
+}
+ensureCardQrColumns();
 
 const router = Router();
 
@@ -75,6 +90,8 @@ function toCardDto(row: any) {
     socialHandle: row.socialHandle,
     address: row.address,
     qrUrl: row.qrUrl,
+    qrType: row.qrType || "vcard",
+    qrContentUrl: row.qrContentUrl || null,
     palette: safeJson(row.palette, {}),
     fonts: safeJson(row.fonts, {}),
     layout: row.layout,
@@ -259,17 +276,31 @@ router.patch("/cards/:id", requireAdmin, async (req, res) => {
       patch.backgroundConfig = JSON.stringify(req.body.backgroundConfig);
     }
 
-    if (Object.keys(patch).length === 0) {
-      res.json(toCardDto(existing));
-      return;
-    }
+    // Extra columns (qrType/qrContentUrl) — persisted via raw SQL since not in drizzle schema
+    const newQrType: string | undefined = typeof req.body?.qrType === "string" ? req.body.qrType : undefined;
+    const newQrContentUrl: string | null | undefined = req.body?.qrContentUrl === null ? null
+      : typeof req.body?.qrContentUrl === "string" ? (req.body.qrContentUrl.trim() || null) : undefined;
 
-    const [updated] = await db
-      .update(businessCardsTable)
-      .set(patch)
-      .where(eq(businessCardsTable.id, id))
-      .returning();
-    res.json(toCardDto(updated));
+    const hasExtra = newQrType !== undefined || newQrContentUrl !== undefined;
+
+    let updatedRow: any = existing;
+    if (Object.keys(patch).length > 0) {
+      const [r] = await db
+        .update(businessCardsTable)
+        .set(patch)
+        .where(eq(businessCardsTable.id, id))
+        .returning();
+      updatedRow = r;
+    }
+    if (hasExtra) {
+      const qt = newQrType ?? (existing as any).qrType ?? "vcard";
+      const qcu = newQrContentUrl !== undefined ? newQrContentUrl : ((existing as any).qrContentUrl ?? null);
+      await db.execute(sql`
+        UPDATE business_cards SET qr_type = ${qt}, qr_content_url = ${qcu} WHERE id = ${id}
+      `);
+      updatedRow = { ...updatedRow, qrType: qt, qrContentUrl: qcu };
+    }
+    res.json(toCardDto(updatedRow));
   } catch (err: any) {
     logger.error({ err: err?.message }, "cards update failed");
     res.status(500).json({ error: err?.message || "Error" });
@@ -387,7 +418,18 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
       background: background && background.kind ? background : undefined,
       backgroundModel: (overrideBgModel as any) || undefined,
       layout: (row.layout === "centered" || row.layout === "left" || row.layout === "grid") ? row.layout : undefined,
-      qrUrl: row.qrUrl ?? undefined,
+      qrUrl: (() => {
+        const qrType: string = (row as any).qrType || "vcard";
+        const qrContentUrl: string | null = (row as any).qrContentUrl || null;
+        if (qrType === "url" && qrContentUrl) return qrContentUrl;
+        if (qrType === "vcard") return undefined;
+        if (["video", "image", "animation"].includes(qrType)) {
+          const proto = (req.headers["x-forwarded-proto"] as string | undefined) || req.protocol || "https";
+          const host = req.get("host") || "localhost:8080";
+          return `${proto}://${host}/api/public/qr/${id}`;
+        }
+        return row.qrUrl ?? undefined;
+      })(),
       logoBuffer,
       logoMime,
       overrides: safeJson(row.layoutOverrides, {}) as any,

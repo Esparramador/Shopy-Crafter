@@ -56,6 +56,7 @@ import billingRouter from "./billing.js";
 import brandDnaRouter from "./brand-dna.js";
 import tripo3dRouter from "./tripo3d.js";
 import stitchRouter from "./stitch.js";
+import publicQrRouter from "./public-qr.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -78,6 +79,7 @@ router.use("/cms", (req, res, next) => {
 router.use(storeRouter);
 router.use(contactRouter);
 router.use(apkRouter);
+router.use(publicQrRouter);
 
 router.get("/report-templates/:token", (req, res, next) => {
   if (/^[a-f0-9]{64}$/.test(req.params.token)) return next();
