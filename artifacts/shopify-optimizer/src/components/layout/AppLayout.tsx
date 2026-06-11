@@ -43,6 +43,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Email Marketing", icon: "📧", href: "/admin/emails" },
   { label: "Flujos de Email", icon: "🔁", href: "/admin/email-flows" },
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
+  { label: "Librería de Prompts", icon: "🏛", href: "/admin/prompt-library" },
 
   { label: "Lab Web", icon: "🔬", href: "/web-lab" },
 

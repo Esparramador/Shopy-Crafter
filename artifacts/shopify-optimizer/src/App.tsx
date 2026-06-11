@@ -55,6 +55,7 @@ const Billing = lazy(() => import("@/pages/admin/Billing"));
 const BrainSync = lazy(() => import("@/pages/admin/BrainSync"));
 const AdStudio = lazy(() => import("@/pages/projects/AdStudio"));
 const AvatarStudio = lazy(() => import("@/pages/admin/AvatarStudio"));
+const PromptLibrary = lazy(() => import("@/pages/admin/PromptLibrary"));
 
 const SobreNosotros = lazy(() => import("@/pages/public/SobreNosotros"));
 const CasosDeExito = lazy(() => import("@/pages/public/CasosDeExito"));
@@ -352,6 +353,9 @@ function Router() {
         </Route>
         <Route path="/admin/avatar-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><AvatarStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/prompt-library">
+          <RequireAdmin><AdminWrapper><AppLayout><S><PromptLibrary /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/shopybrain/memories">
           <RequireAdmin><AdminWrapper><AppLayout><S><ShopyBrainMemories /></S></AppLayout></AdminWrapper></RequireAdmin>
