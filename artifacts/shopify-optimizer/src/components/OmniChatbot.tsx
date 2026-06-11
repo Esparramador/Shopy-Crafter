@@ -6,7 +6,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Brain, X, Send, Loader2, Minimize2, Maximize2, Sparkles, ChevronDown,
   Link, Image, Video, Upload, Eye, Palette, Layers, Cpu, Globe,
-  Instagram, Twitter, Facebook, Youtube, CheckCircle, ZapIcon, HelpCircle, Mic, MicOff
+  Instagram, Twitter, Facebook, Youtube, CheckCircle, ZapIcon, HelpCircle, Mic, MicOff,
+  Volume2, VolumeX
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -925,6 +926,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [showActions, setShowActions] = useState(false);
   const [quickActions, setQuickActions] = useState<QuickAction[]>(FALLBACK_QUICK_ACTIONS);
   const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only">("auto");
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachFiles, setAttachFiles] = useState<File[]>([]);
@@ -1031,6 +1033,67 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     rec.onend = () => setIsListening(false);
     try { rec.start(); setIsListening(true); } catch { setIsListening(false); }
   }, [isListening]);
+
+  const speakText = useCallback((text: string) => {
+    if (!voiceEnabled || typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const cleaned = text
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/#{1,6}\s+/g, "")
+      .replace(/!\[.*?\]\(.*?\)/g, "")
+      .replace(/\[([^\]]+)\]\(.*?\)/g, "$1")
+      .replace(/`{1,3}[^`]*`{1,3}/g, "")
+      .replace(/>\s*/g, "")
+      .replace(/[-•·]\s+/g, ". ")
+      .replace(/\n{2,}/g, ". ")
+      .replace(/\n/g, " ")
+      .slice(0, 700);
+    if (!cleaned.trim()) return;
+    const utter = new SpeechSynthesisUtterance(cleaned);
+    utter.lang = "es-ES";
+    utter.rate = 0.93;
+    utter.pitch = 1.06;
+    const trySpeak = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        const best = voices.find(v => v.lang.startsWith("es") && (
+          v.name.includes("Google") || v.name.includes("Microsoft") ||
+          v.name.includes("Paulina") || v.name.includes("Monica") ||
+          v.name.includes("Jorge") || v.name.includes("Conchita") ||
+          v.name.includes("Sabina") || v.name.includes("Diego")
+        )) || voices.find(v => v.lang.startsWith("es"));
+        if (best) utter.voice = best;
+      }
+      utter.onend = () => {
+        if (voiceEnabled) {
+          setTimeout(() => {
+            const rec = recognitionRef.current || createSpeechRecognition();
+            if (rec) {
+              recognitionRef.current = rec;
+              rec.onresult = (e: any) => {
+                const t = Array.from(e.results as any[]).map((r: any) => r[0].transcript).join("");
+                setInput(t);
+                if (e.results[e.results.length - 1].isFinal) {
+                  setIsListening(false);
+                  pendingTranscriptRef.current = t;
+                }
+              };
+              rec.onerror = () => setIsListening(false);
+              rec.onend = () => setIsListening(false);
+              try { rec.start(); setIsListening(true); } catch { setIsListening(false); }
+            }
+          }, 400);
+        }
+      };
+      window.speechSynthesis.speak(utter);
+    };
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = trySpeak;
+    } else {
+      trySpeak();
+    }
+  }, [voiceEnabled]);
 
   // ─── Execute Shopify action via backend ────────────────────────────────────
   // Acciones de generación de vídeo (montage/long_ad/brand_ad/cinematic-multishot) pueden
@@ -1572,9 +1635,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     const hasEmailMarketing = lower.includes("email marketing") && (lower.includes("genera") || lower.includes("crea") || lower.includes("diseña") || lower.includes("workflow") || lower.includes("flujo"));
     if (!hasKlaviyoExplicit && !hasEmailWorkflow && !hasEmailMarketing) return null;
     const domainMatch = text.match(/([a-zA-Z0-9-]+\.myshopify\.com)/);
-    const shopDomain = domainMatch?.[1] ?? "comic-crafter.myshopify.com";
+    const shopDomain = domainMatch?.[1] ?? "mitienda.myshopify.com";
     const storeName = shopDomain.split(".")[0].replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    return { shopDomain, storeName, niche: "Comics y Arte" };
+    return { shopDomain, storeName, niche: "eCommerce" };
   };
 
   // ─── Send message ──────────────────────────────────────────────────────────
@@ -1939,6 +2002,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const filtered = m.filter(msg => msg.id !== thinkingId && !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
         return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain", action }];
       });
+      if (voiceEnabled && assistantContent) {
+        setTimeout(() => speakText(assistantContent), 200);
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Fallo de conexión";
       const isTimeout = errMsg === "timeout" || errMsg.includes("aborted");
@@ -2011,15 +2077,13 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             position: "fixed",
             bottom: isMobile ? 0 : 24,
             right: isMobile ? 0 : 24,
-            width: isMobile ? "100%" : (minimized ? 290 : "min(440px, calc(100vw - 48px))"),
+            width: isMobile ? "min(96vw, 440px)" : (minimized ? 290 : "min(440px, calc(100vw - 48px))"),
             height: isMobile
-              ? (minimized ? 52 : "calc(100dvh - env(safe-area-inset-top, 0px))")
+              ? (minimized ? 52 : "min(82dvh, 600px)")
               : (minimized ? 52 : "min(640px, calc(100dvh - 48px))"),
-            ...(isMobile && !minimized ? { left: 0, top: "env(safe-area-inset-top, 0px)" } : {}),
-            ...(isMobile && minimized ? { left: 0, bottom: 0 } : {}),
             background: "var(--ink)",
-            border: isMobile ? "none" : `1px solid ${isDragging ? "var(--jade)" : "rgba(200,168,75,0.28)"}`,
-            borderRadius: isMobile ? 0 : 16, zIndex: 9990, display: "flex", flexDirection: "column",
+            border: `1px solid ${isDragging ? "var(--jade)" : "rgba(200,168,75,0.28)"}`,
+            borderRadius: 16, zIndex: 9990, display: "flex", flexDirection: "column",
             boxShadow: isDragging ? "0 0 0 2px var(--jade), 0 8px 40px rgba(0,0,0,0.6)" : "0 8px 40px rgba(0,0,0,0.6)",
             transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)", overflow: "hidden",
           }}>
@@ -2036,6 +2100,14 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button onClick={() => setMinimized(!minimized)} aria-label={minimized ? "Expandir chat" : "Minimizar chat"} style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {minimized ? <Maximize2 size={isMobile ? 18 : 14} /> : <Minimize2 size={isMobile ? 18 : 14} />}
+              </button>
+              <button
+                onClick={() => { setVoiceEnabled(v => !v); if (voiceEnabled) window.speechSynthesis?.cancel(); }}
+                title={voiceEnabled ? "Desactivar voz — conversación fluída activa" : "Activar conversación por voz"}
+                aria-label={voiceEnabled ? "Desactivar voz" : "Activar voz"}
+                style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: voiceEnabled ? "rgba(45,212,159,0.18)" : "var(--ink2)", color: voiceEnabled ? "var(--jade)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s, color 0.2s" }}
+              >
+                {voiceEnabled ? <Volume2 size={isMobile ? 18 : 14} /> : <VolumeX size={isMobile ? 18 : 14} />}
               </button>
               <button onClick={() => setOpen(false)} aria-label="Cerrar chat" style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <X size={isMobile ? 18 : 14} />

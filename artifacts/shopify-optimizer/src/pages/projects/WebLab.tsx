@@ -1512,6 +1512,25 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                     >
                       👁️ Descargar Preview HTML
                     </button>
+                    <button
+                      onClick={() => {
+                        const fragments = (a.improvedHtmlFragments || []).map((f: any) => f.improved).join("\n");
+                        const fullHtml = `<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Diseño Web</title>\n<style>\n${a.improvedCss}\nbody{margin:0;padding:0;min-height:100vh}\n</style>\n</head>\n<body>\n${fragments}\n</body>\n</html>`;
+                        navigator.clipboard.writeText(fullHtml).catch(() => {});
+                        window.open("https://claude.ai/design", "_blank", "noopener,noreferrer");
+                      }}
+                      style={{
+                        padding: "8px 16px",
+                        background: "linear-gradient(135deg, rgba(147,51,234,0.18), rgba(79,70,229,0.12))",
+                        border: "1px solid rgba(147,51,234,0.4)",
+                        borderRadius: 8, color: "#c084fc",
+                        cursor: "pointer", fontSize: 13, fontWeight: 600,
+                        display: "flex", alignItems: "center", gap: 6,
+                      }}
+                      title="Copia el HTML al portapapeles y abre claude.ai/design para diseño profesional en vivo"
+                    >
+                      ✏️ Diseñar con Claude
+                    </button>
                   </div>
                 </div>
                 <pre style={{

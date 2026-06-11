@@ -43,7 +43,6 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Email Marketing", icon: "📧", href: "/admin/emails" },
   { label: "Flujos de Email", icon: "🔁", href: "/admin/email-flows" },
   { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
-  { label: "Ver Landing", icon: "🌐", href: "/landing" },
 
   { label: "Lab Web", icon: "🔬", href: "/web-lab" },
 
@@ -478,6 +477,21 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="status-pulse" />
               {ap.header?.active ?? "Activo"}
             </div>
+            <Link href="/landing">
+              <div style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "4px 10px",
+                borderRadius: 6, background: "rgba(200,168,75,0.08)",
+                border: "1px solid rgba(200,168,75,0.25)", cursor: "pointer",
+                color: "var(--gold)", fontSize: 11, fontWeight: 600,
+                transition: "background 0.15s", whiteSpace: "nowrap",
+              }}
+                onMouseOver={e => (e.currentTarget.style.background = "rgba(200,168,75,0.18)")}
+                onMouseOut={e => (e.currentTarget.style.background = "rgba(200,168,75,0.08)")}
+                title="Ver Landing Page"
+              >
+                🌐 <span style={{ display: "none" }} className="sm-show">Landing</span>
+              </div>
+            </Link>
             <div style={{ position: "relative" }}>
               <button
                 className="notif-btn"

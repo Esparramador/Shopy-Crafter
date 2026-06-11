@@ -72,6 +72,31 @@ export default function CampaignKit() {
   const [adapting, setAdapting] = useState(false);
   const [adaptResult, setAdaptResult] = useState<AdaptedCampaign | null>(null);
   const [adaptError, setAdaptError] = useState("");
+  const [brandDnaLoaded, setBrandDnaLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!projectId || projectId === "0") return;
+    fetch(`${API}/api/projects/${projectId}/brand-dna`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        const b = d.brandDna || d.data || d;
+        if (!b) return;
+        setAdaptForm(f => ({
+          brandName:       f.brandName       || b.brandName       || b.brand_name       || "",
+          industry:        f.industry        || b.industry        || b.niche            || "",
+          coreOffering:    f.coreOffering    || b.coreOffering    || b.core_offering    || b.mainProduct || "",
+          targetAudience:  f.targetAudience  || b.targetAudience  || b.target_audience  || b.audience    || "",
+          toneOfVoice:     f.toneOfVoice     || b.toneOfVoice     || b.tone_of_voice    || b.tone        || "",
+          visualIdentity:  f.visualIdentity  || b.visualIdentity  || b.visual_identity  || b.colors      || "",
+          emotionalBenefit:f.emotionalBenefit|| b.emotionalBenefit|| b.emotional_benefit|| b.benefit     || "",
+          primaryColor:    f.primaryColor !== "#000000" ? f.primaryColor : (b.primaryColor || b.primary_color || "#000000"),
+          accentColor:     f.accentColor  !== "#FFD700" ? f.accentColor  : (b.accentColor  || b.accent_color  || "#FFD700"),
+        }));
+        setBrandDnaLoaded(true);
+      })
+      .catch(() => {});
+  }, [projectId]);
 
   useEffect(() => {
     setLoading(true);

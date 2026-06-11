@@ -182,7 +182,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,      desc: "TTS, voice clone, SFX, música original" },
   { id: "compose",    label: "Componer",        icon: <Palette size={15} />,  desc: "Mezcla video + voz + música + texto en MP4" },
   { id: "protools",   label: "Pro tools",       icon: <Mic size={15} />,      desc: "Lip-sync, subtítulos auto, motion transfer" },
-  { id: "promptlab",  label: "Prompt Lab",      icon: <Zap size={15} />,      desc: "Construye prompts cinematográficos profesionales con presets" },
+  { id: "promptlab",  label: "Prompt Lab",      icon: <Zap size={15} />,      desc: "Construye prompts profesionales: imagen, vídeo, podcast, testimonial, Reels, unboxing, narrativa de marca" },
   { id: "cinematic-templates", label: "Cinematic Templates", icon: <Film size={15} />, desc: "Plantillas masterpiece: Anatomía / Deconstrucción / Construcción / Exploded View / Apple-Porsche" },
   { id: "downloads",  label: "Descargas",       icon: <Download size={15} />, desc: "Exportar todos los assets en ZIP" },
 ];
@@ -2359,21 +2359,27 @@ type PromptIntent =
   | "image_hero_product" | "ugc_video"
   | "ad_copy_meta" | "infographic_html"
   | "seo_product_100" | "email_marketing"
-  | "landing_hero" | "brand_kit_ocr";
+  | "landing_hero" | "brand_kit_ocr"
+  | "podcast_script" | "video_testimonial" | "reels_story" | "brand_narrative" | "product_reveal";
 
 const INTENT_LABELS: Record<PromptIntent, { label: string; emoji: string; visual: boolean }> = {
-  image:               { label: "Imagen libre",                 emoji: "📸", visual: true  },
-  video:               { label: "Vídeo libre",                  emoji: "🎬", visual: true  },
-  image_hero_product:  { label: "Hero shot producto",           emoji: "✨", visual: true  },
-  ad_cinematic:        { label: "Anuncio cinematográfico",      emoji: "🎥", visual: true  },
-  multishot_director:  { label: "Anuncio largo (showrunner)",   emoji: "🎞️", visual: true  },
-  ugc_video:           { label: "UGC creator",                  emoji: "📱", visual: true  },
-  ad_copy_meta:        { label: "Copy Meta/TikTok",             emoji: "✍️", visual: false },
-  infographic_html:    { label: "Infografía HTML",              emoji: "📊", visual: false },
-  seo_product_100:     { label: "Descripción SEO 100/100",      emoji: "🔍", visual: false },
-  email_marketing:     { label: "Email marketing",              emoji: "📧", visual: false },
-  landing_hero:        { label: "Landing hero",                 emoji: "🚀", visual: false },
-  brand_kit_ocr:       { label: "Brand kit OCR",                emoji: "🎨", visual: false },
+  image:               { label: "Imagen libre",                   emoji: "📸", visual: true  },
+  video:               { label: "Vídeo libre",                    emoji: "🎬", visual: true  },
+  image_hero_product:  { label: "Hero shot producto",             emoji: "✨", visual: true  },
+  ad_cinematic:        { label: "Anuncio cinematográfico",        emoji: "🎥", visual: true  },
+  multishot_director:  { label: "Anuncio largo (showrunner)",     emoji: "🎞️", visual: true  },
+  ugc_video:           { label: "UGC creator",                    emoji: "📱", visual: true  },
+  ad_copy_meta:        { label: "Copy Meta/TikTok",               emoji: "✍️", visual: false },
+  infographic_html:    { label: "Infografía HTML",                emoji: "📊", visual: false },
+  seo_product_100:     { label: "Descripción SEO 100/100",        emoji: "🔍", visual: false },
+  email_marketing:     { label: "Email marketing",                emoji: "📧", visual: false },
+  landing_hero:        { label: "Landing hero",                   emoji: "🚀", visual: false },
+  brand_kit_ocr:       { label: "Brand kit OCR",                  emoji: "🎨", visual: false },
+  podcast_script:      { label: "Guión Podcast / Narración",      emoji: "🎙️", visual: false },
+  video_testimonial:   { label: "Testimonial / Review UGC",       emoji: "💬", visual: true  },
+  reels_story:         { label: "Reels / Story 9:16",             emoji: "📲", visual: true  },
+  brand_narrative:     { label: "Narrativa de Marca (storytelling)", emoji: "📖", visual: false },
+  product_reveal:      { label: "Product Reveal / Unboxing",      emoji: "📦", visual: true  },
 };
 
 interface LibraryItem {
