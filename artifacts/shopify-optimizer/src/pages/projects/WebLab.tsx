@@ -584,6 +584,15 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [scratchLoading, setScratchLoading] = useState(false);
   const [scratchMsg, setScratchMsg] = useState("");
 
+  // Stitch AI — generación de páginas profesionales
+  const [showStitch, setShowStitch] = useState(false);
+  const [stitchLoading, setStitchLoading] = useState(false);
+  const [stitchMsg, setStitchMsg] = useState("");
+  const [stitchPrompt, setStitchPrompt] = useState("");
+  const [stitchPageType, setStitchPageType] = useState<"landing" | "product" | "about" | "pricing" | "contact">("landing");
+  const [stitchProjectId, setStitchProjectId] = useState<string>("");
+  const [stitchStatus, setStitchStatus] = useState<"unknown" | "available" | "unavailable">("unknown");
+
   const loadHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/web-lab/history/${projectId}`, { credentials: "include" });
@@ -677,6 +686,77 @@ function WebLabInner({ projectId }: { projectId: number }) {
       setScratchLoading(false);
     }
   }, [projectId, scratchPageType, scratchBrief, scratchSections, loadHistory]);
+
+  const checkStitchStatus = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/stitch/status`, { credentials: "include" });
+      const data = await r.json();
+      setStitchStatus(data.available ? "available" : "unavailable");
+      if (!data.available) setStitchMsg(data.message || "Stitch no configurado.");
+    } catch {
+      setStitchStatus("unavailable");
+      setStitchMsg("No se pudo conectar con Stitch AI.");
+    }
+  }, []);
+
+  const generateWithStitch = useCallback(async () => {
+    if (!stitchPrompt.trim()) { setStitchMsg("⚠ Escribe un prompt para generar la página"); return; }
+    setStitchLoading(true); setStitchMsg("Conectando con Stitch AI…");
+    try {
+      let pid = stitchProjectId;
+      if (!pid) {
+        setStitchMsg("Creando proyecto en Stitch…");
+        const pr = await fetch(`${API_BASE}/api/stitch/projects`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: `ShopyCrafter-Lab-${Date.now()}`, description: "Generado desde Lab Web" }),
+        });
+        const pd = await pr.json();
+        if (!pr.ok || pd.error) throw new Error(pd.error || "Error creando proyecto Stitch");
+        pid = pd.project?.id || pd.project?.project_id || String(pd.project);
+        if (pid) setStitchProjectId(pid);
+      }
+
+      setStitchMsg("Generando diseño con Stitch AI (puede tardar 30-60 s)…");
+
+      const isProduct = stitchPageType === "product";
+      const endpoint = isProduct
+        ? `${API_BASE}/api/stitch/generate/shopify-product`
+        : `${API_BASE}/api/stitch/generate`;
+
+      const body = isProduct
+        ? JSON.stringify({ product: { title: brandName || stitchPrompt.slice(0, 60), description: stitchPrompt, category: "ecommerce" }, projectId: pid, style: "modern ecommerce dark gold premium" })
+        : JSON.stringify({ prompt: stitchPrompt, projectId: pid, model: "gemini-2.5-pro" });
+
+      const gr = await fetch(endpoint, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body });
+      const gd = await gr.json();
+      if (!gr.ok || gd.error) throw new Error(gd.error || `Error ${gr.status}`);
+
+      const screen = gd.result ?? gd;
+      const html =
+        screen?.html ??
+        screen?.content ??
+        screen?.code ??
+        screen?.body ??
+        screen?.rendered_html ??
+        (typeof screen === "string" ? screen : null);
+
+      if (html && typeof html === "string" && html.trim().length > 50) {
+        setEditHtml(html);
+        setEditCss("");
+        setEditLabel(`stitch · ${stitchPageType}`);
+        setTab("edit");
+        setStitchMsg("✓ Página generada con Stitch AI — cargada en el editor. Edita y guarda en la bóveda.");
+        loadHistory();
+      } else {
+        setStitchMsg(`✓ Stitch respondió. Resultado: ${JSON.stringify(screen).slice(0, 200)}`);
+      }
+    } catch (e: any) {
+      setStitchMsg(`⚠ ${e.message}`);
+    } finally {
+      setStitchLoading(false);
+    }
+  }, [stitchPrompt, stitchPageType, stitchProjectId, brandName, loadHistory]);
 
   const analyze = async () => {
     if (!url.trim()) return;
@@ -1114,6 +1194,27 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
           >
             ✨ Crear desde cero
           </button>
+          <button
+            onClick={() => {
+              const next = !showStitch;
+              setShowStitch(next);
+              if (next && stitchStatus === "unknown") checkStitchStatus();
+            }}
+            title="Google Stitch AI — genera landing pages, product pages y páginas completas con HTML/Tailwind desde un prompt"
+            style={{
+              padding: "12px 16px",
+              background: showStitch ? "linear-gradient(135deg, #3b82f6, #1d4ed8)" : "transparent",
+              border: showStitch ? "none" : "1px solid var(--border, #333)",
+              borderRadius: 10,
+              color: showStitch ? "#fff" : "var(--t2, #aaa)",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: showStitch ? 700 : 400,
+              whiteSpace: "nowrap",
+            }}
+          >
+            🪡 Stitch AI
+          </button>
         </div>
       </div>
 
@@ -1173,6 +1274,111 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
               <span style={{ fontSize: 12, color: scratchMsg.startsWith("✓") ? "#22c55e" : "#ef4444" }}>{scratchMsg}</span>
             )}
           </div>
+        </div>
+      )}
+
+      {showStitch && (
+        <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 22, marginBottom: 24, border: "1px solid #1d4ed844" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 26, lineHeight: 1 }}>🪡</div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, color: "#60a5fa" }}>Stitch AI — Generador de Páginas Profesionales</h3>
+              <p style={{ fontSize: 12, color: "#888", marginTop: 4, marginBottom: 0 }}>
+                Google Stitch genera HTML + Tailwind CSS completo desde tu descripción. Landing pages, product pages, about, pricing... listos para editar en el editor y guardar en la bóveda.
+              </p>
+            </div>
+            {stitchStatus === "available" && (
+              <span style={{ fontSize: 10, padding: "3px 8px", background: "#22c55e18", border: "1px solid #22c55e44", borderRadius: 6, color: "#22c55e", whiteSpace: "nowrap" }}>● Stitch conectado</span>
+            )}
+          </div>
+
+          {stitchStatus === "unavailable" && (
+            <div style={{ background: "#1a0a00", border: "1px solid #f59e0b44", borderRadius: 10, padding: 14, marginBottom: 14, fontSize: 13, color: "#fbbf24" }}>
+              ⚠ {stitchMsg || "Stitch no está configurado. Añade STITCH_API_KEY en los Secrets del proyecto."}<br />
+              <span style={{ fontSize: 11, color: "#888", marginTop: 4, display: "block" }}>
+                Obtén tu clave en <strong style={{ color: "#60a5fa" }}>stitch.withgoogle.com → Settings → API Keys</strong>
+              </span>
+            </div>
+          )}
+
+          {stitchStatus !== "unavailable" && (
+            <>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                {(["landing", "product", "about", "pricing", "contact"] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setStitchPageType(t)}
+                    style={{
+                      padding: "5px 14px", fontSize: 12, borderRadius: 20, cursor: "pointer",
+                      background: stitchPageType === t ? "#1d4ed8" : "#0a0a14",
+                      border: stitchPageType === t ? "none" : "1px solid #1d4ed855",
+                      color: stitchPageType === t ? "#fff" : "#60a5fa",
+                      fontWeight: stitchPageType === t ? 600 : 400,
+                    }}
+                  >
+                    {t === "landing" ? "🚀 Landing" : t === "product" ? "🛍️ Producto" : t === "about" ? "👤 About" : t === "pricing" ? "💰 Pricing" : "📬 Contacto"}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, color: "#555", alignSelf: "center" }}>Plantillas rápidas:</span>
+                {[
+                  "Landing de moda lujo: hero vídeo full-screen, testimonios, galería producto, CTA dorado",
+                  "Product page Shopify: galería zoom, descripción con bullets, reviews, upsell, sticky CTA",
+                  "Pricing SaaS con 3 planes, tabla comparativa, FAQ, garantía y CTA urgencia",
+                  "About storytelling: fundadores, misión, valores, línea de tiempo de marca",
+                  "Landing ecommerce multimarca: filtros, grid productos, banner oferta, newsletter",
+                ].map((t, i) => (
+                  <button key={i} onClick={() => setStitchPrompt(t)} style={{ fontSize: 11, padding: "4px 10px", background: "#0a0a1a", border: "1px solid #1d4ed833", borderRadius: 6, color: "#60a5fa88", cursor: "pointer", textAlign: "left" }}>
+                    {t.slice(0, 40)}…
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={stitchPrompt}
+                onChange={(e) => setStitchPrompt(e.target.value)}
+                placeholder={`Describe la ${stitchPageType === "product" ? "página de producto" : stitchPageType === "landing" ? "landing page" : "página"}: producto, público objetivo, secciones, estilo visual, paleta de colores, tono, referencias de diseño…`}
+                style={{
+                  width: "100%", minHeight: 110, padding: 12,
+                  background: "#0a0a14", border: "1px solid #1d4ed855", borderRadius: 10,
+                  color: "#eee", fontSize: 13, resize: "vertical",
+                  boxSizing: "border-box", outline: "none", marginBottom: 12,
+                  fontFamily: "inherit",
+                }}
+              />
+
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  onClick={generateWithStitch}
+                  disabled={stitchLoading || !stitchPrompt.trim()}
+                  style={{
+                    padding: "11px 26px",
+                    background: stitchLoading || !stitchPrompt.trim() ? "#1a1a24" : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                    border: "none", borderRadius: 10,
+                    color: stitchLoading || !stitchPrompt.trim() ? "#444" : "#fff",
+                    fontWeight: 700, cursor: stitchLoading || !stitchPrompt.trim() ? "not-allowed" : "pointer",
+                    fontSize: 14,
+                  }}
+                >
+                  {stitchLoading ? "⏳ Generando con Stitch…" : "🪡 Generar página con Stitch AI"}
+                </button>
+                {stitchProjectId && (
+                  <span style={{ fontSize: 11, color: "#3b82f666" }}>Proyecto: {stitchProjectId.toString().slice(0, 12)}…</span>
+                )}
+                {stitchMsg && !stitchLoading && (
+                  <span style={{
+                    fontSize: 12,
+                    color: stitchMsg.startsWith("✓") ? "#22c55e" : stitchMsg.startsWith("⚠") ? "#ef4444" : "#60a5fa",
+                    maxWidth: 500,
+                  }}>
+                    {stitchMsg}
+                  </span>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
