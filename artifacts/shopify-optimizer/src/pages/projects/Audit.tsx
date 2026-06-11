@@ -8,7 +8,7 @@ import {
   getGetProjectProductsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import{ RefreshCw, Search, AlertCircle, TrendingUp, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff, Film }from "lucide-react";
+import{ RefreshCw, Search, AlertCircle, TrendingUp, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff, Film, Box }from "lucide-react";
 import CreateAdModal from "@/components/CreateAdModal";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
 import { useState, useCallback, useEffect } from "react";
@@ -746,6 +746,229 @@ const DIFFICULTY_COLOR: Record<OppDifficulty, string> = {
   Difícil: "text-red-400 bg-red-500/10 border-red-500/20",
 };
 
+// ─── Tripo3D Auto-Generate Modal ─────────────────────────────────────────────
+type Model3dProduct = {
+  id: string;
+  title: string;
+  productType?: string;
+  bodyHtml?: string;
+  imageUrl?: string;
+};
+
+function Tripo3DAutoModal({
+  projectId,
+  product,
+  onClose,
+}: {
+  projectId: number;
+  product: Model3dProduct;
+  onClose: () => void;
+}) {
+  const API = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const [phase, setPhase] = useState<"generating" | "done" | "error">("generating");
+  const [messages, setMessages] = useState<string[]>(["Iniciando generación 3D..."]);
+  const [prompt, setPrompt] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [result, setResult] = useState<{ modelUrl?: string; previewUrl?: string; vaultId?: number } | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const start = useCallback(async () => {
+    setPhase("generating");
+    setMessages(["Iniciando generación 3D..."]);
+    setProgress(0);
+    setResult(null);
+    setErrorMsg("");
+    setPrompt("");
+    try {
+      const res = await fetch(`${API}/api/tripo3d/auto-generate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          productId: product.id,
+          productTitle: product.title,
+          productType: product.productType || "",
+          bodyHtml: product.bodyHtml || "",
+          imageUrl: product.imageUrl || null,
+        }),
+      });
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const ev = JSON.parse(line.slice(6));
+            if (ev.message) setMessages(prev => [...prev.slice(-5), ev.message]);
+            if (ev.prompt) setPrompt(ev.prompt);
+            if (typeof ev.progress === "number") setProgress(ev.progress);
+            if (ev.event === "done") {
+              setResult({ modelUrl: ev.model_url, previewUrl: ev.preview_url, vaultId: ev.vault_id });
+              setProgress(100);
+              setPhase("done");
+            }
+            if (ev.event === "error") {
+              setErrorMsg(ev.error || "Error desconocido");
+              setPhase("error");
+            }
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      setErrorMsg(e.message || "Error de conexión");
+      setPhase("error");
+    }
+  }, [API, projectId, product]);
+
+  useEffect(() => { start(); }, [start]);
+
+  const hasImage = !!product.imageUrl;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={phase !== "generating" ? onClose : undefined}
+    >
+      <div
+        className="bg-[#0d0d1a] border border-cyan-500/25 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+        onClick={e => e.stopPropagation()}
+        style={{ boxShadow: "0 0 60px rgba(6,182,212,0.12)" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center text-xl">🧊</div>
+            <div>
+              <h3 className="text-base font-bold text-white">Modelo 3D Automático</h3>
+              <p className="text-xs text-cyan-400/60 truncate max-w-[200px]">{product.title}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-white transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Mode badge */}
+        <div className="mb-4 flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-400">
+          {hasImage ? (
+            <>
+              <img src={product.imageUrl} className="w-8 h-8 rounded object-cover flex-shrink-0" />
+              <span>Usando imagen del producto → <span className="text-cyan-400">image-to-model</span></span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+              <span>Sin imagen → IA genera prompt profesional → <span className="text-cyan-400">text-to-model</span></span>
+            </>
+          )}
+        </div>
+
+        {/* Generating */}
+        {phase === "generating" && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
+              <Loader2 className="w-5 h-5 text-cyan-400 animate-spin flex-shrink-0" />
+              <p className="text-sm text-cyan-300 font-medium truncate flex-1">
+                {messages[messages.length - 1] || "Procesando..."}
+              </p>
+            </div>
+            {progress > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Progreso de renderizado</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+            )}
+            {prompt && (
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-[10px] text-gray-500 mb-1.5 uppercase tracking-wider font-medium">Prompt 3D generado por IA</p>
+                <p className="text-xs text-gray-300 leading-relaxed line-clamp-4">{prompt}</p>
+              </div>
+            )}
+            <p className="text-center text-xs text-gray-600">Proceso: 2-5 min · Puedes cerrar y volver al panel</p>
+          </div>
+        )}
+
+        {/* Done */}
+        {phase === "done" && result && (
+          <div className="space-y-4">
+            <div className="rounded-xl overflow-hidden border border-cyan-500/20 aspect-square bg-black/40">
+              {result.previewUrl ? (
+                <img src={result.previewUrl} alt="Preview modelo 3D" className="w-full h-full object-contain" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                  <span className="text-5xl">🧊</span>
+                  <span className="text-xs text-gray-500">Modelo generado</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-green-500/10 border border-green-500/20">
+              <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-green-300 font-semibold">Modelo 3D listo y guardado ✓</p>
+                {result.vaultId && (
+                  <p className="text-xs text-green-400/60 mt-0.5">Vault ID #{result.vaultId} · disponible en 🗂 Vault</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {result.modelUrl && (
+                <a
+                  href={result.modelUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-sm font-medium text-center hover:bg-cyan-500/25 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Box className="w-4 h-4" /> Descargar Modelo
+                </a>
+              )}
+              <button onClick={onClose} className="flex-1 py-2.5 px-4 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-sm hover:bg-white/10 transition-colors">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {phase === "error" && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-red-300 font-medium">Error en la generación</p>
+                <p className="text-xs text-red-400/60 mt-1">{errorMsg}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={start} className="flex-1 py-2.5 px-4 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-sm font-medium hover:bg-cyan-500/25 transition-colors">
+                Reintentar
+              </button>
+              <button onClick={onClose} className="flex-1 py-2.5 px-4 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-sm hover:bg-white/10 transition-colors">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AuditPage() {
   const [, params] = useRoute("/projects/:id/audit");
   const projectId = parseInt(params?.id || "0");
@@ -763,6 +986,7 @@ export default function AuditPage() {
   const [tokenLoading, setTokenLoading] = useState(false);
   const [editProduct, setEditProduct] = useState<EditableProduct | null>(null);
   const [adProduct, setAdProduct] = useState<{ id: string; title: string } | null>(null);
+  const [model3dProduct, setModel3dProduct] = useState<Model3dProduct | null>(null);
   const [optimizingId, setOptimizingId] = useState<string | null>(null);
   const [bulkOptimizing, setBulkOptimizing] = useState(false);
   const [optimizeMsg, setOptimizeMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -1157,6 +1381,14 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
         />
       )}
 
+      {model3dProduct && (
+        <Tripo3DAutoModal
+          projectId={projectId}
+          product={model3dProduct}
+          onClose={() => setModel3dProduct(null)}
+        />
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <GlassCard delay={0.1} className="p-5">
@@ -1397,6 +1629,21 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                           data-testid={`btn-create-ad-${product.id}`}
                         >
                           <Film className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => setModel3dProduct({
+                            id: String((product as any).shopifyProductId || product.id),
+                            title: product.title,
+                            productType: (product as any).productType || "",
+                            bodyHtml: (product as any).bodyHtml || "",
+                            imageUrl: (product as any).images?.[0]?.src || undefined,
+                          })}
+                          className="p-2.5 rounded-lg hover:bg-cyan-500/10 text-muted-foreground hover:text-cyan-400 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+                          title="Generar modelo 3D automático con Tripo3D AI"
+                          aria-label="Generar modelo 3D con IA"
+                          data-testid={`btn-model3d-${product.id}`}
+                        >
+                          <Box className="w-5 h-5" />
                         </button>
                         <button
                           onClick={() => setEditProduct(product as unknown as EditableProduct)}

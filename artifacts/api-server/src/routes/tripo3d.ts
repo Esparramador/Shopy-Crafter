@@ -2,6 +2,8 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
+import { askClaudeWithBrain } from "../lib/claude.js";
+import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 
@@ -641,6 +643,159 @@ router.post("/api/tripo3d/stylize", async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({ event: "error", error: e.message })}\n\n`);
     res.end();
   }
+});
+
+/* POST /api/tripo3d/auto-generate
+ * Genera modelo 3D automáticamente desde un producto:
+ *  - Si imageUrl → descarga imagen → image_to_model
+ *  - Si no hay imagen → Claude genera prompt inteligente → text_to_model
+ * Streams SSE progress y guarda en vault al finalizar.
+ */
+router.post("/api/tripo3d/auto-generate", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
+
+  const { projectId, productId, productTitle, productType, bodyHtml, imageUrl } = req.body ?? {};
+
+  const send = (payload: object) => {
+    if (!res.writableEnded) res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  try {
+    let taskId: string;
+
+    if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("http")) {
+      // ── Modo imagen: descargar del CDN del producto y enviar a Tripo3D ─────
+      send({ event: "status", message: "Descargando imagen del producto..." });
+
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) throw new Error(`No se pudo descargar la imagen: HTTP ${imgRes.status}`);
+      const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+      const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+      const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+
+      send({ event: "status", message: "Subiendo imagen a Tripo3D AI..." });
+      const imageToken = await tripoUploadFile(imgBuffer, contentType, `product.${ext}`);
+
+      send({ event: "status", message: "Iniciando generación de modelo 3D desde imagen..." });
+      taskId = await tripoCreateTask({
+        type: "image_to_model",
+        file: { type: ext, file_token: imageToken },
+        texture: true,
+        pbr: true,
+      });
+    } else {
+      // ── Modo texto: Claude genera prompt profesional → text_to_model ────────
+      send({ event: "status", message: "Analizando producto con IA para crear prompt 3D..." });
+
+      const systemPrompt = `Eres un experto en diseño 3D y visualización de productos. Crea prompts técnicos y profesionales para generar modelos 3D con Tripo3D AI.
+El prompt debe:
+- Describir el objeto 3D que mejor represente visualmente el producto o servicio
+- Ser específico sobre materiales, formas, estilos y acabados
+- Incluir detalles: studio lighting, clean background, PBR materials, high quality 3D render
+- Si es un servicio sin objeto físico, crear un objeto icónico que lo simbolice (ej: consultoría → maletín elegante de cuero marrón)
+- Máximo 150 palabras, en inglés técnico de modelado 3D
+- Solo devuelve el prompt, sin comillas ni explicaciones`;
+
+      const userMsg = `Crea un prompt para Tripo3D AI que genere un modelo 3D representando este producto/servicio:
+Nombre: ${productTitle || "Producto"}
+Tipo: ${productType || "General"}
+Descripción: ${bodyHtml ? bodyHtml.replace(/<[^>]+>/g, "").slice(0, 500) : "Sin descripción disponible"}
+
+El modelo 3D debe representar visualmente el valor del producto/servicio de forma atractiva y profesional.`;
+
+      let prompt = "";
+      try {
+        const result = await askClaudeWithBrain(
+          Number(projectId) || 0,
+          [{ role: "user", content: userMsg }],
+          systemPrompt,
+          "general",
+          productType || "ecommerce",
+          300,
+        );
+        prompt = String(result).trim().replace(/^["']|["']$/g, "");
+      } catch {
+        // Fallback prompt si Claude falla
+        prompt = `A high-quality 3D product model of ${productTitle || "a commercial product"}, professional studio lighting, clean white background, PBR materials, detailed surface textures, photorealistic rendering, 8k resolution`;
+      }
+
+      send({ event: "prompt_generated", prompt, message: "Prompt 3D generado. Iniciando modelado..." });
+
+      taskId = await tripoCreateTask({
+        type: "text_to_model",
+        prompt,
+        model_version: "default",
+        texture: true,
+        pbr: true,
+      });
+    }
+
+    send({ event: "started", task_id: taskId, message: "Modelo 3D en proceso (2-5 min)..." });
+
+    // ── Polling de progreso ────────────────────────────────────────────────
+    let finalData: any = null;
+    for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+      const data = await tripoFetch(`/task/${taskId}`);
+      const status: string = data.status;
+      const progress: number = data.progress ?? 0;
+
+      if (status === "success") {
+        finalData = data;
+        send({ event: "progress", task_id: taskId, progress: 100, status });
+        break;
+      }
+      if (status === "failed" || status === "cancelled") {
+        throw new Error(`La tarea ${status === "failed" ? "falló" : "fue cancelada"}`);
+      }
+      send({ event: "progress", task_id: taskId, progress, status });
+    }
+
+    if (!finalData) throw new Error("Tiempo de espera agotado (6 min). El modelo puede seguir procesándose.");
+
+    // ── Guardar en Vault ───────────────────────────────────────────────────
+    const modelUrl: string | undefined =
+      finalData.output?.model || finalData.output?.pbr_model || finalData.output?.rendered_image;
+    const previewUrl: string | undefined =
+      finalData.output?.rendered_image || modelUrl;
+
+    let vaultId: number | null = null;
+    if (modelUrl && Number(projectId) > 0) {
+      try {
+        vaultId = await saveToVault({
+          projectId: Number(projectId),
+          fileType: "3d_model",
+          category: "tripo3d",
+          title: `Modelo 3D: ${productTitle || "Producto"}`,
+          description: `Modelo 3D generado automáticamente con Tripo3D AI`,
+          productId: productId ? String(productId) : undefined,
+          productTitle: productTitle || undefined,
+          originalUrl: modelUrl,
+          mimeType: "model/gltf-binary",
+          generatedBy: "tripo3d-auto",
+          metadata: { taskId, output: finalData.output, imageMode: !!(imageUrl) },
+        });
+      } catch (vaultErr: any) {
+        logger.warn({ err: vaultErr?.message, taskId }, "tripo3d/auto-generate: vault save failed (non-fatal)");
+      }
+    }
+
+    send({
+      event: "done",
+      task_id: taskId,
+      output: finalData.output,
+      model_url: modelUrl,
+      preview_url: previewUrl,
+      vault_id: vaultId,
+    });
+  } catch (e: any) {
+    logger.error({ err: e.message }, "tripo3d/auto-generate error");
+    send({ event: "error", error: e.message || "Error desconocido" });
+  }
+
+  res.end();
 });
 
 export default router;
