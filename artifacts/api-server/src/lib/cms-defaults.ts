@@ -452,6 +452,7 @@ export const DEFAULT_CMS_CONTENT = {
       { label: "Mi Pricing CFO", icon: "💰", href: "/admin/my-pricing" },
       { label: "Email Marketing", icon: "📧", href: "/admin/emails" },
       { label: "Flujos de Email", icon: "🔁", href: "/admin/email-flows" },
+      { label: "Librería de Prompts", icon: "🏛", href: "/admin/prompt-library" },
       { label: "Editor Landing", icon: "✏️", href: "/admin/cms" },
       { label: "Ver Landing", icon: "🌐", href: "/landing" },
       { label: "Lab Web", icon: "🔬", href: "/web-lab" },
