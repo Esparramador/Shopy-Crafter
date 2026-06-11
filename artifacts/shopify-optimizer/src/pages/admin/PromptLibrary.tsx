@@ -163,10 +163,16 @@ export default function PromptLibrary() {
   const LIMIT = 24;
 
   const loadItems = useCallback(async (key: string, q: string, off: number, append = false) => {
+    if (!key && !q.trim()) {
+      if (!append) setItems([]);
+      setHasMore(false);
+      setTotalInLib(0);
+      return;
+    }
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: String(LIMIT), offset: String(off) });
-      if (key) params.set("key", key);
+      if (key) params.set("library", key);
       if (q.trim()) params.set("search", q.trim());
       const r = await fetch(`${API_BASE}/api/fs-pro/prompt-library-master?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error("failed");
@@ -185,18 +191,28 @@ export default function PromptLibrary() {
 
   const loadIndex = useCallback(async () => {
     try {
-      const r = await fetch(`${API_BASE}/api/fs-pro/prompt-library-master/index`, { credentials: "include" });
+      const r = await fetch(`${API_BASE}/api/fs-pro/prompt-library-master?indexOnly=1`, { credentials: "include" });
       if (r.ok) {
         const d = await r.json();
-        setLibIndex(Array.isArray(d) ? d : []);
+        let idx: LibIndex[] = [];
+        if (Array.isArray(d)) {
+          idx = d;
+        } else if (Array.isArray(d.libraries)) {
+          idx = d.libraries.map((l: any) => ({ key: l.key ?? l.name ?? "", count: l.count ?? l.total ?? 0 }));
+        } else if (d.libraries && typeof d.libraries === "object") {
+          idx = Object.entries(d.libraries).map(([k, v]: [string, any]) => ({
+            key: k,
+            count: Array.isArray(v?.templates) ? v.templates.length : (v?.count ?? 0),
+          }));
+        }
+        setLibIndex(idx);
       }
     } catch {}
   }, []);
 
   useEffect(() => {
     loadIndex();
-    loadItems("", "", 0);
-  }, [loadIndex, loadItems]);
+  }, [loadIndex]);
 
   const handleCategorySelect = (key: string) => {
     setActiveCategory(key);
