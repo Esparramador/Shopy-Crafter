@@ -286,7 +286,19 @@ export default function MeshyStudio() {
     ? `📁 ${customModel.name}`
     : `${selectedChar.emoji} ${selectedChar.name}`;
 
-  const filteredClips = apiClips.filter(c => {
+  const browserAnims = customModel
+    ? apiClips.map(c => ({
+        id: c.id, label: c.label, category: c.category, looping: c.looping,
+        glbPath: `/assets/3d/animations/alec_monopoly/${c.id}.glb`,
+      }))
+    : selectedChar.animations
+        .filter(a => a.name !== "rigged")
+        .map(a => {
+          const meta = apiClips.find(c => c.id === a.name);
+          return { id: a.name, label: a.label, category: meta?.category ?? "general", looping: a.looping ?? true, glbPath: a.glbPath };
+        });
+
+  const filteredClips = browserAnims.filter(c => {
     const matchCat = animCategory === "all" || c.category === animCategory;
     const q = animSearch.toLowerCase();
     const matchSearch = !q || c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || c.category.includes(q);
@@ -520,10 +532,10 @@ export default function MeshyStudio() {
                   color: animCategory === "all" ? "var(--l-gold)" : "var(--l-t4)",
                 }}
               >
-                Todas ({apiClips.length || 134})
+                Todas ({browserAnims.length})
               </button>
               {ANIM_CATEGORIES.map(cat => {
-                const count = apiClips.filter(c => c.category === cat.id).length;
+                const count = browserAnims.filter(c => c.category === cat.id).length;
                 return (
                   <button
                     key={cat.id}
@@ -580,7 +592,7 @@ export default function MeshyStudio() {
               </button>
 
               {filteredClips.map(clip => {
-                const animPath = `/assets/3d/animations/alec_monopoly/${clip.id}.glb`;
+                const animPath = clip.glbPath;
                 const isActive = selectedAnimPath === animPath;
                 return (
                   <button
