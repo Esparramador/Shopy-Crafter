@@ -55,6 +55,9 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Buscador Universal", icon: "🔎", href: "/admin/search" },
   { label: "Template Studio", icon: "🎨", href: "/admin/template-studio" },
   { label: "Avatar Studio", icon: "🎬", href: "/admin/avatar-studio" },
+  { label: "Meshy Character Lab", icon: "🧊", href: "/admin/meshy-studio" },
+  { label: "Effects Studio", icon: "✦", href: "/effects-studio" },
+  { label: "AI Web Designer", icon: "🎨", href: "/web-designer" },
 ];
 
 const DEFAULT_ADMIN_NAV = [
@@ -570,7 +573,9 @@ export function AppLayout({ children }: AppLayoutProps) {
               const isActive = currentPage === item.id;
               const tabHref = activeProjectId
                 ? `/projects/${activeProjectId}/${item.id}`
-                : `/${item.id}`;
+                : firstProjectId
+                  ? `/projects/${firstProjectId}/${item.id}`
+                  : `/${item.id}`;
               return (
                 <Link key={item.id} href={tabHref}>
                   <div

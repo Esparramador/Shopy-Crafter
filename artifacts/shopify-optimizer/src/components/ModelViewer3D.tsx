@@ -2,7 +2,7 @@ import { Suspense, useRef, useEffect, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations, OrbitControls, Environment, ContactShadows, Html } from "@react-three/drei";
 import * as THREE from "three";
-import { Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Sun } from "lucide-react";
+import { Play, Pause, RotateCcw, Sun } from "lucide-react";
 
 export interface ModelAnimation {
   name: string;
@@ -18,9 +18,29 @@ export interface ModelViewerProps {
   className?: string;
   autoRotate?: boolean;
   height?: number | string;
+  overrideAnimPath?: string | null;
+  hideAnimPills?: boolean;
+  onRigStatus?: (isRigged: boolean, boneCount: number) => void;
 }
 
-// ── Base model (no animation GLB) ─────────────────────────────────────────────
+// ── Rig detector (runs inside Canvas) ────────────────────────────────────────
+
+function RigDetector({ glbPath, onRigStatus }: { glbPath: string; onRigStatus: (r: boolean, b: number) => void }) {
+  const { scene } = useGLTF(glbPath);
+  useEffect(() => {
+    if (!scene) return;
+    let hasBones = false;
+    let boneCount = 0;
+    scene.traverse((obj: any) => {
+      if (obj.isBone) { hasBones = true; boneCount++; }
+      if (obj.isSkinnedMesh) hasBones = true;
+    });
+    onRigStatus(hasBones, boneCount);
+  }, [glbPath]);
+  return null;
+}
+
+// ── Base model (no animation GLB) ────────────────────────────────────────────
 
 function BaseModel({ glbPath, onReady }: { glbPath: string; onReady?: () => void }) {
   const group = useRef<THREE.Group>(null!);
@@ -41,7 +61,6 @@ function BaseModel({ glbPath, onReady }: { glbPath: string; onReady?: () => void
     onReady?.();
   }, [scene]);
 
-  // Play first embedded animation if any
   useEffect(() => {
     const keys = Object.keys(actions);
     if (keys.length === 0) return;
@@ -105,7 +124,7 @@ function AnimatedModel({
 // ── Switcher: picks which sub-component to render ────────────────────────────
 
 function ModelSwitcher({
-  glbPath, animGlbPath, looping, autoRotate, envPreset, onReady,
+  glbPath, animGlbPath, looping, autoRotate, envPreset, onReady, onRigStatus,
 }: {
   glbPath: string;
   animGlbPath?: string;
@@ -113,6 +132,7 @@ function ModelSwitcher({
   autoRotate: boolean;
   envPreset: string;
   onReady?: () => void;
+  onRigStatus?: (isRigged: boolean, boneCount: number) => void;
 }) {
   return (
     <>
@@ -121,6 +141,11 @@ function ModelSwitcher({
       <directionalLight position={[-3, 4, -3]} intensity={0.4} />
       <Environment preset={envPreset as any} />
       <ContactShadows position={[0, 0, 0]} opacity={0.4} scale={6} blur={2} far={3} />
+      {onRigStatus && (
+        <Suspense fallback={null}>
+          <RigDetector glbPath={glbPath} onRigStatus={onRigStatus} />
+        </Suspense>
+      )}
       {animGlbPath
         ? <AnimatedModel glbPath={glbPath} animGlbPath={animGlbPath} looping={looping} onReady={onReady} />
         : <BaseModel glbPath={glbPath} onReady={onReady} />
@@ -167,6 +192,9 @@ export default function ModelViewer3D({
   className = "",
   autoRotate: initAutoRotate = true,
   height = 480,
+  overrideAnimPath,
+  hideAnimPills = false,
+  onRigStatus,
 }: ModelViewerProps) {
   const [animIdx, setAnimIdx]       = useState(-1);
   const [paused, setPaused]         = useState(false);
@@ -174,8 +202,19 @@ export default function ModelViewer3D({
   const [envIdx, setEnvIdx]         = useState(0);
 
   const currentAnim = animations[animIdx] ?? null;
-  const envPreset   = ENV_PRESETS[envIdx % ENV_PRESETS.length];
-  const h           = typeof height === "number" ? `${height}px` : height;
+
+  const effectiveAnimPath: string | undefined =
+    overrideAnimPath !== undefined
+      ? (overrideAnimPath ?? undefined)
+      : (currentAnim?.glbPath ?? undefined);
+
+  const effectiveLooping: boolean =
+    overrideAnimPath !== undefined
+      ? true
+      : (currentAnim?.looping ?? true);
+
+  const envPreset = ENV_PRESETS[envIdx % ENV_PRESETS.length];
+  const h = typeof height === "number" ? `${height}px` : height;
 
   return (
     <div
@@ -193,15 +232,15 @@ export default function ModelViewer3D({
           <Suspense fallback={<Spinner />}>
             <ModelSwitcher
               glbPath={glbPath}
-              animGlbPath={currentAnim?.glbPath}
-              looping={currentAnim?.looping ?? true}
+              animGlbPath={effectiveAnimPath}
+              looping={effectiveLooping}
               autoRotate={autoRotate && !paused}
               envPreset={envPreset}
+              onRigStatus={onRigStatus}
             />
           </Suspense>
         </Canvas>
 
-        {/* Character name badge */}
         {characterName && (
           <div style={{
             position: "absolute", top: 10, left: 10,
@@ -214,7 +253,18 @@ export default function ModelViewer3D({
           </div>
         )}
 
-        {/* Env cycle button */}
+        {effectiveAnimPath && (
+          <div style={{
+            position: "absolute", bottom: 10, left: 10,
+            background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
+            borderRadius: 6, padding: "3px 10px",
+            border: "1px solid rgba(212,168,67,0.2)",
+            color: "#d4a843", fontSize: 11, pointerEvents: "none",
+          }}>
+            ▶ {effectiveAnimPath.split("/").pop()?.replace(".glb", "") ?? ""}
+          </div>
+        )}
+
         <button
           onClick={() => setEnvIdx(i => i + 1)}
           style={{
@@ -254,34 +304,19 @@ export default function ModelViewer3D({
           <RotateCcw size={14} />
         </button>
 
-        {animations.length > 0 ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
-            <button
-              onClick={() => setAnimIdx(i => Math.max(-1, i - 1))}
-              disabled={animIdx <= -1}
-              style={{ padding: "3px 4px", background: "none", border: "none", cursor: animIdx <= -1 ? "not-allowed" : "pointer", color: animIdx <= -1 ? "#444" : "#888", display: "flex" }}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span style={{ flex: 1, textAlign: "center", fontSize: 12, color: "#d4a843", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {currentAnim ? currentAnim.label : "Pose base"}
-              <span style={{ marginLeft: 4, color: "#555", fontSize: 10 }}>({animIdx + 2}/{animations.length + 1})</span>
-            </span>
-            <button
-              onClick={() => setAnimIdx(i => Math.min(animations.length - 1, i + 1))}
-              disabled={animIdx >= animations.length - 1}
-              style={{ padding: "3px 4px", background: "none", border: "none", cursor: animIdx >= animations.length - 1 ? "not-allowed" : "pointer", color: animIdx >= animations.length - 1 ? "#444" : "#888", display: "flex" }}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        ) : (
-          <span style={{ flex: 1, textAlign: "center", fontSize: 11, color: "#555" }}>Sin animaciones · arrastra para rotar</span>
-        )}
+        <span style={{ flex: 1, textAlign: "center", fontSize: 11, color: overrideAnimPath !== undefined ? "#d4a843" : "#555", fontWeight: overrideAnimPath !== undefined ? 600 : 400 }}>
+          {overrideAnimPath !== undefined
+            ? (overrideAnimPath ? `▶ ${overrideAnimPath.split("/").pop()?.replace(".glb", "")}` : "Pose base")
+            : (currentAnim ? currentAnim.label : "Pose base · arrastra para rotar")}
+        </span>
+
+        <span style={{ fontSize: 10, color: "#444", padding: "2px 6px", borderRadius: 4, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          {envPreset}
+        </span>
       </div>
 
-      {/* Animation pills */}
-      {animations.length > 0 && (
+      {/* Animation pills (internal control, shown only when not overriding and not hidden) */}
+      {!hideAnimPills && overrideAnimPath === undefined && animations.length > 0 && (
         <div style={{ display: "flex", gap: 6, padding: "6px 10px", background: "rgba(12,8,2,0.95)", borderTop: "1px solid rgba(212,168,67,0.07)", overflowX: "auto" }}>
           <button
             onClick={() => setAnimIdx(-1)}
@@ -311,7 +346,6 @@ export default function ModelViewer3D({
         </div>
       )}
 
-      {/* Spin keyframe */}
       <style>{`@keyframes mv3d-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );

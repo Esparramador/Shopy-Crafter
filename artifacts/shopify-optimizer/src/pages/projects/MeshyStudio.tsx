@@ -1,12 +1,13 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRoute } from "wouter";
 import {
   Loader2, Upload, Box, Wand2, Image,
-  CheckCircle2, AlertCircle, Zap, Film, Star, Lock, Cpu, ChevronRight,
+  CheckCircle2, AlertCircle, Zap, Film, Star, Lock, Cpu,
+  Search, Download, FolderOpen, TriangleAlert, RefreshCw,
 } from "lucide-react";
 import ModelViewer3D from "@/components/ModelViewer3D";
 import AnimationFlowPicker from "@/components/AnimationFlowPicker";
-import { MESHY_CHARACTERS, RIGGED_CHARACTERS, type MeshyCharacter } from "@/lib/meshyModels";
+import { MESHY_CHARACTERS, RIGGED_CHARACTERS, ANIM_CATEGORIES, type MeshyCharacter } from "@/lib/meshyModels";
 
 const API = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -31,14 +32,34 @@ interface FactoryItem {
   error?: string;
 }
 
+interface ApiClip {
+  action_id: number;
+  id: string;
+  label: string;
+  category: string;
+  looping: boolean;
+}
+
+interface ApiCategory {
+  id: string;
+  label: string;
+  icon: string;
+  count: number;
+}
+
+interface CustomModel {
+  url: string;
+  name: string;
+  isRigged: boolean | null;
+  boneCount: number;
+}
+
 const ART_STYLES = [
   { value: "realistic", label: "🔬 Realista" },
   { value: "cartoon",   label: "🎨 Cartoon"  },
   { value: "low-poly",  label: "💎 Low-Poly"  },
   { value: "sculpture", label: "🗿 Escultura" },
 ];
-
-// ── SSE helper ────────────────────────────────────────────────────────────────
 
 function streamSSE(
   url: string, body: FormData | string, headers: Record<string, string>,
@@ -69,8 +90,6 @@ function streamSSE(
   return () => ctrl.abort();
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-
 export default function MeshyStudio() {
   const [, params] = useRoute("/projects/:id/*");
   const projectId = params?.id;
@@ -79,7 +98,17 @@ export default function MeshyStudio() {
   const [selectedChar, setSelectedChar] = useState<MeshyCharacter>(RIGGED_CHARACTERS[0]);
   const [catFilter, setCatFilter] = useState<"all" | "cartoon" | "realistic">("all");
 
-  // Text-to-3D
+  // ── Enhanced Viewer state ──────────────────────────────────────────────────
+  const [selectedAnimPath, setSelectedAnimPath] = useState<string | null>(null);
+  const [animSearch, setAnimSearch] = useState("");
+  const [animCategory, setAnimCategory] = useState("all");
+  const [apiClips, setApiClips] = useState<ApiClip[]>([]);
+  const [apiCats, setApiCats] = useState<ApiCategory[]>([]);
+  const [animsLoaded, setAnimsLoaded] = useState(false);
+  const [customModel, setCustomModel] = useState<CustomModel | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  // ── Text-to-3D ─────────────────────────────────────────────────────────────
   const [txtPrompt, setTxtPrompt]   = useState("");
   const [txtNeg, setTxtNeg]         = useState("");
   const [txtStyle, setTxtStyle]     = useState("realistic");
@@ -91,7 +120,7 @@ export default function MeshyStudio() {
   const [txtPreviewTaskId, setTxtPreviewTaskId] = useState("");
   const stopTxtRef = useRef<(() => void) | null>(null);
 
-  // Image-to-3D
+  // ── Image-to-3D ────────────────────────────────────────────────────────────
   const [imgFile, setImgFile]       = useState<File | null>(null);
   const [imgPreview, setImgPreview] = useState("");
   const [imgStatus, setImgStatus]   = useState<GenStatus>("idle");
@@ -102,13 +131,38 @@ export default function MeshyStudio() {
   const imgRef = useRef<HTMLInputElement>(null);
   const stopImgRef = useRef<(() => void) | null>(null);
 
-  // Factory
+  // ── Factory ────────────────────────────────────────────────────────────────
   const [factoryItems, setFactoryItems] = useState<FactoryItem[]>(() =>
     MESHY_CHARACTERS.map(c => ({ char: c, status: "idle", progress: 0 }))
   );
   const [factoryArtStyle, setFactoryArtStyle] = useState("realistic");
 
-  // ── Text-to-3D ─────────────────────────────────────────────────────────────
+  // ── Fetch API animations on mount ─────────────────────────────────────────
+  useEffect(() => {
+    fetch(`${API}/api/meshy/animations`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d && d.clips) {
+          setApiClips(d.clips);
+          setApiCats(d.categories ?? []);
+          setAnimsLoaded(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Custom model import ────────────────────────────────────────────────────
+  const handleImportModel = useCallback((f: File) => {
+    const url = URL.createObjectURL(f);
+    setCustomModel({ url, name: f.name, isRigged: null, boneCount: 0 });
+    setSelectedAnimPath(null);
+  }, []);
+
+  const handleRigStatus = useCallback((isRigged: boolean, boneCount: number) => {
+    setCustomModel(prev => prev ? { ...prev, isRigged, boneCount } : null);
+  }, []);
+
+  // ── Text-to-3D handlers ────────────────────────────────────────────────────
   const generateText = useCallback(() => {
     if (!txtPrompt.trim()) return;
     stopTxtRef.current?.();
@@ -217,18 +271,30 @@ export default function MeshyStudio() {
     );
   }, [factoryItems, factoryArtStyle]);
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
+  // ── Derived ────────────────────────────────────────────────────────────────
   const riggedCount  = RIGGED_CHARACTERS.length;
   const totalModels  = MESHY_CHARACTERS.length;
   const factoryDone  = factoryItems.filter(i => i.status === "done").length;
   const factoryReady = factoryItems.filter(i => i.file && i.status === "idle").length;
-  const totalAnims   = RIGGED_CHARACTERS.reduce((s, c) => s + c.animations.length, 0);
+  const totalAnims   = animsLoaded ? apiClips.length : 134;
 
   const filteredChars = catFilter === "all" ? MESHY_CHARACTERS
     : MESHY_CHARACTERS.filter(c => c.category === catFilter);
 
+  const activeGlbPath   = customModel?.url ?? selectedChar.glbPath;
+  const activeModelName = customModel
+    ? `📁 ${customModel.name}`
+    : `${selectedChar.emoji} ${selectedChar.name}`;
+
+  const filteredClips = apiClips.filter(c => {
+    const matchCat = animCategory === "all" || c.category === animCategory;
+    const q = animSearch.toLowerCase();
+    const matchSearch = !q || c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || c.category.includes(q);
+    return matchCat && matchSearch;
+  });
+
   const tabs: { id: Tab; label: string; icon: string; badge?: string }[] = [
-    { id: "viewer",  label: "Viewer 3D",     icon: "🎮", badge: `${riggedCount} rigged` },
+    { id: "viewer",  label: "Studio 3D",     icon: "🎮", badge: `${riggedCount} modelos` },
     { id: "flows",   label: "Animaciones",   icon: "💃", badge: `${totalAnims} clips` },
     { id: "catalog", label: "Catálogo",      icon: "🎭" },
     { id: "text",    label: "Texto → 3D",    icon: "✏️" },
@@ -237,21 +303,21 @@ export default function MeshyStudio() {
   ];
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 1200, margin: "0 auto" }}>
+    <div style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <div style={{ fontSize: 28 }}>🧊</div>
         <div>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--l-t)" }}>Meshy Studio — Character Lab</h1>
           <p style={{ margin: 0, fontSize: 12, color: "var(--l-t3)" }}>
-            {riggedCount} personajes rigged · {totalAnims} animaciones GLB · {totalModels} modelos totales
+            {riggedCount} personajes rigged · {totalAnims} animaciones · {totalModels} modelos · sin créditos para animar
           </p>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <StatPill label="GLBs"      value={`${totalModels}`}  color="gold"   />
           <StatPill label="Rigged"    value={`${riggedCount}`}  color="jade"   />
-          <StatPill label="Animaciones" value={`${totalAnims}`} color="purple" />
+          <StatPill label="Anims"     value={`${totalAnims}`}   color="purple" />
         </div>
       </div>
 
@@ -271,65 +337,295 @@ export default function MeshyStudio() {
         ))}
       </div>
 
-      {/* ═══ VIEWER ══════════════════════════════════════════════════════ */}
+      {/* ═══ STUDIO 3D VIEWER ══════════════════════════════════════════════════ */}
       {tab === "viewer" && (
-        <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--l-t4)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Personajes Rigged</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {RIGGED_CHARACTERS.map(c => (
-                <button key={c.id} onClick={() => setSelectedChar(c)} style={{
-                  padding: "9px 11px", border: "1px solid", borderRadius: 9, cursor: "pointer",
-                  textAlign: "left", display: "flex", alignItems: "center", gap: 9, transition: "all 0.12s",
-                  borderColor: selectedChar.id === c.id ? "var(--l-gold)" : "rgba(255,255,255,0.08)",
-                  background: selectedChar.id === c.id ? "rgba(212,168,67,0.08)" : "rgba(255,255,255,0.02)",
-                }}>
-                  <span style={{ fontSize: 22 }}>{c.emoji}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--l-t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-                    <div style={{ fontSize: 9, color: "var(--l-t4)", marginTop: 1 }}>{c.animations.length} animaciones</div>
-                  </div>
-                  {selectedChar.id === c.id && <ChevronRight size={13} style={{ color: "var(--l-gold)", flexShrink: 0 }} />}
-                </button>
-              ))}
+        <div style={{ display: "grid", gridTemplateColumns: "210px 1fr 290px", gap: 14 }}>
+
+          {/* LEFT: Model Selector */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--l-t4)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+              Modelos Rigged
             </div>
 
-            <div style={{ marginTop: 12, padding: "10px 11px", borderRadius: 9, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--l-t4)", marginBottom: 5, letterSpacing: "0.06em" }}>SIN RIG ({MESHY_CHARACTERS.length - riggedCount})</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+            {RIGGED_CHARACTERS.map(c => (
+              <button key={c.id} onClick={() => { setSelectedChar(c); setCustomModel(null); setSelectedAnimPath(null); }} style={{
+                padding: "8px 10px", border: "1px solid", borderRadius: 8, cursor: "pointer",
+                textAlign: "left", display: "flex", alignItems: "center", gap: 8, transition: "all 0.12s",
+                borderColor: !customModel && selectedChar.id === c.id ? "var(--l-gold)" : "rgba(255,255,255,0.07)",
+                background: !customModel && selectedChar.id === c.id ? "rgba(212,168,67,0.08)" : "rgba(255,255,255,0.02)",
+              }}>
+                <span style={{ fontSize: 20 }}>{c.emoji}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--l-t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                  <div style={{ fontSize: 9, color: "var(--l-t4)" }}>✅ {c.animations.length} anim.</div>
+                </div>
+              </button>
+            ))}
+
+            {/* Separator */}
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "4px 0" }} />
+
+            {/* Import custom model */}
+            <div style={{ padding: "10px", borderRadius: 9, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(212,168,67,0.25)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--l-t4)", marginBottom: 6, letterSpacing: "0.06em" }}>IMPORTAR MODELO</div>
+              <button
+                onClick={() => importRef.current?.click()}
+                style={{
+                  width: "100%", padding: "8px", borderRadius: 7, border: "1px solid rgba(212,168,67,0.3)",
+                  background: customModel ? "rgba(212,168,67,0.1)" : "rgba(255,255,255,0.03)",
+                  color: "var(--l-gold)", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                }}
+              >
+                <FolderOpen size={12} />
+                {customModel ? customModel.name.slice(0, 16) + "…" : "GLB / GLTF"}
+              </button>
+              <input
+                ref={importRef}
+                type="file"
+                accept=".glb,.gltf"
+                style={{ display: "none" }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImportModel(f); e.target.value = ""; }}
+              />
+              {customModel && (
+                <div style={{ marginTop: 6 }}>
+                  {customModel.isRigged === null && (
+                    <div style={{ fontSize: 9, color: "var(--l-t4)" }}>Detectando esqueleto…</div>
+                  )}
+                  {customModel.isRigged === true && (
+                    <div style={{ fontSize: 9, color: "#00c864" }}>✅ Rigged ({customModel.boneCount} huesos)</div>
+                  )}
+                  {customModel.isRigged === false && (
+                    <div style={{ fontSize: 9, color: "#f59e0b", lineHeight: 1.4, marginTop: 2 }}>
+                      ⚠ Sin esqueleto. Las animaciones requieren rig.<br />
+                      <span style={{ color: "var(--l-t4)" }}>Genera rig en "Fábrica" o usa Text→3D con A-pose.</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { setCustomModel(null); setSelectedAnimPath(null); }}
+                    style={{ marginTop: 5, fontSize: 9, color: "var(--l-t4)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+                  >
+                    Quitar modelo
+                  </button>
+                </div>
+              )}
+              <div style={{ fontSize: 9, color: "var(--l-t4)", marginTop: 6, lineHeight: 1.5 }}>
+                FBX/STL/OBJ: convierte primero a GLB con Blender o Meshy.
+              </div>
+            </div>
+
+            {/* Unrigged models info */}
+            <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "var(--l-t4)", marginBottom: 4 }}>SIN RIG ({MESHY_CHARACTERS.length - riggedCount})</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
                 {MESHY_CHARACTERS.filter(c => c.rigStatus === "pending").map(c => (
-                  <span key={c.id} style={{ fontSize: 14 }} title={c.name}>{c.emoji}</span>
+                  <span key={c.id} style={{ fontSize: 13 }} title={c.name}>{c.emoji}</span>
                 ))}
               </div>
-              <div style={{ fontSize: 9, color: "var(--l-t4)", marginTop: 5, lineHeight: 1.5 }}>
-                Necesitan A-pose para auto-rig. Usa Fábrica para regenerar.
+              <div style={{ fontSize: 9, color: "var(--l-t4)", marginTop: 4, lineHeight: 1.4 }}>
+                Usa Fábrica → A-pose para auto-rig.
               </div>
             </div>
           </div>
 
-          <div>
+          {/* CENTER: 3D Viewer */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <ModelViewer3D
-              glbPath={selectedChar.glbPath}
-              animations={selectedChar.animations}
-              characterName={`${selectedChar.emoji} ${selectedChar.name}`}
+              glbPath={activeGlbPath}
+              characterName={activeModelName}
+              overrideAnimPath={selectedAnimPath}
+              hideAnimPills={true}
+              onRigStatus={customModel ? handleRigStatus : undefined}
               height={460}
-              autoRotate
+              autoRotate={!selectedAnimPath}
             />
-            <div style={{ marginTop: 10, padding: "11px 14px", borderRadius: 9, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <span style={{ fontSize: 32 }}>{selectedChar.emoji}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--l-t)" }}>{selectedChar.name}</div>
-                <div style={{ fontSize: 11, color: "var(--l-t3)", marginTop: 2 }}>{selectedChar.description}</div>
-                <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-                  {selectedChar.tags.map(t => (
-                    <span key={t} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 9, background: "rgba(255,255,255,0.05)", color: "var(--l-t4)" }}>{t}</span>
-                  ))}
+
+            {/* Model info bar */}
+            <div style={{ padding: "10px 14px", borderRadius: 9, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 10, alignItems: "center" }}>
+              <span style={{ fontSize: 28 }}>{customModel ? "📁" : selectedChar.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--l-t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {customModel ? customModel.name : selectedChar.name}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--l-t3)", marginTop: 1 }}>
+                  {selectedAnimPath
+                    ? `▶ ${selectedAnimPath.split("/").pop()?.replace(".glb", "")}`
+                    : "Pose base · sin animación"}
                 </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <span style={{ fontSize: 10, padding: "3px 9px", borderRadius: 18, background: "rgba(0,200,100,0.1)", color: "#00c864", border: "1px solid rgba(0,200,100,0.25)" }}>✅ GLB + Rigged</span>
-                <a href={selectedChar.glbPath} download style={{ fontSize: 10, padding: "3px 9px", borderRadius: 18, background: "rgba(212,168,67,0.1)", color: "var(--l-gold)", border: "1px solid rgba(212,168,67,0.3)", textDecoration: "none", textAlign: "center" }}>⬇ GLB</a>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {selectedAnimPath && (
+                  <button
+                    onClick={() => setSelectedAnimPath(null)}
+                    style={{ fontSize: 10, padding: "4px 10px", borderRadius: 14, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--l-t3)", cursor: "pointer" }}
+                  >
+                    ⏹ Pose base
+                  </button>
+                )}
+                {!customModel && (
+                  <a
+                    href={selectedChar.glbPath}
+                    download
+                    style={{ fontSize: 10, padding: "4px 10px", borderRadius: 14, background: "rgba(212,168,67,0.1)", border: "1px solid rgba(212,168,67,0.3)", color: "var(--l-gold)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+                  >
+                    <Download size={10} /> GLB
+                  </a>
+                )}
+                {!customModel && (
+                  <span style={{ fontSize: 9, padding: "3px 9px", borderRadius: 12, background: "rgba(0,200,100,0.1)", color: "#00c864", border: "1px solid rgba(0,200,100,0.2)" }}>
+                    ✅ Rigged
+                  </span>
+                )}
               </div>
+            </div>
+
+            {/* Free animations notice */}
+            <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(212,168,67,0.05)", border: "1px solid rgba(212,168,67,0.15)", display: "flex", alignItems: "center", gap: 8 }}>
+              <Zap size={12} style={{ color: "var(--l-gold)", flexShrink: 0 }} />
+              <span style={{ fontSize: 10, color: "var(--l-t3)", lineHeight: 1.5 }}>
+                <strong style={{ color: "var(--l-gold)" }}>{totalAnims} animaciones sin coste</strong> — GLBs descargados localmente.
+                Aplica cualquiera a cualquier modelo rigged humanoid. Solo cambias el mesh, la animación es la misma.
+              </span>
+            </div>
+          </div>
+
+          {/* RIGHT: Animation Browser */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, height: 580 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--l-t4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Librería de Animaciones
+            </div>
+
+            {/* Search */}
+            <div style={{ position: "relative" }}>
+              <Search size={12} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--l-t4)" }} />
+              <input
+                value={animSearch}
+                onChange={e => setAnimSearch(e.target.value)}
+                placeholder="Buscar animación…"
+                style={{
+                  width: "100%", padding: "7px 9px 7px 27px", borderRadius: 8,
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--l-t)", fontSize: 11, boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Category filter */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setAnimCategory("all")}
+                style={{
+                  padding: "3px 9px", borderRadius: 12, fontSize: 10, cursor: "pointer", border: "1px solid",
+                  borderColor: animCategory === "all" ? "var(--l-gold)" : "rgba(255,255,255,0.1)",
+                  background: animCategory === "all" ? "rgba(212,168,67,0.15)" : "transparent",
+                  color: animCategory === "all" ? "var(--l-gold)" : "var(--l-t4)",
+                }}
+              >
+                Todas ({apiClips.length || 134})
+              </button>
+              {ANIM_CATEGORIES.map(cat => {
+                const count = apiClips.filter(c => c.category === cat.id).length;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setAnimCategory(cat.id)}
+                    style={{
+                      padding: "3px 9px", borderRadius: 12, fontSize: 10, cursor: "pointer", border: "1px solid",
+                      borderColor: animCategory === cat.id ? "var(--l-gold)" : "rgba(255,255,255,0.1)",
+                      background: animCategory === cat.id ? "rgba(212,168,67,0.15)" : "transparent",
+                      color: animCategory === cat.id ? "var(--l-gold)" : "var(--l-t4)",
+                    }}
+                  >
+                    {cat.label} {count > 0 ? `(${count})` : ""}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Rigging warning for custom model */}
+            {customModel && customModel.isRigged === false && (
+              <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", display: "flex", gap: 7, alignItems: "flex-start" }}>
+                <TriangleAlert size={12} style={{ color: "#f59e0b", flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 10, color: "#f59e0b", lineHeight: 1.5 }}>
+                  Modelo sin esqueleto. Las animaciones no funcionarán. Genera rig con Meshy desde la pestaña Fábrica o texto→3D con A-pose.
+                </span>
+              </div>
+            )}
+
+            {/* Loading state */}
+            {!animsLoaded && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px", color: "var(--l-t4)", fontSize: 11 }}>
+                <RefreshCw size={12} className="animate-spin" />
+                Cargando catálogo de animaciones…
+              </div>
+            )}
+
+            {/* Animation list */}
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+              {/* Pose base option */}
+              <button
+                onClick={() => setSelectedAnimPath(null)}
+                style={{
+                  padding: "8px 10px", borderRadius: 8, border: "1px solid", cursor: "pointer", textAlign: "left",
+                  borderColor: selectedAnimPath === null ? "var(--l-gold)" : "rgba(255,255,255,0.07)",
+                  background: selectedAnimPath === null ? "rgba(212,168,67,0.1)" : "rgba(255,255,255,0.02)",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>🧍</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: selectedAnimPath === null ? "var(--l-gold)" : "var(--l-t)" }}>Pose base</div>
+                  <div style={{ fontSize: 9, color: "var(--l-t4)" }}>Sin animación · estático</div>
+                </div>
+                {selectedAnimPath === null && <span style={{ fontSize: 9, color: "var(--l-gold)" }}>▶</span>}
+              </button>
+
+              {filteredClips.map(clip => {
+                const animPath = `/assets/3d/animations/alec_monopoly/${clip.id}.glb`;
+                const isActive = selectedAnimPath === animPath;
+                return (
+                  <button
+                    key={clip.id}
+                    onClick={() => setSelectedAnimPath(animPath)}
+                    style={{
+                      padding: "8px 10px", borderRadius: 8, border: "1px solid", cursor: "pointer", textAlign: "left",
+                      borderColor: isActive ? "var(--l-gold)" : "rgba(255,255,255,0.06)",
+                      background: isActive ? "rgba(212,168,67,0.1)" : "rgba(255,255,255,0.01)",
+                      display: "flex", alignItems: "center", gap: 8, transition: "all 0.1s",
+                    }}
+                  >
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                      background: isActive ? "rgba(212,168,67,0.2)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${isActive ? "rgba(212,168,67,0.4)" : "rgba(255,255,255,0.08)"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
+                    }}>
+                      {isActive ? "▶" : clip.label.split(" ")[0]}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 11, fontWeight: isActive ? 600 : 400,
+                        color: isActive ? "var(--l-gold)" : "var(--l-t)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {clip.label.replace(/^[^\s]+\s/, "")}
+                      </div>
+                      <div style={{ fontSize: 9, color: "var(--l-t4)", display: "flex", gap: 5, marginTop: 1 }}>
+                        <span>#{clip.action_id}</span>
+                        <span>·</span>
+                        <span>{clip.category}</span>
+                        <span>·</span>
+                        <span style={{ color: clip.looping ? "#60a5fa" : "#a78bfa" }}>{clip.looping ? "🔄 loop" : "▶ once"}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+
+              {animsLoaded && filteredClips.length === 0 && (
+                <div style={{ textAlign: "center", padding: "20px", color: "var(--l-t4)", fontSize: 11 }}>
+                  Sin resultados para "{animSearch}"
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -563,27 +859,54 @@ function FactoryCard({ item, onFileSelect, onGenerate }: {
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--l-t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
           <div style={{ fontSize: 9, color: "var(--l-t4)" }}>{c.rigStatus === "rigged" ? "✅ Ya rigged" : "⏳ Regenerar en A-pose"}</div>
         </div>
-        {status === "done" && <CheckCircle2 size={13} style={{ color: "#00c864", flexShrink: 0 }} />}
-        {status === "error" && <AlertCircle size={13} style={{ color: "#ff4757", flexShrink: 0 }} />}
-        {status === "running" && <Loader2 size={13} className="animate-spin" style={{ color: "var(--l-gold)", flexShrink: 0 }} />}
       </div>
-      {status === "done" && thumbnailUrl
-        ? <img src={thumbnailUrl} alt={c.name} style={{ width: "100%", borderRadius: 7, marginBottom: 7, aspectRatio: "1", objectFit: "cover" }} />
-        : <div onClick={() => inputRef.current?.click()} style={{ border: "1px dashed rgba(255,255,255,0.1)", borderRadius: 7, padding: 11, textAlign: "center", cursor: "pointer", marginBottom: 7 }}>
-            {item.preview ? <img src={item.preview} alt="ref" style={{ maxHeight: 70, margin: "0 auto", borderRadius: 5 }} /> : <div style={{ fontSize: 9, color: "var(--l-t4)" }}><Upload size={14} style={{ margin: "0 auto 3px" }} /><br/>Imagen ref.</div>}
+      {status === "done" && thumbnailUrl && (
+        <img src={thumbnailUrl} alt="" style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 7, marginBottom: 7, border: "1px solid rgba(0,200,100,0.2)" }} />
+      )}
+      {status === "running" && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--l-t3)", marginBottom: 3 }}>
+            <span><Cpu size={10} style={{ display: "inline", marginRight: 3 }} />Generando…</span>
+            <span>{progress}%</span>
           </div>
-      }
-      <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) onFileSelect(f); }} />
-      {status === "running" && <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.07)", overflow: "hidden", marginBottom: 7 }}><div style={{ width: `${progress}%`, height: "100%", background: "var(--l-gold)", transition: "width 0.5s" }} /></div>}
-      {status === "error" && error && <div style={{ fontSize: 9, color: "#ff4757", marginBottom: 7, lineHeight: 1.4 }}>{error}</div>}
+          <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+            <div style={{ width: `${progress}%`, height: "100%", background: "var(--l-gold)", transition: "width 0.5s" }} />
+          </div>
+        </div>
+      )}
+      {status === "error" && error && (
+        <div style={{ fontSize: 10, color: "#ff4757", marginBottom: 7, background: "rgba(255,71,87,0.08)", padding: "4px 7px", borderRadius: 5, border: "1px solid rgba(255,71,87,0.2)" }}>
+          {error.slice(0, 80)}
+        </div>
+      )}
+      {status !== "running" && status !== "done" && (
+        <>
+          <div onClick={() => inputRef.current?.click()}
+            style={{ border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 7, padding: "10px 8px", textAlign: "center", cursor: "pointer", background: item.preview ? "none" : "rgba(255,255,255,0.02)", marginBottom: 7 }}>
+            {item.preview
+              ? <img src={item.preview} alt="" style={{ maxHeight: 70, margin: "0 auto", borderRadius: 5, objectFit: "contain" }} />
+              : <><Upload size={14} style={{ color: "var(--l-t4)", margin: "0 auto 3px" }} /><p style={{ fontSize: 9, color: "var(--l-t4)", margin: 0 }}>Foto del personaje</p></>
+            }
+          </div>
+          <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) onFileSelect(f); }} />
+        </>
+      )}
       <div style={{ display: "flex", gap: 5 }}>
-        {status === "done" && glbPath && <a href={glbPath} download style={{ flex: 1, fontSize: 10, padding: "4px 0", borderRadius: 5, background: "rgba(0,200,100,0.08)", border: "1px solid rgba(0,200,100,0.2)", color: "#00c864", textAlign: "center", textDecoration: "none" }}>⬇ GLB</a>}
-        {(status === "idle" || status === "error") && (
-          <button onClick={onGenerate} disabled={!item.file} style={{ flex: 1, fontSize: 10, padding: "4px 0", borderRadius: 5, background: item.file ? "rgba(212,168,67,0.12)" : "rgba(255,255,255,0.03)", border: "1px solid", borderColor: item.file ? "rgba(212,168,67,0.3)" : "rgba(255,255,255,0.07)", color: item.file ? "var(--l-gold)" : "var(--l-t4)", cursor: item.file ? "pointer" : "not-allowed" }}>
-            {item.file ? <><Cpu size={9} style={{ display: "inline", marginRight: 2 }} />Generar</> : "Subir imagen"}
+        {status === "done" && glbPath && (
+          <a href={glbPath} download style={{ flex: 1, textAlign: "center", fontSize: 10, padding: "5px 8px", borderRadius: 6, background: "rgba(0,200,100,0.1)", border: "1px solid rgba(0,200,100,0.3)", color: "#00c864", textDecoration: "none" }}>
+            ⬇ GLB
+          </a>
+        )}
+        {status !== "running" && status !== "done" && (
+          <button onClick={onGenerate} disabled={!item.file} style={{
+            flex: 1, padding: "5px 8px", borderRadius: 6, fontSize: 10, cursor: item.file ? "pointer" : "not-allowed",
+            background: item.file ? "rgba(212,168,67,0.15)" : "rgba(255,255,255,0.03)", border: "1px solid",
+            borderColor: item.file ? "rgba(212,168,67,0.3)" : "rgba(255,255,255,0.07)",
+            color: item.file ? "var(--l-gold)" : "var(--l-t4)", fontWeight: 600,
+          }}>
+            <Film size={10} style={{ display: "inline", marginRight: 3 }} />Generar
           </button>
         )}
-        {status === "running" && <div style={{ flex: 1, fontSize: 10, padding: "4px 0", textAlign: "center", color: "var(--l-t4)" }}><Loader2 size={10} className="animate-spin" style={{ display: "inline", marginRight: 2 }} />{progress}%</div>}
       </div>
     </div>
   );

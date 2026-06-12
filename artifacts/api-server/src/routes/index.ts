@@ -101,6 +101,7 @@ router.get("/report-templates/:token", (req, res, next) => {
 });
 
 router.use(requireAuth, meshyRouter);
+router.use(requireAuth, stitchRouter);
 
 router.use(requireAdmin);
 router.use(projectsRouter);
@@ -155,6 +156,5 @@ router.use(brandDnaRouter);
 router.use(tripo3dRouter);
 router.use(vismeRouter);
 router.use(webDesignerRouter);
-router.use("/stitch", stitchRouter);
 
 export default router;

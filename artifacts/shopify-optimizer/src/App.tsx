@@ -358,6 +358,9 @@ function Router() {
         <Route path="/admin/avatar-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><AvatarStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
+        <Route path="/admin/meshy-studio">
+          <RequireAdmin><AdminWrapper><AppLayout><S><MeshyStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
         <Route path="/admin/prompt-library">
           <RequireAdmin><AdminWrapper><AppLayout><S><PromptLibrary /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
