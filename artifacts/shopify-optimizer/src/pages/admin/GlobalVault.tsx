@@ -14,20 +14,20 @@ import {
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const CHARACTERS_3D = [
-  { id: "alec_monopoly", name: "Alec Monopoly", emoji: "🎩", anims: 134, rigged: true, size: "8.2MB" },
-  { id: "batman", name: "Batman", emoji: "🦇", anims: 22, rigged: true, size: "6.7MB" },
-  { id: "chico_casual", name: "Chico Casual", emoji: "👕", anims: 22, rigged: true, size: "6.8MB" },
-  { id: "chico_formal", name: "Chico Formal", emoji: "👔", anims: 22, rigged: true, size: "5.2MB" },
-  { id: "ted", name: "Ted (Oso)", emoji: "🧸", anims: 3, rigged: true, size: "7.3MB" },
-  { id: "spiderman", name: "Spiderman", emoji: "🕷️", anims: 21, rigged: true, size: "1.3MB" },
-  { id: "mickey_mouse", name: "Mickey Mouse", emoji: "🐭", anims: 21, rigged: true, size: "1.4MB" },
-  { id: "minnie_mouse", name: "Minnie Mouse", emoji: "🐭", anims: 21, rigged: true, size: "1.4MB" },
-  { id: "bob_esponja", name: "Bob Esponja", emoji: "🧽", anims: 21, rigged: true, size: "1.4MB" },
-  { id: "bugs_bunny", name: "Bugs Bunny", emoji: "🐰", anims: 21, rigged: true, size: "1.4MB" },
-  { id: "payaso_plim_plim", name: "Payaso Plim Plim", emoji: "🤡", anims: 21, rigged: true, size: "1.4MB" },
-  { id: "chica_ejecutiva", name: "Chica Ejecutiva", emoji: "💼", anims: 21, rigged: true, size: "1.4MB" },
-  { id: "chica_creativa", name: "Chica Creativa", emoji: "🎨", anims: 0, rigged: false, size: "1.3MB" },
-  { id: "pikachu", name: "Pikachu", emoji: "⚡", anims: 0, rigged: false, size: "1.3MB" },
+  { id: "alec_monopoly",    name: "Alec Monopoly",    emoji: "🎩", anims: 134, rigged: true,  textured: true,  size: "8.2MB" },
+  { id: "batman",           name: "Batman",            emoji: "🦇", anims: 22,  rigged: true,  textured: true,  size: "6.7MB" },
+  { id: "chico_casual",     name: "Chico Casual",      emoji: "👕", anims: 22,  rigged: true,  textured: true,  size: "6.8MB" },
+  { id: "chico_formal",     name: "Chico Formal",      emoji: "👔", anims: 22,  rigged: true,  textured: true,  size: "5.2MB" },
+  { id: "ted",              name: "Ted (Oso)",          emoji: "🧸", anims: 3,   rigged: true,  textured: true,  size: "7.3MB" },
+  { id: "spiderman",        name: "Spiderman",          emoji: "🕷️", anims: 21,  rigged: true,  textured: false, size: "1.3MB" },
+  { id: "mickey_mouse",     name: "Mickey Mouse",       emoji: "🐭", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
+  { id: "minnie_mouse",     name: "Minnie Mouse",       emoji: "🐭", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
+  { id: "bob_esponja",      name: "Bob Esponja",        emoji: "🧽", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
+  { id: "bugs_bunny",       name: "Bugs Bunny",         emoji: "🐰", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
+  { id: "payaso_plim_plim", name: "Payaso Plim Plim",   emoji: "🤡", anims: 21,  rigged: true,  textured: false, size: "1.5MB" },
+  { id: "chica_ejecutiva",  name: "Chica Ejecutiva",    emoji: "💼", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
+  { id: "chica_creativa",   name: "Chica Creativa",     emoji: "🎨", anims: 0,   rigged: false, textured: false, size: "1.3MB" },
+  { id: "pikachu",          name: "Pikachu",            emoji: "⚡", anims: 0,   rigged: false, textured: false, size: "1.3MB" },
 ];
 
 const FOLDER_META: Record<string, { label: string; icon: typeof Image; color: string; group: string; description: string }> = {
@@ -172,6 +172,56 @@ export default function GlobalVault() {
   const [activeFolderType, setActiveFolderType] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(FOLDER_GROUP_ORDER));
   const [char3dSearch, setChar3dSearch] = useState("");
+  const [texturizingId, setTexturizingId] = useState<string | null>(null);
+  const [texturizingProgress, setTexturizingProgress] = useState(0);
+  const [texturizingMsg, setTexturizingMsg] = useState("");
+  const [texturedNow, setTexturedNow] = useState<Set<string>>(new Set());
+  const [texturizeError, setTexturizeError] = useState<string | null>(null);
+
+  const handleTexturize = useCallback(async (charId: string) => {
+    setTexturizingId(charId);
+    setTexturizingProgress(0);
+    setTexturizingMsg("Conectando con Meshy…");
+    setTexturizeError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/meshy/texturize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ char_id: charId }),
+      });
+      if (!res.ok || !res.body) {
+        setTexturizeError(`Error HTTP ${res.status}`);
+        setTexturizingId(null);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          try {
+            const evt = JSON.parse(line.slice(5).trim());
+            if (evt.event === "phase")     setTexturizingMsg(evt.message ?? evt.phase);
+            if (evt.event === "started")   setTexturizingMsg("Tarea iniciada — generando texturas PBR…");
+            if (evt.event === "progress")  { setTexturizingProgress(evt.progress ?? 0); setTexturizingMsg(`Texturizando… ${evt.progress ?? 0}%`); }
+            if (evt.event === "done")      { setTexturedNow(prev => new Set([...prev, charId])); setTexturizingId(null); setTexturizingMsg(""); setTexturizingProgress(0); }
+            if (evt.event === "error")     { setTexturizeError(evt.error ?? "Error desconocido"); setTexturizingId(null); }
+            if (evt.event === "timeout")   { setTexturizeError("Tiempo de espera agotado"); setTexturizingId(null); }
+          } catch { /* ignore malformed SSE line */ }
+        }
+      }
+    } catch (err: any) {
+      setTexturizeError(err.message ?? "Error de red");
+      setTexturizingId(null);
+    }
+  }, []);
 
   const loadEntities = useCallback(async () => {
     setLoading(true);
@@ -444,6 +494,25 @@ export default function GlobalVault() {
       ════════════════════════════════ */}
       {!selectedEntity && tab === "personajes3d" && (
         <div>
+          {/* Texturize error banner */}
+          {texturizeError && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+              padding: "10px 14px", borderRadius: 10,
+              background: "rgba(244,67,54,0.08)", border: "1px solid rgba(244,67,54,0.25)",
+            }}>
+              <span style={{ fontSize: 18 }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#ef5350" }}>Error al texturizar</div>
+                <div style={{ fontSize: 11, color: "#8b8b9e", marginTop: 1 }}>{texturizeError}</div>
+              </div>
+              <button
+                onClick={() => setTexturizeError(null)}
+                style={{ background: "none", border: "none", color: "#8b8b9e", cursor: "pointer", padding: 4, fontSize: 16, lineHeight: 1 }}
+              >×</button>
+            </div>
+          )}
+
           <div style={{
             display: "flex", alignItems: "center", gap: 10, marginBottom: 20,
             padding: "14px 18px", borderRadius: 12,
@@ -453,7 +522,7 @@ export default function GlobalVault() {
             <Box size={18} style={{ color: "#00bcd4", flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#f5f5f7" }}>14 Personajes 3D listos para usar</div>
-              <div style={{ fontSize: 12, color: "#8b8b9e" }}>Modelos GLB reales en disco · 1.7GB total · 350 animaciones</div>
+              <div style={{ fontSize: 12, color: "#8b8b9e" }}>Modelos GLB reales en disco · 1.7GB total · 9 sin textura</div>
             </div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               <button onClick={() => navigate("/admin/meshy-studio")}
@@ -501,7 +570,8 @@ export default function GlobalVault() {
                   <div style={{ fontSize: 11, color: "#8b8b9e", marginTop: 2 }}>{char.size}</div>
                 </div>
 
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 12 }}>
+                {/* ── Badges ── */}
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
                   <span style={{
                     fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
                     background: char.rigged ? "rgba(0,188,212,0.12)" : "rgba(255,165,0,0.12)",
@@ -510,6 +580,39 @@ export default function GlobalVault() {
                   }}>
                     {char.rigged ? "✦ Rigged" : "⏳ Pending"}
                   </span>
+                  {/* Texture status badge */}
+                  {(() => {
+                    const isDone = texturedNow.has(char.id) || char.textured;
+                    const isActive = texturizingId === char.id;
+                    if (isActive) return (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+                        background: "rgba(200,168,75,0.15)", color: "#c8a84b",
+                        border: "1px solid rgba(200,168,75,0.3)",
+                        display: "flex", alignItems: "center", gap: 3,
+                      }}>
+                        <RefreshCw size={9} style={{ animation: "spin 1s linear infinite" }} /> Texturizando…
+                      </span>
+                    );
+                    if (isDone) return (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+                        background: "rgba(76,175,80,0.12)", color: "#4caf50",
+                        border: "1px solid rgba(76,175,80,0.2)",
+                      }}>
+                        🎨 Texturizado
+                      </span>
+                    );
+                    return (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+                        background: "rgba(255,255,255,0.04)", color: "#8b8b9e",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                      }}>
+                        ⬜ Sin textura
+                      </span>
+                    );
+                  })()}
                   {char.anims > 0 && (
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
@@ -521,12 +624,36 @@ export default function GlobalVault() {
                   )}
                 </div>
 
-                <div style={{ display: "flex", gap: 6 }}>
+                {/* ── Progress bar (active texturize) ── */}
+                {texturizingId === char.id && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{
+                      height: 4, borderRadius: 3,
+                      background: "rgba(255,255,255,0.06)",
+                      overflow: "hidden",
+                    }}>
+                      <div style={{
+                        height: "100%",
+                        width: `${texturizingProgress}%`,
+                        background: "linear-gradient(90deg, #c8a84b, #e8c86b)",
+                        borderRadius: 3,
+                        transition: "width 0.4s ease",
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: "#8b8b9e", marginTop: 3, textAlign: "center" }}>
+                      {texturizingMsg}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Buttons ── */}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <a
                     href={`${API_BASE}/assets/3d/models/${char.id}.glb`}
                     download={`${char.id}.glb`}
                     style={{
-                      flex: 1, background: "rgba(200,168,75,0.08)", border: "1px solid rgba(200,168,75,0.15)",
+                      flex: 1, minWidth: 50,
+                      background: "rgba(200,168,75,0.08)", border: "1px solid rgba(200,168,75,0.15)",
                       borderRadius: 8, padding: "6px 0", fontSize: 11, fontWeight: 600,
                       color: "#c8a84b", textDecoration: "none", textAlign: "center",
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
@@ -538,13 +665,36 @@ export default function GlobalVault() {
                     <button
                       onClick={() => navigate("/admin/meshy-studio")}
                       style={{
-                        flex: 1, background: "rgba(0,188,212,0.08)", border: "1px solid rgba(0,188,212,0.15)",
+                        flex: 1, minWidth: 50,
+                        background: "rgba(0,188,212,0.08)", border: "1px solid rgba(0,188,212,0.15)",
                         borderRadius: 8, padding: "6px 0", fontSize: 11, fontWeight: 600,
                         color: "#00bcd4", cursor: "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
                       }}
                     >
                       <Play size={11} /> Ver
+                    </button>
+                  )}
+                  {/* Texturizar button — only for untextured chars not currently processing */}
+                  {!char.textured && !texturedNow.has(char.id) && texturizingId !== char.id && (
+                    <button
+                      onClick={() => handleTexturize(char.id)}
+                      disabled={texturizingId !== null}
+                      style={{
+                        flex: "0 0 100%",
+                        background: texturizingId !== null
+                          ? "rgba(255,255,255,0.03)"
+                          : "linear-gradient(135deg, rgba(200,168,75,0.15), rgba(255,200,80,0.1))",
+                        border: `1px solid ${texturizingId !== null ? "rgba(255,255,255,0.07)" : "rgba(200,168,75,0.3)"}`,
+                        borderRadius: 8, padding: "7px 0", fontSize: 11, fontWeight: 700,
+                        color: texturizingId !== null ? "#555" : "#c8a84b",
+                        cursor: texturizingId !== null ? "not-allowed" : "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      <Wand2 size={11} />
+                      {texturizingId !== null ? "Texturizando otro…" : "Texturizar con Meshy"}
                     </button>
                   )}
                 </div>

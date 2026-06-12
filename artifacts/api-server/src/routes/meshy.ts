@@ -819,4 +819,98 @@ router.post("/meshy/generate-character", upload.single("image"), async (req: Req
   }
 });
 
+// ── Text-to-Texture (apply PBR textures to existing untextured GLB) ──────────
+
+const CHARACTER_TEXTURE_PROMPTS: Record<string, { object_prompt: string; style_prompt: string }> = {
+  spiderman:        { object_prompt: "Spider-Man Marvel superhero full body character 3D model",           style_prompt: "Marvel comic book style, classic red and blue spandex suit with black spider web line pattern, white lenses on mask, muscular heroic figure, vibrant saturated colors, clean UV mapping" },
+  mickey_mouse:     { object_prompt: "Mickey Mouse Disney cartoon character 3D model",                     style_prompt: "classic Disney animation style, solid black body head and ears, white 4-finger gloves, bright red shorts with two white buttons, yellow shoes with white cuffs, cheerful expression" },
+  minnie_mouse:     { object_prompt: "Minnie Mouse Disney cartoon character 3D model",                     style_prompt: "classic Disney animation style, solid black body, white polka dot red dress with white trim, white gloves, large red polka dot bow on head, yellow heeled shoes, sweet expression" },
+  pikachu:          { object_prompt: "Pikachu Pokemon electric mouse character 3D model",                  style_prompt: "official Pokemon anime style, bright saturated yellow short fur, round bright red circular blush cheeks, brown horizontal stripe markings on back, lightning bolt shaped tail yellow-brown, big shiny black oval eyes, small black ears with red tips" },
+  bob_esponja:      { object_prompt: "SpongeBob SquarePants Nickelodeon cartoon character 3D model",       style_prompt: "Nickelodeon cartoon style, bright yellow square sponge porous body with brown irregular pores, blue eyes, brown pants with black belt and silver buckle, white shirt, red tie, brown shoes, cheerful buck teeth smile" },
+  bugs_bunny:       { object_prompt: "Bugs Bunny Looney Tunes cartoon character 3D model",                 style_prompt: "classic Looney Tunes style, light gray body fur, white belly and muzzle, pink inner ears, long upright ears, large white buck front teeth, white gloves, holding bright orange carrot with green top" },
+  payaso_plim_plim: { object_prompt: "Plim Plim clown children cartoon character 3D model",                style_prompt: "vibrant children TV cartoon style, colorful star-shaped clown costume with rainbow primary colors, happy painted clown face with star makeup around eyes, oversized red round nose, fluffy ruffled collar, bright star emblems on costume" },
+  chica_creativa:   { object_prompt: "Creative young woman cartoon character 3D model",                    style_prompt: "vibrant artistic street fashion, colorful patterned outfit with warm orange and teal tones, warm realistic beige-brown skin tone, expressive dark brown eyes, curly or wavy hair, creative artistic clothing with patterns and layers" },
+  chica_ejecutiva:  { object_prompt: "Professional executive businesswoman 3D character model",            style_prompt: "modern corporate fashion, elegant dark charcoal navy blazer with light blouse, realistic warm skin tone, smooth dark hair, polished professional attire, subtle natural makeup, business formal look" },
+};
+
+router.post("/meshy/texturize", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
+
+  const { char_id } = req.body ?? {};
+  if (!char_id || !/^[a-z0-9_]+$/i.test(char_id)) {
+    sseWrite(res, { event: "error", error: "char_id inválido o faltante" }); res.end(); return;
+  }
+
+  const glbFilePath = join(MODELS_DIR, `${char_id}.glb`);
+  if (!existsSync(glbFilePath)) {
+    sseWrite(res, { event: "error", error: `Modelo ${char_id}.glb no encontrado en disco` }); res.end(); return;
+  }
+
+  const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:19080";
+  const modelPublicUrl = `https://${devDomain}/assets/3d/models/${char_id}.glb`;
+
+  const prompts = CHARACTER_TEXTURE_PROMPTS[char_id] ?? {
+    object_prompt: `${char_id.replace(/_/g, " ")} 3D character model`,
+    style_prompt: "vibrant cartoon animation style, bright saturated colors, clean PBR texture mapping, professional quality",
+  };
+
+  try {
+    sseWrite(res, { event: "phase", phase: "creating", message: `Iniciando texturización de ${char_id}…`, model_url: modelPublicUrl });
+
+    const created = await meshyFetch("/text-to-texture", {
+      method: "POST",
+      body: JSON.stringify({
+        model_url: modelPublicUrl,
+        object_prompt: prompts.object_prompt,
+        style_prompt: prompts.style_prompt,
+        enable_pbr: true,
+        resolution: "1024",
+        negative_prompt: "low quality, blurry, ugly, distorted, incomplete texture, flat grey, untextured, dark muddy",
+      }),
+    });
+
+    const taskId: string = created.result;
+    sseWrite(res, { event: "started", task_id: taskId, char_id });
+
+    let lastProgress = -1;
+    for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
+      const data = await meshyFetch(`/text-to-texture/${taskId}`);
+      const progress: number = data.progress ?? 0;
+      if (progress !== lastProgress) {
+        sseWrite(res, { event: "progress", task_id: taskId, progress, status: data.status });
+        lastProgress = progress;
+      }
+      if (data.status === "SUCCEEDED") {
+        const texturedGlbUrl: string = data.model_urls?.glb ?? "";
+        if (texturedGlbUrl) {
+          sseWrite(res, { event: "phase", phase: "downloading", message: "Descargando modelo texturizado…", progress: 100 });
+          await downloadToFile(texturedGlbUrl, glbFilePath);
+          sseWrite(res, {
+            event: "done", char_id, task_id: taskId,
+            glb_path: `/assets/3d/models/${char_id}.glb`,
+            thumbnail_url: data.thumbnail_url,
+            model_urls: data.model_urls,
+          });
+        } else {
+          sseWrite(res, { event: "error", error: "Texturizado completado pero URL del modelo no disponible en respuesta Meshy" });
+        }
+        res.end(); return;
+      }
+      if (data.status === "FAILED" || data.status === "EXPIRED") {
+        sseWrite(res, { event: "error", error: data.task_error?.message ?? data.status });
+        res.end(); return;
+      }
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    sseWrite(res, { event: "timeout", message: "Tiempo máximo de espera excedido" });
+    res.end();
+  } catch (e: any) {
+    logger.error({ err: e }, "meshy/texturize error");
+    sseWrite(res, { event: "error", error: e.message });
+    res.end();
+  }
+});
+
 export default router;
