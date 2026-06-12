@@ -8,11 +8,12 @@ export interface MeshyCharacter {
   description: string;
   tags: string[];
   glbPath: string;
-  rigStatus: "rigged" | "pending";
+  rigStatus: "rigged" | "pending" | "missing";
   animations: ModelAnimation[];
+  rigTaskId?: string;
 }
 
-// ── Animation definitions (20 action_ids) ─────────────────────────────────────
+// ── 22 animation definitions (all 20 action_ids + run + jump) ─────────────────
 
 export interface AnimDef {
   action_id: number;
@@ -27,39 +28,41 @@ export interface AnimDef {
   best_for: string[];
   prompt_hint: string;
   triggers: string[];
-  file?: string; // relative path within /assets/3d/animations/{char}/
 }
 
 export const ALL_ANIMATIONS: AnimDef[] = [
-  { action_id:  1, id:"walk",        name:"Walk",          label:"🚶 Caminar",        label_short:"Walk",     category:"locomotion",  visme_phase:"transit",  looping:true,  duration_ms:1200, best_for:["transición entre pasos","formulario multi-step","progreso visual"],     prompt_hint:"humanoid character in natural walking pose, arms slightly swinging, relaxed stride, full body visible",                               triggers:["on_step_change","on_scroll","on_transition"] },
-  { action_id:  2, id:"alert",       name:"Alert",         label:"⚠️ Alerta",         label_short:"Alert",    category:"action",      visme_phase:"interact", looping:false, duration_ms:1500, best_for:["validación de error","campo requerido","advertencia"],                   prompt_hint:"humanoid character in alert standing pose, body slightly tense, head turned",                                                         triggers:["on_error","on_validation_fail","on_required_field"] },
-  { action_id:  3, id:"arise",       name:"Arise",         label:"⬆️ Levantarse",     label_short:"Arise",    category:"entrance",    visme_phase:"intro",    looping:false, duration_ms:1200, best_for:["aparición inicial","hero section","primera impresión"],                  prompt_hint:"humanoid character rising from ground, arms lifting, triumphant entrance, A-pose ready",                                              triggers:["on_page_load","on_scroll_enter","on_section_visible"] },
-  { action_id:  4, id:"idle",        name:"Idle",          label:"🧍 Reposo",         label_short:"Idle",     category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:3000, best_for:["estado por defecto","sin interacción","carga"],                          prompt_hint:"humanoid character in relaxed standing position, weight on one leg, neutral expression",                                               triggers:["on_idle","on_default","continuous_loop"] },
-  { action_id:  5, id:"idle_breath", name:"Idle_Breathing",label:"💨 Respirar",       label_short:"Breath",   category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:4000, best_for:["espera natural","vida realista","formulario abierto"],                    prompt_hint:"humanoid character in natural standing pose, subtle chest movement, calm expression",                                                  triggers:["on_form_open","on_idle_long","continuous_subtle"] },
-  { action_id:  6, id:"wave",        name:"Wave",          label:"👋 Saludar",        label_short:"Wave",     category:"entrance",    visme_phase:"intro",    looping:false, duration_ms:1800, best_for:["bienvenida","inicio de formulario","onboarding"],                         prompt_hint:"friendly humanoid character waving hand, welcoming gesture, smiling expression",                                                       triggers:["on_first_visit","on_form_start","on_welcome"] },
-  { action_id:  7, id:"thumbs_up",   name:"Thumbs_Up",     label:"👍 Pulgar arriba",  label_short:"Thumbs",   category:"celebration", visme_phase:"success",  looping:false, duration_ms:1200, best_for:["confirmación de paso","campo correcto","validación exitosa"],             prompt_hint:"humanoid character giving thumbs up, confident posture, approving expression",                                                         triggers:["on_step_complete","on_field_valid","on_small_win"] },
-  { action_id:  8, id:"clap",        name:"Clapping",      label:"👏 Aplaudir",       label_short:"Clap",     category:"celebration", visme_phase:"success",  looping:false, duration_ms:2500, best_for:["formulario completado","compra confirmada","meta alcanzada"],             prompt_hint:"humanoid character clapping hands, joyful expression, energetic applause movement",                                                    triggers:["on_form_submit","on_purchase_complete","on_goal_reached"] },
-  { action_id:  9, id:"dance",       name:"Dance",         label:"💃 Bailar",         label_short:"Dance",    category:"celebration", visme_phase:"success",  looping:true,  duration_ms:4000, best_for:["celebración máxima","resultado excepcional","éxito viral"],              prompt_hint:"humanoid character in joyful dance pose, arms and legs in motion, dynamic movement",                                                   triggers:["on_big_win","on_exceptional_result","on_viral_share"] },
-  { action_id: 10, id:"point",       name:"Point_Forward", label:"☝️ Señalar",        label_short:"Point",    category:"action",      visme_phase:"interact", looping:false, duration_ms:1500, best_for:["señalar CTA","indicar siguiente paso","guiar atención"],                  prompt_hint:"humanoid character pointing finger forward, directing gaze, confident stance",                                                         triggers:["on_cta_appear","on_next_step","on_attention_guide"] },
-  { action_id: 11, id:"think",       name:"Thinking",      label:"🤔 Pensar",         label_short:"Think",    category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:5000, best_for:["procesando datos","cargando resultado","IA pensando"],                   prompt_hint:"humanoid character in thinking pose, hand on chin, tilted head, contemplative expression",                                             triggers:["on_loading","on_ai_processing","on_wait_long"] },
-  { action_id: 12, id:"victory",     name:"Victory",       label:"🏆 Victoria",       label_short:"Victory",  category:"celebration", visme_phase:"success",  looping:false, duration_ms:2000, best_for:["conversión completada","pago realizado","suscripción activa"],            prompt_hint:"humanoid character in victory pose, arms raised triumphantly, powerful stance",                                                        triggers:["on_conversion","on_payment_success","on_subscription_active"] },
-  { action_id: 13, id:"sit",         name:"Sit",           label:"🪑 Sentarse",       label_short:"Sit",      category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:0,    best_for:["lectura de contenido","revisión de datos","checkout largo"],              prompt_hint:"humanoid character sitting comfortably, relaxed posture, hands on lap",                                                                triggers:["on_content_read","on_long_form","on_checkout_review"] },
-  { action_id: 14, id:"look_around", name:"Look_Around",   label:"👀 Mirar",          label_short:"Look",     category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:4000, best_for:["exploración del producto","navegación","browsing"],                       prompt_hint:"humanoid character curiously looking around, engaged expression, scanning movement",                                                    triggers:["on_page_browse","on_product_view","on_exploration"] },
-  { action_id: 15, id:"kick",        name:"Kick",          label:"🦵 Patear",         label_short:"Kick",     category:"action",      visme_phase:"interact", looping:false, duration_ms:800,  best_for:["acción enérgica","botón de impacto","CTA agresivo"],                      prompt_hint:"humanoid character in dynamic kick pose, powerful leg movement, athletic stance",                                                      triggers:["on_power_cta","on_aggressive_action","on_impact_moment"] },
-  { action_id: 16, id:"punch",       name:"Punch",         label:"👊 Golpear",        label_short:"Punch",    category:"action",      visme_phase:"interact", looping:false, duration_ms:700,  best_for:["acción de fuerza","superhéroe","impacto dramático"],                      prompt_hint:"humanoid character in punching pose, arm extended forward, powerful stance",                                                           triggers:["on_hero_action","on_super_cta","on_dramatic_moment"] },
-  { action_id: 17, id:"crouch",      name:"Crouch",        label:"🦸 Agacharse",      label_short:"Crouch",   category:"entrance",    visme_phase:"intro",    looping:false, duration_ms:1000, best_for:["entrada dramática de superhéroe","landing de impacto","reveal épico"],    prompt_hint:"humanoid character in crouching hero landing pose, one knee down, dramatic entrance",                                                  triggers:["on_hero_reveal","on_dramatic_entrance","on_epic_intro"] },
-  { action_id: 18, id:"celebrate",   name:"Celebrate_Arms",label:"🙌 Celebrar",       label_short:"Celeb",    category:"celebration", visme_phase:"success",  looping:false, duration_ms:2000, best_for:["éxito de formulario","lead capturado","email confirmado"],                prompt_hint:"humanoid character raising both arms in celebration, joyful expression, open arms wide",                                               triggers:["on_lead_captured","on_email_confirmed","on_form_success"] },
-  { action_id: 19, id:"nod",         name:"Head_Nod",      label:"😌 Asentir",        label_short:"Nod",      category:"emotion",     visme_phase:"react",    looping:false, duration_ms:1000, best_for:["confirmación leve","acuerdo con términos","check positivo"],              prompt_hint:"humanoid character nodding head in agreement, pleasant expression, approving gesture",                                                 triggers:["on_terms_accept","on_minor_confirm","on_positive_feedback"] },
-  { action_id: 20, id:"shake_head",  name:"Shake_Head",    label:"😤 Negar",          label_short:"Shake",    category:"emotion",     visme_phase:"react",    looping:false, duration_ms:1000, best_for:["error de formulario","campo inválido","límite superado"],                 prompt_hint:"humanoid character shaking head in disapproval, slightly frowning, negative gesture",                                                  triggers:["on_error","on_limit_exceeded","on_invalid_input"] },
+  { action_id:  1, id:"walk",        name:"Walk",           label:"🚶 Caminar",        label_short:"Walk",    category:"locomotion",  visme_phase:"transit",  looping:true,  duration_ms:1200, best_for:["transición entre pasos","progreso visual"],             prompt_hint:"humanoid in natural walking pose, arms slightly swinging",                triggers:["on_step_change","on_scroll","on_transition"]   },
+  { action_id:  2, id:"alert",       name:"Alert",          label:"⚠️ Alerta",          label_short:"Alert",   category:"action",      visme_phase:"interact", looping:false, duration_ms:1500, best_for:["validación de error","campo requerido"],                 prompt_hint:"humanoid in alert pose, body slightly tense, head turned",                triggers:["on_error","on_validation_fail","on_required"]  },
+  { action_id:  3, id:"arise",       name:"Arise",          label:"⬆️ Levantarse",      label_short:"Arise",   category:"entrance",    visme_phase:"intro",    looping:false, duration_ms:1200, best_for:["aparición inicial","hero section"],                      prompt_hint:"humanoid rising from ground, arms lifting, A-pose ready",                 triggers:["on_page_load","on_scroll_enter"]               },
+  { action_id:  4, id:"idle",        name:"Idle",           label:"🧍 Reposo",          label_short:"Idle",    category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:3000, best_for:["estado por defecto","sin interacción"],                  prompt_hint:"humanoid in relaxed standing, weight on one leg, neutral",                triggers:["on_idle","on_default","continuous_loop"]       },
+  { action_id:  5, id:"idle_breath", name:"Idle_Breathing", label:"💨 Respirar",        label_short:"Breath",  category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:4000, best_for:["espera natural","vida realista","formulario abierto"],    prompt_hint:"humanoid in natural standing, subtle chest movement, calm",               triggers:["on_form_open","on_idle_long"]                  },
+  { action_id:  6, id:"wave",        name:"Wave",           label:"👋 Saludar",         label_short:"Wave",    category:"entrance",    visme_phase:"intro",    looping:false, duration_ms:1800, best_for:["bienvenida","inicio de formulario","onboarding"],        prompt_hint:"friendly humanoid waving hand, welcoming gesture",                        triggers:["on_first_visit","on_form_start","on_welcome"]  },
+  { action_id:  7, id:"thumbs_up",   name:"Thumbs_Up",      label:"👍 Pulgar arriba",   label_short:"Thumbs",  category:"celebration", visme_phase:"success",  looping:false, duration_ms:1200, best_for:["confirmación de paso","campo correcto"],                 prompt_hint:"humanoid giving thumbs up, confident posture",                            triggers:["on_step_complete","on_field_valid"]            },
+  { action_id:  8, id:"clap",        name:"Clapping",       label:"👏 Aplaudir",        label_short:"Clap",    category:"celebration", visme_phase:"success",  looping:false, duration_ms:2500, best_for:["formulario completado","meta alcanzada"],                prompt_hint:"humanoid clapping hands, joyful expression",                              triggers:["on_form_submit","on_goal_reached"]             },
+  { action_id:  9, id:"dance",       name:"Dance",          label:"💃 Bailar",          label_short:"Dance",   category:"celebration", visme_phase:"success",  looping:true,  duration_ms:4000, best_for:["celebración máxima","éxito viral"],                      prompt_hint:"humanoid in joyful dance, arms and legs in motion",                       triggers:["on_big_win","on_exceptional_result"]           },
+  { action_id: 10, id:"point",       name:"Point_Forward",  label:"☝️ Señalar",         label_short:"Point",   category:"action",      visme_phase:"interact", looping:false, duration_ms:1500, best_for:["señalar CTA","guiar atención"],                          prompt_hint:"humanoid pointing finger forward, directing gaze",                        triggers:["on_cta_appear","on_next_step"]                 },
+  { action_id: 11, id:"think",       name:"Thinking",       label:"🤔 Pensar",          label_short:"Think",   category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:5000, best_for:["procesando datos","IA pensando"],                        prompt_hint:"humanoid in thinking pose, hand on chin, contemplative",                  triggers:["on_loading","on_ai_processing"]                },
+  { action_id: 12, id:"victory",     name:"Victory",        label:"🏆 Victoria",        label_short:"Victory", category:"celebration", visme_phase:"success",  looping:false, duration_ms:2000, best_for:["conversión completada","pago realizado"],                prompt_hint:"humanoid in victory pose, arms raised triumphantly",                      triggers:["on_conversion","on_payment_success"]           },
+  { action_id: 13, id:"sit",         name:"Sit",            label:"🪑 Sentarse",        label_short:"Sit",     category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:0,    best_for:["lectura de contenido","checkout largo"],                 prompt_hint:"humanoid sitting comfortably, hands on lap",                              triggers:["on_content_read","on_long_form"]               },
+  { action_id: 14, id:"look_around", name:"Look_Around",    label:"👀 Mirar",           label_short:"Look",    category:"waiting",     visme_phase:"idle",     looping:true,  duration_ms:4000, best_for:["exploración del producto","browsing"],                   prompt_hint:"humanoid looking around, curious expression, scanning",                   triggers:["on_page_browse","on_product_view"]             },
+  { action_id: 15, id:"kick",        name:"Kick",           label:"🦵 Patear",          label_short:"Kick",    category:"action",      visme_phase:"interact", looping:false, duration_ms:800,  best_for:["acción enérgica","CTA agresivo"],                        prompt_hint:"humanoid in dynamic kick pose, powerful leg movement",                    triggers:["on_power_cta","on_impact_moment"]              },
+  { action_id: 16, id:"punch",       name:"Punch",          label:"👊 Golpear",         label_short:"Punch",   category:"action",      visme_phase:"interact", looping:false, duration_ms:700,  best_for:["acción de fuerza","superhéroe"],                         prompt_hint:"humanoid in punching pose, arm extended forward",                         triggers:["on_hero_action","on_dramatic_moment"]          },
+  { action_id: 17, id:"crouch",      name:"Crouch",         label:"🦸 Agacharse",       label_short:"Crouch",  category:"entrance",    visme_phase:"intro",    looping:false, duration_ms:1000, best_for:["entrada dramática","landing de impacto"],                prompt_hint:"humanoid crouching hero landing, one knee down",                          triggers:["on_hero_reveal","on_dramatic_entrance"]        },
+  { action_id: 18, id:"celebrate",   name:"Celebrate_Arms", label:"🙌 Celebrar",        label_short:"Celeb",   category:"celebration", visme_phase:"success",  looping:false, duration_ms:2000, best_for:["éxito de formulario","lead capturado"],                  prompt_hint:"humanoid raising both arms in celebration, joyful",                       triggers:["on_lead_captured","on_form_success"]           },
+  { action_id: 19, id:"nod",         name:"Head_Nod",       label:"😌 Asentir",         label_short:"Nod",     category:"emotion",     visme_phase:"react",    looping:false, duration_ms:1000, best_for:["confirmación leve","acuerdo con términos"],              prompt_hint:"humanoid nodding in agreement, pleasant expression",                      triggers:["on_terms_accept","on_minor_confirm"]           },
+  { action_id: 20, id:"shake_head",  name:"Shake_Head",     label:"😤 Negar",           label_short:"Shake",   category:"emotion",     visme_phase:"react",    looping:false, duration_ms:1000, best_for:["error de formulario","campo inválido"],                  prompt_hint:"humanoid shaking head in disapproval, frowning",                          triggers:["on_error","on_invalid_input"]                  },
+  // Extra (from Meshy basic rig outputs)
+  { action_id: 21, id:"run",         name:"Run",            label:"🏃 Correr",          label_short:"Run",     category:"locomotion",  visme_phase:"transit",  looping:true,  duration_ms:800,  best_for:["transición rápida","urgencia","oferta flash"],           prompt_hint:"humanoid running at speed, athletic stride",                              triggers:["on_flash_sale","on_timer","on_urgency"]        },
+  { action_id: 22, id:"jump",        name:"Jump",           label:"⬆ Saltar",          label_short:"Jump",    category:"entrance",    visme_phase:"intro",    looping:false, duration_ms:1000, best_for:["aparición dinámica","scroll reveal"],                    prompt_hint:"humanoid jumping, full body airborne, excited",                           triggers:["on_scroll_reveal","on_dynamic_entry"]          },
 ];
 
 export const ANIM_CATEGORIES = [
-  { id: "entrance",    label: "🎬 Entrada",      phase: "intro"    },
-  { id: "waiting",     label: "🧍 Espera/Idle",  phase: "idle"     },
-  { id: "action",      label: "👆 Acción",        phase: "interact" },
-  { id: "celebration", label: "🎉 Celebración",   phase: "success"  },
-  { id: "locomotion",  label: "🚶 Locomoción",    phase: "transit"  },
-  { id: "emotion",     label: "😄 Emociones",     phase: "react"    },
+  { id: "entrance",    label: "🎬 Entrada",       phase: "intro"    },
+  { id: "waiting",     label: "🧍 Espera/Idle",   phase: "idle"     },
+  { id: "action",      label: "👆 Acción",         phase: "interact" },
+  { id: "celebration", label: "🎉 Celebración",    phase: "success"  },
+  { id: "locomotion",  label: "🚶 Locomoción",     phase: "transit"  },
+  { id: "emotion",     label: "😄 Emociones",      phase: "react"    },
 ];
 
 // Visme-style flow templates
@@ -77,70 +80,34 @@ export interface FlowTemplate {
 
 export const FLOW_TEMPLATES: FlowTemplate[] = [
   {
-    id: "shopify_lead",
-    name: "🛍️ Lead Form Shopify",
+    id: "shopify_lead", name: "🛍️ Lead Form Shopify",
     description: "Captura de lead: bienvenida → espera → señala CTA → celebra",
-    stages: {
-      intro:    { action_id:  6, id:"wave",       label:"👋 Saluda" },
-      idle:     { action_id:  5, id:"idle_breath",label:"💨 Respira" },
-      interact: { action_id: 10, id:"point",      label:"☝️ Señala CTA" },
-      success:  { action_id: 18, id:"celebrate",  label:"🙌 Lead capturado" },
-    }
+    stages: { intro: {action_id:6,id:"wave",label:"👋 Saluda"}, idle: {action_id:5,id:"idle_breath",label:"💨 Respira"}, interact: {action_id:10,id:"point",label:"☝️ Señala CTA"}, success: {action_id:18,id:"celebrate",label:"🙌 Lead capturado"} }
   },
   {
-    id: "checkout",
-    name: "🛒 Checkout / Compra",
+    id: "checkout", name: "🛒 Checkout / Compra",
     description: "Flujo de compra: aparece → piensa → aprueba → victoria",
-    stages: {
-      intro:    { action_id:  3, id:"arise",      label:"⬆️ Aparece" },
-      idle:     { action_id: 11, id:"think",      label:"🤔 Procesando" },
-      interact: { action_id:  7, id:"thumbs_up",  label:"👍 Confirma" },
-      success:  { action_id: 12, id:"victory",    label:"🏆 Pago exitoso" },
-    }
+    stages: { intro: {action_id:3,id:"arise",label:"⬆️ Aparece"}, idle: {action_id:11,id:"think",label:"🤔 Procesando"}, interact: {action_id:7,id:"thumbs_up",label:"👍 Confirma"}, success: {action_id:12,id:"victory",label:"🏆 Pago exitoso"} }
   },
   {
-    id: "hero_landing",
-    name: "🦸 Héroe Landing Page",
+    id: "hero_landing", name: "🦸 Héroe Landing Page",
     description: "Entrada épica: aterrizaje → pose → acción → baile",
-    stages: {
-      intro:    { action_id: 17, id:"crouch",     label:"🦸 Aterriza" },
-      idle:     { action_id:  4, id:"idle",       label:"🧍 Pose heroica" },
-      interact: { action_id: 16, id:"punch",      label:"👊 Acción" },
-      success:  { action_id:  9, id:"dance",      label:"💃 Celebra" },
-    }
+    stages: { intro: {action_id:17,id:"crouch",label:"🦸 Aterriza"}, idle: {action_id:4,id:"idle",label:"🧍 Pose heroica"}, interact: {action_id:16,id:"punch",label:"👊 Acción"}, success: {action_id:9,id:"dance",label:"💃 Celebra"} }
   },
   {
-    id: "onboarding",
-    name: "👋 Onboarding Amigable",
+    id: "onboarding", name: "👋 Onboarding Amigable",
     description: "Guía al usuario: saluda → explora → avanza → asiente",
-    stages: {
-      intro:    { action_id:  6, id:"wave",        label:"👋 Hola!" },
-      idle:     { action_id: 14, id:"look_around", label:"👀 Explora" },
-      interact: { action_id:  1, id:"walk",        label:"🚶 Avanza" },
-      success:  { action_id: 19, id:"nod",         label:"😌 Confirma" },
-    }
+    stages: { intro: {action_id:6,id:"wave",label:"👋 Hola!"}, idle: {action_id:14,id:"look_around",label:"👀 Explora"}, interact: {action_id:1,id:"walk",label:"🚶 Avanza"}, success: {action_id:19,id:"nod",label:"😌 Confirma"} }
   },
   {
-    id: "error_flow",
-    name: "❌ Corrección de Errores",
+    id: "error_flow", name: "❌ Corrección de Errores",
     description: "Manejo de errores: alerta → revisa → niega → aplaude",
-    stages: {
-      intro:    { action_id:  2, id:"alert",       label:"⚠️ Atención!" },
-      idle:     { action_id: 14, id:"look_around", label:"👀 Revisa" },
-      interact: { action_id: 20, id:"shake_head",  label:"😤 Incorrecto" },
-      success:  { action_id:  8, id:"clap",        label:"👏 Corregido!" },
-    }
+    stages: { intro: {action_id:2,id:"alert",label:"⚠️ Atención!"}, idle: {action_id:14,id:"look_around",label:"👀 Revisa"}, interact: {action_id:20,id:"shake_head",label:"😤 Incorrecto"}, success: {action_id:8,id:"clap",label:"👏 Corregido!"} }
   },
   {
-    id: "social_proof",
-    name: "⭐ Social Proof / Reviews",
+    id: "social_proof", name: "⭐ Social Proof / Reviews",
     description: "Presenta reseñas: baila → reposo → señala → pulgar",
-    stages: {
-      intro:    { action_id:  9, id:"dance",      label:"💃 Energía!" },
-      idle:     { action_id:  4, id:"idle",       label:"🧍 Reposo" },
-      interact: { action_id: 10, id:"point",      label:"☝️ Mira esto" },
-      success:  { action_id:  7, id:"thumbs_up",  label:"👍 Recomendado" },
-    }
+    stages: { intro: {action_id:9,id:"dance",label:"💃 Energía!"}, idle: {action_id:4,id:"idle",label:"🧍 Reposo"}, interact: {action_id:10,id:"point",label:"☝️ Mira esto"}, success: {action_id:7,id:"thumbs_up",label:"👍 Recomendado"} }
   },
 ];
 
@@ -153,131 +120,190 @@ export const FLOW_STAGE_LABELS: Record<FlowStage, { label: string; icon: string;
   success:  { label: "Éxito",       icon: "🎉", color: "#34d399" },
 };
 
-// Character prompts for generating riggable characters
+// ── Helper to build ModelAnimation array from filesystem ─────────────────────
+
+function anims(charId: string, names: string[]): ModelAnimation[] {
+  return names.map(name => {
+    const def = ALL_ANIMATIONS.find(a => a.id === name);
+    return {
+      name,
+      label: def?.label ?? name,
+      glbPath: `/assets/3d/animations/${charId}/${name}.glb`,
+      looping: def?.looping ?? true,
+    };
+  });
+}
+
+// 22 animations (4 classic chars: alec_monopoly, batman, chico_casual, chico_formal)
+const FULL_22 = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","jump","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
+// 21 animations (7 new chars: spiderman, mickey, minnie, bob, bugs, plim_plim, chica_ejecutiva)
+const FULL_21 = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
+// Basic 3 (TED — plan limit hit)
+const BASIC_3 = ["jump","run","walk"];
+
+// ── Character definitions ─────────────────────────────────────────────────────
+
+export const MESHY_CHARACTERS: MeshyCharacter[] = [
+  // ── Fully rigged with 22 animations ──
+  {
+    id: "alec_monopoly", name: "Alec Monopoly", emoji: "🎩", category: "cartoon",
+    description: "El artista urbano más icónico. 22 animaciones completas.",
+    tags: ["arte","urbano","cartoon","rigged","full"],
+    glbPath: "/assets/3d/models/alec_monopoly.glb", rigStatus: "rigged",
+    rigTaskId: "019ebb36-4f0c-7d21-a268-2ff6198aca60",
+    animations: anims("alec_monopoly", FULL_22),
+  },
+  {
+    id: "batman", name: "Batman", emoji: "🦇", category: "cartoon",
+    description: "El Caballero de la Noche. 22 animaciones completas.",
+    tags: ["superhéroe","dc","acción","rigged","full"],
+    glbPath: "/assets/3d/models/batman.glb", rigStatus: "rigged",
+    rigTaskId: "019ebb36-4f15-7f7e-af4e-3148857adbfe",
+    animations: anims("batman", FULL_22),
+  },
+  {
+    id: "chico_casual", name: "Hombre Casual Tech", emoji: "👨‍💻", category: "realistic",
+    description: "Dev casual. 22 animaciones completas.",
+    tags: ["humano","casual","tech","rigged","full"],
+    glbPath: "/assets/3d/models/chico_casual.glb", rigStatus: "rigged",
+    rigTaskId: "019ebb36-4f25-7f7f-b072-2ef66d123f7d",
+    animations: anims("chico_casual", FULL_22),
+  },
+  {
+    id: "chico_formal", name: "Hombre Traje Formal", emoji: "🤵", category: "realistic",
+    description: "Ejecutivo con traje. 22 animaciones completas.",
+    tags: ["humano","formal","corporativo","rigged","full"],
+    glbPath: "/assets/3d/models/chico_formal.glb", rigStatus: "rigged",
+    rigTaskId: "019ebb36-4eef-728c-87b1-6f3f022a9a2e",
+    animations: anims("chico_formal", FULL_22),
+  },
+  // ── Newly generated and rigged ──
+  {
+    id: "spiderman", name: "Spider-Man", emoji: "🕷️", category: "cartoon",
+    description: "El Hombre Araña. 21 animaciones.",
+    tags: ["marvel","superhéroe","acción","rigged"],
+    glbPath: "/assets/3d/models/spiderman.glb", rigStatus: "rigged",
+    animations: anims("spiderman", FULL_21),
+  },
+  {
+    id: "mickey_mouse", name: "Mickey Mouse", emoji: "🐭", category: "cartoon",
+    description: "El personaje más icónico de Disney. 21 animaciones.",
+    tags: ["disney","cartoon","clásico","rigged"],
+    glbPath: "/assets/3d/models/mickey_mouse.glb", rigStatus: "rigged",
+    animations: anims("mickey_mouse", FULL_21),
+  },
+  {
+    id: "minnie_mouse", name: "Minnie Mouse", emoji: "🎀", category: "cartoon",
+    description: "La ratoncita elegante de Disney. 21 animaciones.",
+    tags: ["disney","cartoon","clásico","rigged"],
+    glbPath: "/assets/3d/models/minnie_mouse.glb", rigStatus: "rigged",
+    animations: anims("minnie_mouse", FULL_21),
+  },
+  {
+    id: "bob_esponja", name: "Bob Esponja", emoji: "🧽", category: "cartoon",
+    description: "La esponja de Fondo de Bikini. 21 animaciones.",
+    tags: ["nickelodeon","cartoon","humor","rigged"],
+    glbPath: "/assets/3d/models/bob_esponja.glb", rigStatus: "rigged",
+    animations: anims("bob_esponja", FULL_21),
+  },
+  {
+    id: "bugs_bunny", name: "Bugs Bunny", emoji: "🐰", category: "cartoon",
+    description: "El conejo de Looney Tunes. 21 animaciones.",
+    tags: ["warner","cartoon","clásico","rigged"],
+    glbPath: "/assets/3d/models/bugs_bunny.glb", rigStatus: "rigged",
+    animations: anims("bugs_bunny", FULL_21),
+  },
+  {
+    id: "payaso_plim_plim", name: "Plim Plim", emoji: "🤡", category: "cartoon",
+    description: "El payaso mágico para niños. 21 animaciones.",
+    tags: ["infantil","cartoon","latam","rigged"],
+    glbPath: "/assets/3d/models/payaso_plim_plim.glb", rigStatus: "rigged",
+    animations: anims("payaso_plim_plim", FULL_21),
+  },
+  {
+    id: "chica_ejecutiva", name: "Mujer Ejecutiva", emoji: "👩‍💼", category: "realistic",
+    description: "Profesional corporativa. 21 animaciones.",
+    tags: ["humano","ejecutiva","corporativo","rigged"],
+    glbPath: "/assets/3d/models/chica_ejecutiva.glb", rigStatus: "rigged",
+    animations: anims("chica_ejecutiva", FULL_21),
+  },
+  {
+    id: "chica_creativa", name: "Mujer Creativa", emoji: "👩‍🎨", category: "realistic",
+    description: "Diseñadora de agencia. Modelo 3D listo, rig pendiente.",
+    tags: ["humano","creativa","agencia"],
+    glbPath: "/assets/3d/models/chica_creativa.glb", rigStatus: "pending",
+    animations: [],
+  },
+  // ── Plan limit (TED only has basic 3) ──
+  {
+    id: "ted", name: "TED (Oso)", emoji: "🐻", category: "cartoon",
+    description: "El osito más famoso. 3 animaciones básicas.",
+    tags: ["oso","humor","cartoon","rigged"],
+    glbPath: "/assets/3d/models/ted.glb", rigStatus: "rigged",
+    rigTaskId: "019ebb36-4f56-728f-bb13-5654f37c1b41",
+    animations: anims("ted", BASIC_3),
+  },
+  // ── Missing (rig failed — pose estimation) ──
+  {
+    id: "pikachu", name: "Pikachu", emoji: "⚡", category: "cartoon",
+    description: "El Pokémon eléctrico. Rig pendiente.",
+    tags: ["pokemon","nintendo","cartoon"],
+    glbPath: "/assets/3d/models/pikachu.glb", rigStatus: "pending",
+    animations: [],
+  },
+];
+
+export const RIGGED_CHARACTERS = MESHY_CHARACTERS.filter(c => c.rigStatus === "rigged");
+export const PENDING_CHARACTERS = MESHY_CHARACTERS.filter(c => c.rigStatus === "pending");
+export const FULL_ANIM_CHARACTERS = MESHY_CHARACTERS.filter(c => c.animations.length >= 20);
+
+// ── Character generation prompts ──────────────────────────────────────────────
+
 export const CHARACTER_PROMPTS = [
   {
     id: "humanoid_realistic",
     label: "👔 Humano Realista",
-    subtitle: "Compatible con todas las animaciones",
-    base_prompt: "full body humanoid character, A-pose, realistic proportions, clear facial features, professional look, symmetric body structure, game-ready 3D model, no floating accessories, clear joint separation at shoulders hips knees",
-    negative: "cartoon, deformed limbs, floating accessories, asymmetric, no neck, merged legs",
-    tip: "Usa A-pose — mejor compatibilidad con auto-rig de Meshy",
+    subtitle: "Compatible con todas las animaciones (22/22)",
+    base_prompt: "full body humanoid character, A-pose arms at 45 degrees from body, realistic proportions, clear facial features, professional look, symmetric body structure, game-ready 3D model, no floating accessories, clear joint separation at shoulders hips knees elbows",
+    negative: "cartoon, deformed limbs, floating accessories, asymmetric, no neck, merged legs, T-pose",
+    tip: "Usa A-pose (brazos a 45°) — mejor compatibilidad con auto-rig de Meshy",
     compatible_actions: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+    art_style: "realistic",
   },
   {
     id: "cartoon_humanoid",
     label: "🎨 Cartoon Humanoide",
     subtitle: "Compatible con rig (proporciones humanoides)",
-    base_prompt: "full body cartoon character, bipedal humanoid proportions, A-pose, oversized head small body acceptable, clear arm and leg separation, no extra limbs, simple clothing without complex accessories, clear neck visible",
-    negative: "quadruped, tentacles, floating parts, non-humanoid, merged limbs, complex hair blocking neck",
-    tip: "Los cartoon necesitan proporciones humanoides para el auto-rig",
+    base_prompt: "full body cartoon character, bipedal humanoid proportions, A-pose arms at 45 degrees, oversized head small body acceptable, clear arm and leg separation, no extra limbs, simple clothing without complex accessories, clear neck visible, symmetric",
+    negative: "quadruped, tentacles, floating parts, non-humanoid, merged limbs, complex hair blocking neck, T-pose",
+    tip: "Los cartoon necesitan proporciones humanoides para el auto-rig. Describe el estilo cartoon en el prompt.",
     compatible_actions: [1,2,3,4,5,6,7,8,9,10,11,12,14,15,16,17,18,19,20],
+    art_style: "realistic",
   },
   {
     id: "superhero",
     label: "🦸 Superhéroe",
     subtitle: "Optimizado para punch/crouch/victory",
-    base_prompt: "full body superhero character, muscular humanoid build, A-pose, tight fitting suit no loose elements, athletic proportions, clear joint definition at shoulders and hips, caped optional but tucked",
-    negative: "loose flowing cape, bulky accessories blocking arms, non-humanoid, merged body parts",
+    base_prompt: "full body superhero character, muscular humanoid build, A-pose arms at 45 degrees, tight fitting suit no loose elements, athletic proportions, clear joint definition at shoulders and hips, cape optional but tucked, symmetric, game-ready",
+    negative: "loose flowing cape, bulky accessories blocking arms, non-humanoid, merged body parts, T-pose",
     tip: "Traje ajustado funciona mejor que capas sueltas para animaciones de acción",
     compatible_actions: [1,3,4,6,7,8,9,10,12,15,16,17,18,19],
+    art_style: "realistic",
   },
   {
-    id: "bear_humanoid",
-    label: "🐻 Animal Humanoide",
-    subtitle: "Estilo TED — bípedo con proporciones humanoides",
-    base_prompt: "full body bipedal animal character, humanoid standing pose, A-pose, plush toy or cartoon aesthetic, round body with clear arm and leg separation, stubby humanoid limbs, no accessories blocking joints",
-    negative: "on all fours, quadruped pose, non-bipedal, merged legs, complex fur accessories",
-    tip: "TED funciona bien — pose bípeda + proporciones humanoides son clave",
+    id: "animal_bipedal",
+    label: "🐻 Animal Bípedo",
+    subtitle: "Estilo TED / Mickey — bípedo con proporciones humanoides",
+    base_prompt: "full body bipedal animal cartoon character, humanoid standing pose, A-pose arms at 45 degrees, plush toy or cartoon aesthetic, round body with clear arm and leg separation, stubby humanoid limbs, no accessories blocking joints, symmetric",
+    negative: "on all fours, quadruped pose, non-bipedal, merged legs, complex fur accessories, T-pose",
+    tip: "Clave: pose bípeda + proporciones humanoides. Mickey y TED funcionan bien con este prompt.",
     compatible_actions: [1,3,4,6,7,8,9,10,12,14,18,19,20],
+    art_style: "realistic",
   },
 ];
 
-// Real GLB files per character (from actual downloaded files)
-const CHAR_ANIMATIONS: Record<string, ModelAnimation[]> = {
-  alec_monopoly: [
-    { name:"walk",        label:"🚶 Caminar",   glbPath:"/assets/3d/animations/alec_monopoly/walk.glb",        looping:true  },
-    { name:"run",         label:"🏃 Correr",    glbPath:"/assets/3d/animations/alec_monopoly/run.glb",         looping:true  },
-    { name:"jump",        label:"⬆ Saltar",    glbPath:"/assets/3d/animations/alec_monopoly/jump.glb",        looping:false },
-    { name:"wave",        label:"👋 Saludar",   glbPath:"/assets/3d/animations/alec_monopoly/wave.glb",        looping:false },
-    { name:"idle",        label:"🧍 Reposo",    glbPath:"/assets/3d/animations/alec_monopoly/idle.glb",        looping:true  },
-    { name:"idle_breath", label:"💨 Respirar",  glbPath:"/assets/3d/animations/alec_monopoly/idle_breath.glb", looping:true  },
-    { name:"dance",       label:"💃 Bailar",    glbPath:"/assets/3d/animations/alec_monopoly/dance.glb",       looping:true  },
-    { name:"victory",     label:"🏆 Victoria",  glbPath:"/assets/3d/animations/alec_monopoly/victory.glb",     looping:false },
-    { name:"clap",        label:"👏 Aplaudir",  glbPath:"/assets/3d/animations/alec_monopoly/clap.glb",        looping:false },
-    { name:"thumbs_up",   label:"👍 Pulgar",    glbPath:"/assets/3d/animations/alec_monopoly/thumbs_up.glb",   looping:false },
-    { name:"point",       label:"☝️ Señalar",   glbPath:"/assets/3d/animations/alec_monopoly/point.glb",       looping:false },
-    { name:"think",       label:"🤔 Pensar",    glbPath:"/assets/3d/animations/alec_monopoly/think.glb",       looping:true  },
-    { name:"look_around", label:"👀 Mirar",     glbPath:"/assets/3d/animations/alec_monopoly/look_around.glb", looping:true  },
-    { name:"sit",         label:"🪑 Sentarse",  glbPath:"/assets/3d/animations/alec_monopoly/sit.glb",         looping:true  },
-    { name:"alert",       label:"⚠️ Alerta",    glbPath:"/assets/3d/animations/alec_monopoly/alert.glb",       looping:false },
-    { name:"arise",       label:"⬆️ Levantarse",glbPath:"/assets/3d/animations/alec_monopoly/arise.glb",       looping:false },
-    { name:"kick",        label:"🦵 Patear",    glbPath:"/assets/3d/animations/alec_monopoly/kick.glb",        looping:false },
-    { name:"punch",       label:"👊 Golpear",   glbPath:"/assets/3d/animations/alec_monopoly/punch.glb",       looping:false },
-  ],
-  batman: [
-    { name:"walk",  label:"🚶 Caminar",  glbPath:"/assets/3d/animations/batman/walk.glb",  looping:true  },
-    { name:"run",   label:"🏃 Correr",   glbPath:"/assets/3d/animations/batman/run.glb",   looping:true  },
-    { name:"jump",  label:"⬆ Saltar",   glbPath:"/assets/3d/animations/batman/jump.glb",  looping:false },
-  ],
-  chico_casual: [
-    { name:"walk",       label:"🚶 Caminar",    glbPath:"/assets/3d/animations/chico_casual/walk.glb",        looping:true  },
-    { name:"run",        label:"🏃 Correr",     glbPath:"/assets/3d/animations/chico_casual/run.glb",         looping:true  },
-    { name:"jump",       label:"⬆ Saltar",     glbPath:"/assets/3d/animations/chico_casual/jump.glb",        looping:false },
-    { name:"wave",       label:"👋 Saludar",    glbPath:"/assets/3d/animations/chico_casual/wave.glb",        looping:false },
-    { name:"idle_breath",label:"💨 Respirar",   glbPath:"/assets/3d/animations/chico_casual/idle_breath.glb", looping:true  },
-    { name:"dance",      label:"💃 Bailar",     glbPath:"/assets/3d/animations/chico_casual/dance.glb",       looping:true  },
-    { name:"victory",    label:"🏆 Victoria",   glbPath:"/assets/3d/animations/chico_casual/victory.glb",     looping:false },
-    { name:"clap",       label:"👏 Aplaudir",   glbPath:"/assets/3d/animations/chico_casual/clap.glb",        looping:false },
-    { name:"thumbs_up",  label:"👍 Pulgar",     glbPath:"/assets/3d/animations/chico_casual/thumbs_up.glb",   looping:false },
-    { name:"point",      label:"☝️ Señalar",    glbPath:"/assets/3d/animations/chico_casual/point.glb",       looping:false },
-    { name:"alert",      label:"⚠️ Alerta",     glbPath:"/assets/3d/animations/chico_casual/alert.glb",       looping:false },
-    { name:"celebrate",  label:"🙌 Celebrar",   glbPath:"/assets/3d/animations/chico_casual/celebrate.glb",   looping:false },
-    { name:"kick",       label:"🦵 Patear",     glbPath:"/assets/3d/animations/chico_casual/kick.glb",        looping:false },
-    { name:"crouch",     label:"🦸 Agacharse",  glbPath:"/assets/3d/animations/chico_casual/crouch.glb",      looping:false },
-    { name:"nod",        label:"😌 Asentir",    glbPath:"/assets/3d/animations/chico_casual/nod.glb",         looping:false },
-    { name:"shake_head", label:"😤 Negar",      glbPath:"/assets/3d/animations/chico_casual/shake_head.glb",  looping:false },
-  ],
-  chico_formal: [
-    { name:"walk",    label:"🚶 Caminar",    glbPath:"/assets/3d/animations/chico_formal/walk.glb",     looping:true  },
-    { name:"run",     label:"🏃 Correr",     glbPath:"/assets/3d/animations/chico_formal/run.glb",      looping:true  },
-    { name:"jump",    label:"⬆ Saltar",     glbPath:"/assets/3d/animations/chico_formal/jump.glb",     looping:false },
-    { name:"dance",   label:"💃 Bailar",     glbPath:"/assets/3d/animations/chico_formal/dance.glb",    looping:true  },
-    { name:"victory", label:"🏆 Victoria",   glbPath:"/assets/3d/animations/chico_formal/victory.glb",  looping:false },
-    { name:"kick",    label:"🦵 Patear",     glbPath:"/assets/3d/animations/chico_formal/kick.glb",     looping:false },
-    { name:"punch",   label:"👊 Golpear",    glbPath:"/assets/3d/animations/chico_formal/punch.glb",    looping:false },
-    { name:"crouch",  label:"🦸 Agacharse",  glbPath:"/assets/3d/animations/chico_formal/crouch.glb",   looping:false },
-    { name:"celebrate",label:"🙌 Celebrar",  glbPath:"/assets/3d/animations/chico_formal/celebrate.glb",looping:false },
-    { name:"look_around",label:"👀 Mirar",   glbPath:"/assets/3d/animations/chico_formal/look_around.glb",looping:true },
-  ],
-  ted: [
-    { name:"walk",  label:"🚶 Caminar",  glbPath:"/assets/3d/animations/ted/walk.glb",  looping:true  },
-    { name:"run",   label:"🏃 Correr",   glbPath:"/assets/3d/animations/ted/run.glb",   looping:true  },
-    { name:"jump",  label:"⬆ Saltar",   glbPath:"/assets/3d/animations/ted/jump.glb",  looping:false },
-  ],
-};
+// ── Utility functions ─────────────────────────────────────────────────────────
 
-export const MESHY_CHARACTERS: MeshyCharacter[] = [
-  { id:"batman",          name:"Batman",              emoji:"🦇", category:"cartoon",   description:"El Caballero de la Noche. 3 animaciones.",                   tags:["superhéroe","dc","acción","rigged"],             glbPath:"/assets/3d/models/batman.glb",          rigStatus:"rigged",  animations: CHAR_ANIMATIONS.batman         },
-  { id:"alec_monopoly",   name:"Alec Monopoly",       emoji:"🎩", category:"cartoon",   description:"El artista urbano. 18 animaciones completas.",               tags:["arte","urbano","cartoon","rigged"],              glbPath:"/assets/3d/models/alec_monopoly.glb",   rigStatus:"rigged",  animations: CHAR_ANIMATIONS.alec_monopoly  },
-  { id:"ted",             name:"TED (Oso)",            emoji:"🐻", category:"cartoon",   description:"El osito más famoso. 3 animaciones.",                        tags:["oso","humor","cartoon","rigged"],                glbPath:"/assets/3d/models/ted.glb",             rigStatus:"rigged",  animations: CHAR_ANIMATIONS.ted            },
-  { id:"chico_casual",    name:"Hombre Casual Tech",   emoji:"👨‍💻", category:"realistic", description:"Dev casual. 16 animaciones completas.",                     tags:["humano","casual","tech","rigged"],               glbPath:"/assets/3d/models/chico_casual.glb",    rigStatus:"rigged",  animations: CHAR_ANIMATIONS.chico_casual   },
-  { id:"chico_formal",    name:"Hombre Traje Formal",  emoji:"🤵", category:"realistic", description:"Ejecutivo con traje. 10 animaciones.",                       tags:["humano","formal","corporativo","rigged"],        glbPath:"/assets/3d/models/chico_formal.glb",    rigStatus:"rigged",  animations: CHAR_ANIMATIONS.chico_formal   },
-  { id:"spiderman",       name:"Spider-Man",           emoji:"🕷️", category:"cartoon",   description:"El Hombre Araña. Modelo 3D (rig pendiente).",                tags:["marvel","superhéroe","acción"],                  glbPath:"/assets/3d/models/spiderman.glb",       rigStatus:"pending", animations:[] },
-  { id:"bob_esponja",     name:"Bob Esponja",          emoji:"🧽", category:"cartoon",   description:"La esponja de Fondo de Bikini.",                             tags:["nickelodeon","cartoon","humor"],                 glbPath:"/assets/3d/models/bob_esponja.glb",     rigStatus:"pending", animations:[] },
-  { id:"mickey_mouse",    name:"Mickey Mouse",         emoji:"🐭", category:"cartoon",   description:"El personaje más icónico de Disney.",                        tags:["disney","cartoon","clásico"],                   glbPath:"/assets/3d/models/mickey_mouse.glb",    rigStatus:"pending", animations:[] },
-  { id:"payaso_plim_plim",name:"Plim Plim",            emoji:"🤡", category:"cartoon",   description:"El payaso mágico para niños.",                               tags:["infantil","cartoon","latam"],                   glbPath:"/assets/3d/models/payaso_plim_plim.glb",rigStatus:"pending", animations:[] },
-  { id:"minnie_mouse",    name:"Minnie Mouse",         emoji:"🎀", category:"cartoon",   description:"La ratoncita elegante de Disney.",                           tags:["disney","cartoon","clásico"],                   glbPath:"/assets/3d/models/minnie_mouse.glb",    rigStatus:"pending", animations:[] },
-  { id:"bugs_bunny",      name:"Bugs Bunny",           emoji:"🐰", category:"cartoon",   description:"El conejo de Looney Tunes.",                                 tags:["warner","cartoon","clásico"],                   glbPath:"/assets/3d/models/bugs_bunny.glb",      rigStatus:"pending", animations:[] },
-  { id:"pikachu",         name:"Pikachu",              emoji:"⚡", category:"cartoon",   description:"El Pokémon eléctrico más amado.",                            tags:["pokemon","nintendo","cartoon"],                 glbPath:"/assets/3d/models/pikachu.glb",         rigStatus:"pending", animations:[] },
-  { id:"chica_ejecutiva", name:"Mujer Ejecutiva",      emoji:"👩‍💼", category:"realistic", description:"Profesional corporativa.",                                   tags:["humano","ejecutiva","corporativo"],              glbPath:"/assets/3d/models/chica_ejecutiva.glb", rigStatus:"pending", animations:[] },
-  { id:"chica_creativa",  name:"Mujer Creativa",       emoji:"👩‍🎨", category:"realistic", description:"Diseñadora de agencia.",                                     tags:["humano","creativa","agencia"],                  glbPath:"/assets/3d/models/chica_creativa.glb",  rigStatus:"pending", animations:[] },
-];
-
-export const RIGGED_CHARACTERS = MESHY_CHARACTERS.filter(c => c.rigStatus === "rigged");
-export const PENDING_CHARACTERS = MESHY_CHARACTERS.filter(c => c.rigStatus === "pending");
-
-// Get animations for a character filtered by visme phase
 export function getAnimsByPhase(charId: string, phase: string): ModelAnimation[] {
   const char = MESHY_CHARACTERS.find(c => c.id === charId);
   if (!char) return [];
@@ -286,7 +312,6 @@ export function getAnimsByPhase(charId: string, phase: string): ModelAnimation[]
   return char.animations.filter(a => ids.includes(a.name));
 }
 
-// Resolve animation GLB path for a character + action_id
 export function resolveAnimGlb(charId: string, actionId: number): string | null {
   const animDef = ALL_ANIMATIONS.find(a => a.action_id === actionId);
   if (!animDef) return null;
@@ -295,10 +320,13 @@ export function resolveAnimGlb(charId: string, actionId: number): string | null 
   return anim?.glbPath ?? null;
 }
 
-// Get best animation available for a flow stage
 export function getBestAnimForStage(charId: string, stage: FlowStage, template: FlowTemplate): ModelAnimation | null {
   const stageConfig = template.stages[stage];
   const glbPath = resolveAnimGlb(charId, stageConfig.action_id);
   if (!glbPath) return null;
   return { name: stageConfig.id, label: stageConfig.label, glbPath, looping: stage === "idle" };
+}
+
+export function getCharAnimCount(charId: string): number {
+  return MESHY_CHARACTERS.find(c => c.id === charId)?.animations.length ?? 0;
 }

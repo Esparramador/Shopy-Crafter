@@ -100,6 +100,8 @@ router.get("/report-templates/:token", (req, res, next) => {
   res.json(tpl);
 });
 
+router.use(requireAuth, meshyRouter);
+
 router.use(requireAdmin);
 router.use(projectsRouter);
 router.use(productsRouter);
@@ -151,7 +153,6 @@ router.use(reportTemplatesRouter);
 router.use(billingRouter);
 router.use(brandDnaRouter);
 router.use(tripo3dRouter);
-router.use(meshyRouter);
 router.use(vismeRouter);
 router.use(webDesignerRouter);
 router.use("/stitch", stitchRouter);
