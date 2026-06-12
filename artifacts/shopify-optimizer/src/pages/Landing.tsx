@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import "./landing.css";
+
+const FloatingSpiderman3D = lazy(() =>
+  import("@/components/FloatingSpiderman3D").then(m => ({ default: m.FloatingSpiderman3D }))
+);
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -816,71 +820,28 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className={`fp-hero-right ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s" }}>
+            <div className={`fp-hero-right ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s", position: "relative" }}>
               <div className="l-preview-glow"></div>
               {content.hero.imageUrl ? (
                 <div className="l-preview-frame" style={{ padding: 0, overflow: "hidden" }}>
                   <img src={`${API_BASE_LANDING}${content.hero.imageUrl}`} alt="Hero" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }} />
                 </div>
               ) : (
-                <div className="l-preview-frame">
-                  <div className="l-preview-topbar">
-                    <div className="l-preview-dots">
-                      <div className="l-dot" style={{ background: "#ff5f57" }}></div>
-                      <div className="l-dot" style={{ background: "#ffbd2e" }}></div>
-                      <div className="l-dot" style={{ background: "#28ca41" }}></div>
+                <>
+                  <div style={{
+                    position: "absolute", top: -40, right: -20, width: 200, height: 200,
+                    borderRadius: "50%", pointerEvents: "none", zIndex: 0,
+                    background: "radial-gradient(ellipse, rgba(200,168,75,0.08) 0%, transparent 70%)",
+                    filter: "blur(30px)",
+                  }} />
+                  <Suspense fallback={
+                    <div style={{ width: "100%", height: 520, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", border: "3px solid rgba(200,168,75,0.3)", borderTopColor: "#c8a84b", animation: "spin 1s linear infinite" }} />
                     </div>
-                    <div className="l-preview-url">{content.hero.demo?.url ?? "app.shopycrafter.com/admin — Moda Urbana"}</div>
-                    <div className="l-preview-status"><div className="l-status-dot"></div>{content.hero.demo?.status ?? "6 motores activos"}</div>
-                  </div>
-                  <div className="l-preview-body">
-                    <div className="l-preview-sb">
-                      <div className="l-psb-logo"><div className="l-psb-gem"></div><div className="l-psb-name">{content.site.name}</div></div>
-                      {(Array.isArray(content.hero.demo?.navItems) ? content.hero.demo!.navItems : ["Overview", "Productos", "Imágenes IA", "Pricing + P&L", "SEO Técnico", "A/B Tests"]).map((item, i) => (
-                        <div key={i} className={`l-psb-item${i === 0 ? " l-psb-on" : ""}`}><div className="l-psb-dot"></div>{item}</div>
-                      ))}
-                    </div>
-                    <div className="l-preview-main">
-                      <div className="l-pm-row">
-                        {(content.hero.demo?.metrics ?? [{ label: "Revenue", value: "€32.4K", change: "↑ 22%" }, { label: "Conversión", value: "4.2%", change: "↑ 0.9pp" }, { label: "Margen", value: "61%", change: "↑ 8pts" }, { label: "SEO", value: "88", change: "↑ 23pts" }]).map((m, i) => ({ lbl: m.label, val: m.value, ch: m.change, color: ["#e6c668", "#2dd49f", "#f2f0ff", "#4a9edd"][i] ?? "#e6c668" })).map((c, i) => (
-                          <div key={i} className="l-pm-card">
-                            <div className="l-pm-lbl">{c.lbl}</div>
-                            <div className="l-pm-val" style={{ color: c.color }}>{c.val}</div>
-                            <div className="l-pm-ch" style={{ color: c.color }}>{c.ch}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="l-pm-row2">
-                        <div className="l-pm-card2">
-                          <div className="l-pm-c2-title">{content.heroDemoTitles?.storeHealth ?? "Salud de tiendas"}</div>
-                          {(content.hero.demo?.stores ?? [{ name: "Moda Urbana", score: "88" }, { name: "TechGadgets", score: "71" }, { name: "Casa & Arte", score: "42" }]).map((s, i) => {
-                            const v = parseInt(String(s.score), 10) || 0;
-                            const color = v >= 80 ? "#2dd49f" : v >= 60 ? "#4a9edd" : "#e84558";
-                            return (
-                              <div key={i}>
-                                <div className="l-pm-bar-row"><span>{s.name}</span><span style={{ color }}>{v}</span></div>
-                                <div className="l-pm-bar"><div className="l-pm-bar-f" style={{ width: `${v}%`, background: `linear-gradient(90deg,${color},${color}88)` }}></div></div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="l-pm-card2">
-                          <div className="l-pm-c2-title">{content.heroDemoTitles?.recentActivity ?? "Actividad reciente"}</div>
-                          {(content.hero.demo?.activity ?? ["A/B Test ganador · +28% conv.", "48 imágenes · €13.44", "Schema SEO · 234 productos"]).map((txt, i) => {
-                            const icons = [{ ico: "✓", bg: "rgba(45,212,159,.1)", color: "#2dd49f" }, { ico: "★", bg: "rgba(200,168,75,.1)", color: "#e6c668" }, { ico: "◎", bg: "rgba(74,158,221,.1)", color: "#4a9edd" }];
-                            const ic = icons[i % icons.length];
-                            return (
-                              <div key={i} className="l-feed-row">
-                                <div className="l-feed-ico" style={{ background: ic.bg, color: ic.color }}>{ic.ico}</div>
-                                <div className="l-feed-txt">{txt}</div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  }>
+                    <FloatingSpiderman3D height={520} />
+                  </Suspense>
+                </>
               )}
             </div>
           </div>
