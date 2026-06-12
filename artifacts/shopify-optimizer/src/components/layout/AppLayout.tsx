@@ -51,6 +51,17 @@ const DEFAULT_SHOPYBRAIN_NAV = [
 
   { label: "Lab Web", icon: "🔬", href: "/web-lab" },
 
+  { label: "Studio Fotografía IA", icon: "🧬", href: "/fusion-studio" },
+  { label: "Studio Multimedia Pro", icon: "⚡", href: "/fusion-studio-pro" },
+  { label: "Studio de Anuncios", icon: "📺", href: "/ad-studio" },
+  { label: "Studio de Cards", icon: "💳", href: "/cards" },
+  { label: "Kit de Campañas", icon: "🎬", href: "/campaign-kit" },
+  { label: "Vista Explosionada", icon: "💥", href: "/exploded-view" },
+
+  { label: "Generador IA", icon: "✨", href: "/generator" },
+  { label: "Exportar", icon: "📥", href: "/exports" },
+  { label: "Proveedores", icon: "🏭", href: "/suppliers" },
+
   { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
   { label: "Buscador Universal", icon: "🔎", href: "/admin/search" },
   { label: "Template Studio", icon: "🎨", href: "/admin/template-studio" },
