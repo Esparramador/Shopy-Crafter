@@ -1,0 +1,32 @@
+{
+  "alec_monopoly": {
+    "rigged_glb": "/assets/3d/animations/alec_monopoly/rigged.glb",
+    "walk_glb": "/assets/3d/animations/alec_monopoly/walk.glb",
+    "run_glb": "/assets/3d/animations/alec_monopoly/run.glb",
+    "jump_glb": "/assets/3d/animations/alec_monopoly/jump.glb"
+  },
+  "batman": {
+    "rigged_glb": "/assets/3d/animations/batman/rigged.glb",
+    "walk_glb": "/assets/3d/animations/batman/walk.glb",
+    "run_glb": "/assets/3d/animations/batman/run.glb",
+    "jump_glb": "/assets/3d/animations/batman/jump.glb"
+  },
+  "chico_casual": {
+    "rigged_glb": "/assets/3d/animations/chico_casual/rigged.glb",
+    "walk_glb": "/assets/3d/animations/chico_casual/walk.glb",
+    "run_glb": "/assets/3d/animations/chico_casual/run.glb",
+    "jump_glb": "/assets/3d/animations/chico_casual/jump.glb"
+  },
+  "chico_formal": {
+    "rigged_glb": "/assets/3d/animations/chico_formal/rigged.glb",
+    "walk_glb": "/assets/3d/animations/chico_formal/walk.glb",
+    "run_glb": "/assets/3d/animations/chico_formal/run.glb",
+    "jump_glb": "/assets/3d/animations/chico_formal/jump.glb"
+  },
+  "ted": {
+    "rigged_glb": "/assets/3d/animations/ted/rigged.glb",
+    "walk_glb": "/assets/3d/animations/ted/walk.glb",
+    "run_glb": "/assets/3d/animations/ted/run.glb",
+    "jump_glb": "/assets/3d/animations/ted/jump.glb"
+  }
+}
