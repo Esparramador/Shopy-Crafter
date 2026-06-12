@@ -1,0 +1,981 @@
+{
+  "categories": [
+    {
+      "id": "entrance",
+      "label": "Entrada",
+      "icon": "🎬",
+      "visme_phase": "intro",
+      "description": "El personaje aparece en escena"
+    },
+    {
+      "id": "waiting",
+      "label": "Idle / Espera",
+      "icon": "🧍",
+      "visme_phase": "idle",
+      "description": "El personaje espera o respira naturalmente"
+    },
+    {
+      "id": "action",
+      "label": "Acción",
+      "icon": "👆",
+      "visme_phase": "interact",
+      "description": "El personaje interactúa con el formulario/contenido"
+    },
+    {
+      "id": "celebration",
+      "label": "Celebración",
+      "icon": "🎉",
+      "visme_phase": "success",
+      "description": "El personaje celebra un logro o conversión"
+    },
+    {
+      "id": "locomotion",
+      "label": "Locomoción",
+      "icon": "🚶",
+      "visme_phase": "transit",
+      "description": "El personaje se mueve entre estados"
+    },
+    {
+      "id": "emotion",
+      "label": "Emociones",
+      "icon": "😄",
+      "visme_phase": "react",
+      "description": "El personaje reacciona emocionalmente"
+    },
+    {
+      "id": "outro",
+      "label": "Salida / Fin",
+      "icon": "👋",
+      "visme_phase": "outro",
+      "description": "El personaje concluye la interacción"
+    }
+  ],
+  "animations": [
+    {
+      "action_id": 1,
+      "id": "walk",
+      "name": "Walk",
+      "label": "🚶 Caminar",
+      "label_short": "Walk",
+      "category": "locomotion",
+      "visme_phase": "transit",
+      "looping": true,
+      "duration_ms": 1200,
+      "best_for": [
+        "transición entre pasos",
+        "formulario multi-step",
+        "progreso visual"
+      ],
+      "prompt_hint": "humanoid character in natural walking pose, arms slightly swinging, relaxed stride, full body visible",
+      "triggers": [
+        "on_step_change",
+        "on_scroll",
+        "on_transition"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human",
+        "animal_bipedal"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "batman",
+        "chico_casual",
+        "chico_formal",
+        "ted"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 2,
+      "id": "alert",
+      "name": "Alert",
+      "label": "⚠️ Alerta",
+      "label_short": "Alert",
+      "category": "action",
+      "visme_phase": "interact",
+      "looping": false,
+      "duration_ms": 1500,
+      "best_for": [
+        "validación de error",
+        "campo requerido",
+        "advertencia importante"
+      ],
+      "prompt_hint": "humanoid character in alert standing pose, body slightly tense, head turned, arms ready",
+      "triggers": [
+        "on_error",
+        "on_validation_fail",
+        "on_required_field"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 3,
+      "id": "arise",
+      "name": "Arise",
+      "label": "⬆️ Levantarse",
+      "label_short": "Arise",
+      "category": "entrance",
+      "visme_phase": "intro",
+      "looping": false,
+      "duration_ms": 1200,
+      "best_for": [
+        "aparición inicial del personaje",
+        "hero section",
+        "primera impresión"
+      ],
+      "prompt_hint": "humanoid character rising from ground, arms lifting, triumphant entrance, A-pose ready",
+      "triggers": [
+        "on_page_load",
+        "on_scroll_enter",
+        "on_section_visible"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 4,
+      "id": "idle",
+      "name": "Idle",
+      "label": "🧍 Reposo",
+      "label_short": "Idle",
+      "category": "waiting",
+      "visme_phase": "idle",
+      "looping": true,
+      "duration_ms": 3000,
+      "best_for": [
+        "estado por defecto",
+        "sin interacción",
+        "carga de página"
+      ],
+      "prompt_hint": "humanoid character in relaxed standing position, weight on one leg, neutral expression, arms at sides",
+      "triggers": [
+        "on_idle",
+        "on_default",
+        "continuous_loop"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human",
+        "cartoon_any"
+      ],
+      "available_in": [
+        "alec_monopoly"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 5,
+      "id": "idle_breath",
+      "name": "Idle_Breathing",
+      "label": "💨 Respirar",
+      "label_short": "Breath",
+      "category": "waiting",
+      "visme_phase": "idle",
+      "looping": true,
+      "duration_ms": 4000,
+      "best_for": [
+        "espera natural",
+        "vida realista",
+        "formulario abierto en espera"
+      ],
+      "prompt_hint": "humanoid character in natural standing pose, subtle chest movement, calm expression, realistic proportions",
+      "triggers": [
+        "on_form_open",
+        "on_idle_long",
+        "continuous_subtle"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 6,
+      "id": "wave",
+      "name": "Wave",
+      "label": "👋 Saludar",
+      "label_short": "Wave",
+      "category": "entrance",
+      "visme_phase": "intro",
+      "looping": false,
+      "duration_ms": 1800,
+      "best_for": [
+        "bienvenida al usuario",
+        "inicio de formulario",
+        "onboarding"
+      ],
+      "prompt_hint": "friendly humanoid character waving hand, welcoming gesture, smiling expression, open body language",
+      "triggers": [
+        "on_first_visit",
+        "on_form_start",
+        "on_welcome"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human",
+        "animal_bipedal"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 7,
+      "id": "thumbs_up",
+      "name": "Thumbs_Up",
+      "label": "👍 Pulgar arriba",
+      "label_short": "Thumbs",
+      "category": "celebration",
+      "visme_phase": "success",
+      "looping": false,
+      "duration_ms": 1200,
+      "best_for": [
+        "confirmación de paso",
+        "campo correcto",
+        "validación exitosa"
+      ],
+      "prompt_hint": "humanoid character giving thumbs up, confident posture, approving expression, clear hand gesture",
+      "triggers": [
+        "on_step_complete",
+        "on_field_valid",
+        "on_small_win"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 8,
+      "id": "clap",
+      "name": "Clapping",
+      "label": "👏 Aplaudir",
+      "label_short": "Clap",
+      "category": "celebration",
+      "visme_phase": "success",
+      "looping": false,
+      "duration_ms": 2500,
+      "best_for": [
+        "formulario completado",
+        "compra confirmada",
+        "meta alcanzada"
+      ],
+      "prompt_hint": "humanoid character clapping hands, joyful expression, energetic applause movement, celebrating",
+      "triggers": [
+        "on_form_submit",
+        "on_purchase_complete",
+        "on_goal_reached"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 9,
+      "id": "dance",
+      "name": "Dance",
+      "label": "💃 Bailar",
+      "label_short": "Dance",
+      "category": "celebration",
+      "visme_phase": "success",
+      "looping": true,
+      "duration_ms": 4000,
+      "best_for": [
+        "celebración máxima",
+        "resultado excepcional",
+        "éxito viral"
+      ],
+      "prompt_hint": "humanoid character in joyful dance pose, arms and legs in motion, dynamic movement, celebratory energy",
+      "triggers": [
+        "on_big_win",
+        "on_exceptional_result",
+        "on_viral_share"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual",
+        "chico_formal"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 10,
+      "id": "point",
+      "name": "Point_Forward",
+      "label": "☝️ Señalar",
+      "label_short": "Point",
+      "category": "action",
+      "visme_phase": "interact",
+      "looping": false,
+      "duration_ms": 1500,
+      "best_for": [
+        "señalar CTA",
+        "indicar siguiente paso",
+        "guiar atención"
+      ],
+      "prompt_hint": "humanoid character pointing finger forward/to side, directing gaze, confident stance, clear pointing gesture",
+      "triggers": [
+        "on_cta_appear",
+        "on_next_step",
+        "on_attention_guide"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 11,
+      "id": "think",
+      "name": "Thinking",
+      "label": "🤔 Pensar",
+      "label_short": "Think",
+      "category": "waiting",
+      "visme_phase": "idle",
+      "looping": true,
+      "duration_ms": 5000,
+      "best_for": [
+        "procesando datos",
+        "cargando resultado",
+        "IA pensando"
+      ],
+      "prompt_hint": "humanoid character in thinking pose, hand on chin, tilted head, contemplative expression, thoughtful stance",
+      "triggers": [
+        "on_loading",
+        "on_ai_processing",
+        "on_wait_long"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 12,
+      "id": "victory",
+      "name": "Victory",
+      "label": "🏆 Victoria",
+      "label_short": "Victory",
+      "category": "celebration",
+      "visme_phase": "success",
+      "looping": false,
+      "duration_ms": 2000,
+      "best_for": [
+        "conversión completada",
+        "pago realizado",
+        "suscripción activa"
+      ],
+      "prompt_hint": "humanoid character in victory pose, arms raised triumphantly, powerful stance, expression of success",
+      "triggers": [
+        "on_conversion",
+        "on_payment_success",
+        "on_subscription_active"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual",
+        "chico_formal"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 13,
+      "id": "sit",
+      "name": "Sit",
+      "label": "🪑 Sentarse",
+      "label_short": "Sit",
+      "category": "waiting",
+      "visme_phase": "idle",
+      "looping": true,
+      "duration_ms": 0,
+      "best_for": [
+        "lectura de contenido",
+        "revisión de datos",
+        "checkout largo"
+      ],
+      "prompt_hint": "humanoid character sitting comfortably, relaxed posture, hands on lap or table, casual reading pose",
+      "triggers": [
+        "on_content_read",
+        "on_long_form",
+        "on_checkout_review"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 14,
+      "id": "look_around",
+      "name": "Look_Around",
+      "label": "👀 Mirar alrededor",
+      "label_short": "Look",
+      "category": "waiting",
+      "visme_phase": "idle",
+      "looping": true,
+      "duration_ms": 4000,
+      "best_for": [
+        "exploración del producto",
+        "navegación",
+        "browsing"
+      ],
+      "prompt_hint": "humanoid character curiously looking around, engaged expression, scanning movement, exploring posture",
+      "triggers": [
+        "on_page_browse",
+        "on_product_view",
+        "on_exploration"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_formal"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 15,
+      "id": "kick",
+      "name": "Kick",
+      "label": "🦵 Patear",
+      "label_short": "Kick",
+      "category": "action",
+      "visme_phase": "interact",
+      "looping": false,
+      "duration_ms": 800,
+      "best_for": [
+        "acción enérgica",
+        "botón de impacto",
+        "CTA agresivo"
+      ],
+      "prompt_hint": "humanoid character in dynamic kick pose, powerful leg movement, athletic stance, action hero proportions",
+      "triggers": [
+        "on_power_cta",
+        "on_aggressive_action",
+        "on_impact_moment"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_casual",
+        "chico_formal"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 16,
+      "id": "punch",
+      "name": "Punch",
+      "label": "👊 Golpear",
+      "label_short": "Punch",
+      "category": "action",
+      "visme_phase": "interact",
+      "looping": false,
+      "duration_ms": 700,
+      "best_for": [
+        "acción de fuerza",
+        "superhéroe",
+        "impacto dramático"
+      ],
+      "prompt_hint": "humanoid character in punching pose, arm extended forward, powerful stance, athletic muscular build",
+      "triggers": [
+        "on_hero_action",
+        "on_super_cta",
+        "on_dramatic_moment"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human",
+        "superhero"
+      ],
+      "available_in": [
+        "alec_monopoly",
+        "chico_formal"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 17,
+      "id": "crouch",
+      "name": "Crouch",
+      "label": "🦸 Agacharse",
+      "label_short": "Crouch",
+      "category": "entrance",
+      "visme_phase": "intro",
+      "looping": false,
+      "duration_ms": 1000,
+      "best_for": [
+        "entrada dramática de superhéroe",
+        "landing de impacto",
+        "reveal épico"
+      ],
+      "prompt_hint": "humanoid character in crouching hero landing pose, one knee down, fist on ground, dramatic entrance",
+      "triggers": [
+        "on_hero_reveal",
+        "on_dramatic_entrance",
+        "on_epic_intro"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "superhero",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "chico_casual",
+        "chico_formal"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 18,
+      "id": "celebrate",
+      "name": "Celebrate_Arms",
+      "label": "🙌 Celebrar brazos",
+      "label_short": "Celebrate",
+      "category": "celebration",
+      "visme_phase": "success",
+      "looping": false,
+      "duration_ms": 2000,
+      "best_for": [
+        "éxito de formulario",
+        "lead capturado",
+        "email confirmado"
+      ],
+      "prompt_hint": "humanoid character raising both arms in celebration, joyful expression, open arms wide, success posture",
+      "triggers": [
+        "on_lead_captured",
+        "on_email_confirmed",
+        "on_form_success"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human",
+        "animal_bipedal"
+      ],
+      "available_in": [
+        "chico_casual",
+        "chico_formal"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 19,
+      "id": "nod",
+      "name": "Head_Nod",
+      "label": "😌 Asentir",
+      "label_short": "Nod",
+      "category": "emotion",
+      "visme_phase": "react",
+      "looping": false,
+      "duration_ms": 1000,
+      "best_for": [
+        "confirmación leve",
+        "acuerdo con términos",
+        "check positivo"
+      ],
+      "prompt_hint": "humanoid character nodding head in agreement, pleasant expression, approving gesture, friendly face",
+      "triggers": [
+        "on_terms_accept",
+        "on_minor_confirm",
+        "on_positive_feedback"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "chico_casual"
+      ],
+      "file_exists": true
+    },
+    {
+      "action_id": 20,
+      "id": "shake_head",
+      "name": "Shake_Head",
+      "label": "😤 Negar",
+      "label_short": "Shake",
+      "category": "emotion",
+      "visme_phase": "react",
+      "looping": false,
+      "duration_ms": 1000,
+      "best_for": [
+        "error de formulario",
+        "campo inválido",
+        "límite superado"
+      ],
+      "prompt_hint": "humanoid character shaking head in disapproval, slightly frowning, negative gesture, corrective expression",
+      "triggers": [
+        "on_error",
+        "on_limit_exceeded",
+        "on_invalid_input"
+      ],
+      "compatible_chars": [
+        "humanoid",
+        "cartoon_human"
+      ],
+      "available_in": [
+        "chico_casual"
+      ],
+      "file_exists": true
+    }
+  ],
+  "flow_templates": [
+    {
+      "id": "shopify_lead_form",
+      "name": "🛍️ Formulario Lead Shopify",
+      "description": "Captura de lead con personaje guía. Entrada → Espera → Señala CTA → Celebra.",
+      "stages": {
+        "intro": {
+          "action_id": 6,
+          "name": "wave",
+          "label": "Bienvenida",
+          "trigger": "on_page_load",
+          "duration_ms": 1800
+        },
+        "idle": {
+          "action_id": 5,
+          "name": "idle_breath",
+          "label": "Espera",
+          "trigger": "on_form_open",
+          "duration_ms": 0
+        },
+        "interact": {
+          "action_id": 10,
+          "name": "point",
+          "label": "Señala CTA",
+          "trigger": "on_cta_visible",
+          "duration_ms": 1500
+        },
+        "success": {
+          "action_id": 18,
+          "name": "celebrate",
+          "label": "Lead capturado",
+          "trigger": "on_form_submit",
+          "duration_ms": 2000
+        }
+      }
+    },
+    {
+      "id": "product_purchase",
+      "name": "🛒 Flujo Compra / Checkout",
+      "description": "Acompaña al usuario en el checkout. Aparece → Piensa → Aprueba → Victoria.",
+      "stages": {
+        "intro": {
+          "action_id": 3,
+          "name": "arise",
+          "label": "Aparece",
+          "trigger": "on_checkout_start",
+          "duration_ms": 1200
+        },
+        "idle": {
+          "action_id": 11,
+          "name": "think",
+          "label": "Procesando",
+          "trigger": "on_loading",
+          "duration_ms": 0
+        },
+        "interact": {
+          "action_id": 7,
+          "name": "thumbs_up",
+          "label": "Confirma",
+          "trigger": "on_review_done",
+          "duration_ms": 1200
+        },
+        "success": {
+          "action_id": 12,
+          "name": "victory",
+          "label": "Pago exitoso",
+          "trigger": "on_payment_ok",
+          "duration_ms": 2000
+        }
+      }
+    },
+    {
+      "id": "hero_intro",
+      "name": "🦸 Héroe Landing Page",
+      "description": "Entrada épica para landing page. Aterrizaje heroico → Idle → Señala propuesta → Celebra.",
+      "stages": {
+        "intro": {
+          "action_id": 17,
+          "name": "crouch",
+          "label": "Aterrizaje épico",
+          "trigger": "on_page_load",
+          "duration_ms": 1000
+        },
+        "idle": {
+          "action_id": 4,
+          "name": "idle",
+          "label": "Pose heroica",
+          "trigger": "after_intro",
+          "duration_ms": 0
+        },
+        "interact": {
+          "action_id": 16,
+          "name": "punch",
+          "label": "Acción poderosa",
+          "trigger": "on_cta_hover",
+          "duration_ms": 700
+        },
+        "success": {
+          "action_id": 9,
+          "name": "dance",
+          "label": "Celebración",
+          "trigger": "on_conversion",
+          "duration_ms": 0
+        }
+      }
+    },
+    {
+      "id": "friendly_onboarding",
+      "name": "👋 Onboarding Amigable",
+      "description": "Guía amistosa de onboarding. Saluda → Camina → Mira → Asiente.",
+      "stages": {
+        "intro": {
+          "action_id": 6,
+          "name": "wave",
+          "label": "Hola!",
+          "trigger": "on_first_step",
+          "duration_ms": 1800
+        },
+        "idle": {
+          "action_id": 14,
+          "name": "look_around",
+          "label": "Explora",
+          "trigger": "on_content_show",
+          "duration_ms": 0
+        },
+        "interact": {
+          "action_id": 1,
+          "name": "walk",
+          "label": "Avanza",
+          "trigger": "on_next_step",
+          "duration_ms": 0
+        },
+        "success": {
+          "action_id": 19,
+          "name": "nod",
+          "label": "Confirma",
+          "trigger": "on_step_done",
+          "duration_ms": 1000
+        }
+      }
+    },
+    {
+      "id": "error_correction",
+      "name": "❌ Corrección de Errores",
+      "description": "Personaje ayuda a corregir errores. Alerta → Mira → Asiente → Aplaude.",
+      "stages": {
+        "intro": {
+          "action_id": 2,
+          "name": "alert",
+          "label": "Atención!",
+          "trigger": "on_error",
+          "duration_ms": 1500
+        },
+        "idle": {
+          "action_id": 14,
+          "name": "look_around",
+          "label": "Revisa",
+          "trigger": "on_error_show",
+          "duration_ms": 0
+        },
+        "interact": {
+          "action_id": 20,
+          "name": "shake_head",
+          "label": "Incorrecto",
+          "trigger": "on_submit_fail",
+          "duration_ms": 1000
+        },
+        "success": {
+          "action_id": 8,
+          "name": "clap",
+          "label": "Corregido!",
+          "trigger": "on_error_fixed",
+          "duration_ms": 2500
+        }
+      }
+    },
+    {
+      "id": "social_proof",
+      "name": "⭐ Social Proof / Reviews",
+      "description": "Personaje presenta reseñas. Baila → Señala → Pulgar → Celebra.",
+      "stages": {
+        "intro": {
+          "action_id": 9,
+          "name": "dance",
+          "label": "Energía!",
+          "trigger": "on_reviews_show",
+          "duration_ms": 0
+        },
+        "idle": {
+          "action_id": 4,
+          "name": "idle",
+          "label": "Reposo",
+          "trigger": "on_review_read",
+          "duration_ms": 0
+        },
+        "interact": {
+          "action_id": 10,
+          "name": "point",
+          "label": "Mira esto",
+          "trigger": "on_review_hover",
+          "duration_ms": 1500
+        },
+        "success": {
+          "action_id": 7,
+          "name": "thumbs_up",
+          "label": "Recomendado!",
+          "trigger": "on_cta_click",
+          "duration_ms": 1200
+        }
+      }
+    }
+  ],
+  "character_prompts": {
+    "humanoid_realistic": {
+      "label": "Humano Realista (compatible todas las animaciones)",
+      "base_prompt": "full body humanoid character, T-pose or A-pose, realistic proportions, clear facial features, professional look, no clothing accessories that would break animation, symmetric body structure, game-ready 3D model",
+      "negative": "cartoon, deformed limbs, floating accessories, asymmetric, no neck, merged legs, accessories blocking joints",
+      "tip": "Usa A-pose para mejor compatibilidad con el auto-rig de Meshy"
+    },
+    "cartoon_humanoid": {
+      "label": "Cartoon Humanoide (compatible con rig)",
+      "base_prompt": "full body cartoon character, bipedal humanoid proportions, A-pose, oversized head with small body, clear arm and leg separation, no extra limbs, simple clothing without complex accessories",
+      "negative": "quadruped, tentacles, floating parts, non-humanoid, merged limbs, complex hair blocking neck",
+      "tip": "Los personajes cartoon necesitan proporciones humanoides para el auto-rig"
+    },
+    "superhero": {
+      "label": "Superhéroe (optimizado acciones 16/17)",
+      "base_prompt": "full body superhero character, muscular humanoid build, A-pose, tight fitting suit without loose elements, athletic proportions, cape optional but tucked, clear joint definition at shoulders and hips",
+      "negative": "loose flowing cape, bulky accessories blocking arms, non-humanoid, merged body parts",
+      "tip": "Traje ajustado funciona mejor que capas sueltas para punch/crouch"
+    },
+    "bear_ted_style": {
+      "label": "Oso Humanoide (estilo TED)",
+      "base_prompt": "full body bipedal bear character, humanoid standing pose, A-pose, plush toy aesthetic, round body with clear arm and leg separation, stubby humanoid limbs, no accessories",
+      "negative": "on all fours, quadruped pose, non-bipedal, merged legs, complex fur accessories",
+      "tip": "TED funciona bien — oso con proporciones humanoides y pose bípeda"
+    }
+  },
+  "char_anim_map": {
+    "alec_monopoly": [
+      "alert",
+      "arise",
+      "clap",
+      "dance",
+      "idle",
+      "idle_breath",
+      "jump",
+      "kick",
+      "look_around",
+      "point",
+      "punch",
+      "run",
+      "sit",
+      "think",
+      "thumbs_up",
+      "victory",
+      "walk",
+      "wave"
+    ],
+    "batman": [
+      "jump",
+      "run",
+      "walk"
+    ],
+    "chico_casual": [
+      "alert",
+      "celebrate",
+      "clap",
+      "crouch",
+      "dance",
+      "idle_breath",
+      "jump",
+      "kick",
+      "nod",
+      "point",
+      "run",
+      "shake_head",
+      "thumbs_up",
+      "victory",
+      "walk",
+      "wave"
+    ],
+    "chico_formal": [
+      "celebrate",
+      "crouch",
+      "dance",
+      "jump",
+      "kick",
+      "look_around",
+      "punch",
+      "run",
+      "victory",
+      "walk"
+    ],
+    "ted": [
+      "jump",
+      "run",
+      "walk"
+    ]
+  }
+}
