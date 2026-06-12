@@ -1157,6 +1157,7 @@
   .fp-pricing-arrow-left { left: 4px; }
   .fp-pricing-arrow-right { right: 50px; }
   .fp-contact-form { max-height: none !important; overflow: visible !important; }
+  .fp-contact-form-v2 { max-height: none !important; overflow: visible !important; }
 }
 
 /* ════════════════════════════════════════════════════
@@ -1246,6 +1247,12 @@
   .fp-calc-summary { position: static; }
   .fp-contact-form { padding: 24px 16px !important; }
   .fp-contact-form .fp-contact-row { grid-template-columns: 1fr !important; }
+  .fp-contact-form-v2 {
+    padding: 24px 16px !important;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+  }
+  .fp-contact-form-v2 .fp-contact-row { grid-template-columns: 1fr !important; }
   .fp-stats-grid { grid-template-columns: 1fr 1fr !important; }
   .l-marquee-track { width: max-content; }
   .fp-engine-panel { grid-template-columns: 1fr !important; }
@@ -1347,12 +1354,14 @@
   .l-testi-card { padding: 24px; }
   .fp-testi-carousel { perspective: none; }
   .fp-contact-form { padding: 32px 28px !important; }
+  .fp-contact-form-v2 { padding: 32px 28px !important; }
   .fp-testi-carousel { height: auto; min-height: 300px; }
   .fp-testi-card:not(.active) { display: none !important; }
   .fp-testi-card.active { position: relative !important; transform: none !important; }
   .fp-calc-grid { grid-template-columns: 1fr !important; }
   .fp-calc-summary { position: static; }
   .fp-contact-form .fp-contact-row { grid-template-columns: 1fr !important; }
+  .fp-contact-form-v2 .fp-contact-row { grid-template-columns: 1fr !important; }
 }
 
 /* ════════════════════════════════════════════════════
@@ -1456,6 +1465,7 @@
 
   /* Contact form scrollable */
   .fp-contact-form { max-height: 80vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .fp-contact-form-v2 { max-height: none; overflow-y: visible; }
 
   /* Testimonials */
   .fp-testi-carousel { height: auto !important; min-height: 280px; position: relative; }
@@ -1480,6 +1490,15 @@
     border-radius: 14px !important;
   }
   .fp-contact-form .fp-contact-row {
+    grid-template-columns: 1fr !important;
+  }
+  .fp-contact-form-v2 {
+    padding: 24px 16px !important;
+    border-radius: 14px !important;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+  }
+  .fp-contact-form-v2 .fp-contact-row {
     grid-template-columns: 1fr !important;
   }
 
@@ -1957,7 +1976,7 @@
   opacity: 0;
   pointer-events: none;
 }
-.sc-figure.phase-in {
+.sc-figure.phase-fall {
   opacity: 1;
   animation: sc-drop-in 0.7s cubic-bezier(0.22,1.1,0.36,1) forwards;
 }
