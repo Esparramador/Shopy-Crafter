@@ -834,13 +834,17 @@ export default function Landing() {
                     background: "radial-gradient(ellipse, rgba(200,168,75,0.08) 0%, transparent 70%)",
                     filter: "blur(30px)",
                   }} />
-                  <Suspense fallback={
-                    <div style={{ width: "100%", height: 520, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <div style={{ width: 48, height: 48, borderRadius: "50%", border: "3px solid rgba(200,168,75,0.3)", borderTopColor: "#c8a84b", animation: "spin 1s linear infinite" }} />
-                    </div>
-                  }>
-                    <FloatingSpiderman3D height={520} />
-                  </Suspense>
+                  {currentSection <= 2 ? (
+                    <Suspense fallback={
+                      <div style={{ width: "100%", height: 520, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: 48, height: 48, borderRadius: "50%", border: "3px solid rgba(200,168,75,0.3)", borderTopColor: "#c8a84b", animation: "spin 1s linear infinite" }} />
+                      </div>
+                    }>
+                      <FloatingSpiderman3D height={520} />
+                    </Suspense>
+                  ) : (
+                    <div style={{ width: "100%", height: 520, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 100, filter: "drop-shadow(0 20px 40px rgba(200,0,0,0.25))" }}>🕷️</div>
+                  )}
                 </>
               )}
             </div>
@@ -1263,38 +1267,18 @@ export default function Landing() {
             <div className="sc-stage-wrap">
               <div className={`sc-web-line${webLine ? " active" : ""}`}></div>
               <div className={`sc-figure${spiderPhase !== "hidden" ? ` phase-${spiderPhase}` : ""}`}>
-                <div style={{ position: "relative", zIndex: 30 }}>
-                  <div className={`sc-speech-bubble${showBubble ? " show" : ""}`}>
-                    {spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
-                  </div>
-                  <div className="sc-head-el">
-                    <div className="sc-head-lines"></div>
-                    <div className="sc-eyes-el">
-                      <div className="sc-eye-el"></div>
-                      <div className="sc-eye-el"></div>
-                    </div>
-                  </div>
+                <div className={`sc-speech-bubble${showBubble ? " show" : ""}`}>
+                  {spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
                 </div>
-                <div style={{ position: "relative" }}>
-                  <div className="sc-arms-wrap">
-                    <div className="sc-arm-el l"></div>
-                    <div className="sc-arm-el r"></div>
-                  </div>
-                  <div className="sc-torso">
-                    <div className="sc-torso-chest"></div>
-                    <div className="sc-belt-el"></div>
-                  </div>
-                </div>
-                <div className="sc-legs-el">
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <div className="sc-leg-el"></div>
-                    <div className="sc-boot-el"></div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <div className="sc-leg-el"></div>
-                    <div className="sc-boot-el"></div>
-                  </div>
-                </div>
+                {spiderPhase !== "hidden" ? (
+                  <Suspense fallback={
+                    <div style={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, filter: "drop-shadow(0 8px 24px rgba(200,0,0,0.35))" }}>🕷️</div>
+                  }>
+                    <FloatingSpiderman3D height={220} />
+                  </Suspense>
+                ) : (
+                  <div style={{ width: 220, height: 220 }} />
+                )}
                 <div className={`sc-laptop-wrap${showLaptop ? " show" : ""}`}>
                   <div className="sc-laptop-screen-outer">
                     <div className="sc-laptop-screen-inner">
