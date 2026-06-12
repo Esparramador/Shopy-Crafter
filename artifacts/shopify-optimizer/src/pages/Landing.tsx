@@ -219,37 +219,78 @@ export default function Landing() {
   const handleCardMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const card = e.currentTarget;
     const rect = card.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 22;
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 18;
-    card.style.transform = `perspective(900px) rotateY(${x}deg) rotateX(${-y}deg) scale3d(1.03,1.03,1.03)`;
-    card.style.boxShadow = `${-x * 1.5}px ${y * 1.5}px 48px rgba(0,0,0,0.5), 0 0 30px rgba(200,168,75,0.12)`;
+    const rx = ((e.clientX - rect.left) / rect.width - 0.5) * 32;
+    const ry = ((e.clientY - rect.top) / rect.height - 0.5) * 26;
+    const mx = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
+    const my = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
+    card.style.transition = "box-shadow 0.18s ease";
+    card.style.transform = `perspective(560px) rotateY(${rx}deg) rotateX(${-ry}deg) scale3d(1.06,1.06,1.06)`;
+    card.style.boxShadow = `${-rx * 2.2}px ${ry * 2.2}px 70px rgba(0,0,0,0.65), 0 0 50px rgba(200,168,75,0.18), inset 0 0 0 1px rgba(255,255,255,0.06)`;
+    card.style.opacity = "1";
+    card.style.filter = "";
+    card.style.setProperty("--mx", `${mx}%`);
+    card.style.setProperty("--my", `${my}%`);
   }, []);
 
   const handleCardMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const card = e.currentTarget;
-    card.style.transform = "";
+    // Restore scroll-depth state if available
+    const row = card.closest<HTMLElement>(".fp-pricing-row");
+    card.style.transition = "transform 0.4s ease, box-shadow 0.4s ease, opacity 0.4s ease";
     card.style.boxShadow = "";
+    card.style.removeProperty("--mx");
+    card.style.removeProperty("--my");
+    if (row) {
+      const rowRect = row.getBoundingClientRect();
+      const rowCenter = rowRect.left + rowRect.width / 2;
+      const cRect = card.getBoundingClientRect();
+      const cardCenter = cRect.left + cRect.width / 2;
+      const dist = Math.abs(cardCenter - rowCenter);
+      const norm = Math.min(dist / (rowRect.width * 0.5), 1);
+      const side = cardCenter < rowCenter ? 1 : -1;
+      const rotY = side * norm * 28;
+      const tz = -norm * 60;
+      const sc = 1 - norm * 0.08;
+      card.style.transform = `perspective(1000px) rotateY(${rotY}deg) translateZ(${tz}px) scale(${sc})`;
+      card.style.opacity = String(Math.max(0.55, 1 - norm * 0.45));
+      card.style.filter = norm > 0.2 ? `brightness(${Math.max(0.65, 1 - norm * 0.35)})` : "";
+    } else {
+      card.style.transform = "";
+    }
   }, []);
 
   useEffect(() => {
     const row = pricingRowRef.current;
     if (!row) return;
-    const onScroll = () => {
+    const applyScrollDepth = () => {
       const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card");
       if (!cards.length) return;
       const rowRect = row.getBoundingClientRect();
-      const center = rowRect.left + rowRect.width / 2;
+      const rowCenter = rowRect.left + rowRect.width / 2;
       let closest = 0;
       let minDist = Infinity;
       cards.forEach((c, i) => {
         const cRect = c.getBoundingClientRect();
-        const dist = Math.abs(cRect.left + cRect.width / 2 - center);
+        const cardCenter = cRect.left + cRect.width / 2;
+        const dist = Math.abs(cardCenter - rowCenter);
         if (dist < minDist) { minDist = dist; closest = i; }
+        // 3D depth: cards farther from center rotate & shrink on Z axis
+        const norm = Math.min(dist / (rowRect.width * 0.5), 1);
+        const side = cardCenter < rowCenter ? 1 : -1;
+        const rotY = side * norm * 28;
+        const scaleZ = 1 - norm * 0.08;
+        const tz = -norm * 60;
+        if (!c.matches(":hover")) {
+          c.style.transform = `perspective(1000px) rotateY(${rotY}deg) translateZ(${tz}px) scale(${scaleZ})`;
+          c.style.opacity = String(Math.max(0.55, 1 - norm * 0.45));
+          c.style.filter = norm > 0.2 ? `brightness(${Math.max(0.65, 1 - norm * 0.35)})` : "";
+        }
       });
       setPricingIdx(closest);
     };
-    row.addEventListener("scroll", onScroll, { passive: true });
-    return () => row.removeEventListener("scroll", onScroll);
+    applyScrollDepth();
+    row.addEventListener("scroll", applyScrollDepth, { passive: true });
+    return () => row.removeEventListener("scroll", applyScrollDepth);
   }, [content]);
 
   const submitContact = async (e: React.FormEvent) => {
@@ -1045,10 +1086,10 @@ export default function Landing() {
                   <div
                     key={plan.id}
                     className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}
-                    style={{ transition: "transform 0.12s ease, box-shadow 0.25s ease" }}
                     onMouseMove={handleCardMouseMove}
                     onMouseLeave={handleCardMouseLeave}
                   >
+                    <div className="pc-glare" />
                     {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
                     {plan.featured && <div className="pc-savings-tag">✨ MÁS POPULAR</div>}
                     <div className="l-pricing-plan" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>

@@ -1066,7 +1066,7 @@ function ImageUploader({ value, onChange }: { value: string; onChange: (url: str
 /* ── VISME EFFECT SECTION PICKER ──────────────────────────────────────────── */
 function EffectSectionPicker({ content, onChange }: { content: Record<string, unknown>; onChange: (path: string, value: unknown) => void }) {
   const effects = (content as any)?.effects ?? {};
-  const [activeSec, setActiveSec] = useState(LANDING_SECTIONS_EFFECTS[0].id);
+  const [activeSec, setActiveSec] = useState<string>(LANDING_SECTIONS_EFFECTS[0].id);
   const [hoveredFx, setHoveredFx] = useState<string | null>(null);
   const currentEffect = effects[activeSec] ?? "fadeUp";
 

@@ -15,7 +15,7 @@ interface VaultFile { id: string; title: string; category: string; fileType: str
 
 function useCountUp(target: number, duration = 1100) {
   const [n, setN] = useState(0);
-  const raf = useRef<number>();
+  const raf = useRef<number>(undefined);
   useEffect(() => {
     if (!target) { setN(0); return; }
     const t0 = performance.now();
