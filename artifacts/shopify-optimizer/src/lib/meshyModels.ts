@@ -57,12 +57,16 @@ export const ALL_ANIMATIONS: AnimDef[] = [
 ];
 
 export const ANIM_CATEGORIES = [
-  { id: "entrance",    label: "🎬 Entrada",       phase: "intro"    },
-  { id: "waiting",     label: "🧍 Espera/Idle",   phase: "idle"     },
-  { id: "action",      label: "👆 Acción",         phase: "interact" },
-  { id: "celebration", label: "🎉 Celebración",    phase: "success"  },
   { id: "locomotion",  label: "🚶 Locomoción",     phase: "transit"  },
-  { id: "emotion",     label: "😄 Emociones",      phase: "react"    },
+  { id: "dance",       label: "💃 Baile",           phase: "success"  },
+  { id: "combat",      label: "⚔️ Combate",         phase: "interact" },
+  { id: "celebration", label: "🎉 Celebración",     phase: "success"  },
+  { id: "gesture",     label: "👌 Gestos",          phase: "interact" },
+  { id: "entrance",    label: "🎬 Entrada",         phase: "intro"    },
+  { id: "waiting",     label: "🧍 Espera/Idle",     phase: "idle"     },
+  { id: "emotion",     label: "😄 Emociones",       phase: "react"    },
+  { id: "action",      label: "👆 Acción",           phase: "interact" },
+  { id: "magic",       label: "🔮 Magia",           phase: "interact" },
 ];
 
 // Visme-style flow templates
@@ -134,7 +138,29 @@ function anims(charId: string, names: string[]): ModelAnimation[] {
   });
 }
 
-// 22 animations (4 classic chars: alec_monopoly, batman, chico_casual, chico_formal)
+// 134 animations — alec_monopoly (full catalog discovered via API probe)
+const FULL_134 = [
+  "walk","alert","arise","idle","idle_breath","wave","thumbs_up","clap","dance","point",
+  "think","victory","sit","look_around","kick","punch","crouch","celebrate","nod","shake_head","run","jump",
+  "funny_dancing_02","funny_dancing_03","agree_gesture","angry_stomp","big_heart_gesture","big_wave_hello","call_gesture","casual_walk",
+  "catching_breath","chair_sit_idle_f","chair_sit_idle_m","checkout_gesture","clapping_run","confused_scratch","discuss_while_moving","dozing_elderly",
+  "excited_walk_f","excited_walk_m","formal_bow","gentlemans_bow","handbag_walk","happy_jump_f","indoor_play","jump_rope",
+  "listening_gesture","mirror_viewing","motivational_cheer","phone_call_gesture",
+  "shouting_angrily","sit_to_stand_f","sit_to_stand_m","squat_stance","stage_walk","stand_and_chat","stand_to_sit_m","step_to_sit",
+  "victory_cheer","walk_to_sit","happy_jump_m","penguin_walk",
+  "arm_circle_shuffle","all_night_dance","bass_beats","boom_dance","bubble_dance","cherish_pop_dance","crystal_beads","cardio_dance",
+  "denim_pop_dance","dont_you_dare","fast_lightning","gangnam_groove","indoor_swing","love_you_pop_dance","magic_genie","not_your_mom",
+  "omg_groove","pop_dance_lsa2","pod_baby_groove","shake_it_off_dance","superlove_pop_dance","you_groove",
+  "axe_stance","basic_jump","boxing_practice","chest_pound_taunt","combat_stance","counterstrike","double_blade_spin","double_combo_attack",
+  "dodge_and_counter","flying_fist_kick","gun_hold_left_turn","kung_fu_punch","left_slash","run_and_shoot","reaping_swing","rightward_spin",
+  "sword_shout","sword_judgment","simple_kick","side_shot","triple_combo_attack",
+  "confident_walk","confident_strut","flirty_strut","groovy_walk","hello_run","injured_walk","monster_walk","mummy_stagger",
+  "proud_strut","quick_walk","run_to_walk","red_carpet_walk","skip_forward","slow_orc_walk","touch_and_run","thoughtful_walk",
+  "texting_walk","unsteady_walk","walking_with_phone",
+  "charged_spell_cast","charged_spell_cast_1","charged_ground_slam","heavy_hammer_swing",
+  "mage_spell_cast","mage_spell_cast_1","mage_spell_cast_2","mage_spell_cast_3","mage_spell_cast_4","mage_spell_cast_5",
+];
+// 22 animations (batman, chico_casual, chico_formal)
 const FULL_22 = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","jump","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
 // 21 animations (7 new chars: spiderman, mickey, minnie, bob, bugs, plim_plim, chica_ejecutiva)
 const FULL_21 = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
@@ -147,11 +173,11 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
   // ── Fully rigged with 22 animations ──
   {
     id: "alec_monopoly", name: "Alec Monopoly", emoji: "🎩", category: "cartoon",
-    description: "El artista urbano más icónico. 22 animaciones completas.",
-    tags: ["arte","urbano","cartoon","rigged","full"],
+    description: "El artista urbano más icónico. 134 animaciones — catálogo completo de Meshy.",
+    tags: ["arte","urbano","cartoon","rigged","full","134-anims"],
     glbPath: "/assets/3d/models/alec_monopoly.glb", rigStatus: "rigged",
     rigTaskId: "019ebb36-4f0c-7d21-a268-2ff6198aca60",
-    animations: anims("alec_monopoly", FULL_22),
+    animations: anims("alec_monopoly", FULL_134),
   },
   {
     id: "batman", name: "Batman", emoji: "🦇", category: "cartoon",
