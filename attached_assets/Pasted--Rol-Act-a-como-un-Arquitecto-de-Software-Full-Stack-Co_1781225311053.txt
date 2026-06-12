@@ -1,0 +1,17 @@
+​Rol: Actúa como un Arquitecto de Software Full-Stack.
+​Contexto: Vamos a automatizar la creación de los avatares 3D. Tengo acceso a la API de Meshy.ai. Quiero usar su endpoint de "Image-to-3D" para generar nuestros 14 personajes subiendo imágenes de referencia.
+​Misión: Necesito que construyas un servicio/utilidad que se conecte con la API de Meshy, envíe una imagen, espere el resultado y guarde el .glb generado directamente en nuestra carpeta /public/assets/3d/models/.
+​Paso 1: Configuración de Variables de Entorno
+Crea la estructura para que yo pueda introducir mi MESHY_API_KEY en los Secrets/Environment Variables del proyecto de forma segura.
+​Paso 2: Construir el Servicio de Integración (Backend/API Route)
+Escribe una función de servidor (ej. meshyService.js en Node/Express o una API Route si estamos en Next.js) que haga el siguiente flujo:
+​Recibir un archivo de imagen y un characterId (ej. 'spiderman', 'batman').
+​Hacer un POST al endpoint de Meshy de Image-to-3D enviando la imagen. Asegúrate de incluir en el payload de la API los parámetros necesarios para habilitar el auto-rigging y las animaciones base (PBR texturing).
+​Hacer un sistema de polling (intervalos) que consulte el endpoint de estado de la tarea (GET) con el task_id hasta que devuelva status: "SUCCEEDED".
+​Cuando tenga éxito, descargar el archivo .glb desde la URL que devuelve Meshy.
+​Guardar ese archivo físicamente en /public/assets/3d/models/[characterId].glb.
+​Paso 3: UI de Administración (Oculta)
+En nuestro Form3DBuilder, añade un pequeño panel de "Admin/Dev" con un input de tipo file y un botón "Generar con Meshy". Esto conectará el frontend con el servicio que acabas de crear para que yo pueda ir subiendo mis 14 imágenes una a una y ver cómo aparecen los .glb en el proyecto automáticamente.
+​Ejecución: Escribe el código necesario manejando correctamente las promesas, los tiempos de espera del polling (Meshy tarda 1-2 minutos por modelo) y los errores (try/catch). Avísame cuando esté listo para que yo ponga mi API Key.
+​🧠 ¿Por qué este enfoque es tan potente?
+​Con este script, has convertido tu proyecto en una fábrica de avatares. Ya no tienes que descargar cosas manualmente en tu ordenador y arrastrarlas a Replit. Solo subes la foto del Payaso Plim Plim o de Alec Monopoly a tu propia interfaz, y tu código hará el pedido a Meshy, esperará a que se cocine, lo descargará y actualizará el formulario 3D al instante
