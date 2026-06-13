@@ -1312,7 +1312,7 @@ export default function Landing() {
                   <Suspense fallback={
                     <div style={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, filter: "drop-shadow(0 20px 40px rgba(200,168,75,0.40))" }}>🎩</div>
                   }>
-                    <FloatingAlecMonopoly height={220} phase={spiderPhase === "waiting" ? "waiting" : spiderPhase === "celebrate" ? "celebrate" : "ready"} />
+                    <FloatingAlecMonopoly height={220} phase={spiderPhase as import("@/components/FloatingAlecMonopoly3D").AlecPhase} />
                   </Suspense>
                 ) : (
                   <div style={{ width: 220, height: 220 }} />
@@ -1332,8 +1332,8 @@ export default function Landing() {
               {spiderPhase !== "hidden" && (
                 <p style={{ fontSize: 11.5, color: "rgba(200,168,75,0.45)", marginTop: 12, fontStyle: "italic", textAlign: "center" }}>
                   {spiderPhase === "celebrate" ? "🚀 ¡Misión completada! Analizando tu negocio con IA…" :
-                   spiderPhase === "waiting" ? "🧠 Spider-Man está procesando tu información…" :
-                   (spiderPhase === "fall" || spiderPhase === "bounce") ? "🕸️ ¡Tu experto IA ha llegado!" :
+                   spiderPhase === "waiting" ? "🧠 Alec está procesando tu información…" :
+                   (spiderPhase === "fall" || spiderPhase === "bounce") ? "🎩 ¡Tu experto IA ha aterrizado!" :
                    (spiderPhase === "standup" || spiderPhase === "look") ? "🔍 Analizando oportunidades de negocio…" :
                    showLaptop ? "💻 Rellena el formulario y te contactamos en 24h" : ""}
                 </p>
@@ -1352,7 +1352,7 @@ export default function Landing() {
                   <p style={{ color: "var(--t4)", fontSize: 13 }}>{content.contact?.successSubtext ?? "Te contactaremos con un informe detallado en menos de 24h. Revisa también tu carpeta de spam."}</p>
                 </div>
               ) : (
-                <form onSubmit={submitContact} className={`fp-contact-form-v2${formSlideIn ? " slide-in" : ""}`}>
+                <form onSubmit={submitContact} className={`fp-contact-form-v2${formSlideIn ? " slide-in" : ""}${formFieldsIn ? " fields-in" : ""}`}>
                   {/* Row 1: Nombre + Email */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>

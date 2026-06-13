@@ -32,70 +32,95 @@ class SceneErrorBoundary extends Component<
   }
 }
 
-// ── Phase → animation mapping ────────────────────────────────────────────────
-export type AlecPhase = "ready" | "waiting" | "celebrate";
+// ── Full phase type — matches Landing.tsx spiderPhase ────────────────────────
+export type AlecPhase =
+  | "hidden" | "fall" | "bounce" | "standup" | "look"
+  | "ready" | "waiting" | "celebrate";
 
-const PHASE_ANIM: Record<AlecPhase, { name: string; looping: boolean }> = {
-  ready:     { name: "idle_breath", looping: true },
-  waiting:   { name: "think",       looping: true },
-  celebrate: { name: "dance",       looping: true },
-};
+// Maps phase → { animName, loop }
+function resolveAnim(phase: AlecPhase): { name: string; looping: boolean } {
+  switch (phase) {
+    case "fall":
+    case "bounce":
+    case "standup":    return { name: "idle_breath",  looping: true  };
+    case "look":       return { name: "look_around",  looping: false };
+    case "waiting":    return { name: "think",         looping: true  };
+    case "celebrate":  return { name: "dance",         looping: true  };
+    default:           return { name: "idle_breath",  looping: true  };
+  }
+}
 
 // ── Inner 3D character ───────────────────────────────────────────────────────
-function AlecCharacter({ animGlbPath, looping }: { animGlbPath: string; looping: boolean }) {
+function AlecCharacter({
+  animGlbPath,
+  looping,
+}: {
+  animGlbPath: string;
+  looping: boolean;
+}) {
   const group = useRef<THREE.Group>(null!);
   const { scene }      = useGLTF(MODEL_PATH);
   const { animations } = useGLTF(animGlbPath);
   const { actions, mixer } = useAnimations(animations, group);
 
-  // Normalise model: scale to 2 units tall, feet at y = 0
+  // Normalise: scale to 2 units tall, feet at y = 0
   useEffect(() => {
     if (!scene) return;
     const box  = new THREE.Box3().setFromObject(scene);
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
-    const scale  = 2 / maxDim;
-    const center = box.getCenter(new THREE.Vector3());
-    scene.scale.setScalar(scale);
-    scene.position.sub(center.multiplyScalar(scale));
+    const sc   = 2 / maxDim;
+    const ctr  = box.getCenter(new THREE.Vector3());
+    scene.scale.setScalar(sc);
+    scene.position.sub(ctr.multiplyScalar(sc));
     const box2 = new THREE.Box3().setFromObject(scene);
     scene.position.y -= box2.min.y;
   }, [scene]);
 
-  // Play animation whenever the GLB changes
+  // Play animation when GLB or loop flag changes
   useEffect(() => {
     const keys = Object.keys(actions);
     Object.values(actions).forEach(a => a?.stop());
-    if (keys.length === 0) return;
+    if (!keys.length) return;
     const action = actions[keys[0]];
     if (!action) return;
     action.reset();
     action.setLoop(looping ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
     action.clampWhenFinished = !looping;
-    action.fadeIn(0.45);
+    action.fadeIn(0.4);
     action.play();
-  }, [animGlbPath, looping, JSON.stringify(Object.keys(actions))]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animGlbPath, looping]);
 
   useFrame((_, dt) => mixer.update(dt));
 
   return <group ref={group}><primitive object={scene} /></group>;
 }
 
-// ── Scene wrapper ─────────────────────────────────────────────────────────────
+// ── Scene with subtle idle sway ────────────────────────────────────────────
 function AlecScene({ phase }: { phase: AlecPhase }) {
-  const { name, looping } = PHASE_ANIM[phase];
+  const { name, looping } = resolveAnim(phase);
   const animGlbPath = `${ANIM_ROOT}/${name}.glb`;
+
+  // Gentle camera bob while idle/waiting
+  const clock = useRef(0);
+  useFrame((state, dt) => {
+    if (phase === "ready" || phase === "waiting") {
+      clock.current += dt;
+      state.camera.position.y = 1.1 + Math.sin(clock.current * 0.5) * 0.04;
+    }
+  });
 
   return (
     <>
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[3, 7, 5]}  intensity={1.4} castShadow />
-      <directionalLight position={[-3, 4, -2]} intensity={0.35} />
-      <pointLight position={[0, 3, 2]} intensity={0.5} color="#c8a84b" />
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[3, 7, 5]}  intensity={1.5} castShadow />
+      <directionalLight position={[-3, 4, -2]} intensity={0.4} />
+      <pointLight position={[0, 3, 2]} intensity={0.6} color="#c8a84b" />
       <Environment preset="sunset" />
       <ContactShadows
         position={[0, -0.01, 0]}
-        opacity={0.4}
+        opacity={0.45}
         scale={5}
         blur={2.5}
         far={3}
@@ -111,7 +136,9 @@ function AlecScene({ phase }: { phase: AlecPhase }) {
 function CSSFallback({ height, phase }: { height: number; phase: AlecPhase }) {
   const label =
     phase === "celebrate" ? "🎉 ¡MISIÓN CUMPLIDA!" :
-    phase === "waiting"   ? "🤔 ANALIZANDO…"        :
+    phase === "waiting"   ? "🤔 ANALIZANDO…"       :
+    (phase === "fall" || phase === "bounce" || phase === "standup" || phase === "look")
+                          ? "🎩 LLEGANDO…"          :
     "ALEC MONOPOLY";
 
   return (
@@ -126,7 +153,6 @@ function CSSFallback({ height, phase }: { height: number; phase: AlecPhase }) {
         pointerEvents: "none",
       }} />
       <div style={{ textAlign: "center" }}>
-        {/* sc-emoji-head — targeted by CSS data-focus head-tracking rules */}
         <div
           className="sc-emoji-head"
           style={{
@@ -154,7 +180,7 @@ export function FloatingAlecMonopoly({ height = 320, phase = "ready" }: Floating
   const webglOk = useMemo(() => isWebGLAvailable(), []);
   const fallback = <CSSFallback height={height} phase={phase} />;
 
-  if (!webglOk) return fallback;
+  if (!webglOk || phase === "hidden") return fallback;
 
   return (
     <SceneErrorBoundary fallback={fallback}>
@@ -179,5 +205,6 @@ export function FloatingAlecMonopoly({ height = 320, phase = "ready" }: Floating
 // Preload critical GLBs eagerly
 useGLTF.preload(MODEL_PATH);
 useGLTF.preload(`${ANIM_ROOT}/idle_breath.glb`);
+useGLTF.preload(`${ANIM_ROOT}/look_around.glb`);
 useGLTF.preload(`${ANIM_ROOT}/think.glb`);
 useGLTF.preload(`${ANIM_ROOT}/dance.glb`);

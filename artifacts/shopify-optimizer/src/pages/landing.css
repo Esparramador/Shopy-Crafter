@@ -2697,3 +2697,83 @@
 .sc-figure[data-focus=""] .sc-emoji-head {
   transform: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VISME-STYLE FORM FIELDS — Staggered reveal when character lands
+   Each row/field slides up + fades in sequentially after Alec settles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes alec-field-rise {
+  0%   { opacity: 0; transform: translateY(28px) scale(0.97); }
+  60%  { opacity: 1; transform: translateY(-3px) scale(1.005); }
+  100% { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* All direct children of the form start invisible */
+.fp-contact-form-v2 > * {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+/* When fields-in fires, each child appears in sequence */
+.fp-contact-form-v2.fields-in > *:nth-child(1)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.00s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(2)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.08s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(3)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.16s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(4)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.24s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(5)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.32s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(6)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.40s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(7)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.48s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(8)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.56s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(9)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.64s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(10) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.72s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(11) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.80s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(12) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.88s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(13) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.96s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(n+14) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 1.04s forwards; }
+
+/* ── Golden entrance line that sweeps across the top of each field ── */
+.fp-contact-form-v2.fields-in .fp-contact-row,
+.fp-contact-form-v2.fields-in > div {
+  position: relative;
+}
+.fp-contact-form-v2.fields-in .fp-contact-row::after,
+.fp-contact-form-v2.fields-in > div::after {
+  content: '';
+  position: absolute;
+  bottom: -8px; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(200,168,75,0.18) 30%, rgba(200,168,75,0.08) 70%, transparent 100%);
+  pointer-events: none;
+}
+
+/* ── Cinematic web-line — golden gradient drop line ── */
+.sc-web-line {
+  background: linear-gradient(to bottom,
+    rgba(200,168,75,0.85) 0%,
+    rgba(200,168,75,0.40) 60%,
+    rgba(200,168,75,0.0) 100%) !important;
+  width: 1.5px !important;
+  box-shadow: 0 0 6px rgba(200,168,75,0.5);
+}
+.sc-web-line.active {
+  height: 100px !important;
+  transition: height 0.55s cubic-bezier(0.34,1.2,0.64,1) !important;
+}
+
+/* ── Character stage: golden ambient glow on entrance ── */
+.sc-figure.phase-fall::before,
+.sc-figure.phase-bounce::before,
+.sc-figure.phase-standup::before,
+.sc-figure.phase-look::before {
+  content: '';
+  position: absolute;
+  inset: -30px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,168,75,0.14) 0%, transparent 70%);
+  pointer-events: none;
+  animation: alecEntranceGlow 0.7s ease-out forwards;
+}
+@keyframes alecEntranceGlow {
+  0%   { opacity: 0; transform: scale(0.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
