@@ -37,20 +37,27 @@ export type AlecPhase =
   | "hidden" | "fall" | "bounce" | "standup" | "look"
   | "ready" | "waiting" | "celebrate";
 
-// Maps phase → { animName, loop }
+// Phase → { animName, loop }
+// casual_walk = natural person walking in place (full body movement)
+// arise       = character dramatically rising/appearing
+// look_around = scans left–right
+// think       = stationary pondering
+// dance       = victory celebration
 function resolveAnim(phase: AlecPhase): { name: string; looping: boolean } {
   switch (phase) {
     case "fall":
     case "bounce":
-    case "standup":    return { name: "idle_breath",  looping: true  };
-    case "look":       return { name: "look_around",  looping: false };
-    case "waiting":    return { name: "think",         looping: true  };
-    case "celebrate":  return { name: "dance",         looping: true  };
-    default:           return { name: "idle_breath",  looping: true  };
+    case "standup":  return { name: "arise",        looping: false };
+    case "look":     return { name: "look_around",  looping: false };
+    case "waiting":  return { name: "think",         looping: true  };
+    case "celebrate":return { name: "dance",         looping: true  };
+    default:         return { name: "casual_walk",  looping: true  };
   }
 }
 
-// ── Inner 3D character ───────────────────────────────────────────────────────
+// ── Inner character — base model + retargeted animation clip ─────────────────
+// IMPORTANT: useEffect must include JSON.stringify(Object.keys(actions))
+// so it re-fires AFTER useAnimations populates actions (async GLB load).
 function AlecCharacter({
   animGlbPath,
   looping,
@@ -59,17 +66,19 @@ function AlecCharacter({
   looping: boolean;
 }) {
   const group = useRef<THREE.Group>(null!);
-  const { scene }      = useGLTF(MODEL_PATH);
+
+  // Base model provides mesh + skeleton
+  const { scene } = useGLTF(MODEL_PATH);
+  // Animation GLB provides the clip whose tracks target those bones
   const { animations } = useGLTF(animGlbPath);
   const { actions, mixer } = useAnimations(animations, group);
 
-  // Normalise: scale to 2 units tall, feet at y = 0
+  // Normalise: fit to 2 units tall, feet at y = 0
   useEffect(() => {
     if (!scene) return;
     const box  = new THREE.Box3().setFromObject(scene);
     const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const sc   = 2 / maxDim;
+    const sc   = 2 / Math.max(size.x, size.y, size.z);
     const ctr  = box.getCenter(new THREE.Vector3());
     scene.scale.setScalar(sc);
     scene.position.sub(ctr.multiplyScalar(sc));
@@ -77,46 +86,49 @@ function AlecCharacter({
     scene.position.y -= box2.min.y;
   }, [scene]);
 
-  // Play animation when GLB or loop flag changes
+  // ── KEY FIX: include actions key signature so effect re-runs when
+  //    the GLB finishes loading and actions become available ──────────────────
+  const actionKeys = JSON.stringify(Object.keys(actions));
   useEffect(() => {
     const keys = Object.keys(actions);
+    if (!keys.length) return;               // GLB not yet loaded → wait
     Object.values(actions).forEach(a => a?.stop());
-    if (!keys.length) return;
     const action = actions[keys[0]];
     if (!action) return;
     action.reset();
     action.setLoop(looping ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
     action.clampWhenFinished = !looping;
-    action.fadeIn(0.4);
+    action.fadeIn(0.35);
     action.play();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animGlbPath, looping]);
+  }, [animGlbPath, looping, actionKeys]);
 
   useFrame((_, dt) => mixer.update(dt));
 
   return <group ref={group}><primitive object={scene} /></group>;
 }
 
-// ── Scene with subtle idle sway ────────────────────────────────────────────
+// ── Scene ─────────────────────────────────────────────────────────────────────
 function AlecScene({ phase }: { phase: AlecPhase }) {
   const { name, looping } = resolveAnim(phase);
   const animGlbPath = `${ANIM_ROOT}/${name}.glb`;
 
-  // Gentle camera bob while idle/waiting
-  const clock = useRef(0);
+  // Subtle camera sway while walking/thinking
+  const t = useRef(0);
   useFrame((state, dt) => {
     if (phase === "ready" || phase === "waiting") {
-      clock.current += dt;
-      state.camera.position.y = 1.1 + Math.sin(clock.current * 0.5) * 0.04;
+      t.current += dt;
+      state.camera.position.y = 1.1 + Math.sin(t.current * 0.6) * 0.03;
+      state.camera.position.x = Math.sin(t.current * 0.25) * 0.05;
     }
   });
 
   return (
     <>
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[3, 7, 5]}  intensity={1.5} castShadow />
-      <directionalLight position={[-3, 4, -2]} intensity={0.4} />
-      <pointLight position={[0, 3, 2]} intensity={0.6} color="#c8a84b" />
+      <ambientLight intensity={0.75} />
+      <directionalLight position={[3, 7, 5]}   intensity={1.5} castShadow />
+      <directionalLight position={[-3, 4, -2]}  intensity={0.4} />
+      <pointLight       position={[0, 3, 2]}    intensity={0.6} color="#c8a84b" />
       <Environment preset="sunset" />
       <ContactShadows
         position={[0, -0.01, 0]}
@@ -136,35 +148,17 @@ function AlecScene({ phase }: { phase: AlecPhase }) {
 function CSSFallback({ height, phase }: { height: number; phase: AlecPhase }) {
   const label =
     phase === "celebrate" ? "🎉 ¡MISIÓN CUMPLIDA!" :
-    phase === "waiting"   ? "🤔 ANALIZANDO…"       :
+    phase === "waiting"   ? "🤔 ANALIZANDO…"        :
     (phase === "fall" || phase === "bounce" || phase === "standup" || phase === "look")
-                          ? "🎩 LLEGANDO…"          :
+                          ? "🎩 LLEGANDO…"           :
     "ALEC MONOPOLY";
 
   return (
-    <div style={{
-      width: "100%", height,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      position: "relative",
-    }}>
-      <div style={{
-        position: "absolute", inset: 0,
-        background: "radial-gradient(ellipse 70% 60% at 50% 38%, rgba(200,168,75,0.10) 0%, transparent 70%)",
-        pointerEvents: "none",
-      }} />
+    <div style={{ width: "100%", height, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 70% 60% at 50% 38%, rgba(200,168,75,0.10) 0%, transparent 70%)", pointerEvents: "none" }} />
       <div style={{ textAlign: "center" }}>
-        <div
-          className="sc-emoji-head"
-          style={{
-            fontSize: 120, lineHeight: 1, display: "inline-block",
-            filter: "drop-shadow(0 20px 40px rgba(200,168,75,0.40))",
-            transformOrigin: "center bottom",
-          }}
-        >🎩</div>
-        <div style={{
-          marginTop: 14, fontSize: 12, fontWeight: 700, letterSpacing: 3,
-          color: "rgba(200,168,75,0.65)", textTransform: "uppercase",
-        }}>{label}</div>
+        <div className="sc-emoji-head" style={{ fontSize: 120, lineHeight: 1, display: "inline-block", filter: "drop-shadow(0 20px 40px rgba(200,168,75,0.40))", transformOrigin: "center bottom" }}>🎩</div>
+        <div style={{ marginTop: 14, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: "rgba(200,168,75,0.65)", textTransform: "uppercase" }}>{label}</div>
       </div>
     </div>
   );
@@ -202,9 +196,10 @@ export function FloatingAlecMonopoly({ height = 320, phase = "ready" }: Floating
   );
 }
 
-// Preload critical GLBs eagerly
+// Preload the four most-used GLBs so first frames are instant
 useGLTF.preload(MODEL_PATH);
-useGLTF.preload(`${ANIM_ROOT}/idle_breath.glb`);
+useGLTF.preload(`${ANIM_ROOT}/casual_walk.glb`);
 useGLTF.preload(`${ANIM_ROOT}/look_around.glb`);
 useGLTF.preload(`${ANIM_ROOT}/think.glb`);
+useGLTF.preload(`${ANIM_ROOT}/arise.glb`);
 useGLTF.preload(`${ANIM_ROOT}/dance.glb`);
