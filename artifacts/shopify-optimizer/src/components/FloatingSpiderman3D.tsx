@@ -123,10 +123,14 @@ vec4 diffuseColor = vec4(col, opacity);
   return mat;
 }
 
-/* ── 3D model component ──────────────────────────────────────────────────── */
-function SpidermanModel() {
+/* ── Phase type ─────────────────────────────────────────────────────────── */
+export type Spider3DPhase = "ready" | "waiting" | "celebrate";
+
+/* ── 3D model component ─ phase-aware animations ───────────────────────── */
+function SpidermanModel({ phase }: { phase: Spider3DPhase }) {
   const { scene } = useGLTF(`${BASE_URL}/assets/3d/models/spiderman.glb`);
   const group = useRef<THREE.Group>(null);
+  const celebrateStartRef = useRef<number | null>(null);
 
   const cloned = useMemo(() => {
     const c = scene.clone();
@@ -143,8 +147,30 @@ function SpidermanModel() {
   useFrame((state) => {
     if (!group.current) return;
     const t = state.clock.elapsedTime;
-    group.current.position.y = -0.95 + Math.sin(t * 0.75) * 0.07;
-    group.current.rotation.y = -0.25 + Math.sin(t * 0.28) * 0.18;
+
+    if (phase === "celebrate") {
+      /* Victory dance: fast bounce + spin + scale pulse */
+      if (celebrateStartRef.current === null) celebrateStartRef.current = t;
+      const e = t - celebrateStartRef.current;
+      group.current.position.y = -0.95 + Math.abs(Math.sin(e * 5.2)) * 0.30;
+      group.current.rotation.y = e * 3.2;
+      group.current.rotation.x = Math.sin(e * 4.0) * 0.14;
+      group.current.scale.setScalar(1.72 + Math.sin(e * 6.5) * 0.10);
+    } else if (phase === "waiting") {
+      /* Attentive reading: subtle breathing, slight lean toward form */
+      celebrateStartRef.current = null;
+      group.current.position.y = -0.95 + Math.sin(t * 0.55) * 0.022;
+      group.current.rotation.y = -0.18 + Math.sin(t * 0.22) * 0.06;
+      group.current.rotation.x = 0.06 + Math.sin(t * 0.35) * 0.018;
+      group.current.scale.setScalar(1.72 + Math.sin(t * 0.9) * 0.012);
+    } else {
+      /* Ready/idle: gentle float + rotation */
+      celebrateStartRef.current = null;
+      group.current.position.y = -0.95 + Math.sin(t * 0.75) * 0.07;
+      group.current.rotation.y = -0.25 + Math.sin(t * 0.28) * 0.18;
+      group.current.rotation.x = 0;
+      group.current.scale.setScalar(1.72);
+    }
   });
 
   return (
@@ -155,7 +181,15 @@ function SpidermanModel() {
 }
 
 /* ── CSS fallback ───────────────────────────────────────────────────────── */
-function CSSFallback({ height }: { height: number }) {
+function CSSFallback({ height, phase }: { height: number; phase: Spider3DPhase }) {
+  const anim = phase === "celebrate"
+    ? "spiderCSSCelebrate 0.5s ease-in-out infinite"
+    : phase === "waiting"
+    ? "spiderCSSWait 3s ease-in-out infinite"
+    : "spiderFloatCSS 3s ease-in-out infinite";
+
+  const label = phase === "celebrate" ? "¡MISIÓN CUMPLIDA!" : phase === "waiting" ? "Leyendo tu info…" : "Spiderman 3D";
+
   return (
     <div style={{
       width: "100%", height,
@@ -171,17 +205,27 @@ function CSSFallback({ height }: { height: number }) {
         <div style={{
           fontSize: 130, lineHeight: 1,
           filter: "drop-shadow(0 24px 48px rgba(200,0,0,0.28))",
-          animation: "spiderFloatCSS 3s ease-in-out infinite",
+          animation: anim,
         }}>🕷️</div>
         <div style={{
           marginTop: 14, fontSize: 13, fontWeight: 700, letterSpacing: 3,
           color: "rgba(200,168,75,0.65)", textTransform: "uppercase",
-        }}>Spiderman 3D</div>
+        }}>{label}</div>
       </div>
       <style>{`
         @keyframes spiderFloatCSS {
           0%,100%{transform:translateY(0) rotate(-3deg)}
           50%{transform:translateY(-20px) rotate(3deg)}
+        }
+        @keyframes spiderCSSWait {
+          0%,100%{transform:translateY(0) scale(1)}
+          50%{transform:translateY(-4px) scale(1.02,0.99)}
+        }
+        @keyframes spiderCSSCelebrate {
+          0%,100%{transform:translateY(0) scale(1) rotate(0deg)}
+          25%{transform:translateY(-22px) scale(0.9,1.15) rotate(-12deg)}
+          50%{transform:translateY(4px) scale(1.12,0.88) rotate(0deg)}
+          75%{transform:translateY(-14px) scale(0.92,1.1) rotate(12deg)}
         }
       `}</style>
     </div>
@@ -191,16 +235,19 @@ function CSSFallback({ height }: { height: number }) {
 /* ── Public component ───────────────────────────────────────────────────── */
 export interface FloatingSpiderman3DProps {
   height?: number;
+  spiderPhase?: Spider3DPhase;
 }
 
-export function FloatingSpiderman3D({ height = 500 }: FloatingSpiderman3DProps) {
+export function FloatingSpiderman3D({ height = 500, spiderPhase = "ready" }: FloatingSpiderman3DProps) {
   const webglOk = useMemo(() => isWebGLAvailable(), []);
 
   if (!webglOk) {
-    return <CSSFallback height={height} />;
+    return <CSSFallback height={height} phase={spiderPhase} />;
   }
 
-  const cssFallback = <CSSFallback height={height} />;
+  const cssFallback = <CSSFallback height={height} phase={spiderPhase} />;
+  const isCelebrate = spiderPhase === "celebrate";
+  const isWaiting = spiderPhase === "waiting";
 
   return (
     <SceneErrorBoundary fallback={cssFallback}>
@@ -209,31 +256,40 @@ export function FloatingSpiderman3D({ height = 500 }: FloatingSpiderman3DProps) 
           position: "absolute", bottom: "8%", left: "50%",
           transform: "translateX(-50%)",
           width: "55%", height: 28, borderRadius: "50%",
-          background: "radial-gradient(ellipse, rgba(200,168,75,0.35), transparent 70%)",
+          background: isCelebrate
+            ? "radial-gradient(ellipse, rgba(200,168,75,0.65), transparent 70%)"
+            : "radial-gradient(ellipse, rgba(200,168,75,0.35), transparent 70%)",
           filter: "blur(14px)",
-          animation: "spiderShadowPulse 3s ease-in-out infinite",
+          animation: isCelebrate
+            ? "spiderShadowCelebrate 0.5s ease-in-out infinite"
+            : "spiderShadowPulse 3s ease-in-out infinite",
           zIndex: 2,
+          transition: "background 0.5s ease",
         }} />
         <div style={{
           position: "absolute", inset: 0,
-          background: "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(200,50,50,0.08) 0%, transparent 70%)",
+          background: isCelebrate
+            ? "radial-gradient(ellipse 80% 70% at 50% 40%, rgba(200,168,75,0.14) 0%, rgba(200,50,50,0.06) 55%, transparent 70%)"
+            : "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(200,50,50,0.08) 0%, transparent 70%)",
           pointerEvents: "none", zIndex: 1,
+          transition: "background 0.8s ease",
         }} />
         <Canvas
-          camera={{ position: [0, 0.4, 3.1], fov: 42 }}
+          camera={{ position: isWaiting ? [0.12, 0.4, 3.1] : [0, 0.4, 3.1], fov: 42 }}
           gl={{ alpha: true, antialias: true, failIfMajorPerformanceCaveat: false }}
           style={{ width: "100%", height: "100%", background: "transparent", position: "relative", zIndex: 3 }}
         >
-          <ambientLight intensity={0.55} />
-          <directionalLight position={[2, 5, 3]} intensity={1.8} color="#ffffff" />
+          <ambientLight intensity={isCelebrate ? 0.85 : 0.55} />
+          <directionalLight position={[2, 5, 3]} intensity={isCelebrate ? 2.4 : 1.8} color="#ffffff" />
           <directionalLight position={[-2, 2, -2]} intensity={0.35} color="#4a9eff" />
-          <pointLight position={[0, 3, 2]} intensity={0.9} color="#ff2222" />
+          <pointLight position={[0, 3, 2]} intensity={isCelebrate ? 1.6 : 0.9} color={isCelebrate ? "#ffcc00" : "#ff2222"} />
           <pointLight position={[0.5, 2.5, 1.5]} intensity={0.5} color="#c8a84b" />
+          {isCelebrate && <pointLight position={[-1, 1, 1]} intensity={1.2} color="#ff4488" />}
           <Suspense fallback={null}>
-            <SpidermanModel />
+            <SpidermanModel phase={spiderPhase} />
             <ContactShadows
               position={[0, -1.02, 0]}
-              opacity={0.35}
+              opacity={isCelebrate ? 0.55 : 0.35}
               scale={4}
               blur={2.5}
               color="#000"
@@ -244,6 +300,12 @@ export function FloatingSpiderman3D({ height = 500 }: FloatingSpiderman3DProps) 
           @keyframes spiderShadowPulse {
             0%,100%{opacity:.7;transform:translateX(-50%) scaleX(1)}
             50%{opacity:1;transform:translateX(-50%) scaleX(.85)}
+          }
+          @keyframes spiderShadowCelebrate {
+            0%,100%{opacity:.6;transform:translateX(-50%) scaleX(1)}
+            25%{opacity:1;transform:translateX(-50%) scaleX(0.5)}
+            50%{opacity:.9;transform:translateX(-50%) scaleX(1.4)}
+            75%{opacity:1;transform:translateX(-50%) scaleX(0.55)}
           }
         `}</style>
       </div>

@@ -157,7 +157,7 @@ export default function Landing() {
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
 
-  const [spiderPhase, setSpiderPhase] = useState<"hidden"|"fall"|"bounce"|"standup"|"look"|"ready">("hidden");
+  const [spiderPhase, setSpiderPhase] = useState<"hidden"|"fall"|"bounce"|"standup"|"look"|"ready"|"waiting"|"celebrate">("hidden");
   const [formSlideIn, setFormSlideIn] = useState(false);
   const [formFieldsIn, setFormFieldsIn] = useState(false);
   const [showLaptop, setShowLaptop] = useState(false);
@@ -172,6 +172,13 @@ export default function Landing() {
 
   const CF = (field: keyof typeof contactForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setContactForm(f => ({ ...f, [field]: e.target.value }));
+
+  // Visme-style "waiting" phase: Spider-Man reads attentively when user starts filling the form
+  useEffect(() => {
+    if (spiderPhase !== "ready") return;
+    const hasInput = Object.values(contactForm).some(v => String(v).trim() !== "");
+    if (hasInput) setSpiderPhase("waiting");
+  }, [contactForm, spiderPhase]);
 
   const toggleService = (s: string) =>
     setContactServices(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
@@ -320,6 +327,7 @@ export default function Landing() {
       }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? (content?.errorMessages?.sendFail ?? "Error al enviar"));
+      setSpiderPhase("celebrate");
       setContactStatus("sent");
     } catch (err: unknown) {
       setContactStatus("error");
@@ -1256,7 +1264,7 @@ export default function Landing() {
               background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(200,168,75,0.06) 0%, transparent 70%)",
             }} />
           </div>
-          <div className="fp-content" style={{ maxWidth: 900, padding: "0 24px" }}>
+          <div className="fp-content fp-contact-visme" style={{ maxWidth: 1120, padding: "0 24px" }}>
             <div className={`fp-section-header ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
               <div className="l-pill" style={{ background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)" }} onClick={cmsClick("contact.pill")} {...cmsData("contact.pill")}>{content.contact?.pill ?? "Trabaja con nosotros"}</div>
               <h2 className="l-h2" onClick={cmsClick("contact.headline")} {...cmsData("contact.headline")}>{content.contact?.headline ?? "Cuéntanos sobre tu negocio."}<br /><em>{content.contact?.headlineHighlight ?? "Te contactamos en menos de 24h."}</em></h2>
@@ -1268,13 +1276,13 @@ export default function Landing() {
               <div className={`sc-web-line${webLine ? " active" : ""}`}></div>
               <div className={`sc-figure${spiderPhase !== "hidden" ? ` phase-${spiderPhase}` : ""}`}>
                 <div className={`sc-speech-bubble${showBubble ? " show" : ""}`}>
-                  {spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
+                  {spiderPhase === "celebrate" ? "🎉 ¡Información recibida!" : spiderPhase === "waiting" ? "📝 Leyendo tu negocio…" : spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
                 </div>
                 {spiderPhase !== "hidden" ? (
                   <Suspense fallback={
                     <div style={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, filter: "drop-shadow(0 8px 24px rgba(200,0,0,0.35))" }}>🕷️</div>
                   }>
-                    <FloatingSpiderman3D height={220} />
+                    <FloatingSpiderman3D height={220} spiderPhase={spiderPhase === "waiting" ? "waiting" : spiderPhase === "celebrate" ? "celebrate" : "ready"} />
                   </Suspense>
                 ) : (
                   <div style={{ width: 220, height: 220 }} />
@@ -1293,7 +1301,9 @@ export default function Landing() {
               </div>
               {spiderPhase !== "hidden" && (
                 <p style={{ fontSize: 11.5, color: "rgba(200,168,75,0.45)", marginTop: 12, fontStyle: "italic", textAlign: "center" }}>
-                  {(spiderPhase === "fall" || spiderPhase === "bounce") ? "🕸️ ¡Tu experto IA ha llegado!" :
+                  {spiderPhase === "celebrate" ? "🚀 ¡Misión completada! Analizando tu negocio con IA…" :
+                   spiderPhase === "waiting" ? "🧠 Spider-Man está procesando tu información…" :
+                   (spiderPhase === "fall" || spiderPhase === "bounce") ? "🕸️ ¡Tu experto IA ha llegado!" :
                    (spiderPhase === "standup" || spiderPhase === "look") ? "🔍 Analizando oportunidades de negocio…" :
                    showLaptop ? "💻 Rellena el formulario y te contactamos en 24h" : ""}
                 </p>

@@ -4160,7 +4160,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             try {
               const headers = await getShopifyHeaders(parseInt(projectId));
               const domain = normalizeShopDomain(project.shopDomain);
-              const countRes = await fetch(`https://${domain}/admin/api/2025-01/products/count.json`, {
+              const countRes = await fetch(`https://${domain}/admin/api/2026-01/products/count.json`, {
                 headers,
                 signal: AbortSignal.timeout(10000),
               });

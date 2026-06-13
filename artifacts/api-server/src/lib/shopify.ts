@@ -127,7 +127,7 @@ export async function shopifyRequest<T>(
 ): Promise<T> {
   const domain = normalizeShopDomain(shopDomain);
   const headers = await getShopifyHeaders(projectId);
-  const url = `https://${domain}/admin/api/2025-01${path}`;
+  const url = `https://${domain}/admin/api/2026-01${path}`;
 
   const doFetch = (hdrs: Record<string, string>) => () =>
     fetch(url, {
@@ -168,7 +168,7 @@ export async function shopifyRequestPaged<T>(
 ): Promise<{ data: T; nextPageInfo: string | null }> {
   const domain = normalizeShopDomain(shopDomain);
   const hdrs = await getShopifyHeaders(projectId);
-  const url = `https://${domain}/admin/api/2025-01${path}`;
+  const url = `https://${domain}/admin/api/2026-01${path}`;
 
   const doPagedFetch = async (fetchHeaders: Record<string, string>): Promise<{ data: T; nextPageInfo: string | null }> => {
     let lastResp: Response | null = null;
@@ -278,7 +278,7 @@ export async function shopifyGraphQL<T = Record<string, unknown>>(
 ): Promise<T> {
   const domain = normalizeShopDomain(shopDomain);
   const headers = await getShopifyHeaders(projectId);
-  const url = `https://${domain}/admin/api/2025-01/graphql.json`;
+  const url = `https://${domain}/admin/api/2026-01/graphql.json`;
 
   let retried401 = false;
   const doFetch = async (hdrs: Record<string, string>): Promise<T> => {
