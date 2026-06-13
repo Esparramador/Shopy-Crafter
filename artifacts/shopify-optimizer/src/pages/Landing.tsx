@@ -3,8 +3,8 @@ import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import "./landing.css";
 
-const FloatingSpiderman3D = lazy(() =>
-  import("@/components/FloatingSpiderman3D").then(m => ({ default: m.FloatingSpiderman3D }))
+const FloatingAlecMonopoly = lazy(() =>
+  import("@/components/FloatingAlecMonopoly3D").then(m => ({ default: m.FloatingAlecMonopoly }))
 );
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -866,10 +866,10 @@ export default function Landing() {
                         <div style={{ width: 48, height: 48, borderRadius: "50%", border: "3px solid rgba(200,168,75,0.3)", borderTopColor: "#c8a84b", animation: "spin 1s linear infinite" }} />
                       </div>
                     }>
-                      <FloatingSpiderman3D height={520} />
+                      <FloatingAlecMonopoly height={520} phase="ready" />
                     </Suspense>
                   ) : (
-                    <div style={{ width: "100%", height: 520, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 100, filter: "drop-shadow(0 20px 40px rgba(200,0,0,0.25))" }}>🕷️</div>
+                    <div style={{ width: "100%", height: 520, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 100, filter: "drop-shadow(0 20px 40px rgba(200,168,75,0.35))" }}>🎩</div>
                   )}
                 </>
               )}
@@ -1310,9 +1310,9 @@ export default function Landing() {
                 </div>
                 {spiderPhase !== "hidden" ? (
                   <Suspense fallback={
-                    <div style={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, filter: "drop-shadow(0 8px 24px rgba(200,0,0,0.35))" }}>🕷️</div>
+                    <div style={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, filter: "drop-shadow(0 20px 40px rgba(200,168,75,0.40))" }}>🎩</div>
                   }>
-                    <FloatingSpiderman3D height={220} spiderPhase={spiderPhase === "waiting" ? "waiting" : spiderPhase === "celebrate" ? "celebrate" : "ready"} />
+                    <FloatingAlecMonopoly height={220} phase={spiderPhase === "waiting" ? "waiting" : spiderPhase === "celebrate" ? "celebrate" : "ready"} />
                   </Suspense>
                 ) : (
                   <div style={{ width: 220, height: 220 }} />
