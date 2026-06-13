@@ -2546,3 +2546,154 @@
   from { transform: scale(1); filter: brightness(1); }
   to   { transform: scale(1.15); filter: brightness(1.3) drop-shadow(0 0 12px rgba(45,212,159,0.6)); }
 }
+
+/* ════════════════════════════════════════════════════════════
+   YOUTUBE-STYLE INTERACTIVE FORM: Spider-Man HEAD TRACKING
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Override: MUCH more dramatic "waiting" animation ── */
+.sc-figure.phase-waiting {
+  opacity: 1 !important;
+  animation: sc-watching 1.4s ease-in-out infinite !important;
+}
+@keyframes sc-watching {
+  0%, 100% { transform: translateY(0)    rotate(0deg)  scale(1);    }
+  18%       { transform: translateY(-11px) rotate(-7deg) scale(1.05); }
+  40%       { transform: translateY(-5px)  rotate(5deg)  scale(1.03); }
+  65%       { transform: translateY(-13px) rotate(-5deg) scale(1.07); }
+  82%       { transform: translateY(-8px)  rotate(4deg)  scale(1.04); }
+}
+
+/* ── Head element: transition on all focus states ── */
+.sc-head-el {
+  transition: transform 0.4s cubic-bezier(0.34, 1.1, 0.64, 1);
+}
+.sc-torso {
+  transition: transform 0.45s cubic-bezier(0.34, 1.1, 0.64, 1);
+}
+
+/* ── Head looks RIGHT toward form when ANY field is focused ── */
+.sc-figure[data-focus]:not([data-focus=""]) .sc-head-el {
+  transform: rotate(10deg) translateX(20px);
+}
+.sc-figure[data-focus]:not([data-focus=""]) .sc-torso {
+  transform: translateX(7px) rotate(3deg);
+}
+
+/* ── Per-field Y tilt: top fields = lean up-right, bottom = lean down-right ── */
+.sc-figure[data-focus="name"]        .sc-head-el { transform: rotate(14deg) translateX(18px) translateY(-12px); }
+.sc-figure[data-focus="email"]       .sc-head-el { transform: rotate(12deg) translateX(19px) translateY(-7px); }
+.sc-figure[data-focus="phone"]       .sc-head-el { transform: rotate(10deg) translateX(20px) translateY(-3px); }
+.sc-figure[data-focus="storeUrl"]    .sc-head-el { transform: rotate(9deg)  translateX(21px) translateY(2px); }
+.sc-figure[data-focus="niche"]       .sc-head-el { transform: rotate(7deg)  translateX(22px) translateY(6px); }
+.sc-figure[data-focus="revenue"]     .sc-head-el { transform: rotate(6deg)  translateX(22px) translateY(9px); }
+.sc-figure[data-focus="socialMedia"] .sc-head-el { transform: rotate(5deg)  translateX(23px) translateY(13px); }
+.sc-figure[data-focus="extraInfo"]   .sc-head-el { transform: rotate(4deg)  translateX(24px) translateY(17px); }
+.sc-figure[data-focus="suppliers"]   .sc-head-el { transform: rotate(3deg)  translateX(24px) translateY(21px); }
+.sc-figure[data-focus="message"]     .sc-head-el { transform: rotate(2deg)  translateX(25px) translateY(24px); }
+
+/* ── Eyes shift toward form on focus ── */
+.sc-figure[data-focus]:not([data-focus=""]) .sc-eyes-el {
+  transform: translateX(calc(-50% + 7px)) !important;
+  transition: transform 0.3s ease;
+}
+
+/* ── Reset on blur ── */
+.sc-figure[data-focus=""] .sc-head-el    { transform: none; }
+.sc-figure[data-focus=""] .sc-torso      { transform: none; }
+.sc-figure[data-focus=""] .sc-eyes-el   { transform: translateX(-50%) !important; }
+
+/* ── INPUT FOCUS: gold glow ring (YouTube-style immediate feedback) ── */
+.fp-input-v2:focus {
+  outline: none !important;
+  border-color: rgba(200,168,75,0.7) !important;
+  background: rgba(200,168,75,0.06) !important;
+  box-shadow: 0 0 0 3px rgba(200,168,75,0.18), 0 2px 12px rgba(200,168,75,0.12) !important;
+  transform: translateY(-1px);
+  transition: all 0.2s cubic-bezier(0.34, 1.1, 0.64, 1) !important;
+}
+.fp-input-v2 {
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s !important;
+}
+
+/* ════════════════════════════════════
+   PROGRESS BAR
+   ════════════════════════════════════ */
+.fp-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 0 4px;
+}
+.fp-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.fp-progress-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.fp-progress-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: #c8a84b;
+  font-variant-numeric: tabular-nums;
+}
+.fp-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.fp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6b4a0f 0%, #c8a84b 50%, #f0d27a 100%);
+  border-radius: 99px;
+  transition: width 0.5s cubic-bezier(0.34, 1.1, 0.64, 1);
+  box-shadow: 0 0 8px rgba(200,168,75,0.5);
+}
+/* Milestone glow at 100% */
+.fp-progress-fill[style*="width: 100%"] {
+  box-shadow: 0 0 16px rgba(200,168,75,0.9), 0 0 32px rgba(200,168,75,0.4);
+  animation: progress-done-pulse 1.2s ease-in-out infinite;
+}
+@keyframes progress-done-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.75; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   sc-emoji-head: CSS-trackable emoji wrapper (CSSFallback)
+   Outer sc-figure handles bounce; this handles head tilt
+   ════════════════════════════════════════════════════════════ */
+.sc-emoji-head {
+  display: inline-block;
+  transform-origin: center bottom;
+  transition: transform 0.38s cubic-bezier(0.34, 1.15, 0.64, 1);
+}
+
+/* ── General: look toward form when ANY field active ── */
+.sc-figure[data-focus]:not([data-focus=""]) .sc-emoji-head {
+  transform: rotate(12deg) translateX(22px);
+}
+
+/* ── Per-field Y tilt (top row tilts up-right, bottom tilts down-right) ── */
+.sc-figure[data-focus="name"]        .sc-emoji-head { transform: rotate(16deg) translateX(20px) translateY(-14px) scale(1.06); }
+.sc-figure[data-focus="email"]       .sc-emoji-head { transform: rotate(13deg) translateX(22px) translateY(-8px)  scale(1.04); }
+.sc-figure[data-focus="phone"]       .sc-emoji-head { transform: rotate(11deg) translateX(22px) translateY(-3px)  scale(1.03); }
+.sc-figure[data-focus="storeUrl"]    .sc-emoji-head { transform: rotate(9deg)  translateX(24px) translateY(2px)   scale(1.03); }
+.sc-figure[data-focus="niche"]       .sc-emoji-head { transform: rotate(8deg)  translateX(24px) translateY(6px)   scale(1.02); }
+.sc-figure[data-focus="revenue"]     .sc-emoji-head { transform: rotate(7deg)  translateX(25px) translateY(10px)  scale(1.02); }
+.sc-figure[data-focus="socialMedia"] .sc-emoji-head { transform: rotate(5deg)  translateX(26px) translateY(14px)  scale(1.01); }
+.sc-figure[data-focus="extraInfo"]   .sc-emoji-head { transform: rotate(4deg)  translateX(26px) translateY(18px)  scale(1.01); }
+.sc-figure[data-focus="suppliers"]   .sc-emoji-head { transform: rotate(3deg)  translateX(27px) translateY(22px); }
+.sc-figure[data-focus="message"]     .sc-emoji-head { transform: rotate(2deg)  translateX(27px) translateY(25px); }
+
+/* ── Reset on idle ── */
+.sc-figure[data-focus=""] .sc-emoji-head {
+  transform: none;
+}

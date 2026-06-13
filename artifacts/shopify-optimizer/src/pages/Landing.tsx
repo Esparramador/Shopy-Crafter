@@ -162,6 +162,8 @@ export default function Landing() {
   const [formFieldsIn, setFormFieldsIn] = useState(false);
   const [showLaptop, setShowLaptop] = useState(false);
   const [showBubble, setShowBubble] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [formProgress, setFormProgress] = useState(0);
   const [webLine, setWebLine] = useState(false);
   const contactSectionRef = useRef<HTMLElement>(null);
   const heroSectionRef = useRef<HTMLElement>(null);
@@ -173,12 +175,28 @@ export default function Landing() {
   const CF = (field: keyof typeof contactForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setContactForm(f => ({ ...f, [field]: e.target.value }));
 
-  // Visme-style "waiting" phase: Spider-Man reads attentively when user starts filling the form
+  // Waiting phase: Spider-Man animates when user starts filling the form
   useEffect(() => {
     if (spiderPhase !== "ready") return;
     const hasInput = Object.values(contactForm).some(v => String(v).trim() !== "");
     if (hasInput) setSpiderPhase("waiting");
   }, [contactForm, spiderPhase]);
+
+  // Live progress counter: % of form filled
+  useEffect(() => {
+    const vals = Object.values(contactForm);
+    const filled = vals.filter(v => String(v).trim() !== "").length;
+    setFormProgress(Math.round((filled / vals.length) * 100));
+  }, [contactForm]);
+
+  // Field focus handler: head tracks focused field + triggers waiting
+  const handleFF = useCallback((field: string) => ({
+    onFocus: () => {
+      setFocusedField(field);
+      if (spiderPhase === "ready") setSpiderPhase("waiting");
+    },
+    onBlur: () => setFocusedField(null),
+  }), [spiderPhase]);
 
   const toggleService = (s: string) =>
     setContactServices(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
@@ -1274,9 +1292,21 @@ export default function Landing() {
             {/* ── SPIDER-MAN CHARACTER STAGE ── */}
             <div className="sc-stage-wrap">
               <div className={`sc-web-line${webLine ? " active" : ""}`}></div>
-              <div className={`sc-figure${spiderPhase !== "hidden" ? ` phase-${spiderPhase}` : ""}`}>
-                <div className={`sc-speech-bubble${showBubble ? " show" : ""}`}>
-                  {spiderPhase === "celebrate" ? "🎉 ¡Información recibida!" : spiderPhase === "waiting" ? "📝 Leyendo tu negocio…" : spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
+              <div className={`sc-figure${spiderPhase !== "hidden" ? ` phase-${spiderPhase}` : ""}`} data-focus={focusedField ?? ""}>
+                <div className={`sc-speech-bubble${(showBubble || focusedField !== null) ? " show" : ""}`}>
+                  {focusedField === "name" ? "💬 ¿Cómo te llamas?" :
+                   focusedField === "email" ? "📧 ¡Te escribiremos aquí!" :
+                   focusedField === "phone" ? "📞 Para contactarte directamente" :
+                   focusedField === "storeUrl" ? "🔍 ¡Voy a analizar tu tienda!" :
+                   focusedField === "niche" ? "🎯 Clave para personalizar el SEO" :
+                   focusedField === "revenue" ? "💰 Para calibrar la estrategia IA" :
+                   focusedField === "socialMedia" ? "📱 Tu presencia social importa" :
+                   focusedField === "extraInfo" ? "📝 ¡Cuéntame todo!" :
+                   focusedField === "suppliers" ? "🏭 Perfecto para el análisis de nicho" :
+                   focusedField === "message" ? "💡 Cualquier detalle ayuda" :
+                   spiderPhase === "celebrate" ? "🎉 ¡Información recibida!" :
+                   spiderPhase === "waiting" ? "👀 Leyendo tu negocio…" :
+                   spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
                 </div>
                 {spiderPhase !== "hidden" ? (
                   <Suspense fallback={
@@ -1329,13 +1359,13 @@ export default function Landing() {
                       <label className="fp-field-label">{content.contact?.labels?.name ?? "Nombre completo *"}</label>
                       <input type="text" required value={contactForm.name} onChange={CF("name")}
                         placeholder={content.contact?.placeholders?.name ?? "Tu nombre y apellidos"}
-                        className="fp-input-v2" />
+                        className="fp-input-v2" {...handleFF("name")} />
                     </div>
                     <div>
                       <label className="fp-field-label">{content.contact?.labels?.email ?? "Email de contacto *"}</label>
                       <input type="email" required value={contactForm.email} onChange={CF("email")}
                         placeholder={content.contact?.placeholders?.email ?? "tu@email.com"}
-                        className="fp-input-v2" />
+                        className="fp-input-v2" {...handleFF("email")} />
                     </div>
                   </div>
 
@@ -1346,7 +1376,7 @@ export default function Landing() {
                       <input
                         type="tel" value={contactForm.phone} onChange={CF("phone")}
                         placeholder={content.contact?.placeholders?.phone ?? "+34 600 000 000"}
-                        className="fp-input-v2"
+                        className="fp-input-v2" {...handleFF("phone")}
                       />
                     </div>
                     <div>
@@ -1354,7 +1384,7 @@ export default function Landing() {
                       <input
                         type="text" value={contactForm.storeUrl} onChange={CF("storeUrl")}
                         placeholder={content.contact?.placeholders?.storeUrl ?? "mitienda.com"}
-                        className="fp-input-v2"
+                        className="fp-input-v2" {...handleFF("storeUrl")}
                       />
                     </div>
                   </div>
@@ -1365,7 +1395,7 @@ export default function Landing() {
                       <label className="fp-field-label">{content.contact?.labels?.niche ?? "Nicho / tipo de productos"}</label>
                       <select
                         value={contactForm.niche} onChange={CF("niche")}
-                        className="fp-input-v2"
+                        className="fp-input-v2" {...handleFF("niche")}
                       >
                         <option value="">{content.contact?.placeholders?.niche ?? "Selecciona tu nicho"}</option>
                         {(Array.isArray(content.contact?.nicheOptions) ? content.contact!.nicheOptions : ["Moda y ropa", "Electrónica y gadgets", "Hogar y decoración", "Belleza y cosmética", "Deporte y fitness", "Alimentación y gourmet", "Arte y coleccionismo", "Mascotas", "Joyería y accesorios", "Otro"]).map(o => (
@@ -1387,7 +1417,7 @@ export default function Landing() {
                       <label className="fp-field-label">{content.contact?.labels?.revenue ?? "Facturación mensual aprox."}</label>
                       <select
                         value={contactForm.revenue} onChange={CF("revenue")}
-                        className="fp-input-v2"
+                        className="fp-input-v2" {...handleFF("revenue")}
                       >
                         <option value="">{content.contact?.placeholders?.revenue ?? "Selecciona rango"}</option>
                         {(Array.isArray(content.contact?.revenueOptions) ? content.contact!.revenueOptions : ["Menos de €1.000", "€1.000 – €5.000", "€5.000 – €15.000", "€15.000 – €50.000", "Más de €50.000"]).map(o => (
@@ -1403,7 +1433,7 @@ export default function Landing() {
                     <input
                       type="text" value={contactForm.socialMedia} onChange={CF("socialMedia")}
                       placeholder={content.contact?.socialPlaceholder ?? "@tutienda o https://instagram.com/tutienda"}
-                      className="fp-input-v2"
+                      className="fp-input-v2" {...handleFF("socialMedia")}
                     />
                   </div>
 
@@ -1413,7 +1443,7 @@ export default function Landing() {
                     <textarea
                       rows={3} value={contactForm.extraInfo} onChange={CF("extraInfo")}
                       placeholder={"Numero de productos, tipos (tallas, colores, materiales...), plataformas que usas, retos actuales, objetivos a corto plazo, cualquier detalle relevante..."}
-                      className="fp-input-v2"
+                      className="fp-input-v2" {...handleFF("extraInfo")}
                     />
                   </div>
 
@@ -1426,7 +1456,7 @@ export default function Landing() {
                     <textarea
                       rows={2} value={contactForm.suppliers} onChange={CF("suppliers")}
                       placeholder={"Ej: Alibaba, BigBuy, Printful, proveedor local de Barcelona... Separa con comas si son varios"}
-                      className="fp-input-v2"
+                      className="fp-input-v2" {...handleFF("suppliers")}
                     />
                     <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 4 }}>Si nos indicas tus proveedores, compararemos sus precios con alternativas y estimaremos el revenue potencial</p>
                   </div>
@@ -1503,7 +1533,7 @@ export default function Landing() {
                     <textarea
                       rows={3} value={contactForm.message} onChange={CF("message")}
                       placeholder={content.contact?.placeholders?.message ?? "Cuéntanos más sobre tu tienda, tus retos actuales o lo que quieres conseguir…"}
-                      className="fp-input-v2"
+                      className="fp-input-v2" {...handleFF("message")}
                     />
                   </div>
 
@@ -1518,6 +1548,17 @@ export default function Landing() {
                     <p style={{ margin: 0, fontSize: 12, color: "var(--t3)", lineHeight: 1.5 }}>
                       Tus datos se usan exclusivamente para contactarte sobre tu proyecto. No compartimos información con terceros. Si subes una imagen de producto, nuestro equipo la analizará manualmente para preparar tu muestra gratuita personalizada.
                     </p>
+                  </div>
+
+                  {/* ── Progress bar ── */}
+                  <div className="fp-progress-wrap">
+                    <div className="fp-progress-header">
+                      <span className="fp-progress-label">Formulario completado</span>
+                      <span className="fp-progress-pct">{formProgress}%</span>
+                    </div>
+                    <div className="fp-progress-track">
+                      <div className="fp-progress-fill" style={{ width: `${formProgress}%` }} />
+                    </div>
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>

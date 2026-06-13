@@ -182,52 +182,37 @@ function SpidermanModel({ phase }: { phase: Spider3DPhase }) {
 
 /* ── CSS fallback ───────────────────────────────────────────────────────── */
 function CSSFallback({ height, phase }: { height: number; phase: Spider3DPhase }) {
-  const anim = phase === "celebrate"
-    ? "spiderCSSCelebrate 0.5s ease-in-out infinite"
+  // Outer sc-figure handles all phase animations (sc-watching, sc-victory-dance etc.)
+  // Inner sc-emoji-head is the CSS-trackable element that tilts toward focused fields
+  const label = phase === "celebrate"
+    ? "🎉 ¡MISIÓN CUMPLIDA!"
     : phase === "waiting"
-    ? "spiderCSSWait 3s ease-in-out infinite"
-    : "spiderFloatCSS 3s ease-in-out infinite";
-
-  const label = phase === "celebrate" ? "¡MISIÓN CUMPLIDA!" : phase === "waiting" ? "Leyendo tu info…" : "Spiderman 3D";
+    ? "👀 LEYENDO TU INFO…"
+    : "SPIDERMAN 3D";
 
   return (
     <div style={{
       width: "100%", height,
       display: "flex", alignItems: "center", justifyContent: "center",
-      position: "relative", overflow: "hidden",
+      position: "relative",
     }}>
       <div style={{
         position: "absolute", inset: 0,
-        background: "radial-gradient(ellipse 70% 60% at 50% 38%, rgba(200,50,50,0.07) 0%, transparent 70%)",
+        background: "radial-gradient(ellipse 70% 60% at 50% 38%, rgba(200,50,50,0.08) 0%, transparent 70%)",
         pointerEvents: "none",
       }} />
       <div style={{ textAlign: "center" }}>
-        <div style={{
-          fontSize: 130, lineHeight: 1,
-          filter: "drop-shadow(0 24px 48px rgba(200,0,0,0.28))",
-          animation: anim,
+        {/* sc-emoji-head: targeted by CSS data-focus head-tracking rules */}
+        <div className="sc-emoji-head" style={{
+          fontSize: 130, lineHeight: 1, display: "inline-block",
+          filter: "drop-shadow(0 24px 48px rgba(200,0,0,0.32))",
+          transformOrigin: "center bottom",
         }}>🕷️</div>
         <div style={{
-          marginTop: 14, fontSize: 13, fontWeight: 700, letterSpacing: 3,
+          marginTop: 14, fontSize: 12, fontWeight: 700, letterSpacing: 3,
           color: "rgba(200,168,75,0.65)", textTransform: "uppercase",
         }}>{label}</div>
       </div>
-      <style>{`
-        @keyframes spiderFloatCSS {
-          0%,100%{transform:translateY(0) rotate(-3deg)}
-          50%{transform:translateY(-20px) rotate(3deg)}
-        }
-        @keyframes spiderCSSWait {
-          0%,100%{transform:translateY(0) scale(1)}
-          50%{transform:translateY(-4px) scale(1.02,0.99)}
-        }
-        @keyframes spiderCSSCelebrate {
-          0%,100%{transform:translateY(0) scale(1) rotate(0deg)}
-          25%{transform:translateY(-22px) scale(0.9,1.15) rotate(-12deg)}
-          50%{transform:translateY(4px) scale(1.12,0.88) rotate(0deg)}
-          75%{transform:translateY(-14px) scale(0.92,1.1) rotate(12deg)}
-        }
-      `}</style>
     </div>
   );
 }
