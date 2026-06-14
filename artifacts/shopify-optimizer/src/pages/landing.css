@@ -1043,9 +1043,9 @@
 .fp-pricing-card .l-pricing-period { margin-bottom: 6px !important; font-size: 10px !important; }
 .fp-pricing-card .l-pricing-divider { margin-bottom: 6px !important; }
 .fp-pricing-card .l-pricing-features {
-  gap: 4px !important;
+  gap: 3px !important;
   margin-bottom: 10px !important;
-  max-height: calc(100dvh - 400px);
+  max-height: 150px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(200,168,75,0.2) transparent;
@@ -2480,16 +2480,14 @@
     grid-row: 1;
   }
 
-  /* Spider-Man panel: left column, sticky, with Visme clip-path trick */
+  /* Batman panel: left column, sticky */
   .fp-contact-visme .sc-stage-wrap {
     grid-column: 1;
     grid-row: 2;
     position: sticky;
     top: 80px;
     align-self: start;
-    /* Visme clip-path trick: -8% allows slight overflow on left side (emergencia) */
-    clip-path: inset(0% -8% 0% 0%);
-    transition: clip-path 0.6s ease;
+    overflow: visible;
   }
 
   /* Form panel: right column */
@@ -2499,21 +2497,15 @@
     grid-row: 2;
   }
 
-  /* Expand clip to full view once spider is ready */
-  .fp-contact-visme .sc-stage-wrap:has(.phase-ready),
-  .fp-contact-visme .sc-stage-wrap:has(.phase-waiting),
-  .fp-contact-visme .sc-stage-wrap:has(.phase-celebrate) {
-    clip-path: inset(0% -8% 0% -5%);
+  /* Footer: full width, row 3 — FIXES the overlap bug */
+  .fp-contact-visme .fp-footer {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
   }
 
-  /* sc-figure sizing on side-panel */
-  .fp-contact-visme .sc-figure {
-    width: 100%;
-  }
-
-  /* Spider canvas height adjustment for side panel */
-  .fp-contact-visme .sc-figure canvas {
-    max-height: 340px;
+  /* Batman scene sizing in side panel */
+  .fp-contact-visme .bat-scene {
+    min-height: 300px;
   }
 }
 
@@ -2910,3 +2902,433 @@
 
 /* Inherit all sc-figure phase animations (drop-in, bounce, look etc.)
    and sc-emoji-head head-tracking rules */
+
+/* ═══════════════════════════════════════════════════════════════
+   HERO VISUAL FLOAT — Stats cards (replaces 3D hat)
+   ═══════════════════════════════════════════════════════════════ */
+.hero-visual-float {
+  position: relative;
+  width: 260px;
+  height: 240px;
+  pointer-events: none;
+}
+.hv-glow {
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(ellipse, rgba(200,168,75,0.07) 0%, transparent 65%);
+  filter: blur(20px);
+  pointer-events: none;
+}
+.hv-card {
+  position: absolute;
+  background: rgba(14,14,24,0.88);
+  border: 1px solid rgba(200,168,75,0.2);
+  border-radius: 14px;
+  padding: 14px 18px;
+  text-align: center;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(200,168,75,0.04);
+}
+.hv-icon { font-size: 18px; margin-bottom: 5px; }
+.hv-num {
+  font-family: var(--l-fh);
+  font-size: 22px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f0d070, #c8a84b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.hv-label { font-size: 9.5px; color: var(--l-t3); text-transform: uppercase; letter-spacing: 1px; }
+.hv-c1 { top: 15px; left: 0; animation: hv-float1 5s ease-in-out infinite; }
+.hv-c2 { top: 0; right: 0; animation: hv-float1 5.5s ease-in-out 1.2s infinite; }
+.hv-c3 {
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  animation: hv-float3 4.8s ease-in-out 2.4s infinite;
+}
+@keyframes hv-float1 {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+@keyframes hv-float3 {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%       { transform: translateX(-50%) translateY(-12px); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BATMAN SCENE — Contact Section Character (100% CSS, no WebGL)
+   Timeline: walk(0-2.5s) → look(2.5-4.3s) → spotlight(3.8s+) → SC(4.8s+)
+   ═══════════════════════════════════════════════════════════════ */
+
+.bat-scene {
+  position: relative;
+  width: 100%;
+  min-height: 260px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+/* Ground glow line */
+.bat-ground {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(200,168,75,0.35) 40%, rgba(200,168,75,0.35) 60%, transparent 100%);
+  pointer-events: none;
+}
+.bat-ground::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 15%;
+  right: 15%;
+  height: 14px;
+  background: radial-gradient(ellipse, rgba(200,168,75,0.1) 0%, transparent 100%);
+  filter: blur(5px);
+}
+
+/* ── Batman wrapper — walks in from left ── */
+.bat-man {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 2;
+  animation:
+    bat-walk-in 2.2s cubic-bezier(0.22, 0.61, 0.36, 1) 0.3s both,
+    bat-idle-breathe 3.2s ease-in-out 3.5s infinite;
+}
+
+@keyframes bat-walk-in {
+  0%   { transform: translateX(-420px); }
+  62%  { transform: translateX(10px); }
+  76%  { transform: translateX(-7px); }
+  88%  { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes bat-idle-breathe {
+  0%, 100% { transform: translateX(0) translateY(0) scale(1); }
+  50%       { transform: translateX(0) translateY(-4px) scale(1.012); }
+}
+
+/* ── Cape (behind figure) ── */
+.bat-cape {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 124px;
+  height: 108px;
+  background: linear-gradient(175deg, #060610 0%, #04040c 100%);
+  clip-path: polygon(22% 0%, 78% 0%, 102% 100%, -2% 100%);
+  z-index: 1;
+  animation: bat-cape-billow 3.8s ease-in-out 2.5s infinite alternate;
+}
+
+@keyframes bat-cape-billow {
+  0%   { clip-path: polygon(22% 0%, 78% 0%, 104% 100%, -4% 100%); }
+  50%  { clip-path: polygon(18% 0%, 82% 0%, 110% 100%, -10% 100%); }
+  100% { clip-path: polygon(25% 0%, 75% 0%, 100% 100%, 0% 100%); }
+}
+
+/* ── Figure stack ── */
+.bat-figure {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+}
+
+/* Head with pointy ears */
+.bat-head {
+  width: 42px;
+  height: 34px;
+  background: #08080f;
+  border-radius: 44% 44% 32% 32%;
+  position: relative;
+  animation: bat-head-look 2s ease-in-out 2.6s;
+}
+
+.bat-head::before,
+.bat-head::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+.bat-head::before {
+  left: 4px;
+  border-width: 0 9px 22px 9px;
+  border-color: transparent transparent #08080f transparent;
+}
+.bat-head::after {
+  right: 4px;
+  border-width: 0 9px 22px 9px;
+  border-color: transparent transparent #08080f transparent;
+}
+
+@keyframes bat-head-look {
+  0%   { transform: rotate(0deg) translateX(0); }
+  16%  { transform: rotate(-20deg) translateX(-6px); }
+  40%  { transform: rotate(20deg) translateX(7px); }
+  60%  { transform: rotate(-11deg) translateX(-3px); }
+  80%  { transform: rotate(9deg) translateX(3px); }
+  100% { transform: rotate(0deg) translateX(0); }
+}
+
+/* White eye strip */
+.bat-eyes {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 5px;
+  background: rgba(255,255,255,0.78);
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(255,255,255,0.4);
+}
+
+/* Torso */
+.bat-torso {
+  width: 56px;
+  height: 52px;
+  background: linear-gradient(180deg, #0d0d1e 0%, #070710 100%);
+  clip-path: polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -2px;
+  z-index: 2;
+  position: relative;
+}
+
+.bat-symbol {
+  font-size: 18px;
+  filter: drop-shadow(0 0 4px rgba(200,168,75,0.45));
+  animation: bat-chest-pulse 2s ease-in-out 4s infinite alternate;
+}
+
+@keyframes bat-chest-pulse {
+  from { filter: drop-shadow(0 0 4px rgba(200,168,75,0.3)); }
+  to   { filter: drop-shadow(0 0 14px rgba(200,168,75,0.95)) brightness(1.25); }
+}
+
+/* Gold belt */
+.bat-belt {
+  width: 54px;
+  height: 9px;
+  background: linear-gradient(90deg, #9a7020, #e6c668, #f5d88a, #e6c668, #9a7020);
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 10px rgba(200,168,75,0.5);
+}
+.bat-belt::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  background: #e6c668;
+  border-radius: 3px;
+  box-shadow: 0 0 10px rgba(200,168,75,1);
+}
+
+/* Legs */
+.bat-legs {
+  display: flex;
+  gap: 5px;
+  z-index: 2;
+  position: relative;
+}
+
+.bat-leg {
+  width: 20px;
+  height: 44px;
+  background: #08080f;
+  border-radius: 0 0 6px 6px;
+  transform-origin: top center;
+}
+
+.bat-leg-l {
+  animation: bat-leg-l-walk 0.4s ease-in-out 0.4s 5 alternate both;
+}
+.bat-leg-r {
+  animation: bat-leg-r-walk 0.4s ease-in-out 0.4s 5 alternate-reverse both;
+}
+
+@keyframes bat-leg-l-walk {
+  0%   { transform: rotate(-12deg); }
+  100% { transform: rotate(12deg); }
+}
+@keyframes bat-leg-r-walk {
+  0%   { transform: rotate(12deg); }
+  100% { transform: rotate(-12deg); }
+}
+
+/* ── SPOTLIGHT / BAT-SIGNAL ── */
+.bat-spotlight {
+  position: absolute;
+  top: 0;
+  right: 6%;
+  width: 160px;
+  height: 250px;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: top center;
+  animation: bat-spot-fade-in 1.3s ease-out 3.8s both;
+  z-index: 1;
+}
+
+@keyframes bat-spot-fade-in {
+  0%   { opacity: 0; transform: scaleY(0.35) translateY(-30px); }
+  60%  { opacity: 1; transform: scaleY(1.05) translateY(4px); }
+  100% { opacity: 1; transform: scaleY(1) translateY(0); }
+}
+
+/* Cone beam (border triangle) */
+.bat-beam {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 72px solid transparent;
+  border-right: 72px solid transparent;
+  border-top: 215px solid rgba(255,244,155,0.10);
+  filter: blur(12px);
+}
+/* Inner bright core */
+.bat-beam::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -33px;
+  width: 0;
+  height: 0;
+  border-left: 33px solid transparent;
+  border-right: 33px solid transparent;
+  border-top: 215px solid rgba(255,252,210,0.14);
+  filter: blur(6px);
+}
+
+/* Glow oval at source (top) */
+.bat-beam::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -30px;
+  width: 60px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255,255,200,0.45);
+  filter: blur(6px);
+}
+
+/* Signal circle at bottom of beam */
+.bat-signal-circle {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 88px;
+  height: 58px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+    rgba(255,252,180,0.22) 0%,
+    rgba(200,168,75,0.07) 55%,
+    transparent 80%
+  );
+  border: 1.5px solid rgba(200,168,75,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: bat-sc-pop 0.75s cubic-bezier(0.34,1.25,0.64,1) 4.9s both;
+  box-shadow:
+    0 0 22px rgba(200,168,75,0.28),
+    inset 0 0 18px rgba(200,168,75,0.09);
+}
+
+@keyframes bat-sc-pop {
+  0%   { opacity: 0; transform: translateX(-50%) scale(0.35) rotate(-12deg); }
+  68%  { transform: translateX(-50%) scale(1.14) rotate(2deg); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1) rotate(0deg); }
+}
+
+.bat-signal-sc {
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  color: #e6c668;
+  text-shadow:
+    0 0 8px rgba(255,244,100,0.95),
+    0 0 20px rgba(200,168,75,0.75),
+    0 0 45px rgba(200,168,75,0.45);
+  animation: bat-sc-shine 2s ease-in-out 5.8s infinite alternate;
+  font-family: var(--l-fh, Georgia, serif);
+}
+
+@keyframes bat-sc-shine {
+  from {
+    text-shadow: 0 0 8px rgba(255,244,100,0.95), 0 0 20px rgba(200,168,75,0.75), 0 0 45px rgba(200,168,75,0.45);
+    letter-spacing: 5px;
+  }
+  to {
+    text-shadow: 0 0 14px rgba(255,255,210,1), 0 0 35px rgba(200,168,75,1), 0 0 80px rgba(200,168,75,0.65);
+    letter-spacing: 6px;
+  }
+}
+
+/* ── Speech bubble positioning for Batman panel ── */
+.bat-bubble {
+  position: absolute;
+  bottom: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 10;
+}
+
+/* ── Celebrate state ── */
+.bat-celebrate .bat-man {
+  animation:
+    bat-walk-in 2.2s cubic-bezier(0.22, 0.61, 0.36, 1) 0.3s both,
+    bat-celebrate-jump 0.55s ease-in-out 3s infinite alternate;
+}
+@keyframes bat-celebrate-jump {
+  0%   { transform: translateY(0) scale(1); }
+  100% { transform: translateY(-14px) scale(1.06); }
+}
+
+/* ── Form staggered build animation ── */
+.fp-contact-form-v2.fields-in > * {
+  animation: form-field-emerge 0.42s ease-out both;
+}
+.fp-contact-form-v2.fields-in > *:nth-child(1) { animation-delay: 0.08s; }
+.fp-contact-form-v2.fields-in > *:nth-child(2) { animation-delay: 0.22s; }
+.fp-contact-form-v2.fields-in > *:nth-child(3) { animation-delay: 0.36s; }
+.fp-contact-form-v2.fields-in > *:nth-child(4) { animation-delay: 0.50s; }
+.fp-contact-form-v2.fields-in > *:nth-child(5) { animation-delay: 0.65s; }
+.fp-contact-form-v2.fields-in > *:nth-child(6) { animation-delay: 0.80s; }
+.fp-contact-form-v2.fields-in > *:nth-child(7) { animation-delay: 0.96s; }
+.fp-contact-form-v2.fields-in > *:nth-child(8) { animation-delay: 1.12s; }
+.fp-contact-form-v2.fields-in > *:nth-child(n+9) { animation-delay: 1.28s; }
+
+@keyframes form-field-emerge {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}

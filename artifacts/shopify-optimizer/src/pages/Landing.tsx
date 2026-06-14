@@ -840,28 +840,24 @@ export default function Landing() {
                   <img src={`${API_BASE_LANDING}${content.hero.imageUrl}`} alt="Hero" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }} />
                 </div>
               ) : (
-                <>
-                  <div style={{
-                    position: "absolute", top: -40, right: -20, width: 200, height: 200,
-                    borderRadius: "50%", pointerEvents: "none", zIndex: 0,
-                    background: "radial-gradient(ellipse, rgba(200,168,75,0.08) 0%, transparent 70%)",
-                    filter: "blur(30px)",
-                  }} />
-                  <div className="hero-alec-css">
-                    <div className="hero-alec-glow" />
-                    <div className="hero-alec-emoji">🎩</div>
-                    <div className="hero-alec-rings">
-                      <div className="hero-alec-ring r1" />
-                      <div className="hero-alec-ring r2" />
-                      <div className="hero-alec-ring r3" />
-                    </div>
-                    <div className="hero-alec-particles">
-                      {["💰","📈","🛒","✨","🚀","💎"].map((e, i) => (
-                        <span key={i} className={`hero-alec-particle p${i+1}`}>{e}</span>
-                      ))}
-                    </div>
+                <div className="hero-visual-float">
+                  <div className="hv-glow" />
+                  <div className="hv-card hv-c1">
+                    <div className="hv-icon">📈</div>
+                    <div className="hv-num">+340%</div>
+                    <div className="hv-label">Conversión</div>
                   </div>
-                </>
+                  <div className="hv-card hv-c2">
+                    <div className="hv-icon">⚡</div>
+                    <div className="hv-num">48h</div>
+                    <div className="hv-label">Configuración</div>
+                  </div>
+                  <div className="hv-card hv-c3">
+                    <div className="hv-icon">🎯</div>
+                    <div className="hv-num">7 IA</div>
+                    <div className="hv-label">Motores</div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1279,59 +1275,68 @@ export default function Landing() {
               <p className="l-sub" {...cmsProps("contact.subheadline")}>{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
             </div>
 
-            {/* ── SPIDER-MAN CHARACTER STAGE ── */}
+            {/* ── BATMAN CHARACTER STAGE ── */}
             <div className="sc-stage-wrap">
-              <div className={`sc-web-line${webLine ? " active" : ""}`}></div>
-              <div className={`sc-figure${spiderPhase !== "hidden" ? ` phase-${spiderPhase}` : ""}`} data-focus={focusedField ?? ""}>
-                <div className={`sc-speech-bubble${(showBubble || focusedField !== null) ? " show" : ""}`}>
-                  {focusedField === "name" ? "💬 ¿Cómo te llamas?" :
-                   focusedField === "email" ? "📧 ¡Te escribiremos aquí!" :
-                   focusedField === "phone" ? "📞 Para contactarte directamente" :
-                   focusedField === "storeUrl" ? "🔍 ¡Voy a analizar tu tienda!" :
-                   focusedField === "niche" ? "🎯 Clave para personalizar el SEO" :
-                   focusedField === "revenue" ? "💰 Para calibrar la estrategia IA" :
-                   focusedField === "socialMedia" ? "📱 Tu presencia social importa" :
-                   focusedField === "extraInfo" ? "📝 ¡Cuéntame todo!" :
-                   focusedField === "suppliers" ? "🏭 Perfecto para el análisis de nicho" :
-                   focusedField === "message" ? "💡 Cualquier detalle ayuda" :
-                   spiderPhase === "celebrate" ? "🎉 ¡Información recibida!" :
-                   spiderPhase === "waiting" ? "👀 Leyendo tu negocio…" :
-                   spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
-                </div>
+              <div className={`bat-scene${spiderPhase !== "hidden" ? " bat-active" : ""}${spiderPhase === "celebrate" ? " bat-celebrate" : ""}`}>
                 {spiderPhase !== "hidden" ? (
-                  <div className="alec-css-char">
-                    <div className="alec-css-glow" />
-                    <div
-                      className="sc-emoji-head alec-css-hat"
-                      style={{
-                        fontSize: spiderPhase === "celebrate" ? 96 : 88,
-                        filter: `drop-shadow(0 16px 32px rgba(200,168,75,${spiderPhase === "celebrate" ? "0.7" : "0.4"}))`,
-                      }}
-                    >
-                      {spiderPhase === "celebrate" ? "🎊" : "🎩"}
+                  <>
+                    {/* Speech bubble */}
+                    <div className={`sc-speech-bubble bat-bubble${(showBubble || focusedField !== null) ? " show" : ""}`}>
+                      {focusedField === "name" ? "💬 ¿Cómo te llamas?" :
+                       focusedField === "email" ? "📧 ¡Te escribiremos aquí!" :
+                       focusedField === "phone" ? "📞 Para contactarte directamente" :
+                       focusedField === "storeUrl" ? "🔍 ¡Voy a analizar tu tienda!" :
+                       focusedField === "niche" ? "🎯 Clave para personalizar el SEO" :
+                       focusedField === "revenue" ? "💰 Para calibrar la estrategia IA" :
+                       focusedField === "socialMedia" ? "📱 Tu presencia social importa" :
+                       focusedField === "extraInfo" ? "📝 ¡Cuéntame todo!" :
+                       focusedField === "suppliers" ? "🏭 Perfecto para el análisis de nicho" :
+                       focusedField === "message" ? "💡 Cualquier detalle ayuda" :
+                       spiderPhase === "celebrate" ? "🎉 ¡Información recibida!" :
+                       spiderPhase === "waiting" ? "👀 Leyendo tu negocio…" :
+                       spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "🦇 ¡Cuéntame tu negocio!"}
                     </div>
-                  </div>
-                ) : (
-                  <div style={{ width: 220, height: 220 }} />
-                )}
-                <div className={`sc-laptop-wrap${showLaptop ? " show" : ""}`}>
-                  <div className="sc-laptop-screen-outer">
-                    <div className="sc-laptop-screen-inner">
-                      <div className="sc-screen-scanlines"></div>
-                      <div className="sc-screen-code">
-                        {`const shop = await AI.analyze();\nconst roi = shop.optimize3x();\n// +340% conversión 🚀\nconst seo = AI.keywords(shop);\nshop.launch(roi, seo);\n// Shopify →→ PROFIT ✓`}
+
+                    {/* Batman CSS figure */}
+                    <div className="bat-man">
+                      <div className="bat-cape"></div>
+                      <div className="bat-figure">
+                        <div className="bat-head">
+                          <div className="bat-eyes"></div>
+                        </div>
+                        <div className="bat-torso">
+                          <span className="bat-symbol">🦇</span>
+                        </div>
+                        <div className="bat-belt"></div>
+                        <div className="bat-legs">
+                          <div className="bat-leg bat-leg-l"></div>
+                          <div className="bat-leg bat-leg-r"></div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="sc-laptop-base-el"></div>
-                </div>
+
+                    {/* Bat-Signal spotlight */}
+                    <div className="bat-spotlight">
+                      <div className="bat-beam"></div>
+                      <div className="bat-signal-circle">
+                        <span className="bat-signal-sc">SC</span>
+                      </div>
+                    </div>
+
+                    {/* Ground glow */}
+                    <div className="bat-ground"></div>
+                  </>
+                ) : (
+                  <div style={{ width: "100%", height: 260 }} />
+                )}
               </div>
+
               {spiderPhase !== "hidden" && (
                 <p style={{ fontSize: 11.5, color: "rgba(200,168,75,0.45)", marginTop: 12, fontStyle: "italic", textAlign: "center" }}>
                   {spiderPhase === "celebrate" ? "🚀 ¡Misión completada! Analizando tu negocio con IA…" :
-                   spiderPhase === "waiting" ? "🧠 Alec está procesando tu información…" :
-                   (spiderPhase === "fall" || spiderPhase === "bounce") ? "🎩 ¡Tu experto IA ha aterrizado!" :
-                   (spiderPhase === "standup" || spiderPhase === "look") ? "🔍 Analizando oportunidades de negocio…" :
+                   spiderPhase === "waiting" ? "🧠 Batman está analizando tu negocio…" :
+                   (spiderPhase === "fall" || spiderPhase === "bounce") ? "🦇 ¡Tu guardián IA ha llegado!" :
+                   (spiderPhase === "standup" || spiderPhase === "look") ? "🔍 Activando la Bat-señal Shopy Crafter…" :
                    showLaptop ? "💻 Rellena el formulario y te contactamos en 24h" : ""}
                 </p>
               )}
