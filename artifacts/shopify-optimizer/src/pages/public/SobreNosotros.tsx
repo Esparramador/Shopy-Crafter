@@ -1,8 +1,15 @@
+import PageMeta from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 
 export default function SobreNosotros() {
   return (
-    <PublicLayout>
+    <>
+      <PageMeta
+        title="Sobre Nosotros — Shopy Crafter"
+        description="Conoce al equipo detrás de Shopy Crafter: ingenieros de IA y operadores de eCommerce que automatizamos el trabajo pesado para que tú crezcas."
+        canonical="https://shopycrafter.com/sobre-nosotros"
+      />
+      <PublicLayout>
       <div style={{ padding: "80px 24px", maxWidth: 980, margin: "0 auto" }}>
         <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Sobre nosotros</div>
         <h1 style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 20, lineHeight: 1.1 }}>
@@ -54,5 +61,6 @@ export default function SobreNosotros() {
         </div>
       </div>
     </PublicLayout>
+    </>
   );
 }

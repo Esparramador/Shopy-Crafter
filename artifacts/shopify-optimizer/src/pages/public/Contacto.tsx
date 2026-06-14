@@ -1,3 +1,4 @@
+import PageMeta from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 import { useState } from "react";
 
@@ -50,7 +51,13 @@ export default function Contacto() {
   const serviceOptions = ["Auditoría completa", "Generación de imágenes IA", "SEO y schemas", "A/B Testing", "Pricing y COGS", "Rediseño web", "Programa de afiliados", "Plan personalizado"];
 
   return (
-    <PublicLayout>
+    <>
+      <PageMeta
+        title="Contacto — Shopy Crafter"
+        description="Contacta con el equipo de Shopy Crafter. Respondemos en menos de 24 horas para resolver tus dudas sobre eCommerce e IA."
+        canonical="https://shopycrafter.com/contacto"
+      />
+      <PublicLayout>
       <div style={{ padding: "80px 24px", maxWidth: 720, margin: "0 auto" }}>
         <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Contacto</div>
         <h1 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 12, lineHeight: 1.15 }}>
@@ -188,5 +195,6 @@ export default function Contacto() {
         </div>
       </div>
     </PublicLayout>
+    </>
   );
 }

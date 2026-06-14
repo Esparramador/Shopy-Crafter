@@ -1,10 +1,17 @@
 import { Link } from "wouter";
+import PageMeta from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 import { CASES } from "@/lib/casos-data";
 
 export default function CasosDeExito() {
   return (
-    <PublicLayout>
+    <>
+      <PageMeta
+        title="Casos de Éxito — Shopy Crafter"
+        description="Resultados reales de tiendas que ya usan Shopy Crafter. Cifras verificadas: más tráfico orgánico, mejor conversión y menos horas manuales."
+        canonical="https://shopycrafter.com/casos-de-exito"
+      />
+      <PublicLayout>
       <div style={{ padding: "80px 24px", maxWidth: 980, margin: "0 auto" }}>
         <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(45,212,159,0.12)", color: "var(--jade, #2dd49f)", border: "1px solid rgba(45,212,159,0.25)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Casos de éxito</div>
         <h1 style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 16, lineHeight: 1.1 }}>
@@ -74,5 +81,6 @@ export default function CasosDeExito() {
         </div>
       </div>
     </PublicLayout>
+    </>
   );
 }

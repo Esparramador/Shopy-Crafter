@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { FloatingBatman } from "@/components/FloatingBatman3D";
+import PageMeta from "@/components/PageMeta";
 import "./landing.css";
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -730,6 +731,11 @@ export default function Landing() {
 
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
+      <PageMeta
+        title="Shopy Crafter — Optimización IA para tiendas Shopify"
+        description="7 motores de IA para mejorar SEO, imágenes y conversión en tu tienda Shopify. Sin conocimientos técnicos. Prueba gratis 14 días."
+        canonical="https://shopycrafter.com/landing"
+      />
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">
         <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>

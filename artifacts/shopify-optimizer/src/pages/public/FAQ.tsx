@@ -1,3 +1,4 @@
+import PageMeta from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 import { useState } from "react";
 
@@ -67,7 +68,13 @@ export default function FAQ() {
   };
 
   return (
-    <PublicLayout>
+    <>
+      <PageMeta
+        title="Preguntas Frecuentes — Shopy Crafter"
+        description="Resuelve dudas sobre precios, integraciones, seguridad y resultados de Shopy Crafter para eCommerce Shopify."
+        canonical="https://shopycrafter.com/faq"
+      />
+      <PublicLayout>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
@@ -134,5 +141,6 @@ export default function FAQ() {
         </div>
       </div>
     </PublicLayout>
+    </>
   );
 }

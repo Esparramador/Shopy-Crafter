@@ -1,8 +1,15 @@
+import PageMeta from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 
 export default function ProgramaAfiliados() {
   return (
-    <PublicLayout>
+    <>
+      <PageMeta
+        title="Programa de Afiliados — Shopy Crafter"
+        description="Recomienda Shopy Crafter y gana un 30% de comisión recurrente. Ideal para agencias, freelancers y consultores de eCommerce."
+        canonical="https://shopycrafter.com/programa-de-afiliados"
+      />
+      <PublicLayout>
       <div style={{ padding: "80px 24px", maxWidth: 980, margin: "0 auto" }}>
         <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Programa de afiliados</div>
         <h1 style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 16, lineHeight: 1.1 }}>
@@ -73,5 +80,6 @@ export default function ProgramaAfiliados() {
         </div>
       </div>
     </PublicLayout>
+    </>
   );
 }

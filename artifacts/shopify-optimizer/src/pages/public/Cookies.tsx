@@ -1,3 +1,4 @@
+import PageMeta from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 
 const SECTIONS = [
@@ -18,7 +19,13 @@ const COOKIE_TABLE = [
 
 export default function Cookies() {
   return (
-    <PublicLayout>
+    <>
+      <PageMeta
+        title="Política de Cookies — Shopy Crafter"
+        description="Información sobre las cookies que usa Shopy Crafter: técnicas, de preferencia y de medición."
+        canonical="https://shopycrafter.com/cookies"
+      />
+      <PublicLayout>
       <div style={{ padding: "80px 24px", maxWidth: 820, margin: "0 auto" }}>
         <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Legal</div>
         <h1 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 12, lineHeight: 1.15 }}>Política de Cookies</h1>
@@ -61,5 +68,6 @@ export default function Cookies() {
         </div>
       </div>
     </PublicLayout>
+    </>
   );
 }
