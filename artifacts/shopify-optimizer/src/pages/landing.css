@@ -3332,3 +3332,40 @@
   from { opacity: 0; transform: translateY(18px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BATMAN 3D WRAP — Canvas wrapper that walks in from the left
+   The walk.glb animation plays inside while CSS moves the box
+   ═══════════════════════════════════════════════════════════════ */
+
+.bat-3d-wrap {
+  position: relative;
+  width: 100%;
+  z-index: 2;
+}
+
+/* Walking in: translateX from off-screen left to center */
+.bat-3d-wrap.bat-walking-in {
+  animation: bat3d-walk-in 2.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.2s both;
+}
+
+@keyframes bat3d-walk-in {
+  0%   { transform: translateX(-120%); opacity: 0.4; }
+  15%  { opacity: 1; }
+  65%  { transform: translateX(6px); }
+  78%  { transform: translateX(-5px); }
+  90%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+/* Bat-scene: allow overflow so the 3D canvas is fully visible */
+.bat-scene {
+  overflow: visible !important;
+  flex-direction: column;
+}
+
+/* Spotlight is absolute-positioned OVER the 3D canvas */
+.bat-scene .bat-spotlight {
+  position: absolute;
+  pointer-events: none;
+}

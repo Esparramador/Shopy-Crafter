@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { FloatingBatman } from "@/components/FloatingBatman3D";
 import "./landing.css";
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -1297,25 +1298,12 @@ export default function Landing() {
                        spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "🦇 ¡Cuéntame tu negocio!"}
                     </div>
 
-                    {/* Batman CSS figure */}
-                    <div className="bat-man">
-                      <div className="bat-cape"></div>
-                      <div className="bat-figure">
-                        <div className="bat-head">
-                          <div className="bat-eyes"></div>
-                        </div>
-                        <div className="bat-torso">
-                          <span className="bat-symbol">🦇</span>
-                        </div>
-                        <div className="bat-belt"></div>
-                        <div className="bat-legs">
-                          <div className="bat-leg bat-leg-l"></div>
-                          <div className="bat-leg bat-leg-r"></div>
-                        </div>
-                      </div>
+                    {/* 3D Batman — walks in from left via CSS, plays walk.glb */}
+                    <div className={`bat-3d-wrap${(spiderPhase === "fall" || spiderPhase === "bounce" || spiderPhase === "standup") ? " bat-walking-in" : ""}`}>
+                      <FloatingBatman phase={spiderPhase} height={280} />
                     </div>
 
-                    {/* Bat-Signal spotlight */}
+                    {/* Bat-Signal spotlight (CSS overlay above 3D canvas) */}
                     <div className="bat-spotlight">
                       <div className="bat-beam"></div>
                       <div className="bat-signal-circle">
