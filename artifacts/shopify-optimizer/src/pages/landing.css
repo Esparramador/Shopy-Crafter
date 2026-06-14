@@ -2777,3 +2777,136 @@
   0%   { opacity: 0; transform: scale(0.5); }
   100% { opacity: 1; transform: scale(1); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HERO SECTION — CSS-only Alec character (no WebGL)
+   Floating hat with orbit rings and animated particles
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero-alec-css {
+  position: relative;
+  width: 100%;
+  height: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-alec-glow {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,168,75,0.18) 0%, rgba(200,168,75,0.04) 50%, transparent 70%);
+  animation: hero-pulse 3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes hero-pulse {
+  0%, 100% { transform: scale(1);   opacity: 0.7; }
+  50%       { transform: scale(1.2); opacity: 1; }
+}
+
+.hero-alec-emoji {
+  font-size: 160px;
+  line-height: 1;
+  position: relative;
+  z-index: 2;
+  animation: hero-float 4s ease-in-out infinite;
+  filter: drop-shadow(0 30px 60px rgba(200,168,75,0.5))
+          drop-shadow(0 0 80px rgba(200,168,75,0.2));
+  cursor: default;
+  user-select: none;
+}
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0)    rotate(-2deg); }
+  25%       { transform: translateY(-18px) rotate(1deg);  }
+  50%       { transform: translateY(-8px)  rotate(-1deg); }
+  75%       { transform: translateY(-22px) rotate(2deg);  }
+}
+
+/* Orbit rings */
+.hero-alec-rings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hero-alec-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(200,168,75,0.2);
+  transform: translate(-50%, -50%);
+}
+.hero-alec-ring.r1 {
+  width: 240px; height: 90px;
+  animation: ring-orbit 8s linear infinite;
+}
+.hero-alec-ring.r2 {
+  width: 320px; height: 120px;
+  border-color: rgba(200,168,75,0.12);
+  animation: ring-orbit 12s linear infinite reverse;
+}
+.hero-alec-ring.r3 {
+  width: 400px; height: 150px;
+  border-color: rgba(200,168,75,0.07);
+  animation: ring-orbit 18s linear infinite;
+}
+@keyframes ring-orbit {
+  from { transform: translate(-50%, -50%) rotateX(72deg) rotateZ(0deg); }
+  to   { transform: translate(-50%, -50%) rotateX(72deg) rotateZ(360deg); }
+}
+
+/* Floating emoji particles around the hat */
+.hero-alec-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hero-alec-particle {
+  position: absolute;
+  top: 50%; left: 50%;
+  font-size: 26px;
+  animation: particle-orbit 6s ease-in-out infinite;
+  opacity: 0.85;
+}
+.hero-alec-particle.p1 { animation-delay: 0s;    --r: 130px; --a: 0deg; }
+.hero-alec-particle.p2 { animation-delay: -1s;   --r: 140px; --a: 60deg; }
+.hero-alec-particle.p3 { animation-delay: -2s;   --r: 125px; --a: 120deg; }
+.hero-alec-particle.p4 { animation-delay: -3s;   --r: 135px; --a: 180deg; }
+.hero-alec-particle.p5 { animation-delay: -4s;   --r: 145px; --a: 240deg; }
+.hero-alec-particle.p6 { animation-delay: -5s;   --r: 130px; --a: 300deg; }
+@keyframes particle-orbit {
+  0%   { transform: translate(-50%,-50%) rotate(calc(var(--a) + 0deg))   translateX(var(--r)) rotate(calc(-1*(var(--a)+0deg)));   opacity: 0.5; }
+  25%  { opacity: 1; }
+  50%  { transform: translate(-50%,-50%) rotate(calc(var(--a) + 180deg)) translateX(var(--r)) rotate(calc(-1*(var(--a)+180deg))); opacity: 0.7; }
+  75%  { opacity: 1; }
+  100% { transform: translate(-50%,-50%) rotate(calc(var(--a) + 360deg)) translateX(var(--r)) rotate(calc(-1*(var(--a)+360deg))); opacity: 0.5; }
+}
+
+/* ── Contact section CSS character ── */
+.alec-css-char {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.alec-css-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,168,75,0.16) 0%, transparent 70%);
+  animation: hero-pulse 3s ease-in-out infinite;
+  pointer-events: none;
+}
+.alec-css-hat {
+  position: relative;
+  z-index: 2;
+  display: inline-block;
+  transform-origin: center bottom;
+  transition: font-size 0.3s ease, filter 0.3s ease;
+}
+
+/* Inherit all sc-figure phase animations (drop-in, bounce, look etc.)
+   and sc-emoji-head head-tracking rules */

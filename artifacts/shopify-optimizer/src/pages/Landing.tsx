@@ -1,11 +1,7 @@
-import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import "./landing.css";
-
-const FloatingAlecMonopoly = lazy(() =>
-  import("@/components/FloatingAlecMonopoly3D").then(m => ({ default: m.FloatingAlecMonopoly }))
-);
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -762,15 +758,6 @@ export default function Landing() {
         </div>
       </nav>
 
-      {/* ── SIDE NAV DOTS (right) ── */}
-      <nav className="fp-sidenav" aria-label="Secciones">
-        {FP_SECTIONS.map((sec, i) => (
-          <button key={sec.id} className={`fp-nav-dot${currentSection === i ? " active" : ""}`} onClick={() => { goToSection(i); setHashRobust(sec.id); }} title={sec.nav}>
-            <span className="fp-nav-dot-label">{sec.nav}</span>
-            <div className="fp-nav-dot-circle"></div>
-          </button>
-        ))}
-      </nav>
 
       {/* ── PROGRESS BAR (left) ── */}
       <div className="fp-progress">
@@ -860,17 +847,20 @@ export default function Landing() {
                     background: "radial-gradient(ellipse, rgba(200,168,75,0.08) 0%, transparent 70%)",
                     filter: "blur(30px)",
                   }} />
-                  {currentSection <= 2 ? (
-                    <Suspense fallback={
-                      <div style={{ width: "100%", height: 520, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <div style={{ width: 48, height: 48, borderRadius: "50%", border: "3px solid rgba(200,168,75,0.3)", borderTopColor: "#c8a84b", animation: "spin 1s linear infinite" }} />
-                      </div>
-                    }>
-                      <FloatingAlecMonopoly height={520} phase="ready" />
-                    </Suspense>
-                  ) : (
-                    <div style={{ width: "100%", height: 520, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 100, filter: "drop-shadow(0 20px 40px rgba(200,168,75,0.35))" }}>🎩</div>
-                  )}
+                  <div className="hero-alec-css">
+                    <div className="hero-alec-glow" />
+                    <div className="hero-alec-emoji">🎩</div>
+                    <div className="hero-alec-rings">
+                      <div className="hero-alec-ring r1" />
+                      <div className="hero-alec-ring r2" />
+                      <div className="hero-alec-ring r3" />
+                    </div>
+                    <div className="hero-alec-particles">
+                      {["💰","📈","🛒","✨","🚀","💎"].map((e, i) => (
+                        <span key={i} className={`hero-alec-particle p${i+1}`}>{e}</span>
+                      ))}
+                    </div>
+                  </div>
                 </>
               )}
             </div>
@@ -1309,11 +1299,18 @@ export default function Landing() {
                    spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "💻 ¡Cuéntame tu negocio!"}
                 </div>
                 {spiderPhase !== "hidden" ? (
-                  <Suspense fallback={
-                    <div style={{ width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, filter: "drop-shadow(0 20px 40px rgba(200,168,75,0.40))" }}>🎩</div>
-                  }>
-                    <FloatingAlecMonopoly height={220} phase={spiderPhase as import("@/components/FloatingAlecMonopoly3D").AlecPhase} />
-                  </Suspense>
+                  <div className="alec-css-char">
+                    <div className="alec-css-glow" />
+                    <div
+                      className="sc-emoji-head alec-css-hat"
+                      style={{
+                        fontSize: spiderPhase === "celebrate" ? 96 : 88,
+                        filter: `drop-shadow(0 16px 32px rgba(200,168,75,${spiderPhase === "celebrate" ? "0.7" : "0.4"}))`,
+                      }}
+                    >
+                      {spiderPhase === "celebrate" ? "🎊" : "🎩"}
+                    </div>
+                  </div>
                 ) : (
                   <div style={{ width: 220, height: 220 }} />
                 )}
