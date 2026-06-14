@@ -4,8 +4,10 @@ import { useGLTF, useAnimations, ContactShadows, Environment } from "@react-thre
 import * as THREE from "three";
 
 const BASE_URL   = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-const MODEL_PATH = `${BASE_URL}/assets/3d/models/batman.glb`;
 const ANIM_ROOT  = `${BASE_URL}/assets/3d/animations/batman`;
+// rigged.glb has the batman mesh WITH the full skeleton (Hips, Spine, etc.)
+// batman.glb has no bones — retargeting only works from rigged.glb
+const MODEL_PATH = `${ANIM_ROOT}/rigged.glb`;
 
 function isWebGLAvailable(): boolean {
   try {
@@ -174,6 +176,7 @@ export function FloatingBatman({ height = 300, phase = "ready" }: FloatingBatman
   );
 }
 
+// MODEL_PATH = rigged.glb (has mesh + skeleton)
 useGLTF.preload(MODEL_PATH);
 useGLTF.preload(`${ANIM_ROOT}/walk.glb`);
 useGLTF.preload(`${ANIM_ROOT}/look_around.glb`);

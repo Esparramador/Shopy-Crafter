@@ -2944,11 +2944,12 @@
 .bat-scene {
   position: relative;
   width: 100%;
-  min-height: 260px;
+  min-height: 320px;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  overflow: hidden;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
   margin-bottom: 4px;
 }
 
@@ -3334,12 +3335,6 @@
   78%  { transform: translateX(-5px); }
   90%  { transform: translateX(3px); }
   100% { transform: translateX(0); }
-}
-
-/* Bat-scene: allow overflow so the 3D canvas is fully visible */
-.bat-scene {
-  overflow: visible !important;
-  flex-direction: column;
 }
 
 /* Spotlight is absolute-positioned OVER the 3D canvas */
