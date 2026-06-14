@@ -1270,7 +1270,7 @@ export default function Landing() {
             }} />
           </div>
           <div className="fp-content fp-contact-visme" style={{ maxWidth: 1120, padding: "0 24px" }}>
-            <div className={`fp-section-header ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
+            <div className={`fp-section-header ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s", gridColumn: "1 / -1", gridRow: "1" }}>
               <div className="l-pill" style={{ background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)" }} onClick={cmsClick("contact.pill")} {...cmsData("contact.pill")}>{content.contact?.pill ?? "Trabaja con nosotros"}</div>
               <h2 className="l-h2" onClick={cmsClick("contact.headline")} {...cmsData("contact.headline")}>{content.contact?.headline ?? "Cuéntanos sobre tu negocio."}<br /><em>{content.contact?.headlineHighlight ?? "Te contactamos en menos de 24h."}</em></h2>
               <p className="l-sub" {...cmsProps("contact.subheadline")}>{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
@@ -1330,7 +1330,7 @@ export default function Landing() {
               )}
             </div>
 
-            <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s" }}>
+            <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s", gridColumn: "2", gridRow: "2" }}>
               {contactStatus === "sent" ? (
                 <div style={{
                   background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.3)",
@@ -1565,7 +1565,7 @@ export default function Landing() {
             </div>
 
             {/* ── FOOTER ── */}
-            <footer className={`fp-footer ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.3s", marginTop: 40 }}>
+            <footer className={`fp-footer ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.3s", marginTop: 40, gridColumn: "1 / -1", gridRow: "3" }}>
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>

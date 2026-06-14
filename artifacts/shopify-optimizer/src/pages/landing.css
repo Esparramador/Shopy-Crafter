@@ -2468,39 +2468,20 @@
   .fp-contact-visme {
     display: grid !important;
     grid-template-columns: 260px 1fr !important;
-    grid-template-rows: auto auto !important;
+    grid-template-rows: auto auto auto !important;
     gap: 0 44px !important;
     align-items: start !important;
     max-width: 1120px !important;
   }
 
-  /* Header spans full width */
-  .fp-contact-visme .fp-section-header {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
-
   /* Batman panel: left column, sticky */
   .fp-contact-visme .sc-stage-wrap {
-    grid-column: 1;
-    grid-row: 2;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
     position: sticky;
     top: 80px;
     align-self: start;
     overflow: visible;
-  }
-
-  /* Form panel: right column */
-  .fp-contact-visme .fp-animate,
-  .fp-contact-visme .fp-animated {
-    grid-column: 2;
-    grid-row: 2;
-  }
-
-  /* Footer: full width, row 3 — FIXES the overlap bug */
-  .fp-contact-visme .fp-footer {
-    grid-column: 1 / -1 !important;
-    grid-row: 3 !important;
   }
 
   /* Batman scene sizing in side panel */
@@ -2509,12 +2490,9 @@
   }
 }
 
-/* ── Mobile: vertical stack (status quo mantener) ── */
+/* ── Mobile: reset inline grid props so items stack normally ── */
 @media (max-width: 959px) {
-  .fp-contact-visme .fp-section-header,
-  .fp-contact-visme .sc-stage-wrap,
-  .fp-contact-visme .fp-animate,
-  .fp-contact-visme .fp-animated {
+  .fp-contact-visme > * {
     grid-column: unset !important;
     grid-row: unset !important;
   }
