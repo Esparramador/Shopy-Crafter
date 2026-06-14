@@ -39,6 +39,21 @@ const FAQS = [
   },
 ];
 
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.flatMap(section =>
+    section.items.map(item => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.a,
+      },
+    }))
+  ),
+};
+
 export default function FAQ() {
   const [openItems, setOpenItems] = useState<Set<string>>(new Set());
 
@@ -53,6 +68,10 @@ export default function FAQ() {
 
   return (
     <PublicLayout>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       <div style={{ padding: "80px 24px", maxWidth: 820, margin: "0 auto" }}>
         <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>FAQ</div>
         <h1 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 16, lineHeight: 1.1 }}>
@@ -81,11 +100,21 @@ export default function FAQ() {
                         <span style={{ fontSize: 14, fontWeight: 600, color: "var(--t, #eee)", flex: 1 }}>{faq.q}</span>
                         <span style={{ fontSize: 18, color: "var(--t4, #666)", transition: "transform 0.2s", transform: isOpen ? "rotate(45deg)" : "rotate(0)" }}>+</span>
                       </div>
-                      {isOpen && (
-                        <div style={{ padding: "0 20px 16px", fontSize: 14, color: "var(--t3, #999)", lineHeight: 1.7 }}>
-                          {faq.a}
-                        </div>
-                      )}
+                      {/* Answer is always in the DOM for SEO crawlers; visually hidden when closed */}
+                      <div
+                        aria-hidden={!isOpen}
+                        style={{
+                          padding: isOpen ? "0 20px 16px" : "0 20px",
+                          maxHeight: isOpen ? "600px" : "0",
+                          overflow: "hidden",
+                          transition: "max-height 0.25s ease, padding 0.25s ease",
+                          fontSize: 14,
+                          color: "var(--t3, #999)",
+                          lineHeight: 1.7,
+                        }}
+                      >
+                        {faq.a}
+                      </div>
                     </div>
                   );
                 })}
