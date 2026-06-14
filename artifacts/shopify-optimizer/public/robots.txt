@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+
+# Public marketing pages
+Allow: /landing
+Allow: /sobre-nosotros
+Allow: /casos-de-exito
+Allow: /programa-de-afiliados
+Allow: /faq
+Allow: /blog
+Allow: /changelog
+Allow: /privacidad
+Allow: /terminos
+Allow: /cookies
+Allow: /contacto
+
+# Disallow private/authenticated areas
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: https://shopycrafter.com/sitemap.xml

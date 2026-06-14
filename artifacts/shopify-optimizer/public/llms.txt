@@ -1,0 +1,29 @@
+# Shopy Crafter
+
+Shopy Crafter es una plataforma de optimización con inteligencia artificial para tiendas Shopify. Ayuda a comerciantes hispanohablantes a mejorar sus tiendas con 7 motores de IA especializados: SEO de producto, emails automatizados, imágenes profesionales, descripciones persuasivas, schemas JSON-LD, análisis de competencia y estrategias de upsell.
+
+## Descripción del servicio
+
+- **Audiencia:** Emprendedores, pymes y agencias con tiendas Shopify en España y Latinoamérica
+- **Propuesta de valor:** Genera textos, imágenes, schemas y estrategias listos para copiar — sin conocimientos técnicos
+- **Precio inicial:** Desde €0/mes (plan gratuito disponible)
+- **Idioma principal:** Español
+
+## Páginas importantes
+
+- / — Página principal con presentación del producto
+- /landing — Landing page con detalles del servicio y precios
+- /sobre-nosotros — Equipo y misión de Shopy Crafter
+- /casos-de-exito — Casos de uso reales con resultados medibles
+- /programa-de-afiliados — Información sobre el programa de afiliados
+- /faq — Preguntas frecuentes sobre la plataforma
+- /blog — Artículos sobre optimización Shopify, SEO y ecommerce
+- /changelog — Historial de actualizaciones y nuevas funciones
+- /privacidad — Política de privacidad
+- /terminos — Términos y condiciones de uso
+- /cookies — Política de cookies
+- /contacto — Formulario de contacto y soporte
+
+## Tecnología
+
+Shopy Crafter utiliza modelos de IA líderes del mercado (Claude, GPT-4, Gemini) para generar contenido de alta conversión adaptado a cada nicho de producto y mercado objetivo.
