@@ -1,34 +1,6 @@
+import { Link } from "wouter";
 import PublicLayout from "@/components/PublicLayout";
-
-const CASES = [
-  {
-    name: "Comic Crafter",
-    niche: "Cómics e ilustración personalizada",
-    before: "12 ventas/mes, fichas sin SEO",
-    after: "+340% ventas en 90 días, 47 fichas optimizadas, 6 imágenes IA por producto",
-    time: "3 meses",
-    engines: ["Audit", "SEO", "Images"],
-    highlight: "+340%",
-  },
-  {
-    name: "Sakura Studio",
-    niche: "Camisetas estampadas Japón-inspired",
-    before: "Web sin tráfico orgánico",
-    after: "Top 3 Google para 18 keywords del nicho, +210% sesiones, 4× conversión",
-    time: "5 meses",
-    engines: ["SEO", "A/B Testing", "WebLab"],
-    highlight: "4× conv.",
-  },
-  {
-    name: "Audit Multipart",
-    niche: "Repuestos automoción B2B",
-    before: "Catálogo manual, sin descripciones",
-    after: "1.200 productos auto-descritos en 2 semanas, +180% leads cualificados",
-    time: "2 meses",
-    engines: ["Audit", "Generator", "Export"],
-    highlight: "+180%",
-  },
-];
+import { CASES } from "@/lib/casos-data";
 
 export default function CasosDeExito() {
   return (
@@ -44,37 +16,50 @@ export default function CasosDeExito() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24, marginBottom: 60 }}>
           {CASES.map(c => (
-            <div key={c.name} style={{
-              padding: 32, background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)", borderRadius: 20,
-              display: "grid", gridTemplateColumns: "1fr auto", gap: 24, alignItems: "start",
-            }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-                  <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--t, #eee)", margin: 0 }}>{c.name}</h3>
-                  <span style={{ fontSize: 12, color: "#e6c668", background: "rgba(200,168,75,0.12)", padding: "3px 10px", borderRadius: 6 }}>{c.niche}</span>
-                  <span style={{ fontSize: 11, color: "var(--t4, #666)" }}>⏱ {c.time}</span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-                  <div style={{ padding: 16, background: "rgba(232,69,88,0.06)", border: "1px solid rgba(232,69,88,0.15)", borderRadius: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--t4, #666)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Antes</div>
-                    <p style={{ fontSize: 14, color: "var(--t3, #999)", lineHeight: 1.5, margin: 0 }}>{c.before}</p>
+            <Link key={c.slug} href={`/casos-de-exito/${c.slug}`} style={{ textDecoration: "none", display: "block" }}>
+              <div style={{
+                padding: 32, background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)", borderRadius: 20,
+                display: "grid", gridTemplateColumns: "1fr auto", gap: 24, alignItems: "start",
+                transition: "border-color 0.2s, transform 0.2s",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(45,212,159,0.3)";
+                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = "var(--ink3, #1e1e22)";
+                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+              }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                    <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--t, #eee)", margin: 0 }}>{c.name}</h2>
+                    <span style={{ fontSize: 12, color: "#e6c668", background: "rgba(200,168,75,0.12)", padding: "3px 10px", borderRadius: 6 }}>{c.niche}</span>
+                    <span style={{ fontSize: 11, color: "var(--t4, #666)" }}>⏱ {c.time}</span>
                   </div>
-                  <div style={{ padding: 16, background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--jade, #2dd49f)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Después</div>
-                    <p style={{ fontSize: 14, color: "var(--t, #eee)", lineHeight: 1.5, margin: 0 }}>{c.after}</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                    <div style={{ padding: 16, background: "rgba(232,69,88,0.06)", border: "1px solid rgba(232,69,88,0.15)", borderRadius: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--t4, #666)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Antes</div>
+                      <p style={{ fontSize: 14, color: "var(--t3, #999)", lineHeight: 1.5, margin: 0 }}>{c.before}</p>
+                    </div>
+                    <div style={{ padding: 16, background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--jade, #2dd49f)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Después</div>
+                      <p style={{ fontSize: 14, color: "var(--t, #eee)", lineHeight: 1.5, margin: 0 }}>{c.after}</p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    {c.engines.map(e => (
+                      <span key={e} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, background: "var(--ink, #0a0a0c)", border: "1px solid var(--ink3, #1e1e22)", color: "var(--t3, #999)" }}>{e}</span>
+                    ))}
+                    <span style={{ fontSize: 12, color: "var(--jade, #2dd49f)", fontWeight: 600, marginLeft: "auto" }}>Ver caso completo →</span>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {c.engines.map(e => (
-                    <span key={e} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, background: "var(--ink, #0a0a0c)", border: "1px solid var(--ink3, #1e1e22)", color: "var(--t3, #999)" }}>{e}</span>
-                  ))}
+                <div style={{ textAlign: "center", padding: "16px 20px", background: "rgba(45,212,159,0.08)", borderRadius: 14, minWidth: 90 }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: "var(--jade, #2dd49f)" }}>{c.highlight}</div>
+                  <div style={{ fontSize: 10, color: "var(--t4, #666)", textTransform: "uppercase" }}>resultado</div>
                 </div>
               </div>
-              <div style={{ textAlign: "center", padding: "16px 20px", background: "rgba(45,212,159,0.08)", borderRadius: 14, minWidth: 90 }}>
-                <div style={{ fontSize: 28, fontWeight: 800, color: "var(--jade, #2dd49f)" }}>{c.highlight}</div>
-                <div style={{ fontSize: 10, color: "var(--t4, #666)", textTransform: "uppercase" }}>resultado</div>
-              </div>
-            </div>
+            </Link>
           ))}
         </div>
 
