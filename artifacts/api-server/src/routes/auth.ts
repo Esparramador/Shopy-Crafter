@@ -273,7 +273,7 @@ router.post("/impersonate/:userId", requireAuth, async (req, res): Promise<void>
       return;
     }
 
-    const targetId = parseInt(req.params.userId, 10);
+    const targetId = String(req.params.userId);
     const [target] = await db.select().from(usersTable).where(eq(usersTable.id, targetId));
 
     if (!target) {

@@ -153,7 +153,8 @@ async function tripoFetch(path: string, options: RequestInit = {}): Promise<any>
 async function tripoUploadFile(buffer: Buffer, mimeType: string, filename: string): Promise<string> {
   const key = getTripoKey();
   const formData = new FormData();
-  const blob = new Blob([buffer], { type: mimeType });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const blob = new Blob([buffer as any], { type: mimeType });
   formData.append("file", blob, filename);
 
   const res = await fetch(`${TRIPO_BASE}/upload`, {

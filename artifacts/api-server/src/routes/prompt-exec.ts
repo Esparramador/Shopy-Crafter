@@ -206,7 +206,7 @@ router.post("/prompt-library/execute", async (req: Request, res: Response): Prom
     const { resolved, usedVars, unresolvedVars } = resolveTemplate(template, mergedVars);
 
     const brainCtx = projectId
-      ? await buildShopyBrainContext(projectId, "prompts", resolved.slice(0, 200))
+      ? await buildShopyBrainContext(undefined, undefined, resolved.slice(0, 200))
       : "";
 
     const systemPrompt = systemOverride ??
@@ -244,7 +244,12 @@ ${brandDnaContext}${brainCtx}`;
     res.end();
 
     if (saveToMemory && projectId && fullResult.length > 100) {
-      learnFromOperation(projectId, "prompt_library_execution", resolved, fullResult).catch(() => {});
+      learnFromOperation({
+        operationType: "prompt_library_execution",
+        sourceProjectId: typeof projectId === "number" ? projectId : undefined,
+        title: "prompt_exec",
+        content: fullResult.slice(0, 500),
+      });
     }
 
     logger.info({ opId, projectId, usedVars: usedVars.length, outputLength: fullResult.length }, "prompt-exec: completed");

@@ -123,6 +123,7 @@ export default function CardStudio() {
   const [rightTab, setRightTab] = useState<"preview" | "editor" | "generated">("preview");
   const [editorSide, setEditorSide] = useState<"front" | "back">("front");
   const [showAutoDesign, setShowAutoDesign] = useState(false);
+  const [showGenerated, setShowGenerated] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [autoIndustry, setAutoIndustry] = useState("");
   const [autoVibe, setAutoVibe] = useState("");

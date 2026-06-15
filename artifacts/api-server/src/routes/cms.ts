@@ -362,12 +362,13 @@ router.post("/ai/improve", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/ai/generate-section", async (req: Request, res: Response) => {
+router.post("/ai/generate-section", async (req: Request, res: Response): Promise<void> => {
   enableLongRunning(res);
   try {
     const { description, name } = req.body as { description: string; name?: string };
     if (!description || description.length < 5) {
-      return res.status(400).json({ error: "Descripción requerida" });
+      res.status(400).json({ error: "Descripción requerida" });
+      return;
     }
     const sectionId = `custom_${Date.now()}`;
     const systemPrompt = `Eres un experto en UX y diseño web para plataformas SaaS en español. Generas configuraciones de secciones web en JSON. Responde ÚNICAMENTE con JSON válido y nada más.`;

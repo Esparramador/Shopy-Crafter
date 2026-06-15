@@ -2784,7 +2784,7 @@ router.post("/weblab/analyze", async (req: Request, res: Response): Promise<void
       send({ progress: `⚠ No se pudo descargar la página directamente: ${e.message}`, status: "warn" });
       try {
         const scraped = await scrapeWebsite(targetUrl);
-        html = scraped.html || "";
+        html = (scraped as any).html || "";
       } catch {}
     }
 

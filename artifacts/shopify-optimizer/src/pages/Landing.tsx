@@ -151,6 +151,8 @@ export default function Landing() {
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [contactError, setContactError] = useState("");
+  const [spiderPhase, setSpiderPhase] = useState<"ready" | "waiting" | "celebrate">("ready");
+  void spiderPhase;
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
 

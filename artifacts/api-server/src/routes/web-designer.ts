@@ -57,7 +57,7 @@ router.get("/web-designer/demos", (_req: Request, res: Response) => {
 });
 
 router.get("/web-designer/demo-html/:filename", async (req: Request, res: Response): Promise<void> => {
-  const { filename } = req.params;
+  const filename = String(req.params.filename);
   if (!/^[\w-]+\.html$/.test(filename)) {
     res.status(400).json({ error: "Invalid filename" });
     return;
@@ -66,7 +66,7 @@ router.get("/web-designer/demo-html/:filename", async (req: Request, res: Respon
     const { readFileSync } = await import("fs");
     const { resolve, dirname } = await import("path");
     const { fileURLToPath } = await import("url");
-    const __dir = dirname(fileURLToPath(import.meta.url));
+    const __dir = dirname(fileURLToPath(import.meta.url as string));
     const demoPath = resolve(__dir, "../../../../shopify-optimizer/public/web-demos", filename);
     const html = readFileSync(demoPath, "utf-8");
     res.json({ ok: true, html, filename, chars: html.length });
@@ -80,7 +80,7 @@ router.get("/web-designer/sessions", (_req: Request, res: Response) => {
 });
 
 router.get("/web-designer/sessions/:id", (req: Request, res: Response) => {
-  res.json(getSession(req.params.id));
+  res.json(getSession(String(req.params.id)));
 });
 
 router.post("/web-designer/sessions/:id", (req: Request, res: Response) => {
@@ -176,7 +176,7 @@ router.post("/web-designer/deploy", async (req: Request, res: Response): Promise
     const title = `${pageName} — Web Designer`;
     const tags = ["web-designer", pageName, sessionId ?? ""].filter(Boolean);
 
-    const [vault] = await db.execute(sql`
+    const vaultRows = await db.execute(sql`
       INSERT INTO vault_files (project_id, title, category, file_type, content, metadata, generated_by, created_at)
       VALUES (${projectId}, ${title}, 'web-designer', 'html', ${html},
         ${JSON.stringify({ sessionId, pageName, chars: html.length })},
@@ -184,6 +184,7 @@ router.post("/web-designer/deploy", async (req: Request, res: Response): Promise
       ON CONFLICT DO NOTHING
       RETURNING id
     `);
+    const vault = (vaultRows as unknown as any[])[0];
 
     res.json({ success: true, message: `"${pageName}" desplegado a la bóveda`, vaultId: (vault as any)?.id });
   } catch (err: any) {
