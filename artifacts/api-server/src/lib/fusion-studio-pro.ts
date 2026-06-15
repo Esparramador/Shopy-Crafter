@@ -115,14 +115,20 @@ export type ImageGenModel =
   | "imagen-4-ultra"            // Google Imagen 4 Ultra (premium)
   | "imagen-4"                  // Google Imagen 4 (standard)
   | "imagen-4-fast"             // Google Imagen 4 Fast (cheap, quick)
-  | "nano-banana"               // Gemini 2.5 Flash Image (v1)
-  | "nano-banana-pro"           // Gemini 3 Pro Image (v2, 4K, top-tier)
+  | "imagen-5-ultra"            // Google Imagen 5 Ultra — máxima calidad Google 2026
+  | "imagen-5"                  // Google Imagen 5 — estándar 2026, superior al 4
+  | "nano-banana"               // Gemini Flash Image — rápido, consistente con marca
+  | "nano-banana-pro"           // Gemini Pro Image — 4K, texto nítido, identidad estable
   | "seedream-4"                // ByteDance Seedream 4 (text + photoreal)
   | "flux-kontext-pro"          // Flux Kontext Pro — character/style consistency
   | "flux-kontext-max"          // Flux Kontext Max — máxima calidad, consistencia premium
   | "flux-kontext-dev"          // Flux Kontext Dev — open-weights, edición artística
+  | "stable-diffusion-3.5-large"  // Stability AI SD 3.5 Large — photoreal artístico
+  | "stable-diffusion-3.5-turbo"  // Stability AI SD 3.5 Turbo — rápido y barato
+  | "runway-gen4-image"         // Runway Gen4 Image — text-to-image nativo Runway
+  | "runway-gen4-image-turbo"   // Runway Gen4 Image Turbo — más barato, alta velocidad
   | "gpt-image-1"              // OpenAI gpt-image-1 (vía Replit AI Integrations)
-  | "gpt-image-2"              // OpenAI gpt-image-2 — flagship abril 2026, razonamiento integrado
+  | "gpt-image-2"              // OpenAI gpt-image-2 — flagship 2026, razonamiento integrado
   | "gpt-image-1.5"            // OpenAI gpt-image-1.5 — 20% más barato que v1, misma calidad
   | "gpt-image-1-mini";        // OpenAI gpt-image-1 mini — presupuesto, alta velocidad
 
@@ -148,6 +154,12 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "flux-kontext-dev":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-dev",   description: "Flux Kontext Dev — open-weights, edición artística creativa", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
   "recraft-v4":             { provider: "replicate", replicateId: "recraft-ai/recraft-v4",                description: "Recraft V4 — última generación, texto nítido + realismo máximo", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
   "ideogram-v3-quality":    { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-quality",      description: "Ideogram V3 Quality — máxima calidad texto en imagen + photoreal", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "imagen-5-ultra":         { provider: "replicate", replicateId: "google/imagen-5-ultra",               description: "Google Imagen 5 Ultra — máxima calidad 2026, coherencia semántica avanzada", costPerImage: 0.08, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2048x2048" },
+  "imagen-5":               { provider: "replicate", replicateId: "google/imagen-5",                     description: "Google Imagen 5 — estándar 2026, supera al Imagen 4 en detalle", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2048x2048" },
+  "stable-diffusion-3.5-large": { provider: "replicate", replicateId: "stability-ai/stable-diffusion-3.5-large", description: "Stability AI SD 3.5 Large — photoreal artístico, mejor SD a la fecha", costPerImage: 0.035, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "1024x1024" },
+  "stable-diffusion-3.5-turbo": { provider: "replicate", replicateId: "stability-ai/stable-diffusion-3.5-large-turbo", description: "Stability AI SD 3.5 Turbo — 4 pasos, ultra rápido y barato", costPerImage: 0.01, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "1024x1024" },
+  "runway-gen4-image":      { provider: "runway", description: "Runway Gen4 Image — text-to-image nativo Runway con referencias opcionales", costPerImage: 0.08, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1920x1080" },
+  "runway-gen4-image-turbo":{ provider: "runway", description: "Runway Gen4 Image Turbo — más barato, alta velocidad, buena calidad", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1920x1080" },
   "gpt-image-1":            { provider: "openai", description: "OpenAI gpt-image-1 — render limpio, manejo de texto", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
   "gpt-image-2":            { provider: "openai", description: "OpenAI gpt-image-2 — flagship 2026, razonamiento integrado, máxima calidad fotorrealista", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3","21:9"], maxResolution: "1536x864 (flex)" },
   "gpt-image-1.5":          { provider: "openai", description: "OpenAI gpt-image-1.5 — 20% más barato que v1, calidad equivalente", costPerImage: 0.033, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
@@ -240,6 +252,25 @@ export async function generateImage(
     return { buffer: out.buffer, mimeType: out.mimeType, model };
   }
 
+  // ── Runway Gen4 Image (text-to-image nativo vía Runway API)
+  if (model === "runway-gen4-image" || model === "runway-gen4-image-turbo") {
+    const { generateImageWithReferences, fetchRunwayImageBuffer } = await import("./runway.js");
+    const ratioMap: Record<string, "1080:1080" | "1920:1080" | "1080:1920"> = {
+      "1:1":  "1080:1080",
+      "16:9": "1920:1080",
+      "9:16": "1080:1920",
+      "4:3":  "1920:1080",
+      "3:4":  "1080:1920",
+    };
+    const ratio = ratioMap[aspect] || "1080:1080";
+    const runwayModel = model === "runway-gen4-image-turbo" ? "gen4_image_turbo" : "gen4_image";
+    const refs: Array<{ uri: string; tag: string }> = [];
+    if (opts.referenceImage) refs.push({ uri: bufferToDataUri(opts.referenceImage, opts.referenceMime || "image/png"), tag: "product" });
+    const result = await generateImageWithReferences({ promptText: prompt, referenceImages: refs, ratio, model: runwayModel });
+    const { buffer, mimeType } = await fetchRunwayImageBuffer(result.imageUrl);
+    return { buffer, mimeType, model };
+  }
+
   // ── Replicate models
   if (!cfg.replicateId) throw new Error(`Modelo ${model} sin replicateId definido`);
   const token = getReplicateToken(opts.replicateToken);
@@ -259,6 +290,15 @@ export async function generateImage(
   }
   if (model === "imagen-4-ultra" || model === "imagen-4" || model === "imagen-4-fast") {
     input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };
+  }
+  if (model === "imagen-5-ultra" || model === "imagen-5") {
+    input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };
+  }
+  if (model === "stable-diffusion-3.5-large") {
+    input = { prompt, negative_prompt: opts.negativePrompt || "", aspect_ratio: aspect, cfg: 4.5, steps: 28, output_format: "png" };
+  }
+  if (model === "stable-diffusion-3.5-turbo") {
+    input = { prompt, negative_prompt: opts.negativePrompt || "", aspect_ratio: aspect, cfg: 1.0, steps: 4, output_format: "png" };
   }
   if (model === "seedream-4") {
     // Seedream 4 acepta referencias multi-image (hasta 8) para preservar
@@ -755,7 +795,14 @@ export type VideoModel =
   | "runway-seedance2"       // Seedance 2 vía Runway — calidad cinematográfica
   | "runway-seedance2-fast"  // Seedance 2 Fast vía Runway — rápido
   | "wan-2.5-t2v"            // Wan 2.5 Text-to-Video — T2V puro, sin imagen
-  | "seedance-1-lite";       // Seedance 1 Lite — versión económica de Pro
+  | "seedance-1-lite"        // Seedance 1 Lite — versión económica de Pro
+  | "kling-3.0-master"       // Kling V3.0 Master — última gen Kuaishou, máxima calidad
+  | "kling-3.0-turbo"        // Kling V3.0 Turbo — rápido y barato, calidad V3
+  | "veo-4"                  // Google Veo 4 — nueva generación 2026, máxima coherencia
+  | "veo-4-fast"             // Google Veo 4 Fast — Veo 4 más rápido y barato
+  | "minimax-video-01"       // MiniMax Video-01 — modelo base de MiniMax, alternativa a Hailuo
+  | "wan-2.6"                // Wan 2.6 — nueva gen open-source, mejor que Wan 2.5
+  | "runway-gen5";           // Runway Gen 5 — nueva generación 2026 de Runway
 
 export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
   "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
@@ -780,6 +827,13 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "runway-seedance2-fast":{ provider: "runway",                                               description: "Seedance 2 Fast vía Runway — rápido y barato, calidad pro",                  costPerSec: 0.06,  quality: 8,  maxDuration: 10 },
   "wan-2.5-t2v":         { provider: "replicate", modelId: "wan-video/wan-2.5-t2v",          description: "Wan 2.5 Text-to-Video — T2V puro open-source, sin imagen origen",            costPerSec: 0.025, quality: 7,  maxDuration: 5  },
   "seedance-1-lite":     { provider: "replicate", modelId: "bytedance/seedance-1-lite",       description: "Seedance 1 Lite — versión económica de Seedance Pro",                        costPerSec: 0.03,  quality: 6,  maxDuration: 10 },
+  "kling-3.0-master":    { provider: "replicate", modelId: "kwaivgi/kling-v3.0-master",       description: "Kling V3.0 Master — última generación Kuaishou, máxima calidad y motion",   costPerSec: 0.22,  quality: 10, maxDuration: 10 },
+  "kling-3.0-turbo":     { provider: "replicate", modelId: "kwaivgi/kling-v3.0-turbo",        description: "Kling V3.0 Turbo — nueva gen rápida, precio/calidad V3 líder",               costPerSec: 0.14,  quality: 10, maxDuration: 10 },
+  "veo-4":               { provider: "gemini",    modelId: "veo-4.0-generate-preview",        description: "Google Veo 4 — última generación 2026, coherencia narrativa máxima (8s)",    costPerSec: 1.00,  quality: 10, maxDuration: 8  },
+  "veo-4-fast":          { provider: "gemini",    modelId: "veo-4.0-fast-generate-preview",   description: "Google Veo 4 Fast — Veo 4 rápido y barato, audio nativo (8s)",               costPerSec: 0.55,  quality: 9,  maxDuration: 8  },
+  "minimax-video-01":    { provider: "replicate", modelId: "minimax/video-01",                description: "MiniMax Video-01 — modelo base de MiniMax (precursor de Hailuo)",            costPerSec: 0.05,  quality: 8,  maxDuration: 6  },
+  "wan-2.6":             { provider: "replicate", modelId: "wan-video/wan-2.6-i2v",           description: "Wan 2.6 — nueva gen open-source, mayor detalle y duración que 2.5",          costPerSec: 0.05,  quality: 8,  maxDuration: 6  },
+  "runway-gen5":         { provider: "runway",                                                 description: "Runway Gen 5 — nueva generación 2026, motion física realista (10s)",         costPerSec: 0.08,  quality: 10, maxDuration: 10 },
 };
 
 // Modelos que soportan TEXT-TO-VIDEO puro (sin imagen origen).
@@ -807,6 +861,13 @@ const T2V_SUPPORTED: Record<VideoModel, boolean> = {
   "runway-seedance2-fast":false,
   "wan-2.5-t2v":          true,
   "seedance-1-lite":      false,
+  "kling-3.0-master":     true,
+  "kling-3.0-turbo":      true,
+  "veo-4":                true,
+  "veo-4-fast":           true,
+  "minimax-video-01":     true,
+  "wan-2.6":              false,
+  "runway-gen5":          false,
 };
 
 export function modelSupportsTextToVideo(model: VideoModel): boolean {
@@ -897,20 +958,21 @@ export async function generateVideoFromImage(
     //   - Veo 3:    ONLY 16:9, fixed 8s
     //   - Veo 3.1:  16:9 AND 9:16, fixed 8s (audio nativo, mejor identidad)
     const isVeo31 = veoModel.startsWith("veo-3.1");
+    const isVeo4  = veoModel.startsWith("veo-4.0");
     const isVeo3X = veoModel.startsWith("veo-3.0") || veoModel === "veo-3.0-generate-preview" || veoModel === "veo-3.0-fast-generate-preview";
     const requested = opts.aspect || "9:16";
     let aspectRatio: string;
     if (isVeo3X) {
       aspectRatio = "16:9"; // Veo 3.0 sólo permite 16:9
     } else {
-      // Veo 2 y Veo 3.1 soportan 16:9 y 9:16
+      // Veo 2, Veo 3.1 y Veo 4 soportan 16:9 y 9:16
       aspectRatio = (requested === "16:9" || requested === "9:16") ? requested : "9:16";
     }
     const veoDur = Math.min(Math.max(opts.duration || 8, 4), 8);
 
     const config: any = { aspectRatio, numberOfVideos: 1, personGeneration: "allow_all" };
-    // Veo 3.0 y 3.1 tienen duración fija (8s); sólo Veo 2 acepta durationSeconds.
-    if (!isVeo3X && !isVeo31) config.durationSeconds = veoDur;
+    // Veo 3.x y Veo 4 tienen duración fija (8s); sólo Veo 2 acepta durationSeconds.
+    if (!isVeo3X && !isVeo31 && !isVeo4) config.durationSeconds = veoDur;
 
     const veoArgs: any = {
       model: veoModel,
@@ -995,6 +1057,7 @@ export async function generateVideoFromImage(
       : model === "runway-gen4.5" ? "gen4.5"
       : model === "runway-seedance2" ? "seedance2"
       : model === "runway-seedance2-fast" ? "seedance2_fast"
+      : model === "runway-gen5" ? "gen5"
       : "gen4_turbo";
     const runwayDur = duration >= 8 ? 10 : 5;
 

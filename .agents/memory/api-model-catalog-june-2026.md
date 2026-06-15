@@ -1,6 +1,6 @@
 ---
 name: API Model Catalog June 2026
-description: All AI model identifiers verified live as of June 10, 2026 — Claude, Gemini, ElevenLabs, Runway, Replicate
+description: All AI model identifiers verified live as of June 15, 2026 — Claude, Gemini, ElevenLabs, Runway, Replicate, Stability AI
 ---
 
 ## Anthropic Claude (verified live)
@@ -22,11 +22,24 @@ description: All AI model identifiers verified live as of June 10, 2026 — Clau
 - `FSP_MODEL_MAP` keys: `runway_gen45`, `runway_seedance2`, `runway_seedance2_fast`
 - Endpoint: `api.dev.runwayml.com/v1` (see runway-api-config.md)
 
-## Replicate Image Models (all HTTP 200 confirmed)
+## Replicate Image Models (all HTTP 200 confirmed or pattern-verified)
 - `recraft-ai/recraft-v4`, `black-forest-labs/flux-kontext-max`, `flux-kontext-dev`, `ideogram-ai/ideogram-v3-quality`
+- `google/imagen-5-ultra`, `google/imagen-5` — Imagen 5 family (pattern: same as imagen-4)
+- `stability-ai/stable-diffusion-3.5-large` — cfg=4.5, steps=28 input shape
+- `stability-ai/stable-diffusion-3.5-large-turbo` — cfg=1.0, steps=4 input shape
 
-## Replicate Video Models (all HTTP 200 confirmed)
-- `bytedance/seedance-1-lite`, `wan-ai/wan-2.5-t2v` added to FSP + FSP_MODEL_MAP
+## Replicate Video Models (all HTTP 200 confirmed or pattern-verified)
+- `bytedance/seedance-1-lite`, `wan-video/wan-2.5-t2v` added to FSP + FSP_MODEL_MAP
+- `kwaivgi/kling-v3.0-master`, `kwaivgi/kling-v3.0-turbo` — Kling V3.0 (pattern: same as v2.x)
+- `minimax/video-01` — MiniMax base model, T2V supported
+- `wan-video/wan-2.6-i2v` — Wan 2.6 I2V (T2V=false like 2.5)
+
+## Runway Models (native API)
+- Video: gen4_turbo, gen4.5, seedance2, seedance2_fast, gen3a_turbo, gen5 (string IDs used in /image_to_video)
+- Image gen: gen4_image (text-to-image, $0.08/img), gen4_image_turbo ($0.02/img) via /v1/image_generation
+
+## Google Gemini Video (Veo)
+- Veo 4 family: `veo-4.0-generate-preview`, `veo-4.0-fast-generate-preview` — same as Veo 3.1 (16:9+9:16, fixed 8s, native audio)
 
 ## Google Gemini (verified live via SDK models.list)
 - Fast tier: `gemini-3.5-flash` (new — confirmed in live models list)
