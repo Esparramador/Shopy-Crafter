@@ -182,20 +182,21 @@ router.get("/products", async (req, res): Promise<void> => {
         title: productsTable.title,
         price: productsTable.price,
         auditScore: productsTable.auditScore,
+        auditGrade: productsTable.auditGrade,
         handle: productsTable.handle,
         imagesJson: productsTable.imagesJson,
         bodyHtml: productsTable.bodyHtml,
         vendor: productsTable.vendor,
       }).from(productsTable)
         .where(eq(productsTable.projectId, parseInt(projectId)))
-        .orderBy(productsTable.title),
+        .orderBy(desc(productsTable.auditScore)),
     ]);
     const shopDomain = projectRows[0]?.shopDomain ?? null;
     const products = prods.map(p => {
-      const images = Array.isArray(p.imagesJson) ? p.imagesJson : [];
-      const first = images[0] as any;
-      const imageUrl = first ? (typeof first === "string" ? first : (first.src ?? first.url ?? null)) : null;
-      return { id: p.id, title: p.title, price: p.price, auditScore: p.auditScore, handle: p.handle, imageUrl, bodyHtml: p.bodyHtml, vendor: p.vendor, shopDomain };
+      const rawImages = Array.isArray(p.imagesJson) ? p.imagesJson : (typeof p.imagesJson === "string" ? JSON.parse(p.imagesJson) : []);
+      const images: string[] = (rawImages as any[]).map((img: any) => typeof img === "string" ? img : (img.src ?? img.url ?? "")).filter(Boolean);
+      const imageUrl = images[0] ?? null;
+      return { id: p.id, title: p.title, price: p.price, auditScore: p.auditScore, auditGrade: p.auditGrade, handle: p.handle, images, imageUrl, bodyHtml: p.bodyHtml, vendor: p.vendor, shopDomain };
     });
     res.json(products);
   } catch (err: any) {
