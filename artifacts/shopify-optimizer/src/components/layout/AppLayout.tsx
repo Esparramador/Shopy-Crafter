@@ -190,9 +190,13 @@ export function AppLayout({ children }: AppLayoutProps) {
         .then(d => {
           if (d && typeof d.total === "number") {
             const newCount = d.total;
-            if (prevUnreadRef.current >= 0 && newCount > prevUnreadRef.current && locationRef.current !== "/admin/messages") {
+            if (prevUnreadRef.current === -1 && newCount > 0 && locationRef.current !== "/admin/messages") {
+              // Primera carga: hay mensajes pendientes previos
+              showAdminToast(`💬 Tienes ${newCount} mensaje${newCount > 1 ? "s" : ""} pendiente${newCount > 1 ? "s" : ""} sin leer`);
+            } else if (prevUnreadRef.current >= 0 && newCount > prevUnreadRef.current && locationRef.current !== "/admin/messages") {
+              // Nuevo mensaje llegó durante la sesión
               playBeep();
-              showAdminToast(`💬 Tienes ${newCount - prevUnreadRef.current} mensaje${newCount - prevUnreadRef.current > 1 ? "s" : ""} nuevo${newCount - prevUnreadRef.current > 1 ? "s" : ""} de clientes`);
+              showAdminToast(`💬 ${newCount - prevUnreadRef.current} mensaje${newCount - prevUnreadRef.current > 1 ? "s" : ""} nuevo${newCount - prevUnreadRef.current > 1 ? "s" : ""} de clientes`);
             }
             prevUnreadRef.current = newCount;
             setUnreadCount(newCount);
@@ -549,6 +553,38 @@ export function AppLayout({ children }: AppLayoutProps) {
             )}
           </div>
           <div className="topbar-right">
+            {/* Chat shortcut — always visible in topbar */}
+            <Link href="/admin/messages">
+              <div
+                title="Mensajes Clientes"
+                style={{
+                  position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 32, height: 32, borderRadius: 8, cursor: "pointer",
+                  background: unreadCount > 0
+                    ? "linear-gradient(135deg,rgba(200,168,75,0.18) 0%,rgba(226,201,126,0.12) 100%)"
+                    : "var(--ink3)",
+                  border: unreadCount > 0 ? "1px solid rgba(200,168,75,0.45)" : "1px solid var(--bdr2)",
+                  transition: "all 0.2s",
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ fontSize: 15, lineHeight: 1 }}>💬</span>
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: "absolute", top: -5, right: -5,
+                    minWidth: 16, height: 16, borderRadius: 8,
+                    background: "var(--crim)", color: "#fff",
+                    fontSize: 9, fontWeight: 700,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 4px", lineHeight: 1,
+                    border: "1.5px solid var(--bg)",
+                  }}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </div>
+            </Link>
+
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <kbd style={{
                 padding: "2px 6px", borderRadius: 4, fontSize: 10,

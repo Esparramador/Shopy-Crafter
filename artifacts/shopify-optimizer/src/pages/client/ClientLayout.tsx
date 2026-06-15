@@ -68,7 +68,13 @@ export function ClientLayout({ children }: { children: ReactNode }) {
         .then(d => {
           if (d && typeof d.count === "number") {
             const newCount = d.count;
-            if (prevUnreadClientRef.current >= 0 && newCount > prevUnreadClientRef.current && locationRef.current !== "/client/messages") {
+            if (prevUnreadClientRef.current === -1 && newCount > 0 && locationRef.current !== "/client/messages") {
+              const diff = newCount;
+              const msg = `💬 Tienes ${diff} mensaje${diff > 1 ? "s" : ""} pendiente${diff > 1 ? "s" : ""} sin leer`;
+              setClientToast(msg);
+              if (clientToastTimer.current) clearTimeout(clientToastTimer.current);
+              clientToastTimer.current = setTimeout(() => setClientToast(null), 6000);
+            } else if (prevUnreadClientRef.current >= 0 && newCount > prevUnreadClientRef.current && locationRef.current !== "/client/messages") {
               try {
                 const ctx = new AudioContext();
                 const osc = ctx.createOscillator();
