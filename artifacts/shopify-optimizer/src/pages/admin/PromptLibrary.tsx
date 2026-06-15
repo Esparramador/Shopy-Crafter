@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Copy, Check, Zap, Filter, ChevronDown, BookOpen, Sparkles, Star, Clock, Hash } from "lucide-react";
+import { Search, Copy, Check, Zap, Filter, ChevronDown, BookOpen, Sparkles, Star, Clock, Hash, Play, X, ChevronRight, AlertCircle, Loader2, Brain, Code2 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -18,6 +18,18 @@ interface MasterItem {
 interface LibIndex {
   key: string;
   count: number;
+}
+
+interface Project {
+  id: number;
+  name: string;
+  shopDomain?: string;
+}
+
+interface PromptVar {
+  name: string;
+  value: string | null;
+  resolved: boolean;
 }
 
 const EFFECT_CATEGORIES = [
@@ -44,7 +56,400 @@ const ENGINE_COLORS: Record<string, string> = {
   default: "var(--t3)",
 };
 
-function EffectPreviewCard({ item, onCopy }: { item: MasterItem; onCopy: (text: string) => void }) {
+function highlightVars(text: string): React.ReactNode[] {
+  const parts = text.split(/(\{\{[A-Z_]+\}\})/g);
+  return parts.map((part, i) =>
+    /^\{\{[A-Z_]+\}\}$/.test(part)
+      ? <mark key={i} style={{ background: "rgba(200,168,75,0.2)", color: "var(--gold)", borderRadius: 3, padding: "0 3px", fontWeight: 700 }}>{part}</mark>
+      : <span key={i}>{part}</span>
+  );
+}
+
+function VarBadge({ v }: { v: PromptVar }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 6,
+      padding: "4px 8px", borderRadius: 6,
+      background: v.resolved ? "rgba(74,222,128,0.08)" : "rgba(248,113,113,0.08)",
+      border: `1px solid ${v.resolved ? "rgba(74,222,128,0.2)" : "rgba(248,113,113,0.2)"}`,
+      fontSize: 11,
+    }}>
+      <span style={{ color: v.resolved ? "#4ade80" : "#f87171", fontWeight: 700, fontFamily: "monospace" }}>
+        {`{{${v.name}}}`}
+      </span>
+      {v.resolved
+        ? <span style={{ color: "var(--t3)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>→ {v.value}</span>
+        : <span style={{ color: "#f87171" }}>sin resolver</span>
+      }
+    </div>
+  );
+}
+
+function ExecutionPanel({
+  item,
+  projects,
+  onClose,
+}: {
+  item: MasterItem;
+  projects: Project[];
+  onClose: () => void;
+}) {
+  const [selectedProjectId, setSelectedProjectId] = useState<number | "">(projects[0]?.id ?? "");
+  const [vars, setVars] = useState<PromptVar[]>([]);
+  const [loadingVars, setLoadingVars] = useState(false);
+  const [executing, setExecuting] = useState(false);
+  const [result, setResult] = useState("");
+  const [error, setError] = useState("");
+  const [customVars, setCustomVars] = useState<Record<string, string>>({});
+  const [copied, setCopied] = useState(false);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const template = item.prompt ?? item.description ?? item.name;
+
+  const loadVars = useCallback(async (projectId: number | "") => {
+    if (!template) return;
+    setLoadingVars(true);
+    setVars([]);
+    try {
+      const r = await fetch(`${API_BASE}/api/prompt-library/preview-vars`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ template, projectId: projectId || undefined }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setVars(d.vars ?? []);
+      }
+    } catch {}
+    setLoadingVars(false);
+  }, [template]);
+
+  useEffect(() => {
+    loadVars(selectedProjectId);
+  }, [selectedProjectId, loadVars]);
+
+  const handleExecute = async () => {
+    if (!template) return;
+    setExecuting(true);
+    setResult("");
+    setError("");
+    abortRef.current = new AbortController();
+
+    try {
+      const response = await fetch(`${API_BASE}/api/prompt-library/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: abortRef.current.signal,
+        body: JSON.stringify({
+          template,
+          projectId: selectedProjectId || undefined,
+          customVars,
+          saveToMemory: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Error desconocido" }));
+        setError(err.error ?? "Error ejecutando prompt");
+        setExecuting(false);
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) { setError("Sin stream"); setExecuting(false); return; }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const msg = JSON.parse(line.slice(6));
+            if (msg.type === "delta") {
+              fullText += msg.text;
+              setResult(fullText);
+              if (resultRef.current) {
+                resultRef.current.scrollTop = resultRef.current.scrollHeight;
+              }
+            } else if (msg.type === "error") {
+              setError(msg.message ?? "Error");
+            } else if (msg.type === "meta") {
+              if (msg.unresolvedVars?.length > 0) {
+                setVars(prev => prev.map(v =>
+                  msg.unresolvedVars.includes(v.name) ? { ...v, resolved: false } : v
+                ));
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") setError(err.message ?? "Error");
+    }
+    setExecuting(false);
+  };
+
+  const handleStop = () => {
+    abortRef.current?.abort();
+    setExecuting(false);
+  };
+
+  const handleCopyResult = () => {
+    navigator.clipboard.writeText(result).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  const resolvedCount = vars.filter(v => v.resolved).length;
+  const totalVars = vars.length;
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      display: "flex", alignItems: "stretch",
+      background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
+    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+
+      <div style={{
+        marginLeft: "auto",
+        width: "min(680px, 96vw)",
+        background: "var(--ink)",
+        borderLeft: "1px solid var(--bdr)",
+        display: "flex", flexDirection: "column",
+        overflow: "hidden",
+        animation: "slideInRight 0.2s ease-out",
+      }}>
+
+        {/* Header */}
+        <div style={{
+          padding: "18px 20px", borderBottom: "1px solid var(--bdr)",
+          display: "flex", alignItems: "flex-start", gap: 12,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <span style={{
+                fontSize: 9, padding: "2px 7px", borderRadius: 4,
+                background: "rgba(200,168,75,0.12)", color: "var(--gold)",
+                fontWeight: 700, textTransform: "uppercase",
+              }}>
+                Ejecutar con DNA ✨
+              </span>
+              {item.engine && (
+                <span style={{
+                  fontSize: 9, padding: "1px 6px", borderRadius: 3,
+                  background: `${ENGINE_COLORS[item.engine?.toLowerCase() ?? ""] ?? ENGINE_COLORS.default}18`,
+                  color: ENGINE_COLORS[item.engine?.toLowerCase() ?? ""] ?? ENGINE_COLORS.default,
+                  fontWeight: 700, textTransform: "uppercase",
+                }}>
+                  {item.engine}
+                </span>
+              )}
+            </div>
+            <h2 style={{ fontSize: 15, fontWeight: 800, color: "var(--t)", lineHeight: 1.3 }}>
+              {item.name}
+            </h2>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer", padding: 4, flexShrink: 0 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Project Selector */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.8px", display: "block", marginBottom: 6 }}>
+              Proyecto cliente
+            </label>
+            {projects.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--t4)" }}>Sin proyectos. El prompt se ejecutará sin DNA de marca.</p>
+            ) : (
+              <select
+                value={selectedProjectId}
+                onChange={e => setSelectedProjectId(e.target.value ? Number(e.target.value) : "")}
+                className="form-input"
+                style={{ width: "100%", fontSize: 13 }}
+              >
+                <option value="">— Sin proyecto (prompt genérico) —</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} {p.shopDomain ? `(${p.shopDomain})` : ""}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Variable Resolution Status */}
+          {(loadingVars || vars.length > 0) && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                  Variables DNA
+                </label>
+                {!loadingVars && totalVars > 0 && (
+                  <span style={{
+                    fontSize: 10, padding: "1px 7px", borderRadius: 10,
+                    background: resolvedCount === totalVars ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)",
+                    color: resolvedCount === totalVars ? "#4ade80" : "#f87171",
+                    fontWeight: 700,
+                  }}>
+                    {resolvedCount}/{totalVars} resueltas
+                  </span>
+                )}
+              </div>
+              {loadingVars ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--t4)" }}>
+                  <Loader2 size={12} style={{ animation: "spin 0.8s linear infinite" }} />
+                  Analizando DNA del proyecto…
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {vars.map(v => <VarBadge key={v.name} v={v} />)}
+                </div>
+              )}
+              {vars.some(v => !v.resolved) && (
+                <div style={{ marginTop: 10 }}>
+                  <p style={{ fontSize: 11, color: "var(--t4)", marginBottom: 6 }}>
+                    Variables sin resolver — completa manualmente:
+                  </p>
+                  <div style={{ display: "grid", gap: 5 }}>
+                    {vars.filter(v => !v.resolved).map(v => (
+                      <div key={v.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--gold)", width: 140, flexShrink: 0 }}>
+                          {`{{${v.name}}}`}
+                        </span>
+                        <input
+                          value={customVars[v.name] ?? ""}
+                          onChange={e => setCustomVars(prev => ({ ...prev, [v.name]: e.target.value }))}
+                          placeholder={`Valor para ${v.name}…`}
+                          className="form-input"
+                          style={{ flex: 1, fontSize: 11, padding: "5px 10px" }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Prompt Preview */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.8px", display: "block", marginBottom: 6 }}>
+              Template
+            </label>
+            <div style={{
+              padding: "12px 14px", borderRadius: 8,
+              background: "var(--ink2)", border: "1px solid var(--bdr)",
+              fontSize: 12, color: "var(--t2)", lineHeight: 1.7,
+              fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word",
+              maxHeight: 200, overflow: "auto",
+            }}>
+              {highlightVars(template)}
+            </div>
+          </div>
+
+          {/* Result */}
+          {(result || executing) && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                  Resultado IA
+                  {executing && <span style={{ marginLeft: 6, fontSize: 9, color: "var(--gold)", animation: "pulse 1s infinite" }}>• GENERANDO</span>}
+                </label>
+                {result && !executing && (
+                  <button
+                    onClick={handleCopyResult}
+                    className="btn"
+                    style={{ fontSize: 10, padding: "3px 10px", display: "flex", alignItems: "center", gap: 4 }}
+                  >
+                    {copied ? <Check size={11} /> : <Copy size={11} />}
+                    {copied ? "Copiado" : "Copiar"}
+                  </button>
+                )}
+              </div>
+              <div
+                ref={resultRef}
+                style={{
+                  padding: "14px 16px", borderRadius: 8,
+                  background: "var(--ink2)", border: "1px solid rgba(200,168,75,0.2)",
+                  fontSize: 13, color: "var(--t)", lineHeight: 1.75,
+                  whiteSpace: "pre-wrap", wordBreak: "break-word",
+                  maxHeight: 340, overflow: "auto",
+                  minHeight: 80,
+                }}
+              >
+                {result}
+                {executing && <span style={{ display: "inline-block", width: 8, height: 14, background: "var(--gold)", borderRadius: 1, marginLeft: 2, animation: "blink 0.7s infinite" }} />}
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{
+              display: "flex", alignItems: "flex-start", gap: 8,
+              padding: "10px 12px", borderRadius: 8,
+              background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)",
+            }}>
+              <AlertCircle size={14} style={{ color: "#f87171", flexShrink: 0, marginTop: 1 }} />
+              <p style={{ fontSize: 12, color: "#f87171" }}>{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div style={{
+          padding: "14px 20px", borderTop: "1px solid var(--bdr)",
+          display: "flex", gap: 8, alignItems: "center",
+        }}>
+          {executing ? (
+            <button
+              onClick={handleStop}
+              className="btn"
+              style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "#f87171", borderColor: "rgba(248,113,113,0.3)" }}
+            >
+              <X size={13} /> Detener
+            </button>
+          ) : (
+            <button
+              onClick={handleExecute}
+              className="btn-primary"
+              disabled={!template}
+              style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontSize: 13, padding: "10px" }}
+            >
+              <Zap size={14} />
+              {selectedProjectId ? "Ejecutar con DNA del cliente" : "Ejecutar prompt"}
+            </button>
+          )}
+          <button onClick={onClose} className="btn" style={{ padding: "10px 16px" }}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EffectPreviewCard({
+  item,
+  onCopy,
+  onExecute,
+  dnaMode,
+}: {
+  item: MasterItem;
+  onCopy: (text: string) => void;
+  onExecute: (item: MasterItem) => void;
+  dnaMode: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const engineColor = ENGINE_COLORS[item.engine?.toLowerCase() ?? ""] ?? ENGINE_COLORS.default;
@@ -57,6 +462,13 @@ function EffectPreviewCard({ item, onCopy }: { item: MasterItem; onCopy: (text: 
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   };
+
+  const handleExecute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onExecute(item);
+  };
+
+  const hasVars = /\{\{[A-Z_]+\}\}/.test(item.prompt ?? item.description ?? "");
 
   return (
     <div
@@ -92,6 +504,15 @@ function EffectPreviewCard({ item, onCopy }: { item: MasterItem; onCopy: (text: 
                 {item.category}
               </span>
             )}
+            {hasVars && dnaMode && (
+              <span style={{
+                fontSize: 9, padding: "1px 6px", borderRadius: 3,
+                background: "rgba(200,168,75,0.1)", color: "var(--gold)",
+                fontWeight: 700, flexShrink: 0,
+              }}>
+                DNA ✨
+              </span>
+            )}
           </div>
           <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t)", lineHeight: 1.3, marginBottom: 4 }}>
             {item.name}
@@ -114,7 +535,7 @@ function EffectPreviewCard({ item, onCopy }: { item: MasterItem; onCopy: (text: 
               fontSize: 11, color: "var(--t2)", lineHeight: 1.6,
               fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word",
             }}>
-              {item.prompt}
+              {dnaMode ? highlightVars(item.prompt) : item.prompt}
             </div>
           )}
           {item.tags && item.tags.length > 0 && expanded && (
@@ -128,19 +549,39 @@ function EffectPreviewCard({ item, onCopy }: { item: MasterItem; onCopy: (text: 
             </div>
           )}
         </div>
-        <button
-          onClick={handleCopy}
-          title="Copiar prompt"
-          style={{
-            flexShrink: 0, background: copied ? "rgba(74,222,128,0.1)" : "var(--ink3)",
-            border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : "var(--bdr)"}`,
-            borderRadius: 7, padding: "6px 8px", cursor: "pointer",
-            color: copied ? "#4ade80" : "var(--t3)", transition: "all 0.15s",
-            display: "flex", alignItems: "center", gap: 4, fontSize: 11,
-          }}
-        >
-          {copied ? <Check size={13} /> : <Copy size={13} />}
-        </button>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+          {dnaMode && (
+            <button
+              onClick={handleExecute}
+              title="Ejecutar con DNA del cliente"
+              style={{
+                background: "rgba(200,168,75,0.1)",
+                border: "1px solid rgba(200,168,75,0.3)",
+                borderRadius: 7, padding: "6px 8px", cursor: "pointer",
+                color: "var(--gold)", transition: "all 0.15s",
+                display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700,
+              }}
+              onMouseOver={e => { e.currentTarget.style.background = "rgba(200,168,75,0.2)"; }}
+              onMouseOut={e => { e.currentTarget.style.background = "rgba(200,168,75,0.1)"; }}
+            >
+              <Zap size={12} />
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            title="Copiar prompt"
+            style={{
+              flexShrink: 0, background: copied ? "rgba(74,222,128,0.1)" : "var(--ink3)",
+              border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : "var(--bdr)"}`,
+              borderRadius: 7, padding: "6px 8px", cursor: "pointer",
+              color: copied ? "#4ade80" : "var(--t3)", transition: "all 0.15s",
+              display: "flex", alignItems: "center", gap: 4, fontSize: 11,
+            }}
+          >
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -159,6 +600,9 @@ export default function PromptLibrary() {
   const [copiedMsg, setCopiedMsg] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<"default" | "name" | "engine">("default");
+  const [dnaMode, setDnaMode] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [executingItem, setExecutingItem] = useState<MasterItem | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const LIMIT = 24;
 
@@ -210,9 +654,20 @@ export default function PromptLibrary() {
     } catch {}
   }, []);
 
+  const loadProjects = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/projects`, { credentials: "include" });
+      if (r.ok) {
+        const d = await r.json();
+        setProjects(Array.isArray(d) ? d : (d.projects ?? []));
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     loadIndex();
-  }, [loadIndex]);
+    loadProjects();
+  }, [loadIndex, loadProjects]);
 
   const handleCategorySelect = (key: string) => {
     setActiveCategory(key);
@@ -264,7 +719,7 @@ export default function PromptLibrary() {
               Librería de Prompts
             </h1>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{
               fontSize: 12, padding: "5px 12px", borderRadius: 20,
               background: "rgba(200,168,75,0.1)", color: "var(--gold)",
@@ -279,12 +734,61 @@ export default function PromptLibrary() {
             }}>
               {libIndex.length || "..."} categorías
             </span>
+
+            {/* DNA MODE TOGGLE */}
+            <button
+              onClick={() => setDnaMode(m => !m)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 14px", borderRadius: 20, cursor: "pointer",
+                background: dnaMode ? "rgba(200,168,75,0.15)" : "var(--ink2)",
+                border: dnaMode ? "1px solid rgba(200,168,75,0.4)" : "1px solid var(--bdr)",
+                color: dnaMode ? "var(--gold)" : "var(--t3)",
+                fontWeight: 700, fontSize: 12,
+                transition: "all 0.15s",
+                boxShadow: dnaMode ? "0 0 12px rgba(200,168,75,0.15)" : "none",
+              }}
+            >
+              <Brain size={13} />
+              {dnaMode ? "Modo DNA ✦ Activo" : "Modo DNA"}
+            </button>
           </div>
         </div>
         <p style={{ fontSize: 13, color: "var(--t3)" }}>
-          Explora y copia templates de IA para producto, copy, SEO, email, ads y mucho más.
+          {dnaMode
+            ? "🧬 Modo DNA activo — pulsa ⚡ en cualquier template para ejecutarlo con el ADN del cliente."
+            : "Explora y copia templates de IA para producto, copy, SEO, email, ads y mucho más."}
         </p>
       </div>
+
+      {/* ── DNA MODE BANNER ── */}
+      {dnaMode && (
+        <div style={{
+          padding: "14px 18px", borderRadius: 12, marginBottom: 20,
+          background: "linear-gradient(135deg, rgba(200,168,75,0.08), rgba(200,168,75,0.04))",
+          border: "1px solid rgba(200,168,75,0.25)",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <div style={{ fontSize: 28 }}>🧬</div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)", marginBottom: 3 }}>
+              Ejecución con DNA de Marca activada
+            </p>
+            <p style={{ fontSize: 12, color: "var(--t3)", lineHeight: 1.5 }}>
+              Todas las variables <code style={{ fontSize: 11, background: "rgba(200,168,75,0.15)", padding: "1px 4px", borderRadius: 3 }}>{"{{VARIABLE}}"}</code> se resuelven automáticamente con el ADN del cliente seleccionado (nombre, sector, tono, colores, UVP, audiencia, redes sociales…). El resultado es contenido 100% personalizado, no genérico.
+              {projects.length > 0 && <> Tienes <strong style={{ color: "var(--t)" }}>{projects.length} proyectos</strong> disponibles.</>}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, background: "rgba(74,222,128,0.1)", color: "#4ade80", fontWeight: 700 }}>
+              ⚡ = Ejecutar
+            </span>
+            <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8, background: "rgba(200,168,75,0.1)", color: "var(--gold)", fontWeight: 700 }}>
+              DNA ✨ = Con variables
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── SEARCH BAR ── */}
       <form onSubmit={handleSearch} style={{ display: "flex", gap: 8, marginBottom: 20 }}>
@@ -440,7 +944,13 @@ export default function PromptLibrary() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 10, marginBottom: 20 }}>
             {sortedItems.map((item, i) => (
-              <EffectPreviewCard key={item.id ?? i} item={item} onCopy={handleCopy} />
+              <EffectPreviewCard
+                key={item.id ?? i}
+                item={item}
+                onCopy={handleCopy}
+                onExecute={setExecutingItem}
+                dnaMode={dnaMode}
+              />
             ))}
           </div>
 
@@ -489,6 +999,7 @@ export default function PromptLibrary() {
           { icon: <Sparkles size={16} />, label: "Categorías activas", value: `${libIndex.length || EFFECT_CATEGORIES.length - 1}`, color: "#a78bfa" },
           { icon: <Star size={16} />, label: "Motores IA", value: "Claude · GPT · Gemini · Flux", color: "var(--jade)" },
           { icon: <Hash size={16} />, label: "Casos de uso", value: "Copy · SEO · Imagen · Email · Ad", color: "#f59e0b" },
+          { icon: <Brain size={16} />, label: "Modo DNA", value: dnaMode ? "✦ Activo" : "Inactivo", color: dnaMode ? "var(--gold)" : "var(--t4)" },
           { icon: <Clock size={16} />, label: "Actualización", value: "Continua · IA aprendiendo", color: "#06b6d4" },
         ].map(item => (
           <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 160 }}>
@@ -501,10 +1012,34 @@ export default function PromptLibrary() {
         ))}
       </div>
 
+      {/* ── EXECUTION PANEL ── */}
+      {executingItem && (
+        <ExecutionPanel
+          item={executingItem}
+          projects={projects}
+          onClose={() => setExecutingItem(null)}
+        />
+      )}
+
       <style>{`
         @keyframes fadeSlideUp {
           from { opacity: 0; transform: translateX(-50%) translateY(8px); }
           to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to   { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
         }
       `}</style>
     </div>

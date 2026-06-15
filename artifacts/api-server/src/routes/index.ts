@@ -61,6 +61,7 @@ import webDesignerRouter from "./web-designer.js";
 import stitchRouter from "./stitch.js";
 import publicQrRouter from "./public-qr.js";
 import publicChatRouter from "./public-chat.js";
+import promptExecRouter from "./prompt-exec.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -156,5 +157,6 @@ router.use(brandDnaRouter);
 router.use(tripo3dRouter);
 router.use(vismeRouter);
 router.use(webDesignerRouter);
+router.use(promptExecRouter);
 
 export default router;

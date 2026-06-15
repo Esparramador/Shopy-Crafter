@@ -4,6 +4,8 @@ import { eq, sql } from "drizzle-orm";
 import { enableLongRunning } from "../lib/long-running.js";
 import { askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
+import { crawlSiteFromSitemap, formatTechStackForPrompt } from "../lib/site-crawler.js";
+import { extractGoogleBusinessProfile, formatGoogleReviewsForPrompt } from "../lib/google-reviews.js";
 
 const router = Router();
 
@@ -278,41 +280,40 @@ router.post("/projects/:projectId/brand-dna/extract-full", async (req, res): Pro
     // Mark as extracting
     await db.execute(sql`UPDATE brand_dna SET extraction_status = 'extracting' WHERE project_id = ${projectId}`);
 
-    // BLOQUE 1: Scrapear múltiples páginas en paralelo
-    const pagePaths = [
-      { path: "", label: "HOMEPAGE" },
-      { path: "/about", label: "ABOUT" },
-      { path: "/about-us", label: "ABOUT-US" },
-      { path: "/sobre-nosotros", label: "SOBRE-NOSOTROS" },
-      { path: "/quienes-somos", label: "QUIENES-SOMOS" },
-      { path: "/services", label: "SERVICES" },
-      { path: "/servicios", label: "SERVICIOS" },
-      { path: "/products", label: "PRODUCTS" },
-      { path: "/contact", label: "CONTACT" },
-      { path: "/contacto", label: "CONTACTO" },
-    ];
+    // BLOQUE 1: Crawl multi-página desde sitemap.xml + extracción Google Reviews en paralelo
+    const brandName = project.name || baseUrl;
 
-    const scrapeResults = await Promise.allSettled(
-      pagePaths.map(async ({ path, label }) => {
-        const content = await scrapePage(`${baseUrl}${path}`);
-        return content ? `\n\n=== PÁGINA: ${label} (${baseUrl}${path}) ===\n${content}` : "";
-      })
-    );
+    const [crawlResult, googleProfile] = await Promise.all([
+      crawlSiteFromSitemap(baseUrl, 25),
+      extractGoogleBusinessProfile(brandName, baseUrl).catch(() => null),
+    ]);
 
-    const allContent = scrapeResults
-      .filter(r => r.status === "fulfilled" && r.value)
-      .map(r => (r as PromiseFulfilledResult<string>).value)
-      .join("\n")
-      .slice(0, 18000);
+    const techBlock = formatTechStackForPrompt(crawlResult.techStack);
+    const reviewsBlock = googleProfile ? formatGoogleReviewsForPrompt(googleProfile) : "";
+    const socialHandlesFromCrawl = crawlResult.socialHandles.join(", ");
 
-    if (!allContent.trim()) {
+    const enrichedContent = [
+      crawlResult.allContent,
+      "",
+      "=== ANÁLISIS TÉCNICO DEL SITIO ===",
+      techBlock,
+      socialHandlesFromCrawl && `REDES SOCIALES DETECTADAS EN SITIO: ${socialHandlesFromCrawl}`,
+      crawlResult.colorPalette.length && `PALETA DE COLORES DEL SITIO: ${crawlResult.colorPalette.slice(0, 15).join(", ")}`,
+      crawlResult.sitemapFound && `SITEMAP: Sí — ${crawlResult.totalPagesDiscovered} páginas descubiertas, ${crawlResult.pagesCrawled} analizadas`,
+      "",
+      reviewsBlock && "=== GOOGLE BUSINESS PROFILE ===",
+      reviewsBlock,
+    ].filter(Boolean).join("\n").slice(0, 22000);
+
+    const allContent = enrichedContent;
+
+    if (!allContent.trim() || crawlResult.pagesCrawled === 0) {
       res.status(422).json({ error: "No se pudo extraer contenido del sitio web. Verifica que la URL sea accesible." });
       return;
     }
 
     // BLOQUE 2: Análisis Claude — extracción de ADN completa
-    const brandName = project.name || baseUrl;
-    const system = `${SHOPIFY_EXPERT_SYSTEM} Eres el experto máximo en análisis de identidad de marca y branding estratégico. Analizas datos reales de sitios web para extraer el ADN de marca más completo y verídico posible. Siempre devuelves JSON válido sin markdown.`;
+    const system = `${SHOPIFY_EXPERT_SYSTEM} Eres el experto máximo en análisis de identidad de marca y branding estratégico. Analizas datos reales de sitios web (${crawlResult.pagesCrawled} páginas analizadas), tech stack detectado y reseñas de Google para extraer el ADN de marca más completo y verídico posible. Siempre devuelves JSON válido sin markdown.`;
 
     interface DnaResult extends FullBrandDna {}
 
@@ -428,7 +429,12 @@ router.post("/projects/:projectId/brand-dna/extract-full", async (req, res): Pro
       ok: true,
       websiteUrl: baseUrl,
       profile,
-      pagesScraped: scrapeResults.filter(r => r.status === "fulfilled" && (r as PromiseFulfilledResult<string>).value).length,
+      pagesScraped: crawlResult.pagesCrawled,
+      totalPagesDiscovered: crawlResult.totalPagesDiscovered,
+      sitemapFound: crawlResult.sitemapFound,
+      techStack: crawlResult.techStack,
+      googleProfile: googleProfile ?? null,
+      socialHandles: crawlResult.socialHandles,
     });
 
   } catch (e: any) {
