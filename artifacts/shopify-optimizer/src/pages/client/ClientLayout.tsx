@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";
 import { LogOut, Menu, X } from "lucide-react";
 import { ClientChatbot } from "./ClientChatbot";
+import { useClientPreview } from "./ClientPreviewContext";
 
 const _BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -32,6 +33,20 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   const cp: ClientCmsPanel = (cmsContent?.clientPanel as ClientCmsPanel) ?? {};
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const { previewPid, setPreviewPid } = useClientPreview();
+  const [projects, setProjects] = useState<Array<{ id: number; name: string; shopDomain: string }>>([]);
+
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    fetch(`${API_BASE}/api/admin/projects-list`, { credentials: "include" })
+      .then(r => r.json())
+      .then((d: Array<{ id: number; name: string; shopDomain: string }>) => {
+        if (!Array.isArray(d)) return;
+        setProjects(d);
+        if (!previewPid && d.length > 0) setPreviewPid(String(d[0].id));
+      })
+      .catch(() => {});
+  }, [user?.role]);
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
@@ -195,10 +210,28 @@ export function ClientLayout({ children }: { children: ReactNode }) {
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "7px 16px", fontSize: 11.5, fontWeight: 500,
             background: "rgba(200,168,75,0.08)", borderBottom: "1px solid rgba(200,168,75,0.20)",
-            color: "var(--gold)", gap: 8,
+            color: "var(--gold)", gap: 8, flexWrap: "wrap",
           }}>
-            <span>👁 Vista previa del Panel Cliente — estás viendo como Admin</span>
-            <div style={{ display: "flex", gap: 8 }}>
+            <span style={{ flexShrink: 0 }}>👁 Vista previa — ves como Admin</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {projects.length > 0 && (
+                <select
+                  value={previewPid}
+                  onChange={e => setPreviewPid(e.target.value)}
+                  style={{
+                    background: "rgba(200,168,75,0.10)", border: "1px solid rgba(200,168,75,0.30)",
+                    borderRadius: 5, color: "var(--gold)", fontSize: 11, fontWeight: 600,
+                    padding: "2px 7px", cursor: "pointer", outline: "none",
+                  }}
+                >
+                  <option value="">— Selecciona tienda —</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.name}{p.shopDomain ? ` · ${p.shopDomain}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
               <a
                 href={`${_BASE_URL}/admin/cms`}
                 style={{
@@ -206,7 +239,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
                   background: "rgba(200,168,75,0.12)", border: "1px solid rgba(200,168,75,0.30)",
                   color: "var(--gold)", textDecoration: "none",
                 }}
-              >✏️ Editar en CMS</a>
+              >✏️ CMS</a>
               <a
                 href={`${_BASE_URL}/home`}
                 style={{
@@ -214,7 +247,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
                   background: "var(--ink3)", border: "1px solid var(--bdr2)",
                   color: "var(--t2)", textDecoration: "none",
                 }}
-              >← Volver al Admin</a>
+              >← Admin</a>
             </div>
           </div>
         )}
@@ -247,8 +280,8 @@ export function ClientLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      {/* Floating AI Chatbot */}
-      <ClientChatbot />
+      {/* Floating AI Chatbot — solo para clientes reales, no para admin en preview */}
+      {user?.role !== "admin" && <ClientChatbot />}
     </div>
   );
 }

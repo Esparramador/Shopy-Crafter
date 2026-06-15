@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { ClientLayout } from "./ClientLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { useClientPreview } from "./ClientPreviewContext";
 import { Download, FileText, TrendingUp, Package, Image, Search, Loader2, Calendar, BarChart3, ArrowUpRight } from "lucide-react";
 import { timeSince } from "@/lib/utils";
 
@@ -28,6 +30,10 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
 }
 
 export default function ClientReports() {
+  const { user } = useAuth();
+  const { previewPid } = useClientPreview();
+  const isAdmin = user?.role === "admin";
+  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
   const [data, setData] = useState<ReportsData | null>(null);
   const [vault, setVault] = useState<VaultFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,20 +41,21 @@ export default function ClientReports() {
   const [tab, setTab] = useState<"kpis" | "seo" | "vault" | "activity">("kpis");
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
-      fetch(`${API}/client/reports`, { credentials: "include" }).then(r => r.json()),
-      fetch(`${API}/client/vault-files`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+      fetch(apid(`${API}/client/reports`), { credentials: "include" }).then(r => r.json()),
+      fetch(apid(`${API}/client/vault-files`), { credentials: "include" }).then(r => r.json()).catch(() => []),
     ]).then(([d, v]) => {
-      setData(d);
+      setData(d?.productsOptimized !== undefined ? d : null);
       setVault(Array.isArray(v) ? v : []);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+  }, [previewPid]);
 
   const handleExport = async (format: "txt" | "csv") => {
     setExporting(format);
     try {
-      const res = await fetch(`${API}/client/reports/export?format=${format}`, { credentials: "include" });
+      const res = await fetch(apid(`${API}/client/reports/export?format=${format}`), { credentials: "include" });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

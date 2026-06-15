@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthProvider, useAuth, getLastRoute, saveLastRoute, clearLastRoute } from "@/contexts/AuthContext";
 import { CmsProvider } from "@/contexts/CmsContext";
+import { ClientPreviewProvider } from "@/pages/client/ClientPreviewContext";
 import { Loader2 } from "lucide-react";
 import SCCursor from "@/components/ui/SCCursor";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -591,21 +592,23 @@ function Router() {
         </Route>
 
         {/* Client routes */}
-        <Route path="/client">
-          <RequireClient><S><ClientDashboard /></S></RequireClient>
-        </Route>
-        <Route path="/client/products">
-          <RequireClient><S><ClientProducts /></S></RequireClient>
-        </Route>
-        <Route path="/client/approvals">
-          <RequireClient><S><ClientApprovals /></S></RequireClient>
-        </Route>
-        <Route path="/client/messages">
-          <RequireClient><S><ClientMessages /></S></RequireClient>
-        </Route>
-        <Route path="/client/reports">
-          <RequireClient><S><ClientReports /></S></RequireClient>
-        </Route>
+        <ClientPreviewProvider>
+          <Route path="/client">
+            <RequireClient><S><ClientDashboard /></S></RequireClient>
+          </Route>
+          <Route path="/client/products">
+            <RequireClient><S><ClientProducts /></S></RequireClient>
+          </Route>
+          <Route path="/client/approvals">
+            <RequireClient><S><ClientApprovals /></S></RequireClient>
+          </Route>
+          <Route path="/client/messages">
+            <RequireClient><S><ClientMessages /></S></RequireClient>
+          </Route>
+          <Route path="/client/reports">
+            <RequireClient><S><ClientReports /></S></RequireClient>
+          </Route>
+        </ClientPreviewProvider>
 
         <Route>{() => <S><NotFound /></S>}</Route>
       </Switch>

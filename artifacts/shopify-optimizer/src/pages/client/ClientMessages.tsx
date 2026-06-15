@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { ClientLayout } from "./ClientLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
+import { useClientPreview } from "./ClientPreviewContext";
 import { Send, Loader2 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -21,7 +22,10 @@ function formatTime(dateStr: string) {
 }
 
 export default function ClientMessages() {
-  const { user: _user } = useAuth();
+  const { user } = useAuth();
+  const { previewPid } = useClientPreview();
+  const isAdmin = user?.role === "admin";
+  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
   const { t } = useCmsSection("labels.clientMessages");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,18 +34,18 @@ export default function ClientMessages() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const load = () => {
-    fetch(`${API_BASE}/api/client/messages`, { credentials: "include" })
+    fetch(apid(`${API_BASE}/api/client/messages`), { credentials: "include" })
       .then((r) => r.json())
       .then((d) => { setMessages(Array.isArray(d) ? d : []); setLoading(false); });
   };
 
-  useEffect(() => { load(); const iv = setInterval(load, 15000); return () => clearInterval(iv); }, []);
+  useEffect(() => { load(); const iv = setInterval(load, 15000); return () => clearInterval(iv); }, [previewPid]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const send = async () => {
     if (!text.trim()) return;
     setSending(true);
-    await fetch(`${API_BASE}/api/client/messages`, {
+    await fetch(apid(`${API_BASE}/api/client/messages`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ClientLayout } from "./ClientLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { useClientPreview } from "./ClientPreviewContext";
 import { Loader2 } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -82,6 +84,10 @@ function TiltCard({ p, onClick }: { p: Product; onClick?: () => void }) {
 }
 
 export default function ClientProducts() {
+  const { user } = useAuth();
+  const { previewPid } = useClientPreview();
+  const isAdmin = user?.role === "admin";
+  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -89,10 +95,11 @@ export default function ClientProducts() {
   const [sortBy, setSortBy] = useState<"score" | "price" | "name">("score");
 
   useEffect(() => {
-    fetch(`${API}/client/products`, { credentials: "include" })
+    setLoading(true);
+    fetch(apid(`${API}/client/products`), { credentials: "include" })
       .then(r => r.json()).then(d => { setProducts(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  }, [previewPid]);
 
   const filtered = products
     .filter(p => {

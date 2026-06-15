@@ -12,7 +12,9 @@ const router = Router();
 router.use(requireAuth);
 
 function getClientProjectId(req: import("express").Request): string {
-  return String(req.session.clientId ?? req.params["projectId"] ?? "");
+  if (req.session.clientId) return String(req.session.clientId);
+  if (req.session.role === "admin" && req.query.pid) return String(req.query.pid);
+  return "";
 }
 
 router.get("/dashboard", async (req, res): Promise<void> => {

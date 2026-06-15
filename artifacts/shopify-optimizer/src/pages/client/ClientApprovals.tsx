@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { ClientLayout } from "./ClientLayout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
+import { useClientPreview } from "./ClientPreviewContext";
 import { CheckCircle, XCircle, Clock, AlertTriangle, Loader2, MessageSquare } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -21,6 +23,10 @@ interface Approval {
 }
 
 export default function ClientApprovals() {
+  const { user } = useAuth();
+  const { previewPid } = useClientPreview();
+  const isAdmin = user?.role === "admin";
+  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
   const { t } = useCmsSection("labels.clientApprovals");
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +34,7 @@ export default function ClientApprovals() {
   const [processing, setProcessing] = useState<string | null>(null);
 
   const load = () => {
-    fetch(`${API_BASE}/api/client/approvals`, { credentials: "include" })
+    fetch(apid(`${API_BASE}/api/client/approvals`), { credentials: "include" })
       .then((r) => r.json())
       .then((d) => { setApprovals(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
@@ -38,11 +44,11 @@ export default function ClientApprovals() {
     load();
     const t = setInterval(load, 15000);
     return () => clearInterval(t);
-  }, []);
+  }, [previewPid]);
 
   const act = async (id: string, action: "approve" | "reject") => {
     setProcessing(id);
-    await fetch(`${API_BASE}/api/client/approvals/${id}/${action}`, {
+    await fetch(apid(`${API_BASE}/api/client/approvals/${id}/${action}`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

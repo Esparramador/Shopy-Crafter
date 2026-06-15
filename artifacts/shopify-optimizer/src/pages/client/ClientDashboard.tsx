@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClientLayout } from "./ClientLayout";
+import { useClientPreview } from "./ClientPreviewContext";
 import { Link } from "wouter";
 import { timeSince } from "@/lib/utils";
 
@@ -71,6 +72,9 @@ const ENGINES = [
 
 export default function ClientDashboard() {
   const { user } = useAuth();
+  const { previewPid } = useClientPreview();
+  const isAdmin = user?.role === "admin";
+  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
   const [data, setData] = useState<DashData | null>(null);
   const [vault, setVault] = useState<VaultFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,15 +87,16 @@ export default function ClientDashboard() {
   useEffect(() => {
     const h = new Date().getHours();
     setGreeting(h < 12 ? "Buenos días" : h < 20 ? "Buenas tardes" : "Buenas noches");
+    setLoading(true);
     Promise.all([
-      fetch(`${API}/client/dashboard`, { credentials: "include" }).then(r => r.json()),
-      fetch(`${API}/client/vault-files`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+      fetch(apid(`${API}/client/dashboard`), { credentials: "include" }).then(r => r.json()),
+      fetch(apid(`${API}/client/vault-files`), { credentials: "include" }).then(r => r.json()).catch(() => []),
     ]).then(([d, v]) => {
-      setData(d);
+      setData(d?.totalProducts !== undefined ? d : null);
       setVault(Array.isArray(v) ? v : []);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+  }, [previewPid]);
 
   const prod = useCountUp(data?.totalProducts ?? 0);
   const score = useCountUp(data?.avgScore ?? 0);
@@ -101,7 +106,7 @@ export default function ClientDashboard() {
   const quickSend = useCallback(async () => {
     if (!msgDraft.trim()) return;
     setSending(true);
-    await fetch(`${API}/client/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ content: msgDraft.trim() }) }).catch(() => {});
+    await fetch(apid(`${API}/client/messages`), { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ content: msgDraft.trim() }) }).catch(() => {});
     setSending(false); setSent(true); setMsgDraft("");
     setTimeout(() => setSent(false), 3000);
   }, [msgDraft]);
