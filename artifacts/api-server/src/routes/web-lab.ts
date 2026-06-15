@@ -1807,6 +1807,17 @@ REGLAS DURAS:
 // DEEP SCAN — Security, DOM, JS, SEO, Accessibility (no AI, fast)
 // ═══════════════════════════════════════════════════════════════
 
+interface ExposedSecret {
+  type: string;
+  service: string;
+  severity: "critical" | "high" | "medium";
+  masked: string;
+  raw: string;
+  context: string;
+  recommendation: string;
+  lineNumber: number;
+}
+
 interface DeepScanResult {
   url: string;
   scannedAt: string;
@@ -1817,6 +1828,7 @@ interface DeepScanResult {
     https: boolean;
     mixedContent: boolean;
     serverInfo?: string;
+    exposedSecrets: ExposedSecret[];
   };
   dom: {
     totalElements: number;
@@ -2086,6 +2098,94 @@ function parseSeoFromHtml(html: string): DeepScanResult["seo"] {
   return { score, title, titleLength, titleStatus, metaDescription: desc, metaDescriptionLength: descLength, metaDescriptionStatus: descStatus, h1Count, h1Status, hasCanonical, canonicalUrl, metaRobots, hasOpenGraph, ogTitle, ogDescription: ogDesc, ogImage: ogImg, hasTwitterCard, hasStructuredData, structuredDataTypes, hasHreflang, hasViewport, hasCharset, issues };
 }
 
+// ── Exposed Secrets Scanner ──────────────────────────────────────────────────
+function scanExposedSecrets(content: string): ExposedSecret[] {
+  const PATTERNS: Array<{
+    type: string; service: string; severity: "critical" | "high" | "medium";
+    regex: RegExp; recommendation: string;
+  }> = [
+    { type: "API Key — Live Secret Key", service: "Stripe", severity: "critical", regex: /sk_live_[0-9a-zA-Z]{24,}/g, recommendation: "Revocar inmediatamente en dashboard.stripe.com → Developers → API keys" },
+    { type: "API Key — Publishable Key Live", service: "Stripe", severity: "high", regex: /pk_live_[0-9a-zA-Z]{24,}/g, recommendation: "Rotar la clave live en Stripe Dashboard; nunca exponer sk_live en frontend" },
+    { type: "API Key — Test Secret Key", service: "Stripe", severity: "high", regex: /sk_test_[0-9a-zA-Z]{24,}/g, recommendation: "Mover a variable de entorno servidor; nunca en código frontend" },
+    { type: "API Key", service: "OpenAI", severity: "critical", regex: /sk-[A-Za-z0-9]{20,}T3BlbkFJ[A-Za-z0-9]{20,}|sk-proj-[A-Za-z0-9_-]{50,}/g, recommendation: "Revocar en platform.openai.com → API Keys. Crear nueva y usar solo en backend" },
+    { type: "API Key", service: "Anthropic (Claude)", severity: "critical", regex: /sk-ant-api\d{2}-[A-Za-z0-9_-]{80,}/g, recommendation: "Revocar en console.anthropic.com → API Keys. Usar solo en backend con variables de entorno" },
+    { type: "API Key", service: "Google (AI/Maps/Firebase)", severity: "critical", regex: /AIza[0-9A-Za-z_-]{35}/g, recommendation: "Restringir en Google Cloud Console → APIs → Credentials. Limitar por HTTP Referrer o IP" },
+    { type: "OAuth Token", service: "Google OAuth", severity: "critical", regex: /ya29\.[0-9A-Za-z\-_]{50,}/g, recommendation: "Revocar el token OAuth en myaccount.google.com → Security → Manage third-party access" },
+    { type: "Access Key ID", service: "AWS", severity: "critical", regex: /AKIA[0-9A-Z]{16}/g, recommendation: "Revocar en AWS IAM Console inmediatamente. Auditar accesos con AWS CloudTrail" },
+    { type: "Secret Access Key", service: "AWS", severity: "critical", regex: /(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])/g, recommendation: "Si es AWS Secret Key, revocar en IAM. Usar IAM Roles en lugar de claves estáticas" },
+    { type: "Personal Access Token", service: "GitHub", severity: "critical", regex: /ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{82,}/g, recommendation: "Revocar en github.com → Settings → Developer settings → Personal access tokens" },
+    { type: "App Token", service: "GitHub", severity: "high", regex: /ghs_[A-Za-z0-9]{36,}|gho_[A-Za-z0-9]{36,}/g, recommendation: "Revocar el OAuth/App token en GitHub Settings → Authorized OAuth Apps" },
+    { type: "Private App Token", service: "Shopify", severity: "critical", regex: /shppa_[A-Za-z0-9]{32,}|shpat_[A-Za-z0-9]{32,}|shpss_[A-Za-z0-9]{32,}/g, recommendation: "Revocar en Shopify Admin → Apps → Private apps. Nunca exponer access tokens en frontend" },
+    { type: "Storefront Token", service: "Shopify", severity: "high", regex: /[0-9a-fA-F]{32}(?=.*shopify|.*storefront)/g, recommendation: "El Storefront API token es público, pero limitar scopes a solo lectura en Shopify Admin" },
+    { type: "API Key", service: "SendGrid", severity: "critical", regex: /SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}/g, recommendation: "Revocar en app.sendgrid.com → Settings → API Keys. Usar solo en backend" },
+    { type: "API Key", service: "Twilio", severity: "critical", regex: /SK[0-9a-f]{32}/g, recommendation: "Revocar en console.twilio.com → Account → API Keys. Rotar AccountSid y AuthToken" },
+    { type: "Auth Token", service: "Twilio", severity: "critical", regex: /AC[0-9a-f]{32}/g, recommendation: "Este puede ser AccountSid de Twilio. Verificar y revocar AuthToken asociado si se expuso" },
+    { type: "API Key", service: "Mailchimp", severity: "high", regex: /[0-9a-f]{32}-us[0-9]{1,2}/g, recommendation: "Revocar en Mailchimp Account → Extras → API Keys" },
+    { type: "Server Key / Legacy", service: "Firebase", severity: "critical", regex: /AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}/g, recommendation: "Migrar a FCM v1 API con OAuth 2.0. Revocar Legacy Server Key en Firebase Console" },
+    { type: "API Key", service: "HubSpot", severity: "high", regex: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, recommendation: "Si es HubSpot API Key (UUID format), revocar en HubSpot → Settings → API Key" },
+    { type: "Secret Key", service: "Mailgun", severity: "critical", regex: /key-[0-9a-zA-Z]{32}/g, recommendation: "Revocar en app.mailgun.com → Settings → API Keys" },
+    { type: "Access Token", service: "Slack", severity: "critical", regex: /xox[baprs]-[0-9A-Za-z-]{10,}/g, recommendation: "Revocar en api.slack.com → Your Apps → OAuth & Permissions → Revoke All Tokens" },
+    { type: "Webhook URL (contiene token)", service: "Slack", severity: "high", regex: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]+/g, recommendation: "Regenerar Incoming Webhook en Slack App → Incoming Webhooks" },
+    { type: "Bot Token", service: "Telegram", severity: "critical", regex: /[0-9]{8,10}:[A-Za-z0-9_-]{35}/g, recommendation: "Revocar con /revoke en @BotFather de Telegram y generar nuevo token" },
+    { type: "Private Key", service: "RSA/PEM", severity: "critical", regex: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/g, recommendation: "Eliminar clave privada del código. Usar gestores de secretos (AWS Secrets Manager, Vault)" },
+    { type: "Password en URL", service: "Base de datos / Conexión", severity: "critical", regex: /(?:mysql|postgres|mongodb|redis|amqp):\/\/[^:]+:[^@]{4,}@/gi, recommendation: "Nunca incluir credenciales en URLs de conexión en código frontend o público" },
+    { type: "Contraseña hardcodeada", service: "Genérico", severity: "high", regex: /(?:password|passwd|secret|api_secret|client_secret)\s*[=:]\s*["'][^"']{6,}["']/gi, recommendation: "Mover contraseñas/secrets a variables de entorno del servidor. Nunca en código cliente" },
+    { type: "API Key genérica", service: "Genérico", severity: "medium", regex: /(?:api[_-]?key|apikey|access[_-]?token)\s*[=:]\s*["'][A-Za-z0-9_\-]{16,}["']/gi, recommendation: "Verificar si es una clave real. Si lo es, mover a variables de entorno del servidor" },
+    { type: "JWT Token", service: "Autenticación", severity: "high", regex: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, recommendation: "JWTs hardcodeados pueden revelar datos internos. Nunca incrustar tokens de sesión en código" },
+    { type: "Webhook Secret", service: "Shopify Webhook", severity: "high", regex: /[A-Fa-f0-9]{64}(?=.*webhook|.*hmac)/gi, recommendation: "Revocar el webhook secret en Shopify Admin → Settings → Notifications → Webhooks" },
+  ];
+
+  const lines = content.split("\n");
+  const found: ExposedSecret[] = [];
+  const seen = new Set<string>();
+
+  for (const pattern of PATTERNS) {
+    const matches = content.matchAll(new RegExp(pattern.regex.source, pattern.regex.flags.includes("g") ? pattern.regex.flags : pattern.regex.flags + "g"));
+    for (const match of matches) {
+      const raw = match[0];
+      const key = `${pattern.service}:${raw.slice(0, 12)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      // Find line number
+      let lineNumber = 1;
+      let pos = 0;
+      for (let i = 0; i < lines.length; i++) {
+        pos += lines[i].length + 1;
+        if (pos > (match.index ?? 0)) { lineNumber = i + 1; break; }
+      }
+
+      // Build context (surrounding 80 chars, sanitized)
+      const start = Math.max(0, (match.index ?? 0) - 40);
+      const end = Math.min(content.length, (match.index ?? 0) + raw.length + 40);
+      const ctx = content.slice(start, end).replace(/\n/g, " ").trim();
+
+      // Mask: show first 6 + *** + last 4 (if long enough)
+      const masked = raw.length > 12
+        ? raw.slice(0, 6) + "•".repeat(Math.min(raw.length - 10, 20)) + raw.slice(-4)
+        : raw.slice(0, 3) + "•".repeat(raw.length - 3);
+
+      // Skip very short AWS-style matches that are likely false positives
+      if (pattern.service === "AWS" && pattern.type.includes("Secret") && raw.length < 35) continue;
+
+      found.push({
+        type: pattern.type,
+        service: pattern.service,
+        severity: pattern.severity,
+        masked,
+        raw,
+        context: ctx,
+        recommendation: pattern.recommendation,
+        lineNumber,
+      });
+    }
+  }
+
+  // Sort by severity
+  const order: Record<string, number> = { critical: 0, high: 1, medium: 2 };
+  return found.sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
+}
+
 function parseSecurityFromHeaders(headers: Record<string, string>, url: string, html: string): DeepScanResult["security"] {
   const SECURITY_HEADERS: Array<{ name: string; headerKey: string; severity: "critical" | "high" | "medium" | "info"; description: string; recommendation: string }> = [
     { name: "Content-Security-Policy", headerKey: "content-security-policy", severity: "high", description: "Previene inyección de scripts maliciosos (XSS)", recommendation: "Añadir CSP estricta: default-src 'self'; script-src 'self' 'nonce-...';" },
@@ -2148,6 +2248,23 @@ function parseSecurityFromHeaders(headers: Record<string, string>, url: string, 
   secScore -= vulnerabilities.filter(v => v.severity === "medium").length * 8;
   secScore = Math.max(0, secScore);
 
+  const exposedSecrets = scanExposedSecrets(html);
+  // Penalizar score por secretos expuestos
+  secScore -= exposedSecrets.filter(s => s.severity === "critical").length * 30;
+  secScore -= exposedSecrets.filter(s => s.severity === "high").length * 15;
+  secScore -= exposedSecrets.filter(s => s.severity === "medium").length * 5;
+  secScore = Math.max(0, secScore);
+
+  // Añadir vulnerabilidades de secretos expuestos al resumen
+  for (const secret of exposedSecrets) {
+    vulnerabilities.push({
+      type: `🔑 Secreto expuesto: ${secret.service} — ${secret.type}`,
+      severity: secret.severity,
+      description: `Credencial hardcodeada detectada en el código fuente: ${secret.masked} (línea ${secret.lineNumber})`,
+      recommendation: secret.recommendation,
+    });
+  }
+
   return {
     score: secScore,
     headers: headerResults,
@@ -2155,6 +2272,7 @@ function parseSecurityFromHeaders(headers: Record<string, string>, url: string, 
     https: url.startsWith("https://"),
     mixedContent,
     serverInfo: serverHeader,
+    exposedSecrets,
   };
 }
 
@@ -2806,6 +2924,38 @@ Genera el HTML COMPLETO ahora:`;
     res.end();
   } finally {
     clearInterval(heartbeat);
+  }
+});
+
+// ── Standalone Secrets Scanner (acepta HTML/código crudo sin URL) ──────────
+router.post("/web-lab/scan-secrets", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { html, source } = req.body as { html?: string; source?: string };
+    const content = html ?? source ?? "";
+    if (!content.trim()) { res.status(400).json({ error: "Proporciona HTML, JS o código a analizar" }); return; }
+    if (content.length > 5_000_000) { res.status(400).json({ error: "Contenido demasiado grande (máx 5 MB)" }); return; }
+
+    const secrets = scanExposedSecrets(content);
+
+    const summary = {
+      total: secrets.length,
+      critical: secrets.filter(s => s.severity === "critical").length,
+      high: secrets.filter(s => s.severity === "high").length,
+      medium: secrets.filter(s => s.severity === "medium").length,
+      services: [...new Set(secrets.map(s => s.service))],
+      riskScore: Math.max(0, 100
+        - secrets.filter(s => s.severity === "critical").length * 30
+        - secrets.filter(s => s.severity === "high").length * 15
+        - secrets.filter(s => s.severity === "medium").length * 5
+      ),
+      scannedAt: new Date().toISOString(),
+      contentLength: content.length,
+    };
+
+    res.json({ success: true, summary, secrets });
+  } catch (err: any) {
+    logger.error({ err }, "Secrets scan failed");
+    res.status(500).json({ error: err.message || "Error en el análisis de secretos" });
   }
 });
 

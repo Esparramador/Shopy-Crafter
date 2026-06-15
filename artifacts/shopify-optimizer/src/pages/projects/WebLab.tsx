@@ -57,6 +57,14 @@ interface HistoryItem {
   metadata: any;
 }
 
+interface ExposedSecret {
+  type: string; service: string; severity: string; masked: string; raw: string;
+  context: string; recommendation: string; lineNumber: number;
+}
+interface SecretsReport {
+  summary: { total: number; critical: number; high: number; medium: number; services: string[]; riskScore: number; scannedAt: string; contentLength: number };
+  secrets: ExposedSecret[];
+}
 interface DeepScanResult {
   url: string;
   scannedAt: string;
@@ -67,6 +75,7 @@ interface DeepScanResult {
     https: boolean;
     mixedContent: boolean;
     serverInfo?: string;
+    exposedSecrets?: ExposedSecret[];
   };
   dom: {
     totalElements: number;
@@ -227,6 +236,41 @@ function SecurityPanel({ scan }: { scan: DeepScanResult }) {
         </div>
       )}
 
+      {/* Exposed Secrets Section */}
+      {s.exposedSecrets && s.exposedSecrets.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 700, color: "#ef4444", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            🔑 Credenciales / API Keys expuestas ({s.exposedSecrets.length})
+            <span style={{ fontSize: 11, fontWeight: 400, color: "#fca5a5", background: "#4a0a0a", padding: "2px 8px", borderRadius: 4 }}>
+              ACCIÓN URGENTE REQUERIDA
+            </span>
+          </h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {s.exposedSecrets.map((sec, i) => (
+              <div key={i} style={{ padding: "14px 16px", background: "#0a0005", borderRadius: 10, border: `1px solid ${sec.severity === "critical" ? "#ef4444" : sec.severity === "high" ? "#f97316" : "#eab308"}44` }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <SevBadge s={sec.severity} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{sec.service}</span>
+                      <span style={{ fontSize: 11, color: "#aaa" }}>— {sec.type}</span>
+                      <span style={{ fontSize: 10, color: "#666" }}>línea {sec.lineNumber}</span>
+                    </div>
+                    <div style={{ fontFamily: "monospace", fontSize: 12, color: "#ef4444", background: "#0a0000", padding: "6px 10px", borderRadius: 6, marginBottom: 6, wordBreak: "break-all" }}>
+                      {sec.masked}
+                    </div>
+                    <p style={{ color: "#888", fontSize: 11, margin: "0 0 4px", fontStyle: "italic", wordBreak: "break-all" }}>
+                      Contexto: …{sec.context.slice(0, 120)}…
+                    </p>
+                    <p style={{ color: "#22c55e", fontSize: 11, margin: 0 }}>💡 {sec.recommendation}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
         <h4 style={{ fontSize: 14, fontWeight: 700, color: "#aaa", marginBottom: 12 }}>🛡️ Headers de Seguridad HTTP</h4>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 8 }}>
@@ -244,6 +288,77 @@ function SecurityPanel({ scan }: { scan: DeepScanResult }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function SecretsScanPanel({ report, onDownload }: { report: SecretsReport; onDownload: () => void }) {
+  const { summary, secrets } = report;
+  const sevC: Record<string, string> = { critical: "#ef4444", high: "#f97316", medium: "#eab308" };
+  return (
+    <div>
+      {/* Summary banner */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Risk Score", val: summary.riskScore, color: summary.riskScore >= 70 ? "#22c55e" : summary.riskScore >= 40 ? "#eab308" : "#ef4444", big: true },
+          { label: "Total Hallados", val: summary.total, color: summary.total === 0 ? "#22c55e" : "#ef4444", big: false },
+          { label: "🔴 Críticos", val: summary.critical, color: "#ef4444", big: false },
+          { label: "🟠 Altos", val: summary.high, color: "#f97316", big: false },
+          { label: "🟡 Medios", val: summary.medium, color: "#eab308", big: false },
+          { label: "Servicios afectados", val: summary.services.length, color: "#a78bfa", big: false },
+        ].map((s, i) => (
+          <div key={i} style={{ padding: 14, background: "#0a0a14", borderRadius: 10, textAlign: "center" }}>
+            <div style={{ fontSize: s.big ? 32 : 24, fontWeight: 800, color: s.color }}>{s.val}</div>
+            <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {summary.services.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <span style={{ fontSize: 12, color: "#888" }}>Servicios comprometidos: </span>
+          {summary.services.map((sv, i) => (
+            <span key={i} style={{ fontSize: 11, background: "#2a0a0a", color: "#fca5a5", padding: "2px 8px", borderRadius: 12, marginRight: 6, border: "1px solid #ef444433" }}>{sv}</span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <button
+          onClick={onDownload}
+          style={{ padding: "8px 16px", background: "linear-gradient(135deg, #d4a843, #b8860b)", border: "none", borderRadius: 8, color: "#000", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+        >
+          📥 Descargar Informe de Seguridad
+        </button>
+      </div>
+
+      {secrets.length === 0 ? (
+        <div style={{ padding: 32, textAlign: "center", color: "#22c55e", background: "#0a1a0a", borderRadius: 12, border: "1px solid #22c55e33" }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>🛡️</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>¡Sin credenciales expuestas detectadas!</div>
+          <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>El código analizado parece limpio. Recuerda escanear todos tus archivos JS/HTML públicos regularmente.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {secrets.map((sec, i) => (
+            <div key={i} style={{ padding: "14px 16px", background: "#0a0005", borderRadius: 10, border: `1px solid ${sevC[sec.severity] || "#888"}44` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, background: sevC[sec.severity] || "#888", color: "#000", padding: "2px 7px", borderRadius: 4 }}>{sec.severity.toUpperCase()}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{sec.service}</span>
+                <span style={{ fontSize: 11, color: "#aaa" }}>— {sec.type}</span>
+                <span style={{ fontSize: 10, color: "#666", marginLeft: "auto" }}>línea {sec.lineNumber}</span>
+              </div>
+              <div style={{ fontFamily: "monospace", fontSize: 12, color: sevC[sec.severity] || "#ef4444", background: "#0a0000", padding: "6px 10px", borderRadius: 6, marginBottom: 6, wordBreak: "break-all" }}>
+                {sec.masked}
+              </div>
+              <p style={{ color: "#777", fontSize: 11, margin: "0 0 6px", wordBreak: "break-all", fontStyle: "italic" }}>
+                Contexto: …{sec.context.slice(0, 150)}…
+              </p>
+              <p style={{ color: "#22c55e", fontSize: 11, margin: 0 }}>💡 {sec.recommendation}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -569,6 +684,13 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [deepScan, setDeepScan] = useState<DeepScanResult | null>(null);
   const [deepScanLoading, setDeepScanLoading] = useState(false);
   const [deepScanError, setDeepScanError] = useState("");
+
+  // Secrets Inspector state
+  const [showSecrets, setShowSecrets] = useState(false);
+  const [secretsInput, setSecretsInput] = useState("");
+  const [secretsReport, setSecretsReport] = useState<SecretsReport | null>(null);
+  const [secretsLoading, setSecretsLoading] = useState(false);
+  const [secretsError, setSecretsError] = useState("");
   // 3D Effects state
   const [effects3d, setEffects3d] = useState<Effects3DResult | null>(null);
   const [effects3dLoading, setEffects3dLoading] = useState(false);
@@ -932,6 +1054,72 @@ function WebLabInner({ projectId }: { projectId: number }) {
     } finally {
       setDeepScanLoading(false);
     }
+  };
+
+  const runSecretsScanner = async (htmlOverride?: string) => {
+    const content = htmlOverride ?? secretsInput.trim();
+    if (!content) return;
+    setSecretsLoading(true);
+    setSecretsError("");
+    setSecretsReport(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/web-lab/scan-secrets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ html: content }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
+      setSecretsReport(data);
+    } catch (e: any) {
+      setSecretsError(e.message || "Error en el análisis de secretos");
+    } finally {
+      setSecretsLoading(false);
+    }
+  };
+
+  const downloadSecretsReport = () => {
+    if (!secretsReport) return;
+    const { summary, secrets } = secretsReport;
+    const sevColor: Record<string, string> = { critical: "#ef4444", high: "#f97316", medium: "#eab308" };
+    const rows = secrets.map(s => `
+      <tr style="border-bottom:1px solid #1a1a2e">
+        <td style="padding:10px 12px"><span style="background:${sevColor[s.severity]||"#888"};color:#000;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">${s.severity.toUpperCase()}</span></td>
+        <td style="padding:10px 12px;font-weight:600">${s.service}</td>
+        <td style="padding:10px 12px;font-size:12px">${s.type}</td>
+        <td style="padding:10px 12px;font-family:monospace;font-size:11px;color:${sevColor[s.severity]||"#ef4444"}">${s.masked}</td>
+        <td style="padding:10px 12px;font-size:11px">${s.lineNumber}</td>
+        <td style="padding:10px 12px;font-size:11px;color:#22c55e">${s.recommendation}</td>
+      </tr>`).join("");
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Informe de Seguridad — Shopy Crafter</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',sans-serif;background:#09090b;color:#e5e7eb;padding:40px 32px}
+h1{font-size:28px;font-weight:800;color:#d4a843;margin-bottom:4px}p.sub{color:#888;font-size:13px;margin-bottom:32px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-weight:700;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:32px}
+.card{background:#111;border-radius:10px;padding:16px;text-align:center}
+.card .num{font-size:28px;font-weight:800}.card .lbl{font-size:11px;color:#888;margin-top:4px}
+table{width:100%;border-collapse:collapse;background:#111;border-radius:12px;overflow:hidden}
+th{background:#1a1a2e;padding:10px 12px;text-align:left;font-size:12px;color:#888;font-weight:600}
+td{color:#e5e7eb;vertical-align:top}
+.footer{margin-top:40px;text-align:center;font-size:11px;color:#555}</style></head>
+<body>
+<h1>🔐 Informe de Seguridad — Credenciales Expuestas</h1>
+<p class="sub">Generado por Shopy Crafter · ${new Date(summary.scannedAt).toLocaleString("es-ES")} · ${(summary.contentLength/1024).toFixed(1)} KB analizados</p>
+<div class="grid">
+  <div class="card"><div class="num" style="color:${summary.riskScore>=70?"#22c55e":summary.riskScore>=40?"#eab308":"#ef4444"}">${summary.riskScore}</div><div class="lbl">Risk Score</div></div>
+  <div class="card"><div class="num" style="color:${summary.total===0?"#22c55e":"#ef4444"}">${summary.total}</div><div class="lbl">Total Hallados</div></div>
+  <div class="card"><div class="num" style="color:#ef4444">${summary.critical}</div><div class="lbl">🔴 Críticos</div></div>
+  <div class="card"><div class="num" style="color:#f97316">${summary.high}</div><div class="lbl">🟠 Altos</div></div>
+  <div class="card"><div class="num" style="color:#eab308">${summary.medium}</div><div class="lbl">🟡 Medios</div></div>
+  <div class="card"><div class="num" style="color:#a78bfa">${summary.services.length}</div><div class="lbl">Servicios</div></div>
+</div>
+${secrets.length === 0
+  ? '<div style="padding:32px;text-align:center;color:#22c55e;background:#0a1a0a;border-radius:12px;border:1px solid #22c55e33"><div style="font-size:40px;margin-bottom:8px">🛡️</div><div style="font-size:16px;font-weight:700">Sin credenciales expuestas detectadas</div></div>'
+  : `<table><thead><tr><th>Severidad</th><th>Servicio</th><th>Tipo</th><th>Clave (enmascarada)</th><th>Línea</th><th>Acción recomendada</th></tr></thead><tbody>${rows}</tbody></table>`}
+<div class="footer">Shopy Crafter — Escáner de Seguridad Avanzado · No compartas este informe públicamente</div>
+</body></html>`;
+    downloadFile(html, `informe-seguridad-${new Date().toISOString().slice(0,10)}.html`, "text/html");
   };
 
   const generate3dEffects = async () => {
@@ -1368,6 +1556,23 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
           >
             🧬 Extractor DNA
           </button>
+          <button
+            onClick={() => setShowSecrets(s => !s)}
+            title="Pega HTML o código JS y detecta API Keys, tokens y credenciales expuestas con 30+ patrones — Stripe, OpenAI, AWS, GitHub, Shopify…"
+            style={{
+              padding: "12px 16px",
+              background: showSecrets ? "linear-gradient(135deg, #ef4444, #b91c1c)" : "transparent",
+              border: showSecrets ? "none" : "1px solid var(--border, #333)",
+              borderRadius: 10,
+              color: showSecrets ? "#fff" : secretsReport && secretsReport.summary.critical > 0 ? "#ef4444" : "var(--t2, #aaa)",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: showSecrets ? 700 : 400,
+              whiteSpace: "nowrap",
+            }}
+          >
+            🔐 Inspector Secretos
+          </button>
         </div>
       </div>
 
@@ -1719,6 +1924,71 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                 style={{ width: "100%", height: 540, border: "1px solid #22c55e22", borderRadius: 12, background: "#fff" }}
                 srcDoc={dnaGenerated}
               />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Inspector de Secretos ─────────────────────────── */}
+      {showSecrets && (
+        <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 24, marginBottom: 24, border: "1px solid #ef444433" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+            <span style={{ fontSize: 28 }}>🔐</span>
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: "#fca5a5" }}>Inspector de Secretos Expuestos</h3>
+              <p style={{ color: "#888", fontSize: 12, margin: "2px 0 0" }}>Pega el código fuente HTML/JS de cualquier página y detecta API Keys, tokens y credenciales expuestas con 30+ patrones</p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <textarea
+              value={secretsInput}
+              onChange={e => setSecretsInput(e.target.value)}
+              placeholder="Pega aquí el HTML/JS de tu página, bundle.js, theme.liquid, o cualquier archivo de código fuente…&#10;&#10;Detecta: Stripe, OpenAI, Anthropic, Google API, AWS, GitHub, Shopify, SendGrid, Twilio, Firebase, Slack, Telegram, JWT, contraseñas hardcodeadas, certificados RSA…"
+              rows={10}
+              style={{
+                width: "100%", padding: "12px 14px",
+                background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10,
+                color: "#eee", fontSize: 12, resize: "vertical", lineHeight: 1.5,
+                boxSizing: "border-box", outline: "none", fontFamily: "monospace",
+              }}
+            />
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={() => runSecretsScanner()}
+                disabled={secretsLoading || !secretsInput.trim()}
+                style={{
+                  padding: "10px 24px",
+                  background: secretsLoading || !secretsInput.trim() ? "#2a2a30" : "linear-gradient(135deg, #ef4444, #b91c1c)",
+                  border: "none", borderRadius: 10,
+                  color: secretsLoading || !secretsInput.trim() ? "#666" : "#fff",
+                  fontWeight: 700, cursor: secretsLoading || !secretsInput.trim() ? "not-allowed" : "pointer",
+                  fontSize: 13, whiteSpace: "nowrap",
+                }}
+              >
+                {secretsLoading ? "🔍 Escaneando…" : "🔐 Escanear Secretos"}
+              </button>
+              {secretsInput.trim() && (
+                <span style={{ fontSize: 11, color: "#666" }}>
+                  {(secretsInput.length / 1024).toFixed(1)} KB de código
+                </span>
+              )}
+              {secretsReport && (
+                <span style={{ fontSize: 11, color: secretsReport.summary.total === 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
+                  {secretsReport.summary.total === 0 ? "✅ Sin secretos expuestos" : `⚠️ ${secretsReport.summary.total} secreto(s) encontrado(s)`}
+                </span>
+              )}
+            </div>
+            {secretsError && (
+              <div style={{ padding: "10px 14px", background: "#2a0000", border: "1px solid #4a1111", borderRadius: 8, color: "#fca5a5", fontSize: 12 }}>
+                ❌ {secretsError}
+              </div>
+            )}
+          </div>
+
+          {secretsReport && (
+            <div style={{ marginTop: 24 }}>
+              <SecretsScanPanel report={secretsReport} onDownload={downloadSecretsReport} />
             </div>
           )}
         </div>
