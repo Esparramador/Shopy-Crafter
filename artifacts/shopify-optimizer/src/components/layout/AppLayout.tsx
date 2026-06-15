@@ -593,7 +593,6 @@ export function AppLayout({ children }: AppLayoutProps) {
               }}
                 onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))}
               >⌘K</kbd>
-              <span style={{ fontSize: 11, color: "var(--t4)" }}>{ap.header?.search ?? "Búsqueda"}</span>
             </div>
             <a
               href={`${BASE_URL}/landing`}
