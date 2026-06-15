@@ -120,6 +120,12 @@ function toCardDto(row: any) {
       ? `/api/projects/${row.projectId}/files/${row.logoVaultFileId}/preview`
       : null,
     layoutOverrides: safeJson(row.layoutOverrides, {}),
+    backgroundImageUrl: (() => {
+      const bg = safeJson(row.backgroundConfig, {}) as any;
+      return bg?.kind === "custom-image" && bg?.vaultFileId
+        ? `/api/projects/${row.projectId}/files/${bg.vaultFileId}/preview`
+        : null;
+    })(),
   };
 }
 
@@ -360,6 +366,50 @@ router.post(
   },
 );
 
+// ─── Upload background photo ─────────────────────────────────────────────────
+router.post(
+  "/cards/:id/upload-background",
+  requireAdmin,
+  upload.single("background"),
+  async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+      if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+      if (!req.file) { res.status(400).json({ error: "Falta archivo de fondo" }); return; }
+
+      const vaultId = await saveToVault({
+        projectId: row.projectId,
+        fileType: "card-background",
+        category: "card_background",
+        title: `Fondo · ${row.name}`,
+        description: `Foto de fondo tarjeta ${row.name}`,
+        mimeType: req.file.mimetype,
+        content: req.file.buffer.toString("base64"),
+        fileSizeBytes: req.file.buffer.length,
+        generatedBy: "card-studio",
+        metadata: { cardId: id },
+      });
+
+      if (!vaultId) { res.status(500).json({ error: "No se pudo guardar fondo en vault" }); return; }
+
+      const existingBg = safeJson(row.backgroundConfig, {}) as any;
+      const newBgConfig = { ...existingBg, kind: "custom-image", vaultFileId: vaultId };
+
+      const [updated] = await db
+        .update(businessCardsTable)
+        .set({ backgroundConfig: newBgConfig as any })
+        .where(eq(businessCardsTable.id, id))
+        .returning();
+
+      res.json(toCardDto(updated));
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "cards upload-background failed");
+      res.status(500).json({ error: err?.message || "Error subiendo foto de fondo" });
+    }
+  },
+);
+
 // ─── Generate (pipeline completo, long-running) ─────────────────────────────
 router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Response) => {
   enableLongRunning(res);
@@ -392,6 +442,20 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
         try {
           logoBuffer = Buffer.from(lf.content, "base64");
           logoMime = lf.mimeType || "image/png";
+        } catch {}
+      }
+    }
+
+    // Fondo personalizado (foto subida por el usuario)
+    let backgroundImageBuffer: Buffer | undefined;
+    let backgroundImageMime: string | undefined;
+    const bgCfgRaw = safeJson(row.backgroundConfig, {}) as any;
+    if (bgCfgRaw?.kind === "custom-image" && bgCfgRaw?.vaultFileId) {
+      const [bf] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, bgCfgRaw.vaultFileId));
+      if (bf?.content) {
+        try {
+          backgroundImageBuffer = Buffer.from(bf.content, "base64");
+          backgroundImageMime = bf.mimeType || "image/jpeg";
         } catch {}
       }
     }
@@ -432,6 +496,8 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
       })(),
       logoBuffer,
       logoMime,
+      backgroundImageBuffer,
+      backgroundImageMime,
       overrides: safeJson(row.layoutOverrides, {}) as any,
     };
 

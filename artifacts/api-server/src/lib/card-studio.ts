@@ -30,10 +30,14 @@ export type GenerateCardInput = {
   fonts?: Partial<CardFonts>;
   /** Config de fondo opcional (override) */
   background?: {
-    kind: "solid" | "gradient" | "ai-texture";
+    kind: "solid" | "gradient" | "ai-texture" | "custom-image";
     prompt?: string;
     hex?: string;
+    vaultFileId?: number;
   };
+  /** Buffer de imagen para fondos custom-image (foto subida por el usuario) */
+  backgroundImageBuffer?: Buffer;
+  backgroundImageMime?: string;
   /** Modelo IA para fondo cuando kind === "ai-texture" */
   backgroundModel?: ImageGenModel;
   /** Override de layout del template (centered / left / grid) */
@@ -117,6 +121,17 @@ export async function generateBusinessCard(
       bgGenError = err?.message || "Error generando fondo IA";
       backgroundPng = await renderSolidOrGradient(palette, "solid");
     }
+  } else if (bgConfig.kind === "custom-image") {
+    if (input.backgroundImageBuffer && input.backgroundImageBuffer.length > 0) {
+      backgroundPng = await sharp(input.backgroundImageBuffer)
+        .resize(CARD_WIDTH_PX, CARD_HEIGHT_PX, { fit: "cover", position: "center" })
+        .png()
+        .toBuffer();
+    } else {
+      // Si no hay buffer cae a sólido
+      backgroundPng = await renderSolidOrGradient(palette, "solid");
+      bgKindUsed = "solid";
+    }
   } else if (bgConfig.kind === "gradient") {
     backgroundPng = await renderSolidOrGradient(palette, "gradient", template.background.gradientAngle);
   } else {
@@ -155,8 +170,8 @@ export async function generateBusinessCard(
   const qrPngBase64 = qrPng.toString("base64");
 
   // ── Renderizar capa de texto (transparente) ─────────────────────────
-  const transparent = bgKindUsed === "ai-texture";
-  const isAiBackground = bgKindUsed === "ai-texture";
+  const transparent = bgKindUsed === "ai-texture" || bgKindUsed === "custom-image";
+  const isAiBackground = bgKindUsed === "ai-texture" || bgKindUsed === "custom-image";
   const frontTextLayer = await renderCardSide(template, input.data, {
     side: "front",
     transparent,

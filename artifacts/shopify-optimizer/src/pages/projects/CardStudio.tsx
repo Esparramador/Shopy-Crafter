@@ -21,7 +21,7 @@ const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 type Palette = { bg: string; primary: string; secondary: string; accent: string; text: string };
 type Fonts = { heading: string; body: string; weights?: { heading?: number; body?: number } };
-type BackgroundConfig = { kind: "solid" | "gradient" | "ai-texture"; prompt?: string; hex?: string; gradientAngle?: number };
+type BackgroundConfig = { kind: "solid" | "gradient" | "ai-texture" | "custom-image"; prompt?: string; hex?: string; gradientAngle?: number; vaultFileId?: number };
 
 interface CardTemplate {
   id: string;
@@ -64,6 +64,7 @@ interface BusinessCard {
   pdfUrl?: string | null;
   logoUrl?: string | null;
   logoVaultFileId?: number | null;
+  backgroundImageUrl?: string | null;
   frontImageVaultFileId?: number | null;
   backImageVaultFileId?: number | null;
   pdfVaultFileId?: number | null;
@@ -271,6 +272,24 @@ export default function CardStudio() {
       setError(err?.message || "Error eliminando");
     }
   }, [selectedId]);
+
+  const uploadBackground = useCallback(async (id: number, file: File) => {
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("background", file);
+      const res = await fetch(`${API_BASE}/api/cards/${id}/upload-background`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Error subiendo fondo");
+      const updated: BusinessCard = await res.json();
+      setCards((prev) => prev.map((c) => (c.id === id ? updated : c)));
+    } catch (err: any) {
+      setError(err?.message || "Error");
+    }
+  }, []);
 
   const uploadLogo = useCallback(async (id: number, file: File) => {
     setError(null);
@@ -610,11 +629,11 @@ export default function CardStudio() {
                 </div>
               </Field>
               <Field label="Fondo">
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
-                  {(["solid","gradient","ai-texture"] as const).map((k) => (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 5, marginBottom: 6 }}>
+                  {(["solid","gradient","ai-texture","custom-image"] as const).map((k) => (
                     <button key={k} onClick={() => { const b = { ...selected.backgroundConfig, kind: k }; updateLocal({ backgroundConfig: b }); updateCard(selected.id, { backgroundConfig: b as any }); }}
-                      style={{ padding: 8, fontSize: 11, borderRadius: 4, background: selected.backgroundConfig?.kind === k ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)", border: selected.backgroundConfig?.kind === k ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)", color: "var(--t1)", cursor: "pointer" }}>
-                      {k === "solid" ? "Sólido" : k === "gradient" ? "Degradado" : "IA Textura"}
+                      style={{ padding: "7px 4px", fontSize: 10, borderRadius: 4, background: selected.backgroundConfig?.kind === k ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)", border: selected.backgroundConfig?.kind === k ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)", color: "var(--t1)", cursor: "pointer", textAlign: "center" }}>
+                      {k === "solid" ? "Sólido" : k === "gradient" ? "Degradado" : k === "ai-texture" ? "IA Textura" : "📷 Foto"}
                     </button>
                   ))}
                 </div>
@@ -626,6 +645,17 @@ export default function CardStudio() {
                     placeholder="Prompt IA: premium leather texture, fine grain, dramatic lighting…"
                     style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
                   />
+                )}
+                {selected.backgroundConfig?.kind === "custom-image" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                    <label style={{ ...btnSecondary, cursor: "pointer", fontSize: 11 }}>
+                      <Upload size={13} /> {selected.backgroundImageUrl ? "Cambiar foto" : "Subir foto"}
+                      <input type="file" accept="image/png,image/jpeg,image/webp,image/jpg" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) uploadBackground(selected.id, e.target.files[0]); }} />
+                    </label>
+                    {selected.backgroundImageUrl && (
+                      <img src={selected.backgroundImageUrl} alt="fondo" style={{ height: 36, width: 60, objectFit: "cover", borderRadius: 4, border: "1px solid rgba(255,255,255,0.12)" }} />
+                    )}
+                  </div>
                 )}
               </Field>
               <Field label="Logo (opcional)">
@@ -878,6 +908,8 @@ function CardLivePreview({ card, side }: { card: BusinessCard; side: "front" | "
     ? { background: `linear-gradient(135deg, ${bg} 0%, ${accent}55 100%)` }
     : bgCfg.kind === "ai-texture"
     ? { background: `linear-gradient(160deg, ${bg} 0%, ${primary}30 60%, ${accent}18 100%)` }
+    : bgCfg.kind === "custom-image" && (card as any).backgroundImageUrl
+    ? { backgroundImage: `url(${(card as any).backgroundImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { background: bg };
 
   const isLeft = layout === "left";

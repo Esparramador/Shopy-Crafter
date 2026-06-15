@@ -214,7 +214,7 @@ function buildHtml(args: {
   }
   .el .text-inner {
     width: 100%;
-    text-shadow: ${isAi ? "0 1px 2px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.4)" : "none"};
+    text-shadow: ${isAi ? "0 2px 8px rgba(0,0,0,0.85), 0 1px 3px rgba(0,0,0,0.65), 0 0 12px rgba(0,0,0,0.4)" : "none"};
     word-break: break-word;
   }
   .el img { display: block; width: 100%; height: 100%; object-fit: contain; }
@@ -263,11 +263,9 @@ function renderElementHtml(el: RenderElement, isAi: boolean): string {
   const tt = el.textTransform === "uppercase" ? "uppercase" : "none";
   const color = el.color || "#fff";
 
-  // Plate de contraste (si definido o auto en ai)
-  let plate = el.plate;
-  if (plate === undefined && isAi) {
-    plate = { color: "#000000", opacity: 0.5, padding: 12, radius: 6 };
-  }
+  // Solo usa plates si están explícitamente definidos en el elemento
+  // (no se añaden cajas automáticas a fondos IA — el text-shadow provee la legibilidad)
+  const plate = el.plate;
   const plateHtml = plate
     ? `<div class="plate" style="background:${plate.color}; opacity:${plate.opacity}; left:${-plate.padding}px; right:${-plate.padding}px; top:${-plate.padding/2}px; bottom:${-plate.padding/2}px; border-radius:${plate.radius}px;"></div>`
     : "";
