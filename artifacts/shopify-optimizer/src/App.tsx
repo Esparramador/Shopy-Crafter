@@ -634,7 +634,9 @@ function PublicChatbotSlot() {
 
 function AdminOmniChatbotSlot() {
   const { user, loading } = useAuth();
+  const [location] = useLocation();
   if (loading || user?.role !== "admin") return null;
+  if (location.startsWith("/client") || location === "/" || location === "") return null;
   return (
     <Suspense fallback={null}>
       <OmniChatbot />
