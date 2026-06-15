@@ -920,7 +920,33 @@ export async function generateVideoFromImage(
     if (imageBuffer) {
       veoArgs.image = { imageBytes: imageBuffer.toString("base64"), mimeType: imageMime };
     }
-    let operation: any = await ai.models.generateVideos(veoArgs);
+
+    // Google Veo can return "temporarily_saturated" / UNAVAILABLE / 503 under load.
+    // These are transient server-side errors — retry up to 2 times with 30s backoff.
+    const isVeoTransient = (err: unknown) => {
+      const s = String(err).toLowerCase();
+      return s.includes("temporarily_saturated") || s.includes("temporarily saturated")
+        || s.includes("unavailable") || s.includes("overloaded")
+        || s.includes("503") || s.includes("529");
+    };
+    let operation: any;
+    for (let veoAttempt = 0; veoAttempt <= 2; veoAttempt++) {
+      try {
+        operation = await ai.models.generateVideos(veoArgs);
+        break;
+      } catch (err) {
+        if (veoAttempt < 2 && isVeoTransient(err)) {
+          // Google Veo saturado — esperar 30s antes de reintentar
+          await new Promise(r => setTimeout(r, 30_000));
+          continue;
+        }
+        // Re-throw with a friendlier message for saturation errors
+        if (isVeoTransient(err)) {
+          throw new Error("Google Veo está temporalmente saturado — el servicio tiene alta demanda en este momento. Reintenta en 1-2 minutos.");
+        }
+        throw err;
+      }
+    }
 
     const deadline = Date.now() + 6 * 60_000;
     while (!operation.done && Date.now() < deadline) {

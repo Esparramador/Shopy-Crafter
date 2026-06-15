@@ -197,6 +197,14 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
   const cs = profile?.contentStrategy;
   const intel = profile?.intelligence;
 
+  // Derive accent color from the client brand's own extracted primary colors.
+  // Falls back to platform gold ONLY when no brand colors have been extracted yet.
+  const validHex = (vi?.primaryColors ?? []).find(c => /^#[0-9a-fA-F]{6}$/i.test(c));
+  const accentHex = validHex ?? "#d4a017";
+  const accentRgb = validHex
+    ? `${parseInt(validHex.slice(1, 3), 16)},${parseInt(validHex.slice(3, 5), 16)},${parseInt(validHex.slice(5, 7), 16)}`
+    : "212,160,23";
+
   return (
     <div style={S.wrap}>
       <div style={S.card}>
@@ -277,9 +285,9 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
           {state === "done" && profile && !collapsed && (
             <div>
               {/* Header summary */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, padding: "14px 16px", borderRadius: 12, background: "linear-gradient(135deg, rgba(212,160,23,0.08), rgba(0,168,107,0.06))", border: "1px solid rgba(212,160,23,0.15)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, padding: "14px 16px", borderRadius: 12, background: `linear-gradient(135deg, rgba(${accentRgb},0.08), rgba(0,168,107,0.06))`, border: `1px solid rgba(${accentRgb},0.15)` }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: "#d4a017" }}>{ci?.name ?? projectName ?? "Marca analizada"}</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: accentHex }}>{ci?.name ?? projectName ?? "Marca analizada"}</div>
                   <div style={{ fontSize: 12, color: "#00a86b", marginTop: 2, fontWeight: 600 }}>{ci?.sector}</div>
                   {intel?.summary && <div style={{ fontSize: 11, color: "#888", marginTop: 4, lineHeight: 1.5 }}>{intel.summary}</div>}
                 </div>
@@ -356,7 +364,7 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
                 <div style={S.grid3}>
                   <div>
                     <div style={S.label}>Arquetipo</div>
-                    <div style={{ ...S.value, fontWeight: 700, color: "#d4a017" }}>{bi?.archetype ?? "—"}</div>
+                    <div style={{ ...S.value, fontWeight: 700, color: accentHex }}>{bi?.archetype ?? "—"}</div>
                   </div>
                   <div>
                     <div style={S.label}>Tono de Voz</div>
@@ -364,13 +372,13 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
                   </div>
                   <div>
                     <div style={S.label}>Punto de Precio</div>
-                    <span style={S.tag("212,160,23")}>{mp?.pricePoint ?? "—"}</span>
+                    <span style={S.tag(accentRgb)}>{mp?.pricePoint ?? "—"}</span>
                   </div>
                 </div>
                 {bi?.uniqueValueProposition && (
                   <div style={{ marginBottom: 10 }}>
                     <div style={S.label}>Propuesta de Valor Única (UVP)</div>
-                    <div style={{ ...S.value, fontStyle: "italic", color: "#d4a017", fontSize: 13, borderLeft: "3px solid rgba(212,160,23,0.4)", paddingLeft: 10 }}>
+                    <div style={{ ...S.value, fontStyle: "italic", color: accentHex, fontSize: 13, borderLeft: `3px solid rgba(${accentRgb},0.4)`, paddingLeft: 10 }}>
                       "{bi.uniqueValueProposition}"
                     </div>
                   </div>
@@ -379,7 +387,7 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
                   <div style={{ marginBottom: 10 }}>
                     <div style={S.label}>Taglines / Slogans detectados</div>
                     <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4 }}>
-                      {bi.taglines.map((t, i) => <span key={i} style={{ ...S.tag("212,160,23"), fontStyle: "italic" }}>"{t}"</span>)}
+                      {bi.taglines.map((t, i) => <span key={i} style={{ ...S.tag(accentRgb), fontStyle: "italic" }}>"{t}"</span>)}
                     </div>
                   </div>
                 )}
@@ -486,7 +494,7 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
                         {dp.socialHandles.map((sh, i) => (
                           <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, fontSize: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#ccc" }}>
                             {platformIcon(sh.platform)}
-                            <span style={{ fontWeight: 600, color: "#d4a017", fontSize: 11 }}>{sh.platform}</span>
+                            <span style={{ fontWeight: 600, color: accentHex, fontSize: 11 }}>{sh.platform}</span>
                             {sh.handle}
                           </span>
                         ))}
@@ -522,7 +530,7 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
                     <div style={{ marginBottom: 10 }}>
                       <div style={S.label}>Pilares de contenido</div>
                       <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4 }}>
-                        {cs.contentPillars.map((p, i) => <span key={i} style={S.tag("212,160,23")}>{p}</span>)}
+                        {cs.contentPillars.map((p, i) => <span key={i} style={S.tag(accentRgb)}>{p}</span>)}
                       </div>
                     </div>
                   )}
@@ -539,7 +547,7 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
 
               {/* BLOQUE: Insights de Inteligencia */}
               {intel?.uniqueInsights && intel.uniqueInsights.length > 0 && (
-                <div style={{ padding: "16px", borderRadius: 12, background: "rgba(212,160,23,0.05)", border: "1px solid rgba(212,160,23,0.15)" }}>
+                <div style={{ padding: "16px", borderRadius: 12, background: `rgba(${accentRgb},0.05)`, border: `1px solid rgba(${accentRgb},0.15)` }}>
                   <div style={S.blockTitle}><Brain size={12} /> 💡 Insights de Inteligencia</div>
                   {intel.contentPersonalizationGuide && (
                     <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 8, background: "rgba(0,168,107,0.08)", border: "1px solid rgba(0,168,107,0.15)" }}>
@@ -549,7 +557,7 @@ export default function BrandDnaExtractor({ projectId, initialUrl, projectName, 
                   )}
                   {intel.uniqueInsights.map((ins, i) => (
                     <div key={i} style={{ fontSize: 11, color: "#ccc", padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", gap: 8 }}>
-                      <span style={{ color: "#d4a017", fontWeight: 700 }}>{i + 1}.</span>
+                      <span style={{ color: accentHex, fontWeight: 700 }}>{i + 1}.</span>
                       {ins}
                     </div>
                   ))}

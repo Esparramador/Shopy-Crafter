@@ -51,15 +51,15 @@ export interface EnhanceResult {
 // el motor de producción.
 
 const SYSTEMS: Record<EnhanceIntent, string> = {
-  ad_cinematic: `Eres un director creativo y copywriter senior especializado en anuncios cinemáticos multi-shot (Seedance Pro / Kling v2.1 / Runway Gen-4 / Veo 3). Reescribe el prompt baseline del usuario en un PROMPT PROFESIONAL en INGLÉS de >=120 palabras estructurado en este orden: subject → composition → camera framing & lens → lighting setup (key/fill/rim, color temp) → color palette (3 hex aprox) → mood & texture → integración del producto. Cierra con descriptores técnicos ("shot on RED, 8k, photorealistic, ultra detailed"). REGLA ANTI-TEXTO: NUNCA incluyas nombres de marca, nombres de producto, CTA, precios o cualquier palabra que el modelo pueda intentar pintar como texto. La marca y CTA se sobreimprimen DESPUÉS con FFmpeg drawtext. Devuelve JSON estricto.`,
+  ad_cinematic: `Eres un director creativo y copywriter senior especializado en anuncios cinemáticos multi-shot (Seedance Pro / Kling v2.1 / Runway Gen-4 / Veo 3). ENRIQUECE Y EXPANDE el contenido existente del usuario en un PROMPT PROFESIONAL en INGLÉS de >=120 palabras estructurado en este orden: subject → composition → camera framing & lens → lighting setup (key/fill/rim, color temp) → color palette (3 hex aprox) → mood & texture → integración del producto. Cierra con descriptores técnicos ("shot on RED, 8k, photorealistic, ultra detailed"). REGLA ANTI-TEXTO: NUNCA incluyas nombres de marca, nombres de producto, CTA, precios o cualquier palabra que el modelo pueda intentar pintar como texto. La marca y CTA se sobreimprimen DESPUÉS con FFmpeg drawtext. MANDATORY: Preserve all specific product details, technical choices, and creative elements from the user's existing content — enhance quality, never replace unique specifics with generic descriptions. Devuelve JSON estricto.`,
 
-  multishot_director: `Eres un director de cine y showrunner profesional con experiencia en spots largos premium (Apple, Tesla, Nike, A24). Reescribe el prompt baseline del usuario en una directiva PRO en INGLÉS para un anuncio multi-shot con UN SOLO arco narrativo coherente, continuidad estricta entre escenas (pose/iluminación/paleta/posición del producto) y preservación de identidad. Devuelve JSON estricto.`,
+  multishot_director: `Eres un director de cine y showrunner profesional con experiencia en spots largos premium (Apple, Tesla, Nike, A24). ENRIQUECE Y EXPANDE el contenido existente del usuario en una directiva PRO en INGLÉS para un anuncio multi-shot con UN SOLO arco narrativo coherente, continuidad estricta entre escenas (pose/iluminación/paleta/posición del producto) y preservación de identidad. MANDATORY: Preserve all timeline sequences (0-10, 0-1.5, 0-2, etc.), exploded-view stages, and assembly/disassembly details from the existing content — never discard user's specific creative structure. Devuelve JSON estricto.`,
 
-  image_hero_product: `You are an elite commercial photographer and art director. Rewrite the user's baseline prompt into a magazine-grade English image prompt (120-180 words, single dense paragraph). Cover: subject + materials + camera + lens + lighting (key/fill/rim, soft/hard) + color palette + mood + composition + negative space + post-grade aesthetic. ABSOLUTELY NO TEXT, NO LOGOS, NO WATERMARKS in the image. Preserve any text printed on the product itself EXACTLY. Output STRICT JSON only.`,
+  image_hero_product: `You are an elite commercial photographer and art director. ENHANCE AND BUILD UPON the user's existing prompt to produce a magazine-grade English image prompt (120-180 words, single dense paragraph). Cover: subject + materials + camera + lens + lighting (key/fill/rim, soft/hard) + color palette + mood + composition + negative space + post-grade aesthetic. ABSOLUTELY NO TEXT, NO LOGOS, NO WATERMARKS in the image. Preserve any text printed on the product itself EXACTLY. MANDATORY: Preserve all specific product details, materials, colors, and creative choices from the existing content. Output STRICT JSON only.`,
 
-  image: `You are an elite commercial photographer and art director. Rewrite the user's baseline prompt into a magazine-grade English image prompt (120-180 words, single dense paragraph). Cover: subject + materials + camera + lens + lighting + color palette + mood + composition + negative space. ABSOLUTELY NO TEXT, NO LOGOS, NO WATERMARKS. Output STRICT JSON only.`,
+  image: `You are an elite commercial photographer and art director. ENHANCE AND BUILD UPON the user's existing prompt to produce a magazine-grade English image prompt (120-180 words, single dense paragraph). Cover: subject + materials + camera + lens + lighting + color palette + mood + composition + negative space. ABSOLUTELY NO TEXT, NO LOGOS, NO WATERMARKS. MANDATORY: Preserve all specific product details, technical parameters, and creative choices from the existing text. Output STRICT JSON only.`,
 
-  video: `You are an elite cinematographer. Rewrite the user's baseline prompt into a professional English video prompt (80-140 words). Cover: opening frame (subject + composition + lens + lighting + palette) → camera movement with speed and easing → motion within the frame → atmosphere → closing beat. NO TEXT, NO LOGOS, NO WATERMARKS, NO TYPOGRAPHY in any frame. Strict design fidelity — the product never deconstructs, morphs or recolors mid-frame. Output STRICT JSON only.`,
+  video: `You are an elite cinematographer. ENHANCE AND BUILD UPON the user's existing video prompt to produce a professional English video prompt (80-140 words). Cover: opening frame (subject + composition + lens + lighting + palette) → camera movement with speed and easing → motion within the frame → atmosphere → closing beat. NO TEXT, NO LOGOS, NO WATERMARKS, NO TYPOGRAPHY in any frame. Strict design fidelity — the product never deconstructs, morphs or recolors mid-frame. MANDATORY: Preserve all timeline sequences (e.g. 0-10s, 0-1.5s), exploded-view stages, camera preset names, and technical specifics already written by the user. Do NOT replace specific content with generic descriptions. Output STRICT JSON only.`,
 
   ad_copy_meta: `You are an elite advertising copywriter for Meta/TikTok/Reels. Rewrite the user's baseline brief into a strategic JSON containing a hook (3-7 words, scroll-stopping), body (15-25 words, emotional), cta (3-5 words, action verb), tone (one word) and angle (benefit | problem | social_proof | curiosity | urgency). Avoid generic phrases like "check this out". Be specific and provocative. Output STRICT JSON only.`,
 
@@ -108,16 +108,18 @@ function buildUserPrompt(input: EnhanceInput): string {
   "breakdown": { "key": "value" }
 }`;
 
-  return `Rewrite this baseline into a PROFESSIONAL ${input.intent.replace(/_/g, " ")} prompt/asset.
+  return `ENHANCE this into a PROFESSIONAL ${input.intent.replace(/_/g, " ")} prompt/asset. BUILD UPON the existing content — preserve all specific details.
 
 USER INTENT: ${input.intent}
 SUBJECT / TOPIC: ${input.subject}${brandLine}${extraLine}
 TARGET LANGUAGE OF OUTPUT: ${lang}
 
-BASELINE PROMPT (built deterministically, low quality):
+EXISTING USER CONTENT (enhance quality and detail — preserve ALL specific information):
 """
 ${input.baselinePrompt}
 """
+
+CRITICAL RULE: Do NOT discard the user's specific product details, timeline sequences, technical parameters, camera choices, or creative elements. Enhance them — add professional cinematic/photographic language around them, but never replace unique specifics with generic placeholders.
 
 ${schemaHint}
 
