@@ -202,6 +202,13 @@ const reportAuth = async (req: Request, res: Response, next: NextFunction): Prom
 app.use("/api/reports", (req, res, next) => { void reportAuth(req, res, next); }, express.static(reportsDir));
 app.use("/reports", (req, res, next) => { void reportAuth(req, res, next); }, express.static(reportsDir));
 
+const msgUploadsDir = path.resolve(process.cwd(), "msg-uploads");
+app.use("/api/msg-uploads", (req: Request, res: Response, next: NextFunction) => {
+  const sess = req.session as { userId?: string } | undefined;
+  if (!sess?.userId) { res.status(401).end(); return; }
+  next();
+}, express.static(msgUploadsDir));
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authLimiter);
 app.use("/api/shopybrain/study", aiLimiter);

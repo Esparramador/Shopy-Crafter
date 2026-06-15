@@ -10,6 +10,7 @@ import { recordAudit } from "../lib/audit.helper.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { askClaude } from "../lib/claude.js";
 import { sendPushToClientByProject } from "../lib/push-helper.js";
+import { msgUpload } from "../lib/msg-uploads.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -387,39 +388,70 @@ router.get("/unread-messages", async (_req, res): Promise<void> => {
 router.get("/projects/:projectId/messages", async (req, res): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const msgs = await db.select().from(messagesTable)
-      .where(eq(messagesTable.projectId, projectId))
-      .orderBy(messagesTable.createdAt);
-  
-    await db.update(messagesTable).set({ isRead: 1 })
-      .where(and(eq(messagesTable.projectId, projectId), eq(messagesTable.fromRole, "client")));
-  
-    res.json(msgs);
+    const result = await db.execute(sql`
+      SELECT id,
+             project_id    AS "projectId",
+             from_role     AS "fromRole",
+             from_name     AS "fromName",
+             content,
+             is_read       AS "isRead",
+             created_at    AS "createdAt",
+             file_url      AS "fileUrl",
+             file_name     AS "fileName",
+             file_type     AS "fileType",
+             file_size     AS "fileSize"
+      FROM messages
+      WHERE project_id = ${projectId}
+      ORDER BY created_at ASC
+    `);
+    await db.execute(sql`
+      UPDATE messages SET is_read = 1
+      WHERE project_id = ${projectId} AND from_role = 'client'
+    `);
+    res.json((result as any).rows ?? result);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
+  }
+});
+
+router.post("/projects/:projectId/messages/upload", msgUpload.single("file"), async (req, res): Promise<void> => {
+  try {
+    if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
+    const { originalname, mimetype, size, filename } = req.file;
+    res.json({
+      fileUrl: `/api/msg-uploads/${filename}`,
+      fileName: originalname,
+      fileType: mimetype,
+      fileSize: size,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
   }
 });
 
 router.post("/projects/:projectId/messages", async (req, res): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const { content } = req.body as { content: string };
+    const { content, fileUrl, fileName, fileType, fileSize } = req.body as {
+      content?: string; fileUrl?: string; fileName?: string; fileType?: string; fileSize?: number;
+    };
+    if (!content?.trim() && !fileUrl) { res.status(400).json({ error: "Content or file required" }); return; }
     const id = randomBytes(16).toString("hex");
     const adminName = req.session.name ?? "Tu agencia";
-    await db.insert(messagesTable).values({
-      id, projectId, fromRole: "admin", fromName: adminName, content,
-    });
-    sendPushToClientByProject(
-      projectId,
-      `💬 Mensaje de ${adminName}`,
-      content.length > 80 ? content.slice(0, 77) + "…" : content,
-      "/client/messages"
-    ).catch(() => {});
+    await db.execute(sql`
+      INSERT INTO messages (id, project_id, from_role, from_name, content, file_url, file_name, file_type, file_size)
+      VALUES (
+        ${id}, ${projectId}, 'admin', ${adminName},
+        ${content ?? null}, ${fileUrl ?? null}, ${fileName ?? null}, ${fileType ?? null}, ${fileSize ?? null}
+      )
+    `);
+    const preview = content?.trim()
+      ? (content.length > 80 ? content.slice(0, 77) + "…" : content)
+      : `📎 ${fileName ?? "Archivo adjunto"}`;
+    sendPushToClientByProject(projectId, `💬 Mensaje de ${adminName}`, preview, "/client/messages").catch(() => {});
     res.json({ id });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
   }
 });
 

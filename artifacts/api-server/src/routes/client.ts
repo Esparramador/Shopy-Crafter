@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
 import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
+import { msgUpload } from "../lib/msg-uploads.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { askClaude } from "../lib/claude.js";
@@ -126,17 +127,62 @@ router.get("/messages", async (req, res): Promise<void> => {
   try {
     const projectId = getClientProjectId(req);
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
-    const msgs = await db.select().from(messagesTable)
-      .where(eq(messagesTable.projectId, projectId))
-      .orderBy(messagesTable.createdAt);
-  
-    await db.update(messagesTable).set({ isRead: 1 })
-      .where(and(eq(messagesTable.projectId, projectId), eq(messagesTable.fromRole, "admin")));
-  
-    res.json(msgs);
+    const result = await db.execute(sql`
+      SELECT id,
+             project_id    AS "projectId",
+             from_role     AS "fromRole",
+             from_name     AS "fromName",
+             content,
+             is_read       AS "isRead",
+             created_at    AS "createdAt",
+             file_url      AS "fileUrl",
+             file_name     AS "fileName",
+             file_type     AS "fileType",
+             file_size     AS "fileSize"
+      FROM messages
+      WHERE project_id = ${projectId}
+      ORDER BY created_at ASC
+    `);
+    await db.execute(sql`
+      UPDATE messages SET is_read = 1
+      WHERE project_id = ${projectId} AND from_role = 'admin'
+    `);
+    res.json((result as any).rows ?? result);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
+  }
+});
+
+router.get("/products", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.json([]); return; }
+    const prods = await db.select({
+      id: productsTable.id,
+      title: productsTable.title,
+      price: productsTable.price,
+      auditScore: productsTable.auditScore,
+    }).from(productsTable)
+      .where(eq(productsTable.projectId, parseInt(projectId)))
+      .orderBy(productsTable.title);
+    res.json(prods);
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
+  }
+});
+
+router.post("/messages/upload", msgUpload.single("file"), async (req, res): Promise<void> => {
+  try {
+    if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
+    const { originalname, mimetype, size, filename } = req.file;
+    res.json({
+      fileUrl: `/api/msg-uploads/${filename}`,
+      fileName: originalname,
+      fileType: mimetype,
+      fileSize: size,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
   }
 });
 
@@ -144,31 +190,26 @@ router.post("/messages", async (req, res): Promise<void> => {
   try {
     const projectId = getClientProjectId(req);
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
-    const { content } = req.body as { content: string };
+    const { content, fileUrl, fileName, fileType, fileSize } = req.body as {
+      content?: string; fileUrl?: string; fileName?: string; fileType?: string; fileSize?: number;
+    };
+    if (!content?.trim() && !fileUrl) { res.status(400).json({ error: "Content or file required" }); return; }
     const id = randomBytes(16).toString("hex");
-    const senderName = req.session.name ?? (req.session.role === "admin" ? "Admin" : "Cliente");
-    const fromRole: "admin" | "client" = req.session.role === "admin" ? "admin" : "client";
-    await db.insert(messagesTable).values({
-      id, projectId, fromRole, fromName: senderName, content,
-    });
-    if (fromRole === "client") {
-      sendPushToAdmins(
-        `💬 Nuevo mensaje de ${senderName}`,
-        content.length > 80 ? content.slice(0, 77) + "…" : content,
-        "/admin/messages"
-      ).catch(() => {});
-    } else {
-      sendPushToClientByProject(
-        projectId,
-        `💬 Mensaje de tu agencia`,
-        content.length > 80 ? content.slice(0, 77) + "…" : content,
-        "/client/messages"
-      ).catch(() => {});
-    }
+    const senderName = req.session.name ?? "Cliente";
+    await db.execute(sql`
+      INSERT INTO messages (id, project_id, from_role, from_name, content, file_url, file_name, file_type, file_size)
+      VALUES (
+        ${id}, ${projectId}, 'client', ${senderName},
+        ${content ?? null}, ${fileUrl ?? null}, ${fileName ?? null}, ${fileType ?? null}, ${fileSize ?? null}
+      )
+    `);
+    const preview = content?.trim()
+      ? (content.length > 80 ? content.slice(0, 77) + "…" : content)
+      : `📎 ${fileName ?? "Archivo adjunto"}`;
+    sendPushToAdmins(`💬 Nuevo mensaje de ${senderName}`, preview, "/admin/messages").catch(() => {});
     res.json({ id });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
   }
 });
 
