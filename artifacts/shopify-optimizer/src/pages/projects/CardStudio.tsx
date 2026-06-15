@@ -6,13 +6,14 @@
  *  2. Editor de la tarjeta seleccionada (centro): datos, paleta, fonts, layout, fondo, QR
  *  3. Preview LIVE en CSS (derecha) + preview PNG generado + acciones
  */
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRoute } from "wouter";
 import {
-  Loader2, Sparkles, Plus, Trash2, Download, Wand2, Save,
+  Loader2, Sparkles, Plus, Trash2, Download, Wand2,
   CreditCard, RefreshCw, AlertCircle, CheckCircle2, Upload,
-  Image as ImageIcon, FileText, QrCode, Palette, Move,
-  Link2, Video, Frame, Smartphone, Eye, EyeOff, Copy, ExternalLink,
+  Image as ImageIcon, FileText, QrCode, Move,
+  Link2, Video, Frame, Smartphone, Copy, ExternalLink,
+  PenSquare, Eye,
 } from "lucide-react";
 import CardStudioEditor, { type LayoutOverrides } from "./CardStudioEditor";
 
@@ -119,16 +120,16 @@ export default function CardStudio() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [showEditor, setShowEditor] = useState(false);
+  const [rightTab, setRightTab] = useState<"preview" | "editor" | "generated">("preview");
+  const [editorSide, setEditorSide] = useState<"front" | "back">("front");
   const [showAutoDesign, setShowAutoDesign] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
   const [autoIndustry, setAutoIndustry] = useState("");
   const [autoVibe, setAutoVibe] = useState("");
   const [autoColor, setAutoColor] = useState("");
   const [autoBrand, setAutoBrand] = useState("");
   const [autoBusy, setAutoBusy] = useState(false);
   const [bgModel, setBgModel] = useState("recraft-v4");
-  const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
-  const [showGenerated, setShowGenerated] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   const selected = useMemo(() => cards.find((c) => c.id === selectedId) ?? null, [cards, selectedId]);
@@ -246,7 +247,7 @@ export default function CardStudio() {
       const data = await res.json();
       setCards((prev) => prev.map((c) => (c.id === id ? data.card : c)));
       setSuccess(`✓ Tarjeta generada (coste: $${data.cost?.toFixed(4) || "0.00"})`);
-      setShowGenerated(true);
+      setRightTab("generated");
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
       setError(err?.message || "Error generando");
@@ -637,135 +638,186 @@ export default function CardStudio() {
           </div>
         )}
 
-        {/* ── COL 3: Live Preview + Acciones ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {selected && (
+        {/* ── COL 3: Preview / Editor / Generated ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {selected ? (
             <>
-              {/* Live Preview panel */}
-              <div style={panelStyle}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <h3 style={{ ...panelTitle, margin: 0 }}>
-                    {showGenerated && selected.frontUrl ? "Vista generada" : "Live Preview"}
-                  </h3>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {showGenerated && selected.frontUrl && (
-                      <button onClick={() => setShowGenerated(false)} style={{ ...btnSmall, fontSize: 10, color: "var(--t3)" }} title="Ver live preview">
-                        <Eye size={10} /> Live
-                      </button>
-                    )}
-                    {!showGenerated && selected.frontUrl && (
-                      <button onClick={() => setShowGenerated(true)} style={{ ...btnSmall, fontSize: 10, color: "var(--gold)" }} title="Ver imagen generada">
-                        <ImageIcon size={10} /> Generada
-                      </button>
-                    )}
-                    {(selected.frontUrl || selected.backUrl) && (
-                      <button onClick={() => setShowEditor(true)} style={{ ...btnSmall, color: "var(--gold)", borderColor: "rgba(212,175,55,0.4)" }} title="Editor visual de posiciones">
-                        <Move size={12} /> Editor
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Side toggle */}
-                <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-                  {(["front","back"] as const).map((side) => (
-                    <button key={side} onClick={() => setPreviewSide(side)}
-                      style={{ flex: 1, padding: "6px 10px", fontSize: 11, borderRadius: 4, cursor: "pointer",
-                        background: previewSide === side ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.03)",
-                        border: previewSide === side ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
-                        color: "var(--t1)" }}>
-                      {side === "front" ? "Frente" : "Reverso"}
-                    </button>
-                  ))}
-                </div>
-
-                {showGenerated && selected.frontUrl ? (
-                  <div style={{ aspectRatio: "1080/720", width: "100%", background: "rgba(0,0,0,0.3)", borderRadius: 8, overflow: "hidden" }}>
-                    <img
-                      src={previewSide === "front" ? `${API_BASE}${selected.frontUrl}` : (selected.backUrl ? `${API_BASE}${selected.backUrl}` : `${API_BASE}${selected.frontUrl}`)}
-                      alt={previewSide}
-                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                    />
-                  </div>
-                ) : (
-                  <CardLivePreview card={selected} side={previewSide} />
-                )}
-
-                {selected.status === "generating" && (
-                  <div style={{ textAlign: "center", padding: "10px 0", fontSize: 12, color: "var(--t3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <Loader2 size={14} className="animate-spin" style={{ color: "var(--gold)" }} /> Generando en servidor…
-                  </div>
+              {/* Tab bar */}
+              <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.03)", padding: 3, borderRadius: 7, border: "1px solid rgba(255,255,255,0.06)" }}>
+                <button onClick={() => setRightTab("preview")}
+                  style={{ flex: 1, padding: "7px 10px", fontSize: 11, borderRadius: 5, cursor: "pointer", border: "none",
+                    background: rightTab === "preview" ? "rgba(255,255,255,0.08)" : "transparent",
+                    color: rightTab === "preview" ? "var(--t1)" : "var(--t3)", fontWeight: rightTab === "preview" ? 600 : 400 }}>
+                  <Eye size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Live
+                </button>
+                <button onClick={() => setRightTab("editor")}
+                  style={{ flex: 1, padding: "7px 10px", fontSize: 11, borderRadius: 5, cursor: "pointer", border: "none",
+                    background: rightTab === "editor" ? "rgba(212,175,55,0.15)" : "transparent",
+                    color: rightTab === "editor" ? "var(--gold)" : "var(--t3)", fontWeight: rightTab === "editor" ? 600 : 400 }}>
+                  <PenSquare size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Editor
+                </button>
+                {selected.frontUrl && (
+                  <button onClick={() => setRightTab("generated")}
+                    style={{ flex: 1, padding: "7px 10px", fontSize: 11, borderRadius: 5, cursor: "pointer", border: "none",
+                      background: rightTab === "generated" ? "rgba(255,255,255,0.08)" : "transparent",
+                      color: rightTab === "generated" ? "var(--t1)" : "var(--t3)", fontWeight: rightTab === "generated" ? 600 : 400 }}>
+                    <ImageIcon size={12} style={{ verticalAlign: -2, marginRight: 4 }} />Generada
+                  </button>
                 )}
               </div>
 
-              {/* Acciones */}
+              {/* ── Live Preview tab ── */}
+              {rightTab === "preview" && (
+                <div style={panelStyle}>
+                  <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
+                    {(["front","back"] as const).map((s) => (
+                      <button key={s} onClick={() => setEditorSide(s)}
+                        style={{ flex: 1, padding: "6px 10px", fontSize: 11, borderRadius: 4, cursor: "pointer",
+                          background: editorSide === s ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.03)",
+                          border: editorSide === s ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
+                          color: "var(--t1)" }}>
+                        {s === "front" ? "Frente" : "Reverso"}
+                      </button>
+                    ))}
+                  </div>
+                  <CardLivePreview card={selected} side={editorSide} />
+                  {selected.status === "generating" && (
+                    <div style={{ textAlign: "center", padding: "10px 0", fontSize: 12, color: "var(--t3)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      <Loader2 size={14} className="animate-spin" style={{ color: "var(--gold)" }} /> Generando…
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Inline Editor tab ── */}
+              {rightTab === "editor" && (
+                <div style={{ ...panelStyle, minHeight: 560 }}>
+                  <CardStudioEditor
+                    apiBase={API_BASE}
+                    cardId={selected.id}
+                    frontUrl={selected.frontUrl ? `${API_BASE}${selected.frontUrl}` : null}
+                    backUrl={selected.backUrl ? `${API_BASE}${selected.backUrl}` : null}
+                    logoUrl={selected.logoUrl ?? null}
+                    initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
+                    generating={generating}
+                    side={editorSide}
+                    onSideChange={setEditorSide}
+                    onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
+                    onRegenerate={async () => { await generateCard(selected.id); }}
+                  />
+                </div>
+              )}
+
+              {/* ── Generated image tab ── */}
+              {rightTab === "generated" && selected.frontUrl && (
+                <div style={panelStyle}>
+                  <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
+                    {(["front","back"] as const).map((s) => (
+                      <button key={s} onClick={() => setEditorSide(s)}
+                        style={{ flex: 1, padding: "6px 10px", fontSize: 11, borderRadius: 4, cursor: "pointer",
+                          background: editorSide === s ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.03)",
+                          border: editorSide === s ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
+                          color: "var(--t1)" }}>
+                        {s === "front" ? "Frente" : "Reverso"}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 8, overflow: "hidden", lineHeight: 0 }}>
+                    <img
+                      src={editorSide === "front"
+                        ? `${API_BASE}${selected.frontUrl}`
+                        : (selected.backUrl ? `${API_BASE}${selected.backUrl}` : `${API_BASE}${selected.frontUrl}`)}
+                      alt={editorSide}
+                      style={{ width: "100%", display: "block", borderRadius: 8 }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
+                    <a href={`${API_BASE}${selected.frontUrl}`} download={`${selected.name}-frente.png`} style={{ ...btnSmall, textDecoration: "none" }}>
+                      <Download size={12} /> Frente PNG
+                    </a>
+                    {selected.backUrl && (
+                      <a href={`${API_BASE}${selected.backUrl}`} download={`${selected.name}-reverso.png`} style={{ ...btnSmall, textDecoration: "none" }}>
+                        <Download size={12} /> Reverso PNG
+                      </a>
+                    )}
+                    {selected.pdfUrl && (
+                      <a href={selected.pdfUrl} download={`${selected.name}-print.pdf`} style={{ ...btnSmall, textDecoration: "none" }}>
+                        <FileText size={12} /> PDF Print
+                      </a>
+                    )}
+                    <a href={`${API_BASE}/api/cards/${selected.id}/qr.svg`} download={`${selected.name}-qr.svg`} style={{ ...btnSmall, textDecoration: "none" }}>
+                      <QrCode size={12} /> QR SVG
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Generar panel */}
               <div style={panelStyle}>
-                <h3 style={panelTitle}>Generar</h3>
+                <h3 style={panelTitle}>Generar tarjeta</h3>
                 <Field label="Modelo IA para el fondo:">
                   <select value={bgModel} onChange={(e) => setBgModel(e.target.value)} style={inputStyle}>
                     {BG_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
                 </Field>
-                <button
-                  onClick={() => generateCard(selected.id)}
-                  disabled={generating}
-                  style={{ ...btnPrimary, padding: "12px 16px", width: "100%", marginTop: 8 }}
-                >
-                  {generating ? <><Loader2 size={14} className="animate-spin" /> Generando (1-2 min)…</> : <><Sparkles size={14} /> Generar tarjeta</>}
-                </button>
-
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <button
+                    onClick={() => generateCard(selected.id)}
+                    disabled={generating}
+                    style={{ ...btnPrimary, flex: 1, padding: "11px 16px" }}
+                  >
+                    {generating ? <><Loader2 size={14} className="animate-spin" /> Generando…</> : <><Sparkles size={14} /> Generar</>}
+                  </button>
+                  {/* Import existing card image */}
+                  <label style={{ ...btnSmall, cursor: "pointer", padding: "11px 10px" }} title="Importar imagen de tarjeta ya generada">
+                    <Upload size={13} /> Importar
+                    <input
+                      ref={importFileRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      style={{ display: "none" }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const fd = new FormData();
+                        fd.append("logo", file);
+                        try {
+                          const res = await fetch(`${API_BASE}/api/cards/${selected.id}/upload-logo`, { method: "POST", credentials: "include", body: fd });
+                          if (res.ok) {
+                            const upd = await res.json();
+                            setCards(prev => prev.map(c => c.id === selected.id ? upd : c));
+                            setSuccess("✓ Imagen importada");
+                            setTimeout(() => setSuccess(null), 3000);
+                          }
+                        } catch {}
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
                 {selected.lastError && (
                   <div style={{ fontSize: 11, color: "#e84558", padding: 8, background: "rgba(232,69,88,0.08)", borderRadius: 4, marginTop: 8 }}>
-                    <strong>Error:</strong> {selected.lastError}
+                    {selected.lastError}
                   </div>
                 )}
                 {selected.generationCost && (
                   <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 6 }}>
-                    Coste última generación: ${selected.generationCost}
+                    Coste: ${selected.generationCost}
                   </div>
-                )}
-
-                {selected.frontUrl && (
-                  <>
-                    <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "12px 0" }} />
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                      <a href={`${API_BASE}${selected.frontUrl}`} download={`${selected.name}-frente.png`} style={{ ...btnSmall, textDecoration: "none" }}>
-                        <Download size={12} /> Frente PNG
-                      </a>
-                      <a href={selected.backUrl ? `${API_BASE}${selected.backUrl}` : "#"} download={`${selected.name}-reverso.png`} style={{ ...btnSmall, textDecoration: "none" }}>
-                        <Download size={12} /> Reverso PNG
-                      </a>
-                      {selected.pdfUrl && (
-                        <a href={selected.pdfUrl} download={`${selected.name}-print.pdf`} style={{ ...btnSmall, textDecoration: "none" }}>
-                          <FileText size={12} /> PDF Print
-                        </a>
-                      )}
-                      <a href={`${API_BASE}/api/cards/${selected.id}/qr.svg`} download={`${selected.name}-qr.svg`} style={{ ...btnSmall, textDecoration: "none" }}>
-                        <QrCode size={12} /> QR SVG
-                      </a>
-                    </div>
-                  </>
                 )}
               </div>
             </>
+          ) : (
+            <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
+              <CreditCard size={32} style={{ color: "var(--t3)", marginBottom: 12 }} />
+              <p style={{ color: "var(--t3)", fontSize: 13, margin: 0 }}>
+                {cards.length === 0 ? "Crea tu primera tarjeta seleccionando una plantilla." : "Selecciona una tarjeta."}
+              </p>
+            </div>
           )}
         </div>
       </div>
-
-      {/* EDITOR VISUAL */}
-      {showEditor && selected && (
-        <CardStudioEditor
-          apiBase={API_BASE}
-          cardId={selected.id}
-          frontUrl={selected.frontUrl ? `${API_BASE}${selected.frontUrl}` : null}
-          backUrl={selected.backUrl ? `${API_BASE}${selected.backUrl}` : null}
-          initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
-          generating={generating}
-          onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
-          onRegenerate={async () => { await generateCard(selected.id); }}
-          onClose={() => setShowEditor(false)}
-        />
-      )}
 
       {/* AUTO-DESIGN MODAL */}
       {showAutoDesign && (
@@ -860,7 +912,7 @@ function CardLivePreview({ card, side }: { card: BusinessCard; side: "front" | "
             {/* Grid: left column accent bar */}
             <div style={{ width: "30%", background: `${accent}18`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "8% 5%", borderRight: `1px solid ${accent}22` }}>
               {card.logoUrl ? (
-                <img src={card.logoUrl} alt="logo" style={{ maxWidth: "80%", maxHeight: 48, objectFit: "contain", marginBottom: 12 }} />
+                <img src={card.logoUrl.startsWith("http") ? card.logoUrl : `${API_BASE}${card.logoUrl}`} alt="logo" style={{ maxWidth: "80%", maxHeight: 48, objectFit: "contain", marginBottom: 12 }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
               ) : (
                 <div style={{ width: 40, height: 40, borderRadius: "50%", background: `${accent}25`, border: `2px solid ${accent}44`, marginBottom: 12 }} />
               )}
@@ -881,7 +933,7 @@ function CardLivePreview({ card, side }: { card: BusinessCard; side: "front" | "
           <>
             {/* Centered or Left layout */}
             {card.logoUrl ? (
-              <img src={card.logoUrl} alt="logo" style={{ maxWidth: isLeft ? 80 : 60, maxHeight: isLeft ? 36 : 28, objectFit: "contain", marginBottom: 8 }} />
+              <img src={card.logoUrl.startsWith("http") ? card.logoUrl : `${API_BASE}${card.logoUrl}`} alt="logo" style={{ maxWidth: isLeft ? 80 : 60, maxHeight: isLeft ? 36 : 28, objectFit: "contain", marginBottom: 8 }} onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }} />
             ) : null}
             {card.companyName && (
               <div style={{ fontSize: "clamp(6px,1.2vw,9px)", color: accent, letterSpacing: 2.5, textTransform: "uppercase", fontWeight: 700, textAlign, marginBottom: 4 }}>
