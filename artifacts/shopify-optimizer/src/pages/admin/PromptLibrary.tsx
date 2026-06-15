@@ -33,24 +33,66 @@ interface PromptVar {
 }
 
 const EFFECT_CATEGORIES = [
-  { key: "", label: "Todas", icon: "🌐", color: "var(--gold)", desc: "Explorar toda la librería" },
-  { key: "product_photography", label: "Fotografía de Producto", icon: "📸", color: "#f59e0b", desc: "Composiciones profesionales para e-commerce" },
-  { key: "lifestyle", label: "Lifestyle", icon: "🌿", color: "#4ade80", desc: "Escenas de vida real y contexto emocional" },
-  { key: "seo_copy", label: "SEO & Copy", icon: "🔍", color: "#60a5fa", desc: "Textos optimizados para buscadores" },
-  { key: "email", label: "Email Marketing", icon: "📧", color: "#a78bfa", desc: "Campañas y flujos automatizados" },
-  { key: "ad_creative", label: "Ad Creatives", icon: "📺", color: "#f87171", desc: "Creatividades para Facebook, Instagram, TikTok" },
-  { key: "brand_voice", label: "Brand Voice", icon: "🎯", color: "#fbbf24", desc: "Tono y personalidad de marca" },
-  { key: "product_description", label: "Descripción Producto", icon: "📦", color: "var(--jade)", desc: "Fichas y textos de producto persuasivos" },
-  { key: "storytelling", label: "Storytelling", icon: "📖", color: "#ec4899", desc: "Narrativas de marca con impacto emocional" },
-  { key: "video_script", label: "Vídeo & Script", icon: "🎬", color: "#06b6d4", desc: "Guiones para UGC, reels y anuncios" },
-  { key: "social_media", label: "Social Media", icon: "📱", color: "#f97316", desc: "Posts, captions y hashtags" },
-  { key: "upsell", label: "Upsell & CRO", icon: "📈", color: "#34d399", desc: "Estrategias de conversión y venta cruzada" },
-  { key: "trail_of_bits_security", label: "Seguridad (Trail of Bits)", icon: "🛡️", color: "#ef4444", desc: "27 skills profesionales de auditoría y seguridad — código, supply chain, criptografía" },
-  { key: "claude_code_agents_ecc", label: "Agentes Claude Code", icon: "🤖", color: "#8b5cf6", desc: "64 agentes especializados — reviewers, architects, resolvers, optimizers para cada lenguaje" },
-  { key: "dev_workflow_skills", label: "Skills de Desarrollo", icon: "⚙️", color: "#0ea5e9", desc: "19 skills de workflow — API design, backend patterns, DB migrations, git workflow" },
-  { key: "animate_css_library", label: "Animaciones CSS (97)", icon: "✨", color: "#f59e0b", desc: "97 animaciones de animate.css — bounce, fade, flip, rotate, zoom. CDN + JS patterns" },
-  { key: "hover_css_library", label: "Hover Effects CSS (80)", icon: "🖱️", color: "#10b981", desc: "80 efectos hover de hover.css — 2D/3D transitions, underlines, backgrounds, bubbles" },
-  { key: "awesome_claude_code", label: "Awesome Claude Code", icon: "⭐", color: "#f97316", desc: "30 recursos curados del registry — top agent skills, workflows, MCP servers y templates" },
+  { key: "", label: "Todas", icon: "🌐", color: "var(--gold)", desc: "Explorar toda la librería — 6.677 templates" },
+
+  // ── E-Commerce Stitch ──
+  { key: "stitch_bulk_v2", label: "E-commerce Premium", icon: "🛍️", color: "#f59e0b", desc: "225 templates Shopify — salud, moda, tech, luxury, pets" },
+  { key: "stitch_bulk_v3", label: "Viaje & Lifestyle", icon: "🌿", color: "#4ade80", desc: "125 templates de viaje, lifestyle y e-commerce moderno" },
+  { key: "shopy_crafter_seeds", label: "Shopy Crafter Seeds", icon: "🌱", color: "var(--jade)", desc: "10 templates base de Shopy Crafter — copy y estrategia" },
+  { key: "crafter_methodology", label: "Metodología Crafter", icon: "🎯", color: "#fbbf24", desc: "5 plantillas de metodología de agencia" },
+
+  // ── Ads & Vídeo ──
+  { key: "ad_studio_templates", label: "Ad Studio", icon: "📺", color: "#f87171", desc: "7 creatividades para Facebook, Instagram, TikTok — UGC, testimonios, hooks" },
+  { key: "cinematic_ad_templates", label: "Ads Cinematográficos", icon: "🎬", color: "#e879f9", desc: "9 templates tipo Apple/Porsche — anatomía, deconstrucción, masterpiece" },
+  { key: "video_prompts", label: "Guiones de Vídeo", icon: "🎥", color: "#06b6d4", desc: "19 guiones para UGC, reels, shorts y anuncios en vídeo" },
+  { key: "effects_prompts", label: "Efectos & Prompts", icon: "✨", color: "#a78bfa", desc: "24 prompts de efectos creativos para webs y apps" },
+
+  // ── Diseño & UI ──
+  { key: "design_catalog", label: "Catálogo de Diseño", icon: "🎨", color: "#60a5fa", desc: "312 prompts de diseño web — landing pages, dashboards, UI systems" },
+  { key: "neuform_design_systems", label: "Sistemas de Diseño", icon: "🏗️", color: "#38bdf8", desc: "215 sistemas de diseño web inspirados en Vercel, Linear, Apple" },
+  { key: "external_ui_libs", label: "Librerías UI", icon: "📦", color: "#fb923c", desc: "395 templates de Cult UI, Magic UI y otras librerías premium" },
+  { key: "stitch_design_system", label: "Stitch Design System", icon: "🔧", color: "#818cf8", desc: "52 componentes de sistema de diseño Stitch — tokens, variables, specs" },
+
+  // ── Efectos Web ──
+  { key: "stitch_effects", label: "Efectos Stitch", icon: "🌊", color: "#22d3ee", desc: "210 efectos de animación y UI para webs premium — parallax, morphing, transitions" },
+  { key: "effects_catalog", label: "Catálogo Efectos CSS", icon: "💫", color: "#c084fc", desc: "213 efectos CSS — auroras, glassmorphism, gradientes animados, partículas" },
+  { key: "cult_ui_effects", label: "Cult UI Effects", icon: "🔮", color: "#f0abfc", desc: "25 efectos especiales de Cult UI — Text Animate, Magnetic, Spotlight" },
+  { key: "visme_form_effects", label: "Visme Form Effects", icon: "📋", color: "#34d399", desc: "35 efectos interactivos para formularios y encuestas Visme" },
+
+  // ── Animaciones CSS ──
+  { key: "animate_css_library", label: "Animate.css (97)", icon: "⚡", color: "#fbbf24", desc: "97 animaciones — bounce, fade, flip, rotate, zoom. CDN + JS patterns" },
+  { key: "hover_css_library", label: "Hover.css (80)", icon: "🖱️", color: "#10b981", desc: "80 efectos hover — 2D/3D transitions, underlines, backgrounds, bubbles" },
+
+  // ── Componentes UI ──
+  { key: "shadcn_components", label: "shadcn/ui", icon: "🧩", color: "#e2e8f0", desc: "40 componentes shadcn/ui con variantes, estados y dark mode" },
+  { key: "21st_dev_sections", label: "Secciones Web", icon: "🏠", color: "#7dd3fc", desc: "39 secciones web modernas — pricing, features, testimonios, FAQs" },
+  { key: "21st_dev_heroes_nav", label: "Heroes & Navegación", icon: "🗺️", color: "#86efac", desc: "26 heroes y navbars premium — glassmorphism, animated, sticky" },
+  { key: "21st_dev_auth_dash", label: "Auth & Dashboard", icon: "📊", color: "#fca5a5", desc: "30 pantallas de autenticación y dashboards — login, signup, analytics" },
+  { key: "card_studio_templates", label: "Card Studio", icon: "🃏", color: "#fdba74", desc: "6 templates de cards premium para portfolios y catálogos" },
+
+  // ── GPU & 3D ──
+  { key: "typegpu_advanced", label: "TypeGPU Avanzado", icon: "⚛️", color: "#f472b6", desc: "78 shaders GPU, física avanzada y partículas WebGL — Three.js, WGSL" },
+  { key: "typegpu_effects", label: "Efectos GPU", icon: "🌈", color: "#fb7185", desc: "61 efectos básicos GPU — gradientes animados, blur, distorsión de imagen" },
+  { key: "tripo3d_animations", label: "Animaciones 3D (Tripo)", icon: "🧊", color: "#67e8f9", desc: "63 animaciones 3D para modelos — idle, walk, attack, dance, emotes" },
+  { key: "3d_mining", label: "3D Mining (3.414)", icon: "⛏️", color: "#a78bfa", desc: "3.414 prompts 3D — modelos, texturas, escenas, renders y assets" },
+
+  // ── Presentaciones ──
+  { key: "visme_templates", label: "Visme Templates", icon: "📊", color: "#60a5fa", desc: "579 plantillas de presentaciones, infografías y diseño visual" },
+
+  // ── Desktop & Agentes ──
+  { key: "desktop_commander", label: "Desktop Commander", icon: "🖥️", color: "#94a3b8", desc: "73 comandos y workflows para Desktop Commander MCP" },
+  { key: "claude_code_agents", label: "Agentes Claude", icon: "🤖", color: "#8b5cf6", desc: "30 agentes Claude Code — reviewers, architects y planners" },
+  { key: "claude_code_agents_ecc", label: "Agentes ECC (64)", icon: "🧠", color: "#a855f7", desc: "64 agentes especializados — resolvers, optimizers para cada lenguaje" },
+  { key: "anthropic_skills", label: "Anthropic Skills", icon: "🏛️", color: "#c4b5fd", desc: "20 skills oficiales Anthropic — workflows, pipelines, patterns Claude" },
+  { key: "awesome_claude_code", label: "Awesome Claude Code", icon: "⭐", color: "#f97316", desc: "30 recursos curados del registry — agent skills, MCPs y templates" },
+
+  // ── Dev & Seguridad ──
+  { key: "dev_workflow_skills", label: "Dev Skills (19)", icon: "⚙️", color: "#0ea5e9", desc: "19 skills — API design, backend patterns, DB migrations, git workflow" },
+  { key: "trail_of_bits_security", label: "Seguridad (Trail of Bits)", icon: "🛡️", color: "#ef4444", desc: "27 skills de auditoría — código, supply chain, criptografía avanzada" },
+  { key: "web_security_workflows", label: "Web Security", icon: "🔒", color: "#f87171", desc: "15 workflows de seguridad web — OWASP, XSS, SQLi, auth hardening" },
+
+  // ── Agencia ──
+  { key: "agency_singles", label: "Agency Singles", icon: "💼", color: "#d4a017", desc: "4 templates de agencia — propuesta de valor, pitch, onboarding" },
 ];
 
 const ENGINE_COLORS: Record<string, string> = {

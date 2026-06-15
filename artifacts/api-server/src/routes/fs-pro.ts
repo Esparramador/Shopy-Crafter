@@ -600,16 +600,21 @@ router.get("/fs-pro/prompt-library-master", requireAdmin, async (req, res): Prom
     const lim = Math.min(parseInt(limit) || 20, 100);
     const off = parseInt(offset) || 0;
     const total = templates.length;
-    const items = templates.slice(off, off + lim).map((t: any) => ({
-      id:          t.id || t.slug || undefined,
-      name:        t.name || t.title || t.id || "(sin título)",
-      description: t.description || t.prompt?.slice?.(0, 120) || t.user_template?.slice?.(0, 120) || "",
-      category:    t.category || t.type || t.useCase || t._category || "",
-      engine:      t.engine || t.engine_hint || t.ai_model || "",
-      variables:   t.variables || t.dna_variables || [],
-      _library:    t._library || libKey || "all",
-      _raw:        t,
-    }));
+    const items = templates.slice(off, off + lim).map((t: any) => {
+      const fullPrompt = t.prompt || t.user_template || t.system_prompt || t.template || "";
+      const desc = t.description || fullPrompt.slice(0, 150) || "";
+      return {
+        id:          t.id || t.slug || undefined,
+        name:        t.name || t.title || t.id || "(sin título)",
+        description: desc,
+        prompt:      fullPrompt,
+        category:    t.category || t.type || t.useCase || t._category || "",
+        engine:      t.engine || t.engine_hint || t.ai_model || "",
+        variables:   t.variables || t.dna_variables || [],
+        _library:    t._library || libKey || "all",
+        _raw:        t,
+      };
+    });
 
     res.json({ total, limit: lim, offset: off, library: libKey || "all", items });
   } catch (e: any) {
