@@ -40,6 +40,21 @@ function RigDetector({ glbPath, onRigStatus }: { glbPath: string; onRigStatus: (
   return null;
 }
 
+// ── Helper: normalize model scale and floor position ─────────────────────────
+
+function normalizeScene(scene: THREE.Object3D) {
+  const box = new THREE.Box3().setFromObject(scene);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  if (maxDim === 0) return;
+  const scale = 2 / maxDim;
+  const center = box.getCenter(new THREE.Vector3());
+  scene.scale.setScalar(scale);
+  scene.position.sub(center.multiplyScalar(scale));
+  const box2 = new THREE.Box3().setFromObject(scene);
+  scene.position.y -= box2.min.y;
+}
+
 // ── Base model (no animation GLB) ────────────────────────────────────────────
 
 function BaseModel({ glbPath, onReady }: { glbPath: string; onReady?: () => void }) {
@@ -49,17 +64,9 @@ function BaseModel({ glbPath, onReady }: { glbPath: string; onReady?: () => void
 
   useEffect(() => {
     if (!scene) return;
-    const box = new THREE.Box3().setFromObject(scene);
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 2 / maxDim;
-    const center = box.getCenter(new THREE.Vector3());
-    scene.scale.setScalar(scale);
-    scene.position.sub(center.multiplyScalar(scale));
-    const box2 = new THREE.Box3().setFromObject(scene);
-    scene.position.y -= box2.min.y;
+    normalizeScene(scene);
     onReady?.();
-  }, [scene]);
+  }, [glbPath]);
 
   useEffect(() => {
     const keys = Object.keys(actions);
@@ -70,38 +77,30 @@ function BaseModel({ glbPath, onReady }: { glbPath: string; onReady?: () => void
   }, [JSON.stringify(Object.keys(actions))]);
 
   useFrame((_, dt) => mixer.update(dt));
-
   return <group ref={group}><primitive object={scene} /></group>;
 }
 
-// ── Animated model (loads separate animation GLB) ─────────────────────────────
+// ── Animated model ────────────────────────────────────────────────────────────
+// Meshy animation GLBs ARE the full animated character — they include the mesh
+// AND the baked animation. We load animGlbPath as the display scene so bones
+// and animation clips are from the same GLB (guaranteed to match).
 
 function AnimatedModel({
-  glbPath, animGlbPath, looping, onReady,
+  animGlbPath, looping, onReady,
 }: {
-  glbPath: string;
   animGlbPath: string;
   looping?: boolean;
   onReady?: () => void;
 }) {
   const group = useRef<THREE.Group>(null!);
-  const { scene } = useGLTF(glbPath);
-  const { animations: animAnims } = useGLTF(animGlbPath);
-  const { actions, mixer } = useAnimations(animAnims, group);
+  const { scene, animations } = useGLTF(animGlbPath);
+  const { actions, mixer } = useAnimations(animations, group);
 
   useEffect(() => {
     if (!scene) return;
-    const box = new THREE.Box3().setFromObject(scene);
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 2 / maxDim;
-    const center = box.getCenter(new THREE.Vector3());
-    scene.scale.setScalar(scale);
-    scene.position.sub(center.multiplyScalar(scale));
-    const box2 = new THREE.Box3().setFromObject(scene);
-    scene.position.y -= box2.min.y;
+    normalizeScene(scene);
     onReady?.();
-  }, [scene]);
+  }, [animGlbPath]);
 
   useEffect(() => {
     const keys = Object.keys(actions);
@@ -117,7 +116,6 @@ function AnimatedModel({
   }, [animGlbPath, looping, JSON.stringify(Object.keys(actions))]);
 
   useFrame((_, dt) => mixer.update(dt));
-
   return <group ref={group}><primitive object={scene} /></group>;
 }
 
@@ -147,10 +145,11 @@ function ModelSwitcher({
         </Suspense>
       )}
       {animGlbPath
-        ? <AnimatedModel glbPath={glbPath} animGlbPath={animGlbPath} looping={looping} onReady={onReady} />
-        : <BaseModel glbPath={glbPath} onReady={onReady} />
+        ? <AnimatedModel key={animGlbPath} animGlbPath={animGlbPath} looping={looping} onReady={onReady} />
+        : <BaseModel key={glbPath} glbPath={glbPath} onReady={onReady} />
       }
       <OrbitControls
+        target={[0, 1.0, 0]}
         autoRotate={autoRotate}
         autoRotateSpeed={1.5}
         enablePan={false}

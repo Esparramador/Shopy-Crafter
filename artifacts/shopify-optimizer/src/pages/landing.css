@@ -1623,6 +1623,117 @@
 
 }
 
+/* ════════════════════════════════════════════════════
+   RESPONSIVE — SMALL MOBILE (≤480px)
+   iPhone SE, iPhone mini, small Android phones
+════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .l-nav { padding: 0 12px; height: 52px; }
+  .l-nav-ctas .l-btn-ghost { display: none; }
+  .l-nav-logo-text { font-size: 15px; }
+  .l-btn-gold { padding: 7px 12px; font-size: 11px; }
+  .l-nav-gem { width: 24px; height: 24px; font-size: 12px; }
+
+  .fp-section { padding: 50px 16px 40px !important; }
+  .fp-section:first-child { padding-top: 70px !important; }
+
+  .fp-hero-left .l-hero-h1 { font-size: 26px !important; line-height: 1.15; }
+  .fp-hero-left .l-hero-sub { font-size: 14px !important; }
+  .fp-hero-left .l-hero-ctas { flex-direction: column; align-items: stretch; gap: 10px; }
+  .l-btn-primary, .l-btn-secondary { text-align: center; }
+  .l-hero-pill { font-size: 10px; padding: 4px 10px; }
+  .l-hero-trust { flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .l-trust-item { font-size: 11px; }
+
+  .l-h2 { font-size: 24px !important; }
+  .l-sub { font-size: 13px !important; }
+  .l-pill { font-size: 10px; padding: 4px 10px; }
+
+  .fp-stats-grid { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .fp-stat-val { font-size: 30px !important; }
+  .fp-stat-label { font-size: 11px !important; }
+  .fp-tech-logos { gap: 6px; }
+
+  .l-features-grid { grid-template-columns: 1fr !important; gap: 10px; }
+
+  .fp-pricing-row > * {
+    flex: 0 0 92% !important;
+    min-width: 230px !important;
+    max-width: 300px !important;
+  }
+  .l-pricing-card { padding: 20px 16px !important; }
+  .l-pricing-price { font-size: 36px; }
+
+  .fp-calc-grid { grid-template-columns: 1fr !important; }
+  .fp-calc-summary { position: static !important; }
+
+  .fp-contact-visme { max-width: 100% !important; }
+  .fp-contact-form-v2 {
+    padding: 20px 14px !important;
+    border-radius: 12px !important;
+    gap: 16px !important;
+  }
+  .fp-contact-form-v2 .fp-contact-row { grid-template-columns: 1fr !important; }
+
+  .fp-footer-inner { grid-template-columns: 1fr !important; gap: 18px; }
+  .fp-footer-col { display: none; }
+  .l-footer-bottom { flex-direction: column; gap: 10px; text-align: center; }
+  .l-footer-badges { justify-content: center; }
+
+  .fp-engine-tabs { justify-content: flex-start; }
+  .fp-etab { padding: 5px 10px; font-size: 11px; }
+  .fp-testi-card { padding: 16px; font-size: 13px; }
+
+  .fp-demo-steps { gap: 12px; }
+}
+
+/* ════════════════════════════════════════════════════
+   RESPONSIVE — TINY MOBILE (≤360px)
+   Very small Androids, old budget phones
+════════════════════════════════════════════════════ */
+@media (max-width: 360px) {
+  .l-nav { padding: 0 10px; height: 50px; }
+  .l-nav-logo-text { font-size: 14px; }
+
+  .fp-section { padding: 44px 12px 36px !important; }
+  .fp-section:first-child { padding-top: 64px !important; }
+
+  .fp-hero-left .l-hero-h1 { font-size: 22px !important; }
+  .l-h2 { font-size: 20px !important; }
+  .l-sub { font-size: 12px !important; }
+
+  .fp-stat-val { font-size: 26px !important; }
+  .fp-stat-label { font-size: 10px !important; }
+
+  .fp-contact-form-v2 { padding: 16px 10px !important; }
+  .l-pricing-card { padding: 16px 12px !important; }
+}
+
+/* ════════════════════════════════════════════════════
+   RESPONSIVE — TABLET PORTRAIT (601–900px)
+   iPad mini portrait, small tablets
+════════════════════════════════════════════════════ */
+@media (min-width: 601px) and (max-width: 900px) {
+  .fp-hero-left .l-hero-h1 { font-size: 34px; }
+  .fp-stats-grid { grid-template-columns: repeat(4, 1fr) !important; }
+  .l-features-grid { grid-template-columns: 1fr 1fr !important; }
+  .fp-pricing-row > * {
+    flex: 0 0 calc(50% - 10px) !important;
+    min-width: 240px;
+  }
+  .fp-calc-grid { grid-template-columns: 1fr 280px; }
+}
+
+/* ════════════════════════════════════════════════════
+   RESPONSIVE — TABLET LANDSCAPE / SMALL DESKTOP (901–1024px)
+════════════════════════════════════════════════════ */
+@media (min-width: 901px) and (max-width: 1024px) {
+  .fp-section { padding: 0 32px !important; }
+  .fp-hero-left .l-hero-h1 { font-size: 44px; }
+  .fp-calc-grid { grid-template-columns: 1fr 300px; }
+  .fp-footer-inner { gap: 24px; }
+}
+
 /* ══════════════════════════════════════
    CALCULATOR SECTION
 ══════════════════════════════════════ */

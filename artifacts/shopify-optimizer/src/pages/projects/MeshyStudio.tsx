@@ -316,17 +316,64 @@ export default function MeshyStudio() {
 
   return (
     <div style={{ padding: "20px 24px", maxWidth: 1400, margin: "0 auto" }}>
+      <style>{`
+        .msy-header { display: flex; align-items: center; gap: 12; margin-bottom: 16px; }
+        .msy-header-stats { display: flex; gap: 8px; margin-left: auto; }
+        .msy-tabs-bar {
+          display: flex; gap: 2px; margin-bottom: 20px;
+          border-bottom: 1px solid rgba(255,255,255,0.07);
+          overflow-x: auto; scrollbar-width: none;
+        }
+        .msy-tabs-bar::-webkit-scrollbar { display: none; }
+        .msy-viewer-grid {
+          display: grid;
+          grid-template-columns: 210px 1fr 290px;
+          gap: 14px;
+        }
+        .msy-anim-sidebar {
+          display: flex; flex-direction: column; gap: 8px; height: 580px;
+        }
+        @media (max-width: 1100px) {
+          .msy-viewer-grid { grid-template-columns: 180px 1fr 260px; }
+        }
+        @media (max-width: 900px) {
+          .msy-viewer-grid {
+            grid-template-columns: 1fr;
+          }
+          .msy-viewer-grid > *:first-child {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 6px;
+          }
+          .msy-viewer-grid > *:first-child > div:first-child {
+            display: none;
+          }
+          .msy-anim-sidebar {
+            height: auto;
+            max-height: 420px;
+          }
+        }
+        @media (max-width: 640px) {
+          .msy-header-stats { display: none; }
+          .msy-viewer-grid > *:first-child {
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          }
+        }
+        @media (max-width: 480px) {
+          .msy-tabs-bar { gap: 0px; }
+        }
+      `}</style>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <div style={{ fontSize: 28 }}>🧊</div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--l-t)" }}>Meshy Studio — Character Lab</h1>
           <p style={{ margin: 0, fontSize: 12, color: "var(--l-t3)" }}>
             {riggedCount} personajes rigged · {totalAnims} animaciones · {totalModels} modelos · sin créditos para animar
           </p>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+        <div className="msy-header-stats">
           <StatPill label="GLBs"      value={`${totalModels}`}  color="gold"   />
           <StatPill label="Rigged"    value={`${riggedCount}`}  color="jade"   />
           <StatPill label="Anims"     value={`${totalAnims}`}   color="purple" />
@@ -334,7 +381,7 @@ export default function MeshyStudio() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 2, marginBottom: 20, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="msy-tabs-bar">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: "8px 14px", border: "none", cursor: "pointer", borderRadius: "6px 6px 0 0",
@@ -342,6 +389,7 @@ export default function MeshyStudio() {
             background: tab === t.id ? "rgba(212,168,67,0.15)" : "transparent",
             color: tab === t.id ? "var(--l-gold)" : "var(--l-t3)",
             borderBottom: tab === t.id ? "2px solid var(--l-gold)" : "2px solid transparent",
+            whiteSpace: "nowrap", flexShrink: 0,
           }}>
             {t.icon} {t.label}
             {t.badge && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: "rgba(212,168,67,0.15)", color: "var(--l-gold)" }}>{t.badge}</span>}
@@ -351,7 +399,7 @@ export default function MeshyStudio() {
 
       {/* ═══ STUDIO 3D VIEWER ══════════════════════════════════════════════════ */}
       {tab === "viewer" && (
-        <div style={{ display: "grid", gridTemplateColumns: "210px 1fr 290px", gap: 14 }}>
+        <div className="msy-viewer-grid">
 
           {/* LEFT: Model Selector */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -501,7 +549,7 @@ export default function MeshyStudio() {
           </div>
 
           {/* RIGHT: Animation Browser */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, height: 580 }}>
+          <div className="msy-anim-sidebar">
             <div style={{ fontSize: 10, fontWeight: 700, color: "var(--l-t4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
               Librería de Animaciones
             </div>
