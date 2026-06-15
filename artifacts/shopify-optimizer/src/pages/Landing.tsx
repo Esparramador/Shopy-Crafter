@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { FloatingBatman } from "@/components/FloatingBatman3D";
 import PageMeta from "@/components/PageMeta";
 import "./landing.css";
 
@@ -155,14 +154,7 @@ export default function Landing() {
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
 
-  const [spiderPhase, setSpiderPhase] = useState<"hidden"|"fall"|"bounce"|"standup"|"look"|"ready"|"waiting"|"celebrate">("hidden");
-  const [formSlideIn, setFormSlideIn] = useState(false);
-  const [formFieldsIn, setFormFieldsIn] = useState(false);
-  const [showLaptop, setShowLaptop] = useState(false);
-  const [showBubble, setShowBubble] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
   const [formProgress, setFormProgress] = useState(0);
-  const [webLine, setWebLine] = useState(false);
   const contactSectionRef = useRef<HTMLElement>(null);
   const heroSectionRef = useRef<HTMLElement>(null);
   const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
@@ -173,28 +165,12 @@ export default function Landing() {
   const CF = (field: keyof typeof contactForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setContactForm(f => ({ ...f, [field]: e.target.value }));
 
-  // Waiting phase: Spider-Man animates when user starts filling the form
-  useEffect(() => {
-    if (spiderPhase !== "ready") return;
-    const hasInput = Object.values(contactForm).some(v => String(v).trim() !== "");
-    if (hasInput) setSpiderPhase("waiting");
-  }, [contactForm, spiderPhase]);
-
   // Live progress counter: % of form filled
   useEffect(() => {
     const vals = Object.values(contactForm);
     const filled = vals.filter(v => String(v).trim() !== "").length;
     setFormProgress(Math.round((filled / vals.length) * 100));
   }, [contactForm]);
-
-  // Field focus handler: head tracks focused field + triggers waiting
-  const handleFF = useCallback((field: string) => ({
-    onFocus: () => {
-      setFocusedField(field);
-      if (spiderPhase === "ready") setSpiderPhase("waiting");
-    },
-    onBlur: () => setFocusedField(null),
-  }), [spiderPhase]);
 
   const toggleService = (s: string) =>
     setContactServices(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
@@ -208,29 +184,6 @@ export default function Landing() {
     cards[next].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     setPricingIdx(next);
   }, [pricingIdx]);
-
-  const spiderTriggeredRef = useRef(false);
-  useEffect(() => {
-    const contactIdx = FP_SECTION_IDS.indexOf("fp-contact");
-    if (currentSection !== contactIdx) return;
-    if (spiderTriggeredRef.current) return;
-    spiderTriggeredRef.current = true;
-    setWebLine(true);
-    setTimeout(() => setSpiderPhase("fall"), 200);
-    setTimeout(() => setSpiderPhase("bounce"), 900);
-    setTimeout(() => setSpiderPhase("standup"), 1380);
-    setTimeout(() => setSpiderPhase("look"), 1900);
-    setTimeout(() => {
-      setSpiderPhase("ready");
-      setShowLaptop(true);
-      setShowBubble(true);
-    }, 3300);
-    setTimeout(() => {
-      setFormSlideIn(true);
-      setShowBubble(false);
-    }, 4000);
-    setTimeout(() => setFormFieldsIn(true), 4600);
-  }, [currentSection]);
 
   const handleHeroMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -789,22 +742,30 @@ export default function Landing() {
           onMouseMove={handleHeroMouseMove} onMouseLeave={handleHeroMouseLeave}>
           <div className="fp-bg">
             {videoBg("hero")}
-            <div className="l-hero-grid"></div>
-            <div className="fp-hero-orb fp-orb-gold" style={{ transform: `translate(${heroTilt.x * -2}px, ${heroTilt.y * -1.5}px)` }}></div>
-            <div className="fp-hero-orb fp-orb-jade" style={{ transform: `translate(${heroTilt.x * 1.5}px, ${heroTilt.y * 2}px)` }}></div>
-            <div className="fp-hero-orb fp-orb-sky" style={{ transform: `translate(${heroTilt.x * 1}px, ${heroTilt.y * -1}px)` }}></div>
-            <div className="fp-particles">
-              {Array.from({ length: 20 }).map((_, i) => (
-                <div key={i} className="fp-particle" style={{
-                  left: `${Math.random() * 100}%`,
-                  width: `${2 + Math.random() * 3}px`,
-                  height: `${2 + Math.random() * 3}px`,
-                  animationDuration: `${6 + Math.random() * 8}s`,
-                  animationDelay: `${Math.random() * 8}s`,
-                  opacity: 0.3 + Math.random() * 0.4,
-                }}></div>
+            {/* ── Aurora (21st.dev style) — gold/jade conic gradients rotating ── */}
+            <div className="hero-aurora" aria-hidden="true"><div className="hero-aurora-inner" /></div>
+            {/* ── Lamp cone — golden cone of light from top ── */}
+            <div className="hero-lamp-cone" style={{ transform: `translateX(calc(-50% + ${heroTilt.x * 0.3}px))` }} aria-hidden="true" />
+            <div className="hero-lamp-line" aria-hidden="true" />
+            {/* ── Falling light beams ── */}
+            <div className="hero-beams" aria-hidden="true">
+              {[
+                { left: "8%",  dur: "4.2s", delay: "0s",   opacity: 0.45 },
+                { left: "22%", dur: "6.1s", delay: "1.4s",  opacity: 0.30 },
+                { left: "38%", dur: "3.8s", delay: "0.5s",  opacity: 0.55 },
+                { left: "55%", dur: "5.5s", delay: "2.2s",  opacity: 0.35 },
+                { left: "68%", dur: "4.0s", delay: "0.9s",  opacity: 0.50 },
+                { left: "80%", dur: "7.0s", delay: "3.1s",  opacity: 0.25 },
+                { left: "92%", dur: "3.5s", delay: "1.8s",  opacity: 0.40 },
+              ].map((b, i) => (
+                <div key={i} className="hero-beam" style={{ left: b.left, animationDuration: b.dur, animationDelay: b.delay, opacity: b.opacity }} />
               ))}
             </div>
+            {/* ── Subtle dot grid ── */}
+            <div className="l-hero-grid" />
+            {/* ── Parallax orbs ── */}
+            <div className="fp-hero-orb fp-orb-gold" style={{ transform: `translate(${heroTilt.x * -2}px, ${heroTilt.y * -1.5}px)` }} />
+            <div className="fp-hero-orb fp-orb-jade" style={{ transform: `translate(${heroTilt.x * 1.5}px, ${heroTilt.y * 2}px)` }} />
           </div>
           <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.48)" }}></div>
 
@@ -1282,61 +1243,7 @@ export default function Landing() {
               <p className="l-sub" {...cmsProps("contact.subheadline")}>{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
             </div>
 
-            {/* ── BATMAN CHARACTER STAGE ── */}
-            <div className="sc-stage-wrap">
-              <div className={`bat-scene${spiderPhase !== "hidden" ? " bat-active" : ""}${spiderPhase === "celebrate" ? " bat-celebrate" : ""}`}>
-                {spiderPhase !== "hidden" ? (
-                  <>
-                    {/* Speech bubble */}
-                    <div className={`sc-speech-bubble bat-bubble${(showBubble || focusedField !== null) ? " show" : ""}`}>
-                      {focusedField === "name" ? "💬 ¿Cómo te llamas?" :
-                       focusedField === "email" ? "📧 ¡Te escribiremos aquí!" :
-                       focusedField === "phone" ? "📞 Para contactarte directamente" :
-                       focusedField === "storeUrl" ? "🔍 ¡Voy a analizar tu tienda!" :
-                       focusedField === "niche" ? "🎯 Clave para personalizar el SEO" :
-                       focusedField === "revenue" ? "💰 Para calibrar la estrategia IA" :
-                       focusedField === "socialMedia" ? "📱 Tu presencia social importa" :
-                       focusedField === "extraInfo" ? "📝 ¡Cuéntame todo!" :
-                       focusedField === "suppliers" ? "🏭 Perfecto para el análisis de nicho" :
-                       focusedField === "message" ? "💡 Cualquier detalle ayuda" :
-                       spiderPhase === "celebrate" ? "🎉 ¡Información recibida!" :
-                       spiderPhase === "waiting" ? "👀 Leyendo tu negocio…" :
-                       spiderPhase === "look" ? "🔍 Analizando tu tienda…" : "🦇 ¡Cuéntame tu negocio!"}
-                    </div>
-
-                    {/* 3D Batman — walks in from left via CSS, plays walk.glb */}
-                    <div className={`bat-3d-wrap${(spiderPhase === "fall" || spiderPhase === "bounce" || spiderPhase === "standup") ? " bat-walking-in" : ""}`}>
-                      <FloatingBatman phase={spiderPhase} height={280} />
-                    </div>
-
-                    {/* Bat-Signal spotlight (CSS overlay above 3D canvas) */}
-                    <div className="bat-spotlight">
-                      <div className="bat-beam"></div>
-                      <div className="bat-signal-circle">
-                        <span className="bat-signal-sc">SC</span>
-                      </div>
-                    </div>
-
-                    {/* Ground glow */}
-                    <div className="bat-ground"></div>
-                  </>
-                ) : (
-                  <div style={{ width: "100%", height: 260 }} />
-                )}
-              </div>
-
-              {spiderPhase !== "hidden" && (
-                <p style={{ fontSize: 11.5, color: "rgba(200,168,75,0.45)", marginTop: 12, fontStyle: "italic", textAlign: "center" }}>
-                  {spiderPhase === "celebrate" ? "🚀 ¡Misión completada! Analizando tu negocio con IA…" :
-                   spiderPhase === "waiting" ? "🧠 Batman está analizando tu negocio…" :
-                   (spiderPhase === "fall" || spiderPhase === "bounce") ? "🦇 ¡Tu guardián IA ha llegado!" :
-                   (spiderPhase === "standup" || spiderPhase === "look") ? "🔍 Activando la Bat-señal Shopy Crafter…" :
-                   showLaptop ? "💻 Rellena el formulario y te contactamos en 24h" : ""}
-                </p>
-              )}
-            </div>
-
-            <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s", gridColumn: "2", gridRow: "2" }}>
+            <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s" }}>
               {contactStatus === "sent" ? (
                 <div style={{
                   background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.3)",
@@ -1348,20 +1255,20 @@ export default function Landing() {
                   <p style={{ color: "var(--t4)", fontSize: 13 }}>{content.contact?.successSubtext ?? "Te contactaremos con un informe detallado en menos de 24h. Revisa también tu carpeta de spam."}</p>
                 </div>
               ) : (
-                <form onSubmit={submitContact} className={`fp-contact-form-v2${formSlideIn ? " slide-in" : ""}${formFieldsIn ? " fields-in" : ""}`}>
+                <form onSubmit={submitContact} className="fp-contact-form-v2">
                   {/* Row 1: Nombre + Email */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
                       <label className="fp-field-label">{content.contact?.labels?.name ?? "Nombre completo *"}</label>
                       <input type="text" required value={contactForm.name} onChange={CF("name")}
                         placeholder={content.contact?.placeholders?.name ?? "Tu nombre y apellidos"}
-                        className="fp-input-v2" {...handleFF("name")} />
+                        className="fp-input-v2" />
                     </div>
                     <div>
                       <label className="fp-field-label">{content.contact?.labels?.email ?? "Email de contacto *"}</label>
                       <input type="email" required value={contactForm.email} onChange={CF("email")}
                         placeholder={content.contact?.placeholders?.email ?? "tu@email.com"}
-                        className="fp-input-v2" {...handleFF("email")} />
+                        className="fp-input-v2" />
                     </div>
                   </div>
 
@@ -1372,7 +1279,7 @@ export default function Landing() {
                       <input
                         type="tel" value={contactForm.phone} onChange={CF("phone")}
                         placeholder={content.contact?.placeholders?.phone ?? "+34 600 000 000"}
-                        className="fp-input-v2" {...handleFF("phone")}
+                        className="fp-input-v2"
                       />
                     </div>
                     <div>
@@ -1380,7 +1287,7 @@ export default function Landing() {
                       <input
                         type="text" value={contactForm.storeUrl} onChange={CF("storeUrl")}
                         placeholder={content.contact?.placeholders?.storeUrl ?? "mitienda.com"}
-                        className="fp-input-v2" {...handleFF("storeUrl")}
+                        className="fp-input-v2"
                       />
                     </div>
                   </div>
@@ -1391,7 +1298,7 @@ export default function Landing() {
                       <label className="fp-field-label">{content.contact?.labels?.niche ?? "Nicho / tipo de productos"}</label>
                       <select
                         value={contactForm.niche} onChange={CF("niche")}
-                        className="fp-input-v2" {...handleFF("niche")}
+                        className="fp-input-v2"
                       >
                         <option value="">{content.contact?.placeholders?.niche ?? "Selecciona tu nicho"}</option>
                         {(Array.isArray(content.contact?.nicheOptions) ? content.contact!.nicheOptions : ["Moda y ropa", "Electrónica y gadgets", "Hogar y decoración", "Belleza y cosmética", "Deporte y fitness", "Alimentación y gourmet", "Arte y coleccionismo", "Mascotas", "Joyería y accesorios", "Otro"]).map(o => (
@@ -1413,7 +1320,7 @@ export default function Landing() {
                       <label className="fp-field-label">{content.contact?.labels?.revenue ?? "Facturación mensual aprox."}</label>
                       <select
                         value={contactForm.revenue} onChange={CF("revenue")}
-                        className="fp-input-v2" {...handleFF("revenue")}
+                        className="fp-input-v2"
                       >
                         <option value="">{content.contact?.placeholders?.revenue ?? "Selecciona rango"}</option>
                         {(Array.isArray(content.contact?.revenueOptions) ? content.contact!.revenueOptions : ["Menos de €1.000", "€1.000 – €5.000", "€5.000 – €15.000", "€15.000 – €50.000", "Más de €50.000"]).map(o => (
@@ -1429,7 +1336,7 @@ export default function Landing() {
                     <input
                       type="text" value={contactForm.socialMedia} onChange={CF("socialMedia")}
                       placeholder={content.contact?.socialPlaceholder ?? "@tutienda o https://instagram.com/tutienda"}
-                      className="fp-input-v2" {...handleFF("socialMedia")}
+                      className="fp-input-v2"
                     />
                   </div>
 
@@ -1439,7 +1346,7 @@ export default function Landing() {
                     <textarea
                       rows={3} value={contactForm.extraInfo} onChange={CF("extraInfo")}
                       placeholder={"Numero de productos, tipos (tallas, colores, materiales...), plataformas que usas, retos actuales, objetivos a corto plazo, cualquier detalle relevante..."}
-                      className="fp-input-v2" {...handleFF("extraInfo")}
+                      className="fp-input-v2"
                     />
                   </div>
 
@@ -1452,7 +1359,7 @@ export default function Landing() {
                     <textarea
                       rows={2} value={contactForm.suppliers} onChange={CF("suppliers")}
                       placeholder={"Ej: Alibaba, BigBuy, Printful, proveedor local de Barcelona... Separa con comas si son varios"}
-                      className="fp-input-v2" {...handleFF("suppliers")}
+                      className="fp-input-v2"
                     />
                     <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 4 }}>Si nos indicas tus proveedores, compararemos sus precios con alternativas y estimaremos el revenue potencial</p>
                   </div>
@@ -1529,7 +1436,7 @@ export default function Landing() {
                     <textarea
                       rows={3} value={contactForm.message} onChange={CF("message")}
                       placeholder={content.contact?.placeholders?.message ?? "Cuéntanos más sobre tu tienda, tus retos actuales o lo que quieres conseguir…"}
-                      className="fp-input-v2" {...handleFF("message")}
+                      className="fp-input-v2"
                     />
                   </div>
 

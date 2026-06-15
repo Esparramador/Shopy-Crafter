@@ -453,6 +453,113 @@
   overflow: hidden;
 }
 
+/* ════════════════════════════════════════════════════════════
+   HERO PROFESSIONAL EFFECTS — Aurora · Lamp · Beams
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Aurora — rotating conic gradient (gold + jade) ── */
+.hero-aurora {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.hero-aurora-inner {
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  transform: translateX(-50%);
+  background: conic-gradient(
+    from 0deg at 50% 20%,
+    transparent 0deg,
+    rgba(200,168,75,0.07) 40deg,
+    rgba(45,212,159,0.06) 100deg,
+    transparent 160deg,
+    rgba(200,168,75,0.05) 220deg,
+    rgba(45,212,159,0.04) 280deg,
+    transparent 360deg
+  );
+  filter: blur(40px);
+  animation: hero-aurora-spin 18s linear infinite;
+  will-change: transform;
+}
+@keyframes hero-aurora-spin {
+  from { transform: translateX(-50%) rotate(0deg); }
+  to   { transform: translateX(-50%) rotate(360deg); }
+}
+
+/* ── Lamp — golden cone from top ── */
+.hero-lamp-cone {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 580px;
+  height: 75%;
+  background: conic-gradient(
+    from -14deg at 50% 0%,
+    transparent 0deg,
+    rgba(200,168,75,0.13) 28deg,
+    rgba(230,200,100,0.22) 40deg,
+    rgba(200,168,75,0.13) 52deg,
+    transparent 80deg
+  );
+  filter: blur(2px);
+  z-index: 1;
+  pointer-events: none;
+  animation: lamp-pulse 6s ease-in-out infinite alternate;
+}
+.hero-lamp-line {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 280px;
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(to right, transparent, rgba(230,200,100,0.7) 30%, rgba(255,224,120,1) 50%, rgba(230,200,100,0.7) 70%, transparent);
+  box-shadow: 0 0 18px 4px rgba(230,200,100,0.35);
+  z-index: 2;
+  pointer-events: none;
+  animation: lamp-pulse 6s ease-in-out infinite alternate;
+}
+@keyframes lamp-pulse {
+  from { opacity: 0.85; }
+  to   { opacity: 1; }
+}
+
+/* ── Falling light beams ── */
+.hero-beams {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.hero-beam {
+  position: absolute;
+  top: -60px;
+  width: 1.5px;
+  height: 220px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(200,168,75,0.65) 40%,
+    rgba(230,200,100,0.85) 60%,
+    transparent
+  );
+  filter: blur(0.5px);
+  border-radius: 2px;
+  animation: beam-fall linear infinite;
+}
+@keyframes beam-fall {
+  0%   { transform: translateY(0);     opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 0.6; }
+  100% { transform: translateY(120vh); opacity: 0; }
+}
+
 /* PARTICLES (pure CSS) */
 .fp-particles { position: absolute; inset: 0; z-index: 0; }
 .fp-particle {
@@ -2463,39 +2570,13 @@
   to   { transform: scale(1.2); opacity: 1; }
 }
 
-/* ── Visme-style contact layout — horizontal above 960px ── */
-@media (min-width: 960px) {
-  .fp-contact-visme {
-    display: grid !important;
-    grid-template-columns: 260px 1fr !important;
-    grid-template-rows: auto auto auto !important;
-    gap: 0 44px !important;
-    align-items: start !important;
-    max-width: 1120px !important;
-  }
-
-  /* Batman panel: left column, sticky */
-  .fp-contact-visme .sc-stage-wrap {
-    grid-column: 1 !important;
-    grid-row: 2 !important;
-    position: sticky;
-    top: 80px;
-    align-self: start;
-    overflow: visible;
-  }
-
-  /* Batman scene sizing in side panel */
-  .fp-contact-visme .bat-scene {
-    min-height: 300px;
-  }
-}
-
-/* ── Mobile: reset inline grid props so items stack normally ── */
-@media (max-width: 959px) {
-  .fp-contact-visme > * {
-    grid-column: unset !important;
-    grid-row: unset !important;
-  }
+/* ── Contact layout — single column centred ── */
+.fp-contact-visme {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  max-width: 800px !important;
+  margin-inline: auto !important;
 }
 
 /* ── Celebrate success card enhancement ── */
