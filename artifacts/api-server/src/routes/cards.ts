@@ -520,6 +520,8 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
       card: toCardDto(updated),
       cost: result.cost,
       meta: result.meta,
+      bgGenFailed: result.meta.bgGenFailed ?? false,
+      bgGenError: result.meta.bgGenError ?? null,
     });
   } catch (err: any) {
     logger.error({ err: err?.message, cardId: id }, "cards generate failed");

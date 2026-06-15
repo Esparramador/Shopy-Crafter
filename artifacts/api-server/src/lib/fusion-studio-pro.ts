@@ -253,6 +253,10 @@ export async function generateImage(
   if (model === "flux-1.1-pro-ultra-raw") input = { ...input, raw: true,  output_format: "png", output_quality: 95, safety_tolerance: 2 };
   if (model === "recraft-v3") input = { ...input, style: "realistic_image", size: "1820x1024" };
   if (model === "recraft-v3-svg") input = { ...input, style: "vector_illustration", size: "1820x1024" };
+  if (model === "recraft-v4") {
+    const { aspect_ratio, ...rest } = input;
+    input = { ...rest, style: "realistic_image", size: "1820x1024" };
+  }
   if (model === "imagen-4-ultra" || model === "imagen-4" || model === "imagen-4-fast") {
     input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };
   }

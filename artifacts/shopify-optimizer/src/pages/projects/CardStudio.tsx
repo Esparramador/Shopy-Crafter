@@ -132,6 +132,7 @@ export default function CardStudio() {
   const [autoBusy, setAutoBusy] = useState(false);
   const [bgModel, setBgModel] = useState("recraft-v4");
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [bgWarning, setBgWarning] = useState<string | null>(null);
 
   const selected = useMemo(() => cards.find((c) => c.id === selectedId) ?? null, [cards, selectedId]);
 
@@ -247,6 +248,11 @@ export default function CardStudio() {
       if (!res.ok) throw new Error((await res.json()).error || "Error generando");
       const data = await res.json();
       setCards((prev) => prev.map((c) => (c.id === id ? data.card : c)));
+      if (data.bgGenFailed) {
+        setBgWarning(`⚠️ El fondo IA no se pudo generar (${data.bgGenError || "error desconocido"}) — se usó fondo sólido. Prueba otro modelo.`);
+      } else {
+        setBgWarning(null);
+      }
       setSuccess(`✓ Tarjeta generada (coste: $${data.cost?.toFixed(4) || "0.00"})`);
       setRightTab("generated");
       setTimeout(() => setSuccess(null), 5000);
@@ -362,9 +368,16 @@ export default function CardStudio() {
           <CheckCircle2 size={16} /> {success}
         </div>
       )}
+      {bgWarning && (
+        <div style={{ padding: 10, borderRadius: 8, background: "rgba(234,179,8,0.12)", color: "#ca8a04", border: "1px solid rgba(234,179,8,0.35)", marginBottom: 12, display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12 }}>
+          <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{bgWarning}</span>
+          <button onClick={() => setBgWarning(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0, flexShrink: 0 }}>✕</button>
+        </div>
+      )}
 
-      {/* GRID 3-col */}
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 560px", gap: 16, alignItems: "start" }}>
+      {/* GRID: 3-col normal, 2-col cuando editor activo (col2 se oculta, col3 expande a 1fr) */}
+      <div style={{ display: "grid", gridTemplateColumns: rightTab === "editor" ? "260px 1fr" : "260px 1fr 560px", gap: 16, alignItems: "start" }}>
 
         {/* ── COL 1: Lista + crear ── */}
         <div style={panelStyle}>
@@ -418,8 +431,8 @@ export default function CardStudio() {
           </div>
         </div>
 
-        {/* ── COL 2: Editor ── */}
-        {selected ? (
+        {/* ── COL 2: Form editor (hidden when canvas editor tab is active) ── */}
+        {rightTab !== "editor" && selected ? (
           <div style={panelStyle}>
             <h3 style={panelTitle}>Editor</h3>
 
@@ -630,16 +643,16 @@ export default function CardStudio() {
 
             {saving && <div style={{ fontSize: 11, color: "var(--t3)", display: "flex", alignItems: "center", gap: 6 }}><Loader2 size={12} className="animate-spin" /> guardando…</div>}
           </div>
-        ) : (
+        ) : rightTab !== "editor" ? (
           <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
             <CreditCard size={32} style={{ color: "var(--t3)", marginBottom: 12 }} />
             <p style={{ color: "var(--t3)", fontSize: 13, margin: 0 }}>
               {cards.length === 0 ? "Crea tu primera tarjeta seleccionando una plantilla." : "Selecciona una tarjeta."}
             </p>
           </div>
-        )}
+        ) : null}
 
-        {/* ── COL 3: Preview / Editor / Generated ── */}
+        {/* ── COL 3 (o COL 2 en modo editor): Preview / Editor / Generated ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {selected ? (
             <>

@@ -88,6 +88,8 @@ export async function generateBusinessCard(
   let cost = 0;
   let bgKindUsed = bgConfig.kind;
   let bgModelUsed: string | undefined;
+  let bgGenFailed = false;
+  let bgGenError: string | undefined;
 
   if (bgConfig.kind === "ai-texture") {
     try {
@@ -111,6 +113,8 @@ export async function generateBusinessCard(
     } catch (err: any) {
       logger.warn({ err: err?.message, model: bgModel }, "card-studio: AI bg failed — fallback to solid");
       bgKindUsed = "solid";
+      bgGenFailed = true;
+      bgGenError = err?.message || "Error generando fondo IA";
       backgroundPng = await renderSolidOrGradient(palette, "solid");
     }
   } else if (bgConfig.kind === "gradient") {
@@ -189,6 +193,8 @@ export async function generateBusinessCard(
       templateId: template.id,
       backgroundKind: bgKindUsed,
       backgroundModel: bgModelUsed,
+      bgGenFailed,
+      bgGenError,
       qrSource: useUrl ? "url" : "vcard",
       qrData,
       width: CARD_WIDTH_PX,

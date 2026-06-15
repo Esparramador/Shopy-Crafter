@@ -8,7 +8,7 @@
  * - Select to edit text, color, font, size
  * - Background = actual generated image (frontUrl/backUrl)
  */
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import {
   Eye, EyeOff, Plus, RefreshCw, Save, Trash2, Type, X,
   RotateCcw, Loader2, Minus, AlignLeft, AlignCenter, AlignRight,
@@ -105,6 +105,7 @@ export default function CardStudioEditor({
   const [isResizing, setIsResizing] = useState(false);
 
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const elementsRef = useRef<ResolvedElement[]>([]);
   const dragState = useRef<{
     id: string; startX: number; startY: number; origX: number; origY: number;
@@ -117,6 +118,15 @@ export default function CardStudioEditor({
   } | null>(null);
 
   useEffect(() => { elementsRef.current = elements; }, [elements]);
+
+  useLayoutEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+    const available = el.clientWidth - 32;
+    if (available > 100) {
+      setZoom(Math.max(0.3, Math.min(0.9, available / CARD_W)));
+    }
+  }, []);
 
   // Sync overrides when parent passes new initialOverrides
   useEffect(() => {
@@ -429,7 +439,7 @@ export default function CardStudioEditor({
       {/* CANVAS + SIDEBAR */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: 10, flex: 1, minHeight: 0 }}>
         {/* STAGE */}
-        <div style={{ background: "#0a0a0a", borderRadius: 8, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, minHeight: 400 }}>
+        <div ref={canvasContainerRef} style={{ background: "#0a0a0a", borderRadius: 8, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, minHeight: 520 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
             <div
               ref={stageRef}
