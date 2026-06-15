@@ -3,7 +3,7 @@ import { ClientLayout } from "./ClientLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
 import { useClientPreview } from "./ClientPreviewContext";
-import { Send, Loader2, Paperclip, X, Download, Package, Search } from "lucide-react";
+import { Send, Loader2, Paperclip, X, Download, Package, Search, ExternalLink } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -25,6 +25,37 @@ interface Product {
   title: string;
   price: string | null;
   auditScore: number | null;
+  handle: string;
+  imageUrl: string | null;
+  bodyHtml: string | null;
+  vendor: string | null;
+  shopDomain: string | null;
+}
+
+function stripHtml(html: string | null) {
+  if (!html) return "";
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function renderContent(content: string, isOwn: boolean) {
+  const color = isOwn ? "rgba(10,10,20,0.75)" : "var(--t2)";
+  const parts = content.split(/(\[Producto: [^\]]+\]\([^)]+\)|\[Producto: [^\]]+\])/g);
+  return parts.map((part, i) => {
+    const full = part.match(/^\[Producto: ([^\]]+)\]\(([^)]+)\)$/);
+    const simple = part.match(/^\[Producto: ([^\]]+)\]$/);
+    if (full) return (
+      <a key={i} href={full[2]} target="_blank" rel="noopener noreferrer"
+        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 6px", borderRadius: 6, background: isOwn ? "rgba(0,0,0,0.15)" : "rgba(201,169,97,0.12)", border: `1px solid ${isOwn ? "rgba(0,0,0,0.2)" : "rgba(201,169,97,0.3)"}`, color: isOwn ? "#0a0a14" : "var(--gold)", textDecoration: "none", fontSize: 12, fontWeight: 700, verticalAlign: "middle", marginInline: 2 }}>
+        🛍️ {full[1]} <ExternalLink size={10} />
+      </a>
+    );
+    if (simple) return (
+      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 6px", borderRadius: 6, background: isOwn ? "rgba(0,0,0,0.12)" : "rgba(201,169,97,0.08)", color, fontSize: 12, fontWeight: 600, verticalAlign: "middle", marginInline: 2 }}>
+        🛍️ {simple[1]}
+      </span>
+    );
+    return <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part}</span>;
+  });
 }
 
 interface PendingFile {
@@ -146,7 +177,9 @@ export default function ClientMessages() {
   const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
+  const [barsReady, setBarsReady] = useState(false);
 
   const loadMessages = useCallback(() => {
     fetch(apid(`${API_BASE}/api/client/messages`), { credentials: "include" })
@@ -223,10 +256,22 @@ export default function ClientMessages() {
     loadMessages();
   };
 
+  useEffect(() => {
+    if (products.length > 0) {
+      setBarsReady(false);
+      const t = setTimeout(() => setBarsReady(true), 60);
+      return () => clearTimeout(t);
+    }
+  }, [products]);
+
   const insertProduct = (p: Product) => {
-    const ref = `[Producto: ${p.title}]`;
+    const url = p.shopDomain && p.handle
+      ? `https://${p.shopDomain}/products/${p.handle}`
+      : null;
+    const ref = url ? `[Producto: ${p.title}](${url})` : `[Producto: ${p.title}]`;
     setText(prev => prev ? `${prev} ${ref}` : ref);
-    textInputRef.current?.focus();
+    setPreviewProduct(null);
+    setTimeout(() => textInputRef.current?.focus(), 50);
   };
 
   const filteredProducts = products.filter(p =>
@@ -287,35 +332,51 @@ export default function ClientMessages() {
             ) : filteredProducts.map(p => (
               <button
                 key={p.id}
-                onClick={() => insertProduct(p)}
+                onClick={() => setPreviewProduct(p)}
                 style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 9,
+                  width: "100%", display: "flex", alignItems: "flex-start", gap: 9,
                   padding: "9px 10px", borderRadius: 9, border: "none",
-                  background: "transparent", cursor: "pointer", textAlign: "left",
+                  background: previewProduct?.id === p.id ? "rgba(201,169,97,0.1)" : "transparent",
+                  cursor: "pointer", textAlign: "left",
                   transition: "background 0.12s", marginBottom: 2,
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = "rgba(201,169,97,0.07)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = previewProduct?.id === p.id ? "rgba(201,169,97,0.1)" : "transparent"; }}
               >
                 <div style={{
-                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                  background: "rgba(201,169,97,0.1)", border: "1px solid rgba(201,169,97,0.2)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 13,
-                }}>🛍️</div>
+                  width: 38, height: 38, borderRadius: 8, flexShrink: 0,
+                  background: "rgba(201,169,97,0.08)", border: "1px solid rgba(201,169,97,0.15)",
+                  overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {p.imageUrl
+                    ? <img src={p.imageUrl} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    : <span style={{ fontSize: 15 }}>🛍️</span>
+                  }
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: 11.5, fontWeight: 600, color: "var(--t1)",
+                    fontSize: 11, fontWeight: 600, color: "var(--t1)",
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    marginBottom: 2,
                   }}>{p.title}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 1 }}>
-                    {p.price && <span style={{ fontSize: 10, color: "var(--t3)" }}>{p.price}€</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                    {p.price && <span style={{ fontSize: 9.5, color: "var(--t3)" }}>{p.price}€</span>}
                     {p.auditScore !== null && (
-                      <span style={{ fontSize: 9.5, fontWeight: 700, color: scoreColor(p.auditScore) }}>
-                        ● {p.auditScore}
+                      <span style={{ fontSize: 9, fontWeight: 700, color: scoreColor(p.auditScore) }}>
+                        {p.auditScore}/100
                       </span>
                     )}
                   </div>
+                  {p.auditScore !== null && (
+                    <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
+                      <div style={{
+                        height: "100%", borderRadius: 2,
+                        background: scoreColor(p.auditScore),
+                        width: barsReady ? `${p.auditScore}%` : "0%",
+                        transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)",
+                      }} />
+                    </div>
+                  )}
                 </div>
               </button>
             ))}
@@ -323,7 +384,7 @@ export default function ClientMessages() {
 
           <div style={{ padding: "10px 12px", borderTop: "1px solid var(--bdr)" }}>
             <p style={{ fontSize: 10, color: "var(--t4)", lineHeight: 1.5 }}>
-              💡 Selecciona un producto para incluirlo en tu mensaje y que la agencia sepa a cuál te refieres.
+              💡 Haz clic en un producto para ver su ficha y referenciarlo en el chat.
             </p>
           </div>
         </div>
@@ -396,7 +457,7 @@ export default function ClientMessages() {
                               isOwn={isOwn}
                             />
                           )}
-                          {msg.content?.trim() && <span>{msg.content}</span>}
+                          {msg.content?.trim() && <span>{renderContent(msg.content, isOwn)}</span>}
                         </div>
                         <p style={{
                           fontSize: 10, color: "var(--t3)", marginTop: 3,
@@ -467,19 +528,29 @@ export default function ClientMessages() {
                 ? <Loader2 size={14} style={{ animation: "spin 0.6s linear infinite" }} />
                 : <Paperclip size={14} />}
             </button>
-            <input
+            <textarea
               ref={textInputRef}
               value={text}
               onChange={e => setText(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && !e.shiftKey && send()}
-              placeholder={pendingFile ? "Añade un comentario al archivo..." : t("placeholder", "Escribe tu mensaje...")}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+              }}
+              placeholder={pendingFile ? "Añade un comentario al archivo..." : t("placeholder", "Escribe tu mensaje… (Shift+Enter para nueva línea)")}
+              rows={1}
               style={{
                 flex: 1, background: "rgba(255,255,255,0.03)", border: "1px solid var(--bdr)",
                 borderRadius: 10, padding: "10px 14px", fontSize: 13.5, color: "var(--t1)",
                 outline: "none", transition: "border-color 0.15s",
+                resize: "none", minHeight: 42, maxHeight: 120, overflowY: "auto",
+                fontFamily: "inherit", lineHeight: 1.5,
               }}
               onFocus={e => { e.target.style.borderColor = "var(--gold)"; }}
               onBlur={e => { e.target.style.borderColor = "var(--bdr)"; }}
+              onInput={e => {
+                const el = e.target as HTMLTextAreaElement;
+                el.style.height = "auto";
+                el.style.height = Math.min(el.scrollHeight, 120) + "px";
+              }}
             />
             <button
               onClick={send}
@@ -501,6 +572,145 @@ export default function ClientMessages() {
           </div>
         </div>
       </div>
+      {/* ── Mini Product Preview Modal ── */}
+      {previewProduct && (
+        <div
+          onClick={() => setPreviewProduct(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9000,
+            background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, animation: "fadein 0.15s ease",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "var(--ink2)", border: "1px solid var(--bdr2)",
+              borderRadius: 20, width: 370, maxWidth: "100%",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.75)",
+              overflow: "hidden", animation: "slideup 0.2s ease",
+            }}
+          >
+            {/* Product image */}
+            <div style={{ height: 200, background: "var(--ink3)", position: "relative", overflow: "hidden" }}>
+              {previewProduct.imageUrl
+                ? <img src={previewProduct.imageUrl} alt={previewProduct.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48 }}>🛍️</div>
+              }
+              {/* Close button */}
+              <button
+                onClick={() => setPreviewProduct(null)}
+                style={{
+                  position: "absolute", top: 10, right: 10, width: 30, height: 30,
+                  borderRadius: 8, background: "rgba(0,0,0,0.65)", border: "none",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff",
+                }}
+              >
+                <X size={14} />
+              </button>
+              {/* Shopify badge */}
+              {previewProduct.shopDomain && previewProduct.handle && (
+                <a
+                  href={`https://${previewProduct.shopDomain}/products/${previewProduct.handle}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{
+                    position: "absolute", top: 10, left: 10,
+                    fontSize: 10, fontWeight: 600, padding: "4px 9px", borderRadius: 6,
+                    background: "rgba(0,0,0,0.65)", color: "#fff",
+                    textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
+                  }}
+                >
+                  <ExternalLink size={9} /> Ver en Shopify
+                </a>
+              )}
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: "18px 20px 20px" }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--t)", marginBottom: 4, lineHeight: 1.3 }}>
+                {previewProduct.title}
+              </h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                {previewProduct.price && (
+                  <span style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)" }}>
+                    {previewProduct.price}€
+                  </span>
+                )}
+                {previewProduct.vendor && (
+                  <span style={{ fontSize: 11.5, color: "var(--t3)" }}>{previewProduct.vendor}</span>
+                )}
+              </div>
+
+              {/* Score bar */}
+              {previewProduct.auditScore !== null && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                    <span style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Score IA</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: scoreColor(previewProduct.auditScore) }}>
+                      {previewProduct.auditScore}/100
+                    </span>
+                  </div>
+                  <div style={{ height: 7, background: "rgba(255,255,255,0.06)", borderRadius: 4 }}>
+                    <div style={{
+                      height: "100%", borderRadius: 4,
+                      background: `linear-gradient(90deg,${scoreColor(previewProduct.auditScore)},${scoreColor(previewProduct.auditScore)}bb)`,
+                      width: `${previewProduct.auditScore}%`,
+                      transition: "width 0.9s cubic-bezier(0.4,0,0.2,1)",
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              {previewProduct.bodyHtml && (
+                <p style={{
+                  fontSize: 12, color: "var(--t3)", lineHeight: 1.65, marginBottom: 16,
+                  display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}>
+                  {stripHtml(previewProduct.bodyHtml)}
+                </p>
+              )}
+
+              {/* Actions */}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => insertProduct(previewProduct)}
+                  style={{
+                    flex: 1, padding: "10px 0", borderRadius: 11, border: "none",
+                    background: "linear-gradient(135deg,var(--gold),var(--gold2))",
+                    color: "#0a0a14", fontSize: 12.5, fontWeight: 800, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  }}
+                >
+                  ✓ Insertar en mensaje
+                </button>
+                {previewProduct.shopDomain && previewProduct.handle && (
+                  <a
+                    href={`https://${previewProduct.shopDomain}/products/${previewProduct.handle}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: "10px 14px", borderRadius: 11,
+                      background: "var(--ink3)", border: "1px solid var(--bdr)",
+                      color: "var(--t2)", fontSize: 12, fontWeight: 600, textDecoration: "none",
+                      gap: 5,
+                    }}
+                  >
+                    <ExternalLink size={12} /> Shopify
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+          <style>{`
+            @keyframes fadein { from { opacity:0 } to { opacity:1 } }
+            @keyframes slideup { from { transform:translateY(20px);opacity:0 } to { transform:translateY(0);opacity:1 } }
+          `}</style>
+        </div>
+      )}
     </ClientLayout>
   );
 }

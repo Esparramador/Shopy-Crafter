@@ -1,6 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AppLayout } from "../../components/layout/AppLayout";
-import { Send, Loader2, MessageSquare, Search, Paperclip, X, Download } from "lucide-react";
+import { Send, Loader2, MessageSquare, Search, Paperclip, X, Download, ExternalLink } from "lucide-react";
+
+function renderMsgContent(content: string, isAdmin: boolean) {
+  const parts = content.split(/(\[Producto: [^\]]+\]\([^)]+\)|\[Producto: [^\]]+\])/g);
+  return parts.map((part, i) => {
+    const full = part.match(/^\[Producto: ([^\]]+)\]\(([^)]+)\)$/);
+    const simple = part.match(/^\[Producto: ([^\]]+)\]$/);
+    if (full) return (
+      <a key={i} href={full[2]} target="_blank" rel="noopener noreferrer"
+        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 6px", borderRadius: 6, background: isAdmin ? "rgba(0,0,0,0.18)" : "rgba(201,169,97,0.12)", border: `1px solid ${isAdmin ? "rgba(0,0,0,0.22)" : "rgba(201,169,97,0.3)"}`, color: isAdmin ? "#0a0a14" : "var(--gold)", textDecoration: "none", fontSize: 12, fontWeight: 700, verticalAlign: "middle", marginInline: 2 }}>
+        🛍️ {full[1]} <ExternalLink size={10} />
+      </a>
+    );
+    if (simple) return (
+      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 6px", borderRadius: 6, background: isAdmin ? "rgba(0,0,0,0.12)" : "rgba(201,169,97,0.08)", color: isAdmin ? "rgba(10,10,20,0.7)" : "var(--t2)", fontSize: 12, fontWeight: 600, verticalAlign: "middle", marginInline: 2 }}>
+        🛍️ {simple[1]}
+      </span>
+    );
+    return <span key={i} style={{ whiteSpace: "pre-wrap" }}>{part}</span>;
+  });
+}
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -307,7 +327,7 @@ export default function AdminMessages() {
                               isAdmin={isAdminMsg}
                             />
                           )}
-                          {msg.content?.trim() && <span>{msg.content}</span>}
+                          {msg.content?.trim() && <span>{renderMsgContent(msg.content, isAdminMsg)}</span>}
                         </div>
                         <p style={{ fontSize: 10, color: "var(--t3)", margin: "3px 4px 0", textAlign: isAdminMsg ? "right" : "left" }}>{fmtTime(msg.createdAt)}</p>
                       </div>

@@ -173,15 +173,30 @@ router.get("/products", async (req, res): Promise<void> => {
   try {
     const projectId = getClientProjectId(req);
     if (!projectId) { res.json([]); return; }
-    const prods = await db.select({
-      id: productsTable.id,
-      title: productsTable.title,
-      price: productsTable.price,
-      auditScore: productsTable.auditScore,
-    }).from(productsTable)
-      .where(eq(productsTable.projectId, parseInt(projectId)))
-      .orderBy(productsTable.title);
-    res.json(prods);
+    const [projectRows, prods] = await Promise.all([
+      db.select({ shopDomain: projectsTable.shopDomain })
+        .from(projectsTable).where(eq(projectsTable.id, parseInt(projectId))).limit(1),
+      db.select({
+        id: productsTable.id,
+        title: productsTable.title,
+        price: productsTable.price,
+        auditScore: productsTable.auditScore,
+        handle: productsTable.handle,
+        imagesJson: productsTable.imagesJson,
+        bodyHtml: productsTable.bodyHtml,
+        vendor: productsTable.vendor,
+      }).from(productsTable)
+        .where(eq(productsTable.projectId, parseInt(projectId)))
+        .orderBy(productsTable.title),
+    ]);
+    const shopDomain = projectRows[0]?.shopDomain ?? null;
+    const products = prods.map(p => {
+      const images = Array.isArray(p.imagesJson) ? p.imagesJson : [];
+      const first = images[0] as any;
+      const imageUrl = first ? (typeof first === "string" ? first : (first.src ?? first.url ?? null)) : null;
+      return { id: p.id, title: p.title, price: p.price, auditScore: p.auditScore, handle: p.handle, imageUrl, bodyHtml: p.bodyHtml, vendor: p.vendor, shopDomain };
+    });
+    res.json(products);
   } catch (err: any) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
   }
