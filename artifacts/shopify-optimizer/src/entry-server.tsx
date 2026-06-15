@@ -1,6 +1,7 @@
 import { renderToString } from "react-dom/server";
 import type { ComponentType } from "react";
 import { Router } from "wouter";
+import LandingSSR from "./pages/LandingSSR";
 import Blog from "./pages/public/Blog";
 import CasosDeExito from "./pages/public/CasosDeExito";
 import Changelog from "./pages/public/Changelog";
@@ -13,6 +14,8 @@ import SobreNosotros from "./pages/public/SobreNosotros";
 import Terminos from "./pages/public/Terminos";
 
 const ROUTE_MAP: Record<string, ComponentType> = {
+  "/": LandingSSR,
+  "/landing": LandingSSR,
   "/sobre-nosotros": SobreNosotros,
   "/casos-de-exito": CasosDeExito,
   "/programa-de-afiliados": ProgramaAfiliados,

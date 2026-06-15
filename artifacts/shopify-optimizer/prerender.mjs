@@ -11,13 +11,13 @@ const ROUTES = [
     path: "/",
     title: "Shopy Crafter — Optimización IA para tiendas Shopify",
     description: "7 motores de IA para mejorar SEO, imágenes y conversión en tu tienda Shopify. Sin conocimientos técnicos. Prueba gratis 14 días.",
-    ssr: false,
+    ssr: true,
   },
   {
     path: "/landing",
     title: "Shopy Crafter — Plataforma IA para eCommerce Shopify",
-    description: "Descubre los 17 motores de IA que automatizan SEO, imágenes, emails y estrategias de crecimiento para tu tienda Shopify.",
-    ssr: false,
+    description: "Descubre los 7 motores de IA que automatizan SEO, imágenes, emails y estrategias de crecimiento para tu tienda Shopify.",
+    ssr: true,
   },
   {
     path: "/sobre-nosotros",
