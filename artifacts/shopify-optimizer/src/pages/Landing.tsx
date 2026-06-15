@@ -1255,7 +1255,7 @@ export default function Landing() {
                   <p style={{ color: "var(--t4)", fontSize: 13 }}>{content.contact?.successSubtext ?? "Te contactaremos con un informe detallado en menos de 24h. Revisa también tu carpeta de spam."}</p>
                 </div>
               ) : (
-                <form onSubmit={submitContact} className="fp-contact-form-v2">
+                <form onSubmit={submitContact} className={`fp-contact-form-v2${isAnimated("fp-contact") ? " fields-in" : ""}`}>
                   {/* Row 1: Nombre + Email */}
                   <div className="fp-contact-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 16 }}>
                     <div>
