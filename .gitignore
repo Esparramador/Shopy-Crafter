@@ -96,3 +96,11 @@ shopify.app.toml.bak
 
 # Android build artifacts (generados por GitHub Actions, no hace falta subir)
 artifacts/shopify-optimizer/dist/
+
+# ─── Carpetas grandes de assets — demasiado grandes para el deployment (>8 GB) ─
+# IMPORTANTE: si ya están en git, ejecutar: git rm --cached -r <carpeta>
+attached_assets/
+exports/
+logs/
+screenshots/
+artifacts/shopify-optimizer/public/assets/3d/
