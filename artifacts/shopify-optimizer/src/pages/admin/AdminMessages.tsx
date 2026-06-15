@@ -1,18 +1,30 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useLocation } from "wouter";
 import { AppLayout } from "../../components/layout/AppLayout";
-import { Send, Loader2, MessageSquare, Search, Paperclip, X, Download, ExternalLink } from "lucide-react";
+import { Send, Loader2, MessageSquare, Search, Paperclip, X, Download } from "lucide-react";
 
-function renderMsgContent(content: string, isAdmin: boolean) {
+function renderMsgContent(content: string, isAdmin: boolean, onProductNav?: (handle: string) => void) {
   const parts = content.split(/(\[Producto: [^\]]+\]\([^)]+\)|\[Producto: [^\]]+\])/g);
   return parts.map((part, i) => {
-    const full = part.match(/^\[Producto: ([^\]]+)\]\(([^)]+)\)$/);
+    const full   = part.match(/^\[Producto: ([^\]]+)\]\(([^)]+)\)$/);
     const simple = part.match(/^\[Producto: ([^\]]+)\]$/);
-    if (full) return (
-      <a key={i} href={full[2]} target="_blank" rel="noopener noreferrer"
-        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 6px", borderRadius: 6, background: isAdmin ? "rgba(0,0,0,0.18)" : "rgba(201,169,97,0.12)", border: `1px solid ${isAdmin ? "rgba(0,0,0,0.22)" : "rgba(201,169,97,0.3)"}`, color: isAdmin ? "#0a0a14" : "var(--gold)", textDecoration: "none", fontSize: 12, fontWeight: 700, verticalAlign: "middle", marginInline: 2 }}>
-        🛍️ {full[1]} <ExternalLink size={10} />
-      </a>
-    );
+    if (full) {
+      const handle = full[2].includes("/products/") ? full[2].split("/products/")[1]?.split("?")[0] : null;
+      if (onProductNav && handle) {
+        return (
+          <button key={i} onClick={() => onProductNav(handle)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 6px", borderRadius: 6, background: isAdmin ? "rgba(0,0,0,0.18)" : "rgba(201,169,97,0.12)", border: `1px solid ${isAdmin ? "rgba(0,0,0,0.22)" : "rgba(201,169,97,0.3)"}`, color: isAdmin ? "#0a0a14" : "var(--gold)", fontSize: 12, fontWeight: 700, verticalAlign: "middle", marginInline: 2, cursor: "pointer" }}>
+            🛍️ {full[1]} <span style={{ fontSize: 10, opacity: 0.7 }}>→ Auditoría</span>
+          </button>
+        );
+      }
+      return (
+        <a key={i} href={full[2]} target="_blank" rel="noopener noreferrer"
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 6px", borderRadius: 6, background: isAdmin ? "rgba(0,0,0,0.18)" : "rgba(201,169,97,0.12)", border: `1px solid ${isAdmin ? "rgba(0,0,0,0.22)" : "rgba(201,169,97,0.3)"}`, color: isAdmin ? "#0a0a14" : "var(--gold)", textDecoration: "none", fontSize: 12, fontWeight: 700, verticalAlign: "middle", marginInline: 2 }}>
+          🛍️ {full[1]}
+        </a>
+      );
+    }
     if (simple) return (
       <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px 2px 6px", borderRadius: 6, background: isAdmin ? "rgba(0,0,0,0.12)" : "rgba(201,169,97,0.08)", color: isAdmin ? "rgba(10,10,20,0.7)" : "var(--t2)", fontSize: 12, fontWeight: 600, verticalAlign: "middle", marginInline: 2 }}>
         🛍️ {simple[1]}
@@ -117,6 +129,7 @@ function FileAttachment({ fileUrl, fileName, fileType, fileSize, isAdmin }: {
 }
 
 export default function AdminMessages() {
+  const [, navigate] = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<Project | null>(null);
@@ -127,6 +140,12 @@ export default function AdminMessages() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [search, setSearch] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+
+  const handleProductNav = useCallback((handle: string) => {
+    const params = new URLSearchParams({ search: handle });
+    if (selected) params.set("project", String(selected.id));
+    navigate(`/admin/products?${params.toString()}`);
+  }, [navigate, selected]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -333,7 +352,7 @@ export default function AdminMessages() {
                           ) : msg.fileUrl ? (
                             <FileAttachment fileUrl={msg.fileUrl} fileName={msg.fileName ?? "archivo"} fileType={msg.fileType ?? "application/octet-stream"} fileSize={msg.fileSize} isAdmin={isAdminMsg} />
                           ) : null}
-                          {msg.content?.trim() && <span>{renderMsgContent(msg.content, isAdminMsg)}</span>}
+                          {msg.content?.trim() && <span>{renderMsgContent(msg.content, isAdminMsg, handleProductNav)}</span>}
                         </div>
                         <p style={{ fontSize: 10, color: "var(--t3)", margin: "3px 4px 0", textAlign: isAdminMsg ? "right" : "left" }}>{fmtTime(msg.createdAt)}</p>
                       </div>

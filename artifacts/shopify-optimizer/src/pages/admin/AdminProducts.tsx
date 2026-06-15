@@ -42,9 +42,15 @@ export default function AdminProducts() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [gradeCounts, setGradeCounts] = useState<Record<string, number>>({});
-  const [filterProject, setFilterProject] = useState<string>("");
+  const [filterProject, setFilterProject] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("project") ?? "";
+  });
   const [filterGrade, setFilterGrade] = useState<string>("");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") ?? "";
+  });
 
   const loadProducts = async (p = 1) => {
     setLoading(true);
