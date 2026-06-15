@@ -93,6 +93,12 @@ const MeshyStudio = lazy(() => import("@/pages/projects/MeshyStudio"));
 const WebDesigner = lazy(() => import("@/pages/admin/WebDesigner"));
 const EffectsStudio = lazy(() => import("@/pages/admin/EffectsStudio"));
 const MCPManager = lazy(() => import("@/pages/admin/MCPManager"));
+const AMRStudio = lazy(() => import("@/pages/admin/AMRStudio"));
+const SkillsLibrary = lazy(() => import("@/pages/admin/SkillsLibrary"));
+const DesignSystems = lazy(() => import("@/pages/admin/DesignSystems"));
+const PluginsCatalog = lazy(() => import("@/pages/admin/PluginsCatalog"));
+const HyperFrames = lazy(() => import("@/pages/admin/HyperFrames"));
+const DeckBuilder = lazy(() => import("@/pages/admin/DeckBuilder"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -562,6 +568,26 @@ function Router() {
         </Route>
         <Route path="/ad-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><AdStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+
+        {/* Studio IA routes */}
+        <Route path="/admin/amr-studio">
+          <RequireAdmin><AdminWrapper><AppLayout><S><AMRStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/skills-library">
+          <RequireAdmin><AdminWrapper><AppLayout><S><SkillsLibrary /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/design-systems">
+          <RequireAdmin><AdminWrapper><AppLayout><S><DesignSystems /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/plugins-catalog">
+          <RequireAdmin><AdminWrapper><AppLayout><S><PluginsCatalog /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/hyperframes">
+          <RequireAdmin><AdminWrapper><AppLayout><S><HyperFrames /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/deck-builder">
+          <RequireAdmin><AdminWrapper><AppLayout><S><DeckBuilder /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         {/* Client routes */}

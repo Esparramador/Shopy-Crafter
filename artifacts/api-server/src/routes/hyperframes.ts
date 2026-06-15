@@ -1,7 +1,7 @@
 import { Router } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { askAMR } from "../lib/amr.js";
+import { askAMR, streamAMR } from "../lib/amr.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -57,10 +57,10 @@ router.post("/hyperframes/generate", async (req, res) => {
       await page.evaluate((frameIndex: number, totalFps: number) => {
         const t = frameIndex / totalFps;
         // Dispatch a custom event so HTML can react to frame time
-        window.dispatchEvent(new CustomEvent("hyperframe-tick", { detail: { t, frame: frameIndex } }));
+        (globalThis as unknown as { dispatchEvent: (e: Event) => void }).dispatchEvent(new CustomEvent("hyperframe-tick", { detail: { t, frame: frameIndex } }));
       }, i, fps);
 
-      await page.waitForTimeout?.(1000 / fps).catch(() => new Promise(r => setTimeout(r, 1000 / fps)));
+      await new Promise(r => setTimeout(r, 1000 / fps));
     }
 
     await browser.close();

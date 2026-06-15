@@ -70,6 +70,14 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Effects Studio", icon: "✦", href: "/effects-studio" },
   { label: "AI Web Designer", icon: "🎨", href: "/web-designer" },
   { label: "MCP Manager", icon: "🔌", href: "/admin/mcp-manager" },
+
+  { label: "── STUDIO IA ──", icon: "", href: "#", divider: true },
+  { label: "AMR Studio", icon: "🤖", href: "/admin/amr-studio" },
+  { label: "Librería de Skills", icon: "📚", href: "/admin/skills-library" },
+  { label: "Design Systems", icon: "🎨", href: "/admin/design-systems" },
+  { label: "Catálogo de Plugins", icon: "🔌", href: "/admin/plugins-catalog" },
+  { label: "HyperFrames Studio", icon: "🖼", href: "/admin/hyperframes" },
+  { label: "Deck Builder", icon: "📊", href: "/admin/deck-builder" },
 ];
 
 const DEFAULT_ADMIN_NAV = [
@@ -257,16 +265,22 @@ export function AppLayout({ children }: AppLayoutProps) {
             🧠 {siteName}
           </span>
           {shopybrainNav.map((item: any) => (
-            <Link key={item.href} href={item.href}>
-              <div
-                className={`nav-item${location.startsWith(item.href) && (item.href !== "/admin/shopybrain" || location === "/admin/shopybrain") ? " active" : ""}`}
-                role="button"
-                aria-current={location === item.href ? "page" : undefined}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                {item.label}
+            item.divider ? (
+              <div key={item.label} style={{ padding: "10px 14px 4px", fontSize: 9, fontWeight: 800, color: "var(--t4)", textTransform: "uppercase", letterSpacing: "0.12em", pointerEvents: "none" }}>
+                {item.label.replace(/^──\s*|\s*──$/g, "").trim()}
               </div>
-            </Link>
+            ) : (
+              <Link key={item.href} href={item.href}>
+                <div
+                  className={`nav-item${location.startsWith(item.href) && (item.href !== "/admin/shopybrain" || location === "/admin/shopybrain") ? " active" : ""}`}
+                  role="button"
+                  aria-current={location === item.href ? "page" : undefined}
+                >
+                  <span className="nav-icon">{item.icon}</span>
+                  {item.label}
+                </div>
+              </Link>
+            )
           ))}
         </div>
 
