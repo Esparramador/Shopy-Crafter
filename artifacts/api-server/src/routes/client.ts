@@ -6,6 +6,7 @@ import { requireAuth } from "../lib/auth.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { askClaude } from "../lib/claude.js";
+import { sendPushToAdmins } from "../lib/push-helper.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -143,13 +144,32 @@ router.post("/messages", async (req, res): Promise<void> => {
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
     const { content } = req.body as { content: string };
     const id = randomBytes(16).toString("hex");
+    const clientName = req.session.name ?? "Cliente";
     await db.insert(messagesTable).values({
-      id, projectId, fromRole: "client", fromName: req.session.name ?? "Cliente", content,
+      id, projectId, fromRole: "client", fromName: clientName, content,
     });
+    sendPushToAdmins(
+      `💬 Nuevo mensaje de ${clientName}`,
+      content.length > 80 ? content.slice(0, 77) + "…" : content,
+      "/admin/clients"
+    ).catch(() => {});
     res.json({ id });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
+  }
+});
+
+router.get("/unread-count", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.json({ count: 0 }); return; }
+    const rows = await db.select({ count: messagesTable.id })
+      .from(messagesTable)
+      .where(and(eq(messagesTable.projectId, projectId), eq(messagesTable.fromRole, "admin"), eq(messagesTable.isRead, 0)));
+    res.json({ count: rows.length });
+  } catch {
+    res.json({ count: 0 });
   }
 });
 

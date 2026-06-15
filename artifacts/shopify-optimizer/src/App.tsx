@@ -595,6 +595,16 @@ function PublicChatbotSlot() {
   );
 }
 
+function AdminOmniChatbotSlot() {
+  const { user, loading } = useAuth();
+  if (loading || user?.role !== "admin") return null;
+  return (
+    <Suspense fallback={null}>
+      <OmniChatbot />
+    </Suspense>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -604,9 +614,7 @@ function App() {
             <AuthProvider>
               <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                 <Router />
-                <Suspense fallback={null}>
-                  <OmniChatbot />
-                </Suspense>
+                <AdminOmniChatbotSlot />
                 <PublicChatbotSlot />
               </WouterRouter>
             </AuthProvider>

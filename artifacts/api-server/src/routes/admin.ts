@@ -1,13 +1,15 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
-import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable } from "@workspace/db";
+import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
+import { askClaude } from "../lib/claude.js";
+import { sendPushToClientByProject } from "../lib/push-helper.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -289,7 +291,77 @@ router.post("/projects/:projectId/approvals", async (req, res): Promise<void> =>
     await db.insert(approvalsTable).values({
       id, projectId, type, title, description, beforeValue, afterValue, reasoning, estimatedImpact,
     });
+    sendPushToClientByProject(
+      projectId,
+      "📋 Nueva propuesta de tu agencia",
+      `${title} — Revísala en Aprobaciones`,
+      "/client/approvals"
+    ).catch(() => {});
     res.json({ id });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+router.post("/projects/:projectId/ai-suggest", async (req, res): Promise<void> => {
+  try {
+    const { projectId } = req.params;
+    const pid = parseInt(projectId);
+    if (isNaN(pid)) { res.status(400).json({ error: "Invalid projectId" }); return; }
+
+    const products = await db.select({
+      id: productsTable.id,
+      title: productsTable.title,
+      price: productsTable.price,
+      auditScore: productsTable.auditScore,
+      auditGrade: productsTable.auditGrade,
+    }).from(productsTable)
+      .where(eq(productsTable.projectId, pid))
+      .orderBy(productsTable.auditScore)
+      .limit(20);
+
+    if (!products.length) {
+      res.json({ suggestions: [] });
+      return;
+    }
+
+    const productList = products.slice(0, 15)
+      .map(p => `- "${p.title}" | Precio: €${p.price ?? "?"} | Score: ${p.auditScore ?? "—"}${p.auditGrade ? ` (${p.auditGrade})` : ""}`)
+      .join("\n");
+
+    const prompt = `Eres un experto en optimización de tiendas Shopify. Analiza estos productos y genera exactamente 4 propuestas de mejora concretas y accionables.
+
+PRODUCTOS DEL CLIENTE:
+${productList}
+
+Genera propuestas en formato JSON exactamente así (sin texto adicional antes o después):
+{
+  "suggestions": [
+    {
+      "type": "seo_update",
+      "title": "Título conciso de la propuesta",
+      "description": "Descripción detallada del cambio propuesto con ejemplos concretos",
+      "beforeValue": "valor actual (texto o precio actual)",
+      "afterValue": "valor propuesto (texto o precio nuevo)",
+      "reasoning": "Por qué este cambio mejorará los resultados, basado en los datos",
+      "estimatedImpact": "Impacto cuantificado esperado (ej: +15% clics orgánicos)"
+    }
+  ]
+}
+
+Tipos válidos: "seo_update", "price_change", "product_update", "strategy".
+Prioriza los productos con score más bajo. Responde SOLO con el JSON.`;
+
+    const reply = await askClaude(pid, [{ role: "user", content: prompt }], undefined, 900);
+    const match = reply.match(/\{[\s\S]*\}/);
+    if (!match) { res.json({ suggestions: [] }); return; }
+    try {
+      const parsed = JSON.parse(match[0]);
+      res.json({ suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [] });
+    } catch {
+      res.json({ suggestions: [] });
+    }
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
@@ -334,9 +406,16 @@ router.post("/projects/:projectId/messages", async (req, res): Promise<void> => 
     const { projectId } = req.params;
     const { content } = req.body as { content: string };
     const id = randomBytes(16).toString("hex");
+    const adminName = req.session.name ?? "Tu agencia";
     await db.insert(messagesTable).values({
-      id, projectId, fromRole: "admin", fromName: req.session.name ?? "Admin", content,
+      id, projectId, fromRole: "admin", fromName: adminName, content,
     });
+    sendPushToClientByProject(
+      projectId,
+      `💬 Mensaje de ${adminName}`,
+      content.length > 80 ? content.slice(0, 77) + "…" : content,
+      "/client/messages"
+    ).catch(() => {});
     res.json({ id });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";

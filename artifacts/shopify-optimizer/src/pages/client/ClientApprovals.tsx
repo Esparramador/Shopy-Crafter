@@ -30,10 +30,15 @@ export default function ClientApprovals() {
   const load = () => {
     fetch(`${API_BASE}/api/client/approvals`, { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => { setApprovals(Array.isArray(d) ? d : []); setLoading(false); });
+      .then((d) => { setApprovals(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, []);
 
   const act = async (id: string, action: "approve" | "reject") => {
     setProcessing(id);

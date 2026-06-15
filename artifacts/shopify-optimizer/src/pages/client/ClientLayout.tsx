@@ -6,6 +6,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import { ClientChatbot } from "./ClientChatbot";
 
 const _BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 const DEFAULT_NAV_ITEMS = [
   { href: "/client",           label: "Dashboard",    icon: "📊" },
@@ -30,8 +31,25 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   const { content: cmsContent } = useCms();
   const cp: ClientCmsPanel = (cmsContent?.clientPanel as ClientCmsPanel) ?? {};
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
+
+  useEffect(() => {
+    const poll = () => {
+      fetch(`${API_BASE}/api/client/unread-count`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && typeof d.count === "number") setUnreadMessages(d.count); })
+        .catch(() => {});
+    };
+    poll();
+    const t = setInterval(poll, 20000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (location === "/client/messages") setUnreadMessages(0);
+  }, [location]);
 
   const NAV_ITEMS = DEFAULT_NAV_ITEMS.map((item, i) => ({
     ...item,
@@ -97,11 +115,28 @@ export function ClientLayout({ children }: { children: ReactNode }) {
           <span className="sidebar-label">{cp.sidebar?.navigation ?? "Navegación"}</span>
           {NAV_ITEMS.map(({ href, label, icon }) => {
             const active = href === "/client" ? location === "/client" : location.startsWith(href);
+            const isMessages = href === "/client/messages";
+            const badge = isMessages && unreadMessages > 0;
             return (
               <Link key={href} href={href}>
-                <div className={`nav-item${active ? " active" : ""}`}>
+                <div className={`nav-item${active ? " active" : ""}`} style={{ position: "relative" }}>
                   <span className="nav-icon">{icon}</span>
                   {label}
+                  {badge && (
+                    <span style={{
+                      marginLeft: "auto",
+                      minWidth: 18, height: 18,
+                      background: "var(--gold)",
+                      color: "#0a0a14",
+                      borderRadius: 9,
+                      fontSize: 10,
+                      fontWeight: 800,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: "0 5px",
+                    }}>
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  )}
                 </div>
               </Link>
             );
