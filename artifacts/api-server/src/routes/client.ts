@@ -6,7 +6,7 @@ import { requireAuth } from "../lib/auth.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { askClaude } from "../lib/claude.js";
-import { sendPushToAdmins } from "../lib/push-helper.js";
+import { sendPushToAdmins, sendPushToClientByProject } from "../lib/push-helper.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -146,15 +146,25 @@ router.post("/messages", async (req, res): Promise<void> => {
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
     const { content } = req.body as { content: string };
     const id = randomBytes(16).toString("hex");
-    const clientName = req.session.name ?? "Cliente";
+    const senderName = req.session.name ?? (req.session.role === "admin" ? "Admin" : "Cliente");
+    const fromRole: "admin" | "client" = req.session.role === "admin" ? "admin" : "client";
     await db.insert(messagesTable).values({
-      id, projectId, fromRole: "client", fromName: clientName, content,
+      id, projectId, fromRole, fromName: senderName, content,
     });
-    sendPushToAdmins(
-      `💬 Nuevo mensaje de ${clientName}`,
-      content.length > 80 ? content.slice(0, 77) + "…" : content,
-      "/admin/clients"
-    ).catch(() => {});
+    if (fromRole === "client") {
+      sendPushToAdmins(
+        `💬 Nuevo mensaje de ${senderName}`,
+        content.length > 80 ? content.slice(0, 77) + "…" : content,
+        "/admin/messages"
+      ).catch(() => {});
+    } else {
+      sendPushToClientByProject(
+        projectId,
+        `💬 Mensaje de tu agencia`,
+        content.length > 80 ? content.slice(0, 77) + "…" : content,
+        "/client/messages"
+      ).catch(() => {});
+    }
     res.json({ id });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";

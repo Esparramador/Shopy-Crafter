@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useRef, useCallback } from "react";
 import { Link, useRoute, useLocation } from "wouter";
 import { LogOut, Settings, Sun, Moon, Menu, X, WifiOff } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
@@ -111,6 +111,33 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const prevUnreadRef = useRef(-1);
+  const [adminToast, setAdminToast] = useState<string | null>(null);
+  const adminToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locationRef = useRef(location);
+  useEffect(() => { locationRef.current = location; }, [location]);
+
+  const playBeep = useCallback(() => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch { /* browser may block autoplay */ }
+  }, []);
+
+  const showAdminToast = useCallback((msg: string) => {
+    setAdminToast(msg);
+    if (adminToastTimer.current) clearTimeout(adminToastTimer.current);
+    adminToastTimer.current = setTimeout(() => setAdminToast(null), 6000);
+  }, []);
   const { content: cmsContent } = useCms();
   const cmsNav = cmsContent?.adminNav ?? null;
   const cmsPanel = cmsContent?.adminPanel ?? null;
@@ -160,7 +187,17 @@ export function AppLayout({ children }: AppLayoutProps) {
     const poll = () => {
       fetch(`${API_BASE}/api/admin/unread-messages`, { credentials: "include" })
         .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d && typeof d.total === "number") setUnreadCount(d.total); })
+        .then(d => {
+          if (d && typeof d.total === "number") {
+            const newCount = d.total;
+            if (prevUnreadRef.current >= 0 && newCount > prevUnreadRef.current && locationRef.current !== "/admin/messages") {
+              playBeep();
+              showAdminToast(`💬 Tienes ${newCount - prevUnreadRef.current} mensaje${newCount - prevUnreadRef.current > 1 ? "s" : ""} nuevo${newCount - prevUnreadRef.current > 1 ? "s" : ""} de clientes`);
+            }
+            prevUnreadRef.current = newCount;
+            setUnreadCount(newCount);
+          }
+        })
         .catch(() => {});
     };
     poll();
@@ -632,6 +669,39 @@ export function AppLayout({ children }: AppLayoutProps) {
           {children}
         </div>
       </div>
+
+      {/* In-app notification toast for admin */}
+      {adminToast && (
+        <div
+          onClick={() => { navigate("/admin/messages"); setAdminToast(null); }}
+          style={{
+            position: "fixed", bottom: 28, right: 28, zIndex: 99999,
+            background: "linear-gradient(135deg, #c8a84b 0%, #e2c97e 100%)",
+            color: "#0a0a14",
+            padding: "14px 20px", borderRadius: 14,
+            boxShadow: "0 8px 36px rgba(0,0,0,0.55)",
+            display: "flex", alignItems: "center", gap: 12,
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            maxWidth: 340,
+            animation: "fadeInUp 0.3s ease",
+          }}
+        >
+          <span style={{ fontSize: 22, flexShrink: 0 }}>💬</span>
+          <div style={{ flex: 1 }}>
+            <div>{adminToast}</div>
+            <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.75, marginTop: 2 }}>
+              Haz clic para responder
+            </div>
+          </div>
+          <button
+            onClick={e => { e.stopPropagation(); setAdminToast(null); }}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 16, color: "#0a0a14", opacity: 0.6, padding: "0 2px", flexShrink: 0,
+            }}
+          >✕</button>
+        </div>
+      )}
     </div>
   );
 }

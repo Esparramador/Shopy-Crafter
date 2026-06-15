@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useEffect } from "react";
+import { type ReactNode, useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";
@@ -33,6 +33,11 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   const cp: ClientCmsPanel = (cmsContent?.clientPanel as ClientCmsPanel) ?? {};
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const prevUnreadClientRef = useRef(-1);
+  const [clientToast, setClientToast] = useState<string | null>(null);
+  const clientToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locationRef = useRef(location);
+  useEffect(() => { locationRef.current = location; }, [location]);
   const { previewPid, setPreviewPid } = useClientPreview();
   const [projects, setProjects] = useState<Array<{ id: number; name: string; shopDomain: string }>>([]);
 
@@ -51,16 +56,48 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
   useEffect(() => {
+    const isAdmin = user?.role === "admin";
+    function apid(url: string) {
+      return isAdmin && previewPid
+        ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}`
+        : url;
+    }
     const poll = () => {
-      fetch(`${API_BASE}/api/client/unread-count`, { credentials: "include" })
+      fetch(apid(`${API_BASE}/api/client/unread-count`), { credentials: "include" })
         .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d && typeof d.count === "number") setUnreadMessages(d.count); })
+        .then(d => {
+          if (d && typeof d.count === "number") {
+            const newCount = d.count;
+            if (prevUnreadClientRef.current >= 0 && newCount > prevUnreadClientRef.current && locationRef.current !== "/client/messages") {
+              try {
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.setValueAtTime(660, ctx.currentTime);
+                osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+              } catch { /* ok */ }
+              const diff = newCount - prevUnreadClientRef.current;
+              const msg = `💬 Tienes ${diff} mensaje${diff > 1 ? "s" : ""} nuevo${diff > 1 ? "s" : ""} de tu agencia`;
+              setClientToast(msg);
+              if (clientToastTimer.current) clearTimeout(clientToastTimer.current);
+              clientToastTimer.current = setTimeout(() => setClientToast(null), 6000);
+            }
+            prevUnreadClientRef.current = newCount;
+            setUnreadMessages(newCount);
+          }
+        })
         .catch(() => {});
     };
     poll();
-    const t = setInterval(poll, 20000);
+    const t = setInterval(poll, 15000);
     return () => clearInterval(t);
-  }, []);
+  }, [user?.role, previewPid]);
 
   useEffect(() => {
     if (location === "/client/messages") setUnreadMessages(0);
@@ -282,6 +319,38 @@ export function ClientLayout({ children }: { children: ReactNode }) {
 
       {/* Floating AI Chatbot del cliente — siempre visible (experto en su tienda) */}
       <ClientChatbot />
+
+      {/* In-app notification toast for client */}
+      {clientToast && (
+        <div
+          onClick={() => { navigate("/client/messages"); setClientToast(null); }}
+          style={{
+            position: "fixed", bottom: 28, right: 28, zIndex: 99999,
+            background: "linear-gradient(135deg, #1a6b4a 0%, #22c77e 100%)",
+            color: "#fff",
+            padding: "14px 20px", borderRadius: 14,
+            boxShadow: "0 8px 36px rgba(0,0,0,0.55)",
+            display: "flex", alignItems: "center", gap: 12,
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            maxWidth: 320,
+          }}
+        >
+          <span style={{ fontSize: 22, flexShrink: 0 }}>💬</span>
+          <div style={{ flex: 1 }}>
+            <div>{clientToast}</div>
+            <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.85, marginTop: 2 }}>
+              Haz clic para ver
+            </div>
+          </div>
+          <button
+            onClick={e => { e.stopPropagation(); setClientToast(null); }}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 16, color: "#fff", opacity: 0.7, padding: "0 2px", flexShrink: 0,
+            }}
+          >✕</button>
+        </div>
+      )}
     </div>
   );
 }
