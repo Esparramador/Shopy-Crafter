@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "wouter";
+import { useParams, useSearch, useLocation } from "wouter";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -24,6 +24,8 @@ const MODELS = [
 export default function WebDesigner() {
   const params = useParams<{ id?: string }>();
   const urlProjectId = params.id ? Number(params.id) : undefined;
+  const searchStr = useSearch();
+  const [, setLocation] = useLocation();
 
   const [sessionId, setSessionId] = useState<string>("");
   const [currentHtml, setCurrentHtml] = useState("");
@@ -33,6 +35,7 @@ export default function WebDesigner() {
   const [projectId, setProjectId] = useState<number | undefined>(urlProjectId);
 
   useEffect(() => { if (urlProjectId) setProjectId(urlProjectId); }, [urlProjectId]);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
@@ -40,6 +43,7 @@ export default function WebDesigner() {
   const [leftTab, setLeftTab] = useState<"templates" | "sessions" | "demos" | "effects">("templates");
   const [deployMsg, setDeployMsg] = useState("");
   const [streamText, setStreamText] = useState("");
+  const [demoLoadingId, setDemoLoadingId] = useState("");
 
   // Import URL modal
   const [showImportModal, setShowImportModal] = useState(false);
@@ -87,6 +91,55 @@ export default function WebDesigner() {
   }, []);
 
   useEffect(() => { if (currentHtml) updateIframe(currentHtml); }, [currentHtml, updateIframe]);
+
+  // ── Load real HTML of a demo file directly into the editor ──────────────
+  const loadDemoHtmlByFilename = useCallback(async (filename: string) => {
+    setDemoLoadingId(filename);
+    try {
+      const res = await fetch(`${API}/web-designer/demo-html/${encodeURIComponent(filename)}`, { credentials: "include" });
+      const d = await res.json();
+      if (!d.ok || !d.html) throw new Error(d.error ?? "Sin HTML");
+      setCurrentHtml(d.html);
+      updateIframe(d.html);
+      setSessionId("");
+      setHistory([{ role: "assistant", content: `✓ Demo "${filename}" cargada (${(d.chars ?? d.html.length).toLocaleString()} chars). Escribe un prompt para modificarla con IA.` }]);
+      setRightPanel("chat");
+    } catch (e: any) {
+      setError(`No se pudo cargar la demo: ${e.message}`);
+    } finally {
+      setDemoLoadingId("");
+    }
+  }, [updateIframe]);
+
+  // ── Auto-load from URL ?demo=filename or sessionStorage preload ──────────
+  useEffect(() => {
+    const qs = new URLSearchParams(searchStr);
+    const demoFile = qs.get("demo");
+    if (demoFile) {
+      setLeftTab("demos");
+      void loadDemoHtmlByFilename(demoFile);
+      setLocation("/web-designer", { replace: true });
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem("designer_preload");
+      if (raw) {
+        const data = JSON.parse(raw) as { html?: string; name?: string; prompt?: string };
+        sessionStorage.removeItem("designer_preload");
+        if (data.html) {
+          setCurrentHtml(data.html);
+          updateIframe(data.html);
+          setHistory([{ role: "assistant", content: `✓ "${data.name ?? "Efecto"}" cargado (${data.html.length.toLocaleString()} chars). Puedes editarlo con IA.` }]);
+          setRightPanel("chat");
+        } else if (data.prompt) {
+          setPrompt(data.prompt);
+          setRightPanel("chat");
+          setTimeout(() => promptRef.current?.focus(), 100);
+        }
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function generate(promptText: string) {
     if (!promptText.trim() || isGenerating) return;
@@ -175,6 +228,10 @@ export default function WebDesigner() {
     setPrompt(`Recrear esta página de demo: "${d.name}". Estilo: ${d.category}. Genera una página similar con HTML/CSS/JS completo, misma categoría visual pero con el DNA de marca aplicado.`);
     setRightPanel("chat");
     promptRef.current?.focus();
+  }
+
+  function openDemoHtml(d: DemoItem) {
+    void loadDemoHtmlByFilename(d.file);
   }
 
   async function deployHtml() {
@@ -380,16 +437,37 @@ export default function WebDesigner() {
 
             {/* Demos tab */}
             {leftTab === "demos" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ fontSize: 11, color: st.t3, padding: "4px 6px 8px" }}>26 páginas de referencia generadas con IA — úsalas como inspiración</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ fontSize: 11, color: st.t3, padding: "4px 6px 6px", lineHeight: 1.5 }}>
+                  26 demos reales — <strong style={{ color: st.gold }}>📥 Cargar</strong> abre el HTML directo · <strong style={{ color: "#a5b4fc" }}>✍️ Recrear</strong> genera una versión nueva con IA
+                </div>
                 {demos.map(d => (
-                  <button key={d.id} onClick={() => loadDemo(d)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 8px", borderRadius: 6, border: "none", background: "transparent", color: st.t1, fontSize: 12, cursor: "pointer", textAlign: "left", transition: "background .12s" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.05)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <span>{d.id}. {d.name}</span>
-                    <span style={{ fontSize: 10, background: "rgba(255,255,255,.07)", padding: "1px 6px", borderRadius: 100, color: st.t3, flexShrink: 0 }}>{d.category}</span>
-                  </button>
+                  <div key={d.id} style={{ borderRadius: 8, border: `1px solid ${demoLoadingId === d.file ? "rgba(201,169,97,.4)" : st.border}`, background: demoLoadingId === d.file ? "rgba(201,169,97,.06)" : "transparent", overflow: "hidden", transition: "all .12s" }}>
+                    <div style={{ padding: "7px 8px 4px", color: st.t1, fontSize: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, marginBottom: 3 }}>
+                        <span style={{ fontWeight: 600 }}>{d.id}. {d.name}</span>
+                        <span style={{ fontSize: 9, background: "rgba(255,255,255,.07)", padding: "1px 5px", borderRadius: 100, color: st.t3, flexShrink: 0 }}>{d.category}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button
+                          onClick={() => openDemoHtml(d)}
+                          disabled={!!demoLoadingId}
+                          title="Cargar el HTML real de esta demo en el editor"
+                          style={{ flex: 1, padding: "4px 6px", background: "rgba(201,169,97,.12)", border: "1px solid rgba(201,169,97,.3)", borderRadius: 5, color: demoLoadingId === d.file ? "#888" : st.gold, fontSize: 10, fontWeight: 700, cursor: demoLoadingId ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}
+                        >
+                          {demoLoadingId === d.file ? "⏳ Cargando…" : "📥 Cargar HTML"}
+                        </button>
+                        <button
+                          onClick={() => loadDemo(d)}
+                          disabled={!!demoLoadingId}
+                          title="Generar una versión nueva de esta demo con IA"
+                          style={{ flex: 1, padding: "4px 6px", background: "rgba(99,102,241,.08)", border: "1px solid rgba(99,102,241,.25)", borderRadius: 5, color: "#a5b4fc", fontSize: 10, fontWeight: 700, cursor: demoLoadingId ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}
+                        >
+                          ✍️ Recrear IA
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

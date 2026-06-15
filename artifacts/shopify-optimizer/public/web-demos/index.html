@@ -121,14 +121,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);min-height
 .demo-desc{font-size:.82rem;color:var(--muted);line-height:1.6;flex:1}
 .demo-tags{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:1rem}
 .demo-tag{padding:.2rem .6rem;border-radius:4px;font-size:.67rem;font-weight:600;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);color:var(--muted)}
-.demo-footer{padding:.9rem 1.4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.demo-line-count{font-size:.72rem;color:var(--muted)}
+.demo-footer{padding:.9rem 1.4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.demo-line-count{font-size:.72rem;color:var(--muted);flex-shrink:0}
+.demo-actions{display:flex;gap:.4rem;align-items:center}
 .demo-open{
   padding:.32rem .85rem;border-radius:6px;background:rgba(99,102,241,.1);
   border:1px solid rgba(99,102,241,.2);color:var(--accent);font-size:.75rem;font-weight:700;
-  transition:all .2s;
+  transition:all .2s;white-space:nowrap;
 }
 .demo-card:hover .demo-open{background:var(--accent);color:#fff}
+.demo-edit{
+  padding:.32rem .85rem;border-radius:6px;background:rgba(201,169,97,.08);
+  border:1px solid rgba(201,169,97,.25);color:#c9a961;font-size:.75rem;font-weight:700;
+  transition:all .2s;white-space:nowrap;cursor:pointer;text-decoration:none;
+}
+.demo-edit:hover{background:rgba(201,169,97,.2);border-color:rgba(201,169,97,.5)}
 
 /* COMING SOON CARD */
 .demo-card.coming{opacity:.5;pointer-events:none}
@@ -449,22 +456,27 @@ function renderDemos(){
   }
 
   grid.innerHTML=filtered.map(d=>`
-    <a class="demo-card" href="${d.file}" target="_blank">
-      <div class="demo-thumb">
-        <div class="demo-thumb-bg" style="background-image:url('${d.thumb}')"></div>
-        <span class="demo-badge badge-${d.badge}">${d.badgeLabel}</span>
-      </div>
-      <div class="demo-card-body">
-        <div class="demo-num">DEMO ${d.num}</div>
-        <div class="demo-title">${d.title}</div>
-        <div class="demo-desc">${d.desc}</div>
-        <div class="demo-tags">${d.tags.map(t=>`<span class="demo-tag">${t}</span>`).join('')}</div>
-      </div>
+    <div class="demo-card">
+      <a href="${d.file}" target="_blank" style="text-decoration:none;color:inherit;display:block;">
+        <div class="demo-thumb">
+          <div class="demo-thumb-bg" style="background-image:url('${d.thumb}')"></div>
+          <span class="demo-badge badge-${d.badge}">${d.badgeLabel}</span>
+        </div>
+        <div class="demo-card-body">
+          <div class="demo-num">DEMO ${d.num}</div>
+          <div class="demo-title">${d.title}</div>
+          <div class="demo-desc">${d.desc}</div>
+          <div class="demo-tags">${d.tags.map(t=>`<span class="demo-tag">${t}</span>`).join('')}</div>
+        </div>
+      </a>
       <div class="demo-footer">
         <span class="demo-line-count">📄 ${d.lines} líneas</span>
-        <span class="demo-open">Abrir demo →</span>
+        <div class="demo-actions">
+          <a class="demo-open" href="${d.file}" target="_blank">Abrir →</a>
+          <a class="demo-edit" href="/web-designer?demo=${encodeURIComponent(d.file)}" title="Cargar en AI Web Designer para editar con IA">✨ Designer</a>
+        </div>
       </div>
-    </a>
+    </div>
   `).join('');
 }
 

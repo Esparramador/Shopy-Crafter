@@ -56,6 +56,25 @@ router.get("/web-designer/demos", (_req: Request, res: Response) => {
   res.json(DEMOS);
 });
 
+router.get("/web-designer/demo-html/:filename", async (req: Request, res: Response): Promise<void> => {
+  const { filename } = req.params;
+  if (!/^[\w-]+\.html$/.test(filename)) {
+    res.status(400).json({ error: "Invalid filename" });
+    return;
+  }
+  try {
+    const { readFileSync } = await import("fs");
+    const { resolve, dirname } = await import("path");
+    const { fileURLToPath } = await import("url");
+    const __dir = dirname(fileURLToPath(import.meta.url));
+    const demoPath = resolve(__dir, "../../../../shopify-optimizer/public/web-demos", filename);
+    const html = readFileSync(demoPath, "utf-8");
+    res.json({ ok: true, html, filename, chars: html.length });
+  } catch {
+    res.status(404).json({ error: "Demo not found", filename });
+  }
+});
+
 router.get("/web-designer/sessions", (_req: Request, res: Response) => {
   res.json(listSessions());
 });

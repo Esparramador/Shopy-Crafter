@@ -4,9 +4,10 @@
  * Features: Brand DNA Adapter · AI Generator · Live Preview · Copy/Export
  */
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "wouter";
 import { Search, Copy, Check, Zap, Filter, ChevronDown, BookOpen,
          Sparkles, Star, Hash, Wand2, Play, Download, X, ChevronRight,
-         Code2, Eye, RefreshCw } from "lucide-react";
+         Code2, Eye, RefreshCw, ExternalLink } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -97,6 +98,8 @@ function EngineTag({ engine }: { engine?: string }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function EffectsStudio() {
+  const [, navigate] = useLocation();
+
   // Source & category
   const [source, setSource] = useState<Source>("prompts");
   const [category, setCategory] = useState("");
@@ -393,6 +396,20 @@ export default function EffectsStudio() {
     const u = URL.createObjectURL(b);
     const a = document.createElement("a"); a.href = u; a.download = filename; a.click();
     URL.revokeObjectURL(u);
+  }
+
+  function openInDesigner(html: string, name?: string) {
+    try {
+      sessionStorage.setItem("designer_preload", JSON.stringify({ html, name: name ?? selected?.name ?? "Efecto" }));
+    } catch {}
+    navigate("/web-designer");
+  }
+
+  function openPromptInDesigner(prompt: string, name?: string) {
+    try {
+      sessionStorage.setItem("designer_preload", JSON.stringify({ prompt, name: name ?? selected?.name ?? "Efecto" }));
+    } catch {}
+    navigate("/web-designer");
   }
 
   function toggleComposeMode() {
@@ -889,7 +906,7 @@ export default function EffectsStudio() {
               <div style={{ marginTop: 14, borderRadius: 10, overflow: "hidden", border: "1px solid rgba(34,197,94,.25)" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", background: "rgba(34,197,94,.07)", borderBottom: "1px solid rgba(34,197,94,.15)" }}>
                   <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}><Check size={12} /> Output generado</span>
-                  <div style={{ display: "flex", gap: 5 }}>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                     {(customOutputType === "html") && (
                       <button onClick={() => setOutputMode(m => m === "preview" ? "code" : "preview")} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t2, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
                         {outputMode === "preview" ? <Code2 size={10} /> : <Eye size={10} />} {outputMode === "preview" ? "Código" : "Preview"}
@@ -897,6 +914,7 @@ export default function EffectsStudio() {
                     )}
                     <button onClick={() => copyText(customOutput, "custom-out")} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t2, fontSize: 10, cursor: "pointer" }}>{copied === "custom-out" ? "✓" : "📋"} Copiar</button>
                     {customOutputType === "html" && <button onClick={() => downloadHtml(customOutput)} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 4, color: S.t2, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><Download size={10} /> HTML</button>}
+                    {customOutputType === "html" && <button onClick={() => openInDesigner(customOutput, customPrompt.slice(0, 40))} style={{ padding: "2px 8px", background: "rgba(201,169,97,.12)", border: "1px solid rgba(201,169,97,.3)", borderRadius: 4, color: S.gold, fontSize: 10, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><ExternalLink size={10} /> Designer</button>}
                   </div>
                 </div>
                 {customOutputType === "html" && outputMode === "preview"
@@ -1039,12 +1057,13 @@ export default function EffectsStudio() {
               {/* ── Generated output ── */}
               {generatedOutput && (
                 <div style={{ margin: "0 14px 14px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, flexWrap: "wrap", gap: 4 }}>
                     <span style={{ fontSize: 9, fontWeight: 700, color: "#22c55e", letterSpacing: ".1em", textTransform: "uppercase" }}>OUTPUT GENERADO</span>
-                    <div style={{ display: "flex", gap: 4 }}>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       {outputType === "html" && <button onClick={() => setOutputMode(m => m === "preview" ? "code" : "preview")} style={{ padding: "1px 7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer" }}>{outputMode === "preview" ? "Código" : "Preview"}</button>}
                       <button onClick={() => copyText(generatedOutput, "gen-out")} style={{ padding: "1px 7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer" }}>{copied === "gen-out" ? "✓" : "📋"}</button>
                       {outputType === "html" && <button onClick={() => downloadHtml(generatedOutput, `${selected?.name ?? "output"}.html`)} style={{ padding: "1px 7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 3, color: S.t3, fontSize: 9, cursor: "pointer", display: "flex", alignItems: "center", gap: 2 }}><Download size={9} /></button>}
+                      {outputType === "html" && <button onClick={() => openInDesigner(generatedOutput, selected?.name)} style={{ padding: "1px 7px", background: "rgba(201,169,97,.12)", border: "1px solid rgba(201,169,97,.3)", borderRadius: 3, color: S.gold, fontSize: 9, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 2 }}><ExternalLink size={8} /> Designer</button>}
                     </div>
                   </div>
                   <div style={{ border: `1px solid rgba(34,197,94,.2)`, borderRadius: 8, overflow: "hidden" }}>
@@ -1058,21 +1077,36 @@ export default function EffectsStudio() {
             </div>
 
             {/* Panel footer actions */}
-            <div style={{ padding: 10, borderTop: `1px solid ${S.bdr}`, flexShrink: 0, display: "flex", gap: 6 }}>
+            <div style={{ padding: 10, borderTop: `1px solid ${S.bdr}`, flexShrink: 0, display: "flex", flexWrap: "wrap", gap: 5 }}>
               {selected.source === "prompts" && (
-                <button onClick={() => copyText(getItemPrompt(selected), "footer-copy")} style={{ flex: 1, padding: "7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t2, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                  {copied === "footer-copy" ? <Check size={11} /> : <Copy size={11} />} Copiar prompt
-                </button>
+                <>
+                  <button onClick={() => copyText(getItemPrompt(selected), "footer-copy")} style={{ flex: 1, minWidth: 90, padding: "7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t2, fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                    {copied === "footer-copy" ? <Check size={11} /> : <Copy size={11} />} Copiar
+                  </button>
+                  <button onClick={() => openPromptInDesigner(getItemPrompt(selected), selected.name)} style={{ flex: 1, minWidth: 110, padding: "7px", background: "rgba(201,169,97,.1)", border: "1px solid rgba(201,169,97,.3)", borderRadius: 6, color: S.gold, fontSize: 10, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                    <ExternalLink size={10} /> Abrir en Designer
+                  </button>
+                </>
               )}
               {selected.source === "effects" && snippetDetail && (
-                <button onClick={() => copyText(snippetDetail.html + (snippetDetail.css ? `\n<style>${snippetDetail.css}</style>` : "") + (snippetDetail.js ? `\n<script>${snippetDetail.js}</script>` : ""), "eff-copy")} style={{ flex: 1, padding: "7px", background: "rgba(201,169,97,.1)", border: "1px solid rgba(201,169,97,.25)", borderRadius: 6, color: S.gold, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
-                  {copied === "eff-copy" ? "✓ Copiado" : "📋 Copiar código"}
-                </button>
+                <>
+                  <button onClick={() => copyText(snippetDetail.html + (snippetDetail.css ? `\n<style>${snippetDetail.css}</style>` : "") + (snippetDetail.js ? `\n<script>${snippetDetail.js}</script>` : ""), "eff-copy")} style={{ flex: 1, minWidth: 90, padding: "7px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t2, fontSize: 10, cursor: "pointer" }}>
+                    {copied === "eff-copy" ? "✓ Copiado" : "📋 Copiar"}
+                  </button>
+                  <button onClick={() => { const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${snippetDetail.css || ""}</style></head><body>${snippetDetail.html || ""}<script>${snippetDetail.js || ""}<\/script></body></html>`; openInDesigner(fullHtml, selected.name); }} style={{ flex: 1, minWidth: 110, padding: "7px", background: "rgba(201,169,97,.12)", border: "1px solid rgba(201,169,97,.35)", borderRadius: 6, color: S.gold, fontSize: 10, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                    <ExternalLink size={10} /> Abrir en Designer
+                  </button>
+                </>
               )}
               {selected.source === "visme" && (
-                <button onClick={() => { setCustomPrompt(`Generar componente web basado en "${selected.name}": ${getItemPrompt(selected).slice(0, 180)}`); setCustomOutputType("html"); closeDetail(); setTimeout(() => window.scrollTo(0, 99999), 100); }} style={{ flex: 1, padding: "7px", background: "rgba(99,102,241,.1)", border: "1px solid rgba(99,102,241,.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
-                  ⚡ Generar con IA
-                </button>
+                <>
+                  <button onClick={() => { setCustomPrompt(`Generar componente web basado en "${selected.name}": ${getItemPrompt(selected).slice(0, 180)}`); setCustomOutputType("html"); closeDetail(); setTimeout(() => window.scrollTo(0, 99999), 100); }} style={{ flex: 1, minWidth: 90, padding: "7px", background: "rgba(99,102,241,.1)", border: "1px solid rgba(99,102,241,.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                    ⚡ Generar IA
+                  </button>
+                  <button onClick={() => openPromptInDesigner(`Generar landing completa basada en template "${selected.name}". ${getItemPrompt(selected).slice(0, 300)}`, selected.name)} style={{ flex: 1, minWidth: 110, padding: "7px", background: "rgba(201,169,97,.1)", border: "1px solid rgba(201,169,97,.3)", borderRadius: 6, color: S.gold, fontSize: 10, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                    <ExternalLink size={10} /> Abrir en Designer
+                  </button>
+                </>
               )}
               <button onClick={closeDetail} style={{ padding: "7px 10px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t4, fontSize: 10, cursor: "pointer" }}>
                 <X size={11} />
@@ -1102,6 +1136,9 @@ export default function EffectsStudio() {
               </button>
               <button onClick={() => { const url2 = "data:text/html;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(composeHtml))); window.open(url2, "_blank", "noopener,noreferrer"); }} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t2, fontSize: 11, cursor: "pointer" }}>
                 ↗ Nueva pestaña
+              </button>
+              <button onClick={() => openInDesigner(composeHtml, `Composición ${composeSelected.length} efectos`)} style={{ padding: "5px 12px", background: "rgba(201,169,97,.15)", border: "1px solid rgba(201,169,97,.4)", borderRadius: 6, color: S.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                <ExternalLink size={11} /> Editar en Designer
               </button>
               <button onClick={() => setShowComposePrev(false)} style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${S.bdr}`, borderRadius: 6, color: S.t3, fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}>
                 <X size={12} /> Cerrar
