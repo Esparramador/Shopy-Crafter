@@ -39,13 +39,14 @@ function TiltCard({ p, onClick }: { p: Product; onClick?: () => void }) {
       {/* Image */}
       <div style={{ aspectRatio: "4/3", background: "var(--ink3)", position: "relative", overflow: "hidden" }}>
         {img ? (
-          <img src={img} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.3s ease" }}
+          <img src={img} alt={p.title} referrerPolicy="no-referrer" crossOrigin="anonymous"
+            style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.3s ease" }}
+            onError={e => { e.currentTarget.style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty("display", "flex"); }}
             onMouseEnter={e => e.currentTarget.style.transform = "scale(1.06)"}
             onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
           />
-        ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, opacity: 0.12 }}>📦</div>
-        )}
+        ) : null}
+        <div style={{ width: "100%", height: "100%", display: img ? "none" : "flex", alignItems: "center", justifyContent: "center", fontSize: 40, opacity: 0.12, position: img ? "absolute" : "relative", inset: 0 }}>📦</div>
         {/* Overlay gradient */}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,10,20,0.6) 0%, transparent 50%)" }} />
         {/* Grade badge */}

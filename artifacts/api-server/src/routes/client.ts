@@ -323,8 +323,7 @@ router.get("/products", async (req, res): Promise<void> => {
       imagesJson: productsTable.imagesJson,
     }).from(productsTable)
       .where(eq(productsTable.projectId, parseInt(projectId)))
-      .orderBy(desc(productsTable.auditScore))
-      .limit(50);
+      .orderBy(desc(productsTable.auditScore));
     const products = rows.map((r) => {
       let images: string[] | null = null;
       try { images = r.imagesJson ? (typeof r.imagesJson === "string" ? JSON.parse(r.imagesJson) : r.imagesJson as string[]) : null; } catch {}
@@ -355,8 +354,7 @@ router.get("/vault-files", async (req, res): Promise<void> => {
       hasContent: projectFilesTable.content,
     }).from(projectFilesTable)
       .where(eq(projectFilesTable.projectId, pid))
-      .orderBy(desc(projectFilesTable.createdAt))
-      .limit(30);
+      .orderBy(desc(projectFilesTable.createdAt));
 
     const result = files.map(f => ({
       id: f.id,

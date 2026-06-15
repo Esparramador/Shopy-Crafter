@@ -82,6 +82,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
 
 const DEFAULT_ADMIN_NAV = [
   { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
+  { label: "Mensajes Clientes", icon: "💬", href: "/admin/messages" },
   { label: "Productos Global", icon: "📦", href: "/admin/products" },
   { label: "A/B Tests Global", icon: "📈", href: "/admin/abtests" },
   { label: "Automaciones", icon: "⚡", href: "/admin/automations" },
@@ -163,7 +164,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         .catch(() => {});
     };
     poll();
-    const t = setInterval(poll, 30000);
+    const t = setInterval(poll, 8000);
     return () => clearInterval(t);
   }, [user?.role]);
 
@@ -298,7 +299,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               >
                 <span className="nav-icon">{item.icon}</span>
                 {item.label}
-                {item.href === "/admin/clients" && unreadCount > 0 && (
+                {(item.href === "/admin/clients" || item.href === "/admin/messages") && unreadCount > 0 && (
                   <span style={{
                     marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 9,
                     background: "var(--crim)", color: "#fff", fontSize: 10, fontWeight: 700,

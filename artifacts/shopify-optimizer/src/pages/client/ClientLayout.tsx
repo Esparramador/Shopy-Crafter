@@ -280,8 +280,8 @@ export function ClientLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      {/* Floating AI Chatbot — solo para clientes reales, no para admin en preview */}
-      {user?.role !== "admin" && <ClientChatbot />}
+      {/* Floating AI Chatbot del cliente — siempre visible (experto en su tienda) */}
+      <ClientChatbot />
     </div>
   );
 }

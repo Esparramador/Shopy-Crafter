@@ -12,7 +12,7 @@ interface ReportsData {
   avgSeoScore: number | null; revenueImpact: string;
   timeline: Array<{ id: string; action: string; details: string; createdAt: string }>;
 }
-interface VaultFile { id: string; title: string; fileType: string; category: string; createdAt: string; downloadUrl?: string; }
+interface VaultFile { id: string; title: string; fileType: string; category: string; description?: string; createdAt: string; downloadUrl?: string; }
 
 function ScoreBar({ score, label }: { score: number; label: string }) {
   const color = score >= 80 ? "var(--jade)" : score >= 60 ? "#f59e0b" : "#f43f5e";
@@ -208,7 +208,7 @@ export default function ClientReports() {
 
               {/* Vault Files tab */}
               {tab === "vault" && (
-                <div>
+                <div style={{ padding: vault.length > 0 ? 0 : 0 }}>
                   {vault.length === 0 ? (
                     <div style={{ padding: 40, textAlign: "center", color: "var(--t3)" }}>
                       <div style={{ fontSize: 36, marginBottom: 12 }}>📁</div>
@@ -217,32 +217,76 @@ export default function ClientReports() {
                         Generar primer reporte HTML
                       </button>
                     </div>
-                  ) : (
-                    vault.map((f, i) => (
-                      <div key={f.id} className="vf-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderBottom: i < vault.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(201,169,97,0.08)", border: "1px solid rgba(201,169,97,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
-                          {f.fileType === "html" ? "📄" : f.fileType === "csv" ? "📊" : f.category?.includes("image") ? "🖼" : f.fileType === "pdf" ? "📋" : "📂"}
+                  ) : (() => {
+                    const CATEGORY_META: Record<string, { label: string; icon: string; color: string }> = {
+                      image: { label: "🖼 Imágenes IA", icon: "🖼", color: "#60a5fa" },
+                      images: { label: "🖼 Imágenes IA", icon: "🖼", color: "#60a5fa" },
+                      video: { label: "🎬 Videos", icon: "🎬", color: "#a78bfa" },
+                      videos: { label: "🎬 Videos", icon: "🎬", color: "#a78bfa" },
+                      report: { label: "📊 Informes", icon: "📊", color: "var(--gold)" },
+                      reports: { label: "📊 Informes", icon: "📊", color: "var(--gold)" },
+                      html: { label: "📄 Reportes HTML", icon: "📄", color: "var(--jade)" },
+                      csv: { label: "📋 Exportaciones CSV", icon: "📋", color: "#34d399" },
+                      pdf: { label: "📋 Documentos PDF", icon: "📋", color: "#f87171" },
+                      seo: { label: "🔎 Análisis SEO", icon: "🔎", color: "var(--jade)" },
+                      audit: { label: "🔍 Auditorías", icon: "🔍", color: "var(--gold)" },
+                      general: { label: "📂 Archivos Generales", icon: "📂", color: "var(--t2)" },
+                    };
+                    const FILE_TYPE_ICON: Record<string, string> = { html: "📄", csv: "📊", pdf: "📋", jpg: "🖼", jpeg: "🖼", png: "🖼", mp4: "🎬", webm: "🎬", gif: "🎞", zip: "🗜", json: "⚙" };
+                    const getCatMeta = (f: typeof vault[0]) => {
+                      const cat = (f.category ?? "").toLowerCase();
+                      const ft = (f.fileType ?? "").toLowerCase();
+                      return CATEGORY_META[cat] ?? CATEGORY_META[ft] ?? CATEGORY_META.general;
+                    };
+                    const getFileIcon = (f: typeof vault[0]) => FILE_TYPE_ICON[(f.fileType ?? "").toLowerCase()] ?? "📄";
+                    const fmtCatLabel = (f: typeof vault[0]) => {
+                      const cat = (f.category ?? "").toLowerCase();
+                      return CATEGORY_META[cat]?.label ?? `📂 ${f.category ?? "General"}`;
+                    };
+                    const grouped: Record<string, typeof vault> = {};
+                    for (const f of vault) {
+                      const key = (f.category ?? f.fileType ?? "general").toLowerCase();
+                      if (!grouped[key]) grouped[key] = [];
+                      grouped[key].push(f);
+                    }
+                    return Object.entries(grouped).map(([cat, files]) => (
+                      <div key={cat}>
+                        <div style={{ padding: "10px 20px 6px", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: getCatMeta(files[0]).color, letterSpacing: "0.03em" }}>
+                            {fmtCatLabel(files[0])}
+                          </span>
+                          <span style={{ fontSize: 10, color: "var(--t3)", background: "rgba(255,255,255,0.05)", padding: "1px 7px", borderRadius: 100 }}>{files.length} archivo{files.length > 1 ? "s" : ""}</span>
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t1)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.title}</p>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
-                            <span style={{ fontSize: 10, color: "var(--t3)", background: "rgba(255,255,255,0.05)", padding: "1px 6px", borderRadius: 100 }}>{f.fileType?.toUpperCase()}</span>
-                            <span style={{ fontSize: 10, color: "var(--t3)" }}>{f.category}</span>
-                            <span style={{ fontSize: 10, color: "var(--t3)" }}>{timeSince(f.createdAt)}</span>
+                        {files.map((f, i) => (
+                          <div key={f.id} className="vf-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 9, background: `${getCatMeta(f).color}14`, border: `1px solid ${getCatMeta(f).color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
+                              {getFileIcon(f)}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t1)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.title}</p>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+                                <span style={{ fontSize: 10, background: `${getCatMeta(f).color}18`, padding: "1px 6px", borderRadius: 100, color: getCatMeta(f).color, fontWeight: 600 }}>{(f.fileType ?? "file").toUpperCase()}</span>
+                                {f.description && <span style={{ fontSize: 10.5, color: "var(--t2)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", maxWidth: 200 }}>{f.description}</span>}
+                                <span style={{ fontSize: 10, color: "var(--t3)", marginLeft: "auto", flexShrink: 0 }}>{timeSince(f.createdAt)}</span>
+                              </div>
+                            </div>
+                            {f.downloadUrl ? (
+                              <a href={f.downloadUrl} download style={{ textDecoration: "none", flexShrink: 0 }}>
+                                <button className="rpt-dl" style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 13px", background: "rgba(201,169,97,0.08)", border: "1px solid rgba(201,169,97,0.2)", borderRadius: 8, color: "var(--t2)", fontSize: 11.5, cursor: "pointer", transition: "all 0.13s" }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(201,169,97,0.18)"; e.currentTarget.style.color = "var(--gold)"; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(201,169,97,0.08)"; e.currentTarget.style.color = "var(--t2)"; }}
+                                >
+                                  <Download size={12} /> Descargar
+                                </button>
+                              </a>
+                            ) : (
+                              <span style={{ fontSize: 10.5, color: "var(--t3)", flexShrink: 0 }}>Sin archivo</span>
+                            )}
                           </div>
-                        </div>
-                        {f.downloadUrl ? (
-                          <a href={f.downloadUrl} download style={{ textDecoration: "none", flexShrink: 0 }}>
-                            <button className="rpt-dl" style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 13px", background: "rgba(201,169,97,0.08)", border: "1px solid rgba(201,169,97,0.2)", borderRadius: 8, color: "var(--t2)", fontSize: 11.5, cursor: "pointer", transition: "all 0.13s" }}>
-                              <Download size={12} /> Descargar
-                            </button>
-                          </a>
-                        ) : (
-                          <span style={{ fontSize: 10.5, color: "var(--t3)", flexShrink: 0 }}>Sin archivo</span>
-                        )}
+                        ))}
                       </div>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </div>
               )}
 
