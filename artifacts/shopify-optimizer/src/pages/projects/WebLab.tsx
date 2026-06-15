@@ -534,6 +534,7 @@ function Effects3DPanel({ data, activeTab, setActiveTab, copied, setCopied }: {
 }
 
 function WebLabInner({ projectId }: { projectId: number }) {
+  const [labMode, setLabMode] = useState<"analysis" | "demos">("analysis");
   const [url, setUrl] = useState("");
   const [instagram, setInstagram] = useState("");
   const [brandName, setBrandName] = useState("");
@@ -1128,15 +1129,46 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
 
   return (
     <div style={{ padding: "24px 32px", maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--gold, #d4a843)", marginBottom: 4, display: "flex", alignItems: "center", gap: 10 }}>
-          🔬 Lab Web
-        </h1>
-        <p style={{ color: "var(--t2, #aaa)", fontSize: 14 }}>
-          Analiza cualquier página web — Shopify, WooCommerce, WordPress, custom o cualquier CMS.
-          Extrae el código real y genera CSS/HTML mejorado listo para tu equipo de desarrollo.
-        </p>
+      {/* Header + mode tabs */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 16 }}>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--gold, #d4a843)", marginBottom: 4, display: "flex", alignItems: "center", gap: 10 }}>
+              🔬 Lab Web IA
+            </h1>
+            <p style={{ color: "var(--t2, #aaa)", fontSize: 14, margin: 0 }}>
+              {labMode === "analysis"
+                ? "Analiza cualquier página web y genera CSS/HTML mejorado con IA. Extrae el código real listo para tu equipo de desarrollo."
+                : "26 demos premium de efectos visuales, Three.js, GSAP y UI Components — código vanilla listo para producción."}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 4, border: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
+            {([
+              { id: "analysis", label: "🔬 Análisis Web", desc: "AI Lab" },
+              { id: "demos", label: "🎨 Demo Library", desc: "26 efectos" },
+            ] as const).map(m => (
+              <button
+                key={m.id}
+                onClick={() => setLabMode(m.id)}
+                style={{
+                  padding: "8px 18px", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none",
+                  background: labMode === m.id ? "linear-gradient(135deg, #d4a843, #b8860b)" : "transparent",
+                  color: labMode === m.id ? "#000" : "var(--t2, #aaa)",
+                  transition: "all 0.15s",
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* Demo Library mode */}
+      {labMode === "demos" && <DemoLibrary />}
+
+      {/* Analysis mode */}
+      {labMode === "analysis" && <>
 
       <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 24, marginBottom: 24, border: "1px solid var(--border, #222)" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -2492,6 +2524,225 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
           </div>
         </>
       )}
+
+      </> /* end analysis mode */ }
+    </div>
+  );
+}
+
+// ── Demo Library ─────────────────────────────────────────────────────────────
+
+const WEB_DEMOS = [
+  { num:"01", file:"01-particle-saas.html", title:"Particle SaaS Landing", desc:"Hero con sistema de partículas WebGL, animaciones de entrada y secciones de producto.", badge:"3d", badgeLabel:"3D", tags:["Three.js","Particles","Hero","SaaS"], lines:"~900", cats:["3d","landing","effects"], thumb:"https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=700&q=75" },
+  { num:"02", file:"02-cinematic-agency.html", title:"Cinematic Agency", desc:"Landing de agencia con efectos cinematográficos, tipografía animada y reveal de secciones.", badge:"fx", badgeLabel:"FX", tags:["GSAP","Cinema","Agency","Reveal"], lines:"~1100", cats:["landing","effects","scroll"], thumb:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&q=75" },
+  { num:"03", file:"03-glass-product-3d.html", title:"Glass Product 3D", desc:"Producto en 3D con material glass/liquid, iluminación dinámica y orbit controls.", badge:"3d", badgeLabel:"3D", tags:["Three.js","Glass","MeshPhysical","Product"], lines:"~850", cats:["3d","effects"], thumb:"https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?w=700&q=75" },
+  { num:"04", file:"04-disassembly-scroll.html", title:"GSAP Disassembly Scroll", desc:"Explosión de producto en scroll. 500vh sticky section con ScrollTrigger, ripple shader y export a landing.", badge:"new", badgeLabel:"NEW", tags:["GSAP","ScrollTrigger","Explode","Shader"], lines:"1091", cats:["3d","scroll","effects"], thumb:"https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=700&q=75" },
+  { num:"05", file:"05-21stdev-effects.html", title:"21st.dev Effects (8 bloques)", desc:"Aurora, Lamp, Container Scroll, Chatbot, Text Effects, Spotlight Cards, Bento, Sticky Scroll y más.", badge:"hot", badgeLabel:"HOT", tags:["Aurora","Chatbot","Scramble","Bento","Gooey"], lines:"1747", cats:["effects","ui","landing","3d"], thumb:"https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=700&q=75" },
+  { num:"06", file:"06-shaders-particles.html", title:"Shaders & Particles", desc:"Plasma GLSL (FBM 5 octavas), Galaxia espiral 8k puntos, DNA Helix, Holographic Card, Matrix Rain, Blob Morph.", badge:"3d", badgeLabel:"3D", tags:["GLSL","Galaxy","DNA","Matrix","WebGL"], lines:"982", cats:["3d","effects"], thumb:"https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=700&q=75" },
+  { num:"07", file:"07-landing-sections.html", title:"Landing Sections Completas", desc:"Pricing toggle animado, Testimonials marquee doble fila, Stats count-up, FAQ accordion, Logo strip, CTA partículas.", badge:"new", badgeLabel:"NEW", tags:["Pricing","Marquee","CountUp","FAQ","CTA"], lines:"~1250", cats:["landing","ui"], thumb:"https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=700&q=75" },
+  { num:"08", file:"08-micro-interactions.html", title:"Micro-interactions & UI", desc:"Toast system, Skeleton loading, Toggles, Progress wizard, Tooltips, Confetti, Search bar, Drag-to-reorder.", badge:"ui", badgeLabel:"UI", tags:["Toast","Skeleton","Tooltip","Confetti","Drag"], lines:"~1300", cats:["ui","effects"], thumb:"https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=700&q=75" },
+  { num:"09", file:"09-video-image-effects.html", title:"Video & Image Effects", desc:"Video hero con controles, Parallax multi-capa, Scroll reveal clip-path, Zoom magnético, Carousel 3D, Before/After slider, Masonry stagger.", badge:"new", badgeLabel:"NEW", tags:["Video","Parallax","Reveal","Carousel","B/A"], lines:"~900", cats:["video","effects","scroll"], thumb:"https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=700&q=75" },
+  { num:"10", file:"10-3d-product-viewer.html", title:"3D Product Viewer — GLB Real", desc:"DamagedHelmet (PBR textures), RobotExpressive (rigged + animaciones), Flamingo, LittlestTokyo. GLTFLoader + RoomEnvironment + UnrealBloom.", badge:"3d", badgeLabel:"3D", tags:["GLTFLoader","RoomEnvironment","PBR","Animations","Bloom"], lines:"~1000", cats:["3d","effects"], thumb:"https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?w=700&q=75" },
+  { num:"11", file:"11-immersive-scroll-lenis.html", title:"Immersive Scroll + Lenis", desc:"Lenis smooth scroll + GSAP ScrollTrigger. Hero 3D scroll-reactive, scroll horizontal pinned, clip-path reveal, video fullscreen.", badge:"new", badgeLabel:"NEW", tags:["Lenis","Horizontal","3D Hero","Scramble","Pin"], lines:"~1000", cats:["scroll","3d","effects"], thumb:"https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=700&q=75" },
+  { num:"12", file:"12-explode-view-glb.html", title:"Explode View 3D — GLB Real", desc:"RobotExpressive.glb con explode scroll-driven. mesh.traverse() detecta todas las partes. Labels SVG con project3DToScreen.", badge:"3d", badgeLabel:"3D", tags:["GLTFLoader","Explode","SVG Labels","ScrollTrigger","PBR"], lines:"~950", cats:["3d","scroll","effects"], thumb:"https://images.unsplash.com/photo-1555421689-d68471e189f2?w=700&q=75" },
+  { num:"13", file:"13-scroll-media-expansion.html", title:"Scroll Media Expansion", desc:"El efecto más icónico: media card 72vw→100vw, altura 55vh→100vh, border-radius 18px→0 en scroll scrub. Video real.", badge:"hot", badgeLabel:"HOT", tags:["ScrollTrigger","Expansion","Video","Strip","Masonry"], lines:"~750", cats:["scroll","video","effects"], thumb:"https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=700&q=75" },
+  { num:"14", file:"14-3d-globe-world.html", title:"3D Globe World — NASA Textures", desc:"Globo terráqueo con texturas NASA reales. Atmosphere glow shader, 8 ciudades con halos pulsantes, 10 arcos CatmullRomCurve3.", badge:"3d", badgeLabel:"3D", tags:["Globe","NASA","Three.js","CatmullRom","Atmosphere"], lines:"~950", cats:["3d","effects"], thumb:"https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?w=700&q=75" },
+  { num:"15", file:"15-ui-premium-components.html", title:"UI Premium Components", desc:"MacOS Dock con magnification, Command Palette (Ctrl+K), Terminal typer JetBrains Mono, Sound Wave 64 barras, Notification Bell spring.", badge:"ui", badgeLabel:"UI", tags:["Dock","CommandPalette","Terminal","SoundWave","Bell"], lines:"~1050", cats:["ui","effects"], thumb:"https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=700&q=75" },
+  { num:"16", file:"16-spline-hero-fluid.html", title:"Spline Hero + Fluid GLSL", desc:"Doble renderer: fluid GLSL FBM warp reactivo al mouse + DamagedHelmet GLB con rotación suave. Custom cursor, badges flotantes.", badge:"hot", badgeLabel:"HOT", tags:["GLSL","FBM","GLTFLoader","Fluid","SplineHero"], lines:"~800", cats:["3d","effects","landing"], thumb:"https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=700&q=75" },
+  { num:"17", file:"17-morphing-text-particles.html", title:"Morphing Text Particles", desc:"6000 partículas que morphean entre palabras via Canvas2D getImageData sampling. Text Scramble, Kinetic Scroll, Gooey SVG filter.", badge:"hot", badgeLabel:"HOT", tags:["Particles","Morph","Scramble","Gooey","SVG Filter"], lines:"1370", cats:["effects","landing","3d"], thumb:"https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=700&q=75" },
+  { num:"18", file:"18-3d-scroll-narrative.html", title:"3D Scroll Narrative — Apple Style", desc:"RobotExpressive GLB con 5 actos scroll-driven (camera orbit, anim clips, fade panels). Horizontal product showcase. Parallax reveal grid.", badge:"3d", badgeLabel:"3D", tags:["GLTFLoader","ScrollNarrative","Lenis","Horizontal","AnimationMixer"], lines:"~950", cats:["3d","scroll","effects","landing"], thumb:"https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=700&q=75" },
+  { num:"19", file:"19-gradient-mesh-backgrounds.html", title:"Gradient Mesh Backgrounds", desc:"7 secciones: Conic gradient mesh CSS, WebGL FBM noise reactivo al mouse, Dot Matrix, Aurora Borealis GLSL, SVG Mesh, Bokeh, Scroll color shift.", badge:"new", badgeLabel:"NEW", tags:["GLSL","FBM","DotMatrix","Aurora","Bokeh"], lines:"~850", cats:["effects","3d","landing"], thumb:"https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=700&q=75" },
+  { num:"20", file:"20-magnetic-cursor-effects.html", title:"Magnetic Cursor Effects", desc:"Custom cursor dot+ring con 4 estados. Botones magnéticos con lerp dual-layer. Tilt cards 3D perspectiva. Liquid blob trail 12 esferas.", badge:"ui", badgeLabel:"UI", tags:["Cursor","Magnetic","Tilt3D","Trail","Underline"], lines:"~800", cats:["ui","effects","scroll"], thumb:"https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=700&q=75" },
+  { num:"21", file:"21-data-visualization.html", title:"Data Visualization", desc:"Dashboard KPI con sparklines, SVG line chart, Bar+Donut Chart, Canvas live streaming chart, Heatmap calendar 52 semanas, Funnel + Cohort.", badge:"new", badgeLabel:"NEW", tags:["SVG Charts","Canvas","KPI","Heatmap","Funnel"], lines:"1908", cats:["ui","effects"], thumb:"https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=700&q=75" },
+  { num:"22", file:"22-3d-carousel-gallery.html", title:"3D Carousel & Gallery", desc:"CSS 3D carousel cilíndrico 8 cards. Three.js GLB showcase 3 sub-viewports. Masonry lightbox con GSAP flip. Horizontal scroll gallery parallax.", badge:"3d", badgeLabel:"3D", tags:["CSS3D","GLTFLoader","Lightbox","HorizontalScroll","StackedCards"], lines:"1897", cats:["3d","scroll","effects","ui"], thumb:"https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=700&q=75" },
+  { num:"23", file:"23-page-transitions.html", title:"Page Transitions & Loaders", desc:"6 transiciones: Curtain Split, Gradient Wipe, Iris Open, Pixel Dissolve, Glitch. 9 loaders CSS. 4 preloaders. Stagger reveals.", badge:"new", badgeLabel:"NEW", tags:["Transitions","Loaders","Preloaders","Stagger","Progress"], lines:"~900", cats:["effects","ui"], thumb:"https://images.unsplash.com/photo-1579547621113-e4bb2a19bdd6?w=700&q=75" },
+  { num:"24", file:"24-infinite-scroll-feed.html", title:"Infinite Scroll & Feeds", desc:"Social feed IntersectionObserver lazy load. Pinterest masonry. E-commerce grid load-more. News editorial layout.", badge:"ui", badgeLabel:"UI", tags:["InfiniteScroll","Masonry","Feed","LazyLoad","E-Commerce"], lines:"~750", cats:["ui","scroll"], thumb:"https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?w=700&q=75" },
+  { num:"25", file:"25-hero-sections.html", title:"Hero Sections — 6 Tipos Premium", desc:"6 hero sections: Split + Three.js DamagedHelmet, Cinematic Video fullscreen, SaaS Gradient + Floating UI, Luxury Editorial, Typewriter, Bold + Marquee.", badge:"hot", badgeLabel:"HOT", tags:["Hero","Three.js","Lenis","SplitType","Typewriter","Marquee"], lines:"~700", cats:["landing","effects","3d","ui"], thumb:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&q=75" },
+  { num:"26", file:"26-bento-grids.html", title:"Bento Grid Layouts — 5 Sistemas", desc:"5 sistemas: SaaS Feature Grid (12 col), Agency Portfolio masonry tilt, Analytics Dashboard, Social iOS-style, Pricing 3 tiers. GSAP ScrollTrigger.", badge:"new", badgeLabel:"NEW", tags:["BentoGrid","Dashboard","Portfolio","Pricing","Analytics"], lines:"~650", cats:["ui","landing","effects"], thumb:"https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=700&q=75" },
+];
+
+const DEMO_BADGE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  new:  { bg: "rgba(34,197,94,0.15)",  border: "rgba(34,197,94,0.3)",  text: "#22c55e" },
+  hot:  { bg: "rgba(239,68,68,0.15)",  border: "rgba(239,68,68,0.3)",  text: "#ef4444" },
+  "3d": { bg: "rgba(99,102,241,0.15)", border: "rgba(99,102,241,0.3)", text: "#818cf8" },
+  fx:   { bg: "rgba(168,85,247,0.15)", border: "rgba(168,85,247,0.3)", text: "#c084fc" },
+  ui:   { bg: "rgba(6,182,212,0.15)",  border: "rgba(6,182,212,0.3)",  text: "#22d3ee" },
+};
+
+const DEMO_FILTERS = [
+  { id: "all",     label: "Todos" },
+  { id: "3d",      label: "3D / WebGL" },
+  { id: "scroll",  label: "Scroll" },
+  { id: "ui",      label: "UI Components" },
+  { id: "landing", label: "Landing" },
+  { id: "video",   label: "Video" },
+  { id: "effects", label: "Effects" },
+];
+
+function DemoLibrary() {
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [hoveredDemo, setHoveredDemo] = useState<string | null>(null);
+
+  const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+  const filtered = WEB_DEMOS.filter(d => {
+    const matchFilter = filter === "all" || d.cats.includes(filter);
+    const q = search.toLowerCase();
+    const matchSearch = !q || d.title.toLowerCase().includes(q) || d.desc.toLowerCase().includes(q) || d.tags.some(t => t.toLowerCase().includes(q));
+    return matchFilter && matchSearch;
+  });
+
+  return (
+    <div>
+      {/* Stats bar */}
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 20, padding: "14px 20px", background: "var(--card, #111)", borderRadius: 14, border: "1px solid var(--border, #222)" }}>
+        {[
+          { num: "26", label: "Demos premium" },
+          { num: "50+", label: "Efectos únicos" },
+          { num: "Vanilla", label: "Sin React/build" },
+          { num: "100%", label: "Real, sin mocks" },
+        ].map(s => (
+          <div key={s.label} style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--gold, #d4a843)", lineHeight: 1 }}>{s.num}</div>
+            <div style={{ fontSize: 10, color: "var(--t3, #666)", marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ position: "relative" }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="🔍 Buscar demos..."
+              style={{
+                padding: "7px 12px", paddingLeft: 14, borderRadius: 8, fontSize: 12,
+                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                color: "var(--t1, #eee)", outline: "none", width: 200,
+              }}
+            />
+          </div>
+          <a
+            href={`${BASE}/web-demos/index.html`}
+            target="_blank" rel="noreferrer"
+            style={{ fontSize: 11, padding: "7px 14px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--t2, #aaa)", textDecoration: "none", whiteSpace: "nowrap" }}
+          >
+            ↗ Abrir galería completa
+          </a>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+        {DEMO_FILTERS.map(f => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            style={{
+              padding: "5px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid",
+              borderColor: filter === f.id ? "var(--gold, #d4a843)" : "rgba(255,255,255,0.1)",
+              background: filter === f.id ? "rgba(212,168,67,0.15)" : "transparent",
+              color: filter === f.id ? "var(--gold, #d4a843)" : "var(--t3, #888)",
+              transition: "all 0.15s",
+            }}
+          >
+            {f.label}
+            {f.id !== "all" && <span style={{ marginLeft: 5, opacity: 0.6, fontSize: 10 }}>
+              {WEB_DEMOS.filter(d => d.cats.includes(f.id)).length}
+            </span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Demo Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 18, marginBottom: 40 }}>
+        {filtered.map(d => {
+          const badge = DEMO_BADGE_COLORS[d.badge] ?? DEMO_BADGE_COLORS.ui;
+          const isHovered = hoveredDemo === d.num;
+          return (
+            <a
+              key={d.num}
+              href={`${BASE}/web-demos/${d.file}`}
+              target="_blank" rel="noreferrer"
+              onMouseEnter={() => setHoveredDemo(d.num)}
+              onMouseLeave={() => setHoveredDemo(null)}
+              style={{
+                display: "flex", flexDirection: "column", textDecoration: "none", color: "inherit",
+                background: "var(--card, #111)", borderRadius: 14, overflow: "hidden",
+                border: `1px solid ${isHovered ? "rgba(212,168,67,0.35)" : "var(--border, #222)"}`,
+                transform: isHovered ? "translateY(-4px)" : "none",
+                boxShadow: isHovered ? "0 20px 40px rgba(0,0,0,0.4)" : "none",
+                transition: "all 0.25s",
+              }}
+            >
+              {/* Thumbnail */}
+              <div style={{ width: "100%", paddingTop: "56.25%", position: "relative", overflow: "hidden", background: "#0a0a0a" }}>
+                <img
+                  src={d.thumb}
+                  alt={d.title}
+                  loading="lazy"
+                  style={{
+                    position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover",
+                    transform: isHovered ? "scale(1.05)" : "scale(1)", transition: "transform 0.5s",
+                  }}
+                />
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.5) 100%)" }} />
+                <span style={{
+                  position: "absolute", top: 10, left: 10, padding: "3px 8px", borderRadius: 5,
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+                  background: badge.bg, border: `1px solid ${badge.border}`, color: badge.text,
+                }}>
+                  {d.badgeLabel}
+                </span>
+                <span style={{ position: "absolute", bottom: 10, right: 10, fontSize: 10, color: "rgba(255,255,255,0.6)" }}>
+                  📄 {d.lines} líneas
+                </span>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: "14px 16px", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t4, #555)", letterSpacing: "0.1em" }}>DEMO {d.num}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--t1, #eee)", lineHeight: 1.3 }}>{d.title}</div>
+                <div style={{ fontSize: 12, color: "var(--t3, #777)", lineHeight: 1.6, flex: 1 }}>{d.desc}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
+                  {d.tags.slice(0, 4).map(t => (
+                    <span key={t} style={{ padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--t3, #777)" }}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{
+                padding: "10px 16px", borderTop: "1px solid rgba(255,255,255,0.06)",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <div style={{ display: "flex", gap: 5 }}>
+                  {d.cats.slice(0, 3).map(c => (
+                    <span key={c} style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "rgba(255,255,255,0.04)", color: "var(--t4, #555)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{c}</span>
+                  ))}
+                </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 6,
+                  background: isHovered ? "var(--gold, #d4a843)" : "rgba(212,168,67,0.1)",
+                  border: `1px solid ${isHovered ? "transparent" : "rgba(212,168,67,0.3)"}`,
+                  color: isHovered ? "#000" : "var(--gold, #d4a843)",
+                  transition: "all 0.2s",
+                }}>
+                  Abrir →
+                </span>
+              </div>
+            </a>
+          );
+        })}
+
+        {filtered.length === 0 && (
+          <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "var(--t4, #555)" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+            <div style={{ fontSize: 14 }}>No se encontraron demos para "{search}"</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

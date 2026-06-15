@@ -50,8 +50,23 @@ interface ApiCategory {
 interface CustomModel {
   url: string;
   name: string;
+  file?: File;
   isRigged: boolean | null;
   boneCount: number;
+  rigStatus?: "idle" | "uploading" | "rigging" | "done" | "error";
+  rigProgress?: number;
+  rigError?: string;
+  rigTaskId?: string;
+  riggedUrl?: string;
+}
+
+interface AnimGenState {
+  actionId: number;
+  label: string;
+  status: "generating" | "done" | "error";
+  progress: number;
+  error?: string;
+  url?: string;
 }
 
 const ART_STYLES = [
@@ -106,7 +121,11 @@ export default function MeshyStudio() {
   const [apiCats, setApiCats] = useState<ApiCategory[]>([]);
   const [animsLoaded, setAnimsLoaded] = useState(false);
   const [customModel, setCustomModel] = useState<CustomModel | null>(null);
+  const [customAnimCache, setCustomAnimCache] = useState<Record<number, string>>({});
+  const [animGenState, setAnimGenState] = useState<AnimGenState | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const stopRigRef = useRef<(() => void) | null>(null);
+  const stopAnimGenRef = useRef<(() => void) | null>(null);
 
   // ── Text-to-3D ─────────────────────────────────────────────────────────────
   const [txtPrompt, setTxtPrompt]   = useState("");
@@ -154,9 +173,99 @@ export default function MeshyStudio() {
   // ── Custom model import ────────────────────────────────────────────────────
   const handleImportModel = useCallback((f: File) => {
     const url = URL.createObjectURL(f);
-    setCustomModel({ url, name: f.name, isRigged: null, boneCount: 0 });
+    setCustomModel({ url, name: f.name, file: f, isRigged: null, boneCount: 0 });
     setSelectedAnimPath(null);
+    setCustomAnimCache({});
+    setAnimGenState(null);
+    stopRigRef.current?.();
+    stopAnimGenRef.current?.();
   }, []);
+
+  // ── Auto-rig imported model via Meshy ─────────────────────────────────────
+  const handleAutoRig = useCallback(async () => {
+    if (!customModel?.file) return;
+    stopRigRef.current?.();
+    setAnimGenState(null);
+
+    setCustomModel(prev => prev ? { ...prev, rigStatus: "uploading", rigProgress: 0, rigError: undefined } : null);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", customModel.file);
+      const upRes = await fetch(`${API}/api/meshy/upload-model`, { method: "POST", body: fd, credentials: "include" });
+      if (!upRes.ok) throw new Error("Error subiendo archivo");
+      const upData = await upRes.json();
+      const assetPath: string = upData.path;
+      const modelUrl = `${window.location.origin}${import.meta.env.BASE_URL ?? "/"}${assetPath}`.replace(/([^:])\/\/+/g, "$1/");
+
+      setCustomModel(prev => prev ? { ...prev, rigStatus: "rigging", rigProgress: 5 } : null);
+
+      const cancel = streamSSE(
+        `${API}/api/meshy/rig`,
+        JSON.stringify({ model_url: modelUrl }),
+        { "Content-Type": "application/json" },
+        (e) => {
+          if (e.event === "started") {
+            setCustomModel(prev => prev ? { ...prev, rigStatus: "rigging", rigProgress: 10, rigTaskId: e.rig_task_id } : null);
+          } else if (e.event === "progress") {
+            setCustomModel(prev => prev ? { ...prev, rigProgress: e.progress ?? prev.rigProgress } : null);
+          } else if (e.event === "done") {
+            setCustomModel(prev => prev ? {
+              ...prev,
+              rigStatus: "done",
+              rigProgress: 100,
+              rigTaskId: e.rig_task_id,
+              riggedUrl: e.rigged_glb_url,
+              isRigged: true,
+            } : null);
+            setCustomAnimCache({});
+          } else if (e.event === "error") {
+            setCustomModel(prev => prev ? { ...prev, rigStatus: "error", rigError: e.error ?? "Error en auto-rig" } : null);
+          } else if (e.event === "timeout") {
+            setCustomModel(prev => prev ? { ...prev, rigStatus: "error", rigError: "Tiempo de espera superado" } : null);
+          }
+        },
+        () => {}
+      );
+      stopRigRef.current = cancel;
+    } catch (e: any) {
+      setCustomModel(prev => prev ? { ...prev, rigStatus: "error", rigError: e.message ?? "Error inesperado" } : null);
+    }
+  }, [customModel]);
+
+  // ── Generate animation for custom rigged model ─────────────────────────────
+  const handleCustomAnimSelect = useCallback((clip: ApiClip) => {
+    if (!customModel?.rigTaskId) return;
+
+    if (customAnimCache[clip.action_id]) {
+      setSelectedAnimPath(customAnimCache[clip.action_id]);
+      return;
+    }
+
+    stopAnimGenRef.current?.();
+    setAnimGenState({ actionId: clip.action_id, label: clip.label, status: "generating", progress: 0 });
+    setSelectedAnimPath(null);
+
+    const cancel = streamSSE(
+      `${API}/api/meshy/animate`,
+      JSON.stringify({ rig_task_id: customModel.rigTaskId, action_id: clip.action_id }),
+      { "Content-Type": "application/json" },
+      (e) => {
+        if (e.event === "progress") {
+          setAnimGenState(prev => prev ? { ...prev, progress: e.progress ?? prev.progress } : null);
+        } else if (e.event === "done") {
+          const url: string = e.animation_glb_url ?? e.glb_url ?? "";
+          setCustomAnimCache(prev => ({ ...prev, [clip.action_id]: url }));
+          setAnimGenState(prev => prev ? { ...prev, status: "done", url, progress: 100 } : null);
+          setSelectedAnimPath(url);
+        } else if (e.event === "error") {
+          setAnimGenState(prev => prev ? { ...prev, status: "error", error: e.error ?? "Error generando animación" } : null);
+        }
+      },
+      () => {}
+    );
+    stopAnimGenRef.current = cancel;
+  }, [customModel, customAnimCache]);
 
   const handleRigStatus = useCallback((isRigged: boolean, boneCount: number) => {
     setCustomModel(prev => prev ? { ...prev, isRigged, boneCount } : null);
@@ -281,7 +390,9 @@ export default function MeshyStudio() {
   const filteredChars = catFilter === "all" ? MESHY_CHARACTERS
     : MESHY_CHARACTERS.filter(c => c.category === catFilter);
 
-  const activeGlbPath   = customModel?.url ?? selectedChar.glbPath;
+  const activeGlbPath = customModel
+    ? (customModel.riggedUrl ?? customModel.url)
+    : selectedChar.glbPath;
   const activeModelName = customModel
     ? `📁 ${customModel.name}`
     : `${selectedChar.emoji} ${selectedChar.name}`;
@@ -451,17 +562,49 @@ export default function MeshyStudio() {
                   {customModel.isRigged === null && (
                     <div style={{ fontSize: 9, color: "var(--l-t4)" }}>Detectando esqueleto…</div>
                   )}
-                  {customModel.isRigged === true && (
+                  {customModel.rigStatus === "done" && (
+                    <div style={{ fontSize: 9, color: "#00c864" }}>✅ Auto-rigged con Meshy · Haz clic en una animación</div>
+                  )}
+                  {customModel.isRigged === true && !customModel.rigStatus && (
                     <div style={{ fontSize: 9, color: "#00c864" }}>✅ Rigged ({customModel.boneCount} huesos)</div>
                   )}
-                  {customModel.isRigged === false && (
-                    <div style={{ fontSize: 9, color: "#f59e0b", lineHeight: 1.4, marginTop: 2 }}>
-                      ⚠ Sin esqueleto. Las animaciones requieren rig.<br />
-                      <span style={{ color: "var(--l-t4)" }}>Genera rig en "Fábrica" o usa Text→3D con A-pose.</span>
+                  {customModel.isRigged === false && !customModel.rigStatus && (
+                    <div style={{ marginTop: 3 }}>
+                      <div style={{ fontSize: 9, color: "#f59e0b", lineHeight: 1.4, marginBottom: 5 }}>
+                        ⚠ Sin esqueleto detectado.
+                      </div>
+                      <button
+                        onClick={handleAutoRig}
+                        style={{
+                          width: "100%", padding: "5px 0", fontSize: 9, fontWeight: 700, cursor: "pointer",
+                          background: "linear-gradient(135deg, rgba(212,168,67,0.2), rgba(212,168,67,0.1))",
+                          border: "1px solid rgba(212,168,67,0.4)", borderRadius: 6, color: "var(--l-gold)",
+                        }}
+                      >
+                        🦴 Auto-rig con Meshy
+                      </button>
+                    </div>
+                  )}
+                  {(customModel.rigStatus === "uploading" || customModel.rigStatus === "rigging") && (
+                    <div style={{ marginTop: 3 }}>
+                      <div style={{ fontSize: 9, color: "var(--l-gold)", marginBottom: 3 }}>
+                        {customModel.rigStatus === "uploading" ? "⬆ Subiendo modelo…" : `🦴 Rigging… ${customModel.rigProgress ?? 0}%`}
+                      </div>
+                      <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                        <div style={{ height: "100%", borderRadius: 2, background: "var(--l-gold)", width: `${customModel.rigProgress ?? 5}%`, transition: "width 0.4s" }} />
+                      </div>
+                    </div>
+                  )}
+                  {customModel.rigStatus === "error" && (
+                    <div style={{ marginTop: 3 }}>
+                      <div style={{ fontSize: 9, color: "#ef4444", marginBottom: 4, lineHeight: 1.4 }}>❌ {customModel.rigError}</div>
+                      <button onClick={handleAutoRig} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 5, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.08)", color: "#ef4444", cursor: "pointer" }}>
+                        Reintentar rig
+                      </button>
                     </div>
                   )}
                   <button
-                    onClick={() => { setCustomModel(null); setSelectedAnimPath(null); }}
+                    onClick={() => { setCustomModel(null); setSelectedAnimPath(null); setCustomAnimCache({}); setAnimGenState(null); stopRigRef.current?.(); stopAnimGenRef.current?.(); }}
                     style={{ marginTop: 5, fontSize: 9, color: "var(--l-t4)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
                   >
                     Quitar modelo
@@ -601,13 +744,64 @@ export default function MeshyStudio() {
               })}
             </div>
 
-            {/* Rigging warning for custom model */}
-            {customModel && customModel.isRigged === false && (
-              <div style={{ padding: "8px 10px", borderRadius: 8, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", display: "flex", gap: 7, alignItems: "flex-start" }}>
-                <TriangleAlert size={12} style={{ color: "#f59e0b", flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 10, color: "#f59e0b", lineHeight: 1.5 }}>
-                  Modelo sin esqueleto. Las animaciones no funcionarán. Genera rig con Meshy desde la pestaña Fábrica o texto→3D con A-pose.
-                </span>
+            {/* Rig status panel */}
+            {customModel && customModel.isRigged === false && !customModel.rigStatus && (
+              <div style={{ padding: "10px 11px", borderRadius: 8, background: "rgba(212,168,67,0.06)", border: "1px solid rgba(212,168,67,0.25)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+                  <TriangleAlert size={11} style={{ color: "#f59e0b", flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, color: "#f59e0b", fontWeight: 600 }}>Sin esqueleto — las animaciones requieren rig</span>
+                </div>
+                <button
+                  onClick={handleAutoRig}
+                  style={{
+                    width: "100%", padding: "7px 0", fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    background: "linear-gradient(135deg, rgba(212,168,67,0.25), rgba(212,168,67,0.12))",
+                    border: "1px solid rgba(212,168,67,0.5)", borderRadius: 7, color: "var(--l-gold)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  }}
+                >
+                  🦴 Auto-rig con Meshy
+                </button>
+              </div>
+            )}
+            {customModel && (customModel.rigStatus === "uploading" || customModel.rigStatus === "rigging") && (
+              <div style={{ padding: "10px 11px", borderRadius: 8, background: "rgba(212,168,67,0.06)", border: "1px solid rgba(212,168,67,0.2)" }}>
+                <div style={{ fontSize: 10, color: "var(--l-gold)", marginBottom: 5, fontWeight: 600 }}>
+                  {customModel.rigStatus === "uploading" ? "⬆ Subiendo modelo a Meshy…" : `🦴 Generando rig… ${customModel.rigProgress ?? 0}%`}
+                </div>
+                <div style={{ height: 5, background: "rgba(255,255,255,0.08)", borderRadius: 3 }}>
+                  <div style={{ height: "100%", borderRadius: 3, background: "linear-gradient(90deg, var(--l-gold), #f59e0b)", width: `${customModel.rigProgress ?? 5}%`, transition: "width 0.5s" }} />
+                </div>
+                <div style={{ fontSize: 9, color: "var(--l-t4)", marginTop: 4 }}>Meshy genera huesos, skin weights y mesh. Espera 1-3 min.</div>
+              </div>
+            )}
+            {customModel && customModel.rigStatus === "done" && (
+              <div style={{ padding: "8px 11px", borderRadius: 8, background: "rgba(0,200,100,0.06)", border: "1px solid rgba(0,200,100,0.2)", display: "flex", alignItems: "center", gap: 6 }}>
+                <CheckCircle2 size={12} style={{ color: "#00c864" }} />
+                <span style={{ fontSize: 10, color: "#00c864", fontWeight: 600 }}>Auto-rig listo · Haz clic en una animación</span>
+              </div>
+            )}
+            {customModel && customModel.rigStatus === "error" && (
+              <div style={{ padding: "8px 11px", borderRadius: 8, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                <div style={{ fontSize: 10, color: "#ef4444", marginBottom: 5 }}>❌ {customModel.rigError}</div>
+                <button onClick={handleAutoRig} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.08)", color: "#ef4444", cursor: "pointer" }}>
+                  Reintentar
+                </button>
+              </div>
+            )}
+            {/* Animation generation state */}
+            {animGenState && customModel?.rigStatus === "done" && (
+              <div style={{ padding: "10px 11px", borderRadius: 8, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                <div style={{ fontSize: 10, color: "#818cf8", fontWeight: 600, marginBottom: animGenState.status === "generating" ? 5 : 0 }}>
+                  {animGenState.status === "generating" && `⚙ Generando: ${animGenState.label.replace(/^[^\s]+\s/, "")} … ${animGenState.progress}%`}
+                  {animGenState.status === "done" && `✅ ${animGenState.label.replace(/^[^\s]+\s/, "")} lista`}
+                  {animGenState.status === "error" && `❌ Error: ${animGenState.error}`}
+                </div>
+                {animGenState.status === "generating" && (
+                  <div style={{ height: 5, background: "rgba(255,255,255,0.08)", borderRadius: 3 }}>
+                    <div style={{ height: "100%", borderRadius: 3, background: "#818cf8", width: `${animGenState.progress}%`, transition: "width 0.5s" }} />
+                  </div>
+                )}
               </div>
             )}
 
@@ -640,34 +834,46 @@ export default function MeshyStudio() {
               </button>
 
               {filteredClips.map(clip => {
-                const animPath = clip.glbPath;
-                const isActive = selectedAnimPath === animPath;
+                const isCustomRigged = !!(customModel?.rigStatus === "done" && customModel.rigTaskId);
+                const cachedUrl = isCustomRigged ? customAnimCache[clip.action_id] : null;
+                const animPath = isCustomRigged ? (cachedUrl ?? null) : clip.glbPath;
+                const isActive = animPath !== null && selectedAnimPath === animPath;
+                const isGenerating = animGenState?.actionId === clip.action_id && animGenState.status === "generating";
+                const isCached = !!cachedUrl;
                 return (
                   <button
                     key={clip.id}
-                    onClick={() => setSelectedAnimPath(animPath)}
+                    onClick={() => {
+                      if (isCustomRigged) {
+                        handleCustomAnimSelect(clip);
+                      } else {
+                        setSelectedAnimPath(clip.glbPath);
+                      }
+                    }}
+                    disabled={isGenerating}
                     style={{
-                      padding: "8px 10px", borderRadius: 8, border: "1px solid", cursor: "pointer", textAlign: "left",
-                      borderColor: isActive ? "var(--l-gold)" : "rgba(255,255,255,0.06)",
-                      background: isActive ? "rgba(212,168,67,0.1)" : "rgba(255,255,255,0.01)",
+                      padding: "8px 10px", borderRadius: 8, border: "1px solid", cursor: isGenerating ? "default" : "pointer", textAlign: "left",
+                      borderColor: isActive ? "var(--l-gold)" : isGenerating ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.06)",
+                      background: isActive ? "rgba(212,168,67,0.1)" : isGenerating ? "rgba(99,102,241,0.05)" : "rgba(255,255,255,0.01)",
                       display: "flex", alignItems: "center", gap: 8, transition: "all 0.1s",
                     }}
                   >
                     <div style={{
                       width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-                      background: isActive ? "rgba(212,168,67,0.2)" : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${isActive ? "rgba(212,168,67,0.4)" : "rgba(255,255,255,0.08)"}`,
+                      background: isActive ? "rgba(212,168,67,0.2)" : isGenerating ? "rgba(99,102,241,0.15)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${isActive ? "rgba(212,168,67,0.4)" : isGenerating ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.08)"}`,
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
                     }}>
-                      {isActive ? "▶" : clip.label.split(" ")[0]}
+                      {isGenerating ? <RefreshCw size={10} className="animate-spin" style={{ color: "#818cf8" }} /> : isActive ? "▶" : isCached ? "✅" : clip.label.split(" ")[0]}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
                         fontSize: 11, fontWeight: isActive ? 600 : 400,
-                        color: isActive ? "var(--l-gold)" : "var(--l-t)",
+                        color: isActive ? "var(--l-gold)" : isGenerating ? "#818cf8" : "var(--l-t)",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
                         {clip.label.replace(/^[^\s]+\s/, "")}
+                        {isGenerating && ` ${animGenState.progress}%`}
                       </div>
                       <div style={{ fontSize: 9, color: "var(--l-t4)", display: "flex", gap: 5, marginTop: 1 }}>
                         <span>#{clip.action_id}</span>
@@ -675,6 +881,7 @@ export default function MeshyStudio() {
                         <span>{clip.category}</span>
                         <span>·</span>
                         <span style={{ color: clip.looping ? "#60a5fa" : "#a78bfa" }}>{clip.looping ? "🔄 loop" : "▶ once"}</span>
+                        {isCustomRigged && !isCached && !isGenerating && <span style={{ color: "#818cf8" }}>· ⚙ generar</span>}
                       </div>
                     </div>
                   </button>

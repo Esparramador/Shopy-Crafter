@@ -18,6 +18,11 @@ const upload = multer({
   },
 });
 
+const uploadGlb = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 60 * 1024 * 1024 },
+});
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MESHY_BASE_V1 = "https://api.meshy.ai/openapi/v1";
@@ -553,6 +558,22 @@ router.post("/meshy/image-to-3d", upload.single("image"), async (req: Request, r
   }
 });
 
+// ── Upload custom GLB for rigging ─────────────────────────────────────────────
+
+router.post("/meshy/upload-model", uploadGlb.single("file"), async (req: Request, res: Response) => {
+  if (!req.file) { res.status(400).json({ error: "No se recibió archivo" }); return; }
+  try {
+    await mkdir(TEMP_DIR, { recursive: true });
+    const ext = req.file.originalname.toLowerCase().endsWith(".gltf") ? ".gltf" : ".glb";
+    const filename = `${randomUUID()}${ext}`;
+    const dest = join(TEMP_DIR, filename);
+    await writeFile(dest, req.file.buffer);
+    res.json({ ok: true, filename, path: `assets/3d/temp/${filename}` });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Manual Rigging ────────────────────────────────────────────────────────────
 
 router.post("/meshy/rig", async (req: Request, res: Response) => {
@@ -561,10 +582,12 @@ router.post("/meshy/rig", async (req: Request, res: Response) => {
   enableLongRunning(res);
 
   const { input_task_id, model_url } = req.body ?? {};
-  if (!input_task_id || !model_url) { sseWrite(res, { event: "error", error: "input_task_id y model_url requeridos" }); res.end(); return; }
+  if (!model_url) { sseWrite(res, { event: "error", error: "model_url es requerido" }); res.end(); return; }
 
   try {
-    const created = await meshyFetch("/rigging", { method: "POST", body: JSON.stringify({ input_task_id, model_url }) });
+    const rigBody: Record<string, any> = { model_url };
+    if (input_task_id) rigBody.input_task_id = input_task_id;
+    const created = await meshyFetch("/rigging", { method: "POST", body: JSON.stringify(rigBody) });
     const rigTaskId: string = created.result;
     sseWrite(res, { event: "started", rig_task_id: rigTaskId });
 
