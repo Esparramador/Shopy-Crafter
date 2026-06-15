@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCms } from "@/contexts/CmsContext";
 import { ClientLayout } from "./ClientLayout";
 import { useClientPreview } from "./ClientPreviewContext";
 import { Link } from "wouter";
@@ -11,6 +12,7 @@ interface DashData {
   totalProducts: number; avgScore: number | null; pendingApprovals: number;
   enginesActive: number; lastOptimized: string | null;
   recentActivity: Array<{ id: string; action: string; details: string; createdAt: string }>;
+  projectName: string | null; shopDomain: string | null;
 }
 interface VaultFile { id: string; title: string; category: string; fileType: string; createdAt: string; downloadUrl?: string; }
 
@@ -72,6 +74,8 @@ const ENGINES = [
 
 export default function ClientDashboard() {
   const { user } = useAuth();
+  const { content: cmsContent } = useCms();
+  const cmsGreetingName: string | undefined = (cmsContent?.clientPanel as any)?.greetingName;
   const { previewPid } = useClientPreview();
   const isAdmin = user?.role === "admin";
   function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
@@ -168,7 +172,7 @@ export default function ClientDashboard() {
                 <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--jade)", fontWeight: 600 }}>Tu agencia trabaja 24/7 para ti</span>
               </div>
               <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 32, fontWeight: 400, margin: 0, lineHeight: 1.1 }}>
-                {greeting}, <span style={{ color: "var(--gold2)" }}>{user?.name?.split(" ")[0] ?? ""}.</span>
+                {greeting}, <span style={{ color: "var(--gold2)" }}>{cmsGreetingName ?? data?.projectName ?? user?.name?.split(" ")[0] ?? ""}.</span>
               </h1>
               {data?.lastOptimized && (
                 <p style={{ fontSize: 11.5, color: "var(--t3)", marginTop: 7, display: "flex", alignItems: "center", gap: 5 }}>

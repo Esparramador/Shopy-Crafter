@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
-import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable } from "@workspace/db";
+import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable, projectsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { msgUpload } from "../lib/msg-uploads.js";
@@ -23,25 +23,27 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     const projectId = getClientProjectId(req);
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
   
-    const products = await db.select({
-      id: productsTable.id,
-      title: productsTable.title,
-      auditScore: productsTable.auditScore,
-      price: productsTable.price,
-    }).from(productsTable).where(eq(productsTable.projectId, parseInt(projectId)));
+    const [project, products, pendingApprovals, recentActivity] = await Promise.all([
+      db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain })
+        .from(projectsTable).where(eq(projectsTable.id, parseInt(projectId))).limit(1),
+      db.select({
+        id: productsTable.id,
+        title: productsTable.title,
+        auditScore: productsTable.auditScore,
+        price: productsTable.price,
+      }).from(productsTable).where(eq(productsTable.projectId, parseInt(projectId))),
+      db.select({ id: approvalsTable.id })
+        .from(approvalsTable)
+        .where(and(eq(approvalsTable.projectId, projectId), eq(approvalsTable.status, "pending"))),
+      db.select().from(auditLogTable)
+        .where(eq(auditLogTable.projectId, projectId))
+        .orderBy(desc(auditLogTable.createdAt)).limit(20),
+    ]);
   
     const scored = products.filter((p) => p.auditScore !== null);
     const avgScore = scored.length > 0
       ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length)
       : null;
-  
-    const pendingApprovals = await db.select({ id: approvalsTable.id })
-      .from(approvalsTable)
-      .where(and(eq(approvalsTable.projectId, projectId), eq(approvalsTable.status, "pending")));
-  
-    const recentActivity = await db.select().from(auditLogTable)
-      .where(eq(auditLogTable.projectId, projectId))
-      .orderBy(desc(auditLogTable.createdAt)).limit(20);
   
     res.json({
       totalProducts: products.length,
@@ -50,10 +52,24 @@ router.get("/dashboard", async (req, res): Promise<void> => {
       recentActivity,
       enginesActive: 6,
       lastOptimized: recentActivity[0]?.createdAt ?? null,
+      projectName: project[0]?.name ?? null,
+      shopDomain: project[0]?.shopDomain ?? null,
     });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
+  }
+});
+
+router.get("/project-info", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.json({ name: null, shopDomain: null }); return; }
+    const [project] = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain })
+      .from(projectsTable).where(eq(projectsTable.id, parseInt(projectId))).limit(1);
+    res.json(project ?? { name: null, shopDomain: null });
+  } catch {
+    res.json({ name: null, shopDomain: null });
   }
 });
 

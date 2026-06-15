@@ -23,6 +23,7 @@ interface ClientCmsPanel {
   topbar?: string;
   logoBadge?: string;
   statusOnline?: string;
+  greetingName?: string;
   tooltips?: { logout?: string };
 }
 
@@ -40,6 +41,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   useEffect(() => { locationRef.current = location; }, [location]);
   const { previewPid, setPreviewPid } = useClientPreview();
   const [projects, setProjects] = useState<Array<{ id: number; name: string; shopDomain: string }>>([]);
+  const [clientProjectInfo, setClientProjectInfo] = useState<{ name: string | null; shopDomain: string | null } | null>(null);
 
   useEffect(() => {
     if (user?.role !== "admin") return;
@@ -50,6 +52,14 @@ export function ClientLayout({ children }: { children: ReactNode }) {
         setProjects(d);
         if (!previewPid && d.length > 0) setPreviewPid(String(d[0].id));
       })
+      .catch(() => {});
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (user?.role === "admin") return;
+    fetch(`${API_BASE}/api/client/project-info`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setClientProjectInfo(d); })
       .catch(() => {});
   }, [user?.role]);
 
@@ -115,8 +125,15 @@ export function ClientLayout({ children }: { children: ReactNode }) {
     icon: cp.navItems?.[i]?.icon ?? item.icon,
   }));
 
-  const initials = user?.name
-    ? user.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
+  const activeProject = user?.role === "admin"
+    ? (projects.find(p => String(p.id) === previewPid) ?? null)
+    : clientProjectInfo ? { name: clientProjectInfo.name, shopDomain: clientProjectInfo.shopDomain } : null;
+
+  const displayName = activeProject?.name ?? cp.sidebar?.defaultName ?? "Cliente";
+  const displayDomain = activeProject?.shopDomain ?? cp.sidebar?.storePanel ?? "Panel de tienda";
+
+  const initials = displayName
+    ? displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
     : "CL";
 
   return (
@@ -143,8 +160,8 @@ export function ClientLayout({ children }: { children: ReactNode }) {
           <div className="client-pill active">
             <div className="client-dot" style={{ background: "var(--gold)" }} />
             <div className="client-info">
-              <p className="client-name">{user?.name ?? (cp.sidebar?.defaultName ?? "Cliente")}</p>
-              <p className="client-domain">{cp.sidebar?.storePanel ?? "Panel de tienda"}</p>
+              <p className="client-name">{displayName}</p>
+              <p className="client-domain">{displayDomain}</p>
             </div>
           </div>
 

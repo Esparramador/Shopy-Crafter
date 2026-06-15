@@ -577,6 +577,7 @@ const SECTIONS: SectionDef[] = [
       { label: "Label — Motores activos", path: "clientPanel.sidebar.enginesActive", type: "text" },
       { label: "Label — Navegación", path: "clientPanel.sidebar.navigation", type: "text" },
       { label: "Label — Optimizaciones", path: "clientPanel.sidebar.aiOptimizations", type: "text" },
+      { label: "Saludo — nombre personalizado (override)", path: "clientPanel.greetingName", type: "text" },
       { label: "Topbar texto", path: "clientPanel.topbar", type: "text" },
       { label: "Badge logo", path: "clientPanel.logoBadge", type: "text" },
       { label: "Status online", path: "clientPanel.statusOnline", type: "text" },
