@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable, projectsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
-import { msgUpload } from "../lib/msg-uploads.js";
+import { msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { askClaude } from "../lib/claude.js";
@@ -154,7 +154,8 @@ router.get("/messages", async (req, res): Promise<void> => {
              file_url      AS "fileUrl",
              file_name     AS "fileName",
              file_type     AS "fileType",
-             file_size     AS "fileSize"
+             file_size     AS "fileSize",
+             files_json    AS "filesJson"
       FROM messages
       WHERE project_id = ${projectId}
       ORDER BY created_at ASC
@@ -217,21 +218,41 @@ router.post("/messages/upload", msgUpload.single("file"), async (req, res): Prom
   }
 });
 
+router.post("/messages/upload-multi", msgUploadMulti.array("files", 20), async (req, res): Promise<void> => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files?.length) { res.status(400).json({ error: "No files provided" }); return; }
+    const result = files.map(f => ({
+      fileUrl: `/api/msg-uploads/${f.filename}`,
+      fileName: f.originalname,
+      fileType: f.mimetype,
+      fileSize: f.size,
+    }));
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
+  }
+});
+
 router.post("/messages", async (req, res): Promise<void> => {
   try {
     const projectId = getClientProjectId(req);
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
-    const { content, fileUrl, fileName, fileType, fileSize } = req.body as {
+    const { content, fileUrl, fileName, fileType, fileSize, filesJson } = req.body as {
       content?: string; fileUrl?: string; fileName?: string; fileType?: string; fileSize?: number;
+      filesJson?: Array<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }> | null;
     };
-    if (!content?.trim() && !fileUrl) { res.status(400).json({ error: "Content or file required" }); return; }
+    const hasFiles = !!(fileUrl || (filesJson && filesJson.length > 0));
+    if (!content?.trim() && !hasFiles) { res.status(400).json({ error: "Content or file required" }); return; }
     const id = randomBytes(16).toString("hex");
     const senderName = req.session.name ?? "Cliente";
+    const filesJsonVal = filesJson && filesJson.length > 0 ? JSON.stringify(filesJson) : null;
     await db.execute(sql`
-      INSERT INTO messages (id, project_id, from_role, from_name, content, file_url, file_name, file_type, file_size)
+      INSERT INTO messages (id, project_id, from_role, from_name, content, file_url, file_name, file_type, file_size, files_json)
       VALUES (
         ${id}, ${projectId}, 'client', ${senderName},
-        ${content ?? null}, ${fileUrl ?? null}, ${fileName ?? null}, ${fileType ?? null}, ${fileSize ?? null}
+        ${content ?? null}, ${fileUrl ?? null}, ${fileName ?? null}, ${fileType ?? null}, ${fileSize ?? null},
+        ${filesJsonVal}::jsonb
       )
     `);
     const preview = content?.trim()

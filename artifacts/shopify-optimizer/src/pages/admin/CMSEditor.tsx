@@ -1782,6 +1782,22 @@ interface VersionEntry {
   label: string | null;
 }
 
+/* ── CMS PAGES ───────────────────────────────────────────────────────────── */
+const CMS_PAGES = [
+  { value: "/landing?preview=true", label: "🏠 Landing", group: "Sitio web" },
+  { value: "/home", label: "🖥 Panel Admin", group: "Admin" },
+  { value: "/admin/messages", label: "💬 Mensajes Admin", group: "Admin" },
+  { value: "/admin/clients", label: "👥 Clientes", group: "Admin" },
+  { value: "/admin/products", label: "🛍️ Productos", group: "Admin" },
+  { value: "/admin/intelligence", label: "📊 Revenue Intel", group: "Admin" },
+  { value: "/admin/inventory", label: "📦 Inventario", group: "Admin" },
+  { value: "/admin/competitors", label: "🎯 Competidores", group: "Admin" },
+  { value: "/admin/forecast", label: "🔮 Forecast AI", group: "Admin" },
+  { value: "/client", label: "👤 Panel Cliente", group: "Cliente" },
+  { value: "/client/messages", label: "💬 Mensajes Cliente", group: "Cliente" },
+  { value: "/client/products", label: "📦 Productos Cliente", group: "Cliente" },
+];
+
 /* ══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════════════════ */
@@ -1796,6 +1812,8 @@ export default function CMSEditor() {
   const [showVersions, setShowVersions] = useState(false);
   const [iframeKey, setIframeKey]       = useState(0);
   const [mobileTab, setMobileTab]       = useState<MobileTab>("edit");
+  const [previewPage, setPreviewPage]   = useState("/landing?preview=true");
+  const [sectionSearch, setSectionSearch] = useState("");
   const CONTENT_FIRST_ORDER = [
     "nav", "hero", "features", "stats", "how", "pricing", "testimonials", "cta",
     "results", "contact", "howCards", "footer", "sectionNav",
@@ -2219,7 +2237,7 @@ export default function CMSEditor() {
           borderRight: "1px solid var(--bdr)", background: "var(--ink)", overflow: "hidden",
         }}>
           {/* panel header */}
-          <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--bdr)" }}>
+          <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--bdr)", flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, color: "var(--t3)", margin: 0 }}>
                 Secciones de la Landing
@@ -2249,9 +2267,28 @@ export default function CMSEditor() {
             </div>
           </div>
 
+          {/* section search */}
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid var(--bdr)", flexShrink: 0 }}>
+            <input
+              value={sectionSearch}
+              onChange={e => setSectionSearch(e.target.value)}
+              placeholder="Buscar sección o campo…"
+              style={{ width: "100%", padding: "5px 10px", fontSize: 12, background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 7, color: "var(--t)", outline: "none", boxSizing: "border-box" }}
+            />
+          </div>
+
           {/* sections list */}
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {sectionOrder.map((sectionId, orderIdx) => {
+            {(sectionSearch
+              ? sectionOrder.filter(sId => {
+                  const s = [...SECTIONS, ...customSections].find(s => s.id === sId);
+                  if (!s) return false;
+                  const q = sectionSearch.toLowerCase();
+                  return s.label.toLowerCase().includes(q) || s.id.toLowerCase().includes(q)
+                    || s.fields.some(f => f.label.toLowerCase().includes(q));
+                })
+              : sectionOrder
+            ).map((sectionId, orderIdx) => {
               const section = [...SECTIONS, ...customSections].find(s => s.id === sectionId);
               if (!section) return null;
               const isOpen = openSections.has(section.id);
@@ -2388,19 +2425,35 @@ export default function CMSEditor() {
           {/* preview topbar */}
           <div style={{
             flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "0 16px", height: 40, borderBottom: "1px solid var(--bdr)",
+            padding: "0 12px", height: 40, borderBottom: "1px solid var(--bdr)", gap: 8,
           }}>
-            <div className="flex items-center gap-2" style={{ color: "var(--t3)", fontSize: 12 }}>
+            <div className="flex items-center gap-2" style={{ color: "var(--t3)", fontSize: 12, flexShrink: 0 }}>
               <Eye size={13} />
-              <span>Vista previa en vivo</span>
+              <span style={{ whiteSpace: "nowrap" }}>Vista previa</span>
               <span style={{ color: "var(--bdr2)" }}>·</span>
               <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--t4)" }}>
                 {device} · {DEVICE_WIDTHS[device]}
               </span>
             </div>
+
+            {/* page selector */}
+            <select
+              value={previewPage}
+              onChange={e => { setPreviewPage(e.target.value); setIframeKey(k => k + 1); }}
+              style={{
+                flex: 1, minWidth: 0, maxWidth: 220, fontSize: 11, padding: "2px 6px",
+                background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 6,
+                color: "var(--t2)", cursor: "pointer", outline: "none",
+              }}
+            >
+              {CMS_PAGES.map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+
             <button onClick={() => setIframeKey(k => k + 1)}
               className="flex items-center gap-1"
-              style={{ fontSize: 11, color: "var(--t3)", cursor: "pointer", background: "none", border: "none" }}
+              style={{ fontSize: 11, color: "var(--t3)", cursor: "pointer", background: "none", border: "none", flexShrink: 0, whiteSpace: "nowrap" }}
             ><RefreshCw size={12} />Recargar</button>
           </div>
 
@@ -2410,8 +2463,8 @@ export default function CMSEditor() {
               <iframe
                 key={iframeKey}
                 ref={iframeRef}
-                src={previewUrl}
-                title="Landing page preview"
+                src={`${window.location.origin}${BASE_URL === "" ? "" : BASE_URL}${previewPage}`}
+                title="Vista previa de página"
                 style={{
                   width: "100%", height: "100%", minHeight: 500,
                   border: "1px solid var(--bdr2)", borderRadius: 16,

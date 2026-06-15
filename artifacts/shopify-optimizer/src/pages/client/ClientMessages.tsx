@@ -7,6 +7,8 @@ import { Send, Loader2, Paperclip, X, Download, Package, Search, ExternalLink } 
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+interface FileRef { fileUrl: string; fileName: string; fileType: string; fileSize: number; }
+
 interface Message {
   id: string;
   fromRole: "admin" | "client";
@@ -18,6 +20,7 @@ interface Message {
   fileName?: string;
   fileType?: string;
   fileSize?: number;
+  filesJson?: FileRef[] | null;
 }
 
 interface Product {
@@ -174,7 +177,7 @@ export default function ClientMessages() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
@@ -204,30 +207,27 @@ export default function ClientMessages() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!e.target.files) return;
+    if (!e.target.files?.length) return;
     const files = Array.from(e.target.files);
-    if (!files.length) return;
-    const f = files[0];
-    if (!f) return;
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await fetch(apid(`${API_BASE}/api/client/messages/upload`), {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
-      let previewUrl: string | undefined;
-      if (f.type.startsWith("image/") || f.type.startsWith("video/")) {
-        previewUrl = URL.createObjectURL(f);
-      }
-      setPendingFile({ ...data, previewUrl });
+      const uploaded = await Promise.all(
+        files.map(async (f) => {
+          const fd = new FormData();
+          fd.append("file", f);
+          const res = await fetch(apid(`${API_BASE}/api/client/messages/upload`), {
+            method: "POST", credentials: "include", body: fd,
+          });
+          if (!res.ok) throw new Error("Upload failed");
+          const data = await res.json();
+          let previewUrl: string | undefined;
+          if (f.type.startsWith("image/") || f.type.startsWith("video/")) previewUrl = URL.createObjectURL(f);
+          return { ...data, previewUrl } as PendingFile;
+        })
+      );
+      setPendingFiles(prev => [...prev, ...uploaded]);
     } catch {
-      alert("Error al subir el archivo. Inténtalo de nuevo.");
+      alert("Error al subir uno o más archivos. Inténtalo de nuevo.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -235,33 +235,31 @@ export default function ClientMessages() {
   };
 
   const send = async () => {
-    if ((!text.trim() && !pendingFile) || sending) return;
+    if ((!text.trim() && pendingFiles.length === 0) || sending) return;
     setSending(true);
+    const filePayload = pendingFiles.length === 1
+      ? { fileUrl: pendingFiles[0].fileUrl, fileName: pendingFiles[0].fileName, fileType: pendingFiles[0].fileType, fileSize: pendingFiles[0].fileSize }
+      : pendingFiles.length > 1
+        ? { filesJson: pendingFiles.map(f => ({ fileUrl: f.fileUrl, fileName: f.fileName, fileType: f.fileType, fileSize: f.fileSize })) }
+        : {};
     await fetch(apid(`${API_BASE}/api/client/messages`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({
-        content: text.trim() || undefined,
-        fileUrl: pendingFile?.fileUrl,
-        fileName: pendingFile?.fileName,
-        fileType: pendingFile?.fileType,
-        fileSize: pendingFile?.fileSize,
-      }),
+      body: JSON.stringify({ content: text.trim() || undefined, ...filePayload }),
     });
     setText("");
-    if (pendingFile?.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl);
-    setPendingFile(null);
+    pendingFiles.forEach(f => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
+    setPendingFiles([]);
     setSending(false);
     loadMessages();
   };
 
   useEffect(() => {
-    if (products.length > 0) {
-      setBarsReady(false);
-      const t = setTimeout(() => setBarsReady(true), 60);
-      return () => clearTimeout(t);
-    }
+    if (products.length === 0) return;
+    setBarsReady(false);
+    const t = setTimeout(() => setBarsReady(true), 60);
+    return () => clearTimeout(t);
   }, [products]);
 
   const insertProduct = (p: Product) => {
@@ -437,7 +435,7 @@ export default function ClientMessages() {
                           <p style={{ fontSize: 10, color: "var(--t3)", marginBottom: 3, marginLeft: 2 }}>{msg.fromName}</p>
                         )}
                         <div style={{
-                          padding: msg.fileUrl && !msg.content?.trim() ? "8px 10px" : "9px 13px",
+                          padding: (msg.fileUrl || (msg.filesJson?.length ?? 0) > 0) && !msg.content?.trim() ? "8px 10px" : "9px 13px",
                           borderRadius: isOwn ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
                           background: isOwn
                             ? "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)"
@@ -448,15 +446,15 @@ export default function ClientMessages() {
                           fontWeight: isOwn ? 500 : 400,
                           lineHeight: 1.5,
                         }}>
-                          {msg.fileUrl && (
-                            <FileAttachment
-                              fileUrl={msg.fileUrl}
-                              fileName={msg.fileName ?? "archivo"}
-                              fileType={msg.fileType ?? "application/octet-stream"}
-                              fileSize={msg.fileSize}
-                              isOwn={isOwn}
-                            />
-                          )}
+                          {(msg.filesJson && msg.filesJson.length > 0) ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: msg.content?.trim() ? 6 : 0 }}>
+                              {msg.filesJson.map((f, i) => (
+                                <FileAttachment key={i} fileUrl={f.fileUrl} fileName={f.fileName} fileType={f.fileType} fileSize={f.fileSize} isOwn={isOwn} />
+                              ))}
+                            </div>
+                          ) : msg.fileUrl ? (
+                            <FileAttachment fileUrl={msg.fileUrl} fileName={msg.fileName ?? "archivo"} fileType={msg.fileType ?? "application/octet-stream"} fileSize={msg.fileSize} isOwn={isOwn} />
+                          ) : null}
                           {msg.content?.trim() && <span>{renderContent(msg.content, isOwn)}</span>}
                         </div>
                         <p style={{
@@ -475,27 +473,30 @@ export default function ClientMessages() {
             )}
           </div>
 
-          {/* Pending file preview */}
-          {pendingFile && (
-            <div style={{
-              margin: "0 12px 6px", padding: "8px 12px",
-              background: "rgba(201,169,97,0.08)", border: "1px solid rgba(201,169,97,0.2)",
-              borderRadius: 10, display: "flex", alignItems: "center", gap: 10,
-            }}>
-              {pendingFile.previewUrl && pendingFile.fileType.startsWith("image/") && (
-                <img src={pendingFile.previewUrl} alt="" style={{ width: 44, height: 44, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
-              )}
-              {!pendingFile.previewUrl || !pendingFile.fileType.startsWith("image/") ? (
-                <span style={{ fontSize: 24, flexShrink: 0 }}>{fileIcon(pendingFile.fileType, pendingFile.fileName)}</span>
-              ) : null}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--t1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pendingFile.fileName}</p>
-                <p style={{ fontSize: 10, color: "var(--t3)" }}>{formatBytes(pendingFile.fileSize)}</p>
+          {/* Pending files preview */}
+          {pendingFiles.length > 0 && (
+            <div style={{ margin: "0 12px 6px", padding: "8px 10px", background: "rgba(201,169,97,0.06)", border: "1px solid rgba(201,169,97,0.2)", borderRadius: 10 }}>
+              <div style={{ display: "flex", gap: 8, overflowX: "auto", flexWrap: "nowrap" }}>
+                {pendingFiles.map((f, i) => (
+                  <div key={i} style={{ position: "relative", flexShrink: 0 }}>
+                    {f.previewUrl && f.fileType.startsWith("image/") ? (
+                      <img src={f.previewUrl} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover", display: "block", border: "1px solid rgba(201,169,97,0.3)" }} />
+                    ) : (
+                      <div style={{ width: 56, height: 56, borderRadius: 8, background: "rgba(201,169,97,0.1)", border: "1px solid rgba(201,169,97,0.2)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                        <span style={{ fontSize: 20 }}>{fileIcon(f.fileType, f.fileName)}</span>
+                        <span style={{ fontSize: 8, color: "var(--t3)", maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName.split(".").pop()?.toUpperCase()}</span>
+                      </div>
+                    )}
+                    <button onClick={() => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); setPendingFiles(prev => prev.filter((_, idx) => idx !== i)); }}
+                      style={{ position: "absolute", top: -5, right: -5, width: 17, height: 17, borderRadius: "50%", background: "#e84558", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                      <X size={9} style={{ color: "#fff" }} />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <button onClick={() => { if (pendingFile.previewUrl) URL.revokeObjectURL(pendingFile.previewUrl); setPendingFile(null); }}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", padding: 2 }}>
-                <X size={14} />
-              </button>
+              <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 5 }}>
+                {pendingFiles.length} archivo{pendingFiles.length !== 1 ? "s" : ""} · {formatBytes(pendingFiles.reduce((a, f) => a + f.fileSize, 0))} total
+              </p>
             </div>
           )}
 
@@ -507,26 +508,32 @@ export default function ClientMessages() {
             <input
               ref={fileInputRef}
               type="file"
-              multiple={false}
+              multiple
               style={{ display: "none" }}
               onChange={handleFileSelect}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              title="Adjuntar archivo"
+              title="Adjuntar archivos (máx. 20, ZIP hasta 500MB)"
               style={{
                 width: 36, height: 36, borderRadius: 9, border: "1px solid var(--bdr)",
-                background: pendingFile ? "rgba(201,169,97,0.12)" : "rgba(255,255,255,0.04)",
-                color: pendingFile ? "var(--gold)" : "var(--t3)",
+                background: pendingFiles.length > 0 ? "rgba(201,169,97,0.12)" : "rgba(255,255,255,0.04)",
+                color: pendingFiles.length > 0 ? "var(--gold)" : "var(--t3)",
                 cursor: uploading ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                 transition: "all 0.15s",
+                position: "relative",
               }}
             >
               {uploading
                 ? <Loader2 size={14} style={{ animation: "spin 0.6s linear infinite" }} />
                 : <Paperclip size={14} />}
+              {pendingFiles.length > 0 && (
+                <span style={{ position: "absolute", top: -5, right: -5, width: 16, height: 16, borderRadius: "50%", background: "var(--gold)", color: "#0a0a14", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {pendingFiles.length}
+                </span>
+              )}
             </button>
             <textarea
               ref={textInputRef}
@@ -535,7 +542,7 @@ export default function ClientMessages() {
               onKeyDown={e => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
               }}
-              placeholder={pendingFile ? "Añade un comentario al archivo..." : t("placeholder", "Escribe tu mensaje… (Shift+Enter para nueva línea)")}
+              placeholder={pendingFiles.length > 0 ? "Añade un comentario a los archivos..." : t("placeholder", "Escribe tu mensaje… (Shift+Enter para nueva línea)")}
               rows={1}
               style={{
                 flex: 1, background: "rgba(255,255,255,0.03)", border: "1px solid var(--bdr)",
@@ -554,13 +561,13 @@ export default function ClientMessages() {
             />
             <button
               onClick={send}
-              disabled={sending || uploading || (!text.trim() && !pendingFile)}
+              disabled={sending || uploading || (!text.trim() && pendingFiles.length === 0)}
               style={{
                 width: 40, height: 40, borderRadius: 10, border: "none",
                 background: "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)",
                 color: "#0a0a14",
-                cursor: (sending || uploading || (!text.trim() && !pendingFile)) ? "not-allowed" : "pointer",
-                opacity: (sending || uploading || (!text.trim() && !pendingFile)) ? 0.5 : 1,
+                cursor: (sending || uploading || (!text.trim() && pendingFiles.length === 0)) ? "not-allowed" : "pointer",
+                opacity: (sending || uploading || (!text.trim() && pendingFiles.length === 0)) ? 0.5 : 1,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0, transition: "opacity 0.15s",
               }}

@@ -10,7 +10,7 @@ import { recordAudit } from "../lib/audit.helper.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { askClaude } from "../lib/claude.js";
 import { sendPushToClientByProject } from "../lib/push-helper.js";
-import { msgUpload } from "../lib/msg-uploads.js";
+import { msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -399,7 +399,8 @@ router.get("/projects/:projectId/messages", async (req, res): Promise<void> => {
              file_url      AS "fileUrl",
              file_name     AS "fileName",
              file_type     AS "fileType",
-             file_size     AS "fileSize"
+             file_size     AS "fileSize",
+             files_json    AS "filesJson"
       FROM messages
       WHERE project_id = ${projectId}
       ORDER BY created_at ASC
@@ -429,20 +430,40 @@ router.post("/projects/:projectId/messages/upload", msgUpload.single("file"), as
   }
 });
 
+router.post("/projects/:projectId/messages/upload-multi", msgUploadMulti.array("files", 20), async (req, res): Promise<void> => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files?.length) { res.status(400).json({ error: "No files provided" }); return; }
+    const result = files.map(f => ({
+      fileUrl: `/api/msg-uploads/${f.filename}`,
+      fileName: f.originalname,
+      fileType: f.mimetype,
+      fileSize: f.size,
+    }));
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
+  }
+});
+
 router.post("/projects/:projectId/messages", async (req, res): Promise<void> => {
   try {
     const { projectId } = req.params;
-    const { content, fileUrl, fileName, fileType, fileSize } = req.body as {
+    const { content, fileUrl, fileName, fileType, fileSize, filesJson } = req.body as {
       content?: string; fileUrl?: string; fileName?: string; fileType?: string; fileSize?: number;
+      filesJson?: Array<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }> | null;
     };
-    if (!content?.trim() && !fileUrl) { res.status(400).json({ error: "Content or file required" }); return; }
+    const hasFiles = !!(fileUrl || (filesJson && filesJson.length > 0));
+    if (!content?.trim() && !hasFiles) { res.status(400).json({ error: "Content or file required" }); return; }
     const id = randomBytes(16).toString("hex");
     const adminName = req.session.name ?? "Tu agencia";
+    const filesJsonVal = filesJson && filesJson.length > 0 ? JSON.stringify(filesJson) : null;
     await db.execute(sql`
-      INSERT INTO messages (id, project_id, from_role, from_name, content, file_url, file_name, file_type, file_size)
+      INSERT INTO messages (id, project_id, from_role, from_name, content, file_url, file_name, file_type, file_size, files_json)
       VALUES (
         ${id}, ${projectId}, 'admin', ${adminName},
-        ${content ?? null}, ${fileUrl ?? null}, ${fileName ?? null}, ${fileType ?? null}, ${fileSize ?? null}
+        ${content ?? null}, ${fileUrl ?? null}, ${fileName ?? null}, ${fileType ?? null}, ${fileSize ?? null},
+        ${filesJsonVal}::jsonb
       )
     `);
     const preview = content?.trim()

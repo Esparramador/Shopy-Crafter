@@ -17,19 +17,27 @@ if (!fs.existsSync(MSG_UPLOADS_DIR)) {
     await db.execute(sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT`);
     await db.execute(sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT`);
     await db.execute(sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_size INTEGER`);
+    await db.execute(sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS files_json JSONB`);
     logger.info("messages file columns ensured");
   } catch (e: any) {
     logger.warn({ err: e?.message }, "messages file columns migration non-fatal");
   }
 })();
 
+const diskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, MSG_UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || "";
+    cb(null, `${randomBytes(14).toString("hex")}${ext}`);
+  },
+});
+
 export const msgUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, MSG_UPLOADS_DIR),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname) || "";
-      cb(null, `${randomBytes(14).toString("hex")}${ext}`);
-    },
-  }),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  storage: diskStorage,
+  limits: { fileSize: 500 * 1024 * 1024 },
+});
+
+export const msgUploadMulti = multer({
+  storage: diskStorage,
+  limits: { fileSize: 500 * 1024 * 1024, files: 20 },
 });
