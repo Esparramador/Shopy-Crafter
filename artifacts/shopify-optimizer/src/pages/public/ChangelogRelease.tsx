@@ -71,7 +71,7 @@ export default function ChangelogRelease() {
           </p>
         )}
 
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px", fontSize: 12 }}>
+        <h2 style={{ fontSize: 12, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 16, textTransform: "uppercase", letterSpacing: "0.5px" }}>
           Cambios incluidos
         </h2>
         <ul style={{ margin: "0 0 48px", paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>

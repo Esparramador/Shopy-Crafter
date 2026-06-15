@@ -288,14 +288,14 @@ export default function MeshyStudio() {
 
   const browserAnims = customModel
     ? apiClips.map(c => ({
-        id: c.id, label: c.label, category: c.category, looping: c.looping,
+        id: c.id, label: c.label, category: c.category, looping: c.looping, action_id: c.action_id,
         glbPath: `/assets/3d/animations/alec_monopoly/${c.id}.glb`,
       }))
     : selectedChar.animations
         .filter(a => a.name !== "rigged")
         .map(a => {
           const meta = apiClips.find(c => c.id === a.name);
-          return { id: a.name, label: a.label, category: meta?.category ?? "general", looping: a.looping ?? true, glbPath: a.glbPath };
+          return { id: a.name, label: a.label, category: meta?.category ?? "general", looping: a.looping ?? true, glbPath: a.glbPath, action_id: meta?.action_id ?? 0 };
         });
 
   const filteredClips = browserAnims.filter(c => {
