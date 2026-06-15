@@ -542,12 +542,29 @@ function getMasterLib(): any {
     const p = resolve(process.cwd(), "src/lib/master-prompt-library.json");
     try {
       _masterLib = JSON.parse(readFileSync(p, "utf-8"));
+      // Rebuild _meta.libraries index dynamically from actual libraries dict
+      // so new libraries added to the JSON are always visible without manual _meta edits
+      const libsObj = _masterLib.libraries || {};
+      const libsIndex = Object.entries(libsObj).map(([key, v]: [string, any]) => ({
+        key,
+        name: v.name || key,
+        count: Array.isArray(v.templates) ? v.templates.length : (v.count || 0),
+        category: v.category || "",
+        description: (v.description || "").slice(0, 120),
+      }));
+      if (!_masterLib._meta) _masterLib._meta = {};
+      _masterLib._meta.libraries = libsIndex;
+      _masterLib._meta.total_templates = libsIndex.reduce((s: number, l: any) => s + l.count, 0);
+      _masterLib._meta.total_libraries = libsIndex.length;
     } catch {
       _masterLib = { _meta: { libraries: [], total_templates: 0 }, libraries: {} };
     }
   }
   return _masterLib;
 }
+
+// Force reload the master library (call when the JSON file is updated)
+export function resetMasterLib() { _masterLib = null; }
 
 // GET /api/fs-pro/prompt-library-master?library=KEY&search=TEXT&limit=20&offset=0
 // Without params (or indexOnly=1) → returns the library index with counts only

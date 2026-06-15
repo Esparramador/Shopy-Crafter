@@ -92,6 +92,7 @@ const Tripo3DStudio = lazy(() => import("@/pages/projects/Tripo3DStudio"));
 const MeshyStudio = lazy(() => import("@/pages/projects/MeshyStudio"));
 const WebDesigner = lazy(() => import("@/pages/admin/WebDesigner"));
 const EffectsStudio = lazy(() => import("@/pages/admin/EffectsStudio"));
+const MCPManager = lazy(() => import("@/pages/admin/MCPManager"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -351,6 +352,9 @@ function Router() {
         </Route>
         <Route path="/admin/system">
           <RequireAdmin><AdminWrapper><AppLayout><S><SystemHealth /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/mcp-manager">
+          <RequireAdmin><AdminWrapper><AppLayout><S><MCPManager /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/vault">
           <RequireAdmin><AdminWrapper><AppLayout><S><GlobalVault /></S></AppLayout></AdminWrapper></RequireAdmin>

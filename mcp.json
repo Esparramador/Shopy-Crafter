@@ -9,6 +9,31 @@
         "STITCH_PROXY_PORT": "4123"
       },
       "description": "Google Stitch MCP — AI UI/UX design and code generation. Generate screens, list projects, download HTML/Tailwind UI assets."
+    },
+    "filesystem": {
+      "command": "node",
+      "args": ["node_modules/@modelcontextprotocol/server-filesystem/dist/index.js", "/home/runner/workspace"],
+      "description": "MCP filesystem server — read/write/list files and directories in the workspace. Useful for file-based operations, reading project assets, and managing uploads."
+    },
+    "memory": {
+      "command": "node",
+      "args": ["node_modules/@modelcontextprotocol/server-memory/dist/index.js"],
+      "description": "MCP memory server — persistent knowledge graph memory across sessions. Store and retrieve entities, relations, and observations for clients and brands."
+    },
+    "context7": {
+      "command": "node",
+      "args": ["node_modules/@upstash/context7-mcp/dist/index.js"],
+      "description": "Context7 MCP — up-to-date library documentation for any npm package, framework, or tool. Resolve /use [library-name] to inject accurate docs into code generation."
+    },
+    "puppeteer": {
+      "command": "node",
+      "args": ["node_modules/puppeteer-mcp-server/dist/index.js"],
+      "description": "Puppeteer MCP — browser automation: navigate URLs, take screenshots, extract page content, fill forms, click elements. Use for web scraping, visual audits, and page analysis."
+    },
+    "everything": {
+      "command": "node",
+      "args": ["node_modules/@modelcontextprotocol/server-everything/dist/index.js"],
+      "description": "MCP everything server — comprehensive test server with prompts, resources, sampling, and tool demonstrations. Use for testing MCP integrations and protocol features."
     }
   }
 }

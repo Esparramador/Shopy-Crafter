@@ -10,10 +10,15 @@
   },
   "private": true,
   "devDependencies": {
+    "@modelcontextprotocol/server-filesystem": "^2026.1.14",
+    "@modelcontextprotocol/server-memory": "^2026.1.26",
+    "@upstash/context7-mcp": "^3.2.1",
     "prettier": "^3.8.1",
+    "puppeteer-mcp-server": "^0.7.2",
     "typescript": "~5.9.2"
   },
   "dependencies": {
+    "@modelcontextprotocol/server-everything": "^2026.1.26",
     "pdfkit": "^0.18.0",
     "playwright": "^1.58.2",
     "puppeteer": "^24.40.0",

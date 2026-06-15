@@ -45,6 +45,12 @@ const EFFECT_CATEGORIES = [
   { key: "video_script", label: "Vídeo & Script", icon: "🎬", color: "#06b6d4", desc: "Guiones para UGC, reels y anuncios" },
   { key: "social_media", label: "Social Media", icon: "📱", color: "#f97316", desc: "Posts, captions y hashtags" },
   { key: "upsell", label: "Upsell & CRO", icon: "📈", color: "#34d399", desc: "Estrategias de conversión y venta cruzada" },
+  { key: "trail_of_bits_security", label: "Seguridad (Trail of Bits)", icon: "🛡️", color: "#ef4444", desc: "27 skills profesionales de auditoría y seguridad — código, supply chain, criptografía" },
+  { key: "claude_code_agents_ecc", label: "Agentes Claude Code", icon: "🤖", color: "#8b5cf6", desc: "64 agentes especializados — reviewers, architects, resolvers, optimizers para cada lenguaje" },
+  { key: "dev_workflow_skills", label: "Skills de Desarrollo", icon: "⚙️", color: "#0ea5e9", desc: "19 skills de workflow — API design, backend patterns, DB migrations, git workflow" },
+  { key: "animate_css_library", label: "Animaciones CSS (97)", icon: "✨", color: "#f59e0b", desc: "97 animaciones de animate.css — bounce, fade, flip, rotate, zoom. CDN + JS patterns" },
+  { key: "hover_css_library", label: "Hover Effects CSS (80)", icon: "🖱️", color: "#10b981", desc: "80 efectos hover de hover.css — 2D/3D transitions, underlines, backgrounds, bubbles" },
+  { key: "awesome_claude_code", label: "Awesome Claude Code", icon: "⭐", color: "#f97316", desc: "30 recursos curados del registry — top agent skills, workflows, MCP servers y templates" },
 ];
 
 const ENGINE_COLORS: Record<string, string> = {
@@ -703,7 +709,7 @@ export default function PromptLibrary() {
     return 0;
   });
 
-  const totalTemplates = libIndex.reduce((s, l) => s + l.count, 0) || 6132;
+  const totalTemplates = libIndex.reduce((s, l) => s + l.count, 0) || 6677;
 
   return (
     <div className="page-inner" style={{ maxWidth: 1100 }}>

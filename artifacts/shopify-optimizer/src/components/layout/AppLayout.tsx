@@ -69,6 +69,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Meshy Character Lab", icon: "🧊", href: "/admin/meshy-studio" },
   { label: "Effects Studio", icon: "✦", href: "/effects-studio" },
   { label: "AI Web Designer", icon: "🎨", href: "/web-designer" },
+  { label: "MCP Manager", icon: "🔌", href: "/admin/mcp-manager" },
 ];
 
 const DEFAULT_ADMIN_NAV = [
