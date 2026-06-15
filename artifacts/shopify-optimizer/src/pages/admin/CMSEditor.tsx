@@ -2094,7 +2094,7 @@ export default function CMSEditor() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
 
       {/* ── TOPBAR ──────────────────────────────────────────────────────── */}
       <div className="topbar-cms" style={{
