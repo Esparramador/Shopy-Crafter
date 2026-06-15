@@ -1,0 +1,18 @@
+{
+  "title": "dangerous-command-blocker",
+  "category": "security",
+  "description": "Bloquea comandos destructivos irreversibles antes de ejecutarse: rm -rf sobre raíz/home, Remove-Item -Recurse -Force, git push --force a main, git reset --hard a ramas protegidas, DROP/TRUNCATE/DELETE sin WHERE, mkfs, dd a discos físicos, fork bombs, chmod 777 recursivo y curl|sh remoto.",
+  "supportingFiles": [
+    { "source": "dangerous-command-blocker.py", "destination": ".claude/hooks/dangerous-command-blocker.py", "executable": true }
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/dangerous-command-blocker.py\"" }
+        ]
+      }
+    ]
+  }
+}

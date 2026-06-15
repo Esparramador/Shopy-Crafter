@@ -1,0 +1,18 @@
+{
+  "title": "env-file-protection",
+  "category": "security",
+  "description": "Impide la exfiltración del contenido de ficheros .env: bloquea cat/type/curl/scp/nc/Get-Content que vuelquen o envíen un .env a destinos externos, y los pipes del contenido de .env hacia peticiones de red.",
+  "supportingFiles": [
+    { "source": "env-file-protection.py", "destination": ".claude/hooks/env-file-protection.py", "executable": true }
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/env-file-protection.py\"" }
+        ]
+      }
+    ]
+  }
+}
