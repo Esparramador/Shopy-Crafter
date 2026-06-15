@@ -62,6 +62,11 @@ import stitchRouter from "./stitch.js";
 import publicQrRouter from "./public-qr.js";
 import publicChatRouter from "./public-chat.js";
 import promptExecRouter from "./prompt-exec.js";
+import amrRouter from "./amr.js";
+import skillsRouter from "./skills.js";
+import designSystemsRouter from "./design-systems.js";
+import pluginsRouter from "./plugins.js";
+import hyperframesRouter from "./hyperframes.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -158,5 +163,10 @@ router.use(tripo3dRouter);
 router.use(vismeRouter);
 router.use(webDesignerRouter);
 router.use(promptExecRouter);
+router.use(amrRouter);
+router.use(skillsRouter);
+router.use(designSystemsRouter);
+router.use(pluginsRouter);
+router.use(hyperframesRouter);
 
 export default router;
