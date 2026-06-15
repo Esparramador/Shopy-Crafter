@@ -19,7 +19,8 @@ import {
   upscaleImage, clarityUpscale, enhanceFaces,
   upscaleVideo, VIDEO_UPSCALE_MODELS, type VideoUpscaleEngine,
   cloneVoice, deleteCloneVoice, generateTTS, generateSFX, generateMusic,
-  generateVideoFromImage, composeAd, concatVideos, packAssetsAsZip,
+  generateVideoFromImage, extendXaiVideo, editXaiVideo,
+  composeAd, concatVideos, packAssetsAsZip,
   fetchToBuffer,
   CAMERA_PRESETS, TRANSITION_PRESETS,
   lipSyncVideoToAudio, transcribeAudioToSrt, burnSubtitlesIntoVideo,
@@ -1785,6 +1786,100 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
   } catch (err: any) {
     logger.error({ err }, "fs-pro generate-video failed");
     res.status(500).json({ error: err?.message || "Error generando video" });
+  }
+});
+
+// ─── xAI VIDEO EXTENSION ──────────────────────────────────────────────────
+// POST /api/fs-pro/extend-video
+// Body: { projectId, videoUrl, prompt, duration?, model? }
+// Extiende un vídeo existente por la cola (original + extensión concatenados).
+// El vídeo origen debe ser una URL pública (2-15s MP4).
+router.post("/fs-pro/extend-video", requireAdmin, async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const { projectId: pidStr, videoUrl, prompt, duration, model } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId || !videoUrl || !prompt) {
+      res.status(400).json({ error: "projectId, videoUrl, prompt requeridos" }); return;
+    }
+    if (typeof videoUrl !== "string" || !videoUrl.startsWith("http")) {
+      res.status(400).json({ error: "videoUrl debe ser una URL pública HTTP/HTTPS" }); return;
+    }
+    const VIDEO_CREDITS = 4;
+    const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const xaiModel = model === "grok-imagine-video-1.5-preview" ? "grok-imagine-video-1.5-preview" : "grok-imagine-video";
+    const extDur = Math.min(Math.max(parseInt(duration || "6"), 2), 10);
+
+    const buf = await extendXaiVideo(videoUrl, String(prompt).slice(0, 1500), extDur, xaiModel);
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-video-extend", category: "fusion-studio-pro",
+      title: `FS Pro Extender: ${String(prompt).slice(0, 60)}`,
+      mimeType: "video/mp4", generatedBy: `xai:extend:${xaiModel}`,
+      buffer: buf,
+    });
+    await recordUsage(projectId, "image", VIDEO_CREDITS);
+    learnFromOperation({
+      operationType: "fs_pro_extend_video",
+      title: `Vídeo extendido: ${String(prompt).slice(0, 80)}`,
+      content: `xAI extend-video ${xaiModel}, ${extDur}s extensión. Prompt: ${String(prompt).slice(0, 200)}`,
+      confidence: 0.85, tags: ["fusion-studio-pro", "video", "xai", "extend"],
+    });
+    res.json({ success: true, vaultId, sizeBytes: buf.length, model: xaiModel, extensionDurationSec: extDur });
+  } catch (err: any) {
+    logger.error({ err }, "fs-pro extend-video failed");
+    res.status(500).json({ error: err?.message || "Error extendiendo vídeo" });
+  }
+});
+
+// ─── xAI VIDEO EDITING ────────────────────────────────────────────────────
+// POST /api/fs-pro/edit-video
+// Body: { projectId, videoUrl, prompt, model? }
+// Edita el contenido de un vídeo corto (max 8.7s) con instrucciones de texto.
+router.post("/fs-pro/edit-video", requireAdmin, async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const { projectId: pidStr, videoUrl, prompt, model } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId || !videoUrl || !prompt) {
+      res.status(400).json({ error: "projectId, videoUrl, prompt requeridos" }); return;
+    }
+    if (typeof videoUrl !== "string" || !videoUrl.startsWith("http")) {
+      res.status(400).json({ error: "videoUrl debe ser una URL pública HTTP/HTTPS" }); return;
+    }
+    const VIDEO_CREDITS = 4;
+    const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const xaiModel = model === "grok-imagine-video-1.5-preview" ? "grok-imagine-video-1.5-preview" : "grok-imagine-video";
+
+    const buf = await editXaiVideo(videoUrl, String(prompt).slice(0, 1500), xaiModel);
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-video-edit", category: "fusion-studio-pro",
+      title: `FS Pro Edit Vídeo: ${String(prompt).slice(0, 60)}`,
+      mimeType: "video/mp4", generatedBy: `xai:edit-video:${xaiModel}`,
+      buffer: buf,
+    });
+    await recordUsage(projectId, "image", VIDEO_CREDITS);
+    learnFromOperation({
+      operationType: "fs_pro_edit_video",
+      title: `Vídeo editado: ${String(prompt).slice(0, 80)}`,
+      content: `xAI edit-video ${xaiModel}. Prompt: ${String(prompt).slice(0, 200)}`,
+      confidence: 0.85, tags: ["fusion-studio-pro", "video", "xai", "edit"],
+    });
+    res.json({ success: true, vaultId, sizeBytes: buf.length, model: xaiModel });
+  } catch (err: any) {
+    logger.error({ err }, "fs-pro edit-video failed");
+    res.status(500).json({ error: err?.message || "Error editando vídeo" });
   }
 });
 

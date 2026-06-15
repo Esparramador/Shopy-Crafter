@@ -7,7 +7,7 @@ const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "compose" | "protools" | "promptlab" | "cinematic-templates" | "downloads";
 
-type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs";
+type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai";
 type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
 interface ProviderHealth { provider: ProviderId; status: ProviderStatus; hasKey: boolean; detail?: string; checkedAt: number }
 type HealthMap = Record<ProviderId, ProviderHealth>;
@@ -55,7 +55,7 @@ function useProviderHealth(): { health: HealthMap | null; loading: boolean; refr
 }
 
 const PROVIDER_LABEL: Record<ProviderId, string> = {
-  replicate: "Replicate", runway: "Runway", gemini: "Gemini", elevenlabs: "ElevenLabs",
+  replicate: "Replicate", runway: "Runway", gemini: "Gemini", elevenlabs: "ElevenLabs", xai: "xAI (Grok)",
 };
 const STATUS_COLOR: Record<ProviderStatus, { bg: string; fg: string; border: string; emoji: string }> = {
   ok:              { bg: "rgba(45,212,159,0.15)", fg: "#2dd49f", border: "rgba(45,212,159,0.4)", emoji: "🟢" },
@@ -244,7 +244,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--t3, #6c6c7c)", textTransform: "uppercase", letterSpacing: 0.6, marginRight: 6 }}>
           Motores IA
         </span>
-        {(["replicate","runway","gemini","elevenlabs"] as ProviderId[]).map(p => (
+        {(["replicate","runway","gemini","elevenlabs","xai"] as ProviderId[]).map(p => (
           <ProviderBadge key={p} provider={p} health={health} />
         ))}
         <button onClick={() => refreshHealth(true)} disabled={healthLoading}
@@ -784,26 +784,29 @@ function EnhanceTab({ caps, projectId, onSuccess, onError }: { caps: Capabilitie
 // Modelos que NO soportan text-to-video puro → exigen imagen origen.
 const I2V_ONLY_MODELS = new Set(["runway-gen4-turbo", "runway-gen3-alpha", "wan-2.5-fast"]);
 
-type VideoMode = "t2v" | "i2v" | "v2v";
+type VideoMode = "t2v" | "i2v" | "extend" | "edit-video";
 
 function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }: { caps: Capabilities | null; health: HealthMap | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onCreditError?: () => void }) {
   const [mode, setMode] = useState<VideoMode>("i2v");
   const [model, setModel] = useState("seedance-fast");
+  const [xaiModel, setXaiModel] = useState<string>("grok-imagine-video");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(5);
+  const [extendDuration, setExtendDuration] = useState(6);
   const [aspect, setAspect] = useState("9:16");
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [cameraPreset, setCameraPreset] = useState<string>("");
   const [busy, setBusy] = useState(false);
 
   const modelCfg = caps?.videoGeneration.find(m => m.key === model);
-  const currentProvider = modelCfg?.provider;
+  const currentProvider = (mode === "extend" || mode === "edit-video") ? "xai" as ProviderId : modelCfg?.provider;
   const providerStatus = currentProvider ? health?.[currentProvider]?.status : undefined;
   const providerDown = providerStatus === "out_of_credits" || providerStatus === "down" || providerStatus === "missing_key";
   const fallback = useMemo(
-    () => providerDown && caps ? suggestFallback(caps.videoGeneration, model, health) : null,
-    [providerDown, caps, model, health],
+    () => providerDown && caps && mode !== "extend" && mode !== "edit-video" ? suggestFallback(caps.videoGeneration, model, health) : null,
+    [providerDown, caps, model, health, mode],
   );
 
   // Si el modelo seleccionado no soporta T2V, fuerza I2V automáticamente.
@@ -814,15 +817,38 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
   const run = async () => {
     if (!prompt.trim()) { onError("Prompt requerido"); return; }
     if (mode === "i2v" && !file && !sourceUrl) { onError("Imagen origen requerida en modo Imagen → Vídeo"); return; }
-    if (mode === "v2v") { onError("Vídeo → Vídeo aún no disponible. Usa ProTools → Motion transfer como alternativa."); return; }
+    if ((mode === "extend" || mode === "edit-video") && !videoUrl.trim()) {
+      onError("URL del vídeo origen requerida"); return;
+    }
     setBusy(true);
     try {
+      if (mode === "extend") {
+        const res = await fetch(`${API_BASE}/api/fs-pro/extend-video`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, videoUrl, prompt, duration: extendDuration, model: xaiModel }),
+        });
+        const d = await res.json();
+        if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+        onSuccess({ vaultId: d.vaultId, type: "video", label: `Ext: ${prompt.slice(0, 30)}`, mimeType: "video/mp4" });
+        return;
+      }
+      if (mode === "edit-video") {
+        const res = await fetch(`${API_BASE}/api/fs-pro/edit-video`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, videoUrl, prompt, model: xaiModel }),
+        });
+        const d = await res.json();
+        if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+        onSuccess({ vaultId: d.vaultId, type: "video", label: `Edit: ${prompt.slice(0, 30)}`, mimeType: "video/mp4" });
+        return;
+      }
       const fd = new FormData();
       fd.append("projectId", String(projectId));
       fd.append("model", model); fd.append("prompt", prompt);
       fd.append("duration", String(duration)); fd.append("aspect", aspect);
       if (cameraPreset) fd.append("cameraPreset", cameraPreset);
-      // En T2V puro NO se envía imagen aunque haya quedado seleccionada.
       if (mode === "i2v") {
         if (file) fd.append("image", file);
         if (sourceUrl) fd.append("sourceImageUrl", sourceUrl);
@@ -844,12 +870,16 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
   };
 
   const modelSupportsT2V = !I2V_ONLY_MODELS.has(model);
+  const isXaiMode = mode === "extend" || mode === "edit-video";
+
+  const xaiHealthStatus = health?.["xai"]?.status;
+  const xaiDown = xaiHealthStatus === "out_of_credits" || xaiHealthStatus === "down" || xaiHealthStatus === "missing_key";
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
         <Section title="Modo de generación">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
             <button
               onClick={() => setMode("t2v")}
               disabled={!modelSupportsT2V}
@@ -864,13 +894,19 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
               <div style={{ fontSize: 11, fontWeight: 700 }}>Imagen → Vídeo</div>
               <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Animar foto</div>
             </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             <button
-              onClick={() => setMode("v2v")}
-              disabled
-              title="Próximamente — usa ProTools → Motion transfer"
-              style={{ ...cardButton(false), opacity: 0.45, cursor: "not-allowed", padding: "10px 8px" }}>
-              <div style={{ fontSize: 11, fontWeight: 700 }}>Vídeo → Vídeo</div>
-              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Próximamente</div>
+              onClick={() => setMode("extend")}
+              style={{ ...cardButton(mode === "extend"), padding: "10px 8px", borderColor: mode === "extend" ? "#7c3aed" : undefined }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>⟳ Extender Vídeo</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>xAI · +2-10s</div>
+            </button>
+            <button
+              onClick={() => setMode("edit-video")}
+              style={{ ...cardButton(mode === "edit-video"), padding: "10px 8px", borderColor: mode === "edit-video" ? "#7c3aed" : undefined }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>✏️ Editar Vídeo</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>xAI · max 8.7s</div>
             </button>
           </div>
           {mode === "t2v" && (
@@ -878,93 +914,200 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
               Modo Texto → Vídeo: el modelo genera el clip a partir del prompt sin imagen origen. Disponible en Veo, Kling, Seedance y Hailuo.
             </p>
           )}
-        </Section>
-        <Section title="Modelo">
-          {providerDown && (
-            <div style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
-              ⚠️ <strong>{PROVIDER_LABEL[currentProvider!]}</strong> está {statusLabel(providerStatus!)}.
-              {fallback && <> Sugerencia: <button onClick={() => setModel(fallback.key)} style={{ background: "transparent", border: "none", color: "#fbbf24", textDecoration: "underline", cursor: "pointer", padding: 0, fontSize: 11, fontWeight: 700 }}>{fallback.label}</button> ({PROVIDER_LABEL[fallback.provider!]}).</>}
-            </div>
+          {mode === "extend" && (
+            <p style={{ fontSize: 10, color: "var(--t3)", margin: "8px 0 0", lineHeight: 1.4 }}>
+              xAI Grok Imagine Video extiende el vídeo por la cola. El resultado combina el original + la extensión. Requiere URL pública del vídeo origen (2-15s MP4).
+            </p>
           )}
-          {caps?.videoGeneration.map(m => (
-            <button key={m.key} onClick={() => setModel(m.key)} style={{ ...cardButton(model === m.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
-                <strong style={{ fontSize: 12 }}>{m.label}</strong>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <ProviderBadge provider={m.provider} health={health} compact />
-                  <span style={{ fontSize: 10, color: "var(--gold)" }}>~€{m.costPerSec}/s · Q{m.quality}/10</span>
-                </div>
-              </div>
-              <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{m.description}</div>
-            </button>
-          ))}
+          {mode === "edit-video" && (
+            <p style={{ fontSize: 10, color: "var(--t3)", margin: "8px 0 0", lineHeight: 1.4 }}>
+              xAI Grok edita el contenido del vídeo siguiendo instrucciones en lenguaje natural. El output mantiene la resolución original (máx 720p). Requiere URL pública del vídeo (máx 8.7s MP4).
+            </p>
+          )}
         </Section>
+
+        {isXaiMode ? (
+          <Section title="Modelo xAI">
+            {xaiDown && (
+              <div style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
+                ⚠️ <strong>xAI (Grok)</strong> está {statusLabel(xaiHealthStatus!)}. Verifica que XAI_API_KEY está configurada.
+              </div>
+            )}
+            <ProviderBadge provider="xai" health={health} />
+            <div style={{ marginTop: 8 }}>
+              {[
+                { key: "grok-imagine-video", label: "Grok Imagine Video", desc: "Estándar — 720p, hasta 15s, $0.07/s" },
+                { key: "grok-imagine-video-1.5-preview", label: "Grok Imagine Video 1.5 Preview", desc: "Mayor calidad — 720p, hasta 15s, $0.14/s" },
+              ].map(m => (
+                <button key={m.key} onClick={() => setXaiModel(m.key)} style={{ ...cardButton(xaiModel === m.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
+                  <strong style={{ fontSize: 12 }}>{m.label}</strong>
+                  <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{m.desc}</div>
+                </button>
+              ))}
+            </div>
+          </Section>
+        ) : (
+          <Section title="Modelo">
+            {providerDown && (
+              <div style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", color: "#ef4444", fontSize: 11, lineHeight: 1.4 }}>
+                ⚠️ <strong>{PROVIDER_LABEL[currentProvider!]}</strong> está {statusLabel(providerStatus!)}.
+                {fallback && <> Sugerencia: <button onClick={() => setModel(fallback.key)} style={{ background: "transparent", border: "none", color: "#fbbf24", textDecoration: "underline", cursor: "pointer", padding: 0, fontSize: 11, fontWeight: 700 }}>{fallback.label}</button> ({PROVIDER_LABEL[fallback.provider!]}).</>}
+              </div>
+            )}
+            {caps?.videoGeneration.filter(m => m.provider !== "xai").map(m => (
+              <button key={m.key} onClick={() => setModel(m.key)} style={{ ...cardButton(model === m.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+                  <strong style={{ fontSize: 12 }}>{m.label}</strong>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <ProviderBadge provider={m.provider} health={health} compact />
+                    <span style={{ fontSize: 10, color: "var(--gold)" }}>~€{m.costPerSec}/s · Q{m.quality}/10</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{m.description}</div>
+              </button>
+            ))}
+            {caps?.videoGeneration.filter(m => m.provider === "xai").length! > 0 && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--bdr)" }}>
+                <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 6 }}>xAI Grok (T2V/I2V):</div>
+                {caps?.videoGeneration.filter(m => m.provider === "xai").map(m => (
+                  <button key={m.key} onClick={() => setModel(m.key)} style={{ ...cardButton(model === m.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+                      <strong style={{ fontSize: 12 }}>{m.label}</strong>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <ProviderBadge provider={m.provider} health={health} compact />
+                        <span style={{ fontSize: 10, color: "var(--gold)" }}>~€{m.costPerSec}/s · Q{m.quality}/10</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{m.description}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
       </div>
       <div>
         <Section title="Prompt">
           <div style={{ position: "relative" }}>
-            <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Cinematic dolly-in product reveal, soft golden lighting, slow motion at 30fps..." style={{ ...inputStyle, minHeight: 100 }} />
+            <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
+              placeholder={
+                mode === "extend" ? "Continúa con la escena: el producto emerge del agua..." :
+                mode === "edit-video" ? "Cambia el fondo a blanco, elimina el logotipo..." :
+                "Cinematic dolly-in product reveal, soft golden lighting, slow motion at 30fps..."
+              }
+              style={{ ...inputStyle, minHeight: 100 }} />
             {prompt.trim().length >= 3 && (
               <VideoPromptEnhanceBtn prompt={prompt} setPrompt={setPrompt} projectId={projectId} />
             )}
           </div>
         </Section>
-        <Section title="Duración / Aspecto">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>{duration}s</div>
-              <input type="range" min={3} max={10} value={duration} onChange={e => setDuration(parseInt(e.target.value))} style={{ width: "100%" }} />
-            </div>
-            <div style={{ display: "flex", gap: 4 }}>
-              {["9:16", "16:9", "1:1", "4:5"].map(a => (
-                <button key={a} onClick={() => setAspect(a)} style={pillButton(aspect === a)}>{a}</button>
-              ))}
-            </div>
-          </div>
-        </Section>
-        {mode === "i2v" && (
-          <Section title="Imagen origen (requerida)">
-            <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
-            <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0" }}>O URL pública:</p>
-            <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
-          </Section>
-        )}
-        {mode === "t2v" && (
-          <Section title="Imagen origen">
-            <p style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.4, margin: 0 }}>
-              No se usa imagen en modo Texto → Vídeo. Cambia a "Imagen → Vídeo" si quieres animar una foto concreta.
-            </p>
-          </Section>
-        )}
-        {caps?.cameraPresets && caps.cameraPresets.length > 0 && (
-          <Section title="Movimiento de cámara (preset)">
-            <select value={cameraPreset} onChange={e => setCameraPreset(e.target.value)} style={inputStyle}>
-              <option value="">Sin preset (libre)</option>
-              {caps.cameraPresets.map(p => (
-                <option key={p.key} value={p.key}>{p.label}</option>
-              ))}
-            </select>
-            {cameraPreset && (
-              <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0 0" }}>
-                {caps.cameraPresets.find(p => p.key === cameraPreset)?.description}
+
+        {isXaiMode ? (
+          <>
+            <Section title="Vídeo origen (URL pública)">
+              <input
+                value={videoUrl}
+                onChange={e => setVideoUrl(e.target.value)}
+                placeholder="https://cdn.example.com/video.mp4"
+                style={inputStyle}
+              />
+              <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0 0", lineHeight: 1.4 }}>
+                {mode === "extend"
+                  ? "MP4 de 2-15s. El resultado será el vídeo original + la extensión concatenados."
+                  : "MP4 de máx 8.7s. El output mantiene la resolución del original (capado a 720p)."}
               </p>
+            </Section>
+            {mode === "extend" && (
+              <Section title={`Duración extensión: ${extendDuration}s`}>
+                <input
+                  type="range" min={2} max={10} value={extendDuration}
+                  onChange={e => setExtendDuration(parseInt(e.target.value))}
+                  style={{ width: "100%" }}
+                />
+                <p style={{ fontSize: 10, color: "var(--t3)", margin: "4px 0 0" }}>
+                  Duración de la parte añadida (2-10s). El original se mantiene intacto.
+                </p>
+              </Section>
             )}
-          </Section>
+          </>
+        ) : (
+          <>
+            <Section title="Duración / Aspecto">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>{duration}s</div>
+                  <input type="range" min={3} max={15} value={duration} onChange={e => setDuration(parseInt(e.target.value))} style={{ width: "100%" }} />
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {["9:16", "16:9", "1:1", "4:5"].map(a => (
+                    <button key={a} onClick={() => setAspect(a)} style={pillButton(aspect === a)}>{a}</button>
+                  ))}
+                </div>
+              </div>
+            </Section>
+            {mode === "i2v" && (
+              <Section title="Imagen origen (requerida)">
+                <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
+                <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0" }}>O URL pública:</p>
+                <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
+              </Section>
+            )}
+            {mode === "t2v" && (
+              <Section title="Imagen origen">
+                <p style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.4, margin: 0 }}>
+                  No se usa imagen en modo Texto → Vídeo. Cambia a "Imagen → Vídeo" si quieres animar una foto concreta.
+                </p>
+              </Section>
+            )}
+            {caps?.cameraPresets && caps.cameraPresets.length > 0 && (
+              <Section title="Movimiento de cámara (preset)">
+                <select value={cameraPreset} onChange={e => setCameraPreset(e.target.value)} style={inputStyle}>
+                  <option value="">Sin preset (libre)</option>
+                  {caps.cameraPresets.map(p => (
+                    <option key={p.key} value={p.key}>{p.label}</option>
+                  ))}
+                </select>
+                {cameraPreset && (
+                  <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0 0" }}>
+                    {caps.cameraPresets.find(p => p.key === cameraPreset)?.description}
+                  </p>
+                )}
+              </Section>
+            )}
+          </>
         )}
+
         <button onClick={run} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
-          {busy ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />} {busy ? "Generando video..." : "Generar video (1-3 min)"}
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />}
+          {busy
+            ? (mode === "extend" ? "Extendiendo vídeo..." : mode === "edit-video" ? "Editando vídeo..." : "Generando video...")
+            : (mode === "extend" ? "Extender vídeo (xAI, 2-4 min)" : mode === "edit-video" ? "Editar vídeo (xAI, 2-4 min)" : "Generar video (1-3 min)")}
         </button>
         <LiveOperation
           active={busy}
-          title="Generando video con IA"
-          estimatedSec={150}
-          messages={[
-            "Enviando prompt y frame de origen al modelo de video…",
-            "Renderizando 24-30 fps por segundo de salida…",
-            "El proceso completo tarda 1-3 minutos según duración.",
-            "El servidor sigue trabajando aunque cierres la pestaña.",
-            "Codificando MP4 final y subiendo al Vault…",
-          ]}
+          title={mode === "extend" ? "Extendiendo vídeo con xAI Grok" : mode === "edit-video" ? "Editando vídeo con xAI Grok" : "Generando video con IA"}
+          estimatedSec={mode === "extend" || mode === "edit-video" ? 180 : 150}
+          messages={
+            mode === "extend" ? [
+              "Enviando vídeo origen y prompt a xAI Grok Imagine Video…",
+              "Generando la extensión (nuevas escenas por la cola)…",
+              "Concatenando original + extensión en un solo MP4…",
+              "El servidor sigue trabajando aunque cierres la pestaña.",
+              "Subiendo vídeo extendido al Vault…",
+            ] : mode === "edit-video" ? [
+              "Enviando vídeo y prompt de edición a xAI Grok Imagine Video…",
+              "Aplicando cambios: reencuadre, fondo, objetos, estilo…",
+              "El output mantiene la resolución del original (máx 720p).",
+              "El servidor sigue trabajando aunque cierres la pestaña.",
+              "Subiendo vídeo editado al Vault…",
+            ] : [
+              "Enviando prompt y frame de origen al modelo de video…",
+              "Renderizando 24-30 fps por segundo de salida…",
+              "El proceso completo tarda 1-3 minutos según duración.",
+              "El servidor sigue trabajando aunque cierres la pestaña.",
+              "Codificando MP4 final y subiendo al Vault…",
+            ]
+          }
           className="w-full mt-3"
         />
       </div>

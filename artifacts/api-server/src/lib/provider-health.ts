@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVIDER HEALTH CHECK
 // Verifica disponibilidad y saldo de cada API (Replicate, Runway, Gemini,
-// ElevenLabs) sin gastar créditos. Usa endpoints de cuenta/usuario que son
-// gratuitos y devuelven 200 si la API key es válida y la cuenta está activa.
+// ElevenLabs, xAI) sin gastar créditos. Usa endpoints de cuenta/usuario que
+// son gratuitos y devuelven 200 si la API key es válida y la cuenta está activa.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs";
+export type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai";
 
 export type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
 
@@ -56,7 +56,6 @@ async function checkRunway(): Promise<ProviderHealth> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    // Runway usa /v1/organization para devolver datos de cuenta y créditos.
     const res = await fetch("https://api.dev.runwayml.com/v1/organization", {
       headers: { Authorization: `Bearer ${key}`, "X-Runway-Version": "2024-11-06" },
       signal: ctrl.signal,
@@ -66,7 +65,6 @@ async function checkRunway(): Promise<ProviderHealth> {
     if (res.status === 402)                       return { provider: "runway", status: "out_of_credits", hasKey: true, detail: "402 sin saldo", checkedAt };
     if (res.status === 429)                       return { provider: "runway", status: "rate_limited", hasKey: true, detail: "429 rate limit", checkedAt };
     if (!res.ok)                                  return { provider: "runway", status: "down", hasKey: true, detail: `HTTP ${res.status}`, checkedAt };
-    // Si la respuesta trae créditos, los exponemos como detail.
     let detail: string | undefined;
     try {
       const j: any = await res.json();
@@ -86,7 +84,6 @@ async function checkGemini(): Promise<ProviderHealth> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    // Llamada barata: listar modelos disponibles (no consume cuota de generación).
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`, {
       signal: ctrl.signal,
     });
@@ -134,16 +131,39 @@ async function checkElevenLabs(): Promise<ProviderHealth> {
   }
 }
 
+async function checkXai(): Promise<ProviderHealth> {
+  const key = process.env.XAI_API_KEY;
+  const checkedAt = Date.now();
+  if (!key) return { provider: "xai", status: "missing_key", hasKey: false, checkedAt };
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    // Llamada barata: listar modelos disponibles (no consume cuota de generación).
+    const res = await fetch("https://api.x.ai/v1/models", {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (res.status === 401 || res.status === 403) return { provider: "xai", status: "missing_key", hasKey: true, detail: `auth ${res.status}`, checkedAt };
+    if (res.status === 402)                       return { provider: "xai", status: "out_of_credits", hasKey: true, detail: "402 sin saldo", checkedAt };
+    if (res.status === 429)                       return { provider: "xai", status: "rate_limited", hasKey: true, detail: "429 rate limit", checkedAt };
+    if (!res.ok)                                  return { provider: "xai", status: "down", hasKey: true, detail: `HTTP ${res.status}`, checkedAt };
+    return { provider: "xai", status: "ok", hasKey: true, checkedAt };
+  } catch (e: any) {
+    return { provider: "xai", status: "down", hasKey: true, detail: e?.message || "fetch error", checkedAt };
+  }
+}
+
 // ── Cache 60s para evitar machacar las APIs en cada render del frontend.
 let _cache: { ts: number; data: Record<ProviderId, ProviderHealth> } | null = null;
 const CACHE_TTL_MS = 60_000;
 
 export async function getAllProvidersHealth(forceFresh = false): Promise<Record<ProviderId, ProviderHealth>> {
   if (!forceFresh && _cache && Date.now() - _cache.ts < CACHE_TTL_MS) return _cache.data;
-  const [replicate, runway, gemini, elevenlabs] = await Promise.all([
-    checkReplicate(), checkRunway(), checkGemini(), checkElevenLabs(),
+  const [replicate, runway, gemini, elevenlabs, xai] = await Promise.all([
+    checkReplicate(), checkRunway(), checkGemini(), checkElevenLabs(), checkXai(),
   ]);
-  const data: Record<ProviderId, ProviderHealth> = { replicate, runway, gemini, elevenlabs };
+  const data: Record<ProviderId, ProviderHealth> = { replicate, runway, gemini, elevenlabs, xai };
   _cache = { ts: Date.now(), data };
   return data;
 }

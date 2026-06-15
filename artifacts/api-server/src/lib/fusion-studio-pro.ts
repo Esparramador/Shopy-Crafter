@@ -98,6 +98,28 @@ function getElevenKey(): string {
   return k;
 }
 
+function getXaiKey(): string {
+  const k = process.env.XAI_API_KEY;
+  if (!k) throw new Error("XAI_API_KEY no configurada — contacta al administrador");
+  return k;
+}
+
+async function pollXaiVideo(requestId: string, apiKey: string, timeoutMs = 6 * 60_000): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 6_000));
+    const res = await fetch(`https://api.x.ai/v1/videos/${requestId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) continue;
+    const data = await res.json() as { status: string; video?: { url: string } };
+    if (data.status === "done" && data.video?.url) return data.video.url;
+    if (data.status === "expired") throw new Error("xAI video request expirado");
+    if (data.status === "failed") throw new Error("xAI video generation falló");
+  }
+  throw new Error("xAI video timeout (>6 min)");
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CAPABILITY 1: IMAGE GENERATION (text-to-image, multiple PRO models)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -130,10 +152,12 @@ export type ImageGenModel =
   | "gpt-image-1"              // OpenAI gpt-image-1 (vía Replit AI Integrations)
   | "gpt-image-2"              // OpenAI gpt-image-2 — flagship 2026, razonamiento integrado
   | "gpt-image-1.5"            // OpenAI gpt-image-1.5 — 20% más barato que v1, misma calidad
-  | "gpt-image-1-mini";        // OpenAI gpt-image-1 mini — presupuesto, alta velocidad
+  | "gpt-image-1-mini"         // OpenAI gpt-image-1 mini — presupuesto, alta velocidad
+  | "grok-imagine-image"        // xAI Grok Imagine — generación de imagen T2I ($0.02/img)
+  | "grok-imagine-image-quality"; // xAI Grok Imagine Quality — alta calidad ($0.05/img 1K, $0.07/img 2K)
 
 // ImageProvider explícito para health-check / fallback automático en frontend.
-export type ImageProvider = "replicate" | "gemini" | "runway" | "openai";
+export type ImageProvider = "replicate" | "gemini" | "runway" | "openai" | "xai";
 
 export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; replicateId?: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }> = {
   "flux-1.1-pro-ultra":     { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Top photoreal 4MP, mejor calidad fotográfica", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
@@ -163,7 +187,9 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "gpt-image-1":            { provider: "openai", description: "OpenAI gpt-image-1 — render limpio, manejo de texto", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
   "gpt-image-2":            { provider: "openai", description: "OpenAI gpt-image-2 — flagship 2026, razonamiento integrado, máxima calidad fotorrealista", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3","21:9"], maxResolution: "1536x864 (flex)" },
   "gpt-image-1.5":          { provider: "openai", description: "OpenAI gpt-image-1.5 — 20% más barato que v1, calidad equivalente", costPerImage: 0.033, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
-  "gpt-image-1-mini":       { provider: "openai", description: "OpenAI gpt-image-1 mini — presupuesto, alta velocidad, ideal para volumen", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1024x1024" },
+  "gpt-image-1-mini":             { provider: "openai", description: "OpenAI gpt-image-1 mini — presupuesto, alta velocidad, ideal para volumen", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1024x1024" },
+  "grok-imagine-image":           { provider: "xai",   description: "xAI Grok Imagine — generación de imagen rápida y barata ($0.02/img)", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1K" },
+  "grok-imagine-image-quality":   { provider: "xai",   description: "xAI Grok Imagine Quality — alta calidad 1K/2K, mejor coherencia visual ($0.05/img)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "2K" },
 };
 
 // Modelos de edición de imagen mapeados a provider para el health-check.
@@ -235,6 +261,35 @@ export async function generateImage(
     const base64 = response.data?.[0]?.b64_json;
     if (!base64) throw new Error(`${model} no devolvió imagen`);
     return { buffer: Buffer.from(base64, "base64"), mimeType: "image/png", model };
+  }
+
+  // ── xAI Grok Imagine (image generation)
+  if (model === "grok-imagine-image" || model === "grok-imagine-image-quality") {
+    const key = getXaiKey();
+    const xaiAspectMap: Record<string, string> = {
+      "1:1": "1:1", "16:9": "16:9", "9:16": "9:16", "4:3": "4:3",
+      "3:4": "3:4", "3:2": "3:2", "2:3": "2:3",
+    };
+    const xaiAspect = xaiAspectMap[aspect] || "1:1";
+    const xaiModel = model === "grok-imagine-image-quality" ? "grok-imagine-image-quality" : "grok-imagine-image";
+    const res = await fetch("https://api.x.ai/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: xaiModel,
+        prompt,
+        n: 1,
+        aspect_ratio: xaiAspect,
+        resolution: model === "grok-imagine-image-quality" ? "2K" : "1K",
+        response_format: "url",
+      }),
+    });
+    if (!res.ok) throw new Error(`xAI image failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
+    const data = await res.json() as { data: Array<{ url: string }> };
+    const imgUrl = data.data?.[0]?.url;
+    if (!imgUrl) throw new Error("xAI Grok Imagine: no se devolvió URL de imagen");
+    const buffer = await fetchToBuffer(imgUrl);
+    return { buffer, mimeType: "image/jpeg", model };
   }
 
   // ── Nano Banana v1 / v2 (Gemini → Replicate fallback)
@@ -802,9 +857,11 @@ export type VideoModel =
   | "veo-4-fast"             // Google Veo 4 Fast — Veo 4 más rápido y barato
   | "minimax-video-01"       // MiniMax Video-01 — modelo base de MiniMax, alternativa a Hailuo
   | "wan-2.6"                // Wan 2.6 — nueva gen open-source, mejor que Wan 2.5
-  | "runway-gen5";           // Runway Gen 5 — nueva generación 2026 de Runway
+  | "runway-gen5"            // Runway Gen 5 — nueva generación 2026 de Runway
+  | "grok-imagine-video"     // xAI Grok Imagine Video — T2V/I2V ($0.07/s 720p)
+  | "grok-imagine-video-1.5"; // xAI Grok Imagine Video 1.5 Preview — mayor calidad ($0.14/s 720p)
 
-export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
+export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini" | "xai"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
   "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
   "runway-gen3-alpha":  { provider: "runway",                                                description: "Runway Gen-3 Alpha — buena calidad, mejor precio",               costPerSec: 0.05, quality: 8,  maxDuration: 10 },
   "veo-3.1":            { provider: "gemini",    modelId: "veo-3.1-generate-preview",       description: "Google Veo 3.1 — última gen + audio nativo, 16:9 / 9:16 (8s)",   costPerSec: 0.75, quality: 10, maxDuration: 8  },
@@ -833,7 +890,9 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "veo-4-fast":          { provider: "gemini",    modelId: "veo-4.0-fast-generate-preview",   description: "Google Veo 4 Fast — Veo 4 rápido y barato, audio nativo (8s)",               costPerSec: 0.55,  quality: 9,  maxDuration: 8  },
   "minimax-video-01":    { provider: "replicate", modelId: "minimax/video-01",                description: "MiniMax Video-01 — modelo base de MiniMax (precursor de Hailuo)",            costPerSec: 0.05,  quality: 8,  maxDuration: 6  },
   "wan-2.6":             { provider: "replicate", modelId: "wan-video/wan-2.6-i2v",           description: "Wan 2.6 — nueva gen open-source, mayor detalle y duración que 2.5",          costPerSec: 0.05,  quality: 8,  maxDuration: 6  },
-  "runway-gen5":         { provider: "runway",                                                 description: "Runway Gen 5 — nueva generación 2026, motion física realista (10s)",         costPerSec: 0.08,  quality: 10, maxDuration: 10 },
+  "runway-gen5":           { provider: "runway",   description: "Runway Gen 5 — nueva generación 2026, motion física realista (10s)", costPerSec: 0.08, quality: 10, maxDuration: 10 },
+  "grok-imagine-video":    { provider: "xai", modelId: "grok-imagine-video",           description: "xAI Grok Imagine Video — T2V/I2V, hasta 15s, 720p ($0.07/s)", costPerSec: 0.07, quality: 9,  maxDuration: 15 },
+  "grok-imagine-video-1.5":{ provider: "xai", modelId: "grok-imagine-video-1.5-preview", description: "xAI Grok Imagine Video 1.5 Preview — mayor calidad, 720p ($0.14/s)", costPerSec: 0.14, quality: 10, maxDuration: 15 },
 };
 
 // Modelos que soportan TEXT-TO-VIDEO puro (sin imagen origen).
@@ -866,8 +925,10 @@ const T2V_SUPPORTED: Record<VideoModel, boolean> = {
   "veo-4":                true,
   "veo-4-fast":           true,
   "minimax-video-01":     true,
-  "wan-2.6":              false,
-  "runway-gen5":          false,
+  "wan-2.6":                false,
+  "runway-gen5":            false,
+  "grok-imagine-video":     true,  // xAI soporta T2V puro y también I2V
+  "grok-imagine-video-1.5": true,
 };
 
 export function modelSupportsTextToVideo(model: VideoModel): boolean {
@@ -1083,6 +1144,34 @@ export async function generateVideoFromImage(
     throw new Error("Runway timed out");
   }
 
+  // ── xAI Grok Imagine Video (T2V + I2V) ───────────────────────────────────
+  if (cfg.provider === "xai") {
+    const key = getXaiKey();
+    const xaiAspectMap: Record<string, string> = {
+      "9:16": "9:16", "16:9": "16:9", "1:1": "1:1",
+      "4:3": "4:3", "3:4": "3:4", "3:2": "3:2", "2:3": "2:3",
+    };
+    const body: any = {
+      model: cfg.modelId!,
+      prompt,
+      duration: Math.min(Math.max(duration, 1), 15),
+      aspect_ratio: xaiAspectMap[opts.aspect || "9:16"] || "9:16",
+      resolution: "720p",
+    };
+    if (imageBuffer) {
+      body.image = { url: bufferToDataUri(imageBuffer, imageMime) };
+    }
+    const createRes = await fetch("https://api.x.ai/v1/videos/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!createRes.ok) throw new Error(`xAI video create failed: ${createRes.status} ${(await createRes.text()).slice(0, 300)}`);
+    const { request_id } = await createRes.json() as { request_id: string };
+    const videoUrl = await pollXaiVideo(request_id, key);
+    return await fetchToBuffer(videoUrl);
+  }
+
   // Replicate (T2V o I2V según haya imagen)
   if (!cfg.modelId) throw new Error(`Modelo ${model} sin modelId`);
   const token = getReplicateToken(opts.replicateToken);
@@ -1125,6 +1214,63 @@ export async function generateVideoFromImage(
   }
 
   return await replicateRunBuffer(cfg.modelId, input, token);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 10b: xAI VIDEO EXTENSION + EDITING
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Extiende un vídeo existente por la cola usando xAI Grok Imagine Video.
+ * El resultado es el vídeo original + la extensión concatenados.
+ *
+ * @param videoUrl  URL pública del vídeo origen (2-15s MP4). Acepta data-URI base64.
+ * @param prompt    Descripción de qué debe ocurrir en la extensión.
+ * @param extensionDurationSec  Duración de la extensión (2-10s, default 6).
+ * @param model     Modelo xAI a usar (default: grok-imagine-video).
+ */
+export async function extendXaiVideo(
+  videoUrl: string,
+  prompt: string,
+  extensionDurationSec = 6,
+  model: "grok-imagine-video" | "grok-imagine-video-1.5-preview" = "grok-imagine-video",
+): Promise<Buffer> {
+  const key = getXaiKey();
+  const dur = Math.min(Math.max(extensionDurationSec, 2), 10);
+  const createRes = await fetch("https://api.x.ai/v1/videos/extensions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, prompt, duration: dur, video: { url: videoUrl } }),
+  });
+  if (!createRes.ok) throw new Error(`xAI extend-video failed: ${createRes.status} ${(await createRes.text()).slice(0, 300)}`);
+  const { request_id } = await createRes.json() as { request_id: string };
+  const outUrl = await pollXaiVideo(request_id, key, 10 * 60_000);
+  return await fetchToBuffer(outUrl);
+}
+
+/**
+ * Edita el contenido de un vídeo corto (max 8.7s) siguiendo instrucciones en lenguaje natural.
+ * El output mantiene las especificaciones del input (resolución capada a 720p).
+ *
+ * @param videoUrl  URL pública del vídeo origen (max 8.7s MP4). Acepta data-URI base64.
+ * @param prompt    Instrucción de edición (qué cambiar, qué añadir, qué quitar).
+ * @param model     Modelo xAI a usar (default: grok-imagine-video).
+ */
+export async function editXaiVideo(
+  videoUrl: string,
+  prompt: string,
+  model: "grok-imagine-video" | "grok-imagine-video-1.5-preview" = "grok-imagine-video",
+): Promise<Buffer> {
+  const key = getXaiKey();
+  const createRes = await fetch("https://api.x.ai/v1/videos/edits", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, prompt, video: { url: videoUrl } }),
+  });
+  if (!createRes.ok) throw new Error(`xAI edit-video failed: ${createRes.status} ${(await createRes.text()).slice(0, 300)}`);
+  const { request_id } = await createRes.json() as { request_id: string };
+  const outUrl = await pollXaiVideo(request_id, key, 10 * 60_000);
+  return await fetchToBuffer(outUrl);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
