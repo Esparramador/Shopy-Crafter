@@ -117,6 +117,7 @@ router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
   try {
     const id = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
     const gradeFilter = req.query.grade as string | undefined;
+    const searchFilter = (req.query.search as string | undefined)?.toLowerCase().trim();
   
     let query = db
       .select()
@@ -125,8 +126,11 @@ router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
       .orderBy(desc(productsTable.auditScore));
   
     const allProducts = await query;
-    const filtered = gradeFilter
-      ? allProducts.filter((p) => p.auditGrade === gradeFilter)
+    const filtered = (gradeFilter || searchFilter)
+      ? allProducts.filter((p) =>
+          (!gradeFilter || p.auditGrade === gradeFilter) &&
+          (!searchFilter || p.handle?.toLowerCase().includes(searchFilter) || p.title?.toLowerCase().includes(searchFilter))
+        )
       : allProducts;
   
     const page = parseInt(req.query.page as string ?? "1", 10);

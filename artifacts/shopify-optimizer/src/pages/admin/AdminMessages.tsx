@@ -142,9 +142,11 @@ export default function AdminMessages() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
 
   const handleProductNav = useCallback((handle: string) => {
-    const params = new URLSearchParams({ search: handle });
-    if (selected) params.set("project", String(selected.id));
-    navigate(`/admin/products?${params.toString()}`);
+    if (selected) {
+      navigate(`/projects/${selected.id}/audit?product=${encodeURIComponent(handle)}`);
+    } else {
+      navigate(`/admin/products?search=${encodeURIComponent(handle)}`);
+    }
   }, [navigate, selected]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

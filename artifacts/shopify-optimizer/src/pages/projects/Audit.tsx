@@ -11,7 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import{ RefreshCw, Search, AlertCircle, TrendingUp, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff, Film, Box }from "lucide-react";
 import CreateAdModal from "@/components/CreateAdModal";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import SaveReportButton from "@/components/SaveReportButton";
 import { LiveOperation } from "@/components/LiveOperation";
@@ -992,6 +992,27 @@ export default function AuditPage() {
   const [optimizeMsg, setOptimizeMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [tokenMsg, setTokenMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
+  const [deepLinkHandle] = useState(() => new URLSearchParams(window.location.search).get("product") ?? "");
+  const [highlightedHandle, setHighlightedHandle] = useState(deepLinkHandle);
+  const productCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (!deepLinkHandle || !projectId) return;
+    fetch(`${API}/api/projects/${projectId}/products?search=${encodeURIComponent(deepLinkHandle)}&limit=1`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => {
+        const match = d.products?.[0];
+        if (!match) return;
+        setEditProduct(match as EditableProduct);
+        setHighlightedHandle(match.handle ?? deepLinkHandle);
+        setTimeout(() => {
+          const el = productCardRefs.current[match.handle ?? ""];
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 500);
+      })
+      .catch(() => {});
+  }, [deepLinkHandle, projectId]);
+
   const { data, isLoading, refetch } = useGetProjectProducts(projectId, {
     page: currentPage,
     limit: PAGE_SIZE,
@@ -1584,11 +1605,11 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {products.map((product, idx) => (
+              <div key={product.id} ref={(el) => { productCardRefs.current[(product as any).handle ?? ""] = el; }}>
               <GlassCard
-                key={product.id}
                 delay={0.05 * (idx % 10)}
                 hoverEffect
-                className="p-0 flex flex-col md:flex-row border-white/5 overflow-hidden"
+                className={`p-0 flex flex-col md:flex-row overflow-hidden transition-all ${highlightedHandle && highlightedHandle === (product as any).handle ? "border-amber-400/70 ring-2 ring-amber-400/40 shadow-lg shadow-amber-400/10" : "border-white/5"}`}
               >
                 <div className="w-full md:w-36 h-44 md:h-auto bg-black/40 relative flex-shrink-0">
                   {product.images?.[0]?.src ? (
@@ -1724,6 +1745,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                   </div>
                 </div>
               </GlassCard>
+              </div>
             ))}
             {products.length === 0 && (
               <div className="col-span-full py-20 text-center">
