@@ -255,7 +255,7 @@ export async function generateImage(
         prompt,
         n: 1,
         aspect_ratio: xaiAspect,
-        resolution: model === "grok-imagine-image-quality" ? "2K" : "1K",
+        resolution: model === "grok-imagine-image-quality" ? "2k" : "1k",
         response_format: "url",
       }),
     });
@@ -314,7 +314,23 @@ export async function generateImage(
       replicateToken: token,
     });
     const { aspect_ratio, ...rest } = input;
-    input = { ...rest, style: "realistic_image", size: v4Size || "1024x1024" };
+    // v4Size must be WxH format; if it's an aspect-ratio string (e.g. "3:2"), use closest valid size
+    const RECRAFT_V4_SIZES: Array<[number,number]> = [
+      [1024,1024],[1536,768],[768,1536],[1280,832],[832,1280],
+      [1216,896],[896,1216],[1152,896],[896,1152],[832,1344],
+      [1280,896],[896,1280],[1344,768],[768,1344],
+    ];
+    let safeSize = v4Size;
+    if (!safeSize || !safeSize.includes("x")) {
+      const targetRatio = aspect ? parseFloat(aspect.split(":")[0]) / parseFloat(aspect.split(":")[1]) : 1.5;
+      let best = RECRAFT_V4_SIZES[0], bestDiff = Infinity;
+      for (const [w,h] of RECRAFT_V4_SIZES) {
+        const diff = Math.abs(w/h - targetRatio);
+        if (diff < bestDiff) { bestDiff = diff; best = [w,h]; }
+      }
+      safeSize = `${best[0]}x${best[1]}`;
+    }
+    input = { ...rest, style: "realistic_image", size: safeSize };
   }
   if (model === "imagen-4-ultra" || model === "imagen-4" || model === "imagen-4-fast") {
     input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };

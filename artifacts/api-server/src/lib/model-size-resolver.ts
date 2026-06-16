@@ -43,6 +43,9 @@ export function parseRatioString(s: string): number {
 
 /** Pick the enum entry whose W/H ratio is closest to targetRatio */
 function closestEnum(sizes: Array<[number, number]>, targetRatio: number): SizeResult {
+  if (!sizes || sizes.length === 0) {
+    return { w: 0, h: 0, sizeString: "1024x1024", error: Infinity };
+  }
   let best = sizes[0], bestDiff = Infinity;
   for (const [w, h] of sizes) {
     const diff = Math.abs(w / h - targetRatio);
@@ -187,6 +190,7 @@ export async function pickBestImageSize(
     const hit = SCHEMA_CACHE.get(cacheKey);
 
     if (hit && hit.expires > now) {
+      if (hit.sizes.length === 0) return { w: 0, h: 0, sizeString: aspect, error: 0 };
       return closestEnum(hit.sizes, ratio);
     }
 

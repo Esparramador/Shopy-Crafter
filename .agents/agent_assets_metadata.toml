@@ -515,3 +515,39 @@ id = "xWYD0uutFB5vjwD-y8Kek"
 uri = "file://exports/comic_crafter_15s_CINEMATIC.mp4"
 type = "video"
 title = "Comic Crafter 15s CINEMATIC — 3 escenas, 1080×1920, narrativa multi-shot"
+
+[[outputs]]
+id = "7Rdi7-HTD8I-sNFh6oNZO"
+uri = "file://attached_assets/e2e-test/card_front.png"
+type = "image"
+title = "✅ Tarjeta FRENTE generada (1080×720, texto bakeado)"
+
+[[outputs]]
+id = "F-3Cie7HM7PjeozmQfgir"
+uri = "file://attached_assets/e2e-test/card_bg_texture.png"
+type = "image"
+title = "✅ Textura FONDO puro (1080×720 RGBA, SIN texto)"
+
+[[outputs]]
+id = "fyeZYyxHJ54-sOn4gYDTH"
+uri = "file://attached_assets/e2e-test/card_qr.png"
+type = "image"
+title = "✅ QR code (760×760, endpoint /cards/8/qr.png)"
+
+[[outputs]]
+id = "JJMi5Y21_PQoEejONvna3"
+uri = "file://attached_assets/e2e-test/final_front_xai.png"
+type = "image"
+title = "✅ FRENTE generado (1080×720 RGBA — compuesto con texto+QR)"
+
+[[outputs]]
+id = "CXCF0vNQeIghCjxmyf8Kp"
+uri = "file://attached_assets/e2e-test/final_bg_xai.png"
+type = "image"
+title = "✅ FONDO xAI (1080×720 RGB — textura pura SIN texto, grok-imagine-image)"
+
+[[outputs]]
+id = "R7wYgmQv6X-5NmNoN7V31"
+uri = "file://attached_assets/e2e-test/final_qr_xai.png"
+type = "image"
+title = "✅ QR code (760×760 — endpoint /cards/8/qr.png HTTP 200)"
