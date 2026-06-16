@@ -1159,6 +1159,10 @@ export default function CardStudioEditor({
                     </button>
                   ))}
                 </div>
+                <label style={labelStyle}>Opacidad del texto</label>
+                <input type="range" min={0} max={100} step={5} value={Math.round((selProps.opacity ?? 1) * 100)}
+                  onChange={e => updateSelProp("opacity", +e.target.value / 100)}
+                  style={{ width: "100%", accentColor: "var(--gold)", marginBottom: 5 }}/>
               </>
             )}
 
