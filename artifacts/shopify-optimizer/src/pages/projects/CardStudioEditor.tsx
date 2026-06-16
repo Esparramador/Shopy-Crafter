@@ -134,21 +134,26 @@ async function applyBackground(url: string, canvas: fabric.Canvas): Promise<void
   const blobUrl = await fetchBlob(url);
   if (!blobUrl) return;
   return new Promise<void>((resolve) => {
-    fabric.Image.fromURL(blobUrl, (img) => {
+    // Usamos HTMLImageElement directamente: más fiable que fabric.Image.fromURL con blob URLs
+    const imgEl = new Image();
+    imgEl.onload = () => {
+      const w = imgEl.naturalWidth || imgEl.width;
+      const h = imgEl.naturalHeight || imgEl.height;
+      if (!w || !h) { URL.revokeObjectURL(blobUrl); resolve(); return; }
+      const fabricImg = new fabric.Image(imgEl as HTMLImageElement);
       URL.revokeObjectURL(blobUrl);
-      if (!img || !img.width || !img.height) { resolve(); return; }
-      // Cover: escalar para rellenar todo el canvas
-      const scale = Math.max(CANVAS_W / img.width!, CANVAS_H / img.height!);
-      img.set({
+      const scale = Math.max(CANVAS_W / w, CANVAS_H / h);
+      fabricImg.set({
         scaleX: scale, scaleY: scale,
         originX: "center", originY: "center",
         left: CANVAS_W / 2, top: CANVAS_H / 2,
         selectable: false, evented: false,
         hasBorders: false, hasControls: false,
       });
-      // setBackgroundImage asegura que queda POR DEBAJO de todos los objetos
-      canvas.setBackgroundImage(img, () => { canvas.renderAll(); resolve(); });
-    });
+      canvas.setBackgroundImage(fabricImg, () => { canvas.renderAll(); resolve(); });
+    };
+    imgEl.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(); };
+    imgEl.src = blobUrl;
   });
 }
 

@@ -754,37 +754,31 @@ export default function CardStudio() {
           </div>
         )}
 
-        {/* ── COL 3: Editor inline (siempre visible) ── */}
+        {/* ── COL 3: Smart Editor Area (3 estados: vacío / cargando / editor) ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {selected ? (
+          {!selected ? (
+            <div style={{ ...panelStyle, textAlign: "center", padding: 60, minHeight: 440, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <CreditCard size={40} style={{ color: "rgba(212,175,55,0.15)", marginBottom: 16 }} />
+              <p style={{ color: "var(--t3)", fontSize: 13, margin: 0 }}>Selecciona una tarjeta para empezar</p>
+            </div>
+          ) : generating ? (
+            <GenerationLoadingScreen card={selected} />
+          ) : !selected.frontUrl ? (
+            <PreGenerationView card={selected} onGenerate={() => generateCard(selected.id)} />
+          ) : (
             <div style={{ ...panelStyle, minHeight: 580 }}>
               <CardStudioEditor
+                key={selected.id}
                 apiBase={API_BASE}
                 cardId={selected.id}
-                frontUrl={selected.frontUrl
-                  ? (selected.frontUrl.startsWith("http") ? selected.frontUrl : `${API_BASE}${selected.frontUrl}`)
-                  : null}
-                backUrl={selected.backUrl
-                  ? (selected.backUrl.startsWith("http") ? selected.backUrl : `${API_BASE}${selected.backUrl}`)
-                  : null}
-                logoUrl={selected.logoUrl
-                  ? (selected.logoUrl.startsWith("http") ? selected.logoUrl : `${API_BASE}${selected.logoUrl}`)
-                  : null}
+                frontUrl={selected.frontUrl.startsWith("http") ? selected.frontUrl : `${API_BASE}${selected.frontUrl}`}
+                backUrl={selected.backUrl ? (selected.backUrl.startsWith("http") ? selected.backUrl : `${API_BASE}${selected.backUrl}`) : null}
+                logoUrl={selected.logoUrl ? (selected.logoUrl.startsWith("http") ? selected.logoUrl : `${API_BASE}${selected.logoUrl}`) : null}
                 initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
-                generating={generating}
+                generating={false}
                 onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
                 onRegenerate={async () => { await generateCard(selected.id); }}
               />
-            </div>
-          ) : (
-            <div style={{ ...panelStyle, textAlign: "center", padding: 60, minHeight: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <CreditCard size={40} style={{ color: "rgba(212,175,55,0.2)", marginBottom: 16 }} />
-              <p style={{ color: "var(--t3)", fontSize: 13, margin: 0 }}>
-                Editor inline · Selecciona una tarjeta para empezar
-              </p>
-              <p style={{ color: "var(--t3)", fontSize: 11, margin: "8px 0 0", opacity: 0.6 }}>
-                El fondo IA real se verá aquí una vez generada la tarjeta
-              </p>
             </div>
           )}
         </div>
@@ -813,6 +807,283 @@ export default function CardStudio() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Pasos y tiempos estimados del pipeline de generación ─────────────────────
+const GEN_STEPS = [
+  { emoji: "💾", label: "Procesando configuración" },
+  { emoji: "🤖", label: "Generando fondo con IA" },
+  { emoji: "🎨", label: "Pintando cara frontal" },
+  { emoji: "🔄", label: "Diseñando el reverso" },
+  { emoji: "📄", label: "Generando PDF de impresión" },
+  { emoji: "✨", label: "Finalizando tu tarjeta" },
+];
+const GEN_TARGETS = [8, 38, 60, 76, 89, 96];
+
+function GenerationLoadingScreen({ card }: { card: BusinessCard }) {
+  const [step, setStep] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  const pal = (card.palette || {}) as Palette;
+  const accent = pal.accent || "#d4a843";
+  const cardBg = pal.bg || "#141414";
+  const primary = pal.primary || "#c9a227";
+
+  useEffect(() => {
+    let prog = 0;
+    let cur = 0;
+    const id = setInterval(() => {
+      if (cur >= GEN_TARGETS.length) {
+        prog = Math.min(prog + 0.04, 99);
+        setProgress(prog);
+        return;
+      }
+      const target = GEN_TARGETS[cur];
+      const speed = Math.max((target - prog) * 0.012, 0.18);
+      prog = Math.min(prog + speed, target);
+      setProgress(prog);
+      if (prog >= target - 0.3) { cur++; setStep(cur); }
+    }, 100);
+    return () => clearInterval(id);
+  }, []);
+
+  const activeStep = GEN_STEPS[Math.min(step, GEN_STEPS.length - 1)];
+
+  return (
+    <div style={{
+      ...panelStyle,
+      minHeight: 520,
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      gap: 24, position: "relative", overflow: "hidden",
+    }}>
+      <style>{`
+        @keyframes cg-shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(250%)} }
+        @keyframes cg-glow { 0%,100%{box-shadow:0 0 22px ${accent}22,0 0 55px ${accent}0d} 50%{box-shadow:0 0 44px ${accent}44,0 0 80px ${accent}20} }
+        @keyframes cg-breathe { 0%,100%{opacity:.35} 50%{opacity:.75} }
+        @keyframes cg-bar { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes cg-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes cg-dot { 0%,80%,100%{transform:scaleY(.45);opacity:.3} 40%{transform:scaleY(1);opacity:1} }
+      `}</style>
+
+      {/* Blob de fondo */}
+      <div style={{
+        position:"absolute", top:"15%", left:"50%", transform:"translateX(-50%)",
+        width:320, height:220,
+        background:`radial-gradient(ellipse, ${accent}14 0%, transparent 70%)`,
+        animation:"cg-breathe 3.2s ease-in-out infinite",
+        pointerEvents:"none",
+      }}/>
+
+      {/* Encabezado */}
+      <div style={{ textAlign:"center", position:"relative" }}>
+        <div style={{
+          display:"inline-flex", alignItems:"center", gap:7,
+          fontSize:10, letterSpacing:3, textTransform:"uppercase",
+          color:accent, fontWeight:700, marginBottom:8,
+          padding:"3px 14px", borderRadius:20,
+          border:`1px solid ${accent}30`, background:`${accent}0a`,
+        }}>✦ Creando con IA ✦</div>
+        <h3 style={{ margin:0, fontSize:16, fontWeight:700, color:"var(--t1)" }}>
+          {card.fullName || "Tu tarjeta de presentación"}
+        </h3>
+        {card.companyName && <div style={{ fontSize:11, color:"var(--t3)", marginTop:3 }}>{card.companyName}</div>}
+      </div>
+
+      {/* Tarjeta animada */}
+      <div style={{ position:"relative" }}>
+        <div style={{
+          position:"absolute", top:10, left:-4,
+          width:220, height:147, borderRadius:10,
+          background:accent, opacity:.07, filter:"blur(16px)",
+        }}/>
+        <div style={{
+          width:220, height:147, borderRadius:10,
+          background:`linear-gradient(135deg, ${cardBg} 0%, ${cardBg} 45%, ${primary}22 100%)`,
+          border:`1px solid ${accent}30`,
+          animation:"cg-glow 2.6s ease-in-out infinite",
+          position:"relative", overflow:"hidden",
+          display:"flex", flexDirection:"column",
+          alignItems:"center", justifyContent:"center", gap:7,
+        }}>
+          <div style={{ position:"absolute", top:0, left:0, right:0, height:2,
+            background:`linear-gradient(90deg, transparent, ${accent}, transparent)` }}/>
+          <div style={{
+            position:"absolute", top:0, bottom:0, width:"45%",
+            background:`linear-gradient(90deg, transparent, ${accent}10, transparent)`,
+            animation:"cg-shimmer 2.2s ease-in-out infinite",
+          }}/>
+          {card.logoUrl
+            ? <img src={card.logoUrl.startsWith("http") ? card.logoUrl : `${API_BASE}${card.logoUrl}`}
+                alt="" style={{ height:20, maxWidth:55, objectFit:"contain", opacity:.9 }}
+                onError={(e)=>{ (e.target as HTMLImageElement).style.display="none"; }}/>
+            : <div style={{ width:38, height:13, borderRadius:3, background:`${accent}28` }}/>
+          }
+          <div style={{ width:88, height:8, borderRadius:2, background:"rgba(255,255,255,0.58)" }}/>
+          <div style={{ width:58, height:5, borderRadius:2, background:`${accent}65` }}/>
+          <div style={{ width:72, height:4, borderRadius:2, background:"rgba(255,255,255,0.14)" }}/>
+          <div style={{ display:"flex", gap:5, marginTop:2 }}>
+            <div style={{ width:28, height:3, borderRadius:2, background:"rgba(255,255,255,0.09)" }}/>
+            <div style={{ width:44, height:3, borderRadius:2, background:"rgba(255,255,255,0.09)" }}/>
+          </div>
+          <div style={{ position:"absolute", bottom:0, left:0, right:0, height:1, background:`${accent}22` }}/>
+        </div>
+      </div>
+
+      {/* Badge paso activo */}
+      <div style={{
+        display:"flex", alignItems:"center", gap:10,
+        padding:"9px 20px",
+        background:`${accent}0c`, border:`1px solid ${accent}22`,
+        borderRadius:28, fontSize:12, color:accent, fontWeight:600,
+        maxWidth:"92%",
+      }}>
+        <span style={{ fontSize:15 }}>{activeStep?.emoji}</span>
+        {activeStep?.label}
+        <div style={{ display:"flex", gap:3, alignItems:"flex-end", height:12 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              width:3, height:"100%", borderRadius:2,
+              background:accent,
+              animation:`cg-dot 1.2s ease-in-out ${i * 0.2}s infinite`,
+            }}/>
+          ))}
+        </div>
+      </div>
+
+      {/* Lista de pasos */}
+      <div style={{ width:"100%", maxWidth:360, display:"flex", flexDirection:"column", gap:2 }}>
+        {GEN_STEPS.map((s, i) => {
+          const isDone = i < step;
+          const isActive = i === step;
+          return (
+            <div key={i} style={{
+              display:"flex", alignItems:"center", gap:10,
+              padding:"4px 10px", borderRadius:5,
+              opacity: i > step ? 0.22 : 1,
+              background: isActive ? `${accent}07` : "transparent",
+              transition:"opacity 0.4s ease",
+            }}>
+              <span style={{
+                fontSize:13, flexShrink:0, fontWeight:700,
+                color: isDone ? "#22c55e" : isActive ? accent : "var(--t3)",
+                display:"inline-block",
+                animation: isActive ? "cg-spin 1.8s linear infinite" : "none",
+              }}>
+                {isDone ? "✓" : isActive ? "◐" : "○"}
+              </span>
+              <span style={{
+                fontSize:11,
+                color: isDone ? "#22c55e" : isActive ? "var(--t1)" : "var(--t3)",
+                fontWeight: isActive ? 600 : 400,
+              }}>
+                {s.emoji} {s.label}
+              </span>
+              {isDone && <span style={{ marginLeft:"auto", fontSize:9, color:"#22c55e40" }}>listo</span>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Barra de progreso */}
+      <div style={{ width:"100%", maxWidth:360 }}>
+        <div style={{
+          width:"100%", height:5,
+          background:"rgba(255,255,255,0.05)", borderRadius:3, overflow:"hidden",
+        }}>
+          <div style={{
+            height:"100%", borderRadius:3,
+            width:`${progress}%`,
+            background:`linear-gradient(90deg, ${primary}, ${accent}, ${primary})`,
+            backgroundSize:"200% 100%",
+            animation:"cg-bar 2s linear infinite",
+            transition:"width 0.25s ease",
+          }}/>
+        </div>
+        <div style={{
+          display:"flex", justifyContent:"space-between",
+          fontSize:10, color:"var(--t3)", marginTop:5,
+        }}>
+          <span>Calidad imprenta · 300 DPI · 85×55mm</span>
+          <span style={{ color:accent, fontWeight:600 }}>{Math.round(progress)}%</span>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+function PreGenerationView({ card, onGenerate }: { card: BusinessCard; onGenerate: () => void }) {
+  const [side, setSide] = useState<"front" | "back">("front");
+  const pal = (card.palette || {}) as Palette;
+  const accent = pal.accent || "#d4a843";
+
+  return (
+    <div style={{ ...panelStyle, display:"flex", flexDirection:"column", gap:12 }}>
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+        <span style={{ fontSize:11, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", color:"var(--gold)" }}>
+          Vista Previa
+        </span>
+        <div style={{
+          display:"flex", gap:2, marginLeft:"auto",
+          background:"rgba(0,0,0,0.3)", padding:"2px", borderRadius:5,
+        }}>
+          {(["front","back"] as const).map(s => (
+            <button key={s} onClick={() => setSide(s)} style={{
+              padding:"4px 11px", fontSize:11, borderRadius:3, border:"none", cursor:"pointer",
+              background: side === s ? accent : "transparent",
+              color: side === s ? "#0a0a0a" : "var(--t3)",
+              fontWeight: side === s ? 700 : 400,
+              transition:"all 0.15s ease",
+            }}>
+              {s === "front" ? "Frente" : "Reverso"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* CSS preview + overlay */}
+      <div style={{ position:"relative" }}>
+        <CardLivePreview card={card} side={side} />
+        <div style={{
+          position:"absolute", inset:0,
+          background:"linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.62) 100%)",
+          borderRadius:8,
+          display:"flex", flexDirection:"column",
+          alignItems:"center", justifyContent:"flex-end",
+          padding:20,
+        }}>
+          <div style={{ textAlign:"center", marginBottom:12 }}>
+            <div style={{ fontSize:10, letterSpacing:2, textTransform:"uppercase", color:`${accent}cc`, marginBottom:4 }}>
+              Aproximación visual CSS
+            </div>
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.75)", lineHeight:1.4 }}>
+              Genera con IA para obtener el diseño real en 300 DPI
+            </div>
+          </div>
+          <button onClick={onGenerate} style={{
+            padding:"11px 28px", fontSize:13, fontWeight:700,
+            background:`linear-gradient(135deg, ${accent}, #b8941e)`,
+            color:"#0a0a0a", border:"none", borderRadius:8, cursor:"pointer",
+            display:"flex", alignItems:"center", gap:8,
+            boxShadow:`0 4px 24px ${accent}50`,
+          }}>
+            <Sparkles size={15}/> Generar tarjeta con IA
+          </button>
+        </div>
+      </div>
+
+      <div style={{
+        fontSize:10, color:"var(--t3)", textAlign:"center",
+        padding:"5px 12px",
+        background:"rgba(255,255,255,0.018)", borderRadius:4,
+        border:"1px solid rgba(255,255,255,0.04)",
+      }}>
+        💡 Rellena tus datos en el panel central · el fondo IA real se genera al hacer clic
+      </div>
     </div>
   );
 }
