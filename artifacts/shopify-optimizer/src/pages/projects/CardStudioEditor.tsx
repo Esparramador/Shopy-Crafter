@@ -10,7 +10,7 @@
  *   - Nuevas herramientas: formas, emojis, bocadillos de texto
  */
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { fabric } from "fabric";
 import JSZip from "jszip";
 import {
@@ -299,13 +299,15 @@ async function populateCanvas(
           fabric.Image.fromURL(blobUrl, (img) => {
             URL.revokeObjectURL(blobUrl);
             if (!img) { res(); return; }
+            const sw = img.width || 1;
+            const sh = img.height || 1;
             img.set({
               left: el.x, top: el.y,
-              scaleX: el.width / (img.width || 1),
-              scaleY: el.height / (img.height || 1),
-              data: { id: el.id, side, type: "logo" },
+              scaleX: el.width / sw,
+              scaleY: el.height / sh,
+              data: { id: el.id, side, type: "logo", srcW: sw, srcH: sh },
               name: el.id,
-            });
+            } as any);
             canvas.add(img);
             res();
           }, { crossOrigin: "anonymous" });
@@ -320,8 +322,11 @@ async function populateCanvas(
       } as any);
       canvas.add(rect);
     } else if (el.type === "qr") {
-      // Carga el QR real como imagen desde el backend
-      const qrBlobUrl = await fetchBlob(`${apiBase}/api/cards/${cardId}/qr.png`);
+      // Carga QR: si tiene qrUrl propia usa endpoint genérico, si no usa el de la tarjeta
+      const qrSrc = el.qrUrl
+        ? `${apiBase}/api/qr.png?data=${encodeURIComponent(el.qrUrl)}`
+        : `${apiBase}/api/cards/${cardId}/qr.png`;
+      const qrBlobUrl = await fetchBlob(qrSrc);
       if (qrBlobUrl) {
         await new Promise<void>((res) => {
           fabric.Image.fromURL(qrBlobUrl, (img) => {
@@ -329,13 +334,15 @@ async function populateCanvas(
             if (!img) { res(); return; }
             const sw = img.width || 400;
             const sh = img.height || 400;
+            const sq = Math.min(el.width, el.height);
             img.set({
               left: el.x, top: el.y,
-              scaleX: el.width / sw,
-              scaleY: el.height / sh,
-              data: { id: el.id, side, type: "qr" },
+              scaleX: sq / sw,
+              scaleY: sq / sh,
+              lockUniScaling: true,
+              data: { id: el.id, side, type: "qr", srcW: sw, srcH: sh },
               name: el.id,
-            });
+            } as any);
             canvas.add(img);
             res();
           }, { crossOrigin: "anonymous" });
@@ -399,10 +406,25 @@ export default function CardStudioEditor({
   const [activeTab, setActiveTab] = useState<"elementos" | "temas">("elementos");
   const [localQrType, setLocalQrType] = useState<string>(qrTypeProp || "vcard");
   const [localQrUrl, setLocalQrUrl] = useState<string>(qrContentUrlProp ?? "");
+  const [fontSizeStr, setFontSizeStr] = useState<string>("");
+  const [extraQrUrlInput, setExtraQrUrlInput] = useState<string>("");
 
   useEffect(() => { setOverrides(initialOverrides || {}); }, [initialOverrides]);
   useEffect(() => { setLocalQrType(qrTypeProp || "vcard"); }, [qrTypeProp]);
   useEffect(() => { setLocalQrUrl(qrContentUrlProp ?? ""); }, [qrContentUrlProp]);
+  useEffect(() => {
+    setFontSizeStr(selProps?.fontSize !== undefined ? String(selProps.fontSize) : "");
+  }, [selProps?.fontSize]);
+  useEffect(() => {
+    if (selId?.startsWith("extra-")) {
+      const exId = selId.replace("extra-", "");
+      const ex = (overrides.extras ?? []).find(e => e.id === exId);
+      setExtraQrUrlInput(ex?.qrUrl ?? "");
+    } else {
+      setExtraQrUrlInput("");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selId]);
 
   // ── Inicializar canvases ──────────────────────────────────────────────────
   useEffect(() => {
@@ -469,9 +491,25 @@ export default function CardStudioEditor({
         const nh = Math.round((obj.height ?? 20) * sy);
         const nx = Math.round(obj.left ?? 0);
         const ny = Math.round(obj.top ?? 0);
-        if (sx !== 1 || sy !== 1) obj.set({ scaleX: 1, scaleY: 1, width: nw, height: nh });
 
-        const patch: ElementOverride = { x: nx, y: ny, width: nw, height: nh };
+        let patchW = nw, patchH = nh;
+        if (data.type === "qr") {
+          // QR siempre cuadrado; reaplica escala proporcional
+          const sq = Math.min(nw, nh);
+          patchW = sq; patchH = sq;
+          const srcW: number = data.srcW ?? obj.width ?? 400;
+          const srcH: number = data.srcH ?? obj.height ?? 400;
+          obj.set({ scaleX: sq / srcW, scaleY: sq / srcH, left: nx, top: ny });
+        } else if (data.type === "logo") {
+          // Logo: reaplica escala (fabric.Image no acepta width/height directos)
+          const srcW: number = data.srcW ?? obj.width ?? 1;
+          const srcH: number = data.srcH ?? obj.height ?? 1;
+          obj.set({ scaleX: nw / srcW, scaleY: nh / srcH, left: nx, top: ny });
+        } else if (sx !== 1 || sy !== 1) {
+          obj.set({ scaleX: 1, scaleY: 1, width: nw, height: nh });
+        }
+
+        const patch: ElementOverride = { x: nx, y: ny, width: patchW, height: patchH };
         if (obj.type === "textbox") {
           patch.text = (obj as fabric.Textbox).text;
           patch.fontSize = (obj as fabric.Textbox).fontSize;
@@ -747,6 +785,84 @@ export default function CardStudioEditor({
     setShowEmoji(false);
   }, [activeCanvas]);
 
+  // ── Añadir QR extra ──────────────────────────────────────────────────────
+  const addQr = useCallback(async (targetSide?: "front" | "back") => {
+    const side = targetSide ?? activeCanvas ?? "front";
+    const canvas = side === "front" ? frontFabric.current : backFabric.current;
+    const guide = side === "front" ? frontGuide.current : backGuide.current;
+    if (!canvas) return;
+    const id = `${Date.now()}`.slice(-7);
+    const size = 200;
+    const defaultUrl = "https://shopycrafter.com";
+    setOverrides(prev => ({
+      ...prev,
+      extras: [...(prev.extras || []), {
+        id, side, type: "qr" as const,
+        x: CANVAS_W / 2 - size / 2, y: CANVAS_H / 2 - size / 2,
+        width: size, height: size,
+        qrUrl: defaultUrl,
+      }],
+    }));
+    const qrSrc = `${apiBase}/api/qr.png?data=${encodeURIComponent(defaultUrl)}`;
+    const blobUrl = await fetchBlob(qrSrc);
+    if (blobUrl) {
+      fabric.Image.fromURL(blobUrl, (img) => {
+        URL.revokeObjectURL(blobUrl);
+        if (!img) return;
+        const sw = img.width || 400;
+        const sh = img.height || 400;
+        img.set({
+          left: CANVAS_W / 2 - size / 2, top: CANVAS_H / 2 - size / 2,
+          scaleX: size / sw, scaleY: size / sh,
+          lockUniScaling: true,
+          data: { id: `extra-${id}`, side, type: "qr", srcW: sw, srcH: sh },
+          name: `extra-${id}`,
+        } as any);
+        canvas.add(img);
+        if (guide) canvas.bringToFront(guide);
+        canvas.setActiveObject(img);
+        canvas.renderAll();
+      }, { crossOrigin: "anonymous" });
+    } else {
+      const ph = new fabric.Rect({
+        left: CANVAS_W / 2 - size / 2, top: CANVAS_H / 2 - size / 2,
+        width: size, height: size,
+        fill: "#ffffff", stroke: "#aaa", strokeWidth: 2, rx: 4, ry: 4,
+        data: { id: `extra-${id}`, side, type: "qr", srcW: size, srcH: size },
+        name: `extra-${id}`,
+      } as any);
+      canvas.add(ph);
+      if (guide) canvas.bringToFront(guide);
+      canvas.setActiveObject(ph);
+      canvas.renderAll();
+    }
+  }, [activeCanvas, apiBase]);
+
+  // ── Recargar imagen QR extra en canvas ──────────────────────────────────
+  const reloadExtraQr = useCallback(async (url: string) => {
+    if (!selId?.startsWith("extra-")) return;
+    const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
+    if (!canvas) return;
+    const obj = canvas.getObjects().find((o: any) => o.name === selId) as fabric.Image | undefined;
+    if (!obj || obj.type !== "image") return;
+    const srcW: number = (obj as any).data?.srcW ?? obj.width ?? 400;
+    const srcH: number = (obj as any).data?.srcH ?? obj.height ?? 400;
+    const sq = Math.round((obj.width ?? srcW) * (obj.scaleX ?? 1));
+    const blobUrl = await fetchBlob(`${apiBase}/api/qr.png?data=${encodeURIComponent(url)}`);
+    if (!blobUrl) return;
+    (obj as any).setSrc(blobUrl, () => {
+      URL.revokeObjectURL(blobUrl);
+      const newSrcW = obj.width || srcW;
+      const newSrcH = obj.height || srcH;
+      obj.set({
+        scaleX: sq / newSrcW,
+        scaleY: sq / newSrcH,
+      });
+      (obj as any).data = { ...(obj as any).data, srcW: newSrcW, srcH: newSrcH };
+      canvas.renderAll();
+    }, { crossOrigin: "anonymous" });
+  }, [selId, selSide, apiBase]);
+
   // ── Añadir bocadillo de texto ─────────────────────────────────────────────
   const addBubble = useCallback((targetSide?: "front" | "back") => {
     const side = targetSide ?? activeCanvas ?? "front";
@@ -894,9 +1010,28 @@ export default function CardStudioEditor({
     });
   }, [selId, selSide]);
 
-  // ── Todos los elementos visibles ──────────────────────────────────────────
-  const allFrontVisible = frontElements.filter(e => !e.hidden);
-  const allBackVisible = backElements.filter(e => !e.hidden);
+  // ── Todos los elementos visibles (base + extras) ─────────────────────────
+  const allFrontVisible = useMemo(() => {
+    const frontOv = overrides.front ?? {};
+    const base = frontElements
+      .filter(e => !(frontOv[e.id]?.hidden))
+      .map(e => ({ ...e, ...(frontOv[e.id] ?? {}) }));
+    const extFront = (overrides.extras ?? [])
+      .filter(ex => ex.side === "front")
+      .map(ex => ({ ...ex, id: `extra-${ex.id}` } as any));
+    return [...base, ...extFront];
+  }, [frontElements, overrides]);
+
+  const allBackVisible = useMemo(() => {
+    const backOv = overrides.back ?? {};
+    const base = backElements
+      .filter(e => !(backOv[e.id]?.hidden))
+      .map(e => ({ ...e, ...(backOv[e.id] ?? {}) }));
+    const extBack = (overrides.extras ?? [])
+      .filter(ex => ex.side === "back")
+      .map(ex => ({ ...ex, id: `extra-${ex.id}` } as any));
+    return [...base, ...extBack];
+  }, [backElements, overrides]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -1008,6 +1143,11 @@ export default function CardStudioEditor({
             )}
           </div>
 
+          {/* QR extra */}
+          <button onClick={() => addQr()} style={btnTool} title="Añadir QR adicional con URL propia">
+            <QrCode size={11}/> +QR
+          </button>
+
           <div style={{ flex: 1 }} />
 
           {/* Zoom */}
@@ -1062,7 +1202,7 @@ export default function CardStudioEditor({
             <canvas ref={frontCanvasEl} data-testid="canvas-front" />
           </div>
           <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 4, textAlign: "center" }}>
-            {CANVAS_W}×{CANVAS_H}px · zona segura (línea roja)
+            {CANVAS_W}×{CANVAS_H}px · ~322 DPI · zona segura (línea roja)
           </div>
         </div>
 
@@ -1234,8 +1374,20 @@ export default function CardStudioEditor({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 5 }}>
                   <div>
                     <label style={labelStyle}>Tamaño</label>
-                    <input type="number" min={6} max={300} value={selProps.fontSize ?? 24}
-                      onChange={e => updateSelProp("fontSize", +e.target.value || 24, "fontSize")}
+                    <input type="number" min={6} max={300} value={fontSizeStr}
+                      onChange={e => setFontSizeStr(e.target.value)}
+                      onBlur={() => {
+                        const n = parseInt(fontSizeStr, 10);
+                        if (!isNaN(n) && n >= 6 && n <= 300) updateSelProp("fontSize", n, "fontSize");
+                        else setFontSizeStr(String(selProps?.fontSize ?? 24));
+                      }}
+                      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                        if (e.key === "Enter") {
+                          const n = parseInt(fontSizeStr, 10);
+                          if (!isNaN(n) && n >= 6 && n <= 300) updateSelProp("fontSize", n, "fontSize");
+                          else setFontSizeStr(String(selProps?.fontSize ?? 24));
+                        }
+                      }}
                       style={inputStyle}/>
                   </div>
                   <div>
@@ -1301,56 +1453,101 @@ export default function CardStudioEditor({
                   <QrCode size={12} style={{ color: "var(--gold)" }} />
                   <span style={{ fontSize: 11, fontWeight: 600, color: "var(--t1)" }}>Destino del QR</span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                  {QR_TYPES_EDITOR.map(qt => (
-                    <button
-                      key={qt.id}
-                      onClick={() => {
-                        setLocalQrType(qt.id);
-                        if (!qt.needsUrl) {
-                          setLocalQrUrl("");
-                          onQrDataChange?.(qt.id, null);
-                        } else {
-                          onQrDataChange?.(qt.id, localQrUrl || null);
-                        }
-                      }}
-                      style={{
-                        padding: "5px 6px", fontSize: 10, borderRadius: 4, cursor: "pointer",
-                        background: localQrType === qt.id ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)",
-                        border: localQrType === qt.id ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
-                        color: "var(--t1)", fontWeight: localQrType === qt.id ? 600 : 400,
-                      }}
-                    >{qt.label}</button>
-                  ))}
-                </div>
-                {QR_TYPES_EDITOR.find(q => q.id === localQrType)?.needsUrl && (
+                {selId?.startsWith("extra-") ? (
+                  /* QR extra: solo URL de destino */
                   <>
-                    <label style={{ fontSize: 10, color: "var(--t3)", marginBottom: 1 }}>
-                      {localQrType === "url" ? "URL de destino" : localQrType === "video" ? "URL del video" : "URL de la imagen"}
-                    </label>
+                    <label style={{ fontSize: 10, color: "var(--t3)", marginBottom: 1 }}>URL de destino</label>
                     <input
                       type="url"
-                      value={localQrUrl}
-                      onChange={e => setLocalQrUrl(e.target.value)}
-                      onBlur={() => onQrDataChange?.(localQrType, localQrUrl || null)}
-                      placeholder={QR_TYPES_EDITOR.find(q => q.id === localQrType)?.placeholder}
+                      value={extraQrUrlInput}
+                      onChange={e => setExtraQrUrlInput(e.target.value)}
+                      onBlur={async () => {
+                        if (!selId?.startsWith("extra-")) return;
+                        const exId = selId.replace("extra-", "");
+                        setOverrides(prev => ({
+                          ...prev,
+                          extras: (prev.extras ?? []).map(ex =>
+                            ex.id === exId ? { ...ex, qrUrl: extraQrUrlInput } : ex
+                          ),
+                        }));
+                        await reloadExtraQr(extraQrUrlInput);
+                      }}
+                      onKeyDown={async (e: React.KeyboardEvent<HTMLInputElement>) => {
+                        if (e.key !== "Enter") return;
+                        if (!selId?.startsWith("extra-")) return;
+                        const exId = selId.replace("extra-", "");
+                        setOverrides(prev => ({
+                          ...prev,
+                          extras: (prev.extras ?? []).map(ex =>
+                            ex.id === exId ? { ...ex, qrUrl: extraQrUrlInput } : ex
+                          ),
+                        }));
+                        await reloadExtraQr(extraQrUrlInput);
+                      }}
+                      placeholder="https://tu-sitio.com"
                       style={{
                         fontSize: 10, padding: "5px 7px", borderRadius: 4,
                         background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
-                        color: "var(--t1)", width: "100%", boxSizing: "border-box",
+                        color: "var(--t1)", width: "100%", boxSizing: "border-box" as const,
                       }}
                     />
+                    <div style={{ fontSize: 9, color: "var(--t3)" }}>Escanear el QR abre esta URL · Pulsa Enter o cambia de campo para aplicar</div>
                   </>
-                )}
-                {(localQrType === "vcard") && (
-                  <div style={{ fontSize: 10, color: "var(--t3)", padding: "5px 7px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>
-                    El QR codifica tu contacto completo (vCard 3.0) para añadir a la agenda.
-                  </div>
-                )}
-                {(localQrType === "animation") && (
-                  <div style={{ fontSize: 10, color: "var(--t3)", padding: "5px 7px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>
-                    El QR abre la tarjeta animada premium en el navegador.
-                  </div>
+                ) : (
+                  /* QR base: selector de tipo + URL */
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                      {QR_TYPES_EDITOR.map(qt => (
+                        <button
+                          key={qt.id}
+                          onClick={() => {
+                            setLocalQrType(qt.id);
+                            if (!qt.needsUrl) {
+                              setLocalQrUrl("");
+                              onQrDataChange?.(qt.id, null);
+                            } else {
+                              onQrDataChange?.(qt.id, localQrUrl || null);
+                            }
+                          }}
+                          style={{
+                            padding: "5px 6px", fontSize: 10, borderRadius: 4, cursor: "pointer",
+                            background: localQrType === qt.id ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)",
+                            border: localQrType === qt.id ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
+                            color: "var(--t1)", fontWeight: localQrType === qt.id ? 600 : 400,
+                          }}
+                        >{qt.label}</button>
+                      ))}
+                    </div>
+                    {QR_TYPES_EDITOR.find(q => q.id === localQrType)?.needsUrl && (
+                      <>
+                        <label style={{ fontSize: 10, color: "var(--t3)", marginBottom: 1 }}>
+                          {localQrType === "url" ? "URL de destino" : localQrType === "video" ? "URL del video" : "URL de la imagen"}
+                        </label>
+                        <input
+                          type="url"
+                          value={localQrUrl}
+                          onChange={e => setLocalQrUrl(e.target.value)}
+                          onBlur={() => onQrDataChange?.(localQrType, localQrUrl || null)}
+                          placeholder={QR_TYPES_EDITOR.find(q => q.id === localQrType)?.placeholder}
+                          style={{
+                            fontSize: 10, padding: "5px 7px", borderRadius: 4,
+                            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                            color: "var(--t1)", width: "100%", boxSizing: "border-box",
+                          }}
+                        />
+                      </>
+                    )}
+                    {(localQrType === "vcard") && (
+                      <div style={{ fontSize: 10, color: "var(--t3)", padding: "5px 7px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>
+                        El QR codifica tu contacto completo (vCard 3.0) para añadir a la agenda.
+                      </div>
+                    )}
+                    {(localQrType === "animation") && (
+                      <div style={{ fontSize: 10, color: "var(--t3)", padding: "5px 7px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>
+                        El QR abre la tarjeta animada premium en el navegador.
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

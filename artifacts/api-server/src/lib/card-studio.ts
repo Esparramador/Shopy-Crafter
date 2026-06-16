@@ -269,6 +269,7 @@ async function renderSolidOrGradient(
 async function composeOver(background: Buffer, overlay: Buffer): Promise<Buffer> {
   return await sharp(background)
     .composite([{ input: overlay, top: 0, left: 0 }])
+    .withMetadata({ density: 300 })
     .png({ compressionLevel: 9 })
     .toBuffer();
 }

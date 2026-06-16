@@ -814,4 +814,25 @@ router.get("/cards/:id/qr.svg", requireAdmin, async (req: Request, res: Response
   }
 });
 
+// ─── QR genérico (para elementos QR extra del editor) ───────────────────────
+router.get("/qr.png", async (req: Request, res: Response) => {
+  try {
+    const data = String(req.query.data || "").trim();
+    if (!data) { res.status(400).send("Missing 'data' param"); return; }
+    const png = await generateQrPng(data, {
+      fgColor: "#000000",
+      bgColor: "#ffffff",
+      margin: 1,
+      size: 400,
+      errorLevel: "H",
+    });
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(png);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "generic qr.png failed");
+    res.status(500).send(err?.message || "error");
+  }
+});
+
 export default router;
