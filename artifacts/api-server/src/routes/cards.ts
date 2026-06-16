@@ -108,22 +108,22 @@ function toCardDto(row: any) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     frontUrl: row.frontImageVaultFileId
-      ? `/api/projects/${row.projectId}/files/${row.frontImageVaultFileId}/preview`
+      ? `/api/projects/${row.projectId}/vault/${row.frontImageVaultFileId}/preview`
       : null,
     backUrl: row.backImageVaultFileId
-      ? `/api/projects/${row.projectId}/files/${row.backImageVaultFileId}/preview`
+      ? `/api/projects/${row.projectId}/vault/${row.backImageVaultFileId}/preview`
       : null,
     pdfUrl: row.pdfVaultFileId
-      ? `/api/projects/${row.projectId}/files/${row.pdfVaultFileId}/preview`
+      ? `/api/projects/${row.projectId}/vault/${row.pdfVaultFileId}/preview`
       : null,
     logoUrl: row.logoVaultFileId
-      ? `/api/projects/${row.projectId}/files/${row.logoVaultFileId}/preview`
+      ? `/api/projects/${row.projectId}/vault/${row.logoVaultFileId}/preview`
       : null,
     layoutOverrides: safeJson(row.layoutOverrides, {}),
     backgroundImageUrl: (() => {
       const bg = safeJson(row.backgroundConfig, {}) as any;
       return bg?.kind === "custom-image" && bg?.vaultFileId
-        ? `/api/projects/${row.projectId}/files/${bg.vaultFileId}/preview`
+        ? `/api/projects/${row.projectId}/vault/${bg.vaultFileId}/preview`
         : null;
     })(),
   };

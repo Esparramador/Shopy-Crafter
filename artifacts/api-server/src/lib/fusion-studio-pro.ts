@@ -340,8 +340,25 @@ export async function generateImage(
   if (model === "recraft-v3") input = { ...input, style: "realistic_image", size: "1820x1024" };
   if (model === "recraft-v3-svg") input = { ...input, style: "vector_illustration", size: "1820x1024" };
   if (model === "recraft-v4") {
+    // recraft-v4 has its own size enum — "1820x1024" is NOT valid (causes 422).
+    // Valid sizes verified from Replicate schema June 2026:
+    // 1024x1024 | 1536x768 | 768x1536 | 1280x832 | 832x1280 |
+    // 1216x896  | 896x1216 | 1152x896 | 896x1152 | 832x1344 |
+    // 1280x896  | 896x1280 | 1344x768 | 768x1344
+    const v4SizeMap: Record<string, string> = {
+      "1:1":  "1024x1024",
+      "3:2":  "1280x832",
+      "2:3":  "832x1280",
+      "16:9": "1344x768",
+      "9:16": "768x1344",
+      "4:3":  "1216x896",
+      "3:4":  "896x1216",
+      "2:1":  "1536x768",
+      "1:2":  "768x1536",
+    };
+    const v4Size = v4SizeMap[aspect] || "1024x1024";
     const { aspect_ratio, ...rest } = input;
-    input = { ...rest, style: "realistic_image", size: "1820x1024" };
+    input = { ...rest, style: "realistic_image", size: v4Size };
   }
   if (model === "imagen-4-ultra" || model === "imagen-4" || model === "imagen-4-fast") {
     input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };
