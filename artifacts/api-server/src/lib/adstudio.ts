@@ -572,9 +572,9 @@ async function generateVideoReplicate(
     "replicate-seedance-pro":     "bytedance/seedance-1-pro",
     "replicate-seedance-fast":    "bytedance/seedance-1-pro",
     "replicate-seedance-lite":    "bytedance/seedance-1-lite",
-    "replicate-kling-master":     "kwaivgi/kling-v3.0-master",
-    "replicate-kling-2.5-turbo":  "kwaivgi/kling-v3.0-turbo",
-    "replicate-kling":            "kwaivgi/kling-v3.0-turbo",
+    "replicate-kling-master":     "kwaivgi/kling-v3-omni-video",
+    "replicate-kling-2.5-turbo":  "kwaivgi/kling-v3-video",
+    "replicate-kling":            "kwaivgi/kling-v3-video",
     "replicate-hailuo":           "minimax/hailuo-02",
     "replicate-wan-2.5":          "wan-video/wan-2.5-i2v",
   };

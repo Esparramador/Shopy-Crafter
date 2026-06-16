@@ -644,17 +644,15 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                       <span className="text-xs font-semibold text-amber-300 mb-1 block">Modelo de video</span>
                       <select value={videoModel} onChange={e => setVideoModel(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm">
                         <optgroup label="── Runway ──">
-                          <option value="runway-gen5">Runway Gen-5 (2026, física realista, €0.08/s)</option>
+                          <option value="runway-seedance2">Runway Seedance 2.0 (mayo 2026, €0.10/s) ★</option>
                           <option value="runway-gen4.5">Runway Gen-4.5 (control fino, €0.06/s)</option>
-                          <option value="runway-gen4-turbo">Runway Gen-4 Turbo (top Q, €0.05/s)</option>
-                          <option value="runway-seedance2">Runway Seedance 2 (cinematic, €0.10/s)</option>
                           <option value="runway-seedance2-fast">Runway Seedance 2 Fast (€0.06/s)</option>
+                          <option value="runway-gen4-turbo">Runway Gen-4 Turbo (€0.05/s)</option>
                         </optgroup>
                         <optgroup label="── Kling V3.0 ──">
+                          <option value="kling-3.0-omni">Kling V3.0 Omni (multimodal+audio, €0.22/s) ★</option>
                           <option value="kling-3.0-master">Kling V3.0 Master (máxima calidad, €0.22/s)</option>
-                          <option value="kling-3.0-turbo">Kling V3.0 Turbo (rápido/calidad V3, €0.14/s)</option>
-                          <option value="kling-master">Kling Master (alias V3.0, €0.22/s)</option>
-                          <option value="kling-2.5-turbo">Kling 2.5 Turbo (→ V3.0 Turbo, €0.14/s)</option>
+                          <option value="kling-3.0-turbo">Kling V3.0 Turbo (rápido/calidad, €0.14/s)</option>
                         </optgroup>
                         <optgroup label="── Seedance / ByteDance ──">
                           <option value="seedance-pro">Seedance Pro (cinema 9-refs, €0.07/s)</option>
@@ -677,11 +675,12 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                           <option value="sora-2">Sora 2 (narrativa, €0.30/s)</option>
                         </optgroup>
                         <optgroup label="── MiniMax Hailuo ──">
+                          <option value="hailuo-2.3">Hailuo 2.3 (1080p, €0.06/s) ★</option>
                           <option value="hailuo-02">Hailuo 02 (equilibrado, €0.05/s)</option>
                           <option value="hailuo-02-fast">Hailuo 02 Fast (€0.03/s)</option>
                         </optgroup>
                         <optgroup label="── Wan (open-source) ──">
-                          <option value="wan-2.6">Wan 2.6 I2V (nueva gen, €0.05/s)</option>
+                          <option value="wan-2.7">Wan 2.7 T2V+I2V (última gen, €0.05/s) ★</option>
                           <option value="wan-2.5-t2v">Wan 2.5 T2V puro (€0.025/s)</option>
                           <option value="wan-2.5">Wan 2.5 I2V (€0.04/s)</option>
                         </optgroup>
@@ -750,7 +749,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                           </div>
                         </div>
                         <p className="text-[10px] text-amber-300 bg-amber-500/10 rounded p-2 border border-amber-500/20">
-                          💡 Estimación: {(totalDurationSec / 60).toFixed(1)} min con {videoModel} ≈ ${(totalDurationSec * (videoModel === "veo-4" ? 1.00 : videoModel === "veo-4-fast" ? 0.55 : videoModel === "veo-3.1" || videoModel === "veo-3" ? 0.75 : videoModel === "veo-3.1-fast" || videoModel === "veo-3-fast" ? 0.40 : videoModel === "sora-2" ? 0.30 : videoModel === "grok-imagine-video-1.5" || videoModel === "kling-3.0-master" || videoModel === "kling-master" ? 0.22 : videoModel === "runway-seedance2" ? 0.10 : videoModel === "runway-gen5" ? 0.08 : videoModel === "seedance-pro" ? 0.07 : videoModel === "grok-imagine-video" || videoModel === "runway-gen4.5" || videoModel === "runway-seedance2-fast" ? 0.06 : videoModel === "kling-3.0-turbo" || videoModel === "kling-2.5-turbo" || videoModel === "kling-2.1" ? 0.14 : videoModel === "seedance-fast" || videoModel === "runway-gen4-turbo" || videoModel === "hailuo-02" || videoModel === "wan-2.6" ? 0.05 : videoModel === "wan-2.5" ? 0.04 : videoModel === "seedance-1-lite" || videoModel === "hailuo-02-fast" ? 0.03 : videoModel === "wan-2.5-t2v" ? 0.025 : 0.05)).toFixed(2)} en API providers · Tiempo wall-clock estimado: {Math.ceil(scenesCount / 5 * 1.5)}-{Math.ceil(scenesCount / 5 * 3)} min (5 clips en paralelo).
+                          💡 Estimación: {(totalDurationSec / 60).toFixed(1)} min con {videoModel} ≈ ${(totalDurationSec * (videoModel === "veo-4" ? 1.00 : videoModel === "veo-4-fast" ? 0.55 : videoModel === "veo-3.1" || videoModel === "veo-3" ? 0.75 : videoModel === "veo-3.1-fast" || videoModel === "veo-3-fast" ? 0.40 : videoModel === "sora-2" ? 0.30 : videoModel === "grok-imagine-video-1.5" || videoModel === "kling-3.0-master" || videoModel === "kling-master" ? 0.22 : videoModel === "runway-seedance2" ? 0.10 : videoModel === "kling-3.0-omni" ? 0.22 : videoModel === "seedance-pro" ? 0.07 : videoModel === "grok-imagine-video" || videoModel === "runway-gen4.5" || videoModel === "runway-seedance2-fast" ? 0.06 : videoModel === "kling-3.0-turbo" || videoModel === "kling-2.5-turbo" || videoModel === "kling-2.1" ? 0.14 : videoModel === "seedance-fast" || videoModel === "runway-gen4-turbo" || videoModel === "hailuo-02" || videoModel === "wan-2.7" || videoModel === "wan-2.6" ? 0.05 : videoModel === "wan-2.5" ? 0.04 : videoModel === "seedance-1-lite" || videoModel === "hailuo-02-fast" ? 0.03 : videoModel === "wan-2.5-t2v" ? 0.025 : 0.05)).toFixed(2)} en API providers · Tiempo wall-clock estimado: {Math.ceil(scenesCount / 5 * 1.5)}-{Math.ceil(scenesCount / 5 * 3)} min (5 clips en paralelo).
                         </p>
                       </>
                     )}

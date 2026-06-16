@@ -53,7 +53,7 @@ export interface CampaignEstimate {
 }
 
 const TIER_PRIORITY: Record<QualityTier, VideoModel[]> = {
-  draft:    ["wan-2.6", "seedance-1-lite", "seedance-fast"],
+  draft:    ["wan-2.7", "seedance-1-lite", "seedance-fast"],
   standard: ["seedance-fast", "seedance-pro", "runway-gen4.5", "kling-3.0-turbo"],
   premium:  ["seedance-pro", "kling-3.0-turbo", "runway-gen4.5", "kling-master"],
   cinema:   ["kling-3.0-master", "veo-3.1-fast", "runway-gen4.5", "kling-3.0-turbo"],
@@ -63,7 +63,7 @@ const PURPOSE_TIER_BIAS: Record<ShotPurpose, Partial<Record<QualityTier, VideoMo
   intro:      { cinema: "kling-3.0-master",  premium: "kling-master",      standard: "kling-3.0-turbo",  draft: "wan-2.6" },
   hero:       { cinema: "kling-3.0-master",  premium: "runway-gen4.5",     standard: "runway-gen4.5",    draft: "seedance-fast" },
   model:      { cinema: "seedance-pro",       premium: "seedance-pro",      standard: "seedance-pro",     draft: "seedance-fast" },
-  product:    { cinema: "runway-gen5",        premium: "runway-gen4.5",     standard: "seedance-pro",     draft: "seedance-fast" },
+  product:    { cinema: "runway-seedance2",    premium: "runway-gen4.5",     standard: "seedance-pro",     draft: "seedance-fast" },
   lifestyle:  { cinema: "seedance-pro",       premium: "seedance-pro",      standard: "kling-3.0-turbo",  draft: "seedance-fast" },
   transition: { cinema: "wan-2.6",            premium: "wan-2.6",           standard: "wan-2.6",          draft: "wan-2.6" },
   outro:      { cinema: "wan-2.6",            premium: "wan-2.6",           standard: "wan-2.6",          draft: "wan-2.6" },
@@ -117,7 +117,7 @@ export function planCampaign(
     "Cobro por segundo: clips largos ≡ clips cortos al mismo coste, usar pocos cortes para fluidez.",
     "Preservar caras reales → seedance-pro multi-ref.",
     "Intros/outros/transiciones → wan-2.6 (open-source rápido y barato).",
-    "Hero shots de producto → runway-gen5 (Gen 5, física realista) o runway-gen4.5.",
+    "Hero shots de producto → runway-seedance2 (Seedance 2.0 vía Runway, mayo 2026) o runway-gen4.5.",
     "Si hay fotos de modelo+producto, saltar virtual try-on → ahorra ~$0.04-15/img.",
   ];
 

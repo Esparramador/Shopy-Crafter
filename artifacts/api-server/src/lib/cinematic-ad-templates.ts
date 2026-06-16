@@ -1241,8 +1241,11 @@ export function composeCinematicScript(
     "veo-3.1", "veo-3.1-fast", "veo-3", "veo-3-fast", "veo-2",
     "sora-2",
     "runway-gen4.5", "runway-seedance2", "runway-seedance2-fast", "runway-gen4-turbo",
-    "hailuo-02", "hailuo-02-fast",
-    "wan-2.6", "wan-2.5", "wan-2.5-fast", "wan-2.5-t2v",
+    "hailuo-02", "hailuo-02-fast", "hailuo-2.3",
+    "wan-2.7", "wan-2.6", "wan-2.5", "wan-2.5-fast", "wan-2.5-t2v",
+    "kling-3.0-omni",
+    "veo-4", "veo-4-fast",
+    "grok-imagine-video", "grok-imagine-video-1.5",
   ]);
   const safeVideoModel = KNOWN_VIDEO_MODELS.has(template.masterConfig.recommendedVideoModel)
     ? template.masterConfig.recommendedVideoModel

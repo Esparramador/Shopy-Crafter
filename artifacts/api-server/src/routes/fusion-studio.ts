@@ -1295,7 +1295,7 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
       hailuo_02:        "hailuo-02",
       hailuo_02_fast:   "hailuo-02-fast",
       // Wan
-      wan_25:           "wan-2.6",
+      wan_25:           "wan-2.7",
       wan_25_hq:        "wan-2.5",
       wan_25_t2v:       "wan-2.5-t2v",
       // Veo (Gemini)
