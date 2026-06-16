@@ -90,14 +90,40 @@ async function fetchReplicateEnumSizes(
     const schema =
       data?.latest_version?.openapi_schema ??
       data?.openapi_schema;
-    const inputProps: Record<string, any> =
-      schema?.components?.schemas?.Input?.properties ?? {};
+    const allSchemas: Record<string, any> = schema?.components?.schemas ?? {};
+    const inputProps: Record<string, any> = allSchemas?.Input?.properties ?? {};
+
+    /** Resolve a JSON Schema $ref like "#/components/schemas/size" to its enum */
+    function resolveRef(ref: string): string[] {
+      const refName = ref.split("/").pop();
+      if (!refName) return [];
+      return allSchemas[refName]?.enum ?? [];
+    }
 
     // Check common size-field names in priority order
     for (const key of ["size", "image_size", "output_size", "resolution"]) {
       const prop = inputProps[key];
       if (!prop) continue;
-      const enumVals: string[] = prop.enum ?? prop.allOf?.[0]?.enum ?? [];
+
+      // 1. Direct enum on the property itself
+      let enumVals: string[] = prop.enum ?? [];
+
+      // 2. allOf entries — check inline enum or resolve $ref
+      if (enumVals.length === 0 && Array.isArray(prop.allOf)) {
+        for (const entry of prop.allOf) {
+          if (entry.enum) { enumVals = entry.enum; break; }
+          if (entry.$ref) { enumVals = resolveRef(entry.$ref); if (enumVals.length) break; }
+        }
+      }
+
+      // 3. anyOf entries (same pattern)
+      if (enumVals.length === 0 && Array.isArray(prop.anyOf)) {
+        for (const entry of prop.anyOf) {
+          if (entry.enum) { enumVals = entry.enum; break; }
+          if (entry.$ref) { enumVals = resolveRef(entry.$ref); if (enumVals.length) break; }
+        }
+      }
+
       const parsed: Array<[number, number]> = [];
       for (const v of enumVals) {
         const m = String(v).match(/^(\d+)[x×](\d+)$/i);
