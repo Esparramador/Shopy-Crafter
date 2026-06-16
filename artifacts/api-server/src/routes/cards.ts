@@ -903,19 +903,23 @@ router.post("/cards/:id/generate-bg", requireAdmin, async (req: Request, res: Re
 });
 
 // ─── QR genérico (para elementos QR extra del editor) ───────────────────────
+// Parámetros: data=URL, fg=#RRGGBB, bg=#RRGGBB, size=N (px, 128–2048)
 router.get("/qr.png", async (req: Request, res: Response) => {
   try {
     const data = String(req.query.data || "").trim();
     if (!data) { res.status(400).send("Missing 'data' param"); return; }
+    const fg = /^#[0-9a-f]{6}$/i.test(String(req.query.fg || "")) ? String(req.query.fg) : "#000000";
+    const bg = /^#[0-9a-f]{6}$/i.test(String(req.query.bg || "")) ? String(req.query.bg) : "#ffffff";
+    const size = Math.max(128, Math.min(2048, parseInt(String(req.query.size || "1200"), 10) || 1200));
     const png = await generateQrPng(data, {
-      fgColor: "#000000",
-      bgColor: "#ffffff",
+      fgColor: fg,
+      bgColor: bg,
       margin: 1,
-      size: 400,
+      size,
       errorLevel: "H",
     });
     res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "public, max-age=300");
+    res.setHeader("Cache-Control", "public, max-age=60");
     res.send(png);
   } catch (err: any) {
     logger.error({ err: err?.message }, "generic qr.png failed");

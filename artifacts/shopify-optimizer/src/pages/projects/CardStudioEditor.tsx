@@ -46,6 +46,8 @@ export type ExtraElement = {
   letterSpacing?: number; textTransform?: "none" | "uppercase";
   rotate?: number; italic?: boolean;
   qrUrl?: string;
+  qrFg?: string;   // color módulos QR (hex)
+  qrBg?: string;   // color fondo QR (hex)
   shapeType?: "rect" | "circle" | "triangle";
   fill?: string; stroke?: string; strokeWidth?: number;
 };
@@ -412,6 +414,8 @@ export default function CardStudioEditor({
   const [localQrUrl, setLocalQrUrl] = useState<string>(qrContentUrlProp ?? "");
   const [fontSizeStr, setFontSizeStr] = useState<string>("");
   const [extraQrUrlInput, setExtraQrUrlInput] = useState<string>("");
+  const [extraQrFg, setExtraQrFg] = useState<string>("#000000");
+  const [extraQrBg, setExtraQrBg] = useState<string>("#ffffff");
 
   useEffect(() => { setOverrides(initialOverrides || {}); }, [initialOverrides]);
   useEffect(() => { setLocalQrType(qrTypeProp || "vcard"); }, [qrTypeProp]);
@@ -424,8 +428,12 @@ export default function CardStudioEditor({
       const exId = selId.replace("extra-", "");
       const ex = (overrides.extras ?? []).find(e => e.id === exId);
       setExtraQrUrlInput(ex?.qrUrl ?? "");
+      setExtraQrFg(ex?.qrFg ?? "#000000");
+      setExtraQrBg(ex?.qrBg ?? "#ffffff");
     } else {
       setExtraQrUrlInput("");
+      setExtraQrFg("#000000");
+      setExtraQrBg("#ffffff");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selId]);
@@ -790,6 +798,11 @@ export default function CardStudioEditor({
   }, [activeCanvas]);
 
   // ── Añadir QR extra ──────────────────────────────────────────────────────
+  // Construye la URL del QR con colores y tamaño
+  const buildQrUrl = useCallback((dataUrl: string, fg = "#000000", bg = "#ffffff") => {
+    return `${apiBase}/api/qr.png?data=${encodeURIComponent(dataUrl)}&fg=${encodeURIComponent(fg)}&bg=${encodeURIComponent(bg)}&size=1200`;
+  }, [apiBase]);
+
   const addQr = useCallback(async (targetSide?: "front" | "back") => {
     const side = targetSide ?? activeCanvas ?? "front";
     const canvas = side === "front" ? frontFabric.current : backFabric.current;
@@ -798,28 +811,29 @@ export default function CardStudioEditor({
     const id = `${Date.now()}`.slice(-7);
     const size = 200;
     const defaultUrl = "https://shopycrafter.com";
+    const defaultFg = "#000000"; const defaultBg = "#ffffff";
     setOverrides(prev => ({
       ...prev,
       extras: [...(prev.extras || []), {
         id, side, type: "qr" as const,
         x: CANVAS_W / 2 - size / 2, y: CANVAS_H / 2 - size / 2,
         width: size, height: size,
-        qrUrl: defaultUrl,
+        qrUrl: defaultUrl, qrFg: defaultFg, qrBg: defaultBg,
       }],
     }));
-    const qrSrc = `${apiBase}/api/qr.png?data=${encodeURIComponent(defaultUrl)}`;
-    const blobUrl = await fetchBlob(qrSrc);
+    const blobUrl = await fetchBlob(buildQrUrl(defaultUrl, defaultFg, defaultBg));
     if (blobUrl) {
       fabric.Image.fromURL(blobUrl, (img) => {
         URL.revokeObjectURL(blobUrl);
         if (!img) return;
-        const sw = img.width || 400;
-        const sh = img.height || 400;
+        const sw = img.width || 1200;
+        const sh = img.height || 1200;
         img.set({
           left: CANVAS_W / 2 - size / 2, top: CANVAS_H / 2 - size / 2,
           scaleX: size / sw, scaleY: size / sh,
           lockUniScaling: true,
-          data: { id: `extra-${id}`, side, type: "qr", srcW: sw, srcH: sh },
+          imageSmoothing: false,
+          data: { id: `extra-${id}`, side, type: "qr", srcW: sw, srcH: sh, qrFg: defaultFg, qrBg: defaultBg },
           name: `extra-${id}`,
         } as any);
         canvas.add(img);
@@ -832,7 +846,7 @@ export default function CardStudioEditor({
         left: CANVAS_W / 2 - size / 2, top: CANVAS_H / 2 - size / 2,
         width: size, height: size,
         fill: "#ffffff", stroke: "#aaa", strokeWidth: 2, rx: 4, ry: 4,
-        data: { id: `extra-${id}`, side, type: "qr", srcW: size, srcH: size },
+        data: { id: `extra-${id}`, side, type: "qr", srcW: size, srcH: size, qrFg: defaultFg, qrBg: defaultBg },
         name: `extra-${id}`,
       } as any);
       canvas.add(ph);
@@ -840,19 +854,21 @@ export default function CardStudioEditor({
       canvas.setActiveObject(ph);
       canvas.renderAll();
     }
-  }, [activeCanvas, apiBase]);
+  }, [activeCanvas, apiBase, buildQrUrl]);
 
-  // ── Recargar imagen QR extra en canvas ──────────────────────────────────
-  const reloadExtraQr = useCallback(async (url: string) => {
+  // ── Recargar imagen QR extra en canvas (con colores opcionales) ─────────
+  const reloadExtraQr = useCallback(async (url: string, fg?: string, bg?: string) => {
     if (!selId?.startsWith("extra-")) return;
     const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
     if (!canvas) return;
     const obj = canvas.getObjects().find((o: any) => o.name === selId) as fabric.Image | undefined;
     if (!obj || obj.type !== "image") return;
-    const srcW: number = (obj as any).data?.srcW ?? obj.width ?? 400;
-    const srcH: number = (obj as any).data?.srcH ?? obj.height ?? 400;
+    const srcW: number = (obj as any).data?.srcW ?? obj.width ?? 1200;
+    const srcH: number = (obj as any).data?.srcH ?? obj.height ?? 1200;
     const sq = Math.round((obj.width ?? srcW) * (obj.scaleX ?? 1));
-    const blobUrl = await fetchBlob(`${apiBase}/api/qr.png?data=${encodeURIComponent(url)}`);
+    const useFg = fg ?? (obj as any).data?.qrFg ?? "#000000";
+    const useBg = bg ?? (obj as any).data?.qrBg ?? "#ffffff";
+    const blobUrl = await fetchBlob(buildQrUrl(url, useFg, useBg));
     if (!blobUrl) return;
     (obj as any).setSrc(blobUrl, () => {
       URL.revokeObjectURL(blobUrl);
@@ -861,11 +877,12 @@ export default function CardStudioEditor({
       obj.set({
         scaleX: sq / newSrcW,
         scaleY: sq / newSrcH,
+        imageSmoothing: false,
       });
-      (obj as any).data = { ...(obj as any).data, srcW: newSrcW, srcH: newSrcH };
+      (obj as any).data = { ...(obj as any).data, srcW: newSrcW, srcH: newSrcH, qrFg: useFg, qrBg: useBg };
       canvas.renderAll();
     }, { crossOrigin: "anonymous" });
-  }, [selId, selSide, apiBase]);
+  }, [selId, selSide, apiBase, buildQrUrl]);
 
   // ── Añadir bocadillo de texto ─────────────────────────────────────────────
   const addBubble = useCallback((targetSide?: "front" | "back") => {
@@ -1512,7 +1529,7 @@ export default function CardStudioEditor({
                   <span style={{ fontSize: 11, fontWeight: 600, color: "var(--t1)" }}>Destino del QR</span>
                 </div>
                 {selId?.startsWith("extra-") ? (
-                  /* QR extra: solo URL de destino */
+                  /* QR extra: URL + colores */
                   <>
                     <label style={{ fontSize: 10, color: "var(--t3)", marginBottom: 1 }}>URL de destino</label>
                     <input
@@ -1528,7 +1545,7 @@ export default function CardStudioEditor({
                             ex.id === exId ? { ...ex, qrUrl: extraQrUrlInput } : ex
                           ),
                         }));
-                        await reloadExtraQr(extraQrUrlInput);
+                        await reloadExtraQr(extraQrUrlInput, extraQrFg, extraQrBg);
                       }}
                       onKeyDown={async (e: React.KeyboardEvent<HTMLInputElement>) => {
                         if (e.key !== "Enter") return;
@@ -1540,7 +1557,7 @@ export default function CardStudioEditor({
                             ex.id === exId ? { ...ex, qrUrl: extraQrUrlInput } : ex
                           ),
                         }));
-                        await reloadExtraQr(extraQrUrlInput);
+                        await reloadExtraQr(extraQrUrlInput, extraQrFg, extraQrBg);
                       }}
                       placeholder="https://tu-sitio.com"
                       style={{
@@ -1549,7 +1566,66 @@ export default function CardStudioEditor({
                         color: "var(--t1)", width: "100%", boxSizing: "border-box" as const,
                       }}
                     />
-                    <div style={{ fontSize: 9, color: "var(--t3)" }}>Escanear el QR abre esta URL · Pulsa Enter o cambia de campo para aplicar</div>
+                    <div style={{ fontSize: 9, color: "var(--t3)", marginBottom: 8 }}>Escanear el QR abre esta URL · Pulsa Enter o cambia de campo para aplicar</div>
+
+                    {/* ── Colores del QR ── */}
+                    <label style={{ fontSize: 10, color: "var(--t3)", marginBottom: 4, display: "block" }}>Color del QR</label>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                        <span style={{ fontSize: 9, color: "var(--t3)" }}>Módulos (fg)</span>
+                        <input type="color" value={extraQrFg}
+                          onChange={async e => {
+                            const v = e.target.value;
+                            setExtraQrFg(v);
+                            if (!selId?.startsWith("extra-")) return;
+                            const exId = selId.replace("extra-", "");
+                            setOverrides(prev => ({
+                              ...prev,
+                              extras: (prev.extras ?? []).map(ex =>
+                                ex.id === exId ? { ...ex, qrFg: v } : ex
+                              ),
+                            }));
+                            await reloadExtraQr(extraQrUrlInput, v, extraQrBg);
+                          }}
+                          style={{ width: "100%", height: 28, padding: 0, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", background: "none" }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                        <span style={{ fontSize: 9, color: "var(--t3)" }}>Fondo (bg)</span>
+                        <input type="color" value={extraQrBg}
+                          onChange={async e => {
+                            const v = e.target.value;
+                            setExtraQrBg(v);
+                            if (!selId?.startsWith("extra-")) return;
+                            const exId = selId.replace("extra-", "");
+                            setOverrides(prev => ({
+                              ...prev,
+                              extras: (prev.extras ?? []).map(ex =>
+                                ex.id === exId ? { ...ex, qrBg: v } : ex
+                              ),
+                            }));
+                            await reloadExtraQr(extraQrUrlInput, extraQrFg, v);
+                          }}
+                          style={{ width: "100%", height: 28, padding: 0, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", background: "none" }}
+                        />
+                      </div>
+                    </div>
+                    {(() => {
+                      // Contraste mínimo: diferencia de luminancia
+                      const hexL = (h: string) => {
+                        const r = parseInt(h.slice(1,3),16)/255, g = parseInt(h.slice(3,5),16)/255, b = parseInt(h.slice(5,7),16)/255;
+                        const t = (c: number) => c <= 0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+                        return 0.2126*t(r)+0.7152*t(g)+0.0722*t(b);
+                      };
+                      const L1 = Math.max(hexL(extraQrFg), hexL(extraQrBg));
+                      const L2 = Math.min(hexL(extraQrFg), hexL(extraQrBg));
+                      const ratio = (L1+0.05)/(L2+0.05);
+                      return ratio < 3 ? (
+                        <div style={{ fontSize: 9, color: "#f5a623", padding: "4px 6px", background: "rgba(245,166,35,0.1)", borderRadius: 4, border: "1px solid rgba(245,166,35,0.3)" }}>
+                          ⚠️ Contraste bajo ({ratio.toFixed(1)}:1) — el QR podría no escanearse. Se recomienda &gt;3:1.
+                        </div>
+                      ) : null;
+                    })()}
                   </>
                 ) : (
                   /* QR base: selector de tipo + URL */
