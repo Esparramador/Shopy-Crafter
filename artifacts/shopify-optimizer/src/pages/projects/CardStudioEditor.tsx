@@ -41,6 +41,8 @@ export type ElementOverride = {
   textTransform?: "none" | "uppercase";
   text?: string; rotate?: number;
   italic?: boolean;
+  /** Plate (caja de fondo detrás del texto). null = sin plate. */
+  plate?: { color: string; opacity: number; padding: number; radius: number } | null;
 };
 export type ExtraElement = {
   id: string; side: "front" | "back"; type: "text" | "line" | "qr";
@@ -1007,6 +1009,64 @@ export default function CardStudioEditor({
                     </button>
                   ))}
                 </div>
+
+                {/* ── Fondo texto (plate) ───────────────────────────── */}
+                {(() => {
+                  const currentPlate = selSide && selId
+                    ? (overrides[selSide as "front" | "back"] as any)?.[selId]?.plate ?? null
+                    : null;
+                  const pct = currentPlate ? Math.round(currentPlate.opacity * 100) : 0;
+                  const isDark = currentPlate?.color === "#000000" || !currentPlate;
+
+                  const setPlate = (opacity: number, dark: boolean) => {
+                    const newPlate = opacity === 0 ? null : {
+                      color: dark ? "#000000" : "#ffffff",
+                      opacity,
+                      padding: 14,
+                      radius: 8,
+                    };
+                    setOverrides(prev => {
+                      if (!selId || !selSide) return prev;
+                      if (selId.startsWith("extra-")) {
+                        const exId = selId.replace("extra-", "");
+                        return { ...prev, extras: (prev.extras || []).map(ex => ex.id === exId ? { ...ex, plate: newPlate } : ex) };
+                      }
+                      const s = selSide as "front" | "back";
+                      const sideOv = { ...(prev[s] ?? {}) };
+                      sideOv[selId] = { ...(sideOv[selId] ?? {}), plate: newPlate };
+                      return { ...prev, [s]: sideOv };
+                    });
+                  };
+
+                  return (
+                    <div style={{ marginTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <label style={labelStyle}>Fondo texto</label>
+                        <span style={{ fontSize: 10, color: "var(--t3)" }}>{pct}%</span>
+                      </div>
+                      <input
+                        type="range" min={0} max={90} step={5} value={pct}
+                        onChange={(e) => setPlate(+e.target.value / 100, isDark)}
+                        style={{ width: "100%", accentColor: "var(--gold)", marginBottom: 5 }}
+                      />
+                      <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                        <button
+                          onClick={() => setPlate(pct / 100, true)}
+                          style={{ ...iconBtn, flex: 1, fontSize: 10, background: isDark ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
+                        >⬛ Oscuro</button>
+                        <button
+                          onClick={() => setPlate(pct / 100, false)}
+                          style={{ ...iconBtn, flex: 1, fontSize: 10, background: !isDark ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
+                        >⬜ Claro</button>
+                      </div>
+                      {pct > 0 && (
+                        <p style={{ margin: 0, fontSize: 10, color: "var(--gold)", opacity: 0.7 }}>
+                          ↻ Pulsa Re-generar para aplicar
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </>
             )}
 
