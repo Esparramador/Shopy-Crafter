@@ -21,6 +21,7 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
 import { logger } from "./logger.js";
+import { pickBestImageSize } from "./model-size-resolver.js";
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 
@@ -223,30 +224,8 @@ export async function generateImage(
   if (model === "gpt-image-1" || model === "gpt-image-2" || model === "gpt-image-1.5" || model === "gpt-image-1-mini") {
     const { openai } = await import("@workspace/integrations-openai-ai-server");
 
-    // gpt-image-2 soporta tamaños flexibles (WxH divisible por 16, ratio 1:3 a 3:1)
-    // gpt-image-1 / 1.5 / mini: sólo 1024x1024, 1536x1024, 1024x1536
-    const gpt2SizeMap: Record<string, string> = {
-      "1:1":  "1024x1024",
-      "16:9": "1536x864",
-      "3:2":  "1536x1024",
-      "4:3":  "1280x960",
-      "9:16": "864x1536",
-      "2:3":  "1024x1536",
-      "3:4":  "960x1280",
-      "21:9": "2016x864",
-    };
-    const stdSizeMap: Record<string, string> = {
-      "1:1":  "1024x1024",
-      "16:9": "1536x1024",
-      "3:2":  "1536x1024",
-      "4:3":  "1536x1024",
-      "9:16": "1024x1536",
-      "2:3":  "1024x1536",
-      "3:4":  "1024x1536",
-    };
-    const size = model === "gpt-image-2"
-      ? (gpt2SizeMap[aspect] || "1024x1024")
-      : (stdSizeMap[aspect]  || "1024x1024");
+    // Resolver dinámico: gpt-image-2 acepta WxH libre; otros tienen enum fijo.
+    const { sizeString: size } = await pickBestImageSize("openai", model, aspect);
 
     // gpt-image-2 usa quality "medium" por defecto (high=$0.211/img); mini usa "high" (solo $0.052)
     const quality = model === "gpt-image-2" ? "medium" : "high";
@@ -266,11 +245,7 @@ export async function generateImage(
   // ── xAI Grok Imagine (image generation)
   if (model === "grok-imagine-image" || model === "grok-imagine-image-quality") {
     const key = getXaiKey();
-    const xaiAspectMap: Record<string, string> = {
-      "1:1": "1:1", "16:9": "16:9", "9:16": "9:16", "4:3": "4:3",
-      "3:4": "3:4", "3:2": "3:2", "2:3": "2:3",
-    };
-    const xaiAspect = xaiAspectMap[aspect] || "1:1";
+    const { sizeString: xaiAspect } = await pickBestImageSize("xai", model, aspect);
     const xaiModel = model === "grok-imagine-image-quality" ? "grok-imagine-image-quality" : "grok-imagine-image";
     const res = await fetch("https://api.x.ai/v1/images/generations", {
       method: "POST",
@@ -310,14 +285,7 @@ export async function generateImage(
   // ── Runway Gen4 Image (text-to-image nativo vía Runway API)
   if (model === "runway-gen4-image" || model === "runway-gen4-image-turbo") {
     const { generateImageWithReferences, fetchRunwayImageBuffer } = await import("./runway.js");
-    const ratioMap: Record<string, "1080:1080" | "1920:1080" | "1080:1920"> = {
-      "1:1":  "1080:1080",
-      "16:9": "1920:1080",
-      "9:16": "1080:1920",
-      "4:3":  "1920:1080",
-      "3:4":  "1080:1920",
-    };
-    const ratio = ratioMap[aspect] || "1080:1080";
+    const { sizeString: ratio } = await pickBestImageSize("runway", model, aspect);
     const runwayModel = model === "runway-gen4-image-turbo" ? "gen4_image_turbo" : "gen4_image";
     const refs: Array<{ uri: string; tag: string }> = [];
     if (opts.referenceImage) refs.push({ uri: bufferToDataUri(opts.referenceImage, opts.referenceMime || "image/png"), tag: "product" });
@@ -340,42 +308,13 @@ export async function generateImage(
   if (model === "recraft-v3") input = { ...input, style: "realistic_image", size: "1820x1024" };
   if (model === "recraft-v3-svg") input = { ...input, style: "vector_illustration", size: "1820x1024" };
   if (model === "recraft-v4") {
-    // recraft-v4 has its own fixed size enum (verified Replicate schema June 2026).
-    // "1820x1024" and other recraft-v3 sizes are NOT valid here — causes 422.
-    // All 14 valid sizes sit near ~1M pixels; no native 4K/8K support.
-    // Full HD / 4K / 8K / 1980×1260 all map to the closest available size by ratio.
-    const RECRAFT_V4_SIZES: Array<[number, number]> = [
-      [1024, 1024], // 1:1    — exact
-      [1536,  768], // 2:1    — exact
-      [ 768, 1536], // 1:2    — exact
-      [1280,  832], // ≈ 3:2  (1.538) — business card, 1980×1260, A4-ish landscape
-      [ 832, 1280], // ≈ 2:3  (0.650)
-      [1344,  768], // ≈ 16:9 (1.750) — Full HD, 4K UHD, 8K, 1280×720
-      [ 768, 1344], // ≈ 9:16 (0.571) — Instagram/TikTok Story
-      [1280,  896], // ≈ 7:5  (1.429) — A4 landscape (1.414)
-      [ 896, 1280], // ≈ 5:7  (0.700) — A4 portrait  (0.707)
-      [1216,  896], // ≈ 4:3  (1.357)
-      [ 896, 1216], // ≈ 3:4  (0.737)
-      [1152,  896], // ≈ 9:7  (1.286) — 5:4 (1.250)
-      [ 896, 1152], // ≈ 7:9  (0.778) — 4:5 (0.800)
-      [ 832, 1344], // ≈ 5:8  (0.619) — between 9:16 and 2:3
-    ];
-    // Parse aspect string → target ratio. Handles "W:H", "WxH", or plain "W:H".
-    function parseRatio(s: string): number {
-      const m = s.match(/^(\d+(?:\.\d+)?)[:/x×](\d+(?:\.\d+)?)$/i);
-      if (m) return parseFloat(m[1]) / parseFloat(m[2]);
-      return 1; // fallback square
-    }
-    const targetRatio = parseRatio(aspect);
-    let bestSize = RECRAFT_V4_SIZES[0];
-    let bestDiff = Infinity;
-    for (const [w, h] of RECRAFT_V4_SIZES) {
-      const diff = Math.abs(w / h - targetRatio);
-      if (diff < bestDiff) { bestDiff = diff; bestSize = [w, h]; }
-    }
-    const v4Size = `${bestSize[0]}x${bestSize[1]}`;
+    // Schema fetched dynamically from Replicate (cached 24 h). No hardcoded list.
+    const { sizeString: v4Size } = await pickBestImageSize("replicate", model, aspect, {
+      replicateId: cfg.replicateId,
+      replicateToken: token,
+    });
     const { aspect_ratio, ...rest } = input;
-    input = { ...rest, style: "realistic_image", size: v4Size };
+    input = { ...rest, style: "realistic_image", size: v4Size || "1024x1024" };
   }
   if (model === "imagen-4-ultra" || model === "imagen-4" || model === "imagen-4-fast") {
     input = { ...input, output_format: "png", safety_filter_level: "block_only_high" };
