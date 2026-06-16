@@ -693,7 +693,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - persist_cinematic_script: Guardar un script cinematográfico (objeto con scenes[]) como template reutilizable. Devuelve {scriptId} para reutilizar como savedPromptId en futuros anuncios. Params: {projectId, script (objeto con scenes[]), brand?, productName?, niche?, audience?, language?, totalDurationSec?, aspect?, videoModel?, imageModel?, style?, customBrief?}.
   - build_product_dna: Extraer un dossier hiper-detallado del producto (materiales, capas, paleta, hardware, branding visible) usando visión IA. Útil antes de generar un anuncio largo. Params: {projectId, productId}
   - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. EXIGE un productId Shopify (para anuncios de MARCA sin producto Shopify usa create_brand_ad). Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6, hasta 240), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), savedPromptId? (id devuelto por persist_cinematic_script para REUSAR un script ya guardado en lugar de generar uno nuevo), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"kling-3.0-omni"|"runway-seedance2"|"runway-gen4.5"|"seedance-pro"|"veo-4"|"veo-3.1")}
-  - create_brand_ad: Crear un anuncio de MARCA (sin producto Shopify específico) — ideal para campañas de branding, drops o equivalente al script v3 cascada en una sola llamada: imagen de referencia → N escenas → voz off → música → concat con crossfade. Equivalente al runner offline pero invocable desde el chat. La imagen de referencia debe estar PREVIAMENTE en el vault del proyecto (usa absorb-image antes para subirla y obtén el vault id). Devuelve {vaultId} del vídeo final + {scriptVaultId} reusable. Params: {projectId, brand (nombre de la marca), productName (concepto del anuncio, ej "drop primavera 2026"), referenceImageVaultId (id en vault de la imagen base — obligatorio), scenesCount? (2-24, default 6), totalDurationSec? (6-240, default scenesCount*8), aspect? ("9:16"|"16:9"|"1:1", default 9:16), language? ("es"|"en", default es), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"kling-3.0-omni"|"seedance-pro"|"runway-seedance2"|"runway-gen4.5", default kling-3.0-turbo), style? ("cinematic"|"ugc"|"editorial"|"luxury"|"tech"|"energetic"), customBrief? (notas extra para el guion), narrationEnabled? (default true), narrationVoiceId? (default ES Bella 21m00Tcm4TlvDq8ikWAM), musicEnabled? (default true), musicPrompt? (descripción para ElevenLabs Music)}
+  - create_brand_ad: Crear un anuncio de MARCA (sin producto Shopify específico) — ideal para campañas de branding, drops o equivalente al script v3 cascada en una sola llamada: imagen de referencia → N escenas → voz off → música → concat con crossfade. Equivalente al runner offline pero invocable desde el chat. La imagen de referencia debe estar PREVIAMENTE en el vault del proyecto (usa absorb-image antes para subirla y obtén el vault id). Devuelve {vaultId} del vídeo final + {scriptVaultId} reusable. Params: {projectId, brand (nombre de la marca), productName (concepto del anuncio, ej "drop primavera 2026"), referenceImageVaultId (id en vault de la imagen base — obligatorio), scenesCount? (2-24, default 6), totalDurationSec? (6-240, default scenesCount*8), aspect? ("9:16"|"16:9"|"1:1", default 9:16), language? ("es"|"en", default es), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"kling-3.0-omni"|"seedance-pro"|"runway-seedance2"|"runway-gen4.5", default kling-3.0-turbo), style? ("cinematic"|"ugc"|"editorial"|"luxury"|"tech"|"energetic"), customBrief? (notas extra para el guion), narrationEnabled? (default true), narrationVoiceId? (default ES Bella 21m00Tcm4TlvDq8ikWAM), musicEnabled? (default true), musicPrompt? (descripción para Stable Audio via Replicate — ej: "ambient electronic 120 BPM para anuncio de tecnología")}
   - get_ai_models: Devuelve la matriz activa de modelos AI (claude/gemini × fast/smart/genius/vision) indicando si la fuente es db/env/default + catálogo de modelos conocidos. Sin params.
   - set_ai_model: Cambia EN VIVO el modelo de un provider+tier (ej: usar Opus 4.1 para "genius"). Pasa model=null para borrar el override. Params: {provider:"claude"|"gemini", tier:"fast"|"smart"|"genius"|"vision", model:string|null}
     • compositionMode "narrative" = cámara y escenas libres (default).
@@ -1253,6 +1253,33 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
       let answer = "";
       let engineUsed = "claude+omnicore";
 
+      // ── CLASIFICADOR DE TAREAS (Routing Matrix por Gemini) ───────────────────
+      // Si el usuario eligió "auto", clasificamos automáticamente la consulta
+      // y elegimos el motor óptimo siguiendo el Mapa de Capacidades:
+      //   • Gemini  → análisis de vídeo, investigación de mercado/competidores,
+      //               tendencias actuales, cálculos rápidos, búsqueda web en tiempo real
+      //   • Claude  → escritura profunda, guiones, JSON estructurado, código HTML/CSS,
+      //               razonamiento complejo, análisis estratégico largo
+      function classifyQueryEngine(q: string): "gemini" | "claude" {
+        const ql = q.toLowerCase();
+        // Señales de investigación/mercado/tendencias → Gemini + search
+        const researchSignals = [
+          /competidor|competencia|competitor/i,
+          /tendencia|trend|viral|de moda/i,
+          /mercado|market|precio.*mercado|cuánto.*vende/i,
+          /busca la|busca en|búsqueda|search|investiga|investig/i,
+          /qué busca|qué compra|comportamiento del consumidor/i,
+          /noticias|actualidad|news|hoy|ahora|2025|2026/i,
+          /analiza.*vídeo|vídeo.*viral|tiktok|reels|youtube.*analiza/i,
+          /qué pasa en.*vídeo|resumen.*vídeo|entiende.*vídeo/i,
+          /cálculo rápido|cogs|margen|punto de equilibrio.*rápido/i,
+          /proveed.*precio|precio.*proveedor|alibaba|aliexpress/i,
+        ];
+        if (researchSignals.some(r => r.test(ql))) return "gemini";
+        // Todo lo demás → Claude (razonamiento profundo, escritura, código)
+        return "claude";
+      }
+
       if (engine === "brain_only") {
         const queryWords = query.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
         const brainConditions = [gte(omnicoreMemoriesTable.confidence, 0.3)];
@@ -1293,22 +1320,24 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           8000,
         );
         engineUsed = "brain_only";
-      } else if (engine === "gemini") {
+      } else if (engine === "gemini" || (engine === "auto" && classifyQueryEngine(query) === "gemini")) {
+        // Gemini: investigación de mercado, análisis de vídeo, tendencias, búsqueda en tiempo real
         const { askGeminiWithSearch } = await import("../lib/gemini.js");
         const geminiRes = await askGeminiWithSearch(
           `${sysPrompt}\n\n${userContent}`,
           "Eres Shopy Crafter, asistente experto de eCommerce Shopify. Responde SIEMPRE en español. Sé directo y accionable."
         );
         answer = geminiRes.text || "Gemini no pudo generar una respuesta. Prueba con otro motor.";
-        engineUsed = "gemini+search";
+        engineUsed = engine === "auto" ? "auto→gemini+search" : "gemini+search";
       } else {
+        // Claude: escritura profunda, guiones, código, JSON estructurado, razonamiento complejo
         answer = await askClaude(
           resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
           [{ role: "user", content: userContent }],
           sysPrompt,
           16000,
         );
-        engineUsed = engine === "claude" ? "claude" : "claude+omnicore";
+        engineUsed = engine === "claude" ? "claude" : engine === "auto" ? "auto→claude+omnicore" : "claude+omnicore";
       }
 
       let detectedAction: { action: string; params: Record<string, unknown> } | null = null;
