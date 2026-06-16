@@ -113,12 +113,57 @@ const POPULAR_FONTS = [
   "Comic Sans MS", "Orbitron", "Press Start 2P",
 ];
 
-// ── Emojis frecuentes para selector ──────────────────────────────────────────
-const EMOJI_LIST = [
-  "⭐","🌟","💫","✨","🔥","💥","🎯","🏆","💎","👑",
-  "🎨","🖌️","📱","💻","🌐","📧","📞","📍","💼","🚀",
-  "❤️","💛","💚","💙","💜","🖤","🤍","🎭","🎬","🎵",
-  "😊","😎","🤝","👏","💪","✌️","👍","🙌","🌈","🦋",
+// ── Emojis organizados por categoría ─────────────────────────────────────────
+const EMOJI_CATS: { label: string; icon: string; list: string[] }[] = [
+  { label: "Estrellas", icon: "⭐", list: [
+    "⭐","🌟","💫","✨","🔥","💥","🎯","🏆","💎","👑","🥇","🎖️",
+    "🔮","🪄","⚡","❄️","🌙","☀️","🌈","🎆","🎇","🪅","🎊","🎉",
+  ]},
+  { label: "Caras", icon: "😊", list: [
+    "😀","😃","😄","😁","😆","😎","🤩","😍","🥰","😇","🤗","😏",
+    "😅","😂","🤣","😊","🙂","😌","😐","😑","😒","🤔","🤨","😮",
+    "😲","😳","🥺","😢","😭","😤","😠","😡","🤯","🥳","🤓","👿",
+  ]},
+  { label: "Gestos", icon: "👍", list: [
+    "👍","👎","✌️","🤞","🤙","👌","👏","🙌","🤝","🫶","💪","🦾",
+    "🤜","🤛","👊","✊","🤚","🖐️","🤲","🙏","☝️","👇","👉","👈",
+  ]},
+  { label: "Corazones", icon: "❤️", list: [
+    "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💗","💓","💞",
+    "💕","💘","💝","💖","❤️‍🔥","❤️‍🩹","💔","🫀","♥️","🩷","🩵","🩶",
+  ]},
+  { label: "Animales", icon: "🐱", list: [
+    "🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮",
+    "🐸","🐵","🦄","🐝","🦋","🐢","🦅","🦁","🐉","🦈","🐬","🦊",
+  ]},
+  { label: "Naturaleza", icon: "🌿", list: [
+    "🌸","🌺","🌹","🌻","🌼","🪷","🌷","🌿","🍀","🍁","🍂","🍃",
+    "🌵","🎋","🌾","🪴","🌲","🌳","🌴","🪸","🌊","🏔️","🌋","⛰️",
+  ]},
+  { label: "Negocios", icon: "💼", list: [
+    "💼","📊","📈","📉","💰","💳","🏦","🏢","📋","📌","📍","🗂️",
+    "✉️","📧","📱","💻","🖥️","🖨️","📠","📟","⌚","🔑","🔐","💡",
+  ]},
+  { label: "Arte", icon: "🎨", list: [
+    "🎨","🖌️","🖍️","✏️","📝","🎭","🎬","🎤","🎧","🎵","🎶","🎸",
+    "🎹","🥁","🎺","🎻","🎼","🎙️","🎞️","📷","📸","🖼️","🎭","✍️",
+  ]},
+  { label: "Comida", icon: "🍕", list: [
+    "🍕","🍔","🌮","🌯","🥗","🍣","🍜","🍩","🎂","🍰","🧁","☕",
+    "🍺","🍷","🥂","🍾","🧃","🥤","🧋","🍵","🍫","🍬","🍭","🍓",
+  ]},
+  { label: "Deportes", icon: "⚽", list: [
+    "⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🏓","🏸","🥊","🏋️",
+    "🤸","⛷️","🏂","🏄","🚴","🏇","🥋","🥅","🎯","🎳","🎿","🏆",
+  ]},
+  { label: "Viajes", icon: "🚀", list: [
+    "🚀","✈️","🚂","🚢","🚗","🏎️","🛺","🚁","🛸","🌍","🌎","🌏",
+    "🗺️","🗼","🗽","🏰","🏯","⛩️","🏖️","🏝️","🏜️","🌃","🌆","🌉",
+  ]},
+  { label: "Símbolos", icon: "♾️", list: [
+    "♾️","✅","❌","⭕","🔴","🟡","🟢","🔵","🟣","⚫","⚪","🔶",
+    "🔷","🔸","🔹","▶️","⏩","⏭️","🔝","🔆","💯","🆙","🆒","🔱",
+  ]},
 ];
 
 // ── Temas de fondo con prompts IA ─────────────────────────────────────────────
@@ -337,6 +382,7 @@ export default function CardStudioEditor({
     opacity?: number;
   } | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [emojiCatIdx, setEmojiCatIdx] = useState(0);
   const [showThemes, setShowThemes] = useState(false);
   const [activeTab, setActiveTab] = useState<"elementos" | "temas">("elementos");
   const [localQrType, setLocalQrType] = useState<string>(qrTypeProp || "vcard");
@@ -886,18 +932,66 @@ export default function CardStudioEditor({
             </button>
             {showEmoji && (
               <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 50,
-                background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 8, padding: 8, width: 220,
-                display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 2,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+                position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 9999,
+                background: "#12121f", border: "1px solid rgba(255,255,255,0.14)",
+                borderRadius: 10, width: 300,
+                boxShadow: "0 12px 40px rgba(0,0,0,0.85)",
+                display: "flex", flexDirection: "column",
               }}>
-                {EMOJI_LIST.map(em => (
-                  <button key={em} onClick={() => addEmoji(em)}
-                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, padding: 2, borderRadius: 4, lineHeight: 1 }}
-                    title={em}
-                  >{em}</button>
-                ))}
+                {/* Cabecera con categorías */}
+                <div style={{
+                  display: "flex", overflowX: "auto", gap: 2, padding: "6px 6px 0",
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  scrollbarWidth: "none",
+                }}>
+                  {EMOJI_CATS.map((cat, i) => (
+                    <button
+                      key={cat.label}
+                      onClick={() => setEmojiCatIdx(i)}
+                      title={cat.label}
+                      style={{
+                        flexShrink: 0, background: "none", border: "none", cursor: "pointer",
+                        fontSize: 16, padding: "4px 6px", borderRadius: "6px 6px 0 0",
+                        borderBottom: i === emojiCatIdx ? "2px solid var(--gold)" : "2px solid transparent",
+                        opacity: i === emojiCatIdx ? 1 : 0.5,
+                        transition: "opacity 0.15s",
+                        lineHeight: 1,
+                      }}
+                    >{cat.icon}</button>
+                  ))}
+                </div>
+                {/* Label de categoría */}
+                <div style={{ padding: "4px 8px 2px", fontSize: 9, color: "var(--gold)", fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase" }}>
+                  {EMOJI_CATS[emojiCatIdx].label}
+                </div>
+                {/* Grid de emojis con scroll */}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 1,
+                  padding: "0 6px 6px",
+                  maxHeight: 180, overflowY: "auto",
+                  scrollbarWidth: "thin", scrollbarColor: "rgba(212,175,55,0.3) transparent",
+                }}>
+                  {EMOJI_CATS[emojiCatIdx].list.map(em => (
+                    <button
+                      key={em}
+                      onClick={() => addEmoji(em)}
+                      title={em}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        fontSize: 22, padding: "4px 2px", borderRadius: 6,
+                        lineHeight: 1, textAlign: "center",
+                        transition: "background 0.1s",
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(212,175,55,0.15)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                    >{em}</button>
+                  ))}
+                </div>
+                {/* Footer: cerrar */}
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "4px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 9, color: "var(--t3)" }}>{EMOJI_CATS[emojiCatIdx].list.length} emojis · clic para insertar</span>
+                  <button onClick={() => setShowEmoji(false)} style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer", fontSize: 10, padding: "2px 6px" }}>✕ cerrar</button>
+                </div>
               </div>
             )}
           </div>
