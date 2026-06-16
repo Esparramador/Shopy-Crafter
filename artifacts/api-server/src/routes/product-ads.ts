@@ -410,7 +410,7 @@ router.post(
         scenesCount,
         totalDurationSec,
         aspect: ((body.aspect === "4:5" ? "9:16" : (body.aspect || "9:16")) as CinematicAspect),
-        videoModel: (body.videoModel || "kling-2.1") as any,
+        videoModel: (body.videoModel || "kling-3.0-turbo") as any,
         style: "cinematic" as CinematicStyle,
         customBrief: [
           body.ctaText ? `CTA al final: "${body.ctaText}"` : "",
@@ -461,7 +461,7 @@ router.post(
           mimeType: result.finalMime || "video/mp4",
           productId: product.shopifyProductId,
           productTitle: product.title || undefined,
-          generatedBy: `smart-cinematic:${body.videoModel || "kling-2.1"}`,
+          generatedBy: `smart-cinematic:${body.videoModel || "kling-3.0-turbo"}`,
           content: result.finalVideo.toString("base64"),
           metadata: {
             scenesCount: result.script.scenes.length,
@@ -655,7 +655,7 @@ router.post(
               `Effect: ${effectStyle === "lifestyle_use" ? "the model is naturally using the product" : "the model is wearing/holding the product"}. ` +
               `Photorealistic, professional commercial lighting, ${aspect} aspect ratio. Do not invent a different product — copy the one in the SECOND image faithfully.${identityBlock}`;
             const response = await ai.models.generateContent({
-              model: "gemini-2.5-flash-image",
+              model: "gemini-3.1-flash-image",
               contents: [
                 { text: fusionPrompt },
                 { inlineData: { mimeType: baseModelMime, data: baseModelImage.toString("base64") } } as any,

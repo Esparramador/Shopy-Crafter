@@ -19,8 +19,8 @@ export type NanoBananaOpts = {
   tier?: NanoBananaTier;
 };
 
-// ── Nano Banana v1 (Gemini 2.5 Flash Image) — fast, cheap, brand-consistent
-const MODEL_GEMINI_V1 = "gemini-2.5-flash-image";
+// ── Nano Banana v1 (Gemini 3.1 Flash Image) — fast, cheap, brand-consistent
+const MODEL_GEMINI_V1 = "gemini-3.1-flash-image";
 const MODEL_REPLICATE_V1 = "google/nano-banana";
 // ── Nano Banana v2 / Pro (Gemini 3 Pro Image) — 4K, sharper text rendering,
 //    better identity lock, top-tier reasoning. Stable release (no -preview), June 2026.
@@ -198,7 +198,7 @@ async function tryReplicate(
 
 /**
  * Generate or edit an image with Google's Nano Banana
- * (gemini-2.5-flash-image).
+ * (gemini-3.1-flash-image).
  *
  * Tries the direct Gemini API first (cheaper, faster), and on failures that
  * are retryable (403 PERMISSION_DENIED, 429 quota, 5xx, network), falls back

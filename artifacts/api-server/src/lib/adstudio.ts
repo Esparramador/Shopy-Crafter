@@ -3,7 +3,7 @@
  *
  * Pipeline:
  *   1. Copy generation (Claude, ya existente vía learnFromOperation)
- *   2. Hero image (Nano Banana = gemini-2.5-flash-image-preview)
+ *   2. Hero image (Nano Banana = gemini-3.1-flash-image)
  *   3. Video (Runway Gen-4 Turbo, o fallback a Replicate Seedance)
  *   4. Voiceover (ElevenLabs TTS)
  *   5. SFX (ElevenLabs Sound Effects)
@@ -572,11 +572,11 @@ async function generateVideoReplicate(
     "replicate-seedance-pro":     "bytedance/seedance-1-pro",
     "replicate-seedance-fast":    "bytedance/seedance-1-pro",
     "replicate-seedance-lite":    "bytedance/seedance-1-lite",
-    "replicate-kling-master":     "kwaivgi/kling-v2-master",
-    "replicate-kling-2.5-turbo":  "kwaivgi/kling-v2.5-turbo",
-    "replicate-kling":            "kwaivgi/kling-v2.1",
+    "replicate-kling-master":     "kwaivgi/kling-v3.0-master",
+    "replicate-kling-2.5-turbo":  "kwaivgi/kling-v3.0-turbo",
+    "replicate-kling":            "kwaivgi/kling-v3.0-turbo",
     "replicate-hailuo":           "minimax/hailuo-02",
-    "replicate-wan-2.5":          "wan-ai/wan-2.5-i2v",
+    "replicate-wan-2.5":          "wan-video/wan-2.5-i2v",
   };
   const modelId = modelMap[input.videoProvider] || modelMap["replicate-seedance-lite"];
 

@@ -670,7 +670,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   FusionStudioPro es el estudio creativo completo en /projects/:id/fusion-studio-pro con 14 pestañas:
   • Quick Image: Generación rápida con cualquier modelo (gpt-image-1, recraft-v3, flux-dev, imagen-4, nano-banana, seedream-4)
   • Batch Studio: Generación masiva en paralelo (hasta 16 imágenes simultáneas)
-  • Video Studio: Clips de vídeo IA (kling-2.1, kling-master, runway-gen4, seedance-pro, veo-3, hailuo)
+  • Video Studio: Clips de vídeo IA (kling-3.0-turbo, kling-3.0-master, runway-gen5, runway-gen4.5, seedance-pro, veo-4, veo-3.1, hailuo, wan-2.6, grok-video)
   • Multishot Ad: Anuncio cinematográfico multi-escena con música y voz
   • Avatar Studio: Personajes fotorealistas y animados con Character Lock
   • Image Edit: Edición con referencias múltiples (flux-kontext, seedream-4, nano-banana)
@@ -692,8 +692,8 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - update_character: Actualizar campos de un personaje existente sin tocar la imagen. Params: {projectId, characterId, name?, gender?, ageRange?, identityDescription?, voiceId?, voiceGender?, voiceLanguage?, styleNotes?}.
   - persist_cinematic_script: Guardar un script cinematográfico (objeto con scenes[]) como template reutilizable. Devuelve {scriptId} para reutilizar como savedPromptId en futuros anuncios. Params: {projectId, script (objeto con scenes[]), brand?, productName?, niche?, audience?, language?, totalDurationSec?, aspect?, videoModel?, imageModel?, style?, customBrief?}.
   - build_product_dna: Extraer un dossier hiper-detallado del producto (materiales, capas, paleta, hardware, branding visible) usando visión IA. Útil antes de generar un anuncio largo. Params: {projectId, productId}
-  - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. EXIGE un productId Shopify (para anuncios de MARCA sin producto Shopify usa create_brand_ad). Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6, hasta 240), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), savedPromptId? (id devuelto por persist_cinematic_script para REUSAR un script ya guardado en lugar de generar uno nuevo), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-2.1"|"runway-gen4")}
-  - create_brand_ad: Crear un anuncio de MARCA (sin producto Shopify específico) — ideal para campañas de branding, drops o equivalente al script v3 cascada en una sola llamada: imagen de referencia → N escenas → voz off → música → concat con crossfade. Equivalente al runner offline pero invocable desde el chat. La imagen de referencia debe estar PREVIAMENTE en el vault del proyecto (usa absorb-image antes para subirla y obtén el vault id). Devuelve {vaultId} del vídeo final + {scriptVaultId} reusable. Params: {projectId, brand (nombre de la marca), productName (concepto del anuncio, ej "drop primavera 2026"), referenceImageVaultId (id en vault de la imagen base — obligatorio), scenesCount? (2-24, default 6), totalDurationSec? (6-240, default scenesCount*8), aspect? ("9:16"|"16:9"|"1:1", default 9:16), language? ("es"|"en", default es), videoModel? ("kling-2.1"|"kling-master"|"seedance-pro"|"runway-gen4", default kling-2.1), style? ("cinematic"|"ugc"|"editorial"|"luxury"|"tech"|"energetic"), customBrief? (notas extra para el guion), narrationEnabled? (default true), narrationVoiceId? (default ES Bella 21m00Tcm4TlvDq8ikWAM), musicEnabled? (default true), musicPrompt? (descripción para ElevenLabs Music)}
+  - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. EXIGE un productId Shopify (para anuncios de MARCA sin producto Shopify usa create_brand_ad). Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6, hasta 240), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), savedPromptId? (id devuelto por persist_cinematic_script para REUSAR un script ya guardado en lugar de generar uno nuevo), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"runway-gen5"|"runway-gen4.5"|"seedance-pro"|"veo-4"|"veo-3.1")}
+  - create_brand_ad: Crear un anuncio de MARCA (sin producto Shopify específico) — ideal para campañas de branding, drops o equivalente al script v3 cascada en una sola llamada: imagen de referencia → N escenas → voz off → música → concat con crossfade. Equivalente al runner offline pero invocable desde el chat. La imagen de referencia debe estar PREVIAMENTE en el vault del proyecto (usa absorb-image antes para subirla y obtén el vault id). Devuelve {vaultId} del vídeo final + {scriptVaultId} reusable. Params: {projectId, brand (nombre de la marca), productName (concepto del anuncio, ej "drop primavera 2026"), referenceImageVaultId (id en vault de la imagen base — obligatorio), scenesCount? (2-24, default 6), totalDurationSec? (6-240, default scenesCount*8), aspect? ("9:16"|"16:9"|"1:1", default 9:16), language? ("es"|"en", default es), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"seedance-pro"|"runway-gen5"|"runway-gen4.5", default kling-3.0-turbo), style? ("cinematic"|"ugc"|"editorial"|"luxury"|"tech"|"energetic"), customBrief? (notas extra para el guion), narrationEnabled? (default true), narrationVoiceId? (default ES Bella 21m00Tcm4TlvDq8ikWAM), musicEnabled? (default true), musicPrompt? (descripción para ElevenLabs Music)}
   - get_ai_models: Devuelve la matriz activa de modelos AI (claude/gemini × fast/smart/genius/vision) indicando si la fuente es db/env/default + catálogo de modelos conocidos. Sin params.
   - set_ai_model: Cambia EN VIVO el modelo de un provider+tier (ej: usar Opus 4.1 para "genius"). Pasa model=null para borrar el override. Params: {provider:"claude"|"gemini", tier:"fast"|"smart"|"genius"|"vision", model:string|null}
     • compositionMode "narrative" = cámara y escenas libres (default).
@@ -10043,7 +10043,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const customNotes = typeof params?.customNotes === "string" ? params.customNotes : undefined;
           const aspect = (params?.aspect === "16:9" || params?.aspect === "1:1") ? params.aspect : "9:16";
           const language = typeof params?.language === "string" ? params.language : "es";
-          const videoModel = typeof params?.videoModel === "string" ? params.videoModel : "kling-2.1";
+          const videoModel = typeof params?.videoModel === "string" ? params.videoModel : "kling-3.0-turbo";
           const savedPromptId = typeof params?.savedPromptId === "string" && params.savedPromptId.trim()
             ? params.savedPromptId.trim()
             : undefined;
@@ -10120,7 +10120,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const totalDurationSec = Math.max(6, Math.min(240, Number(params?.totalDurationSec) || (scenesCount * 8)));
           const aspect = (params?.aspect === "16:9" || params?.aspect === "1:1") ? params.aspect : "9:16";
           const language = typeof params?.language === "string" ? params.language : "es";
-          const videoModel = typeof params?.videoModel === "string" ? params.videoModel : "kling-2.1";
+          const videoModel = typeof params?.videoModel === "string" ? params.videoModel : "kling-3.0-turbo";
           const imageModel = typeof params?.imageModel === "string" ? params.imageModel : undefined;
           const style = typeof params?.style === "string" ? params.style : "cinematic";
           const customBrief = typeof params?.customBrief === "string" ? params.customBrief : (typeof params?.customNotes === "string" ? params.customNotes : undefined);
@@ -10479,7 +10479,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               scenesCount,
               totalDurationSec,
               aspect: (params?.aspect === "16:9" || params?.aspect === "1:1" || params?.aspect === "9:16") ? params.aspect : "9:16",
-              videoModel: typeof params?.videoModel === "string" ? params.videoModel : "kling-2.1",
+              videoModel: typeof params?.videoModel === "string" ? params.videoModel : "kling-3.0-turbo",
               imageModel: typeof params?.imageModel === "string" ? params.imageModel : undefined,
               style: typeof params?.style === "string" ? params.style : "cinematic",
               customBrief: typeof params?.customBrief === "string" ? params.customBrief : undefined,

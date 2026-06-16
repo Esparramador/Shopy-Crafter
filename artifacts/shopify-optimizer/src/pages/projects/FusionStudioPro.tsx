@@ -782,7 +782,7 @@ function EnhanceTab({ caps, projectId, onSuccess, onError }: { caps: Capabilitie
 
 // ─── TAB: VIDEO ──────────────────────────────────────────────────────────
 // Modelos que NO soportan text-to-video puro → exigen imagen origen.
-const I2V_ONLY_MODELS = new Set(["runway-gen4-turbo", "runway-gen3-alpha", "wan-2.5-fast"]);
+const I2V_ONLY_MODELS = new Set(["runway-gen4-turbo", "runway-gen4.5", "runway-gen5", "runway-gen3-alpha", "wan-2.5", "wan-2.5-fast", "wan-2.6"]);
 
 type VideoMode = "t2v" | "i2v" | "extend" | "edit-video";
 

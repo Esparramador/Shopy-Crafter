@@ -1089,7 +1089,7 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
           const ai = new GoogleGenAI({ apiKey });
           const fusionPrompt = `Create a premium editorial product photograph using the EXACT product shown in the reference image. The product (${productTitle}${productType ? `, ${productType}` : ""}) must appear with its REAL color, shape, materials, branding and proportions — do NOT redesign, restyle or recolor it. Place it in this scene: ${bgPrompt}. The product is the hero of the composition, beautifully lit, sharp focus, photoreal, no AI artifacts. STRICT: do not render any text, letters, words, numbers, logos, watermarks or typography that is not literally on the original product.`;
           const r = await ai.models.generateContent({
-            model: "gemini-2.5-flash-image",
+            model: "gemini-3.1-flash-image",
             contents: [
               { text: fusionPrompt },
               { inlineData: { mimeType: productImageMime, data: productImageBuffer.toString("base64") } },
@@ -1101,15 +1101,15 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
             const inline = (part as any).inlineData || (part as any).inline_data;
             if (inline?.data) {
               bgBuffer = Buffer.from(inline.data, "base64");
-              bgModel = "gemini-2.5-flash-image+productref";
+              bgModel = "gemini-3.1-flash-image+productref";
               break;
             }
           }
-          if (!bgBuffer) bgErrors.push("gemini-2.5-flash-image+productref: no image returned");
+          if (!bgBuffer) bgErrors.push("gemini-3.1-flash-image+productref: no image returned");
         } catch (errFusion: any) {
           const msg = String(errFusion?.message || "").slice(0, 240);
-          bgErrors.push(`gemini-2.5-flash-image+productref: ${msg}`);
-          logger.warn({ err: msg }, "infographic-premium overlay: gemini-with-product-ref fallback to model cascade");
+          bgErrors.push(`gemini-3.1-flash-image+productref: ${msg}`);
+          logger.warn({ err: msg }, "infographic-premium overlay: gemini-3.1-flash-image+productref fallback to model cascade");
         }
       }
 
@@ -1582,7 +1582,7 @@ Take the person from the FIRST image and the product from the SECOND image. Crea
       const ai = new GoogleGenAI({ apiKey });
 
       const result = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
+        model: "gemini-3.1-flash-image",
         contents: [
           { text: promptForFusion },
           { inlineData: { mimeType: file.mimetype, data: file.buffer.toString("base64") } },
@@ -1647,7 +1647,7 @@ Take the person from the FIRST image and the product from the SECOND image. Crea
           imageType: `tryon_${sceneKey}`,
           status: "succeeded",
           prompt: promptForFusion.slice(0, 2000),
-          model: "gemini-2.5-flash-image",
+          model: "gemini-3.1-flash-image",
           estimatedCost: 0.04,
           completedAt: new Date(),
         });
@@ -1669,7 +1669,7 @@ Take the person from the FIRST image and the product from the SECOND image. Crea
         mimeType: resultMime,
         dataUri,
         scene: sceneKey,
-        model: "gemini-2.5-flash-image",
+        model: "gemini-3.1-flash-image",
         vaultId,
       });
     } catch (err: any) {

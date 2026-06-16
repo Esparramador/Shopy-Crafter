@@ -179,7 +179,7 @@ async function applyVirtualTryon(
 
 /**
  * REAL try-on for accessories (watches, glasses, jewelry, hats, shoes, bags…)
- * via Gemini Nano Banana (gemini-2.5-flash-image) multi-image fusion.
+ * via Gemini Nano Banana (gemini-3.1-flash-image) multi-image fusion.
  *
  * IDM-VTON only supports tops/bottoms/dresses. For everything else we use
  * Nano Banana, which understands spatial relationships and can convincingly
@@ -858,7 +858,7 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
                 mimeType: tryonResult.mimeType,
                 generatedBy: "fusion-studio-tryon-nb",
                 metadata: {
-                  model: `gemini-2.5-flash-image (${tryonResult.provider})`,
+                  model: `gemini-3.1-flash-image (${tryonResult.provider})`,
                   productCategory: productCategoryNB,
                   productSubcategory: productSubcategoryNB,
                   cost: totalItemCost,
@@ -877,7 +877,7 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
             index: item.index,
             imageUrl: finalUrl,
             prompt: `REAL accessory try-on (${productCategoryNB} on model)`,
-            model: `gemini-2.5-flash-image (${tryonResult.provider})`,
+            model: `gemini-3.1-flash-image (${tryonResult.provider})`,
             cost: totalItemCost,
             tryonPipeline: true,
           });
@@ -890,7 +890,7 @@ Generate a world-class professional ${mode} photograph. Think Apple, Vogue, Bon 
             index: item.index,
             imageUrl: null,
             prompt: "",
-            model: "gemini-2.5-flash-image",
+            model: "gemini-3.1-flash-image",
             cost: 0,
             error: err instanceof Error ? err.message : String(err),
             tryonPipeline: true,
@@ -1286,7 +1286,7 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
       // Kling
       kling_master:     "kling-master",
       kling_25_turbo:   "kling-2.5-turbo",
-      kling_21:         "kling-2.1",
+      kling_21:         "kling-3.0-turbo",
       // Seedance
       seedance_pro:     "seedance-pro",
       seedance_fast:    "seedance-fast",
@@ -1295,7 +1295,7 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
       hailuo_02:        "hailuo-02",
       hailuo_02_fast:   "hailuo-02-fast",
       // Wan
-      wan_25:           "wan-2.5-fast",
+      wan_25:           "wan-2.6",
       wan_25_hq:        "wan-2.5",
       wan_25_t2v:       "wan-2.5-t2v",
       // Veo (Gemini)

@@ -225,7 +225,7 @@ const TPL_ANATOMY: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "flux-1.1-pro",
     defaultAspect: "9:16",
     motionScore: 5,
@@ -273,7 +273,7 @@ const TPL_DECONSTRUCTION: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "flux-1.1-pro",
     defaultAspect: "9:16",
     motionScore: 5,
@@ -321,7 +321,7 @@ const TPL_CONSTRUCTION: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "flux-1.1-pro",
     defaultAspect: "9:16",
     motionScore: 6,
@@ -389,7 +389,7 @@ const TPL_EXPLODED_VIEW: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "flux-1.1-pro",
     defaultAspect: "16:9",
     motionScore: 4,
@@ -474,7 +474,7 @@ const TPL_APPLE_PORSCHE: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "flux-1.1-pro",
     defaultAspect: "16:9",
     motionScore: 4,
@@ -569,7 +569,7 @@ const TPL_PRESENTER_HYBRID: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "nano-banana",
     defaultAspect: "16:9",
     motionScore: 4,
@@ -637,7 +637,7 @@ const TPL_LIFESTYLE_ORBIT: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "nano-banana",
     defaultAspect: "16:9",
     motionScore: 3,
@@ -716,7 +716,7 @@ const TPL_TALKING_HEAD_DIRECT: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "nano-banana",
     defaultAspect: "9:16",
     motionScore: 2,
@@ -796,7 +796,7 @@ const TPL_ACTION_PULSE: CinematicAdTemplate = {
     },
   ],
   masterConfig: {
-    recommendedVideoModel: "kling-2.1",
+    recommendedVideoModel: "kling-3.0-turbo",
     recommendedImageModel: "nano-banana",
     defaultAspect: "9:16",
     motionScore: 5,
@@ -1236,17 +1236,17 @@ export function composeCinematicScript(
   // fall back to "kling-2.1". This guarantees /cinematic-multishot
   // never receives an unknown videoModel.
   const KNOWN_VIDEO_MODELS = new Set([
-    "kling-master", "kling-2.5-turbo", "kling-2.1",
+    "kling-3.0-master", "kling-3.0-turbo", "kling-master", "kling-2.5-turbo", "kling-2.1",
     "seedance-pro", "seedance-fast", "seedance-1-lite",
     "veo-3.1", "veo-3.1-fast", "veo-3", "veo-3-fast", "veo-2",
     "sora-2",
     "runway-gen4.5", "runway-seedance2", "runway-seedance2-fast", "runway-gen4-turbo",
     "hailuo-02", "hailuo-02-fast",
-    "wan-2.5", "wan-2.5-fast", "wan-2.5-t2v",
+    "wan-2.6", "wan-2.5", "wan-2.5-fast", "wan-2.5-t2v",
   ]);
   const safeVideoModel = KNOWN_VIDEO_MODELS.has(template.masterConfig.recommendedVideoModel)
     ? template.masterConfig.recommendedVideoModel
-    : "kling-2.1";
+    : "kling-3.0-turbo";
 
   return {
     templateId: template.id,

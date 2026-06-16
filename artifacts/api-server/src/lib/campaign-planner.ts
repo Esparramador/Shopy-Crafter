@@ -53,21 +53,21 @@ export interface CampaignEstimate {
 }
 
 const TIER_PRIORITY: Record<QualityTier, VideoModel[]> = {
-  draft:    ["wan-2.5-fast", "seedance-fast", "runway-gen3-alpha"],
-  standard: ["seedance-fast", "seedance-pro", "runway-gen4.5", "kling-2.1"],
-  premium:  ["seedance-pro", "kling-2.1", "runway-gen4.5", "kling-master"],
-  cinema:   ["kling-master", "veo-3-fast", "runway-gen4.5", "kling-2.1"],
+  draft:    ["wan-2.6", "seedance-1-lite", "seedance-fast"],
+  standard: ["seedance-fast", "seedance-pro", "runway-gen4.5", "kling-3.0-turbo"],
+  premium:  ["seedance-pro", "kling-3.0-turbo", "runway-gen4.5", "kling-master"],
+  cinema:   ["kling-3.0-master", "veo-3.1-fast", "runway-gen4.5", "kling-3.0-turbo"],
 };
 
 const PURPOSE_TIER_BIAS: Record<ShotPurpose, Partial<Record<QualityTier, VideoModel>>> = {
-  intro:      { cinema: "kling-master",      premium: "kling-master",     standard: "kling-2.1",       draft: "wan-2.5-fast" },
-  hero:       { cinema: "kling-master",      premium: "runway-gen4.5",   standard: "runway-gen4.5",    draft: "seedance-fast" },
-  model:      { cinema: "seedance-pro",      premium: "seedance-pro",     standard: "seedance-pro",    draft: "seedance-fast" },
-  product:    { cinema: "runway-gen4.5",     premium: "runway-gen4.5",   standard: "seedance-pro",    draft: "seedance-fast" },
-  lifestyle:  { cinema: "seedance-pro",      premium: "seedance-pro",     standard: "kling-2.1",       draft: "seedance-fast" },
-  transition: { cinema: "wan-2.5-fast",      premium: "wan-2.5-fast",     standard: "wan-2.5-fast",    draft: "wan-2.5-fast" },
-  outro:      { cinema: "wan-2.5-fast",      premium: "wan-2.5-fast",     standard: "wan-2.5-fast",    draft: "wan-2.5-fast" },
-  ambient:    { cinema: "wan-2.5-fast",      premium: "wan-2.5-fast",     standard: "wan-2.5-fast",    draft: "wan-2.5-fast" },
+  intro:      { cinema: "kling-3.0-master",  premium: "kling-master",      standard: "kling-3.0-turbo",  draft: "wan-2.6" },
+  hero:       { cinema: "kling-3.0-master",  premium: "runway-gen4.5",     standard: "runway-gen4.5",    draft: "seedance-fast" },
+  model:      { cinema: "seedance-pro",       premium: "seedance-pro",      standard: "seedance-pro",     draft: "seedance-fast" },
+  product:    { cinema: "runway-gen5",        premium: "runway-gen4.5",     standard: "seedance-pro",     draft: "seedance-fast" },
+  lifestyle:  { cinema: "seedance-pro",       premium: "seedance-pro",      standard: "kling-3.0-turbo",  draft: "seedance-fast" },
+  transition: { cinema: "wan-2.6",            premium: "wan-2.6",           standard: "wan-2.6",          draft: "wan-2.6" },
+  outro:      { cinema: "wan-2.6",            premium: "wan-2.6",           standard: "wan-2.6",          draft: "wan-2.6" },
+  ambient:    { cinema: "wan-2.6",            premium: "wan-2.6",           standard: "wan-2.6",          draft: "wan-2.6" },
 };
 
 export function pickModelForShot(
@@ -116,8 +116,8 @@ export function planCampaign(
   const rules: string[] = [
     "Cobro por segundo: clips largos ≡ clips cortos al mismo coste, usar pocos cortes para fluidez.",
     "Preservar caras reales → seedance-pro multi-ref.",
-    "Intros/outros/transiciones → wan-2.5-fast (más barato del mercado).",
-    "Hero shots / heros de producto → runway-gen4.5 (control fino, gen más reciente).",
+    "Intros/outros/transiciones → wan-2.6 (open-source rápido y barato).",
+    "Hero shots de producto → runway-gen5 (Gen 5, física realista) o runway-gen4.5.",
     "Si hay fotos de modelo+producto, saltar virtual try-on → ahorra ~$0.04-15/img.",
   ];
 

@@ -68,7 +68,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
 
   // Cinematic
   const [scenesCount, setScenesCount] = useState(5);
-  const [videoModel, setVideoModel] = useState("kling-2.1");
+  const [videoModel, setVideoModel] = useState("kling-3.0-turbo");
   // LONG-FORM: ad de 30s a 20min con director cinematográfico, paralelización y composición pro
   const [longForm, setLongForm] = useState(false);
   const [totalDurationSec, setTotalDurationSec] = useState(180); // 3 min default cuando longForm
@@ -644,16 +644,17 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                       <span className="text-xs font-semibold text-amber-300 mb-1 block">Modelo de video</span>
                       <select value={videoModel} onChange={e => setVideoModel(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm">
                         <optgroup label="── Runway ──">
-                          <option value="runway-gen4.5">Runway Gen-4.5 (nueva gen, €0.06/s)</option>
+                          <option value="runway-gen5">Runway Gen-5 (2026, física realista, €0.08/s)</option>
+                          <option value="runway-gen4.5">Runway Gen-4.5 (control fino, €0.06/s)</option>
                           <option value="runway-gen4-turbo">Runway Gen-4 Turbo (top Q, €0.05/s)</option>
                           <option value="runway-seedance2">Runway Seedance 2 (cinematic, €0.10/s)</option>
                           <option value="runway-seedance2-fast">Runway Seedance 2 Fast (€0.06/s)</option>
-                          <option value="runway-gen3-alpha">Runway Gen-3 Alpha (€0.05/s)</option>
                         </optgroup>
-                        <optgroup label="── Kling ──">
-                          <option value="kling-master">Kling Master (top motion, €0.18/s)</option>
-                          <option value="kling-2.5-turbo">Kling 2.5 Turbo Pro (1080p, €0.12/s)</option>
-                          <option value="kling-2.1">Kling 2.1 (1080p, €0.09/s)</option>
+                        <optgroup label="── Kling V3.0 ──">
+                          <option value="kling-3.0-master">Kling V3.0 Master (máxima calidad, €0.22/s)</option>
+                          <option value="kling-3.0-turbo">Kling V3.0 Turbo (rápido/calidad V3, €0.14/s)</option>
+                          <option value="kling-master">Kling Master (alias V3.0, €0.22/s)</option>
+                          <option value="kling-2.5-turbo">Kling 2.5 Turbo (→ V3.0 Turbo, €0.14/s)</option>
                         </optgroup>
                         <optgroup label="── Seedance / ByteDance ──">
                           <option value="seedance-pro">Seedance Pro (cinema 9-refs, €0.07/s)</option>
@@ -661,11 +662,16 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                           <option value="seedance-1-lite">Seedance 1 Lite (low-cost, €0.03/s)</option>
                         </optgroup>
                         <optgroup label="── Google Veo ──">
+                          <option value="veo-4">Veo 4 (2026, coherencia max, €1.00/s)</option>
+                          <option value="veo-4-fast">Veo 4 Fast + audio (€0.55/s)</option>
                           <option value="veo-3.1">Veo 3.1 + audio nativo (€0.75/s)</option>
                           <option value="veo-3.1-fast">Veo 3.1 Fast + audio (€0.40/s)</option>
                           <option value="veo-3">Veo 3 + audio nativo (€0.75/s)</option>
                           <option value="veo-3-fast">Veo 3 Fast (€0.40/s)</option>
-                          <option value="veo-2">Veo 2 (€0.35/s)</option>
+                        </optgroup>
+                        <optgroup label="── xAI Grok ──">
+                          <option value="grok-imagine-video-1.5">Grok Video 1.5 Preview (€0.14/s)</option>
+                          <option value="grok-imagine-video">Grok Video (T2V/I2V, €0.07/s)</option>
                         </optgroup>
                         <optgroup label="── OpenAI Sora ──">
                           <option value="sora-2">Sora 2 (narrativa, €0.30/s)</option>
@@ -675,9 +681,9 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                           <option value="hailuo-02-fast">Hailuo 02 Fast (€0.03/s)</option>
                         </optgroup>
                         <optgroup label="── Wan (open-source) ──">
+                          <option value="wan-2.6">Wan 2.6 I2V (nueva gen, €0.05/s)</option>
                           <option value="wan-2.5-t2v">Wan 2.5 T2V puro (€0.025/s)</option>
                           <option value="wan-2.5">Wan 2.5 I2V (€0.04/s)</option>
-                          <option value="wan-2.5-fast">Wan 2.5 Fast (€0.018/s)</option>
                         </optgroup>
                       </select>
                     </label>
@@ -744,7 +750,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
                           </div>
                         </div>
                         <p className="text-[10px] text-amber-300 bg-amber-500/10 rounded p-2 border border-amber-500/20">
-                          💡 Estimación: {(totalDurationSec / 60).toFixed(1)} min con {videoModel} ≈ ${(totalDurationSec * (videoModel === "kling-master" ? 0.18 : videoModel === "kling-2.5-turbo" ? 0.12 : videoModel === "runway-seedance2" ? 0.10 : videoModel === "veo-3.1" || videoModel === "veo-3" ? 0.75 : videoModel === "veo-3.1-fast" || videoModel === "veo-3-fast" ? 0.40 : videoModel === "veo-2" ? 0.35 : videoModel === "sora-2" ? 0.30 : videoModel === "kling-2.1" ? 0.09 : videoModel === "seedance-pro" ? 0.07 : videoModel === "runway-gen4.5" || videoModel === "runway-seedance2-fast" ? 0.06 : videoModel === "seedance-fast" || videoModel === "runway-gen4-turbo" || videoModel === "runway-gen3-alpha" || videoModel === "hailuo-02" ? 0.05 : videoModel === "wan-2.5" ? 0.04 : videoModel === "seedance-1-lite" || videoModel === "hailuo-02-fast" ? 0.03 : videoModel === "wan-2.5-t2v" ? 0.025 : videoModel === "wan-2.5-fast" ? 0.018 : 0.05)).toFixed(2)} en API providers · Tiempo wall-clock estimado: {Math.ceil(scenesCount / 5 * 1.5)}-{Math.ceil(scenesCount / 5 * 3)} min (5 clips en paralelo).
+                          💡 Estimación: {(totalDurationSec / 60).toFixed(1)} min con {videoModel} ≈ ${(totalDurationSec * (videoModel === "veo-4" ? 1.00 : videoModel === "veo-4-fast" ? 0.55 : videoModel === "veo-3.1" || videoModel === "veo-3" ? 0.75 : videoModel === "veo-3.1-fast" || videoModel === "veo-3-fast" ? 0.40 : videoModel === "sora-2" ? 0.30 : videoModel === "grok-imagine-video-1.5" || videoModel === "kling-3.0-master" || videoModel === "kling-master" ? 0.22 : videoModel === "runway-seedance2" ? 0.10 : videoModel === "runway-gen5" ? 0.08 : videoModel === "seedance-pro" ? 0.07 : videoModel === "grok-imagine-video" || videoModel === "runway-gen4.5" || videoModel === "runway-seedance2-fast" ? 0.06 : videoModel === "kling-3.0-turbo" || videoModel === "kling-2.5-turbo" || videoModel === "kling-2.1" ? 0.14 : videoModel === "seedance-fast" || videoModel === "runway-gen4-turbo" || videoModel === "hailuo-02" || videoModel === "wan-2.6" ? 0.05 : videoModel === "wan-2.5" ? 0.04 : videoModel === "seedance-1-lite" || videoModel === "hailuo-02-fast" ? 0.03 : videoModel === "wan-2.5-t2v" ? 0.025 : 0.05)).toFixed(2)} en API providers · Tiempo wall-clock estimado: {Math.ceil(scenesCount / 5 * 1.5)}-{Math.ceil(scenesCount / 5 * 3)} min (5 clips en paralelo).
                         </p>
                       </>
                     )}

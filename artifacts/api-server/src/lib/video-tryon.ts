@@ -2,7 +2,7 @@
  * Video Virtual Try-On — Spokesperson + Product fusion in motion.
  *
  * Pipeline:
- *  1. (Optional) Fuse model image + product image via gemini-2.5-flash-image
+ *  1. (Optional) Fuse model image + product image via gemini-3.1-flash-image
  *     to get a reference frame where the model already wears/holds the product.
  *  2. Feed that frame to a video model (Kling / Hailuo / Runway Gen-4) with a
  *     cinematic prompt describing the motion (effectStyle).
@@ -22,9 +22,9 @@ export type EffectStyle = "natural_wear" | "magical_dress" | "multishot_outfit_c
 export type CharacterGender = "female" | "male" | "neutral";
 
 const PROVIDER_TO_MODEL: Record<TryonProvider, { primary: VideoModel; quality: VideoModel }> = {
-  kling:  { primary: "kling-2.1",         quality: "kling-master" },
+  kling:  { primary: "kling-3.0-turbo",   quality: "kling-3.0-master" },
   hailuo: { primary: "hailuo-02",         quality: "hailuo-02" },
-  runway: { primary: "runway-gen4.5", quality: "runway-gen4.5" },
+  runway: { primary: "runway-gen4.5",     quality: "runway-gen5" },
 };
 
 export interface TryonVideoInput {
@@ -130,9 +130,10 @@ export async function generateTryonVideo(input: TryonVideoInput): Promise<TryonV
   }
 
   // Cost estimate: very rough — providers vary
-  const costPerSec = chosenModel === "kling-master" ? 0.18 :
-                     chosenModel === "kling-2.1" ? 0.09 :
+  const costPerSec = chosenModel === "kling-3.0-master" || chosenModel === "kling-master" ? 0.22 :
+                     chosenModel === "kling-3.0-turbo" || chosenModel === "kling-2.5-turbo" || chosenModel === "kling-2.1" ? 0.14 :
                      chosenModel === "hailuo-02" ? 0.05 :
+                     chosenModel === "runway-gen5" ? 0.08 :
                      chosenModel === "runway-gen4.5" ? 0.06 : 0.07;
   const costEstimateUsd = +(costPerSec * duration).toFixed(3);
 

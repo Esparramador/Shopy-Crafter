@@ -38,9 +38,10 @@ const VIDEO_MODELS = [
   // OpenAI
   { id: "sora-2",               label: "OpenAI Sora 2 · narrativa cinemática ($0.30/s)" },
   // Kling
-  { id: "kling-master",         label: "Kling Master · cinemático max + audio ($0.18/s)" },
-  { id: "kling-2.5-turbo",      label: "Kling 2.5 Turbo · 1080p rápido ($0.12/s)" },
-  { id: "kling-2.1",            label: "Kling 2.1 · 1080p realista ($0.09/s)" },
+  { id: "kling-3.0-master",     label: "Kling V3.0 Master · máxima calidad 2026 ($0.22/s)" },
+  { id: "kling-3.0-turbo",      label: "Kling V3.0 Turbo · rápido, calidad V3 ($0.14/s)" },
+  { id: "kling-master",         label: "Kling Master · alias V3.0 Master ($0.22/s)" },
+  { id: "kling-2.5-turbo",      label: "Kling 2.5 Turbo · → V3.0 Turbo ($0.14/s)" },
   // Seedance (ByteDance)
   { id: "seedance-pro",         label: "Seedance Pro · multi-ref cinemático ($0.07/s)" },
   { id: "seedance-fast",        label: "Seedance Fast · rápido y barato ($0.05/s)" },
@@ -50,7 +51,7 @@ const VIDEO_MODELS = [
   { id: "runway-seedance2",     label: "Runway Seedance 2 · cinematográfico ($0.10/s)" },
   { id: "runway-seedance2-fast",label: "Runway Seedance 2 Fast · rápido ($0.06/s)" },
   { id: "runway-gen4-turbo",    label: "Runway Gen 4 Turbo · foto-real ($0.05/s)" },
-  { id: "runway-gen3-alpha",    label: "Runway Gen 3 Alpha · estable ($0.05/s)" },
+  { id: "runway-gen3-alpha",    label: "Runway Gen 3 Alpha · legado ($0.03/s)" },
   // Hailuo (MiniMax)
   { id: "hailuo-02",            label: "Hailuo 02 · balance vel/calidad ($0.05/s)" },
   { id: "hailuo-02-fast",       label: "Hailuo 02 Fast · económico ($0.03/s)" },

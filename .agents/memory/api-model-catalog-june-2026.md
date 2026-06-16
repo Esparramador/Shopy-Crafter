@@ -44,7 +44,7 @@ description: All AI model identifiers verified live as of June 15, 2026 — Clau
 ## Google Gemini (verified live via SDK models.list)
 - Fast tier: `gemini-3.5-flash` (new — confirmed in live models list)
 - Smart/genius/vision tier: `gemini-3.1-pro-preview` (confirmed live)
-- Nano-Banana v1: `gemini-2.5-flash-image` (confirmed live)
+- Nano-Banana v1: `gemini-3.1-flash-image` (updated from gemini-2.5-flash-image — also in images.ts, product-ads.ts, fusion-studio.ts tryon routes)
 - Nano-Banana v2: `gemini-3-pro-image` (stable, upgraded from -preview)
 - Also available: `gemini-3-pro-preview`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite`
 - SDK `@google/genai ^1.46.0`
