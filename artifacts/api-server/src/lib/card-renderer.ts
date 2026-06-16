@@ -214,7 +214,9 @@ function buildHtml(args: {
   }
   .el .text-inner {
     width: 100%;
-    text-shadow: ${isAi ? "0 2px 8px rgba(0,0,0,0.85), 0 1px 3px rgba(0,0,0,0.65), 0 0 12px rgba(0,0,0,0.4)" : "none"};
+    text-shadow: ${isAi
+      ? "0 2px 14px rgba(0,0,0,0.95), 0 1px 4px rgba(0,0,0,0.85), 0 0 28px rgba(0,0,0,0.65), 0 4px 20px rgba(0,0,0,0.5)"
+      : "none"};
     word-break: break-word;
   }
   .el img { display: block; width: 100%; height: 100%; object-fit: contain; }

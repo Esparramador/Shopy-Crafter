@@ -152,7 +152,9 @@ export function defaultFrontElements(ctx: DefaultsContext): RenderElement[] {
   const { layout, data, palette, fonts, isAiBg, logoDataUri } = ctx;
   const headingW = fonts.weights?.heading ?? 700;
   const bodyW = fonts.weights?.body ?? 400;
-  const plate = isAiBg ? autoPlate(palette) : null;
+  // No plates automáticos — el text-shadow del renderer garantiza legibilidad
+  // sin añadir cajas de fondo detrás del texto sobre fondos IA.
+  const plate = null;
 
   const company = (data.companyName || "").trim();
   const name = (data.fullName || "").trim();
@@ -319,7 +321,8 @@ export function defaultFrontElements(ctx: DefaultsContext): RenderElement[] {
  */
 export function defaultBackElements(ctx: DefaultsContext): RenderElement[] {
   const { data, palette, fonts, isAiBg, qrPngBase64 } = ctx;
-  const plate = isAiBg ? autoPlate(palette) : null;
+  // No plates automáticos — text-shadow del renderer garantiza legibilidad.
+  const plate = null;
   const els: RenderElement[] = [];
 
   const hasContact = !!(data.email || data.phone || data.website || data.socialHandle || data.address);
