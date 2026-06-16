@@ -124,6 +124,28 @@ export type DefaultsContext = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+/**
+ * Calcula un font-size adaptativo basado en la longitud del texto y el
+ * ancho disponible del contenedor. Evita que nombres largos desborden.
+ *
+ * @param text         Texto a medir
+ * @param containerW   Ancho del contenedor en px
+ * @param maxFs        Font-size máximo (diseño ideal)
+ * @param minFs        Font-size mínimo (legibilidad mínima)
+ * @param charRatio    Ratio ancho-carácter / font-size (0.55 para serifs, 0.52 para sans)
+ */
+export function adaptiveFontSize(
+  text: string,
+  containerW: number,
+  maxFs: number,
+  minFs = 28,
+  charRatio = 0.55,
+): number {
+  if (!text || text.length === 0) return maxFs;
+  const estimated = containerW / (text.length * charRatio);
+  return Math.max(minFs, Math.min(maxFs, Math.round(estimated)));
+}
+
 /** Luminance perceptual (0..1) — para decidir scrim claro vs oscuro. */
 export function luminance(hex: string): number {
   const h = hex.replace("#", "");
@@ -163,103 +185,119 @@ export function defaultFrontElements(ctx: DefaultsContext): RenderElement[] {
 
   const els: RenderElement[] = [];
 
+  // ── Ancho disponible para el nombre en cada layout ──────────────────────────
+  const nameW_centered = CARD_W - SAFE * 2;        // 912px
+  const nameW_left     = CARD_W - SAFE * 2;        // 912px
+  const nameW_grid     = 640;
+
   if (layout === "centered") {
     // Bloque vertical centrado dentro de safe zone
-    let cy = 200;
+    let cy = logoDataUri ? 100 : 160;
+
     if (logoDataUri) {
-      els.push({ id: "logo", type: "logo", logoSrc: logoDataUri, x: (CARD_W - 140) / 2, y: 110, width: 140, height: 80 });
-      cy = 220;
+      els.push({ id: "logo", type: "logo", logoSrc: logoDataUri, x: (CARD_W - 140) / 2, y: cy, width: 140, height: 80 });
+      cy += 100;
     }
     if (company) {
+      const companyFs = adaptiveFontSize(company, nameW_centered, 26, 14, 0.52);
       els.push({
         id: "company", type: "text", text: company,
-        x: SAFE, y: cy, width: CARD_W - SAFE * 2, height: 40,
-        fontFamily: fonts.heading, fontSize: 28, fontWeight: 600,
+        x: SAFE, y: cy, width: nameW_centered, height: 36,
+        fontFamily: fonts.heading, fontSize: companyFs, fontWeight: 600,
         color: palette.secondary, letterSpacing: 4, textTransform: "uppercase",
         align: "center", plate,
       });
-      cy += 56;
+      cy += companyFs + 28;
     }
+    const nameFs = adaptiveFontSize(name, nameW_centered, 88, 36, 0.54);
+    const nameH  = Math.round(nameFs * 1.25);
     els.push({
       id: "name", type: "text", text: name,
-      x: SAFE, y: cy, width: CARD_W - SAFE * 2, height: 110,
-      fontFamily: fonts.heading, fontSize: 82, fontWeight: headingW,
-      color: palette.primary, letterSpacing: 1, lineHeight: 1.05,
+      x: SAFE, y: cy, width: nameW_centered, height: nameH,
+      fontFamily: fonts.heading, fontSize: nameFs, fontWeight: headingW,
+      color: palette.primary, letterSpacing: nameFs > 60 ? 1 : 0, lineHeight: 1.05,
       align: "center", plate,
     });
-    cy += 130;
+    cy += nameH + 18;
     if (role) {
+      const roleFs = adaptiveFontSize(role, nameW_centered, 22, 13, 0.50);
       els.push({
         id: "title", type: "text", text: role,
-        x: SAFE, y: cy, width: CARD_W - SAFE * 2, height: 32,
-        fontFamily: fonts.body, fontSize: 22, fontWeight: 500,
+        x: SAFE, y: cy, width: nameW_centered, height: 32,
+        fontFamily: fonts.body, fontSize: roleFs, fontWeight: 500,
         color: palette.secondary, letterSpacing: 5, textTransform: "uppercase",
         align: "center", plate,
       });
-      cy += 50;
+      cy += 48;
     }
     els.push({
       id: "line", type: "line",
-      x: (CARD_W - 140) / 2, y: cy + 4, width: 140, height: 3,
+      x: (CARD_W - 140) / 2, y: cy, width: 140, height: 2,
       color: palette.accent,
     });
-    cy += 30;
+    cy += 22;
     if (tagline) {
+      const tagFs = adaptiveFontSize(tagline, nameW_centered - 200, 22, 13, 0.48);
       els.push({
         id: "tagline", type: "text", text: tagline,
-        x: 180, y: cy, width: CARD_W - 360, height: 80,
-        fontFamily: fonts.body, fontSize: 24, fontWeight: bodyW,
-        color: palette.text, lineHeight: 1.4, align: "center", plate,
+        x: SAFE + 80, y: cy, width: nameW_centered - 160, height: Math.round(tagFs * 2.8 + 20),
+        fontFamily: fonts.body, fontSize: tagFs, fontWeight: bodyW,
+        color: palette.text, lineHeight: 1.45, align: "center", plate,
       });
     }
     return els;
   }
 
   if (layout === "left") {
-    let cy = 130;
+    let cy = logoDataUri ? 110 : 130;
     if (logoDataUri) {
       els.push({ id: "logo", type: "logo", logoSrc: logoDataUri, x: SAFE, y: cy, width: 130, height: 70 });
       cy += 90;
     }
     if (company) {
+      const companyFs = adaptiveFontSize(company, nameW_left, 24, 13, 0.50);
       els.push({
         id: "company", type: "text", text: company,
-        x: SAFE, y: cy, width: CARD_W - SAFE * 2, height: 36,
-        fontFamily: fonts.heading, fontSize: 26, fontWeight: 600,
+        x: SAFE, y: cy, width: nameW_left, height: 34,
+        fontFamily: fonts.heading, fontSize: companyFs, fontWeight: 600,
         color: palette.secondary, letterSpacing: 3, textTransform: "uppercase",
         align: "left", plate,
       });
-      cy += 50;
+      cy += companyFs + 24;
     }
+    const nameFs = adaptiveFontSize(name, nameW_left, 80, 34, 0.54);
+    const nameH  = Math.round(nameFs * 1.25);
     els.push({
       id: "name", type: "text", text: name,
-      x: SAFE, y: cy, width: CARD_W - SAFE * 2, height: 100,
-      fontFamily: fonts.heading, fontSize: 74, fontWeight: headingW,
-      color: palette.primary, letterSpacing: 0.5, lineHeight: 1.05,
+      x: SAFE, y: cy, width: nameW_left, height: nameH,
+      fontFamily: fonts.heading, fontSize: nameFs, fontWeight: headingW,
+      color: palette.primary, letterSpacing: nameFs > 56 ? 0.5 : 0, lineHeight: 1.05,
       align: "left", plate,
     });
-    cy += 110;
+    cy += nameH + 14;
     if (role) {
+      const roleFs = adaptiveFontSize(role, nameW_left, 20, 12, 0.50);
       els.push({
         id: "title", type: "text", text: role,
-        x: SAFE, y: cy, width: CARD_W - SAFE * 2, height: 30,
-        fontFamily: fonts.body, fontSize: 20, fontWeight: 500,
+        x: SAFE, y: cy, width: nameW_left, height: 30,
+        fontFamily: fonts.body, fontSize: roleFs, fontWeight: 500,
         color: palette.secondary, letterSpacing: 4, textTransform: "uppercase",
         align: "left", plate,
       });
-      cy += 44;
+      cy += 40;
     }
     els.push({
       id: "line", type: "line",
-      x: SAFE, y: cy + 4, width: 110, height: 3, color: palette.accent,
+      x: SAFE, y: cy, width: 100, height: 2, color: palette.accent,
     });
-    cy += 28;
+    cy += 20;
     if (tagline) {
+      const tagFs = adaptiveFontSize(tagline, nameW_left - 80, 20, 12, 0.48);
       els.push({
         id: "tagline", type: "text", text: tagline,
-        x: SAFE, y: cy, width: CARD_W - SAFE * 2 - 80, height: 80,
-        fontFamily: fonts.body, fontSize: 22, fontWeight: bodyW,
-        color: palette.text, lineHeight: 1.4, align: "left", plate,
+        x: SAFE, y: cy, width: nameW_left - 80, height: Math.round(tagFs * 2.8 + 18),
+        fontFamily: fonts.body, fontSize: tagFs, fontWeight: bodyW,
+        color: palette.text, lineHeight: 1.45, align: "left", plate,
       });
     }
     return els;
@@ -268,43 +306,48 @@ export function defaultFrontElements(ctx: DefaultsContext): RenderElement[] {
   // grid (2 col): texto izq · logo o accent derecha
   let cy = 150;
   if (company) {
+    const companyFs = adaptiveFontSize(company, nameW_grid, 24, 13, 0.50);
     els.push({
       id: "company", type: "text", text: company,
-      x: SAFE, y: cy, width: 600, height: 36,
-      fontFamily: fonts.heading, fontSize: 26, fontWeight: 600,
+      x: SAFE, y: cy, width: nameW_grid, height: 36,
+      fontFamily: fonts.heading, fontSize: companyFs, fontWeight: 600,
       color: palette.secondary, letterSpacing: 3, textTransform: "uppercase",
       align: "left", plate,
     });
-    cy += 48;
+    cy += companyFs + 24;
   }
+  const nameFs_g = adaptiveFontSize(name, nameW_grid, 70, 30, 0.54);
+  const nameH_g  = Math.round(nameFs_g * 1.25);
   els.push({
     id: "name", type: "text", text: name,
-    x: SAFE, y: cy, width: 640, height: 90,
-    fontFamily: fonts.heading, fontSize: 64, fontWeight: headingW,
+    x: SAFE, y: cy, width: nameW_grid, height: nameH_g,
+    fontFamily: fonts.heading, fontSize: nameFs_g, fontWeight: headingW,
     color: palette.primary, lineHeight: 1.05, align: "left", plate,
   });
-  cy += 100;
+  cy += nameH_g + 12;
   if (role) {
+    const roleFs = adaptiveFontSize(role, nameW_grid, 18, 12, 0.50);
     els.push({
       id: "title", type: "text", text: role,
-      x: SAFE, y: cy, width: 640, height: 28,
-      fontFamily: fonts.body, fontSize: 18, fontWeight: 500,
+      x: SAFE, y: cy, width: nameW_grid, height: 28,
+      fontFamily: fonts.body, fontSize: roleFs, fontWeight: 500,
       color: palette.secondary, letterSpacing: 4, textTransform: "uppercase",
       align: "left", plate,
     });
-    cy += 40;
+    cy += 36;
   }
   els.push({
     id: "line", type: "line",
-    x: SAFE, y: cy + 6, width: 90, height: 3, color: palette.accent,
+    x: SAFE, y: cy + 6, width: 80, height: 2, color: palette.accent,
   });
   cy += 26;
   if (tagline) {
+    const tagFs_g = adaptiveFontSize(tagline, nameW_grid - 40, 20, 12, 0.48);
     els.push({
       id: "tagline", type: "text", text: tagline,
-      x: SAFE, y: cy, width: 640, height: 70,
-      fontFamily: fonts.body, fontSize: 20, fontWeight: bodyW,
-      color: palette.text, lineHeight: 1.4, align: "left", plate,
+      x: SAFE, y: cy, width: nameW_grid, height: Math.round(tagFs_g * 2.8 + 18),
+      fontFamily: fonts.body, fontSize: tagFs_g, fontWeight: bodyW,
+      color: palette.text, lineHeight: 1.45, align: "left", plate,
     });
   }
   if (logoDataUri) {

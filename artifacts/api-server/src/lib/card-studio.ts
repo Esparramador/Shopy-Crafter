@@ -98,8 +98,17 @@ export async function generateBusinessCard(
   if (bgConfig.kind === "ai-texture") {
     try {
       const userPrompt = (bgConfig.prompt || template.background.prompt || "premium business card background").trim();
+      // Potenciar el prompt con xAI para obtener texturas de fondo más sofisticadas
+      const smartPrompt = await enhanceCardBackgroundPrompt(userPrompt, {
+        palette,
+        fonts,
+        category: template.category,
+        layout: template.layout,
+        companyName: input.data.companyName,
+        jobTitle: input.data.jobTitle,
+      });
       // Refuerzo anti-texto en el prompt mismo (algunos modelos ignoran negativePrompt)
-      const promptToUse = `${userPrompt}, ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO TYPOGRAPHY, NO LOGOS, NO WATERMARKS, pure background texture only, even lighting suitable for overlay text, photorealistic, 8k`;
+      const promptToUse = `${smartPrompt}, ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO TYPOGRAPHY, NO LOGOS, NO WATERMARKS, pure background texture only, even lighting suitable for overlay text, photorealistic, 8k`;
       logger.info({ model: bgModel, promptPreview: promptToUse.slice(0, 100) }, "card-studio: generating AI background");
       const out = await generateImage(bgModel, promptToUse, {
         aspectRatio: "3:2",
@@ -431,4 +440,75 @@ DEVUELVE JSON:
     throw new Error("auto-design: respuesta IA inválida");
   }
   return out;
+}
+
+/**
+ * Potencia el prompt de fondo con xAI (grok-3-mini-fast) para obtener
+ * texturas más sofisticadas y coherentes con el sistema de diseño de la tarjeta.
+ * Si falla, devuelve el prompt original sin interrumpir el pipeline.
+ */
+async function enhanceCardBackgroundPrompt(
+  userPrompt: string,
+  ctx: {
+    palette: CardPalette;
+    fonts: CardFonts;
+    category: string;
+    layout: string;
+    companyName?: string | null;
+    jobTitle?: string | null;
+  },
+): Promise<string> {
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) return userPrompt; // sin key → pass-through
+
+  // Si el prompt ya es largo y descriptivo, no lo toquemos
+  if (userPrompt.length > 180) return userPrompt;
+
+  try {
+    const systemMsg = `You are a professional art director specializing in premium business card backgrounds for high-end print. You transform simple user prompts into precise, cinematic texture descriptions that generate stunning backgrounds via AI image models. Return ONLY the enhanced prompt text — no explanation, no quotes, no JSON.`;
+
+    const userMsg = `ORIGINAL PROMPT: "${userPrompt}"
+
+CARD DESIGN CONTEXT:
+- Category: ${ctx.category}
+- Layout: ${ctx.layout}
+- Primary color: ${ctx.palette.primary}
+- Background color: ${ctx.palette.bg}
+- Accent color: ${ctx.palette.accent}
+- Heading font: ${ctx.fonts.heading}
+${ctx.companyName ? `- Company: ${ctx.companyName}` : ""}
+${ctx.jobTitle ? `- Role: ${ctx.jobTitle}` : ""}
+
+Transform the prompt into a rich, specific texture/material description suitable as a business card background. Include: material type, lighting direction, depth, micro-details, mood. Keep it under 200 characters. Do NOT include text, letters, words, logos, or human faces.`;
+
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "grok-3-mini-fast",
+        messages: [
+          { role: "system", content: systemMsg },
+          { role: "user", content: userMsg },
+        ],
+        max_tokens: 120,
+        temperature: 0.7,
+      }),
+      signal: AbortSignal.timeout(8000), // 8s timeout — no bloquear el pipeline
+    });
+
+    if (!res.ok) return userPrompt;
+    const data = await res.json() as any;
+    const enhanced = data.choices?.[0]?.message?.content?.trim();
+    if (enhanced && enhanced.length > 20) {
+      logger.info({ original: userPrompt.slice(0, 60), enhanced: enhanced.slice(0, 80) }, "card-studio: prompt enhanced by xAI");
+      return enhanced;
+    }
+    return userPrompt;
+  } catch (err: any) {
+    logger.warn({ err: err?.message }, "card-studio: prompt enhancement failed — using original");
+    return userPrompt;
+  }
 }

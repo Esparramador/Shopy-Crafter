@@ -193,31 +193,53 @@ function buildHtml(args: {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="${fontsLink}" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     width: ${CARD_W}px; height: ${CARD_H}px;
     background: ${bgCss};
     color: ${palette.text};
-    font-family: '${fonts.body}', -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-family: '${fonts.body}', -apple-system, "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
     overflow: hidden; position: relative;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   }
   .card { position: absolute; inset: 0; }
   .vignette {
     position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.18) 100%);
+    background:
+      radial-gradient(ellipse 120% 80% at 50% 0%, rgba(0,0,0,0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 120% 80% at 50% 100%, rgba(0,0,0,0.28) 0%, transparent 55%),
+      radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.12) 100%);
     z-index: 1;
   }
-  .el { position: absolute; display: flex; align-items: center; overflow: visible; z-index: 2; }
+  .el {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    overflow: visible;
+    z-index: 2;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
   .el .plate {
-    position: absolute; inset: 0; border-radius: 6px; z-index: -1;
+    position: absolute; inset: 0; z-index: -1;
   }
   .el .text-inner {
     width: 100%;
-    text-shadow: ${isAi
-      ? "0 2px 14px rgba(0,0,0,0.95), 0 1px 4px rgba(0,0,0,0.85), 0 0 28px rgba(0,0,0,0.65), 0 4px 20px rgba(0,0,0,0.5)"
-      : "none"};
     word-break: break-word;
+    hyphens: none;
+    ${isAi ? `
+    text-shadow:
+      0 1px 0 rgba(0,0,0,0.9),
+      0 2px 6px rgba(0,0,0,0.92),
+      0 4px 16px rgba(0,0,0,0.78),
+      0 8px 32px rgba(0,0,0,0.55),
+      0 0 60px rgba(0,0,0,0.35);
+    paint-order: stroke fill;
+    ` : "text-shadow: none;"}
   }
   .el img { display: block; width: 100%; height: 100%; object-fit: contain; }
   .el .line { width: 100%; height: 100%; border-radius: 2px; }

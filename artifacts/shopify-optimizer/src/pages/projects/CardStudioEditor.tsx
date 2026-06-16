@@ -210,12 +210,14 @@ function addFabricTextbox(
 }
 
 // ── Puebla un canvas con los elementos recibidos del backend ──────────────────
+// hasBackground = true → el PNG ya está renderizado con el texto; usar ghost mode
 async function populateCanvas(
   canvas: fabric.Canvas,
   elements: ResolvedElement[],
   side: "front" | "back",
   logoUrl: string | null | undefined,
-  guide: fabric.Rect | null
+  guide: fabric.Rect | null,
+  hasBackground = false
 ) {
   // Quitar todos los objetos salvo la guía de sangrado
   const toRemove = canvas.getObjects().filter(o => o !== guide);
@@ -232,19 +234,31 @@ async function populateCanvas(
         ? (el.text || "").toUpperCase()
         : (el.text || "Texto");
 
-      const tb = new fabric.Textbox(displayText, {
+      // Ghost mode: cuando ya hay PNG de fondo, el texto real está ahí.
+      // Solo mostramos la caja de selección (fill transparente, borde punteado).
+      const tb = new fabric.Textbox(hasBackground ? " " : displayText, {
         left: el.x, top: el.y,
         width: el.width,
+        height: el.height || undefined,
         fontSize: el.fontSize || 24,
         fontFamily: el.fontFamily ? `'${el.fontFamily}'` : "Inter",
         fontWeight: String(el.fontWeight || 400),
         fontStyle: el.italic ? "italic" : "normal",
-        fill: el.color || "#ffffff",
+        fill: hasBackground ? "transparent" : (el.color || "#ffffff"),
         textAlign: el.align || "left",
         lineHeight: el.lineHeight || 1.3,
-        editable: true,
+        editable: !hasBackground,
         splitByGrapheme: false,
-        data: { id: el.id, side, type: "text" },
+        ...(hasBackground ? {
+          stroke: "rgba(212,175,55,0.30)",
+          strokeWidth: 1,
+          strokeDashArray: [6, 4],
+          backgroundColor: "transparent",
+          padding: 6,
+          lockScalingX: false,
+          lockScalingY: false,
+        } : {}),
+        data: { id: el.id, side, type: "text", label: displayText },
         name: el.id,
       } as any);
       canvas.add(tb);
@@ -411,7 +425,10 @@ export default function CardStudioEditor({
         setSelSide(side);
         setSelProps({
           type: data?.type ?? obj.type ?? "unknown",
-          text: obj.type === "textbox" ? (obj as fabric.Textbox).text : undefined,
+          // En ghost mode el textbox contiene " " como placeholder; usar data.label para el panel
+          text: obj.type === "textbox"
+            ? (data?.label ?? (obj as fabric.Textbox).text)
+            : undefined,
           fill: String(obj.fill ?? ""),
           fontSize: obj.type === "textbox" ? (obj as fabric.Textbox).fontSize : undefined,
           fontFamily: obj.type === "textbox"
@@ -454,9 +471,13 @@ export default function CardStudioEditor({
 
         const patch: ElementOverride = { x: nx, y: ny, width: nw, height: nh };
         if (obj.type === "textbox") {
-          patch.text = (obj as fabric.Textbox).text;
+          // En ghost mode el texto del Fabric obj es " " (placeholder) — usar data.label
+          const realText = (obj as any).data?.label ?? (obj as fabric.Textbox).text;
+          if (realText && realText.trim()) patch.text = realText;
           patch.fontSize = (obj as fabric.Textbox).fontSize;
-          patch.color = String((obj as fabric.Textbox).fill ?? "");
+          // fill es "transparent" en ghost mode — no sobrescribir con eso
+          const fill = String((obj as fabric.Textbox).fill ?? "");
+          if (fill !== "transparent") patch.color = fill;
           patch.fontFamily = String((obj as fabric.Textbox).fontFamily ?? "").replace(/'/g, "");
           patch.align = (obj as fabric.Textbox).textAlign as any;
         }
@@ -544,15 +565,15 @@ export default function CardStudioEditor({
   useEffect(() => {
     const fc = frontFabric.current;
     if (!canvasesReady || !fc || frontElements.length === 0) return;
-    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current);
-  }, [canvasesReady, frontElements, logoUrl]);
+    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current, !!frontUrl);
+  }, [canvasesReady, frontElements, logoUrl, frontUrl]);
 
   // ── Popula canvas Reverso ──────────────────────────────────────────────────
   useEffect(() => {
     const bc = backFabric.current;
     if (!canvasesReady || !bc || backElements.length === 0) return;
-    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current);
-  }, [canvasesReady, backElements, logoUrl]);
+    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current, !!backUrl);
+  }, [canvasesReady, backElements, logoUrl, backUrl]);
 
   // ── Paso 3: cargar fondo Frente cuando cambia frontUrl ────────────────────
   useEffect(() => {
@@ -657,8 +678,9 @@ export default function CardStudioEditor({
     const elements = side === "front" ? frontElements : backElements;
     const canvas = side === "front" ? frontFabric.current : backFabric.current;
     const guide = side === "front" ? frontGuide.current : backGuide.current;
-    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide);
-  }, [frontElements, backElements, logoUrl]);
+    const hasBg = side === "front" ? !!frontUrl : !!backUrl;
+    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide, hasBg);
+  }, [frontElements, backElements, logoUrl, frontUrl, backUrl]);
 
   // ── Guardar overrides en backend ──────────────────────────────────────────
   const saveAll = async () => {
@@ -946,8 +968,14 @@ export default function CardStudioEditor({
                     const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
                     const obj = canvas?.getActiveObject() as fabric.Textbox;
                     if (obj && obj.type === "textbox") {
-                      obj.set("text", e.target.value);
-                      canvas?.renderAll();
+                      const ghostMode = (obj as any).data?.label !== undefined && String(obj.fill) === "transparent";
+                      if (ghostMode) {
+                        // Actualizar el label en data (sin cambiar el texto visual invisible)
+                        (obj as any).data = { ...(obj as any).data, label: e.target.value };
+                      } else {
+                        obj.set("text", e.target.value);
+                        canvas?.renderAll();
+                      }
                     }
                     setSelProps(p => p ? { ...p, text: e.target.value } : p);
                     setOverrides(prev => {
