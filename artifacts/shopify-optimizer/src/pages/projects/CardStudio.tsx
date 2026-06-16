@@ -695,13 +695,14 @@ export default function CardStudio() {
                       fd.append("front", file);
                       try {
                         const res = await fetch(`${API_BASE}/api/cards/${selected.id}/import-front`, { method: "POST", credentials: "include", body: fd });
-                        if (res.ok) {
-                          const upd = await res.json();
-                          setCards(prev => prev.map(c => c.id === selected.id ? upd : c));
-                          setSuccess("✓ Imagen importada como frente");
-                          setTimeout(() => setSuccess(null), 3000);
-                        }
-                      } catch {}
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+                        setCards(prev => prev.map(c => c.id === selected.id ? data : c));
+                        setSuccess("✓ Imagen importada como frente de la tarjeta");
+                        setTimeout(() => setSuccess(null), 4000);
+                      } catch (err: any) {
+                        setError(err.message || "Error importando imagen");
+                      }
                       e.target.value = "";
                     }}
                   />

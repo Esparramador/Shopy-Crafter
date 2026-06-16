@@ -90,16 +90,33 @@ const POPULAR_FONTS = [
   "Georgia", "Times New Roman", "Arial", "Helvetica",
 ];
 
-// ── Hook: carga una URL en HTMLImageElement (CORS-safe) ───────────────────────
+// ── Hook: carga una URL como blob (evita restricciones CORS del canvas) ───────
 function useKonvaImage(src: string | null | undefined): HTMLImageElement | null {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   useEffect(() => {
     if (!src) { setImg(null); return; }
-    const im = new window.Image();
-    im.crossOrigin = "anonymous";
-    im.onload = () => setImg(im);
-    im.onerror = () => setImg(null);
-    im.src = src;
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(src, { credentials: "include" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        const im = new window.Image();
+        im.onload = () => { if (!cancelled) setImg(im); };
+        im.onerror = () => { if (!cancelled) setImg(null); };
+        im.src = objectUrl;
+      } catch {
+        if (!cancelled) setImg(null);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [src]);
   return img;
 }
@@ -380,14 +397,12 @@ export default function CardStudioEditor({
         </div>
       )}
 
-      {/* CANVAS + SIDEBAR */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: 10, flex: 1, minHeight: 0 }}>
-
-        {/* ── KONVA STAGE ─────────────────────────────────────────────────── */}
+      {/* ── KONVA STAGE (full width) ────────────────────────────────────────── */}
+      <div style={{ flex: 1, minHeight: 0 }}>
         <div
           ref={stageContainerRef}
           style={{ background: "#0a0a0a", borderRadius: 8, overflow: "auto", display: "flex",
-            alignItems: "flex-start", justifyContent: "center", padding: 16, minHeight: 520 }}
+            alignItems: "flex-start", justifyContent: "center", padding: 16, minHeight: 420 }}
         >
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
             {loading ? (
@@ -538,33 +553,35 @@ export default function CardStudioEditor({
             </div>
           </div>
         </div>
+      </div>
 
-        {/* ── SIDEBAR ─────────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", maxHeight: 560 }}>
-          {/* Elements list */}
-          <div style={panelStyle}>
-            <h4 style={panelTitle}>Elementos · {side === "front" ? "Frente" : "Reverso"}</h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 180, overflowY: "auto" }}>
-              {elements.length === 0 && !loading && (
-                <p style={{ fontSize: 11, color: "var(--t3)", textAlign: "center", padding: 8 }}>
-                  Genera la tarjeta primero para ver elementos.
-                </p>
-              )}
+      {/* ── ELEMENTOS + PROPIEDADES (debajo del canvas) ─────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: selected ? "1fr 300px" : "1fr", gap: 10, alignItems: "start" }}>
+
+        {/* Lista de elementos */}
+        <div style={panelStyle}>
+          <h4 style={panelTitle}>Elementos · {side === "front" ? "Frente" : "Reverso"}</h4>
+          {elements.length === 0 && !loading ? (
+            <p style={{ fontSize: 11, color: "var(--t3)", textAlign: "center", padding: "8px 0", margin: 0 }}>
+              Genera la tarjeta primero para ver elementos.
+            </p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 4 }}>
               {elements.map((el) => (
                 <div
                   key={el.id}
                   onClick={() => setSelectedId(selectedId === el.id ? null : el.id)}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4,
-                    padding: "5px 7px", borderRadius: 4, cursor: "pointer",
+                    padding: "5px 8px", borderRadius: 4, cursor: "pointer",
                     background: selectedId === el.id ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.02)",
-                    border: selectedId === el.id ? "1px solid var(--gold)" : "1px solid transparent",
+                    border: selectedId === el.id ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.06)",
                     opacity: el.hidden ? 0.45 : 1,
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {elementLabel(el.id)} {el.type === "text" && el.text ? `· ${el.text.slice(0, 16)}` : ""}
+                      {elementLabel(el.id)} {el.type === "text" && el.text ? `· ${el.text.slice(0, 14)}` : ""}
                     </div>
                     <div style={{ fontSize: 9, color: "var(--t3)" }}>
                       {el.type} · {Math.round(el.x)}, {Math.round(el.y)}
@@ -580,131 +597,123 @@ export default function CardStudioEditor({
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Properties panel */}
-          {selected && (
-            <div style={panelStyle}>
-              <h4 style={panelTitle}>
-                <Type size={11} style={{ verticalAlign: -2, marginRight: 4 }} />
-                {elementLabel(selected.id)}
-              </h4>
-
-              {selected.type === "text" && (
-                <>
-                  <label style={labelStyle}>Texto</label>
-                  <textarea
-                    value={selected.text || ""}
-                    onChange={(e) => setOverride(selected.id, { text: e.target.value })}
-                    style={{ ...inputStyle, minHeight: 52, resize: "vertical", marginBottom: 8 }}
-                  />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 5 }}>
-                    <div>
-                      <label style={labelStyle}>Tamaño</label>
-                      <input type="number" min={6} max={200}
-                        value={selected.fontSize ?? 22}
-                        onChange={(e) => setOverride(selected.id, { fontSize: +e.target.value || 22 })}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Color</label>
-                      <input type="color"
-                        value={selected.color || "#ffffff"}
-                        onChange={(e) => setOverride(selected.id, { color: e.target.value })}
-                        style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer" }}
-                      />
-                    </div>
-                  </div>
-                  <label style={labelStyle}>Fuente</label>
-                  <select
-                    value={selected.fontFamily || "Inter"}
-                    onChange={(e) => setOverride(selected.id, { fontFamily: e.target.value })}
-                    style={{ ...inputStyle, marginBottom: 5 }}
-                  >
-                    {POPULAR_FONTS.map(f => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                  <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
-                    <button
-                      onClick={() => setOverride(selected.id, { fontWeight: (selected.fontWeight ?? 400) >= 600 ? 400 : 700 })}
-                      style={{ ...iconBtn, background: (selected.fontWeight ?? 400) >= 600 ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
-                      title="Negrita"
-                    ><Bold size={12} /></button>
-                    <button
-                      onClick={() => setOverride(selected.id, { italic: !selected.italic })}
-                      style={{ ...iconBtn, background: selected.italic ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
-                      title="Cursiva"
-                    ><Italic size={12} /></button>
-                    {(["left", "center", "right"] as const).map((a, i) => (
-                      <button key={a}
-                        onClick={() => setOverride(selected.id, { align: a })}
-                        style={{ ...iconBtn, background: selected.align === a ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
-                      >
-                        {i === 0 ? <AlignLeft size={12} /> : i === 1 ? <AlignCenter size={12} /> : <AlignRight size={12} />}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {selected.type === "qr" && (
-                <>
-                  <label style={labelStyle}>URL del QR</label>
-                  <input
-                    value={(selected as any).qrUrl || ""}
-                    onChange={(e) => setOverride(selected.id, { text: e.target.value })}
-                    placeholder="https://…"
-                    style={{ ...inputStyle, marginBottom: 8 }}
-                  />
-                </>
-              )}
-
-              {selected.type === "line" && (
-                <>
-                  <label style={labelStyle}>Color línea</label>
-                  <input type="color"
-                    value={selected.color || "#d4af37"}
-                    onChange={(e) => setOverride(selected.id, { color: e.target.value })}
-                    style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer", marginBottom: 8 }}
-                  />
-                </>
-              )}
-
-              <label style={labelStyle}>Posición (X, Y)</label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
-                <input type="number" value={Math.round(selected.x)}
-                  onChange={(e) => setOverride(selected.id, { x: +e.target.value || 0 })}
-                  style={inputStyle} placeholder="X" />
-                <input type="number" value={Math.round(selected.y)}
-                  onChange={(e) => setOverride(selected.id, { y: +e.target.value || 0 })}
-                  style={inputStyle} placeholder="Y" />
-              </div>
-              <label style={labelStyle}>Tamaño (W, H)</label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
-                <input type="number" value={Math.round(selected.width)}
-                  onChange={(e) => setOverride(selected.id, { width: +e.target.value || 40 })}
-                  style={inputStyle} placeholder="W" />
-                <input type="number" value={Math.round(selected.height)}
-                  onChange={(e) => setOverride(selected.id, { height: +e.target.value || 20 })}
-                  style={inputStyle} placeholder="H" />
-              </div>
-
-              {selected.id.startsWith("extra-") && (
-                <button onClick={() => removeExtra(selected.id)} style={{ ...btnSecondary, width: "100%", justifyContent: "center", color: "#e84558", borderColor: "rgba(232,69,88,0.3)", marginTop: 4 }}>
-                  <Trash2 size={12} /> Eliminar elemento
-                </button>
-              )}
-            </div>
-          )}
-
-          {!selected && (
-            <div style={{ ...panelStyle, textAlign: "center", padding: 16 }}>
-              <p style={{ fontSize: 11, color: "var(--t3)", margin: 0, lineHeight: 1.5 }}>
-                Haz clic en un elemento del canvas para seleccionarlo y editarlo.
-              </p>
-            </div>
           )}
         </div>
+
+        {/* Panel de propiedades (sólo cuando hay elemento seleccionado) */}
+        {selected && (
+          <div style={panelStyle}>
+            <h4 style={panelTitle}>
+              <Type size={11} style={{ verticalAlign: -2, marginRight: 4 }} />
+              {elementLabel(selected.id)}
+            </h4>
+
+            {selected.type === "text" && (
+              <>
+                <label style={labelStyle}>Texto</label>
+                <textarea
+                  value={selected.text || ""}
+                  onChange={(e) => setOverride(selected.id, { text: e.target.value })}
+                  style={{ ...inputStyle, minHeight: 52, resize: "vertical", marginBottom: 8 }}
+                />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 5 }}>
+                  <div>
+                    <label style={labelStyle}>Tamaño</label>
+                    <input type="number" min={6} max={200}
+                      value={selected.fontSize ?? 22}
+                      onChange={(e) => setOverride(selected.id, { fontSize: +e.target.value || 22 })}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Color</label>
+                    <input type="color"
+                      value={selected.color || "#ffffff"}
+                      onChange={(e) => setOverride(selected.id, { color: e.target.value })}
+                      style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer" }}
+                    />
+                  </div>
+                </div>
+                <label style={labelStyle}>Fuente</label>
+                <select
+                  value={selected.fontFamily || "Inter"}
+                  onChange={(e) => setOverride(selected.id, { fontFamily: e.target.value })}
+                  style={{ ...inputStyle, marginBottom: 5 }}
+                >
+                  {POPULAR_FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+                <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
+                  <button
+                    onClick={() => setOverride(selected.id, { fontWeight: (selected.fontWeight ?? 400) >= 600 ? 400 : 700 })}
+                    style={{ ...iconBtn, background: (selected.fontWeight ?? 400) >= 600 ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
+                    title="Negrita"
+                  ><Bold size={12} /></button>
+                  <button
+                    onClick={() => setOverride(selected.id, { italic: !selected.italic })}
+                    style={{ ...iconBtn, background: selected.italic ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
+                    title="Cursiva"
+                  ><Italic size={12} /></button>
+                  {(["left", "center", "right"] as const).map((a, i) => (
+                    <button key={a}
+                      onClick={() => setOverride(selected.id, { align: a })}
+                      style={{ ...iconBtn, background: selected.align === a ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
+                    >
+                      {i === 0 ? <AlignLeft size={12} /> : i === 1 ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {selected.type === "qr" && (
+              <>
+                <label style={labelStyle}>URL del QR</label>
+                <input
+                  value={(selected as any).qrUrl || ""}
+                  onChange={(e) => setOverride(selected.id, { text: e.target.value })}
+                  placeholder="https://…"
+                  style={{ ...inputStyle, marginBottom: 8 }}
+                />
+              </>
+            )}
+
+            {selected.type === "line" && (
+              <>
+                <label style={labelStyle}>Color línea</label>
+                <input type="color"
+                  value={selected.color || "#d4af37"}
+                  onChange={(e) => setOverride(selected.id, { color: e.target.value })}
+                  style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer", marginBottom: 8 }}
+                />
+              </>
+            )}
+
+            <label style={labelStyle}>Posición (X, Y)</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
+              <input type="number" value={Math.round(selected.x)}
+                onChange={(e) => setOverride(selected.id, { x: +e.target.value || 0 })}
+                style={inputStyle} placeholder="X" />
+              <input type="number" value={Math.round(selected.y)}
+                onChange={(e) => setOverride(selected.id, { y: +e.target.value || 0 })}
+                style={inputStyle} placeholder="Y" />
+            </div>
+            <label style={labelStyle}>Tamaño (W, H)</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
+              <input type="number" value={Math.round(selected.width)}
+                onChange={(e) => setOverride(selected.id, { width: +e.target.value || 40 })}
+                style={inputStyle} placeholder="W" />
+              <input type="number" value={Math.round(selected.height)}
+                onChange={(e) => setOverride(selected.id, { height: +e.target.value || 20 })}
+                style={inputStyle} placeholder="H" />
+            </div>
+
+            {selected.id.startsWith("extra-") && (
+              <button onClick={() => removeExtra(selected.id)} style={{ ...btnSecondary, width: "100%", justifyContent: "center", color: "#e84558", borderColor: "rgba(232,69,88,0.3)", marginTop: 4 }}>
+                <Trash2 size={12} /> Eliminar elemento
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
