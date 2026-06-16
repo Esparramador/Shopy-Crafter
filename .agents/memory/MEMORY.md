@@ -19,3 +19,4 @@
 - [Wouter SSR with Vite](wouter-ssr.md) — use `<Router ssrPath={path}>` (native wouter prop); do NOT use custom hooks or memoryLocation — shim lacks getServerSnapshot.
 - [Shopify API Version](shopify-api-version.md) — current version is 2026-01 in shopify.ts (3 URL strings) + shopybrain.ts (1 URL); REST connector uses same constants; update all 4 on next version bump.
 - [Spider-Man Phase System](spiderman-phase-system.md) — FloatingSpiderman3D accepts spiderPhase: "ready"|"waiting"|"celebrate"; waiting=attentive breathing (form has input), celebrate=victory dance (form sent); CSS in landing.css uses same class names; ai-engine-skills.ts has 12 expert system prompts via buildEnginePrompt().
+- [CardStudio Konva migration](cardstudio-konva.md) — migrado de position:absolute divs a react-konva Stage/Layer/Transformer; konva+react-konva instalados en shopify-optimizer.

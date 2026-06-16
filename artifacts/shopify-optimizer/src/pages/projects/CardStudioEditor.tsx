@@ -1,14 +1,17 @@
 /**
- * Card Studio · Editor visual inline (NO modal).
+ * Card Studio · Editor visual con Konva.js (canvas real).
  *
- * Renders directly inside the page as a canvas-based editor where:
- * - Elements appear as REAL styled text/logo/QR (not boxes)
- * - Drag to move any element
- * - Resize via corner handles
- * - Select to edit text, color, font, size
- * - Background = actual generated image (frontUrl/backUrl)
+ * Migrado desde position:absolute CSS divs a react-konva Stage/Layer
+ * eliminando la desincronización visual entre editor y salida generada.
+ *
+ * Arquitectura de capas Konva:
+ *   Layer "bg"       → imagen de fondo (frontUrl / backUrl)
+ *   Layer "elements" → texto, logo, QR, líneas (todos draggables)
+ *   Transformer      → handles de resize/rotate sobre el nodo seleccionado
  */
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Stage, Layer, Image as KImage, Text as KText, Rect, Line, Transformer } from "react-konva";
+import Konva from "konva";
 import {
   Eye, EyeOff, Plus, RefreshCw, Save, Trash2, Type, X,
   RotateCcw, Loader2, Minus, AlignLeft, AlignCenter, AlignRight,
@@ -76,18 +79,30 @@ const ELEMENT_LABELS: Record<string, string> = {
   qr: "QR", qrLabel: "Etiqueta QR", brand: "Marca", email: "Email",
   phone: "Teléfono", web: "Web", social: "Social", address: "Dirección",
 };
-
 function elementLabel(id: string): string {
-  if (id.startsWith("extra-")) return `Extra`;
+  if (id.startsWith("extra-")) return "Extra";
   return ELEMENT_LABELS[id] || id;
 }
-
 const POPULAR_FONTS = [
   "Inter", "Cinzel", "Playfair Display", "Montserrat", "Lato",
   "Source Serif Pro", "Space Grotesk", "JetBrains Mono",
   "Poppins", "Raleway", "Crimson Pro", "DM Sans", "DM Serif Display",
   "Georgia", "Times New Roman", "Arial", "Helvetica",
 ];
+
+// ── Hook: carga una URL en HTMLImageElement (CORS-safe) ───────────────────────
+function useKonvaImage(src: string | null | undefined): HTMLImageElement | null {
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!src) { setImg(null); return; }
+    const im = new window.Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => setImg(im);
+    im.onerror = () => setImg(null);
+    im.src = src;
+  }, [src]);
+  return img;
+}
 
 export default function CardStudioEditor({
   apiBase, cardId, frontUrl, backUrl, logoUrl,
@@ -101,39 +116,29 @@ export default function CardStudioEditor({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.52);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
 
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
-  const elementsRef = useRef<ResolvedElement[]>([]);
-  const dragState = useRef<{
-    id: string; startX: number; startY: number; origX: number; origY: number;
-    lastX: number; lastY: number;
-  } | null>(null);
-  const resizeState = useRef<{
-    id: string; handle: string; startX: number; startY: number;
-    origX: number; origY: number; origW: number; origH: number;
-    lastX: number; lastY: number; lastW: number; lastH: number;
-  } | null>(null);
+  const stageContainerRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const trRef = useRef<Konva.Transformer | null>(null);
+  const nodeRefs = useRef<Map<string, Konva.Node>>(new Map());
+  const elemLayerRef = useRef<Konva.Layer | null>(null);
 
-  useEffect(() => { elementsRef.current = elements; }, [elements]);
+  const bgUrl = side === "front" ? frontUrl : backUrl;
+  const bgImage = useKonvaImage(bgUrl);
+  const logoImage = useKonvaImage(logoUrl);
 
-  useLayoutEffect(() => {
-    const el = canvasContainerRef.current;
+  // Auto-zoom to fit container
+  useEffect(() => {
+    const el = stageContainerRef.current;
     if (!el) return;
     const available = el.clientWidth - 32;
-    if (available > 100) {
-      setZoom(Math.max(0.3, Math.min(0.9, available / CARD_W)));
-    }
+    if (available > 100) setZoom(Math.max(0.3, Math.min(0.9, available / CARD_W)));
   }, []);
 
-  // Sync overrides when parent passes new initialOverrides
-  useEffect(() => {
-    setOverrides(initialOverrides || {});
-  }, [initialOverrides]);
+  // Sync overrides when parent resets them
+  useEffect(() => { setOverrides(initialOverrides || {}); }, [initialOverrides]);
 
-  // Load elements from backend each time side changes
+  // Load elements from backend when side changes
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -163,11 +168,9 @@ export default function CardStudioEditor({
             hidden: !!ov.hidden,
           };
         });
-        // Add extras for this side
         const extras = (overrides.extras || []).filter(e => e.side === side);
         for (const ex of extras) {
-          const alreadyInMerged = merged.find(m => m.id === `extra-${ex.id}`);
-          if (!alreadyInMerged) {
+          if (!merged.find(m => m.id === `extra-${ex.id}`)) {
             merged.push({
               id: `extra-${ex.id}`,
               type: ex.type === "line" ? "line" : ex.type === "qr" ? "qr" : "text",
@@ -191,7 +194,7 @@ export default function CardStudioEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [side, cardId, apiBase]);
 
-  // Re-apply overrides to elements state without refetch
+  // Re-apply overrides without refetch
   useEffect(() => {
     setElements((prev) => {
       const sideOv = side === "front" ? overrides.front : overrides.back;
@@ -199,11 +202,9 @@ export default function CardStudioEditor({
         if (el.id.startsWith("extra-")) {
           const exId = el.id.replace("extra-", "");
           const ex = (overrides.extras || []).find(e => e.id === exId);
-          if (ex) {
-            return { ...el, x: ex.x, y: ex.y, width: ex.width, height: ex.height ?? el.height,
-              text: ex.text, color: ex.color, fontSize: ex.fontSize, fontFamily: ex.fontFamily,
-              fontWeight: ex.fontWeight, align: ex.align, italic: ex.italic, qrUrl: ex.qrUrl };
-          }
+          if (ex) return { ...el, x: ex.x, y: ex.y, width: ex.width, height: ex.height ?? el.height,
+            text: ex.text, color: ex.color, fontSize: ex.fontSize, fontFamily: ex.fontFamily,
+            fontWeight: ex.fontWeight, align: ex.align, italic: ex.italic, qrUrl: ex.qrUrl };
           return el;
         }
         const ov = sideOv?.[el.id];
@@ -227,6 +228,26 @@ export default function CardStudioEditor({
     });
   }, [overrides, side]);
 
+  // Attach Transformer to selected node
+  useEffect(() => {
+    const tr = trRef.current;
+    if (!tr) return;
+    if (selectedId && nodeRefs.current.has(selectedId)) {
+      tr.nodes([nodeRefs.current.get(selectedId)!]);
+    } else {
+      tr.nodes([]);
+    }
+    tr.getLayer()?.batchDraw();
+  }, [selectedId, elements]);
+
+  // Preload fonts when elements change
+  useEffect(() => {
+    const fonts = [...new Set(elements.map(e => e.fontFamily).filter(Boolean))] as string[];
+    Promise.all(fonts.map(f => document.fonts.load(`16px "${f}"`))).then(() => {
+      elemLayerRef.current?.batchDraw();
+    });
+  }, [elements]);
+
   const setOverride = useCallback((id: string, patch: ElementOverride) => {
     setOverrides((prev) => {
       if (id.startsWith("extra-")) {
@@ -240,89 +261,30 @@ export default function CardStudioEditor({
     });
   }, [side]);
 
-  const zoomRef = useRef(zoom); zoomRef.current = zoom;
+  // ── Konva node handlers ────────────────────────────────────────────────────
+  const onDragEnd = useCallback((id: string, e: Konva.KonvaEventObject<DragEvent>) => {
+    const node = e.target;
+    const nx = Math.round(Math.max(0, Math.min(CARD_W - 10, node.x())));
+    const ny = Math.round(Math.max(0, Math.min(CARD_H - 10, node.y())));
+    node.x(nx); node.y(ny);
+    setOverride(id, { x: nx, y: ny });
+  }, [setOverride]);
 
-  // ── DRAG ──────────────────────────────────────────────────────────────────
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    const ds = dragState.current; if (!ds) return;
-    const z = zoomRef.current || 0.52;
-    const dx = (e.clientX - ds.startX) / z;
-    const dy = (e.clientY - ds.startY) / z;
-    const nx = Math.max(0, Math.min(CARD_W - 20, ds.origX + dx));
-    const ny = Math.max(0, Math.min(CARD_H - 20, ds.origY + dy));
-    ds.lastX = nx; ds.lastY = ny;
-    setElements((prev) => prev.map((el) => el.id === ds.id ? { ...el, x: nx, y: ny } : el));
-  }, []);
+  const onTransformEnd = useCallback((id: string, el: ResolvedElement, e: Konva.KonvaEventObject<Event>) => {
+    const node = e.target;
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
+    node.scaleX(1);
+    node.scaleY(1);
+    const nw = Math.round(Math.max(40, node.width() * scaleX));
+    const nh = Math.round(Math.max(16, node.height() * scaleY));
+    const nx = Math.round(node.x());
+    const ny = Math.round(node.y());
+    setOverride(id, { x: nx, y: ny, width: nw, height: nh,
+      ...(el.type === "text" ? { fontSize: Math.round(Math.max(8, (el.fontSize ?? 22) * Math.min(scaleX, scaleY))) } : {}) });
+  }, [setOverride]);
 
-  const handleMouseUp = useCallback(() => {
-    window.removeEventListener("mousemove", handleMouseMove);
-    window.removeEventListener("mouseup", handleMouseUp);
-    const ds = dragState.current; if (!ds) return;
-    dragState.current = null;
-    setIsDragging(false);
-    setOverride(ds.id, { x: Math.round(ds.lastX), y: Math.round(ds.lastY) });
-  }, [handleMouseMove, setOverride]);
-
-  const onMouseDownEl = (e: React.MouseEvent, el: ResolvedElement) => {
-    e.stopPropagation();
-    setSelectedId(el.id);
-    setIsDragging(true);
-    dragState.current = {
-      id: el.id, startX: e.clientX, startY: e.clientY,
-      origX: el.x, origY: el.y, lastX: el.x, lastY: el.y,
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
-
-  // ── RESIZE ────────────────────────────────────────────────────────────────
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    const rs = resizeState.current; if (!rs) return;
-    const z = zoomRef.current || 0.52;
-    const dx = (e.clientX - rs.startX) / z;
-    const dy = (e.clientY - rs.startY) / z;
-    let nx = rs.origX, ny = rs.origY, nw = rs.origW, nh = rs.origH;
-    if (rs.handle.includes("e")) nw = Math.max(40, rs.origW + dx);
-    if (rs.handle.includes("s")) nh = Math.max(20, rs.origH + dy);
-    if (rs.handle.includes("w")) { nw = Math.max(40, rs.origW - dx); nx = rs.origX + (rs.origW - nw); }
-    if (rs.handle.includes("n")) { nh = Math.max(20, rs.origH - dy); ny = rs.origY + (rs.origH - nh); }
-    rs.lastX = nx; rs.lastY = ny; rs.lastW = nw; rs.lastH = nh;
-    setElements((prev) => prev.map((el) => el.id === rs.id ? { ...el, x: nx, y: ny, width: nw, height: nh } : el));
-  }, []);
-
-  const handleResizeUp = useCallback(() => {
-    window.removeEventListener("mousemove", handleResizeMove);
-    window.removeEventListener("mouseup", handleResizeUp);
-    const rs = resizeState.current; if (!rs) return;
-    resizeState.current = null;
-    setIsResizing(false);
-    setOverride(rs.id, { x: Math.round(rs.lastX), y: Math.round(rs.lastY), width: Math.round(rs.lastW), height: Math.round(rs.lastH) });
-  }, [handleResizeMove, setOverride]);
-
-  const onResizeHandleDown = (e: React.MouseEvent, el: ResolvedElement, handle: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setIsResizing(true);
-    resizeState.current = {
-      id: el.id, handle, startX: e.clientX, startY: e.clientY,
-      origX: el.x, origY: el.y, origW: el.width, origH: el.height,
-      lastX: el.x, lastY: el.y, lastW: el.width, lastH: el.height,
-    };
-    window.addEventListener("mousemove", handleResizeMove);
-    window.addEventListener("mouseup", handleResizeUp);
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("mousemove", handleResizeMove);
-      window.removeEventListener("mouseup", handleResizeUp);
-    };
-  }, [handleMouseMove, handleMouseUp, handleResizeMove, handleResizeUp]);
-
-  // ── ACTIONS ───────────────────────────────────────────────────────────────
+  // ── Actions ────────────────────────────────────────────────────────────────
   const addExtra = (type: "text" | "line" | "qr" = "text") => {
     const id = String(Date.now()).slice(-6);
     const ex: ExtraElement = {
@@ -356,8 +318,7 @@ export default function CardStudioEditor({
   const toggleHidden = (id: string) => {
     if (id.startsWith("extra-")) { removeExtra(id); return; }
     const sideOv = (side === "front" ? overrides.front : overrides.back) || {};
-    const cur = sideOv[id] || {};
-    setOverride(id, { hidden: !cur.hidden });
+    setOverride(id, { hidden: !sideOv[id]?.hidden });
   };
 
   const resetSide = () => {
@@ -374,52 +335,35 @@ export default function CardStudioEditor({
 
   const regenerateNow = async () => {
     setSaving(true); setError(null);
-    try {
-      await onSaveOverrides(overrides);
-      await onRegenerate();
-    } catch (err: any) { setError(err?.message || "Error re-renderizando"); }
+    try { await onSaveOverrides(overrides); await onRegenerate(); }
+    catch (err: any) { setError(err?.message || "Error re-renderizando"); }
     finally { setSaving(false); }
   };
 
   const selected = elements.find((e) => e.id === selectedId);
-  const bgUrl = side === "front" ? frontUrl : backUrl;
+  const visibleElements = elements.filter(e => !e.hidden);
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
+  // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, height: "100%" }}>
       {/* TOOLBAR */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-        {/* Side tabs */}
         <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", padding: 3, borderRadius: 6 }}>
-          <button onClick={() => onSideChange("front")} style={tabBtn(side === "front")}>Frente</button>
-          <button onClick={() => onSideChange("back")} style={tabBtn(side === "back")}>Reverso</button>
+          <button onClick={() => { onSideChange("front"); setSelectedId(null); }} style={tabBtn(side === "front")}>Frente</button>
+          <button onClick={() => { onSideChange("back"); setSelectedId(null); }} style={tabBtn(side === "back")}>Reverso</button>
         </div>
-
-        {/* Add elements */}
         <div style={{ display: "flex", gap: 5 }}>
-          <button onClick={() => addExtra("text")} style={btnTool} title="Añadir texto">
-            <Type size={13} /> Texto
-          </button>
-          <button onClick={() => addExtra("line")} style={btnTool} title="Añadir línea">
-            <Minus size={13} /> Línea
-          </button>
-          <button onClick={() => addExtra("qr")} style={btnTool} title="Añadir QR extra">
-            <QrCode size={13} /> QR
-          </button>
+          <button onClick={() => addExtra("text")} style={btnTool} title="Añadir texto"><Type size={13} /> Texto</button>
+          <button onClick={() => addExtra("line")} style={btnTool} title="Añadir línea"><Minus size={13} /> Línea</button>
+          <button onClick={() => addExtra("qr")} style={btnTool} title="Añadir QR extra"><QrCode size={13} /> QR</button>
         </div>
-
-        {/* Zoom */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button onClick={() => setZoom(z => Math.max(0.25, z - 0.05))} style={iconBtn}><ZoomOut size={14}/></button>
           <span style={{ fontSize: 11, color: "var(--t3)", minWidth: 38, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
           <button onClick={() => setZoom(z => Math.min(1.2, z + 0.05))} style={iconBtn}><ZoomIn size={14}/></button>
         </div>
-
-        {/* Actions */}
         <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={resetSide} style={btnSecondary} title="Restablecer lado actual">
-            <RotateCcw size={13} /> Reset
-          </button>
+          <button onClick={resetSide} style={btnSecondary}><RotateCcw size={13} /> Reset</button>
           <button onClick={savePositions} disabled={saving} style={btnSecondary}>
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Guardar
           </button>
@@ -438,164 +382,164 @@ export default function CardStudioEditor({
 
       {/* CANVAS + SIDEBAR */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: 10, flex: 1, minHeight: 0 }}>
-        {/* STAGE */}
-        <div ref={canvasContainerRef} style={{ background: "#0a0a0a", borderRadius: 8, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, minHeight: 520 }}>
+
+        {/* ── KONVA STAGE ─────────────────────────────────────────────────── */}
+        <div
+          ref={stageContainerRef}
+          style={{ background: "#0a0a0a", borderRadius: 8, overflow: "auto", display: "flex",
+            alignItems: "flex-start", justifyContent: "center", padding: 16, minHeight: 520 }}
+        >
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-            <div
-              ref={stageRef}
-              onClick={() => setSelectedId(null)}
-              style={{
-                width: CARD_W * zoom,
-                height: CARD_H * zoom,
-                position: "relative",
-                ...(bgUrl
-                  ? {
-                      backgroundImage: `url(${bgUrl})`,
-                      backgroundSize: "100% 100%",
-                      backgroundRepeat: "no-repeat",
-                      backgroundColor: "transparent",
-                    }
-                  : {
-                      background: "radial-gradient(ellipse at 20% 30%, #2a1f04 0%, #0d0d0d 70%)",
-                    }
-                ),
-                borderRadius: 4,
-                boxShadow: "0 8px 40px rgba(0,0,0,0.8)",
-                cursor: isDragging ? "grabbing" : isResizing ? "nwse-resize" : "default",
-                flexShrink: 0,
-              }}
-            >
-              {loading && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", borderRadius: 4 }}>
-                  <Loader2 className="animate-spin" style={{ color: "var(--gold)" }} />
-                </div>
-              )}
+            {loading ? (
+              <div style={{ width: CARD_W * zoom, height: CARD_H * zoom, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(ellipse at 20% 30%, #2a1f04 0%, #0d0d1a 70%)", borderRadius: 4, boxShadow: "0 8px 40px rgba(0,0,0,0.8)" }}>
+                <Loader2 className="animate-spin" style={{ color: "var(--gold)" }} />
+              </div>
+            ) : (
+              <Stage
+                ref={stageRef}
+                width={CARD_W * zoom}
+                height={CARD_H * zoom}
+                scaleX={zoom}
+                scaleY={zoom}
+                style={{ borderRadius: 4, boxShadow: "0 8px 40px rgba(0,0,0,0.8)", cursor: "default" }}
+                onClick={(e) => { if (e.target === e.target.getStage()) setSelectedId(null); }}
+              >
+                {/* ── Background Layer ─────────────────────────────────── */}
+                <Layer>
+                  {bgImage ? (
+                    <KImage image={bgImage} x={0} y={0} width={CARD_W} height={CARD_H} listening={false} />
+                  ) : (
+                    <Rect x={0} y={0} width={CARD_W} height={CARD_H}
+                      fillRadialGradientStartPoint={{ x: CARD_W * 0.2, y: CARD_H * 0.3 }}
+                      fillRadialGradientEndPoint={{ x: CARD_W * 0.5, y: CARD_H * 0.5 }}
+                      fillRadialGradientStartRadius={0}
+                      fillRadialGradientEndRadius={CARD_W * 0.8}
+                      fillRadialGradientColorStops={[0, "#2a1f04", 1, "#0d0d0d"]}
+                      listening={false}
+                    />
+                  )}
+                </Layer>
 
-              {elements.filter((e) => !e.hidden).map((el) => {
-                const isSel = el.id === selectedId;
-                const left = el.x * zoom;
-                const top = el.y * zoom;
-                const width = el.width * zoom;
-                const height = el.height * zoom;
+                {/* ── Elements Layer ───────────────────────────────────── */}
+                <Layer ref={elemLayerRef}>
+                  {visibleElements.map((el) => {
+                    const isSel = el.id === selectedId;
+                    const commonProps = {
+                      key: el.id,
+                      x: el.x,
+                      y: el.y,
+                      rotation: el.rotate ?? 0,
+                      draggable: true,
+                      onClick: (e: Konva.KonvaEventObject<MouseEvent>) => { e.cancelBubble = true; setSelectedId(el.id); },
+                      onTap: (e: Konva.KonvaEventObject<Event>) => { e.cancelBubble = true; setSelectedId(el.id); },
+                      onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => onDragEnd(el.id, e),
+                      onTransformEnd: (e: Konva.KonvaEventObject<Event>) => onTransformEnd(el.id, el, e),
+                      ref: (node: Konva.Node | null) => {
+                        if (node) nodeRefs.current.set(el.id, node);
+                        else nodeRefs.current.delete(el.id);
+                      },
+                    };
 
-                return (
-                  <div
-                    key={el.id}
-                    onMouseDown={(e) => onMouseDownEl(e, el)}
-                    style={{
-                      position: "absolute",
-                      left, top, width, height,
-                      cursor: "move",
-                      userSelect: "none",
-                      outline: isSel ? "2px solid var(--gold)" : "1px dashed rgba(255,255,255,0.25)",
-                      outlineOffset: isSel ? 1 : 0,
-                      boxShadow: isSel ? "0 0 0 4px rgba(212,175,55,0.2)" : "none",
+                    if (el.type === "text") {
+                      const displayText = el.textTransform === "uppercase"
+                        ? (el.text || "").toUpperCase()
+                        : (el.text || "");
+                      return (
+                        <KText
+                          {...commonProps}
+                          width={el.width}
+                          height={el.height}
+                          text={displayText}
+                          fontSize={el.fontSize ?? 22}
+                          fontFamily={el.fontFamily ? `'${el.fontFamily}', sans-serif` : "Inter, sans-serif"}
+                          fontStyle={[el.italic ? "italic" : "", el.fontWeight && el.fontWeight >= 600 ? "bold" : ""].filter(Boolean).join(" ") || "normal"}
+                          fill={el.color ?? "#ffffff"}
+                          align={el.align ?? "left"}
+                          letterSpacing={el.letterSpacing ?? 0}
+                          lineHeight={el.lineHeight ?? 1.3}
+                          wrap="word"
+                          ellipsis={false}
+                          strokeWidth={0}
+                        />
+                      );
+                    }
+
+                    if (el.type === "logo") {
+                      if (logoImage) {
+                        return (
+                          <KImage
+                            {...commonProps}
+                            image={logoImage}
+                            width={el.width}
+                            height={el.height}
+                          />
+                        );
+                      }
+                      return (
+                        <Rect
+                          {...commonProps}
+                          width={el.width}
+                          height={el.height}
+                          fill="rgba(212,175,55,0.15)"
+                          stroke="rgba(212,175,55,0.4)"
+                          strokeWidth={1}
+                          dash={[4, 4]}
+                        />
+                      );
+                    }
+
+                    if (el.type === "qr") {
+                      return (
+                        <Rect
+                          {...commonProps}
+                          width={el.width}
+                          height={el.height}
+                          fill="#ffffff"
+                          cornerRadius={4}
+                        />
+                      );
+                    }
+
+                    if (el.type === "line") {
+                      return (
+                        <Rect
+                          {...commonProps}
+                          width={el.width}
+                          height={Math.max(2, el.height)}
+                          fill={el.color ?? "rgba(212,175,55,0.6)"}
+                        />
+                      );
+                    }
+
+                    return null;
+                  })}
+
+                  {/* Transformer (selection handles) */}
+                  <Transformer
+                    ref={trRef}
+                    boundBoxFunc={(oldBox, newBox) => {
+                      if (newBox.width < 20 || newBox.height < 10) return oldBox;
+                      return newBox;
                     }}
-                  >
-                    {/* Actual content rendering */}
-                    {el.type === "text" && (
-                      <div style={{
-                        width: "100%", height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start",
-                        fontSize: (el.fontSize ?? 22) * zoom,
-                        fontFamily: el.fontFamily ? `'${el.fontFamily}', sans-serif` : "inherit",
-                        fontWeight: el.fontWeight ?? 400,
-                        fontStyle: el.italic ? "italic" : "normal",
-                        color: el.color ?? "#ffffff",
-                        letterSpacing: el.letterSpacing ? el.letterSpacing * zoom : undefined,
-                        textTransform: el.textTransform ?? "none",
-                        lineHeight: el.lineHeight ?? 1.3,
-                        whiteSpace: "pre-wrap",
-                        overflow: "visible",
-                        pointerEvents: "none",
-                        padding: `0 ${2 * zoom}px`,
-                        textAlign: el.align ?? "left",
-                      }}>
-                        {el.text || ""}
-                      </div>
-                    )}
+                    borderStroke="var(--gold)"
+                    borderStrokeWidth={1.5 / zoom}
+                    anchorFill="#d4af37"
+                    anchorStroke="#000"
+                    anchorSize={8 / zoom}
+                    rotateEnabled={true}
+                    keepRatio={false}
+                  />
+                </Layer>
+              </Stage>
+            )}
 
-                    {el.type === "logo" && (
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                        {logoUrl ? (
-                          <img
-                            src={logoUrl}
-                            alt="logo"
-                            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                          />
-                        ) : (
-                          <div style={{ width: "100%", height: "100%", background: "rgba(212,175,55,0.15)", border: "1px dashed rgba(212,175,55,0.4)", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <ImageIcon size={Math.max(16, 24 * zoom)} style={{ color: "var(--gold)", opacity: 0.5 }} />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {el.type === "qr" && (
-                      <div style={{ width: "100%", height: "100%", background: "#fff", borderRadius: 4 * zoom, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                        <QrCode size={Math.max(16, Math.min(el.width, el.height) * zoom * 0.7)} style={{ color: "#000" }} />
-                      </div>
-                    )}
-
-                    {el.type === "line" && (
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", pointerEvents: "none" }}>
-                        <div style={{ width: "100%", height: Math.max(1, 2 * zoom), background: el.color ?? "rgba(212,175,55,0.6)" }} />
-                      </div>
-                    )}
-
-                    {/* Element label (only shown when selected) */}
-                    {isSel && (
-                      <div style={{
-                        position: "absolute", top: -20 * zoom, left: 0,
-                        fontSize: Math.max(8, 10 * zoom),
-                        color: "var(--gold)", background: "rgba(0,0,0,0.85)",
-                        padding: `${1 * zoom}px ${4 * zoom}px`, borderRadius: 3,
-                        whiteSpace: "nowrap", pointerEvents: "none",
-                        border: "1px solid rgba(212,175,55,0.4)",
-                      }}>
-                        {elementLabel(el.id)}
-                      </div>
-                    )}
-
-                    {/* Resize handles (only when selected) */}
-                    {isSel && (
-                      <>
-                        {[
-                          { h: "nw", s: { top: -4, left: -4, cursor: "nwse-resize" } },
-                          { h: "ne", s: { top: -4, right: -4, cursor: "nesw-resize" } },
-                          { h: "sw", s: { bottom: -4, left: -4, cursor: "nesw-resize" } },
-                          { h: "se", s: { bottom: -4, right: -4, cursor: "nwse-resize" } },
-                          { h: "n",  s: { top: -4, left: "50%", transform: "translateX(-50%)", cursor: "ns-resize" } },
-                          { h: "s",  s: { bottom: -4, left: "50%", transform: "translateX(-50%)", cursor: "ns-resize" } },
-                          { h: "w",  s: { top: "50%", left: -4, transform: "translateY(-50%)", cursor: "ew-resize" } },
-                          { h: "e",  s: { top: "50%", right: -4, transform: "translateY(-50%)", cursor: "ew-resize" } },
-                        ].map(({ h, s }) => (
-                          <div
-                            key={h}
-                            onMouseDown={(e) => { e.stopPropagation(); onResizeHandleDown(e, el, h); }}
-                            style={{
-                              position: "absolute", width: 8, height: 8,
-                              background: "var(--gold)", border: "1px solid #000",
-                              borderRadius: 2, zIndex: 10,
-                              ...s as React.CSSProperties,
-                            }}
-                          />
-                        ))}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
             <div style={{ fontSize: 10, color: "var(--t3)" }}>
               {CARD_W}×{CARD_H}px · 85×55mm · arrastra los elementos para moverlos
             </div>
           </div>
         </div>
 
-        {/* SIDEBAR */}
+        {/* ── SIDEBAR ─────────────────────────────────────────────────────── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", maxHeight: 560 }}>
           {/* Elements list */}
           <div style={panelStyle}>
@@ -654,7 +598,6 @@ export default function CardStudioEditor({
                     onChange={(e) => setOverride(selected.id, { text: e.target.value })}
                     style={{ ...inputStyle, minHeight: 52, resize: "vertical", marginBottom: 8 }}
                   />
-
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 5 }}>
                     <div>
                       <label style={labelStyle}>Tamaño</label>
@@ -673,7 +616,6 @@ export default function CardStudioEditor({
                       />
                     </div>
                   </div>
-
                   <label style={labelStyle}>Fuente</label>
                   <select
                     value={selected.fontFamily || "Inter"}
@@ -682,7 +624,6 @@ export default function CardStudioEditor({
                   >
                     {POPULAR_FONTS.map(f => <option key={f} value={f}>{f}</option>)}
                   </select>
-
                   <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
                     <button
                       onClick={() => setOverride(selected.id, { fontWeight: (selected.fontWeight ?? 400) >= 600 ? 400 : 700 })}
@@ -729,7 +670,6 @@ export default function CardStudioEditor({
                 </>
               )}
 
-              {/* Position + size */}
               <label style={labelStyle}>Posición (X, Y)</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
                 <input type="number" value={Math.round(selected.x)}
@@ -739,7 +679,6 @@ export default function CardStudioEditor({
                   onChange={(e) => setOverride(selected.id, { y: +e.target.value || 0 })}
                   style={inputStyle} placeholder="Y" />
               </div>
-
               <label style={labelStyle}>Tamaño (W, H)</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
                 <input type="number" value={Math.round(selected.width)}
@@ -771,7 +710,7 @@ export default function CardStudioEditor({
   );
 }
 
-// ── Shared styles ────────────────────────────────────────────────────────────
+// ── Shared styles ─────────────────────────────────────────────────────────────
 const tabBtn = (active: boolean): React.CSSProperties => ({
   padding: "5px 12px", fontSize: 11, borderRadius: 4,
   background: active ? "rgba(212,175,55,0.18)" : "transparent",
