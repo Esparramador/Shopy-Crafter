@@ -941,4 +941,365 @@ router.post("/projects/:projectId/seo/generate-schemas", async (req, res): Promi
   }
 });
 
+// ── Helper: extraer señales SEO reales del HTML vivo de un producto ──────────
+function extractLiveSeoSignals(html: string, productUrl: string) {
+  const clean = (s: string) =>
+    s.replace(/&#(\d+);/g, (_, c) => String.fromCharCode(+c))
+      .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/\s+/g, " ").trim().slice(0, 600);
+
+  const title = clean(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
+  const metaDescM = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)/i)
+    ?? html.match(/<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description/i);
+  const metaDesc = clean(metaDescM?.[1] ?? "");
+  const ogTitle = clean(html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)/i)?.[1] ?? "");
+  const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']*)/i)?.[1]?.trim() ?? "";
+  const canonical = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']*)/i)?.[1]?.trim() ?? "";
+  const robotsMeta = html.match(/<meta[^>]+name=["']robots["'][^>]+content=["']([^"']*)/i)?.[1]?.trim() ?? "";
+
+  const schemaTypes: string[] = [];
+  const schemaRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let sm: RegExpExecArray | null;
+  while ((sm = schemaRe.exec(html)) !== null) {
+    try {
+      const p = JSON.parse(sm[1]);
+      const types: string[] = Array.isArray(p) ? p.map((x: any) => x["@type"]).filter(Boolean) : [p["@type"]].filter(Boolean);
+      schemaTypes.push(...types);
+    } catch {}
+  }
+
+  const h1s: string[] = [];
+  const h1Re = /<h1[^>]*>([\s\S]*?)<\/h1>/gi;
+  let hm: RegExpExecArray | null;
+  while ((hm = h1Re.exec(html)) !== null) h1s.push(hm[1].replace(/<[^>]+>/g, "").trim().slice(0, 120));
+
+  const imgTags = [...html.matchAll(/<img[^>]*>/gi)];
+  const imgsWithoutAlt = imgTags.filter(m => !/alt=["'][^"']+/i.test(m[0])).length;
+
+  const bodyText = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const wordCount = bodyText.split(/\s+/).filter(w => w.length > 2).length;
+
+  let internalLinks = 0;
+  try {
+    const base = new URL(productUrl);
+    const linkRe = /href=["']([^"'#?]+)/gi;
+    let lm: RegExpExecArray | null;
+    while ((lm = linkRe.exec(html)) !== null) {
+      const h = lm[1];
+      if (h.startsWith("/") || h.includes(base.hostname)) internalLinks++;
+    }
+  } catch {}
+
+  const hasGoogleAnalytics = /gtag\s*\(|google-analytics\.com|_ga\b|UA-\d{4,}|G-[A-Z0-9]+/i.test(html);
+  const hasGTM = /googletagmanager\.com|GTM-[A-Z0-9]+/i.test(html);
+  const hasFbPixel = /connect\.facebook\.net|fbq\s*\(/i.test(html);
+
+  return {
+    titleTag: title, titleLength: title.length,
+    metaDescription: metaDesc, metaDescLength: metaDesc.length,
+    hasOgTitle: !!ogTitle, hasOgImage: !!ogImage,
+    hasCanonical: !!canonical, canonicalUrl: canonical,
+    robotsMeta: robotsMeta || "index, follow",
+    isIndexable: !robotsMeta.toLowerCase().includes("noindex"),
+    hasSchema: schemaTypes.length > 0, schemaTypes,
+    h1Count: h1s.length, h1Text: h1s[0] ?? "",
+    imagesTotal: imgTags.length, imagesWithoutAlt: imgsWithoutAlt,
+    wordCount, internalLinks,
+    hasGoogleAnalytics, hasGTM, hasFbPixel,
+  };
+}
+
+function computeLiveSeoScore(signals: ReturnType<typeof extractLiveSeoSignals>): { score: number; grade: string; issues: string[]; fixes: string[] } {
+  const issues: string[] = []; const fixes: string[] = []; let score = 100;
+  if (!signals.titleTag) { issues.push("❌ Sin etiqueta <title>"); fixes.push("Añade title de 50–60 chars con keyword principal"); score -= 20; }
+  else if (signals.titleLength < 30 || signals.titleLength > 70) { issues.push(`⚠️ Title con ${signals.titleLength} chars (ideal 50–60)`); fixes.push("Ajusta el title a 50–60 caracteres"); score -= 8; }
+  if (!signals.metaDescription) { issues.push("❌ Sin meta description"); fixes.push("Añade meta description 140–160 chars con keyword y CTA"); score -= 15; }
+  else if (signals.metaDescLength < 80 || signals.metaDescLength > 175) { issues.push(`⚠️ Meta description: ${signals.metaDescLength} chars (ideal 140–160)`); score -= 6; }
+  if (!signals.hasSchema) { issues.push("❌ Sin JSON-LD — sin rich snippets en Google"); fixes.push("Implementa schema Product con precio, disponibilidad y reseñas"); score -= 15; }
+  if (!signals.hasOgTitle || !signals.hasOgImage) { issues.push("⚠️ Open Graph incompleto"); fixes.push("Añade og:title, og:description y og:image"); score -= 5; }
+  if (!signals.hasCanonical) { issues.push("⚠️ Sin URL canonical"); fixes.push("Añade <link rel='canonical'> para evitar contenido duplicado"); score -= 7; }
+  if (signals.h1Count === 0) { issues.push("❌ Sin etiqueta H1"); fixes.push("Añade exactamente 1 H1 con la keyword principal"); score -= 12; }
+  else if (signals.h1Count > 1) { issues.push(`⚠️ ${signals.h1Count} etiquetas H1 (Google prefiere 1)`); score -= 4; }
+  if (signals.imagesWithoutAlt > 0) { issues.push(`⚠️ ${signals.imagesWithoutAlt} imagen(es) sin alt text`); fixes.push("Añade alt text descriptivo con keyword a cada imagen"); score -= Math.min(10, signals.imagesWithoutAlt * 2); }
+  if (signals.wordCount < 200) { issues.push(`⚠️ Contenido escaso: ${signals.wordCount} palabras`); fixes.push("Amplía descripción con beneficios, materiales, FAQ (mínimo 300 palabras)"); score -= 8; }
+  if (!signals.isIndexable) { issues.push("🚨 CRÍTICO: Página noindex — NO aparece en Google"); score -= 30; }
+  score = Math.max(0, Math.min(100, score));
+  const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 45 ? "D" : "F";
+  return { score, grade, issues, fixes };
+}
+
+function escH(s: string): string {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function seoScoreColor(s: number): string {
+  return s >= 80 ? "#22c55e" : s >= 60 ? "#eab308" : s >= 40 ? "#f97316" : "#ef4444";
+}
+
+function buildSeoFullScanReport(opts: {
+  project: { name?: string | null; shopDomain: string; storeNiche?: string | null };
+  products: Array<{
+    productId: string; title: string; handle: string; url: string;
+    liveSignals?: ReturnType<typeof extractLiveSeoSignals>;
+    liveSeoScore: number; liveGrade: string; issues: string[]; fixes: string[]; fetchError?: string;
+  }>;
+  homepagePageSpeed: any;
+  serpData: { text: string; sources: string[] } | null;
+  avgScore: number; scanned: number; total: number;
+  stats: { noTitle: number; noMetaDesc: number; noSchema: number; noH1: number; noindexCount: number };
+  generatedAt: string;
+}): string {
+  const { project, products, homepagePageSpeed, serpData, avgScore, scanned, total, stats, generatedAt } = opts;
+  const storeGrade = avgScore >= 90 ? "A" : avgScore >= 75 ? "B" : avgScore >= 60 ? "C" : avgScore >= 45 ? "D" : "F";
+  const scoreC = seoScoreColor(avgScore);
+  const storeName = project.name ?? project.shopDomain;
+  const domain = project.shopDomain;
+  const date = new Date(generatedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  const time = new Date(generatedAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+
+  const productRows = products.map(p => {
+    const s = p.liveSignals;
+    const c = seoScoreColor(p.liveSeoScore);
+    const checksHtml = s ? [
+      { ok: !!s.titleTag && s.titleLength >= 30 && s.titleLength <= 70, label: "Title" },
+      { ok: !!s.metaDescription && s.metaDescLength >= 100, label: "Meta" },
+      { ok: s.hasSchema, label: "Schema" },
+      { ok: s.hasOgTitle && s.hasOgImage, label: "OG" },
+      { ok: s.hasCanonical, label: "Canonical" },
+      { ok: s.h1Count === 1, label: "H1" },
+      { ok: s.imagesWithoutAlt === 0, label: "Alts" },
+      { ok: s.wordCount >= 200, label: "Words" },
+    ].map(x => `<span style="padding:1px 5px;border-radius:3px;font-size:9px;background:${x.ok ? "#22c55e22" : "#ef444422"};color:${x.ok ? "#22c55e" : "#ef4444"};border:1px solid ${x.ok ? "#22c55e33" : "#ef444433"};">${x.ok ? "✓" : "✗"} ${x.label}</span>`).join("") : "";
+    const issueHtml = p.issues.length > 0
+      ? `<ul style="margin:4px 0 0;padding-left:14px;font-size:10px;color:#ccc;">${p.issues.slice(0, 3).map(i => `<li>${escH(i)}</li>`).join("")}</ul>`
+      : `<div style="color:#22c55e;font-size:10px;margin-top:4px;">✅ Sin problemas críticos</div>`;
+    return `<tr style="border-bottom:1px solid #11111f;">
+      <td style="padding:10px 8px;vertical-align:top;">
+        <a href="${escH(p.url)}" target="_blank" style="color:#d4a843;text-decoration:none;font-size:12px;font-weight:600;">${escH(p.title.slice(0, 48))}</a>
+        <div style="font-size:10px;color:#444;margin-top:2px;">/products/${escH(p.handle)}</div>
+        ${p.fetchError ? `<div style="font-size:10px;color:#ef4444;">${escH(p.fetchError)}</div>` : ""}
+      </td>
+      <td style="padding:10px 8px;text-align:center;vertical-align:top;">
+        <div style="width:34px;height:34px;border-radius:50%;border:2px solid ${c};display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${c};">${p.liveGrade}</div>
+        <div style="font-size:9px;color:#666;margin-top:2px;">${p.liveSeoScore}/100</div>
+      </td>
+      <td style="padding:10px 8px;vertical-align:top;">
+        <div style="display:flex;gap:3px;flex-wrap:wrap;">${checksHtml}</div>
+        ${issueHtml}
+      </td>
+      <td style="padding:10px 8px;vertical-align:top;font-size:11px;color:#888;">${s ? s.wordCount : "–"}</td>
+      <td style="padding:10px 8px;vertical-align:top;font-size:10px;">${s ? (s.hasSchema ? `<span style="color:#22c55e;">${escH(s.schemaTypes.slice(0, 2).join(", "))}</span>` : `<span style="color:#ef4444;">Ninguno</span>`) : "–"}</td>
+    </tr>`;
+  }).join("");
+
+  const psBlock = homepagePageSpeed ? `
+  <div style="margin-bottom:40px;">
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;color:#d4a843;">⚡ Google PageSpeed — Homepage (Mobile)</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+      ${[
+        { label: "Rendimiento", val: homepagePageSpeed.performanceScore },
+        { label: "SEO Google", val: homepagePageSpeed.seoScore },
+        { label: "Accesibilidad", val: homepagePageSpeed.accessibilityScore },
+        { label: "Best Practices", val: homepagePageSpeed.bestPracticesScore },
+      ].map(x => { const c2 = seoScoreColor(x.val ?? 0); return `<div style="background:#0d0d1a;padding:16px;border-radius:10px;text-align:center;border:1px solid ${c2}33;"><div style="font-size:32px;font-weight:800;color:${c2};">${x.val ?? "–"}</div><div style="font-size:11px;color:#888;margin-top:4px;">${x.label}</div></div>`; }).join("")}
+    </div>
+    ${homepagePageSpeed.coreWebVitals ? `<table style="width:100%;border-collapse:collapse;font-size:12px;background:#0d0d1a;border-radius:10px;overflow:hidden;"><thead><tr style="background:#11112a;"><th style="padding:8px;text-align:left;color:#888;">Métrica CWV</th><th style="padding:8px;color:#888;">Valor</th><th style="padding:8px;color:#888;">Estado</th></tr></thead><tbody>${Object.entries(homepagePageSpeed.coreWebVitals).map(([k, v]: [string, any]) => { const statusC2 = v.status === "good" ? "#22c55e" : v.status === "needs-improvement" ? "#eab308" : "#ef4444"; const lbs: Record<string,string> = { lcp:"LCP (Largest Contentful Paint)", cls:"CLS (Cumulative Layout Shift)", fcp:"FCP (First Contentful Paint)", inp:"INP (Interaction to Next Paint)", tbt:"TBT (Total Blocking Time)", si:"Speed Index", ttfb:"TTFB" }; return `<tr style="border-top:1px solid #11111f;"><td style="padding:8px;color:#ccc;">${lbs[k]??k.toUpperCase()}</td><td style="padding:8px;color:${statusC2};font-weight:700;">${v.value}${v.unit}</td><td style="padding:8px;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;background:${statusC2}22;color:${statusC2};">${v.status === "good" ? "Bueno" : v.status === "needs-improvement" ? "Mejorable" : "Malo"}</span></td></tr>`; }).join("")}</tbody></table>` : ""}
+    ${(homepagePageSpeed.opportunities ?? []).length > 0 ? `<h3 style="font-size:14px;margin:16px 0 8px;color:#f97316;">🚀 Oportunidades de Mejora de Velocidad</h3>${(homepagePageSpeed.opportunities as any[]).slice(0,5).map(o => `<div style="padding:8px 12px;background:#0d0d1a;border-radius:6px;margin-bottom:4px;border-left:3px solid #f97316;font-size:12px;color:#ccc;">${escH(o.title)} <span style="color:#f97316;">${escH(o.savings)}</span></div>`).join("")}` : ""}
+  </div>` : "";
+
+  const serpBlock = serpData?.text ? `
+  <div style="margin-bottom:40px;">
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:12px;color:#d4a843;">🔍 Posicionamiento Real en Google (SERP)</h2>
+    <div style="background:#0d0d1a;padding:20px;border-radius:12px;border:1px solid #1a1a2e;"><p style="color:#ccc;font-size:13px;line-height:1.7;white-space:pre-wrap;">${escH(serpData.text.slice(0, 2000))}</p>${serpData.sources.length > 0 ? `<div style="margin-top:10px;font-size:11px;color:#555;">Fuentes: ${serpData.sources.slice(0,6).map(s => `<a href="${escH(s)}" target="_blank" style="color:#d4a843;margin-right:6px;">${escH(s.replace(/^https?:\/\/(www\.)?/,"").split("/")[0])}</a>`).join("")}</div>` : ""}</div>
+  </div>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Informe SEO Completo — ${escH(storeName)}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{background:#080814;color:#eee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.5}.page{max-width:1100px;margin:0 auto;padding:40px 32px}table{width:100%;border-collapse:collapse}@media print{body{background:#fff;color:#000}}</style>
+</head>
+<body><div class="page">
+  <div style="background:linear-gradient(135deg,#0d0d1a,#12123a);border-radius:16px;padding:40px;margin-bottom:32px;border:1px solid #1a1a3a;text-align:center;">
+    <div style="font-size:12px;color:#d4a843;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Shopy Crafter · Informe Profesional SEO</div>
+    <h1 style="font-size:28px;font-weight:800;margin-bottom:4px;">Escaneo SEO Real — ${escH(storeName)}</h1>
+    <p style="color:#888;font-size:13px;">${escH(domain)} · Generado ${date} ${time}</p>
+    <div style="margin-top:20px;display:inline-block;width:90px;height:90px;border-radius:50%;border:5px solid ${scoreC};display:inline-flex;align-items:center;justify-content:center;"><span style="font-size:32px;font-weight:800;color:${scoreC};">${storeGrade}</span></div>
+    <p style="margin-top:8px;font-size:13px;color:#aaa;">Score Medio: ${avgScore}/100 · ${scanned} de ${total} productos escaneados en vivo</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:32px;">
+    ${[
+      { label: "Score Medio", val: `${avgScore}/100`, color: scoreC, icon: "📊" },
+      { label: "Sin Meta Desc", val: stats.noMetaDesc, color: stats.noMetaDesc > 0 ? "#ef4444" : "#22c55e", icon: "📝" },
+      { label: "Sin Schema", val: stats.noSchema, color: stats.noSchema > 0 ? "#f97316" : "#22c55e", icon: "🔗" },
+      { label: "Sin H1", val: stats.noH1, color: stats.noH1 > 0 ? "#eab308" : "#22c55e", icon: "📰" },
+      { label: "Noindex ⚠", val: stats.noindexCount, color: stats.noindexCount > 0 ? "#ef4444" : "#22c55e", icon: "🚫" },
+    ].map(k => `<div style="background:#0d0d1a;padding:16px;border-radius:10px;text-align:center;border:1px solid ${k.color}33;"><div style="font-size:20px;">${k.icon}</div><div style="font-size:26px;font-weight:800;color:${k.color};margin:4px 0;">${k.val}</div><div style="font-size:11px;color:#888;">${k.label}</div></div>`).join("")}
+  </div>
+  ${psBlock}${serpBlock}
+  <div style="margin-bottom:40px;">
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;color:#d4a843;">📦 Análisis en Vivo por Producto (${scanned} escaneados de ${total})</h2>
+    <div style="background:#0d0d1a;border-radius:12px;border:1px solid #1a1a2e;overflow:hidden;">
+      <table><thead><tr style="background:#111128;border-bottom:2px solid #1a1a3a;">
+        <th style="text-align:left;padding:10px 8px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;">Producto</th>
+        <th style="text-align:center;padding:10px 8px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;">Score</th>
+        <th style="text-align:left;padding:10px 8px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;">Checks SEO + Issues</th>
+        <th style="text-align:left;padding:10px 8px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;">Palabras</th>
+        <th style="text-align:left;padding:10px 8px;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;">Schema</th>
+      </tr></thead><tbody>${productRows}</tbody></table>
+    </div>
+  </div>
+  <div style="margin-bottom:40px;">
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;color:#d4a843;">🛠️ Plan de Acción SEO Priorizado</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${stats.noMetaDesc > 0 ? `<div style="background:#0d0d1a;padding:16px;border-radius:10px;border-left:4px solid #ef4444;"><div style="color:#ef4444;font-size:12px;font-weight:700;margin-bottom:6px;">🔴 CRÍTICO — ${stats.noMetaDesc} sin Meta Description</div><p style="font-size:12px;color:#ccc;">Usa "Meta Tags Masivos" en Shopy Crafter para generarlas con IA en 1 clic. Impacto directo en CTR.</p></div>` : ""}
+      ${stats.noSchema > 0 ? `<div style="background:#0d0d1a;padding:16px;border-radius:10px;border-left:4px solid #f97316;"><div style="color:#f97316;font-size:12px;font-weight:700;margin-bottom:6px;">🟠 ALTO — ${stats.noSchema} sin JSON-LD Schema</div><p style="font-size:12px;color:#ccc;">Usa "Generar JSON-LD Schemas" para rich snippets con precio y disponibilidad en resultados de Google.</p></div>` : ""}
+      ${stats.noH1 > 0 ? `<div style="background:#0d0d1a;padding:16px;border-radius:10px;border-left:4px solid #eab308;"><div style="color:#eab308;font-size:12px;font-weight:700;margin-bottom:6px;">🟡 MEDIO — ${stats.noH1} sin H1</div><p style="font-size:12px;color:#ccc;">Añade etiqueta H1 con keyword principal de cada producto en el theme de Shopify.</p></div>` : ""}
+      <div style="background:#0d0d1a;padding:16px;border-radius:10px;border-left:4px solid #22c55e;"><div style="color:#22c55e;font-size:12px;font-weight:700;margin-bottom:6px;">✅ VELOCIDAD — Core Web Vitals</div><p style="font-size:12px;color:#ccc;">Optimiza imágenes a WebP, activa lazy loading y comprime JS/CSS para mejorar LCP y CLS.</p></div>
+    </div>
+  </div>
+  <div style="text-align:center;padding:20px;border-top:1px solid #1a1a2e;margin-top:32px;">
+    <p style="font-size:12px;color:#555;">Generado por <strong style="color:#d4a843;">Shopy Crafter</strong> · shopycrafter.com · ${date}</p>
+    <p style="font-size:11px;color:#333;margin-top:2px;">Datos en tiempo real — escaneo vivo de ${escH(domain)}</p>
+  </div>
+</div></body></html>`;
+}
+
+// ── Escaneo SEO REAL en vivo: scrape de cada URL de producto + PageSpeed + SERP
+router.post("/projects/:projectId/seo/full-scan", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const shopDomain = project.shopDomain;
+    if (!shopDomain) { res.status(400).json({ error: "Dominio de tienda no configurado" }); return; }
+
+    const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
+    if (products.length === 0) {
+      res.json({ success: false, error: "No hay productos sincronizados. Sincroniza tu catálogo primero.", products: [], storeScore: 0 });
+      return;
+    }
+
+    const BROWSER_UA = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+
+    // PageSpeed homepage + SERP en paralelo
+    const [psResult, serpResult] = await Promise.allSettled([
+      (async () => { const { runPageSpeedAudit } = await import("../lib/pagespeed.js"); return runPageSpeedAudit(`https://${shopDomain}`, "mobile"); })(),
+      (async () => {
+        if (await isGeminiSearchBlocked()) return null;
+        const niche = project.storeNiche ?? "e-commerce";
+        return askGeminiWithSearch(
+          `Search Google for the Shopify store ${shopDomain} (brand: "${project.name ?? shopDomain}"). Find real data:
+1. Total pages indexed by Google: use site:${shopDomain} operator
+2. Top keyword rankings in Google for ${niche} products from this store
+3. Does this store appear in Google Shopping? Any product ads?
+4. Google My Business listing or reviews visible in Google results?
+5. Domain authority estimate and organic visibility
+Return specific numbers and URLs you found in the search results.`,
+          "SEO ranking expert. Search Google and return REAL SERP data for this exact store. Report actual findings with numbers."
+        );
+      })(),
+    ]);
+
+    const homepagePageSpeed = psResult.status === "fulfilled" ? psResult.value : null;
+    const serpRaw = serpResult.status === "fulfilled" ? serpResult.value : null;
+    const serpData = serpRaw ? { text: (serpRaw as any)?.text?.slice(0, 3000) ?? "", sources: (serpRaw as any)?.sources?.slice(0, 10) ?? [] } : null;
+
+    // Scrape en vivo de cada producto (lotes de 5)
+    const productsToScan = products.slice(0, 60);
+    const liveResults: Array<{
+      productId: string; title: string; handle: string; url: string;
+      liveSignals?: ReturnType<typeof extractLiveSeoSignals>;
+      liveSeoScore: number; liveGrade: string; issues: string[]; fixes: string[]; fetchError?: string;
+    }> = [];
+
+    for (let i = 0; i < productsToScan.length; i += 5) {
+      const batch = productsToScan.slice(i, i + 5);
+      const batchResults = await Promise.allSettled(batch.map(async (product) => {
+        const productUrl = `https://${shopDomain}/products/${product.handle}`;
+        try {
+          const resp = await fetch(productUrl, {
+            headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
+            signal: AbortSignal.timeout(15_000),
+            redirect: "follow",
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const html = await resp.text();
+          const signals = extractLiveSeoSignals(html, productUrl);
+          const { score, grade, issues, fixes } = computeLiveSeoScore(signals);
+          return { productId: product.shopifyProductId, title: product.title, handle: product.handle, url: productUrl, liveSignals: signals, liveSeoScore: score, liveGrade: grade, issues, fixes };
+        } catch (err) {
+          return {
+            productId: product.shopifyProductId, title: product.title, handle: product.handle, url: productUrl,
+            liveSignals: undefined, liveSeoScore: 0, liveGrade: "?",
+            issues: [`Error al acceder: ${err instanceof Error ? err.message : "Sin respuesta"}`],
+            fixes: ["Verifica que la tienda esté activa y accesible públicamente"],
+            fetchError: err instanceof Error ? err.message : "Error",
+          };
+        }
+      }));
+      for (const r of batchResults) {
+        liveResults.push(r.status === "fulfilled" ? r.value : { productId: "", title: "Error", handle: "", url: "", liveSeoScore: 0, liveGrade: "?", issues: [], fixes: [] });
+      }
+      if (i + 5 < productsToScan.length) await new Promise(r => setTimeout(r, 800));
+    }
+
+    const scanned = liveResults.filter(r => !r.fetchError).length;
+    const avgScore = scanned > 0 ? Math.round(liveResults.filter(r => !r.fetchError).reduce((s, r) => s + r.liveSeoScore, 0) / scanned) : 0;
+    const stats = {
+      noTitle: liveResults.filter(r => !r.liveSignals?.titleTag).length,
+      noMetaDesc: liveResults.filter(r => !r.liveSignals?.metaDescription).length,
+      noSchema: liveResults.filter(r => !r.liveSignals?.hasSchema).length,
+      noH1: liveResults.filter(r => r.liveSignals && r.liveSignals.h1Count === 0).length,
+      noindexCount: liveResults.filter(r => r.liveSignals && !r.liveSignals.isIndexable).length,
+    };
+
+    const reportHtml = buildSeoFullScanReport({
+      project, products: liveResults, homepagePageSpeed, serpData, avgScore, scanned, total: products.length, stats, generatedAt: new Date().toISOString(),
+    });
+
+    try {
+      await saveToVault({
+        projectId, fileType: "seo_full_scan", category: "seo",
+        title: `Escaneo SEO Real — ${shopDomain} · ${new Date().toLocaleDateString("es-ES")}`,
+        description: `${scanned} productos escaneados. Score medio: ${avgScore}/100. ${stats.noMetaDesc} sin meta desc. ${stats.noSchema} sin schema.`,
+        mimeType: "text/html", generatedBy: "seo-full-scan", content: reportHtml,
+        metadata: { shopDomain, scanned, avgScore, ...stats },
+      });
+    } catch {}
+
+    learnFromOperation({
+      operationType: "seo_full_scan", niche: project.storeNiche ?? null,
+      title: `Escaneo SEO Real — ${shopDomain}: ${avgScore}/100`,
+      content: `Escaneados ${scanned}/${products.length} productos en vivo. Score: ${avgScore}. Sin meta desc: ${stats.noMetaDesc}. Sin schema: ${stats.noSchema}.`,
+      confidence: 0.9, tags: ["seo", "full-scan", "live-audit"],
+    });
+
+    res.json({
+      success: true,
+      storeScore: avgScore,
+      storeGrade: avgScore >= 90 ? "A" : avgScore >= 75 ? "B" : avgScore >= 60 ? "C" : avgScore >= 45 ? "D" : "F",
+      scanned, total: products.length, stats,
+      homepagePageSpeed: homepagePageSpeed ? {
+        performance: homepagePageSpeed.performanceScore, seo: homepagePageSpeed.seoScore,
+        accessibility: homepagePageSpeed.accessibilityScore, bestPractices: homepagePageSpeed.bestPracticesScore,
+        coreWebVitals: homepagePageSpeed.coreWebVitals, opportunities: homepagePageSpeed.opportunities,
+      } : null,
+      serpData,
+      products: liveResults,
+      reportHtml,
+    });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Error en el escaneo";
+    if (!res.headersSent) res.status(500).json({ error: msg });
+    else try { res.end(JSON.stringify({ error: msg })); } catch {}
+  }
+});
+
 export default router;

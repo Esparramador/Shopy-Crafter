@@ -385,12 +385,29 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
       competitorDesign: Record<string, unknown> | null;
       sectorDesign: Record<string, unknown> | null;
       encyclopedia: Record<string, unknown> | null;
+      googleReviews: Record<string, unknown> | null;
+      serpPositioning: { text: string; sources: string[] } | null;
     } = {
       brandInfo: null,
       instagramInfo: null,
       competitorDesign: null,
       sectorDesign: null,
       encyclopedia: null,
+      googleReviews: null,
+      serpPositioning: null,
+    };
+
+    // Detect analytics/tracking from extracted HTML
+    const htmlForAnalytics = extraction.html.slice(0, 60_000);
+    const analyticsDetection = {
+      hasGoogleAnalytics: /gtag\s*\(|google-analytics\.com|G-[A-Z0-9]{4,}|UA-\d{4,}/i.test(htmlForAnalytics),
+      hasGTM: /googletagmanager\.com|GTM-[A-Z0-9]+/i.test(htmlForAnalytics),
+      hasFbPixel: /connect\.facebook\.net|fbq\s*\(/i.test(htmlForAnalytics),
+      hasTikTokPixel: /analytics\.tiktok\.com|ttq\s*\./i.test(htmlForAnalytics),
+      hasPinterest: /ct\.pinterest\.com|pintrk\s*\(/i.test(htmlForAnalytics),
+      hasHotjar: /hotjar\.com|hj\s*\(|hjSettings/i.test(htmlForAnalytics),
+      hasCookieBanner: /cookieconsent|cookie-banner|gdpr|consent-manager|cookiebot|axeptio/i.test(htmlForAnalytics),
+      hasChatWidget: /intercom|zendesk|freshchat|tawk\.to|tidio|crisp\.chat/i.test(htmlForAnalytics),
     };
 
     const parsedUrl = new URL(normalizedUrl);
@@ -401,7 +418,7 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
 
     try {
       const multiSourceHint = "Cruza información de MÚLTIPLES fuentes (Google, Bing, DuckDuckGo, Wikipedia, Trustpilot, Crunchbase, LinkedIn, Instagram, prensa local). Cita 'sources' con URLs reales encontradas. Si dos fuentes se contradicen, usa la más reciente o la oficial.";
-      const [brandResult, igResult, competitorResult, sectorResult, encyclopediaResult] = await Promise.allSettled([
+      const [brandResult, igResult, competitorResult, sectorResult, encyclopediaResult, reviewsResult, serpResult] = await Promise.allSettled([
         askGeminiWithSearch(
           `Investiga "${searchName}" (${url}). ${multiSourceHint} Qué es, qué vende, sector/nicho, público objetivo (edad, género, poder adquisitivo), estilo de marca (luxury, streetwear, corporate, artesanal, tech, minimal, bold...), colores que usa, valores de marca, rango de precios. SOLO JSON: { "name": "", "sector": "", "audience": "", "style": "", "colors": [], "values": [], "priceRange": "", "luxuryLevel": 0, "designAdjectives": [], "sources": [] }`,
           "Brand analyst riguroso. Return ONLY valid JSON. Cruza Google, Bing, DuckDuckGo y fuentes oficiales antes de afirmar nada."
@@ -427,6 +444,14 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
           `Busca a "${searchName}" en Wikipedia (es y en) y en bases enciclopédicas/empresariales (Crunchbase, LinkedIn, OpenCorporates). ${multiSourceHint} Devuelve JSON: { "wikipediaUrl": "", "summary": "", "founded": "", "headquarters": "", "founders": [], "categoryTags": [], "knownFor": [], "sources": [] }`,
           "Encyclopedic researcher. Return ONLY JSON. Si nada concluyente, devuelve campos vacíos pero NO inventes."
         ),
+        askGeminiWithSearch(
+          `Search Google for reviews and reputation of "${searchName}" (${url}). Find: 1) Google Business reviews (rating and count if available), 2) Trustpilot rating if exists, 3) Reviews on Yelp, Sitejabber, or other review platforms, 4) Social media sentiment (positive/negative), 5) Any complaints or praises on forums or Reddit. Return JSON: { "googleRating": null, "googleReviewCount": null, "trustpilotRating": null, "trustpilotReviewCount": null, "otherRatings": [], "overallSentiment": "positive|neutral|negative", "keyPraises": [], "keyComplaints": [], "sources": [] }`,
+          "Online reputation analyst. Search Google for REAL review data. Return ONLY valid JSON with actual data found."
+        ),
+        askGeminiWithSearch(
+          `Search Google for the website ${domain} (brand: "${searchName}"). Find real SERP data: 1) How many pages indexed (use site:${domain}), 2) What keywords does it rank for in Google top 10? 3) Does it appear in Google Shopping? 4) Estimated domain authority or page authority, 5) Any featured snippets or rich results. Report specific URLs and rankings you found.`,
+          "SEO SERP analyst. Search Google and return REAL ranking data for this website. Report specific page URLs and keyword rankings found."
+        ),
       ]);
 
       const parseSafe = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>): Record<string, unknown> | null => {
@@ -443,12 +468,18 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
       brandResearch.competitorDesign = parseSafe(competitorResult);
       brandResearch.sectorDesign = parseSafe(sectorResult);
       brandResearch.encyclopedia = parseSafe(encyclopediaResult);
+      brandResearch.googleReviews = parseSafe(reviewsResult);
+      brandResearch.serpPositioning = serpResult.status === "fulfilled"
+        ? { text: serpResult.value?.text?.slice(0, 3000) ?? "", sources: serpResult.value?.sources?.slice(0, 10) ?? [] }
+        : null;
 
       logger.info({
         hasBrand: !!brandResearch.brandInfo,
         hasIg: !!brandResearch.instagramInfo,
         hasCompetitors: !!brandResearch.competitorDesign,
         hasTrends: !!brandResearch.sectorDesign,
+        hasReviews: !!brandResearch.googleReviews,
+        hasSerp: !!brandResearch.serpPositioning,
       }, "✅ Brand research complete");
     } catch (err) {
       logger.warn({ err }, "Brand research partially failed — continuing with available data");
@@ -639,6 +670,9 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
         totalImages: scraperData.images?.total,
         imagesMissingAlt: scraperData.images?.withoutAlt ?? 0,
       } : null,
+      analyticsDetection,
+      googleReviews: brandResearch.googleReviews,
+      serpPositioning: brandResearch.serpPositioning,
       url,
       template: tpl,
     });

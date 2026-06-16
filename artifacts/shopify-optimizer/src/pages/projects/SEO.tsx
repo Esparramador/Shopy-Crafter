@@ -56,6 +56,63 @@ export default function SEOPage(){ const [, params] = useRoute("/projects/:id/se
   const [generatedPost, setGeneratedPost] = useState<{ title?: string; content?: string } | null>(null);
   const [selectedPillar, _setSelectedPillar] = useState<string>("");
 
+  const [fullScanLoading, setFullScanLoading] = useState(false);
+  const [fullScanError, setFullScanError] = useState("");
+  const [fullScanResult, setFullScanResult] = useState<{
+    storeScore: number;
+    storeGrade: string;
+    scanned: number;
+    total: number;
+    stats: { noTitle: number; noMetaDesc: number; noSchema: number; noH1: number; noindexCount: number };
+    homepagePageSpeed: { performance: number; seo: number; accessibility: number; bestPractices: number; coreWebVitals?: any; opportunities?: any[] } | null;
+    serpData: { text: string; sources: string[] } | null;
+    products: Array<{
+      productId: string; title: string; handle: string; url: string;
+      liveSignals?: {
+        titleTag: string; titleLength: number; metaDescription: string; metaDescLength: number;
+        hasOgTitle: boolean; hasOgImage: boolean; hasCanonical: boolean; robotsMeta: string;
+        isIndexable: boolean; hasSchema: boolean; schemaTypes: string[];
+        h1Count: number; h1Text: string; imagesTotal: number; imagesWithoutAlt: number;
+        wordCount: number; internalLinks: number; hasGoogleAnalytics: boolean; hasGTM: boolean;
+      };
+      liveSeoScore: number; liveGrade: string; issues: string[]; fixes: string[]; fetchError?: string;
+    }>;
+    reportHtml?: string;
+  } | null>(null);
+
+  const handleFullScan = async () => {
+    setFullScanLoading(true);
+    setFullScanError("");
+    setFullScanResult(null);
+    try {
+      const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/seo/full-scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
+      setFullScanResult(data);
+      toast({ title: `✅ Escaneo completado: ${data.scanned} productos · Score: ${data.storeScore}/100` });
+    } catch (e: any) {
+      setFullScanError(e.message || "Error en el escaneo");
+      toast({ title: "Error en el escaneo SEO real", variant: "destructive" });
+    } finally {
+      setFullScanLoading(false);
+    }
+  };
+
+  const downloadFullScanReport = () => {
+    if (!fullScanResult?.reportHtml) return;
+    const blob = new Blob([fullScanResult.reportHtml], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `informe-seo-real-${new Date().toISOString().slice(0, 10)}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const [psUrl, setPsUrl] = useState("");
   const [psStrategy, setPsStrategy] = useState<"mobile" | "desktop">("mobile");
   const [psResult, setPsResult] = useState<{
@@ -687,6 +744,195 @@ ${blogStrategy?.pillars ? `<h2>Estrategia de Blog</h2><table><tr><th>Pilar</th><
         {!psResult && !auditPageSpeed.isPending && (
           <p className="text-sm text-muted-foreground text-center py-4">
             Ingresa la URL de cualquier página de tu tienda para obtener su análisis Core Web Vitals en tiempo real.
+          </p>
+        )}
+      </GlassCard>
+
+      {/* ── Escaneo SEO Real Completo ─────────────────────────────────────────── */}
+      <GlassCard className="p-6 border-amber-500/20">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center flex-shrink-0">
+              <span style={{ fontSize: 18 }}>🔍</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Escaneo SEO Real — Live Scraping</h2>
+              <p className="text-xs text-muted-foreground">Accede a cada URL de producto en vivo · Extrae title, meta, schema, H1, alt texts reales · PageSpeed + SERP</p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {fullScanResult?.reportHtml && (
+              <button
+                onClick={downloadFullScanReport}
+                className="text-sm bg-green-500/10 text-green-400 border border-green-500/20 px-4 py-2 rounded-xl hover:bg-green-500/20 transition-colors flex items-center gap-2"
+              >
+                <span>📥</span> Descargar Informe
+              </button>
+            )}
+            <button
+              onClick={handleFullScan}
+              disabled={fullScanLoading}
+              className="text-sm px-5 py-2 rounded-xl font-semibold flex items-center gap-2 transition-all disabled:opacity-60"
+              style={{ background: fullScanLoading ? "#333" : "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000" }}
+            >
+              {fullScanLoading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Escaneando productos...</>
+              ) : (
+                <><Globe className="w-4 h-4" /> Escaneo Real Completo</>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {fullScanLoading && (
+          <div className="bg-amber-500/5 border border-amber-500/15 rounded-xl p-4 text-center">
+            <Loader2 className="w-6 h-6 text-amber-400 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-amber-300 font-medium">Escaneando productos en vivo con User-Agent de Googlebot…</p>
+            <p className="text-xs text-muted-foreground mt-1">Extrayendo señales SEO reales de cada URL · Ejecutando PageSpeed · Consultando posicionamiento SERP</p>
+          </div>
+        )}
+
+        {fullScanError && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-sm text-red-400">
+            {fullScanError}
+          </div>
+        )}
+
+        {fullScanResult && (
+          <div className="space-y-5">
+            {/* KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {[
+                { label: "Score Medio", value: `${fullScanResult.storeScore}/100`, grade: fullScanResult.storeGrade, color: fullScanResult.storeScore >= 75 ? "#22c55e" : fullScanResult.storeScore >= 55 ? "#eab308" : "#ef4444" },
+                { label: "Sin Meta Desc", value: fullScanResult.stats.noMetaDesc, color: fullScanResult.stats.noMetaDesc > 0 ? "#ef4444" : "#22c55e" },
+                { label: "Sin Schema", value: fullScanResult.stats.noSchema, color: fullScanResult.stats.noSchema > 0 ? "#f97316" : "#22c55e" },
+                { label: "Sin H1", value: fullScanResult.stats.noH1, color: fullScanResult.stats.noH1 > 0 ? "#eab308" : "#22c55e" },
+                { label: "Noindex ⚠", value: fullScanResult.stats.noindexCount, color: fullScanResult.stats.noindexCount > 0 ? "#ef4444" : "#22c55e" },
+              ].map((k, i) => (
+                <div key={i} className="bg-black/30 rounded-xl p-3 text-center border" style={{ borderColor: `${k.color}25` }}>
+                  <div className="text-2xl font-bold" style={{ color: k.color }}>{(k as any).grade ?? k.value}</div>
+                  {(k as any).grade && <div className="text-xs" style={{ color: k.color }}>{k.value}</div>}
+                  <div className="text-xs text-muted-foreground mt-1">{k.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* PageSpeed homepage */}
+            {fullScanResult.homepagePageSpeed && (
+              <div className="bg-black/20 rounded-xl p-4 border border-cyan-500/15">
+                <h3 className="text-sm font-semibold text-cyan-400 mb-3">⚡ PageSpeed Homepage (Mobile)</h3>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: "Rendimiento", score: fullScanResult.homepagePageSpeed.performance },
+                    { label: "SEO", score: fullScanResult.homepagePageSpeed.seo },
+                    { label: "Accesibilidad", score: fullScanResult.homepagePageSpeed.accessibility },
+                    { label: "Best Practices", score: fullScanResult.homepagePageSpeed.bestPractices },
+                  ].map((m, i) => {
+                    const c = (m.score ?? 0) >= 90 ? "#22c55e" : (m.score ?? 0) >= 50 ? "#eab308" : "#ef4444";
+                    return (
+                      <div key={i} className="text-center bg-black/30 rounded-lg p-2 border" style={{ borderColor: `${c}22` }}>
+                        <div className="text-xl font-bold" style={{ color: c }}>{m.score ?? "–"}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{m.label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* SERP data */}
+            {fullScanResult.serpData?.text && (
+              <div className="bg-black/20 rounded-xl p-4 border border-violet-500/15">
+                <h3 className="text-sm font-semibold text-violet-400 mb-2">🔍 Posicionamiento Real en Google (SERP)</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">{fullScanResult.serpData.text}</p>
+                {fullScanResult.serpData.sources?.length > 0 && (
+                  <div className="flex gap-2 flex-wrap mt-2">
+                    {fullScanResult.serpData.sources.slice(0, 4).map((s, i) => (
+                      <a key={i} href={s} target="_blank" rel="noreferrer" className="text-xs text-amber-400 hover:underline">
+                        {s.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Products table */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Productos Escaneados en Vivo ({fullScanResult.scanned}/{fullScanResult.total})
+              </h3>
+              <div className="bg-black/20 rounded-xl border border-white/5 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-white/5 border-b border-white/5">
+                        <th className="text-left px-3 py-2.5 text-muted-foreground font-medium">Producto</th>
+                        <th className="text-center px-3 py-2.5 text-muted-foreground font-medium">Score</th>
+                        <th className="text-left px-3 py-2.5 text-muted-foreground font-medium">Checks SEO</th>
+                        <th className="text-left px-3 py-2.5 text-muted-foreground font-medium">Issues</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fullScanResult.products.slice(0, 50).map((p, i) => {
+                        const sc = p.liveSeoScore >= 80 ? "#22c55e" : p.liveSeoScore >= 60 ? "#eab308" : p.liveSeoScore >= 40 ? "#f97316" : "#ef4444";
+                        const s = p.liveSignals;
+                        return (
+                          <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td className="px-3 py-2.5 max-w-[200px]">
+                              <a href={p.url} target="_blank" rel="noreferrer" className="font-medium text-amber-400 hover:underline truncate block">{p.title}</a>
+                              {p.fetchError && <span className="text-red-400 text-xs">{p.fetchError}</span>}
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              <span className="inline-flex w-8 h-8 rounded-full border-2 items-center justify-center font-bold text-sm" style={{ borderColor: sc, color: sc }}>
+                                {p.liveGrade}
+                              </span>
+                              <div className="text-xs text-muted-foreground mt-0.5">{p.liveSeoScore}</div>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {s && (
+                                <div className="flex gap-1 flex-wrap">
+                                  {[
+                                    { ok: !!s.titleTag && s.titleLength >= 30, label: "Title" },
+                                    { ok: !!s.metaDescription, label: "Meta" },
+                                    { ok: s.hasSchema, label: "Schema" },
+                                    { ok: s.hasOgTitle, label: "OG" },
+                                    { ok: s.hasCanonical, label: "Canon" },
+                                    { ok: s.h1Count === 1, label: "H1" },
+                                    { ok: s.imagesWithoutAlt === 0, label: "Alts" },
+                                  ].map((ch, ci) => (
+                                    <span key={ci} className="px-1.5 py-0.5 rounded text-xs" style={{
+                                      background: ch.ok ? "#22c55e15" : "#ef444415",
+                                      color: ch.ok ? "#22c55e" : "#ef4444",
+                                      border: `1px solid ${ch.ok ? "#22c55e25" : "#ef444425"}`,
+                                    }}>
+                                      {ch.ok ? "✓" : "✗"} {ch.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-muted-foreground max-w-[220px]">
+                              <div className="space-y-0.5">
+                                {p.issues.slice(0, 2).map((issue, ii) => (
+                                  <div key={ii} className="text-xs leading-tight">{issue}</div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!fullScanResult && !fullScanLoading && (
+          <p className="text-sm text-muted-foreground text-center py-3">
+            Haz clic en "Escaneo Real Completo" para auditar CADA URL de producto en vivo — extrae las señales SEO reales que ve Google.
           </p>
         )}
       </GlassCard>

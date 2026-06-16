@@ -44,6 +44,18 @@ interface AnalysisResult {
   vaultIds: { report: number | null; css: number | null; html: number | null };
   pageSpeed: any;
   scraperData: any;
+  analyticsDetection?: {
+    hasGoogleAnalytics: boolean;
+    hasGTM: boolean;
+    hasFbPixel: boolean;
+    hasTikTokPixel: boolean;
+    hasPinterest: boolean;
+    hasHotjar: boolean;
+    hasCookieBanner: boolean;
+    hasChatWidget: boolean;
+  };
+  googleReviews?: Record<string, any> | null;
+  serpPositioning?: { text: string; sources: string[] } | null;
   url: string;
   template: string;
 }
@@ -2272,6 +2284,102 @@ ${body || '<div style="padding:40px;text-align:center;color:#888;font-family:san
                           <div style={{ fontSize: 11, color: "#888" }}>{k}</div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Analytics & Tracking Detection ─────────────────────────── */}
+                {result.analyticsDetection && (
+                  <div style={{ marginTop: 28 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>📊 Herramientas de Analytics Detectadas</h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+                      {[
+                        { label: "Google Analytics 4", key: "hasGoogleAnalytics", icon: "📈" },
+                        { label: "Google Tag Manager", key: "hasGTM", icon: "🏷️" },
+                        { label: "Meta Pixel", key: "hasFbPixel", icon: "📘" },
+                        { label: "TikTok Pixel", key: "hasTikTokPixel", icon: "🎵" },
+                        { label: "Pinterest Tag", key: "hasPinterest", icon: "📌" },
+                        { label: "Hotjar", key: "hasHotjar", icon: "🔥" },
+                        { label: "Banner de Cookies", key: "hasCookieBanner", icon: "🍪" },
+                        { label: "Chat Widget", key: "hasChatWidget", icon: "💬" },
+                      ].map(({ label, key, icon }) => {
+                        const active = result.analyticsDetection![key as keyof typeof result.analyticsDetection];
+                        return (
+                          <div key={key} style={{
+                            background: active ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
+                            border: `1px solid ${active ? "#22c55e33" : "#33333355"}`,
+                            borderRadius: 10, padding: "10px 14px",
+                            display: "flex", alignItems: "center", gap: 8,
+                          }}>
+                            <span style={{ fontSize: 18 }}>{icon}</span>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: active ? "#22c55e" : "#666" }}>{label}</div>
+                              <div style={{ fontSize: 11, color: active ? "#22c55e99" : "#555" }}>{active ? "Detectado ✓" : "No encontrado"}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Google Reviews / Reputación Online ─────────────────────── */}
+                {result.googleReviews && (
+                  <div style={{ marginTop: 28 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⭐ Reputación Online & Reseñas</h3>
+                    <div style={{ background: "#0a0a14", borderRadius: 12, padding: 18, border: "1px solid #2a2a3e" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
+                        {[
+                          { label: "Google Rating", value: result.googleReviews.googleRating != null ? `${result.googleReviews.googleRating} ⭐` : "N/D", color: "#fbbf24" },
+                          { label: "Google Reviews", value: result.googleReviews.googleReviewCount != null ? result.googleReviews.googleReviewCount : "N/D", color: "#fbbf24" },
+                          { label: "Trustpilot", value: result.googleReviews.trustpilotRating != null ? `${result.googleReviews.trustpilotRating} ⭐` : "N/D", color: "#00b67a" },
+                          { label: "Sentimiento", value: result.googleReviews.overallSentiment ?? "—", color: result.googleReviews.overallSentiment === "positive" ? "#22c55e" : result.googleReviews.overallSentiment === "negative" ? "#ef4444" : "#eab308" },
+                        ].map((m, i) => (
+                          <div key={i} style={{ background: "#111", borderRadius: 8, padding: 12, textAlign: "center", border: "1px solid #222" }}>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: m.color }}>{String(m.value)}</div>
+                            <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>{m.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {Array.isArray(result.googleReviews.keyPraises) && (result.googleReviews.keyPraises as string[]).length > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 12, color: "#22c55e", fontWeight: 600, marginBottom: 4 }}>✅ Puntos fuertes</div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {(result.googleReviews.keyPraises as string[]).map((p, i) => (
+                              <span key={i} style={{ background: "#22c55e10", color: "#22c55e", border: "1px solid #22c55e25", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>{p}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {Array.isArray(result.googleReviews.keyComplaints) && (result.googleReviews.keyComplaints as string[]).length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 12, color: "#ef4444", fontWeight: 600, marginBottom: 4 }}>⚠️ Quejas frecuentes</div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {(result.googleReviews.keyComplaints as string[]).map((c, i) => (
+                              <span key={i} style={{ background: "#ef444410", color: "#ef4444", border: "1px solid #ef444425", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>{c}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Posicionamiento SERP Real ───────────────────────────────── */}
+                {result.serpPositioning?.text && (
+                  <div style={{ marginTop: 28 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>🔍 Posicionamiento Real en Google (SERP)</h3>
+                    <div style={{ background: "#0a0a14", borderRadius: 12, padding: 18, border: "1px solid #2a2a3e" }}>
+                      <p style={{ fontSize: 13, color: "#ccc", lineHeight: 1.7, marginBottom: 12 }}>{result.serpPositioning.text}</p>
+                      {result.serpPositioning.sources && result.serpPositioning.sources.length > 0 && (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {result.serpPositioning.sources.slice(0, 6).map((s, i) => (
+                            <a key={i} href={s} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#d4a843", textDecoration: "none" }}>
+                              {s.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
