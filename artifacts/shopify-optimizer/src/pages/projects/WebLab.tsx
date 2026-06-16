@@ -1006,7 +1006,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
 
     const phaseInterval = setInterval(() => {
       setPhase((p) => (p < 3 ? p + 1 : p));
-    }, 8000);
+    }, 5000);
 
     try {
       const res = await fetch(`${API_BASE}/api/web-lab/analyze`, {
@@ -1031,13 +1031,11 @@ function WebLabInner({ projectId }: { projectId: number }) {
       }
 
       setResult(data);
-      // BUG FIX: tras generar, abrir directamente el tab "preview" para que
-      // el usuario vea el iframe + textarea de iteración SIN tener que pulsar
-      // ningún tab manualmente. Antes saltaba a "summary" y muchos usuarios
-      // no encontraban el preview ni el flujo de cambios.
       setTab("preview");
       setPhase(4);
       loadHistory();
+      // Auto-run deep scan in background after analyze completes
+      setTimeout(() => { runDeepScan(); }, 800);
     } catch (err: any) {
       clearInterval(phaseInterval);
       setError(err.message || "Error en el análisis");

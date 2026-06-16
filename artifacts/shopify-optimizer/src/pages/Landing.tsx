@@ -1247,7 +1247,7 @@ export default function Landing() {
             </div>
 
             {/* ── Visme-style 3D form hero ── */}
-            <VismeFormHero />
+            <VismeFormHero isActive={isAnimated("fp-contact")} />
 
             {/* ── Legacy form (preserved, hidden) ── */}
             <div style={{ display: "none" }}>

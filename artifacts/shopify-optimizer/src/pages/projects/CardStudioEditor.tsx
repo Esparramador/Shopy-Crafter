@@ -1990,3 +1990,9 @@ const tabBtn: React.CSSProperties = {
   border: "none", cursor: "pointer", fontWeight: 600,
   transition: "color 0.2s", borderRadius: 0,
 };
+const btnGold: React.CSSProperties = {
+  padding: "6px 12px", fontSize: 11, fontWeight: 700,
+  background: "linear-gradient(135deg, #d4a843, #b8941e)",
+  color: "#0a0a0a", border: "none", borderRadius: 5, cursor: "pointer",
+  display: "inline-flex", alignItems: "center", gap: 5,
+};

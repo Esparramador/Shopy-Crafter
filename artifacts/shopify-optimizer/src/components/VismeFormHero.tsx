@@ -90,7 +90,7 @@ const btnSecondary: React.CSSProperties = {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function VismeFormHero() {
+export function VismeFormHero({ isActive = false }: { isActive?: boolean }) {
   const [step,     setStep]    = useState(0);
   const [form,     setForm]    = useState<FormData>(EMPTY);
   const [services, setServices] = useState<string[]>([]);
@@ -166,14 +166,22 @@ export function VismeFormHero() {
 
         {/* ── LEFT: 3D CHARACTER ─────────────────────────────────────────────── */}
         <div style={{ position: "relative" }}>
-          <FloatingAlecMonopoly
-            height={420}
-            phase="ready"
-            animName={isSuccess ? SUCCESS_ANIM    : current.animName}
-            animLooping={isSuccess ? true         : current.animLoop}
-            cameraPos={isSuccess  ? SUCCESS_CAM  : current.camPos}
-            cameraLookAt={isSuccess ? SUCCESS_LOOK : current.camLook}
-          />
+          {isActive ? (
+            <FloatingAlecMonopoly
+              height={420}
+              phase="ready"
+              animName={isSuccess ? SUCCESS_ANIM    : current.animName}
+              animLooping={isSuccess ? true         : current.animLoop}
+              cameraPos={isSuccess  ? SUCCESS_CAM  : current.camPos}
+              cameraLookAt={isSuccess ? SUCCESS_LOOK : current.camLook}
+            />
+          ) : (
+            <div style={{
+              height: 420, display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 72, opacity: 0.15,
+              background: "rgba(200,168,75,0.03)", borderRadius: 16,
+            }}>🤵‍♂️</div>
+          )}
 
           {/* Speech bubble */}
           {!isSuccess && (
