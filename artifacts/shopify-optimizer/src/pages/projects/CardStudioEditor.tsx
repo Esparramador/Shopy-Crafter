@@ -448,11 +448,17 @@ export default function CardStudioEditor({
                 width: CARD_W * zoom,
                 height: CARD_H * zoom,
                 position: "relative",
-                backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
-                backgroundSize: "100% 100%",
-                backgroundRepeat: "no-repeat",
-                backgroundColor: bgUrl ? "transparent" : "#1a1208",
-                background: bgUrl ? undefined : "radial-gradient(ellipse at 20% 30%, #2a1f04 0%, #0d0d0d 70%)",
+                ...(bgUrl
+                  ? {
+                      backgroundImage: `url(${bgUrl})`,
+                      backgroundSize: "100% 100%",
+                      backgroundRepeat: "no-repeat",
+                      backgroundColor: "transparent",
+                    }
+                  : {
+                      background: "radial-gradient(ellipse at 20% 30%, #2a1f04 0%, #0d0d0d 70%)",
+                    }
+                ),
                 borderRadius: 4,
                 boxShadow: "0 8px 40px rgba(0,0,0,0.8)",
                 cursor: isDragging ? "grabbing" : isResizing ? "nwse-resize" : "default",

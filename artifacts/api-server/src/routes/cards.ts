@@ -410,6 +410,47 @@ router.post(
   },
 );
 
+// ─── Import front image (set existing image as front of card, marks as ready) ─
+router.post(
+  "/cards/:id/import-front",
+  requireAdmin,
+  upload.single("front"),
+  async (req, res) => {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+      if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+      if (!req.file) { res.status(400).json({ error: "Falta archivo de imagen" }); return; }
+
+      const vaultId = await saveToVault({
+        projectId: row.projectId,
+        fileType: "card-front",
+        category: "card_generated",
+        title: `Frente importado · ${row.name}`,
+        description: `Imagen importada como frente de tarjeta ${row.name}`,
+        mimeType: req.file.mimetype,
+        content: req.file.buffer.toString("base64"),
+        fileSizeBytes: req.file.buffer.length,
+        generatedBy: "card-studio-import",
+        metadata: { cardId: id },
+      });
+
+      if (!vaultId) { res.status(500).json({ error: "No se pudo guardar imagen en vault" }); return; }
+
+      const [updated] = await db
+        .update(businessCardsTable)
+        .set({ frontImageVaultFileId: vaultId, status: "ready" })
+        .where(eq(businessCardsTable.id, id))
+        .returning();
+
+      res.json(toCardDto(updated));
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "cards import-front failed");
+      res.status(500).json({ error: err?.message || "Error importando imagen" });
+    }
+  },
+);
+
 // ─── Generate (pipeline completo, long-running) ─────────────────────────────
 router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Response) => {
   enableLongRunning(res);
