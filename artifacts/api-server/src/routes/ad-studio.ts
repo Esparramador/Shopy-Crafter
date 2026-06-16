@@ -48,19 +48,29 @@ router.get("/ad-studio/voices", requireAdmin, async (_req, res): Promise<void> =
 router.get("/ad-studio/providers", requireAdmin, async (_req, res): Promise<void> => {
   res.json({
     videoProviders: [
-      // ── Premium (top calidad) ──
-      { key: "runway-gen4.5",           label: "Runway Gen-4.5 (recomendado)", tier: "premium",  costPerAd: 0.50, quality: 10, description: "Última generación Runway — motion y detalle máximos" },
-      { key: "replicate-kling-master",  label: "Kling Master",                tier: "premium",  costPerAd: 1.20, quality: 10, description: "Cinemático máximo + audio hasta 10s" },
-      { key: "replicate-kling-2.5-turbo",label:"Kling 2.5 Turbo",            tier: "premium",  costPerAd: 0.90, quality: 9,  description: "1080p rápido — top motion realista" },
+      // ── Ultra Premium ──
+      { key: "veo-4",                    label: "Veo 4 · Google 2026 ★",        tier: "ultra",    costPerAd: 2.00, quality: 10, description: "Última generación Google — coherencia narrativa máxima + audio" },
+      { key: "kling-3.0-omni",           label: "Kling V3.0 Omni · multimodal ★",tier: "ultra",   costPerAd: 1.50, quality: 10, description: "Multimodal: texto + imagen + refs + audio nativo, hasta 15s" },
+      // ── Premium ──
+      { key: "runway-seedance2",         label: "Runway Seedance 2.0",          tier: "premium",  costPerAd: 0.80, quality: 10, description: "Cinematográfico mayo 2026 — motion y detalle máximos vía Runway" },
+      { key: "runway-gen4.5",            label: "Runway Gen-4.5",               tier: "premium",  costPerAd: 0.50, quality: 10, description: "Última generación Runway — motion y detalle máximos" },
+      { key: "replicate-kling-master",   label: "Kling V3.0 Master",            tier: "premium",  costPerAd: 1.20, quality: 10, description: "Máxima calidad cinemática V3.0, hasta 15s" },
+      { key: "sora-2",                   label: "OpenAI Sora 2",                tier: "premium",  costPerAd: 1.20, quality: 10, description: "Narrativa cinematográfica OpenAI, hasta 12s" },
+      { key: "veo-3.1",                  label: "Veo 3.1 + audio nativo",       tier: "premium",  costPerAd: 0.70, quality: 10, description: "Google Veo 3.1 — última gen estable, audio nativo" },
       // ── Standard ──
-      { key: "replicate-kling",         label: "Kling 2.1",                   tier: "standard", costPerAd: 0.70, quality: 9,  description: "1080p realista hasta 10s" },
-      { key: "replicate-seedance-pro",  label: "Seedance Pro",                tier: "standard", costPerAd: 0.50, quality: 8,  description: "Multi-referencia cinematográfica, 9 imgs" },
-      { key: "replicate-hailuo",        label: "Hailuo 02",                   tier: "standard", costPerAd: 0.40, quality: 8,  description: "Balance velocidad/calidad, motion suave" },
+      { key: "veo-3",                    label: "Veo 3 + audio",                tier: "standard", costPerAd: 0.70, quality: 9,  description: "Google Veo 3 — máxima calidad Google con audio" },
+      { key: "replicate-kling-2.5-turbo",label: "Kling V3.0 Turbo",            tier: "standard", costPerAd: 0.90, quality: 9,  description: "1080p rápido — top motion realista V3.0" },
+      { key: "hailuo-2.3",               label: "Hailuo 2.3 · última gen",      tier: "standard", costPerAd: 0.50, quality: 8,  description: "Última gen MiniMax — 1080p, T2V + I2V" },
+      { key: "replicate-kling",          label: "Kling 2.1",                    tier: "standard", costPerAd: 0.70, quality: 9,  description: "1080p realista hasta 10s" },
+      { key: "replicate-seedance-pro",   label: "Seedance Pro",                 tier: "standard", costPerAd: 0.50, quality: 8,  description: "Multi-referencia cinematográfica, 9 imgs" },
+      { key: "replicate-hailuo",         label: "Hailuo 02",                    tier: "standard", costPerAd: 0.40, quality: 8,  description: "Balance velocidad/calidad, motion suave" },
+      { key: "wan-2.7",                  label: "Wan 2.7 · última gen open",    tier: "standard", costPerAd: 0.35, quality: 8,  description: "Última gen open-source — T2V + I2V + R2V, hasta 15s" },
       // ── Economy ──
-      { key: "replicate-seedance-fast", label: "Seedance Fast",               tier: "economy",  costPerAd: 0.35, quality: 7,  description: "Rápido y económico" },
-      { key: "replicate-seedance-lite", label: "Seedance 1 Lite",             tier: "economy",  costPerAd: 0.20, quality: 6,  description: "Más barato — ideal para bocetos" },
-      { key: "replicate-wan-2.5",       label: "Wan 2.5 I2V",                 tier: "economy",  costPerAd: 0.25, quality: 7,  description: "Open-source image-to-video, artístico" },
-      { key: "runway-gen4-turbo",       label: "Runway Gen-4 Turbo",          tier: "economy",  costPerAd: 0.45, quality: 8,  description: "Gen anterior Runway — todavía sólido" },
+      { key: "runway-gen4-turbo",        label: "Runway Gen-4 Turbo",           tier: "economy",  costPerAd: 0.45, quality: 8,  description: "Gen anterior Runway — todavía sólido" },
+      { key: "replicate-seedance-fast",  label: "Seedance Fast",                tier: "economy",  costPerAd: 0.35, quality: 7,  description: "Rápido y económico" },
+      { key: "grok-imagine-video",       label: "Grok Video (xAI)",             tier: "economy",  costPerAd: 0.30, quality: 7,  description: "T2V / I2V xAI, hasta 15s, 720p" },
+      { key: "replicate-wan-2.5",        label: "Wan 2.5 I2V",                  tier: "economy",  costPerAd: 0.25, quality: 7,  description: "Open-source image-to-video, artístico" },
+      { key: "replicate-seedance-lite",  label: "Seedance 1 Lite",              tier: "economy",  costPerAd: 0.20, quality: 6,  description: "Más barato — ideal para bocetos" },
     ],
     aspects: ["9:16", "16:9", "1:1", "4:5"],
     durations: [3, 5, 6, 8, 10],
