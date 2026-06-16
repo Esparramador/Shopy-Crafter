@@ -198,6 +198,107 @@ export const BACKGROUND_THEMES = [
   { id: "watercolor", emoji: "🎨", label: "Acuarela",     prompt: "beautiful watercolor wash background, soft pastel ink blooms, artistic texture, bleed edges, no text" },
 ];
 
+// ── Tipos y helpers de fills de fondo ──────────────────────────────────────────
+type BgFillConfig = {
+  type: "solid" | "linear" | "radial" | "carbon";
+  color1?: string;
+  color2?: string;
+  stops?: string[];
+  angle?: number;
+};
+type FillPreset = BgFillConfig & { id: string; label: string; emoji: string; cssPreview: string };
+
+const FILL_PRESETS: FillPreset[] = [
+  { id: "black-matte",  type: "solid",  color1: "#1a1a1a", emoji: "🖤", label: "Negro mate",     cssPreview: "#1a1a1a" },
+  { id: "white-matte",  type: "solid",  color1: "#f0f0f0", emoji: "⬜", label: "Blanco mate",    cssPreview: "#f0f0f0" },
+  { id: "cream-matte",  type: "solid",  color1: "#f5f0e8", emoji: "🍦", label: "Crema marfil",   cssPreview: "#f5f0e8" },
+  { id: "gold-metal",   type: "linear", stops: ["#2d1a00","#8B6914","#f5d76e","#d4af37","#8B6914","#2d1a00"], angle: 135, emoji: "✨", label: "Metálico dorado",  cssPreview: "linear-gradient(135deg,#2d1a00,#8B6914,#f5d76e,#d4af37,#8B6914,#2d1a00)" },
+  { id: "silver-metal", type: "linear", stops: ["#1a1a1a","#808080","#e8e8e8","#c0c0c0","#808080","#1a1a1a"], angle: 135, emoji: "🥈", label: "Metálico plata",   cssPreview: "linear-gradient(135deg,#1a1a1a,#808080,#e8e8e8,#c0c0c0,#808080,#1a1a1a)" },
+  { id: "black-metal",  type: "linear", stops: ["#000","#1c1c1c","#3a3a3a","#1c1c1c","#000"],                angle: 135, emoji: "⚫", label: "Metálico negro",   cssPreview: "linear-gradient(135deg,#000,#3a3a3a,#000)" },
+  { id: "bronze-metal", type: "linear", stops: ["#1a0a00","#8B4513","#d4814a","#8B4513","#1a0a00"],           angle: 135, emoji: "🟫", label: "Bronce",           cssPreview: "linear-gradient(135deg,#1a0a00,#8B4513,#d4814a,#8B4513,#1a0a00)" },
+  { id: "rose-gold",    type: "linear", stops: ["#3d1020","#a04060","#f5b8c8","#d4708a","#a04060","#3d1020"], angle: 135, emoji: "🌸", label: "Oro rosa",         cssPreview: "linear-gradient(135deg,#3d1020,#a04060,#f5b8c8,#d4708a,#a04060,#3d1020)" },
+  { id: "satin-navy",   type: "linear", stops: ["#05102a","#1565C0","#42a5f5","#1565C0","#05102a"],           angle: 135, emoji: "🔵", label: "Satinado azul",    cssPreview: "linear-gradient(135deg,#05102a,#1565C0,#42a5f5,#1565C0,#05102a)" },
+  { id: "satin-purple", type: "linear", stops: ["#1a003a","#4a148c","#9c27b0","#4a148c","#1a003a"],           angle: 135, emoji: "🟣", label: "Satinado morado",  cssPreview: "linear-gradient(135deg,#1a003a,#4a148c,#9c27b0,#4a148c,#1a003a)" },
+  { id: "satin-green",  type: "linear", stops: ["#001a0a","#1b5e20","#4caf50","#1b5e20","#001a0a"],           angle: 135, emoji: "🟢", label: "Satinado verde",   cssPreview: "linear-gradient(135deg,#001a0a,#1b5e20,#4caf50,#1b5e20,#001a0a)" },
+  { id: "carbon",       type: "carbon", color1: "#1a1a1a", emoji: "⬛", label: "Fibra carbono",   cssPreview: "repeating-linear-gradient(45deg,#1a1a1a 0px,#2a2a2a 10px,#0d0d0d 10px,#1a1a1a 20px)" },
+  { id: "carbon-gold",  type: "carbon", color1: "#b8960c", emoji: "🟨", label: "Carbono dorado",  cssPreview: "repeating-linear-gradient(45deg,#1a1500 0px,#2a2100 10px,#0d0a00 10px,#3a2f00 20px)" },
+  { id: "sunset",       type: "linear", stops: ["#1a0000","#c0392b","#f39c12","#9b59b6","#1a0040"],           angle: 135, emoji: "🌅", label: "Atardecer",        cssPreview: "linear-gradient(135deg,#1a0000,#c0392b,#f39c12,#9b59b6,#1a0040)" },
+  { id: "ocean",        type: "linear", stops: ["#001a2a","#0077b6","#00b4d8","#90e0ef"],                     angle: 160, emoji: "🌊", label: "Océano",           cssPreview: "linear-gradient(160deg,#001a2a,#0077b6,#00b4d8,#90e0ef)" },
+  { id: "night",        type: "linear", stops: ["#000005","#03002e","#1a1a4e","#2d2d7a","#4d4da0"],           angle: 180, emoji: "🌌", label: "Galaxia",          cssPreview: "linear-gradient(180deg,#000005,#03002e,#2d2d7a,#4d4da0)" },
+];
+
+function _drawLinearFill(ctx: CanvasRenderingContext2D, W: number, H: number, stops: string[], angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  const half = Math.sqrt(W * W + H * H) / 2;
+  const cx = W / 2, cy = H / 2;
+  const g = ctx.createLinearGradient(cx - Math.cos(rad) * half, cy - Math.sin(rad) * half, cx + Math.cos(rad) * half, cy + Math.sin(rad) * half);
+  stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+function _drawCarbonFiber(ctx: CanvasRenderingContext2D, W: number, H: number, accentHex?: string) {
+  const T = 20;
+  ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, W, H);
+  for (let row = 0; row * T < H + T; row++) {
+    for (let col = 0; col * T < W + T; col++) {
+      const x = col * T, y = row * T, ev = (row + col) % 2 === 0;
+      const g1 = ctx.createLinearGradient(x, y, x + T, y + T / 2);
+      g1.addColorStop(0, ev ? "#2e2e2e" : "#222"); g1.addColorStop(0.5, ev ? "#1a1a1a" : "#141414"); g1.addColorStop(1, ev ? "#0b0b0b" : "#0a0a0a");
+      ctx.fillStyle = g1; ctx.fillRect(x, y, T, T / 2);
+      const g2 = ctx.createLinearGradient(x, y + T / 2, x + T, y + T);
+      g2.addColorStop(0, ev ? "#0b0b0b" : "#0a0a0a"); g2.addColorStop(0.5, ev ? "#1a1a1a" : "#141414"); g2.addColorStop(1, ev ? "#2e2e2e" : "#222");
+      ctx.fillStyle = g2; ctx.fillRect(x, y + T / 2, T, T / 2);
+    }
+  }
+  ctx.strokeStyle = "rgba(0,0,0,0.8)"; ctx.lineWidth = 0.5;
+  for (let r = 0; r * T <= H; r++) { ctx.beginPath(); ctx.moveTo(0, r * T); ctx.lineTo(W, r * T); ctx.stroke(); }
+  for (let c = 0; c * T <= W; c++) { ctx.beginPath(); ctx.moveTo(c * T, 0); ctx.lineTo(c * T, H); ctx.stroke(); }
+  if (accentHex && accentHex !== "#1a1a1a") {
+    ctx.globalAlpha = 0.18;
+    const gA = ctx.createLinearGradient(0, 0, W, H);
+    gA.addColorStop(0, "transparent"); gA.addColorStop(0.5, accentHex); gA.addColorStop(1, "transparent");
+    ctx.fillStyle = gA; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+  }
+}
+
+function generateFillDataUrl(cfg: BgFillConfig): string {
+  const W = CANVAS_W, H = CANVAS_H;
+  const el = document.createElement("canvas"); el.width = W; el.height = H;
+  const ctx = el.getContext("2d"); if (!ctx) return "";
+  if (cfg.type === "carbon") {
+    _drawCarbonFiber(ctx, W, H, cfg.color1);
+  } else if (cfg.type === "solid") {
+    ctx.fillStyle = cfg.color1 ?? "#1a1a1a"; ctx.fillRect(0, 0, W, H);
+  } else if (cfg.type === "linear") {
+    _drawLinearFill(ctx, W, H, cfg.stops ?? [cfg.color1 ?? "#000", cfg.color2 ?? "#333333"], cfg.angle ?? 135);
+  } else if (cfg.type === "radial") {
+    const stops = cfg.stops ?? [cfg.color1 ?? "#333", cfg.color2 ?? "#000"];
+    const g = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)/2);
+    stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  return el.toDataURL("image/png");
+}
+
+async function applyBackgroundDataUrl(dataUrl: string, canvas: fabric.Canvas | null): Promise<void> {
+  if (!canvas || !dataUrl) return;
+  return new Promise<void>((resolve) => {
+    const imgEl = new Image();
+    imgEl.onload = () => {
+      const fabricImg = new fabric.Image(imgEl as HTMLImageElement);
+      const scale = Math.max(CANVAS_W / (imgEl.naturalWidth || CANVAS_W), CANVAS_H / (imgEl.naturalHeight || CANVAS_H));
+      fabricImg.set({
+        scaleX: scale, scaleY: scale, originX: "center", originY: "center",
+        left: CANVAS_W / 2, top: CANVAS_H / 2,
+        selectable: false, evented: false, hasBorders: false, hasControls: false,
+      });
+      canvas.setBackgroundImage(fabricImg, () => { canvas.renderAll(); resolve(); });
+    };
+    imgEl.onerror = () => resolve();
+    imgEl.src = dataUrl;
+  });
+}
+
 // ── Configuración global de controles Fabric ──────────────────────────────────
 function configureFabricGlobals() {
   (fabric.Object.prototype as any).set({
@@ -326,9 +427,11 @@ async function populateCanvas(
       } as any);
       canvas.add(rect);
     } else if (el.type === "qr") {
-      // Carga QR: si tiene qrUrl propia usa endpoint genérico, si no usa el de la tarjeta
+      // Carga QR: si tiene qrUrl propia usa endpoint genérico con colores y 1200px
+      const qrFg = (el as any).qrFg ?? "#000000";
+      const qrBg = (el as any).qrBg ?? "#ffffff";
       const qrSrc = el.qrUrl
-        ? `${apiBase}/api/qr.png?data=${encodeURIComponent(el.qrUrl)}`
+        ? `${apiBase}/api/qr.png?data=${encodeURIComponent(el.qrUrl)}&fg=${encodeURIComponent(qrFg)}&bg=${encodeURIComponent(qrBg)}&size=1200`
         : `${apiBase}/api/cards/${cardId}/qr.png`;
       const qrBlobUrl = await fetchBlob(qrSrc);
       if (qrBlobUrl) {
@@ -336,15 +439,16 @@ async function populateCanvas(
           fabric.Image.fromURL(qrBlobUrl, (img) => {
             URL.revokeObjectURL(qrBlobUrl);
             if (!img) { res(); return; }
-            const sw = img.width || 400;
-            const sh = img.height || 400;
+            const sw = img.width || 1200;
+            const sh = img.height || 1200;
             const sq = Math.min(el.width, el.height);
             img.set({
               left: el.x, top: el.y,
               scaleX: sq / sw,
               scaleY: sq / sh,
               lockUniScaling: true,
-              data: { id: el.id, side, type: "qr", srcW: sw, srcH: sh },
+              imageSmoothing: false,
+              data: { id: el.id, side, type: "qr", srcW: sw, srcH: sh, qrFg, qrBg },
               name: el.id,
             } as any);
             canvas.add(img);
@@ -416,6 +520,13 @@ export default function CardStudioEditor({
   const [extraQrUrlInput, setExtraQrUrlInput] = useState<string>("");
   const [extraQrFg, setExtraQrFg] = useState<string>("#000000");
   const [extraQrBg, setExtraQrBg] = useState<string>("#ffffff");
+  // Fill de fondo (diseño sin IA)
+  const [bgMode, setBgMode] = useState<"design" | "ai">("ai");
+  const [fillType, setFillType] = useState<"solid" | "linear" | "radial">("solid");
+  const [fillColor1, setFillColor1] = useState<string>("#1a1a1a");
+  const [fillColor2, setFillColor2] = useState<string>("#4a4a4a");
+  const [fillAngle, setFillAngle] = useState<number>(135);
+  const [fillGradientType, setFillGradientType] = useState<"linear" | "radial">("linear");
 
   useEffect(() => { setOverrides(initialOverrides || {}); }, [initialOverrides]);
   useEffect(() => { setLocalQrType(qrTypeProp || "vcard"); }, [qrTypeProp]);
@@ -447,6 +558,7 @@ export default function CardStudioEditor({
     const opts: fabric.ICanvasOptions = {
       width: CANVAS_W * z, height: CANVAS_H * z,
       preserveObjectStacking: true, selection: true,
+      enableRetinaScaling: true,   // Renderiza en DPR real → texto y gráficos nítidos en Retina
     };
 
     const fc = new fabric.Canvas(frontCanvasEl.current, { ...opts, backgroundColor: "#111111" });
@@ -669,6 +781,23 @@ export default function CardStudioEditor({
     if (url) applyBackground(url, bc);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasesReady, bgBackUrl, bgUrl, backUrl]);
+
+  // ── Aplicar fill de diseño al canvas ─────────────────────────────────────
+  const applyFillToSide = useCallback(async (cfg: BgFillConfig, side: "front" | "back" | "both") => {
+    const dataUrl = generateFillDataUrl(cfg);
+    if (!dataUrl) return;
+    if (side === "front" || side === "both") await applyBackgroundDataUrl(dataUrl, frontFabric.current);
+    if (side === "back" || side === "both") await applyBackgroundDataUrl(dataUrl, backFabric.current);
+  }, []);
+
+  const clearCanvasBg = useCallback((side: "front" | "back" | "both") => {
+    const clear = (canvas: fabric.Canvas | null) => {
+      if (!canvas) return;
+      (canvas as any).setBackgroundImage(null, () => { canvas.renderAll(); });
+    };
+    if (side === "front" || side === "both") clear(frontFabric.current);
+    if (side === "back" || side === "both") clear(backFabric.current);
+  }, []);
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   const applyZoom = useCallback((nz: number) => {
@@ -1357,10 +1486,10 @@ export default function CardStudioEditor({
           {activeTab === "temas" && (
             <div>
               {/* ── Selector de cara ── */}
-              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+              <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
                 {(["front", "back", "both"] as const).map(s => (
                   <button key={s} onClick={() => setBgSide(s)} style={{
-                    flex: 1, padding: "5px 0", fontSize: 11, borderRadius: 6, cursor: "pointer",
+                    flex: 1, padding: "5px 0", fontSize: 10, borderRadius: 5, cursor: "pointer",
                     background: bgSide === s ? "var(--gold)" : "rgba(255,255,255,0.05)",
                     color: bgSide === s ? "#000" : "var(--t2)",
                     border: bgSide === s ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.1)",
@@ -1370,41 +1499,144 @@ export default function CardStudioEditor({
                   </button>
                 ))}
               </div>
-              <p style={{ fontSize: 10, color: "var(--t3)", margin: "0 0 10px" }}>
-                Elige un tema → el fondo IA se genera solo para la cara seleccionada (sin Re-generar la tarjeta completa).
-              </p>
-              {bgGenerating && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--gold)", padding: "8px 0" }}>
-                  <Loader2 size={13} className="animate-spin" /> Generando fondo IA…
-                </div>
-              )}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 6, opacity: bgGenerating ? 0.5 : 1 }}>
-                {BACKGROUND_THEMES.map(theme => (
-                  <button key={theme.id} disabled={bgGenerating}
-                    onClick={async () => {
-                      if (!onThemePrompt) return;
-                      setBgGenerating(true);
-                      try { await onThemePrompt(theme.prompt, bgSide); }
-                      finally { setBgGenerating(false); }
-                    }}
-                    style={{
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 8, padding: "10px 8px",
-                      cursor: bgGenerating ? "not-allowed" : "pointer",
-                      textAlign: "center", transition: "all 0.2s", color: "var(--t1)",
-                    }}
-                    onMouseEnter={e => { if (!bgGenerating) e.currentTarget.style.borderColor = "var(--gold)"; }}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
-                  >
-                    <div style={{ fontSize: 24, marginBottom: 4 }}>{theme.emoji}</div>
-                    <div style={{ fontSize: 11, fontWeight: 600 }}>{theme.label}</div>
-                    <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>
-                      {theme.prompt.slice(0, 40)}…
-                    </div>
-                  </button>
+
+              {/* ── Sub-tabs: Diseño / IA ── */}
+              <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
+                {([["design","🎨 Diseño"],["ai","🤖 IA"]] as [string,string][]).map(([m, lbl]) => (
+                  <button key={m} onClick={() => setBgMode(m as "design" | "ai")} style={{
+                    flex: 1, padding: "5px 0", fontSize: 11, borderRadius: 6, cursor: "pointer",
+                    background: bgMode === m ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.04)",
+                    color: bgMode === m ? "var(--gold)" : "var(--t2)",
+                    border: bgMode === m ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.1)",
+                    fontWeight: bgMode === m ? 700 : 400,
+                  }}>{lbl}</button>
                 ))}
               </div>
+
+              {/* ── MODO DISEÑO ── */}
+              {bgMode === "design" && (
+                <div>
+                  {/* Sub-tipo */}
+                  <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
+                    {([["solid","Sólido"],["linear","Degradado"],["radial","Radial"]] as [string,string][]).map(([t,lbl]) => (
+                      <button key={t} onClick={() => setFillType(t as any)} style={{
+                        flex: 1, padding: "4px 0", fontSize: 10, borderRadius: 5, cursor: "pointer",
+                        background: fillType === t ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.04)",
+                        color: fillType === t ? "var(--gold)" : "var(--t2)",
+                        border: fillType === t ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
+                      }}>{lbl}</button>
+                    ))}
+                  </div>
+
+                  {/* Sólido */}
+                  {fillType === "solid" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <label style={{ fontSize: 10, color: "var(--t3)", minWidth: 40 }}>Color</label>
+                      <input type="color" value={fillColor1} onChange={e => setFillColor1(e.target.value)}
+                        style={{ flex: 1, height: 32, padding: 0, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", background: "none" }} />
+                    </div>
+                  )}
+
+                  {/* Degradado lineal / radial */}
+                  {(fillType === "linear" || fillType === "radial") && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 9, color: "var(--t3)", marginBottom: 2 }}>Color 1</div>
+                          <input type="color" value={fillColor1} onChange={e => setFillColor1(e.target.value)}
+                            style={{ width: "100%", height: 28, padding: 0, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", background: "none" }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 9, color: "var(--t3)", marginBottom: 2 }}>Color 2</div>
+                          <input type="color" value={fillColor2} onChange={e => setFillColor2(e.target.value)}
+                            style={{ width: "100%", height: 28, padding: 0, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", background: "none" }} />
+                        </div>
+                      </div>
+                      {fillType === "linear" && (
+                        <div>
+                          <div style={{ fontSize: 9, color: "var(--t3)", marginBottom: 2 }}>Ángulo: {fillAngle}°</div>
+                          <input type="range" min={0} max={360} value={fillAngle} onChange={e => setFillAngle(Number(e.target.value))}
+                            style={{ width: "100%", accentColor: "var(--gold)" }} />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Preview + Botones */}
+                  <div style={{
+                    height: 40, borderRadius: 6, marginBottom: 8,
+                    background: fillType === "solid" ? fillColor1
+                      : fillType === "radial" ? `radial-gradient(circle, ${fillColor1}, ${fillColor2})`
+                      : `linear-gradient(${fillAngle}deg, ${fillColor1}, ${fillColor2})`,
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }} />
+                  <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                    <button onClick={() => applyFillToSide({ type: fillType, color1: fillColor1, color2: fillColor2, angle: fillAngle }, bgSide)}
+                      style={{ ...btnGold, flex: 2, fontSize: 11 }}>Aplicar</button>
+                    <button onClick={() => clearCanvasBg(bgSide)}
+                      style={{ ...btnSecondary, flex: 1, fontSize: 10 }}>Limpiar</button>
+                  </div>
+
+                  {/* Presets rápidos */}
+                  <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 6, fontWeight: 600 }}>Presets — clic para aplicar</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5 }}>
+                    {FILL_PRESETS.map(p => (
+                      <button key={p.id} title={p.label}
+                        onClick={() => applyFillToSide(p, bgSide)}
+                        style={{
+                          background: p.cssPreview, height: 48, borderRadius: 6, cursor: "pointer",
+                          border: "1px solid rgba(255,255,255,0.12)", position: "relative", overflow: "hidden",
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", padding: "0 2px 4px",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--gold)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+                      >
+                        <span style={{ fontSize: 8, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.9)", lineHeight: 1.2, textAlign: "center" }}>
+                          {p.emoji} {p.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── MODO IA ── */}
+              {bgMode === "ai" && (
+                <div>
+                  <p style={{ fontSize: 10, color: "var(--t3)", margin: "0 0 8px" }}>
+                    Elige un tema → fondo IA generado para la cara seleccionada.
+                  </p>
+                  {bgGenerating && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--gold)", padding: "8px 0" }}>
+                      <Loader2 size={13} className="animate-spin" /> Generando fondo IA…
+                    </div>
+                  )}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 6, opacity: bgGenerating ? 0.5 : 1 }}>
+                    {BACKGROUND_THEMES.map(theme => (
+                      <button key={theme.id} disabled={bgGenerating}
+                        onClick={async () => {
+                          if (!onThemePrompt) return;
+                          setBgGenerating(true);
+                          try { await onThemePrompt(theme.prompt, bgSide); }
+                          finally { setBgGenerating(false); }
+                        }}
+                        style={{
+                          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: 8, padding: "10px 8px",
+                          cursor: bgGenerating ? "not-allowed" : "pointer",
+                          textAlign: "center", transition: "all 0.2s", color: "var(--t1)",
+                        }}
+                        onMouseEnter={e => { if (!bgGenerating) e.currentTarget.style.borderColor = "var(--gold)"; }}
+                        onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
+                      >
+                        <div style={{ fontSize: 24, marginBottom: 4 }}>{theme.emoji}</div>
+                        <div style={{ fontSize: 11, fontWeight: 600 }}>{theme.label}</div>
+                        <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>{theme.prompt.slice(0, 40)}…</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
