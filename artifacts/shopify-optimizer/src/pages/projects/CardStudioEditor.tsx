@@ -1,19 +1,13 @@
 /**
- * CardStudioEditor — Dual-Canvas Editor con Fabric.js
+ * CardStudioEditor — Estudio Gráfico Profesional con Fabric.js
  *
- * Arquitectura:
- *   Dos lienzos Fabric independientes (Frente + Reverso) visibles
- *   simultáneamente. Las posiciones de los objetos están en el
- *   sistema de coordenadas del backend (1080 × 720 px).
- *
- *   Capas por canvas:
- *     background  → imagen generada por IA (vault, cargada con auth)
- *     objects     → textos, logos, líneas, QR (draggables, editables)
- *     bleed guide → rect de guía de sangrado (no seleccionable)
- *
- *   Exportación:
- *     ZIP con 01_Cara_Frontal.png + 02_Cara_Posterior.png a resolución
- *     completa (1080 × 720, multiplicador 1/zoom).
+ * Arquitectura CORRECTA (sin ghost mode):
+ *   - bgUrl  → fondo puro (textura IA sin texto/QR) como Fabric background
+ *   - Todos los elementos son objetos Fabric REALES y editables
+ *   - Texto doble-clic para editar directamente en el lienzo
+ *   - QR cargado como imagen real desde /api/cards/:id/qr.png
+ *   - Tecla Supr/Backspace elimina el objeto seleccionado
+ *   - Nuevas herramientas: formas, emojis, bocadillos de texto
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -22,15 +16,16 @@ import JSZip from "jszip";
 import {
   Type, RefreshCw, Save, Trash2, Loader2, Minus,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
-  ZoomIn, ZoomOut, Download, RotateCcw, Eye, EyeOff,
+  ZoomIn, ZoomOut, Download, RotateCcw, EyeOff,
+  Square, Circle, Triangle, Smile, MessageSquare,
 } from "lucide-react";
 
-// ── Constantes (deben coincidir con card-elements.ts del backend) ─────────────
+// ── Constantes ────────────────────────────────────────────────────────────────
 const CANVAS_W = 1080;
 const CANVAS_H = 720;
-const SAFE_MARGIN = 40; // mismo valor que la constante SAFE del backend
+const SAFE_MARGIN = 40;
 
-// ── Tipos exportados (mismo contrato que antes) ───────────────────────────────
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 export type ElementOverride = {
   hidden?: boolean;
   x?: number; y?: number; width?: number; height?: number;
@@ -41,25 +36,24 @@ export type ElementOverride = {
   textTransform?: "none" | "uppercase";
   text?: string; rotate?: number;
   italic?: boolean;
-  /** Plate (caja de fondo detrás del texto). null = sin plate. */
   plate?: { color: string; opacity: number; padding: number; radius: number } | null;
 };
 export type ExtraElement = {
-  id: string; side: "front" | "back"; type: "text" | "line" | "qr";
+  id: string; side: "front" | "back"; type: "text" | "line" | "qr" | "shape" | "emoji" | "bubble";
   x: number; y: number; width: number; height?: number;
   text?: string; fontFamily?: string; fontSize?: number; fontWeight?: number;
   color?: string; align?: "left" | "center" | "right";
   letterSpacing?: number; textTransform?: "none" | "uppercase";
   rotate?: number; italic?: boolean;
   qrUrl?: string;
+  shapeType?: "rect" | "circle" | "triangle";
+  fill?: string; stroke?: string; strokeWidth?: number;
 };
 export type LayoutOverrides = {
   front?: Record<string, ElementOverride>;
   back?: Record<string, ElementOverride>;
   extras?: ExtraElement[];
 };
-
-// ── Tipo de elemento resuelto (backend response) ──────────────────────────────
 type ResolvedElement = {
   id: string;
   type: "text" | "qr" | "logo" | "line";
@@ -76,13 +70,15 @@ type ResolvedElement = {
 interface Props {
   apiBase: string;
   cardId: number;
-  frontUrl?: string | null;
+  bgUrl?: string | null;        // fondo puro (textura sin texto/QR)
+  frontUrl?: string | null;     // compuesto final (para descarga)
   backUrl?: string | null;
   logoUrl?: string | null;
   initialOverrides: LayoutOverrides;
   generating: boolean;
   onSaveOverrides: (overrides: LayoutOverrides) => Promise<void>;
   onRegenerate: () => Promise<void>;
+  onThemePrompt?: (prompt: string) => void; // callback para presets de tema
 }
 
 // ── Etiquetas ─────────────────────────────────────────────────────────────────
@@ -101,28 +97,45 @@ const POPULAR_FONTS = [
   "Inter", "Cinzel", "Playfair Display", "Montserrat", "Lato",
   "Source Serif Pro", "Space Grotesk", "JetBrains Mono",
   "Poppins", "Raleway", "Crimson Pro", "DM Sans", "DM Serif Display",
-  "Georgia", "Times New Roman", "Arial", "Helvetica",
+  "Georgia", "Times New Roman", "Arial", "Helvetica", "Oswald", "Bebas Neue",
+  "Comic Sans MS", "Orbitron", "Press Start 2P",
 ];
 
-// ── Paso 2 (propuesta): configuración global de controles Fabric ──────────────
-// Se llama una vez al montar el primer canvas. Bloquea escala no uniforme.
+// ── Emojis frecuentes para selector ──────────────────────────────────────────
+const EMOJI_LIST = [
+  "⭐","🌟","💫","✨","🔥","💥","🎯","🏆","💎","👑",
+  "🎨","🖌️","📱","💻","🌐","📧","📞","📍","💼","🚀",
+  "❤️","💛","💚","💙","💜","🖤","🤍","🎭","🎬","🎵",
+  "😊","😎","🤝","👏","💪","✌️","👍","🙌","🌈","🦋",
+];
+
+// ── Temas de fondo con prompts IA ─────────────────────────────────────────────
+export const BACKGROUND_THEMES = [
+  { id: "pixel",      emoji: "👾", label: "Pixel Art",    prompt: "8-bit pixel art retro video game background pattern, sharp pixels, dark navy blue and gold palette, no text" },
+  { id: "lego",       emoji: "🧱", label: "Lego",         prompt: "LEGO bricks pattern background, colorful interlocking blocks texture, plastic sheen, no text" },
+  { id: "scifi",      emoji: "🚀", label: "Sci-Fi",       prompt: "futuristic sci-fi dark background, glowing neon circuit board lines, deep space stars, holographic blue purple, no text" },
+  { id: "underground",emoji: "🎸", label: "Underground",  prompt: "urban underground graffiti wall texture, dark concrete, spray paint splatters, grungy street art style, no text" },
+  { id: "comic",      emoji: "💥", label: "Cómic",        prompt: "classic comic book halftone dot pattern background, bold primary colors, pop art style, no text" },
+  { id: "anime",      emoji: "🌸", label: "Anime",        prompt: "anime style background, sakura cherry blossoms, soft watercolor sky gradient, japanese manga aesthetic, no text" },
+  { id: "retro",      emoji: "📺", label: "Retro 80s",   prompt: "retro 1980s synthwave sunset background, neon pink purple grid lines, vapor wave aesthetic, dark sky, no text" },
+  { id: "nature",     emoji: "🌿", label: "Naturaleza",   prompt: "lush tropical botanical leaves background, dark emerald green, gold veins, luxury nature texture, no text" },
+  { id: "marble",     emoji: "🪨", label: "Mármol",       prompt: "white and gold luxury marble texture background, elegant veins, polished surface, no text" },
+  { id: "luxury",     emoji: "✨", label: "Luxury Gold",  prompt: "dark black background with golden geometric lines and patterns, luxury premium business card texture, no text" },
+  { id: "tech",       emoji: "💻", label: "Tech Dark",    prompt: "dark technology background, matrix code rain green on black, digital circuit patterns, minimal, no text" },
+  { id: "watercolor", emoji: "🎨", label: "Acuarela",     prompt: "beautiful watercolor wash background, soft pastel ink blooms, artistic texture, bleed edges, no text" },
+];
+
+// ── Configuración global de controles Fabric ──────────────────────────────────
 function configureFabricGlobals() {
   (fabric.Object.prototype as any).set({
-    cornerStyle: "circle",
-    cornerSize: 9,
-    cornerColor: "#d4a843",
-    borderColor: "#d4a843",
-    cornerStrokeColor: "#0a0a0a",
-    transparentCorners: false,
-    padding: 5,
+    cornerStyle: "circle", cornerSize: 10,
+    cornerColor: "#d4af37", borderColor: "#d4af37",
+    cornerStrokeColor: "#0a0a0a", transparentCorners: false, padding: 6,
   });
-  // Oculta handles del centro (escala solo desde esquinas → proporcional)
-  fabric.Object.prototype.setControlsVisibility({
-    ml: false, mr: false, mt: false, mb: false,
-  });
+  fabric.Object.prototype.setControlsVisibility({ ml: false, mr: false, mt: false, mb: false });
 }
 
-// ── Paso 3 (propuesta): carga imagen con autenticación → blob URL ─────────────
+// ── Carga imagen con auth → blob URL ─────────────────────────────────────────
 async function fetchBlob(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, { credentials: "include" });
@@ -131,12 +144,11 @@ async function fetchBlob(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-// ── Paso 3: setBackgroundImage con cover scaling (bloqueado, bajo todo) ───────
+// ── Aplicar fondo como Fabric background image ────────────────────────────────
 async function applyBackground(url: string, canvas: fabric.Canvas): Promise<void> {
   const blobUrl = await fetchBlob(url);
   if (!blobUrl) return;
   return new Promise<void>((resolve) => {
-    // Usamos HTMLImageElement directamente: más fiable que fabric.Image.fromURL con blob URLs
     const imgEl = new Image();
     imgEl.onload = () => {
       const w = imgEl.naturalWidth || imgEl.width;
@@ -159,110 +171,58 @@ async function applyBackground(url: string, canvas: fabric.Canvas): Promise<void
   });
 }
 
-// ── Paso 3: dibuja la guía de sangrado (no seleccionable) ────────────────────
+// ── Guía de sangrado ──────────────────────────────────────────────────────────
 function addBleedGuide(canvas: fabric.Canvas): fabric.Rect {
   const guide = new fabric.Rect({
-    left: SAFE_MARGIN,
-    top: SAFE_MARGIN,
-    width: CANVAS_W - SAFE_MARGIN * 2,
-    height: CANVAS_H - SAFE_MARGIN * 2,
+    left: SAFE_MARGIN, top: SAFE_MARGIN,
+    width: CANVAS_W - SAFE_MARGIN * 2, height: CANVAS_H - SAFE_MARGIN * 2,
     fill: "transparent",
-    stroke: "rgba(255, 65, 65, 0.55)",
-    strokeWidth: 1.5,
+    stroke: "rgba(255,65,65,0.5)", strokeWidth: 1.5,
     strokeDashArray: [7, 5],
-    selectable: false,
-    evented: false,
-    hasBorders: false,
-    hasControls: false,
+    selectable: false, evented: false,
+    hasBorders: false, hasControls: false,
   } as any);
   canvas.add(guide);
   canvas.bringToFront(guide);
   return guide;
 }
 
-// ── Paso 2: addTextbox — centrado, editable inline, al frente ────────────────
-function addFabricTextbox(
-  canvas: fabric.Canvas,
-  text: string,
-  side: "front" | "back",
-  extraId: string,
-  options: Partial<fabric.ITextboxOptions> = {}
-): fabric.Textbox {
-  const tb = new fabric.Textbox(text, {
-    left: CANVAS_W * 0.1,
-    top: CANVAS_H * 0.4,
-    width: CANVAS_W * 0.6,
-    fontSize: 32,
-    fontFamily: "Inter",
-    fill: side === "front" ? "#ffffff" : "#1a1a1a",
-    textAlign: "left",
-    editable: true,
-    splitByGrapheme: false,
-    ...options,
-    data: { id: `extra-${extraId}`, side, type: "text" },
-    name: `extra-${extraId}`,
-  } as any);
-  canvas.add(tb);
-  canvas.bringToFront(tb);
-  canvas.setActiveObject(tb);
-  canvas.renderAll();
-  return tb;
-}
-
-// ── Puebla un canvas con los elementos recibidos del backend ──────────────────
-// hasBackground = true → el PNG ya está renderizado con el texto; usar ghost mode
+// ── Puebla canvas con elementos del backend (SIN ghost mode) ─────────────────
 async function populateCanvas(
   canvas: fabric.Canvas,
   elements: ResolvedElement[],
   side: "front" | "back",
   logoUrl: string | null | undefined,
   guide: fabric.Rect | null,
-  hasBackground = false
+  apiBase: string,
+  cardId: number,
 ) {
-  // Quitar todos los objetos salvo la guía de sangrado
   const toRemove = canvas.getObjects().filter(o => o !== guide);
   canvas.remove(...toRemove);
-
-  const fontFamilies = new Set<string>();
 
   for (const el of elements) {
     if (el.hidden) continue;
 
     if (el.type === "text") {
-      fontFamilies.add(el.fontFamily || "Inter");
       const displayText = el.textTransform === "uppercase"
         ? (el.text || "").toUpperCase()
         : (el.text || "Texto");
-
-      // Ghost mode: cuando ya hay PNG de fondo, el texto real está ahí.
-      // Solo mostramos la caja de selección (fill transparente, borde punteado).
-      const tb = new fabric.Textbox(hasBackground ? " " : displayText, {
+      const tb = new fabric.Textbox(displayText, {
         left: el.x, top: el.y,
         width: el.width,
-        height: el.height || undefined,
         fontSize: el.fontSize || 24,
         fontFamily: el.fontFamily ? `'${el.fontFamily}'` : "Inter",
         fontWeight: String(el.fontWeight || 400),
         fontStyle: el.italic ? "italic" : "normal",
-        fill: hasBackground ? "transparent" : (el.color || "#ffffff"),
+        fill: el.color || "#ffffff",
         textAlign: el.align || "left",
         lineHeight: el.lineHeight || 1.3,
-        editable: !hasBackground,
+        editable: true,
         splitByGrapheme: false,
-        ...(hasBackground ? {
-          stroke: "rgba(212,175,55,0.30)",
-          strokeWidth: 1,
-          strokeDashArray: [6, 4],
-          backgroundColor: "transparent",
-          padding: 6,
-          lockScalingX: false,
-          lockScalingY: false,
-        } : {}),
-        data: { id: el.id, side, type: "text", label: displayText },
+        data: { id: el.id, side, type: "text" },
         name: el.id,
       } as any);
       canvas.add(tb);
-
     } else if (el.type === "logo" && logoUrl) {
       const blobUrl = await fetchBlob(logoUrl);
       if (blobUrl) {
@@ -270,69 +230,59 @@ async function populateCanvas(
           fabric.Image.fromURL(blobUrl, (img) => {
             URL.revokeObjectURL(blobUrl);
             if (!img) { res(); return; }
-            const sw = img.width || 1;
-            const sh = img.height || 1;
+            img.set({
+              left: el.x, top: el.y,
+              scaleX: el.width / (img.width || 1),
+              scaleY: el.height / (img.height || 1),
+              data: { id: el.id, side, type: "logo" },
+              name: el.id,
+            });
+            canvas.add(img);
+            res();
+          }, { crossOrigin: "anonymous" });
+        });
+      }
+    } else if (el.type === "line") {
+      const rect = new fabric.Rect({
+        left: el.x, top: el.y, width: el.width, height: el.height || 2,
+        fill: el.color || "rgba(212,175,55,0.8)",
+        data: { id: el.id, side, type: "line" },
+        name: el.id,
+      } as any);
+      canvas.add(rect);
+    } else if (el.type === "qr") {
+      // Carga el QR real como imagen desde el backend
+      const qrBlobUrl = await fetchBlob(`${apiBase}/api/cards/${cardId}/qr.png`);
+      if (qrBlobUrl) {
+        await new Promise<void>((res) => {
+          fabric.Image.fromURL(qrBlobUrl, (img) => {
+            URL.revokeObjectURL(qrBlobUrl);
+            if (!img) { res(); return; }
+            const sw = img.width || 400;
+            const sh = img.height || 400;
             img.set({
               left: el.x, top: el.y,
               scaleX: el.width / sw,
               scaleY: el.height / sh,
-              data: { id: el.id, side, type: "logo" },
+              data: { id: el.id, side, type: "qr" },
               name: el.id,
-            } as any);
+            });
             canvas.add(img);
             res();
-          });
+          }, { crossOrigin: "anonymous" });
         });
       } else {
-        // Logo placeholder si no carga
-        const rect = new fabric.Rect({
+        // Placeholder si el QR no se puede cargar
+        const ph = new fabric.Rect({
           left: el.x, top: el.y, width: el.width, height: el.height,
-          fill: "rgba(212,175,55,0.12)",
-          stroke: "rgba(212,175,55,0.35)", strokeWidth: 1,
-          strokeDashArray: [4, 4],
-          data: { id: el.id, side, type: "logo" }, name: el.id,
+          fill: "#ffffff", stroke: "#ccc", strokeWidth: 2, rx: 4, ry: 4,
+          data: { id: el.id, side, type: "qr" }, name: el.id,
         } as any);
-        canvas.add(rect);
+        canvas.add(ph);
       }
-
-    } else if (el.type === "line") {
-      const rect = new fabric.Rect({
-        left: el.x, top: el.y,
-        width: el.width, height: Math.max(2, el.height || 3),
-        fill: el.color || "rgba(212,175,55,0.6)",
-        data: { id: el.id, side, type: "line" }, name: el.id,
-      } as any);
-      canvas.add(rect);
-
-    } else if (el.type === "qr") {
-      // Placeholder visual del QR (el real lo genera el backend)
-      const grp = new fabric.Group([
-        new fabric.Rect({
-          width: el.width, height: el.height || el.width,
-          fill: "#ffffff", rx: 4, ry: 4,
-          stroke: "rgba(212,175,55,0.3)", strokeWidth: 1,
-        }),
-        new fabric.Text("QR", {
-          fontSize: 20, fill: "#888",
-          originX: "center", originY: "center",
-          left: (el.width || 160) / 2, top: (el.height || el.width || 160) / 2,
-        }),
-      ], {
-        left: el.x, top: el.y, subTargetCheck: false,
-        data: { id: el.id, side, type: "qr" }, name: el.id,
-      } as any);
-      canvas.add(grp);
     }
   }
 
-  // Precargar fuentes antes del renderAll
-  if (fontFamilies.size > 0) {
-    await Promise.all([...fontFamilies].map(f =>
-      document.fonts.load(`16px '${f}'`).catch(() => {})
-    ));
-  }
-
-  // La guía de sangrado siempre queda encima
   if (guide) canvas.bringToFront(guide);
   canvas.renderAll();
 }
@@ -341,24 +291,18 @@ async function populateCanvas(
 // Componente principal
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CardStudioEditor({
-  apiBase, cardId, frontUrl, backUrl, logoUrl,
+  apiBase, cardId, bgUrl, frontUrl, backUrl, logoUrl,
   initialOverrides, generating,
-  onSaveOverrides, onRegenerate,
+  onSaveOverrides, onRegenerate, onThemePrompt,
 }: Props) {
 
-  // ── Refs de los elementos <canvas> ─────────────────────────────────────────
   const frontCanvasEl = useRef<HTMLCanvasElement | null>(null);
   const backCanvasEl = useRef<HTMLCanvasElement | null>(null);
-
-  // ── Instancias Fabric (sin causar re-renders) ───────────────────────────────
   const frontFabric = useRef<fabric.Canvas | null>(null);
   const backFabric = useRef<fabric.Canvas | null>(null);
-
-  // ── Refs para guías de sangrado ────────────────────────────────────────────
   const frontGuide = useRef<fabric.Rect | null>(null);
   const backGuide = useRef<fabric.Rect | null>(null);
 
-  // ── Estado React ───────────────────────────────────────────────────────────
   const [canvasesReady, setCanvasesReady] = useState(false);
   const [overrides, setOverrides] = useState<LayoutOverrides>(initialOverrides || {});
   const [frontElements, setFrontElements] = useState<ResolvedElement[]>([]);
@@ -369,115 +313,95 @@ export default function CardStudioEditor({
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.43);
   const zoomRef = useRef(0.43);
-
-  // ── Paso 4: estado del objeto activo (selección → React) ───────────────────
   const [activeCanvas, setActiveCanvas] = useState<"front" | "back" | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
   const [selSide, setSelSide] = useState<"front" | "back" | null>(null);
   const [selProps, setSelProps] = useState<{
-    type: string; text?: string; fill?: string;
+    type: string; text?: string; fill?: string; stroke?: string;
     fontSize?: number; fontFamily?: string; fontWeight?: string;
     fontStyle?: string; textAlign?: string;
     left?: number; top?: number; width?: number; height?: number;
+    opacity?: number;
   } | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [showThemes, setShowThemes] = useState(false);
+  const [activeTab, setActiveTab] = useState<"elementos" | "temas">("elementos");
 
-  // ── Sync overrides cuando el padre los resetea ──────────────────────────────
   useEffect(() => { setOverrides(initialOverrides || {}); }, [initialOverrides]);
 
-  // ── Paso 1: inicialización segura de los dos lienzos Fabric ───────────────
+  // ── Inicializar canvases ──────────────────────────────────────────────────
   useEffect(() => {
     if (!frontCanvasEl.current || !backCanvasEl.current) return;
-
     configureFabricGlobals();
 
     const z = zoomRef.current;
     const opts: fabric.ICanvasOptions = {
-      width: CANVAS_W * z,
-      height: CANVAS_H * z,
-      preserveObjectStacking: true,
-      selection: true,
+      width: CANVAS_W * z, height: CANVAS_H * z,
+      preserveObjectStacking: true, selection: true,
     };
 
-    const fc = new fabric.Canvas(frontCanvasEl.current, {
-      ...opts, backgroundColor: "#111111",
-    });
+    const fc = new fabric.Canvas(frontCanvasEl.current, { ...opts, backgroundColor: "#111111" });
     fc.setZoom(z);
-
-    const bc = new fabric.Canvas(backCanvasEl.current, {
-      ...opts, backgroundColor: "#f4f4f4",
-    });
+    const bc = new fabric.Canvas(backCanvasEl.current, { ...opts, backgroundColor: "#f4f4f4" });
     bc.setZoom(z);
 
     frontFabric.current = fc;
     backFabric.current = bc;
-
-    // Añadir guías de sangrado a ambos lienzos
     frontGuide.current = addBleedGuide(fc);
     backGuide.current = addBleedGuide(bc);
 
-    // ── Paso 4: event listeners de selección ─────────────────────────────
-    const bindSelection = (canvas: fabric.Canvas, side: "front" | "back") => {
+    // ── Selección y eventos ──────────────────────────────────────────────
+    const bindAll = (canvas: fabric.Canvas, side: "front" | "back") => {
       const extract = (obj: fabric.Object | null) => {
         if (!obj) { setSelId(null); setSelSide(null); setSelProps(null); return; }
         const data = (obj as any).data;
         setActiveCanvas(side);
-        setSelId(data?.id ?? null);
+        setSelId(data?.id ?? obj.name ?? null);
         setSelSide(side);
+        const isTb = obj.type === "textbox";
+        const isRect = obj.type === "rect";
+        const isCircle = obj.type === "circle";
+        const isTri = obj.type === "triangle";
         setSelProps({
           type: data?.type ?? obj.type ?? "unknown",
-          // En ghost mode el textbox contiene " " como placeholder; usar data.label para el panel
-          text: obj.type === "textbox"
-            ? (data?.label ?? (obj as fabric.Textbox).text)
-            : undefined,
+          text: isTb ? (obj as fabric.Textbox).text : undefined,
           fill: String(obj.fill ?? ""),
-          fontSize: obj.type === "textbox" ? (obj as fabric.Textbox).fontSize : undefined,
-          fontFamily: obj.type === "textbox"
-            ? String((obj as fabric.Textbox).fontFamily ?? "").replace(/'/g, "")
-            : undefined,
-          fontWeight: obj.type === "textbox"
-            ? String((obj as fabric.Textbox).fontWeight ?? "400")
-            : undefined,
-          fontStyle: obj.type === "textbox" ? (obj as fabric.Textbox).fontStyle : undefined,
-          textAlign: obj.type === "textbox" ? (obj as fabric.Textbox).textAlign : undefined,
+          stroke: isTb ? undefined : String((obj as any).stroke ?? ""),
+          fontSize: isTb ? (obj as fabric.Textbox).fontSize : undefined,
+          fontFamily: isTb ? String((obj as fabric.Textbox).fontFamily ?? "").replace(/'/g, "") : undefined,
+          fontWeight: isTb ? String((obj as fabric.Textbox).fontWeight ?? "400") : undefined,
+          fontStyle: isTb ? (obj as fabric.Textbox).fontStyle : undefined,
+          textAlign: isTb ? (obj as fabric.Textbox).textAlign : undefined,
           left: Math.round(obj.left ?? 0),
           top: Math.round(obj.top ?? 0),
           width: Math.round((obj.width ?? 0) * (obj.scaleX ?? 1)),
           height: Math.round((obj.height ?? 0) * (obj.scaleY ?? 1)),
+          opacity: obj.opacity ?? 1,
         });
       };
+
       canvas.on("selection:created", (e: any) => extract(e.selected?.[0] ?? null));
       canvas.on("selection:updated", (e: any) => extract(e.selected?.[0] ?? null));
-      canvas.on("selection:cleared", () => {
-        setSelId(null); setSelSide(null); setSelProps(null);
-      });
+      canvas.on("selection:cleared", () => { setSelId(null); setSelSide(null); setSelProps(null); });
 
-      // Sincroniza posición/tamaño al mover o transformar
       canvas.on("object:modified", (e: any) => {
         const obj = e.target;
         if (!obj) return;
         const data = (obj as any).data;
         if (!data?.id) return;
-
-        // Normalizar escala → colapsar a width/height reales
-        const sx = obj.scaleX ?? 1;
-        const sy = obj.scaleY ?? 1;
+        const sx = obj.scaleX ?? 1; const sy = obj.scaleY ?? 1;
         const nw = Math.round((obj.width ?? 40) * sx);
         const nh = Math.round((obj.height ?? 20) * sy);
         const nx = Math.round(obj.left ?? 0);
         const ny = Math.round(obj.top ?? 0);
-        if (sx !== 1 || sy !== 1) {
-          obj.set({ scaleX: 1, scaleY: 1, width: nw, height: nh });
-        }
+        if (sx !== 1 || sy !== 1) obj.set({ scaleX: 1, scaleY: 1, width: nw, height: nh });
 
         const patch: ElementOverride = { x: nx, y: ny, width: nw, height: nh };
         if (obj.type === "textbox") {
-          // En ghost mode el texto del Fabric obj es " " (placeholder) — usar data.label
-          const realText = (obj as any).data?.label ?? (obj as fabric.Textbox).text;
-          if (realText && realText.trim()) patch.text = realText;
+          patch.text = (obj as fabric.Textbox).text;
           patch.fontSize = (obj as fabric.Textbox).fontSize;
-          // fill es "transparent" en ghost mode — no sobrescribir con eso
-          const fill = String((obj as fabric.Textbox).fill ?? "");
-          if (fill !== "transparent") patch.color = fill;
+          const f = String((obj as fabric.Textbox).fill ?? "");
+          if (f && f !== "transparent") patch.color = f;
           patch.fontFamily = String((obj as fabric.Textbox).fontFamily ?? "").replace(/'/g, "");
           patch.align = (obj as fabric.Textbox).textAlign as any;
         }
@@ -493,50 +417,77 @@ export default function CardStudioEditor({
           sideOv[id] = { ...(sideOv[id] ?? {}), ...patch };
           return { ...prev, [s]: sideOv };
         });
-
-        // Actualiza panel de propiedades
         extract(obj);
         canvas.renderAll();
       });
 
-      // Texto editado inline (doble click)
       canvas.on("text:changed" as any, (e: any) => {
         const obj = e.target;
         if (!obj || obj.type !== "textbox") return;
         const data = (obj as any).data;
         if (!data?.id) return;
+        const newText = (obj as fabric.Textbox).text;
+        setSelProps(p => p ? { ...p, text: newText } : p);
         setOverrides(prev => {
           const id = data.id as string;
           const s = data.side as "front" | "back";
           if (id.startsWith("extra-")) {
             const exId = id.replace("extra-", "");
-            return { ...prev, extras: (prev.extras || []).map(ex => ex.id === exId ? { ...ex, text: (obj as fabric.Textbox).text } : ex) };
+            return { ...prev, extras: (prev.extras || []).map(ex => ex.id === exId ? { ...ex, text: newText } : ex) };
           }
           const sideOv = { ...(prev[s] ?? {}) };
-          sideOv[id] = { ...(sideOv[id] ?? {}), text: (obj as fabric.Textbox).text };
+          sideOv[id] = { ...(sideOv[id] ?? {}), text: newText };
           return { ...prev, [s]: sideOv };
         });
       });
     };
 
-    bindSelection(fc, "front");
-    bindSelection(bc, "back");
+    bindAll(fc, "front");
+    bindAll(bc, "back");
+
+    // ── Tecla Delete/Backspace elimina el objeto seleccionado ────────────
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+
+      for (const [canvas, side] of [[fc, "front"], [bc, "back"]] as const) {
+        const obj = canvas.getActiveObject();
+        if (!obj) continue;
+        if ((obj as any).isEditing) continue;
+        const data = (obj as any).data;
+        const id: string = data?.id ?? obj.name ?? "";
+        canvas.remove(obj);
+        canvas.discardActiveObject();
+        canvas.renderAll();
+        setSelId(null); setSelSide(null); setSelProps(null);
+        if (id.startsWith("extra-")) {
+          const exId = id.replace("extra-", "");
+          setOverrides(prev => ({ ...prev, extras: (prev.extras || []).filter(ex => ex.id !== exId) }));
+        } else if (id) {
+          setOverrides(prev => {
+            const sideOv = { ...(prev[side] ?? {}) };
+            sideOv[id] = { ...(sideOv[id] ?? {}), hidden: true };
+            return { ...prev, [side]: sideOv };
+          });
+        }
+        break;
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
 
     setCanvasesReady(true);
-
     return () => {
-      fc.dispose();
-      bc.dispose();
-      frontFabric.current = null;
-      backFabric.current = null;
-      frontGuide.current = null;
-      backGuide.current = null;
+      window.removeEventListener("keydown", onKeyDown);
+      fc.dispose(); bc.dispose();
+      frontFabric.current = null; backFabric.current = null;
+      frontGuide.current = null; backGuide.current = null;
       setCanvasesReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Carga elementos de ambas caras en paralelo (una sola vez por cardId) ───
+  // ── Cargar elementos de ambas caras ───────────────────────────────────────
   useEffect(() => {
     if (!cardId) return;
     let cancelled = false;
@@ -561,67 +512,76 @@ export default function CardStudioEditor({
     return () => { cancelled = true; };
   }, [cardId, apiBase]);
 
-  // ── Popula canvas Frente cuando canvas listo + elementos disponibles ────────
+  // ── Poblar canvas frente ──────────────────────────────────────────────────
   useEffect(() => {
     const fc = frontFabric.current;
     if (!canvasesReady || !fc || frontElements.length === 0) return;
-    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current, !!frontUrl);
-  }, [canvasesReady, frontElements, logoUrl, frontUrl]);
+    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current, apiBase, cardId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasesReady, frontElements, logoUrl, cardId]);
 
-  // ── Popula canvas Reverso ──────────────────────────────────────────────────
+  // ── Poblar canvas reverso ─────────────────────────────────────────────────
   useEffect(() => {
     const bc = backFabric.current;
     if (!canvasesReady || !bc || backElements.length === 0) return;
-    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current, !!backUrl);
-  }, [canvasesReady, backElements, logoUrl, backUrl]);
+    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current, apiBase, cardId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasesReady, backElements, logoUrl, cardId]);
 
-  // ── Paso 3: cargar fondo Frente cuando cambia frontUrl ────────────────────
+  // ── Fondo: usa bgUrl (textura pura) si existe, si no usa frontUrl/backUrl ─
   useEffect(() => {
     const fc = frontFabric.current;
-    if (!canvasesReady || !fc || !frontUrl) return;
-    applyBackground(frontUrl, fc);
-  }, [canvasesReady, frontUrl]);
+    if (!canvasesReady || !fc) return;
+    const url = bgUrl || frontUrl;
+    if (url) applyBackground(url, fc);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasesReady, bgUrl, frontUrl]);
 
-  // ── Paso 3: cargar fondo Reverso cuando cambia backUrl ────────────────────
   useEffect(() => {
     const bc = backFabric.current;
-    if (!canvasesReady || !bc || !backUrl) return;
-    applyBackground(backUrl, bc);
-  }, [canvasesReady, backUrl]);
+    if (!canvasesReady || !bc) return;
+    const url = bgUrl || backUrl;
+    if (url) applyBackground(url, bc);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasesReady, bgUrl, backUrl]);
 
-  // ── Manejo de zoom en ambos lienzos ───────────────────────────────────────
-  const applyZoom = useCallback((newZoom: number) => {
-    zoomRef.current = newZoom;
-    setZoom(newZoom);
+  // ── Zoom ──────────────────────────────────────────────────────────────────
+  const applyZoom = useCallback((nz: number) => {
+    zoomRef.current = nz;
+    setZoom(nz);
     [frontFabric.current, backFabric.current].forEach(c => {
       if (!c) return;
-      c.setZoom(newZoom);
-      c.setDimensions({ width: CANVAS_W * newZoom, height: CANVAS_H * newZoom });
+      c.setZoom(nz);
+      c.setDimensions({ width: CANVAS_W * nz, height: CANVAS_H * nz });
       c.renderAll();
     });
   }, []);
 
-  // ── Paso 2: añadir textbox centrado en el canvas activo ───────────────────
+  // ── Añadir textbox ────────────────────────────────────────────────────────
   const addTextbox = useCallback((targetSide?: "front" | "back") => {
     const side = targetSide ?? activeCanvas ?? "front";
     const canvas = side === "front" ? frontFabric.current : backFabric.current;
     const guide = side === "front" ? frontGuide.current : backGuide.current;
     if (!canvas) return;
-    const id = String(Date.now()).slice(-6);
+    const id = `${Date.now()}`.slice(-7);
     const ex: ExtraElement = {
       id, side, type: "text",
       x: CANVAS_W * 0.1, y: CANVAS_H * 0.4,
       width: CANVAS_W * 0.6, height: 60,
-      text: "Texto nuevo", fontFamily: "Inter",
-      fontSize: 32, fontWeight: 400,
-      color: side === "front" ? "#ffffff" : "#1a1a1a",
-      align: "left",
+      text: "Texto nuevo", fontFamily: "Inter", fontSize: 36, fontWeight: 400,
+      color: "#ffffff", align: "left",
     };
     setOverrides(prev => ({ ...prev, extras: [...(prev.extras || []), ex] }));
-    const tb = addFabricTextbox(canvas, "Texto nuevo", side, id);
+    const tb = new fabric.Textbox("Texto nuevo", {
+      left: ex.x, top: ex.y, width: ex.width,
+      fontSize: 36, fontFamily: "Inter", fill: side === "front" ? "#ffffff" : "#1a1a1a",
+      textAlign: "left", editable: true, splitByGrapheme: false,
+      data: { id: `extra-${id}`, side, type: "text" }, name: `extra-${id}`,
+    } as any);
+    canvas.add(tb);
     if (guide) canvas.bringToFront(guide);
+    canvas.setActiveObject(tb);
     canvas.renderAll();
-    return tb;
   }, [activeCanvas]);
 
   // ── Añadir línea decorativa ───────────────────────────────────────────────
@@ -630,21 +590,132 @@ export default function CardStudioEditor({
     const canvas = side === "front" ? frontFabric.current : backFabric.current;
     const guide = side === "front" ? frontGuide.current : backGuide.current;
     if (!canvas) return;
-    const id = String(Date.now()).slice(-6);
+    const id = `${Date.now()}`.slice(-7);
     const ex: ExtraElement = {
       id, side, type: "line",
       x: SAFE_MARGIN, y: CANVAS_H / 2,
       width: CANVAS_W - SAFE_MARGIN * 2, height: 3,
-      color: "rgba(212,175,55,0.6)",
+      color: "rgba(212,175,55,0.7)",
     };
     setOverrides(prev => ({ ...prev, extras: [...(prev.extras || []), ex] }));
     const rect = new fabric.Rect({
-      left: ex.x, top: ex.y, width: ex.width, height: ex.height,
+      left: ex.x, top: ex.y, width: ex.width, height: 3,
       fill: ex.color,
       data: { id: `extra-${id}`, side, type: "line" }, name: `extra-${id}`,
     } as any);
     canvas.add(rect);
     if (guide) canvas.bringToFront(guide);
+    canvas.renderAll();
+  }, [activeCanvas]);
+
+  // ── Añadir forma geométrica ───────────────────────────────────────────────
+  const addShape = useCallback((shapeType: "rect" | "circle" | "triangle", targetSide?: "front" | "back") => {
+    const side = targetSide ?? activeCanvas ?? "front";
+    const canvas = side === "front" ? frontFabric.current : backFabric.current;
+    const guide = side === "front" ? frontGuide.current : backGuide.current;
+    if (!canvas) return;
+    const id = `${Date.now()}`.slice(-7);
+    const defaultFill = "rgba(212,175,55,0.18)";
+    const defaultStroke = "rgba(212,175,55,0.9)";
+    let shape: fabric.Object;
+    const commonProps: any = {
+      left: CANVAS_W / 2 - 100, top: CANVAS_H / 2 - 60,
+      fill: defaultFill, stroke: defaultStroke, strokeWidth: 2,
+      data: { id: `extra-${id}`, side, type: "shape", shapeType },
+      name: `extra-${id}`,
+    };
+    if (shapeType === "rect") {
+      shape = new fabric.Rect({ ...commonProps, width: 200, height: 120, rx: 8, ry: 8 });
+    } else if (shapeType === "circle") {
+      shape = new fabric.Circle({ ...commonProps, radius: 80 });
+    } else {
+      shape = new fabric.Triangle({ ...commonProps, width: 200, height: 160 });
+    }
+    const ex: ExtraElement = {
+      id, side, type: "shape", shapeType,
+      x: CANVAS_W / 2 - 100, y: CANVAS_H / 2 - 60,
+      width: 200, height: 120,
+      fill: defaultFill, stroke: defaultStroke, strokeWidth: 2,
+    };
+    setOverrides(prev => ({ ...prev, extras: [...(prev.extras || []), ex] }));
+    canvas.add(shape);
+    if (guide) canvas.bringToFront(guide);
+    canvas.setActiveObject(shape);
+    canvas.renderAll();
+  }, [activeCanvas]);
+
+  // ── Añadir emoji ──────────────────────────────────────────────────────────
+  const addEmoji = useCallback((emoji: string, targetSide?: "front" | "back") => {
+    const side = targetSide ?? activeCanvas ?? "front";
+    const canvas = side === "front" ? frontFabric.current : backFabric.current;
+    const guide = side === "front" ? frontGuide.current : backGuide.current;
+    if (!canvas) return;
+    const id = `${Date.now()}`.slice(-7);
+    setOverrides(prev => ({
+      ...prev,
+      extras: [...(prev.extras || []), {
+        id, side, type: "emoji",
+        x: CANVAS_W / 2 - 40, y: CANVAS_H / 2 - 40,
+        width: 80, height: 80, text: emoji, fontSize: 72,
+      }],
+    }));
+    const tb = new fabric.Textbox(emoji, {
+      left: CANVAS_W / 2 - 40, top: CANVAS_H / 2 - 40,
+      width: 100, fontSize: 72, fontFamily: "Arial",
+      textAlign: "center", editable: false,
+      data: { id: `extra-${id}`, side, type: "emoji" }, name: `extra-${id}`,
+    } as any);
+    canvas.add(tb);
+    if (guide) canvas.bringToFront(guide);
+    canvas.setActiveObject(tb);
+    canvas.renderAll();
+    setShowEmoji(false);
+  }, [activeCanvas]);
+
+  // ── Añadir bocadillo de texto ─────────────────────────────────────────────
+  const addBubble = useCallback((targetSide?: "front" | "back") => {
+    const side = targetSide ?? activeCanvas ?? "front";
+    const canvas = side === "front" ? frontFabric.current : backFabric.current;
+    const guide = side === "front" ? frontGuide.current : backGuide.current;
+    if (!canvas) return;
+    const id = `${Date.now()}`.slice(-7);
+
+    // Bocadillo usando Path SVG
+    const bw = 320; const bh = 130; const tail = 36;
+    const path = new fabric.Path(
+      `M 20 0 L ${bw - 20} 0 Q ${bw} 0 ${bw} 20 L ${bw} ${bh - 20} Q ${bw} ${bh} ${bw - 20} ${bh} L 80 ${bh} L 54 ${bh + tail} L 44 ${bh} L 20 ${bh} Q 0 ${bh} 0 ${bh - 20} L 0 20 Q 0 0 20 0 Z`,
+      {
+        left: CANVAS_W / 2 - bw / 2, top: CANVAS_H / 2 - (bh + tail) / 2,
+        fill: "rgba(255,255,255,0.92)", stroke: "#222", strokeWidth: 2,
+        selectable: true, evented: true,
+        data: { id: `extra-${id}-shape`, side, type: "bubble" },
+        name: `extra-${id}-shape`,
+      } as any,
+    );
+
+    const textId = `${Date.now() + 1}`.slice(-7);
+    const tb = new fabric.Textbox("¡Escribe aquí!", {
+      left: CANVAS_W / 2 - bw / 2 + 18,
+      top: CANVAS_H / 2 - (bh + tail) / 2 + 22,
+      width: bw - 36, fontSize: 22, fontFamily: "Inter",
+      fill: "#222", textAlign: "center", editable: true,
+      splitByGrapheme: false,
+      data: { id: `extra-${textId}`, side, type: "text" },
+      name: `extra-${textId}`,
+    } as any);
+
+    canvas.add(path);
+    canvas.add(tb);
+    setOverrides(prev => ({
+      ...prev,
+      extras: [
+        ...(prev.extras || []),
+        { id: `${id}-shape`, side, type: "bubble", x: path.left!, y: path.top!, width: bw, height: bh + tail },
+        { id: textId, side, type: "text", x: tb.left!, y: tb.top!, width: bw - 36, text: "¡Escribe aquí!", fontSize: 22 },
+      ],
+    }));
+    if (guide) canvas.bringToFront(guide);
+    canvas.setActiveObject(tb);
     canvas.renderAll();
   }, [activeCanvas]);
 
@@ -671,18 +742,17 @@ export default function CardStudioEditor({
     setSelId(null); setSelSide(null); setSelProps(null);
   }, [selId, selSide]);
 
-  // ── Reset posiciones de un lado ───────────────────────────────────────────
+  // ── Reset posiciones ──────────────────────────────────────────────────────
   const resetSide = useCallback((side: "front" | "back") => {
     if (!confirm(`¿Restablecer posiciones del ${side === "front" ? "frente" : "reverso"}?`)) return;
     setOverrides(prev => ({ ...prev, [side]: {} }));
     const elements = side === "front" ? frontElements : backElements;
     const canvas = side === "front" ? frontFabric.current : backFabric.current;
     const guide = side === "front" ? frontGuide.current : backGuide.current;
-    const hasBg = side === "front" ? !!frontUrl : !!backUrl;
-    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide, hasBg);
-  }, [frontElements, backElements, logoUrl, frontUrl, backUrl]);
+    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide, apiBase, cardId);
+  }, [frontElements, backElements, logoUrl, apiBase, cardId]);
 
-  // ── Guardar overrides en backend ──────────────────────────────────────────
+  // ── Guardar ───────────────────────────────────────────────────────────────
   const saveAll = async () => {
     setSaving(true); setError(null);
     try { await onSaveOverrides(overrides); }
@@ -690,7 +760,7 @@ export default function CardStudioEditor({
     finally { setSaving(false); }
   };
 
-  // ── Re-generar tarjeta ────────────────────────────────────────────────────
+  // ── Re-generar ────────────────────────────────────────────────────────────
   const regenerate = async () => {
     setSaving(true); setError(null);
     try { await onSaveOverrides(overrides); await onRegenerate(); }
@@ -698,44 +768,35 @@ export default function CardStudioEditor({
     finally { setSaving(false); }
   };
 
-  // ── Exportar ZIP para imprenta ────────────────────────────────────────────
+  // ── Exportar ZIP ──────────────────────────────────────────────────────────
   const exportToZip = useCallback(async () => {
-    const fc = frontFabric.current;
-    const bc = backFabric.current;
+    const fc = frontFabric.current; const bc = backFabric.current;
     if (!fc || !bc) return;
     setExporting(true);
     try {
-      // Ocultar guías para la exportación
-      const fg = frontGuide.current;
-      const bg2 = backGuide.current;
+      const fg = frontGuide.current; const bg2 = backGuide.current;
       if (fg) fg.set({ visible: false });
       if (bg2) bg2.set({ visible: false });
       fc.renderAll(); bc.renderAll();
-
-      const mult = 1 / zoomRef.current; // exportar a resolución completa (1080×720)
+      const mult = 1 / zoomRef.current;
       const frontData = fc.toDataURL({ format: "png", multiplier: mult });
-      const backData  = bc.toDataURL({ format: "png", multiplier: mult });
-
-      // Restaurar guías
+      const backData = bc.toDataURL({ format: "png", multiplier: mult });
       if (fg) fg.set({ visible: true });
       if (bg2) bg2.set({ visible: true });
       fc.renderAll(); bc.renderAll();
-
-      // Crear ZIP con nomenclatura de imprenta
       const zip = new JSZip();
-      zip.file("01_Cara_Frontal_Datos.png",     frontData.split(",")[1], { base64: true });
-      zip.file("02_Cara_Posterior_Diseño.png",  backData.split(",")[1],  { base64: true });
-
+      zip.file("01_Cara_Frontal.png", frontData.split(",")[1], { base64: true });
+      zip.file("02_Cara_Posterior.png", backData.split(",")[1], { base64: true });
       const blob = await zip.generateAsync({ type: "blob" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "tarjeta-imprenta.zip";
+      a.download = "tarjeta-estudio.zip";
       a.click();
       URL.revokeObjectURL(a.href);
     } finally { setExporting(false); }
   }, []);
 
-  // ── Actualizar propiedad del objeto seleccionado desde el panel ───────────
+  // ── Actualizar propiedad del objeto seleccionado ──────────────────────────
   const updateSelProp = useCallback((fabricProp: string, value: any, overrideProp?: string) => {
     const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
     if (!canvas || !selId) return;
@@ -743,8 +804,7 @@ export default function CardStudioEditor({
     if (!obj) return;
     obj.set(fabricProp as any, value);
     canvas.renderAll();
-    setSelProps(prev => prev ? { ...prev, [fabricProp === "fill" ? "fill" : fabricProp]: value } : prev);
-    // Guardar en overrides inmediatamente
+    setSelProps(prev => prev ? { ...prev, [fabricProp]: value } : prev);
     const key = overrideProp ?? fabricProp;
     const patch: ElementOverride = { [key]: value };
     setOverrides(prev => {
@@ -759,9 +819,9 @@ export default function CardStudioEditor({
     });
   }, [selId, selSide]);
 
-  // ── Todos los elementos visibles (para el panel de lista) ─────────────────
+  // ── Todos los elementos visibles ──────────────────────────────────────────
   const allFrontVisible = frontElements.filter(e => !e.hidden);
-  const allBackVisible  = backElements.filter(e => !e.hidden);
+  const allBackVisible = backElements.filter(e => !e.hidden);
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -769,48 +829,91 @@ export default function CardStudioEditor({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
-      {/* ── TOOLBAR ─────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+      {/* ── TOOLBAR PRINCIPAL ────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
 
-        {/* Añadir elementos */}
-        <div style={{ display: "flex", gap: 5 }}>
-          <button onClick={() => addTextbox("front")} style={btnTool} title="Texto en Frente">
-            <Type size={12}/> Texto·F
+        {/* Fila 1: añadir elementos */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", padding: "6px 8px", background: "rgba(255,255,255,0.03)", borderRadius: 7, border: "1px solid rgba(255,255,255,0.07)" }}>
+          <span style={{ fontSize: 9, color: "var(--t3)", letterSpacing: 1.2, textTransform: "uppercase", marginRight: 4 }}>Añadir</span>
+
+          {/* Texto */}
+          <button onClick={() => addTextbox()} style={btnTool} title="Texto editable">
+            <Type size={11}/> Texto
           </button>
-          <button onClick={() => addTextbox("back")} style={btnTool} title="Texto en Reverso">
-            <Type size={12}/> Texto·R
+
+          {/* Línea */}
+          <button onClick={() => addLine()} style={btnTool} title="Línea decorativa">
+            <Minus size={11}/> Línea
           </button>
-          <button onClick={() => addLine("front")} style={btnTool} title="Línea en Frente">
-            <Minus size={12}/> Línea·F
+
+          {/* Formas */}
+          <button onClick={() => addShape("rect")} style={btnTool} title="Rectángulo">
+            <Square size={11}/> Rect
           </button>
-          <button onClick={() => addLine("back")} style={btnTool} title="Línea en Reverso">
-            <Minus size={12}/> Línea·R
+          <button onClick={() => addShape("circle")} style={btnTool} title="Círculo">
+            <Circle size={11}/> Círculo
           </button>
+          <button onClick={() => addShape("triangle")} style={btnTool} title="Triángulo">
+            <Triangle size={11}/> Triáng.
+          </button>
+
+          {/* Bocadillo */}
+          <button onClick={() => addBubble()} style={btnTool} title="Bocadillo de texto (cómic)">
+            <MessageSquare size={11}/> Bocadillo
+          </button>
+
+          {/* Emoji */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setShowEmoji(v => !v)} style={btnTool} title="Emoji">
+              <Smile size={11}/> Emoji
+            </button>
+            {showEmoji && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 50,
+                background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 8, padding: 8, width: 220,
+                display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 2,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+              }}>
+                {EMOJI_LIST.map(em => (
+                  <button key={em} onClick={() => addEmoji(em)}
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, padding: 2, borderRadius: 4, lineHeight: 1 }}
+                    title={em}
+                  >{em}</button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Zoom */}
+          <button onClick={() => applyZoom(Math.max(0.25, zoom - 0.05))} style={iconBtn}><ZoomOut size={12}/></button>
+          <span style={{ fontSize: 10, color: "var(--t3)", minWidth: 34, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
+          <button onClick={() => applyZoom(Math.min(1.0, zoom + 0.05))} style={iconBtn}><ZoomIn size={12}/></button>
         </div>
 
-        {/* Zoom */}
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <button onClick={() => applyZoom(Math.max(0.25, zoom - 0.05))} style={iconBtn}><ZoomOut size={13}/></button>
-          <span style={{ fontSize: 11, color: "var(--t3)", minWidth: 36, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
-          <button onClick={() => applyZoom(Math.min(1.0, zoom + 0.05))} style={iconBtn}><ZoomIn size={13}/></button>
-        </div>
-
-        {/* Acciones principales */}
-        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+        {/* Fila 2: acciones principales */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+          {selId && (
+            <button onClick={deleteSelected} style={{ ...btnTool, color: "#e84558", border: "1px solid rgba(232,69,88,0.4)" }} title="Eliminar seleccionado (Supr)">
+              <Trash2 size={11}/> Eliminar
+            </button>
+          )}
           <button onClick={() => resetSide("front")} style={btnSecondary} title="Reset Frente">
-            <RotateCcw size={12}/> Reset·F
+            <RotateCcw size={11}/> Reset·F
           </button>
           <button onClick={() => resetSide("back")} style={btnSecondary} title="Reset Reverso">
-            <RotateCcw size={12}/> Reset·R
+            <RotateCcw size={11}/> Reset·R
           </button>
           <button onClick={saveAll} disabled={saving} style={btnSecondary}>
-            {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Guardar
+            {saving ? <Loader2 size={11} className="animate-spin"/> : <Save size={11}/>} Guardar
           </button>
-          <button onClick={exportToZip} disabled={exporting} style={btnSecondary} title="Exportar ZIP para imprenta (300 DPI)">
-            {exporting ? <Loader2 size={12} className="animate-spin"/> : <Download size={12}/>} ZIP
+          <button onClick={exportToZip} disabled={exporting} style={btnSecondary} title="Exportar ZIP (PNG alta resolución)">
+            {exporting ? <Loader2 size={11} className="animate-spin"/> : <Download size={11}/>} ZIP
           </button>
           <button onClick={regenerate} disabled={saving || generating} style={btnPrimary}>
-            {(saving || generating) ? <Loader2 size={12} className="animate-spin"/> : <RefreshCw size={12}/>}
+            {(saving || generating) ? <Loader2 size={11} className="animate-spin"/> : <RefreshCw size={11}/>}
             Re-generar
           </button>
         </div>
@@ -822,43 +925,27 @@ export default function CardStudioEditor({
         </div>
       )}
 
-      {loading && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, fontSize: 12, color: "var(--t3)" }}>
-          <Loader2 size={14} className="animate-spin" style={{ color: "var(--gold)" }}/> Cargando elementos…
-        </div>
-      )}
-
       {/* ── DUAL CANVAS ─────────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 4 }}>
 
         {/* Frente */}
         <div style={{ flex: "0 0 auto" }}>
-          <div style={{
-            fontSize: 10, color: selSide === "front" ? "var(--gold)" : "var(--t3)",
-            letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700,
-            marginBottom: 6, paddingLeft: 2,
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
+          <div style={{ fontSize: 10, color: selSide === "front" ? "var(--gold)" : "var(--t3)", letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: selSide === "front" ? "var(--gold)" : "rgba(255,255,255,0.2)", display: "inline-block" }}/>
             Cara Frontal
-            <span style={{ fontSize: 9, color: "var(--t3)", fontWeight: 400 }}>doble clic para editar texto</span>
+            <span style={{ fontSize: 9, color: "var(--t3)", fontWeight: 400 }}>doble clic = editar texto</span>
           </div>
           <div data-testid="canvas-front-area" style={{ background: "#0a0a0a", borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.7)", overflow: "hidden", border: selSide === "front" ? "2px solid var(--gold)" : "2px solid transparent" }}>
             <canvas ref={frontCanvasEl} data-testid="canvas-front" />
           </div>
           <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 4, textAlign: "center" }}>
-            {CANVAS_W}×{CANVAS_H}px · zona segura {CANVAS_W - SAFE_MARGIN*2}×{CANVAS_H - SAFE_MARGIN*2}px (línea roja)
+            {CANVAS_W}×{CANVAS_H}px · zona segura (línea roja)
           </div>
         </div>
 
         {/* Reverso */}
         <div style={{ flex: "0 0 auto" }}>
-          <div style={{
-            fontSize: 10, color: selSide === "back" ? "var(--gold)" : "var(--t3)",
-            letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700,
-            marginBottom: 6, paddingLeft: 2,
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
+          <div style={{ fontSize: 10, color: selSide === "back" ? "var(--gold)" : "var(--t3)", letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: selSide === "back" ? "var(--gold)" : "rgba(255,255,255,0.2)", display: "inline-block" }}/>
             Cara Posterior
           </div>
@@ -866,116 +953,146 @@ export default function CardStudioEditor({
             <canvas ref={backCanvasEl} data-testid="canvas-back" />
           </div>
           <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 4, textAlign: "center" }}>
-            {CANVAS_W}×{CANVAS_H}px · texto a sangrado: no cruzar la línea roja
+            {CANVAS_W}×{CANVAS_H}px · no cruzar la línea roja
           </div>
         </div>
       </div>
 
-      {/* ── ELEMENTOS + PROPIEDADES (debajo del canvas) ─────────────────── */}
+      {/* ── PANEL INFERIOR ─────────────────────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: selId ? "1fr 300px" : "1fr", gap: 10, alignItems: "start" }}>
 
-        {/* Lista de elementos — agrupados por cara */}
+        {/* Tabs: Elementos | Temas */}
         <div style={panelStyle}>
-          <h4 style={panelTitle}>
-            Elementos del lienzo
-            {selId && <span style={{ marginLeft: 8, color: "var(--t3)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>— seleccionado: {elLabel(selId)} ({selSide === "front" ? "Frente" : "Reverso"})</span>}
-          </h4>
+          <div style={{ display: "flex", gap: 0, marginBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            {(["elementos", "temas"] as const).map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                style={{ ...tabBtn, borderBottom: activeTab === tab ? "2px solid var(--gold)" : "2px solid transparent", color: activeTab === tab ? "var(--gold)" : "var(--t3)" }}>
+                {tab === "elementos" ? "🎭 Elementos" : "🎨 Temas de fondo"}
+              </button>
+            ))}
+          </div>
 
-          {(allFrontVisible.length > 0 || allBackVisible.length > 0) && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 4 }}>
-              {[...allFrontVisible.map(e => ({ ...e, _side: "front" as const })), ...allBackVisible.map(e => ({ ...e, _side: "back" as const }))].map(el => (
-                <div
-                  key={`${el._side}-${el.id}`}
-                  onClick={() => {
-                    const canvas = el._side === "front" ? frontFabric.current : backFabric.current;
-                    if (!canvas) return;
-                    const obj = canvas.getObjects().find((o: any) => o.name === el.id);
-                    if (obj) { canvas.setActiveObject(obj); canvas.renderAll(); }
-                  }}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4,
-                    padding: "5px 8px", borderRadius: 4, cursor: "pointer",
-                    background: selId === el.id && selSide === el._side ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.02)",
-                    border: selId === el.id && selSide === el._side ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.06)",
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {elLabel(el.id)}{el.type === "text" && el.text ? ` · ${el.text.slice(0, 12)}` : ""}
-                    </div>
-                    <div style={{ fontSize: 9, color: el._side === "front" ? "rgba(212,175,55,0.7)" : "rgba(100,200,255,0.7)" }}>
-                      {el._side === "front" ? "Frente" : "Reverso"} · {el.type}
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (el.id.startsWith("extra-")) {
+          {/* Tab Elementos */}
+          {activeTab === "elementos" && (
+            <>
+              {loading && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--t3)", padding: 4 }}>
+                  <Loader2 size={13} className="animate-spin" style={{ color: "var(--gold)" }}/> Cargando elementos…
+                </div>
+              )}
+              {(allFrontVisible.length > 0 || allBackVisible.length > 0) ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 4 }}>
+                  {[...allFrontVisible.map(e => ({ ...e, _side: "front" as const })), ...allBackVisible.map(e => ({ ...e, _side: "back" as const }))].map(el => (
+                    <div key={`${el._side}-${el.id}`}
+                      onClick={() => {
+                        const canvas = el._side === "front" ? frontFabric.current : backFabric.current;
+                        if (!canvas) return;
+                        const obj = canvas.getObjects().find((o: any) => o.name === el.id);
+                        if (obj) { canvas.setActiveObject(obj); canvas.renderAll(); }
+                      }}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4,
+                        padding: "5px 8px", borderRadius: 4, cursor: "pointer",
+                        background: selId === el.id && selSide === el._side ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.02)",
+                        border: selId === el.id && selSide === el._side ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.06)",
+                      }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {elLabel(el.id)}{el.type === "text" && el.text ? ` · ${el.text.slice(0, 10)}` : ""}
+                        </div>
+                        <div style={{ fontSize: 9, color: el._side === "front" ? "rgba(212,175,55,0.7)" : "rgba(100,200,255,0.7)" }}>
+                          {el._side === "front" ? "Frente" : "Reverso"} · {el.type}
+                        </div>
+                      </div>
+                      <button onClick={e2 => {
+                        e2.stopPropagation();
                         const canvas = el._side === "front" ? frontFabric.current : backFabric.current;
                         if (!canvas) return;
                         const obj = canvas.getObjects().find((o: any) => o.name === el.id);
                         if (obj) { canvas.remove(obj); canvas.renderAll(); }
-                        const exId = el.id.replace("extra-", "");
-                        setOverrides(prev => ({ ...prev, extras: (prev.extras || []).filter(ex => ex.id !== exId) }));
-                      } else {
-                        setOverrides(prev => {
-                          const sideOv = { ...(prev[el._side] ?? {}) };
-                          sideOv[el.id] = { ...(sideOv[el.id] ?? {}), hidden: true };
-                          return { ...prev, [el._side]: sideOv };
-                        });
-                        const canvas = el._side === "front" ? frontFabric.current : backFabric.current;
-                        if (canvas) {
-                          const obj = canvas.getObjects().find((o: any) => o.name === el.id);
-                          if (obj) { canvas.remove(obj); canvas.renderAll(); }
+                        if (el.id.startsWith("extra-")) {
+                          const exId = el.id.replace("extra-", "");
+                          setOverrides(prev => ({ ...prev, extras: (prev.extras || []).filter(ex => ex.id !== exId) }));
+                        } else {
+                          setOverrides(prev => {
+                            const sideOv = { ...(prev[el._side] ?? {}) };
+                            sideOv[el.id] = { ...(sideOv[el.id] ?? {}), hidden: true };
+                            return { ...prev, [el._side]: sideOv };
+                          });
                         }
-                      }
-                    }}
-                    style={iconBtn}
-                    title={el.id.startsWith("extra-") ? "Eliminar" : "Ocultar"}
-                  >
-                    {el.id.startsWith("extra-") ? <Trash2 size={11}/> : <EyeOff size={11}/>}
-                  </button>
+                      }} style={iconBtn} title={el.id.startsWith("extra-") ? "Eliminar" : "Ocultar"}>
+                        <EyeOff size={10}/>
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              ) : (
+                !loading && (
+                  <p style={{ fontSize: 11, color: "var(--t3)", textAlign: "center", margin: 0, padding: 8 }}>
+                    Genera la tarjeta primero para ver los elementos.
+                  </p>
+                )
+              )}
+            </>
           )}
-          {!loading && allFrontVisible.length === 0 && allBackVisible.length === 0 && (
-            <p style={{ fontSize: 11, color: "var(--t3)", textAlign: "center", margin: 0, padding: 8 }}>
-              Genera la tarjeta primero para ver los elementos.
-            </p>
+
+          {/* Tab Temas */}
+          {activeTab === "temas" && (
+            <div>
+              <p style={{ fontSize: 11, color: "var(--t3)", margin: "0 0 10px" }}>
+                Haz clic en un tema para usar su prompt de fondo IA. Después pulsa <strong style={{ color: "var(--gold)" }}>Re-generar</strong>.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 6 }}>
+                {BACKGROUND_THEMES.map(theme => (
+                  <button key={theme.id}
+                    onClick={() => {
+                      if (onThemePrompt) onThemePrompt(theme.prompt);
+                    }}
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 8, padding: "10px 8px",
+                      cursor: "pointer", textAlign: "center",
+                      transition: "all 0.2s",
+                      color: "var(--t1)",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--gold)")}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
+                  >
+                    <div style={{ fontSize: 24, marginBottom: 4 }}>{theme.emoji}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600 }}>{theme.label}</div>
+                    <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>
+                      {theme.prompt.slice(0, 40)}…
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
-        {/* ── PANEL DE PROPIEDADES (Paso 4: actualiza desde selección) ────── */}
+        {/* ── PANEL DE PROPIEDADES ──────────────────────────────────────── */}
         {selId && selProps && (
           <div style={panelStyle}>
             <h4 style={{ ...panelTitle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span><Type size={11} style={{ marginRight: 4, verticalAlign: -2 }}/>{elLabel(selId)}</span>
-              {selId.startsWith("extra-") && (
-                <button onClick={deleteSelected} style={{ background: "none", border: "none", color: "#e84558", cursor: "pointer", padding: 0 }}>
-                  <Trash2 size={12}/>
-                </button>
-              )}
+              <button onClick={deleteSelected} style={{ background: "none", border: "none", color: "#e84558", cursor: "pointer", padding: 0 }} title="Eliminar">
+                <Trash2 size={12}/>
+              </button>
             </h4>
 
             {/* Propiedades de texto */}
             {selProps.type === "text" && (
               <>
-                <label style={labelStyle}>Texto</label>
+                <label style={labelStyle}>Texto (doble clic en el lienzo para editar)</label>
                 <textarea
                   value={selProps.text || ""}
                   onChange={(e) => {
                     const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
                     const obj = canvas?.getActiveObject() as fabric.Textbox;
                     if (obj && obj.type === "textbox") {
-                      const ghostMode = (obj as any).data?.label !== undefined && String(obj.fill) === "transparent";
-                      if (ghostMode) {
-                        // Actualizar el label en data (sin cambiar el texto visual invisible)
-                        (obj as any).data = { ...(obj as any).data, label: e.target.value };
-                      } else {
-                        obj.set("text", e.target.value);
-                        canvas?.renderAll();
-                      }
+                      obj.set("text", e.target.value);
+                      canvas?.renderAll();
                     }
                     setSelProps(p => p ? { ...p, text: e.target.value } : p);
                     setOverrides(prev => {
@@ -989,143 +1106,91 @@ export default function CardStudioEditor({
                       return { ...prev, [selSide]: sideOv };
                     });
                   }}
-                  style={{ ...inputStyle, minHeight: 50, resize: "vertical", marginBottom: 8 }}
+                  style={{ ...inputStyle, minHeight: 52, resize: "vertical", marginBottom: 8 }}
                 />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 5 }}>
                   <div>
                     <label style={labelStyle}>Tamaño</label>
                     <input type="number" min={6} max={300} value={selProps.fontSize ?? 24}
-                      onChange={(e) => updateSelProp("fontSize", +e.target.value || 24, "fontSize")}
-                      style={inputStyle}
-                    />
+                      onChange={e => updateSelProp("fontSize", +e.target.value || 24, "fontSize")}
+                      style={inputStyle}/>
                   </div>
                   <div>
                     <label style={labelStyle}>Color</label>
-                    <input type="color" value={selProps.fill || "#ffffff"}
-                      onChange={(e) => updateSelProp("fill", e.target.value, "color")}
-                      style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer" }}
-                    />
+                    <input type="color" value={selProps.fill?.startsWith("#") ? selProps.fill : "#ffffff"}
+                      onChange={e => updateSelProp("fill", e.target.value, "color")}
+                      style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer" }}/>
                   </div>
                 </div>
                 <label style={labelStyle}>Fuente</label>
                 <select value={(selProps.fontFamily || "Inter").replace(/'/g, "")}
-                  onChange={(e) => updateSelProp("fontFamily", `'${e.target.value}'`, "fontFamily")}
-                  style={{ ...inputStyle, marginBottom: 5 }}
-                >
+                  onChange={e => updateSelProp("fontFamily", `'${e.target.value}'`, "fontFamily")}
+                  style={{ ...inputStyle, marginBottom: 5 }}>
                   {POPULAR_FONTS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
                 <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
-                  <button
-                    onClick={() => {
-                      const isBold = (selProps.fontWeight ?? "400") === "700" || selProps.fontWeight === "bold";
-                      updateSelProp("fontWeight", isBold ? "400" : "bold", "fontWeight");
-                    }}
-                    style={{ ...iconBtn, background: (selProps.fontWeight === "700" || selProps.fontWeight === "bold") ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}
-                    title="Negrita"
-                  ><Bold size={12}/></button>
-                  <button
-                    onClick={() => updateSelProp("fontStyle", selProps.fontStyle === "italic" ? "normal" : "italic", "italic")}
-                    style={{ ...iconBtn, background: selProps.fontStyle === "italic" ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}
-                    title="Cursiva"
-                  ><Italic size={12}/></button>
+                  <button onClick={() => {
+                    const isBold = selProps.fontWeight === "700" || selProps.fontWeight === "bold";
+                    updateSelProp("fontWeight", isBold ? "400" : "bold", "fontWeight");
+                  }} style={{ ...iconBtn, background: (selProps.fontWeight === "700" || selProps.fontWeight === "bold") ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}><Bold size={12}/></button>
+                  <button onClick={() => updateSelProp("fontStyle", selProps.fontStyle === "italic" ? "normal" : "italic", "italic")}
+                    style={{ ...iconBtn, background: selProps.fontStyle === "italic" ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}><Italic size={12}/></button>
                   {(["left", "center", "right"] as const).map((a, i) => (
-                    <button key={a}
-                      onClick={() => updateSelProp("textAlign", a, "align")}
-                      style={{ ...iconBtn, background: selProps.textAlign === a ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}
-                    >
+                    <button key={a} onClick={() => updateSelProp("textAlign", a, "align")}
+                      style={{ ...iconBtn, background: selProps.textAlign === a ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}>
                       {i === 0 ? <AlignLeft size={12}/> : i === 1 ? <AlignCenter size={12}/> : <AlignRight size={12}/>}
                     </button>
                   ))}
                 </div>
-
-                {/* ── Fondo texto (plate) ───────────────────────────── */}
-                {(() => {
-                  const currentPlate = selSide && selId
-                    ? (overrides[selSide as "front" | "back"] as any)?.[selId]?.plate ?? null
-                    : null;
-                  const pct = currentPlate ? Math.round(currentPlate.opacity * 100) : 0;
-                  const isDark = currentPlate?.color === "#000000" || !currentPlate;
-
-                  const setPlate = (opacity: number, dark: boolean) => {
-                    const newPlate = opacity === 0 ? null : {
-                      color: dark ? "#000000" : "#ffffff",
-                      opacity,
-                      padding: 14,
-                      radius: 8,
-                    };
-                    setOverrides(prev => {
-                      if (!selId || !selSide) return prev;
-                      if (selId.startsWith("extra-")) {
-                        const exId = selId.replace("extra-", "");
-                        return { ...prev, extras: (prev.extras || []).map(ex => ex.id === exId ? { ...ex, plate: newPlate } : ex) };
-                      }
-                      const s = selSide as "front" | "back";
-                      const sideOv = { ...(prev[s] ?? {}) };
-                      sideOv[selId] = { ...(sideOv[selId] ?? {}), plate: newPlate };
-                      return { ...prev, [s]: sideOv };
-                    });
-                  };
-
-                  return (
-                    <div style={{ marginTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                        <label style={labelStyle}>Fondo texto</label>
-                        <span style={{ fontSize: 10, color: "var(--t3)" }}>{pct}%</span>
-                      </div>
-                      <input
-                        type="range" min={0} max={90} step={5} value={pct}
-                        onChange={(e) => setPlate(+e.target.value / 100, isDark)}
-                        style={{ width: "100%", accentColor: "var(--gold)", marginBottom: 5 }}
-                      />
-                      <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-                        <button
-                          onClick={() => setPlate(pct / 100, true)}
-                          style={{ ...iconBtn, flex: 1, fontSize: 10, background: isDark ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
-                        >⬛ Oscuro</button>
-                        <button
-                          onClick={() => setPlate(pct / 100, false)}
-                          style={{ ...iconBtn, flex: 1, fontSize: 10, background: !isDark ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
-                        >⬜ Claro</button>
-                      </div>
-                      {pct > 0 && (
-                        <p style={{ margin: 0, fontSize: 10, color: "var(--gold)", opacity: 0.7 }}>
-                          ↻ Pulsa Re-generar para aplicar
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
               </>
             )}
 
-            {/* Propiedades de línea (color) */}
-            {selProps.type === "line" && (
+            {/* Propiedades de formas */}
+            {(selProps.type === "shape" || selProps.type === "line" || selProps.type === "bubble") && (
               <>
-                <label style={labelStyle}>Color de línea</label>
-                <input type="color" value={selProps.fill || "#d4af37"}
-                  onChange={(e) => updateSelProp("fill", e.target.value, "color")}
-                  style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer", marginBottom: 8 }}
-                />
+                <label style={labelStyle}>Relleno</label>
+                <input type="color" value={selProps.fill?.startsWith("#") ? selProps.fill : "#d4af37"}
+                  onChange={e => updateSelProp("fill", e.target.value)}
+                  style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer", marginBottom: 5 }}/>
+                {selProps.type !== "line" && (
+                  <>
+                    <label style={labelStyle}>Borde</label>
+                    <input type="color" value={selProps.stroke?.startsWith("#") ? selProps.stroke : "#d4af37"}
+                      onChange={e => updateSelProp("stroke", e.target.value)}
+                      style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer", marginBottom: 5 }}/>
+                  </>
+                )}
+                <label style={labelStyle}>Opacidad</label>
+                <input type="range" min={0} max={100} step={5} value={Math.round((selProps.opacity ?? 1) * 100)}
+                  onChange={e => updateSelProp("opacity", +e.target.value / 100)}
+                  style={{ width: "100%", accentColor: "var(--gold)", marginBottom: 5 }}/>
               </>
             )}
 
-            {/* Posición */}
+            {/* Propiedades QR */}
+            {selProps.type === "qr" && (
+              <p style={{ fontSize: 11, color: "var(--t3)", margin: 0 }}>
+                QR generado automáticamente. Configura el tipo (vCard, URL, etc.) en el panel de datos.
+              </p>
+            )}
+
+            {/* Posición y tamaño */}
             <label style={labelStyle}>Posición (X, Y)</label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
               <input type="number" value={selProps.left ?? 0}
-                onChange={(e) => updateSelProp("left", +e.target.value || 0, "x")}
+                onChange={e => updateSelProp("left", +e.target.value || 0, "x")}
                 style={inputStyle} placeholder="X"/>
               <input type="number" value={selProps.top ?? 0}
-                onChange={(e) => updateSelProp("top", +e.target.value || 0, "y")}
+                onChange={e => updateSelProp("top", +e.target.value || 0, "y")}
                 style={inputStyle} placeholder="Y"/>
             </div>
             <label style={labelStyle}>Tamaño (W, H)</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
               <input type="number" value={selProps.width ?? 100}
-                onChange={(e) => updateSelProp("width", +e.target.value || 40, "width")}
+                onChange={e => updateSelProp("width", +e.target.value || 40, "width")}
                 style={inputStyle} placeholder="W"/>
               <input type="number" value={selProps.height ?? 40}
-                onChange={(e) => updateSelProp("height", +e.target.value || 20, "height")}
+                onChange={e => updateSelProp("height", +e.target.value || 20, "height")}
                 style={inputStyle} placeholder="H"/>
             </div>
           </div>
@@ -1167,7 +1232,7 @@ const btnSecondary: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", gap: 5,
 };
 const btnTool: React.CSSProperties = {
-  padding: "5px 7px", fontSize: 10,
+  padding: "4px 7px", fontSize: 10,
   background: "rgba(255,255,255,0.04)", color: "var(--t2)",
   border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, cursor: "pointer",
   display: "inline-flex", alignItems: "center", gap: 3,
@@ -1175,4 +1240,9 @@ const btnTool: React.CSSProperties = {
 const iconBtn: React.CSSProperties = {
   background: "none", border: "none", color: "var(--t3)", cursor: "pointer",
   padding: 3, display: "inline-flex", alignItems: "center",
+};
+const tabBtn: React.CSSProperties = {
+  padding: "6px 12px", fontSize: 11, background: "none",
+  border: "none", cursor: "pointer", fontWeight: 600,
+  transition: "color 0.2s", borderRadius: 0,
 };

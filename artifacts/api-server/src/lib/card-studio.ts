@@ -56,6 +56,10 @@ export type GenerateCardInput = {
 export type GenerateCardResult = {
   frontPng: Buffer;
   backPng: Buffer;
+  /** Solo el fondo (sin texto/QR/logo) — para el editor visual */
+  backgroundPng?: Buffer;
+  /** QR PNG generado */
+  qrPng?: Buffer;
   /** Coste estimado en USD */
   cost: number;
   meta: {
@@ -212,6 +216,8 @@ export async function generateBusinessCard(
   return {
     frontPng,
     backPng,
+    backgroundPng: backgroundPng ?? undefined,
+    qrPng,
     cost,
     meta: {
       templateId: template.id,

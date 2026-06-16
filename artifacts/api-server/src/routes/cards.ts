@@ -28,7 +28,7 @@ import {
   type GenerateCardInput,
 } from "../lib/card-studio.js";
 import { listTemplates, getTemplate } from "../lib/card-templates.js";
-import { generateQrSvg, buildVCard } from "../lib/card-qr.js";
+import { generateQrPng, generateQrSvg, buildVCard } from "../lib/card-qr.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { learnFromOperation } from "../lib/claude.js";
 
@@ -119,6 +119,12 @@ function toCardDto(row: any) {
     logoUrl: row.logoVaultFileId
       ? `/api/projects/${row.projectId}/vault/${row.logoVaultFileId}/preview`
       : null,
+    bgUrl: (() => {
+      const meta = safeJson(row.metadata, {}) as any;
+      return meta?.bgVaultFileId
+        ? `/api/projects/${row.projectId}/vault/${meta.bgVaultFileId}/preview`
+        : null;
+    })(),
     layoutOverrides: safeJson(row.layoutOverrides, {}),
     backgroundImageUrl: (() => {
       const bg = safeJson(row.backgroundConfig, {}) as any;
@@ -544,36 +550,58 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
 
     const result = await generateBusinessCard(input);
 
-    // Persistir front + back + PDF en vault
+    // Persistir front + back + PDF + background + QR en vault
     const tpl = getTemplate(row.templateId);
     const safeName = (row.name || `card-${id}`).replace(/[^a-z0-9-_]+/gi, "_").slice(0, 60);
 
-    const [frontVaultId, backVaultId] = await Promise.all([
+    const vaultJobs: Promise<number | null>[] = [
       saveToVault({
-        projectId: row.projectId,
-        fileType: "card-front",
-        category: "card_front",
+        projectId: row.projectId, fileType: "card-front", category: "card_front",
         title: `${row.name} · Frente`,
         description: `Tarjeta ${tpl?.name || row.templateId} — frente`,
-        mimeType: "image/png",
-        content: result.frontPng.toString("base64"),
-        fileSizeBytes: result.frontPng.length,
-        generatedBy: "card-studio",
+        mimeType: "image/png", content: result.frontPng.toString("base64"),
+        fileSizeBytes: result.frontPng.length, generatedBy: "card-studio",
         metadata: { cardId: id, side: "front", ...result.meta },
       }),
       saveToVault({
-        projectId: row.projectId,
-        fileType: "card-back",
-        category: "card_back",
+        projectId: row.projectId, fileType: "card-back", category: "card_back",
         title: `${row.name} · Reverso`,
         description: `Tarjeta ${tpl?.name || row.templateId} — reverso`,
-        mimeType: "image/png",
-        content: result.backPng.toString("base64"),
-        fileSizeBytes: result.backPng.length,
-        generatedBy: "card-studio",
+        mimeType: "image/png", content: result.backPng.toString("base64"),
+        fileSizeBytes: result.backPng.length, generatedBy: "card-studio",
         metadata: { cardId: id, side: "back", ...result.meta },
       }),
-    ]);
+    ];
+
+    // Background puro (para el editor visual sin texto/QR encima)
+    if (result.backgroundPng) {
+      vaultJobs.push(saveToVault({
+        projectId: row.projectId, fileType: "card-background", category: "card_bg",
+        title: `${row.name} · Fondo`,
+        description: `Textura de fondo para ${row.name}`,
+        mimeType: "image/png", content: result.backgroundPng.toString("base64"),
+        fileSizeBytes: result.backgroundPng.length, generatedBy: "card-studio",
+        metadata: { cardId: id, side: "background" },
+      }));
+    } else {
+      vaultJobs.push(Promise.resolve(null));
+    }
+
+    // QR PNG (para el editor visual)
+    if (result.qrPng) {
+      vaultJobs.push(saveToVault({
+        projectId: row.projectId, fileType: "card-qr", category: "card_qr",
+        title: `${row.name} · QR`,
+        description: `Código QR para ${row.name}`,
+        mimeType: "image/png", content: result.qrPng.toString("base64"),
+        fileSizeBytes: result.qrPng.length, generatedBy: "card-studio",
+        metadata: { cardId: id, qrData: result.meta.qrSource },
+      }));
+    } else {
+      vaultJobs.push(Promise.resolve(null));
+    }
+
+    const [frontVaultId, backVaultId, bgVaultId, qrVaultId] = await Promise.all(vaultJobs);
 
     // Validación dura: si front o back no se persistieron, fallar
     if (!frontVaultId || !backVaultId) {
@@ -608,7 +636,12 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
         backImageVaultFileId: backVaultId ?? row.backImageVaultFileId,
         pdfVaultFileId: pdfVaultId ?? row.pdfVaultFileId,
         generationCost: result.cost.toFixed(4),
-        metadata: JSON.stringify({ ...safeJson(row.metadata, {}) as any, lastGeneration: result.meta }),
+        metadata: JSON.stringify({
+          ...safeJson(row.metadata, {}) as any,
+          lastGeneration: result.meta,
+          bgVaultFileId: bgVaultId ?? (safeJson(row.metadata, {}) as any)?.bgVaultFileId ?? null,
+          qrVaultFileId: qrVaultId ?? (safeJson(row.metadata, {}) as any)?.qrVaultFileId ?? null,
+        }),
         lastError: null,
       })
       .where(eq(businessCardsTable.id, id))
@@ -690,6 +723,63 @@ router.get("/cards/:id/elements", requireAdmin, async (req: Request, res: Respon
   } catch (err: any) {
     logger.error({ err: err?.message }, "cards elements failed");
     res.status(500).json({ error: err?.message || "Error" });
+  }
+});
+
+// ─── Export QR PNG (para el editor Fabric) ──────────────────────────────────
+router.get("/cards/:id/qr.png", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+    if (!row) { res.status(404).send("not found"); return; }
+
+    // Si ya tenemos el QR guardado en vault, servirlo directamente
+    const meta = safeJson(row.metadata, {}) as any;
+    if (meta?.qrVaultFileId) {
+      const [bf] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, meta.qrVaultFileId));
+      if (bf?.content) {
+        res.setHeader("Content-Type", "image/png");
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        res.send(Buffer.from(bf.content, "base64"));
+        return;
+      }
+    }
+
+    // Fallback: generar QR on-the-fly
+    const tpl = getTemplate(row.templateId);
+    const qrType: string = (row as any).qrType || "vcard";
+    const qrContentUrl: string | null = (row as any).qrContentUrl || null;
+    let qrData: string;
+    if (qrType === "url" && qrContentUrl) {
+      qrData = qrContentUrl;
+    } else if (["video", "image", "animation"].includes(qrType)) {
+      const proto = (req.headers["x-forwarded-proto"] as string | undefined) || req.protocol || "https";
+      const host = req.get("host") || "localhost:8080";
+      qrData = `${proto}://${host}/api/public/qr/${id}`;
+    } else {
+      qrData = buildVCard({
+        fullName: row.fullName,
+        jobTitle: row.jobTitle ?? undefined,
+        organization: row.companyName ?? undefined,
+        email: row.email ?? undefined,
+        phone: row.phone ?? undefined,
+        website: row.website ?? undefined,
+        address: row.address ?? undefined,
+      });
+    }
+    const png = await generateQrPng(qrData, {
+      fgColor: tpl?.qrStyle.fgColor || "#000000",
+      bgColor: tpl?.qrStyle.bgColor || "#ffffff",
+      margin: tpl?.qrStyle.margin ?? 1,
+      size: 400,
+      errorLevel: "H",
+    });
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(png);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "cards qr.png failed");
+    res.status(500).send(err?.message || "error");
   }
 });
 

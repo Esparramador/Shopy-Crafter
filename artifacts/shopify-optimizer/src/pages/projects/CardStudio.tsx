@@ -69,6 +69,7 @@ interface BusinessCard {
   pdfVaultFileId?: number | null;
   metadata?: any;
   layoutOverrides?: LayoutOverrides;
+  bgUrl?: string | null;
   updatedAt: string;
 }
 
@@ -771,6 +772,7 @@ export default function CardStudio() {
                 key={selected.id}
                 apiBase={API_BASE}
                 cardId={selected.id}
+                bgUrl={selected.bgUrl ? (selected.bgUrl.startsWith("http") ? selected.bgUrl : `${API_BASE}${selected.bgUrl}`) : null}
                 frontUrl={selected.frontUrl.startsWith("http") ? selected.frontUrl : `${API_BASE}${selected.frontUrl}`}
                 backUrl={selected.backUrl ? (selected.backUrl.startsWith("http") ? selected.backUrl : `${API_BASE}${selected.backUrl}`) : null}
                 logoUrl={selected.logoUrl ? (selected.logoUrl.startsWith("http") ? selected.logoUrl : `${API_BASE}${selected.logoUrl}`) : null}
@@ -778,6 +780,11 @@ export default function CardStudio() {
                 generating={false}
                 onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
                 onRegenerate={async () => { await generateCard(selected.id); }}
+                onThemePrompt={(prompt) => {
+                  const b = { ...selected.backgroundConfig, kind: "ai-texture" as const, prompt };
+                  updateLocal({ backgroundConfig: b });
+                  updateCard(selected.id, { backgroundConfig: b as any });
+                }}
               />
             </div>
           )}
