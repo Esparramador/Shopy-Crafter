@@ -17,7 +17,7 @@ import {
   Type, RefreshCw, Save, Trash2, Loader2, Minus,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ZoomIn, ZoomOut, Download, RotateCcw, EyeOff,
-  Square, Circle, Triangle, Smile, MessageSquare,
+  Square, Circle, Triangle, Smile, MessageSquare, QrCode,
 } from "lucide-react";
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -66,6 +66,15 @@ type ResolvedElement = {
   qrUrl?: string;
 };
 
+// ── QR types (editor mini-catalog) ────────────────────────────────────────────
+const QR_TYPES_EDITOR = [
+  { id: "vcard",     label: "vCard",     needsUrl: false, placeholder: "" },
+  { id: "url",       label: "URL",       needsUrl: true,  placeholder: "https://tuwebsite.com" },
+  { id: "video",     label: "Video",     needsUrl: true,  placeholder: "https://youtube.com/watch?v=…" },
+  { id: "image",     label: "Imagen",    needsUrl: true,  placeholder: "https://… (imagen PNG/JPG)" },
+  { id: "animation", label: "Animación", needsUrl: false, placeholder: "" },
+];
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   apiBase: string;
@@ -76,9 +85,12 @@ interface Props {
   logoUrl?: string | null;
   initialOverrides: LayoutOverrides;
   generating: boolean;
+  qrType?: string | null;
+  qrContentUrl?: string | null;
   onSaveOverrides: (overrides: LayoutOverrides) => Promise<void>;
   onRegenerate: () => Promise<void>;
-  onThemePrompt?: (prompt: string) => void; // callback para presets de tema
+  onThemePrompt?: (prompt: string) => void;
+  onQrDataChange?: (type: string, url: string | null) => void;
 }
 
 // ── Etiquetas ─────────────────────────────────────────────────────────────────
@@ -293,7 +305,8 @@ async function populateCanvas(
 export default function CardStudioEditor({
   apiBase, cardId, bgUrl, frontUrl, backUrl, logoUrl,
   initialOverrides, generating,
-  onSaveOverrides, onRegenerate, onThemePrompt,
+  qrType: qrTypeProp, qrContentUrl: qrContentUrlProp,
+  onSaveOverrides, onRegenerate, onThemePrompt, onQrDataChange,
 }: Props) {
 
   const frontCanvasEl = useRef<HTMLCanvasElement | null>(null);
@@ -326,8 +339,12 @@ export default function CardStudioEditor({
   const [showEmoji, setShowEmoji] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
   const [activeTab, setActiveTab] = useState<"elementos" | "temas">("elementos");
+  const [localQrType, setLocalQrType] = useState<string>(qrTypeProp || "vcard");
+  const [localQrUrl, setLocalQrUrl] = useState<string>(qrContentUrlProp ?? "");
 
   useEffect(() => { setOverrides(initialOverrides || {}); }, [initialOverrides]);
+  useEffect(() => { setLocalQrType(qrTypeProp || "vcard"); }, [qrTypeProp]);
+  useEffect(() => { setLocalQrUrl(qrContentUrlProp ?? ""); }, [qrContentUrlProp]);
 
   // ── Inicializar canvases ──────────────────────────────────────────────────
   useEffect(() => {
@@ -1169,9 +1186,63 @@ export default function CardStudioEditor({
 
             {/* Propiedades QR */}
             {selProps.type === "qr" && (
-              <p style={{ fontSize: 11, color: "var(--t3)", margin: 0 }}>
-                QR generado automáticamente. Configura el tipo (vCard, URL, etc.) en el panel de datos.
-              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <QrCode size={12} style={{ color: "var(--gold)" }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--t1)" }}>Destino del QR</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                  {QR_TYPES_EDITOR.map(qt => (
+                    <button
+                      key={qt.id}
+                      onClick={() => {
+                        setLocalQrType(qt.id);
+                        if (!qt.needsUrl) {
+                          setLocalQrUrl("");
+                          onQrDataChange?.(qt.id, null);
+                        } else {
+                          onQrDataChange?.(qt.id, localQrUrl || null);
+                        }
+                      }}
+                      style={{
+                        padding: "5px 6px", fontSize: 10, borderRadius: 4, cursor: "pointer",
+                        background: localQrType === qt.id ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)",
+                        border: localQrType === qt.id ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.08)",
+                        color: "var(--t1)", fontWeight: localQrType === qt.id ? 600 : 400,
+                      }}
+                    >{qt.label}</button>
+                  ))}
+                </div>
+                {QR_TYPES_EDITOR.find(q => q.id === localQrType)?.needsUrl && (
+                  <>
+                    <label style={{ fontSize: 10, color: "var(--t3)", marginBottom: 1 }}>
+                      {localQrType === "url" ? "URL de destino" : localQrType === "video" ? "URL del video" : "URL de la imagen"}
+                    </label>
+                    <input
+                      type="url"
+                      value={localQrUrl}
+                      onChange={e => setLocalQrUrl(e.target.value)}
+                      onBlur={() => onQrDataChange?.(localQrType, localQrUrl || null)}
+                      placeholder={QR_TYPES_EDITOR.find(q => q.id === localQrType)?.placeholder}
+                      style={{
+                        fontSize: 10, padding: "5px 7px", borderRadius: 4,
+                        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+                        color: "var(--t1)", width: "100%", boxSizing: "border-box",
+                      }}
+                    />
+                  </>
+                )}
+                {(localQrType === "vcard") && (
+                  <div style={{ fontSize: 10, color: "var(--t3)", padding: "5px 7px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>
+                    El QR codifica tu contacto completo (vCard 3.0) para añadir a la agenda.
+                  </div>
+                )}
+                {(localQrType === "animation") && (
+                  <div style={{ fontSize: 10, color: "var(--t3)", padding: "5px 7px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>
+                    El QR abre la tarjeta animada premium en el navegador.
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Posición y tamaño */}

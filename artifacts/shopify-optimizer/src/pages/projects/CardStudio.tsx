@@ -807,12 +807,18 @@ export default function CardStudio() {
                 logoUrl={selected.logoUrl ? (selected.logoUrl.startsWith("http") ? selected.logoUrl : `${API_BASE}${selected.logoUrl}`) : null}
                 initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
                 generating={false}
+                qrType={selected.qrType || "vcard"}
+                qrContentUrl={selected.qrContentUrl ?? null}
                 onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
                 onRegenerate={async () => { await generateCard(selected.id); }}
                 onThemePrompt={(prompt) => {
                   const b = { ...selected.backgroundConfig, kind: "ai-texture" as const, prompt };
                   updateLocal({ backgroundConfig: b });
                   updateCard(selected.id, { backgroundConfig: b as any });
+                }}
+                onQrDataChange={(type, url) => {
+                  updateLocal({ qrType: type, qrContentUrl: url ?? "" });
+                  updateCard(selected.id, { qrType: type, qrContentUrl: url ?? null } as any);
                 }}
               />
             </div>
