@@ -1,26 +1,36 @@
 /**
- * Card Studio · Editor visual con Konva.js (canvas real).
+ * CardStudioEditor — Dual-Canvas Editor con Fabric.js
  *
- * Migrado desde position:absolute CSS divs a react-konva Stage/Layer
- * eliminando la desincronización visual entre editor y salida generada.
+ * Arquitectura:
+ *   Dos lienzos Fabric independientes (Frente + Reverso) visibles
+ *   simultáneamente. Las posiciones de los objetos están en el
+ *   sistema de coordenadas del backend (1080 × 720 px).
  *
- * Arquitectura de capas Konva:
- *   Layer "bg"       → imagen de fondo (frontUrl / backUrl)
- *   Layer "elements" → texto, logo, QR, líneas (todos draggables)
- *   Transformer      → handles de resize/rotate sobre el nodo seleccionado
+ *   Capas por canvas:
+ *     background  → imagen generada por IA (vault, cargada con auth)
+ *     objects     → textos, logos, líneas, QR (draggables, editables)
+ *     bleed guide → rect de guía de sangrado (no seleccionable)
+ *
+ *   Exportación:
+ *     ZIP con 01_Cara_Frontal.png + 02_Cara_Posterior.png a resolución
+ *     completa (1080 × 720, multiplicador 1/zoom).
  */
+
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Stage, Layer, Image as KImage, Text as KText, Rect, Line, Transformer } from "react-konva";
-import Konva from "konva";
+import { fabric } from "fabric";
+import JSZip from "jszip";
 import {
-  Eye, EyeOff, Plus, RefreshCw, Save, Trash2, Type, X,
-  RotateCcw, Loader2, Minus, AlignLeft, AlignCenter, AlignRight,
-  Bold, Italic, ZoomIn, ZoomOut, QrCode, Image as ImageIcon,
+  Type, RefreshCw, Save, Trash2, Loader2, Minus,
+  AlignLeft, AlignCenter, AlignRight, Bold, Italic,
+  ZoomIn, ZoomOut, Download, RotateCcw, Eye, EyeOff,
 } from "lucide-react";
 
-const CARD_W = 1050;
-const CARD_H = 680;
+// ── Constantes (deben coincidir con card-elements.ts del backend) ─────────────
+const CANVAS_W = 1080;
+const CANVAS_H = 720;
+const SAFE_MARGIN = 40; // mismo valor que la constante SAFE del backend
 
+// ── Tipos exportados (mismo contrato que antes) ───────────────────────────────
 export type ElementOverride = {
   hidden?: boolean;
   x?: number; y?: number; width?: number; height?: number;
@@ -46,6 +56,8 @@ export type LayoutOverrides = {
   back?: Record<string, ElementOverride>;
   extras?: ExtraElement[];
 };
+
+// ── Tipo de elemento resuelto (backend response) ──────────────────────────────
 type ResolvedElement = {
   id: string;
   type: "text" | "qr" | "logo" | "line";
@@ -55,9 +67,10 @@ type ResolvedElement = {
   letterSpacing?: number; lineHeight?: number;
   textTransform?: "none" | "uppercase";
   rotate?: number; hidden?: boolean; italic?: boolean;
-  qrUrl?: string; logoUrl?: string;
+  qrUrl?: string;
 };
 
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   apiBase: string;
   cardId: number;
@@ -66,23 +79,22 @@ interface Props {
   logoUrl?: string | null;
   initialOverrides: LayoutOverrides;
   generating: boolean;
-  side: "front" | "back";
-  onSideChange: (s: "front" | "back") => void;
   onSaveOverrides: (overrides: LayoutOverrides) => Promise<void>;
   onRegenerate: () => Promise<void>;
-  onAddExtraQr?: () => void;
 }
 
+// ── Etiquetas ─────────────────────────────────────────────────────────────────
 const ELEMENT_LABELS: Record<string, string> = {
   logo: "Logo", company: "Empresa", name: "Nombre", title: "Cargo",
-  line: "Línea", tagline: "Tagline",
-  qr: "QR", qrLabel: "Etiqueta QR", brand: "Marca", email: "Email",
-  phone: "Teléfono", web: "Web", social: "Social", address: "Dirección",
+  line: "Línea", tagline: "Tagline", qr: "QR", qrLabel: "Etiq. QR",
+  brand: "Marca", email: "Email", phone: "Teléfono", web: "Web",
+  social: "Social", address: "Dirección",
 };
-function elementLabel(id: string): string {
+function elLabel(id: string) {
   if (id.startsWith("extra-")) return "Extra";
   return ELEMENT_LABELS[id] || id;
 }
+
 const POPULAR_FONTS = [
   "Inter", "Cinzel", "Playfair Display", "Montserrat", "Lato",
   "Source Serif Pro", "Space Grotesk", "JetBrains Mono",
@@ -90,302 +102,686 @@ const POPULAR_FONTS = [
   "Georgia", "Times New Roman", "Arial", "Helvetica",
 ];
 
-// ── Hook: carga una URL como blob (evita restricciones CORS del canvas) ───────
-function useKonvaImage(src: string | null | undefined): HTMLImageElement | null {
-  const [img, setImg] = useState<HTMLImageElement | null>(null);
-  useEffect(() => {
-    if (!src) { setImg(null); return; }
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await fetch(src, { credentials: "include" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        const im = new window.Image();
-        im.onload = () => { if (!cancelled) setImg(im); };
-        im.onerror = () => { if (!cancelled) setImg(null); };
-        im.src = objectUrl;
-      } catch {
-        if (!cancelled) setImg(null);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [src]);
-  return img;
+// ── Paso 2 (propuesta): configuración global de controles Fabric ──────────────
+// Se llama una vez al montar el primer canvas. Bloquea escala no uniforme.
+function configureFabricGlobals() {
+  (fabric.Object.prototype as any).set({
+    cornerStyle: "circle",
+    cornerSize: 9,
+    cornerColor: "#d4a843",
+    borderColor: "#d4a843",
+    cornerStrokeColor: "#0a0a0a",
+    transparentCorners: false,
+    padding: 5,
+  });
+  // Oculta handles del centro (escala solo desde esquinas → proporcional)
+  fabric.Object.prototype.setControlsVisibility({
+    ml: false, mr: false, mt: false, mb: false,
+  });
 }
 
+// ── Paso 3 (propuesta): carga imagen con autenticación → blob URL ─────────────
+async function fetchBlob(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return null;
+    return URL.createObjectURL(await res.blob());
+  } catch { return null; }
+}
+
+// ── Paso 3: setBackgroundImage con cover scaling (bloqueado, bajo todo) ───────
+async function applyBackground(url: string, canvas: fabric.Canvas): Promise<void> {
+  const blobUrl = await fetchBlob(url);
+  if (!blobUrl) return;
+  return new Promise<void>((resolve) => {
+    fabric.Image.fromURL(blobUrl, (img) => {
+      URL.revokeObjectURL(blobUrl);
+      if (!img || !img.width || !img.height) { resolve(); return; }
+      // Cover: escalar para rellenar todo el canvas
+      const scale = Math.max(CANVAS_W / img.width!, CANVAS_H / img.height!);
+      img.set({
+        scaleX: scale, scaleY: scale,
+        originX: "center", originY: "center",
+        left: CANVAS_W / 2, top: CANVAS_H / 2,
+        selectable: false, evented: false,
+        hasBorders: false, hasControls: false,
+      });
+      // setBackgroundImage asegura que queda POR DEBAJO de todos los objetos
+      canvas.setBackgroundImage(img, () => { canvas.renderAll(); resolve(); });
+    });
+  });
+}
+
+// ── Paso 3: dibuja la guía de sangrado (no seleccionable) ────────────────────
+function addBleedGuide(canvas: fabric.Canvas): fabric.Rect {
+  const guide = new fabric.Rect({
+    left: SAFE_MARGIN,
+    top: SAFE_MARGIN,
+    width: CANVAS_W - SAFE_MARGIN * 2,
+    height: CANVAS_H - SAFE_MARGIN * 2,
+    fill: "transparent",
+    stroke: "rgba(255, 65, 65, 0.55)",
+    strokeWidth: 1.5,
+    strokeDashArray: [7, 5],
+    selectable: false,
+    evented: false,
+    hasBorders: false,
+    hasControls: false,
+  } as any);
+  canvas.add(guide);
+  canvas.bringToFront(guide);
+  return guide;
+}
+
+// ── Paso 2: addTextbox — centrado, editable inline, al frente ────────────────
+function addFabricTextbox(
+  canvas: fabric.Canvas,
+  text: string,
+  side: "front" | "back",
+  extraId: string,
+  options: Partial<fabric.ITextboxOptions> = {}
+): fabric.Textbox {
+  const tb = new fabric.Textbox(text, {
+    left: CANVAS_W * 0.1,
+    top: CANVAS_H * 0.4,
+    width: CANVAS_W * 0.6,
+    fontSize: 32,
+    fontFamily: "Inter",
+    fill: side === "front" ? "#ffffff" : "#1a1a1a",
+    textAlign: "left",
+    editable: true,
+    splitByGrapheme: false,
+    ...options,
+    data: { id: `extra-${extraId}`, side, type: "text" },
+    name: `extra-${extraId}`,
+  } as any);
+  canvas.add(tb);
+  canvas.bringToFront(tb);
+  canvas.setActiveObject(tb);
+  canvas.renderAll();
+  return tb;
+}
+
+// ── Puebla un canvas con los elementos recibidos del backend ──────────────────
+async function populateCanvas(
+  canvas: fabric.Canvas,
+  elements: ResolvedElement[],
+  side: "front" | "back",
+  logoUrl: string | null | undefined,
+  guide: fabric.Rect | null
+) {
+  // Quitar todos los objetos salvo la guía de sangrado
+  const toRemove = canvas.getObjects().filter(o => o !== guide);
+  canvas.remove(...toRemove);
+
+  const fontFamilies = new Set<string>();
+
+  for (const el of elements) {
+    if (el.hidden) continue;
+
+    if (el.type === "text") {
+      fontFamilies.add(el.fontFamily || "Inter");
+      const displayText = el.textTransform === "uppercase"
+        ? (el.text || "").toUpperCase()
+        : (el.text || "Texto");
+
+      const tb = new fabric.Textbox(displayText, {
+        left: el.x, top: el.y,
+        width: el.width,
+        fontSize: el.fontSize || 24,
+        fontFamily: el.fontFamily ? `'${el.fontFamily}'` : "Inter",
+        fontWeight: String(el.fontWeight || 400),
+        fontStyle: el.italic ? "italic" : "normal",
+        fill: el.color || "#ffffff",
+        textAlign: el.align || "left",
+        lineHeight: el.lineHeight || 1.3,
+        editable: true,
+        splitByGrapheme: false,
+        data: { id: el.id, side, type: "text" },
+        name: el.id,
+      } as any);
+      canvas.add(tb);
+
+    } else if (el.type === "logo" && logoUrl) {
+      const blobUrl = await fetchBlob(logoUrl);
+      if (blobUrl) {
+        await new Promise<void>((res) => {
+          fabric.Image.fromURL(blobUrl, (img) => {
+            URL.revokeObjectURL(blobUrl);
+            if (!img) { res(); return; }
+            const sw = img.width || 1;
+            const sh = img.height || 1;
+            img.set({
+              left: el.x, top: el.y,
+              scaleX: el.width / sw,
+              scaleY: el.height / sh,
+              data: { id: el.id, side, type: "logo" },
+              name: el.id,
+            } as any);
+            canvas.add(img);
+            res();
+          });
+        });
+      } else {
+        // Logo placeholder si no carga
+        const rect = new fabric.Rect({
+          left: el.x, top: el.y, width: el.width, height: el.height,
+          fill: "rgba(212,175,55,0.12)",
+          stroke: "rgba(212,175,55,0.35)", strokeWidth: 1,
+          strokeDashArray: [4, 4],
+          data: { id: el.id, side, type: "logo" }, name: el.id,
+        } as any);
+        canvas.add(rect);
+      }
+
+    } else if (el.type === "line") {
+      const rect = new fabric.Rect({
+        left: el.x, top: el.y,
+        width: el.width, height: Math.max(2, el.height || 3),
+        fill: el.color || "rgba(212,175,55,0.6)",
+        data: { id: el.id, side, type: "line" }, name: el.id,
+      } as any);
+      canvas.add(rect);
+
+    } else if (el.type === "qr") {
+      // Placeholder visual del QR (el real lo genera el backend)
+      const grp = new fabric.Group([
+        new fabric.Rect({
+          width: el.width, height: el.height || el.width,
+          fill: "#ffffff", rx: 4, ry: 4,
+          stroke: "rgba(212,175,55,0.3)", strokeWidth: 1,
+        }),
+        new fabric.Text("QR", {
+          fontSize: 20, fill: "#888",
+          originX: "center", originY: "center",
+          left: (el.width || 160) / 2, top: (el.height || el.width || 160) / 2,
+        }),
+      ], {
+        left: el.x, top: el.y, subTargetCheck: false,
+        data: { id: el.id, side, type: "qr" }, name: el.id,
+      } as any);
+      canvas.add(grp);
+    }
+  }
+
+  // Precargar fuentes antes del renderAll
+  if (fontFamilies.size > 0) {
+    await Promise.all([...fontFamilies].map(f =>
+      document.fonts.load(`16px '${f}'`).catch(() => {})
+    ));
+  }
+
+  // La guía de sangrado siempre queda encima
+  if (guide) canvas.bringToFront(guide);
+  canvas.renderAll();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Componente principal
+// ─────────────────────────────────────────────────────────────────────────────
 export default function CardStudioEditor({
   apiBase, cardId, frontUrl, backUrl, logoUrl,
-  initialOverrides, generating, side, onSideChange,
+  initialOverrides, generating,
   onSaveOverrides, onRegenerate,
 }: Props) {
+
+  // ── Refs de los elementos <canvas> ─────────────────────────────────────────
+  const frontCanvasEl = useRef<HTMLCanvasElement | null>(null);
+  const backCanvasEl = useRef<HTMLCanvasElement | null>(null);
+
+  // ── Instancias Fabric (sin causar re-renders) ───────────────────────────────
+  const frontFabric = useRef<fabric.Canvas | null>(null);
+  const backFabric = useRef<fabric.Canvas | null>(null);
+
+  // ── Refs para guías de sangrado ────────────────────────────────────────────
+  const frontGuide = useRef<fabric.Rect | null>(null);
+  const backGuide = useRef<fabric.Rect | null>(null);
+
+  // ── Estado React ───────────────────────────────────────────────────────────
+  const [canvasesReady, setCanvasesReady] = useState(false);
   const [overrides, setOverrides] = useState<LayoutOverrides>(initialOverrides || {});
-  const [elements, setElements] = useState<ResolvedElement[]>([]);
+  const [frontElements, setFrontElements] = useState<ResolvedElement[]>([]);
+  const [backElements, setBackElements] = useState<ResolvedElement[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(0.52);
+  const [zoom, setZoom] = useState(0.43);
+  const zoomRef = useRef(0.43);
 
-  const stageContainerRef = useRef<HTMLDivElement | null>(null);
-  const stageRef = useRef<Konva.Stage | null>(null);
-  const trRef = useRef<Konva.Transformer | null>(null);
-  const nodeRefs = useRef<Map<string, Konva.Node>>(new Map());
-  const elemLayerRef = useRef<Konva.Layer | null>(null);
+  // ── Paso 4: estado del objeto activo (selección → React) ───────────────────
+  const [activeCanvas, setActiveCanvas] = useState<"front" | "back" | null>(null);
+  const [selId, setSelId] = useState<string | null>(null);
+  const [selSide, setSelSide] = useState<"front" | "back" | null>(null);
+  const [selProps, setSelProps] = useState<{
+    type: string; text?: string; fill?: string;
+    fontSize?: number; fontFamily?: string; fontWeight?: string;
+    fontStyle?: string; textAlign?: string;
+    left?: number; top?: number; width?: number; height?: number;
+  } | null>(null);
 
-  const bgUrl = side === "front" ? frontUrl : backUrl;
-  const bgImage = useKonvaImage(bgUrl);
-  const logoImage = useKonvaImage(logoUrl);
-
-  // Auto-zoom to fit container
-  useEffect(() => {
-    const el = stageContainerRef.current;
-    if (!el) return;
-    const available = el.clientWidth - 32;
-    if (available > 100) setZoom(Math.max(0.3, Math.min(0.9, available / CARD_W)));
-  }, []);
-
-  // Sync overrides when parent resets them
+  // ── Sync overrides cuando el padre los resetea ──────────────────────────────
   useEffect(() => { setOverrides(initialOverrides || {}); }, [initialOverrides]);
 
-  // Load elements from backend when side changes
+  // ── Paso 1: inicialización segura de los dos lienzos Fabric ───────────────
   useEffect(() => {
+    if (!frontCanvasEl.current || !backCanvasEl.current) return;
+
+    configureFabricGlobals();
+
+    const z = zoomRef.current;
+    const opts: fabric.ICanvasOptions = {
+      width: CANVAS_W * z,
+      height: CANVAS_H * z,
+      preserveObjectStacking: true,
+      selection: true,
+    };
+
+    const fc = new fabric.Canvas(frontCanvasEl.current, {
+      ...opts, backgroundColor: "#111111",
+    });
+    fc.setZoom(z);
+
+    const bc = new fabric.Canvas(backCanvasEl.current, {
+      ...opts, backgroundColor: "#f4f4f4",
+    });
+    bc.setZoom(z);
+
+    frontFabric.current = fc;
+    backFabric.current = bc;
+
+    // Añadir guías de sangrado a ambos lienzos
+    frontGuide.current = addBleedGuide(fc);
+    backGuide.current = addBleedGuide(bc);
+
+    // ── Paso 4: event listeners de selección ─────────────────────────────
+    const bindSelection = (canvas: fabric.Canvas, side: "front" | "back") => {
+      const extract = (obj: fabric.Object | null) => {
+        if (!obj) { setSelId(null); setSelSide(null); setSelProps(null); return; }
+        const data = (obj as any).data;
+        setActiveCanvas(side);
+        setSelId(data?.id ?? null);
+        setSelSide(side);
+        setSelProps({
+          type: data?.type ?? obj.type ?? "unknown",
+          text: obj.type === "textbox" ? (obj as fabric.Textbox).text : undefined,
+          fill: String(obj.fill ?? ""),
+          fontSize: obj.type === "textbox" ? (obj as fabric.Textbox).fontSize : undefined,
+          fontFamily: obj.type === "textbox"
+            ? String((obj as fabric.Textbox).fontFamily ?? "").replace(/'/g, "")
+            : undefined,
+          fontWeight: obj.type === "textbox"
+            ? String((obj as fabric.Textbox).fontWeight ?? "400")
+            : undefined,
+          fontStyle: obj.type === "textbox" ? (obj as fabric.Textbox).fontStyle : undefined,
+          textAlign: obj.type === "textbox" ? (obj as fabric.Textbox).textAlign : undefined,
+          left: Math.round(obj.left ?? 0),
+          top: Math.round(obj.top ?? 0),
+          width: Math.round((obj.width ?? 0) * (obj.scaleX ?? 1)),
+          height: Math.round((obj.height ?? 0) * (obj.scaleY ?? 1)),
+        });
+      };
+      canvas.on("selection:created", (e: any) => extract(e.selected?.[0] ?? null));
+      canvas.on("selection:updated", (e: any) => extract(e.selected?.[0] ?? null));
+      canvas.on("selection:cleared", () => {
+        setSelId(null); setSelSide(null); setSelProps(null);
+      });
+
+      // Sincroniza posición/tamaño al mover o transformar
+      canvas.on("object:modified", (e: any) => {
+        const obj = e.target;
+        if (!obj) return;
+        const data = (obj as any).data;
+        if (!data?.id) return;
+
+        // Normalizar escala → colapsar a width/height reales
+        const sx = obj.scaleX ?? 1;
+        const sy = obj.scaleY ?? 1;
+        const nw = Math.round((obj.width ?? 40) * sx);
+        const nh = Math.round((obj.height ?? 20) * sy);
+        const nx = Math.round(obj.left ?? 0);
+        const ny = Math.round(obj.top ?? 0);
+        if (sx !== 1 || sy !== 1) {
+          obj.set({ scaleX: 1, scaleY: 1, width: nw, height: nh });
+        }
+
+        const patch: ElementOverride = { x: nx, y: ny, width: nw, height: nh };
+        if (obj.type === "textbox") {
+          patch.text = (obj as fabric.Textbox).text;
+          patch.fontSize = (obj as fabric.Textbox).fontSize;
+          patch.color = String((obj as fabric.Textbox).fill ?? "");
+          patch.fontFamily = String((obj as fabric.Textbox).fontFamily ?? "").replace(/'/g, "");
+          patch.align = (obj as fabric.Textbox).textAlign as any;
+        }
+
+        setOverrides(prev => {
+          const id = data.id as string;
+          const s = data.side as "front" | "back";
+          if (id.startsWith("extra-")) {
+            const exId = id.replace("extra-", "");
+            return { ...prev, extras: (prev.extras || []).map(ex => ex.id === exId ? { ...ex, ...patch } : ex) };
+          }
+          const sideOv = { ...(prev[s] ?? {}) };
+          sideOv[id] = { ...(sideOv[id] ?? {}), ...patch };
+          return { ...prev, [s]: sideOv };
+        });
+
+        // Actualiza panel de propiedades
+        extract(obj);
+        canvas.renderAll();
+      });
+
+      // Texto editado inline (doble click)
+      canvas.on("text:changed" as any, (e: any) => {
+        const obj = e.target;
+        if (!obj || obj.type !== "textbox") return;
+        const data = (obj as any).data;
+        if (!data?.id) return;
+        setOverrides(prev => {
+          const id = data.id as string;
+          const s = data.side as "front" | "back";
+          if (id.startsWith("extra-")) {
+            const exId = id.replace("extra-", "");
+            return { ...prev, extras: (prev.extras || []).map(ex => ex.id === exId ? { ...ex, text: (obj as fabric.Textbox).text } : ex) };
+          }
+          const sideOv = { ...(prev[s] ?? {}) };
+          sideOv[id] = { ...(sideOv[id] ?? {}), text: (obj as fabric.Textbox).text };
+          return { ...prev, [s]: sideOv };
+        });
+      });
+    };
+
+    bindSelection(fc, "front");
+    bindSelection(bc, "back");
+
+    setCanvasesReady(true);
+
+    return () => {
+      fc.dispose();
+      bc.dispose();
+      frontFabric.current = null;
+      backFabric.current = null;
+      frontGuide.current = null;
+      backGuide.current = null;
+      setCanvasesReady(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Carga elementos de ambas caras en paralelo (una sola vez por cardId) ───
+  useEffect(() => {
+    if (!cardId) return;
     let cancelled = false;
     (async () => {
       setLoading(true); setError(null);
       try {
-        const res = await fetch(`${apiBase}/api/cards/${cardId}/elements?side=${side}`, { credentials: "include" });
-        if (!res.ok) throw new Error((await res.json()).error || "Error cargando elementos");
-        const data = await res.json();
+        const [fr, br] = await Promise.all([
+          fetch(`${apiBase}/api/cards/${cardId}/elements?side=front`, { credentials: "include" }),
+          fetch(`${apiBase}/api/cards/${cardId}/elements?side=back`, { credentials: "include" }),
+        ]);
+        if (!fr.ok || !br.ok) throw new Error("Error cargando elementos");
+        const [fd, bd] = await Promise.all([fr.json(), br.json()]);
         if (cancelled) return;
-        const sideOv = side === "front" ? overrides.front : overrides.back;
-        const merged: ResolvedElement[] = (data.elements as ResolvedElement[]).map((el: ResolvedElement) => {
-          const ov = sideOv?.[el.id];
-          if (!ov) return el;
-          return {
-            ...el,
-            ...(ov.x !== undefined ? { x: ov.x } : {}),
-            ...(ov.y !== undefined ? { y: ov.y } : {}),
-            ...(ov.width !== undefined ? { width: ov.width } : {}),
-            ...(ov.height !== undefined ? { height: ov.height } : {}),
-            ...(ov.fontSize !== undefined ? { fontSize: ov.fontSize } : {}),
-            ...(ov.color !== undefined ? { color: ov.color } : {}),
-            ...(ov.text !== undefined && el.type === "text" ? { text: ov.text } : {}),
-            ...(ov.align !== undefined ? { align: ov.align } : {}),
-            ...(ov.fontFamily !== undefined ? { fontFamily: ov.fontFamily } : {}),
-            ...(ov.fontWeight !== undefined ? { fontWeight: ov.fontWeight } : {}),
-            ...(ov.italic !== undefined ? { italic: ov.italic } : {}),
-            hidden: !!ov.hidden,
-          };
-        });
-        const extras = (overrides.extras || []).filter(e => e.side === side);
-        for (const ex of extras) {
-          if (!merged.find(m => m.id === `extra-${ex.id}`)) {
-            merged.push({
-              id: `extra-${ex.id}`,
-              type: ex.type === "line" ? "line" : ex.type === "qr" ? "qr" : "text",
-              x: ex.x, y: ex.y, width: ex.width, height: ex.height ?? 60,
-              text: ex.text, color: ex.color, fontSize: ex.fontSize,
-              fontFamily: ex.fontFamily, fontWeight: ex.fontWeight,
-              align: ex.align, letterSpacing: ex.letterSpacing,
-              textTransform: ex.textTransform, rotate: ex.rotate,
-              italic: ex.italic, qrUrl: ex.qrUrl,
-            });
-          }
-        }
-        setElements(merged);
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message || "Error cargando editor");
+        setFrontElements(fd.elements || []);
+        setBackElements(bd.elements || []);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || "Error cargando elementos");
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [side, cardId, apiBase]);
+  }, [cardId, apiBase]);
 
-  // Re-apply overrides without refetch
+  // ── Popula canvas Frente cuando canvas listo + elementos disponibles ────────
   useEffect(() => {
-    setElements((prev) => {
-      const sideOv = side === "front" ? overrides.front : overrides.back;
-      return prev.map((el) => {
-        if (el.id.startsWith("extra-")) {
-          const exId = el.id.replace("extra-", "");
-          const ex = (overrides.extras || []).find(e => e.id === exId);
-          if (ex) return { ...el, x: ex.x, y: ex.y, width: ex.width, height: ex.height ?? el.height,
-            text: ex.text, color: ex.color, fontSize: ex.fontSize, fontFamily: ex.fontFamily,
-            fontWeight: ex.fontWeight, align: ex.align, italic: ex.italic, qrUrl: ex.qrUrl };
-          return el;
-        }
-        const ov = sideOv?.[el.id];
-        if (!ov) return { ...el, hidden: false };
-        return {
-          ...el,
-          ...(ov.x !== undefined ? { x: ov.x } : {}),
-          ...(ov.y !== undefined ? { y: ov.y } : {}),
-          ...(ov.width !== undefined ? { width: ov.width } : {}),
-          ...(ov.height !== undefined ? { height: ov.height } : {}),
-          ...(ov.fontSize !== undefined ? { fontSize: ov.fontSize } : {}),
-          ...(ov.color !== undefined ? { color: ov.color } : {}),
-          ...(ov.text !== undefined && el.type === "text" ? { text: ov.text } : {}),
-          ...(ov.align !== undefined ? { align: ov.align } : {}),
-          ...(ov.fontFamily !== undefined ? { fontFamily: ov.fontFamily } : {}),
-          ...(ov.fontWeight !== undefined ? { fontWeight: ov.fontWeight } : {}),
-          ...(ov.italic !== undefined ? { italic: ov.italic } : {}),
-          hidden: !!ov.hidden,
-        };
-      });
-    });
-  }, [overrides, side]);
+    const fc = frontFabric.current;
+    if (!canvasesReady || !fc || frontElements.length === 0) return;
+    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current);
+  }, [canvasesReady, frontElements, logoUrl]);
 
-  // Attach Transformer to selected node
+  // ── Popula canvas Reverso ──────────────────────────────────────────────────
   useEffect(() => {
-    const tr = trRef.current;
-    if (!tr) return;
-    if (selectedId && nodeRefs.current.has(selectedId)) {
-      tr.nodes([nodeRefs.current.get(selectedId)!]);
-    } else {
-      tr.nodes([]);
-    }
-    tr.getLayer()?.batchDraw();
-  }, [selectedId, elements]);
+    const bc = backFabric.current;
+    if (!canvasesReady || !bc || backElements.length === 0) return;
+    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current);
+  }, [canvasesReady, backElements, logoUrl]);
 
-  // Preload fonts when elements change
+  // ── Paso 3: cargar fondo Frente cuando cambia frontUrl ────────────────────
   useEffect(() => {
-    const fonts = [...new Set(elements.map(e => e.fontFamily).filter(Boolean))] as string[];
-    Promise.all(fonts.map(f => document.fonts.load(`16px "${f}"`))).then(() => {
-      elemLayerRef.current?.batchDraw();
+    const fc = frontFabric.current;
+    if (!canvasesReady || !fc || !frontUrl) return;
+    applyBackground(frontUrl, fc);
+  }, [canvasesReady, frontUrl]);
+
+  // ── Paso 3: cargar fondo Reverso cuando cambia backUrl ────────────────────
+  useEffect(() => {
+    const bc = backFabric.current;
+    if (!canvasesReady || !bc || !backUrl) return;
+    applyBackground(backUrl, bc);
+  }, [canvasesReady, backUrl]);
+
+  // ── Manejo de zoom en ambos lienzos ───────────────────────────────────────
+  const applyZoom = useCallback((newZoom: number) => {
+    zoomRef.current = newZoom;
+    setZoom(newZoom);
+    [frontFabric.current, backFabric.current].forEach(c => {
+      if (!c) return;
+      c.setZoom(newZoom);
+      c.setDimensions({ width: CANVAS_W * newZoom, height: CANVAS_H * newZoom });
+      c.renderAll();
     });
-  }, [elements]);
+  }, []);
 
-  const setOverride = useCallback((id: string, patch: ElementOverride) => {
-    setOverrides((prev) => {
-      if (id.startsWith("extra-")) {
-        const exId = id.replace("extra-", "");
-        const extras = (prev.extras || []).map((e) => e.id === exId ? { ...e, ...patch } : e);
-        return { ...prev, extras };
-      }
-      const sideOv = { ...(prev[side] || {}) };
-      sideOv[id] = { ...(sideOv[id] || {}), ...patch };
-      return { ...prev, [side]: sideOv };
-    });
-  }, [side]);
-
-  // ── Konva node handlers ────────────────────────────────────────────────────
-  const onDragEnd = useCallback((id: string, e: Konva.KonvaEventObject<DragEvent>) => {
-    const node = e.target;
-    const nx = Math.round(Math.max(0, Math.min(CARD_W - 10, node.x())));
-    const ny = Math.round(Math.max(0, Math.min(CARD_H - 10, node.y())));
-    node.x(nx); node.y(ny);
-    setOverride(id, { x: nx, y: ny });
-  }, [setOverride]);
-
-  const onTransformEnd = useCallback((id: string, el: ResolvedElement, e: Konva.KonvaEventObject<Event>) => {
-    const node = e.target;
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
-    node.scaleX(1);
-    node.scaleY(1);
-    const nw = Math.round(Math.max(40, node.width() * scaleX));
-    const nh = Math.round(Math.max(16, node.height() * scaleY));
-    const nx = Math.round(node.x());
-    const ny = Math.round(node.y());
-    setOverride(id, { x: nx, y: ny, width: nw, height: nh,
-      ...(el.type === "text" ? { fontSize: Math.round(Math.max(8, (el.fontSize ?? 22) * Math.min(scaleX, scaleY))) } : {}) });
-  }, [setOverride]);
-
-  // ── Actions ────────────────────────────────────────────────────────────────
-  const addExtra = (type: "text" | "line" | "qr" = "text") => {
+  // ── Paso 2: añadir textbox centrado en el canvas activo ───────────────────
+  const addTextbox = useCallback((targetSide?: "front" | "back") => {
+    const side = targetSide ?? activeCanvas ?? "front";
+    const canvas = side === "front" ? frontFabric.current : backFabric.current;
+    const guide = side === "front" ? frontGuide.current : backGuide.current;
+    if (!canvas) return;
     const id = String(Date.now()).slice(-6);
     const ex: ExtraElement = {
-      id, side, type,
-      x: 100, y: 200, width: type === "qr" ? 160 : 400, height: type === "qr" ? 160 : 60,
-      text: type === "text" ? "Texto nuevo" : undefined,
-      fontFamily: "Inter", fontSize: 28, fontWeight: 400,
-      color: "#ffffff", align: "left",
-      qrUrl: type === "qr" ? "https://shopycrafter.com" : undefined,
+      id, side, type: "text",
+      x: CANVAS_W * 0.1, y: CANVAS_H * 0.4,
+      width: CANVAS_W * 0.6, height: 60,
+      text: "Texto nuevo", fontFamily: "Inter",
+      fontSize: 32, fontWeight: 400,
+      color: side === "front" ? "#ffffff" : "#1a1a1a",
+      align: "left",
     };
-    setOverrides((prev) => ({ ...prev, extras: [...(prev.extras || []), ex] }));
-    setElements((prev) => [...prev, {
-      id: `extra-${id}`,
-      type: type === "qr" ? "qr" : type === "line" ? "line" : "text",
-      x: ex.x, y: ex.y, width: ex.width, height: ex.height ?? 60,
-      text: ex.text, color: ex.color, fontSize: ex.fontSize,
-      fontFamily: ex.fontFamily, fontWeight: ex.fontWeight, align: ex.align,
-      qrUrl: ex.qrUrl,
-    }]);
-    setSelectedId(`extra-${id}`);
-  };
+    setOverrides(prev => ({ ...prev, extras: [...(prev.extras || []), ex] }));
+    const tb = addFabricTextbox(canvas, "Texto nuevo", side, id);
+    if (guide) canvas.bringToFront(guide);
+    canvas.renderAll();
+    return tb;
+  }, [activeCanvas]);
 
-  const removeExtra = (id: string) => {
-    if (!id.startsWith("extra-")) return;
-    const exId = id.replace("extra-", "");
-    setOverrides((prev) => ({ ...prev, extras: (prev.extras || []).filter((e) => e.id !== exId) }));
-    setElements((prev) => prev.filter((e) => e.id !== id));
-    if (selectedId === id) setSelectedId(null);
-  };
+  // ── Añadir línea decorativa ───────────────────────────────────────────────
+  const addLine = useCallback((targetSide?: "front" | "back") => {
+    const side = targetSide ?? activeCanvas ?? "front";
+    const canvas = side === "front" ? frontFabric.current : backFabric.current;
+    const guide = side === "front" ? frontGuide.current : backGuide.current;
+    if (!canvas) return;
+    const id = String(Date.now()).slice(-6);
+    const ex: ExtraElement = {
+      id, side, type: "line",
+      x: SAFE_MARGIN, y: CANVAS_H / 2,
+      width: CANVAS_W - SAFE_MARGIN * 2, height: 3,
+      color: "rgba(212,175,55,0.6)",
+    };
+    setOverrides(prev => ({ ...prev, extras: [...(prev.extras || []), ex] }));
+    const rect = new fabric.Rect({
+      left: ex.x, top: ex.y, width: ex.width, height: ex.height,
+      fill: ex.color,
+      data: { id: `extra-${id}`, side, type: "line" }, name: `extra-${id}`,
+    } as any);
+    canvas.add(rect);
+    if (guide) canvas.bringToFront(guide);
+    canvas.renderAll();
+  }, [activeCanvas]);
 
-  const toggleHidden = (id: string) => {
-    if (id.startsWith("extra-")) { removeExtra(id); return; }
-    const sideOv = (side === "front" ? overrides.front : overrides.back) || {};
-    setOverride(id, { hidden: !sideOv[id]?.hidden });
-  };
+  // ── Eliminar elemento seleccionado ────────────────────────────────────────
+  const deleteSelected = useCallback(() => {
+    const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
+    if (!canvas || !selId) return;
+    const obj = canvas.getActiveObject();
+    if (!obj) return;
+    canvas.remove(obj);
+    canvas.discardActiveObject();
+    canvas.renderAll();
+    if (selId.startsWith("extra-")) {
+      const exId = selId.replace("extra-", "");
+      setOverrides(prev => ({ ...prev, extras: (prev.extras || []).filter(e => e.id !== exId) }));
+    } else {
+      setOverrides(prev => {
+        const s = selSide as "front" | "back";
+        const sideOv = { ...(prev[s] ?? {}) };
+        sideOv[selId] = { ...(sideOv[selId] ?? {}), hidden: true };
+        return { ...prev, [s]: sideOv };
+      });
+    }
+    setSelId(null); setSelSide(null); setSelProps(null);
+  }, [selId, selSide]);
 
-  const resetSide = () => {
-    if (!confirm(`¿Restablecer todas las posiciones del ${side === "front" ? "frente" : "reverso"}?`)) return;
-    setOverrides((prev) => ({ ...prev, [side]: {} }));
-  };
+  // ── Reset posiciones de un lado ───────────────────────────────────────────
+  const resetSide = useCallback((side: "front" | "back") => {
+    if (!confirm(`¿Restablecer posiciones del ${side === "front" ? "frente" : "reverso"}?`)) return;
+    setOverrides(prev => ({ ...prev, [side]: {} }));
+    const elements = side === "front" ? frontElements : backElements;
+    const canvas = side === "front" ? frontFabric.current : backFabric.current;
+    const guide = side === "front" ? frontGuide.current : backGuide.current;
+    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide);
+  }, [frontElements, backElements, logoUrl]);
 
-  const savePositions = async () => {
+  // ── Guardar overrides en backend ──────────────────────────────────────────
+  const saveAll = async () => {
     setSaving(true); setError(null);
     try { await onSaveOverrides(overrides); }
-    catch (err: any) { setError(err?.message || "Error guardando"); }
+    catch (e: any) { setError(e?.message || "Error guardando"); }
     finally { setSaving(false); }
   };
 
-  const regenerateNow = async () => {
+  // ── Re-generar tarjeta ────────────────────────────────────────────────────
+  const regenerate = async () => {
     setSaving(true); setError(null);
     try { await onSaveOverrides(overrides); await onRegenerate(); }
-    catch (err: any) { setError(err?.message || "Error re-renderizando"); }
+    catch (e: any) { setError(e?.message || "Error"); }
     finally { setSaving(false); }
   };
 
-  const selected = elements.find((e) => e.id === selectedId);
-  const visibleElements = elements.filter(e => !e.hidden);
+  // ── Exportar ZIP para imprenta ────────────────────────────────────────────
+  const exportToZip = useCallback(async () => {
+    const fc = frontFabric.current;
+    const bc = backFabric.current;
+    if (!fc || !bc) return;
+    setExporting(true);
+    try {
+      // Ocultar guías para la exportación
+      const fg = frontGuide.current;
+      const bg2 = backGuide.current;
+      if (fg) fg.set({ visible: false });
+      if (bg2) bg2.set({ visible: false });
+      fc.renderAll(); bc.renderAll();
 
-  // ── RENDER ──────────────────────────────────────────────────────────────────
+      const mult = 1 / zoomRef.current; // exportar a resolución completa (1080×720)
+      const frontData = fc.toDataURL({ format: "png", multiplier: mult });
+      const backData  = bc.toDataURL({ format: "png", multiplier: mult });
+
+      // Restaurar guías
+      if (fg) fg.set({ visible: true });
+      if (bg2) bg2.set({ visible: true });
+      fc.renderAll(); bc.renderAll();
+
+      // Crear ZIP con nomenclatura de imprenta
+      const zip = new JSZip();
+      zip.file("01_Cara_Frontal_Datos.png",     frontData.split(",")[1], { base64: true });
+      zip.file("02_Cara_Posterior_Diseño.png",  backData.split(",")[1],  { base64: true });
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "tarjeta-imprenta.zip";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally { setExporting(false); }
+  }, []);
+
+  // ── Actualizar propiedad del objeto seleccionado desde el panel ───────────
+  const updateSelProp = useCallback((fabricProp: string, value: any, overrideProp?: string) => {
+    const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
+    if (!canvas || !selId) return;
+    const obj = canvas.getActiveObject();
+    if (!obj) return;
+    obj.set(fabricProp as any, value);
+    canvas.renderAll();
+    setSelProps(prev => prev ? { ...prev, [fabricProp === "fill" ? "fill" : fabricProp]: value } : prev);
+    // Guardar en overrides inmediatamente
+    const key = overrideProp ?? fabricProp;
+    const patch: ElementOverride = { [key]: value };
+    setOverrides(prev => {
+      if (selId.startsWith("extra-")) {
+        const exId = selId.replace("extra-", "");
+        return { ...prev, extras: (prev.extras || []).map(ex => ex.id === exId ? { ...ex, ...patch } : ex) };
+      }
+      const s = selSide as "front" | "back";
+      const sideOv = { ...(prev[s] ?? {}) };
+      sideOv[selId] = { ...(sideOv[selId] ?? {}), ...patch };
+      return { ...prev, [s]: sideOv };
+    });
+  }, [selId, selSide]);
+
+  // ── Todos los elementos visibles (para el panel de lista) ─────────────────
+  const allFrontVisible = frontElements.filter(e => !e.hidden);
+  const allBackVisible  = backElements.filter(e => !e.hidden);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, height: "100%" }}>
-      {/* TOOLBAR */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+
+      {/* ── TOOLBAR ─────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", padding: 3, borderRadius: 6 }}>
-          <button onClick={() => { onSideChange("front"); setSelectedId(null); }} style={tabBtn(side === "front")}>Frente</button>
-          <button onClick={() => { onSideChange("back"); setSelectedId(null); }} style={tabBtn(side === "back")}>Reverso</button>
-        </div>
+
+        {/* Añadir elementos */}
         <div style={{ display: "flex", gap: 5 }}>
-          <button onClick={() => addExtra("text")} style={btnTool} title="Añadir texto"><Type size={13} /> Texto</button>
-          <button onClick={() => addExtra("line")} style={btnTool} title="Añadir línea"><Minus size={13} /> Línea</button>
-          <button onClick={() => addExtra("qr")} style={btnTool} title="Añadir QR extra"><QrCode size={13} /> QR</button>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={() => setZoom(z => Math.max(0.25, z - 0.05))} style={iconBtn}><ZoomOut size={14}/></button>
-          <span style={{ fontSize: 11, color: "var(--t3)", minWidth: 38, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
-          <button onClick={() => setZoom(z => Math.min(1.2, z + 0.05))} style={iconBtn}><ZoomIn size={14}/></button>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={resetSide} style={btnSecondary}><RotateCcw size={13} /> Reset</button>
-          <button onClick={savePositions} disabled={saving} style={btnSecondary}>
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Guardar
+          <button onClick={() => addTextbox("front")} style={btnTool} title="Texto en Frente">
+            <Type size={12}/> Texto·F
           </button>
-          <button onClick={regenerateNow} disabled={saving || generating} style={btnPrimary}>
-            {(saving || generating) ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          <button onClick={() => addTextbox("back")} style={btnTool} title="Texto en Reverso">
+            <Type size={12}/> Texto·R
+          </button>
+          <button onClick={() => addLine("front")} style={btnTool} title="Línea en Frente">
+            <Minus size={12}/> Línea·F
+          </button>
+          <button onClick={() => addLine("back")} style={btnTool} title="Línea en Reverso">
+            <Minus size={12}/> Línea·R
+          </button>
+        </div>
+
+        {/* Zoom */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <button onClick={() => applyZoom(Math.max(0.25, zoom - 0.05))} style={iconBtn}><ZoomOut size={13}/></button>
+          <span style={{ fontSize: 11, color: "var(--t3)", minWidth: 36, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
+          <button onClick={() => applyZoom(Math.min(1.0, zoom + 0.05))} style={iconBtn}><ZoomIn size={13}/></button>
+        </div>
+
+        {/* Acciones principales */}
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          <button onClick={() => resetSide("front")} style={btnSecondary} title="Reset Frente">
+            <RotateCcw size={12}/> Reset·F
+          </button>
+          <button onClick={() => resetSide("back")} style={btnSecondary} title="Reset Reverso">
+            <RotateCcw size={12}/> Reset·R
+          </button>
+          <button onClick={saveAll} disabled={saving} style={btnSecondary}>
+            {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Guardar
+          </button>
+          <button onClick={exportToZip} disabled={exporting} style={btnSecondary} title="Exportar ZIP para imprenta (300 DPI)">
+            {exporting ? <Loader2 size={12} className="animate-spin"/> : <Download size={12}/>} ZIP
+          </button>
+          <button onClick={regenerate} disabled={saving || generating} style={btnPrimary}>
+            {(saving || generating) ? <Loader2 size={12} className="animate-spin"/> : <RefreshCw size={12}/>}
             Re-generar
           </button>
         </div>
@@ -397,321 +793,248 @@ export default function CardStudioEditor({
         </div>
       )}
 
-      {/* ── KONVA STAGE (full width) ────────────────────────────────────────── */}
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <div
-          ref={stageContainerRef}
-          style={{ background: "#0a0a0a", borderRadius: 8, overflow: "auto", display: "flex",
-            alignItems: "flex-start", justifyContent: "center", padding: 16, minHeight: 420 }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-            {loading ? (
-              <div style={{ width: CARD_W * zoom, height: CARD_H * zoom, display: "flex", alignItems: "center", justifyContent: "center", background: "radial-gradient(ellipse at 20% 30%, #2a1f04 0%, #0d0d1a 70%)", borderRadius: 4, boxShadow: "0 8px 40px rgba(0,0,0,0.8)" }}>
-                <Loader2 className="animate-spin" style={{ color: "var(--gold)" }} />
-              </div>
-            ) : (
-              <Stage
-                ref={stageRef}
-                width={CARD_W * zoom}
-                height={CARD_H * zoom}
-                scaleX={zoom}
-                scaleY={zoom}
-                style={{ borderRadius: 4, boxShadow: "0 8px 40px rgba(0,0,0,0.8)", cursor: "default" }}
-                onClick={(e) => { if (e.target === e.target.getStage()) setSelectedId(null); }}
-              >
-                {/* ── Background Layer ─────────────────────────────────── */}
-                <Layer>
-                  {bgImage ? (
-                    <KImage image={bgImage} x={0} y={0} width={CARD_W} height={CARD_H} listening={false} />
-                  ) : (
-                    <Rect x={0} y={0} width={CARD_W} height={CARD_H}
-                      fillRadialGradientStartPoint={{ x: CARD_W * 0.2, y: CARD_H * 0.3 }}
-                      fillRadialGradientEndPoint={{ x: CARD_W * 0.5, y: CARD_H * 0.5 }}
-                      fillRadialGradientStartRadius={0}
-                      fillRadialGradientEndRadius={CARD_W * 0.8}
-                      fillRadialGradientColorStops={[0, "#2a1f04", 1, "#0d0d0d"]}
-                      listening={false}
-                    />
-                  )}
-                </Layer>
+      {loading && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, fontSize: 12, color: "var(--t3)" }}>
+          <Loader2 size={14} className="animate-spin" style={{ color: "var(--gold)" }}/> Cargando elementos…
+        </div>
+      )}
 
-                {/* ── Elements Layer ───────────────────────────────────── */}
-                <Layer ref={elemLayerRef}>
-                  {visibleElements.map((el) => {
-                    const isSel = el.id === selectedId;
-                    const commonProps = {
-                      key: el.id,
-                      x: el.x,
-                      y: el.y,
-                      rotation: el.rotate ?? 0,
-                      draggable: true,
-                      onClick: (e: Konva.KonvaEventObject<MouseEvent>) => { e.cancelBubble = true; setSelectedId(el.id); },
-                      onTap: (e: Konva.KonvaEventObject<Event>) => { e.cancelBubble = true; setSelectedId(el.id); },
-                      onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => onDragEnd(el.id, e),
-                      onTransformEnd: (e: Konva.KonvaEventObject<Event>) => onTransformEnd(el.id, el, e),
-                      ref: (node: Konva.Node | null) => {
-                        if (node) nodeRefs.current.set(el.id, node);
-                        else nodeRefs.current.delete(el.id);
-                      },
-                    };
+      {/* ── DUAL CANVAS ─────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 4 }}>
 
-                    if (el.type === "text") {
-                      const displayText = el.textTransform === "uppercase"
-                        ? (el.text || "").toUpperCase()
-                        : (el.text || "");
-                      return (
-                        <KText
-                          {...commonProps}
-                          width={el.width}
-                          height={el.height}
-                          text={displayText}
-                          fontSize={el.fontSize ?? 22}
-                          fontFamily={el.fontFamily ? `'${el.fontFamily}', sans-serif` : "Inter, sans-serif"}
-                          fontStyle={[el.italic ? "italic" : "", el.fontWeight && el.fontWeight >= 600 ? "bold" : ""].filter(Boolean).join(" ") || "normal"}
-                          fill={el.color ?? "#ffffff"}
-                          align={el.align ?? "left"}
-                          letterSpacing={el.letterSpacing ?? 0}
-                          lineHeight={el.lineHeight ?? 1.3}
-                          wrap="word"
-                          ellipsis={false}
-                          strokeWidth={0}
-                        />
-                      );
-                    }
+        {/* Frente */}
+        <div style={{ flex: "0 0 auto" }}>
+          <div style={{
+            fontSize: 10, color: selSide === "front" ? "var(--gold)" : "var(--t3)",
+            letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700,
+            marginBottom: 6, paddingLeft: 2,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: selSide === "front" ? "var(--gold)" : "rgba(255,255,255,0.2)", display: "inline-block" }}/>
+            Cara Frontal
+            <span style={{ fontSize: 9, color: "var(--t3)", fontWeight: 400 }}>doble clic para editar texto</span>
+          </div>
+          <div style={{ background: "#0a0a0a", borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.7)", overflow: "hidden", border: selSide === "front" ? "2px solid var(--gold)" : "2px solid transparent" }}>
+            <canvas ref={frontCanvasEl} />
+          </div>
+          <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 4, textAlign: "center" }}>
+            {CANVAS_W}×{CANVAS_H}px · zona segura {CANVAS_W - SAFE_MARGIN*2}×{CANVAS_H - SAFE_MARGIN*2}px (línea roja)
+          </div>
+        </div>
 
-                    if (el.type === "logo") {
-                      if (logoImage) {
-                        return (
-                          <KImage
-                            {...commonProps}
-                            image={logoImage}
-                            width={el.width}
-                            height={el.height}
-                          />
-                        );
-                      }
-                      return (
-                        <Rect
-                          {...commonProps}
-                          width={el.width}
-                          height={el.height}
-                          fill="rgba(212,175,55,0.15)"
-                          stroke="rgba(212,175,55,0.4)"
-                          strokeWidth={1}
-                          dash={[4, 4]}
-                        />
-                      );
-                    }
-
-                    if (el.type === "qr") {
-                      return (
-                        <Rect
-                          {...commonProps}
-                          width={el.width}
-                          height={el.height}
-                          fill="#ffffff"
-                          cornerRadius={4}
-                        />
-                      );
-                    }
-
-                    if (el.type === "line") {
-                      return (
-                        <Rect
-                          {...commonProps}
-                          width={el.width}
-                          height={Math.max(2, el.height)}
-                          fill={el.color ?? "rgba(212,175,55,0.6)"}
-                        />
-                      );
-                    }
-
-                    return null;
-                  })}
-
-                  {/* Transformer (selection handles) */}
-                  <Transformer
-                    ref={trRef}
-                    boundBoxFunc={(oldBox, newBox) => {
-                      if (newBox.width < 20 || newBox.height < 10) return oldBox;
-                      return newBox;
-                    }}
-                    borderStroke="var(--gold)"
-                    borderStrokeWidth={1.5 / zoom}
-                    anchorFill="#d4af37"
-                    anchorStroke="#000"
-                    anchorSize={8 / zoom}
-                    rotateEnabled={true}
-                    keepRatio={false}
-                  />
-                </Layer>
-              </Stage>
-            )}
-
-            <div style={{ fontSize: 10, color: "var(--t3)" }}>
-              {CARD_W}×{CARD_H}px · 85×55mm · arrastra los elementos para moverlos
-            </div>
+        {/* Reverso */}
+        <div style={{ flex: "0 0 auto" }}>
+          <div style={{
+            fontSize: 10, color: selSide === "back" ? "var(--gold)" : "var(--t3)",
+            letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700,
+            marginBottom: 6, paddingLeft: 2,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: selSide === "back" ? "var(--gold)" : "rgba(255,255,255,0.2)", display: "inline-block" }}/>
+            Cara Posterior
+          </div>
+          <div style={{ background: "#0a0a0a", borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.7)", overflow: "hidden", border: selSide === "back" ? "2px solid var(--gold)" : "2px solid transparent" }}>
+            <canvas ref={backCanvasEl} />
+          </div>
+          <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 4, textAlign: "center" }}>
+            {CANVAS_W}×{CANVAS_H}px · texto a sangrado: no cruzar la línea roja
           </div>
         </div>
       </div>
 
-      {/* ── ELEMENTOS + PROPIEDADES (debajo del canvas) ─────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: selected ? "1fr 300px" : "1fr", gap: 10, alignItems: "start" }}>
+      {/* ── ELEMENTOS + PROPIEDADES (debajo del canvas) ─────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: selId ? "1fr 300px" : "1fr", gap: 10, alignItems: "start" }}>
 
-        {/* Lista de elementos */}
+        {/* Lista de elementos — agrupados por cara */}
         <div style={panelStyle}>
-          <h4 style={panelTitle}>Elementos · {side === "front" ? "Frente" : "Reverso"}</h4>
-          {elements.length === 0 && !loading ? (
-            <p style={{ fontSize: 11, color: "var(--t3)", textAlign: "center", padding: "8px 0", margin: 0 }}>
-              Genera la tarjeta primero para ver elementos.
-            </p>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 4 }}>
-              {elements.map((el) => (
+          <h4 style={panelTitle}>
+            Elementos del lienzo
+            {selId && <span style={{ marginLeft: 8, color: "var(--t3)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>— seleccionado: {elLabel(selId)} ({selSide === "front" ? "Frente" : "Reverso"})</span>}
+          </h4>
+
+          {(allFrontVisible.length > 0 || allBackVisible.length > 0) && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 4 }}>
+              {[...allFrontVisible.map(e => ({ ...e, _side: "front" as const })), ...allBackVisible.map(e => ({ ...e, _side: "back" as const }))].map(el => (
                 <div
-                  key={el.id}
-                  onClick={() => setSelectedId(selectedId === el.id ? null : el.id)}
+                  key={`${el._side}-${el.id}`}
+                  onClick={() => {
+                    const canvas = el._side === "front" ? frontFabric.current : backFabric.current;
+                    if (!canvas) return;
+                    const obj = canvas.getObjects().find((o: any) => o.name === el.id);
+                    if (obj) { canvas.setActiveObject(obj); canvas.renderAll(); }
+                  }}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4,
                     padding: "5px 8px", borderRadius: 4, cursor: "pointer",
-                    background: selectedId === el.id ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.02)",
-                    border: selectedId === el.id ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.06)",
-                    opacity: el.hidden ? 0.45 : 1,
+                    background: selId === el.id && selSide === el._side ? "rgba(212,175,55,0.15)" : "rgba(255,255,255,0.02)",
+                    border: selId === el.id && selSide === el._side ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.06)",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {elementLabel(el.id)} {el.type === "text" && el.text ? `· ${el.text.slice(0, 14)}` : ""}
+                      {elLabel(el.id)}{el.type === "text" && el.text ? ` · ${el.text.slice(0, 12)}` : ""}
                     </div>
-                    <div style={{ fontSize: 9, color: "var(--t3)" }}>
-                      {el.type} · {Math.round(el.x)}, {Math.round(el.y)}
+                    <div style={{ fontSize: 9, color: el._side === "front" ? "rgba(212,175,55,0.7)" : "rgba(100,200,255,0.7)" }}>
+                      {el._side === "front" ? "Frente" : "Reverso"} · {el.type}
                     </div>
                   </div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); toggleHidden(el.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (el.id.startsWith("extra-")) {
+                        const canvas = el._side === "front" ? frontFabric.current : backFabric.current;
+                        if (!canvas) return;
+                        const obj = canvas.getObjects().find((o: any) => o.name === el.id);
+                        if (obj) { canvas.remove(obj); canvas.renderAll(); }
+                        const exId = el.id.replace("extra-", "");
+                        setOverrides(prev => ({ ...prev, extras: (prev.extras || []).filter(ex => ex.id !== exId) }));
+                      } else {
+                        setOverrides(prev => {
+                          const sideOv = { ...(prev[el._side] ?? {}) };
+                          sideOv[el.id] = { ...(sideOv[el.id] ?? {}), hidden: true };
+                          return { ...prev, [el._side]: sideOv };
+                        });
+                        const canvas = el._side === "front" ? frontFabric.current : backFabric.current;
+                        if (canvas) {
+                          const obj = canvas.getObjects().find((o: any) => o.name === el.id);
+                          if (obj) { canvas.remove(obj); canvas.renderAll(); }
+                        }
+                      }
+                    }}
                     style={iconBtn}
-                    title={el.id.startsWith("extra-") ? "Eliminar" : el.hidden ? "Mostrar" : "Ocultar"}
+                    title={el.id.startsWith("extra-") ? "Eliminar" : "Ocultar"}
                   >
-                    {el.id.startsWith("extra-") ? <Trash2 size={11} /> : el.hidden ? <EyeOff size={11} /> : <Eye size={11} />}
+                    {el.id.startsWith("extra-") ? <Trash2 size={11}/> : <EyeOff size={11}/>}
                   </button>
                 </div>
               ))}
             </div>
           )}
+          {!loading && allFrontVisible.length === 0 && allBackVisible.length === 0 && (
+            <p style={{ fontSize: 11, color: "var(--t3)", textAlign: "center", margin: 0, padding: 8 }}>
+              Genera la tarjeta primero para ver los elementos.
+            </p>
+          )}
         </div>
 
-        {/* Panel de propiedades (sólo cuando hay elemento seleccionado) */}
-        {selected && (
+        {/* ── PANEL DE PROPIEDADES (Paso 4: actualiza desde selección) ────── */}
+        {selId && selProps && (
           <div style={panelStyle}>
-            <h4 style={panelTitle}>
-              <Type size={11} style={{ verticalAlign: -2, marginRight: 4 }} />
-              {elementLabel(selected.id)}
+            <h4 style={{ ...panelTitle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span><Type size={11} style={{ marginRight: 4, verticalAlign: -2 }}/>{elLabel(selId)}</span>
+              {selId.startsWith("extra-") && (
+                <button onClick={deleteSelected} style={{ background: "none", border: "none", color: "#e84558", cursor: "pointer", padding: 0 }}>
+                  <Trash2 size={12}/>
+                </button>
+              )}
             </h4>
 
-            {selected.type === "text" && (
+            {/* Propiedades de texto */}
+            {selProps.type === "text" && (
               <>
                 <label style={labelStyle}>Texto</label>
                 <textarea
-                  value={selected.text || ""}
-                  onChange={(e) => setOverride(selected.id, { text: e.target.value })}
-                  style={{ ...inputStyle, minHeight: 52, resize: "vertical", marginBottom: 8 }}
+                  value={selProps.text || ""}
+                  onChange={(e) => {
+                    const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
+                    const obj = canvas?.getActiveObject() as fabric.Textbox;
+                    if (obj && obj.type === "textbox") {
+                      obj.set("text", e.target.value);
+                      canvas?.renderAll();
+                    }
+                    setSelProps(p => p ? { ...p, text: e.target.value } : p);
+                    setOverrides(prev => {
+                      if (!selId || !selSide) return prev;
+                      if (selId.startsWith("extra-")) {
+                        const exId = selId.replace("extra-", "");
+                        return { ...prev, extras: (prev.extras || []).map(ex => ex.id === exId ? { ...ex, text: e.target.value } : ex) };
+                      }
+                      const sideOv = { ...(prev[selSide] ?? {}) };
+                      sideOv[selId] = { ...(sideOv[selId] ?? {}), text: e.target.value };
+                      return { ...prev, [selSide]: sideOv };
+                    });
+                  }}
+                  style={{ ...inputStyle, minHeight: 50, resize: "vertical", marginBottom: 8 }}
                 />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 5 }}>
                   <div>
                     <label style={labelStyle}>Tamaño</label>
-                    <input type="number" min={6} max={200}
-                      value={selected.fontSize ?? 22}
-                      onChange={(e) => setOverride(selected.id, { fontSize: +e.target.value || 22 })}
+                    <input type="number" min={6} max={300} value={selProps.fontSize ?? 24}
+                      onChange={(e) => updateSelProp("fontSize", +e.target.value || 24, "fontSize")}
                       style={inputStyle}
                     />
                   </div>
                   <div>
                     <label style={labelStyle}>Color</label>
-                    <input type="color"
-                      value={selected.color || "#ffffff"}
-                      onChange={(e) => setOverride(selected.id, { color: e.target.value })}
+                    <input type="color" value={selProps.fill || "#ffffff"}
+                      onChange={(e) => updateSelProp("fill", e.target.value, "color")}
                       style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer" }}
                     />
                   </div>
                 </div>
                 <label style={labelStyle}>Fuente</label>
-                <select
-                  value={selected.fontFamily || "Inter"}
-                  onChange={(e) => setOverride(selected.id, { fontFamily: e.target.value })}
+                <select value={(selProps.fontFamily || "Inter").replace(/'/g, "")}
+                  onChange={(e) => updateSelProp("fontFamily", `'${e.target.value}'`, "fontFamily")}
                   style={{ ...inputStyle, marginBottom: 5 }}
                 >
                   {POPULAR_FONTS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
                 <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
                   <button
-                    onClick={() => setOverride(selected.id, { fontWeight: (selected.fontWeight ?? 400) >= 600 ? 400 : 700 })}
-                    style={{ ...iconBtn, background: (selected.fontWeight ?? 400) >= 600 ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
+                    onClick={() => {
+                      const isBold = (selProps.fontWeight ?? "400") === "700" || selProps.fontWeight === "bold";
+                      updateSelProp("fontWeight", isBold ? "400" : "bold", "fontWeight");
+                    }}
+                    style={{ ...iconBtn, background: (selProps.fontWeight === "700" || selProps.fontWeight === "bold") ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}
                     title="Negrita"
-                  ><Bold size={12} /></button>
+                  ><Bold size={12}/></button>
                   <button
-                    onClick={() => setOverride(selected.id, { italic: !selected.italic })}
-                    style={{ ...iconBtn, background: selected.italic ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
+                    onClick={() => updateSelProp("fontStyle", selProps.fontStyle === "italic" ? "normal" : "italic", "italic")}
+                    style={{ ...iconBtn, background: selProps.fontStyle === "italic" ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}
                     title="Cursiva"
-                  ><Italic size={12} /></button>
+                  ><Italic size={12}/></button>
                   {(["left", "center", "right"] as const).map((a, i) => (
                     <button key={a}
-                      onClick={() => setOverride(selected.id, { align: a })}
-                      style={{ ...iconBtn, background: selected.align === a ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px", fontSize: 11, color: "var(--t1)" }}
+                      onClick={() => updateSelProp("textAlign", a, "align")}
+                      style={{ ...iconBtn, background: selProps.textAlign === a ? "rgba(212,175,55,0.2)" : "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "4px 8px" }}
                     >
-                      {i === 0 ? <AlignLeft size={12} /> : i === 1 ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                      {i === 0 ? <AlignLeft size={12}/> : i === 1 ? <AlignCenter size={12}/> : <AlignRight size={12}/>}
                     </button>
                   ))}
                 </div>
               </>
             )}
 
-            {selected.type === "qr" && (
+            {/* Propiedades de línea (color) */}
+            {selProps.type === "line" && (
               <>
-                <label style={labelStyle}>URL del QR</label>
-                <input
-                  value={(selected as any).qrUrl || ""}
-                  onChange={(e) => setOverride(selected.id, { text: e.target.value })}
-                  placeholder="https://…"
-                  style={{ ...inputStyle, marginBottom: 8 }}
-                />
-              </>
-            )}
-
-            {selected.type === "line" && (
-              <>
-                <label style={labelStyle}>Color línea</label>
-                <input type="color"
-                  value={selected.color || "#d4af37"}
-                  onChange={(e) => setOverride(selected.id, { color: e.target.value })}
+                <label style={labelStyle}>Color de línea</label>
+                <input type="color" value={selProps.fill || "#d4af37"}
+                  onChange={(e) => updateSelProp("fill", e.target.value, "color")}
                   style={{ width: "100%", height: 30, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", padding: 0, cursor: "pointer", marginBottom: 8 }}
                 />
               </>
             )}
 
+            {/* Posición */}
             <label style={labelStyle}>Posición (X, Y)</label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
-              <input type="number" value={Math.round(selected.x)}
-                onChange={(e) => setOverride(selected.id, { x: +e.target.value || 0 })}
-                style={inputStyle} placeholder="X" />
-              <input type="number" value={Math.round(selected.y)}
-                onChange={(e) => setOverride(selected.id, { y: +e.target.value || 0 })}
-                style={inputStyle} placeholder="Y" />
+              <input type="number" value={selProps.left ?? 0}
+                onChange={(e) => updateSelProp("left", +e.target.value || 0, "x")}
+                style={inputStyle} placeholder="X"/>
+              <input type="number" value={selProps.top ?? 0}
+                onChange={(e) => updateSelProp("top", +e.target.value || 0, "y")}
+                style={inputStyle} placeholder="Y"/>
             </div>
             <label style={labelStyle}>Tamaño (W, H)</label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
-              <input type="number" value={Math.round(selected.width)}
-                onChange={(e) => setOverride(selected.id, { width: +e.target.value || 40 })}
-                style={inputStyle} placeholder="W" />
-              <input type="number" value={Math.round(selected.height)}
-                onChange={(e) => setOverride(selected.id, { height: +e.target.value || 20 })}
-                style={inputStyle} placeholder="H" />
+              <input type="number" value={selProps.width ?? 100}
+                onChange={(e) => updateSelProp("width", +e.target.value || 40, "width")}
+                style={inputStyle} placeholder="W"/>
+              <input type="number" value={selProps.height ?? 40}
+                onChange={(e) => updateSelProp("height", +e.target.value || 20, "height")}
+                style={inputStyle} placeholder="H"/>
             </div>
-
-            {selected.id.startsWith("extra-") && (
-              <button onClick={() => removeExtra(selected.id)} style={{ ...btnSecondary, width: "100%", justifyContent: "center", color: "#e84558", borderColor: "rgba(232,69,88,0.3)", marginTop: 4 }}>
-                <Trash2 size={12} /> Eliminar elemento
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -719,13 +1042,7 @@ export default function CardStudioEditor({
   );
 }
 
-// ── Shared styles ─────────────────────────────────────────────────────────────
-const tabBtn = (active: boolean): React.CSSProperties => ({
-  padding: "5px 12px", fontSize: 11, borderRadius: 4,
-  background: active ? "rgba(212,175,55,0.18)" : "transparent",
-  border: active ? "1px solid var(--gold)" : "1px solid transparent",
-  color: active ? "var(--gold)" : "var(--t2)", cursor: "pointer", fontWeight: 600,
-});
+// ── Estilos ───────────────────────────────────────────────────────────────────
 const panelStyle: React.CSSProperties = {
   background: "rgba(255,255,255,0.02)",
   border: "1px solid rgba(255,255,255,0.07)",
@@ -757,10 +1074,10 @@ const btnSecondary: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", gap: 5,
 };
 const btnTool: React.CSSProperties = {
-  padding: "5px 8px", fontSize: 11,
+  padding: "5px 7px", fontSize: 10,
   background: "rgba(255,255,255,0.04)", color: "var(--t2)",
   border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, cursor: "pointer",
-  display: "inline-flex", alignItems: "center", gap: 4,
+  display: "inline-flex", alignItems: "center", gap: 3,
 };
 const iconBtn: React.CSSProperties = {
   background: "none", border: "none", color: "var(--t3)", cursor: "pointer",

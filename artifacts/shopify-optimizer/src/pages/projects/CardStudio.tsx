@@ -120,7 +120,6 @@ export default function CardStudio() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [editorSide, setEditorSide] = useState<"front" | "back">("front");
   const [showAutoDesign, setShowAutoDesign] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [autoIndustry, setAutoIndustry] = useState("");
@@ -773,8 +772,6 @@ export default function CardStudio() {
                   : null}
                 initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
                 generating={generating}
-                side={editorSide}
-                onSideChange={setEditorSide}
                 onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
                 onRegenerate={async () => { await generateCard(selected.id); }}
               />
