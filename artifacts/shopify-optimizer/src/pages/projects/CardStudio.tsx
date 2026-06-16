@@ -74,19 +74,39 @@ interface BusinessCard {
 }
 
 const BG_MODELS = [
-  { id: "recraft-v4",             label: "Recraft v4 · recomendado ($0.05)",         tier: "best" },
-  { id: "recraft-v3",             label: "Recraft v3 · texto en imagen ($0.04)",      tier: "best" },
-  { id: "ideogram-v3-quality",    label: "Ideogram v3 Quality · texto max ($0.06)",   tier: "premium" },
-  { id: "imagen-4-ultra",         label: "Imagen 4 Ultra · 2K ($0.06)",               tier: "premium" },
-  { id: "flux-1.1-pro-ultra",     label: "Flux 1.1 Pro Ultra · 4MP ($0.06)",          tier: "premium" },
-  { id: "flux-kontext-max",       label: "Flux Kontext Max · premium ($0.07)",        tier: "balanced" },
-  { id: "flux-1.1-pro",           label: "Flux 1.1 Pro ($0.04)",                      tier: "balanced" },
-  { id: "nano-banana",            label: "Gemini 2.5 Flash Image ($0.04)",            tier: "balanced" },
-  { id: "imagen-4",               label: "Imagen 4 · estándar ($0.04)",               tier: "balanced" },
-  { id: "gpt-image-2",            label: "OpenAI gpt-image-2 ($0.05)",                tier: "balanced" },
-  { id: "seedream-4",             label: "Seedream 4 · ByteDance ($0.04)",            tier: "balanced" },
-  { id: "imagen-4-fast",          label: "Imagen 4 Fast ($0.02)",                     tier: "economy" },
-  { id: "flux-schnell",           label: "Flux Schnell · rápido ($0.003)",            tier: "economy" },
+  // ── BEST ──────────────────────────────────────────────────────────
+  { id: "recraft-v4",                label: "⭐ Recraft v4 · última gen ($0.05)",                 tier: "best" },
+  { id: "ideogram-v3-quality",       label: "⭐ Ideogram v3 Quality · texto max ($0.06)",         tier: "best" },
+  { id: "imagen-5-ultra",            label: "⭐ Imagen 5 Ultra · Google 2026 ($0.08)",            tier: "best" },
+  { id: "flux-1.1-pro-ultra",        label: "⭐ Flux 1.1 Pro Ultra · 4MP ($0.06)",               tier: "best" },
+  { id: "nano-banana-pro",           label: "⭐ Gemini Pro Image · 4K ($0.12)",                  tier: "best" },
+  { id: "runway-gen4-image",         label: "⭐ Runway Gen4 Image ($0.08)",                       tier: "best" },
+  // ── PREMIUM ───────────────────────────────────────────────────────
+  { id: "imagen-5",                  label: "🔷 Imagen 5 · Google 2026 estándar ($0.05)",         tier: "premium" },
+  { id: "imagen-4-ultra",            label: "🔷 Imagen 4 Ultra · 2K ($0.06)",                    tier: "premium" },
+  { id: "gpt-image-2",               label: "🔷 OpenAI gpt-image-2 · flagship ($0.05)",          tier: "premium" },
+  { id: "grok-imagine-image-quality",label: "🔷 Grok Imagine Quality · xAI 2K ($0.05)",          tier: "premium" },
+  { id: "flux-kontext-max",          label: "🔷 Flux Kontext Max · consistencia ($0.07)",         tier: "premium" },
+  { id: "flux-1.1-pro-ultra-raw",    label: "🔷 Flux Ultra RAW · naturalista ($0.06)",           tier: "premium" },
+  // ── BALANCED ──────────────────────────────────────────────────────
+  { id: "recraft-v3",                label: "🟡 Recraft v3 · texto nítido ($0.04)",               tier: "balanced" },
+  { id: "flux-kontext-pro",          label: "🟡 Flux Kontext Pro · consistencia ($0.05)",         tier: "balanced" },
+  { id: "flux-kontext-dev",          label: "🟡 Flux Kontext Dev · artístico ($0.03)",            tier: "balanced" },
+  { id: "gpt-image-1",               label: "🟡 OpenAI gpt-image-1 ($0.04)",                     tier: "balanced" },
+  { id: "gpt-image-1.5",             label: "🟡 OpenAI gpt-image-1.5 ($0.033)",                  tier: "balanced" },
+  { id: "flux-1.1-pro",              label: "🟡 Flux 1.1 Pro ($0.04)",                           tier: "balanced" },
+  { id: "imagen-4",                  label: "🟡 Imagen 4 · estándar ($0.04)",                    tier: "balanced" },
+  { id: "nano-banana",               label: "🟡 Gemini 2.5 Flash Image ($0.04)",                 tier: "balanced" },
+  { id: "seedream-4",                label: "🟡 Seedream 4 · ByteDance ($0.04)",                 tier: "balanced" },
+  { id: "ideogram-v3-turbo",         label: "🟡 Ideogram v3 Turbo · rápido ($0.03)",             tier: "balanced" },
+  { id: "stable-diffusion-3.5-large",label: "🟡 SD 3.5 Large · artístico ($0.035)",              tier: "balanced" },
+  // ── ECONOMY ───────────────────────────────────────────────────────
+  { id: "grok-imagine-image",        label: "💚 Grok Imagine · xAI rápido ($0.02) ✓ recomendado",tier: "economy" },
+  { id: "gpt-image-1-mini",          label: "💚 gpt-image-1 mini · presupuesto ($0.02)",         tier: "economy" },
+  { id: "imagen-4-fast",             label: "💚 Imagen 4 Fast ($0.02)",                          tier: "economy" },
+  { id: "runway-gen4-image-turbo",   label: "💚 Runway Gen4 Turbo ($0.02)",                      tier: "economy" },
+  { id: "stable-diffusion-3.5-turbo",label: "💚 SD 3.5 Turbo · ultra rápido ($0.01)",           tier: "economy" },
+  { id: "flux-schnell",              label: "💚 Flux Schnell · más barato ($0.003)",             tier: "economy" },
 ];
 
 const QR_TYPES = [
@@ -128,7 +148,7 @@ export default function CardStudio() {
   const [autoColor, setAutoColor] = useState("");
   const [autoBrand, setAutoBrand] = useState("");
   const [autoBusy, setAutoBusy] = useState(false);
-  const [bgModel, setBgModel] = useState("recraft-v4");
+  const [bgModel, setBgModel] = useState("grok-imagine-image");
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [bgWarning, setBgWarning] = useState<string | null>(null);
 
@@ -670,7 +690,16 @@ export default function CardStudio() {
             <Section title="Generar tarjeta">
               <Field label="Modelo IA para el fondo:">
                 <select value={bgModel} onChange={(e) => setBgModel(e.target.value)} style={inputStyle}>
-                  {BG_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  {(["best","premium","balanced","economy"] as const).map(tier => {
+                    const group = BG_MODELS.filter(m => m.tier === tier);
+                    if (!group.length) return null;
+                    const tierLabel = tier === "best" ? "⭐ BEST" : tier === "premium" ? "🔷 PREMIUM" : tier === "balanced" ? "🟡 BALANCED" : "💚 ECONOMY";
+                    return (
+                      <optgroup key={tier} label={tierLabel}>
+                        {group.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                      </optgroup>
+                    );
+                  })}
                 </select>
               </Field>
               <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
