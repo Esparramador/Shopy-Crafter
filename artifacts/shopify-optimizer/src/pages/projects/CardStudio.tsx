@@ -462,7 +462,7 @@ export default function CardStudio() {
 
             <Section title="Datos del titular">
               <Field label="Nombre completo *">
-                <input value={selected.fullName} onChange={(e) => updateLocal({ fullName: e.target.value })} onBlur={() => updateCard(selected.id, { fullName: selected.fullName })} style={inputStyle} />
+                <input data-testid="input-full-name" value={selected.fullName} onChange={(e) => updateLocal({ fullName: e.target.value })} onBlur={() => updateCard(selected.id, { fullName: selected.fullName })} style={inputStyle} />
               </Field>
               <Field label="Cargo">
                 <input value={selected.jobTitle ?? ""} onChange={(e) => updateLocal({ jobTitle: e.target.value })} onBlur={() => updateCard(selected.id, { jobTitle: selected.jobTitle })} style={inputStyle} />

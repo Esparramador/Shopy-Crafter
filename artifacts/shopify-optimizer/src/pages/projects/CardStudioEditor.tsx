@@ -819,8 +819,8 @@ export default function CardStudioEditor({
             Cara Frontal
             <span style={{ fontSize: 9, color: "var(--t3)", fontWeight: 400 }}>doble clic para editar texto</span>
           </div>
-          <div style={{ background: "#0a0a0a", borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.7)", overflow: "hidden", border: selSide === "front" ? "2px solid var(--gold)" : "2px solid transparent" }}>
-            <canvas ref={frontCanvasEl} />
+          <div data-testid="canvas-front-area" style={{ background: "#0a0a0a", borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.7)", overflow: "hidden", border: selSide === "front" ? "2px solid var(--gold)" : "2px solid transparent" }}>
+            <canvas ref={frontCanvasEl} data-testid="canvas-front" />
           </div>
           <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 4, textAlign: "center" }}>
             {CANVAS_W}×{CANVAS_H}px · zona segura {CANVAS_W - SAFE_MARGIN*2}×{CANVAS_H - SAFE_MARGIN*2}px (línea roja)
@@ -838,8 +838,8 @@ export default function CardStudioEditor({
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: selSide === "back" ? "var(--gold)" : "rgba(255,255,255,0.2)", display: "inline-block" }}/>
             Cara Posterior
           </div>
-          <div style={{ background: "#0a0a0a", borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.7)", overflow: "hidden", border: selSide === "back" ? "2px solid var(--gold)" : "2px solid transparent" }}>
-            <canvas ref={backCanvasEl} />
+          <div data-testid="canvas-back-area" style={{ background: "#0a0a0a", borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.7)", overflow: "hidden", border: selSide === "back" ? "2px solid var(--gold)" : "2px solid transparent" }}>
+            <canvas ref={backCanvasEl} data-testid="canvas-back" />
           </div>
           <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 4, textAlign: "center" }}>
             {CANVAS_W}×{CANVAS_H}px · texto a sangrado: no cruzar la línea roja
