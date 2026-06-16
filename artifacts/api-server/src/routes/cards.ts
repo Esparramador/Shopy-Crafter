@@ -24,6 +24,7 @@ import { logger } from "../lib/logger.js";
 import {
   generateBusinessCard,
   generatePrintablePdf,
+  generateCardBackground,
   autoDesignCard,
   type GenerateCardInput,
 } from "../lib/card-studio.js";
@@ -123,6 +124,18 @@ function toCardDto(row: any) {
       const meta = safeJson(row.metadata, {}) as any;
       return meta?.bgVaultFileId
         ? `/api/projects/${row.projectId}/vault/${meta.bgVaultFileId}/preview`
+        : null;
+    })(),
+    bgFrontUrl: (() => {
+      const meta = safeJson(row.metadata, {}) as any;
+      return meta?.bgFrontVaultFileId
+        ? `/api/projects/${row.projectId}/vault/${meta.bgFrontVaultFileId}/preview`
+        : null;
+    })(),
+    bgBackUrl: (() => {
+      const meta = safeJson(row.metadata, {}) as any;
+      return meta?.bgBackVaultFileId
+        ? `/api/projects/${row.projectId}/vault/${meta.bgBackVaultFileId}/preview`
         : null;
     })(),
     layoutOverrides: safeJson(row.layoutOverrides, {}),
@@ -811,6 +824,81 @@ router.get("/cards/:id/qr.svg", requireAdmin, async (req: Request, res: Response
   } catch (err: any) {
     logger.error({ err: err?.message }, "cards qr.svg failed");
     res.status(500).send(err?.message || "error");
+  }
+});
+
+// ─── Export PDF desde canvas (acepta base64 PNGs del cliente) ───────────────
+router.post("/cards/:id/export-pdf", requireAdmin, async (req: Request, res: Response) => {
+  const id = parseInt(String(req.params.id), 10);
+  try {
+    const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+    if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+    const { front, back } = req.body as { front?: string; back?: string };
+    if (!front || !back) { res.status(400).json({ error: "Se requieren 'front' y 'back' en base64" }); return; }
+    const frontPng = Buffer.from(front.replace(/^data:image\/png;base64,/, ""), "base64");
+    const backPng  = Buffer.from(back.replace(/^data:image\/png;base64,/, ""), "base64");
+    const pdfBuf = await generatePrintablePdf(frontPng, backPng, row.name);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${row.name.replace(/[^a-z0-9-_]/gi, "_")}-print.pdf"`);
+    res.send(pdfBuf);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "cards export-pdf failed");
+    res.status(500).json({ error: err?.message || "Error generando PDF" });
+  }
+});
+
+// ─── Generar fondo por cara (sin pipeline completo) ──────────────────────────
+router.post("/cards/:id/generate-bg", requireAdmin, async (req: Request, res: Response) => {
+  enableLongRunning(res);
+  const id = parseInt(String(req.params.id), 10);
+  try {
+    const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+    if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+    const { prompt, side, bgModel } = req.body as {
+      prompt?: string; side?: "front" | "back" | "both"; bgModel?: string;
+    };
+    if (!prompt) { res.status(400).json({ error: "Se requiere 'prompt'" }); return; }
+    const targetSide: "front" | "back" | "both" = (side === "front" || side === "back") ? side : "both";
+
+    const bgBuf = await generateCardBackground(prompt, bgModel as any, undefined);
+
+    const meta = safeJson(row.metadata, {}) as any;
+    const results: { side: string; url: string }[] = [];
+
+    const saveSide = async (s: "front" | "back") => {
+      const vaultId = await saveToVault({
+        projectId: row.projectId,
+        fileType: "card-background",
+        category: "card_bg",
+        title: `${row.name} · Fondo ${s === "front" ? "Frente" : "Reverso"}`,
+        description: `Textura de fondo ${s} para ${row.name}`,
+        mimeType: "image/png",
+        content: bgBuf.toString("base64"),
+        fileSizeBytes: bgBuf.length,
+        generatedBy: "card-studio",
+        metadata: { cardId: id, side: `bg-${s}` },
+      });
+      const key = s === "front" ? "bgFrontVaultFileId" : "bgBackVaultFileId";
+      meta[key] = vaultId;
+      const url = `/api/projects/${row.projectId}/vault/${vaultId}/preview`;
+      results.push({ side: s, url });
+    };
+
+    if (targetSide === "both") {
+      await saveSide("front");
+      await saveSide("back");
+    } else {
+      await saveSide(targetSide);
+    }
+
+    await db.update(businessCardsTable)
+      .set({ metadata: JSON.stringify(meta) })
+      .where(eq(businessCardsTable.id, id));
+
+    res.json({ ok: true, results });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "cards generate-bg failed");
+    res.status(500).json({ error: err?.message || "Error generando fondo" });
   }
 });
 

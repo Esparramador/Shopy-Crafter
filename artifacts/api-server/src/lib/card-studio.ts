@@ -454,6 +454,28 @@ DEVUELVE JSON:
  * texturas más sofisticadas y coherentes con el sistema de diseño de la tarjeta.
  * Si falla, devuelve el prompt original sin interrumpir el pipeline.
  */
+/**
+ * Genera solo la imagen de fondo (sin texto, QR ni logo).
+ * Útil para el endpoint /generate-bg (per-side background change).
+ */
+export async function generateCardBackground(
+  prompt: string,
+  bgModel?: ImageGenModel,
+  replicateToken?: string,
+): Promise<Buffer> {
+  const model: ImageGenModel = bgModel || "recraft-v3";
+  const promptToUse = `${prompt.trim()}, ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO TYPOGRAPHY, NO LOGOS, NO WATERMARKS, pure background texture only, even lighting suitable for overlay text, photorealistic, 8k`;
+  const out = await generateImage(model, promptToUse, {
+    aspectRatio: "3:2",
+    replicateToken,
+    negativePrompt: "text, letters, words, typography, watermark, logo, signature, characters, alphabet, symbols, writing, label, caption, title, lorem ipsum",
+  });
+  return await sharp(out.buffer)
+    .resize(CARD_WIDTH_PX, CARD_HEIGHT_PX, { fit: "cover", position: "center" })
+    .png()
+    .toBuffer();
+}
+
 async function enhanceCardBackgroundPrompt(
   userPrompt: string,
   ctx: {

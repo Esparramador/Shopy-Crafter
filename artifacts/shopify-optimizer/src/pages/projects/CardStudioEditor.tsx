@@ -17,7 +17,7 @@ import {
   Type, RefreshCw, Save, Trash2, Loader2, Minus,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ZoomIn, ZoomOut, Download, RotateCcw, EyeOff,
-  Square, Circle, Triangle, Smile, MessageSquare, QrCode,
+  Square, Circle, Triangle, Smile, MessageSquare, QrCode, FileText,
 } from "lucide-react";
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -79,7 +79,9 @@ const QR_TYPES_EDITOR = [
 interface Props {
   apiBase: string;
   cardId: number;
-  bgUrl?: string | null;        // fondo puro (textura sin texto/QR)
+  bgUrl?: string | null;        // fondo compartido (fallback si no hay por cara)
+  bgFrontUrl?: string | null;   // fondo solo del frente
+  bgBackUrl?: string | null;    // fondo solo del reverso
   frontUrl?: string | null;     // compuesto final (para descarga)
   backUrl?: string | null;
   logoUrl?: string | null;
@@ -89,7 +91,7 @@ interface Props {
   qrContentUrl?: string | null;
   onSaveOverrides: (overrides: LayoutOverrides) => Promise<void>;
   onRegenerate: () => Promise<void>;
-  onThemePrompt?: (prompt: string) => void;
+  onThemePrompt?: (prompt: string, side: "front" | "back" | "both") => Promise<void>;
   onQrDataChange?: (type: string, url: string | null) => void;
 }
 
@@ -367,7 +369,7 @@ async function populateCanvas(
 // Componente principal
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CardStudioEditor({
-  apiBase, cardId, bgUrl, frontUrl, backUrl, logoUrl,
+  apiBase, cardId, bgUrl, bgFrontUrl, bgBackUrl, frontUrl, backUrl, logoUrl,
   initialOverrides, generating,
   qrType: qrTypeProp, qrContentUrl: qrContentUrlProp,
   onSaveOverrides, onRegenerate, onThemePrompt, onQrDataChange,
@@ -404,6 +406,8 @@ export default function CardStudioEditor({
   const [emojiCatIdx, setEmojiCatIdx] = useState(0);
   const [showThemes, setShowThemes] = useState(false);
   const [activeTab, setActiveTab] = useState<"elementos" | "temas">("elementos");
+  const [bgSide, setBgSide] = useState<"front" | "back" | "both">("both");
+  const [bgGenerating, setBgGenerating] = useState(false);
   const [localQrType, setLocalQrType] = useState<string>(qrTypeProp || "vcard");
   const [localQrUrl, setLocalQrUrl] = useState<string>(qrContentUrlProp ?? "");
   const [fontSizeStr, setFontSizeStr] = useState<string>("");
@@ -641,22 +645,22 @@ export default function CardStudioEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasesReady, backElements, logoUrl, cardId]);
 
-  // ── Fondo: usa bgUrl (textura pura) si existe, si no usa frontUrl/backUrl ─
+  // ── Fondo: per-side (bgFrontUrl / bgBackUrl) con fallback a bgUrl ──────────
   useEffect(() => {
     const fc = frontFabric.current;
     if (!canvasesReady || !fc) return;
-    const url = bgUrl || frontUrl;
+    const url = bgFrontUrl || bgUrl || frontUrl;
     if (url) applyBackground(url, fc);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasesReady, bgUrl, frontUrl]);
+  }, [canvasesReady, bgFrontUrl, bgUrl, frontUrl]);
 
   useEffect(() => {
     const bc = backFabric.current;
     if (!canvasesReady || !bc) return;
-    const url = bgUrl || backUrl;
+    const url = bgBackUrl || bgUrl || backUrl;
     if (url) applyBackground(url, bc);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasesReady, bgUrl, backUrl]);
+  }, [canvasesReady, bgBackUrl, bgUrl, backUrl]);
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   const applyZoom = useCallback((nz: number) => {
@@ -960,24 +964,31 @@ export default function CardStudioEditor({
   };
 
   // ── Exportar ZIP ──────────────────────────────────────────────────────────
-  const exportToZip = useCallback(async () => {
+  // ── Captura canvas → base64 PNG (helper) ────────────────────────────────────
+  const captureCanvasPngs = useCallback((): { front: string; back: string } | null => {
     const fc = frontFabric.current; const bc = backFabric.current;
-    if (!fc || !bc) return;
+    if (!fc || !bc) return null;
+    const fg = frontGuide.current; const bg2 = backGuide.current;
+    if (fg) fg.set({ visible: false });
+    if (bg2) bg2.set({ visible: false });
+    fc.renderAll(); bc.renderAll();
+    const mult = 1 / zoomRef.current;
+    const front = fc.toDataURL({ format: "png", multiplier: mult });
+    const back = bc.toDataURL({ format: "png", multiplier: mult });
+    if (fg) fg.set({ visible: true });
+    if (bg2) bg2.set({ visible: true });
+    fc.renderAll(); bc.renderAll();
+    return { front, back };
+  }, []);
+
+  const exportToZip = useCallback(async () => {
     setExporting(true);
     try {
-      const fg = frontGuide.current; const bg2 = backGuide.current;
-      if (fg) fg.set({ visible: false });
-      if (bg2) bg2.set({ visible: false });
-      fc.renderAll(); bc.renderAll();
-      const mult = 1 / zoomRef.current;
-      const frontData = fc.toDataURL({ format: "png", multiplier: mult });
-      const backData = bc.toDataURL({ format: "png", multiplier: mult });
-      if (fg) fg.set({ visible: true });
-      if (bg2) bg2.set({ visible: true });
-      fc.renderAll(); bc.renderAll();
+      const pngs = captureCanvasPngs();
+      if (!pngs) return;
       const zip = new JSZip();
-      zip.file("01_Cara_Frontal.png", frontData.split(",")[1], { base64: true });
-      zip.file("02_Cara_Posterior.png", backData.split(",")[1], { base64: true });
+      zip.file("01_Cara_Frontal.png", pngs.front.split(",")[1], { base64: true });
+      zip.file("02_Cara_Posterior.png", pngs.back.split(",")[1], { base64: true });
       const blob = await zip.generateAsync({ type: "blob" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -985,7 +996,30 @@ export default function CardStudioEditor({
       a.click();
       URL.revokeObjectURL(a.href);
     } finally { setExporting(false); }
-  }, []);
+  }, [captureCanvasPngs]);
+
+  const exportPdf = useCallback(async () => {
+    setExporting(true);
+    try {
+      const pngs = captureCanvasPngs();
+      if (!pngs) return;
+      const res = await fetch(`${apiBase}/api/cards/${cardId}/export-pdf`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ front: pngs.front, back: pngs.back }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error || "Error PDF"); }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "tarjeta-print.pdf";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err: any) {
+      setError(err?.message || "Error exportando PDF");
+    } finally { setExporting(false); }
+  }, [captureCanvasPngs, apiBase, cardId]);
 
   // ── Actualizar propiedad del objeto seleccionado ──────────────────────────
   const updateSelProp = useCallback((fabricProp: string, value: any, overrideProp?: string) => {
@@ -1175,6 +1209,9 @@ export default function CardStudioEditor({
           <button onClick={exportToZip} disabled={exporting} style={btnSecondary} title="Exportar ZIP (PNG alta resolución)">
             {exporting ? <Loader2 size={11} className="animate-spin"/> : <Download size={11}/>} ZIP
           </button>
+          <button onClick={exportPdf} disabled={exporting} style={btnSecondary} title="PDF de impresión con marcas de corte (desde el canvas actual)">
+            {exporting ? <Loader2 size={11} className="animate-spin"/> : <FileText size={11}/>} PDF
+          </button>
           <button onClick={regenerate} disabled={saving || generating} style={btnPrimary}>
             {(saving || generating) ? <Loader2 size={11} className="animate-spin"/> : <RefreshCw size={11}/>}
             Re-generar
@@ -1302,24 +1339,45 @@ export default function CardStudioEditor({
           {/* Tab Temas */}
           {activeTab === "temas" && (
             <div>
-              <p style={{ fontSize: 11, color: "var(--t3)", margin: "0 0 10px" }}>
-                Haz clic en un tema para usar su prompt de fondo IA. Después pulsa <strong style={{ color: "var(--gold)" }}>Re-generar</strong>.
+              {/* ── Selector de cara ── */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                {(["front", "back", "both"] as const).map(s => (
+                  <button key={s} onClick={() => setBgSide(s)} style={{
+                    flex: 1, padding: "5px 0", fontSize: 11, borderRadius: 6, cursor: "pointer",
+                    background: bgSide === s ? "var(--gold)" : "rgba(255,255,255,0.05)",
+                    color: bgSide === s ? "#000" : "var(--t2)",
+                    border: bgSide === s ? "1px solid var(--gold)" : "1px solid rgba(255,255,255,0.1)",
+                    fontWeight: bgSide === s ? 700 : 400,
+                  }}>
+                    {s === "front" ? "🎴 Frente" : s === "back" ? "🔄 Reverso" : "✨ Ambas"}
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: 10, color: "var(--t3)", margin: "0 0 10px" }}>
+                Elige un tema → el fondo IA se genera solo para la cara seleccionada (sin Re-generar la tarjeta completa).
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 6 }}>
+              {bgGenerating && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--gold)", padding: "8px 0" }}>
+                  <Loader2 size={13} className="animate-spin" /> Generando fondo IA…
+                </div>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 6, opacity: bgGenerating ? 0.5 : 1 }}>
                 {BACKGROUND_THEMES.map(theme => (
-                  <button key={theme.id}
-                    onClick={() => {
-                      if (onThemePrompt) onThemePrompt(theme.prompt);
+                  <button key={theme.id} disabled={bgGenerating}
+                    onClick={async () => {
+                      if (!onThemePrompt) return;
+                      setBgGenerating(true);
+                      try { await onThemePrompt(theme.prompt, bgSide); }
+                      finally { setBgGenerating(false); }
                     }}
                     style={{
                       background: "rgba(255,255,255,0.04)",
                       border: "1px solid rgba(255,255,255,0.1)",
                       borderRadius: 8, padding: "10px 8px",
-                      cursor: "pointer", textAlign: "center",
-                      transition: "all 0.2s",
-                      color: "var(--t1)",
+                      cursor: bgGenerating ? "not-allowed" : "pointer",
+                      textAlign: "center", transition: "all 0.2s", color: "var(--t1)",
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--gold)")}
+                    onMouseEnter={e => { if (!bgGenerating) e.currentTarget.style.borderColor = "var(--gold)"; }}
                     onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
                   >
                     <div style={{ fontSize: 24, marginBottom: 4 }}>{theme.emoji}</div>
