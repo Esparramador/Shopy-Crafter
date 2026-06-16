@@ -340,23 +340,40 @@ export async function generateImage(
   if (model === "recraft-v3") input = { ...input, style: "realistic_image", size: "1820x1024" };
   if (model === "recraft-v3-svg") input = { ...input, style: "vector_illustration", size: "1820x1024" };
   if (model === "recraft-v4") {
-    // recraft-v4 has its own size enum — "1820x1024" is NOT valid (causes 422).
-    // Valid sizes verified from Replicate schema June 2026:
-    // 1024x1024 | 1536x768 | 768x1536 | 1280x832 | 832x1280 |
-    // 1216x896  | 896x1216 | 1152x896 | 896x1152 | 832x1344 |
-    // 1280x896  | 896x1280 | 1344x768 | 768x1344
-    const v4SizeMap: Record<string, string> = {
-      "1:1":  "1024x1024",
-      "3:2":  "1280x832",
-      "2:3":  "832x1280",
-      "16:9": "1344x768",
-      "9:16": "768x1344",
-      "4:3":  "1216x896",
-      "3:4":  "896x1216",
-      "2:1":  "1536x768",
-      "1:2":  "768x1536",
-    };
-    const v4Size = v4SizeMap[aspect] || "1024x1024";
+    // recraft-v4 has its own fixed size enum (verified Replicate schema June 2026).
+    // "1820x1024" and other recraft-v3 sizes are NOT valid here — causes 422.
+    // All 14 valid sizes sit near ~1M pixels; no native 4K/8K support.
+    // Full HD / 4K / 8K / 1980×1260 all map to the closest available size by ratio.
+    const RECRAFT_V4_SIZES: Array<[number, number]> = [
+      [1024, 1024], // 1:1    — exact
+      [1536,  768], // 2:1    — exact
+      [ 768, 1536], // 1:2    — exact
+      [1280,  832], // ≈ 3:2  (1.538) — business card, 1980×1260, A4-ish landscape
+      [ 832, 1280], // ≈ 2:3  (0.650)
+      [1344,  768], // ≈ 16:9 (1.750) — Full HD, 4K UHD, 8K, 1280×720
+      [ 768, 1344], // ≈ 9:16 (0.571) — Instagram/TikTok Story
+      [1280,  896], // ≈ 7:5  (1.429) — A4 landscape (1.414)
+      [ 896, 1280], // ≈ 5:7  (0.700) — A4 portrait  (0.707)
+      [1216,  896], // ≈ 4:3  (1.357)
+      [ 896, 1216], // ≈ 3:4  (0.737)
+      [1152,  896], // ≈ 9:7  (1.286) — 5:4 (1.250)
+      [ 896, 1152], // ≈ 7:9  (0.778) — 4:5 (0.800)
+      [ 832, 1344], // ≈ 5:8  (0.619) — between 9:16 and 2:3
+    ];
+    // Parse aspect string → target ratio. Handles "W:H", "WxH", or plain "W:H".
+    function parseRatio(s: string): number {
+      const m = s.match(/^(\d+(?:\.\d+)?)[:/x×](\d+(?:\.\d+)?)$/i);
+      if (m) return parseFloat(m[1]) / parseFloat(m[2]);
+      return 1; // fallback square
+    }
+    const targetRatio = parseRatio(aspect);
+    let bestSize = RECRAFT_V4_SIZES[0];
+    let bestDiff = Infinity;
+    for (const [w, h] of RECRAFT_V4_SIZES) {
+      const diff = Math.abs(w / h - targetRatio);
+      if (diff < bestDiff) { bestDiff = diff; bestSize = [w, h]; }
+    }
+    const v4Size = `${bestSize[0]}x${bestSize[1]}`;
     const { aspect_ratio, ...rest } = input;
     input = { ...rest, style: "realistic_image", size: v4Size };
   }
