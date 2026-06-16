@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import PageMeta from "@/components/PageMeta";
+import { VismeFormHero } from "@/components/VismeFormHero";
 import "./landing.css";
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -1245,7 +1246,11 @@ export default function Landing() {
               <p className="l-sub" {...cmsProps("contact.subheadline")}>{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
             </div>
 
-            <div className={`${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.12s" }}>
+            {/* ── Visme-style 3D form hero ── */}
+            <VismeFormHero />
+
+            {/* ── Legacy form (preserved, hidden) ── */}
+            <div style={{ display: "none" }}>
               {contactStatus === "sent" ? (
                 <div style={{
                   background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.3)",
