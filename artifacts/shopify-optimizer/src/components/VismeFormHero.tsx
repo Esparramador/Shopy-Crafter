@@ -166,22 +166,16 @@ export function VismeFormHero({ isActive = false }: { isActive?: boolean }) {
 
         {/* ── LEFT: 3D CHARACTER ─────────────────────────────────────────────── */}
         <div style={{ position: "relative" }}>
-          {isActive ? (
-            <FloatingAlecMonopoly
-              height={420}
-              phase="ready"
-              animName={isSuccess ? SUCCESS_ANIM    : current.animName}
-              animLooping={isSuccess ? true         : current.animLoop}
-              cameraPos={isSuccess  ? SUCCESS_CAM  : current.camPos}
-              cameraLookAt={isSuccess ? SUCCESS_LOOK : current.camLook}
-            />
-          ) : (
-            <div style={{
-              height: 420, display: "flex", alignItems: "center",
-              justifyContent: "center", fontSize: 72, opacity: 0.15,
-              background: "rgba(200,168,75,0.03)", borderRadius: 16,
-            }}>🤵‍♂️</div>
-          )}
+          {/* Always mounted to avoid WebGL context cold-start on scroll;
+              uses idle_breath animation when section not yet active */}
+          <FloatingAlecMonopoly
+            height={420}
+            phase="ready"
+            animName={!isActive ? "idle_breath" : (isSuccess ? SUCCESS_ANIM : current.animName)}
+            animLooping={!isActive ? true : (isSuccess ? true : current.animLoop)}
+            cameraPos={isSuccess ? SUCCESS_CAM : current.camPos}
+            cameraLookAt={isSuccess ? SUCCESS_LOOK : current.camLook}
+          />
 
           {/* Speech bubble */}
           {!isSuccess && (

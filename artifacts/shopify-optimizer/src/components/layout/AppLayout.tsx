@@ -49,7 +49,9 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "CMS Editor", icon: "✏️", href: "/admin/cms" },
   { label: "Librería de Prompts", icon: "🏛", href: "/admin/prompt-library" },
 
-  { label: "Lab Web", icon: "🔬", href: "/web-lab" },
+  { label: "Lab Web IA", icon: "🔬", href: "/web-lab" },
+  { label: "AI Web Designer", icon: "🎨", href: "/web-designer" },
+  { label: "Effects Studio", icon: "✦", href: "/effects-studio" },
 
   { label: "Studio Fotografía IA", icon: "🧬", href: "/fusion-studio" },
   { label: "Studio Multimedia Pro", icon: "⚡", href: "/fusion-studio-pro" },
@@ -67,8 +69,6 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Template Studio", icon: "🎨", href: "/admin/template-studio" },
   { label: "Avatar Studio", icon: "🎬", href: "/admin/avatar-studio" },
   { label: "Meshy Character Lab", icon: "🧊", href: "/admin/meshy-studio" },
-  { label: "Effects Studio", icon: "✦", href: "/effects-studio" },
-  { label: "AI Web Designer", icon: "🎨", href: "/web-designer" },
   { label: "MCP Manager", icon: "🔌", href: "/admin/mcp-manager" },
 
   { label: "── STUDIO IA ──", icon: "", href: "#", divider: true },
