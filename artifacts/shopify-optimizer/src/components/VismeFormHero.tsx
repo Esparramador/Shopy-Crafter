@@ -43,7 +43,7 @@ const STEPS = [
   },
 ];
 
-const SUCCESS_ANIM = "celebrate";
+const SUCCESS_ANIM = "cardio_dance";
 const SUCCESS_CAM:  [number, number, number] = [0, 0.8, 4.2];
 const SUCCESS_LOOK: [number, number, number] = [0, 0.8, 0];
 
@@ -171,7 +171,7 @@ export function VismeFormHero({ isActive = false }: { isActive?: boolean }) {
           <FloatingAlecMonopoly
             height={420}
             phase="ready"
-            animName={!isActive ? "idle_breath" : (isSuccess ? SUCCESS_ANIM : current.animName)}
+            animName={!isActive ? "catching_breath" : (isSuccess ? SUCCESS_ANIM : current.animName)}
             animLooping={!isActive ? true : (isSuccess ? true : current.animLoop)}
             cameraPos={isSuccess ? SUCCESS_CAM : current.camPos}
             cameraLookAt={isSuccess ? SUCCESS_LOOK : current.camLook}
