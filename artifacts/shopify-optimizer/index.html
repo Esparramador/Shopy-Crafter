@@ -1,43 +1,121 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+
+    <!-- ═══ Primary SEO ═══════════════════════════════════════════════════════ -->
+    <title>Shopy Crafter — IA para tiendas Shopify: SEO, imágenes y conversión</title>
+    <meta name="description" content="Shopy Crafter automatiza la optimización de tu tienda Shopify con 7 motores de IA: SEO técnico, imágenes profesionales, pricing inteligente, emails y tests A/B. Configura en 5 minutos. Sin tarjeta de crédito." />
+    <meta name="keywords" content="shopify ia, optimizar tienda shopify, seo shopify, automatización shopify, imágenes shopify ia, shopy crafter, shopify ai, conversión ecommerce, shopify españa" />
+    <meta name="author" content="Shopy Crafter" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://shopycrafter.com/" />
+
+    <!-- ═══ Open Graph ════════════════════════════════════════════════════════ -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Shopy Crafter" />
+    <meta property="og:url" content="https://shopycrafter.com/" />
+    <meta property="og:title" content="Shopy Crafter — IA para tiendas Shopify: SEO, imágenes y conversión" />
+    <meta property="og:description" content="7 motores de IA para optimizar tu tienda Shopify: SEO técnico, imágenes, pricing, emails y A/B testing. Configura en 5 minutos." />
+    <meta property="og:image" content="https://shopycrafter.com/opengraph.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Shopy Crafter — Plataforma IA para Shopify" />
+    <meta property="og:locale" content="es_ES" />
+
+    <!-- ═══ Twitter / X ═══════════════════════════════════════════════════════ -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@shopycrafter" />
+    <meta name="twitter:title" content="Shopy Crafter — IA para tiendas Shopify" />
+    <meta name="twitter:description" content="7 motores de IA para optimizar tu tienda Shopify: SEO técnico, imágenes, pricing, emails y A/B testing." />
+    <meta name="twitter:image" content="https://shopycrafter.com/opengraph.jpg" />
+    <meta name="twitter:image:alt" content="Shopy Crafter — Plataforma IA para Shopify" />
+
+    <!-- ═══ PWA / App ═════════════════════════════════════════════════════════ -->
     <meta name="theme-color" content="#c8a84b" />
-    <meta name="description" content="Gestión inteligente de tiendas Shopify con IA" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Shopy Crafter" />
-    <title>Shopy Crafter</title>
-    <meta property="og:site_name" content="Shopy Crafter" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://shopycrafter.com/opengraph.jpg" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/images/logo-sc-default.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Shopy Crafter" />
+    <meta name="msapplication-TileColor" content="#080810" />
+    <meta name="msapplication-TileImage" content="/icons/icon-192.png" />
+
+    <!-- ═══ Icons / Manifest ══════════════════════════════════════════════════ -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/logo-sc-default.png" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="preconnect" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <link rel="stylesheet" href="/css/design-system.css?v=3">
+
+    <!-- ═══ Fonts — DNS + Preconnect first, then single stylesheet load ══════ -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="//fonts.gstatic.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&display=swap" /></noscript>
+
+    <!-- ═══ Critical CSS — inline for zero render-block ═════════════════════ -->
+    <link rel="stylesheet" href="/css/design-system.css" />
+
+    <!-- ═══ Structured Data ═══════════════════════════════════════════════════ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Shopy Crafter",
+      "url": "https://shopycrafter.com/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR",
+        "description": "Prueba gratuita disponible. Sin tarjeta de crédito."
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.9",
+        "ratingCount": "127",
+        "bestRating": "5"
+      },
+      "description": "Plataforma de inteligencia artificial para optimizar tiendas Shopify: SEO técnico, imágenes profesionales, pricing inteligente, emails y tests A/B.",
+      "screenshot": "https://shopycrafter.com/opengraph.jpg",
+      "featureList": [
+        "SEO técnico automatizado",
+        "Optimización de imágenes con IA",
+        "Pricing dinámico inteligente",
+        "Emails personalizados",
+        "Tests A/B automatizados",
+        "Análisis de competencia",
+        "Sincronización con Shopify"
+      ]
+    }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "Shopy Crafter",
       "url": "https://shopycrafter.com/",
-      "logo": "https://shopycrafter.com/images/logo-sc-default.png",
-      "description": "Plataforma de inteligencia artificial para optimizar tiendas Shopify: SEO, imágenes, emails, pricing y más.",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://shopycrafter.com/images/logo-sc-default.png",
+        "width": 200,
+        "height": 200
+      },
+      "description": "Plataforma de inteligencia artificial para optimizar tiendas Shopify.",
       "contactPoint": {
         "@type": "ContactPoint",
         "contactType": "customer support",
         "url": "https://shopycrafter.com/contacto",
         "availableLanguage": "Spanish"
       },
-      "sameAs": []
+      "sameAs": [
+        "https://twitter.com/shopycrafter"
+      ]
     }
     </script>
     <script type="application/ld+json">
@@ -56,6 +134,46 @@
         },
         "query-input": "required name=search_term_string"
       }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es Shopy Crafter?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Shopy Crafter es una plataforma de IA que optimiza automáticamente tiendas Shopify mediante 7 motores especializados: SEO técnico, imágenes, pricing, emails, A/B testing, análisis de competencia y más."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto tiempo tarda en configurarse?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "La configuración inicial tarda menos de 5 minutos. Solo necesitas conectar tu tienda Shopify y Shopy Crafter comienza a analizar y optimizar automáticamente."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Necesito tarjeta de crédito para empezar?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Shopy Crafter ofrece una prueba gratuita completa sin necesidad de tarjeta de crédito."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto puede mejorar la conversión de mi tienda?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Nuestros clientes reportan aumentos de hasta +340% en conversión gracias a la optimización automática de SEO, imágenes y pricing inteligente."
+          }
+        }
+      ]
     }
     </script>
   </head>

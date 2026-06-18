@@ -1,22 +1,32 @@
 {
-  "name": "Shopy Crafter",
-  "short_name": "ShopyCrafter",
-  "description": "Shopy Crafter — Optimización IA para tiendas Shopify",
-  "start_url": "./admin/intelligence",
+  "name": "Shopy Crafter — IA para Shopify",
+  "short_name": "Shopy Crafter",
+  "description": "Optimiza tu tienda Shopify con 7 motores de IA: SEO, imágenes, pricing, emails y A/B testing.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#080810",
   "theme_color": "#c8a84b",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "lang": "es",
-  "categories": ["business", "productivity"],
+  "dir": "ltr",
+  "categories": ["business", "productivity", "shopping"],
+  "prefer_related_applications": false,
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any" }
   ],
-  "screenshots": [],
+  "screenshots": [
+    {
+      "src": "/opengraph.jpg",
+      "sizes": "1200x630",
+      "type": "image/jpeg",
+      "label": "Shopy Crafter — Plataforma IA para Shopify"
+    }
+  ],
   "shortcuts": [
-    { "name": "Revenue Intelligence", "url": "/admin/intelligence", "description": "Ver análisis de revenue" },
-    { "name": "Inventario", "url": "/admin/inventory", "description": "Gestionar inventario" }
+    { "name": "Contacto", "url": "/contacto", "description": "Habla con nuestro equipo" },
+    { "name": "Blog", "url": "/blog", "description": "Artículos sobre Shopify e IA" }
   ]
 }

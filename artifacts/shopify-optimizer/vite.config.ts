@@ -4,13 +4,12 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const rawPort = process.env.PORT;
-const isBuild = process.argv.includes("build");
+const rawPort  = process.env.PORT;
+const isBuild  = process.argv.includes("build");
+const isProd   = process.env.NODE_ENV === "production";
 
 if (!rawPort && !isBuild) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+  throw new Error("PORT environment variable is required but was not provided.");
 }
 
 const port = rawPort ? Number(rawPort) : 3000;
@@ -22,31 +21,26 @@ if (!isBuild && (Number.isNaN(port) || port <= 0)) {
 const basePath = process.env.BASE_PATH;
 
 if (!basePath && !isBuild) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
+  throw new Error("BASE_PATH environment variable is required but was not provided.");
 }
 
 export default defineConfig({
   base: basePath,
+
   plugins: [
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
+    ...(!isProd && process.env.REPL_ID !== undefined
       ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
+          await import("@replit/vite-plugin-cartographer").then(m =>
+            m.cartographer({ root: path.resolve(import.meta.dirname, "..") })
           ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
+          await import("@replit/vite-plugin-dev-banner").then(m => m.devBanner()),
         ]
       : []),
   ],
+
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
@@ -54,38 +48,82 @@ export default defineConfig({
     },
     dedupe: ["react", "react-dom"],
   },
+
   root: path.resolve(import.meta.dirname),
+
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir:     path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    cssCodeSplit: true,
+    sourcemap:  false,
+    target:     "es2020",
+
+    // Raise chunk-size warning threshold (we split explicitly below)
+    chunkSizeWarningLimit: 800,
+
+    rollupOptions: {
+      output: {
+        // Content-hashed file names for long-term cache
+        entryFileNames:  "assets/[name]-[hash].js",
+        chunkFileNames:  "assets/[name]-[hash].js",
+        assetFileNames:  "assets/[name]-[hash][extname]",
+
+        // Manual chunks: keep heavy vendor libs in separate cacheable files
+        manualChunks(id) {
+          // React core — changes very rarely
+          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+            return "vendor-react";
+          }
+          // Router
+          if (id.includes("node_modules/wouter")) {
+            return "vendor-router";
+          }
+          // Data fetching
+          if (id.includes("node_modules/@tanstack/react-query")) {
+            return "vendor-query";
+          }
+          // Radix UI / Shadcn (large component lib)
+          if (id.includes("node_modules/@radix-ui")) {
+            return "vendor-radix";
+          }
+          // Three.js (very heavy — keep isolated)
+          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three")) {
+            return "vendor-three";
+          }
+          // Framer Motion
+          if (id.includes("node_modules/framer-motion")) {
+            return "vendor-motion";
+          }
+          // Lucide icons
+          if (id.includes("node_modules/lucide-react")) {
+            return "vendor-icons";
+          }
+          // All other node_modules
+          if (id.includes("node_modules/")) {
+            return "vendor-misc";
+          }
+        },
+      },
+    },
+
+    minify: "esbuild",
   },
+
   server: {
     port,
-    host: "0.0.0.0",
+    host:         "0.0.0.0",
     allowedHosts: true,
-    hmr: {
-      clientPort: 443,
-    },
-    fs: {
-      strict: true,
-      deny: ["**/.*"],
-    },
+    hmr:          { clientPort: 443 },
+    fs:           { strict: true, deny: ["**/.*"] },
     proxy: {
-      "/api": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
-        secure: false,
-      },
-      "/shopify": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
-        secure: false,
-      },
+      "/api":     { target: "http://localhost:8080", changeOrigin: true, secure: false },
+      "/shopify": { target: "http://localhost:8080", changeOrigin: true, secure: false },
     },
   },
+
   preview: {
     port,
-    host: "0.0.0.0",
+    host:         "0.0.0.0",
     allowedHosts: true,
   },
 });

@@ -1,8 +1,7 @@
 User-agent: *
 Allow: /
 
-# Public marketing pages
-Allow: /landing
+# Marketing & public pages
 Allow: /sobre-nosotros
 Allow: /casos-de-exito
 Allow: /programa-de-afiliados
@@ -14,8 +13,13 @@ Allow: /terminos
 Allow: /cookies
 Allow: /contacto
 
-# Disallow private/authenticated areas
+# Block private / authenticated areas
 Disallow: /admin/
 Disallow: /api/
+Disallow: /shopify/
 
+# Block dev/test paths
+Disallow: /web-demos/
+
+# Sitemaps
 Sitemap: https://shopycrafter.com/sitemap.xml
