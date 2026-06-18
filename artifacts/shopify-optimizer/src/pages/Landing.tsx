@@ -354,13 +354,13 @@ export default function Landing() {
     const sectionHeight = container.clientHeight;
     const wrapper = container.querySelector<HTMLElement>(".fp-wrapper");
     if (wrapper) {
-      wrapper.style.transition = "transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+      wrapper.style.transition = "transform 0.88s cubic-bezier(0.76, 0, 0.24, 1)";
       wrapper.style.transform = `translateY(-${clamped * sectionHeight}px)`;
     }
     const sections = container.querySelectorAll<HTMLElement>(".fp-section");
     const targetSection = sections[clamped];
     if (targetSection) targetSection.scrollTop = 0;
-    setTimeout(() => { isAnimatingRef.current = false; }, 800);
+    setTimeout(() => { isAnimatingRef.current = false; }, 980);
   }, []);
 
   useEffect(() => {
@@ -488,7 +488,7 @@ export default function Landing() {
     if (!container) return;
 
     let accumulated = 0;
-    const THRESHOLD = 60;
+    const THRESHOLD = 80;
     let resetTimer: ReturnType<typeof setTimeout> | null = null;
     let touchStartY = 0;
     let touchStartX = 0;
@@ -527,7 +527,7 @@ export default function Landing() {
       e.preventDefault();
       accumulated += e.deltaY;
       if (resetTimer) clearTimeout(resetTimer);
-      resetTimer = setTimeout(() => { accumulated = 0; }, 200);
+      resetTimer = setTimeout(() => { accumulated = 0; }, 300);
 
       if (Math.abs(accumulated) >= THRESHOLD) {
         if (accumulated > 0) goToSection(currentRef.current + 1);
@@ -1239,15 +1239,11 @@ export default function Landing() {
               background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(200,168,75,0.06) 0%, transparent 70%)",
             }} />
           </div>
-          <div className="fp-content fp-contact-visme" style={{ maxWidth: 1120, padding: "0 24px" }}>
-            <div className={`fp-section-header ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s", gridColumn: "1 / -1", gridRow: "1" }}>
-              <div className="l-pill" style={{ background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)" }} onClick={cmsClick("contact.pill")} {...cmsData("contact.pill")}>{content.contact?.pill ?? "Trabaja con nosotros"}</div>
-              <h2 className="l-h2" onClick={cmsClick("contact.headline")} {...cmsData("contact.headline")}>{content.contact?.headline ?? "Cuéntanos sobre tu negocio."}<br /><em>{content.contact?.headlineHighlight ?? "Te contactamos en menos de 24h."}</em></h2>
-              <p className="l-sub" {...cmsProps("contact.subheadline")}>{content.contact?.subheadline ?? "Necesitamos conocer tu tienda para personalizar cada motor de IA a tu nicho, ticket medio y modelo de negocio."}</p>
+          <div className="fp-content fp-contact-visme" style={{ position: "absolute", inset: 0, maxWidth: "none", padding: 0, overflow: "hidden auto" }}>
+            {/* ── Video + form: fixed full-section height, footer scrolls below ── */}
+            <div style={{ position: "relative", height: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
+              <VismeFormHero isActive={isAnimated("fp-contact")} />
             </div>
-
-            {/* ── Visme-style 3D form hero ── */}
-            <VismeFormHero isActive={isAnimated("fp-contact")} />
 
             {/* ── Legacy form (preserved, hidden) ── */}
             <div style={{ display: "none" }}>
