@@ -403,9 +403,14 @@
 .fp-container {
   margin-top: 64px;
   height: calc(100dvh - 64px);
-  overflow-y: hidden;
-  overscroll-behavior: none;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.fp-container::-webkit-scrollbar { display: none; }
 .fp-section {
   height: calc(100dvh - 64px);
   min-height: calc(100dvh - 64px);
@@ -420,12 +425,14 @@
   align-items: center;
   padding: 0 48px;
   box-sizing: border-box;
+  scroll-snap-align: start;
+  flex-shrink: 0;
 }
 .fp-section::-webkit-scrollbar { width: 4px; }
 .fp-section::-webkit-scrollbar-track { background: transparent; }
 .fp-section::-webkit-scrollbar-thumb { background: rgba(200,168,75,0.2); border-radius: 2px; }
 .fp-wrapper {
-  will-change: transform;
+  width: 100%;
 }
 .fp-section-dark { background: var(--l-ink2); }
 

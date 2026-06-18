@@ -269,10 +269,10 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
           z-index: 1;
         }
 
-        /* Mobile: fp-section already height:auto; give it min-height + stack layout */
+        /* Mobile: fp-section height fills viewport below nav */
         @media (max-width: 780px) {
           #fp-contact {
-            min-height: 660px !important;
+            min-height: calc(100dvh - 56px) !important;
             padding: 0 !important;
             overflow: hidden !important;
           }
@@ -287,7 +287,7 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
         }
         @media (max-width: 780px) {
           .vfh-video {
-            object-position: 20% center;
+            object-position: 15% center;
           }
         }
 
@@ -311,6 +311,19 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
               rgba(5,3,12,.5) 100%
             );
         }
+        /* Mobile: vertical gradient — character visible at top, panel fades in below */
+        @media (max-width: 780px) {
+          .vfh-gradient {
+            background:
+              linear-gradient(180deg,
+                rgba(5,3,12,.15) 0%,
+                rgba(5,3,12,.1) 20%,
+                rgba(5,3,12,.55) 40%,
+                rgba(5,3,12,.92) 56%,
+                rgba(5,3,12,.99) 70%
+              );
+          }
+        }
 
         /* ────── Right panel ────── */
         .vfh-panel {
@@ -333,11 +346,34 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
           .vfh-panel {
             position: absolute;
             width: 100%;
-            top: 40%;
+            top: 36%;
             bottom: 0;
-            padding: 28px 22px 36px;
-            background: linear-gradient(180deg,transparent,rgba(5,3,12,.97) 18%,rgba(5,3,12,.99) 100%);
+            padding: 22px 20px 28px;
+            background: none;
             justify-content: flex-start;
+          }
+          .vfh-panel h2 {
+            font-size: clamp(15px, 4vw, 18px) !important;
+            margin-bottom: 6px !important;
+          }
+          .vfh-panel p {
+            font-size: 11.5px !important;
+          }
+          .vfh-2col {
+            grid-template-columns: 1fr 1fr !important;
+          }
+        }
+        @media (max-width: 430px) {
+          .vfh-panel {
+            top: 32%;
+            padding: 18px 16px 24px;
+          }
+          .vfh-2col {
+            grid-template-columns: 1fr !important;
+          }
+          .vfh-input {
+            padding: 9px 12px !important;
+            font-size: 13px !important;
           }
         }
 
@@ -475,7 +511,7 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
               {/* Name + Email — Phase 2 */}
               {buildPhase >= 2 && (
                 <div
-                  className="vfh-rise-in"
+                  className="vfh-rise-in vfh-2col"
                   style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}
                 >
                   <div>
@@ -542,7 +578,7 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
                 <input className="vfh-input" type="text" value={form.storeUrl} onChange={set("storeUrl")} placeholder="mitienda.com" />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
+              <div className="vfh-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
                 <div>
                   <label style={labelSt}>Nicho</label>
                   <select className="vfh-input" value={form.niche} onChange={set("niche")}>
