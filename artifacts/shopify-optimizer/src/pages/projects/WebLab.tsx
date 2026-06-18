@@ -1248,6 +1248,52 @@ ${secrets.length === 0
     // navScript de scroll interno.
     const csp = "default-src 'none'; img-src data: https: http:; font-src data: https:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';";
 
+    // ── Fallback when no HTML fragments are available ──────────────────────────
+    if (!body.trim()) {
+      const siteUrl = result?.url ?? "";
+      if (mode === "original") {
+        return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Página Original</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#0a0a0a;color:#eee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:32px}</style>
+</head><body><div style="max-width:500px;text-align:center">
+<div style="font-size:48px;margin-bottom:16px">🌐</div>
+<h2 style="color:#d4a843;margin:0 0 8px">Página Original</h2>
+<p style="color:#888;margin:0 0 24px;line-height:1.6">El análisis no incluyó fragmentos HTML. Abre la URL directamente para ver la versión original.</p>
+${siteUrl ? `<a href="${siteUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#d4a843,#b8860b);color:#000;font-weight:700;border-radius:10px;text-decoration:none;font-size:14px">↗ Abrir ${siteUrl}</a>` : ""}
+</div></body></html>`;
+      }
+      // improved mode — show CSS with Shopify application guide
+      const cssSnippet = css ? css.substring(0, 4000) + (css.length > 4000 ? "\n\n/* ... ver pestaña CSS para el código completo ... */" : "") : "";
+      const escapedCss = cssSnippet.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>CSS Mejorado</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#0a0a0a;color:#eee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:24px}code{font-family:"JetBrains Mono","Fira Code",monospace}</style>
+</head><body>
+<div style="max-width:900px;margin:0 auto">
+  <div style="background:#111;border:1px solid #d4a84333;border-radius:14px;padding:24px;margin-bottom:20px">
+    <h2 style="color:#d4a843;margin:0 0 6px;font-size:18px">✅ CSS Optimizado Generado</h2>
+    <p style="color:#888;margin:0;font-size:13px;line-height:1.6">El análisis generó CSS mejorado. Los fragmentos HTML individuales no están disponibles en esta sesión — activa el modo <strong style="color:#eee">Iteración</strong> para generar una versión completa de la página. Para aplicar solo el CSS:</p>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
+    <div style="background:#111;border:1px solid #333;border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;margin-bottom:8px">Shopify Admin</div>
+      <div style="font-size:12px;color:#ccc;line-height:1.6">Online Store → Themes → Edit code → <code style="color:#a78bfa">assets/custom.css</code> → Pega el CSS → Guardar</div>
+    </div>
+    <div style="background:#111;border:1px solid #333;border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;margin-bottom:8px">Sección Custom CSS</div>
+      <div style="font-size:12px;color:#ccc;line-height:1.6">Customize → Theme Settings → Custom CSS → Pega el CSS → Save</div>
+    </div>
+    <div style="background:#111;border:1px solid #333;border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#888;margin-bottom:8px">Web Designer</div>
+      <div style="font-size:12px;color:#ccc;line-height:1.6">Usa el botón <strong style="color:#d4a843">Editar y Guardar</strong> para abrir el CSS en el AI Web Designer y refinar el diseño</div>
+    </div>
+  </div>
+  ${cssSnippet ? `<div style="background:#111;border:1px solid #333;border-radius:12px;overflow:hidden">
+    <div style="padding:10px 16px;background:#0a0a0a;border-bottom:1px solid #333;font-size:11px;color:#888;font-weight:600">CSS MEJORADO — ${css.split("\n").length} líneas</div>
+    <pre style="margin:0;padding:20px;font-size:11px;color:#93c5fd;overflow:auto;max-height:400px;line-height:1.6;white-space:pre-wrap"><code>${escapedCss}</code></pre>
+  </div>` : `<div style="color:#888;text-align:center;padding:40px">No hay CSS generado para esta sesión.</div>`}
+</div>
+</body></html>`;
+    }
+
     return `<!DOCTYPE html><html lang="es"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1257,7 +1303,7 @@ ${secrets.length === 0
 <style>${normalize}</style>
 ${css ? `<style>${css}</style>` : ""}
 </head><body>
-${body || '<div style="padding:40px;text-align:center;color:#888;font-family:sans-serif">No hay contenido para mostrar.</div>'}
+${body}
 <script>${navScript}<\/script>
 </body></html>`;
   };

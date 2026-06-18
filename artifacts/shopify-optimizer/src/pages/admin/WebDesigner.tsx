@@ -41,6 +41,8 @@ export default function WebDesigner() {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const [rightPanel, setRightPanel] = useState<"chat" | "code">("chat");
   const [leftTab, setLeftTab] = useState<"templates" | "sessions" | "demos" | "effects">("templates");
+  const [showLeft, setShowLeft] = useState(true);
+  const [showRight, setShowRight] = useState(true);
   const [deployMsg, setDeployMsg] = useState("");
   const [streamText, setStreamText] = useState("");
   const [demoLoadingId, setDemoLoadingId] = useState("");
@@ -340,7 +342,19 @@ export default function WebDesigner() {
         <button onClick={() => setShowImportModal(true)} title="Importar página desde URL" style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${st.border}`, borderRadius: 6, color: st.t2, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>
           🔗 Import URL
         </button>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+          {/* Panel toggles — prevent overlapping on small screens */}
+          <button
+            onClick={() => setShowLeft(v => !v)}
+            title={showLeft ? "Ocultar panel izquierdo" : "Mostrar panel izquierdo"}
+            style={{ padding: "4px 8px", background: showLeft ? "rgba(201,169,97,.12)" : "transparent", border: `1px solid ${showLeft ? "rgba(201,169,97,.4)" : st.border}`, borderRadius: 6, color: showLeft ? st.gold : st.t3, fontSize: 13, cursor: "pointer", lineHeight: 1 }}
+          >◀</button>
+          <button
+            onClick={() => setShowRight(v => !v)}
+            title={showRight ? "Ocultar panel de chat" : "Mostrar panel de chat"}
+            style={{ padding: "4px 8px", background: showRight ? "rgba(201,169,97,.12)" : "transparent", border: `1px solid ${showRight ? "rgba(201,169,97,.4)" : st.border}`, borderRadius: 6, color: showRight ? st.gold : st.t3, fontSize: 13, cursor: "pointer", lineHeight: 1 }}
+          >▶</button>
+          <div style={{ width: 1, height: 20, background: st.border }} />
           {deployMsg && <span style={{ fontSize: 12, color: deployMsg.startsWith("✓") ? "#22c55e" : deployMsg.startsWith("✗") ? "#ef4444" : st.t2 }}>{deployMsg}</span>}
           <button onClick={deployHtml} disabled={!currentHtml} style={{ padding: "5px 14px", background: currentHtml ? `rgba(201,169,97,.15)` : "transparent", border: `1px solid ${currentHtml ? "rgba(201,169,97,.4)" : st.border}`, borderRadius: 6, color: currentHtml ? st.gold : st.t3, fontSize: 12, fontWeight: 600, cursor: currentHtml ? "pointer" : "not-allowed" }}>
             ↗ Bóveda
@@ -355,7 +369,7 @@ export default function WebDesigner() {
 
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* ── Left sidebar ── */}
-        <div style={{ width: 240, flexShrink: 0, background: st.surface, borderRight: `1px solid ${st.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {showLeft && <div style={{ width: 240, flexShrink: 0, background: st.surface, borderRight: `1px solid ${st.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ display: "flex", borderBottom: `1px solid ${st.border}`, flexShrink: 0 }}>
             {LEFT_TABS.map(tab => (
               <button key={tab.id} onClick={() => setLeftTab(tab.id)} style={{ flex: 1, padding: "9px 2px", background: leftTab === tab.id ? `rgba(201,169,97,.1)` : "transparent", border: "none", borderBottom: leftTab === tab.id ? `2px solid ${st.gold}` : "2px solid transparent", color: leftTab === tab.id ? st.gold : st.t2, fontSize: 10, fontWeight: leftTab === tab.id ? 600 : 400, cursor: "pointer", transition: "all .15s" }}>
@@ -472,7 +486,7 @@ export default function WebDesigner() {
               </div>
             )}
           </div>
-        </div>
+        </div>}
 
         {/* ── Center: Preview ── */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#111" }}>
@@ -520,7 +534,7 @@ export default function WebDesigner() {
         </div>
 
         {/* ── Right panel: Chat or Code ── */}
-        <div style={{ width: 340, flexShrink: 0, background: st.surface, borderLeft: `1px solid ${st.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {showRight && <div style={{ width: 340, flexShrink: 0, background: st.surface, borderLeft: `1px solid ${st.border}`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div style={{ display: "flex", borderBottom: `1px solid ${st.border}`, flexShrink: 0 }}>
             {(["chat", "code"] as const).map(tab => (
               <button key={tab} onClick={() => setRightPanel(tab)} style={{ flex: 1, padding: "10px 4px", background: rightPanel === tab ? `rgba(201,169,97,.1)` : "transparent", border: "none", borderBottom: rightPanel === tab ? `2px solid ${st.gold}` : "2px solid transparent", color: rightPanel === tab ? st.gold : st.t2, fontSize: 12, fontWeight: rightPanel === tab ? 600 : 400, cursor: "pointer" }}>
@@ -614,7 +628,7 @@ export default function WebDesigner() {
               )}
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );
