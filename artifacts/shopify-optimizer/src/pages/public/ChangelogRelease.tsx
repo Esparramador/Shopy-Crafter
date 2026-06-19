@@ -1,5 +1,6 @@
 import { useParams, Link } from "wouter";
 import PublicLayout from "@/components/PublicLayout";
+import PageMeta from "@/components/PageMeta";
 import { RELEASES } from "@/lib/changelog-data";
 
 const tagStyle = (tag: string) => ({
@@ -44,6 +45,11 @@ export default function ChangelogRelease() {
 
   return (
     <PublicLayout>
+      <PageMeta
+        title={`Shopy Crafter v${release.version} — ${release.title}`}
+        description={release.description ?? release.changes.slice(0, 3).join(". ")}
+        canonical={`https://shopycrafter.com/changelog/${release.version}`}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(releaseSchema) }}

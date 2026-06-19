@@ -1,5 +1,6 @@
 import { useParams, Link } from "wouter";
 import PublicLayout from "@/components/PublicLayout";
+import PageMeta from "@/components/PageMeta";
 import { CASES } from "@/lib/casos-data";
 
 export default function CasoDeExitoDetail() {
@@ -30,6 +31,11 @@ export default function CasoDeExitoDetail() {
 
   return (
     <PublicLayout>
+      <PageMeta
+        title={`${caso.name} — Caso de éxito · Shopy Crafter`}
+        description={`${caso.name} (${caso.niche}): ${caso.before}. Resultado: ${caso.after}. En ${caso.time}.`}
+        canonical={`https://shopycrafter.com/casos-de-exito/${caso.slug}`}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(caseSchema) }}

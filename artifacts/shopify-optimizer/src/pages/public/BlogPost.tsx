@@ -1,5 +1,6 @@
 import { useParams, Link } from "wouter";
 import PublicLayout from "@/components/PublicLayout";
+import PageMeta from "@/components/PageMeta";
 import { POSTS } from "@/lib/blog-data";
 
 const tagColors: Record<string, string> = {
@@ -46,6 +47,11 @@ export default function BlogPost() {
 
   return (
     <PublicLayout>
+      <PageMeta
+        title={`${post.title} — Blog de Shopy Crafter`}
+        description={post.excerpt}
+        canonical={`https://shopycrafter.com/blog/${post.slug}`}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
