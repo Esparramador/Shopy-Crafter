@@ -1556,6 +1556,832 @@ Ejecutable con: {{RUNTIME}} (node/bun/tsx).`,
     estimatedTokens: 2000,
     isPremium: false,
   },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // EMAIL (12 skills)
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: "email-welcome-sequence",
+    name: "Secuencia de Bienvenida (5 emails)",
+    description: "Serie de 5 emails onboarding para nuevos suscriptores con storytelling y conversión.",
+    category: "email",
+    icon: "📧",
+    promptTemplate: `Crea una secuencia de 5 emails de bienvenida para {{BRAND_NAME}} ({{SECTOR}}).
+Propuesta de valor: {{UVP}}.
+Voz de marca: {{BRAND_VOICE}}.
+Email 1 (día 0): Bienvenida emocional + acceso rápido + historia del fundador.
+Email 2 (día 2): El problema que resuelves — agitar el dolor.
+Email 3 (día 4): Tu solución única — caso de éxito real.
+Email 4 (día 6): Objeciones más frecuentes — responderlas con empatía.
+Email 5 (día 9): CTA directo con oferta de tiempo limitado.
+Para cada email: asunto (A/B), preview text, cuerpo HTML + texto plano, CTA.`,
+    variables: ["BRAND_NAME", "SECTOR", "UVP", "BRAND_VOICE"],
+    tags: ["email", "onboarding", "sequence", "nurture"],
+    outputType: "text",
+    estimatedTokens: 4000,
+    isPremium: true,
+  },
+  {
+    id: "email-abandoned-cart",
+    name: "Recuperación de Carrito Abandonado",
+    description: "Secuencia de 3 emails para recuperar carritos abandonados en e-commerce.",
+    category: "email",
+    icon: "🛒",
+    promptTemplate: `Crea secuencia de 3 emails para recuperar carrito abandonado de {{BRAND_NAME}}.
+Producto: {{PRODUCT_NAME}} (€{{PRICE}}).
+Sector: {{SECTOR}}. Voz: {{BRAND_VOICE}}.
+Email 1 (1h): Recordatorio suave + social proof + botón CTA.
+Email 2 (24h): Urgencia leve + beneficios clave + FAQ corta.
+Email 3 (72h): Oferta especial final (descuento o bonus) con countdown.
+Incluye: asunto, preview text, HTML listo para Klaviyo/Mailchimp, variables de personalización {{nombre}}, {{producto}}, {{precio}}.`,
+    variables: ["BRAND_NAME", "PRODUCT_NAME", "PRICE", "SECTOR", "BRAND_VOICE"],
+    tags: ["email", "cart", "recovery", "ecommerce"],
+    outputType: "html",
+    estimatedTokens: 3000,
+    isPremium: false,
+  },
+  {
+    id: "email-newsletter-template",
+    name: "Newsletter Semanal (Template Maestro)",
+    description: "Template HTML de newsletter semanal reutilizable con secciones modulares.",
+    category: "email",
+    icon: "📰",
+    promptTemplate: `Diseña un template HTML de newsletter para {{BRAND_NAME}}.
+Frecuencia: semanal. Sector: {{SECTOR}}.
+Color primario: {{PRIMARY_COLOR}}. Tipografía: {{FONT_HEADING}}.
+Secciones (modulares, reemplazables): header con logo, titular semana, artículo principal, 3 noticias breves, producto destacado, tip de la semana, CTA final, footer unsubscribe.
+Requisitos técnicos: tablas para compatibilidad email, inline CSS, dark mode support, mobile-first (max-width 600px), preheader text, UTM params en todos los links.`,
+    variables: ["BRAND_NAME", "SECTOR", "PRIMARY_COLOR", "FONT_HEADING"],
+    tags: ["email", "newsletter", "template", "html"],
+    outputType: "html",
+    estimatedTokens: 3500,
+    isPremium: false,
+  },
+  {
+    id: "email-reengagement",
+    name: "Reactivación de Inactivos",
+    description: "Campaña de 3 emails para reactivar suscriptores inactivos (más de 90 días).",
+    category: "email",
+    icon: "💤",
+    promptTemplate: `Crea 3 emails de reactivación para {{BRAND_NAME}}.
+Sector: {{SECTOR}}. Inactivo desde: más de 90 días.
+Email 1: "¿Sigues ahí?" — tono conversacional, resumen de lo que se perdieron.
+Email 2: Propuesta de valor renovada + novedad reciente de {{BRAND_NAME}}.
+Email 3: "Este es tu último email" — FOMO + oferta exclusiva de reactivación.
+Incluye: asuntos con emojis, preview text, segmento de limpieza post-campaña.`,
+    variables: ["BRAND_NAME", "SECTOR"],
+    tags: ["email", "reengagement", "reactivation", "list"],
+    outputType: "text",
+    estimatedTokens: 2000,
+    isPremium: false,
+  },
+  {
+    id: "email-launch-sequence",
+    name: "Secuencia de Lanzamiento de Producto",
+    description: "7 emails de lanzamiento de producto desde anticipación hasta cierre de carrito.",
+    category: "email",
+    icon: "🚀",
+    promptTemplate: `Crea secuencia de lanzamiento de 7 emails para {{PRODUCT_NAME}} de {{BRAND_NAME}}.
+Precio: {{PRICE}}. Sector: {{SECTOR}}. Fecha apertura: {{LAUNCH_DATE}}.
+Email 1 (-7d): Teaser misterioso.
+Email 2 (-5d): El problema que resuelve.
+Email 3 (-3d): La solución revelada.
+Email 4 (-1d): Testimonios + social proof.
+Email 5 (día 0): Apertura de carrito — primera oportunidad.
+Email 6 (+2d): Objeciones y FAQ.
+Email 7 (cierre): Última hora — urgencia máxima.
+Cada email: asunto, preview, cuerpo completo, CTA.`,
+    variables: ["PRODUCT_NAME", "BRAND_NAME", "PRICE", "SECTOR", "LAUNCH_DATE"],
+    tags: ["email", "launch", "product", "sequence"],
+    outputType: "text",
+    estimatedTokens: 5000,
+    isPremium: true,
+  },
+  {
+    id: "email-transactional-templates",
+    name: "Pack Emails Transaccionales",
+    description: "6 templates HTML transaccionales: confirmación, envío, entrega, review, factura, soporte.",
+    category: "email",
+    icon: "📋",
+    promptTemplate: `Diseña 6 emails transaccionales HTML para {{BRAND_NAME}} ({{SECTOR}}).
+Color primario: {{PRIMARY_COLOR}}.
+1. Confirmación de pedido: resumen, número, ETA.
+2. Pedido enviado: tracking link, mapa progreso.
+3. Pedido entregado: CTA dejar review, cross-sell.
+4. Solicitud de review: incentivo, estrellas click-to-rate.
+5. Factura/recibo: tabla itemizada, datos fiscales.
+6. Respuesta soporte: número ticket, tiempo respuesta, FAQ links.
+Todos: inline CSS, mobile-first, branding consistente.`,
+    variables: ["BRAND_NAME", "SECTOR", "PRIMARY_COLOR"],
+    tags: ["email", "transactional", "order", "shipping"],
+    outputType: "html",
+    estimatedTokens: 4000,
+    isPremium: false,
+  },
+  {
+    id: "email-black-friday-campaign",
+    name: "Campaña Black Friday / Eventos",
+    description: "Campaña completa de 5 emails para Black Friday, Navidad o eventos de venta.",
+    category: "email",
+    icon: "🔥",
+    promptTemplate: `Crea campaña de email para {{EVENT_NAME}} de {{BRAND_NAME}}.
+Descuento: {{DISCOUNT}}%. Fechas: {{START_DATE}} – {{END_DATE}}.
+Sector: {{SECTOR}}. Voz: {{BRAND_VOICE}}.
+Email 1 (-3d): "Early access" para suscriptores VIP.
+Email 2 (día 0 mañana): Apertura oficial — todos los deals.
+Email 3 (mediodía): Los más vendidos — urgencia media.
+Email 4 (-1h cierre): Última hora — últimas unidades.
+Email 5 (post-venta): Gracias + próxima acción (review, referral).
+FOMO, social proof, countdown en cada email.`,
+    variables: ["EVENT_NAME", "BRAND_NAME", "DISCOUNT", "START_DATE", "END_DATE", "SECTOR", "BRAND_VOICE"],
+    tags: ["email", "blackfriday", "campaign", "sales"],
+    outputType: "text",
+    estimatedTokens: 3500,
+    isPremium: false,
+  },
+  {
+    id: "email-referral-program",
+    name: "Email Programa de Referidos",
+    description: "Emails para lanzar y mantener un programa de referidos activo.",
+    category: "email",
+    icon: "🤝",
+    promptTemplate: `Crea emails para el programa de referidos de {{BRAND_NAME}}.
+Incentivo: {{REFERRAL_REWARD}} por referido. Sector: {{SECTOR}}.
+Email 1 — Anuncio del programa: mecánica, beneficio, CTA "Obtener mi link".
+Email 2 — Recordatorio (1 semana): cuántos han referido ya, leaderboard ficticio.
+Email 3 — Celebración de primer referido: gracias + próximo reto.
+Incluye: asunto, preview text, diseño HTML con botón de compartir, textos para copiar-pegar en WhatsApp/Instagram.`,
+    variables: ["BRAND_NAME", "REFERRAL_REWARD", "SECTOR"],
+    tags: ["email", "referral", "viral", "program"],
+    outputType: "html",
+    estimatedTokens: 2500,
+    isPremium: false,
+  },
+  {
+    id: "email-winback-discount",
+    name: "Win-back con Oferta Personalizada",
+    description: "Email único de win-back con descuento personalizado para clientes perdidos.",
+    category: "email",
+    icon: "💝",
+    promptTemplate: `Crea un email de win-back premium para {{BRAND_NAME}}.
+Producto más comprado: {{TOP_PRODUCT}}. Sector: {{SECTOR}}.
+Oferta: {{DISCOUNT}}% solo para este cliente durante 48h.
+Tono: íntimo, personal, desde el fundador.
+Incluye: asunto tipo "una cosa más antes de irte", preview text de misterio, cuerpo en primera persona del fundador, historia breve, oferta con código único, countdown 48h, PS poderoso.`,
+    variables: ["BRAND_NAME", "TOP_PRODUCT", "SECTOR", "DISCOUNT"],
+    tags: ["email", "winback", "churn", "personalization"],
+    outputType: "text",
+    estimatedTokens: 1500,
+    isPremium: false,
+  },
+  {
+    id: "email-post-purchase-upsell",
+    name: "Post-Compra: Upsell y Review",
+    description: "Flujo de 3 emails post-compra para maximizar LTV: review + upsell + loyalty.",
+    category: "email",
+    icon: "⬆️",
+    promptTemplate: `Diseña flujo post-compra de 3 emails para {{BRAND_NAME}}.
+Producto comprado: {{PRODUCT_NAME}}. Upsell natural: {{UPSELL_PRODUCT}}.
+Email 1 (+3d entrega): Onboarding del producto, tips de uso, soporte.
+Email 2 (+7d): Solicitud de review + descuento próxima compra.
+Email 3 (+14d): Upsell {{UPSELL_PRODUCT}} con lógica "perfecto para quienes tienen {{PRODUCT_NAME}}".
+Todos con asunto, preview, HTML mobile-first.`,
+    variables: ["BRAND_NAME", "PRODUCT_NAME", "UPSELL_PRODUCT"],
+    tags: ["email", "post-purchase", "upsell", "ltv"],
+    outputType: "html",
+    estimatedTokens: 2500,
+    isPremium: false,
+  },
+  {
+    id: "email-saas-trial-nurture",
+    name: "Nurture de Trial SaaS",
+    description: "Secuencia de 7 emails para convertir usuarios de trial en clientes de pago.",
+    category: "email",
+    icon: "⚡",
+    promptTemplate: `Crea secuencia de 7 emails para convertir trials de {{SAAS_NAME}}.
+Duración del trial: {{TRIAL_DAYS}} días. Precio plan principal: {{PRICE}}.
+Funcionalidad clave: {{KEY_FEATURE}}. Sector: {{SECTOR}}.
+Día 0: Bienvenida + Quick Win (primera victoria en 5 min).
+Día 2: Feature destacada + cómo usarla.
+Día 4: Caso de éxito de cliente real.
+Día 7: "Estás a mitad del trial" + progreso del usuario.
+Día 10: Objeciones + FAQ precios.
+Día 13: "Mañana termina el trial" + oferta especial.
+Día 14: Último día — conversión o pausa.`,
+    variables: ["SAAS_NAME", "TRIAL_DAYS", "PRICE", "KEY_FEATURE", "SECTOR"],
+    tags: ["email", "saas", "trial", "conversion"],
+    outputType: "text",
+    estimatedTokens: 4000,
+    isPremium: true,
+  },
+  {
+    id: "email-cold-outreach-b2b",
+    name: "Cold Outreach B2B (Secuencia 4 emails)",
+    description: "Secuencia de prospección en frío para ventas B2B con personalización y seguimientos.",
+    category: "email",
+    icon: "🎯",
+    promptTemplate: `Crea secuencia de 4 emails de cold outreach B2B para {{BRAND_NAME}}.
+Sector objetivo: {{TARGET_SECTOR}}. Cargo objetivo: {{TARGET_ROLE}}.
+Propuesta de valor: {{UVP}}.
+Email 1: Apertura con problema específico del sector, sin pitch.
+Email 2 (+3d): Follow-up con caso de éxito relevante + pregunta de calificación.
+Email 3 (+6d): Ángulo diferente — ROI o dato de la industria.
+Email 4 (+10d): Cierre suave "Romper el hielo" — ¿Tiene sentido charlar 15 min?
+Asuntos: <5 palabras, personalizables con {{nombre}} y {{empresa}}.`,
+    variables: ["BRAND_NAME", "TARGET_SECTOR", "TARGET_ROLE", "UVP"],
+    tags: ["email", "b2b", "cold-outreach", "sales"],
+    outputType: "text",
+    estimatedTokens: 2500,
+    isPremium: false,
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // VIDEO (10 skills)
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: "video-ugc-script",
+    name: "Script UGC (User Generated Content)",
+    description: "Guion para vídeo UGC auténtico — creador de contenido hablando a cámara.",
+    category: "video",
+    icon: "🎥",
+    promptTemplate: `Crea un script UGC para {{BRAND_NAME}} ({{SECTOR}}).
+Producto: {{PRODUCT_NAME}}. Duración objetivo: {{DURATION}} segundos.
+Tipo de creador: {{CREATOR_TYPE}} (lifestyle, review, tutorial, testimonio).
+Hook (primeros 3s): problema o pregunta que engancha.
+Desarrollo: historia personal de descubrimiento del producto.
+Demostración: mostrar el producto en uso real.
+Resultado: antes/después emocional.
+CTA: natural, no forzado.
+Incluye: notas de dirección, tono de voz, 3 variantes de hook para A/B test.`,
+    variables: ["BRAND_NAME", "SECTOR", "PRODUCT_NAME", "DURATION", "CREATOR_TYPE"],
+    tags: ["video", "ugc", "script", "creator"],
+    outputType: "text",
+    estimatedTokens: 1800,
+    isPremium: false,
+  },
+  {
+    id: "video-reels-hooks",
+    name: "30 Hooks Virales para Reels/TikTok",
+    description: "30 hooks de apertura de vídeo diseñados para máxima retención en primeros 3 segundos.",
+    category: "video",
+    icon: "🎣",
+    promptTemplate: `Genera 30 hooks virales para vídeos de {{BRAND_NAME}} ({{SECTOR}}).
+Audiencia: {{TARGET_AUDIENCE}}. Tono: {{BRAND_VOICE}}.
+Categorías (6 hooks cada una):
+1. Hooks de problema/dolor: empiezan con la frustración del cliente.
+2. Hooks de curiosidad: preguntas que no pueden no contestar.
+3. Hooks de revelación: "Nadie te dice que..."
+4. Hooks de resultado: "Cómo conseguí X en Y días".
+5. Hooks de controversia: opiniones contrarias al mainstream.
+Para cada hook: texto de pantalla + voz en off (si difieren).`,
+    variables: ["BRAND_NAME", "SECTOR", "TARGET_AUDIENCE", "BRAND_VOICE"],
+    tags: ["video", "hooks", "reels", "tiktok"],
+    outputType: "text",
+    estimatedTokens: 2500,
+    isPremium: false,
+  },
+  {
+    id: "video-youtube-script-long",
+    name: "Script YouTube Long-Form",
+    description: "Guion completo para vídeo YouTube de 10-15 minutos con SEO y retención optimizada.",
+    category: "video",
+    icon: "▶️",
+    promptTemplate: `Crea un script completo de YouTube (10-15 min) para {{BRAND_NAME}}.
+Tema: {{VIDEO_TOPIC}}. Keyword SEO: {{KEYWORD}}.
+Audiencia: {{TARGET_AUDIENCE}}. Tono: {{BRAND_VOICE}}.
+Incluye: hook 0-30s (patrón), intro con promesa, capítulos con timestamp, CTA de suscripción natural, mid-roll CTA, outro con siguiente vídeo.
+Técnicas: pacing rápido, loops abiertos, callbacks, patrones 3-partite.
+También: título SEO optimizado (3 opciones), descripción con keywords, tags, thumbnail concept.`,
+    variables: ["BRAND_NAME", "VIDEO_TOPIC", "KEYWORD", "TARGET_AUDIENCE", "BRAND_VOICE"],
+    tags: ["video", "youtube", "longform", "seo"],
+    outputType: "text",
+    estimatedTokens: 4000,
+    isPremium: true,
+  },
+  {
+    id: "video-ad-30s",
+    name: "Guion Anuncio en Vídeo 30s",
+    description: "Guion de anuncio de 30 segundos para Meta Ads, YouTube o TikTok.",
+    category: "video",
+    icon: "📺",
+    promptTemplate: `Crea 3 variantes de guion de anuncio de 30 segundos para {{BRAND_NAME}}.
+Producto: {{PRODUCT_NAME}}. Oferta: {{OFFER}}.
+Audiencia: {{TARGET_AUDIENCE}}. Plataforma: {{PLATFORM}}.
+Variante 1 — Pain/Solution: problema → agitación → solución → CTA.
+Variante 2 — Social Proof: testimonio → resultado → oferta → CTA.
+Variante 3 — Curiosidad/Reveal: hook misterioso → revelación → demo → CTA.
+Para cada variante: texto en pantalla, voz en off, descripción visual escena a escena, notas de producción.`,
+    variables: ["BRAND_NAME", "PRODUCT_NAME", "OFFER", "TARGET_AUDIENCE", "PLATFORM"],
+    tags: ["video", "ad", "script", "30s"],
+    outputType: "text",
+    estimatedTokens: 2000,
+    isPremium: false,
+  },
+  {
+    id: "video-tutorial-script",
+    name: "Tutorial / How-To Video",
+    description: "Guion estructurado para vídeo tutorial de producto o servicio.",
+    category: "video",
+    icon: "🎓",
+    promptTemplate: `Crea un guion tutorial de {{BRAND_NAME}} sobre {{TUTORIAL_TOPIC}}.
+Audiencia: {{TARGET_AUDIENCE}}. Duración: {{DURATION}} minutos.
+Nivel: {{SKILL_LEVEL}} (principiante/intermedio/avanzado).
+Estructura: problema que resuelve el tutorial, requisitos previos, pasos numerados con timestamps, resultado final demostrado, troubleshooting de errores comunes, CTA al producto.
+Incluye: intro de 30s con promesa clara, transiciones entre pasos, recapitulación al 50% y al final.`,
+    variables: ["BRAND_NAME", "TUTORIAL_TOPIC", "TARGET_AUDIENCE", "DURATION", "SKILL_LEVEL"],
+    tags: ["video", "tutorial", "howto", "education"],
+    outputType: "text",
+    estimatedTokens: 2500,
+    isPremium: false,
+  },
+  {
+    id: "video-shorts-batch",
+    name: "Batch de 10 Shorts/Reels",
+    description: "10 guiones de vídeos cortos (30-60s) para un mismo tema o producto.",
+    category: "video",
+    icon: "⚡",
+    promptTemplate: `Genera 10 guiones de Shorts/Reels para {{BRAND_NAME}} ({{SECTOR}}).
+Tema base: {{CONTENT_PILLAR}}. Duración: 30-60s cada uno.
+Audiencia: {{TARGET_AUDIENCE}}.
+Formato para cada vídeo: número, hook (3s), desarrollo (25-50s), CTA (5s), hashtags (8).
+Varía los formatos: tip rápido, mito vs realidad, antes/después, pregunta respuesta, detrás de escenas, dato sorprendente, tutorial express, testimonial reenacted.`,
+    variables: ["BRAND_NAME", "SECTOR", "CONTENT_PILLAR", "TARGET_AUDIENCE"],
+    tags: ["video", "shorts", "reels", "batch"],
+    outputType: "text",
+    estimatedTokens: 3000,
+    isPremium: false,
+  },
+  {
+    id: "video-seedance-prompt",
+    name: "Prompt Generación Vídeo IA (Seedance/Kling)",
+    description: "Prompts optimizados para generación de vídeo con Seedance 2, Kling 2.1 u otros modelos.",
+    category: "video",
+    icon: "🤖",
+    promptTemplate: `Genera 10 prompts optimizados para generación de vídeo IA de {{BRAND_NAME}} ({{SECTOR}}).
+Modelo objetivo: {{VIDEO_MODEL}} (Seedance 2 / Kling 2.1 / Hailuo / Veo 3).
+Estilo visual: {{VISUAL_STYLE}}.
+Para cada prompt:
+- Descripción de escena (sujeto, acción, entorno, iluminación, cámara).
+- Tipo de movimiento de cámara (rack focus, dolly, steadicam, etc.).
+- Paleta de colores y mood.
+- Duración sugerida (5s / 10s / 15s).
+- Negative prompt sugerido.
+Variedad: producto, lifestyle, modelo, naturaleza, abstract brand.`,
+    variables: ["BRAND_NAME", "SECTOR", "VIDEO_MODEL", "VISUAL_STYLE"],
+    tags: ["video", "ai", "seedance", "prompt"],
+    outputType: "text",
+    estimatedTokens: 2000,
+    isPremium: false,
+  },
+  {
+    id: "video-testimonial-interview",
+    name: "Guion Entrevista/Testimonial",
+    description: "Preguntas y guion para grabar un testimonio de cliente convincente.",
+    category: "video",
+    icon: "🎤",
+    promptTemplate: `Crea guion de entrevista/testimonial para cliente de {{BRAND_NAME}}.
+Producto/servicio: {{PRODUCT_NAME}}. Sector del cliente: {{CLIENT_SECTOR}}.
+Resultado obtenido: {{KEY_RESULT}}.
+Incluye:
+- 12 preguntas que llevan al cliente a contar una historia natural (antes → durante → después).
+- Frases de transición para el entrevistador.
+- Errores comunes a evitar en la grabación.
+- Guion de apertura y cierre del vídeo.
+- Textos para gráficos de pantalla (nombre, empresa, resultado).
+- Ideas de edición: cortes, música, lower thirds.`,
+    variables: ["BRAND_NAME", "PRODUCT_NAME", "CLIENT_SECTOR", "KEY_RESULT"],
+    tags: ["video", "testimonial", "interview", "social-proof"],
+    outputType: "text",
+    estimatedTokens: 2000,
+    isPremium: false,
+  },
+  {
+    id: "video-vsls-sales",
+    name: "VSL (Video Sales Letter) Completo",
+    description: "Guion completo de carta de ventas en vídeo de 20-30 minutos para alta conversión.",
+    category: "video",
+    icon: "💰",
+    promptTemplate: `Crea un VSL completo para {{PRODUCT_NAME}} de {{BRAND_NAME}}.
+Precio: {{PRICE}}. Audiencia: {{TARGET_AUDIENCE}}. Sector: {{SECTOR}}.
+Estructura probada de VSL:
+1. Hook + promesa (2 min): resultado extraordinario en tiempo récord.
+2. Historia de credibilidad (3 min): de dónde vengo, por qué me importa.
+3. Agitación del problema (4 min): el dolor en detalle.
+4. Revelación de la solución (5 min): el mecanismo único.
+5. Social proof (4 min): 3 casos de éxito detallados.
+6. Presentación de la oferta (5 min): qué incluye, valor vs precio.
+7. Garantía + cierre (3 min): sin riesgo, últimas objeciones.
+8. CTA urgencia (2 min): bonus por acción inmediata.`,
+    variables: ["PRODUCT_NAME", "BRAND_NAME", "PRICE", "TARGET_AUDIENCE", "SECTOR"],
+    tags: ["video", "vsl", "sales", "conversion"],
+    outputType: "text",
+    estimatedTokens: 6000,
+    isPremium: true,
+  },
+  {
+    id: "video-podcast-repurpose",
+    name: "Repurposing de Podcast a Vídeo",
+    description: "Transforma un episodio de podcast en 10 clips de vídeo para redes sociales.",
+    category: "video",
+    icon: "🎙️",
+    promptTemplate: `Transforma el siguiente fragmento de podcast de {{BRAND_NAME}} en contenido de vídeo.
+Tema del episodio: {{EPISODE_TOPIC}}. Invitado: {{GUEST_NAME}}.
+Fragmento o resumen: {{TRANSCRIPT_SUMMARY}}.
+Genera:
+1. 10 clips de 30-60s con: timestamp sugerido, gancho para pantalla, caption para redes.
+2. 3 titulares para Shorts/Reels.
+3. Descripción de YouTube del episodio completo (800 palabras, SEO).
+4. 5 tweets/hilos de X con las mejores ideas.
+5. Post de LinkedIn (400 palabras, formato carrusel).`,
+    variables: ["BRAND_NAME", "EPISODE_TOPIC", "GUEST_NAME", "TRANSCRIPT_SUMMARY"],
+    tags: ["video", "podcast", "repurpose", "content"],
+    outputType: "text",
+    estimatedTokens: 3000,
+    isPremium: false,
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // AGENCIA & SAAS (10 skills)
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: "agencia-propuesta-comercial",
+    name: "Propuesta Comercial de Agencia",
+    description: "Propuesta completa de agencia con diagnóstico, solución, plan y precios.",
+    category: "commerce",
+    icon: "📄",
+    promptTemplate: `Crea una propuesta comercial profesional para {{AGENCY_NAME}} dirigida a {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).
+Servicio propuesto: {{SERVICE}}.
+Precio: {{PRICE}}.
+Incluye: executive summary (1 párrafo), diagnóstico de la situación actual del cliente, propuesta de solución con metodología, fases del proyecto con timeline, equipo asignado, case studies relevantes, paquetes de precios (3 opciones), garantías, próximos pasos con CTA urgente.
+Formato: estructura clara, lenguaje ejecutivo, métricas de éxito definidas.`,
+    variables: ["AGENCY_NAME", "CLIENT_NAME", "CLIENT_SECTOR", "SERVICE", "PRICE"],
+    tags: ["agencia", "propuesta", "comercial", "b2b"],
+    outputType: "text",
+    estimatedTokens: 3500,
+    isPremium: false,
+  },
+  {
+    id: "saas-onboarding-flow",
+    name: "Flujo de Onboarding SaaS",
+    description: "Diseño completo del onboarding de un SaaS: pasos, mensajes, tooltips y métricas.",
+    category: "code",
+    icon: "🗺️",
+    promptTemplate: `Diseña el flujo de onboarding completo para {{SAAS_NAME}}.
+Feature central: {{KEY_FEATURE}}. Tipo de usuario: {{USER_TYPE}}.
+Precio: {{PRICE_PLAN}}.
+Entrega:
+1. Mapa de pasos del onboarding (máx. 7 pasos, cada uno con objetivo).
+2. Textos de cada pantalla: título, subtítulo, CTA, tooltip.
+3. Email de activación del primer paso.
+4. In-app messages para días 1, 3, 7 del trial.
+5. Definición del "Aha! Moment" y cómo acelerarlo.
+6. Métricas de onboarding: completion rate, time-to-value, activation rate.
+7. Checklist de quick wins para el usuario nuevo.`,
+    variables: ["SAAS_NAME", "KEY_FEATURE", "USER_TYPE", "PRICE_PLAN"],
+    tags: ["saas", "onboarding", "ux", "activation"],
+    outputType: "text",
+    estimatedTokens: 3000,
+    isPremium: true,
+  },
+  {
+    id: "saas-pricing-strategy",
+    name: "Estrategia de Precios SaaS",
+    description: "Análisis y propuesta de estructura de precios para un SaaS con 3 planes.",
+    category: "analytics",
+    icon: "💎",
+    promptTemplate: `Define la estrategia de precios para {{SAAS_NAME}}.
+Coste por usuario: {{COGS}}. Competidores: {{COMPETITORS}}.
+Segmentos objetivo: {{SEGMENTS}}.
+Genera:
+1. Análisis de 3 modelos de pricing (freemium, trial, demo).
+2. Propuesta de 3 planes con nombre, precio, features y límites.
+3. Tabla comparativa de features por plan.
+4. Estrategia de upsell: triggers para upgrade natural.
+5. Página de precios copywriting completa.
+6. Psicología de precios aplicada (anchoring, decoy, charm).
+7. Proyección de ARPU y LTV por plan.`,
+    variables: ["SAAS_NAME", "COGS", "COMPETITORS", "SEGMENTS"],
+    tags: ["saas", "pricing", "strategy", "revenue"],
+    outputType: "text",
+    estimatedTokens: 3000,
+    isPremium: true,
+  },
+  {
+    id: "saas-landing-page",
+    name: "Landing Page SaaS Completa",
+    description: "Landing page HTML completa para SaaS con todas las secciones de conversión.",
+    category: "design",
+    icon: "🖥️",
+    promptTemplate: `Crea una landing page HTML/CSS/JS completa para {{SAAS_NAME}}.
+UVP: {{UVP}}. Precio desde: {{PRICE}}. Sector: {{SECTOR}}.
+Colores: {{PRIMARY_COLOR}}, {{SECONDARY_COLOR}}. Font: {{FONT}}.
+Secciones obligatorias:
+- Hero: headline impactante + sub + CTA + hero image/mockup.
+- Social proof: logos clientes + número usuarios.
+- Features: 6 features con icono, título, descripción.
+- How it works: 3 pasos visuales.
+- Testimonios: 3 con foto, nombre, empresa, resultado.
+- Pricing: 3 planes con toggle mensual/anual.
+- FAQ: 6 preguntas.
+- CTA final: urgencia + garantía.
+Stack: HTML puro + CSS variables + JS vanilla + GSAP CDN.`,
+    variables: ["SAAS_NAME", "UVP", "PRICE", "SECTOR", "PRIMARY_COLOR", "SECONDARY_COLOR", "FONT"],
+    tags: ["saas", "landing", "conversion", "html"],
+    outputType: "html",
+    preferredModel: "claude-opus",
+    estimatedTokens: 7000,
+    isPremium: true,
+  },
+  {
+    id: "agencia-auditoria-digital",
+    name: "Auditoría Digital Completa",
+    description: "Informe de auditoría digital para presentar a un cliente potencial.",
+    category: "analytics",
+    icon: "🔍",
+    promptTemplate: `Crea el template de auditoría digital de {{AGENCY_NAME}} para {{CLIENT_NAME}}.
+URL del cliente: {{CLIENT_URL}}. Sector: {{SECTOR}}.
+Secciones del informe:
+1. Resumen ejecutivo (semáforo: rojo/amarillo/verde).
+2. Presencia web: velocidad, mobile, UX, CRO.
+3. SEO: on-page, off-page, técnico, keywords.
+4. Redes sociales: presencia, engagement, frecuencia.
+5. Publicidad pagada: activos detectados, estimación de gasto.
+6. Email marketing: formularios, secuencias detectadas.
+7. Plan de acción: 3 quick wins + 5 acciones a 90 días.
+8. Propuesta de servicio de {{AGENCY_NAME}}.
+Formato visual con tablas, puntuaciones 1-10, semáforos.`,
+    variables: ["AGENCY_NAME", "CLIENT_NAME", "CLIENT_URL", "SECTOR"],
+    tags: ["agencia", "auditoria", "digital", "report"],
+    outputType: "text",
+    estimatedTokens: 4000,
+    isPremium: false,
+  },
+  {
+    id: "agencia-case-study",
+    name: "Case Study de Agencia",
+    description: "Case study narrativo de resultado de cliente para captar leads B2B.",
+    category: "content",
+    icon: "📈",
+    promptTemplate: `Crea un case study de {{AGENCY_NAME}} sobre el cliente {{CLIENT_NAME}} ({{SECTOR}}).
+Resultado conseguido: {{KEY_RESULT}}.
+Duración del proyecto: {{DURATION}}.
+Estructura:
+1. Titular con métrica del resultado (Cómo [Cliente] consiguió [Resultado] en [Tiempo]).
+2. El desafío: situación inicial con datos.
+3. Nuestra solución: metodología y herramientas.
+4. Implementación: fases, timeline, equipo.
+5. Resultados: métricas antes/después con gráficos descriptivos.
+6. Cita del cliente (testimonial).
+7. Conclusión + CTA "¿Quieres los mismos resultados?".
+Versión larga (blog) + versión corta (PDF 1 página) + LinkedIn post.`,
+    variables: ["AGENCY_NAME", "CLIENT_NAME", "SECTOR", "KEY_RESULT", "DURATION"],
+    tags: ["agencia", "case-study", "b2b", "proof"],
+    outputType: "text",
+    estimatedTokens: 3000,
+    isPremium: false,
+  },
+  {
+    id: "saas-product-roadmap",
+    name: "Product Roadmap & PRD",
+    description: "Documento de requisitos de producto (PRD) y roadmap trimestral para SaaS.",
+    category: "code",
+    icon: "🗓️",
+    promptTemplate: `Crea el PRD y roadmap para {{SAAS_NAME}}.
+Feature a diseñar: {{FEATURE_NAME}}.
+Usuarios que lo solicitan: {{USER_TYPE}}. Impacto esperado: {{EXPECTED_IMPACT}}.
+PRD incluye: problema que resuelve, usuarios afectados, user stories (formato Gherkin), criterios de aceptación, wireframe en texto, métricas de éxito (KPIs), dependencias técnicas, estimación de esfuerzo, riesgos.
+Roadmap trimestral: Now (este sprint), Next (próximo mes), Later (Q3-Q4), Backlog.
+Formato: Notion-ready con tablas y headers.`,
+    variables: ["SAAS_NAME", "FEATURE_NAME", "USER_TYPE", "EXPECTED_IMPACT"],
+    tags: ["saas", "product", "roadmap", "prd"],
+    outputType: "text",
+    estimatedTokens: 3000,
+    isPremium: false,
+  },
+  {
+    id: "agencia-onboarding-cliente",
+    name: "Onboarding de Nuevo Cliente (Agencia)",
+    description: "Kit completo de onboarding para nuevos clientes de agencia: docs, kick-off, Q&A.",
+    category: "commerce",
+    icon: "🤝",
+    promptTemplate: `Crea el kit de onboarding de cliente para {{AGENCY_NAME}}.
+Servicio: {{SERVICE}}. Duración del proyecto: {{DURATION}}.
+Incluye:
+1. Email de bienvenida (tono cálido, profesional).
+2. Cuestionario de kick-off (20 preguntas clave para entender al cliente).
+3. Agenda de reunión de kick-off (60 min).
+4. Documento de expectativas y entregables firmado.
+5. Guía de "Cómo trabajamos" (canales de comunicación, tiempos de respuesta, flujo de aprobaciones).
+6. Checklist de información necesaria del cliente.
+7. Celebración de hitos: qué comunicar y cuándo.`,
+    variables: ["AGENCY_NAME", "SERVICE", "DURATION"],
+    tags: ["agencia", "onboarding", "cliente", "proceso"],
+    outputType: "text",
+    estimatedTokens: 3000,
+    isPremium: false,
+  },
+  {
+    id: "tpv-guion-ventas",
+    name: "Guión de Ventas Punto de Venta (TPV)",
+    description: "Guión de ventas para comercios físicos: bienvenida, needs, objeciones y cierre.",
+    category: "commerce",
+    icon: "🏪",
+    promptTemplate: `Crea un guión de ventas para el personal de {{BRAND_NAME}} ({{SECTOR}}).
+Ticket medio: {{AVG_TICKET}}. Producto estrella: {{HERO_PRODUCT}}.
+Fases del guión:
+1. Saludo y bienvenida (sin presionar): 3 variantes de apertura.
+2. Descubrimiento de necesidades: 5 preguntas de diagnóstico.
+3. Presentación del producto: estructura beneficio → evidencia → invitación.
+4. Manejo de las 5 objeciones más comunes (precio, lo pienso, lo encuentro más barato).
+5. Técnicas de cierre: alternativa, urgencia, resumen de beneficios.
+6. Upsell y cross-sell: cómo proponer complementos de forma natural.
+7. Fidelización: cómo capturar datos para email/WhatsApp.`,
+    variables: ["BRAND_NAME", "SECTOR", "AVG_TICKET", "HERO_PRODUCT"],
+    tags: ["tpv", "ventas", "guion", "retail"],
+    outputType: "text",
+    estimatedTokens: 3000,
+    isPremium: false,
+  },
+  {
+    id: "legal-politica-privacidad",
+    name: "Política de Privacidad & Cookies (RGPD)",
+    description: "Política de privacidad y cookies compliant con RGPD para web española/europea.",
+    category: "content",
+    icon: "⚖️",
+    promptTemplate: `Genera la política de privacidad y cookies RGPD-compliant para {{BRAND_NAME}}.
+Dominio: {{WEBSITE_URL}}. CIF/NIF: {{TAX_ID}}. País: {{COUNTRY}}.
+Email de contacto DPD: {{DPO_EMAIL}}.
+Datos recogidos: {{DATA_COLLECTED}} (ej: nombre, email, IP, cookies analytics).
+Finalidades: {{PURPOSES}} (marketing, analítica, mejora servicio).
+Terceros: {{THIRD_PARTIES}} (Google Analytics, Meta Pixel, Mailchimp).
+Incluye: política de privacidad completa, política de cookies (categorías necesarias/funcionales/analíticas/marketing), banner de consentimiento con textos, período de conservación, derechos ARCO-POL, mecanismo de reclamación a AEPD.`,
+    variables: ["BRAND_NAME", "WEBSITE_URL", "TAX_ID", "COUNTRY", "DPO_EMAIL", "DATA_COLLECTED", "PURPOSES", "THIRD_PARTIES"],
+    tags: ["legal", "rgpd", "privacidad", "cookies"],
+    outputType: "text",
+    estimatedTokens: 4000,
+    isPremium: false,
+  },
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // UGC & REDES SOCIALES (8 skills)
+  // ────────────────────────────────────────────────────────────────────────────
+  {
+    id: "social-ugc-brief",
+    name: "Brief para Creadores UGC",
+    description: "Brief profesional para contratar creadores de contenido UGC para tu marca.",
+    category: "social",
+    icon: "📝",
+    promptTemplate: `Crea un brief para creadores UGC de {{BRAND_NAME}} ({{SECTOR}}).
+Producto: {{PRODUCT_NAME}}. Presupuesto por vídeo: {{BUDGET}}.
+Plataforma objetivo: {{PLATFORM}} (TikTok/Instagram/YouTube Shorts).
+El brief incluye:
+1. Descripción de la marca y el producto (2 párrafos).
+2. El tono y la personalidad buscada en el creador.
+3. Requisitos técnicos del vídeo (duración, formato, calidad).
+4. Estructura obligatoria: hook, demo, CTA.
+5. Elementos a incluir y a evitar (do's & don'ts).
+6. Claims permitidos y prohibidos (sin exageraciones).
+7. Proceso de aprobación y revisiones.
+8. Derechos de uso y exclusividad.`,
+    variables: ["BRAND_NAME", "SECTOR", "PRODUCT_NAME", "BUDGET", "PLATFORM"],
+    tags: ["ugc", "creator", "brief", "social"],
+    outputType: "text",
+    estimatedTokens: 2000,
+    isPremium: false,
+  },
+  {
+    id: "social-content-calendar",
+    name: "Calendario de Contenidos (30 días)",
+    description: "Calendario editorial completo de 30 días para redes sociales de una marca.",
+    category: "social",
+    icon: "📅",
+    promptTemplate: `Crea un calendario de contenidos de 30 días para {{BRAND_NAME}} ({{SECTOR}}).
+Plataformas: {{PLATFORMS}}. Frecuencia: {{FREQUENCY}} publicaciones/semana.
+Pilares de contenido: {{CONTENT_PILLARS}}.
+Para cada publicación: día, plataforma, pilar, tipo de contenido (reel/carrusel/story/post), idea desarrollada, caption completo con CTA, hashtags (15), nota visual o referencia.
+Distribuye: 40% educativo, 30% entretenimiento, 20% social proof, 10% venta directa.
+Incluye: 4 posts virales tipo lista/ranking, 2 behind-the-scenes, 2 colaboraciones propuestas.`,
+    variables: ["BRAND_NAME", "SECTOR", "PLATFORMS", "FREQUENCY", "CONTENT_PILLARS"],
+    tags: ["social", "calendar", "content", "planning"],
+    outputType: "text",
+    estimatedTokens: 5000,
+    isPremium: true,
+  },
+  {
+    id: "social-instagram-captions-batch",
+    name: "Batch 30 Captions de Instagram",
+    description: "30 captions optimizadas para Instagram con emojis, CTA y hashtags por sector.",
+    category: "social",
+    icon: "📸",
+    promptTemplate: `Genera 30 captions para Instagram de {{BRAND_NAME}} ({{SECTOR}}).
+Voz de marca: {{BRAND_VOICE}}. CTA recurrente: {{CTA_TEXT}}.
+Distribuye en 6 tonos (5 de cada): inspiracional, educativo, humor, venta suave, historia, pregunta.
+Cada caption: 3-5 líneas máximo, emojis estratégicos, salto de línea antes del CTA, 15 hashtags (mix popular + nicho + marca), variación del CTA.
+Las 10 mejores: versión con hook de historia de 8-10 líneas.`,
+    variables: ["BRAND_NAME", "SECTOR", "BRAND_VOICE", "CTA_TEXT"],
+    tags: ["social", "instagram", "captions", "batch"],
+    outputType: "text",
+    estimatedTokens: 4000,
+    isPremium: false,
+  },
+  {
+    id: "social-linkedin-thought-leadership",
+    name: "Thought Leadership en LinkedIn",
+    description: "10 posts de LinkedIn para posicionar al fundador/CEO como referente del sector.",
+    category: "social",
+    icon: "💼",
+    promptTemplate: `Crea 10 posts de LinkedIn para {{AUTHOR_NAME}}, {{AUTHOR_ROLE}} de {{BRAND_NAME}}.
+Sector: {{SECTOR}}. Expertise: {{EXPERTISE_AREAS}}.
+Cada post: 800-1200 caracteres, hook de 1 línea brutal, historia o dato sorprendente, insight accionable, CTA suave (sin vender).
+Formatos variados: opinión controversial, lección aprendida, error cometido, predicción de sector, historia de cliente, detrás de escenas, dato vs. mito, hilo narrativo.
+Incluir: emojis estratégicos, espaciado visual, hashtags de nicho (3-5).`,
+    variables: ["AUTHOR_NAME", "AUTHOR_ROLE", "BRAND_NAME", "SECTOR", "EXPERTISE_AREAS"],
+    tags: ["linkedin", "thought-leadership", "b2b", "personal-brand"],
+    outputType: "text",
+    estimatedTokens: 3500,
+    isPremium: false,
+  },
+  {
+    id: "social-tiktok-strategy",
+    name: "Estrategia TikTok 90 días",
+    description: "Plan estratégico de TikTok de 90 días con nichos, formatos y métricas.",
+    category: "social",
+    icon: "🎵",
+    promptTemplate: `Crea una estrategia TikTok de 90 días para {{BRAND_NAME}} ({{SECTOR}}).
+Objetivo: {{GOAL}} (awareness/ventas/comunidad). Audiencia: {{TARGET_AUDIENCE}}.
+Plan incluye:
+Fase 1 (0-30d): Test de 10 formatos distintos, análisis de hooks, benchmark de competidores.
+Fase 2 (30-60d): Doblar lo que funciona, eliminar lo que no, primera colaboración con creador.
+Fase 3 (60-90d): Escalar formatos ganadores, campaña de hashtag, estrategia de duets/stitches.
+También: 20 ideas de vídeo para el mes 1, guía de trending sounds, estructura de perfil optimizada, métricas de éxito por fase.`,
+    variables: ["BRAND_NAME", "SECTOR", "GOAL", "TARGET_AUDIENCE"],
+    tags: ["tiktok", "strategy", "social", "90days"],
+    outputType: "text",
+    estimatedTokens: 3500,
+    isPremium: true,
+  },
+  {
+    id: "social-viral-giveaway",
+    name: "Sorteo/Giveaway Viral",
+    description: "Estrategia completa para un sorteo viral en redes: mecánica, posts, emails.",
+    category: "social",
+    icon: "🎁",
+    promptTemplate: `Diseña un giveaway viral para {{BRAND_NAME}} ({{SECTOR}}).
+Premio: {{PRIZE}} (valor {{PRIZE_VALUE}}€). Plataforma: {{PLATFORM}}.
+Duración: {{DURATION}} días.
+Incluye:
+1. Mecánica de participación (seguir, etiquetar, compartir, UGC).
+2. Post de anuncio completo con caption e imagen concept.
+3. 3 posts de recordatorio durante el giveaway.
+4. Post de ganador y cierre.
+5. Email a participantes (no ganadores) con consolation offer.
+6. Métricas a trackear: nuevos seguidores, alcance, UGC generado.
+7. FAQ del giveaway + términos simplificados.`,
+    variables: ["BRAND_NAME", "SECTOR", "PRIZE", "PRIZE_VALUE", "PLATFORM", "DURATION"],
+    tags: ["social", "giveaway", "viral", "community"],
+    outputType: "text",
+    estimatedTokens: 2500,
+    isPremium: false,
+  },
+  {
+    id: "social-whatsapp-broadcast",
+    name: "Secuencia WhatsApp Business",
+    description: "10 mensajes de broadcast para WhatsApp Business: welcome, nurture y ventas.",
+    category: "social",
+    icon: "💬",
+    promptTemplate: `Crea 10 mensajes de WhatsApp Business para {{BRAND_NAME}} ({{SECTOR}}).
+CTA final: {{CTA_GOAL}}. Voz: {{BRAND_VOICE}}.
+Mensajes: bienvenida inmediata, valor día 1, historia de cliente día 3, tip exclusivo día 5, pregunta de calificación día 7, oferta especial día 9, recordatorio día 11, bonus día 13, urgencia día 14, cierre.
+Cada mensaje: máx. 160 caracteres para preview, emojis coherentes, 1 solo CTA, link trackeado, horario sugerido de envío.
+Incluye: plantilla de respuestas automáticas para FAQs + flujo de respuesta humana.`,
+    variables: ["BRAND_NAME", "SECTOR", "CTA_GOAL", "BRAND_VOICE"],
+    tags: ["whatsapp", "broadcast", "social", "nurture"],
+    outputType: "text",
+    estimatedTokens: 2500,
+    isPremium: false,
+  },
+  {
+    id: "social-community-management",
+    name: "Manual de Community Management",
+    description: "Manual completo de CM: tono, respuestas, crisis, métricas y procesos.",
+    category: "social",
+    icon: "🌐",
+    promptTemplate: `Crea el manual de community management para {{BRAND_NAME}} ({{SECTOR}}).
+Redes activas: {{PLATFORMS}}. Tamaño comunidad: {{COMMUNITY_SIZE}}.
+Incluye:
+1. Guía de tono y voz en redes (con ejemplos correcto/incorrecto).
+2. Banco de respuestas: 20 comentarios frecuentes + respuesta modelo.
+3. Protocolo de gestión de crisis (trolls, quejas públicas, errores de marca).
+4. Plantilla de reporte semanal de comunidad.
+5. Proceso de identificación y fidelización de brand advocates.
+6. Reglas de la comunidad (para grupos/discord/foros).
+7. Métricas de CM: engagement rate, sentiment, response time.`,
+    variables: ["BRAND_NAME", "SECTOR", "PLATFORMS", "COMMUNITY_SIZE"],
+    tags: ["social", "community", "management", "guide"],
+    outputType: "text",
+    estimatedTokens: 3500,
+    isPremium: false,
+  },
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -1591,6 +2417,8 @@ export const SKILL_CATEGORIES = [
   { id: "content",   label: "Contenido",        icon: "✍️", count: getSkillsByCategory("content").length },
   { id: "seo",       label: "SEO",              icon: "🔍", count: getSkillsByCategory("seo").length },
   { id: "social",    label: "Social Media",     icon: "📱", count: getSkillsByCategory("social").length },
+  { id: "email",     label: "Email Marketing",  icon: "📧", count: getSkillsByCategory("email").length },
+  { id: "video",     label: "Vídeo & UGC",      icon: "🎥", count: getSkillsByCategory("video").length },
   { id: "analytics", label: "Analytics",        icon: "📊", count: getSkillsByCategory("analytics").length },
   { id: "commerce",  label: "Comercio",         icon: "🛒", count: getSkillsByCategory("commerce").length },
   { id: "3d",        label: "3D & Visual",      icon: "🧊", count: getSkillsByCategory("3d").length },

@@ -93,6 +93,32 @@ const EFFECT_CATEGORIES = [
 
   // ── Agencia ──
   { key: "agency_singles", label: "Agency Singles", icon: "💼", color: "#d4a017", desc: "4 templates de agencia — propuesta de valor, pitch, onboarding" },
+
+  // ── Email & Automation ──
+  { key: "email_marketing_master", label: "Email Marketing Master", icon: "📧", color: "#f59e0b", desc: "82 prompts de email marketing — bienvenida, carrito, lanzamiento, newsletter, B2B" },
+  { key: "email_sequences_pro", label: "Email Sequences Pro", icon: "📨", color: "#fbbf24", desc: "40 secuencias de nurture completas — onboarding, win-back, trial SaaS, reactivación" },
+  { key: "email_templates_html", label: "Templates HTML Email", icon: "📋", color: "#fcd34d", desc: "25 templates HTML listos para Klaviyo/Mailchimp — transaccionales, newsletter, black friday" },
+
+  // ── Video & UGC ──
+  { key: "video_scripts_master", label: "Scripts de Vídeo Master", icon: "🎥", color: "#e879f9", desc: "75 guiones — UGC, YouTube, Reels, TikTok, VSL, tutoriales, podcast repurpose" },
+  { key: "ugc_creator_briefs", label: "Briefs para Creadores UGC", icon: "🎬", color: "#c084fc", desc: "30 briefs profesionales para contratar y gestionar creadores UGC" },
+  { key: "hooks_viral_library", label: "Hooks Virales (300+)", icon: "🎣", color: "#a855f7", desc: "300 hooks de apertura probados para Reels, TikTok y YouTube Shorts" },
+  { key: "seedance_advanced_prompts", label: "Seedance 2 Prompts Avanzados", icon: "🤖", color: "#8b5cf6", desc: "60 prompts cinematográficos para generación de vídeo con Seedance 2 y Kling 2.1" },
+
+  // ── Agencia & SaaS ──
+  { key: "agencia_master_v1", label: "Agencia Master v1", icon: "🏢", color: "#d4a017", desc: "P-001→P-082 — propuestas, auditorías, cases studies, onboarding, guiones TPV, legal" },
+  { key: "saas_growth_playbook", label: "SaaS Growth Playbook", icon: "🚀", color: "#f97316", desc: "50 prompts SaaS — onboarding, pricing, landing, roadmap, churn, activation" },
+  { key: "legal_rgpd_pack", label: "Legal & RGPD Pack", icon: "⚖️", color: "#94a3b8", desc: "20 plantillas legales — privacidad, cookies, términos, contratos agencia, NDA" },
+
+  // ── Social Media Pro ──
+  { key: "social_media_pro", label: "Social Media Pro 2026", icon: "📱", color: "#06b6d4", desc: "120 prompts de redes — calendarios, captions, LinkedIn, TikTok, WhatsApp, giveaways" },
+  { key: "community_management_kit", label: "Community Management Kit", icon: "🌐", color: "#22d3ee", desc: "35 plantillas de CM — manuales, protocolos de crisis, reportes, brand advocates" },
+
+  // ── AI Workflows & Agentes ──
+  { key: "ai_agents_intensive", label: "AI Agents Intensive (Google)", icon: "🧠", color: "#4ade80", desc: "45 workflows de agentes IA — Google Gemini, multi-agent, tool-use, RAG patterns" },
+  { key: "gemini_omni_advanced", label: "Gemini Omni API Advanced", icon: "✨", color: "#34d399", desc: "38 prompts avanzados para Gemini 2.5 Pro — multimodal, audio, video, live API" },
+  { key: "faceless_video_ai", label: "Faceless Video AI", icon: "🎭", color: "#10b981", desc: "40 workflows para canales faceless — guiones, TTS, B-roll IA, shorts automatizados" },
+  { key: "micro_drama_generator", label: "Micro Drama Generator", icon: "🎭", color: "#059669", desc: "25 fórmulas de micro-drama para TikTok/Reels — conflicto, giro, resolución en <60s" },
 ];
 
 const ENGINE_COLORS: Record<string, string> = {
