@@ -399,38 +399,26 @@
 }
 .l-nav-active { color: var(--l-gold) !important; }
 
-/* FULLPAGE CONTAINER */
+/* FULLPAGE CONTAINER — scroll nativo del navegador */
 .fp-container {
   margin-top: 64px;
-  height: calc(100dvh - 64px);
-  overflow-y: scroll;
   overflow-x: hidden;
-  scroll-snap-type: y mandatory;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
 }
-.fp-container::-webkit-scrollbar { display: none; }
 .fp-section {
-  height: calc(100dvh - 64px);
   min-height: calc(100dvh - 64px);
   position: relative;
   overflow: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   padding: 0 48px;
   box-sizing: border-box;
-  scroll-snap-align: start;
-  flex-shrink: 0;
 }
-.fp-section::-webkit-scrollbar { width: 4px; }
-.fp-section::-webkit-scrollbar-track { background: transparent; }
-.fp-section::-webkit-scrollbar-thumb { background: rgba(200,168,75,0.2); border-radius: 2px; }
+/* Contact usa VismeFormHero (position:absolute;inset:0) — necesita altura fija */
+#fp-contact.fp-section {
+  height: calc(100dvh - 64px);
+}
 .fp-wrapper {
   width: 100%;
 }
@@ -647,36 +635,10 @@
   color: var(--l-gold3);
 }
 
-/* ── PROGRESS BAR (left) ── */
-.fp-progress {
-  position: fixed;
-  left: 0; top: 64px; bottom: 0;
-  width: 2px;
-  background: rgba(200,168,75,0.08);
-  z-index: 500;
-}
-.fp-progress-fill {
-  width: 100%;
-  background: linear-gradient(180deg, var(--l-gold), var(--l-gold2));
-  transition: height 0.4s ease;
-  height: 0%;
-}
-
-/* ── SECTION COUNTER ── */
-.fp-counter {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--l-fm);
-  font-size: 11px;
-  color: var(--l-t3);
-  z-index: 500;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  letter-spacing: 0.5px;
-}
+/* Progress bar y counter — ocultos (scroll nativo) */
+.fp-progress,
+.fp-counter,
+.fp-sidenav { display: none; }
 .fp-counter-current { color: var(--l-gold2); font-weight: 700; }
 .fp-counter-sep { opacity: 0.4; }
 

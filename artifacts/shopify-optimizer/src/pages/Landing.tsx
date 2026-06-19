@@ -307,7 +307,6 @@ export default function Landing() {
     }
   };
 
-  const fpRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef(0);
 
   useEffect(() => {
@@ -332,20 +331,12 @@ export default function Landing() {
   }, []);
 
   const goToSection = useCallback((index: number) => {
-    const container = fpRef.current;
-    if (!container) return;
-    const fpActive = window.innerWidth > 900 && window.innerHeight > 500;
     const clamped = Math.max(0, Math.min(index, FP_SECTION_IDS.length - 1));
     currentRef.current = clamped;
     setCurrentSection(clamped);
     setAnimatedSections(prev => new Set([...prev, FP_SECTION_IDS[clamped]]));
-    if (fpActive) {
-      container.scrollTo({ top: clamped * container.clientHeight, behavior: "smooth" });
-    } else {
-      const sections = container.querySelectorAll<HTMLElement>(".fp-section");
-      const section = sections[clamped];
-      if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    const section = document.getElementById(FP_SECTION_IDS[clamped]);
+    if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   useEffect(() => {
@@ -354,38 +345,19 @@ export default function Landing() {
     setCurrentSection(0);
     currentRef.current = 0;
 
-    const container = fpRef.current;
-    if (!container) return;
-
-    const fpActive = window.innerWidth > 900 && window.innerHeight > 500;
-
-    if (fpActive) {
-      container.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-    } else {
-      setAnimatedSections(new Set(FP_SECTION_IDS));
-    }
-
-    const sections = [...container.querySelectorAll<HTMLElement>(".fp-section")];
+    const sections = [...document.querySelectorAll<HTMLElement>(".fp-section")];
     const obs = new IntersectionObserver(entries => {
-      let bestIdx = -1;
-      let bestRatio = 0;
       entries.forEach(e => {
         if (e.isIntersecting) {
           const idx = sections.indexOf(e.target as HTMLElement);
-          if (idx !== -1 && e.intersectionRatio > bestRatio) {
-            bestIdx = idx;
-            bestRatio = e.intersectionRatio;
+          if (idx !== -1) {
+            currentRef.current = idx;
+            setCurrentSection(idx);
+            setAnimatedSections(prev => new Set([...prev, FP_SECTION_IDS[idx]]));
           }
         }
       });
-      if (bestIdx >= 0) {
-        currentRef.current = bestIdx;
-        setCurrentSection(bestIdx);
-        if (fpActive) {
-          setAnimatedSections(prev => new Set([...prev, FP_SECTION_IDS[bestIdx]]));
-        }
-      }
-    }, { root: fpActive ? container : null, threshold: [0.1, 0.3, 0.5] });
+    }, { root: null, threshold: 0.15 });
 
     sections.forEach(s => obs.observe(s));
     return () => obs.disconnect();
@@ -433,39 +405,6 @@ export default function Landing() {
     return () => window.removeEventListener("message", handler);
   }, [isPreview, goToSection]);
 
-  const [fpMode, setFpMode] = useState(() => typeof window !== "undefined" && window.innerWidth > 900 && window.innerHeight > 600);
-
-  useEffect(() => {
-    const check = () => {
-      const active = window.innerWidth > 900 && window.innerHeight > 600;
-      setFpMode(active);
-      if (active) {
-        const container = fpRef.current;
-        if (container) {
-          container.scrollTo({ top: currentRef.current * container.clientHeight, behavior: "instant" as ScrollBehavior });
-        }
-      }
-    };
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!fpMode) return;
-      if (e.key === "ArrowDown" || e.key === "PageDown") {
-        e.preventDefault();
-        goToSection(Math.min(currentRef.current + 1, FP_SECTIONS.length - 1));
-      }
-      if (e.key === "ArrowUp" || e.key === "PageUp") {
-        e.preventDefault();
-        goToSection(Math.max(currentRef.current - 1, 0));
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [goToSection, fpMode]);
 
   const pad = (n: number) => String(n).padStart(2, "0");
   const isAnimated = (id: string) => animatedSections.has(id);
@@ -606,7 +545,7 @@ export default function Landing() {
       </div>
 
       {/* ── FULLPAGE CONTAINER ── */}
-      <div className="fp-container" ref={fpRef} id="fullpage">
+      <div className="fp-container" id="fullpage">
         <div className="fp-wrapper">
 
         {/* ══════════════════════════════════════
