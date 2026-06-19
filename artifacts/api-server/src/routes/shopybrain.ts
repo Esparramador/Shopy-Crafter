@@ -1351,8 +1351,32 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
         const [activeProj] = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain, accessToken: projectsTable.accessToken, tokenExpiresAt: projectsTable.tokenExpiresAt }).from(projectsTable).where(eq(projectsTable.id, parseInt(resolvedProjectId))).limit(1);
         if (activeProj) {
           const tokenStatus = buildTokenStatusLabel(activeProj.accessToken, activeProj.tokenExpiresAt);
+          let cachedDataInfo = "";
+          if (tokenStatus !== "válido") {
+            // Token inválido → inyectar datos cacheados de la BD para que el asistente pueda trabajar con ellos
+            try {
+              const [cachedProds, cachedSeo] = await Promise.all([
+                db.select({ id: productsTable.id, title: productsTable.title, status: productsTable.status, price: productsTable.price, updatedAt: productsTable.updatedAt })
+                  .from(productsTable).where(eq(productsTable.projectId, activeProj.id)).limit(200),
+                db.select({ shopifyProductId: seoDataTable.shopifyProductId, metaTitle: seoDataTable.metaTitle, metaDescription: seoDataTable.metaDescription })
+                  .from(seoDataTable).where(eq(seoDataTable.projectId, activeProj.id)).limit(200),
+              ]);
+              const activeCount  = cachedProds.filter(p => p.status === "active").length;
+              const draftCount   = cachedProds.filter(p => p.status === "draft").length;
+              const withSeo      = cachedSeo.filter(s => s.metaTitle).length;
+              const withoutSeo   = cachedProds.length - withSeo;
+              const lastSync     = cachedProds.length > 0
+                ? cachedProds.sort((a, b) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime())[0].updatedAt
+                : null;
+              const lastSyncStr  = lastSync ? new Date(lastSync).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }) : "desconocida";
+              if (cachedProds.length > 0) {
+                const sampleProducts = cachedProds.slice(0, 10).map(p => `"${p.title}" (${p.status}, ${p.price ?? "?"}€)`).join(", ");
+                cachedDataInfo = ` DATOS_CACHEADOS (último sync: ${lastSyncStr}): ${cachedProds.length} productos en BD — ${activeCount} activos, ${draftCount} borradores. SEO: ${withSeo} con meta-título, ${withoutSeo} sin optimizar. Muestra: ${sampleProducts}. ÚSALOS para análisis, informes financieros, estrategias SEO y cualquier consulta que no requiera datos en tiempo real de Shopify.`;
+              }
+            } catch { /* no bloquear si falla */ }
+          }
           const tokenWarning = (tokenStatus !== "válido")
-            ? ` ADVERTENCIA_TOKEN: El token Shopify está ${tokenStatus}. NO ejecutes acciones que usen la API de Shopify (create_product, list_products, scan_store, store_status, optimize_all_products, seo_full_audit, audit_theme, list_themes, etc.). Para esas acciones responde que el usuario necesita renovar el token en Configuración → Tienda. Sí puedes ejecutar acciones que NO requieren Shopify: informes desde base de datos, generate_ai_report, recall_knowledge, brain_status, analyze_external_store, generate_budget, update_cms, list_users, generate_email_flow, generate_brand_css, generate_brand_kit, generate_brand_guide, financial_forecast, agency_proposal, search_suppliers, generate_platform_report.`
+            ? ` ADVERTENCIA_TOKEN: El token Shopify está ${tokenStatus}. NO ejecutes acciones que usen la API de Shopify (create_product, list_products, scan_store, store_status, optimize_all_products, seo_full_audit, audit_theme, list_themes, etc.). Para esas acciones indica que debe renovar el token en Configuración → Integración Shopify (hay un banner de aviso visible en la plataforma). SÍ puedes ejecutar con datos cacheados: generate_ai_report, financial_forecast, recall_knowledge, brain_status, analyze_external_store, keyword_intelligence, blog_strategy, generate_email_flow, generate_brand_css, generate_brand_guide, agency_proposal, search_suppliers.${cachedDataInfo}`
             : "";
           projectContextInfo = `\n[CONTEXTO PROYECTO ACTIVO: ID=${activeProj.id} (numérico), nombre="${activeProj.name}", dominio="${activeProj.shopDomain}". Token Shopify: ${tokenStatus}.${tokenWarning} USA projectId=${activeProj.id} en TODAS las acciones. El projectId es SIEMPRE el número ${activeProj.id}.]`;
         }
@@ -3239,8 +3263,20 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             tokenValid: !!newToken,
             expiresAt: updated?.tokenExpiresAt,
             hoursRemaining: updated?.tokenExpiresAt ? Math.round((new Date(updated.tokenExpiresAt).getTime() - Date.now()) / 3600000 * 10) / 10 : 0,
-            message: `Token regenerado exitosamente. Válido por ${updated?.tokenExpiresAt ? Math.round((new Date(updated.tokenExpiresAt).getTime() - Date.now()) / 3600000) : 24} horas.`,
+            message: `Token regenerado exitosamente. Válido por ${updated?.tokenExpiresAt ? Math.round((new Date(updated.tokenExpiresAt).getTime() - Date.now()) / 3600000) : 24} horas. Iniciando sincronización automática de datos…`,
+            syncStarted: true,
           };
+
+          // Auto-sync en background: sincronizar productos y SEO tras renovar token
+          setImmediate(async () => {
+            try {
+              await fetch(`http://localhost:${process.env.PORT || 8080}/api/projects/${projectId}/products/sync?statusFilter=any`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
+                body: JSON.stringify({ statusFilter: "any" }),
+              });
+            } catch { /* fire-and-forget */ }
+          });
           break;
         }
   

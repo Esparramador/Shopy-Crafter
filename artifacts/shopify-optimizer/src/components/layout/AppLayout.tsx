@@ -89,6 +89,71 @@ const DEFAULT_ADMIN_NAV = [
   { label: "Conexiones / Integraciones", icon: "🔗", href: "/help/connections" },
 ];
 
+// ─── Token Expired Banner ────────────────────────────────────────────────────
+function TokenExpiredBanner({
+  projectId, domain, tokenExpiresAt, onSettings,
+}: {
+  projectId: number;
+  domain: string | null;
+  tokenExpiresAt: string | null;
+  onSettings: () => void;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
+  const isExpired = tokenExpiresAt && new Date(tokenExpiresAt) < new Date();
+  const expiredSince = isExpired
+    ? new Date(tokenExpiresAt!).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
+    : null;
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "9px 18px",
+      background: "linear-gradient(90deg, rgba(220,60,60,0.13) 0%, rgba(220,60,60,0.07) 100%)",
+      borderBottom: "1px solid rgba(220,60,60,0.30)",
+      fontSize: 12.5,
+      color: "var(--t)",
+      flexWrap: "wrap",
+    }}>
+      <span style={{ fontSize: 16, flexShrink: 0 }}>🔑</span>
+      <span style={{ flex: 1, minWidth: 200 }}>
+        <strong style={{ color: "#f87171" }}>
+          {isExpired ? `Token Shopify expirado${expiredSince ? ` (${expiredSince})` : ""}` : "Token Shopify no configurado"}
+        </strong>
+        {" — "}
+        Las acciones que requieren la API de Shopify están pausadas.
+        {" "}
+        <span style={{ color: "var(--t3)" }}>
+          El asistente usará los datos cacheados del último escaneo para análisis e informes.
+        </span>
+      </span>
+      <button
+        onClick={onSettings}
+        style={{
+          padding: "5px 14px", borderRadius: 6, border: "1px solid rgba(220,60,60,0.50)",
+          background: "rgba(220,60,60,0.15)", color: "#f87171",
+          fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0,
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(220,60,60,0.28)"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(220,60,60,0.15)"; }}
+      >
+        Renovar token →
+      </button>
+      <button
+        onClick={() => setDismissed(true)}
+        title="Cerrar aviso"
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: "var(--t4)", fontSize: 16, padding: "0 2px", flexShrink: 0,
+          lineHeight: 1,
+        }}
+      >×</button>
+    </div>
+  );
+}
+
 export function AppLayout({ children }: AppLayoutProps) {
   const { data: projects, isLoading } = useListProjects();
   const [match, params] = useRoute("/projects/:id/*");
@@ -641,6 +706,19 @@ export function AppLayout({ children }: AppLayoutProps) {
             }}
           >›</button>
         </div>
+
+        {/* Token expired banner */}
+        {activeProject && match && (
+          !activeProject.hasAccessToken ||
+          (activeProject.tokenExpiresAt && new Date(activeProject.tokenExpiresAt) < new Date())
+        ) && (
+          <TokenExpiredBanner
+            projectId={activeProjectId!}
+            domain={activeProject.shopDomain}
+            tokenExpiresAt={activeProject.tokenExpiresAt ?? null}
+            onSettings={() => navigate(`/projects/${activeProjectId}/settings`)}
+          />
+        )}
 
         {/* Page content */}
         <div className="main-content" role="main">
