@@ -140,16 +140,37 @@ export function AppLayout({ children }: AppLayoutProps) {
     adminToastTimer.current = setTimeout(() => setAdminToast(null), 6000);
   }, []);
   const { content: cmsContent } = useCms();
-  const cmsPanel = cmsContent?.adminPanel ?? null;
-  const cmsSite = cmsContent?.site ?? null;
+  const cmsNav    = cmsContent?.adminNav ?? null;
+  const cmsPanel  = cmsContent?.adminPanel ?? null;
+  const cmsSite   = cmsContent?.site ?? null;
   const siteLogoImageUrl: string | null = cmsSite?.logo?.imageUrl ?? null;
   const siteLogoEmoji: string = cmsSite?.logo?.value ?? "💎";
   const siteName: string = cmsSite?.name ?? "Shopy Crafter";
 
-  // Nav siempre viene del código — nunca del CMS (evita sidebars desactualizados en BD)
-  const moduleNav = DEFAULT_MODULE_NAV;
-  const shopybrainNav = DEFAULT_SHOPYBRAIN_NAV;
-  const adminNav: any[] = DEFAULT_ADMIN_NAV;
+  /**
+   * mergeByKey — fusiona items del CMS (fuente de verdad) con los DEFAULTs del código.
+   * - Si el CMS tiene datos: los usa tal cual + añade al final cualquier item del
+   *   DEFAULT que falte (por href/id), para que funcionalidades nuevas aparezcan.
+   * - Si el CMS está vacío: usa los DEFAULTs completos.
+   * Así el CMS SIEMPRE controla el sidebar; el código nunca se impone.
+   */
+  function mergeByHref(dbItems: any[], defaults: any[]): any[] {
+    if (!Array.isArray(dbItems) || dbItems.length === 0) return defaults;
+    const existing = new Set(dbItems.map((i: any) => i.href).filter(Boolean));
+    const missing = defaults.filter((d: any) => d.href && !existing.has(d.href));
+    return [...dbItems, ...missing];
+  }
+  function mergeById(dbItems: any[], defaults: any[]): any[] {
+    if (!Array.isArray(dbItems) || dbItems.length === 0) return defaults;
+    const existing = new Set(dbItems.map((i: any) => i.id).filter(Boolean));
+    const missing = defaults.filter((d: any) => d.id && !existing.has(d.id));
+    return [...dbItems, ...missing];
+  }
+
+  // CMS es la fuente de verdad; merge garantiza que items nuevos del código aparezcan
+  const moduleNav    = mergeById(cmsNav?.modules ?? [], DEFAULT_MODULE_NAV);
+  const shopybrainNav = mergeByHref(cmsNav?.shopybrain ?? [], DEFAULT_SHOPYBRAIN_NAV);
+  const adminNav: any[] = mergeByHref(cmsNav?.admin ?? [], DEFAULT_ADMIN_NAV);
   const firstProjectId: number | null = projects?.[0]?.id ?? null;
   const ap = cmsPanel ?? {};
 

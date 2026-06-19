@@ -837,14 +837,99 @@ function NavArrayEditor({
   );
 }
 
+// Defaults importados aquí para que el editor los muestre cuando el CMS está vacío
+const CMS_DEFAULT_MODULES = [
+  { id: "audit",            label: "Auditoría",              icon: "📊" },
+  { id: "redesign",         label: "Rediseño IA",            icon: "✏️" },
+  { id: "images",           label: "Imágenes",               icon: "🖼" },
+  { id: "consistency",      label: "Consistencia",           icon: "🎨" },
+  { id: "ab-testing",       label: "A/B Testing",            icon: "📈" },
+  { id: "pricing",          label: "Pricing",                icon: "💰" },
+  { id: "seo",              label: "SEO Engine",             icon: "🔍" },
+  { id: "vault",            label: "Repositorio",            icon: "🗄️" },
+  { id: "exports",          label: "Exportar",               icon: "📥" },
+  { id: "generator",        label: "Generador IA",           icon: "✨" },
+  { id: "web-lab",          label: "Lab Web IA",             icon: "🔬" },
+  { id: "fusion-studio",    label: "Studio Fotografía IA",   icon: "🧬" },
+  { id: "fusion-studio-pro",label: "Studio Multimedia Pro",  icon: "⚡" },
+  { id: "cards",            label: "Studio de Cards",        icon: "💳" },
+  { id: "campaign-kit",     label: "Kit de Campañas",        icon: "🎬" },
+  { id: "exploded-view",    label: "Vista Explosionada",     icon: "💥" },
+  { id: "ad-studio",        label: "Studio de Anuncios",     icon: "📺" },
+  { id: "tripo3d",          label: "Tripo 3D Studio",        icon: "🧊" },
+  { id: "meshy",            label: "Meshy Characters",       icon: "🧊✨" },
+  { id: "web-designer",     label: "Diseñador Web IA",       icon: "🎨" },
+  { id: "effects-studio",   label: "Studio de Efectos",      icon: "✦" },
+  { id: "suppliers",        label: "Proveedores",            icon: "🏭" },
+];
+const CMS_DEFAULT_SHOPYBRAIN = [
+  { href: "/admin/shopybrain",        icon: "🧠",  label: "Centro Shopy Crafter" },
+  { href: "/admin/command-center",    icon: "⚡",  label: "Centro de Comando" },
+  { href: "/admin/shopybrain/memories",icon: "💾", label: "Memorias" },
+  { href: "/admin/shopybrain/insights",icon: "🔬", label: "Knowledge Domains" },
+  { href: "/admin/brain-sync",        icon: "🔄",  label: "Brain Sync" },
+  { href: "/admin/shopybrain/study",  icon: "📚",  label: "Sesiones Estudio" },
+  { href: "/admin/my-pricing",        icon: "💰",  label: "Mi Pricing CFO" },
+  { href: "/admin/emails",            icon: "📧",  label: "Email Marketing" },
+  { href: "/admin/email-flows",       icon: "🔁",  label: "Flujos de Email" },
+  { href: "/admin/cms",               icon: "✏️",  label: "CMS Editor" },
+  { href: "/admin/prompt-library",    icon: "🏛",  label: "Librería de Prompts" },
+  { href: "/web-lab",                 icon: "🔬",  label: "Lab Web IA" },
+  { href: "/web-designer",            icon: "🎨",  label: "Diseñador Web IA" },
+  { href: "/effects-studio",          icon: "✦",   label: "Effects Studio" },
+  { href: "/fusion-studio",           icon: "🧬",  label: "Studio Fotografía IA" },
+  { href: "/fusion-studio-pro",       icon: "⚡",  label: "Studio Multimedia Pro" },
+  { href: "/ad-studio",               icon: "📺",  label: "Studio de Anuncios" },
+  { href: "/cards",                   icon: "💳",  label: "Studio de Cards" },
+  { href: "/campaign-kit",            icon: "🎬",  label: "Kit de Campañas" },
+  { href: "/exploded-view",           icon: "💥",  label: "Vista Explosionada" },
+  { href: "/generator",               icon: "✨",  label: "Generador IA" },
+  { href: "/exports",                 icon: "📥",  label: "Exportar" },
+  { href: "/suppliers",               icon: "🏭",  label: "Proveedores" },
+  { href: "/admin/vault",             icon: "🏦",  label: "Bóveda Global" },
+  { href: "/admin/search",            icon: "🔎",  label: "Buscador Universal" },
+  { href: "/admin/template-studio",   icon: "🎨",  label: "Template Studio" },
+  { href: "/admin/avatar-studio",     icon: "🎬",  label: "Avatar Studio" },
+  { href: "/admin/meshy-studio",      icon: "🧊",  label: "Meshy Character Lab" },
+  { href: "/admin/mcp-manager",       icon: "🔌",  label: "MCP Manager" },
+  { label: "── STUDIO IA ──",         icon: "",    href: "#", divider: true },
+  { href: "/admin/amr-studio",        icon: "🤖",  label: "AMR Studio" },
+  { href: "/admin/skills-library",    icon: "📚",  label: "Librería de Skills" },
+  { href: "/admin/design-systems",    icon: "🎨",  label: "Design Systems" },
+  { href: "/admin/plugins-catalog",   icon: "🔌",  label: "Catálogo de Plugins" },
+  { href: "/admin/hyperframes",       icon: "🖼",  label: "HyperFrames Studio" },
+  { href: "/admin/deck-builder",      icon: "📊",  label: "Deck Builder" },
+];
+const CMS_DEFAULT_ADMIN = [
+  { href: "/admin/clients",       icon: "👥", label: "CRM Clientes" },
+  { href: "/admin/messages",      icon: "💬", label: "Mensajes Clientes" },
+  { href: "/admin/products",      icon: "📦", label: "Productos Global" },
+  { href: "/admin/abtests",       icon: "📈", label: "A/B Tests Global" },
+  { href: "/admin/automations",   icon: "⚡", label: "Automaciones" },
+  { href: "/admin/revenue",       icon: "💰", label: "Revenue & CRM" },
+  { href: "/admin/billing",       icon: "💳", label: "Facturación & Plan" },
+  { href: "/admin/intelligence",  icon: "📊", label: "Revenue Intel" },
+  { href: "/admin/gemini-intel",  icon: "🔬", label: "Gemini Research" },
+  { href: "/admin/inventory",     icon: "🗄", label: "M7 Inventario" },
+  { href: "/admin/competitors",   icon: "🎯", label: "Competitor Intel" },
+  { href: "/admin/forecast",      icon: "🔮", label: "Predicciones ML" },
+  { href: "/admin/achievements",  icon: "🏆", label: "Logros" },
+  { href: "/admin/roadmap",       icon: "🗺", label: "Plan 30-60-90" },
+  { href: "/admin/apk",           icon: "📱", label: "APK Android" },
+  { href: "/tienda",              icon: "🛒", label: "Tienda / Store" },
+  { href: "/admin/system",        icon: "🖥", label: "System Health" },
+  { href: "/help/connections",    icon: "🔗", label: "Conexiones / Integraciones" },
+];
+
 function NavSectionEditor({ content, onChange }: {
   content: Record<string, unknown>;
   onChange: (path: string, value: unknown) => void;
 }) {
   const adminNav = (content as any)?.adminNav ?? {};
-  const modules = Array.isArray(adminNav.modules) ? adminNav.modules : [];
-  const shopybrain = Array.isArray(adminNav.shopybrain) ? adminNav.shopybrain : [];
-  const admin = Array.isArray(adminNav.admin) ? adminNav.admin : [];
+  // Si el CMS no tiene datos aún, muestra los defaults para que el editor sea útil
+  const modules    = Array.isArray(adminNav.modules)    && adminNav.modules.length    > 0 ? adminNav.modules    : CMS_DEFAULT_MODULES;
+  const shopybrain = Array.isArray(adminNav.shopybrain) && adminNav.shopybrain.length > 0 ? adminNav.shopybrain : CMS_DEFAULT_SHOPYBRAIN;
+  const admin      = Array.isArray(adminNav.admin)      && adminNav.admin.length      > 0 ? adminNav.admin      : CMS_DEFAULT_ADMIN;
 
   return (
     <div>
