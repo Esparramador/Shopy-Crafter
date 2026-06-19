@@ -7,15 +7,18 @@ interface AIModel {
   id: string;
   name: string;
   provider: string;
-  category: string;
+  category?: string;
   contextWindow: number;
-  maxOutput: number;
-  strengths: string[];
-  speed: "ultra-fast" | "fast" | "medium" | "slow";
-  costTier: "free" | "low" | "medium" | "high" | "very-high";
-  supportsStreaming: boolean;
-  supportsVision: boolean;
-  supportsTools: boolean;
+  maxOutput?: number;
+  strengths?: string[];
+  tags?: string[];
+  speed?: "ultra-fast" | "fast" | "medium" | "slow";
+  costTier?: "free" | "low" | "medium" | "high" | "very-high";
+  supportsStreaming?: boolean;
+  supportsVision?: boolean;
+  supportsTools?: boolean;
+  isPremium?: boolean;
+  isAvailable?: boolean;
   description: string;
 }
 
@@ -152,7 +155,7 @@ export default function AMRStudio() {
   }
 
   const providers = [...new Set(models.map(m => m.provider))];
-  const categories = [...new Set(models.map(m => m.category))];
+  const categories = [...new Set(models.map(m => m.category).filter(Boolean))] as string[];
   const filtered = models.filter(m =>
     (!filterProvider || m.provider === filterProvider) &&
     (!filterCategory || m.category === filterCategory)
@@ -312,15 +315,13 @@ export default function AMRStudio() {
                     </div>
                     <div style={{ fontSize: 12, color: "var(--t3)", marginBottom: 10 }}>{model.description}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-                      {model.strengths.slice(0, 3).map(s => (
+                      {(model.strengths || model.tags || []).slice(0, 3).map(s => (
                         <span key={s} style={{ background: "var(--s2)", borderRadius: 4, padding: "2px 7px", fontSize: 11, color: "var(--t2)" }}>{s}</span>
                       ))}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 11 }}>
-                      <span style={{ color: speed?.color }}>{speed?.label}</span>
-                      <span style={{ color: "var(--t3)" }}>·</span>
-                      <span style={{ color: cost?.color }}>{cost?.label}</span>
-                      <span style={{ color: "var(--t3)" }}>·</span>
+                      {speed && <><span style={{ color: speed.color }}>{speed.label}</span><span style={{ color: "var(--t3)" }}>·</span></>}
+                      {cost && <><span style={{ color: cost.color }}>{cost.label}</span><span style={{ color: "var(--t3)" }}>·</span></>}
                       <span style={{ color: "var(--t3)" }}>{(model.contextWindow / 1000).toFixed(0)}k ctx</span>
                       <button
                         onClick={e => { e.stopPropagation(); generateSingle(model.id); }}
