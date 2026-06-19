@@ -574,6 +574,12 @@ function Router() {
         <Route path="/ad-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><AdStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
+        <Route path="/tripo3d">
+          <RequireAdmin><AdminWrapper><AppLayout><S><Tripo3DStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/meshy">
+          <RequireAdmin><AdminWrapper><AppLayout><S><MeshyStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
 
         {/* Studio IA routes */}
         <Route path="/admin/amr-studio">
