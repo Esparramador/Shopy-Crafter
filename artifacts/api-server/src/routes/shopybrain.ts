@@ -792,6 +792,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Ir a Card Studio / abrir Card Studio / quiero ir al studio de tarjetas → directamente di la ruta: /projects/{projectId}/cards
   - Informe por niveles / informe nivel 2 / generar nivel 3 / report nivel / informe profesional / informe enterprise → run_leveled_report (genera informe con sistema de 5 niveles). Params: {projectId, type (tipo de informe), level (1-5), template?}
   - Subir archivo / procesar archivo / analizar archivo / importar archivo / CSV / PDF / Excel → upload_file (procesa archivo subido). Params: {fileContext? (descripción del archivo)}
+  - Abrir web / navegar a / ir a / abre / visita / accede a / abre YouTube / pon canción / busca en Google / busca en YouTube / busca en internet / scraping / extrae info de web / analiza página / ¿qué dice esta web? / busca información online → browser_action (controla navegador real Chromium, navega, hace clic, escribe, hace capturas, extrae texto). Params: {goal (descripción en lenguaje natural de qué hacer), steps? (array de pasos explícitos si se quiere control preciso), url? (URL directa si es "abrir esta URL"), scrapeUrl? (URL para scraping)}. PASOS DISPONIBLES: navigate(url), type(selector,text), click(selector), click_text(text), press(key), wait(ms), screenshot(label?), get_url, get_text(selector?), scroll(direction,amount), search(engine:"google"|"youtube"|"bing", query), evaluate(script). RECETAS AUTOMÁTICAS: si el goal menciona "youtube" → busca en YouTube y abre el primer vídeo; si menciona "google" o "buscar" → búsqueda Google con capturas; si es una URL → abre y toma captura; cualquier otra cosa → búsqueda Google. EJEMPLOS: {goal:"Abre YouTube y pon canción de Omar Montes"} / {goal:"Busca en Google precio del oro hoy"} / {goal:"Navega a amazon.es y busca auriculares"} / {goal:"Extrae los precios de esta web", scrapeUrl:"https://ejemplo.com"}
   
   SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
   Somos Shopy Crafter, una agencia de optimización IA para tiendas Shopify, disponible 24/7. Nuestros servicios incluyen:
@@ -10704,6 +10705,76 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             scriptId: savedId,
             message: `📝 Script cinematográfico guardado (id ${savedId}). Reutilízalo en create_long_ad pasando savedPromptId="${savedId}".`,
           };
+          break;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // BROWSER AGENT — Navegación real con Puppeteer/Chromium
+        // ══════════════════════════════════════════════════════════════════
+        case "browser_action": {
+          const { executeBrowserAgent, BrowserRecipes, extractYoutubeVideoId } = await import("../lib/browser-agent.js");
+          const goal: string = params?.goal || "Navegar a una página web";
+          let steps = params?.steps;
+
+          // Si no vienen steps explícitos, usar recetas automáticas según goal
+          if (!steps || !Array.isArray(steps) || steps.length === 0) {
+            const g = goal.toLowerCase();
+            if (/youtube/.test(g)) {
+              // Extraer query de búsqueda del goal
+              const searchMatch = goal.match(/(?:busca?r?|search|pon|play|reproduce|abre?|encuentra?)\s+(?:en\s+youtube\s+)?(.+?)(?:\s+en\s+youtube)?$/i);
+              const ytQuery = searchMatch?.[1] || goal;
+              steps = BrowserRecipes.youtubeSearch(ytQuery);
+            } else if (/google|buscar|search/.test(g)) {
+              const searchMatch = goal.match(/(?:busca?r?|search)\s+(?:en\s+google\s+)?(.+?)(?:\s+en\s+google)?$/i);
+              const googleQuery = searchMatch?.[1] || goal;
+              steps = BrowserRecipes.googleSearch(googleQuery);
+            } else if (/^https?:\/\//.test(goal) || params?.url) {
+              steps = BrowserRecipes.openUrl(params?.url || goal);
+            } else if (params?.scrapeUrl) {
+              steps = BrowserRecipes.webScrape(params.scrapeUrl, params?.selector);
+            } else {
+              // Búsqueda Google genérica
+              steps = BrowserRecipes.googleSearch(goal);
+            }
+          }
+
+          try {
+            const agentResult = await executeBrowserAgent({
+              goal,
+              steps,
+              viewport: params?.viewport,
+              timeout: params?.timeout || 30000,
+            });
+
+            const screenshots = agentResult.screenshots.map((s: { label: string; base64: string }) => ({
+              label: s.label,
+              dataUrl: `data:image/jpeg;base64,${s.base64}`,
+            }));
+
+            // Si hay URL de YouTube, extraer video ID para embed
+            let youtubeEmbed: string | undefined;
+            if (agentResult.finalUrl) {
+              const ytId = extractYoutubeVideoId(agentResult.finalUrl);
+              if (ytId) youtubeEmbed = `https://www.youtube.com/embed/${ytId}`;
+            }
+
+            result = {
+              success: agentResult.success,
+              goal,
+              finalUrl: agentResult.finalUrl,
+              screenshots,
+              youtubeEmbed,
+              extractedText: agentResult.extractedText?.slice(0, 2000),
+              stepsExecuted: agentResult.steps.length,
+              stepsOk: agentResult.steps.filter((s: { success: boolean }) => s.success).length,
+              message: agentResult.success
+                ? `🌐 **Tarea de navegación completada**\n\n${agentResult.summary}\n${agentResult.finalUrl ? `\n🔗 URL: ${agentResult.finalUrl}` : ""}${youtubeEmbed ? "\n\n▶️ Video encontrado — incrustado abajo." : ""}`
+                : `❌ **Error en navegación**: ${agentResult.error}\n\n${agentResult.summary}`,
+              browserType: "chromium",
+            };
+          } catch (err) {
+            result = { error: true, message: `❌ Error al lanzar el agente de navegación: ${err instanceof Error ? err.message : String(err)}` };
+          }
           break;
         }
 

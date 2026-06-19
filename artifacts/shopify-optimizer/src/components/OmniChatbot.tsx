@@ -30,11 +30,23 @@ interface Message {
 }
 
 interface ChatAction {
-  type: "klaviyo-workflow" | "absorb-result" | "entity-research" | "shopify-action" | "supplier-research";
+  type: "klaviyo-workflow" | "absorb-result" | "entity-research" | "shopify-action" | "supplier-research" | "browser-action";
   label: string;
   data: unknown;
   actionName?: string;
   formattedContent?: string;
+}
+
+interface BrowserActionResult {
+  success: boolean;
+  goal: string;
+  finalUrl?: string;
+  screenshots: Array<{ label: string; dataUrl: string }>;
+  youtubeEmbed?: string;
+  extractedText?: string;
+  stepsExecuted: number;
+  stepsOk: number;
+  message: string;
 }
 
 interface EntityResearchResult {
@@ -1554,6 +1566,18 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       case "analyze_external_store":
       case "external_pre_report":
         return `🔍 **Análisis de tienda externa:**\n${result.message || "Análisis completado."}${result.savedToVault ? "\n\n💾 Informe guardado en el vault." : ""}`;
+      case "browser_action": {
+        const br = result as BrowserActionResult;
+        if (!br.success) return `❌ **Error de navegación**: ${br.message}`;
+        let msg = `🌐 **Navegación completada** — "${br.goal}"\n`;
+        msg += `✅ ${br.stepsOk}/${br.stepsExecuted} pasos ejecutados\n`;
+        if (br.finalUrl) msg += `🔗 URL final: ${br.finalUrl}\n`;
+        if (br.screenshots?.length) msg += `📸 ${br.screenshots.length} captura(s) tomadas\n`;
+        if (br.youtubeEmbed) msg += `\n▶️ **Vídeo de YouTube encontrado** — incrustado abajo.`;
+        if (br.extractedText) msg += `\n\n📄 **Texto extraído (fragmento):**\n${br.extractedText.slice(0, 400)}...`;
+        return msg;
+      }
+
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
     }
@@ -2015,8 +2039,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               if (actionResult) {
                 const formatted = formatActionResult(act.action, actionResult);
                 results.push(formatted);
-                const actionType = act.action === "search_suppliers" ? "supplier-research" : "shopify-action";
-                action = { type: actionType as ChatAction["type"], label: actionType === "supplier-research" ? "Descargar informe" : "Ver resultado", data: actionResult, actionName: act.action, formattedContent: formatted };
+                const actionType = act.action === "search_suppliers" ? "supplier-research"
+                  : act.action === "browser_action" ? "browser-action"
+                  : "shopify-action";
+                action = { type: actionType as ChatAction["type"], label: actionType === "supplier-research" ? "Descargar informe" : actionType === "browser-action" ? "Ver navegación" : "Ver resultado", data: actionResult, actionName: act.action, formattedContent: formatted };
               }
             }
             if (results.length > 0) {
@@ -2228,6 +2254,49 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       {msg.action?.type === "entity-research" && (
                         <EntityResearchCard data={msg.action.data as EntityResearchResult} />
                       )}
+                      {msg.action?.type === "browser-action" && (() => {
+                        const br = msg.action!.data as BrowserActionResult;
+                        if (!br) return null;
+                        return (
+                          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                            {br.youtubeEmbed && (
+                              <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--ink3)" }}>
+                                <div style={{ padding: "6px 10px", background: "rgba(255,0,0,0.12)", display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontSize: 14 }}>▶️</span>
+                                  <span style={{ fontSize: 11, color: "#ff4040", fontWeight: 600 }}>YouTube</span>
+                                  {br.finalUrl && <a href={br.finalUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "var(--gold)", marginLeft: "auto", textDecoration: "none" }}>Abrir en nueva pestaña ↗</a>}
+                                </div>
+                                <iframe
+                                  src={br.youtubeEmbed}
+                                  width="100%"
+                                  height="220"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                  style={{ border: "none", display: "block" }}
+                                />
+                              </div>
+                            )}
+                            {!br.youtubeEmbed && br.finalUrl && (
+                              <a href={br.finalUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.3)", borderRadius: 8, fontSize: 11, color: "var(--gold)", textDecoration: "none", width: "fit-content" }}>
+                                🔗 Abrir URL: {br.finalUrl.length > 50 ? br.finalUrl.slice(0, 50) + "..." : br.finalUrl}
+                              </a>
+                            )}
+                            {br.screenshots && br.screenshots.length > 0 && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                {br.screenshots.map((sc, i) => (
+                                  <div key={i} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--ink3)" }}>
+                                    <div style={{ padding: "4px 10px", background: "var(--ink2)", fontSize: 10, color: "var(--t3)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                      <span>📸 {sc.label}</span>
+                                      <a href={sc.dataUrl} download={`${sc.label}.jpg`} style={{ color: "var(--gold)", textDecoration: "none", fontSize: 10 }}>⬇ Descargar</a>
+                                    </div>
+                                    <img src={sc.dataUrl} alt={sc.label} style={{ width: "100%", display: "block", maxHeight: 300, objectFit: "cover" }} />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {msg.action?.actionName && (() => {
                         const prods = extractProductsFromAction(msg.action!.actionName!, msg.action!.data);
                         return prods ? <ProductCardsGrid products={prods} /> : null;
