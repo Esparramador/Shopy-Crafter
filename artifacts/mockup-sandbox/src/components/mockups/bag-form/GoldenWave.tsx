@@ -209,9 +209,10 @@ export function GoldenWave() {
         .play-btn:hover{transform:scale(1.08)!important}
       `}</style>
 
-      {/* VIDEO */}
+      {/* VIDEO — objectPosition adaptativo: portrait → 22% center, wide → left center */}
       <video key={replay} ref={videoRef} muted playsInline src={VID_SRC} poster={POSTER_SRC}
-        style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:"left center", zIndex:1 }} />
+        style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover",
+          objectPosition: narrowPortrait ? "22% center" : "left center", zIndex:1 }} />
 
       {/* Gradient */}
       <div style={{ position:"absolute", inset:0, pointerEvents:"none", zIndex:2, background:overlayGrad }} />

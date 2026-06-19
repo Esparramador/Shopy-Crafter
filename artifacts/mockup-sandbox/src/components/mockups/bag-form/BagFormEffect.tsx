@@ -230,11 +230,13 @@ export function BagFormEffect() {
         .bf-play-btn:hover{transform:scale(1.09)!important}
       `}</style>
 
-      {/* VIDEO */}
+      {/* VIDEO — objectPosition adaptativo: portrait → 22% center, wide → left center */}
       <video key={replay} ref={videoRef} muted playsInline preload="auto"
         src={VID_SRC} poster={POSTER_SRC}
         style={{ position:"absolute", inset:0, width:"100%", height:"100%",
-          objectFit:"cover", objectPosition:"left center", zIndex:1 }}
+          objectFit:"cover",
+          objectPosition: narrowPortrait ? "22% center" : "left center",
+          zIndex:1 }}
       />
 
       {/* Gradient overlay */}
@@ -245,7 +247,7 @@ export function BagFormEffect() {
         <div onClick={startPlay} style={{ position:"absolute", inset:0, zIndex:40, cursor:"pointer",
           display:"flex", alignItems:"center", justifyContent:"center" }}>
           <img src={POSTER_SRC} alt="" style={{ position:"absolute", inset:0, width:"100%", height:"100%",
-            objectFit:"cover", objectPosition:"left center" }} />
+            objectFit:"cover", objectPosition: narrowPortrait ? "22% center" : "left center" }} />
           <div style={{ position:"absolute", inset:0, background:"rgba(5,3,12,.72)" }} />
           <div style={{ position:"relative", textAlign:"center", padding:"0 24px" }}>
             <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.22em", color:"rgba(212,168,67,.72)",

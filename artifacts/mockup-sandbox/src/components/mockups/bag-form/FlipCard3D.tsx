@@ -205,9 +205,10 @@ export function FlipCard3D() {
         .f3d-input:focus{border-color:rgba(212,168,67,.7)!important;box-shadow:0 0 0 3px rgba(212,168,67,.12)!important}
       `}</style>
 
-      {/* VIDEO — full screen fiable con position:absolute + inset:0 + cover */}
+      {/* VIDEO — objectPosition adaptativo: portrait → 22% center, wide → left center */}
       <video key={replay} ref={videoRef} muted playsInline src={VID_SRC} poster={POSTER_SRC}
-        style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:"left center", zIndex:1 }} />
+        style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover",
+          objectPosition: narrowPortrait ? "22% center" : "left center", zIndex:1 }} />
 
       {/* Gradient */}
       <div style={{ position:"absolute", inset:0, pointerEvents:"none", zIndex:2, background:overlayGrad }} />
@@ -216,7 +217,8 @@ export function FlipCard3D() {
       {!videoStarted && (
         <div onClick={startPlay} style={{ position:"absolute", inset:0, zIndex:40, cursor:"pointer",
           display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-          <img src={POSTER_SRC} alt="" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:"left center" }} />
+          <img src={POSTER_SRC} alt="" style={{ position:"absolute", inset:0, width:"100%", height:"100%",
+            objectFit:"cover", objectPosition: narrowPortrait ? "22% center" : "left center" }} />
           <div style={{ position:"absolute", inset:0, background:"rgba(5,3,12,.68)" }} />
           <div style={{ position:"relative", textAlign:"center", padding:"0 20px" }}>
             <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.2em", color:"rgba(212,168,67,.7)", textTransform:"uppercase", marginBottom:20 }}>
