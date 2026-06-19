@@ -138,17 +138,23 @@ router.post("/agency/analyze-pricing", requireAdmin, async (_req, res): Promise<
       0, userMsg, systemPrompt, "pricing", undefined, 16000,
     );
   
-    const recs = (analysis as { recommendations?: Array<{ serviceId?: string; suggestedPrice?: number; reasoning?: string; confidence?: number; currentPrice?: number }> }).recommendations;
+    const recs = (analysis as { recommendations?: Array<{ serviceId?: string | number; suggestedPrice?: number; reasoning?: string; confidence?: number; currentPrice?: number }> }).recommendations;
     if (recs?.length) {
       for (const rec of recs) {
-        if (rec.serviceId) {
+        const sid = rec.serviceId != null ? String(rec.serviceId) : null;
+        if (!sid) continue;
+        const suggestedPrice = rec.suggestedPrice != null ? Number(rec.suggestedPrice) : undefined;
+        const confidence = rec.confidence != null ? Number(rec.confidence) : undefined;
+        try {
           await db.update(serviceCatalogTable).set({
-            priceSuggested: rec.suggestedPrice,
+            priceSuggested: suggestedPrice,
             omnicoreRecommendation: rec.reasoning,
-            omnicoreConfidence: rec.confidence,
-            priceChangeSuggested: (rec.suggestedPrice ?? 0) - (rec.currentPrice ?? 0),
+            omnicoreConfidence: confidence,
+            priceChangeSuggested: (suggestedPrice ?? 0) - (rec.currentPrice ?? 0),
             lastPriceReview: new Date(),
-          }).where(eq(serviceCatalogTable.id, rec.serviceId));
+          }).where(eq(serviceCatalogTable.id, sid));
+        } catch (updateErr) {
+          console.warn("Failed to update service pricing rec", sid, updateErr);
         }
       }
     }

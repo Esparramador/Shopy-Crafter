@@ -137,22 +137,82 @@ function healFooterColumns(merged: Record<string, unknown>, defaults: Record<str
   }
 }
 
+function applyRealisticPatch(content: Record<string, unknown>): { patched: Record<string, unknown>; changed: boolean } {
+  let changed = false;
+  const c = JSON.parse(JSON.stringify(content)) as Record<string, any>;
+
+  // Parche 1: Eliminar métricas inventadas en stats ("↑340%", "+2.8K", "99.9% Uptime garantizado")
+  const stats = c.stats as any[] | undefined;
+  if (Array.isArray(stats) && stats.some((s: any) => s.num === "↑340%" || s.num === "+2.8K")) {
+    c.stats = (DEFAULT_CMS_CONTENT as any).stats;
+    changed = true;
+  }
+
+  // Parche 2: Eliminar testimonios inventados ("María González", "Miguel Rodríguez" con +128% inventado)
+  const testimonialItems = (c.testimonials as any)?.items;
+  if (Array.isArray(testimonialItems) && testimonialItems.some((t: any) =>
+    t.author === "María González" || (t.author === "Miguel Rodríguez" && t.metric === "↑ +128% conversión en 3 semanas")
+  )) {
+    (c.testimonials as any).items = [];
+    changed = true;
+  }
+
+  // Parche 3: Eliminar promesas falsas en hero.trustItems
+  const trustItems = (c.hero as any)?.trustItems;
+  if (Array.isArray(trustItems) && (trustItems.includes("Sin tarjeta de crédito") || trustItems.includes("Cancela cuando quieras"))) {
+    (c.hero as any).trustItems = ["Setup en menos de 48h", "IA real con API Shopify", "RGPD compliant"];
+    changed = true;
+  }
+
+  // Parche 4: Eliminar "Imágenes IA ilimitadas" de planes de precios
+  const plans = (c.pricing as any)?.plans;
+  if (Array.isArray(plans)) {
+    for (const plan of plans) {
+      if (Array.isArray(plan.features)) {
+        for (const feat of plan.features) {
+          if (feat.text === "Imágenes IA ilimitadas") {
+            feat.text = "Imágenes IA (~€0.25 por imagen, coste real API)";
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+
+  // Parche 5: CTA sin promesas falsas
+  const cta = c.cta as any | undefined;
+  if (cta?.finePrint === "Sin tarjeta de crédito · Cancela cuando quieras") {
+    cta.finePrint = "Sin spam. Solo te contactamos para hablar de tu proyecto.";
+    changed = true;
+  }
+  if (typeof cta?.subheadline === "string" && cta.subheadline.includes("200 tiendas")) {
+    cta.subheadline = "Cuéntanos tu caso y te preparamos una propuesta personalizada sin compromiso.";
+    changed = true;
+  }
+
+  return { patched: c, changed };
+}
+
 async function getOrInitContent() {
   const rows = await db.select().from(cmsContent).limit(1);
   if (rows.length > 0) {
     const merged = deepMergeDefaults(DEFAULT_CMS_CONTENT as Record<string, unknown>, rows[0].content as Record<string, unknown>);
     const healed = healFooterColumns(merged, DEFAULT_CMS_CONTENT as Record<string, unknown>);
-    // Si hubo healing, persistimos para que los próximos reads no necesiten heal otra vez.
-    if (healed !== merged) {
+
+    // Aplicar parche de contenido realista (elimina métricas inventadas y promesas falsas)
+    const { patched, changed: patchChanged } = applyRealisticPatch(healed as Record<string, unknown>);
+    const final = patchChanged ? patched : healed;
+
+    // Si hubo healing o patch, persistimos para que los próximos reads no necesiten reparar otra vez.
+    if (healed !== merged || patchChanged) {
       try {
         const newVersion = rows[0].version + 1;
         await db.update(cmsContent)
-          .set({ content: healed, version: newVersion, updatedAt: new Date() })
+          .set({ content: final, version: newVersion, updatedAt: new Date() })
           .where(eq(cmsContent.id, rows[0].id));
-        // Notifica a editores conectados por SSE para que recarguen.
-        try { invalidateCache("cms-"); broadcast("content_updated", { path: "footer.columns", value: (healed as any).footer?.columns, version: newVersion, source: "auto-heal" }); } catch {}
+        try { invalidateCache("cms-"); broadcast("content_updated", { path: "_auto_patch", value: null, version: newVersion, source: "realistic-patch" }); } catch {}
       } catch {}
-      return { ...rows[0], content: healed };
+      return { ...rows[0], content: final };
     }
     return { ...rows[0], content: merged };
   }

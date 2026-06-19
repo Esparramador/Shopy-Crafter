@@ -26,6 +26,9 @@ const DIRECTION_CONFIG = {
   ok: { icon: Minus, color: "var(--jade)", label: "✓ Correcto" },
 };
 
+const fmtMoney = (n?: number | null) =>
+  n != null && n > 0 ? `€${Math.round(n).toLocaleString("es-ES")}` : "€0";
+
 export default function MyPricing() {
   const [costs, setCosts] = useState<CostStructure | null>(null);
   const [services, setServices] = useState<Service[]>([]);
@@ -472,11 +475,11 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
                             <div style={{ fontSize: 13, fontWeight: 600 }}>{svc.serviceName}</div>
                             <div style={{ fontSize: 11, color: "var(--t3)" }}>{svc.ourPositioning}</div>
                           </td>
-                          <td style={{ padding: "12px 14px", fontSize: 13, color: "var(--t2)" }}>€{svc.totalCost?.toFixed(0)}</td>
+                          <td style={{ padding: "12px 14px", fontSize: 13, color: "var(--t2)" }}>{fmtMoney(svc.totalCost)}</td>
                           <td style={{ padding: "12px 14px" }}>
-                            <span style={{ fontSize: 14, fontWeight: 700 }}>€{svc.priceCurrent?.toFixed(0)}</span>
-                            {svc.priceSuggested && svc.priceChangeSuggested && Math.abs(svc.priceChangeSuggested) > 5 && (
-                              <span style={{ fontSize: 11, color: cfg.color, display: "block" }}>→ €{svc.priceSuggested?.toFixed(0)}</span>
+                            <span style={{ fontSize: 14, fontWeight: 700 }}>{fmtMoney(svc.priceCurrent)}</span>
+                            {Math.round(svc.priceSuggested ?? 0) > 0 && svc.priceChangeSuggested && Math.abs(svc.priceChangeSuggested) > 5 && (
+                              <span style={{ fontSize: 11, color: cfg.color, display: "block" }}>→ {fmtMoney(svc.priceSuggested)}</span>
                             )}
                           </td>
                           <td style={{ padding: "12px 14px" }}>
@@ -484,7 +487,7 @@ ${c.additionalNotes ? `<p><strong>Notas:</strong> ${c.additionalNotes}</p>` : ""
                               {margin ?? 0}%
                             </span>
                           </td>
-                          <td style={{ padding: "12px 14px", fontSize: 13, color: "var(--t2)" }}>€{svc.marketAvgPrice?.toFixed(0)}</td>
+                          <td style={{ padding: "12px 14px", fontSize: 13, color: "var(--t2)" }}>{fmtMoney(svc.marketAvgPrice)}</td>
                           <td style={{ padding: "12px 14px" }}>
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
                               <Icon size={14} color={cfg.color} style={{ marginTop: 2, flexShrink: 0 }} />

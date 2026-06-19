@@ -42,7 +42,7 @@ export const DEFAULT_CMS_CONTENT = {
     ctaPrimary: { label: "Descubre nuestros planes→", href: "#cta" },
     ctaSecondary: { label: "▶ Ver en acción", href: "#how" },
     ctaApk: { label: "📱 Descargar App Android", href: "#" },
-    trustItems: ["Sin tarjeta de crédito", "Setup en 5 minutos", "Cancela cuando quieras", "RGPD compliant"],
+    trustItems: ["Setup en menos de 48h", "IA real con API Shopify", "RGPD compliant"],
     scrollHint: "Desliza para explorar",
     imageUrl: null as string | null,
     demo: {
@@ -143,7 +143,7 @@ export const DEFAULT_CMS_CONTENT = {
         features: [
           { text: "Todo lo de Emprendedor +", included: true },
           { text: "Productos ilimitados optimizados con IA", included: true },
-          { text: "Imágenes IA ilimitadas", included: true },
+          { text: "Imágenes IA (~€0.25 por imagen, coste real API)", included: true },
           { text: "SEO técnico completo (schemas, keywords, metas)", included: true },
           { text: "3 informes profesionales/mes (Nivel 2 — con guía)", included: true },
           { text: "A/B testing visual en 3 productos simultáneos", included: true },
@@ -163,8 +163,8 @@ export const DEFAULT_CMS_CONTENT = {
           { text: "Auto-pilot 24/7: optimización continua autónoma", included: true },
           { text: "6 informes especializados incluidos (Nivel 3 — Producido)", included: true },
           { text: "Pricing predictivo con simulación de escenarios", included: true },
-          { text: "Email marketing automation (Klaviyo)", included: true },
-          { text: "Custom AI fine-tuning para tu vertical", included: true },
+          { text: "Automatizaciones avanzadas (webhooks + cron)", included: true },
+          { text: "Análisis de competidores con IA", included: true },
           { text: "Soporte prioritario (<4h)", included: true },
           { text: "Multi-tienda y API privada", included: false },
           { text: "White-label", included: false },
