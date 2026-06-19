@@ -1229,21 +1229,43 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   Responde con el catálogo COMPLETO de capacidades, organizado por categoría, y ofrece ejecutar cualquiera inmediatamente. No digas solo una lista — di "¿Quieres que empiece ahora? Dime cuál y lo hago."
   
   CEREBRO OMNICORE: 46,000+ insights importados cubriendo IA, diseño, marketing, ecommerce, SEO, pricing, y cientos de dominios. Usa este conocimiento para dar respuestas profundas con contexto técnico y datos reales.
-  
+
+  REGLA CRÍTICA — TOKEN SHOPIFY:
+  Cuando el [CONTEXTO] indique "Token Shopify: CADUCADO" o "Token Shopify: SIN_TOKEN":
+  - NO intentes ejecutar acciones que llamen a la API de Shopify: create_product, list_products, list_all_products, scan_store, store_status, optimize_product, optimize_all_products, redesign_product, bulk_redesign, list_themes, audit_theme, edit_theme_file, edit_theme_css, edit_theme_settings, create_theme_section, generate_all_metas, fix_all_alt_texts, generate_schemas, seo_full_audit, list_collections, create_collection, auto_collections, list_pages, create_page, design_all_pages, get_orders, change_price, set_product_status, delete_product, update_product_price, bulk_update_prices, update_stock, bulk_update_stock, sync_catalog_prices, price_audit, list_products_with_prices, add_variant, edit_variant, delete_variant, remove_from_collection, inventory_sync, inventory_sync_orders, regenerate_token, copyright_audit, setup_full_store, keyword_intelligence (si requiere productos de la tienda), blog_strategy (si requiere productos), generate_blog_post (si requiere productos).
+  - SÍ puedes ejecutar estas acciones que NO requieren token Shopify: generate_ai_report, generate_platform_report, recall_knowledge, brain_status, brain_stats, brain_sync, brain_export, analyze_external_store, generate_budget, update_cms, update_cms_batch, read_cms, reset_cms, list_users, create_user, invite_client, deactivate_user, activate_user, reset_user_password, list_messages, send_message, list_approvals, create_approval, audit_log, list_automations, run_automation, generate_email_flow, list_email_flows, generate_brand_css, generate_brand_kit, generate_brand_guide, financial_forecast, financial_dashboard, agency_proposal, search_suppliers, generate_budget, create_business_card, list_business_cards, analyze_web_design, run_universal_generator, run_leveled_report, inspect_code, fix_code, list_source_files, analyze_component, modify_ui, learn_from_url, learn_from_content, generate_competitive_pricing (con URL), scan_competitor, discover_competitors, analyze_competitor_product.
+  - Si el usuario pide un informe o análisis y el token está caducado: responde con lo que puedes hacer con los datos disponibles (generate_ai_report, recall_knowledge) y explica brevemente que para sincronizar datos de la tienda necesita renovar el token en Configuración → Integración Shopify. NO repitas el error de token en cada respuesta.
+  - Si el usuario pregunta sobre informes YA GENERADOS (guardados en el Vault): usa recall_knowledge para buscarlos. Los informes generados se almacenan en la base de datos y NO necesitan token.
+
   Responde SIEMPRE en español. Sé directo, accionable y ejecutivo. No hables de lo que "podrías hacer" — HAZLO.`) + agencyPricingKnowledge + actionDetectionBlock + expertKnowledgeBlock + guideBlock + pageBlock + entityKnowledgeContext + memoriesContext + brandDnaBlock;
   
       let resolvedProjectId = req.body.activeProjectId;
       let projectContextInfo = "";
+      const buildTokenStatusLabel = (accessToken: string | null | undefined, tokenExpiresAt: Date | string | null | undefined): string => {
+        if (!accessToken) return "SIN_TOKEN";
+        const expiry = tokenExpiresAt ? new Date(tokenExpiresAt) : null;
+        return (expiry && expiry < new Date()) ? "CADUCADO" : "válido";
+      };
+
       if (resolvedProjectId && !isNaN(parseInt(resolvedProjectId))) {
-        const [activeProj] = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain }).from(projectsTable).where(eq(projectsTable.id, parseInt(resolvedProjectId))).limit(1);
+        const [activeProj] = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain, accessToken: projectsTable.accessToken, tokenExpiresAt: projectsTable.tokenExpiresAt }).from(projectsTable).where(eq(projectsTable.id, parseInt(resolvedProjectId))).limit(1);
         if (activeProj) {
-          projectContextInfo = `\n[CONTEXTO PROYECTO ACTIVO: ID=${activeProj.id} (numérico), nombre="${activeProj.name}", dominio="${activeProj.shopDomain}". USA projectId=${activeProj.id} en TODAS las acciones. El projectId es SIEMPRE el número ${activeProj.id}.]`;
+          const tokenStatus = buildTokenStatusLabel(activeProj.accessToken, activeProj.tokenExpiresAt);
+          const tokenWarning = (tokenStatus !== "válido")
+            ? ` ADVERTENCIA_TOKEN: El token Shopify está ${tokenStatus}. NO ejecutes acciones que usen la API de Shopify (create_product, list_products, scan_store, store_status, optimize_all_products, seo_full_audit, audit_theme, list_themes, etc.). Para esas acciones responde que el usuario necesita renovar el token en Configuración → Tienda. Sí puedes ejecutar acciones que NO requieren Shopify: informes desde base de datos, generate_ai_report, recall_knowledge, brain_status, analyze_external_store, generate_budget, update_cms, list_users, generate_email_flow, generate_brand_css, generate_brand_kit, generate_brand_guide, financial_forecast, agency_proposal, search_suppliers, generate_platform_report.`
+            : "";
+          projectContextInfo = `\n[CONTEXTO PROYECTO ACTIVO: ID=${activeProj.id} (numérico), nombre="${activeProj.name}", dominio="${activeProj.shopDomain}". Token Shopify: ${tokenStatus}.${tokenWarning} USA projectId=${activeProj.id} en TODAS las acciones. El projectId es SIEMPRE el número ${activeProj.id}.]`;
         }
       }
       if (!projectContextInfo) {
-        const allProjects = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain }).from(projectsTable).limit(5);
+        const allProjects = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain, accessToken: projectsTable.accessToken, tokenExpiresAt: projectsTable.tokenExpiresAt }).from(projectsTable).limit(5);
         if (allProjects.length === 1) {
-          projectContextInfo = `\n[CONTEXTO: Solo hay un proyecto registrado: ID=${allProjects[0].id}, nombre="${allProjects[0].name}", dominio="${allProjects[0].shopDomain}". USA projectId=${allProjects[0].id} en TODAS las acciones.]`;
+          const p = allProjects[0];
+          const tokenStatus = buildTokenStatusLabel(p.accessToken, p.tokenExpiresAt);
+          const tokenWarning = (tokenStatus !== "válido")
+            ? ` Token Shopify: ${tokenStatus} — NO ejecutes acciones que usen la API de Shopify; informa al usuario que debe renovar el token.`
+            : "";
+          projectContextInfo = `\n[CONTEXTO: Solo hay un proyecto registrado: ID=${p.id}, nombre="${p.name}", dominio="${p.shopDomain}".${tokenWarning} USA projectId=${p.id} en TODAS las acciones.]`;
         } else if (allProjects.length > 0) {
           projectContextInfo = `\n[PROYECTOS DISPONIBLES: ${allProjects.map(p => `ID=${p.id} "${p.name}" (${p.shopDomain})`).join(", ")}. Usa el projectId numérico correspondiente en las acciones.]`;
         }
@@ -1971,6 +1993,42 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
       if (confirmationGuard) {
         res.json(confirmationGuard);
         return;
+      }
+
+      // Pre-check: para acciones que requieren la API de Shopify, verificar token
+      const SHOPIFY_API_ACTIONS = new Set([
+        "store_status", "list_products", "list_all_products", "create_product", "update_product",
+        "delete_product", "scan_store", "optimize_product", "optimize_all_products", "redesign_product",
+        "bulk_redesign", "change_price", "set_product_status", "list_themes", "audit_theme",
+        "read_theme_file", "edit_theme_file", "edit_theme_css", "edit_theme_settings",
+        "create_theme_section", "list_theme_files", "generate_all_metas", "fix_all_alt_texts",
+        "generate_schemas", "seo_full_audit", "list_collections", "create_collection",
+        "auto_collections", "edit_collection", "delete_collection", "get_collection_products",
+        "remove_from_collection", "list_pages", "create_page", "design_all_pages", "get_orders",
+        "update_product_price", "bulk_update_prices", "update_stock", "bulk_update_stock",
+        "sync_catalog_prices", "price_audit", "list_products_with_prices",
+        "list_variants", "add_variant", "edit_variant", "delete_variant",
+        "inventory_sync", "inventory_sync_orders", "inventory_alerts",
+        "bulk_generate_images", "optimize_images", "generate_sitemap",
+        "setup_full_store", "copyright_audit", "regenerate_token",
+        "fusion_create_product", "audit_page_speed",
+      ]);
+
+      if (SHOPIFY_API_ACTIONS.has(action) && params?.projectId) {
+        const [projCheck] = await db.select({ accessToken: projectsTable.accessToken, tokenExpiresAt: projectsTable.tokenExpiresAt })
+          .from(projectsTable).where(eq(projectsTable.id, parseInt(String(params.projectId)))).limit(1);
+        if (projCheck) {
+          const hasToken = !!projCheck.accessToken;
+          const tokenExpired = hasToken && projCheck.tokenExpiresAt ? new Date(projCheck.tokenExpiresAt) < new Date() : false;
+          if (!hasToken) {
+            res.json({ error: true, message: `⚠️ **Token de Shopify no configurado**\n\nEsta acción (\`${action}\`) requiere conexión con tu tienda Shopify, pero no hay ningún token de acceso configurado.\n\n👉 Ve a **Configuración → Integración Shopify** para conectar tu tienda.` });
+            return;
+          }
+          if (tokenExpired) {
+            res.json({ error: true, message: `🔑 **Token de Shopify caducado**\n\nEsta acción (\`${action}\`) requiere acceso a tu tienda Shopify, pero el token ha expirado.\n\n👉 Ve a **Configuración → Integración Shopify** para renovar el token de acceso.\n\n_Las funciones que no necesitan Shopify (informes IA, análisis, gestión de usuarios, CMS, etc.) siguen funcionando normalmente._` });
+            return;
+          }
+        }
       }
 
       switch (action) {
