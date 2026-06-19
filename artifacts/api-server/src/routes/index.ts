@@ -67,6 +67,7 @@ import skillsRouter from "./skills.js";
 import designSystemsRouter from "./design-systems.js";
 import pluginsRouter from "./plugins.js";
 import hyperframesRouter from "./hyperframes.js";
+import studioRouter from "./studio.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -168,5 +169,6 @@ router.use(skillsRouter);
 router.use(designSystemsRouter);
 router.use(pluginsRouter);
 router.use(hyperframesRouter);
+router.use(studioRouter);
 
 export default router;
