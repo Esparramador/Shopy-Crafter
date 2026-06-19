@@ -384,6 +384,7 @@ router.post(
   "/projects/:projectId/suppliers/report",
   requireProjectAccess,
   async (req, res): Promise<void> => {
+    enableLongRunning(res);
     try {
       const projectIdNum = parseProjectId(req.params.projectId);
       if (projectIdNum === null) { res.status(400).json({ error: "projectId inválido" }); return; }
@@ -407,57 +408,536 @@ router.post(
       }
 
       const storeName = (project as any).storeName || (project as any).name || "Tienda";
-      const niche = (project as any).storeNiche || "—";
+      const niche = (project as any).storeNiche || "";
       const today = new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" });
 
-      // group by category
+      // ─── COMPUTE REAL STATISTICS ────────────────────────────────────────────
+      const withPrices = entries.filter(e => e.priceRangeMin != null || e.priceRangeMax != null);
+      const priceAverages = withPrices.map(e => {
+        const lo = e.priceRangeMin ?? e.priceRangeMax ?? 0;
+        const hi = e.priceRangeMax ?? e.priceRangeMin ?? 0;
+        return (lo + hi) / 2;
+      });
+      const avgPrice = priceAverages.length > 0 ? priceAverages.reduce((a, b) => a + b, 0) / priceAverages.length : 0;
+      const minPrice = withPrices.length > 0 ? Math.min(...withPrices.map(e => e.priceRangeMin ?? e.priceRangeMax ?? 0)) : 0;
+      const maxPrice = withPrices.length > 0 ? Math.max(...withPrices.map(e => e.priceRangeMax ?? e.priceRangeMin ?? 0)) : 0;
+
+      const withScores = entries.filter(e => e.score != null);
+      const avgScore = withScores.length > 0 ? Math.round(withScores.reduce((a, e) => a + (e.score ?? 0), 0) / withScores.length) : 0;
+      const topScore = withScores.length > 0 ? Math.max(...withScores.map(e => e.score ?? 0)) : 0;
+
       const byCategory: Record<string, typeof entries> = {};
+      const byCountry: Record<string, number> = {};
       for (const e of entries) {
         const k = e.category || "General";
         (byCategory[k] = byCategory[k] || []).push(e);
+        if (e.country) byCountry[e.country] = (byCountry[e.country] ?? 0) + 1;
+      }
+      const categoryNames = Object.keys(byCategory);
+      const topCountries = Object.keys(byCountry).sort((a, b) => byCountry[b] - byCountry[a]).slice(0, 5);
+      const intlShipping = entries.filter(e => e.shipsInternationally === 1).length;
+      const certified = entries.filter(e => (e.certifications ?? "").length > 2).length;
+      const starredCount = entries.filter(e => e.starred === 1).length;
+
+      // ─── AI DEEP ANALYSIS ────────────────────────────────────────────────────
+      const suppliersForAI = entries.map(e => ({
+        id: e.id,
+        name: e.name,
+        category: e.category,
+        country: e.country,
+        products: e.productsOffered,
+        priceMin: e.priceRangeMin,
+        priceMax: e.priceRangeMax,
+        currency: e.currency ?? "EUR",
+        moq: e.moq,
+        leadDays: e.leadDays,
+        paymentTerms: e.paymentTerms,
+        shipsIntl: e.shipsInternationally === 1,
+        certifications: e.certifications,
+        score: e.score,
+        notes: e.notes,
+        starred: e.starred === 1,
+      }));
+
+      const reportPrompt = `Eres el CFO y Director de Compras de una agencia de eCommerce Shopify de primer nivel.
+Analiza en profundidad los ${entries.length} proveedores encontrados para la tienda "${storeName}" (sector: ${niche || "eCommerce general"}).
+
+DATOS COMPLETOS DE LOS ${entries.length} PROVEEDORES:
+${JSON.stringify(suppliersForAI, null, 2)}
+
+ESTADÍSTICAS CALCULADAS DEL PORTFOLIO:
+- Total proveedores: ${entries.length}
+- Con precios conocidos: ${withPrices.length}
+- Precio medio: €${avgPrice.toFixed(2)} (rango: €${minPrice.toFixed(2)}–€${maxPrice.toFixed(2)})
+- Score medio calidad: ${avgScore}/100 · Score más alto: ${topScore}/100
+- Categorías: ${categoryNames.join(", ")}
+- Países principales: ${topCountries.join(", ")}
+- Con envío internacional: ${intlShipping} · Con certificaciones: ${certified}
+
+Genera un análisis COMPLETO Y REAL con esta estructura JSON EXACTA (sin texto adicional fuera del JSON):
+{
+  "executiveSummary": "3-4 párrafos de análisis real del mercado de proveedores, situación competitiva del nicho y conclusiones estratégicas clave.",
+  "marketContext": "2 párrafos sobre el panorama competitivo de aprovisionamiento para este nicho, tendencias de precios y oportunidades identificadas.",
+  "topPicks": [
+    {
+      "rank": 1,
+      "supplierName": "nombre EXACTO del proveedor de la lista",
+      "supplierId": "id EXACTO del proveedor",
+      "scenario": "Mejor relación calidad-precio global",
+      "reason": "Justificación con datos concretos: score, precios, certificaciones, lead time.",
+      "recommendedFor": "Qué productos o volúmenes de venta son ideales con este proveedor"
+    }
+  ],
+  "supplierDeepAnalysis": [
+    {
+      "supplierId": "id exacto",
+      "supplierName": "nombre exacto",
+      "category": "categoría",
+      "marginAnalysis": {
+        "costAvgEur": 0.0,
+        "suggestedRetailMin": 0.0,
+        "suggestedRetailMax": 0.0,
+        "grossMarginPct": 0,
+        "revenueAt100Units": 0.0,
+        "revenueAt500Units": 0.0,
+        "revenueAt1000Units": 0.0,
+        "note": "cómo se calculó o 'Sin datos de precio — solicitar cotización'"
+      },
+      "contractingPlan": {
+        "starter": "Plan inicio: volúmenes, pedido mínimo inicial, inversión estimada €, plazo de prueba",
+        "growth": "Plan crecimiento: volúmenes medios, negociación 6 meses, inversión y descuentos esperados",
+        "scale": "Plan escala: contrato anual, volúmenes altos, mejor precio/u. y condiciones especiales"
+      },
+      "hiringRecommendation": "Si conviene tener personal/freelance especializado para gestionar este proveedor (ej: traductor chino, agente de compras, QC inspector)",
+      "riskLevel": "low|medium|high",
+      "riskFactors": ["riesgo concreto 1", "riesgo concreto 2"],
+      "strengths": ["punto fuerte concreto 1", "punto fuerte concreto 2"],
+      "productFit": "Qué productos específicos y situaciones son ideales para este proveedor"
+    }
+  ],
+  "categoryComparison": [
+    {
+      "category": "nombre categoría",
+      "suppliersInCategory": 0,
+      "bestSupplier": "nombre del mejor",
+      "worstSupplier": "nombre del peor o más arriesgado",
+      "avgScore": 0,
+      "avgPriceRange": "€X – €Y",
+      "priceSpread": "diferencia % entre el más barato y el más caro",
+      "recommendation": "recomendación estratégica concreta para esta categoría"
+    }
+  ],
+  "competitiveMatrix": {
+    "priceLeader": "nombre del proveedor más económico y por qué",
+    "qualityLeader": "nombre del proveedor con mejor calidad/fiabilidad y por qué",
+    "speedLeader": "nombre del proveedor con menor lead time y por qué",
+    "bestCertified": "nombre del proveedor con mejores certificaciones",
+    "bestInternational": "mejor proveedor para envío internacional"
+  },
+  "riskMatrix": {
+    "geographic": "análisis riesgo de concentración geográfica (si todos son de un país, etc.)",
+    "moq": "análisis riesgo de pedidos mínimos (si el MOQ es demasiado alto para empezar)",
+    "leadTime": "análisis riesgo de plazos (si alguno tiene lead times críticos)",
+    "financial": "riesgo financiero del portfolio (inversión mínima para trabajar con todos)",
+    "overall": "evaluación global del riesgo del portfolio de proveedores 1-10"
+  },
+  "contractingPlanGeneral": {
+    "starter": "Plan de inicio para la tienda: qué proveedor/es elegir primero, volúmenes, inversión inicial estimada total",
+    "growth": "Plan de crecimiento a 6-12 meses: qué combinar, cómo diversificar, inversión estimada",
+    "scale": "Plan de escala para alta facturación: red completa de proveedores, inversión total, estructuras de negociación"
+  },
+  "hiringPlan": {
+    "immediate": "Qué perfil contratar/externalizar de forma inmediata para gestionar proveedores eficientemente",
+    "growth": "Qué equipo construir cuando la tienda escale (buyer, QC, logística)",
+    "tools": "Herramientas recomendadas (ERP, PIM, herramienta de compras) para gestionar el portfolio"
+  },
+  "keyRecommendations": [
+    "recomendación concreta y accionable 1",
+    "recomendación concreta y accionable 2",
+    "recomendación concreta y accionable 3",
+    "recomendación concreta y accionable 4",
+    "recomendación concreta y accionable 5"
+  ],
+  "nextSteps": [
+    "paso accionable inmediato 1 (esta semana)",
+    "paso accionable a corto plazo 2 (este mes)",
+    "paso accionable a medio plazo 3 (próximo trimestre)"
+  ]
+}
+
+REGLAS CRÍTICAS:
+1. marginAnalysis.costAvgEur SOLO si el proveedor tiene priceRangeMin o priceRangeMax. Si no, pon 0 y nota.
+2. Para el margen usa markup estándar Shopify: 2.5x–3.5x (PVP = coste × 2.5 a 3.5). Margen bruto = (PVP–coste)/PVP × 100.
+3. topPicks: mínimo 3 picks, máximo 5. Solo proveedores reales de la lista.
+4. Cada supplierDeepAnalysis debe existir para TODOS los proveedores de la lista.
+5. Devuelve SOLO JSON válido, sin explicaciones fuera del JSON.`;
+
+      interface SupplierReportAI {
+        executiveSummary?: string;
+        marketContext?: string;
+        topPicks?: Array<{ rank?: number; supplierName?: string; supplierId?: string; scenario?: string; reason?: string; recommendedFor?: string }>;
+        supplierDeepAnalysis?: Array<{
+          supplierId?: string; supplierName?: string; category?: string;
+          marginAnalysis?: { costAvgEur?: number; suggestedRetailMin?: number; suggestedRetailMax?: number; grossMarginPct?: number; revenueAt100Units?: number; revenueAt500Units?: number; revenueAt1000Units?: number; note?: string };
+          contractingPlan?: { starter?: string; growth?: string; scale?: string };
+          hiringRecommendation?: string;
+          riskLevel?: string; riskFactors?: string[]; strengths?: string[]; productFit?: string;
+        }>;
+        categoryComparison?: Array<{ category?: string; suppliersInCategory?: number; bestSupplier?: string; worstSupplier?: string; avgScore?: number; avgPriceRange?: string; priceSpread?: string; recommendation?: string }>;
+        competitiveMatrix?: { priceLeader?: string; qualityLeader?: string; speedLeader?: string; bestCertified?: string; bestInternational?: string };
+        riskMatrix?: { geographic?: string; moq?: string; leadTime?: string; financial?: string; overall?: string };
+        contractingPlanGeneral?: { starter?: string; growth?: string; scale?: string };
+        hiringPlan?: { immediate?: string; growth?: string; tools?: string };
+        keyRecommendations?: string[];
+        nextSteps?: string[];
       }
 
-      const sections: string[] = [];
-      sections.push(`<h2>Resumen ejecutivo</h2>
-        <p>Este informe recoge <strong>${entries.length} proveedores reales</strong> identificados mediante investigación profunda en Google para la tienda <strong>${esc(storeName)}</strong> (nicho: ${esc(niche)}).
-        Los proveedores se han verificado por su sitio web y se han ordenado por puntuación de calidad-precio-fiabilidad estimada por nuestro analista IA.</p>`);
+      let ai: SupplierReportAI = {};
+      try {
+        ai = await askClaudeJsonWithBrain<SupplierReportAI>(
+          projectIdNum,
+          reportPrompt,
+          "Eres un CFO y consultor de aprovisionamiento de nivel C-suite. Devuelves SOLO JSON válido con análisis profundo y cifras reales derivadas de los datos del proveedor.",
+          "pricing",
+          niche || undefined,
+          16000,
+          180_000,
+        ) as SupplierReportAI;
+      } catch (aiErr: any) {
+        console.warn("[SupplierReport] Claude AI failed:", aiErr?.message?.slice(0, 200));
+      }
 
-      for (const [cat, list] of Object.entries(byCategory)) {
-        const rows = list.map(e => {
-          const price = (e.priceRangeMin != null && e.priceRangeMax != null)
-            ? `${e.priceRangeMin}–${e.priceRangeMax} ${esc(e.currency || "EUR")}`
-            : (e.priceRangeMin != null ? `desde ${e.priceRangeMin} ${esc(e.currency || "EUR")}` : "—");
-          const safeWeb = safeHttpUrl(e.website);
-          const web = safeWeb
-            ? `<a href="${esc(safeWeb)}" target="_blank" rel="noopener">${esc(safeWeb.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a>`
-            : "—";
-          const contact = [e.contactEmail, e.contactPhone].filter(Boolean).map(esc).join("<br/>") || "—";
+      // ─── STYLE HELPERS ────────────────────────────────────────────────────────
+      const scoreCol = (s: number) => s >= 80 ? "#15803d" : s >= 60 ? "#1e40af" : s >= 40 ? "#b45309" : "#991b1b";
+      const riskCol = (r: string) => r === "low" ? "#15803d" : r === "medium" ? "#b45309" : "#991b1b";
+      const riskLbl = (r: string) => r === "low" ? "Riesgo Bajo" : r === "medium" ? "Riesgo Medio" : "Riesgo Alto";
+      const fmtEur = (n: number) => `€${Number(n).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const fmtRev = (n: number) => `€${Number(n).toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+      // ─── BUILD HTML SECTIONS ─────────────────────────────────────────────────
+      const sections: string[] = [];
+
+      // 1. EXECUTIVE SUMMARY
+      sections.push(`
+        <div class="exec-summary">
+          <h2>📋 Resumen Ejecutivo</h2>
+          <p>${esc(ai.executiveSummary ?? `Este informe analiza ${entries.length} proveedores reales identificados mediante investigación IA para la tienda ${storeName} (nicho: ${niche || "eCommerce"}).`)}</p>
+          ${ai.marketContext ? `<p>${esc(ai.marketContext)}</p>` : ""}
+        </div>`);
+
+      // 2. KPI DASHBOARD
+      sections.push(`
+        <h2>📊 Dashboard de Estadísticas Comparativas</h2>
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-blue"><div class="kpi-num">${entries.length}</div><div class="kpi-label">Proveedores analizados</div></div>
+          <div class="kpi-card kpi-green"><div class="kpi-num">${categoryNames.length}</div><div class="kpi-label">Categorías de producto</div></div>
+          <div class="kpi-card kpi-purple"><div class="kpi-num">${topCountries.length > 0 ? topCountries[0] : "—"}</div><div class="kpi-label">País predominante</div></div>
+          <div class="kpi-card kpi-gold"><div class="kpi-num">${avgScore}/100</div><div class="kpi-label">Score medio de calidad</div></div>
+          ${avgPrice > 0 ? `<div class="kpi-card kpi-teal"><div class="kpi-num">${fmtEur(avgPrice)}</div><div class="kpi-label">Precio promedio/unidad</div></div>` : ""}
+          ${withPrices.length > 1 ? `<div class="kpi-card kpi-red"><div class="kpi-num">${fmtEur(minPrice)} – ${fmtEur(maxPrice)}</div><div class="kpi-label">Rango total de precios</div></div>` : ""}
+          <div class="kpi-card kpi-teal"><div class="kpi-num">${intlShipping}</div><div class="kpi-label">Con envío internacional</div></div>
+          <div class="kpi-card kpi-green"><div class="kpi-num">${certified}</div><div class="kpi-label">Con certificaciones</div></div>
+          <div class="kpi-card kpi-gold"><div class="kpi-num">${starredCount}</div><div class="kpi-label">Marcados como favoritos</div></div>
+        </div>`);
+
+      // 3. TOP PICKS
+      const topPicks = ai.topPicks ?? [];
+      if (topPicks.length > 0) {
+        const pickCards = topPicks.map((p, i) => `
+          <div class="pick-card">
+            <div class="pick-rank">#${p.rank ?? (i + 1)}</div>
+            <div class="pick-body">
+              <div class="pick-name">${esc(p.supplierName ?? "—")}</div>
+              <div class="pick-scenario">🎯 ${esc(p.scenario ?? "")}</div>
+              <p class="pick-reason">${esc(p.reason ?? "")}</p>
+              ${p.recommendedFor ? `<div class="pick-for">Ideal para: <strong>${esc(p.recommendedFor)}</strong></div>` : ""}
+            </div>
+          </div>`).join("");
+        sections.push(`<h2>🏆 Top Picks — Proveedores Recomendados por Escenario</h2><div class="picks-grid">${pickCards}</div>`);
+      }
+
+      // 4. FULL COMPARATIVE MATRIX
+      const matrixRows = entries.map(e => {
+        const price = (e.priceRangeMin != null && e.priceRangeMax != null)
+          ? `€${e.priceRangeMin}–€${e.priceRangeMax}`
+          : e.priceRangeMin != null ? `desde €${e.priceRangeMin}` : "—";
+        const sc = e.score ?? 0;
+        const safeWeb = safeHttpUrl(e.website);
+        const contact = [
+          e.contactEmail ? `<span style="font-size:10px">${esc(e.contactEmail)}</span>` : null,
+          e.contactPhone ? `<span style="font-size:10px">${esc(e.contactPhone)}</span>` : null,
+        ].filter(Boolean).join("<br/>") || "—";
+        return `<tr>
+          <td>
+            <strong>${esc(e.name)}</strong>${e.starred === 1 ? ' ⭐' : ''}
+            <br/><span style="color:#64748b;font-size:10px">${esc(e.country ?? "")}${e.region ? ` · ${esc(e.region)}` : ""}</span>
+          </td>
+          <td>${esc(e.category ?? "—")}</td>
+          <td style="text-align:center">
+            <span style="background:${scoreCol(sc)};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${sc}/100</span>
+          </td>
+          <td>${price}<br/><span style="color:#64748b;font-size:10px">MOQ: ${esc(e.moq ?? "—")}</span></td>
+          <td style="text-align:center">${esc(e.leadDays ?? "—")}</td>
+          <td style="text-align:center">${e.shipsInternationally === 1 ? '<span style="color:#15803d">✅</span>' : '<span style="color:#94a3b8">—</span>'}</td>
+          <td style="font-size:10px">${esc(e.certifications ?? "—")}</td>
+          <td>${safeWeb ? `<a href="${esc(safeWeb)}" target="_blank" style="font-size:10px">${esc(safeWeb.replace(/^https?:\/\//, "").replace(/\/$/, "").slice(0, 28))}</a>` : "—"}<br/>${contact}</td>
+          <td style="font-size:10px;color:#475569">${esc((e.notes ?? "").slice(0, 100))}${(e.notes ?? "").length > 100 ? "…" : ""}</td>
+        </tr>`;
+      }).join("");
+
+      sections.push(`
+        <h2>📋 Matriz Comparativa Completa — ${entries.length} Proveedores</h2>
+        <table>
+          <thead><tr>
+            <th>Proveedor</th><th>Categoría</th><th style="text-align:center">Score</th>
+            <th>Precio/u.</th><th style="text-align:center">Lead Time</th><th style="text-align:center">Intl</th>
+            <th>Certificaciones</th><th>Web / Contacto</th><th>Notas IA</th>
+          </tr></thead>
+          <tbody>${matrixRows}</tbody>
+        </table>`);
+
+      // 5. MARGIN & REVENUE ANALYSIS
+      const deepAnalysis = ai.supplierDeepAnalysis ?? [];
+      const deepWithMargin = deepAnalysis.filter(a => (a.marginAnalysis?.costAvgEur ?? 0) > 0);
+      if (deepWithMargin.length > 0) {
+        const marginRows = deepAnalysis.map(a => {
+          const m = a.marginAnalysis ?? {};
+          const hasCost = (m.costAvgEur ?? 0) > 0;
+          const mgn = m.grossMarginPct ?? 0;
           return `<tr>
-            <td><strong>${esc(e.name)}</strong>${e.score != null ? ` <span style="color:#0a4b8c;font-weight:700">· ${e.score}/100</span>` : ""}<br/><span style="color:#64748b;font-size:11px">${esc(e.country || "")}${e.region ? ` · ${esc(e.region)}` : ""}</span></td>
-            <td>${esc(e.productsOffered || "—")}</td>
-            <td>${price}<br/><span style="color:#64748b;font-size:11px">MOQ: ${esc(e.moq || "—")} · Lead: ${esc(e.leadDays || "—")}</span></td>
-            <td>${web}<br/><span style="font-size:11px">${contact}</span></td>
-            <td>${esc(e.notes || "")}</td>
+            <td><strong>${esc(a.supplierName ?? "—")}</strong><br/><span style="color:#64748b;font-size:10px">${esc(a.category ?? "")}</span></td>
+            <td style="text-align:right;font-weight:700">${hasCost ? fmtEur(m.costAvgEur!) : '—'}</td>
+            <td style="text-align:right">${hasCost ? `${fmtEur(m.suggestedRetailMin!)} – ${fmtEur(m.suggestedRetailMax!)}` : '—'}</td>
+            <td style="text-align:center">
+              ${hasCost
+                ? `<span style="background:${mgn >= 55 ? '#15803d' : mgn >= 40 ? '#1e40af' : mgn >= 25 ? '#b45309' : '#991b1b'};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${Math.round(mgn)}%</span>`
+                : '—'}
+            </td>
+            <td style="text-align:right">${hasCost ? fmtRev(m.revenueAt100Units!) : '—'}</td>
+            <td style="text-align:right">${hasCost ? fmtRev(m.revenueAt500Units!) : '—'}</td>
+            <td style="text-align:right">${hasCost ? fmtRev(m.revenueAt1000Units!) : '—'}</td>
+            <td style="font-size:10px;color:#64748b">${esc(m.note ?? (hasCost ? "" : "Solicitar cotización"))}</td>
           </tr>`;
         }).join("");
-        sections.push(`<h2>${esc(cat)} <span style="color:#94a3b8;font-weight:400">(${list.length})</span></h2>
+
+        sections.push(`
+          <h2>💰 Análisis de Márgenes y Revenue Estimado por Proveedor</h2>
+          <p class="note-text">* Estimaciones basadas en rangos de precio del proveedor con markup Shopify estándar (2.5×–3.5×). Revenue neto = (PVP – Coste) × Unidades/mes. Verificar con cotizaciones reales antes de comprometer presupuesto.</p>
           <table>
             <thead><tr>
-              <th style="width:22%">Proveedor</th>
-              <th style="width:25%">Productos / Servicios</th>
-              <th style="width:18%">Precios &amp; condiciones</th>
-              <th style="width:20%">Web / Contacto</th>
-              <th>Notas</th>
+              <th>Proveedor</th>
+              <th style="text-align:right">Coste/u.</th>
+              <th style="text-align:right">PVP sugerido</th>
+              <th style="text-align:center">Margen bruto</th>
+              <th style="text-align:right">Revenue 100 u/mes</th>
+              <th style="text-align:right">Revenue 500 u/mes</th>
+              <th style="text-align:right">Revenue 1.000 u/mes</th>
+              <th>Nota</th>
             </tr></thead>
-            <tbody>${rows}</tbody>
+            <tbody>${marginRows}</tbody>
           </table>`);
       }
 
-      const body = sections.join("\n");
+      // 6. CATEGORY COMPARISON
+      const catComp = ai.categoryComparison ?? [];
+      if (catComp.length > 0) {
+        const catRows = catComp.map(c => `<tr>
+          <td><strong>${esc(c.category ?? "—")}</strong></td>
+          <td style="text-align:center">${c.suppliersInCategory ?? "—"}</td>
+          <td><strong style="color:#15803d">${esc(c.bestSupplier ?? "—")}</strong></td>
+          <td style="color:#991b1b">${esc(c.worstSupplier ?? "—")}</td>
+          <td style="text-align:center">${c.avgScore ?? "—"}/100</td>
+          <td>${esc(c.avgPriceRange ?? "—")}</td>
+          <td style="font-size:11px;color:#475569">${esc(c.priceSpread ?? "—")}</td>
+          <td style="font-size:11px">${esc(c.recommendation ?? "—")}</td>
+        </tr>`).join("");
+        sections.push(`
+          <h2>🗂️ Comparativa por Categoría de Producto</h2>
+          <table>
+            <thead><tr>
+              <th>Categoría</th><th style="text-align:center">N.º</th><th>Mejor proveedor</th><th>Mayor riesgo</th>
+              <th style="text-align:center">Score medio</th><th>Rango precios</th><th>Diferencial precio</th><th>Recomendación</th>
+            </tr></thead>
+            <tbody>${catRows}</tbody>
+          </table>`);
+      }
+
+      // 7. COMPETITIVE MATRIX
+      const compMat = ai.competitiveMatrix;
+      if (compMat) {
+        sections.push(`
+          <h2>🥇 Matriz Competitiva — Líderes por Criterio</h2>
+          <table>
+            <tbody>
+              <tr><td class="matrix-label">💸 Líder en Precio</td><td>${esc(compMat.priceLeader ?? "—")}</td></tr>
+              <tr><td class="matrix-label">⭐ Líder en Calidad</td><td>${esc(compMat.qualityLeader ?? "—")}</td></tr>
+              <tr><td class="matrix-label">⚡ Líder en Velocidad</td><td>${esc(compMat.speedLeader ?? "—")}</td></tr>
+              <tr><td class="matrix-label">🏅 Mejor Certificado</td><td>${esc(compMat.bestCertified ?? "—")}</td></tr>
+              <tr><td class="matrix-label">🌍 Mejor Internacional</td><td>${esc(compMat.bestInternational ?? "—")}</td></tr>
+            </tbody>
+          </table>`);
+      }
+
+      // 8. CONTRACTING PLANS PER SUPPLIER (top 6)
+      if (deepAnalysis.length > 0) {
+        const planCards = deepAnalysis.slice(0, 8).map(a => {
+          const plan = a.contractingPlan ?? {};
+          const rl = a.riskLevel ?? "medium";
+          return `
+            <div class="plan-card">
+              <div class="plan-header">
+                <span class="plan-name">${esc(a.supplierName ?? "—")}</span>
+                <span class="plan-risk" style="background:${riskCol(rl)}">${riskLbl(rl)}</span>
+              </div>
+              <div style="font-size:11px;color:#475569;margin-bottom:8px">${esc(a.category ?? "")}</div>
+              ${a.strengths?.length ? `<div class="plan-strengths">${a.strengths.map(s => `✅ ${esc(s)}`).join(" &nbsp;·&nbsp; ")}</div>` : ""}
+              ${a.riskFactors?.length ? `<div class="plan-risks">${a.riskFactors.map(s => `⚠️ ${esc(s)}`).join(" &nbsp;·&nbsp; ")}</div>` : ""}
+              <table class="plan-table">
+                <tr><td class="plan-tier tier-starter">🌱 Starter</td><td>${esc(plan.starter ?? "—")}</td></tr>
+                <tr><td class="plan-tier tier-growth">🚀 Growth</td><td>${esc(plan.growth ?? "—")}</td></tr>
+                <tr><td class="plan-tier tier-scale">⚡ Scale</td><td>${esc(plan.scale ?? "—")}</td></tr>
+              </table>
+              ${a.hiringRecommendation ? `<div class="plan-hiring">👥 Personal recomendado: ${esc(a.hiringRecommendation)}</div>` : ""}
+              ${a.productFit ? `<div style="margin-top:8px;font-size:11px;color:#475569"><strong>Ideal para:</strong> ${esc(a.productFit)}</div>` : ""}
+            </div>`;
+        }).join("");
+        sections.push(`<h2>📄 Planes de Contratación por Proveedor</h2><div class="plans-grid">${planCards}</div>`);
+      }
+
+      // 9. RISK MATRIX
+      const riskMat = ai.riskMatrix;
+      if (riskMat?.overall) {
+        sections.push(`
+          <h2>⚠️ Matriz de Riesgo del Portfolio de Proveedores</h2>
+          <table>
+            <tbody>
+              <tr><td class="matrix-label">🌍 Riesgo Geográfico</td><td>${esc(riskMat.geographic ?? "—")}</td></tr>
+              <tr><td class="matrix-label">📦 Riesgo MOQ</td><td>${esc(riskMat.moq ?? "—")}</td></tr>
+              <tr><td class="matrix-label">⏱️ Riesgo Lead Time</td><td>${esc(riskMat.leadTime ?? "—")}</td></tr>
+              <tr><td class="matrix-label">💶 Riesgo Financiero</td><td>${esc(riskMat.financial ?? "—")}</td></tr>
+              <tr class="risk-overall"><td class="matrix-label">📊 Evaluación Global</td><td><strong>${esc(riskMat.overall ?? "—")}</strong></td></tr>
+            </tbody>
+          </table>`);
+      }
+
+      // 10. GENERAL CONTRACTING PLAN
+      const genPlan = ai.contractingPlanGeneral;
+      if (genPlan?.starter || genPlan?.growth || genPlan?.scale) {
+        sections.push(`
+          <h2>🗓️ Plan General de Contratación para ${esc(storeName)}</h2>
+          <table>
+            <tbody>
+              <tr><td class="plan-tier tier-starter" style="width:120px">🌱 Starter</td><td>${esc(genPlan.starter ?? "—")}</td></tr>
+              <tr><td class="plan-tier tier-growth">🚀 Growth</td><td>${esc(genPlan.growth ?? "—")}</td></tr>
+              <tr><td class="plan-tier tier-scale">⚡ Scale</td><td>${esc(genPlan.scale ?? "—")}</td></tr>
+            </tbody>
+          </table>`);
+      }
+
+      // 11. HIRING PLAN
+      const hiringPlan = ai.hiringPlan;
+      if (hiringPlan?.immediate || hiringPlan?.growth || hiringPlan?.tools) {
+        sections.push(`
+          <h2>👥 Plan de Contratación y Recursos Humanos</h2>
+          <table>
+            <tbody>
+              <tr><td class="matrix-label">🔴 Inmediato</td><td>${esc(hiringPlan.immediate ?? "—")}</td></tr>
+              <tr><td class="matrix-label">🟡 Al escalar</td><td>${esc(hiringPlan.growth ?? "—")}</td></tr>
+              <tr><td class="matrix-label">🛠️ Herramientas</td><td>${esc(hiringPlan.tools ?? "—")}</td></tr>
+            </tbody>
+          </table>`);
+      }
+
+      // 12. KEY RECOMMENDATIONS
+      const recs = ai.keyRecommendations ?? [];
+      if (recs.length > 0) {
+        const recList = recs.map((r, i) => `<li><span class="rec-num">${i + 1}</span>${esc(r)}</li>`).join("");
+        sections.push(`<h2>✅ Recomendaciones Estratégicas Clave</h2><ul class="recs-list">${recList}</ul>`);
+      }
+
+      // 13. NEXT STEPS
+      const steps = ai.nextSteps ?? [];
+      if (steps.length > 0) {
+        const stepDivs = steps.map((s, i) => `<div class="next-step"><span class="step-num">${i + 1}</span><span>${esc(s)}</span></div>`).join("");
+        sections.push(`<h2>▶️ Próximos Pasos Accionables</h2><div class="steps-list">${stepDivs}</div>`);
+      }
+
+      // 14. FULL PRODUCT CATALOGUE PER SUPPLIER (appendix)
+      sections.push(`
+        <h2>📑 Apéndice — Catálogo de Productos por Proveedor</h2>
+        <table>
+          <thead><tr>
+            <th>Proveedor</th><th>País</th><th>Productos / Servicios Ofrecidos</th>
+            <th>Condiciones de Pago</th><th>Certificaciones</th><th>Fuente / Contacto</th>
+          </tr></thead>
+          <tbody>
+            ${entries.map(e => {
+              const safeWeb = safeHttpUrl(e.website);
+              return `<tr>
+                <td><strong>${esc(e.name)}</strong><br/><span style="color:#64748b;font-size:10px">Score: ${e.score ?? "—"}/100</span></td>
+                <td>${esc(e.country ?? "—")}${e.region ? `<br/><span style="font-size:10px;color:#64748b">${esc(e.region)}</span>` : ""}</td>
+                <td style="font-size:11px">${esc(e.productsOffered ?? "—")}</td>
+                <td style="font-size:11px">${esc(e.paymentTerms ?? "—")}</td>
+                <td style="font-size:10px">${esc(e.certifications ?? "—")}</td>
+                <td style="font-size:10px">
+                  ${safeWeb ? `<a href="${esc(safeWeb)}" target="_blank">${esc(safeWeb.replace(/^https?:\/\//, "").slice(0, 30))}</a><br/>` : ""}
+                  ${e.contactEmail ? `<span style="color:#475569">${esc(e.contactEmail)}</span><br/>` : ""}
+                  ${e.contactPhone ? `<span style="color:#475569">${esc(e.contactPhone)}</span>` : ""}
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>`);
+
+      // ─── EXTRA CSS ────────────────────────────────────────────────────────────
+      const extraCss = `
+        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:16px 0 28px}
+        .kpi-card{border-radius:10px;padding:16px;text-align:center;border:1px solid transparent}
+        .kpi-blue{background:linear-gradient(135deg,#eff6ff,#dbeafe);border-color:#bfdbfe}.kpi-blue .kpi-num{color:#1d4ed8}
+        .kpi-green{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-color:#bbf7d0}.kpi-green .kpi-num{color:#15803d}
+        .kpi-purple{background:linear-gradient(135deg,#faf5ff,#ede9fe);border-color:#ddd6fe}.kpi-purple .kpi-num{color:#7c3aed}
+        .kpi-gold{background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:#fde68a}.kpi-gold .kpi-num{color:#b45309}
+        .kpi-teal{background:linear-gradient(135deg,#f0fdfa,#ccfbf1);border-color:#99f6e4}.kpi-teal .kpi-num{color:#0f766e}
+        .kpi-red{background:linear-gradient(135deg,#fff1f2,#ffe4e6);border-color:#fecdd3}.kpi-red .kpi-num{color:#be123c}
+        .kpi-num{font-size:20px;font-weight:800;margin-bottom:4px}
+        .kpi-label{font-size:11px;color:#475569}
+        .exec-summary{background:#f0fdf4;border-left:4px solid #16a34a;padding:18px 22px;margin:16px 0 28px;border-radius:0 10px 10px 0}
+        .exec-summary p{color:#166534;line-height:1.7;margin:0 0 10px}
+        .picks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin:16px 0 28px}
+        .pick-card{display:flex;gap:14px;background:linear-gradient(135deg,#fefce8,#fef9c3);border:1px solid #fde68a;border-radius:12px;padding:16px}
+        .pick-rank{font-size:32px;font-weight:900;color:#ca8a04;min-width:44px;text-align:center;line-height:1}
+        .pick-name{font-size:15px;font-weight:700;color:#1e293b;margin-bottom:3px}
+        .pick-scenario{font-size:11px;color:#6d28d9;font-weight:600;margin-bottom:6px}
+        .pick-reason{font-size:12px;color:#475569;line-height:1.5;margin:0 0 6px}
+        .pick-for{font-size:11px;color:#064e3b;background:#d1fae5;padding:4px 10px;border-radius:6px;display:inline-block}
+        .plans-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin:16px 0 28px}
+        .plan-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px}
+        .plan-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+        .plan-name{font-size:14px;font-weight:700;color:#1e293b}
+        .plan-risk{color:#fff;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700}
+        .plan-strengths{font-size:11px;color:#166534;margin-bottom:4px;line-height:1.6}
+        .plan-risks{font-size:11px;color:#92400e;margin-bottom:8px;line-height:1.6}
+        .plan-table{font-size:11px;margin-top:10px;width:100%}
+        .plan-table td{padding:4px 6px;vertical-align:top}
+        .plan-tier{font-weight:700;white-space:nowrap;padding-right:10px!important}
+        .tier-starter{color:#15803d}.tier-growth{color:#1e40af}.tier-scale{color:#6d28d9}
+        .plan-hiring{margin-top:10px;padding:8px 12px;background:#eff6ff;border-radius:6px;font-size:11px;color:#1e40af}
+        .matrix-label{font-weight:700;color:#475569;width:180px;white-space:nowrap}
+        .risk-overall td{background:#fef9c3;font-size:13px}
+        .recs-list{list-style:none;padding:0;margin:16px 0 28px}
+        .recs-list li{display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border-left:3px solid #3b82f6;margin-bottom:10px;background:#eff6ff;border-radius:0 8px 8px 0;font-size:13px;color:#1e40af;line-height:1.5}
+        .rec-num{width:24px;height:24px;background:#2563eb;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+        .steps-list{display:flex;flex-direction:column;gap:10px;margin:16px 0 28px}
+        .next-step{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;line-height:1.5}
+        .step-num{width:28px;height:28px;background:#16a34a;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+        .note-text{font-size:11px;color:#64748b;font-style:italic;margin:-8px 0 16px;padding:8px 12px;background:#f8fafc;border-radius:6px}
+      `;
+
+      const body = `<style>${extraCss}</style>\n` + sections.join("\n");
       const shell = getReportShell("prestige");
       const html = shell(
-        `Catálogo de Proveedores Reales`,
-        `${storeName} · ${niche}`,
+        `Análisis Comparativo de Proveedores`,
+        `${storeName} · ${niche || "eCommerce"} · ${entries.length} proveedores analizados · ${today}`,
         body,
         today,
         storeName,
@@ -466,7 +946,7 @@ router.post(
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="proveedores-${projectIdNum}-${Date.now()}.html"`,
+        `attachment; filename="analisis-comparativo-proveedores-${projectIdNum}-${Date.now()}.html"`,
       );
       res.send(html);
     } catch (err: any) {

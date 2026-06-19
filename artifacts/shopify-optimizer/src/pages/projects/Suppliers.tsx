@@ -703,13 +703,19 @@ export default function Suppliers() {
               </button>
               <LiveOperation
                 active={downloading}
-                title="Generando informe de proveedores"
-                estimatedSec={20}
+                title="Generando análisis comparativo profesional"
+                estimatedSec={75}
                 messages={[
-                  "Compilando datos de proveedores seleccionados…",
-                  "Renderizando tabla con contactos y categorías…",
-                  "Aplicando estilo del informe HTML…",
-                  "Empaquetando archivo descargable…",
+                  "Cargando datos de todos los proveedores escaneados…",
+                  "Calculando estadísticas comparativas reales…",
+                  "Analizando márgenes y revenue por proveedor con IA…",
+                  "Cruzando datos: precios, scores, MOQ, lead times…",
+                  "Generando matriz comparativa completa…",
+                  "Calculando planes de contratación Starter/Growth/Scale…",
+                  "Elaborando plan de recursos humanos y contratación…",
+                  "Evaluando riesgos geográficos y financieros del portfolio…",
+                  "Redactando recomendaciones estratégicas accionables…",
+                  "Renderizando informe HTML con gráficos y tablas…",
                 ]}
                 className="w-full"
               />
