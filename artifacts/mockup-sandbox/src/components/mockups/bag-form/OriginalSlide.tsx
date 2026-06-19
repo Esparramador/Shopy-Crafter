@@ -4,9 +4,9 @@
  */
 import { useState, useEffect, useRef } from "react";
 
-const BASE       = import.meta.env.BASE_URL ?? "/__mockup/";
-const VID_SRC    = `${BASE}alec_landing.mp4`;
-const POSTER_SRC = `${BASE}alec_poster.jpg`;
+
+const VID_SRC    = "/assets/videos/alec_landing.mp4";
+const POSTER_SRC = "/assets/videos/alec_poster.jpg";
 const TRIGGER    = 4.5;
 
 function TypewriterText({ text, delay = 0, speed = 62 }: { text: string; delay?: number; speed?: number }) {
