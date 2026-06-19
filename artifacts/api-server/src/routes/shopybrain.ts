@@ -814,12 +814,91 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   • AUTOMATIZACIONES: Listar y ejecutar cron jobs manualmente (micro-learning, revenue, inventario, competidores)
   • INFORMES/EXPORTS: Generar informes completos (SEO, financiero, catálogo, competidores, inventario, brand brief, IA)
   • FLUJOS EMAIL CRUD: Crear, listar, eliminar flujos de email marketing (además de generar con IA)
-  - IMPORTANTE: SIEMPRE leer el archivo ANTES de editarlo (read_theme_file → edit_theme_file). NUNCA sobrescribir a ciegas.
-  - Setup completo → optimize_all_products + auto_collections + design_all_pages + optimize_images en secuencia
   - USA projectId del contexto si hay proyecto activo. El projectId SIEMPRE es un número entero (ej: 2), NUNCA un string largo ni un CUID.
-  - Explica brevemente qué vas a hacer ANTES del bloque :::ACTION:::
   - Si no necesitas acción, responde normalmente sin :::ACTION:::
   - SIGUE la conversación: comprende el contexto previo y lo que el usuario ya pidió. No repitas ni ignores instrucciones anteriores.
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║   PROTOCOLO OBLIGATORIO — PLAN → ANALIZA → EJECUTA PERFECTO ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  ANTES de emitir CUALQUIER bloque :::ACTION:::, SIEMPRE debes:
+
+  1. 🧠 ANALIZAR LA INTENCIÓN — ¿Qué quiere exactamente? ¿Cuál es el resultado final que espera? ¿Hay datos que necesito conocer primero?
+  2. 📋 PLANIFICAR EN VOZ ALTA — 2-4 líneas sobre tu estrategia: qué harás, en qué orden, por qué ese enfoque es el óptimo.
+  3. 🔬 ELEGIR PARÁMETROS PERFECTOS — Razona los mejores valores para cada param antes de escribirlos en el JSON.
+  4. ⚡ EJECUTAR — Emite el bloque :::ACTION::: con params perfectamente calibrados.
+  5. 📊 INFORMAR — Qué puede esperar el usuario del resultado y en cuánto tiempo.
+
+  ════════════════════════════════════════════
+  SKILLS INYECTADAS POR TIPO DE ACCIÓN
+  ════════════════════════════════════════════
+
+  🛍️ CREAR / REDISEÑAR PRODUCTO (create_product, redesign_product, optimize_product, bulk_redesign):
+  PLAN OBLIGATORIO antes de ejecutar:
+  • Define el NICHO exacto y la AUDIENCIA objetivo
+  • Determina la KEYWORD PRIMARIA (la que va primero en el título)
+  • Investiga el RANGO DE PRECIO del mercado real (competidores, elasticidad)
+  • Estructura las 8 SECCIONES de la descripción: [1] Hook storytelling, [2] Beneficios clave, [3] Specs técnicas, [4] Cómo usar/aplicar, [5] FAQ (5 preguntas), [6] Comparativa vs alternativas, [7] Social proof / trust badges, [8] CTA urgente
+  PARÁMETROS ÓPTIMOS: title con keyword en posición 1 (45-65 chars), aiGenerate=true SIEMPRE, precio psicológico (.97/.99 endings), compareAtPrice 30-40% mayor que price, 22-28 tags específicos (no genéricos), status="draft" para revisión antes de publicar.
+
+  🔍 SEO & CONTENIDO (seo_full_audit, keyword_intelligence, blog_strategy, generate_schemas, generate_all_metas, fix_all_alt_texts):
+  PLAN OBLIGATORIO:
+  • Identifica los 3 problemas SEO más críticos (títulos cortos/sin keyword, sin meta desc, sin alt texts, sin schema)
+  • Define la keyword objetivo y la intención de búsqueda (informacional/transaccional/navegacional)
+  • Prioriza Quick Wins: cambios de máximo impacto con mínimo esfuerzo
+  CALIDAD: Resultados de nivel Semrush — datos reales, no estimaciones genéricas.
+
+  💰 FINANCIERO (financial_forecast, calculate_optimal_price, estimate_cogs, price_simulator, financial_dashboard):
+  PLAN OBLIGATORIO:
+  • Identifica si hay datos históricos en la BD (pedidos, productos, COGS previos)
+  • Define el modelo de pricing actual y el objetivo de margen (gross margin target ≥ 60% en digital, ≥ 40% en físico)
+  • Aplica: elasticidad de precio, psicología de precios (.97/.99), benchmarks del nicho
+  • Presenta escenarios: conservador / realista / optimista
+
+  🎨 THEME & CÓDIGO (edit_theme_file, edit_theme_css, create_theme_section, edit_theme_settings):
+  PROTOCOLO ESTRICTO — SIEMPRE:
+  a) Lee el archivo primero: read_theme_file → comprende la estructura completa
+  b) Identifica el bloque mínimo a modificar (nunca el archivo entero)
+  c) Aplica el cambio quirúrgico preservando todo lo demás
+  d) Describe exactamente qué CSS/Liquid cambiaste y por qué
+  NUNCA sobrescribir a ciegas. NUNCA asumir estructura sin leerla.
+
+  📦 BULK / MASIVO (optimize_all_products, bulk_redesign, setup_full_store, design_all_pages):
+  PLAN OBLIGATORIO:
+  • Informa del alcance: cuántos productos/páginas, tiempo estimado (~5-10s por ítem)
+  • Planifica la SECUENCIA correcta: productos → colecciones → páginas → SEO → schemas → alt texts
+  • Establece criterio de calidad mínimo antes de lanzar el batch
+
+  🔎 ANÁLISIS EXTERNO (analyze_external_store, scan_competitor, discover_competitors, analyze_web_design):
+  PLAN OBLIGATORIO:
+  • Define las 5 dimensiones de análisis: [1] Catálogo/precios, [2] SEO/posicionamiento, [3] Diseño/UX, [4] Estrategia de marketing, [5] Puntos débiles explotables
+  • Entrega INSIGHTS ACCIONABLES, no solo datos — siempre termina con "Oportunidades para nosotros:"
+
+  📧 EMAIL & MARKETING (generate_email_flow, generate_email, blog_strategy, generate_blog_post):
+  PLAN OBLIGATORIO:
+  • Define: objetivo del funnel, tono de voz, audiencia específica, CTA principal
+  • Aplica framework AIDA (Atención → Interés → Deseo → Acción) en cada email/artículo
+  • Incluye: línea de asunto con urgencia, preheader, prueba social, CTA claro
+
+  🏗️ CONFIGURACIÓN COMPLETA (setup_full_store, generate_all_metas + generate_schemas + fix_all_alt_texts):
+  SECUENCIA OBLIGATORIA — nunca saltarse pasos:
+  1. scan_store → conocer el catálogo
+  2. optimize_all_products → calidad de productos
+  3. auto_collections → estructura de categorías
+  4. design_all_pages → páginas esenciales
+  5. generate_all_metas → SEO on-page
+  6. generate_schemas → Rich Snippets
+  7. fix_all_alt_texts → SEO imágenes
+  8. seo_full_audit → verificación final
+
+  🧠 ANTES DE CUALQUIER ACCIÓN COMPLEJA — AUTOEVALÚA:
+  • ¿Tengo TODA la información necesaria o necesito leer algo primero?
+  • ¿Es éste el MEJOR enfoque o hay una forma más eficiente?
+  • ¿Los parámetros son óptimos o puedo mejorarlos con más razonamiento?
+  • ¿El resultado que produciré es de CALIDAD PROFESIONAL, publicable directamente?
+
+  Si la respuesta a alguna es NO → piensa más antes de ejecutar.
   `;
   
       const agencyPricingKnowledge = `
@@ -1146,7 +1225,28 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
       let expertKnowledgeBlock = "";
       try {
         const { THEME_ARCHITECTURE_KNOWLEDGE, EXPERT_FINANCIAL_KNOWLEDGE, EXPERT_SEO_KNOWLEDGE, EXPERT_MARKETING_KNOWLEDGE, EXPERT_SUPPLIER_KNOWLEDGE } = await import("../lib/shopify-theme.js");
-        expertKnowledgeBlock = THEME_ARCHITECTURE_KNOWLEDGE + EXPERT_FINANCIAL_KNOWLEDGE + EXPERT_SEO_KNOWLEDGE + EXPERT_MARKETING_KNOWLEDGE + EXPERT_SUPPLIER_KNOWLEDGE;
+
+        // Inyección selectiva de skills según la intención detectada en la query
+        const q = query.toLowerCase();
+        const needsTheme    = /theme|liquid|css|section|header|footer|layout|template|tipograf|diseño web|snippet|sección|plantilla|estilo.*tienda|css.*tienda/.test(q);
+        const needsFinancial = /precio|price|coste|cog|margin|beneficio|forecast|financiero|presupuesto|budget|revenue|ingresos|tarifa|descuento|p&l|unit.*econom|elasticidad/.test(q);
+        const needsSEO      = /seo|keyword|palabras.*clave|posicionamiento|google|ranking|meta|alt.*text|schema|json-ld|sitemap|blog|artículo|articulo|h1|title.*tag|on.page/.test(q);
+        const needsMarketing = /email|marketing|campaña|campaign|copy|funnel|conversion|cro|a\/b|test|anuncio|ad|redes.*social|instagram|facebook|tiktok|newsletter|klaviyo|flujo/.test(q);
+        const needsSupplier  = /proveedor|supplier|fabricante|manufacturer|dropshipping|sourcing|alibaba|mayorista|wholesale|moq|stock|inventario|fulfillment/.test(q);
+        // Acciones de producto siempre necesitan SEO + Marketing
+        const isProductAction = /crear.*producto|product.*creat|rediseñ|redesign|optimiz.*producto|crea.*catálogo|catálogo.*productos/.test(q);
+
+        expertKnowledgeBlock =
+          (needsTheme    ? THEME_ARCHITECTURE_KNOWLEDGE  : "") +
+          (needsFinancial ? EXPERT_FINANCIAL_KNOWLEDGE   : "") +
+          ((needsSEO || isProductAction) ? EXPERT_SEO_KNOWLEDGE : "") +
+          ((needsMarketing || isProductAction) ? EXPERT_MARKETING_KNOWLEDGE : "") +
+          (needsSupplier  ? EXPERT_SUPPLIER_KNOWLEDGE    : "");
+
+        // Fallback: si ningún dominio detectado, carga SEO + Marketing (los más universales)
+        if (!expertKnowledgeBlock) {
+          expertKnowledgeBlock = EXPERT_SEO_KNOWLEDGE + EXPERT_MARKETING_KNOWLEDGE;
+        }
       } catch {}
   
       const sysPrompt = (customSystemPrompt ?? `Eres Shopy Crafter, el CEREBRO CENTRAL de la agencia. NO eres un asistente — eres el COO/CTO/CMO/CFO virtual de la agencia. Tu dueño es Sadia, la única persona que usa esta plataforma. Tú eres su socio de negocio 24/7.
