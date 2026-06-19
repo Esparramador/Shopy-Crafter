@@ -130,7 +130,7 @@ export function OriginalSlide() {
   };
 
   return (
-    <div style={{ width:"100vw", height:"100vh", overflow:"hidden", position:"relative", background:"#05030c", fontFamily:"'Inter',system-ui,sans-serif" }}>
+    <div style={{ position:"fixed", inset:0, overflow:"hidden", background:"#05030c", fontFamily:"'Inter',system-ui,sans-serif" }}>
       <style>{`
         .orig-cursor{display:inline-block;width:2px;height:.85em;background:#d4a843;vertical-align:text-bottom;margin-left:3px;animation:origBlink .7s step-end infinite}
         @keyframes origBlink{0%,49%{opacity:1}50%,100%{opacity:0}}

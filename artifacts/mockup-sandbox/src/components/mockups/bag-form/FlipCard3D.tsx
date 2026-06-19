@@ -1,13 +1,16 @@
 /**
  * ③ FlipCard3D — Formulario entra con flip 3D desde la bolsa
- * Trigger: t=8.0s · perspective(1200px) rotateY(-90°→0°) · billetes + glow
+ * Trigger: t=8.0s · perspective rotateY(-90°→0°) · billetes + glow
  *
- * Cambios v2:
- * - Totalmente responsivo: desktop/tablet → flip lateral desde bolsa
- *   móvil portrait → flip desde abajo · landscape → panel compacto
+ * v3 fixes:
+ * - Container: position:fixed; inset:0 (video full-screen fiable en móvil)
+ * - onAnimationEnd limpia el CSS animation → sin perspectiva 3D residual
+ *   que bloquea el foco/interacción de los inputs
+ * - translateY(-50%) compuesto en los keyframes wide/landscape para que
+ *   el panel quede centrado durante Y después de la animación
+ * - Móvil portrait: sustituye rotateX (caída visual) por slide-up suave
+ * - Inputs sin readOnly → formulario rellenable como demo real
  * - Billetes/glow: solo en pantallas anchas (bolsa visible)
- * - Replay vía onEnded + 3.5s (no timer fijo desde mount)
- * - Último frame queda congelado
  */
 import { useState, useEffect, useRef } from "react";
 
@@ -30,6 +33,7 @@ export function FlipCard3D() {
   const [videoStarted, setVideoStarted] = useState(false);
   const [formReady,    setFormReady]    = useState(false);
   const [buildPhase,   setBuildPhase]   = useState(0);
+  const [animDone,     setAnimDone]     = useState(false);
   const [replay,       setReplay]       = useState(0);
 
   const [vw, setVw] = useState(() => window.innerWidth);
@@ -50,12 +54,15 @@ export function FlipCard3D() {
 
   // Mount / replay
   useEffect(() => {
-    setVideoStarted(false); setFormReady(false); setBuildPhase(0);
+    setVideoStarted(false); setFormReady(false); setBuildPhase(0); setAnimDone(false);
     const v = videoRef.current;
     if (!v) return;
     v.currentTime = 0;
     v.play().then(() => setVideoStarted(true)).catch(() => {});
   }, [replay]);
+
+  // Reset animDone when form becomes ready (new animation cycle)
+  useEffect(() => { if (formReady) setAnimDone(false); }, [formReady]);
 
   const startPlay = () => {
     const v = videoRef.current;
@@ -97,43 +104,44 @@ export function FlipCard3D() {
 
   const sm = narrowPortrait || narrowLandscape;
 
-  // Gradient
+  // Gradient overlay
   const overlayGrad = narrowPortrait
     ? `linear-gradient(180deg,rgba(5,3,12,0) 0%,rgba(5,3,12,0) 30%,rgba(5,3,12,.6) 54%,rgba(5,3,12,.93) 70%,rgba(5,3,12,.97) 100%),
        linear-gradient(180deg,rgba(5,3,12,.25) 0%,transparent 12%)`
     : `linear-gradient(90deg,rgba(5,3,12,.08) 0%,rgba(5,3,12,.08) 38%,rgba(5,3,12,.68) 56%,rgba(5,3,12,.97) 73%,rgba(5,3,12,.99) 100%),
        linear-gradient(180deg,rgba(5,3,12,.4) 0%,transparent 18%,transparent 75%,rgba(5,3,12,.5) 100%)`;
 
-  // Panel position / size
+  // Panel common styles
   const panelCommon: React.CSSProperties = {
-    background:"rgba(10,8,4,.9)", border:"1px solid rgba(212,168,67,.28)", borderRadius:16,
+    background:"rgba(10,8,4,.92)", border:"1px solid rgba(212,168,67,.28)", borderRadius:16,
     backdropFilter:"blur(18px)",
     boxShadow:"0 0 50px 10px rgba(212,168,67,.18),0 0 0 1px rgba(212,168,67,.2)",
     zIndex: 20,
   };
+
+  // Panel positioning — translateY(-50%) included here, composed in keyframes
   const panelStyle: React.CSSProperties = narrowPortrait ? {
     position:"absolute", left:12, right:12, bottom:12,
     padding:"13px 14px 12px",
     ...panelCommon,
   } : narrowLandscape ? {
-    position:"absolute", right:12, top:"50%",
+    position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
     width:`min(250px, ${Math.round(vw*0.46)}px)`,
     padding:"16px 16px 14px",
     ...panelCommon,
   } : {
-    position:"absolute", right: isWide && vw<900 ? 20 : 77, top:"50%",
-    width: isWide && vw<900 ? `min(300px,${Math.round(vw*0.4)}px)` : 340,
+    position:"absolute", right: vw < 900 ? 20 : 77, top:"50%", transform:"translateY(-50%)",
+    width: vw < 900 ? `min(300px,${Math.round(vw*0.4)}px)` : 340,
     padding:"26px 22px 22px",
-    transformOrigin:"left center",
     ...panelCommon,
   };
 
-  // Clase de animación flip
-  const panelAnimClass = narrowPortrait
-    ? "f3d-flip-up"         // flip desde abajo (rotateX)
-    : narrowLandscape
-      ? "f3d-flip-left"     // flip desde la izquierda, más suave
-      : "f3d-flip-side";    // flip lateral rotateY (original, solo wide)
+  // Clase de animación — se elimina tras onAnimationEnd para liberar perspectiva 3D residual
+  const panelAnimClass = animDone ? "" : (
+    narrowPortrait  ? "f3d-slide-up" :
+    narrowLandscape ? "f3d-flip-left" :
+                      "f3d-flip-side"
+  );
 
   const labelSt: React.CSSProperties = {
     display:"block", fontSize:10, fontWeight:700,
@@ -143,13 +151,14 @@ export function FlipCard3D() {
   const inputSt: React.CSSProperties = {
     display:"block", width:"100%", boxSizing:"border-box",
     padding: sm ? "8px 11px" : "10px 13px",
-    background:"rgba(255,255,255,.04)", border:"1px solid rgba(212,168,67,.28)",
-    borderRadius:9, color:"rgba(255,255,255,.9)", fontSize: sm ? 13 : 13,
+    background:"rgba(255,255,255,.05)", border:"1px solid rgba(212,168,67,.28)",
+    borderRadius:9, color:"rgba(255,255,255,.9)", fontSize:13,
     outline:"none", fontFamily:"inherit",
+    transition:"border-color .2s",
   };
 
   return (
-    <div style={{ width:"100vw", height:"100vh", overflow:"hidden", position:"relative", background:"#05030c", fontFamily:"'Inter',system-ui,sans-serif" }}>
+    <div style={{ position:"fixed", inset:0, overflow:"hidden", background:"#05030c", fontFamily:"'Inter',system-ui,sans-serif" }}>
       <style>{`
         ${BILLS.map(b => `
           @keyframes f3dBill${b.id}{
@@ -163,40 +172,40 @@ export function FlipCard3D() {
         @keyframes f3dField{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
         @keyframes f3dBob{0%,100%{transform:translateY(0);opacity:.35}50%{transform:translateY(-6px);opacity:.8}}
 
-        /* ── Wide: flip lateral desde posición de la bolsa ── */
+        /* ── Wide: flip lateral. translateY(-50%) compuesto en keyframes ── */
         @keyframes f3dFlipSide{
-          0%  {transform:perspective(1200px) translateX(-160px) rotateY(-90deg);opacity:0}
-          35% {transform:perspective(1200px) translateX(-28px) rotateY(-22deg);opacity:1}
-          65% {transform:perspective(1200px) translateX(8px) rotateY(6deg);opacity:1}
-          80% {transform:perspective(1200px) translateX(-3px) rotateY(-2deg);opacity:1}
-          100%{transform:perspective(1200px) translateX(0) rotateY(0deg);opacity:1}
+          0%  {transform:translateY(-50%) perspective(1200px) translateX(-180px) rotateY(-90deg);opacity:0}
+          35% {transform:translateY(-50%) perspective(1200px) translateX(-24px) rotateY(-20deg);opacity:1}
+          65% {transform:translateY(-50%) perspective(1200px) translateX(8px) rotateY(5deg);opacity:1}
+          80% {transform:translateY(-50%) perspective(1200px) translateX(-2px) rotateY(-2deg);opacity:1}
+          100%{transform:translateY(-50%) perspective(1200px) translateX(0) rotateY(0deg);opacity:1}
         }
         .f3d-flip-side{animation:f3dFlipSide 1.05s cubic-bezier(.34,1.56,.64,1) forwards}
 
-        /* ── Móvil portrait: flip desde abajo (rotateX) ── */
-        @keyframes f3dFlipUp{
-          0%  {transform:perspective(900px) translateY(50px) rotateX(75deg);opacity:0;transform-origin:bottom center}
-          40% {transform:perspective(900px) translateY(0) rotateX(-9deg);opacity:1}
-          65% {transform:perspective(900px) rotateX(3.5deg)}
-          83% {transform:perspective(900px) rotateX(-1.5deg)}
-          100%{transform:perspective(900px) rotateX(0deg);opacity:1}
+        /* ── Móvil portrait: slide-up suave (sin rotateX que cae visualmente) ── */
+        @keyframes f3dSlideUp{
+          0%  {transform:translateY(52px) scale(0.96);opacity:0}
+          55% {transform:translateY(-5px) scale(1.015);opacity:1}
+          78% {transform:translateY(3px) scale(0.998)}
+          100%{transform:translateY(0) scale(1);opacity:1}
         }
-        .f3d-flip-up{animation:f3dFlipUp 1.0s cubic-bezier(.34,1.56,.64,1) forwards}
+        .f3d-slide-up{animation:f3dSlideUp 0.9s cubic-bezier(.34,1.56,.64,1) forwards}
 
-        /* ── Landscape estrecho: flip desde la izquierda ── */
+        /* ── Landscape: flip desde izquierda. translateY(-50%) compuesto ── */
         @keyframes f3dFlipLeft{
-          0%  {transform:perspective(800px) translateX(-50px) rotateY(-60deg);opacity:0}
-          45% {transform:perspective(800px) translateX(4px) rotateY(6deg);opacity:1}
-          70% {transform:perspective(800px) translateX(-2px) rotateY(-2deg)}
-          100%{transform:perspective(800px) translateX(0) rotateY(0deg);opacity:1}
+          0%  {transform:translateY(-50%) perspective(800px) translateX(-60px) rotateY(-65deg);opacity:0}
+          45% {transform:translateY(-50%) perspective(800px) translateX(5px) rotateY(6deg);opacity:1}
+          70% {transform:translateY(-50%) perspective(800px) translateX(-2px) rotateY(-2deg)}
+          100%{transform:translateY(-50%) perspective(800px) translateX(0) rotateY(0deg);opacity:1}
         }
         .f3d-flip-left{animation:f3dFlipLeft .9s cubic-bezier(.34,1.56,.64,1) forwards}
 
         .f3d-field{animation:f3dField .5s cubic-bezier(.22,1,.36,1) forwards;opacity:0}
         .play-btn:hover{transform:scale(1.08)!important}
+        .f3d-input:focus{border-color:rgba(212,168,67,.7)!important;box-shadow:0 0 0 3px rgba(212,168,67,.12)!important}
       `}</style>
 
-      {/* VIDEO */}
+      {/* VIDEO — full screen fiable con position:absolute + inset:0 + cover */}
       <video key={replay} ref={videoRef} muted playsInline src={VID_SRC} poster={POSTER_SRC}
         style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:"left center", zIndex:1 }} />
 
@@ -269,6 +278,7 @@ export function FlipCard3D() {
           key={`${narrowPortrait}-${narrowLandscape}`}
           className={panelAnimClass}
           style={panelStyle}
+          onAnimationEnd={() => setAnimDone(true)}
         >
           <div style={{ display:"inline-flex", alignItems:"center", gap:6, fontSize:10, fontWeight:700,
             letterSpacing:"0.18em", color:"#d4a843", textTransform:"uppercase",
@@ -293,18 +303,18 @@ export function FlipCard3D() {
             <>
               <div className="f3d-field" style={{ marginBottom:9 }}>
                 <label style={labelSt}>Nombre</label>
-                <input style={inputSt} readOnly placeholder="Tu nombre..." />
+                <input className="f3d-input" style={inputSt} type="text" placeholder="Tu nombre..." />
               </div>
               <div className="f3d-field" style={{ marginBottom:9, animationDelay:"110ms" }}>
                 <label style={labelSt}>Email</label>
-                <input style={inputSt} readOnly placeholder="tu@tienda.com" />
+                <input className="f3d-input" style={inputSt} type="email" placeholder="tu@tienda.com" />
               </div>
             </>
           )}
           {buildPhase >= 3 && !narrowPortrait && (
             <div className="f3d-field" style={{ marginBottom:9 }}>
               <label style={labelSt}>Teléfono</label>
-              <input style={inputSt} readOnly placeholder="+34 600 000 000" />
+              <input className="f3d-input" style={inputSt} type="tel" placeholder="+34 600 000 000" />
             </div>
           )}
           {buildPhase >= 4 && (

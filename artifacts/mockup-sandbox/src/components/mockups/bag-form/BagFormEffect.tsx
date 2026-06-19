@@ -157,7 +157,7 @@ export function BagFormEffect() {
   };
 
   return (
-    <div style={{ width:"100vw", height:"100vh", overflow:"hidden", position:"relative", background:"#05030c", fontFamily:"'Inter',system-ui,sans-serif" }}>
+    <div style={{ position:"fixed", inset:0, overflow:"hidden", background:"#05030c", fontFamily:"'Inter',system-ui,sans-serif" }}>
       <style>{`
         @keyframes bfPlayPulse{0%,100%{box-shadow:0 0 30px rgba(212,168,67,.5),0 0 60px rgba(212,168,67,.25)}50%{box-shadow:0 0 55px rgba(212,168,67,.85),0 0 110px rgba(212,168,67,.5)}}
         @keyframes bfBurst{0%{transform:scale(.08);opacity:0}18%{transform:scale(1.2);opacity:1}55%{transform:scale(2.2);opacity:.6}100%{transform:scale(3.8);opacity:0}}

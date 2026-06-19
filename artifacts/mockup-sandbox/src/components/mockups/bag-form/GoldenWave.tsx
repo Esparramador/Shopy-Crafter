@@ -162,7 +162,7 @@ export function GoldenWave() {
   };
 
   return (
-    <div style={{ width:"100vw", height:"100vh", overflow:"hidden", position:"relative", background:"#05030c", fontFamily:"'Inter',system-ui,sans-serif" }}>
+    <div style={{ position:"fixed", inset:0, overflow:"hidden", background:"#05030c", fontFamily:"'Inter',system-ui,sans-serif" }}>
       <style>{`
         ${SPARKS.map(s => `
           @keyframes gwSpark${s.id}{
