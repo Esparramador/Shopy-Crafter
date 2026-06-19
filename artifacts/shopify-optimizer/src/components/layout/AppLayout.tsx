@@ -396,26 +396,6 @@ export function AppLayout({ children }: AppLayoutProps) {
               </svg>
             </a>
 
-            {/* Shopy Crafter Web */}
-            <a
-              href="https://shopycrafter.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="shopycrafter.com"
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 30, height: 30, borderRadius: 7,
-                background: "rgba(255,255,255,0.025)",
-                border: "1px solid var(--bdr)",
-                textDecoration: "none", transition: "background 0.15s", flexShrink: 0,
-              }}
-              onMouseOver={e => (e.currentTarget.style.background = "rgba(212,168,67,0.12)")}
-              onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#d4a843" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
           </div>
         </div>
 

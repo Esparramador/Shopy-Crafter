@@ -5,6 +5,107 @@ import PageMeta from "@/components/PageMeta";
 import { VismeFormHero } from "@/components/VismeFormHero";
 import "./landing.css";
 
+function MagnetStoreButton() {
+  const btnRef = useRef<HTMLAnchorElement>(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [hovered, setHovered] = useState(false);
+  const animRef = useRef<number>(0);
+  const targetRef = useRef({ x: 0, y: 0 });
+  const currentRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const el = btnRef.current;
+    if (!el) return;
+
+    const RADIUS = 130;
+    const STRENGTH = 0.38;
+
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist < RADIUS) {
+        const pull = (1 - dist / RADIUS) * STRENGTH * 60;
+        targetRef.current = { x: (dx / dist) * pull, y: (dy / dist) * pull };
+        setHovered(true);
+      } else {
+        targetRef.current = { x: 0, y: 0 };
+        setHovered(false);
+      }
+    };
+
+    const loop = () => {
+      const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+      currentRef.current.x = lerp(currentRef.current.x, targetRef.current.x, 0.14);
+      currentRef.current.y = lerp(currentRef.current.y, targetRef.current.y, 0.14);
+      setOffset({ x: currentRef.current.x, y: currentRef.current.y });
+      animRef.current = requestAnimationFrame(loop);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    animRef.current = requestAnimationFrame(loop);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      cancelAnimationFrame(animRef.current);
+    };
+  }, []);
+
+  return (
+    <a
+      ref={btnRef}
+      href="https://shopycrafter.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        position: "absolute",
+        bottom: 72,
+        right: 36,
+        zIndex: 30,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "13px 22px",
+        borderRadius: 50,
+        background: hovered
+          ? "linear-gradient(135deg,#e6c668,#d4a843)"
+          : "linear-gradient(135deg,#d4a843,#b8902e)",
+        color: "#0a0800",
+        fontWeight: 800,
+        fontSize: 13,
+        letterSpacing: "0.02em",
+        textDecoration: "none",
+        boxShadow: hovered
+          ? "0 0 0 4px rgba(212,168,67,0.35), 0 0 40px 12px rgba(212,168,67,0.55), 0 8px 32px rgba(0,0,0,0.5)"
+          : "0 0 0 2px rgba(212,168,67,0.2), 0 0 24px 6px rgba(212,168,67,0.35), 0 6px 24px rgba(0,0,0,0.4)",
+        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        transition: "background 0.2s, box-shadow 0.2s",
+        cursor: "pointer",
+        animation: "magnetBlink 2.4s ease-in-out infinite",
+        willChange: "transform",
+        userSelect: "none",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+      Visitar shopycrafter.com
+      <span style={{
+        display: "inline-block",
+        width: 8, height: 8,
+        borderRadius: "50%",
+        background: "#0a0800",
+        animation: "magnetDot 1.1s ease-in-out infinite",
+        marginLeft: 2,
+      }} />
+    </a>
+  );
+}
+
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 function ApkDownloadButton({ labels }: { labels?: { idle: string; checking: string; downloading: string; building: string; unavailable: string } }) {
@@ -642,6 +743,8 @@ export default function Landing() {
               )}
             </div>
           </div>
+
+          <MagnetStoreButton />
 
           <div className="fp-scroll-hint">
             <div className="fp-scroll-hint-text" {...cmsProps("hero.scrollHint")}>{content.hero.scrollHint ?? "Desliza para explorar"}</div>

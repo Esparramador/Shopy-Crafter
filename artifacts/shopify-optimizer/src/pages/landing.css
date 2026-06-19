@@ -3496,3 +3496,17 @@
   position: absolute;
   pointer-events: none;
 }
+
+/* ── Magnet Store Button ─────────────────────────────────────── */
+@keyframes magnetBlink {
+  0%   { box-shadow: 0 0 0 2px rgba(212,168,67,0.2), 0 0 24px 6px rgba(212,168,67,0.35), 0 6px 24px rgba(0,0,0,0.4); opacity: 1; }
+  45%  { box-shadow: 0 0 0 6px rgba(212,168,67,0.38), 0 0 48px 16px rgba(212,168,67,0.65), 0 6px 24px rgba(0,0,0,0.4); opacity: 1; }
+  50%  { box-shadow: 0 0 0 8px rgba(212,168,67,0.1),  0 0 60px 20px rgba(212,168,67,0.2),  0 6px 24px rgba(0,0,0,0.4); opacity: 0.82; }
+  55%  { box-shadow: 0 0 0 6px rgba(212,168,67,0.38), 0 0 48px 16px rgba(212,168,67,0.65), 0 6px 24px rgba(0,0,0,0.4); opacity: 1; }
+  100% { box-shadow: 0 0 0 2px rgba(212,168,67,0.2), 0 0 24px 6px rgba(212,168,67,0.35), 0 6px 24px rgba(0,0,0,0.4); opacity: 1; }
+}
+
+@keyframes magnetDot {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%       { transform: scale(1.6); opacity: 0.4; }
+}
