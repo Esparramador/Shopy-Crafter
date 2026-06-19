@@ -40,20 +40,6 @@ interface StatsResponse {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PROMPT_CATEGORIES = [
-  { key: "", label: "Todos", icon: "🌐", color: "#c9a961", desc: "Explorar toda la librería" },
-  { key: "product_photography", label: "Fotografía", icon: "📸", color: "#f59e0b", desc: "Composiciones para e-commerce" },
-  { key: "lifestyle", label: "Lifestyle", icon: "🌿", color: "#4ade80", desc: "Escenas de vida real" },
-  { key: "seo_copy", label: "SEO & Copy", icon: "🔍", color: "#60a5fa", desc: "Textos optimizados" },
-  { key: "email", label: "Email", icon: "📧", color: "#a78bfa", desc: "Campañas y flujos" },
-  { key: "ad_creative", label: "Ads", icon: "📺", color: "#f87171", desc: "Facebook, Instagram, TikTok" },
-  { key: "brand_voice", label: "Brand Voice", icon: "🎯", color: "#fbbf24", desc: "Tono de marca" },
-  { key: "product_description", label: "Producto", icon: "📦", color: "#2a7a4b", desc: "Fichas persuasivas" },
-  { key: "storytelling", label: "Storytelling", icon: "📖", color: "#ec4899", desc: "Narrativas de impacto" },
-  { key: "video_script", label: "Vídeo", icon: "🎬", color: "#06b6d4", desc: "Scripts y guiones" },
-  { key: "social_media", label: "Social", icon: "📱", color: "#f97316", desc: "Posts y captions" },
-  { key: "upsell", label: "CRO", icon: "📈", color: "#34d399", desc: "Conversión y upsell" },
-];
 const SNIPPET_CAT_LABELS: Record<string, string> = {
   particle_effects: "Partículas", background_effects: "Fondos", micro_interactions: "Micro-Interactions",
   text_effects: "Texto", cards: "Tarjetas", "3d_effects": "Efectos 3D", typography_effects: "Tipografía",
@@ -193,10 +179,6 @@ export default function EffectsStudio() {
 
   // ── Load items per source ───────────────────────────────────────────────────
   const loadPrompts = useCallback(async (cat: string, q: string, off: number, append = false) => {
-    if (!cat && !q.trim()) {
-      if (!append) { setItems([]); setHasMore(false); setTotalCount(0); }
-      return;
-    }
     setLoading(true);
     try {
       const p = new URLSearchParams({ limit: String(LIMIT), offset: String(off) });
@@ -470,7 +452,7 @@ export default function EffectsStudio() {
     ? (stats?.snippetCategories ?? [])
     : source === "visme"
       ? (stats?.vismeCategories ?? []).slice(0, 50)
-      : PROMPT_CATEGORIES.slice(1).map(c => c.key);
+      : libIndex.map(l => l.key);
 
   // ── Styles ──────────────────────────────────────────────────────────────────
   const S = {
@@ -673,12 +655,16 @@ export default function EffectsStudio() {
           </button>
 
           {/* Category list */}
-          {source === "prompts" && PROMPT_CATEGORIES.slice(1).map(cat => (
-            <button key={cat.key} onClick={() => handleCategoryClick(cat.key)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 7, padding: "6px 12px", border: "none", background: category === cat.key ? `${cat.color}10` : "transparent", color: category === cat.key ? cat.color : S.t3, fontSize: 11, cursor: "pointer", textAlign: "left", transition: "all .1s" }}>
-              <span style={{ fontSize: 14, flexShrink: 0 }}>{cat.icon}</span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
-            </button>
-          ))}
+          {source === "prompts" && libIndex.map((lib, i) => {
+            const PALETTE = ["#f59e0b","#4ade80","#60a5fa","#a78bfa","#f87171","#fbbf24","#06b6d4","#e879f9","#22d3ee","#34d399","#fb923c","#67e8f9","#c084fc","#38bdf8","#f97316","#86efac"];
+            const col = PALETTE[i % PALETTE.length];
+            return (
+              <button key={lib.key} onClick={() => handleCategoryClick(lib.key)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "6px 12px", border: "none", background: category === lib.key ? `${col}10` : "transparent", color: category === lib.key ? col : S.t3, fontSize: 11, cursor: "pointer", textAlign: "left", transition: "all .1s" }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{lib.key.replace(/_/g, " ")}</span>
+                <span style={{ fontSize: 9, background: "rgba(255,255,255,.05)", padding: "0 4px", borderRadius: 6, color: S.t4, flexShrink: 0 }}>{lib.count}</span>
+              </button>
+            );
+          })}
           {source === "effects" && (stats?.snippetCategories ?? []).map(cat => (
             <button key={cat} onClick={() => handleCategoryClick(cat)} style={{ width: "100%", display: "flex", alignItems: "center", padding: "6px 12px", border: "none", background: category === cat ? "rgba(201,169,97,.1)" : "transparent", color: category === cat ? S.gold : S.t3, fontSize: 11, cursor: "pointer", textAlign: "left" }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{SNIPPET_CAT_LABELS[cat] ?? cat.replace(/_/g, " ")}</span>
@@ -699,7 +685,7 @@ export default function EffectsStudio() {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 13, fontWeight: 700 }}>
                 {search ? `"${search}"` : category
-                  ? (source === "prompts" ? PROMPT_CATEGORIES.find(c => c.key === category)?.label : source === "effects" ? (SNIPPET_CAT_LABELS[category] ?? category) : (VISME_CAT_LABELS[category] ?? category.replace(/_/g, " "))) ?? category
+                  ? (source === "prompts" ? category.replace(/_/g, " ") : source === "effects" ? (SNIPPET_CAT_LABELS[category] ?? category) : (VISME_CAT_LABELS[category] ?? category.replace(/_/g, " ")))
                   : source === "prompts" ? "Librería Maestra de Prompts" : source === "effects" ? "Efectos CSS/JS" : "Templates Visme"
                 }
               </span>
@@ -724,17 +710,17 @@ export default function EffectsStudio() {
             <div style={{ marginBottom: 24 }}>
               <p style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", color: S.t4, marginBottom: 10 }}>CATEGORÍAS</p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(155px,1fr))", gap: 8, marginBottom: 20 }}>
-                {PROMPT_CATEGORIES.slice(1).map(cat => {
-                  const libInfo = libIndex.find(l => l.key === cat.key);
-                  const isAct = category === cat.key;
+                {libIndex.map((lib, i) => {
+                  const PALETTE = ["#f59e0b","#4ade80","#60a5fa","#a78bfa","#f87171","#fbbf24","#06b6d4","#e879f9","#22d3ee","#34d399","#fb923c","#67e8f9","#c084fc","#38bdf8","#f97316","#86efac"];
+                  const col = PALETTE[i % PALETTE.length];
+                  const isAct = category === lib.key;
                   return (
-                    <button key={cat.key} onClick={() => handleCategoryClick(cat.key)} style={{ padding: "14px 12px", borderRadius: 12, cursor: "pointer", background: isAct ? `${cat.color}12` : S.surf2, border: `1px solid ${isAct ? cat.color + "50" : S.bdr}`, textAlign: "left", transition: "all .15s" }}
-                      onMouseOver={e => { if (!isAct) { e.currentTarget.style.borderColor = `${cat.color}35`; e.currentTarget.style.background = `${cat.color}08`; } }}
+                    <button key={lib.key} onClick={() => handleCategoryClick(lib.key)} style={{ padding: "14px 12px", borderRadius: 12, cursor: "pointer", background: isAct ? `${col}12` : S.surf2, border: `1px solid ${isAct ? col + "50" : S.bdr}`, textAlign: "left", transition: "all .15s" }}
+                      onMouseOver={e => { if (!isAct) { e.currentTarget.style.borderColor = `${col}35`; e.currentTarget.style.background = `${col}08`; } }}
                       onMouseOut={e => { if (!isAct) { e.currentTarget.style.borderColor = S.bdr; e.currentTarget.style.background = S.surf2; } }}>
-                      <div style={{ fontSize: 22, marginBottom: 8 }}>{cat.icon}</div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: isAct ? cat.color : S.t1, marginBottom: 3 }}>{cat.label}</p>
-                      <p style={{ fontSize: 9, color: S.t4, lineHeight: 1.4, marginBottom: 6 }}>{cat.desc}</p>
-                      {libInfo && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, background: `${cat.color}15`, color: cat.color, fontWeight: 700 }}>{libInfo.count} templates</span>}
+                      <div style={{ fontSize: 9, fontFamily: "monospace", color: col, fontWeight: 700, marginBottom: 8, letterSpacing: ".04em", textTransform: "uppercase" }}>{lib.key.split("_").slice(0, 2).join("_")}</div>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: isAct ? col : S.t1, marginBottom: 3 }}>{lib.key.replace(/_/g, " ")}</p>
+                      <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, background: `${col}15`, color: col, fontWeight: 700 }}>{lib.count} templates</span>
                     </button>
                   );
                 })}

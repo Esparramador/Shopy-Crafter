@@ -574,7 +574,7 @@ router.get("/fs-pro/prompt-library-master", requireAdmin, async (req, res): Prom
     const { library: libKey, search, limit = "20", offset = "0", indexOnly } = req.query as Record<string, string>;
     const master = getMasterLib();
 
-    if (indexOnly === "1" || (!libKey && !search)) {
+    if (indexOnly === "1") {
       res.json({ meta: master._meta, libraries: master._meta.libraries });
       return;
     }
