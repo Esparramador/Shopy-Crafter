@@ -881,15 +881,35 @@ router.post("/mcp/install", async (req, res): Promise<void> => {
     }
     logger.info({ npmPackage }, "MCP install requested");
 
+    // Strip pnpm self-update banners from output (box-drawing chars + "Update available")
+    function cleanPnpmOutput(raw: string): string {
+      return raw.split('\n')
+        .filter(line => {
+          const t = line.trim();
+          return (
+            !t.startsWith('╭') && !t.startsWith('│') && !t.startsWith('╰') &&
+            !t.includes('Update available!') &&
+            !t.includes('Changelog: https://pnpm.io') &&
+            !t.includes('To update run:') &&
+            !t.includes('pnpm self-update')
+          );
+        })
+        .join('\n')
+        .trim();
+    }
+
     try {
-      const output = execSync(`pnpm add -w "${npmPackage}" 2>&1`, {
+      const raw = execSync(`pnpm add -w "${npmPackage}" 2>&1`, {
         cwd: "/home/runner/workspace",
         timeout: 120_000,
         encoding: "utf8",
       });
-      res.json({ ok: true, output: output.slice(0, 2000) });
+      res.json({ ok: true, output: cleanPnpmOutput(raw).slice(0, 2000) });
     } catch (e: any) {
-      const msg = (e?.stdout || e?.stderr || e?.message || "install failed").slice(0, 2000);
+      const raw = (e?.stdout || e?.stderr || e?.message || "install failed");
+      const cleaned = cleanPnpmOutput(String(raw));
+      // If cleaning removed everything, show a generic message
+      const msg = (cleaned.length > 10 ? cleaned : String(raw)).slice(0, 2000);
       res.status(500).json({ error: msg });
     }
   } catch (err: any) {
