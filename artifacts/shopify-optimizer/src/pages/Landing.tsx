@@ -259,7 +259,7 @@ export default function Landing() {
   const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});
   const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
   const [calcCategory, setCalcCategory] = useState("all");
-  const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set());
+  const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set(["fp-hero"]));
   const pricingRowRef = useRef<HTMLDivElement>(null);
   const [pricingIdx, setPricingIdx] = useState(0);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "", suppliers: "" });
