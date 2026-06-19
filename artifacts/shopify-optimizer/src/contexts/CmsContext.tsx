@@ -90,10 +90,35 @@ function loadGoogleFont(fontName: string) {
   document.head.appendChild(link);
 }
 
+/** Inyecta el CSS libre del CMS como <style id="cms-custom-css"> en el <head>.
+ *  Cada vez que el CMS se actualiza (SSE) este bloque se reescribe al instante.
+ *  El CSS vive en la BD — no en archivos compilados. */
+function injectCmsCustomCss(content: Record<string, any>) {
+  const css: string = content?.customCss ?? "";
+  let el = document.getElementById("cms-custom-css") as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement("style");
+    el.id = "cms-custom-css";
+    // Se añade DESPUÉS de todos los demás estilos para que gane en cascada
+    document.head.appendChild(el);
+  }
+  el.textContent = css;
+}
+
 function injectCmsTheme(content: Record<string, any>) {
   const site = content?.site ?? {};
   const root = document.documentElement;
 
+  // ── Variables CSS nombradas (mapa libre de --var: value) ──────────────────
+  // Permite sobreescribir CUALQUIER variable de design-system.css desde la BD
+  const cssVars: Record<string, string> = site.cssVars ?? {};
+  Object.entries(cssVars).forEach(([key, value]) => {
+    if (key.startsWith("--") && typeof value === "string" && value.trim()) {
+      root.style.setProperty(key, value.trim());
+    }
+  });
+
+  // ── Color primario (--gold y familia) ─────────────────────────────────────
   const primaryColor: string | undefined = site.primaryColor;
   if (primaryColor && /^#[0-9a-fA-F]{3,8}$/.test(primaryColor)) {
     const rgb = hexToRgb(primaryColor);
@@ -118,6 +143,7 @@ function injectCmsTheme(content: Record<string, any>) {
     }
   }
 
+  // ── Color acento (--jade y familia) ───────────────────────────────────────
   const accentColor: string | undefined = site.accentColor;
   if (accentColor && /^#[0-9a-fA-F]{3,8}$/.test(accentColor)) {
     const rgb = hexToRgb(accentColor);
@@ -129,6 +155,7 @@ function injectCmsTheme(content: Record<string, any>) {
     }
   }
 
+  // ── Tipografías ───────────────────────────────────────────────────────────
   const fontHeading: string | undefined = site.font_heading;
   if (fontHeading && fontHeading.trim()) {
     loadGoogleFont(fontHeading.trim());
@@ -144,6 +171,9 @@ function injectCmsTheme(content: Record<string, any>) {
     root.style.setProperty("--l-fb", `'${fontBody.trim()}', sans-serif`);
     root.style.setProperty("--font-sans", `'${fontBody.trim()}', sans-serif`);
   }
+
+  // ── CSS libre del CMS ─────────────────────────────────────────────────────
+  injectCmsCustomCss(content);
 }
 
 export function CmsProvider({ children }: { children: ReactNode }) {

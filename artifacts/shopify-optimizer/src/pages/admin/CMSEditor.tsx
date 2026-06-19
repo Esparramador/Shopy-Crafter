@@ -56,6 +56,10 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
+    id: "design", icon: "🎨", label: "Diseño & CSS en vivo",
+    fields: [],
+  },
+  {
     id: "effects", icon: "✨", label: "Efectos Visme",
     fields: [],
   },
@@ -833,6 +837,148 @@ function NavArrayEditor({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── CSS THEME EDITOR ───────────────────────────────────────────────────── */
+const CSS_VAR_DEFS = [
+  { group: "Fondos", vars: [
+    { name: "--ink",  label: "Fondo base",      hint: "Fondo principal de la app" },
+    { name: "--ink2", label: "Fondo medio",      hint: "Cards, paneles" },
+    { name: "--ink3", label: "Fondo elevado",    hint: "Inputs, tooltips" },
+    { name: "--ink4", label: "Fondo alto",       hint: "Modales, popovers" },
+    { name: "--ink5", label: "Fondo máximo",     hint: "Elementos más elevados" },
+  ]},
+  { group: "Color primario (Gold)", vars: [
+    { name: "--gold",  label: "Gold principal",  hint: "#c8a84b por defecto" },
+    { name: "--gold2", label: "Gold claro",      hint: "Variante más clara" },
+    { name: "--gold3", label: "Gold muy claro",  hint: "Variante muy clara" },
+  ]},
+  { group: "Color acento (Jade)", vars: [
+    { name: "--jade",  label: "Jade principal",  hint: "#2dd49f por defecto" },
+    { name: "--jade2", label: "Jade claro",      hint: "Variante más clara" },
+  ]},
+  { group: "Colores de estado", vars: [
+    { name: "--sky",   label: "Sky (info)",      hint: "Azul informativo" },
+    { name: "--crim",  label: "Crim (error)",    hint: "Rojo de errores" },
+    { name: "--amber", label: "Amber (aviso)",   hint: "Amarillo de advertencia" },
+  ]},
+  { group: "Texto", vars: [
+    { name: "--t",  label: "Texto principal", hint: "#f2f0ff" },
+    { name: "--t2", label: "Texto secundario", hint: "#9896ba" },
+    { name: "--t3", label: "Texto tenue",     hint: "#58567a" },
+    { name: "--t4", label: "Texto muy tenue", hint: "#35334f" },
+  ]},
+];
+
+function CssThemeEditor({ content, onChange }: {
+  content: Record<string, unknown>;
+  onChange: (path: string, value: unknown) => void;
+}) {
+  const cssVars: Record<string, string> = (content as any)?.site?.cssVars ?? {};
+  const customCss: string = (content as any)?.customCss ?? "";
+  const [localCss, setLocalCss] = useState(customCss);
+  const [cssApplied, setCssApplied] = useState(false);
+
+  // Sync si llega nueva versión desde el CMS
+  useEffect(() => { setLocalCss(customCss); }, [customCss]);
+
+  function applyVarChange(varName: string, value: string) {
+    const updated = { ...cssVars, [varName]: value };
+    onChange("site.cssVars", updated);
+    // Aplica inmediatamente al DOM para preview en vivo
+    document.documentElement.style.setProperty(varName, value);
+  }
+
+  function saveCss() {
+    onChange("customCss", localCss);
+    setCssApplied(true);
+    setTimeout(() => setCssApplied(false), 2000);
+    // Inyectar inmediatamente sin esperar a guardar el batch
+    let el = document.getElementById("cms-custom-css") as HTMLStyleElement | null;
+    if (!el) {
+      el = document.createElement("style");
+      el.id = "cms-custom-css";
+      document.head.appendChild(el);
+    }
+    el.textContent = localCss;
+  }
+
+  // Leer valor actual de la variable (BD primero, luego computed del DOM)
+  function varValue(name: string): string {
+    if (cssVars[name]) return cssVars[name];
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 14, lineHeight: 1.6 }}>
+        Edita variables CSS del sistema de diseño y añade CSS libre. Los cambios se aplican <strong style={{ color: "var(--jade)" }}>en tiempo real</strong> sin necesidad de compilar. Todo vive en la BD.
+      </p>
+
+      {/* ── Variables CSS ── */}
+      {CSS_VAR_DEFS.map(group => (
+        <div key={group.group} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>{group.group}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {group.vars.map(v => {
+              const current = varValue(v.name);
+              const isHex = /^#[0-9a-fA-F]{3,8}$/.test(current.trim());
+              return (
+                <label key={v.name} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}>
+                  <input
+                    type="color"
+                    value={isHex ? current.trim() : "#c8a84b"}
+                    style={{ width: 26, height: 26, border: "none", borderRadius: 6, cursor: "pointer", background: "none", padding: 0 }}
+                    onChange={e => applyVarChange(v.name, e.target.value)}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--t)", lineHeight: 1.2 }}>{v.label}</div>
+                    <div style={{ fontSize: 9, color: "var(--t4)", fontFamily: "monospace", marginTop: 2 }}>{v.name}</div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* ── CSS Personalizado libre ── */}
+      <div style={{ marginTop: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+          <span>CSS Personalizado</span>
+          <span style={{ fontSize: 9, color: "var(--t3)", fontWeight: 400 }}>Cualquier CSS válido — se inyecta en &lt;head&gt; con máxima prioridad</span>
+        </div>
+        <textarea
+          value={localCss}
+          onChange={e => setLocalCss(e.target.value)}
+          rows={12}
+          placeholder={`/* Escribe cualquier CSS aquí */\n\n/* Ejemplo: cambiar color del sidebar */\n.sc-sidebar { background: #0a0a0f; }\n\n/* Ejemplo: animar botones */\n.btn-gold { transition: all 0.3s ease; }\n\n/* Ejemplo: override de variable */\n:root { --gold: #ff6b35; }`}
+          spellCheck={false}
+          style={{
+            width: "100%", fontFamily: "monospace", fontSize: 11,
+            background: "#0a0a12", border: "1px solid var(--bdr2)", borderRadius: 10,
+            color: "#e2e0ff", padding: "10px 12px", resize: "vertical", outline: "none",
+            lineHeight: 1.6, boxSizing: "border-box",
+          }}
+          onFocus={e => (e.currentTarget.style.borderColor = "var(--gold)")}
+          onBlur={e => (e.currentTarget.style.borderColor = "var(--bdr2)")}
+        />
+        <button
+          onClick={saveCss}
+          style={{
+            marginTop: 8, padding: "7px 18px", fontSize: 12, fontWeight: 600,
+            background: cssApplied ? "var(--jade)" : "var(--gold)", color: "#000",
+            border: "none", borderRadius: 8, cursor: "pointer", transition: "background .3s",
+          }}
+        >
+          {cssApplied ? "✓ CSS aplicado al DOM" : "Aplicar CSS al DOM ahora"}
+        </button>
+        <span style={{ fontSize: 10, color: "var(--t3)", marginLeft: 10 }}>
+          (Pulsa "Guardar" en la barra superior para persistir en BD)
+        </span>
+      </div>
     </div>
   );
 }
@@ -1903,8 +2049,8 @@ export default function CMSEditor() {
     "nav", "hero", "features", "stats", "how", "pricing", "testimonials", "cta",
     "results", "contact", "howCards", "footer", "sectionNav",
     "adminPanel", "clientPanel", "adminNav", "apkLabels", "errorMessages", "heroDemoTitles",
-    "site", "backgrounds",
-    ...SECTIONS.filter(s => !["nav","hero","features","stats","how","pricing","testimonials","cta","results","contact","howCards","footer","sectionNav","adminPanel","clientPanel","adminNav","apkLabels","errorMessages","heroDemoTitles","site","backgrounds"].includes(s.id)).map(s => s.id),
+    "site", "design", "backgrounds",
+    ...SECTIONS.filter(s => !["nav","hero","features","stats","how","pricing","testimonials","cta","results","contact","howCards","footer","sectionNav","adminPanel","clientPanel","adminNav","apkLabels","errorMessages","heroDemoTitles","site","design","backgrounds"].includes(s.id)).map(s => s.id),
   ];
   const [sectionOrder, setSectionOrder] = useState<string[]>(CONTENT_FIRST_ORDER);
   const [dragIdx, setDragIdx]           = useState<number | null>(null);
@@ -2454,7 +2600,9 @@ export default function CMSEditor() {
 
                   {isOpen && (
                     <div style={{ padding: "12px 16px 16px", background: "var(--ink3)" }}>
-                      {section.id === "effects" ? (
+                      {section.id === "design" ? (
+                        <CssThemeEditor content={content} onChange={handleFieldChange} />
+                      ) : section.id === "effects" ? (
                         <EffectSectionPicker content={content} onChange={handleFieldChange} />
                       ) : section.id === "adminNav" ? (
                         <NavSectionEditor content={content} onChange={handleFieldChange} />
