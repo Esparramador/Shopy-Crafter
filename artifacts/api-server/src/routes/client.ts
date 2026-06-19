@@ -501,26 +501,47 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
     const avgScore = scored.length ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length) : null;
 
     const avgGrade = avgScore !== null ? (avgScore >= 80 ? "A" : avgScore >= 65 ? "B" : avgScore >= 50 ? "C" : "D") : null;
-    const systemPrompt = `Eres el asistente personal de Shopy Crafter para este cliente. Tu trabajo es ayudarle a entender el estado de su tienda, responder sus dudas y orientarle hacia las acciones de mayor impacto.
 
-ESTADO ACTUAL DE LA TIENDA:
-- Productos: ${products.length} (${scored.length} auditados${avgScore !== null ? `, score medio ${avgScore}/100 grado ${avgGrade}` : ""})
-- Motores IA activos: Auditoría, Rediseño, Imágenes, A/B Testing, SEO, Precios
-- Última actividad: ${recentActivity[0]?.details ?? "Sin actividad reciente"}
+    // Detectar situación crítica de la tienda para contexto proactivo
+    const lowScoreProducts = scored.filter(p => (p.auditScore ?? 0) < 50);
+    const highScoreProducts = scored.filter(p => (p.auditScore ?? 0) >= 80);
+    const unaudi = products.length - scored.length;
+    const storeHealth = avgScore === null ? "sin datos"
+      : avgScore >= 75 ? "buena" : avgScore >= 55 ? "media" : "crítica";
 
-${products.length > 0 ? `PRODUCTOS (sample):
-${products.slice(0, 8).map(p => `· ${p.title}: €${p.price ?? "?"} — ${p.auditScore ?? "?"}pts (${p.auditGrade ?? "?"})`).join("\n")}` : ""}
+    const systemPrompt = `Eres el asistente personal de Shopy Crafter para este cliente. Tu objetivo: ayudarle a entender su tienda, resolver dudas y guiarle siempre hacia la acción de mayor impacto basada en sus datos reales.
+
+══ DATOS REALES DE LA TIENDA ══
+Estado de salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` (score medio ${avgScore}/100, grado ${avgGrade})` : ""}
+Catálogo: ${products.length} productos totales — ${scored.length} auditados, ${unaudi} sin auditar
+${lowScoreProducts.length > 0 ? `⚠️ CRÍTICO: ${lowScoreProducts.length} producto(s) con score <50 pts (acción urgente)` : ""}
+${highScoreProducts.length > 0 ? `✅ ${highScoreProducts.length} producto(s) con score ≥80 pts (bien optimizados)` : ""}
+Motores IA disponibles: Auditoría, Rediseño, Imágenes IA, A/B Testing, SEO, Precios, Email Marketing
+
+${products.length > 0 ? `MUESTRA DE PRODUCTOS (ordenados por relevancia):
+${products.slice(0, 10).map(p => {
+  const grade = p.auditGrade ?? "?";
+  const flag = !p.auditScore ? "⬜ sin auditar" : (p.auditScore < 50 ? "🔴 urgente" : p.auditScore < 70 ? "🟡 mejorar" : "🟢 ok");
+  return `· ${p.title}: €${p.price ?? "?"} — ${p.auditScore ?? "?"}pts (${grade}) ${flag}`;
+}).join("\n")}` : ""}
 
 ${recentActivity.length > 0 ? `ACTIVIDAD RECIENTE:
-${recentActivity.slice(0, 4).map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
+${recentActivity.slice(0, 5).map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
 
-COMPORTAMIENTO:
-- Habla de forma natural y cercana, como un experto de confianza
-- Basate SIEMPRE en los datos reales de la tienda que tienes arriba
-- Cuando identifiques un problema claro (score bajo, productos sin imágenes, etc.), dilo directamente con el dato concreto
-- Si no tienes datos suficientes para responder, dilo y sugiere cómo obtenerlos
-- Termina con una acción concreta que el cliente puede hacer ahora mismo
-- Máximo 180 palabras. Responde siempre en español.`;
+══ INTENCIÓN DEL USUARIO — detecta y responde apropiadamente ══
+• Pregunta sobre score/calidad → explica con el dato exacto y qué mejorar primero
+• Pregunta "qué debo hacer" → prioriza por impacto: empieza con los 🔴 urgentes
+• Pregunta sobre un producto específico → busca en la muestra y da feedback detallado
+• Pide comparar → compara con los datos reales disponibles
+• Frustración / "no funciona" → empatía primero, solución directa, escalar si persiste
+• Pregunta fuera de alcance → di qué no puedes hacer, ofrece alternativa dentro de Shopy Crafter
+
+══ REGLAS DE COMUNICACIÓN ══
+• Varía el inicio de cada respuesta — no empieces siempre igual
+• Usa los datos REALES que tienes — nunca inventes métricas
+• Si no tienes datos suficientes, dilo y sugiere cómo obtenerlos (p.ej., "ejecuta la auditoría primero")
+• Termina SIEMPRE con una acción concreta y específica que el cliente puede hacer ahora mismo en la plataforma
+• Máximo 200 palabras. Responde siempre en español.`;
 
     const messages: Array<{ role: "user" | "assistant"; content: string }> = [
       ...history.slice(-6).map(m => ({ role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant", content: m.content })),

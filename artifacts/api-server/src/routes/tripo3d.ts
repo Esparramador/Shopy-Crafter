@@ -621,22 +621,24 @@ router.post(
   }
 );
 
-/* POST /api/tripo3d/convert — convertir formato del modelo */
+/* POST /api/tripo3d/convert — convertir formato del modelo
+   Acepta: original_model_task_id (Tripo SDK nativo) o taskId (alias corto) */
 router.post("/api/tripo3d/convert", async (req: Request, res: Response) => {
-  const { original_model_task_id, format = "glb", quad, face_limit, texture_size, pivot_to_center_bottom } = req.body ?? {};
-  if (!original_model_task_id) { res.status(400).json({ error: "original_model_task_id requerido" }); return; }
+  const { taskId: taskIdAlias, original_model_task_id, format = "glb", quad, face_limit, texture_size, pivot_to_center_bottom } = req.body ?? {};
+  const sourceTaskId = original_model_task_id || taskIdAlias;
+  if (!sourceTaskId) { res.status(400).json({ error: "original_model_task_id (o taskId) requerido" }); return; }
   try {
-    const taskId = await tripoCreateTask({
+    const newTaskId = await tripoCreateTask({
       type: "convert_model",
-      original_model_task_id,
-      format,
+      original_model_task_id: sourceTaskId,
+      format: (format as string).toLowerCase(),
       quad: quad ?? undefined,
       face_limit: face_limit ? Number(face_limit) : undefined,
       texture_size: texture_size ? Number(texture_size) : undefined,
       pivot_to_center_bottom: pivot_to_center_bottom ?? undefined,
     });
-    const data = await tripoPollTask(taskId);
-    res.json({ task_id: taskId, output: data.output, status: data.status });
+    const data = await tripoPollTask(newTaskId);
+    res.json({ task_id: newTaskId, output: data.output, status: data.status });
   } catch (e: any) {
     res.status(400).json({ error: e.message });
   }
@@ -905,27 +907,6 @@ router.post("/api/tripo3d/text-to-model-advanced", async (req: Request, res: Res
     logger.error({ err: e }, "tripo3d text-to-model-advanced error");
     res.write(`data: ${JSON.stringify({ event: "error", error: e.message })}\n\n`);
     res.end();
-  }
-});
-
-/* POST /api/tripo3d/convert — convertir modelo 3D entre formatos */
-router.post("/api/tripo3d/convert", async (req: Request, res: Response) => {
-  const { taskId, format } = req.body ?? {};
-  if (!taskId || !format) {
-    res.status(400).json({ error: "taskId y format son requeridos" });
-    return;
-  }
-
-  try {
-    const newTaskId = await tripoCreateTask({
-      type: "convert_model",
-      model: { type: "task", task_id: taskId },
-      format: format.toLowerCase(),
-    });
-    res.json({ task_id: newTaskId });
-  } catch (e: any) {
-    logger.error({ err: e }, "tripo3d convert error");
-    res.status(400).json({ error: e.message });
   }
 });
 

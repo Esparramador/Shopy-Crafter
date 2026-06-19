@@ -889,12 +889,14 @@ function AttachmentPreview({ file, url, onRemove }: {
 // piden dinámicamente al backend según la ruta actual.
 type QuickAction = { icon: string; label: string; prompt: string; isResearch?: boolean };
 const FALLBACK_QUICK_ACTIONS: QuickAction[] = [
-  { icon: "❓", label: "¿Qué puedo hacer aquí?", prompt: "¿Qué puedo hacer en esta página? Guíame paso a paso con los botones y opciones disponibles." },
-  { icon: "🏪", label: "Estado de la tienda", prompt: "Muéstrame el estado de la tienda: productos, pedidos y estado del token." },
-  { icon: "📦", label: "Listar productos", prompt: "Lista todos los productos de la tienda." },
-  { icon: "🛒", label: "Ver pedidos", prompt: "Muéstrame los últimos pedidos de la tienda." },
-  { icon: "🔬", label: "Investigar marca", prompt: "__RESEARCH__", isResearch: true },
-  { icon: "🧠", label: "Estado del sistema", prompt: "¿Qué conocimiento ha absorbido Shopy Crafter? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
+  { icon: "❓", label: "¿Qué puedo hacer aquí?",   prompt: "¿Qué puedo hacer en esta página? Guíame paso a paso con los botones y opciones disponibles." },
+  { icon: "🏪", label: "Estado de la tienda",       prompt: "Muéstrame el estado completo de la tienda: productos con score, pedidos recientes y estado del token Shopify." },
+  { icon: "🔍", label: "Auditoría rápida",          prompt: "Haz una auditoría rápida de mi tienda: top-3 problemas críticos de SEO, conversión e imágenes con su impacto estimado en ventas." },
+  { icon: "📊", label: "Analizar métricas",         prompt: "Analiza las métricas clave de mi tienda: conversión, AOV, tasa de abandono y top productos. Detecta los cuellos de botella del funnel." },
+  { icon: "💰", label: "Analizar precios",          prompt: "Analiza los precios de mis productos: compáralos con el mercado y sugiere ajustes para maximizar margen y conversión." },
+  { icon: "🔬", label: "Investigar marca/URL",      prompt: "__RESEARCH__", isResearch: true },
+  { icon: "🚀", label: "Plan de lanzamiento",       prompt: "Crea un plan de lanzamiento de 30 días para mi tienda/producto: pre-lanzamiento, lanzamiento y post-lanzamiento con presupuesto estimado." },
+  { icon: "🧠", label: "Estado del sistema",        prompt: "¿Qué conocimiento ha absorbido Shopy Crafter? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
 ];
 
 interface SlashSkill {
@@ -907,45 +909,74 @@ interface SlashSkill {
   isResearch?: boolean;
 }
 const SLASH_SKILLS: SlashSkill[] = [
-  { cmd: "/audit",    icon: "🔍", label: "Auditoría completa",    desc: "Analiza tienda, SEO, conversión y oportunidades",       engine: "claude",  prompt: "Haz una auditoría completa de mi tienda: SEO, conversión, imágenes, precios y top-3 oportunidades de mejora." },
-  { cmd: "/seo",      icon: "📈", label: "Optimizar SEO",          desc: "Mejora títulos, metadatos y alt texts de productos",    engine: "claude",  prompt: "Optimiza el SEO de todos mis productos: títulos, meta descripciones, alt texts y palabras clave long-tail." },
-  { cmd: "/email",    icon: "📧", label: "Email Marketing",         desc: "Estrategia completa y flujos Klaviyo con HTML",         engine: "claude",  prompt: "Crea una estrategia completa de email marketing con flujos Klaviyo para mi tienda: bienvenida, carrito abandonado, post-compra y winback." },
-  { cmd: "/research", icon: "🔬", label: "Investigar marca",        desc: "Análisis profundo de competidores y benchmarks",        engine: "gemini",  prompt: "", isResearch: true },
-  { cmd: "/pricing",  icon: "💰", label: "Analizar precios",        desc: "Optimización de márgenes, precios y posicionamiento",   engine: "claude",  prompt: "Analiza todos mis precios, compáralos con el mercado y sugiere ajustes para maximizar margen y conversión. Incluye elasticidad precio." },
-  { cmd: "/products", icon: "📦", label: "Auditar catálogo",        desc: "Lista y puntúa todos los productos por calidad",        engine: "claude",  prompt: "Lista todos mis productos con puntuación SEO, precio, estado e imágenes. Identifica los que necesitan mejora urgente e indica por qué." },
-  { cmd: "/klaviyo",  icon: "🎯", label: "Flujos Klaviyo",          desc: "Genera workflows con emails HTML listos para copiar",   engine: "claude",  prompt: "Genera los flujos Klaviyo más importantes: bienvenida (3 emails), carrito abandonado (2 emails), post-compra (2 emails) y winback (2 emails). Incluye HTML completo." },
-  { cmd: "/ads",      icon: "🎬", label: "Crear anuncio IA",        desc: "Creatividad de vídeo con guión, música y efectos",      engine: "auto",    prompt: "Crea un anuncio de vídeo persuasivo para mi producto más vendido: guión completo, voz en off, música de fondo y efectos visuales cinemáticos." },
-  { cmd: "/content",  icon: "✍️", label: "Generar contenido",       desc: "Copy para Instagram, TikTok y landing page",           engine: "claude",  prompt: "Genera contenido de alto impacto para mi marca: 5 posts Instagram, 3 hooks TikTok y copy para la hero section de la landing." },
-  { cmd: "/brand",    icon: "🏷️", label: "Análisis de branding",    desc: "Identidad visual, tono y posicionamiento competitivo",  engine: "gemini",  prompt: "Analiza mi branding en profundidad: identidad visual, tono de comunicación, posicionamiento y 5 oportunidades de diferenciación frente a competidores." },
-  { cmd: "/images",   icon: "🖼️", label: "Generar imágenes",         desc: "Fotos de producto profesionales con IA (4K)",           engine: "auto",    prompt: "Genera imágenes profesionales de producto: fondo blanco limpio, lifestyle en contexto de uso y banner para redes. Modelo: Flux 1.1 Pro Ultra." },
-  { cmd: "/video",    icon: "🎥", label: "Vídeo de producto",        desc: "Vídeo cinematic de 30 segundos con IA",                 engine: "auto",    prompt: "Crea un vídeo de producto cinematic de 30 segundos: planos de producto, música elegante y voz en off persuasiva en español." },
-  { cmd: "/cards",    icon: "💳", label: "Tarjetas de visita",       desc: "Diseño profesional con tipografía e identidad visual",  engine: "claude",  prompt: "Diseña tarjetas de visita profesionales para mi agencia: logo, colores de marca, tipografía premium y datos de contacto completos." },
-  { cmd: "/supply",   icon: "🏭", label: "Buscar proveedores",       desc: "Fabricantes y mayoristas con precios y plazos",         engine: "gemini",  prompt: "Busca los mejores proveedores y fabricantes para mis productos: precios unitarios, MOQ, calidad, certificaciones y tiempos de entrega a España/Europa." },
-  { cmd: "/describe", icon: "🤖", label: "Describir con IA",         desc: "Copy SEO completo y storytelling por producto",         engine: "claude",  prompt: "Crea descripciones de producto de alto impacto: storytelling emocional, beneficios clave, especificaciones técnicas y palabras clave SEO long-tail." },
+  // ── ANÁLISIS & AUDITORÍA ──────────────────────────────────────────────────
+  { cmd: "/audit",       icon: "🔍", label: "Auditoría completa",     desc: "Analiza tienda, SEO, conversión y top oportunidades",     engine: "claude",  prompt: "Haz una auditoría completa de mi tienda Shopify: evalúa SEO on-page, tasa de conversión estimada, calidad de imágenes, precios vs. mercado y UX del checkout. Dame los top-5 problemas críticos con su impacto estimado en ingresos y el plan de acción paso a paso." },
+  { cmd: "/seo",         icon: "📈", label: "Optimizar SEO",           desc: "Títulos, metadatos, alt texts y estructura interna",      engine: "claude",  prompt: "Optimiza el SEO completo de todos mis productos: títulos con keyword primaria, meta descripciones persuasivas con CTA, alt texts descriptivos, tags y estructura de URL. Prioriza los productos con mayor potencial de conversión." },
+  { cmd: "/cro",         icon: "🎯", label: "Optimizar conversión",    desc: "UX, checkout, CTAs y trust signals para +ventas",         engine: "claude",  prompt: "Analiza mi tienda con foco en Conversion Rate Optimization (CRO): evalúa la claridad de CTAs, el checkout, los trust signals (reseñas, sellos, garantías), la velocidad percibida y las páginas de producto. Da 10 mejoras concretas ordenadas por impacto." },
+  { cmd: "/products",    icon: "📦", label: "Auditar catálogo",        desc: "Lista y puntúa todos los productos por calidad",          engine: "claude",  prompt: "Lista todos mis productos con puntuación SEO (0-100), precio, estado de imágenes y calidad del copy. Identifica los 5 que necesitan mejora urgente e indica exactamente qué cambiar en cada uno y por qué." },
+  { cmd: "/competitors", icon: "⚔️", label: "Analizar competidores",  desc: "Benchmarks de precios, SEO y estrategia vs. rivales",     engine: "gemini",  prompt: "", isResearch: true },
+  { cmd: "/analytics",   icon: "📊", label: "Analizar métricas",       desc: "KPIs de conversión, AOV, LTV y funnel de ventas",         engine: "claude",  prompt: "Analiza las métricas clave de mi tienda: tasa de conversión, valor medio del pedido (AOV), lifetime value (LTV) estimado, tasa de abandono del carrito y top productos por ingresos. Detecta cuellos de botella en el funnel y sugiere experimentos A/B prioritarios." },
+  { cmd: "/legal",       icon: "⚖️", label: "Auditoría legal",         desc: "Copyright, RGPD, cookies, avisos legales y T&C",          engine: "claude",  prompt: "Realiza una auditoría legal de mi tienda Shopify: revisa si hay problemas de copyright en imágenes y nombres de productos, verifica que el aviso legal, política de privacidad, cookies y condiciones de venta cumplen con RGPD y la ley española de e-commerce. Dame las acciones correctivas urgentes." },
+
+  // ── MARKETING & CONTENIDO ─────────────────────────────────────────────────
+  { cmd: "/email",       icon: "📧", label: "Email Marketing",          desc: "Estrategia y flujos Klaviyo con HTML",                   engine: "claude",  prompt: "Diseña una estrategia de email marketing completa para mi tienda: secuencia de bienvenida (5 emails), recuperación de carrito abandonado (3 emails), post-compra (2 emails) y campaña winback (3 emails). Incluye asuntos con A/B test, previsualización móvil y estructura HTML profesional." },
+  { cmd: "/klaviyo",     icon: "🎯", label: "Flujos Klaviyo",           desc: "Workflows con emails HTML listos para importar",         engine: "claude",  prompt: "Genera los flujos Klaviyo más rentables para mi tienda con HTML completo y responsive: bienvenida (3 emails con intervalos), carrito abandonado (2 emails: 1h y 24h), post-compra (upsell a los 7 días) y winback (60 días inactivo). Incluye segmentación de audiencia recomendada." },
+  { cmd: "/content",     icon: "✍️", label: "Generar contenido",        desc: "Copy para Instagram, TikTok, LinkedIn y landing",        engine: "claude",  prompt: "Crea un pack de contenido de alto impacto para mi marca: 5 posts Instagram con caption y hashtags, 3 hooks para TikTok con guión completo, 2 posts LinkedIn para B2B, copy para la hero section de la landing y 5 ideas de reels/shorts adaptadas a mi nicho." },
+  { cmd: "/social",      icon: "📱", label: "Estrategia redes sociales", desc: "Plan editorial 30 días con formatos y calendari",        engine: "claude",  prompt: "Crea una estrategia completa de redes sociales para mi tienda: análisis del perfil ideal de cliente, selección de 2-3 plataformas prioritarias, calendario editorial para los próximos 30 días (5 posts/semana), formatos de contenido más efectivos para mi nicho y KPIs para medir el éxito." },
+  { cmd: "/brand",       icon: "🏷️", label: "Análisis de branding",     desc: "Identidad visual, tono y diferenciación competitiva",    engine: "gemini",  prompt: "Analiza en profundidad el branding de mi tienda: identidad visual (colores, tipografía, logo), tono de comunicación, posicionamiento de marca, coherencia entre canales y 5 oportunidades de diferenciación frente a competidores directos. Incluye recomendaciones de mejora accionables." },
+  { cmd: "/reviews",     icon: "⭐", label: "Analizar reseñas",          desc: "Sentimiento de clientes, NPS y oportunidades de mejora", engine: "claude",  prompt: "Analiza las reseñas y feedback de mis clientes para extraer insights de negocio: principales temas positivos y negativos, palabras más repetidas, Net Promoter Score estimado, productos con mejor y peor valoración, y un plan de mejora basado en los patrones detectados. También sugiere cómo responder a las reseñas negativas." },
+  { cmd: "/returns",     icon: "🔄", label: "Política devoluciones",     desc: "Política y FAQ optimizada para reducir fricciones",      engine: "claude",  prompt: "Diseña una política de devoluciones y cambios optimizada para mi tienda: texto legal completo en español, FAQ con las 10 preguntas más frecuentes respondidas, página de devoluciones con UX fluida para el cliente y estrategias para reducir la tasa de devolución en un 30%. Adapta todo al nicho de mi tienda." },
+
+  // ── INVESTIGACIÓN & PROVEEDORES ───────────────────────────────────────────
+  { cmd: "/research",    icon: "🔬", label: "Investigar marca/URL",     desc: "Análisis exhaustivo con 8 búsquedas Google paralelas",   engine: "gemini",  prompt: "", isResearch: true },
+  { cmd: "/supply",      icon: "🏭", label: "Buscar proveedores",       desc: "Fabricantes y mayoristas con precios, MOQ y plazos",    engine: "gemini",  prompt: "Busca los mejores proveedores y fabricantes para mis productos con datos reales del mercado: precios unitarios por rango de volumen, MOQ mínimo, calidad de materiales, certificaciones (CE, ISO), tiempos de entrega a España/Europa, y condiciones de pago habituales. Incluye 3-5 proveedores con pros y contras de cada uno." },
+  { cmd: "/forecast",    icon: "📈", label: "Previsión financiera",      desc: "Forecast de ventas a 6 meses con escenarios",            engine: "claude",  prompt: "Genera una previsión financiera detallada para mi tienda a 6 meses: modelo de revenue con 3 escenarios (conservador, base, optimista), análisis de break-even, inversión necesaria por canal (SEO, ads, email), cashflow mensual estimado y las métricas críticas que debo monitorizar semanalmente para ir en línea con el objetivo." },
+
+  // ── CREACIÓN ─────────────────────────────────────────────────────────────
+  { cmd: "/ads",         icon: "🎬", label: "Crear anuncio IA",         desc: "Vídeo/imagen con guión, música y efectos cinemáticos",  engine: "auto",    prompt: "Crea un anuncio de vídeo persuasivo y cinematic para mi producto más vendido: guión completo con estructura hook-problema-solución-CTA, descripción visual fotograma a fotograma, voz en off en español con énfasis emocional, música de fondo que refuerza la marca y los 3 formatos de entrega (9:16 para stories, 16:9 para YouTube, 1:1 para feed)." },
+  { cmd: "/images",      icon: "🖼️", label: "Generar imágenes IA",      desc: "Fotos de producto profesionales 4K con Flux Pro",       engine: "auto",    prompt: "Genera un pack completo de imágenes profesionales para mis productos: foto de producto sobre fondo blanco infinito (para marketplace y Shopify), foto lifestyle en contexto de uso real, banner horizontal para web (1920x600px) y cuadrado para redes (1080x1080px). Usa Flux 1.1 Pro Ultra con máxima calidad." },
+  { cmd: "/video",       icon: "🎥", label: "Vídeo de producto",        desc: "Vídeo cinematic de 10-30s con IA (Runway/Kling/Veo)",   engine: "auto",    prompt: "Crea un vídeo de producto cinematic de alta calidad: comenzando con un plano detalle del producto (macro), seguido de un plano de uso en contexto lifestyle, cierre con logo y CTA animado. Música elegante de fondo y voz en off persuasiva en español. Formato 9:16 para Instagram Reels y TikTok." },
+  { cmd: "/describe",    icon: "🤖", label: "Describir con IA",         desc: "Copy SEO premium con storytelling y keywords long-tail", engine: "claude",  prompt: "Escribe descripciones de producto de nivel premium para mis productos top: storytelling emocional que conecte con el cliente ideal (300-500 palabras), 5 bullet points de beneficios clave (no características), FAQ integrada con 3 preguntas, especificaciones técnicas en tabla y 10 keywords long-tail integradas de forma natural. Formato HTML listo para pegar en Shopify." },
+  { cmd: "/newsletter",  icon: "📰", label: "Campaña newsletter",       desc: "Email completo con asunto, preview y HTML responsive", engine: "claude",  prompt: "Diseña una campaña de newsletter de alto impacto para mi tienda: 3 variaciones de asunto (con y sin emoji, con urgencia/curiosidad/beneficio), texto de preview (90 chars), estructura HTML completa y responsive con hero image, cuerpo persuasivo, CTA principal y pie de página con redes. Optimizado para Gmail, Outlook y móvil." },
+  { cmd: "/cards",       icon: "💳", label: "Tarjetas de visita",       desc: "Diseño profesional con identidad visual de marca",      engine: "claude",  prompt: "Diseña un pack completo de identidad de negocio: tarjetas de visita con tipografía premium y datos de contacto, firma de email HTML profesional, plantilla de presupuesto/factura con la marca y una plantilla de propuesta comercial en PDF. Todo coherente con los colores y tono de mi marca." },
+  { cmd: "/launch",      icon: "🚀", label: "Plan de lanzamiento",      desc: "Roadmap completo para lanzar un producto en 30 días",   engine: "claude",  prompt: "Crea un plan de lanzamiento completo para mi nuevo producto en 30 días: semana 1 (pre-lanzamiento: lista de espera, teaser content, influencer outreach), semana 2-3 (lanzamiento: email secuencia, ads creatividades, PR), semana 4 (post-lanzamiento: upsell, reviews, remarketing). Incluye presupuesto estimado por canal y KPIs de éxito." },
 ];
 
-const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización eCommerce.
+const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización eCommerce para tiendas Shopify.
 
-PERSONALIDAD:
-- Hablas como un experto amigo: directo, cálido y sin rodeos
-- Varía cómo inicias las respuestas — nunca repitas el mismo inicio dos veces seguidas
-- Usa el nombre del usuario cuando sea natural, no en cada mensaje
-- Reconoce el estado emocional: si alguien está frustrado, responde con empatía antes de la solución
-- Haz preguntas de seguimiento breves cuando necesites más contexto
-- Ofrece siempre el siguiente paso concreto al terminar una respuesta
+═══ PERSONALIDAD ═══
+• Hablas como un experto amigo: directo, cálido, sin rodeos ni jerga innecesaria
+• VARÍA el inicio de cada respuesta — nunca repitas la misma apertura dos veces seguidas
+• Detecta el estado emocional del usuario: si hay frustración, valídala primero ("Entiendo que es frustrante...") antes de dar la solución
+• Haz preguntas de seguimiento cuando necesites contexto, pero sólo UNA por mensaje
+• Termina SIEMPRE con un siguiente paso concreto o acción que el usuario pueda hacer ahora mismo
 
-CAPACIDADES:
-- Tres motores de análisis: investigación de mercado con Google Search, análisis estratégico con Claude, memoria permanente
-- Experto en: eCommerce, Klaviyo, email marketing, SEO, pricing, visión de producto, composición visual, química de materiales, topología 3D, rendering, branding
-- Puedes absorber y analizar: imágenes, vídeos, URLs, redes sociales, documentos
-- Conoces TODAS las páginas, botones y funciones de la app — guía paso a paso con nombres exactos
+═══ CAPACIDADES ═══
+• 3 motores de análisis: Google Search (tiempo real), Claude (razonamiento estratégico), Memoria permanente (contexto acumulado)
+• Expertise: eCommerce, Klaviyo, email marketing, SEO, pricing, conversión (CRO), branding, copywriting, visión de producto, composición visual, topología 3D, rendering
+• Análisis de: imágenes de producto, vídeos, URLs/webs, perfiles de redes sociales, documentos PDF/Word, datos de tienda Shopify
+• Navegación: conoces TODAS las páginas, botones y funciones de Shopy Crafter — guías paso a paso con nombres exactos de elementos
 
-CONVERSACIÓN:
-- Si el contexto anterior de la conversación es relevante, refiérete a él naturalmente
-- Cuando no puedas hacer algo, explícalo en una frase y sugiere qué sí puedes hacer
-- Si una acción va a tardar más de 15 segundos, avisa antes de empezar con el tiempo estimado
-- Para respuestas técnicas largas, usa formato con **negrita** para los puntos clave
-- Ante errores o problemas, propón 2-3 opciones alternativas siempre que puedas
+═══ CLASIFICACIÓN DE INTENCIÓN (aplica en cada mensaje) ═══
+Detecta mentalmente qué quiere el usuario antes de responder:
+• PREGUNTA INFO — responde de forma concisa y pregunta si necesita profundizar
+• ACCIÓN CONCRETA — ejecuta y confirma qué hiciste + resultado
+• PROBLEMA/ERROR — diagnóstico primero, luego solución paso a paso
+• CONFUSIÓN — pregunta de aclaración + ofrece opciones concretas
+• FRUSTRACIÓN — empatía primero, solución clara, escalado si persiste
+• FUERA DE ALCANCE — di qué NO puedes hacer (1 frase), di qué SÍ puedes ofrecer en su lugar
+• HUMAN HANDOFF — si el usuario dice "quiero hablar con una persona" o similar, responde: "Puedes escribir a hola@shopycrafter.com — el equipo te contactará en menos de 24h."
+
+═══ CONVERSACIÓN ═══
+• Si el contexto anterior es relevante, refiérete a él de forma natural ("Como hablamos antes...")
+• Para acciones que tarden >15s: avisa antes de empezar con el tiempo estimado
+• Respuestas técnicas largas: usa **negrita** para puntos clave, listas para pasos
+• Ante errores: propón 2-3 alternativas ordenadas de más a menos recomendada
+• Después de ayudar en >5 mensajes, pregunta si la sesión fue útil (feedback)
+• Si el usuario lleva mucho tiempo en la misma duda, ofrece escalar: "¿Quieres que lo revisemos juntos con el equipo?"
+
+═══ CONOCIMIENTO DE SKILLS (/comandos) ═══
+Los usuarios pueden usar /comandos para tareas específicas. Cuando detectes que un usuario quiere hacer algo que tiene /comando correspondiente, sugiérelo naturalmente. Skills disponibles: /audit, /seo, /cro, /products, /competitors, /analytics, /legal, /email, /klaviyo, /content, /social, /brand, /reviews, /returns, /research, /supply, /forecast, /ads, /images, /video, /describe, /newsletter, /cards, /launch
 
 IMPORTANTE: Siempre refiérete a la plataforma como "Shopy Crafter". Responde siempre en español.`;
 
