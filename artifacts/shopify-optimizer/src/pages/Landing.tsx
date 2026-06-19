@@ -1178,7 +1178,7 @@ export default function Landing() {
           </div>
           <div className="fp-content fp-contact-visme" style={{ position: "absolute", inset: 0, maxWidth: "none", padding: 0, overflow: "hidden auto" }}>
             {/* ── Video + form: fixed full-section height, footer scrolls below ── */}
-            <div style={{ position: "relative", height: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
+            <div className="fp-contact-visme-wrapper" style={{ position: "relative", height: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
               <VismeFormHero isActive={isAnimated("fp-contact")} />
             </div>
 

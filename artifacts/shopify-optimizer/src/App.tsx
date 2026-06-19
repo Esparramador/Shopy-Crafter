@@ -649,8 +649,11 @@ function Router() {
 initGlobalErrorHandlers();
 
 function PublicChatbotSlot() {
-  const { user, loading } = useAuth();
-  if (loading || user) return null;
+  const { loading } = useAuth();
+  const [location] = useLocation();
+  if (loading) return null;
+  const isPublicPath = !location.startsWith("/admin") && !location.startsWith("/client");
+  if (!isPublicPath) return null;
   return (
     <Suspense fallback={null}>
       <LandingChatbot />
