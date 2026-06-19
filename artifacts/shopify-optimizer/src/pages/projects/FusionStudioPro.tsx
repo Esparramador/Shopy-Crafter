@@ -1251,6 +1251,8 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
   );
 }
 
+const SFX_CAT_LABELS: Record<string, string> = { comercio: "🛒 Comercio", ambiente: "🌿 Ambiente", emociones: "🎭 Emociones", productos: "📦 Productos" };
+
 function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onInfo: (m: string) => void }) {
   const [mode, setMode] = useState<"tts" | "clone" | "sfx" | "music" | "mix">("tts");
   const [voices, setVoices] = useState<any[]>([]);
@@ -1266,7 +1268,10 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
   const [cloneName, setCloneName] = useState("");
   const [cloneFile, setCloneFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
-  
+  const [sfxCatalog, setSfxCatalog] = useState<any[] | null>(null);
+  const [showSfxPanel, setShowSfxPanel] = useState(false);
+  const [sfxCatFilter, setSfxCatFilter] = useState<string>("all");
+
   // Mix state
   const [ttsFile, setTtsFile] = useState<File | null>(null);
   const [musicFile, setMusicFile] = useState<File | null>(null);
@@ -1296,12 +1301,16 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
     } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
   };
 
-  const showSfxCatalog = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/fs-pro/audio/sfx-catalog`);
-      const d = await res.json();
-      onInfo(`Catálogo: ${d.map((s: any) => s.name).join(", ")}`);
-    } catch { onError("Error cargando catálogo"); }
+  const toggleSfxPanel = async () => {
+    if (showSfxPanel) { setShowSfxPanel(false); return; }
+    if (!sfxCatalog) {
+      try {
+        const res = await fetch(`${API_BASE}/api/fs-pro/audio/sfx-catalog`);
+        const d = await res.json();
+        setSfxCatalog(Array.isArray(d) ? d : []);
+      } catch { onError("Error cargando catálogo SFX"); return; }
+    }
+    setShowSfxPanel(true);
   };
 
   const runTTS = async () => {
@@ -1373,8 +1382,38 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
         <button onClick={() => setMode("sfx")} style={pillButton(mode === "sfx")}>SFX</button>
         <button onClick={() => setMode("music")} style={pillButton(mode === "music")}>Música</button>
         <button onClick={() => setMode("mix")} style={pillButton(mode === "mix")}>Mezclar</button>
-        <button onClick={showSfxCatalog} className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }}>Catálogo SFX</button>
+        <button onClick={toggleSfxPanel} className="btn btn-ghost btn-sm" style={{ marginLeft: "auto", border: showSfxPanel ? "1px solid var(--gold)" : undefined }}>
+          {showSfxPanel ? "✕ Cerrar catálogo" : "📋 Catálogo SFX"}
+        </button>
       </div>
+
+      {showSfxPanel && sfxCatalog && (
+        <div style={{ background: "var(--surface2)", borderRadius: 10, padding: 14, marginBottom: 14, border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+            <button onClick={() => setSfxCatFilter("all")} style={pillButton(sfxCatFilter === "all")}>Todos</button>
+            {Object.entries(SFX_CAT_LABELS).map(([key, label]) => (
+              <button key={key} onClick={() => setSfxCatFilter(key)} style={pillButton(sfxCatFilter === key)}>{label}</button>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+            {sfxCatalog
+              .filter(s => sfxCatFilter === "all" || s.category === sfxCatFilter)
+              .map((sfx: any) => (
+                <button
+                  key={sfx.id}
+                  onClick={() => { setText(sfx.prompt); setDuration(sfx.duration); setMode("sfx"); setShowSfxPanel(false); }}
+                  style={{ background: "var(--surface3)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", textAlign: "left", cursor: "pointer", color: "var(--t1)", transition: "border-color 0.15s" }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--gold)")}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--border)")}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 600 }}>{sfx.name}</div>
+                  <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>{SFX_CAT_LABELS[sfx.category]} · {sfx.duration}s</div>
+                </button>
+              ))}
+          </div>
+          <p style={{ fontSize: 9, color: "var(--t3)", marginTop: 8 }}>Haz clic en un efecto para usarlo como prompt en modo SFX.</p>
+        </div>
+      )}
 
       {mode === "mix" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
