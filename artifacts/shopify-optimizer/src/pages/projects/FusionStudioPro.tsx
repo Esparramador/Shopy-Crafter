@@ -350,6 +350,14 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
     [providerDown, caps, model, health],
   );
 
+  // Reset aspect ratio when model changes if current ratio not supported
+  useEffect(() => {
+    const ratios = modelCfg?.aspectRatios;
+    if (ratios && ratios.length > 0 && !ratios.includes(aspectRatio)) {
+      setAspectRatio(ratios[0]);
+    }
+  }, [model, modelCfg]);
+
   const generate = async () => {
     if (!prompt.trim()) { onError("Prompt requerido"); return; }
     setBusy(true);
@@ -399,12 +407,17 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
             ))}
           </div>
         </Section>
-        <Section title="Aspecto">
+        <Section title={`Aspecto · ${modelCfg?.maxResolution ?? ""}`}>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {(modelCfg?.aspectRatios || ["1:1", "16:9", "9:16"]).map(a => (
               <button key={a} onClick={() => setAspectRatio(a)} style={pillButton(aspectRatio === a)}>{a}</button>
             ))}
           </div>
+          {modelCfg && (
+            <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 4 }}>
+              {modelCfg.aspectRatios?.length ?? 0} formatos · máx {modelCfg.maxResolution}
+            </div>
+          )}
         </Section>
       </div>
       <div>
@@ -1137,16 +1150,34 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
           </>
         ) : (
           <>
-            <Section title="Duración / Aspecto">
+            <Section title={`Duración / Aspecto · máx ${modelCfg?.maxDuration ?? 15}s`}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>{duration}s</div>
-                  <input type="range" min={3} max={15} value={duration} onChange={e => setDuration(parseInt(e.target.value))} style={{ width: "100%" }} />
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4 }}>
+                    {duration}s <span style={{ color: "var(--gold)", fontSize: 9 }}>(máx {modelCfg?.maxDuration ?? 15}s)</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={3}
+                    max={modelCfg?.maxDuration ?? 15}
+                    value={Math.min(duration, modelCfg?.maxDuration ?? 15)}
+                    onChange={e => setDuration(parseInt(e.target.value))}
+                    style={{ width: "100%" }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--t3)", marginTop: 2 }}>
+                    <span>3s</span><span>{modelCfg?.maxDuration ?? 15}s</span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {["9:16", "16:9", "1:1", "4:5"].map(a => (
-                    <button key={a} onClick={() => setAspect(a)} style={pillButton(aspect === a)}>{a}</button>
-                  ))}
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 4 }}>Aspecto</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {(modelCfg?.aspectRatios?.length
+                      ? modelCfg.aspectRatios.filter(a => ["9:16","16:9","1:1","4:5","4:3","3:4"].includes(a))
+                      : ["9:16", "16:9", "1:1"]
+                    ).map(a => (
+                      <button key={a} onClick={() => setAspect(a)} style={pillButton(aspect === a)}>{a}</button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </Section>
@@ -1429,7 +1460,23 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
               {mode === "sfx" ? (
                 <input type="range" min={1} max={22} value={duration} onChange={e => setDuration(+e.target.value)} style={{ width: "100%" }} />
               ) : (
-                <input type="range" min={5} max={47} value={musicDuration} onChange={e => setMusicDuration(+e.target.value)} style={{ width: "100%" }} />
+                <>
+                  <input type="range" min={5} max={600} step={5} value={musicDuration} onChange={e => setMusicDuration(+e.target.value)} style={{ width: "100%" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6, gap: 8 }}>
+                    <div style={{ fontSize: 9, color: "var(--t3)" }}>5s · 47s · 120s · 300s · 600s</div>
+                    <input
+                      type="number" min={5} max={600} value={musicDuration}
+                      onChange={e => setMusicDuration(Math.max(5, Math.min(600, +e.target.value)))}
+                      style={{ ...inputStyle, width: 64, padding: "4px 6px", fontSize: 11, textAlign: "center" }}
+                    />
+                  </div>
+                  {musicDuration > 47 && (
+                    <div style={{ fontSize: 9, color: "var(--jade)", marginTop: 4, lineHeight: 1.4 }}>
+                      ✓ Canción larga: se generan {Math.ceil(musicDuration / 45)} bloques de 45s y se unen con crossfade.
+                      {musicDuration > 120 && " Puede tardar varios minutos."}
+                    </div>
+                  )}
+                </>
               )}
             </Section>
           </div>

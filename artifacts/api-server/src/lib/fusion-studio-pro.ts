@@ -248,27 +248,35 @@ export async function generateImage(
     return { buffer: Buffer.from(base64, "base64"), mimeType: "image/png", model };
   }
 
-  // ── xAI Grok Imagine (image generation)
+  // ── xAI Aurora (image generation)
+  // Real xAI model name is "aurora"; "grok-imagine-image-quality" also maps here
+  // API: POST https://api.x.ai/v1/images/generations
   if (model === "grok-imagine-image" || model === "grok-imagine-image-quality") {
     const key = getXaiKey();
     const { sizeString: xaiAspect } = await pickBestImageSize("xai", model, aspect);
-    const xaiModel = model === "grok-imagine-image-quality" ? "grok-imagine-image-quality" : "grok-imagine-image";
+    // Aurora supports n, prompt, aspect_ratio, response_format.
+    // Quality variant: request higher detail via system prompt prefix.
+    const qualityMode = model === "grok-imagine-image-quality";
+    const qualityPrefix = qualityMode ? "Ultra-photorealistic, high-detail, 4K render. " : "";
+    const xaiBody: Record<string, unknown> = {
+      model: "aurora",
+      prompt: qualityPrefix + prompt,
+      n: 1,
+      aspect_ratio: xaiAspect,
+      response_format: "url",
+    };
     const res = await fetch("https://api.x.ai/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: xaiModel,
-        prompt,
-        n: 1,
-        aspect_ratio: xaiAspect,
-        resolution: model === "grok-imagine-image-quality" ? "2k" : "1k",
-        response_format: "url",
-      }),
+      body: JSON.stringify(xaiBody),
     });
-    if (!res.ok) throw new Error(`xAI image failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
-    const data = await res.json() as { data: Array<{ url: string }> };
+    if (!res.ok) {
+      const errText = (await res.text()).slice(0, 400);
+      throw new Error(`xAI Aurora image failed (${res.status}): ${errText}`);
+    }
+    const data = await res.json() as { data: Array<{ url: string; b64_json?: string }> };
     const imgUrl = data.data?.[0]?.url;
-    if (!imgUrl) throw new Error("xAI Grok Imagine: no se devolvió URL de imagen");
+    if (!imgUrl) throw new Error("xAI Aurora: no se devolvió URL de imagen");
     const buffer = await fetchToBuffer(imgUrl);
     return { buffer, mimeType: "image/jpeg", model };
   }

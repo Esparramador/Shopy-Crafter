@@ -18,7 +18,7 @@ import {
   generateImage, editImage, removeBackground, replaceBackground,
   upscaleImage, clarityUpscale, enhanceFaces,
   upscaleVideo, VIDEO_UPSCALE_MODELS, type VideoUpscaleEngine,
-  cloneVoice, deleteCloneVoice, generateTTS, generateSFX, generateMusic,
+  cloneVoice, deleteCloneVoice, generateTTS, generateSFX, generateMusic, generateMusicLong,
   generateVideoFromImage, extendXaiVideo, editXaiVideo,
   composeAd, concatVideos, packAssetsAsZip,
   fetchToBuffer,
@@ -247,9 +247,49 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
     imageGeneration: Object.entries(IMAGE_MODELS).map(([k, v]) => ({
       key: k, label: prettyLabel(k), ...v,
     })),
-    videoGeneration: Object.entries(VIDEO_MODELS).map(([k, v]) => ({
-      key: k, label: prettyLabel(k), ...v,
-    })),
+    videoGeneration: Object.entries(VIDEO_MODELS).map(([k, v]) => {
+      // Derive supported aspect ratios from provider (best-effort — can be overridden per model later)
+      const videoAspects: Record<string, string[]> = {
+        runway:    ["9:16", "16:9", "1:1"],
+        gemini:    ["16:9", "9:16"],
+        replicate: ["9:16", "16:9", "1:1", "4:5", "4:3"],
+        xai:       ["9:16", "16:9", "1:1", "3:4"],
+      };
+      // Per-model overrides
+      const modelAspectOverrides: Record<string, string[]> = {
+        "veo-2": ["16:9", "9:16"],
+        "veo-3": ["16:9", "9:16"],
+        "veo-3-fast": ["16:9", "9:16"],
+        "veo-3.1": ["16:9", "9:16"],
+        "veo-3.1-fast": ["16:9", "9:16"],
+        "veo-4": ["16:9", "9:16"],
+        "veo-4-fast": ["16:9", "9:16"],
+        "hailuo-02": ["9:16", "16:9", "1:1"],
+        "hailuo-02-fast": ["9:16", "16:9", "1:1"],
+        "hailuo-02-master": ["9:16", "16:9", "1:1"],
+        "hailuo-2.3": ["9:16", "16:9", "1:1"],
+        "wan-2.5-t2v-480p": ["9:16", "16:9", "1:1", "4:3", "3:4"],
+        "wan-2.5-t2v-720p": ["9:16", "16:9", "1:1", "4:3", "3:4"],
+        "wan-2.5-i2v-480p": ["9:16", "16:9", "1:1", "4:3", "3:4"],
+        "wan-2.5": ["9:16", "16:9", "1:1", "4:3", "3:4"],
+        "wan-2.5-t2v": ["9:16", "16:9", "1:1", "4:3", "3:4"],
+        "wan-2.6": ["9:16", "16:9", "1:1", "4:3", "3:4"],
+        "wan-2.7": ["9:16", "16:9", "1:1", "4:3", "3:4"],
+        "kling-master": ["9:16", "16:9", "1:1", "4:5"],
+        "kling-2.5-turbo": ["9:16", "16:9", "1:1", "4:5"],
+        "kling-3.0-master": ["9:16", "16:9", "1:1", "4:5"],
+        "kling-3.0-turbo": ["9:16", "16:9", "1:1", "4:5"],
+        "kling-3.0-omni": ["9:16", "16:9", "1:1", "4:5"],
+        "sora-2": ["9:16", "16:9", "1:1", "4:5", "4:3", "3:4"],
+        "runway-gen4.5": ["9:16", "16:9", "1:1"],
+        "runway-gen4-turbo": ["9:16", "16:9", "1:1"],
+        "grok-video-1": ["9:16", "16:9", "1:1"],
+        "grok-imagine-video": ["9:16", "16:9", "1:1"],
+        "grok-imagine-video-1.5": ["9:16", "16:9", "1:1"],
+      };
+      const aspectRatios = modelAspectOverrides[k] ?? videoAspects[v.provider] ?? ["9:16", "16:9", "1:1"];
+      return { key: k, label: prettyLabel(k), ...v, aspectRatios };
+    }),
     imageEdit: Object.entries(IMAGE_EDIT_MODELS).map(([k, v]) => ({
       key: k, label: prettyLabel(k), ...v,
     })),
@@ -2299,7 +2339,10 @@ router.post("/fs-pro/music", requireAdmin, async (req, res) => {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    const buf = await generateMusic(prompt, parseInt(duration || "30"), getProjectReplicateToken(project));
+    const durSec = parseInt(duration || "30", 10);
+    const buf = durSec > 47
+      ? await generateMusicLong(prompt, durSec, getProjectReplicateToken(project))
+      : await generateMusic(prompt, durSec, getProjectReplicateToken(project));
     const vaultId = await saveToVaultSmart({
       projectId, fileType: "fs-pro-music", category: "fusion-studio-pro",
       title: `FS Pro Music: ${prompt.slice(0, 60)}`,
