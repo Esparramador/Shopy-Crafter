@@ -180,7 +180,7 @@ export default function SkillsLibrary() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
                 {filtered.map(skill => {
                   const meta = CATEGORY_META[skill.category] || { icon: "🔧", color: "var(--gold)", label: skill.category };
-                  const diff = DIFFICULTY_META[skill.difficulty];
+                  const diff = DIFFICULTY_META[skill.difficulty] || { label: skill.difficulty || "—", color: "var(--t3)" };
                   const isSelected = selectedSkill?.id === skill.id;
                   return (
                     <div
@@ -202,7 +202,7 @@ export default function SkillsLibrary() {
                       </div>
                       <div style={{ fontSize: 12, color: "var(--t3)", marginBottom: 10, lineHeight: 1.5 }}>{skill.description}</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
-                        {skill.tags.slice(0, 3).map(tag => (
+                        {(skill.tags || []).slice(0, 3).map(tag => (
                           <span key={tag} style={{ background: "var(--s2)", borderRadius: 4, padding: "1px 6px", fontSize: 10, color: "var(--t3)" }}>#{tag}</span>
                         ))}
                       </div>
