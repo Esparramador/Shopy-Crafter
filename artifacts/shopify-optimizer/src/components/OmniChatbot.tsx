@@ -1030,7 +1030,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [selectedFlow, setSelectedFlow] = useState<KlaviyoWorkflowResult["plan"]["flows"][0] | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [quickActions, setQuickActions] = useState<QuickAction[]>(FALLBACK_QUICK_ACTIONS);
-  const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only">("auto");
+  const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only" | "grok">("auto");
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
   const [attachFile, setAttachFile] = useState<File | null>(null);
@@ -1813,7 +1813,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       attachmentName: hasAttach ? attachName : undefined,
     };
     const thinkingId = uuid();
-    const engineLabels: Record<string, string> = { auto: "gemini+claude+brain", claude: "claude", gemini: "gemini+search", brain_only: "brain" };
+    const engineLabels: Record<string, string> = { auto: "gemini+claude+brain", claude: "claude", gemini: "gemini+search", brain_only: "brain", grok: "grok-3" };
     setMessages(m => [...m, userMsg, { id: thinkingId, role: "assistant" as const, content: "🧠 Analizando tu solicitud...", timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain" }]);
     setInput(""); setAttachFile(null); setAttachFiles([]); setAttachUrl(""); setShowAttach(false);
     setLoading(true);
@@ -2642,12 +2642,13 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 {/* Engine selector */}
                 <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5, justifyContent: "center", flexWrap: "wrap" }}>
                   {([
-                    { key: "auto", icon: "⚡", label: "Auto" },
-                    { key: "claude", icon: "🧠", label: "Claude" },
-                    { key: "gemini", icon: "🔬", label: "Gemini" },
-                    { key: "brain_only", icon: "💾", label: "Brain" },
-                  ] as const).map(({ key, icon, label }) => (
-                    <button key={key} onClick={() => setEngineMode(key)}
+                    { key: "auto",       icon: "⚡", label: "Auto",   title: "Selección automática — elige el mejor motor según tu pregunta" },
+                    { key: "claude",     icon: "🧠", label: "Claude", title: "Claude (Anthropic) — escritura profunda, código, análisis estratégico, informes largos" },
+                    { key: "gemini",     icon: "🔬", label: "Gemini", title: "Gemini (Google) + búsqueda web en tiempo real — competidores, tendencias, noticias" },
+                    { key: "grok",       icon: "🤖", label: "Grok",   title: "Grok (xAI) — razonamiento rápido, perspectiva alternativa, análisis directo" },
+                    { key: "brain_only", icon: "💾", label: "Brain",  title: "Solo memoria ShopyBrain — responde desde el conocimiento acumulado de tu tienda" },
+                  ] as const).map(({ key, icon, label, title }) => (
+                    <button key={key} onClick={() => setEngineMode(key)} title={title}
                       style={{
                         fontSize: 9, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
                         border: engineMode === key ? "1px solid var(--gold)" : "1px solid transparent",

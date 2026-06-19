@@ -452,7 +452,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   enableLongRunning(res);
   try {
     const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute, engineMode } = req.body;
-    const validEngines = ["auto", "claude", "gemini", "brain_only"] as const;
+    const validEngines = ["auto", "claude", "gemini", "brain_only", "grok"] as const;
     type EngineMode = typeof validEngines[number];
     const engine: EngineMode = validEngines.includes(engineMode) ? engineMode : "auto";
     if (!query) {
@@ -1454,7 +1454,7 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           0,
           [{ role: "user", content: brainUserContent }],
           brainSynthesisPrompt,
-          8000,
+          32000,
         );
         engineUsed = "brain_only";
       } else if (engine === "gemini" || (engine === "auto" && classifyQueryEngine(query) === "gemini")) {
@@ -1466,13 +1466,39 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
         );
         answer = geminiRes.text || "Gemini no pudo generar una respuesta. Prueba con otro motor.";
         engineUsed = engine === "auto" ? "auto→gemini+search" : "gemini+search";
+      } else if (engine === "grok") {
+        // Grok (xAI): razonamiento rápido, análisis en tiempo real, perspectiva alternativa
+        const xaiKey = process.env.XAI_API_KEY;
+        if (!xaiKey) throw new Error("XAI_API_KEY no configurada — contacta al administrador");
+        const grokModel = process.env.GROK_MODEL || "grok-3";
+        const grokRes = await fetch("https://api.x.ai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${xaiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: grokModel,
+            messages: [
+              { role: "system", content: sysPrompt },
+              { role: "user", content: userContent },
+            ],
+            max_tokens: 32000,
+            temperature: 0.7,
+          }),
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (!grokRes.ok) {
+          const errText = await grokRes.text().catch(() => "");
+          throw new Error(`Grok API error (${grokRes.status}): ${errText.slice(0, 300)}`);
+        }
+        const grokData = await grokRes.json() as { choices?: Array<{ message?: { content?: string } }> };
+        answer = grokData.choices?.[0]?.message?.content || "Grok no pudo generar una respuesta. Prueba con otro motor.";
+        engineUsed = `${grokModel}`;
       } else {
         // Claude: escritura profunda, guiones, código, JSON estructurado, razonamiento complejo
         answer = await askClaude(
           resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
           [{ role: "user", content: userContent }],
           sysPrompt,
-          16000,
+          32000,
         );
         engineUsed = engine === "claude" ? "claude" : engine === "auto" ? "auto→claude+omnicore" : "claude+omnicore";
       }
@@ -1561,7 +1587,7 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           researchSystemPrompt,
           "general",
           niche || undefined,
-          1024
+          16000
         );
       } else {
         aiContent = await askClaudeWithBrain(
@@ -1570,7 +1596,7 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           researchSystemPrompt,
           "general",
           niche || undefined,
-          1024
+          16000
         );
       }
     } catch (aiErr) {
@@ -1683,7 +1709,7 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
       systemPrompt,
       "general",
       undefined,
-      4096
+      16000
     );
     let parsed: any = {};
     try {
