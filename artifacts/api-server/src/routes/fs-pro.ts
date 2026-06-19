@@ -14,7 +14,7 @@ import { ObjectStorageService, signObjectURL, objectStorageClient } from "../lib
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkTtsQuota } from "./voice.js";
 import {
-  VIDEO_MODELS, IMAGE_EDIT_MODELS, VIDEO_MODELS,
+  IMAGE_MODELS, IMAGE_EDIT_MODELS, VIDEO_MODELS,
   generateImage, editImage, removeBackground, replaceBackground,
   upscaleImage, clarityUpscale, enhanceFaces,
   upscaleVideo, VIDEO_UPSCALE_MODELS, type VideoUpscaleEngine,
