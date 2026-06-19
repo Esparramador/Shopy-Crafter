@@ -107,6 +107,46 @@ async function resolveDefaultVoiceId(): Promise<string> {
   ]);
 }
 
+/**
+ * List all available voices in the account.
+ */
+export async function listAllVoices(apiKey?: string): Promise<any[]> {
+  const key = apiKey || getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/voices`, {
+    headers: { "xi-api-key": key },
+  });
+  if (!res.ok) throw new Error(`ElevenLabs list voices failed: ${res.status}`);
+  const data = await res.json();
+  return (data.voices || []).map((v: any) => ({
+    voice_id: v.voice_id,
+    name: v.name,
+    category: v.category,
+    labels: v.labels,
+    preview_url: v.preview_url,
+    settings: v.settings,
+  }));
+}
+
+/**
+ * List available models, optionally filtered by capability.
+ */
+export async function getModels(apiKey?: string): Promise<any[]> {
+  const key = apiKey || getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/models`, {
+    headers: { "xi-api-key": key },
+  });
+  if (!res.ok) throw new Error(`ElevenLabs list models failed: ${res.status}`);
+  return await res.json();
+}
+
+/**
+ * Get models specifically capable of sound effects or other non-TTS tasks.
+ */
+export async function getSoundEffectsModels(apiKey?: string): Promise<any[]> {
+  const models = await getModels(apiKey);
+  return models.filter((m: any) => m.can_do_text_to_speech === false || m.model_id.includes("sfx"));
+}
+
 function getApiKey(): string {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key || key.trim().length < 10) {

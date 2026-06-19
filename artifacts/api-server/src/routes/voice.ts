@@ -148,6 +148,8 @@ router.get("/voice/voices", async (req, res): Promise<void> => {
       voice_id: v.voice_id,
       name: v.name,
       labels: v.labels,
+      preview_url: v.preview_url,
+      category: v.category,
     }));
     res.json({ voices: filtered });
   } catch (err: any) {

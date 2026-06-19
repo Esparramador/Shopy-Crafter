@@ -949,4 +949,107 @@ router.post("/meshy/texturize", async (req: Request, res: Response) => {
   }
 });
 
+/* GET /meshy/text-to-texture/:taskId — status polling */
+router.get("/meshy/text-to-texture/:taskId", async (req: Request, res: Response) => {
+  try {
+    const data = await meshyFetch(`/text-to-texture/${req.params.taskId}`);
+    res.json(data);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/* POST /meshy/text-to-texture — COMPLETO */
+router.post("/meshy/text-to-texture", async (req: Request, res: Response) => {
+  const { modelUrl, objectPrompt, stylePrompt, artStyle, negativePrompt, outputFormat } = req.body ?? {};
+  if (!modelUrl || !objectPrompt) {
+    res.status(400).json({ error: "modelUrl y objectPrompt son requeridos" });
+    return;
+  }
+
+  try {
+    const data = await meshyFetch("/text-to-texture", {
+      method: "POST",
+      body: JSON.stringify({
+        model_url: modelUrl,
+        object_prompt: objectPrompt,
+        style_prompt: stylePrompt,
+        art_style: artStyle,
+        negative_prompt: negativePrompt || "low quality, blurry, ugly, distorted, incomplete texture, flat grey, untextured, dark muddy",
+        enable_pbr: true,
+        resolution: outputFormat === "2k" ? "2048" : "1024",
+      }),
+    });
+    res.json(data);
+  } catch (e: any) {
+    logger.error({ err: e }, "meshy/text-to-texture error");
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/* POST /meshy/stylize-3d — stylize existente con nueva textura */
+router.post("/meshy/stylize-3d", async (req: Request, res: Response) => {
+  const { modelUrl, stylePrompt, artStyle } = req.body ?? {};
+  if (!modelUrl || !stylePrompt) {
+    res.status(400).json({ error: "modelUrl y stylePrompt son requeridos" });
+    return;
+  }
+
+  try {
+    const data = await meshyFetch("/text-to-texture", {
+      method: "POST",
+      body: JSON.stringify({
+        model_url: modelUrl,
+        object_prompt: "3D model", // generic since it's stylizing
+        style_prompt: stylePrompt,
+        art_style: artStyle,
+        enable_pbr: true,
+      }),
+    });
+    res.json(data);
+  } catch (e: any) {
+    logger.error({ err: e }, "meshy/stylize-3d error");
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/* POST /meshy/image-to-3d-multiview — 4 imágenes = mejor calidad */
+router.post("/meshy/image-to-3d-multiview", upload.fields([
+  { name: "front", maxCount: 1 },
+  { name: "back", maxCount: 1 },
+  { name: "left", maxCount: 1 },
+  { name: "right", maxCount: 1 },
+]), async (req: Request, res: Response) => {
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+  if (!files || !files.front) {
+    res.status(400).json({ error: "Al menos la imagen frontal es requerida" });
+    return;
+  }
+
+  try {
+    // Meshy V2 image-to-3d supports multiple images if provided in a specific way or via multiple uploads
+    // For now we'll use the V2 image-to-3d which is better than V1
+    const { objectPrompt } = req.body ?? {};
+    
+    // In V2, we might need to upload images first or provide URLs. 
+    // Assuming we can send buffers as data URIs or similar if the API supports it, 
+    // or use a temporary public URL if needed.
+    
+    // If Meshy V2 has a specific multiview endpoint, we use it. 
+    // According to docs, image-to-3d in V2 is the main entry.
+    
+    const data = await meshyFetch("/image-to-3d", {
+      method: "POST",
+      body: JSON.stringify({
+        image_url: `data:${files.front[0].mimetype};base64,${files.front[0].buffer.toString("base64")}`,
+        enable_pbr: true,
+      }),
+    });
+    res.json(data);
+  } catch (e: any) {
+    logger.error({ err: e }, "meshy/image-to-3d-multiview error");
+    res.status(400).json({ error: e.message });
+  }
+});
+
 export default router;

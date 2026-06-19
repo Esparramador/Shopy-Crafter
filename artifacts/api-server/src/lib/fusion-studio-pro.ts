@@ -31,7 +31,7 @@ export async function makeTmpDir(prefix = "fs-pro"): Promise<string> {
   return dir;
 }
 
-import { validateImageUrlAsync } from "./runway.js";
+import { validateImageUrlAsync, generateVideoFromImage as runwayGenerateVideo } from "./runway.js";
 
 export async function fetchToBuffer(url: string, timeoutMs = 180_000): Promise<Buffer> {
   // SECURITY (HIGH): SSRF guard with DNS resolution — rejects URLs pointing to
@@ -2312,6 +2312,146 @@ export async function extractVideoFrames(
   }
 }
 
+/**
+ * Mix TTS audio with background music using FFmpeg.
+ * Applies optional ducking (compressing music when voice is present).
+ */
+export async function mixAudioWithBackgroundMusic(
+  ttsBuffer: Buffer,
+  musicBuffer: Buffer,
+  opts: { musicVolume?: number; duckingEnabled?: boolean; fadeInMs?: number; fadeOutMs?: number } = {},
+): Promise<Buffer> {
+  const musicVol = opts.musicVolume ?? 0.15;
+  const ducking = opts.duckingEnabled ?? true;
+  const tmp = await makeTmpDir("mix");
+  const ttsPath = path.join(tmp, "tts.mp3");
+  const musicPath = path.join(tmp, "music.mp3");
+  const outPath = path.join(tmp, "mix.mp3");
+
+  await fs.writeFile(ttsPath, ttsBuffer);
+  await fs.writeFile(musicPath, musicBuffer);
+
+  const ffmpeg: any = await loadFfmpeg();
+
+  return await new Promise<Buffer>((resolve, reject) => {
+    const cmd = ffmpeg();
+    cmd.input(ttsPath).input(musicPath);
+
+    // Filter complex for mixing and ducking
+    // [0:a] is TTS, [1:a] is music
+    let filter = `[1:a]volume=${musicVol}[bg];`;
+    if (ducking) {
+      // Sidechain ducking: when [0:a] has signal, compress [bg]
+      filter += `[bg][0:a]sidechaincompress=threshold=0.1:ratio=20[bgd];[0:a][bgd]amix=inputs=2:duration=longest:dropout_transition=3[out]`;
+    } else {
+      filter += `[0:a][bg]amix=inputs=2:duration=longest:dropout_transition=3[out]`;
+    }
+
+    cmd.complexFilter([filter], ["out"])
+      .audioCodec("libmp3lame")
+      .audioBitrate("192k")
+      .on("end", async () => {
+        try {
+          resolve(await fs.readFile(outPath));
+        } catch (e) {
+          reject(e);
+        } finally {
+          fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+        }
+      })
+      .on("error", (err: Error) => {
+        fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+        reject(new Error(`FFmpeg audio mix error: ${err.message}`));
+      })
+      .save(outPath);
+  });
+}
+
+/**
+ * Returns a catalog of predefined sound effects for e-commerce and marketing.
+ */
+export function generateSFXCatalog(): any[] {
+  return [
+    { id: "cash-register", name: "Caja Registradora", prompt: "Classic cash register sound, shop purchase, money ping", category: "comercio", duration: 2 },
+    { id: "shopping-cart", name: "Carrito de Compra", prompt: "Shopping cart wheels rolling on floor with light rattle", category: "comercio", duration: 3 },
+    { id: "package-unwrapping", name: "Desempaquetado", prompt: "Unboxing sound, cardboard ripping, bubble wrap popping softly", category: "comercio", duration: 4 },
+    { id: "notification-ping", name: "Notificación", prompt: "Modern app notification ping, clean digital sound", category: "comercio", duration: 1 },
+    { id: "office-ambience", name: "Ambiente Oficina", prompt: "Soft office background, keyboard typing, distant chatter", category: "ambiente", duration: 10 },
+    { id: "nature-outdoor", name: "Naturaleza Exterior", prompt: "Soft wind, distant birds, peaceful outdoor atmosphere", category: "ambiente", duration: 10 },
+    { id: "city-background", name: "Fondo Ciudad", prompt: "Distant city traffic, urban hum, occasional horn", category: "ambiente", duration: 10 },
+    { id: "coffee-shop", name: "Cafetería", prompt: "Coffee shop atmosphere, espresso machine, porcelain clinking", category: "ambiente", duration: 10 },
+    { id: "success-fanfare", name: "Fanfarria Éxito", prompt: "Short orchestral success fanfare, achievement sound", category: "emociones", duration: 3 },
+    { id: "dramatic-reveal", name: "Revelación Dramática", prompt: "Cinematic orchestral swell, dramatic reveal, suspenseful impact", category: "emociones", duration: 4 },
+    { id: "suspense-build", name: "Construcción Suspense", prompt: "Rising string tension, suspenseful build-up", category: "emociones", duration: 5 },
+    { id: "happy-jingle", name: "Jingle Alegre", prompt: "Happy upbeat musical jingle, positive brand identity", category: "emociones", duration: 3 },
+    { id: "tech-click", name: "Click Tecnológico", prompt: "High-end tech button click, futuristic interface sound", category: "productos", duration: 1 },
+    { id: "soft-close", name: "Cierre Suave", prompt: "Premium car door soft close, high quality mechanical thud", category: "productos", duration: 2 },
+    { id: "fabric-rustle", name: "Crujido de Tela", prompt: "Silk fabric rustling, clothing movement sound", category: "productos", duration: 2 },
+    { id: "liquid-pour", name: "Vertido de Líquido", prompt: "Liquid pouring into glass, refreshing splashing sound", category: "productos", duration: 3 },
+    // More SFX...
+    { id: "keyboard-typing", name: "Escribiendo Teclado", prompt: "Fast mechanical keyboard typing sounds", category: "ambiente", duration: 5 },
+    { id: "camera-shutter", name: "Obturador Cámara", prompt: "Professional DSLR camera shutter click", category: "productos", duration: 1 },
+    { id: "sparkle-magic", name: "Destello Mágico", prompt: "Magical sparkle sound, glittery fairy dust sound effect", category: "emociones", duration: 2 },
+    { id: "pop-minimal", name: "Pop Minimalista", prompt: "Clean minimal UI pop sound", category: "comercio", duration: 1 },
+    { id: "swipe-whoosh", name: "Swipe / Whoosh", prompt: "Fast air whoosh, interface swipe transition", category: "comercio", duration: 1 },
+    { id: "bell-shop", name: "Campana Tienda", prompt: "Classic shop entrance bell ding", category: "comercio", duration: 2 },
+    { id: "pencil-writing", name: "Lápiz Escribiendo", prompt: "Pencil writing on paper texture", category: "ambiente", duration: 3 },
+    { id: "clock-ticking", name: "Reloj Tic-Tac", prompt: "Analog clock ticking steadily", category: "ambiente", duration: 5 },
+    { id: "applause-crowd", name: "Aplausos Público", prompt: "Medium crowd applause and cheering", category: "emociones", duration: 5 },
+    { id: "paper-crumple", name: "Papel Arrugado", prompt: "Crumpling paper sound effect", category: "productos", duration: 2 },
+    { id: "glass-clink", name: "Brindis Copas", prompt: "Two wine glasses clinking together", category: "productos", duration: 1 },
+    { id: "door-opening", name: "Puerta Abriendo", prompt: "Creaky wooden door opening slowly", category: "ambiente", duration: 3 },
+    { id: "footsteps-hardwood", name: "Pasos Madera", prompt: "Footsteps walking on hardwood floor", category: "ambiente", duration: 4 },
+    { id: "electric-spark", name: "Chispa Eléctrica", prompt: "Short electric arc or spark sound", category: "productos", duration: 1 },
+  ];
+}
+
+/**
+ * Advanced TTS with cloned voice settings.
+ */
+export async function generateVoiceWithClone(
+  text: string,
+  voiceId: string,
+  opts: {
+    model?: string;
+    stability?: number;
+    style?: number;
+    similarityBoost?: number;
+    outputFormat?: string;
+  } = {},
+): Promise<Buffer> {
+  const apiKey = getElevenKey();
+  const body: any = {
+    text,
+    model_id: opts.model || "eleven_multilingual_v2",
+    voice_settings: {
+      stability: opts.stability ?? 0.5,
+      similarity_boost: opts.similarityBoost ?? 0.75,
+      style: opts.style ?? 0,
+      use_speaker_boost: true,
+    },
+  };
+
+  const fmt = opts.outputFormat || "mp3_44100_128";
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=${encodeURIComponent(fmt)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "xi-api-key": apiKey,
+      "Content-Type": "application/json",
+      "Accept": "audio/mpeg",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs advanced TTS failed (${res.status}): ${err}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
+}
+
 /** Extract the audio track of a video as MP3 buffer (for transcription). */
 export async function extractAudioMp3(videoBuffer: Buffer): Promise<Buffer> {
   const tmp = await makeTmpDir("audio");
@@ -2334,4 +2474,254 @@ export async function extractAudioMp3(videoBuffer: Buffer): Promise<Buffer> {
   } finally {
     fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 20: IMAGE VARIATIONS & EDITING (Flux / SDXL)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function generateImageVariations(
+  imageBuffer: Buffer,
+  prompt: string,
+  count = 1,
+  replicateToken?: string,
+): Promise<Buffer[]> {
+  const token = getReplicateToken(replicateToken);
+  const n = Math.max(1, Math.min(count, 4));
+  const dataUri = bufferToDataUri(imageBuffer, "image/png");
+
+  try {
+    const results: Buffer[] = [];
+    for (let i = 0; i < n; i++) {
+      const res = await replicateRunBuffer(
+        "black-forest-labs/flux-1.1-pro",
+        {
+          image: dataUri,
+          prompt: prompt || "variation of this image, high quality, photorealistic",
+          prompt_strength: 0.8,
+          num_outputs: 1,
+        },
+        token,
+      );
+      results.push(res);
+    }
+    return results;
+  } catch (err) {
+    logger.warn(`Flux variations failed, falling back to SDXL: ${err}`);
+    const results: Buffer[] = [];
+    for (let i = 0; i < n; i++) {
+      const res = await replicateRunBuffer(
+        "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+        {
+          init_image: dataUri,
+          prompt: prompt || "variation of this image, high quality, photorealistic",
+          prompt_strength: 0.8,
+          num_outputs: 1,
+        },
+        token,
+      );
+      results.push(res);
+    }
+    return results;
+  }
+}
+
+export async function faceSwapImage(
+  faceBuffer: Buffer,
+  targetBuffer: Buffer,
+  replicateToken?: string,
+): Promise<Buffer> {
+  const token = getReplicateToken(replicateToken);
+  try {
+    return await replicateRunBuffer(
+      "yan-ops/face-swap",
+      {
+        request_image: bufferToDataUri(targetBuffer, "image/png"),
+        target_image: bufferToDataUri(faceBuffer, "image/png"),
+      },
+      token,
+    );
+  } catch (err) {
+    logger.warn(`yan-ops/face-swap failed, falling back to lucataco/faceswap: ${err}`);
+    return await replicateRunBuffer(
+      "lucataco/faceswap:9a4234548e6f523897dc3390708688484f937968494cd9a39dfa4a7538ec103a",
+      {
+        target_image: bufferToDataUri(targetBuffer, "image/png"),
+        swap_image: bufferToDataUri(faceBuffer, "image/png"),
+      },
+      token,
+    );
+  }
+}
+
+export async function outpaintImage(
+  imageBuffer: Buffer,
+  prompt: string,
+  direction: "all" | "left" | "right" | "top" | "bottom" = "all",
+  paddingPct = 25,
+  replicateToken?: string,
+): Promise<Buffer> {
+  const token = getReplicateToken(replicateToken);
+  // Using adirik/flux-outpaint as requested
+  return await replicateRunBuffer(
+    "adirik/flux-outpaint",
+    {
+      image: bufferToDataUri(imageBuffer, "image/png"),
+      expansion_prompt: prompt,
+      direction: direction === "all" ? "up, down, left, right" : (direction === "top" ? "up" : (direction === "bottom" ? "down" : direction)),
+      overlap_percentage: 10,
+      offset: paddingPct,
+    },
+    token,
+  );
+}
+
+export async function inpaintImageWithMask(
+  imageBuffer: Buffer,
+  maskBuffer: Buffer,
+  prompt: string,
+  replicateToken?: string,
+): Promise<Buffer> {
+  const token = getReplicateToken(replicateToken);
+  return await replicateRunBuffer(
+    "black-forest-labs/flux-1.1-pro-fill",
+    {
+      image: bufferToDataUri(imageBuffer, "image/png"),
+      mask: bufferToDataUri(maskBuffer, "image/png"),
+      prompt: prompt,
+      guidance: 30,
+      output_format: "png",
+    },
+    token,
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAPABILITY 20: VIDEO-TO-VIDEO & VIDEO EDITING
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Generate video from an existing video (style transfer / v2v).
+ */
+export async function generateVideoFromVideo(
+  videoBuffer: Buffer,
+  prompt: string,
+  model: string,
+  replicateToken?: string,
+): Promise<{ url?: string; buffer: Buffer; model: string }> {
+  const token = getReplicateToken(replicateToken);
+
+  if (model.startsWith("kling")) {
+    // Kling v2v on Replicate
+    const Replicate = (await import("replicate")).default;
+    const rep = new Replicate({ auth: token });
+    
+    // Pattern: Upload to Replicate Files if needed, or use data-uri if small.
+    // For Kling v1.6 standard:
+    const input = {
+      video: bufferToDataUri(videoBuffer, "video/mp4"),
+      prompt,
+    };
+    const buf = await replicateRunLatestBuffer("kwaivgi/kling-v1.6-standard", input, token, 10 * 60_000);
+    return { buffer: buf, model: "kwaivgi/kling-v1.6-standard" };
+  }
+
+  if (model.startsWith("wan")) {
+    const input = {
+      video: bufferToDataUri(videoBuffer, "video/mp4"),
+      prompt,
+      size: "480p",
+    };
+    const buf = await replicateRunLatestBuffer("wan-video/wan-2.5-i2v-480p", input, token, 10 * 60_000);
+    return { buffer: buf, model: "wan-video/wan-2.5-i2v-480p" };
+  }
+
+  if (model.startsWith("runway")) {
+    // For Runway V2V, we extract the first frame and use it as image_to_video
+    const { frames } = await extractVideoFrames(videoBuffer, 1, 1280);
+    if (!frames.length) throw new Error("Could not extract first frame for Runway V2V");
+    
+    const runwayBuf = await runwayGenerateVideo({
+      promptImage: bufferToDataUri(frames[0], "image/jpeg"),
+      promptText: prompt,
+      model: model.includes("4.5") ? "gen4.5" : "gen4_turbo",
+    });
+    
+    const finalBuf = await fetchToBuffer(runwayBuf.videoUrl);
+    return { buffer: finalBuf, model: runwayBuf.model, url: runwayBuf.videoUrl };
+  }
+
+  throw new Error(`Modelo V2V no soportado: ${model}`);
+}
+
+/**
+ * Extend an existing video using Runway.
+ */
+export async function extendVideoWithRunway(
+  videoUrl: string,
+  duration: number,
+  model?: "gen4.5" | "gen4_turbo"
+): Promise<Buffer> {
+  const apiKey = getRunwayKey();
+  const runwayModel = model || "gen4.5";
+  
+  const res = await fetch("https://api.dev.runwayml.com/v1/video_extensions", {
+    method: "POST",
+    headers: { 
+      "Authorization": `Bearer ${apiKey}`, 
+      "Content-Type": "application/json", 
+      "X-Runway-Version": "2024-11-06" 
+    },
+    body: JSON.stringify({
+      init_video_url: videoUrl,
+      model: runwayModel,
+      duration: duration >= 10 ? 10 : 5,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Runway extend failed: ${res.status} ${await res.text()}`);
+  }
+
+  const { id: taskId } = await res.json() as { id: string };
+  
+  // Polling loop
+  const deadline = Date.now() + 10 * 60_000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 6000));
+    const sr = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
+      headers: { "Authorization": `Bearer ${apiKey}`, "X-Runway-Version": "2024-11-06" },
+    });
+    if (!sr.ok) continue;
+    const st = await sr.json() as { status: string; output?: string[]; failure?: string };
+    if (st.status === "SUCCEEDED" && st.output?.[0]) return await fetchToBuffer(st.output[0]);
+    if (st.status === "FAILED") throw new Error(`Runway extend failed: ${st.failure}`);
+  }
+  throw new Error("Runway extend timed out");
+}
+
+/**
+ * Edit a video using a prompt.
+ */
+export async function editVideoWithPrompt(
+  videoBuffer: Buffer,
+  prompt: string,
+  model: string,
+  replicateToken?: string,
+): Promise<Buffer> {
+  if (model.includes("kling")) {
+    const res = await generateVideoFromVideo(videoBuffer, prompt, "kling", replicateToken);
+    return res.buffer;
+  }
+  
+  if (model.includes("runway")) {
+    // For Runway editing, we can use the same V2V logic (first frame + prompt)
+    const res = await generateVideoFromVideo(videoBuffer, prompt, "runway", replicateToken);
+    return res.buffer;
+  }
+
+  // Fallback to xAI if available in the context (already has editXaiVideo)
+  // or use Wan v2.5 i2v as general video editor
+  const res = await generateVideoFromVideo(videoBuffer, prompt, "wan", replicateToken);
+  return res.buffer;
 }

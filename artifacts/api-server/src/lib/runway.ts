@@ -36,6 +36,13 @@ export interface RunwayVideoRequest {
   duration?: RunwayDuration;
   seed?: number;
   supportsAudio?: boolean; // Nuevo: Runway Gen 4.5 soporta audio nativo
+  motionBrushRegions?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    direction: { x: number; y: number };
+  }[];
 }
 
 export interface RunwayVideoResult {
@@ -294,6 +301,7 @@ export async function generateVideoFromImage(
     duration,
     ratio,
     ...(req.supportsAudio ? { supportsAudio: true } : {}),
+    ...(req.motionBrushRegions ? { motion_brush_regions: req.motionBrushRegions } : {}),
   };
   if (typeof req.seed === "number" && Number.isFinite(req.seed)) {
     body.seed = Math.floor(req.seed);

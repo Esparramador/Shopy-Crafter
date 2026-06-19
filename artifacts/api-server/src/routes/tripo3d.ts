@@ -1,11 +1,38 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
+import { existsSync, readdirSync, createWriteStream } from "fs";
+import { mkdir, writeFile } from "fs/promises";
+import { join } from "path";
+import { pipeline } from "stream/promises";
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
 import { askClaudeWithBrain } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
+
+const FRONTEND_PUBLIC = join(process.cwd(), "..", "..", "artifacts", "shopify-optimizer", "public");
+const TRIPO3D_LOCAL_DIR = join(FRONTEND_PUBLIC, "assets", "3d", "tripo3d");
+
+// Ensure directory exists
+if (!existsSync(TRIPO3D_LOCAL_DIR)) {
+  mkdir(TRIPO3D_LOCAL_DIR, { recursive: true }).catch(err => logger.error({ err }, "Error creating Tripo3D local dir"));
+}
+
+async function downloadAndSaveTripoModel(taskId: string, glbUrl: string) {
+  try {
+    const response = await fetch(glbUrl);
+    if (!response.ok) throw new Error(`Failed to download GLB: ${response.statusText}`);
+    const filePath = join(TRIPO3D_LOCAL_DIR, `${taskId}.glb`);
+    const fileStream = createWriteStream(filePath);
+    if (response.body) {
+      await pipeline(response.body as any, fileStream);
+      logger.info({ taskId, filePath }, "Tripo3D model saved locally");
+    }
+  } catch (error) {
+    logger.error({ error, taskId, glbUrl }, "Error downloading/saving Tripo3D model");
+  }
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -254,6 +281,10 @@ router.post("/api/tripo3d/text-to-model", async (req: Request, res: Response) =>
         lastProgress = progress;
       }
       if (status === "success") {
+        const glbUrl = data.output?.model || data.output?.glb;
+        if (glbUrl) {
+          downloadAndSaveTripoModel(taskId, glbUrl);
+        }
         res.write(`data: ${JSON.stringify({ event: "done", task_id: taskId, output: data.output, progress: 100 })}\n\n`);
         res.end();
         return;
@@ -299,6 +330,10 @@ router.post("/api/tripo3d/image-to-model", upload.single("image"), async (req: R
       const progress: number = data.progress ?? 0;
       res.write(`data: ${JSON.stringify({ event: "progress", task_id: taskId, progress, status })}\n\n`);
       if (status === "success") {
+        const glbUrl = data.output?.model || data.output?.glb;
+        if (glbUrl) {
+          downloadAndSaveTripoModel(taskId, glbUrl);
+        }
         res.write(`data: ${JSON.stringify({ event: "done", task_id: taskId, output: data.output, progress: 100 })}\n\n`);
         res.end();
         return;
@@ -801,6 +836,97 @@ El modelo 3D debe representar visualmente el valor del producto/servicio de form
   }
 
   res.end();
+});
+
+/* GET /api/tripo3d/local-models — lista los GLBs guardados localmente */
+router.get("/api/tripo3d/local-models", async (_req, res) => {
+  try {
+    if (!existsSync(TRIPO3D_LOCAL_DIR)) {
+      res.json({ models: [] });
+      return;
+    }
+    const files = readdirSync(TRIPO3D_LOCAL_DIR);
+    const glbs = files.filter(f => f.endsWith(".glb")).map(f => ({
+      taskId: f.replace(".glb", ""),
+      url: `/assets/3d/tripo3d/${f}`,
+      filename: f
+    }));
+    res.json({ models: glbs });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/* POST /api/tripo3d/text-to-model-advanced — prompt, style, quality, seed, multiview */
+router.post("/api/tripo3d/text-to-model-advanced", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
+  const { prompt, style, quality, seed, multiview, model_version = "v2.5" } = req.body ?? {};
+  if (!prompt) { res.status(400).json({ error: "prompt requerido" }); return; }
+  
+  try {
+    const taskId = await tripoCreateTask({
+      type: "text_to_model",
+      prompt,
+      model_version: multiview ? "v2.5" : model_version,
+      style,
+      quality,
+      seed,
+    });
+    res.write(`data: ${JSON.stringify({ event: "started", task_id: taskId })}\n\n`);
+
+    let lastProgress = 0;
+    for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
+      const data = await tripoFetch(`/task/${taskId}`);
+      const status: string = data.status;
+      const progress: number = data.progress ?? 0;
+      if (progress !== lastProgress) {
+        res.write(`data: ${JSON.stringify({ event: "progress", task_id: taskId, progress, status })}\n\n`);
+        lastProgress = progress;
+      }
+      if (status === "success") {
+        const glbUrl = data.output?.model || data.output?.glb;
+        if (glbUrl) downloadAndSaveTripoModel(taskId, glbUrl);
+        res.write(`data: ${JSON.stringify({ event: "done", task_id: taskId, output: data.output, progress: 100 })}\n\n`);
+        res.end();
+        return;
+      }
+      if (status === "failed" || status === "cancelled") {
+        res.write(`data: ${JSON.stringify({ event: "error", task_id: taskId, error: `Task ${status}` })}\n\n`);
+        res.end();
+        return;
+      }
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    res.write(`data: ${JSON.stringify({ event: "timeout", task_id: taskId })}\n\n`);
+    res.end();
+  } catch (e: any) {
+    logger.error({ err: e }, "tripo3d text-to-model-advanced error");
+    res.write(`data: ${JSON.stringify({ event: "error", error: e.message })}\n\n`);
+    res.end();
+  }
+});
+
+/* POST /api/tripo3d/convert — convertir modelo 3D entre formatos */
+router.post("/api/tripo3d/convert", async (req: Request, res: Response) => {
+  const { taskId, format } = req.body ?? {};
+  if (!taskId || !format) {
+    res.status(400).json({ error: "taskId y format son requeridos" });
+    return;
+  }
+
+  try {
+    const newTaskId = await tripoCreateTask({
+      type: "convert_model",
+      model: { type: "task", task_id: taskId },
+      format: format.toLowerCase(),
+    });
+    res.json({ task_id: newTaskId });
+  } catch (e: any) {
+    logger.error({ err: e }, "tripo3d convert error");
+    res.status(400).json({ error: e.message });
+  }
 });
 
 export default router;

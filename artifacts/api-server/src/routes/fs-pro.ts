@@ -14,7 +14,7 @@ import { ObjectStorageService, signObjectURL, objectStorageClient } from "../lib
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkTtsQuota } from "./voice.js";
 import {
-  IMAGE_MODELS, IMAGE_EDIT_MODELS, VIDEO_MODELS,
+  VIDEO_MODELS, IMAGE_EDIT_MODELS, VIDEO_MODELS,
   generateImage, editImage, removeBackground, replaceBackground,
   upscaleImage, clarityUpscale, enhanceFaces,
   upscaleVideo, VIDEO_UPSCALE_MODELS, type VideoUpscaleEngine,
@@ -25,8 +25,10 @@ import {
   CAMERA_PRESETS, TRANSITION_PRESETS,
   lipSyncVideoToAudio, transcribeAudioToSrt, burnSubtitlesIntoVideo,
   transferMotionToImage,
+  mixAudioWithBackgroundMusic, generateSFXCatalog, generateVoiceWithClone,
   type ImageGenModel, type ImageEditModel, type VideoModel,
 } from "../lib/fusion-studio-pro.js";
+import { getAvailableVoices } from "../lib/elevenlabs.js";
 import { getAllProvidersHealth, invalidateProviderHealthCache, type ProviderId } from "../lib/provider-health.js";
 import { buildProPrompt, getPromptCatalog, type BuildPromptOptions } from "../lib/prompt-templates.js";
 import { enhancePrompt, type EnhanceIntent } from "../lib/prompt-enhance.js";
@@ -1745,6 +1747,233 @@ router.post("/fs-pro/upscale-video", requireAdmin, upload.single("video"), async
   }
 });
 
+// ─── IMAGE: REMOVE BACKGROUND ──────────────────────────────────────────────
+router.post("/fs-pro/image/remove-bg", requireAdmin, upload.single("image"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidStr, sourceImageUrl } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    let buf: Buffer; let mime: string;
+    if (f) { buf = f.buffer; mime = f.mimetype; }
+    else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); mime = "image/png"; }
+    else { res.status(400).json({ error: "Imagen requerida" }); return; }
+
+    const out = await removeBackground(buf, mime, getProjectReplicateToken(project));
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-bg-removed", category: "fusion-studio-pro",
+      title: "FS Pro: BG Removed",
+      mimeType: "image/png", generatedBy: "fs-pro:image:remove-bg",
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", 1);
+    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error eliminando fondo" });
+  }
+});
+
+// ─── IMAGE: REPLACE BACKGROUND ─────────────────────────────────────────────
+router.post("/fs-pro/image/replace-bg", requireAdmin, upload.single("image"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidStr, sourceImageUrl, prompt } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    let buf: Buffer; let mime: string;
+    if (f) { buf = f.buffer; mime = f.mimetype; }
+    else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); mime = "image/png"; }
+    else { res.status(400).json({ error: "Imagen requerida" }); return; }
+
+    const out = await replaceBackground(buf, mime, prompt, getProjectReplicateToken(project));
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-bg-replaced", category: "fusion-studio-pro",
+      title: "FS Pro: BG Replaced",
+      mimeType: "image/png", generatedBy: "fs-pro:image:replace-bg",
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", 1);
+    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error reemplazando fondo" });
+  }
+});
+
+// ─── IMAGE: CLARITY UPSCALE ────────────────────────────────────────────────
+router.post("/fs-pro/image/clarity-upscale", requireAdmin, upload.single("image"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidStr, sourceImageUrl, scale, prompt } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    let buf: Buffer; let mime: string;
+    if (f) { buf = f.buffer; mime = f.mimetype; }
+    else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); mime = "image/png"; }
+    else { res.status(400).json({ error: "Imagen requerida" }); return; }
+
+    const sc = parseInt(scale || "2");
+    const out = await clarityUpscale(buf, mime, prompt || "high detail photograph", sc, getProjectReplicateToken(project));
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-clarity", category: "fusion-studio-pro",
+      title: `FS Pro: Clarity Upscale x${sc}`,
+      mimeType: "image/png", generatedBy: "fs-pro:image:clarity-upscale",
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", 1);
+    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error en clarity upscale" });
+  }
+});
+
+// ─── IMAGE: FACE SWAP ──────────────────────────────────────────────────────
+router.post("/fs-pro/image/face-swap", requireAdmin, multer().fields([{ name: "face", maxCount: 1 }, { name: "target", maxCount: 1 }]), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const faceFile = files?.face?.[0];
+    const targetFile = files?.target?.[0];
+    const { projectId: pidStr } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+    if (!faceFile || !targetFile) { res.status(400).json({ error: "Se requieren archivos 'face' y 'target'" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const out = await faceSwapImage(faceFile.buffer, targetFile.buffer, getProjectReplicateToken(project));
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-faceswap", category: "fusion-studio-pro",
+      title: "FS Pro: Face Swap",
+      mimeType: "image/png", generatedBy: "fs-pro:image:face-swap",
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", 2);
+    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error en face swap" });
+  }
+});
+
+// ─── IMAGE: VARIATIONS ─────────────────────────────────────────────────────
+router.post("/fs-pro/image/variations", requireAdmin, upload.single("image"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidStr, sourceImageUrl, prompt, count } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    let buf: Buffer;
+    if (f) { buf = f.buffer; }
+    else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); }
+    else { res.status(400).json({ error: "Imagen requerida" }); return; }
+
+    const n = count ? parseInt(count, 10) : 1;
+    const buffers = await generateImageVariations(buf, prompt, n, getProjectReplicateToken(project));
+
+    const results = [];
+    for (let i = 0; i < buffers.length; i++) {
+      const vaultId = await saveToVaultSmart({
+        projectId, fileType: "fs-pro-variation", category: "fusion-studio-pro",
+        title: `FS Pro: Variation ${i + 1}`,
+        mimeType: "image/png", generatedBy: "fs-pro:image:variations",
+        buffer: buffers[i],
+      });
+      results.push({ vaultId, base64: buffers[i].toString("base64") });
+    }
+
+    await recordUsage(projectId, "image", buffers.length);
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error generando variaciones" });
+  }
+});
+
+// ─── IMAGE: OUTPAINT ───────────────────────────────────────────────────────
+router.post("/fs-pro/image/outpaint", requireAdmin, upload.single("image"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidStr, sourceImageUrl, prompt, direction, paddingPct } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    let buf: Buffer;
+    if (f) { buf = f.buffer; }
+    else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); }
+    else { res.status(400).json({ error: "Imagen requerida" }); return; }
+
+    const out = await outpaintImage(buf, prompt, direction, paddingPct ? parseInt(paddingPct, 10) : undefined, getProjectReplicateToken(project));
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-outpaint", category: "fusion-studio-pro",
+      title: "FS Pro: Outpaint",
+      mimeType: "image/png", generatedBy: "fs-pro:image:outpaint",
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", 2);
+    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error en outpaint" });
+  }
+});
+
+// ─── IMAGE: INPAINT ────────────────────────────────────────────────────────
+router.post("/fs-pro/image/inpaint", requireAdmin, multer().fields([{ name: "image", maxCount: 1 }, { name: "mask", maxCount: 1 }]), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const imageFile = files?.image?.[0];
+    const maskFile = files?.mask?.[0];
+    const { projectId: pidStr, prompt } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId) { res.status(400).json({ error: "projectId requerido" }); return; }
+    if (!imageFile || !maskFile) { res.status(400).json({ error: "Se requieren archivos 'image' y 'mask'" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const out = await inpaintImageWithMask(imageFile.buffer, maskFile.buffer, prompt, getProjectReplicateToken(project));
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-inpaint", category: "fusion-studio-pro",
+      title: "FS Pro: Inpaint",
+      mimeType: "image/png", generatedBy: "fs-pro:image:inpaint",
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", 2);
+    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error en inpaint" });
+  }
+});
+
 // ─── VIDEO GENERATION ─────────────────────────────────────────────────────
 router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), async (req, res) => {
   enableLongRunning(res);
@@ -1880,6 +2109,108 @@ router.post("/fs-pro/edit-video", requireAdmin, async (req, res) => {
   } catch (err: any) {
     logger.error({ err }, "fs-pro edit-video failed");
     res.status(500).json({ error: err?.message || "Error editando vídeo" });
+  }
+});
+
+// ─── VIDEO V2V / STYLE TRANSFER ──────────────────────────────────────────────
+router.post("/fs-pro/video/v2v", requireAdmin, upload.single("video"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidStr, prompt, model } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId || !prompt || !model) {
+      res.status(400).json({ error: "projectId, prompt, model requeridos" }); return;
+    }
+
+    const VIDEO_CREDITS = 8;
+    const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    if (!f) { res.status(400).json({ error: "Video requerido" }); return; }
+
+    const out = await generateVideoFromVideo(f.buffer, prompt, model, getProjectReplicateToken(project));
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-video-v2v", category: "fusion-studio-pro",
+      title: `FS Pro V2V: ${prompt.slice(0, 60)}`,
+      mimeType: "video/mp4", generatedBy: `fs-pro:v2v-${model}`,
+      buffer: out.buffer,
+    });
+    await recordUsage(projectId, "image", VIDEO_CREDITS);
+
+    res.json({ success: true, vaultId, model: out.model, sizeBytes: out.buffer.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error en Video to Video" });
+  }
+});
+
+// ─── VIDEO EXTENSION (RUNWAY) ──────────────────────────────────────────────
+router.post("/fs-pro/video/extend", requireAdmin, async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const { projectId: pidStr, videoUrl, duration, model } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId || !videoUrl) {
+      res.status(400).json({ error: "projectId, videoUrl requeridos" }); return;
+    }
+
+    const VIDEO_CREDITS = 6;
+    const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const out = await extendVideoWithRunway(videoUrl, parseInt(duration || "5"), model);
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-video-extend", category: "fusion-studio-pro",
+      title: `FS Pro Video Extend`,
+      mimeType: "video/mp4", generatedBy: `fs-pro:runway-extend`,
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", VIDEO_CREDITS);
+
+    res.json({ success: true, vaultId, sizeBytes: out.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error extendiendo video" });
+  }
+});
+
+// ─── VIDEO EDIT (PROMPT) ─────────────────────────────────────────────────────
+router.post("/fs-pro/video/edit", requireAdmin, upload.single("video"), async (req, res) => {
+  enableLongRunning(res);
+  try {
+    const f = req.file;
+    const { projectId: pidStr, prompt, model } = req.body;
+    const projectId = parseInt(pidStr || "0", 10);
+    if (!projectId || !prompt || !model) {
+      res.status(400).json({ error: "projectId, prompt, model requeridos" }); return;
+    }
+
+    const VIDEO_CREDITS = 6;
+    const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    if (!f) { res.status(400).json({ error: "Video requerido" }); return; }
+
+    const out = await editVideoWithPrompt(f.buffer, prompt, model, getProjectReplicateToken(project));
+
+    const vaultId = await saveToVaultSmart({
+      projectId, fileType: "fs-pro-video-edit", category: "fusion-studio-pro",
+      title: `FS Pro Video Edit: ${prompt.slice(0, 60)}`,
+      mimeType: "video/mp4", generatedBy: `fs-pro:edit-${model}`,
+      buffer: out,
+    });
+    await recordUsage(projectId, "image", VIDEO_CREDITS);
+
+    res.json({ success: true, vaultId, sizeBytes: out.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error editando video" });
   }
 });
 
@@ -3223,6 +3554,89 @@ router.post(
     }
   },
 );
+
+// ─── AUDIO: MIX TTS + MUSIC ──────────────────────────────────────────────
+router.post(
+  "/fs-pro/audio/mix",
+  requireAdmin,
+  multer().fields([{ name: "tts", maxCount: 1 }, { name: "music", maxCount: 1 }]),
+  async (req, res) => {
+    try {
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const ttsFile = files?.tts?.[0];
+      const musicFile = files?.music?.[0];
+      const { projectId, musicVolume, duckingEnabled } = req.body;
+
+      if (!ttsFile || !musicFile) {
+        res.status(400).json({ error: "Se requieren archivos 'tts' y 'music'" });
+        return;
+      }
+
+      const mixedBuffer = await mixAudioWithBackgroundMusic(ttsFile.buffer, musicFile.buffer, {
+        musicVolume: musicVolume ? parseFloat(musicVolume) : 0.15,
+        duckingEnabled: duckingEnabled === "true" || duckingEnabled === true,
+      });
+
+      const vaultId = await saveToVault({
+        projectId: parseInt(projectId || "0", 10),
+        title: "Mixed Audio",
+        buffer: mixedBuffer,
+        mimeType: "audio/mpeg",
+        category: "audio",
+        generatedBy: "fs-pro:audio:mix",
+      });
+
+      res.json({ success: true, vaultId, url: `/api/vault/file/${vaultId}` });
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "fs-pro audio/mix failed");
+      res.status(500).json({ error: err?.message || "Error mezclando audio" });
+    }
+  }
+);
+
+// ─── AUDIO: SFX CATALOG ──────────────────────────────────────────────────
+router.get("/fs-pro/audio/sfx-catalog", async (req, res) => {
+  res.json(generateSFXCatalog());
+});
+
+// ─── TTS: ADVANCED ───────────────────────────────────────────────────────
+router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
+  try {
+    const { text, voiceId, model, stability, style, similarityBoost, outputFormat, projectId } = req.body;
+    if (!text || !voiceId) {
+      res.status(400).json({ error: "text y voiceId requeridos" });
+      return;
+    }
+
+    const audioBuffer = await generateVoiceWithClone(text, voiceId, {
+      model, stability, style, similarityBoost, outputFormat
+    });
+
+    const vaultId = await saveToVault({
+      projectId: parseInt(projectId || "0", 10),
+      title: "Advanced TTS",
+      buffer: audioBuffer,
+      mimeType: "audio/mpeg",
+      category: "audio",
+      generatedBy: "fs-pro:tts:advanced",
+    });
+
+    res.json({ success: true, vaultId, url: `/api/vault/file/${vaultId}` });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "fs-pro tts/advanced failed");
+    res.status(500).json({ error: err?.message || "Error en TTS avanzado" });
+  }
+});
+
+// ─── VOICE: LIST ─────────────────────────────────────────────────────────
+router.get("/fs-pro/voice/list", requireAdmin, async (req, res) => {
+  try {
+    const voices = await listVoices(); // Using the one already imported/available
+    res.json(voices);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message });
+  }
+});
 
 // Shared helper: read vault content from URL → objectStorage → base64 content
 export async function readVaultContent(file: any): Promise<Buffer | undefined> {

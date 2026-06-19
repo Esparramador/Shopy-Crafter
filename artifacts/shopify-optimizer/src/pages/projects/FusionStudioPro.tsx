@@ -173,7 +173,7 @@ function ImagePromptEnhanceBtn({ prompt, setPrompt, projectId, subject }: { prom
 const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string }> = [
   { id: "generate",   label: "Generar imagen",  icon: <Sparkles size={15} />, desc: "Flux Ultra, Recraft, Ideogram v3, Imagen 4, Kontext, Nano Banana" },
   { id: "edit",       label: "Editar imagen",   icon: <Wand2 size={15} />,    desc: "Nano Banana (Gemini), Flux Kontext, Runway Gen4 Edit" },
-  { id: "background", label: "Fondo",           icon: <Layers size={15} />,   desc: "Quitar / reemplazar fondo profesional (Bria RMBG)" },
+  { id: "background", label: "Fondo",           icon: <Layers size={15} />,   desc: "Quitar / reemplazar fondo profesional, Variaciones, Face Swap, Inpainting, Outpainting" },
   { id: "enhance",    label: "Mejorar",         icon: <Maximize2 size={15} />,desc: "Imágenes (Real-ESRGAN, Clarity, GFPGAN) y vídeo (Topaz, Real-ESRGAN Video) hasta 4K" },
   { id: "video",      label: "Video",           icon: <Video size={15} />,    desc: "Runway Gen-4, Kling 2.1, Seedance, Hailuo, Veo 3" },
   { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (Seedance / Kling / Veo / Runway)" },
@@ -537,70 +537,153 @@ function EditTab({ caps, health, projectId, onSuccess, onError, onCreditError }:
 
 // ─── TAB: BACKGROUND ─────────────────────────────────────────────────────
 function BackgroundTab({ projectId, onSuccess, onError }: { projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
-  const [mode, setMode] = useState<"remove" | "replace">("remove");
-  const [scenePrompt, setScenePrompt] = useState("");
+  const [mode, setMode] = useState<"remove" | "replace" | "variations" | "faceswap" | "inpaint" | "outpaint" | "clarity">("remove");
+  const [prompt, setPrompt] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [maskFile, setMaskFile] = useState<File | null>(null);
+  const [faceFile, setFaceFile] = useState<File | null>(null);
+  const [targetFile, setTargetFile] = useState<File | null>(null);
+  const [count, setCount] = useState(1);
+  const [direction, setDirection] = useState<"all" | "left" | "right" | "top" | "bottom">("all");
+  const [paddingPct, setPaddingPct] = useState(20);
   const [busy, setBusy] = useState(false);
 
   const run = async () => {
-    if (!file) { onError("Imagen requerida"); return; }
-    if (mode === "replace" && !scenePrompt.trim()) { onError("scenePrompt requerido"); return; }
+    if (mode === "faceswap") {
+      if (!faceFile || !targetFile) { onError("Imagen de cara y destino requeridas"); return; }
+    } else if (mode === "inpaint") {
+      if (!file || !maskFile) { onError("Imagen y máscara requeridas"); return; }
+      if (!prompt.trim()) { onError("Prompt requerido para inpaint"); return; }
+    } else {
+      if (!file) { onError("Imagen requerida"); return; }
+      if (mode !== "remove" && !prompt.trim()) { onError("Prompt requerido"); return; }
+    }
+
     setBusy(true);
     try {
       const fd = new FormData();
       fd.append("projectId", String(projectId));
-      fd.append("image", file);
-      if (mode === "replace") fd.append("scenePrompt", scenePrompt);
-      const res = await fetch(`${API_BASE}/api/fs-pro/${mode === "remove" ? "remove-bg" : "replace-bg"}`, {
+      
+      let endpoint = mode as string;
+      if (mode === "remove") endpoint = "image/remove-bg";
+      else if (mode === "replace") endpoint = "image/replace-bg";
+      else if (mode === "variations") endpoint = "image/variations";
+      else if (mode === "faceswap") endpoint = "image/face-swap";
+      else if (mode === "inpaint") endpoint = "image/inpaint";
+      else if (mode === "outpaint") endpoint = "image/outpaint";
+      else if (mode === "clarity") endpoint = "image/clarity-upscale";
+
+      if (mode === "faceswap") {
+        fd.append("face", faceFile!);
+        fd.append("target", targetFile!);
+      } else if (mode === "inpaint") {
+        fd.append("image", file!);
+        fd.append("mask", maskFile!);
+        fd.append("prompt", prompt);
+      } else {
+        fd.append("image", file!);
+        if (prompt) fd.append("prompt", prompt);
+        if (mode === "variations") fd.append("count", String(count));
+        if (mode === "outpaint") {
+          fd.append("direction", direction);
+          fd.append("paddingPct", String(paddingPct));
+        }
+      }
+
+      const res = await fetch(`${API_BASE}/api/fs-pro/${endpoint}`, {
         method: "POST", credentials: "include", body: fd,
       });
       const d = await res.json();
       if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
-      onSuccess({ vaultId: d.vaultId, type: "bg", label: mode === "remove" ? "BG removed" : `BG: ${scenePrompt.slice(0, 30)}`, dataUrl: d.dataUrl, mimeType: "image/png" });
+
+      if (mode === "variations" && d.results) {
+        d.results.forEach((r: any, idx: number) => {
+          onSuccess({ vaultId: r.vaultId, type: "image", label: `Var ${idx+1}: ${prompt.slice(0, 20)}`, dataUrl: r.dataUrl, mimeType: "image/png" });
+        });
+      } else {
+        onSuccess({ vaultId: d.vaultId, type: "image", label: `${mode}: ${prompt.slice(0, 30)}`, dataUrl: d.dataUrl, mimeType: "image/png" });
+      }
     } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
   };
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
       <div>
-        <Section title="Modo">
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setMode("remove")} style={pillButton(mode === "remove")}>Eliminar fondo</button>
-            <button onClick={() => setMode("replace")} style={pillButton(mode === "replace")}>Reemplazar fondo</button>
+        <Section title="Modo Avanzado de Imagen">
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <button onClick={() => setMode("remove")} style={pillButton(mode === "remove")}>Quitar fondo</button>
+            <button onClick={() => setMode("replace")} style={pillButton(mode === "replace")}>Cambiar fondo</button>
+            <button onClick={() => setMode("variations")} style={pillButton(mode === "variations")}>Variaciones</button>
+            <button onClick={() => setMode("faceswap")} style={pillButton(mode === "faceswap")}>Face Swap</button>
+            <button onClick={() => setMode("inpaint")} style={pillButton(mode === "inpaint")}>Inpainting</button>
+            <button onClick={() => setMode("outpaint")} style={pillButton(mode === "outpaint")}>Outpainting</button>
+            <button onClick={() => setMode("clarity")} style={pillButton(mode === "clarity")}>Upscale Calidad</button>
           </div>
         </Section>
-        <Section title="Imagen origen">
-          <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
-        </Section>
-        {mode === "replace" && (
-          <Section title="Escena nueva (prompt)">
-            <textarea value={scenePrompt} onChange={e => setScenePrompt(e.target.value)} placeholder="luxurious marble surface with soft window light from the left, depth of field..." style={{ ...inputStyle, minHeight: 100 }} />
-          </Section>
+
+        {mode === "faceswap" ? (
+          <>
+            <Section title="Imagen de cara (Source)">
+              <input type="file" accept="image/*" onChange={e => setFaceFile(e.target.files?.[0] || null)} />
+            </Section>
+            <Section title="Imagen destino (Target)">
+              <input type="file" accept="image/*" onChange={e => setTargetFile(e.target.files?.[0] || null)} />
+            </Section>
+          </>
+        ) : (
+          <>
+            <Section title="Imagen origen">
+              <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
+            </Section>
+            {mode === "inpaint" && (
+              <Section title="Máscara (B&W: blanco=zona a rellenar)">
+                <input type="file" accept="image/*" onChange={e => setMaskFile(e.target.files?.[0] || null)} />
+              </Section>
+            )}
+            {mode !== "remove" && mode !== "clarity" && (
+              <Section title="Instrucción (Prompt)">
+                <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Describe el cambio o escena..." style={{ ...inputStyle, minHeight: 80 }} />
+              </Section>
+            )}
+            {mode === "variations" && (
+              <Section title={`Cantidad: ${count}`}>
+                <input type="range" min={1} max={4} value={count} onChange={e => setCount(+e.target.value)} style={{ width: "100%" }} />
+              </Section>
+            )}
+            {mode === "outpaint" && (
+              <>
+                <Section title="Dirección">
+                  <select value={direction} onChange={e => setDirection(e.target.value as any)} style={inputStyle}>
+                    <option value="all">Todas direcciones</option>
+                    <option value="left">Izquierda</option>
+                    <option value="right">Derecha</option>
+                    <option value="top">Arriba</option>
+                    <option value="bottom">Abajo</option>
+                  </select>
+                </Section>
+                <Section title={`Padding: ${paddingPct}%`}>
+                  <input type="range" min={10} max={100} step={5} value={paddingPct} onChange={e => setPaddingPct(+e.target.value)} style={{ width: "100%" }} />
+                </Section>
+              </>
+            )}
+          </>
         )}
       </div>
       <div>
-        <button onClick={run} disabled={busy || !file} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+        <button onClick={run} disabled={busy || (mode !== "faceswap" && !file) || (mode === "faceswap" && (!faceFile || !targetFile))} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Layers size={16} />}
-          {busy ? "Procesando..." : mode === "remove" ? "Quitar fondo" : "Reemplazar fondo"}
+          {busy ? "Procesando..." : "Ejecutar Operación"}
         </button>
         <LiveOperation
           active={busy}
-          title={mode === "remove" ? "Quitando fondo de la imagen" : "Reemplazando fondo con escena IA"}
-          estimatedSec={mode === "remove" ? 12 : 25}
-          messages={
-            mode === "remove"
-              ? [
-                  "Subiendo imagen al motor de segmentación…",
-                  "Detectando bordes del producto con precisión…",
-                  "Generando alpha mask y exportando PNG transparente…",
-                ]
-              : [
-                  "Subiendo imagen y prompt de escena…",
-                  "Recortando producto y generando nuevo escenario…",
-                  "Integrando iluminación y sombras coherentes…",
-                  "Validando calidad antes de subir al Vault…",
-                ]
-          }
+          title={`Procesando ${mode} con IA`}
+          estimatedSec={30}
+          messages={[
+            "Subiendo activos al motor de IA…",
+            "Calculando transformación espacial y semántica…",
+            "Refinando detalles y coherencia visual…",
+            "Exportando resultado al Vault…",
+          ]}
           className="w-full mt-3"
         />
       </div>
@@ -784,7 +867,7 @@ function EnhanceTab({ caps, projectId, onSuccess, onError }: { caps: Capabilitie
 // Modelos que NO soportan text-to-video puro → exigen imagen origen.
 const I2V_ONLY_MODELS = new Set(["runway-gen4-turbo", "runway-gen4.5", "runway-gen3-alpha", "wan-2.5", "wan-2.5-fast"]);
 
-type VideoMode = "t2v" | "i2v" | "extend" | "edit-video";
+type VideoMode = "t2v" | "i2v" | "v2v" | "extend" | "edit-video";
 
 function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }: { caps: Capabilities | null; health: HealthMap | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onCreditError?: () => void }) {
   const [mode, setMode] = useState<VideoMode>("i2v");
@@ -815,33 +898,46 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
   }, [model, mode]);
 
   const run = async () => {
-    if (!prompt.trim()) { onError("Prompt requerido"); return; }
+    if (!prompt.trim() && mode !== "extend" && mode !== "edit-video") { onError("Prompt requerido"); return; }
     if (mode === "i2v" && !file && !sourceUrl) { onError("Imagen origen requerida en modo Imagen → Vídeo"); return; }
+    if (mode === "v2v" && !file) { onError("Video origen requerido para V2V"); return; }
     if ((mode === "extend" || mode === "edit-video") && !videoUrl.trim()) {
       onError("URL del vídeo origen requerida"); return;
     }
     setBusy(true);
     try {
       if (mode === "extend") {
-        const res = await fetch(`${API_BASE}/api/fs-pro/extend-video`, {
+        const res = await fetch(`${API_BASE}/api/fs-pro/video/extend`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId, videoUrl, prompt, duration: extendDuration, model: xaiModel }),
+          body: JSON.stringify({ projectId, videoUrl, duration: extendDuration, model: model }),
         });
         const d = await res.json();
         if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
-        onSuccess({ vaultId: d.vaultId, type: "video", label: `Ext: ${prompt.slice(0, 30)}`, mimeType: "video/mp4" });
+        onSuccess({ vaultId: d.vaultId, type: "video", label: `Ext: ${videoUrl.slice(-10)}`, mimeType: "video/mp4" });
         return;
       }
       if (mode === "edit-video") {
-        const res = await fetch(`${API_BASE}/api/fs-pro/edit-video`, {
+        const res = await fetch(`${API_BASE}/api/fs-pro/video/edit`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId, videoUrl, prompt, model: xaiModel }),
+          body: JSON.stringify({ projectId, videoUrl, prompt, model: model }),
         });
         const d = await res.json();
         if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
         onSuccess({ vaultId: d.vaultId, type: "video", label: `Edit: ${prompt.slice(0, 30)}`, mimeType: "video/mp4" });
+        return;
+      }
+      if (mode === "v2v") {
+        const fd = new FormData();
+        fd.append("projectId", String(projectId));
+        fd.append("video", file!);
+        fd.append("prompt", prompt);
+        fd.append("model", model);
+        const res = await fetch(`${API_BASE}/api/fs-pro/video/v2v`, { method: "POST", credentials: "include", body: fd });
+        const d = await res.json();
+        if (!res.ok) { onError(d.error || `Error ${res.status}`); return; }
+        onSuccess({ vaultId: d.vaultId, type: "video", label: `V2V: ${prompt.slice(0, 30)}`, mimeType: "video/mp4" });
         return;
       }
       const fd = new FormData();
@@ -870,7 +966,7 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
   };
 
   const modelSupportsT2V = !I2V_ONLY_MODELS.has(model);
-  const isXaiMode = mode === "extend" || mode === "edit-video";
+  const isXaiMode = false;
 
   const xaiHealthStatus = health?.["xai"]?.status;
   const xaiDown = xaiHealthStatus === "out_of_credits" || xaiHealthStatus === "down" || xaiHealthStatus === "missing_key";
@@ -895,18 +991,26 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
               <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Animar foto</div>
             </button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
             <button
-              onClick={() => setMode("extend")}
-              style={{ ...cardButton(mode === "extend"), padding: "10px 8px", borderColor: mode === "extend" ? "#7c3aed" : undefined }}>
-              <div style={{ fontSize: 11, fontWeight: 700 }}>⟳ Extender Vídeo</div>
-              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>xAI · +2-10s</div>
+              onClick={() => setMode("v2v")}
+              style={{ ...cardButton(mode === "v2v"), padding: "10px 8px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>Video → Video</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Estilizar video</div>
             </button>
             <button
+              onClick={() => setMode("extend")}
+              style={{ ...cardButton(mode === "extend"), padding: "10px 8px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>⟳ Extender</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Añadir segundos</div>
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <button
               onClick={() => setMode("edit-video")}
-              style={{ ...cardButton(mode === "edit-video"), padding: "10px 8px", borderColor: mode === "edit-video" ? "#7c3aed" : undefined }}>
-              <div style={{ fontSize: 11, fontWeight: 700 }}>✏️ Editar Vídeo</div>
-              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>xAI · max 8.7s</div>
+              style={{ ...cardButton(mode === "edit-video"), padding: "10px 8px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>✏️ Editar IA</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Transformar</div>
             </button>
           </div>
           {mode === "t2v" && (
@@ -1116,7 +1220,7 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
 }
 
 function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capabilities | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onInfo: (m: string) => void }) {
-  const [mode, setMode] = useState<"tts" | "clone" | "sfx" | "music">("tts");
+  const [mode, setMode] = useState<"tts" | "clone" | "sfx" | "music" | "mix">("tts");
   const [voices, setVoices] = useState<any[]>([]);
   const [voiceId, setVoiceId] = useState<string>("");
   const [text, setText] = useState("");
@@ -1130,6 +1234,12 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
   const [cloneName, setCloneName] = useState("");
   const [cloneFile, setCloneFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  
+  // Mix state
+  const [ttsFile, setTtsFile] = useState<File | null>(null);
+  const [musicFile, setMusicFile] = useState<File | null>(null);
+  const [musicVolume, setMusicVolume] = useState(0.15);
+  const [duckingEnabled, setDuckingEnabled] = useState(true);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/ad-studio/voices`, { credentials: "include" })
@@ -1137,11 +1247,36 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
       .then(d => { if (d?.voices) { setVoices(d.voices); if (d.voices[0]) setVoiceId(d.voices[0].voice_id); } });
   }, []);
 
+  const runMix = async () => {
+    if (!ttsFile || !musicFile) { onError("Sube TTS y Música"); return; }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", String(projectId));
+      fd.append("tts", ttsFile);
+      fd.append("music", musicFile);
+      fd.append("musicVolume", String(musicVolume));
+      fd.append("duckingEnabled", String(duckingEnabled));
+      const res = await fetch(`${API_BASE}/api/fs-pro/audio/mix`, { method: "POST", credentials: "include", body: fd });
+      const d = await res.json();
+      if (!res.ok) { onError(d.error || "Error"); return; }
+      onSuccess({ vaultId: d.vaultId, type: "audio", label: "Mix final", dataUrl: d.dataUrl, mimeType: "audio/mpeg" });
+    } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
+  };
+
+  const showSfxCatalog = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/fs-pro/audio/sfx-catalog`);
+      const d = await res.json();
+      onInfo(`Catálogo: ${d.map((s: any) => s.name).join(", ")}`);
+    } catch { onError("Error cargando catálogo"); }
+  };
+
   const runTTS = async () => {
     if (!voiceId || !text.trim()) { onError("Voz y texto requeridos"); return; }
     setBusy(true);
     try {
-      const res = await fetch(`${API_BASE}/api/fs-pro/tts`, {
+      const res = await fetch(`${API_BASE}/api/fs-pro/tts/advanced`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, voiceId, text, modelId, stability, similarity, style, speed }),
@@ -1205,7 +1340,34 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
         <button onClick={() => setMode("clone")} style={pillButton(mode === "clone")}>Clonar voz</button>
         <button onClick={() => setMode("sfx")} style={pillButton(mode === "sfx")}>SFX</button>
         <button onClick={() => setMode("music")} style={pillButton(mode === "music")}>Música</button>
+        <button onClick={() => setMode("mix")} style={pillButton(mode === "mix")}>Mezclar</button>
+        <button onClick={showSfxCatalog} className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }}>Catálogo SFX</button>
       </div>
+
+      {mode === "mix" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <Section title="Voz (TTS)">
+              <input type="file" accept="audio/*" onChange={e => setTtsFile(e.target.files?.[0] || null)} />
+            </Section>
+            <Section title="Música de fondo">
+              <input type="file" accept="audio/*" onChange={e => setMusicFile(e.target.files?.[0] || null)} />
+            </Section>
+          </div>
+          <div>
+            <Section title={`Volumen música: ${musicVolume.toFixed(2)}`}><input type="range" min={0} max={0.5} step={0.05} value={musicVolume} onChange={e => setMusicVolume(+e.target.value)} style={{ width: "100%" }} /></Section>
+            <Section title="Ducking (bajar música al hablar)">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" checked={duckingEnabled} onChange={e => setDuckingEnabled(e.target.checked)} />
+                <span style={{ fontSize: 11, color: "var(--t3)" }}>Atenuar música automáticamente</span>
+              </div>
+            </Section>
+            <button onClick={runMix} disabled={busy || !ttsFile || !musicFile} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} />} {busy ? "Mezclando..." : "Mezclar Audio"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {mode === "tts" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
