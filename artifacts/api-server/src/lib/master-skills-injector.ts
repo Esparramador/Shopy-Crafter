@@ -201,18 +201,18 @@ function buildAdvertisingKBBlock(): string {
 ══════════════ ADVERTISING & UGC PLAYBOOK KB ══════════════
 
 BRAND DNA FRAMEWORK — ${BRAND_DNA_FRAMEWORK.length} pilares:
-${BRAND_DNA_FRAMEWORK.map(p => `  [${p.pillar}] ${p.description}\n    Preguntas clave: ${p.keyQuestions?.slice(0, 2).join(" | ") ?? ""}`).join("\n")}
+${BRAND_DNA_FRAMEWORK.map(p => `  [${(p as any).pillar}] ${(p as any).description ?? ""}\n    Preguntas clave: ${(p as any).keyQuestions?.slice(0, 2).join(" | ") ?? ""}`).join("\n")}
 
 CAMPAIGN TYPES (funnel completo):
 ${campaignKeys.map(k => {
-  const c = CAMPAIGN_TYPES[k];
+  const c = CAMPAIGN_TYPES[k] as any;
   return `  ${k.toUpperCase()}: ${c.objective}\n    Hook: ${c.primaryHook ?? "N/A"} | CTA: ${c.cta ?? "N/A"} | Plataformas: ${c.platforms?.join(", ") ?? "N/A"}`;
 }).join("\n")}
 
 UGC ARCHETYPES (${ugcKeys.length} arquetipos):
 ${ugcKeys.slice(0, 6).map(k => {
-  const a = UGC_ARCHETYPES[k];
-  return `  ${k}: ${a.name} — ${a.description}\n    Hook: "${a.hookTemplate ?? "N/A"}"`;
+  const a = UGC_ARCHETYPES[k] as any;
+  return `  ${k}: ${a.name} — ${a.description ?? ""}\n    Hook: "${a.hookTemplate ?? "N/A"}"`;
 }).join("\n")}
 
 MICRO-CLIP METHOD (${MICRO_CLIP_METHOD.length} reglas):
@@ -222,10 +222,10 @@ MASTER PROMPT FORMULA (${MASTER_PROMPT_FORMULA.length} componentes en orden):
 ${MASTER_PROMPT_FORMULA.map(c => `  ${c.order}. [${c.name}] — ${c.description}\n     Placeholder: ${c.placeholder}`).join("\n")}
 
 PLATFORM PROMPT RECIPES (${PLATFORM_PROMPT_RECIPES.length}):
-${PLATFORM_PROMPT_RECIPES.slice(0, 4).map(r => `  ${r.platform} (${r.aspectRatio}): ${r.style} — "${r.promptPrefix ?? ""}..."`).join("\n")}
+${PLATFORM_PROMPT_RECIPES.slice(0, 4).map(r => `  ${r.platform} (${r.aspectRatio}): ${(r as any).style ?? ""} — "${(r as any).promptPrefix ?? ""}..."`).join("\n")}
 
 TECH SPECS:
-${VIDEO_TECH_SPECS.slice(0, 5).map(s => `  ${s.platform}: ${s.resolution} ${s.fps}fps | codec: ${s.codec} | bitrate: ${s.bitrate}`).join("\n")}
+${VIDEO_TECH_SPECS.slice(0, 5).map(s => `  ${(s as any).platform ?? s.resolution}: ${s.resolution} ${s.fps}fps | codec: ${s.codec} | bitrate: ${(s as any).bitrate ?? "N/A"}`).join("\n")}
 `;
 }
 
@@ -237,31 +237,31 @@ function buildCinematicKBBlock(): string {
 ══════════════ CINEMATIC PRODUCTION KB ══════════════
 
 OPTICAL TECHNIQUES (${OPTICAL_TECHNIQUES.length}):
-${OPTICAL_TECHNIQUES.slice(0, 8).map(t => `  [${t.id}] ${t.name}: ${t.description} | Prompt: "${t.promptToken}"`).join("\n")}
+${OPTICAL_TECHNIQUES.slice(0, 8).map(t => `  [${t.id}] ${t.name}: ${(t as any).description ?? ""} | Prompt: "${(t as any).promptToken ?? ""}"`).join("\n")}
 
 CINEMATOGRAPHY PRESETS (${presetKeys.length}):
 ${presetKeys.map(k => {
-  const p = CINEMATOGRAPHY_PRESETS[k];
-  return `  ${k.toUpperCase()}: ${p.description}\n    Style: ${p.colorGrading ?? "N/A"} | Mood: ${p.mood ?? "N/A"}\n    Camera: ${p.cameraMovement?.slice(0, 2).join(", ") ?? "N/A"}\n    Prompt tokens: "${p.promptTokens?.slice(0, 4).join(", ") ?? "N/A"}"`;
+  const p = CINEMATOGRAPHY_PRESETS[k] as any;
+  return `  ${k.toUpperCase()}: ${p.description ?? ""}\n    Style: ${p.colorGrading ?? p.colorGrade ?? "N/A"} | Mood: ${p.mood ?? "N/A"}\n    Camera: ${p.cameraMovement?.slice(0, 2).join(", ") ?? "N/A"}\n    Prompt tokens: "${p.promptTokens?.slice(0, 4).join(", ") ?? "N/A"}"`;
 }).join("\n")}
 
 SHOT VOCABULARY (${shotKeys.length} tamaños):
 ${shotKeys.map(k => {
-  const s = SHOT_VOCABULARY[k];
-  return `  ${k}: ${s.description} | Uso: ${s.bestFor ?? "N/A"} | Token: "${s.promptToken ?? "N/A"}"`;
+  const s = SHOT_VOCABULARY[k] as any;
+  return `  ${k}: ${s.description ?? ""} | Uso: ${s.bestFor ?? "N/A"} | Token: "${s.promptToken ?? "N/A"}"`;
 }).join("\n")}
 
 PRESENTER STYLES (${presenterKeys.length}):
 ${presenterKeys.map(k => {
-  const s = PRESENTER_STYLES[k];
-  return `  ${k}: ${s.description} | Wardrobe: ${s.wardrobe ?? "N/A"} | Tone: ${s.tone ?? "N/A"}`;
+  const s = PRESENTER_STYLES[k] as any;
+  return `  ${k}: ${s.description ?? ""} | Wardrobe: ${s.wardrobe ?? "N/A"} | Tone: ${s.tone ?? "N/A"}`;
 }).join("\n")}
 
 ACTION TOKENS (${Object.keys(ACTION_TOKENS).length}):
 ${Object.entries(ACTION_TOKENS).slice(0, 10).map(([k, v]) => `  ${k}: "${(v as any).prompt ?? v}"` ).join("\n")}
 
 CONTINUITY TOKENS (${CONTINUITY_TOKENS.length}):
-${CONTINUITY_TOKENS.slice(0, 6).map(t => `  "${t.token}": ${t.description}`).join("\n")}
+${CONTINUITY_TOKENS.slice(0, 6).map(t => `  "${(t as any).token ?? (t as any).id ?? ""}": ${(t as any).description ?? ""}`).join("\n")}
 
 NEGATIVE PROMPT LIBRARY (por industria):
 ${Object.entries(NEGATIVE_PROMPT_LIBRARY).slice(0, 4).map(([k, v]) => `  ${k}: "${v.slice(0, 100)}..."`).join("\n")}
@@ -273,16 +273,16 @@ function buildCOGSBlock(): string {
 ══════════════ COGS METHODOLOGY KB ══════════════
 
 PILARES METODOLOGÍA COGS (${COGS_METHODOLOGY_PILLARS.length}):
-${COGS_METHODOLOGY_PILLARS.map(p => `  [${p.name}] ${p.description}\n    Componentes: ${p.components?.slice(0, 3).join(", ") ?? "N/A"}\n    Fórmula: ${p.formula ?? "N/A"}`).join("\n")}
+${COGS_METHODOLOGY_PILLARS.map(p => `  [${(p as any).name ?? ""}] ${(p as any).description ?? ""}\n    Componentes: ${(p as any).components?.slice(0, 3).join(", ") ?? "N/A"}\n    Fórmula: ${(p as any).formula ?? "N/A"}`).join("\n")}
 
 COSTES OCULTOS CRÍTICOS (${HIDDEN_COST_CATEGORIES.length}):
-${HIDDEN_COST_CATEGORIES.map(c => `  ⚠ ${c.name} (${c.severity ?? "medium"}): ${c.description}\n    Cálculo: ${c.calculation ?? "N/A"} | Benchmark: ${c.benchmark ?? "N/A"}`).join("\n")}
+${HIDDEN_COST_CATEGORIES.map(c => `  ⚠ ${(c as any).name ?? ""} (${(c as any).severity ?? "medium"}): ${(c as any).description ?? ""}\n    Cálculo: ${(c as any).calculation ?? "N/A"} | Benchmark: ${(c as any).benchmark ?? "N/A"}`).join("\n")}
 
 TCO COMPONENTS (${TCO_COMPONENTS.length}):
-${TCO_COMPONENTS.map(c => `  ${c.name}: ${c.description} | Incluye: ${c.includes?.slice(0, 3).join(", ") ?? "N/A"}`).join("\n")}
+${TCO_COMPONENTS.map(c => `  ${(c as any).name ?? ""}: ${(c as any).description ?? ""} | Incluye: ${(c as any).includes?.slice(0, 3).join(", ") ?? "N/A"}`).join("\n")}
 
 ESCENARIOS DE PROVEEDOR (${SUPPLIER_SCENARIOS.length}):
-${SUPPLIER_SCENARIOS.map(s => `  ${s.name}: ${s.description}\n    Pros: ${s.pros?.slice(0, 2).join(", ") ?? "N/A"} | Cons: ${s.cons?.slice(0, 2).join(", ") ?? "N/A"}`).join("\n")}
+${SUPPLIER_SCENARIOS.map(s => `  ${(s as any).name ?? ""}: ${(s as any).description ?? ""}\n    Pros: ${(s as any).pros?.slice(0, 2).join(", ") ?? "N/A"} | Cons: ${(s as any).cons?.slice(0, 2).join(", ") ?? "N/A"}`).join("\n")}
 
 PASOS DE CÁLCULO COGS (${COGS_CALCULATION_STEPS.length}):
 ${COGS_CALCULATION_STEPS.map((s, i) => `  ${i + 1}. ${s.step}: ${s.description}`).join("\n")}
@@ -301,7 +301,7 @@ CATEGORÍAS DISPONIBLES:
 ${PLUGIN_CATEGORIES.map(c => `  ${c.label} (${c.count} plugins)`).join("\n")}
 
 PLUGINS RELEVANTES PARA ESTA CONSULTA:
-${all.map(p => `  [${p.category}] ${p.name}${p.pricing ? ` — ${p.pricing}` : ""}\n    ${p.description}\n    Features: ${p.keyFeatures?.slice(0, 3).join(", ") ?? "N/A"}${p.shopifyRating ? ` | ⭐ ${p.shopifyRating}` : ""}`).join("\n")}
+${all.map(p => `  [${(p as any).category ?? ""}] ${p.name}${(p as any).pricing ? ` — ${(p as any).pricing}` : ""}\n    ${(p as any).description ?? ""}\n    Features: ${(p as any).keyFeatures?.slice(0, 3).join(", ") ?? "N/A"}${(p as any).shopifyRating ? ` | ⭐ ${(p as any).shopifyRating}` : ""}`).join("\n")}
 `;
 }
 
@@ -314,23 +314,23 @@ PLATAFORMAS DE IA VIDEO (${summary.totalPlatforms}):
 ${PLATFORM_PROFILES.map(p => `  [${p.id}] ${p.name} (${p.developer})\n    Type: ${p.type} | Best for: ${(p as any).bestFor ?? "general"}`).join("\n")}
 
 GLOBAL STATE DNA TEMPLATES (${summary.totalGlobalStates}):
-${GLOBAL_STATE_TEMPLATES.slice(0, 4).map(t => `  [${t.id}] ${t.name}: ${t.description}\n    Camera lock: ${t.cameraLock ?? "N/A"} | Lighting: ${t.lightingLock ?? "N/A"}`).join("\n")}
+${GLOBAL_STATE_TEMPLATES.slice(0, 4).map(t => `  [${t.id}] ${t.name}: ${(t as any).description ?? ""}\n    Camera lock: ${(t as any).cameraLock ?? "N/A"} | Lighting: ${(t as any).lightingLock ?? "N/A"}`).join("\n")}
 
 SECUENCIAS DE PROMPTS (${summary.totalSequences}):
-${PROMPT_SEQUENCES.slice(0, 3).map(s => `  [${s.id}] ${s.name} (${s.clipCount ?? 5} clips)\n    Style: ${s.style ?? "N/A"} | Category: ${s.category ?? "N/A"}`).join("\n")}
+${PROMPT_SEQUENCES.slice(0, 3).map(s => `  [${s.id}] ${(s as any).name ?? s.id} (${(s as any).clipCount ?? 5} clips)\n    Style: ${(s as any).style ?? "N/A"} | Category: ${(s as any).category ?? "N/A"}`).join("\n")}
 
 PRESETS DE PRODUCTO (${summary.totalProductPresets}):
 ${PRODUCT_PRESETS.map(p => `  ${p.displayName}: ${p.components?.slice(0, 4).join(", ") ?? "N/A"} + ${(p.components?.length ?? 0) - 4} más`).join("\n")}
 
 ESTRATEGIAS DE GENERACIÓN (${summary.totalStrategies}):
-${GENERATION_STRATEGIES.map(g => `  ${g.mode.toUpperCase()}: ${g.description} | Clips: ${g.recommendedClips ?? "5"} | Costo estimado: ${g.estimatedCost ?? "N/A"}`).join("\n")}
+${GENERATION_STRATEGIES.map(g => `  ${g.mode.toUpperCase()}: ${g.description} | Clips: ${(g as any).recommendedClips ?? "5"} | Costo estimado: ${(g as any).estimatedCost ?? "N/A"}`).join("\n")}
 
 POST-PRODUCTION PIPELINE (${summary.totalPostSteps} pasos):
-${POST_PRODUCTION_PIPELINE.map((s, i) => `  ${i + 1}. ${s.step}: ${s.description}`).join("\n")}
+${POST_PRODUCTION_PIPELINE.map((s, i) => `  ${i + 1}. ${(s as any).step ?? (s as any).name ?? ""}: ${(s as any).description ?? ""}`).join("\n")}
 
 REGLAS DE CALIDAD (${summary.totalQualityRules}):
 ${QUALITY_RULES.filter(r => r.severity === "critical").map(r => `  🔴 CRÍTICO [${r.category}]: ${r.rule}`).join("\n")}
-${QUALITY_RULES.filter(r => r.severity === "high").slice(0, 3).map(r => `  🟠 ALTO [${r.category}]: ${r.rule}`).join("\n")}
+${QUALITY_RULES.filter(r => (r.severity as string) === "high" || r.severity === "important").slice(0, 3).map(r => `  🟠 ALTO [${r.category}]: ${r.rule}`).join("\n")}
 `;
 }
 
@@ -355,22 +355,22 @@ function buildCampaignProductionBlock(): string {
 RESUMEN: ${summary.totalVideos} vídeos, ${summary.totalUgcClips} clips UGC, ${summary.characterVariants} variantes de personaje, ${summary.masterCutDuration} duración master
 
 CHARACTER LOCKS (${CHARACTER_LOCKS.length}):
-${CHARACTER_LOCKS.map(c => `  [${c.id}] ${c.name}: ${c.description}\n    Reference: ${c.referenceImage ?? "N/A"} | Gender: ${c.gender ?? "N/A"} | Age: ${c.age ?? "N/A"}`).join("\n")}
+${CHARACTER_LOCKS.map(c => `  [${c.id}] ${c.name}: ${(c as any).description ?? ""}\n    Reference: ${(c as any).referenceImage ?? "N/A"} | Gender: ${(c as any).gender ?? "N/A"} | Age: ${(c as any).age ?? "N/A"}`).join("\n")}
 
 VIDEO CAMPAIGNS (${VIDEO_CAMPAIGNS.length}):
-${VIDEO_CAMPAIGNS.slice(0, 5).map(v => `  [${v.slug}] ${v.title} (${v.durationSec}s)\n    Objective: ${v.objective} | Platform: ${v.platform ?? "multi"}`).join("\n")}
+${VIDEO_CAMPAIGNS.slice(0, 5).map(v => `  [${v.slug}] ${v.title} (${v.durationSec}s)\n    Objective: ${(v as any).objective ?? ""} | Platform: ${(v as any).platform ?? "multi"}`).join("\n")}
 
 UGC MICRO-CLIPS (${UGC_MICRO_CLIPS.length} clips):
-${UGC_MICRO_CLIPS.slice(0, 6).map(c => `  [${c.position}] ${c.type}: ${c.description ?? "N/A"} (${c.durationSec ?? "6"}s)\n    Hook: "${c.hookLine ?? "N/A"}"`).join("\n")}
+${UGC_MICRO_CLIPS.slice(0, 6).map(c => `  [${(c as any).position ?? ""}] ${(c as any).type ?? ""}: ${(c as any).description ?? "N/A"} (${(c as any).durationSec ?? "6"}s)\n    Hook: "${(c as any).hookLine ?? "N/A"}"`).join("\n")}
 
 MASTER CUT TIMELINE (${MASTER_CUT_TIMELINE.length} segmentos):
-${MASTER_CUT_TIMELINE.slice(0, 5).map(s => `  ${s.startTime}s → ${s.endTime}s: [${s.clipRef}] ${s.purpose}`).join("\n")}
+${MASTER_CUT_TIMELINE.slice(0, 5).map(s => `  ${s.startTime}s → ${s.endTime}s: [${(s as any).clipRef ?? ""}] ${(s as any).purpose ?? ""}`).join("\n")}
 
 AI VIDEO TOOLS CATALOGADOS (${AI_VIDEO_TOOLS.length}):
-${AI_VIDEO_TOOLS.map(t => `  ${t.name}: ${t.strengths?.slice(0, 2).join(", ") ?? "N/A"}`).join("\n")}
+${AI_VIDEO_TOOLS.map(t => `  ${t.name}: ${(t as any).strengths?.slice(0, 2).join(", ") ?? "N/A"}`).join("\n")}
 
 TECH SPECS (${TECH_SPECS.length}):
-${TECH_SPECS.slice(0, 4).map(s => `  ${s.platform}: ${s.resolution} ${s.fps}fps | Codec: ${s.codec} | Max duration: ${s.maxDuration ?? "N/A"}`).join("\n")}
+${TECH_SPECS.slice(0, 4).map(s => `  ${(s as any).platform ?? s.resolution}: ${s.resolution} ${s.fps}fps | Codec: ${s.codec} | Max duration: ${(s as any).maxDuration ?? "N/A"}`).join("\n")}
 `;
 }
 

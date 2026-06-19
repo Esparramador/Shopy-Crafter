@@ -189,6 +189,7 @@ export function pickModelSync(provider: AIProvider, tier: AITier = "smart"): str
 export interface AIModelMatrix {
   claude: Record<AITier, { current: string; default: string; envKey: string; settingsKey: string; source: "override" | "db" | "env" | "default" }>;
   gemini: Record<AITier, { current: string; default: string; envKey: string; settingsKey: string; source: "override" | "db" | "env" | "default" }>;
+  xai: Record<AITier, { current: string; default: string; envKey: string; settingsKey: string; source: "override" | "db" | "env" | "default" }>;
 }
 
 /** Snapshot for the admin UI: what model is each tier resolving to and why. */

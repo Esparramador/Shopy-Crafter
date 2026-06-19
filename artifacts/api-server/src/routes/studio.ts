@@ -14,11 +14,11 @@ function resolveSafe(filePath: string): string | null {
   return abs;
 }
 
-router.get("/studio/file", async (req, res) => {
+router.get("/studio/file", async (req, res): Promise<void> => {
   const filePath = req.query.path as string;
-  if (!filePath) return res.status(400).json({ error: "path required" });
+  if (!filePath) { res.status(400).json({ error: "path required" }); return; }
   const abs = resolveSafe(filePath);
-  if (!abs) return res.status(403).json({ error: "path not allowed" });
+  if (!abs) { res.status(403).json({ error: "path not allowed" }); return; }
   try {
     const content = await readFile(abs, "utf-8");
     res.json({ content, path: filePath });
@@ -27,11 +27,11 @@ router.get("/studio/file", async (req, res) => {
   }
 });
 
-router.post("/studio/file", async (req, res) => {
+router.post("/studio/file", async (req, res): Promise<void> => {
   const { path: filePath, content } = req.body;
-  if (!filePath || content === undefined) return res.status(400).json({ error: "path and content required" });
+  if (!filePath || content === undefined) { res.status(400).json({ error: "path and content required" }); return; }
   const abs = resolveSafe(filePath);
-  if (!abs) return res.status(403).json({ error: "path not allowed" });
+  if (!abs) { res.status(403).json({ error: "path not allowed" }); return; }
   try {
     await writeFile(abs, content, "utf-8");
     res.json({ success: true, path: filePath });
@@ -40,15 +40,15 @@ router.post("/studio/file", async (req, res) => {
   }
 });
 
-router.post("/studio/edit", async (req, res) => {
+router.post("/studio/edit", async (req, res): Promise<void> => {
   const { filePath, instruction, model = "claude" } = req.body;
-  if (!filePath || !instruction) return res.status(400).json({ error: "filePath and instruction required" });
+  if (!filePath || !instruction) { res.status(400).json({ error: "filePath and instruction required" }); return; }
   const abs = resolveSafe(filePath);
-  if (!abs) return res.status(403).json({ error: "path not allowed" });
+  if (!abs) { res.status(403).json({ error: "path not allowed" }); return; }
 
   let original: string;
   try { original = await readFile(abs, "utf-8"); }
-  catch { return res.status(404).json({ error: `No encontrado: ${filePath}` }); }
+  catch { res.status(404).json({ error: `No encontrado: ${filePath}` }); return; }
 
   const ext = path.extname(filePath).toLowerCase();
   const lang = ext === ".css" ? "CSS" : [".tsx", ".ts", ".jsx", ".js"].includes(ext) ? "TypeScript/React (TSX)" : "code";

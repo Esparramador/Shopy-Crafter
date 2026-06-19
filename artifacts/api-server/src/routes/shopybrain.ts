@@ -10775,12 +10775,14 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                  NO incluyas DOCTYPE, html, head, body — solo el contenido interior.`;
 
             const { askClaude: ask } = await import("../lib/claude.js");
-            const synthesizedHtml = await ask({
-              system: synthesisPrompt,
-              messages: [{ role: "user", content: rawContent || `Genera un informe completo sobre: ${topic}` }],
-              model: "genius",
-              maxTokens: 8000,
-            });
+            const synthesizedHtml = await ask(
+              0,
+              [{ role: "user" as const, content: rawContent || `Genera un informe completo sobre: ${topic}` }],
+              synthesisPrompt,
+              8000,
+              undefined,
+              { tier: "genius" as any },
+            );
 
             // 4. Construir HTML profesional completo
             const { buildCoverPage } = await import("../lib/report-cover.js");
@@ -10901,8 +10903,7 @@ ${buildCoverPage({ reportTitle, reportSubtitle: `Investigación generada por IA 
             const reportDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
             // Claude genera el contenido del brand book en JSON estructurado
-            const brandBookData = await ask({
-              system: `Eres un director creativo de alto nivel con 20 años de experiencia en branding global (Nike, Apple, Zara, etc.).
+            const brandBookSystem = `Eres un director creativo de alto nivel con 20 años de experiencia en branding global (Nike, Apple, Zara, etc.).
 Tu tarea es crear un BRAND BOOK / BRAND DNA completo y profesional similar al que genera Google AI Studio.
 
 Responde SIEMPRE en formato JSON válido con esta estructura exacta:
@@ -10925,20 +10926,21 @@ Responde SIEMPRE en formato JSON válido con esta estructura exacta:
   "socialMedia": {"instagram": {"tone": "tono", "contentTypes": ["tipo1","tipo2"], "hashtags": ["#tag1","#tag2","#tag3","#tag4","#tag5"], "frequency": "frecuencia"}, "tiktok": {"tone": "tono", "format": "formato de vídeo"}, "linkedin": {"tone": "tono", "contentFocus": "enfoque"}},
   "messagingFramework": {"valueProposition": "propuesta de valor principal", "keyMessages": ["mensaje1","mensaje2","mensaje3"], "elevator": "pitch de 30 segundos", "headlines": ["titular1","titular2","titular3"]},
   "competitivePositioning": {"position": "posicionamiento diferencial", "differentiators": ["diferenciador1","diferenciador2","diferenciador3"], "competitors": [{"name": "competidor", "difference": "cómo nos diferenciamos"}]}
-}`,
-              messages: [{
-                role: "user",
-                content: `Genera un brand book completo para:
+}`;
+            const brandBookData = await ask(
+              projectId || 0,
+              [{ role: "user" as const, content: `Genera un brand book completo para:
 Marca: ${brandName}
 Sector: ${industry || "e-commerce / Shopify"}
 ${customNotes ? `Información adicional: ${customNotes}` : ""}
 ${brandContext ? `\nBrand DNA extraído de la empresa:\n${brandContext.slice(0, 3000)}` : ""}
 
-Genera contenido específico, detallado y profesional. NO uses placeholders genéricos.`
-              }],
-              model: "genius",
-              maxTokens: 6000,
-            });
+Genera contenido específico, detallado y profesional. NO uses placeholders genéricos.` }],
+              brandBookSystem,
+              6000,
+              undefined,
+              { tier: "genius" as any },
+            );
 
             // Parsear JSON del brand book
             let bb: Record<string, any> = {};

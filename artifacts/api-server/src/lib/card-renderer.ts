@@ -122,7 +122,7 @@ export async function renderCardSide(
         let safety = 30;
         while ((el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight) && size > 8 && safety-- > 0) {
           size -= 1.5;
-          el.style.fontSize = size + "px";
+          (el as HTMLElement).style.fontSize = size + "px";
         }
       });
     }).toString()})()`);

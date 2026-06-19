@@ -66,6 +66,8 @@ export type GenerateCardResult = {
     templateId: string;
     backgroundKind: string;
     backgroundModel?: string;
+    bgGenFailed?: boolean;
+    bgGenError?: string;
     qrSource: "url" | "vcard";
     qrData: string;
     width: number;

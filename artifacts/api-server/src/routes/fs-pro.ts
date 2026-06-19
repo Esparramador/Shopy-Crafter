@@ -26,9 +26,11 @@ import {
   lipSyncVideoToAudio, transcribeAudioToSrt, burnSubtitlesIntoVideo,
   transferMotionToImage,
   mixAudioWithBackgroundMusic, generateSFXCatalog, generateVoiceWithClone,
+  faceSwapImage, generateImageVariations, outpaintImage, inpaintImageWithMask,
+  generateVideoFromVideo, extendVideoWithRunway, editVideoWithPrompt,
   type ImageGenModel, type ImageEditModel, type VideoModel,
 } from "../lib/fusion-studio-pro.js";
-import { getAvailableVoices } from "../lib/elevenlabs.js";
+import { listAllVoices } from "../lib/elevenlabs.js";
 import { getAllProvidersHealth, invalidateProviderHealthCache, type ProviderId } from "../lib/provider-health.js";
 import { buildProPrompt, getPromptCatalog, type BuildPromptOptions } from "../lib/prompt-templates.js";
 import { enhancePrompt, type EnhanceIntent } from "../lib/prompt-enhance.js";
@@ -3620,11 +3622,12 @@ router.post(
         duckingEnabled: duckingEnabled === "true" || duckingEnabled === true,
       });
 
-      const vaultId = await saveToVault({
+      const vaultId = await saveToVaultSmart({
         projectId: parseInt(projectId || "0", 10),
         title: "Mixed Audio",
         buffer: mixedBuffer,
         mimeType: "audio/mpeg",
+        fileType: "audio",
         category: "audio",
         generatedBy: "fs-pro:audio:mix",
       });
@@ -3655,11 +3658,12 @@ router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
       model, stability, style, similarityBoost, outputFormat
     });
 
-    const vaultId = await saveToVault({
+    const vaultId = await saveToVaultSmart({
       projectId: parseInt(projectId || "0", 10),
       title: "Advanced TTS",
       buffer: audioBuffer,
       mimeType: "audio/mpeg",
+      fileType: "audio",
       category: "audio",
       generatedBy: "fs-pro:tts:advanced",
     });
@@ -3674,7 +3678,7 @@ router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
 // ─── VOICE: LIST ─────────────────────────────────────────────────────────
 router.get("/fs-pro/voice/list", requireAdmin, async (req, res) => {
   try {
-    const voices = await listVoices(); // Using the one already imported/available
+    const voices = await listAllVoices();
     res.json(voices);
   } catch (err: any) {
     res.status(500).json({ error: err?.message });

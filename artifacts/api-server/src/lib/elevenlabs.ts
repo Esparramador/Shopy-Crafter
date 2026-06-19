@@ -116,7 +116,7 @@ export async function listAllVoices(apiKey?: string): Promise<any[]> {
     headers: { "xi-api-key": key },
   });
   if (!res.ok) throw new Error(`ElevenLabs list voices failed: ${res.status}`);
-  const data = await res.json();
+  const data = await res.json() as any;
   return (data.voices || []).map((v: any) => ({
     voice_id: v.voice_id,
     name: v.name,
@@ -136,7 +136,7 @@ export async function getModels(apiKey?: string): Promise<any[]> {
     headers: { "xi-api-key": key },
   });
   if (!res.ok) throw new Error(`ElevenLabs list models failed: ${res.status}`);
-  return await res.json();
+  return await res.json() as any[];
 }
 
 /**

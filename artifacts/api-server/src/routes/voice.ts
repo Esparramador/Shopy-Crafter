@@ -3,7 +3,7 @@ import { db, projectsTable, productsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
-import { synthesizeSpeech, listVoices, type ElevenModel, type ElevenOutputFormat } from "../lib/elevenlabs.js";
+import { synthesizeSpeech, listVoices, listAllVoices, type ElevenModel, type ElevenOutputFormat } from "../lib/elevenlabs.js";
 import { logger } from "../lib/logger.js";
 import { recommendVoiceForProduct, type VoiceGenderPref, type VoiceLanguage } from "../lib/voice-recommender.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -143,8 +143,8 @@ router.get("/voice/voices", async (req, res): Promise<void> => {
       res.status(401).json({ error: "No autenticado" });
       return;
     }
-    const voices = await listVoices();
-    const filtered = voices.map(v => ({
+    const voices = await listAllVoices();
+    const filtered = voices.map((v: any) => ({
       voice_id: v.voice_id,
       name: v.name,
       labels: v.labels,

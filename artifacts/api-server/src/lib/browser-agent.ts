@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 // ═══════════════════════════════════════════════════════════════════════════
 // BROWSER AGENT — Control de navegador real con Puppeteer
 // Permite al asistente navegar, buscar, hacer clic, escribir y hacer

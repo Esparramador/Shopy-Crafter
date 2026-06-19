@@ -303,7 +303,7 @@ export async function generateImage(
     const runwayModel = model === "runway-gen4-image-turbo" ? "gen4_image_turbo" : "gen4_image";
     const refs: Array<{ uri: string; tag: string }> = [];
     if (opts.referenceImage) refs.push({ uri: bufferToDataUri(opts.referenceImage, opts.referenceMime || "image/png"), tag: "product" });
-    const result = await generateImageWithReferences({ promptText: prompt, referenceImages: refs, ratio, model: runwayModel });
+    const result = await generateImageWithReferences({ promptText: prompt, referenceImages: refs, ratio: ratio as any, model: runwayModel });
     const { buffer, mimeType } = await fetchRunwayImageBuffer(result.imageUrl);
     return { buffer, mimeType, model };
   }
@@ -864,6 +864,18 @@ export type VideoModel =
   | "runway-seedance2-fast"  // Seedance 2 Fast vía Runway — rápido
   | "runway-gen5"            // Runway Gen 5 — alias reservado (redirigido a 4.5)
   | "veo-3.1"
+  | "veo-3.1-fast"           // Veo 3.1 Fast — rápido + audio nativo
+  | "veo-3-fast"             // Veo 3 Fast — legado rápido
+  | "veo-3"                  // Veo 3 — máxima calidad + audio nativo
+  | "veo-2"                  // Veo 2 — soporta 9:16 y 16:9
+  | "sora-2"                 // OpenAI Sora 2 — narrativa cinematográfica
+  | "kling-master"           // Kling V3.0 Omni — alias para máxima calidad
+  | "kling-2.5-turbo"        // Kling 2.5 Turbo — alias legado
+  | "kling-2.1"              // Kling 2.1 — alias legado
+  | "seedance-pro"           // Seedance Pro — alias para seedance-1-pro
+  | "seedance-fast"          // Seedance Fast — alias rápido
+  | "hailuo-02-fast"         // Hailuo 02 Fast — variante rápida y barata
+  | "hailuo-02"              // Hailuo 02 — buen balance velocidad/calidad
   | "wan-2.5-t2v-480p"       // Wan 2.5 T2V 480p — Text-to-Video puro Replicate
   | "wan-2.5-t2v-720p"       // Wan 2.5 T2V 720p — Text-to-Video puro Replicate
   | "wan-2.5-i2v-480p"       // Wan 2.5 I2V 480p — Image-to-Video Replicate
@@ -878,14 +890,15 @@ export type VideoModel =
   | "veo-4"                  // Google Veo 4 — nueva generación 2026, máxima coherencia
   | "veo-4-fast"             // Google Veo 4 Fast — Veo 4 más rápido y barato
   | "minimax-video-01"       // MiniMax Video-01 — modelo base de MiniMax, alternativa a Hailuo
-  | "wan-2.6"                // Wan 2.6 — alias legado, redirigido a Wan 2.7 (wan-2.6 no existe en Replicate)
+  | "wan-2.6"                // Wan 2.6 — alias legado, redirigido a Wan 2.7
   | "wan-2.7"                // Wan 2.7 — última gen open-source, T2V+I2V+R2V, hasta 1080p y 15s
-  | "runway-gen5"            // Runway Gen 5 — alias reservado (no lanzado aún, redirigido a Gen 4.5)
   | "kling-3.0-omni"         // Kling V3.0 Omni — multimodal: texto+imagen+refs+audio, máxima calidad
   | "hailuo-2.3"             // MiniMax Hailuo 2.3 — último Hailuo, 1080p T2V+I2V
   | "grok-video-1"           // xAI Grok Video 1 — June 2026 flagship video, T2V/I2V
   | "grok-imagine-video"     // xAI Grok Imagine Video — T2V/I2V, hasta 15s, 720p ($0.07/s)
-  | "grok-imagine-video-1.5"; // xAI Grok Imagine Video 1.5 Preview — mayor calidad ($0.14/s 720p)
+  | "grok-imagine-video-1.5" // xAI Grok Imagine Video 1.5 Preview — mayor calidad ($0.14/s 720p)
+  | "wan-2.5"               // Wan 2.5 — I2V open-source de calidad
+  | "wan-2.5-fast";         // Wan 2.5 Fast — legado, I2V rápido
 
 export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini" | "xai"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
   "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
