@@ -16,7 +16,7 @@
       "CLIENT_COLORS": "Paleta de colores de la marca",
       "CLIENT_LANGUAGE": "Idioma del contenido"
     },
-    "total_templates": 7714,
+    "total_templates": 6781,
     "libraries": [
       {
         "key": "stitch_bulk_v3",
@@ -286,7 +286,7 @@
       }
     ],
     "last_updated": "2026-06-19",
-    "total_libraries": 53
+    "total_libraries": 57
   },
   "libraries": {
     "stitch_bulk_v3": {
@@ -120227,6 +120227,1017 @@
           "category": "code",
           "source": "saas_growth_playbook",
           "skill": "saas-product-roadmap",
+          "api_endpoint": "/api/prompt-library/execute"
+        }
+      ]
+    },
+    "gemini_omni_cinematic_v2": {
+      "description": "Prompts cinematográficos avanzados para Gemini Omni API: T2V, I2V, product ads, lifestyle B-roll y character consistency multi-escena.",
+      "count": 20,
+      "templates": [
+        {
+          "id": "goc_tokyo_rain",
+          "name": "35mm Tokyo lluvia nocturna",
+          "icon": "🎬",
+          "tags": [
+            "gemini-omni",
+            "cinematic",
+            "t2v",
+            "noir"
+          ],
+          "category": "video_generation",
+          "description": "Callejón Shinjuku 2AM con neón, mujer en chubasquero vinyl, dolly-in bajo ángulo",
+          "prompt": "35mm anamorphic film, rain-soaked back alley in Shinjuku at 2 AM, neon kanji signage reflecting in puddles, a lone woman in a translucent vinyl raincoat walks toward camera holding a clear umbrella, slow dolly-in from low angle, shallow depth of field with bokeh streetlights, steam rising from a ramen stall in the background, authentic 35mm grain, cool teal shadows with warm magenta highlights, 8 seconds, 24fps, no captions, no watermark",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_drone_cliffs",
+          "name": "Drone reveal costal golden hour",
+          "icon": "🚁",
+          "tags": [
+            "gemini-omni",
+            "drone",
+            "aerial",
+            "golden-hour"
+          ],
+          "category": "video_generation",
+          "description": "Surfista en agua espejada, pull-back revela acantilados de 800 pies de Big Sur",
+          "prompt": "Aerial drone shot beginning tight on a lone surfer paddling on glassy water at golden hour, slow upward pull-back and rotate revealing 800-foot Big Sur sea cliffs, ribbons of mist clinging to the rock face, soft volumetric god rays, photorealistic, cinematic color grade, 10 seconds, smooth gimbal motion, no jitter",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_cyberpunk_subway",
+          "name": "Cyberpunk subway tracking shot",
+          "icon": "🚇",
+          "tags": [
+            "gemini-omni",
+            "cyberpunk",
+            "sci-fi",
+            "tracking"
+          ],
+          "category": "video_generation",
+          "description": "Vagón futurista de Tokyo, hologramas, protagonista encapuchada, Blade Runner palette",
+          "prompt": "Low-angle tracking shot through a futuristic Tokyo subway car at night, holographic ads flickering on the windows, a hooded protagonist with cybernetic eyes sits in the foreground, train lights strobe across her face as the camera slowly pushes in, depth of field racks from background passengers to her glowing pupils, Blade Runner 2049 color palette, anamorphic lens flares, 8 seconds, 1080p",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_macro_splash",
+          "name": "Macro slow-motion splash 1000fps",
+          "icon": "💦",
+          "tags": [
+            "gemini-omni",
+            "macro",
+            "slow-motion",
+            "product"
+          ],
+          "category": "video_generation",
+          "description": "Fresa cayendo en leche, corona congelada, luz de ventana norte, 1000fps",
+          "prompt": "Extreme macro slow-motion at 1000fps, a single red strawberry plunging into a glass of milk, crown-shaped splash freezing mid-air, soft north-facing window light, white seamless background, hyper-detailed water droplets, photoreal, 6 seconds, square 1:1 framing",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_wes_anderson",
+          "name": "Wes Anderson hotel simétrico",
+          "icon": "🏨",
+          "tags": [
+            "gemini-omni",
+            "wes-anderson",
+            "symmetrical",
+            "stylized"
+          ],
+          "category": "video_generation",
+          "description": "Lobby rosa pastel perfectamente simétrico, botones en mostaza, perro con lazo",
+          "prompt": "Wes Anderson style, perfectly symmetrical wide shot of a pastel-pink hotel lobby, two bellhops in matching mustard uniforms stand frozen at attention either side of a brass elevator, the elevator doors slide open in unison, a tiny dog wearing a bow tie trots out toward camera, slow dolly-in, flat lighting, ornate wallpaper, 4:3 aspect ratio, 7 seconds",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_steadicam_kitchen",
+          "name": "One-take Steadicam restaurante Michelin",
+          "icon": "🍽️",
+          "tags": [
+            "gemini-omni",
+            "steadicam",
+            "one-take",
+            "restaurant"
+          ],
+          "category": "video_generation",
+          "description": "Toma continua cocina Michelin → comedor romántico en una sola pasada",
+          "prompt": "Single continuous Steadicam take, camera enters a bustling Michelin-starred kitchen, weaves between chefs flambeeing pans and plating dishes, pushes through swinging doors into the candlelit dining room, settles on a couple sharing a toast at a corner booth, warm tungsten light, shallow depth of field, real ambient sound, 15 seconds, 24fps cinematic",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_noir_interrogation",
+          "name": "Film noir B&W interrogatorio",
+          "icon": "🕵️",
+          "tags": [
+            "gemini-omni",
+            "noir",
+            "black-white",
+            "dramatic"
+          ],
+          "category": "video_generation",
+          "description": "Detective fedora, sombras celosía veneciana, cigarrillo, grano 35mm años 40",
+          "prompt": "High-contrast black-and-white film noir, single overhead pendant light swinging over a metal table, a detective in a fedora leans forward into frame casting hard venetian-blind shadows across his face, cigarette smoke curls upward, 35mm film grain, 1940s aesthetic, slight camera shake handheld, 8 seconds",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_i2v_portrait",
+          "name": "I2V Retrato con vida sutil",
+          "icon": "🎭",
+          "tags": [
+            "gemini-omni",
+            "i2v",
+            "portrait",
+            "animation"
+          ],
+          "category": "video_generation",
+          "description": "Anima retrato: respiración suave, parpadeo realista, micro-sonrisa. Camera locked.",
+          "prompt": "Using the attached image as the first frame, animate the subject with subtle natural motion: gentle breathing, slight hair movement from a soft breeze, eyes blink twice with realistic timing, micro-expression shift from neutral to a faint smile, camera holds locked-off, 5 seconds, photorealistic, do not change facial structure or clothing",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_i2v_painting",
+          "name": "I2V Cuadro cobra vida",
+          "icon": "🎨",
+          "tags": [
+            "gemini-omni",
+            "i2v",
+            "art",
+            "painting"
+          ],
+          "category": "video_generation",
+          "description": "Cuadro clásico animado: nubes derivan, follaje se mueve, agua ondula. Estilo preservado.",
+          "prompt": "Treat the attached painting as a living scene. Animate elements naturally within the original brushstroke style: clouds drift, foliage sways, water ripples, fabric moves with the wind, any animals breathe. Camera performs a slow 5% push-in. Preserve the original color palette, lighting, and painterly texture. 8 seconds, 16:9.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_i2v_product_360",
+          "name": "I2V Producto turntable 360°",
+          "icon": "📦",
+          "tags": [
+            "gemini-omni",
+            "i2v",
+            "product",
+            "ecommerce"
+          ],
+          "category": "video_generation",
+          "description": "Rotación 360° suave del producto, softbox studio, sombra de contacto, sin distorsión",
+          "prompt": "Use the attached product image as the subject. Generate a 360 degree turntable rotation with smooth deceleration on the front-facing pose. Studio softbox lighting, gentle bloom on glossy highlights, soft contact shadow on a seamless background. Match exact product geometry, label, and color. 6 seconds, 1:1 aspect ratio, no morphing or warping.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_i2v_arch_flythrough",
+          "name": "I2V Render arquitectónico flythrough",
+          "icon": "🏗️",
+          "tags": [
+            "gemini-omni",
+            "i2v",
+            "architecture",
+            "flythrough"
+          ],
+          "category": "video_generation",
+          "description": "Desde nivel de calle hasta azotea con reflejos en fachada, árboles y peatones animados",
+          "prompt": "Use the attached render as the establishing frame. Animate a cinematic flythrough: camera starts at street level, smoothly cranes up to reveal the rooftop, drifts laterally past the glass facade catching golden hour reflections, ends on a dramatic dutch-tilt hero pose. Trees sway gently, pedestrians walk in the background, water features ripple. 12 seconds, 1080p, 24fps.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_char_three_scenes",
+          "name": "Character 3 escenas mini-film",
+          "icon": "🎥",
+          "tags": [
+            "gemini-omni",
+            "character",
+            "consistency",
+            "storytelling"
+          ],
+          "category": "video_generation",
+          "description": "Mismo personaje idéntico en 3 planos consecutivos con continuidad de ropa y cara",
+          "prompt": "The attached image is the main character. Generate three connected shots, same person in all three, identical face hair and wardrobe throughout: Scene 1 (0-4s): She stands alone in a rain-soaked city square at night, neon reflections at her feet, looking up with quiet resolve. Scene 2 (4-8s): Interior she opens a worn leather journal under warm lamp light, a single tear streaks her cheek. Scene 3 (8-12s): Extreme close-up of her eyes as she reads, irises catching candlelight. Seamless edit pacing, cinematic 24fps, 16:9.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_char_walk_environments",
+          "name": "Character walk 4 entornos",
+          "icon": "🚶",
+          "tags": [
+            "gemini-omni",
+            "character",
+            "walk-cycle",
+            "environments"
+          ],
+          "category": "video_generation",
+          "description": "Mismo personaje camina por desierto, ciudad neon, bosque alpino y estudio en 12s",
+          "prompt": "Using the attached character as the subject, generate a continuous walking sequence where the environment transitions seamlessly every 3 seconds: 0-3s desert dunes at sunset, 3-6s neon-soaked rainy city street, 6-9s misty alpine forest, 9-12s clean white infinity studio. Character stride, outfit, and proportions remain identical throughout. Camera tracks alongside in profile, locked focal length, 12 seconds, 16:9.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_char_lookbook_5loc",
+          "name": "Lookbook mismo outfit 5 locaciones",
+          "icon": "👗",
+          "tags": [
+            "gemini-omni",
+            "fashion",
+            "lookbook",
+            "character"
+          ],
+          "category": "video_generation",
+          "description": "Modelo mismo outfit en 5 locaciones: helipad, museo mármol, arcade neon, desierto, pinar",
+          "prompt": "Use the attached photo as the model. Generate a fashion lookbook video where she wears the exact same outfit across five locations, 2 seconds each: rooftop helipad, marble museum hallway, neon arcade, desert highway, foggy pine forest. Static elegant pose with subtle wind motion, identical outfit details and styling in every shot, smooth match-cuts on her silhouette between locations. 10 seconds, 9:16 vertical.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_ad_beverage_splash",
+          "name": "Ad bebida: splash & reveal premium",
+          "icon": "🥤",
+          "tags": [
+            "gemini-omni",
+            "product-ad",
+            "beverage",
+            "commercial"
+          ],
+          "category": "video_generation",
+          "description": "Spot bebida 6s: hielo slow-mo → splash → gotas en vidrio → hero shot con espacio tagline",
+          "prompt": "Use the attached bottle as the hero product, maintain exact label and shape. Generate a premium drink commercial: 0-2s ice cubes tumble in slow motion through black background, 2-4s liquid splash forms around the bottle as it lands center frame, 4-6s droplets bead on glass and slowly run down, dynamic rim lighting, brand color glow accent, ends on a still hero shot with empty space top-right for a tagline. 6 seconds, 9:16, photorealistic, no text generated.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_ad_skincare",
+          "name": "Ad skincare clínico y sereno",
+          "icon": "✨",
+          "tags": [
+            "gemini-omni",
+            "skincare",
+            "beauty",
+            "commercial"
+          ],
+          "category": "video_generation",
+          "description": "Spot sérum 8s: macro goteo dorado, masaje, rotación suave, paleta beige y marfil",
+          "prompt": "Soft clinical skincare ad using the attached serum bottle. Macro close-ups intercut: dropper releasing a single golden drop, drop landing on a glass surface, hands gently massaging serum into porcelain skin, bottle rotating slowly under diffuse overhead light. Pale beige and ivory palette, gentle ambient piano, 8 seconds, 1:1.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_ad_sneaker_drop",
+          "name": "Ad sneaker drop hype reveal",
+          "icon": "👟",
+          "tags": [
+            "gemini-omni",
+            "sneaker",
+            "hype",
+            "product-reveal"
+          ],
+          "category": "video_generation",
+          "description": "Zapatilla desciende entre humo, impacto dramático, órbita cámara 270°, bass hit",
+          "prompt": "High-energy sneaker reveal using the attached shoe. Black studio, smoke swirls around the floor, sneaker descends from above on an invisible mount and lands with a soft impact kicking up dust, light rays sweep across it, slow 270 degree camera orbit hero shot at the end. Maintain exact colorway and material detail of the reference. 7 seconds, 9:16, aggressive bass-heavy audio cue at the impact frame.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_broll_bali",
+          "name": "B-roll Bali sunrise surf pack",
+          "icon": "🏄",
+          "tags": [
+            "gemini-omni",
+            "broll",
+            "travel",
+            "lifestyle"
+          ],
+          "category": "video_generation",
+          "description": "Pack B-roll Uluwatu: siluetas surfistas, drone acantilados, rocío frangipani, cera tabla",
+          "prompt": "Documentary travel B-roll, Uluwatu Bali at sunrise: surfers paddling out silhouetted against orange horizon, drone reveal over breaking waves onto limestone cliffs, close-up of dewdrops on frangipani flower, hands wax-rubbing a longboard, woman in linen wrap walking down wooden steps to the beach. Multiple short clips edited as one continuous mood reel, golden warm grade, ambient ocean and bird sounds, 15 seconds, 16:9, 24fps.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_broll_morning",
+          "name": "B-roll mañana apartamento minimalista",
+          "icon": "☕",
+          "tags": [
+            "gemini-omni",
+            "broll",
+            "lifestyle",
+            "cozy"
+          ],
+          "category": "video_generation",
+          "description": "Rutina mañana sin rostros: cortinas, espresso, zapatillas, diario, latte. Paleta beige.",
+          "prompt": "Slice-of-life morning routine in a sunlit minimalist apartment, no faces shown above the shoulders. Series of natural moments: linen curtains billowing, espresso machine pulling a shot, slippers crossing a wood floor, a hand opens a journal and writes, steam rises from an oat-milk latte. Soft beige and cream palette, natural window light, gentle ambient room sounds, 12 seconds, 9:16.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "goc_broll_nightmarket",
+          "name": "B-roll mercado nocturno Bangkok POV",
+          "icon": "🌃",
+          "tags": [
+            "gemini-omni",
+            "broll",
+            "travel",
+            "street-food"
+          ],
+          "category": "video_generation",
+          "description": "POV primera persona mercado Bangkok: parrillas, faroles, motos, pad thai en mano",
+          "prompt": "First-person POV walking through a Bangkok night market, handheld natural sway, vendors flame-grilling skewers on the left, lantern strings glowing overhead, steam billowing from noodle pots, motorbikes weaving past, camera occasionally drifts down to a hand carrying a paper plate of pad thai. Real ambient market chatter, sizzling, music bleed. 12 seconds, 9:16, 30fps.",
+          "source": "Awesome-Gemini-Omni-API-Prompts",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        }
+      ]
+    },
+    "seedance2_character_workflow": {
+      "description": "Flujo completo de consistencia de personajes con Seedance 2.0: creación de character sheet, @character:<id> inline, consistent_video(), multi-personaje y edición de video.",
+      "count": 12,
+      "templates": [
+        {
+          "id": "s2c_create_cyberpunk",
+          "name": "Crear personaje cyberpunk",
+          "icon": "🤖",
+          "tags": [
+            "seedance2",
+            "character",
+            "cyberpunk",
+            "creation"
+          ],
+          "category": "video_generation",
+          "description": "Character sheet cyberpunk: chaqueta neon azul, pantalón táctico, botas gastadas",
+          "prompt": "cyberpunk jacket with neon blue accents, black tactical pants, worn boots. Generate a full character sheet: front view, back view, side profile, action pose, facial expressions, accessories. 4K resolution, 21:9 aspect.",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_create_fantasy",
+          "name": "Crear personaje fantasy medieval",
+          "icon": "⚔️",
+          "tags": [
+            "seedance2",
+            "character",
+            "fantasy",
+            "medieval"
+          ],
+          "category": "video_generation",
+          "description": "Character sheet: armadura élfica plateada, capa esmeralda, espada élfica, cabello platino",
+          "prompt": "elven silver plate armor with emerald cloak, elvish sword at hip, platinum hair braided with leaf motifs. Character sheet: front, back, side, action pose, close-up expressions, weapons detail. Fantasy lighting, 4K.",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_create_business",
+          "name": "Crear personaje profesional corporativo",
+          "icon": "💼",
+          "tags": [
+            "seedance2",
+            "character",
+            "business",
+            "professional"
+          ],
+          "category": "video_generation",
+          "description": "Character sheet profesional: traje gris Oxford, camisa blanca, reloj clásico",
+          "prompt": "tailored charcoal Oxford suit, crisp white shirt, classic silver watch, polished oxford shoes. Professional character sheet with business poses, neutral expressions, side profile, and detail shots. Clean studio lighting, 4K.",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_t2v_city_rain",
+          "name": "@character caminando por ciudad lluviosa",
+          "icon": "🌧️",
+          "tags": [
+            "seedance2",
+            "character",
+            "t2v",
+            "city"
+          ],
+          "category": "video_generation",
+          "description": "T2V con @character en ciudad neon lluviosa de noche. Usar ID obtenido en creación.",
+          "prompt": "@character:REPLACE_WITH_CHAR_ID walks through a rain-soaked neon city at night, reflections shimmering on wet pavement, hooded trench coat, slow cinematic dolly shot, atmospheric fog, 16:9, 5 seconds, quality: high",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_t2v_rooftop",
+          "name": "@character en azotea dramática",
+          "icon": "🌆",
+          "tags": [
+            "seedance2",
+            "character",
+            "t2v",
+            "rooftop"
+          ],
+          "category": "video_generation",
+          "description": "Personaje en azotea mirando ciudad al atardecer, viento suave, plano épico",
+          "prompt": "@character:REPLACE_WITH_CHAR_ID stands on a rooftop overlooking the glittering city skyline at dusk, coat tails rippling in the wind, slow camera crane from behind to front reveal, golden hour rim light, cinematic, 16:9, 6 seconds",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_t2v_motorcycle",
+          "name": "@character en moto ciudad neon",
+          "icon": "🏍️",
+          "tags": [
+            "seedance2",
+            "character",
+            "action",
+            "vehicle"
+          ],
+          "category": "video_generation",
+          "description": "Personaje en moto por ciudad neon de noche, plano lateral de seguimiento",
+          "prompt": "@character:REPLACE_WITH_CHAR_ID rides a motorcycle through a neon-lit city at night, rain streaking the visor, side-tracking camera shot, speed blur on background lights, cinematic, 9:16, 5 seconds, quality: basic",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_i2v_background",
+          "name": "@character I2V con fondo personalizado",
+          "icon": "🖼️",
+          "tags": [
+            "seedance2",
+            "character",
+            "i2v",
+            "background"
+          ],
+          "category": "video_generation",
+          "description": "Animar personaje sobre imagen de fondo específica (usar images_list con sheet_url)",
+          "prompt": "@image1 looks out over the city from a rooftop, breathing gently, coat swaying in the breeze, camera slowly pushing in, photorealistic, 16:9, 5 seconds. NOTE: pass sheet_url as images_list[0] for tighter face fidelity",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_multi_char_duo",
+          "name": "Multi-personaje: dos caracteres",
+          "icon": "👥",
+          "tags": [
+            "seedance2",
+            "character",
+            "multi",
+            "duo"
+          ],
+          "category": "video_generation",
+          "description": "Dos personajes distintos en escena compartida. Pasar dos @character IDs.",
+          "prompt": "@character:CHAR_ID_1 and @character:CHAR_ID_2 face each other in a neon-lit arena, tension building as they circle slowly, dramatic low-angle shot, atmospheric smoke, 16:9, 6 seconds, cinematic",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_multi_char_interview",
+          "name": "Multi-personaje: entrevista podcast",
+          "icon": "🎙️",
+          "tags": [
+            "seedance2",
+            "character",
+            "interview",
+            "podcast"
+          ],
+          "category": "video_generation",
+          "description": "Entrevistador + invitado en mesa con micrófonos, plano two-shot warm studio",
+          "prompt": "@character:HOST_CHAR_ID and @character:GUEST_CHAR_ID sit at a wooden podcast table with microphones, warm studio lighting, host asks animated question with hand gestures, guest listens and nods thoughtfully then begins responding with slight laugh, camera holds locked, 10 seconds, 16:9",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_mini_product_quick",
+          "name": "Seedance 2 Mini: render rapido producto",
+          "icon": "⚡",
+          "tags": [
+            "seedance2-mini",
+            "fast",
+            "product",
+            "affordable"
+          ],
+          "category": "video_generation",
+          "description": "Mini (~$0.073/s): product shot animado rapido para prototipado de alto volumen",
+          "prompt": "Product animation: smooth 360 degree turntable rotation, studio softbox lighting, contact shadow, no background. Fast generation via Seedance 2 Mini which outperforms Seedance 2.0 Fast at fraction of cost. 480p, 5 seconds, 1:1",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_omni_ref",
+          "name": "Seedance Omni-Reference imagen+video+audio",
+          "icon": "🌐",
+          "tags": [
+            "seedance2",
+            "omni",
+            "multimodal",
+            "advanced"
+          ],
+          "category": "video_generation",
+          "description": "Condicionar generación con imagen + video de referencia + audio simultáneamente",
+          "prompt": "@character:CHAR_ID enters the scene and picks up the artifact, matching the camera angle from the reference video, ambient audio synchronized. Use omni_reference endpoint with images_list, video_files, and audio_files combined. 16:9, 6 seconds, quality: high",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "s2c_video_edit",
+          "name": "Seedance Video-Edit: editar con texto",
+          "icon": "✏️",
+          "tags": [
+            "seedance2",
+            "video-edit",
+            "v2v",
+            "editing"
+          ],
+          "category": "video_generation",
+          "description": "Editar video existente mediante prompt de texto y imagen de referencia de estilo",
+          "prompt": "Edit the source video: transform the environment to a cyberpunk neon aesthetic while preserving all character movements exactly. Apply rain, neon signs, and wet pavement reflections throughout. Maintain character identity, clothing, and actions unchanged. Duration: match source, quality: basic",
+          "source": "Seedance-2-API",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        }
+      ]
+    },
+    "ugc_video_ads_studio": {
+      "description": "Prompts de anuncios UGC (User-Generated Content) para TikTok, Reels y Shorts: scripts de conversión, hooks virales, demostración de producto y testimonios con IA.",
+      "count": 14,
+      "templates": [
+        {
+          "id": "ugc_hook_problem_solve",
+          "name": "Hook problema solucion UGC",
+          "icon": "💡",
+          "tags": [
+            "ugc",
+            "hook",
+            "problem-solution",
+            "conversion"
+          ],
+          "category": "copywriting",
+          "description": "Gancho clasico UGC: presenta el problema dolorosamente, introduce la solución de forma natural",
+          "prompt": "Create a UGC-style hook for a {{PRODUCT}} video ad:\n\nOpening line (0-3s): State the pain point in first person, conversational and relatable.\n\nTransition (3-7s): Natural pivot to discovery. Then I found {{PRODUCT}} and everything changed.\n\nProof moment (7-15s): Specific, tangible result with a number. In just X days, I noticed specific outcome.\n\nCTA (15-20s): Soft, low-pressure close. If you are dealing with pain point, you need to try this.\n\nTone: authentic, slightly imperfect, conversational. NO corporate language. Film in natural light.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_unboxing_reaction",
+          "name": "Script unboxing + reaccion autentica",
+          "icon": "📦",
+          "tags": [
+            "ugc",
+            "unboxing",
+            "reaction",
+            "tiktok"
+          ],
+          "category": "copywriting",
+          "description": "Unboxing UGC con reaccion genuina, ASMR packaging y primer uso en camara",
+          "prompt": "Write a UGC unboxing and first-reaction script for {{PRODUCT}}:\n\n[OPENING] Camera already rolling, package arrives. Genuine excitement, no scripted intro.\n[UNBOXING] Narrate packaging details in real time: textures, smells, weight. ASMR moments.\n[FIRST IMPRESSION] Oh wow, this is specific observation. React to hero feature immediately.\n[DEMO MOMENT] Quick hands-on demonstration of the main benefit. Show, do not just tell.\n[VERDICT] Honest one-line opinion: Okay {{PRODUCT}} is definitely impressive. I am blown away.\n\nStyle: phone camera, portrait 9:16, natural lighting, slight imperfections are good. Duration: 45-60 seconds.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_testimonial_before_after",
+          "name": "Testimonio antes despues UGC",
+          "icon": "📊",
+          "tags": [
+            "ugc",
+            "testimonial",
+            "before-after",
+            "results"
+          ],
+          "category": "copywriting",
+          "description": "Testimonio UGC estructurado con datos de antes/despues y credibilidad natural",
+          "prompt": "Generate a UGC testimonial script for {{PRODUCT}} with clear before/after structure:\n\n[BEFORE] (0-5s): Where I was before: specific situation, numbers, frustration level.\n[DISCOVERY] (5-10s): How I found {{PRODUCT}}: organic, not salesy. A friend recommended it or saw it online and was skeptical at first.\n[JOURNEY] (10-25s): Week 1 to Week 2 to final week: mini timeline with specific milestones.\n[RESULT] (25-35s): Concrete measurable outcome. Use real-sounding numbers.\n[SOCIAL PROOF] (35-40s): My partner or coworker even noticed the difference.\n[CTA] (40-45s): Authentic recommendation, not a pitch.\n\nKey: Include one moment of doubt mid-script for authenticity. Avoid superlatives.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_demo_3features",
+          "name": "Demo 3 caracteristicas en 60s",
+          "icon": "🎯",
+          "tags": [
+            "ugc",
+            "demo",
+            "features",
+            "product"
+          ],
+          "category": "copywriting",
+          "description": "Demo UGC de 3 características clave en 60 segundos con transiciones naturales",
+          "prompt": "Create a 60-second UGC demo script for {{PRODUCT}} highlighting 3 features:\n\n[HOOK] (0-5s): Start mid-action. Already using the product. I cannot believe this actually works.\n\n[FEATURE 1] (5-20s): Most impressive feature first. Show it live. State the specific benefit.\nWhat I love most is Feature 1: watch this.\n\n[FEATURE 2] (20-35s): Second feature with smooth transition.\nBut it also does Feature 2, which is honestly why I bought it.\n\n[FEATURE 3] (35-50s): Surprise feature: something viewers would not expect.\nOkay but THIS is what blew my mind.\n\n[CLOSE] (50-60s): Summary in one breath plus soft CTA.\nIf you want the main benefit, link is in bio.\n\nTone: enthusiastic but not hype-y. Real reactions only.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_tiktok_trending_hook",
+          "name": "Hook estilo TikTok trending",
+          "icon": "📱",
+          "tags": [
+            "ugc",
+            "tiktok",
+            "viral",
+            "hook"
+          ],
+          "category": "copywriting",
+          "description": "Hook viral TikTok con patron POV / Stop scrolling / Day in my life",
+          "prompt": "Write 5 viral TikTok hook variations for {{PRODUCT}} (first 3 seconds only):\n\n1. POV format: POV you just discovered the best way to solve problem\n2. Stop scrolling: Stop scrolling if you have relatable situation: this changed everything\n3. Controversial opener: Unpopular opinion: you do not need expensive alternative. {{PRODUCT}} does it better.\n4. Story hook: The day I finally fixed my problem after months of struggling\n5. Question hook: Has anyone else been doing thing wrong? Because I just realized the solution.\n\nFor each hook, also write the 5-second continuation that locks the viewer in.\nTarget: 18-35 year old demographic, mobile-first, authentic tone.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_veo3_actor_script",
+          "name": "Script para actor IA Veo 3.1",
+          "icon": "🎬",
+          "tags": [
+            "ugc",
+            "veo3",
+            "ai-actor",
+            "script"
+          ],
+          "category": "video_generation",
+          "description": "Prompt de video para generar actor UGC con Veo 3.1 o Seedance 2 en 9:16",
+          "prompt": "Generate a UGC-style video ad with an AI actor for {{PRODUCT}}:\n\n[Visual prompt for Veo 3.1 or Seedance 2]\nA relatable {{TARGET_DEMOGRAPHIC}} person sitting casually at home (kitchen counter, couch, or desk), holding {{PRODUCT}}, speaking directly to camera in a natural conversational tone. Warm natural lighting, slightly imperfect framing (not perfect studio shot), 9:16 vertical format.\n\n[Script for actor: 30 seconds]\nOkay so I have been using {{PRODUCT}} for X weeks now and I have to be honest, I was skeptical. But specific result. And the best part? Key feature. So yeah, CTA.\n\nModels: Veo 3.1 (Google), Seedance 2 (ByteDance), or Grok Video (xAI)\nAspect: 9:16, Duration: 30s, Style: UGC authentic, no studio look",
+          "source": "Open-AI-UGC",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        },
+        {
+          "id": "ugc_reels_voiceover",
+          "name": "Voiceover IA para Reels estilo UGC",
+          "icon": "🎤",
+          "tags": [
+            "ugc",
+            "voiceover",
+            "reels",
+            "tts"
+          ],
+          "category": "copywriting",
+          "description": "Script de voiceover para Reels con tono UGC: informal, energetico, autentico",
+          "prompt": "Write a UGC-style voiceover script for an Instagram Reel about {{PRODUCT}} (duration: 30 seconds):\n\nVoice style: Conversational, slightly breathless energy, like texting your best friend about something you just found.\n\nScript structure:\n- 0-5s: Relatable hook (no intro, no hey guys)\n- 5-15s: Core demonstration or story\n- 15-25s: Result or payoff moment\n- 25-30s: Call to action (check bio, link below, try it)\n\nInclude: [pause] markers for emphasis, [SHOW: visual cue] for B-roll directions, natural filler words sparingly.\n\nTarget platform: Instagram Reels / TikTok / YouTube Shorts\nVoice model: ElevenLabs eleven_v3 or similar TTS",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_shopify_product_ad",
+          "name": "UGC ad para producto Shopify",
+          "icon": "🛍️",
+          "tags": [
+            "ugc",
+            "shopify",
+            "ecommerce",
+            "product-ad"
+          ],
+          "category": "copywriting",
+          "description": "Script UGC completo para producto de tienda Shopify con CTA a la tienda",
+          "prompt": "Create a complete UGC video script for a {{PRODUCT_NAME}} from a Shopify store:\n\nContext: {{BRAND_NAME}} sells {{PRODUCT_CATEGORY}} targeting {{TARGET_AUDIENCE}}.\nProduct URL: {{STORE_URL}}\nMain benefit: {{MAIN_BENEFIT}}\nPrice point: {{PRICE}}\n\n[30-second UGC Script]\n[HOOK] (0-5s): Start with the customer pain point or surprising result\n[DEMO] (5-20s): Show the product in real use context\n[SOCIAL PROOF] (20-25s): Quick mention of reviews or results\n[CTA] (25-30s): Grab yours at store name, link in bio. Discount code {{DISCOUNT_CODE}} below.\n\nVisual direction: Film at home, work, or gym where product is used. Portrait mode, no tripod, authentic setting.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_competitor_comparison",
+          "name": "UGC comparacion vs competidor",
+          "icon": "⚖️",
+          "tags": [
+            "ugc",
+            "comparison",
+            "competitor",
+            "conversion"
+          ],
+          "category": "copywriting",
+          "description": "Script UGC comparando el producto con alternativas de forma honesta y sin atacar",
+          "prompt": "Write a UGC comparison script for {{PRODUCT}} vs {{COMPETITOR}} or other options:\n\n[SETUP] (0-5s): I spent X months and money trying different category solutions.\n[PAIN WITH OLD WAY] (5-15s): Specific frustrations with previous product or method: be detailed and authentic.\n[SWITCH MOMENT] (15-20s): Then I tried {{PRODUCT}} and noticed first specific difference immediately.\n[COMPARISON] (20-35s): Side-by-side of 3 specific aspects: Price and Value, Performance on key metric, Differentiating feature.\n[CONCLUSION] (35-45s): For me {{PRODUCT}} wins because honest reason. If edge case matters to you, stick with competitor. But for main use case, this is it.\n\nTone: Balanced, credible, not a paid pitch vibe.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_series_week_journey",
+          "name": "Serie UGC: semana de journey",
+          "icon": "📅",
+          "tags": [
+            "ugc",
+            "series",
+            "journey",
+            "retention"
+          ],
+          "category": "copywriting",
+          "description": "Serie de 5 videos UGC (1 por dia) mostrando evolucion semanal con el producto",
+          "prompt": "Create a 5-video UGC series (one per day) documenting a week with {{PRODUCT}}:\n\nDAY 1 (Monday): Starting my {{PRODUCT}} journey\nHook: First impressions and setup. Slight skepticism. End with a question: Will it actually work?\n\nDAY 2-3 (Mid-week): Day 2: Something unexpected happened.\nHook: One surprising discovery. Something that was not in the marketing.\n\nDAY 4 (Thursday): Halfway there: here is what I actually think\nHook: Honest mid-point review. Address one thing you do not love yet.\n\nDAY 5 (Friday): FINAL VERDICT after 5 days of {{PRODUCT}}\nHook: Results recap and recommendation and discount code CTA.\n\nBonus Day 7 (optional): 1 week later: update\n\nEach video: 30-45 seconds, 9:16, same location for continuity.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_skincare_routine",
+          "name": "UGC rutina skincare beauty",
+          "icon": "💄",
+          "tags": [
+            "ugc",
+            "beauty",
+            "skincare",
+            "routine"
+          ],
+          "category": "copywriting",
+          "description": "UGC rutina beauty en formato get ready with me con producto integrado naturalmente",
+          "prompt": "Write a beauty or skincare UGC Get Ready With Me script featuring {{PRODUCT}}:\n\n[INTRO - 0-5s]: Already in bathroom or vanity. Camera at eye level. Skip greeting.\nOkay real talk: my skin concern was driving me crazy until I started using this.\n\n[ROUTINE INTEGRATION - 5-35s]: Show {{PRODUCT}} as a natural step in the routine:\n- Introduce product organically as one of the steps\n- Apply live on camera, show texture, consistency, scent reaction\n- Narrate the experience: It feels like or smells like or the skin instantly reacts.\n\n[RESULT SHOW - 35-50s]: Time-lapse or cut to post-application. See how this looks? This is why I cannot stop talking about it.\n\n[CTA - 50-60s]: Natural close. Tag location, link in bio, discount code.\n\nStyle: GRWM, good ring light, bathroom or bedroom setting, relatable background okay.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_fitness_transformation",
+          "name": "UGC fitness wellness transformation",
+          "icon": "💪",
+          "tags": [
+            "ugc",
+            "fitness",
+            "wellness",
+            "transformation"
+          ],
+          "category": "copywriting",
+          "description": "UGC transformacion fitness con hitos semanales, metricas reales y autenticidad",
+          "prompt": "Create a fitness or wellness UGC transformation script featuring {{PRODUCT}}:\n\n[VULNERABLE OPENER - 0-8s]: Show the before state authentically. Numbers, feelings, not just looks.\nX weeks ago I was in this specific situation with this metric.\n\n[FINDING THE PRODUCT - 8-15s]: Natural discovery. Not an ad origin story.\n\n[JOURNEY - 15-40s]: Narrate over clips:\n- Week 1: Specific challenge but starting to notice something\n- Week 2: First real result or milestone\n- Final Week: Breakthrough moment\n\n[RESULTS - 40-50s]: Specific and believable numbers.\nFrom X to Y in Z weeks. My coach or doctor even commented.\n\n[CLOSE - 50-60s]: Who this is for plus soft CTA.\nIf you are where I was before, this is for you. Link below.\n\nStyle: gym or home workout setting, before and after optional, no filters.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_gifting_holiday",
+          "name": "UGC regalo gift guide seasonal",
+          "icon": "🎁",
+          "tags": [
+            "ugc",
+            "gift",
+            "holiday",
+            "seasonal"
+          ],
+          "category": "copywriting",
+          "description": "UGC guia de regalo con tono entusiasta para temporada festiva o San Valentin",
+          "prompt": "Write a seasonal gift guide UGC video script featuring {{PRODUCT}}:\n\nSeason: {{SEASON_OR_HOLIDAY}}\nRecipient: {{TARGET_RECIPIENT}}\n\n[HOOK - 0-5s]: If you are still looking for holiday gifts for recipient type, I just found the perfect one.\n\n[UNBOXING REVEAL - 5-20s]: Open or show the product as if gifting it. Describe gift-worthiness:\nLook at this packaging: even the box feels like a gift.\nThe key feature alone makes this worth the price.\n\n[WHY IT IS PERFECT - 20-35s]: Match product benefit to recipient lifestyle:\nMy friend or partner has this problem: this solves it perfectly.\n\n[VALUE FRAME - 35-45s]: Price anchor plus comparison.\nFor this price, this is honestly better than spending three times as much on an alternative.\n\n[CTA - 45-55s]: Urgency without pressure. They are going fast: link in bio before holiday rush.\n\nStyle: home wrapping station or unboxing aesthetic, warm tones, natural lighting.",
+          "source": "Open-AI-UGC",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "ugc_multi_model_prompt",
+          "name": "Prompt video UGC multi-modelo IA",
+          "icon": "🤖",
+          "tags": [
+            "ugc",
+            "multi-model",
+            "veo3",
+            "seedance2",
+            "grok-video"
+          ],
+          "category": "video_generation",
+          "description": "Prompt unificado para generar actor UGC IA compatible con Veo 3.1, Seedance 2, Grok Video y Happy Horse 1",
+          "prompt": "Universal UGC Actor Prompt compatible with Veo 3.1, Seedance 2, Grok Video, and Happy Horse 1:\n\nVisual: {{ACTOR_DESCRIPTION}} person approximately {{AGE_RANGE}} years old, casual {{SETTING}} background, holding {{PRODUCT}}, speaking directly to camera with natural eye contact, slight head movement, authentic body language.\n\nLighting: Warm natural window light or ring light. NOT studio perfect.\nFraming: 9:16 vertical, slight tilt or imperfection acceptable, phone-camera aesthetic.\nDuration: 30 seconds.\n\n[Dialogue: natural speech]\nRelatable opener without greeting. Then demo of product in use for 10 seconds. Then specific benefit experienced for 8 seconds. Then soft genuine close for 5 seconds.\n\nNO watermarks, NO logos, NO stock footage look, NO reading-from-script appearance.\nTarget platform: TikTok, Instagram Reels, YouTube Shorts",
+          "source": "Open-AI-UGC",
+          "skill": "video_generation",
+          "api_endpoint": "/api/fusion-studio/generate-video"
+        }
+      ]
+    },
+    "youtube_shorts_viral": {
+      "description": "Framework de viralidad y prompts para generar, editar y optimizar YouTube Shorts, TikToks y Reels: extraccion de momentos clave, hooks de apertura, captions y estrategia de distribucion.",
+      "count": 12,
+      "templates": [
+        {
+          "id": "yts_virality_analysis",
+          "name": "Analisis de viralidad de clip",
+          "icon": "📈",
+          "tags": [
+            "shorts",
+            "virality",
+            "analysis",
+            "hooks"
+          ],
+          "category": "copywriting",
+          "description": "Framework 8 criterios para puntuar y seleccionar los momentos mas virales de un video largo",
+          "prompt": "Analyze this video transcript or content and identify the TOP 5 most viral-worthy moments using this 8-point virality framework:\n\n1. HOOK STRENGTH (0-10): Does it start mid-action or with a power statement?\n2. EMOTIONAL PEAK (0-10): Surprise, laughter, anger, awe, or empathy?\n3. OPINION BOMB (0-10): Controversial or counter-intuitive statement?\n4. REVELATION MOMENT (0-10): Insight the viewer did not know they needed?\n5. CONFLICT AND TENSION (0-10): Problem that begs resolution?\n6. QUOTABLE LINE (0-10): Screenshot-worthy shareable quote?\n7. STORY PEAK (0-10): Clear narrative arc in under 60 seconds?\n8. PRACTICAL VALUE (0-10): Immediately actionable tip or fact?\n\nFor each candidate clip:\n- Timestamp: START to END\n- Virality score: TOTAL out of 80\n- Opening hook line\n- Why it works: one sentence\n- Best platform: TikTok, Reels, or Shorts\n\nContent to analyze: {{VIDEO_TRANSCRIPT_OR_DESCRIPTION}}",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_hook_generator",
+          "name": "Generador de hooks virales apertura",
+          "icon": "🎣",
+          "tags": [
+            "shorts",
+            "hook",
+            "viral",
+            "opening"
+          ],
+          "category": "copywriting",
+          "description": "10 variantes de hooks de apertura para los primeros 3 segundos de un Short viral",
+          "prompt": "Generate 10 viral opening hooks (first 3 seconds) for a {{TOPIC}} YouTube Short or TikTok:\n\n1. STAT SHOCK: X percent of people do not know that surprising fact\n2. STORY MIDDLE: Start at the most dramatic moment: The moment I realized...\n3. CONTROVERSIAL: Everyone is wrong about common belief: here is why\n4. POV: POV: You just discovered solution after problem duration\n5. QUESTION: Why does seemingly simple thing actually have unexpected complexity?\n6. WARNING: Stop doing common mistake: it causes negative consequence\n7. PROMISE: In 60 seconds you will know valuable insight\n8. RELATABLE: Tell me you struggle without telling me you struggle\n9. CHALLENGE: I tried thing for duration: here is what actually happened\n10. TREND JACK: Apply trending format to topic\n\nFor each hook rate: Curiosity Gap, Relatability, and Shareability out of 10.\nBest hook for {{PLATFORM}}: recommendation",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_script_60s",
+          "name": "Script Short viral 60 segundos",
+          "icon": "📝",
+          "tags": [
+            "shorts",
+            "script",
+            "60s",
+            "tiktok"
+          ],
+          "category": "copywriting",
+          "description": "Script completo de 60 segundos para Short/TikTok viral con estructura probada",
+          "prompt": "Write a 60-second viral Short or TikTok script about {{TOPIC}}:\n\n[HOOK - 0-3s]: Strongest possible opening. No intro, no greeting. Start with the payoff, problem, or shock.\n\n[SETUP - 3-15s]: Rapid context building. Establish stakes. Use visual direction: SHOW visual description here.\n\n[MEAT - 15-45s]: The actual valuable content. 3 key points max. Each point 8-10 seconds.\nPoint 1: MOST SURPRISING\nPoint 2: MOST USEFUL\nPoint 3: MOST EMOTIONAL OR MEMORABLE\n\n[TWIST AND PAYOFF - 45-55s]: The moment that makes viewers want to share. Could be a result, reversal, or insight.\n\n[CTA - 55-60s]: ONE action. Follow, Like, Comment a word for part 2, or Link in bio.\n\nPacing notes:\n- Cuts every 2-3 seconds\n- Text overlays for key stats\n- Music: suggest BPM range\n- Caption style: ALL CAPS or Mixed or Minimalist",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_title_thumbnail",
+          "name": "Titulo y thumbnail viral Short",
+          "icon": "🖼️",
+          "tags": [
+            "shorts",
+            "title",
+            "thumbnail",
+            "seo"
+          ],
+          "category": "copywriting",
+          "description": "10 titulos y descripcion de thumbnails optimizados para maximo CTR en YouTube Shorts",
+          "prompt": "Generate viral title and thumbnail concepts for a {{TOPIC}} YouTube Short:\n\n[10 TITLE OPTIONS]\nConstraints: Under 60 characters, include primary keyword, create curiosity gap.\n1-3: Question format titles\n4-6: Number or list format titles\n7-8: Controversy or shock format\n9-10: Story or transformation format\n\n[THUMBNAIL BRIEF for top 3 titles]\n- Main visual: describe image\n- Text overlay: 3-5 words MAX\n- Color scheme: 2-3 colors\n- Emotion conveyed: single word\n- Face expression if applicable: emotion\n- Thumbnail composition: rule of thirds guidance\n\n[SEO METADATA]\n- Primary keyword\n- Secondary keywords: 3-5\n- Hashtags: 5-8 relevant\n- Description first line shown in feed\n- Best upload time for {{TARGET_AUDIENCE}}",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_repurpose_long",
+          "name": "Repurpose video largo a 5 Shorts",
+          "icon": "✂️",
+          "tags": [
+            "shorts",
+            "repurpose",
+            "clipping",
+            "strategy"
+          ],
+          "category": "copywriting",
+          "description": "Estrategia para convertir un video largo de 30-60 min en 5 Shorts virales optimizados",
+          "prompt": "Repurpose this long-form video into 5 viral Shorts:\n\nOriginal video: {{VIDEO_TITLE_OR_TOPIC}}\nDuration: {{DURATION}}\nAudience: {{TARGET_AUDIENCE}}\n\nSHORT 1: HOOK AND TEASER\n- Purpose: Drive traffic to full video\n- Approach: Cut cold into the best 45 seconds, end on cliffhanger\n- CTA: Watch the full breakdown: link in bio\n\nSHORT 2: STANDALONE INSIGHT\n- Purpose: Value delivery, builds authority\n- Approach: Self-contained tip that works without context\n\nSHORT 3: REACTION AND EMOTIONAL\n- Purpose: Shares and saves\n- Approach: Most emotional or surprising moment\n\nSHORT 4: EDUCATIONAL\n- Purpose: SEO and discovery\n- Approach: Most searchable concept explained in 60s\n\nSHORT 5: COMMUNITY AND ENGAGEMENT\n- Purpose: Comments and follows\n- Approach: Controversial opinion or open question\n\nPost schedule: recommended spacing between posts",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_captions_style",
+          "name": "Captions animados estilo viral",
+          "icon": "💬",
+          "tags": [
+            "shorts",
+            "captions",
+            "subtitles",
+            "style"
+          ],
+          "category": "copywriting",
+          "description": "Guia de estilo de captions para Shorts virales: colores, timing, efectos de enfasis",
+          "prompt": "Create caption and subtitle styling guide and reformat script for {{VIDEO_TOPIC}} Short:\n\n[CAPTION STYLE TEMPLATE]\nFont: Bold sans-serif such as Montserrat Bold or Anton\nSize: Large, readable on mobile\nPosition: Lower third or center frame\nBackground: None or semi-transparent black pill\n\n[EMPHASIS RULES]\n- KEY WORDS: ALL CAPS plus yellow highlight\n- Numbers: Extra large, pop animation\n- Emotional words: Color change (red for danger, green for good, gold for money)\n- Questions: Italics plus question emoji\n\n[TIMING]\n- Max 4 words per caption frame\n- Duration: match natural speech rhythm exactly\n- Pause captions: empty frame for 0.3 seconds\n\n[REFORMATTED SCRIPT with caption markup]\nApply to: {{SCRIPT}}\n\nAdd CUT markers every 2-3 seconds\nAdd BROLL markers with description for visual suggestions\nAdd SOUND markers with effect name for audio cues",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_series_content_plan",
+          "name": "Plan de serie de contenido Shorts",
+          "icon": "📅",
+          "tags": [
+            "shorts",
+            "series",
+            "content-plan",
+            "strategy"
+          ],
+          "category": "copywriting",
+          "description": "Plan de 30 dias de Shorts sobre un tema, con estructura de serie y retencion cruzada",
+          "prompt": "Create a 30-day YouTube Shorts content plan for {{NICHE_OR_BRAND}}:\n\nGoal: {{GOAL: followers, sales, or awareness}}\nPosting frequency: {{X}} Shorts per week\n\n[CONTENT PILLARS: 4 types, rotate weekly]\n1. EDUCATION (40%): How-to, tips, explainers in {{NICHE}}\n2. ENTERTAINMENT (30%): Trends, reactions, humor relevant to {{NICHE}}\n3. INSPIRATION (20%): Transformations, success stories, motivation\n4. CONVERSION (10%): Product demos, offers, CTAs\n\n[WEEK-BY-WEEK BREAKDOWN]\nWeek 1 - Hook audience: 3 high-curiosity educational Shorts\nWeek 2 - Build trust: 2 educational plus 1 behind-the-scenes\nWeek 3 - Social proof: 2 results or testimonials plus 1 entertainment\nWeek 4 - Convert: 2 value-heavy plus 1 direct offer Short\n\n[30 SPECIFIC TITLE IDEAS]\nCreate numbered list of 30 compelling Short titles for {{NICHE}}\n\n[ENGAGEMENT STRATEGY]\n- Comment pinning strategy\n- Community posts to complement Shorts\n- Cross-platform repurposing order",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_shopify_product_short",
+          "name": "Short viral para producto Shopify",
+          "icon": "🛒",
+          "tags": [
+            "shorts",
+            "shopify",
+            "product",
+            "ecommerce"
+          ],
+          "category": "copywriting",
+          "description": "Short de 30-45s para promocionar producto Shopify de forma organica y no publicitaria",
+          "prompt": "Create a viral product Short for {{PRODUCT_NAME}} from {{BRAND_NAME}} Shopify store:\n\nProduct: {{PRODUCT_NAME}}\nBenefit: {{MAIN_BENEFIT}}\nPrice: {{PRICE}}\nTarget: {{AUDIENCE}}\n\nOPTION A: I was today years old when I found this.\nFormat: Discovery hook, demo, reaction, CTA. Tone: Genuinely surprised, not performative.\n\nOPTION B: The problem hack that delivers results.\nFormat: Pain point, product introduction, result proof, CTA. Tone: Helpful, practical, peer-to-peer.\n\nOPTION C: Day in the life featuring product.\nFormat: Natural product placement, benefit reveal mid-routine, CTA at end. Tone: Lifestyle aspiration, authentic setting.\n\n[FULL SCRIPT for winning option]\nInclude caption notes, visual directions, and music BPM.\n\nCTA: Link in bio pointing to {{STORE_URL}}\nOrganic first: No ad or sponsored feel. Teach first, sell second.",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_trending_audio",
+          "name": "Estrategia de audio trending para Shorts",
+          "icon": "🎵",
+          "tags": [
+            "shorts",
+            "audio",
+            "trending",
+            "tiktok"
+          ],
+          "category": "copywriting",
+          "description": "Como encontrar y usar audio viral para maximizar el alcance organico de un Short",
+          "prompt": "Create a trending audio strategy for {{BRAND_OR_NICHE}} YouTube Shorts:\n\n[AUDIO SELECTION CRITERIA]\nFor each video choose audio based on:\n1. Currently trending on TikTok and repurpose to Shorts\n2. Fits emotional tone: hype, inspirational, funny, or dramatic\n3. Under 60 seconds to avoid copyright issues mid-video\n4. BPM matches content pacing: Fast content 120-160 BPM, Calm content 60-90 BPM\n\n[AUDIO CATEGORIES for {{NICHE}}]\n- Educational Shorts: Ambient lo-fi, subtle background music\n- Transformation Shorts: Rising build then drop at reveal\n- Trending challenge: Use exact trending sound\n- Product demo: Upbeat, positive, 100-130 BPM\n\n[ORIGINAL AUDIO STRATEGY]\nWhen to use original audio:\n- Talking-head content: Always use your voice to build parasocial connection\n- Tutorial content: Voice plus subtle background\n\n[TRENDING AUDIO SOURCES]\n1. TikTok Trending then repurpose to Shorts\n2. YouTube trending audio library\n3. Epidemic Sound or Artlist for royalty-free\n4. CapCut trending sounds\n\nFor {{BRAND_NAME}}: Recommended audio personality equals two adjectives that match brand voice",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_comment_strategy",
+          "name": "Estrategia de comentarios para Shorts",
+          "icon": "💬",
+          "tags": [
+            "shorts",
+            "comments",
+            "engagement",
+            "community"
+          ],
+          "category": "copywriting",
+          "description": "Guia de gestion de comentarios para maximizar retencion y algoritmo en YouTube Shorts",
+          "prompt": "Create a comment engagement strategy for {{CHANNEL_NAME}} YouTube Shorts:\n\n[PINNED COMMENT TEMPLATES]\nFor each Short, pin a comment within 30 minutes of posting:\n\nType 1 Continuation tease: Part 2 coming Tuesday. Comment WORD if you want it first.\nType 2 Poll: Would you try this? YES or NO in the comments.\nType 3 Additional value: Bonus tip I could not fit in: extra insight here.\nType 4 Community ask: What is your experience with topic? Drop it below.\n\n[REPLY STRATEGY]\n- Reply to ALL comments in first 2 hours to trigger algorithm boost\n- Ask a follow-up question in every reply\n- Heart every comment for 48 hours\n- Pin a valuable viewer comment for social proof\n\n[CONTROVERSY BAIT ethical]\nEnd script with: Agree or disagree: mild controversial statement?\nThis drives comment volume without alienating audience.\n\n[COMMENT TEMPLATES for moderators]\nFor negative comment: Fair point. Our take is nuanced response. What would you suggest?\nFor question: Great question. Quick answer here. Check our Short from Day X for the full breakdown.\nFor compliment: Thank you! The specific part you mentioned was the part I was most excited to share.",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_ab_test_framework",
+          "name": "Framework AB test de Shorts",
+          "icon": "🔬",
+          "tags": [
+            "shorts",
+            "ab-test",
+            "optimization",
+            "analytics"
+          ],
+          "category": "copywriting",
+          "description": "Sistema de AB testing para optimizar hooks, thumbnails y CTAs en YouTube Shorts",
+          "prompt": "Design an AB testing framework for {{CHANNEL_NAME}} YouTube Shorts:\n\n[WHAT TO TEST in priority order]\n1. HOOK (highest impact): Test 2 opening lines for same content\n2. THUMBNAIL: Test text overlay vs face-only vs product-focused\n3. CTA: Follow for more vs Link in bio vs Comment X\n4. LENGTH: 30s vs 45s vs 60s for same topic\n5. POSTING TIME: Morning 8-10am vs Evening 7-9pm local time\n\n[TEST STRUCTURE]\nWeek 1: Post VERSION A on Tuesday\nWeek 2: Post VERSION B on Tuesday (same content, different hook)\nMeasure at 72 hours:\n- View completion rate (target over 60%)\n- Like rate (target over 4%)\n- Comment rate (target over 0.5%)\n- Follow rate (target over 0.3%)\n\n[DECISION FRAMEWORK]\nIf A wins on ALL metrics: A is the format.\nIf split results: Run tiebreaker version C.\nIf no clear winner: Hook quality was equal, test thumbnail next.\n\n[TRACKING SHEET TEMPLATE]\nDate, Version, Hook, Views, Completion Percent, Likes, Comments, Follows, Winner\n\nApply winning formula to next 4 Shorts before testing again.",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
+          "api_endpoint": "/api/prompt-library/execute"
+        },
+        {
+          "id": "yts_collab_shorts",
+          "name": "Shorts de colaboracion con creadores",
+          "icon": "🤝",
+          "tags": [
+            "shorts",
+            "collaboration",
+            "creator",
+            "growth"
+          ],
+          "category": "copywriting",
+          "description": "Script y estrategia para Shorts de colaboracion que benefician a ambas audiencias",
+          "prompt": "Create a collaboration Short concept for {{BRAND_OR_CREATOR}} x {{COLLABORATOR}}:\n\nAudience overlap: {{SHARED_INTEREST}}\nGoal: Reach collaborator audience\n\nOPTION A - REACTION FORMAT:\nCollaborator reacts to your best Short. They own their audience best. Natural cross-promotion.\n\nOPTION B - CHALLENGE FORMAT:\nI challenged Collaborator to relevant challenge: here is what happened.\nEach person makes their own version. Equal value split.\n\nOPTION C - EXPERT INTERVIEW FORMAT:\nI asked Collaborator the one question everyone wants answered about Topic.\n60 seconds, talking heads, authoritative tone.\n\nOPTION D - BRAND X CREATOR PRODUCT:\nCollaborator features product in their natural workflow.\n30 seconds, lifestyle integration, no sales pitch feel.\n\n[OUTREACH DM TEMPLATE]\nHey Name, I love your content on specific video. I think our audiences overlap on topic. I would love to do a 60-second Short collab and I handle all editing. Would you be open to a quick call? No obligation. Your name.",
+          "source": "AI-Youtube-Shorts-Generator",
+          "skill": "copywriting",
           "api_endpoint": "/api/prompt-library/execute"
         }
       ]
