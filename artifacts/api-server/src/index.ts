@@ -426,3 +426,36 @@ async function gracefulShutdown(signal: string) {
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGHUP", () => gracefulShutdown("SIGHUP"));
+
+// ── Heap memory monitor ───────────────────────────────────────────────────────
+// Logs heap usage every 60 s and triggers graceful restart if heap exceeds
+// 1.4 GB (headroom below --max-old-space-size=1536 MB).
+const HEAP_WARN_MB  = 1100; // log WARN above this
+const HEAP_LIMIT_MB = 1400; // graceful restart above this
+let heapRestartTriggered = false;
+
+const heapMonitor = setInterval(() => {
+  const { heapUsed, heapTotal, rss, external } = process.memoryUsage();
+  const usedMB  = Math.round(heapUsed  / 1024 / 1024);
+  const totalMB = Math.round(heapTotal / 1024 / 1024);
+  const rssMB   = Math.round(rss       / 1024 / 1024);
+  const extMB   = Math.round(external  / 1024 / 1024);
+
+  if (usedMB >= HEAP_LIMIT_MB && !heapRestartTriggered) {
+    heapRestartTriggered = true;
+    logger.error(
+      { heapUsedMB: usedMB, heapTotalMB: totalMB, rssMB, limitMB: HEAP_LIMIT_MB },
+      "🚨 Heap limit reached — iniciando restart preventivo para evitar OOM"
+    );
+    clearInterval(heapMonitor);
+    gracefulShutdown("HEAP_LIMIT");
+    return;
+  }
+
+  if (usedMB >= HEAP_WARN_MB) {
+    logger.warn({ heapUsedMB: usedMB, heapTotalMB: totalMB, rssMB, extMB }, "⚠️  Heap alto — posible leak de memoria");
+  } else {
+    logger.info({ heapUsedMB: usedMB, heapTotalMB: totalMB, rssMB }, "🧠 Heap OK");
+  }
+}, 60_000);
+heapMonitor.unref();
