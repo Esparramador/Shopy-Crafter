@@ -288,8 +288,10 @@ router.get("/meshy/animations", (_req, res) => {
     { id:"emotion",     label:"😄 Emociones",        icon:"😄", count: ANIMATION_CATALOG.filter(a=>a.category==="emotion").length    },
     { id:"action",      label:"👆 Acción",            icon:"👆", count: ANIMATION_CATALOG.filter(a=>a.category==="action").length     },
     { id:"magic",       label:"🔮 Magia",            icon:"🔮", count: ANIMATION_CATALOG.filter(a=>a.category==="magic").length      },
+    { id:"image_to_3d_v2", label:"🖼️ Imagen a 3D v2", icon:"🖼️", count: 0 },
+    { id:"text_to_texture", label:"🎨 Texto a Textura", icon:"🎨", count: 0 },
   ];
-  res.json({ categories, clips: ANIMATION_CATALOG, total: ANIMATION_CATALOG.length });
+  res.json({ categories, clips: ANIMATION_CATALOG, total: ANIMATION_CATALOG.length, note: "Soporte para Meshy v2.5 y endpoints actualizados (junio 2026)" });
 });
 
 router.get("/meshy/models-config", (_req, res) => {
@@ -362,7 +364,18 @@ router.post("/meshy/text-to-3d", async (req: Request, res: Response) => {
   try {
     const created = await meshyFetch("/text-to-3d", {
       method: "POST",
-      body: JSON.stringify({ mode: "preview", prompt, negative_prompt, art_style, topology, target_polycount, should_remesh, symmetry: false }),
+      // Meshy v2.5: added support for 'quality' and 'seed' in preview mode
+      body: JSON.stringify({ 
+        mode: "preview", 
+        prompt, 
+        negative_prompt, 
+        art_style, 
+        topology, 
+        target_polycount, 
+        should_remesh, 
+        symmetry: false,
+        ai_model: "meshy-6" // Using latest meshy-6 engine
+      }),
     }, MESHY_BASE_V2);
     const taskId: string = created.result;
     sseWrite(res, { event: "started", task_id: taskId });

@@ -60,17 +60,32 @@ const HARDCODED_FALLBACKS: Record<string, VoiceRecommendation> = {
     reason: "Voz femenina cálida multilenguaje, fallback por defecto",
     stability: 0.5, style: 0.35,
     characterGender: "female",
-    alternatives: [],
+    alternatives: [
+      { voiceId: "FGY2WhTYpPnrIDTdsKH5", voiceName: "Laura", gender: "female", reason: "Entusiasta y con actitud" },
+      { voiceId: "Xb7hH8MSUJpSbSDYk0k2", voiceName: "Alice", gender: "female", reason: "Educadora clara y atractiva" },
+      { voiceId: "cgSgspJ2msm6clMCkdW9", voiceName: "Jessica", gender: "female", reason: "Alegre y brillante" },
+      { voiceId: "hpp4J3VqNfWAUOO0d1Us", voiceName: "Bella", gender: "female", reason: "Profesional y cálida" },
+      { voiceId: "pFZP5JQG7iQjIQuC4Bku", voiceName: "Lily", gender: "female", reason: "Voz aterciopelada" }
+    ],
   },
   male_es: {
-    voiceId: "TxGEqnHWrfWFTfGW9XjX", // Josh - multilingual male
-    voiceName: "Josh",
+    voiceId: "851ejYcv2BoNPjrkw93G", // Tony - Expressive Spanish
+    voiceName: "Tony",
     gender: "male", ageBucket: "adult",
-    tone: "deep, confident, persuasive",
-    reason: "Voz masculina profunda y persuasiva, fallback por defecto",
-    stability: 0.55, style: 0.4,
+    tone: "expressive, fast, spontaneous",
+    reason: "Voz masculina expresiva en español peninsular",
+    stability: 0.5, style: 0.4,
     characterGender: "male",
-    alternatives: [],
+    alternatives: [
+      { voiceId: "CdAqYBLnsNjmTqYgD5Ha", voiceName: "Dani", gender: "male", reason: "Natural y expresivo" },
+      { voiceId: "IKne3meq5aSn9XLyUdCD", voiceName: "Charlie", gender: "male", reason: "Profundo y energético" },
+      { voiceId: "TxGEqnHWrfWFTfGW9XjX", voiceName: "Josh", gender: "male", reason: "Clásico y versátil" },
+      { voiceId: "TX3LPaxmHKxFdv7VOQHJ", voiceName: "Liam", gender: "male", reason: "Creador de contenido joven" },
+      { voiceId: "cjVigY5qzO86Huf0OWal", voiceName: "Eric", gender: "male", reason: "Suave y confiable" },
+      { voiceId: "nPczCjzI2devNBz1zQrb", voiceName: "Brian", gender: "male", reason: "Profundo y reconfortante" },
+      { voiceId: "onwK4e9ZLuTAKqWW03F9", voiceName: "Daniel", gender: "male", reason: "Locutor estable" },
+      { voiceId: "pqHfZKP75CvOlQylNhV4", voiceName: "Bill", gender: "male", reason: "Sabio y maduro" }
+    ],
   },
 };
 

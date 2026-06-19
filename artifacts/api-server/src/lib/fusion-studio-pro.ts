@@ -155,7 +155,11 @@ export type ImageGenModel =
   | "gpt-image-1.5"            // OpenAI gpt-image-1.5 — 20% más barato que v1, misma calidad
   | "gpt-image-1-mini"         // OpenAI gpt-image-1 mini — presupuesto, alta velocidad
   | "grok-imagine-image"        // xAI Grok Imagine — generación de imagen T2I ($0.02/img)
-  | "grok-imagine-image-quality"; // xAI Grok Imagine Quality — alta calidad ($0.05/img 1K, $0.07/img 2K)
+  | "grok-imagine-image-quality" // xAI Grok Imagine Quality — alta calidad ($0.05/img 1K, $0.07/img 2K)
+  | "recraft-v3-svg"            // Recraft v3 SVG — vectorial real (logos, iconos)
+  | "ideogram-v3-balanced"      // Ideogram V3 Balanced — buen balance velocidad/calidad
+  | "imagen-4-fast"             // Google Imagen 4 Fast (cheap, quick)
+  | "bytedance/seedream-3";     // ByteDance Seedream 3 — photoreal artístico
 
 // ImageProvider explícito para health-check / fallback automático en frontend.
 export type ImageProvider = "replicate" | "gemini" | "runway" | "openai" | "xai";
@@ -165,15 +169,17 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "flux-1.1-pro-ultra-raw": { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Flux Ultra modo RAW — fotografía naturalista (sin look AI)", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
   "flux-1.1-pro":           { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro",       description: "Photoreal estándar, buen precio/calidad", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"],         maxResolution: "1440x1440" },
   "flux-schnell":           { provider: "replicate", replicateId: "black-forest-labs/flux-schnell",       description: "El más barato y rápido", costPerImage: 0.003, aspectRatios: ["1:1","16:9","9:16"],                                    maxResolution: "1024x1024" },
-  "recraft-v3":             { provider: "replicate", replicateId: "recraft-ai/recraft-v3",                description: "MEJOR para texto en imagen (posters, logos, packaging)", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  "recraft-v3":             { provider: "replicate", replicateId: "recraft-ai/recraft-v3",                description: "MEJOR para texto en imagen (posters, logos, packaging)", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3","2:1","1:2","7:5","5:7","4:5","5:4","3:5","5:3"], maxResolution: "2048x2048" },
   "recraft-v3-svg":         { provider: "replicate", replicateId: "recraft-ai/recraft-v3-svg",            description: "Recraft v3 SVG — vectorial REAL (logos, iconos, ilustración plana)", costPerImage: 0.08, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "vector" },
   "ideogram-v3-turbo":      { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-turbo",        description: "Texto + photoreal", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
+  "ideogram-v3-balanced":   { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3",              description: "Ideogram V3 Balanced — buen balance entre calidad y velocidad", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
   "imagen-4-ultra":         { provider: "replicate", replicateId: "google/imagen-4-ultra",                description: "Google Imagen 4 Ultra — premium 2K, máxima calidad", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
   "imagen-4":               { provider: "replicate", replicateId: "google/imagen-4",                      description: "Google Imagen 4 estándar — alta calidad/precio equilibrado", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
   "imagen-4-fast":          { provider: "replicate", replicateId: "google/imagen-4-fast",                 description: "Google Imagen 4 Fast — generación rápida y barata", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
   "nano-banana":            { provider: "gemini",                                                          description: "Nano Banana v1 (Gemini 2.5 Flash Image) — rápido, consistente con marca", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "2K" },
   "nano-banana-pro":        { provider: "gemini",                                                          description: "Nano Banana 2 / Pro (Gemini 3 Pro Image) — 4K, texto nítido, identidad estable", costPerImage: 0.12, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","2:3","3:2","4:5","5:4","21:9"], maxResolution: "4K" },
   "seedream-4":             { provider: "replicate", replicateId: "bytedance/seedream-4",                 description: "ByteDance Seedream 4 — photoreal + texto, rival de Recraft/Ideogram", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2048x2048" },
+  "bytedance/seedream-3":   { provider: "replicate", replicateId: "bytedance/seedream-3",                 description: "ByteDance Seedream 3 — modelo photoreal artístico", costPerImage: 0.035, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
   "flux-kontext-pro":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-pro",   description: "Mantiene consistencia entre imágenes (mismo personaje/estilo)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
   "flux-kontext-max":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-max",   description: "Flux Kontext Max — máxima calidad, consistencia de personaje/estilo premium", costPerImage: 0.07, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
   "flux-kontext-dev":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-dev",   description: "Flux Kontext Dev — open-weights, edición artística creativa", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
@@ -724,6 +730,30 @@ export async function generateMusic(
   prompt: string, durationSec = 30, replicateToken?: string,
 ): Promise<Buffer> {
   const token = getReplicateToken(replicateToken);
+
+  // Replicate Audio Models June 2026
+  if (prompt.includes("musicgen-large")) {
+    return await replicateRunBuffer(
+      "facebookresearch/musicgen:7a76a8258b2999da03f0f70155097f48b1116c4fdf4c85f7614d3f25c7865c69",
+      { prompt, duration: Math.min(Math.max(durationSec, 1), 30), model_version: "large" },
+      token,
+    );
+  }
+  if (prompt.includes("musicgen-stereo-large")) {
+    return await replicateRunBuffer(
+      "facebookresearch/musicgen:7a76a8258b2999da03f0f70155097f48b1116c4fdf4c85f7614d3f25c7865c69",
+      { prompt, duration: Math.min(Math.max(durationSec, 1), 30), model_version: "stereo-large" },
+      token,
+    );
+  }
+  if (prompt.includes("audio-ldm-2-large")) {
+    return await replicateRunBuffer(
+      "haoheliu/audio-ldm-2:664293f2f8193856d1136b8c4c700940733d9061d4793616235b02661d935e40",
+      { prompt, duration: Math.min(Math.max(durationSec, 1), 30) },
+      token,
+    );
+  }
+
   // Stable Audio Open 1.0 — best open-source music gen
   return await replicateRunBuffer(
     "stackadoc/stable-audio-open-1.0",
@@ -820,27 +850,22 @@ async function concatAudioBuffers(buffers: Buffer[], crossfadeSec: number): Prom
 export type VideoModel =
   | "runway-gen4-turbo"
   | "runway-gen3-alpha"
-  | "veo-3.1"
-  | "veo-3.1-fast"
-  | "veo-3-fast"
-  | "veo-3"
-  | "veo-2"
-  | "sora-2"
-  | "kling-master"
-  | "kling-2.5-turbo"
-  | "kling-2.1"
-  | "seedance-pro"
-  | "seedance-fast"
-  | "hailuo-02-fast"
-  | "hailuo-02"
-  | "wan-2.5"
-  | "wan-2.5-fast"
   | "runway-gen4.5"          // Runway Gen 4.5 — nueva gen, mejor motion y detalle
+  | "runway-gen4.5-turbo"    // Runway Gen 4.5 Turbo — rápido y eficiente
   | "runway-seedance2"       // Seedance 2 vía Runway — calidad cinematográfica
   | "runway-seedance2-fast"  // Seedance 2 Fast vía Runway — rápido
+  | "runway-gen5"            // Runway Gen 5 — alias reservado (redirigido a 4.5)
+  | "veo-3.1"
+  | "wan-2.5-t2v-480p"       // Wan 2.5 T2V 480p — Text-to-Video puro Replicate
+  | "wan-2.5-t2v-720p"       // Wan 2.5 T2V 720p — Text-to-Video puro Replicate
+  | "wan-2.5-i2v-480p"       // Wan 2.5 I2V 480p — Image-to-Video Replicate
+  | "kling-v1.6-standard"    // Kling v1.6 Standard — calidad balanceada
+  | "kling-v1.6-pro"         // Kling v1.6 Pro — alta calidad
+  | "kling-3.0-master"       // Kling V3.0 Master — última gen Kuaishou, máxima calidad
+  | "hailuo-02-master"       // MiniMax Hailuo 02 Master — máxima calidad cinematográfica
+  | "seedance-1-pro"         // Seedance 1 Pro — calidad profesional
   | "wan-2.5-t2v"            // Wan 2.5 Text-to-Video — T2V puro, sin imagen
   | "seedance-1-lite"        // Seedance 1 Lite — versión económica de Pro
-  | "kling-3.0-master"       // Kling V3.0 Master — última gen Kuaishou, máxima calidad
   | "kling-3.0-turbo"        // Kling V3.0 Turbo — rápido y barato, calidad V3
   | "veo-4"                  // Google Veo 4 — nueva generación 2026, máxima coherencia
   | "veo-4-fast"             // Google Veo 4 Fast — Veo 4 más rápido y barato
@@ -850,12 +875,18 @@ export type VideoModel =
   | "runway-gen5"            // Runway Gen 5 — alias reservado (no lanzado aún, redirigido a Gen 4.5)
   | "kling-3.0-omni"         // Kling V3.0 Omni — multimodal: texto+imagen+refs+audio, máxima calidad
   | "hailuo-2.3"             // MiniMax Hailuo 2.3 — último Hailuo, 1080p T2V+I2V
+  | "grok-video-1"           // xAI Grok Video 1 — June 2026 flagship video, T2V/I2V
   | "grok-imagine-video"     // xAI Grok Imagine Video — T2V/I2V, hasta 15s, 720p ($0.07/s)
   | "grok-imagine-video-1.5"; // xAI Grok Imagine Video 1.5 Preview — mayor calidad ($0.14/s 720p)
 
 export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini" | "xai"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
   "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
   "runway-gen3-alpha":  { provider: "runway",                                                description: "Runway Gen-3 Alpha — legado, reemplazado por Gen-4.5 y Gen-5",    costPerSec: 0.03, quality: 6,  maxDuration: 10 },
+  "runway-gen4.5":       { provider: "runway",                                                description: "Runway Gen 4.5 — última generación Jun-2026, 4K, audio nativo, hasta 15s", costPerSec: 0.07,  quality: 10, maxDuration: 15 },
+  "runway-gen4.5-turbo": { provider: "runway",                                                description: "Runway Gen 4.5 Turbo — rápido y eficiente, 1080p, audio nativo",           costPerSec: 0.05,  quality: 9,  maxDuration: 10 },
+  "runway-seedance2":    { provider: "runway",                                                description: "Seedance 2 vía Runway — nueva generación, calidad cinematográfica",          costPerSec: 0.10,  quality: 10, maxDuration: 10 },
+  "runway-seedance2-fast":{ provider: "runway",                                               description: "Seedance 2 Fast vía Runway — rápido y barato, calidad pro",                  costPerSec: 0.06,  quality: 8,  maxDuration: 10 },
+  "runway-gen5":           { provider: "runway",                                               description: "Runway Gen 5 — alias reservado (Gen 5 no lanzado aún → redirigido a Gen 4.5)", costPerSec: 0.07, quality: 10, maxDuration: 15 },
   "veo-3.1":            { provider: "gemini",    modelId: "veo-3.1-generate-preview",       description: "Google Veo 3.1 — última gen + audio nativo, 16:9 / 9:16 (8s)",   costPerSec: 0.75, quality: 10, maxDuration: 8  },
   "veo-3.1-fast":       { provider: "gemini",    modelId: "veo-3.1-fast-generate-preview",  description: "Google Veo 3.1 Fast — rápido y barato + audio nativo",          costPerSec: 0.40, quality: 9,  maxDuration: 8  },
   "veo-3-fast":         { provider: "gemini",    modelId: "veo-3.0-fast-generate-preview",  description: "Google Veo 3 Fast — rápido + audio nativo (8s, 16:9)",          costPerSec: 0.40, quality: 9,  maxDuration: 8  },
@@ -869,11 +900,15 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "seedance-fast":      { provider: "replicate", modelId: "bytedance/seedance-1-pro-fast",  description: "Seedance Fast — rápido y barato, calidad pro",                   costPerSec: 0.05, quality: 7,  maxDuration: 10 },
   "hailuo-02-fast":     { provider: "replicate", modelId: "minimax/hailuo-02-fast",         description: "Hailuo 02 Fast — variante rápida y barata de MiniMax",           costPerSec: 0.03, quality: 7,  maxDuration: 6  },
   "hailuo-02":          { provider: "replicate", modelId: "minimax/hailuo-02",              description: "Hailuo 02 — buen balance velocidad/calidad",                     costPerSec: 0.05, quality: 7,  maxDuration: 6  },
+  "hailuo-02-master":   { provider: "replicate", modelId: "minimax/hailuo-02",              description: "Hailuo 02 Master — máxima calidad cinematográfica",             costPerSec: 0.08, quality: 10, maxDuration: 6  },
+  "wan-2.5-t2v-480p":    { provider: "replicate", modelId: "wan-video/wan-2.5-t2v-480p",     description: "Wan 2.5 T2V 480p — generación de video rápida por texto",       costPerSec: 0.02, quality: 6,  maxDuration: 5  },
+  "wan-2.5-t2v-720p":    { provider: "replicate", modelId: "wan-video/wan-2.5-t2v-720p",     description: "Wan 2.5 T2V 720p — alta calidad por texto",                     costPerSec: 0.04, quality: 8,  maxDuration: 5  },
+  "wan-2.5-i2v-480p":    { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-480p",     description: "Wan 2.5 I2V 480p — animación de imagen rápida",                 costPerSec: 0.02, quality: 6,  maxDuration: 5  },
+  "kling-v1.6-standard": { provider: "replicate", modelId: "kwaivgi/kling-v1.6-standard",    description: "Kling v1.6 Standard — calidad balanceada",                      costPerSec: 0.10, quality: 8,  maxDuration: 10 },
+  "kling-v1.6-pro":      { provider: "replicate", modelId: "kwaivgi/kling-v1.6-pro",         description: "Kling v1.6 Pro — alta calidad profesional",                     costPerSec: 0.18, quality: 10, maxDuration: 10 },
+  "seedance-1-pro":      { provider: "replicate", modelId: "bytedance/seedance-1-pro",       description: "Seedance 1 Pro — calidad profesional de ByteDance",             costPerSec: 0.08, quality: 10, maxDuration: 10 },
   "wan-2.5":             { provider: "replicate", modelId: "wan-video/wan-2.5-i2v",          description: "Wan 2.5 — open-source de calidad, mejor que la versión Fast",                costPerSec: 0.04,  quality: 8,  maxDuration: 5  },
   "wan-2.5-fast":        { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",     description: "Wan 2.5 Fast — legado, reemplazado por Wan 2.6 (mejor calidad al mismo precio)", costPerSec: 0.018, quality: 5,  maxDuration: 5  },
-  "runway-gen4.5":       { provider: "runway",                                                description: "Runway Gen 4.5 — nueva generación, mejor motion y detalle que Gen 4",       costPerSec: 0.06,  quality: 10, maxDuration: 10 },
-  "runway-seedance2":    { provider: "runway",                                                description: "Seedance 2 vía Runway — nueva generación, calidad cinematográfica",          costPerSec: 0.10,  quality: 10, maxDuration: 10 },
-  "runway-seedance2-fast":{ provider: "runway",                                               description: "Seedance 2 Fast vía Runway — rápido y barato, calidad pro",                  costPerSec: 0.06,  quality: 8,  maxDuration: 10 },
   "wan-2.5-t2v":         { provider: "replicate", modelId: "wan-video/wan-2.5-t2v",          description: "Wan 2.5 Text-to-Video — T2V puro open-source, sin imagen origen",            costPerSec: 0.025, quality: 7,  maxDuration: 5  },
   "seedance-1-lite":     { provider: "replicate", modelId: "bytedance/seedance-1-lite",       description: "Seedance 1 Lite — versión económica de Seedance Pro",                        costPerSec: 0.03,  quality: 6,  maxDuration: 10 },
   "kling-3.0-master":    { provider: "replicate", modelId: "kwaivgi/kling-v3-omni-video",      description: "Kling V3.0 Omni — multimodal, máxima calidad, audio nativo, hasta 15s",     costPerSec: 0.22,  quality: 10, maxDuration: 15 },
@@ -885,16 +920,21 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "wan-2.6":             { provider: "replicate", modelId: "wan-video/wan-2.7-i2v",           description: "Wan 2.7 — última gen open-source, T2V+I2V+R2V, hasta 1080p y 15s (wan-2.6 redirigido)", costPerSec: 0.05, quality: 8,  maxDuration: 15 },
   "wan-2.7":             { provider: "replicate", modelId: "wan-video/wan-2.7-i2v",           description: "Wan 2.7 — última gen open-source wan-video, T2V+I2V+R2V, hasta 1080p y 15s",  costPerSec: 0.05,  quality: 8,  maxDuration: 15 },
   "hailuo-2.3":          { provider: "replicate", modelId: "minimax/hailuo-2.3",              description: "MiniMax Hailuo 2.3 — última gen Hailuo, 1080p, T2V+I2V, mejora sobre hailuo-02", costPerSec: 0.06, quality: 8, maxDuration: 10 },
-  "runway-gen5":           { provider: "runway",   description: "Runway Gen 5 — alias reservado (Gen 5 no lanzado aún → redirigido a Gen 4.5 internamente)", costPerSec: 0.06, quality: 10, maxDuration: 10 },
+  "grok-video-1":        { provider: "xai", modelId: "grok-video-1",           description: "xAI Grok Video 1 — June 2026 flagship video, T2V/I2V, cinematic quality", costPerSec: 0.15, quality: 10, maxDuration: 15 },
   "grok-imagine-video":    { provider: "xai", modelId: "grok-imagine-video",           description: "xAI Grok Imagine Video — T2V/I2V, hasta 15s, 720p ($0.07/s)", costPerSec: 0.07, quality: 9,  maxDuration: 15 },
   "grok-imagine-video-1.5":{ provider: "xai", modelId: "grok-imagine-video-1.5-preview", description: "xAI Grok Imagine Video 1.5 Preview — mayor calidad, 720p ($0.14/s)", costPerSec: 0.14, quality: 10, maxDuration: 15 },
 };
 
 // Modelos que soportan TEXT-TO-VIDEO puro (sin imagen origen).
 // Runway sólo expone /image_to_video en este pipeline → I2V obligatorio.
-const T2V_SUPPORTED: Record<VideoModel, boolean> = {
+const T2V_SUPPORTED: Record<string, boolean> = {
   "runway-gen4-turbo": false,
   "runway-gen3-alpha": false,
+  "runway-gen4.5":       false,
+  "runway-gen4.5-turbo": false,
+  "runway-seedance2":     false,
+  "runway-seedance2-fast":false,
+  "runway-gen5":          false,
   "veo-3.1":      true,
   "veo-3.1-fast": true,
   "veo-3-fast":   true,
@@ -910,9 +950,6 @@ const T2V_SUPPORTED: Record<VideoModel, boolean> = {
   "hailuo-02":       true,
   "wan-2.5":              false,
   "wan-2.5-fast":         false,
-  "runway-gen4.5":        false,
-  "runway-seedance2":     false,
-  "runway-seedance2-fast":false,
   "wan-2.5-t2v":          true,
   "seedance-1-lite":      false,
   "kling-3.0-master":     true,
@@ -924,7 +961,7 @@ const T2V_SUPPORTED: Record<VideoModel, boolean> = {
   "wan-2.7":                true,   // wan-2.7 soporta T2V+I2V+R2V
   "kling-3.0-omni":         true,   // Kling Omni soporta T2V+I2V multimodal
   "hailuo-2.3":             true,   // Hailuo 2.3 soporta T2V+I2V
-  "runway-gen5":            false,  // gen5 no existe → fallback a gen4.5
+  "grok-video-1":           true,
   "grok-imagine-video":     true,   // xAI soporta T2V puro y también I2V
   "grok-imagine-video-1.5": true,
 };

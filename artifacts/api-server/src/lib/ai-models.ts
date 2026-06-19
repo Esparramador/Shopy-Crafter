@@ -22,7 +22,7 @@ import { eq, inArray } from "drizzle-orm";
 import { logger } from "./logger.js";
 
 export type AITier = "fast" | "smart" | "genius" | "vision";
-export type AIProvider = "claude" | "gemini";
+export type AIProvider = "claude" | "gemini" | "xai";
 
 // June-2026 stable defaults. Override via env or admin UI; never hardcode in
 // callsites — always go through `pickModel(provider, tier, override)`.
@@ -39,6 +39,12 @@ const HARD_DEFAULTS: Record<AIProvider, Record<AITier, string>> = {
     genius: "gemini-3.1-pro-preview",
     vision: "gemini-3.1-pro-preview",
   },
+  xai: {
+    fast: "grok-3-mini-fast",
+    smart: "grok-3-fast",
+    genius: "grok-3",
+    vision: "grok-2-vision-1212",
+  },
 };
 
 const ENV_KEYS: Record<AIProvider, Record<AITier, string>> = {
@@ -54,6 +60,12 @@ const ENV_KEYS: Record<AIProvider, Record<AITier, string>> = {
     genius: "GEMINI_GENIUS_MODEL",
     vision: "GEMINI_VISION_MODEL",
   },
+  xai: {
+    fast: "XAI_MODEL_FAST",
+    smart: "XAI_MODEL",
+    genius: "XAI_MODEL_GENIUS",
+    vision: "XAI_MODEL_VISION",
+  },
 };
 
 const SETTINGS_KEYS: Record<AIProvider, Record<AITier, string>> = {
@@ -68,6 +80,12 @@ const SETTINGS_KEYS: Record<AIProvider, Record<AITier, string>> = {
     smart: "ai.gemini.smart",
     genius: "ai.gemini.genius",
     vision: "ai.gemini.vision",
+  },
+  xai: {
+    fast: "ai.xai.fast",
+    smart: "ai.xai.smart",
+    genius: "ai.xai.genius",
+    vision: "ai.xai.vision",
   },
 };
 
@@ -92,7 +110,7 @@ async function loadSettingsFromDb(): Promise<Map<string, string>> {
     const map = new Map<string, string>();
     try {
       const allKeys: string[] = [];
-      for (const p of ["claude", "gemini"] as AIProvider[]) {
+      for (const p of ["claude", "gemini", "xai"] as AIProvider[]) {
         for (const t of ["fast", "smart", "genius", "vision"] as AITier[]) {
           allKeys.push(SETTINGS_KEYS[p][t]);
         }
@@ -192,7 +210,7 @@ export async function getAIModelMatrix(): Promise<AIModelMatrix> {
     }
     return out;
   };
-  return { claude: build("claude"), gemini: build("gemini") };
+  return { claude: build("claude"), gemini: build("gemini"), xai: build("xai") };
 }
 
 /** Persist a tier→model override into platform_settings (admin only). */
@@ -212,15 +230,20 @@ export async function setAIModelOverride(provider: AIProvider, tier: AITier, mod
 /** Catalog of known June-2026 models for the admin UI dropdowns. */
 export const KNOWN_MODELS: Record<AIProvider, Array<{ id: string; label: string; tierHint: AITier; notes?: string }>> = {
   claude: [
-    { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", tierHint: "fast", notes: "Cheapest, fast, good for classification & extraction" },
-    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", tierHint: "smart", notes: "Best balance — default for most tasks (vision-capable)" },
-    { id: "claude-opus-4-8", label: "Claude Opus 4.8", tierHint: "genius", notes: "Highest reasoning, latest Opus, slowest, most expensive" },
-    { id: "claude-opus-4-7", label: "Claude Opus 4.7", tierHint: "genius", notes: "High reasoning, alternative to Opus 4.8" },
-    { id: "claude-fable-5", label: "Claude Fable 5", tierHint: "genius", notes: "Creative storytelling & long-form generation" },
-    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5 (legacy)", tierHint: "smart" },
-    { id: "claude-opus-4-1", label: "Claude Opus 4.1 (legacy)", tierHint: "genius" },
-    { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4 (legacy May-2025)", tierHint: "smart" },
-    { id: "claude-3-5-sonnet-20241022", label: "Claude Sonnet 3.5 (legacy)", tierHint: "smart" },
+    { id: "claude-fable-5", label: "Claude Fable 5", tierHint: "genius", notes: "Modelo creativo especializado en narrativa y generación de contenido largo" },
+    { id: "claude-opus-4-8", label: "Claude Opus 4.8", tierHint: "genius", notes: "Máximo razonamiento, ideal para tareas complejas y programación avanzada" },
+    { id: "claude-opus-4-7", label: "Claude Opus 4.7", tierHint: "genius", notes: "Alta capacidad de razonamiento y análisis de datos complejos" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", tierHint: "smart", notes: "El mejor equilibrio entre velocidad y capacidad, con soporte de visión" },
+    { id: "claude-opus-4-6", label: "Claude Opus 4.6", tierHint: "genius", notes: "Modelo de alto rendimiento para razonamiento profundo" },
+    { id: "claude-opus-4-5-20251101", label: "Claude Opus 4.5", tierHint: "genius", notes: "Versión estable de Opus para flujos de trabajo críticos" },
+    { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", tierHint: "fast", notes: "Ultra rápido y económico, ideal para clasificación y extracción de datos" },
+    { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", tierHint: "smart", notes: "Versión estable de Sonnet con excelentes capacidades multimodales" },
+    { id: "claude-opus-4-1-20250805", label: "Claude Opus 4.1", tierHint: "genius", notes: "Versión legacy de Opus optimizada para estabilidad" },
+    { id: "claude-3-7-sonnet-20250219", label: "Claude 3.7 Sonnet", tierHint: "smart", notes: "Modelo de la generación anterior con gran rendimiento en visión" },
+    { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", tierHint: "smart", notes: "Modelo legacy ampliamente probado y fiable" },
+    { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku", tierHint: "fast", notes: "Haiku de generación anterior para tareas sencillas" },
+    { id: "claude-3-opus-20240229", label: "Claude 3 Opus", tierHint: "genius", notes: "El primer gran modelo de la familia Claude 3" },
+    { id: "claude-3-haiku-20240307", label: "Claude 3 Haiku", tierHint: "fast", notes: "Modelo ultra-rápido legacy" }
   ],
   gemini: [
     // ── Generación — Flagship (Gemini 3.x) ────────────────────────────────
@@ -254,5 +277,14 @@ export const KNOWN_MODELS: Record<AIProvider, Array<{ id: string; label: string;
     { id: "gemini-pro-latest",                      label: "Gemini Pro Latest (alias auto)",          tierHint: "smart",  notes: "🔄 Siempre resuelve al pro más reciente" },
     // ── Especiales / Experimental ─────────────────────────────────────────
     { id: "gemini-2.5-computer-use-preview-10-2025", label: "Gemini 2.5 Computer Use Preview",       tierHint: "genius", notes: "🤖 Agente autónomo / computer use (experimental)" },
+  ],
+  xai: [
+    { id: "grok-3", label: "Grok 3", tierHint: "genius", notes: "Flagship model June 2026, highest reasoning" },
+    { id: "grok-3-fast", label: "Grok 3 Fast", tierHint: "smart", notes: "Balanced Grok 3 performance" },
+    { id: "grok-3-mini", label: "Grok 3 Mini", tierHint: "fast", notes: "Lightweight Grok 3 for quick tasks" },
+    { id: "grok-3-mini-fast", label: "Grok 3 Mini Fast", tierHint: "fast", notes: "Fastest Grok 3 mini variant" },
+    { id: "grok-2-1212", label: "Grok 2", tierHint: "smart", notes: "Stable Grok 2 flagship" },
+    { id: "grok-2-vision-1212", label: "Grok 2 Vision", tierHint: "vision", notes: "Multimodal Grok 2 with vision support" },
+    { id: "grok-vision-beta", label: "Grok Vision Beta", tierHint: "vision", notes: "Experimental vision capabilities" },
   ],
 };

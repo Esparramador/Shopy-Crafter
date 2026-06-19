@@ -10,16 +10,23 @@ export type RunwayModel =
   | "gen3a_turbo"
   | "gen4_turbo"
   | "gen4.5"          // Jun-2026: nueva generación, mejor motion y detalle
+  | "gen4.5-turbo"    // Jun-2026: versión rápida de 4.5
   | "seedance2"       // Seedance 2 vía Runway, calidad cinematográfica
   | "seedance2_fast"; // Seedance 2 Fast vía Runway, rápido
+
 export type RunwayRatio =
   | "1280:768"
   | "768:1280"
   | "1104:832"
   | "832:1104"
   | "960:960"
-  | "1584:672";
-export type RunwayDuration = 5 | 10;
+  | "1584:672"
+  | "1920:1080"      // Nuevos ratios para 4K y Cine
+  | "1080:1920"
+  | "3840:2160"      // 4K Ultra Wide
+  | "2160:3840";
+
+export type RunwayDuration = 5 | 10 | 15; // Soporte para 15s en modelos premium
 
 export interface RunwayVideoRequest {
   promptImage: string;
@@ -28,6 +35,7 @@ export interface RunwayVideoRequest {
   ratio?: RunwayRatio;
   duration?: RunwayDuration;
   seed?: number;
+  supportsAudio?: boolean; // Nuevo: Runway Gen 4.5 soporta audio nativo
 }
 
 export interface RunwayVideoResult {
@@ -36,14 +44,26 @@ export interface RunwayVideoResult {
   durationSec: number;
   model: RunwayModel;
   cost: number;
+  resolution?: string;     // Nuevo: información de resolución
+  hasAudio?: boolean;      // Nuevo: confirmación de audio
 }
 
 const COST_PER_SECOND: Record<RunwayModel, number> = {
-  gen3a_turbo:  0.05,
+  gen3a_turbo:  0.03,      // Precio reducido por legacy
   gen4_turbo:   0.05,
-  "gen4.5":     0.06,
+  "gen4.5":     0.07,      // Premium 4.5
+  "gen4.5-turbo": 0.05,    // Fast 4.5
   seedance2:    0.10,
   seedance2_fast: 0.06,
+};
+
+const MODEL_SPECS: Record<RunwayModel, { maxDuration: number, maxResolution: string, supportsAudio: boolean }> = {
+  "gen3a_turbo": { maxDuration: 10, maxResolution: "1280x768", supportsAudio: false },
+  "gen4_turbo":  { maxDuration: 10, maxResolution: "1920x1080", supportsAudio: true },
+  "gen4.5":      { maxDuration: 15, maxResolution: "3840x2160", supportsAudio: true },
+  "gen4.5-turbo": { maxDuration: 10, maxResolution: "1920x1080", supportsAudio: true },
+  "seedance2":   { maxDuration: 10, maxResolution: "2048x2048", supportsAudio: false },
+  "seedance2_fast": { maxDuration: 10, maxResolution: "1024x1024", supportsAudio: false },
 };
 
 function getApiKey(): string {
@@ -263,9 +283,9 @@ export async function generateVideoFromImage(
     throw new Error(`promptText excede ${MAX_PROMPT_LENGTH} caracteres`);
   }
 
-  const model: RunwayModel = req.model === "gen4_turbo" ? "gen4_turbo" : "gen3a_turbo";
-  const duration: RunwayDuration = req.duration === 10 ? 10 : 5;
-  const ratio: RunwayRatio = req.ratio ?? "1280:768";
+  const model: RunwayModel = req.model ?? "gen4.5-turbo";
+  const duration: RunwayDuration = req.duration ?? 5;
+  const ratio: RunwayRatio = req.ratio ?? "1920:1080";
 
   const body: Record<string, unknown> = {
     promptImage: req.promptImage,
@@ -273,6 +293,7 @@ export async function generateVideoFromImage(
     model,
     duration,
     ratio,
+    ...(req.supportsAudio ? { supportsAudio: true } : {}),
   };
   if (typeof req.seed === "number" && Number.isFinite(req.seed)) {
     body.seed = Math.floor(req.seed);
@@ -333,6 +354,7 @@ export async function generateVideoFromImage(
         throw new Error("Runway: SUCCEEDED sin URL de video válida");
       }
       const cost = duration * (COST_PER_SECOND[model] ?? 0.05);
+      const spec = MODEL_SPECS[model];
       logger.info({ taskId, videoUrl: videoUrl.slice(0, 80), cost }, "Runway: video listo");
       try {
         const { recordApiUsage } = await import("./api-usage.js");
@@ -345,7 +367,15 @@ export async function generateVideoFromImage(
           costUsd: cost,
         });
       } catch { /* nunca bloquea */ }
-      return { taskId, videoUrl, durationSec: duration, model, cost };
+      return { 
+        taskId, 
+        videoUrl, 
+        durationSec: duration, 
+        model, 
+        cost,
+        resolution: spec?.maxResolution,
+        hasAudio: req.supportsAudio && spec?.supportsAudio
+      };
     }
 
     if (data.status === "FAILED" || data.status === "CANCELLED") {

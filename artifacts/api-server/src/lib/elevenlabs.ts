@@ -8,7 +8,9 @@ export type ElevenModel =
   | "eleven_v3"              // Jun-2026: latest, 74 idiomas, máxima calidad
   | "eleven_multilingual_v2" // 29 idiomas, calidad alta
   | "eleven_turbo_v2_5"      // 32 idiomas, baja latencia
-  | "eleven_flash_v2_5";     // 32 idiomas, ultra-rápido, barato
+  | "eleven_flash_v2_5"      // 32 idiomas, ultra-rápido, barato
+  | "eleven_turbo_v2"        // Legacy turbo
+  | "eleven_flash_v2";       // Fast v2
 
 export type ElevenOutputFormat =
   | "mp3_44100_128"

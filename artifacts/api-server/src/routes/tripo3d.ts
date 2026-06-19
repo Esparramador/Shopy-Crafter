@@ -112,6 +112,10 @@ export const TRIPO_ANIMATIONS: Array<{
   { id: "push_up",       label: "Flexiones",         category: "activity",   description: "Ejercicio de push-ups — atletismo y fitness", looping: true,  tags: ["loop","sport","fitness"] },
   { id: "pick_up",       label: "Recoger objeto",    category: "activity",   description: "Agacharse y recoger algo del suelo", looping: false, tags: ["action","game","interactive"] },
   { id: "throw",         label: "Lanzar",            category: "activity",   description: "Lanzamiento de objeto — deporte o combate", looping: false, tags: ["action","sport","game"] },
+  { id: "climb",         label: "Escalar",           category: "activity",   description: "Animación de escalada vertical", looping: true,  tags: ["action","movement","outdoor"] },
+  { id: "swim",          label: "Nadar",             category: "activity",   description: "Estilo libre de natación", looping: true,  tags: ["action","movement","water"] },
+  { id: "drive",         label: "Conducir",          category: "activity",   description: "Postura de conducción de vehículo", looping: true,  tags: ["action","vehicle","casual"] },
+  { id: "yoga",          label: "Yoga",              category: "activity",   description: "Postura de meditación yoga", looping: true,  tags: ["action","relax","fitness"] },
 ];
 
 export const ANIMATION_CATEGORIES = [
@@ -226,14 +230,14 @@ router.post("/api/tripo3d/text-to-model", async (req: Request, res: Response) =>
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
-  const { prompt, model_version = "default", texture = true, pbr = true, face_limit, negative_prompt } = req.body ?? {};
+  const { prompt, model_version = "v2.5", texture = true, pbr = true, face_limit, negative_prompt } = req.body ?? {};
   if (!prompt) { res.status(400).json({ error: "prompt requerido" }); return; }
   try {
     const taskId = await tripoCreateTask({
       type: "text_to_model",
       prompt,
       negative_prompt: negative_prompt || undefined,
-      model_version,
+      model_version, // Soporta v2.5 (junio 2026)
       texture,
       pbr,
       face_limit: face_limit ? Number(face_limit) : undefined,
@@ -276,13 +280,13 @@ router.post("/api/tripo3d/image-to-model", upload.single("image"), async (req: R
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
   if (!req.file) { res.status(400).json({ error: "image requerida" }); return; }
-  const { model_version = "default", texture = true, pbr = true, face_limit } = req.body ?? {};
+  const { model_version = "v2.5", texture = true, pbr = true, face_limit } = req.body ?? {};
   try {
     const imageToken = await tripoUploadFile(req.file.buffer, req.file.mimetype, req.file.originalname);
     const taskId = await tripoCreateTask({
       type: "image_to_model",
       file: { type: "jpg", file_token: imageToken },
-      model_version,
+      model_version, // Soporta v2.5
       texture: texture !== "false",
       pbr: pbr !== "false",
       face_limit: face_limit ? Number(face_limit) : undefined,
