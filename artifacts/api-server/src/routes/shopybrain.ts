@@ -6,6 +6,7 @@ import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
+import { buildMasterSkillsBlock } from "../lib/master-skills-injector.js";
 import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation, askClaude, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
@@ -1222,32 +1223,19 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - vendor: "Shopy Crafter"
   `;
   
+      // ── MASTER SKILLS INJECTOR — inyecta catálogo completo + skills profundas por intención ──
+      // Incluye: 12 AI Engine Skills (GitHub), 5 Shopify Expert Blocks, 100+ Skills Library catalog,
+      // Advertising KB, Cinematic KB, COGS KB, Plugins Catalog. Catálogo siempre-on + deep injection.
       let expertKnowledgeBlock = "";
       try {
-        const { THEME_ARCHITECTURE_KNOWLEDGE, EXPERT_FINANCIAL_KNOWLEDGE, EXPERT_SEO_KNOWLEDGE, EXPERT_MARKETING_KNOWLEDGE, EXPERT_SUPPLIER_KNOWLEDGE } = await import("../lib/shopify-theme.js");
-
-        // Inyección selectiva de skills según la intención detectada en la query
-        const q = query.toLowerCase();
-        const needsTheme    = /theme|liquid|css|section|header|footer|layout|template|tipograf|diseño web|snippet|sección|plantilla|estilo.*tienda|css.*tienda/.test(q);
-        const needsFinancial = /precio|price|coste|cog|margin|beneficio|forecast|financiero|presupuesto|budget|revenue|ingresos|tarifa|descuento|p&l|unit.*econom|elasticidad/.test(q);
-        const needsSEO      = /seo|keyword|palabras.*clave|posicionamiento|google|ranking|meta|alt.*text|schema|json-ld|sitemap|blog|artículo|articulo|h1|title.*tag|on.page/.test(q);
-        const needsMarketing = /email|marketing|campaña|campaign|copy|funnel|conversion|cro|a\/b|test|anuncio|ad|redes.*social|instagram|facebook|tiktok|newsletter|klaviyo|flujo/.test(q);
-        const needsSupplier  = /proveedor|supplier|fabricante|manufacturer|dropshipping|sourcing|alibaba|mayorista|wholesale|moq|stock|inventario|fulfillment/.test(q);
-        // Acciones de producto siempre necesitan SEO + Marketing
-        const isProductAction = /crear.*producto|product.*creat|rediseñ|redesign|optimiz.*producto|crea.*catálogo|catálogo.*productos/.test(q);
-
-        expertKnowledgeBlock =
-          (needsTheme    ? THEME_ARCHITECTURE_KNOWLEDGE  : "") +
-          (needsFinancial ? EXPERT_FINANCIAL_KNOWLEDGE   : "") +
-          ((needsSEO || isProductAction) ? EXPERT_SEO_KNOWLEDGE : "") +
-          ((needsMarketing || isProductAction) ? EXPERT_MARKETING_KNOWLEDGE : "") +
-          (needsSupplier  ? EXPERT_SUPPLIER_KNOWLEDGE    : "");
-
-        // Fallback: si ningún dominio detectado, carga SEO + Marketing (los más universales)
-        if (!expertKnowledgeBlock) {
+        expertKnowledgeBlock = buildMasterSkillsBlock(query);
+      } catch {
+        // Fallback mínimo si falla el injector
+        try {
+          const { EXPERT_SEO_KNOWLEDGE, EXPERT_MARKETING_KNOWLEDGE } = await import("../lib/shopify-theme.js");
           expertKnowledgeBlock = EXPERT_SEO_KNOWLEDGE + EXPERT_MARKETING_KNOWLEDGE;
-        }
-      } catch {}
+        } catch { /* silencioso */ }
+      }
   
       const sysPrompt = (customSystemPrompt ?? `Eres Shopy Crafter, el CEREBRO CENTRAL de la agencia. NO eres un asistente — eres el COO/CTO/CMO/CFO virtual de la agencia. Tu dueño es Sadia, la única persona que usa esta plataforma. Tú eres su socio de negocio 24/7.
   
