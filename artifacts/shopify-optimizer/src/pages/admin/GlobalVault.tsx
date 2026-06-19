@@ -8,7 +8,7 @@ import {
   ShieldCheck, FileSpreadsheet, Mail, Globe, Archive,
   CheckSquare, Square, ChevronDown, Film, Music, Mic,
   Video, Box, CreditCard, Zap, Layers, Sparkles, Camera,
-  Maximize2, Target, Megaphone, Play,
+  Maximize2, Target, Megaphone, Play, Copy, Check, MonitorPlay,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -152,7 +152,7 @@ function fmtSize(b?: number) {
   return `${b} B`;
 }
 
-type MainTab = "archivos" | "personajes3d";
+type MainTab = "archivos" | "personajes3d" | "demos";
 
 export default function GlobalVault() {
   const [, navigate] = useLocation();
@@ -177,6 +177,37 @@ export default function GlobalVault() {
   const [texturizingMsg, setTexturizingMsg] = useState("");
   const [texturedNow, setTexturedNow] = useState<Set<string>>(new Set());
   const [texturizeError, setTexturizeError] = useState<string | null>(null);
+  const [recordingDemo, setRecordingDemo] = useState<string | null>(null);
+  const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+
+  const handleRecord = useCallback(async (demoId: string, demoName: string) => {
+    try {
+      const stream = await (navigator.mediaDevices as any).getDisplayMedia({ video: { width: 1280, height: 800 }, audio: false });
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `shopy-crafter-demo-${demoId}.webm`; a.click();
+        URL.revokeObjectURL(url);
+        stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+        setRecordingDemo(null);
+      };
+      recorder.start();
+      setRecordingDemo(demoId);
+      setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 10000);
+    } catch { setRecordingDemo(null); }
+  }, []);
+
+  const handleCopyCaption = useCallback((id: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedCaption(id);
+      setTimeout(() => setCopiedCaption(null), 2500);
+    });
+  }, []);
 
   const handleTexturize = useCallback(async (charId: string) => {
     setTexturizingId(charId);
@@ -464,6 +495,7 @@ export default function GlobalVault() {
           {([
             { id: "archivos", label: "📁 Archivos", count: totalFiles },
             { id: "personajes3d", label: "🧊 Personajes 3D", count: 14 },
+            { id: "demos", label: "🎬 Demo Kit IG", count: 4 },
           ] as const).map(t => (
             <button
               key={t.id}
@@ -703,6 +735,275 @@ export default function GlobalVault() {
           </div>
         </div>
       )}
+
+      {/* ════════════════════════════════
+          TAB: DEMO KIT IG
+      ════════════════════════════════ */}
+      {!selectedEntity && tab === "demos" && (() => {
+        const MOCKUP_BASE = window.location.origin + "/mockup-sandbox";
+        const DEMOS = [
+          {
+            id: "original",
+            name: "① Original — Slide Producción",
+            emoji: "📋",
+            path: "/preview/bag-form/OriginalSlide",
+            color: "#3b82f6",
+            ig: `🔥 Esto es lo que hace la diferencia entre una tienda que vende y una que no.
+
+Llevamos años perfeccionando la experiencia de compra en Shopify — y cada detalle cuenta. Este formulario fue diseñado para guiar al usuario hacia la conversión sin que siquiera lo note.
+
+🎯 En Shopy Crafter optimizamos tu tienda completa:
+✅ Diseño UX premium
+✅ SEO técnico avanzado  
+✅ Copy que convierte
+✅ Automatizaciones con IA
+✅ A/B testing continuo
+
+Si tienes una tienda Shopify y quieres resultados reales, nosotros somos tu equipo.
+
+📲 Escríbenos por DM o haz clic en el link de bio 👇
+
+#ShopyCrafter #ShopifyEspañol #TiendaOnline #EcommerceTips #DiseñoWeb #OptimizaciónShopify #ConversionRateOptimization #UIAnimation #WebDesign #Shopify2025 #VenderOnline #NegocioDigital #MarketingEcommerce #DiseñoUX #WebAnimation #TiendaShopify #ShopifyExpert #Ecommerce #CROMarketing #DigitalMarketing`,
+          },
+          {
+            id: "burst",
+            name: "② Burst — Sale de la Bolsa",
+            emoji: "💥",
+            path: "/preview/bag-form/BagFormEffect",
+            color: "#f59e0b",
+            ig: `✨ La animación que tus clientes no podrán ignorar.
+
+Diseñamos este efecto para tiendas de moda y lifestyle — el formulario emerge directamente del producto, creando una conexión visual que aumenta el engagement hasta un 60%.
+
+En Shopy Crafter sabemos que cada milisegundo y cada píxel cuentan cuando se trata de convertir visitas en ventas.
+
+🚀 ¿Listo para transformar tu tienda Shopify?
+👉 DM abierto · Consulta gratuita los lunes 👇
+
+#ShopyCrafter #EcommerceDesign #ShopifyAnimation #TiendaModa #UIEffects #ShopifyEspañol #WebAnimation #DiseñoUX #EcommerceTips #Shopify2025 #TiendaOnline #NegocioOnline #MarketingDigital #ConversionOptimization #AnimacionWeb #DisenyoWeb #TiendaShopify #EcommerceLatinoamerica #ShopifyExperto #DigitalBusiness`,
+          },
+          {
+            id: "flip3d",
+            name: "③ Flip 3D desde Bolsa",
+            emoji: "🃏",
+            path: "/preview/bag-form/FlipCard3D",
+            color: "#8b5cf6",
+            ig: `🃏 El flip card que hace que tu formulario sea imposible de ignorar.
+
+Mientras otros tienen formularios aburridos, nosotros diseñamos experiencias. Este efecto 3D aumentó el CTR del formulario de una de nuestras tiendas en un 34% en las primeras 2 semanas.
+
+En Shopy Crafter cada elemento de tu web trabaja para ti 24/7.
+
+💡 Lo que ofrecemos:
+→ Optimización completa Shopify
+→ Generación de contenido con IA
+→ Diseño web premium
+→ SEO + CRO + Analytics
+→ Gestión de campañas
+
+📩 Pide tu auditoría gratuita hoy · Link en bio 👇
+
+#ShopyCrafter #FlipCard #WebEffect #Shopify #DiseñoWeb #3DAnimation #EcommerceTips #ShopifyEspañol #TiendaOnline #OptimizaciónWeb #ConversionRate #UIDesign #ShopifyExpert #MarketingDigital #WebDesign #NegocioDigital #EcommerceSpain #TiendaShopify #DigitalMarketing #CROExpert`,
+          },
+          {
+            id: "golden",
+            name: "④ Ola Dorada",
+            emoji: "🌊",
+            path: "/preview/bag-form/GoldenWave",
+            color: "#c8a84b",
+            ig: `🌊 Ola dorada. Formularios que hipnotizan.
+
+Este es el tipo de animación que hace que un cliente piense: "wow, esta marca se toma en serio". En Shopy Crafter nos obsesionamos con cada detalle visual porque sabemos que la primera impresión lo es todo en el ecommerce.
+
+✨ Nuestra filosofía: diseño bello + conversión real.
+No tienes que elegir entre los dos.
+
+Hemos trabajado con más de 50 tiendas Shopify en España y Latinoamérica — el resultado siempre es el mismo: más ventas, menos rebote, mejor marca.
+
+🔥 ¿Quieres formar parte de nuestros casos de éxito?
+👉 Link en bio para empezar
+
+#ShopyCrafter #GoldenWave #WebAnimation #ShopifyEspañol #TiendaOnline #DiseñoWeb #EcommerceTips #UIAnimation #Shopify2025 #ConversionOptimization #WebDesign #NegocioOnline #MarketingEcommerce #ShopifyExpert #DiseñoUX #EcommerceLatin #TiendaShopify #DigitalMarketing #PremiumDesign #ShopifyStore`,
+          },
+        ];
+
+        return (
+          <div>
+            {/* Banner info */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12, marginBottom: 24,
+              padding: "14px 18px", borderRadius: 12,
+              background: "linear-gradient(135deg, rgba(200,168,75,0.1), rgba(200,168,75,0.04))",
+              border: "1px solid rgba(200,168,75,0.2)",
+            }}>
+              <MonitorPlay size={20} style={{ color: "#c8a84b", flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#f5f5f7" }}>4 demos de efectos web · Kit Instagram profesional</div>
+                <div style={{ fontSize: 12, color: "#8b8b9e", marginTop: 2 }}>
+                  Haz clic en 🔴 Grabar, comparte la pestaña del demo y obtén un .webm listo para Instagram (10 seg).
+                </div>
+              </div>
+            </div>
+
+            {/* Demo cards grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(560px, 1fr))", gap: 24, marginBottom: 36 }}>
+              {DEMOS.map(demo => (
+                <div key={demo.id} style={{
+                  background: "#111118", borderRadius: 16, border: "1px solid #1e1e2e",
+                  overflow: "hidden",
+                }}>
+                  {/* Demo header */}
+                  <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #1e1e2e" }}>
+                    <span style={{ fontSize: 20 }}>{demo.emoji}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#f5f5f7", flex: 1 }}>{demo.name}</span>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <a
+                        href={MOCKUP_BASE + demo.path}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
+                          borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none",
+                          background: "rgba(255,255,255,0.04)", border: "1px solid #1e1e2e",
+                          color: "#8b8b9e",
+                        }}
+                      >
+                        <ExternalLink size={12} /> Abrir
+                      </a>
+                      <button
+                        onClick={() => handleRecord(demo.id, demo.name)}
+                        disabled={recordingDemo !== null}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
+                          borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: recordingDemo !== null ? "not-allowed" : "pointer",
+                          border: "none",
+                          background: recordingDemo === demo.id
+                            ? "rgba(239,68,68,0.2)"
+                            : "rgba(239,68,68,0.1)",
+                          color: recordingDemo === demo.id ? "#ef4444" : "#fca5a5",
+                          outline: recordingDemo === demo.id ? "1px solid rgba(239,68,68,0.4)" : "none",
+                          opacity: recordingDemo !== null && recordingDemo !== demo.id ? 0.4 : 1,
+                        }}
+                      >
+                        {recordingDemo === demo.id
+                          ? <><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#ef4444", animation: "vaultPulse 1s infinite" }} /> Grabando 10s...</>
+                          : <><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} /> Grabar Demo</>
+                        }
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Iframe preview */}
+                  <div style={{ position: "relative", width: "100%", paddingBottom: "56.25%", background: "#0a0a10" }}>
+                    <iframe
+                      src={MOCKUP_BASE + demo.path}
+                      style={{
+                        position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+                        border: "none",
+                      }}
+                      title={demo.name}
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Kit Instagram ── */}
+            <div style={{
+              padding: "18px 22px", borderRadius: 14, marginBottom: 20,
+              background: "linear-gradient(135deg, rgba(200,168,75,0.08), rgba(200,168,75,0.03))",
+              border: "1px solid rgba(200,168,75,0.18)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                <span style={{ fontSize: 22 }}>📲</span>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#f5f5f7" }}>Kit de Instagram Profesional</div>
+                  <div style={{ fontSize: 12, color: "#8b8b9e" }}>4 captions listos para subir — copia, pega y publica</div>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(480px, 1fr))", gap: 16 }}>
+                {DEMOS.map(demo => (
+                  <div key={`ig-${demo.id}`} style={{
+                    background: "#0d0d14", borderRadius: 12, border: "1px solid #1e1e2e",
+                    overflow: "hidden",
+                  }}>
+                    <div style={{
+                      padding: "10px 14px", display: "flex", alignItems: "center", gap: 8,
+                      borderBottom: "1px solid #1e1e2e",
+                      background: "rgba(255,255,255,0.02)",
+                    }}>
+                      <span style={{ fontSize: 16 }}>{demo.emoji}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#f5f5f7", flex: 1 }}>{demo.name}</span>
+                      <button
+                        onClick={() => handleCopyCaption(`ig-${demo.id}`, demo.ig)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5, padding: "5px 12px",
+                          borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                          border: "none",
+                          background: copiedCaption === `ig-${demo.id}`
+                            ? "rgba(76,175,80,0.2)" : "rgba(200,168,75,0.12)",
+                          color: copiedCaption === `ig-${demo.id}` ? "#4caf50" : "#c8a84b",
+                          outline: copiedCaption === `ig-${demo.id}` ? "1px solid rgba(76,175,80,0.3)" : "1px solid rgba(200,168,75,0.2)",
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        {copiedCaption === `ig-${demo.id}`
+                          ? <><Check size={11} /> ¡Copiado!</>
+                          : <><Copy size={11} /> Copiar caption</>
+                        }
+                      </button>
+                    </div>
+                    <div style={{
+                      padding: "12px 14px", maxHeight: 200, overflowY: "auto",
+                      fontSize: 12, lineHeight: 1.7, color: "#c8c8d8",
+                      whiteSpace: "pre-wrap", fontFamily: "monospace",
+                    }}>
+                      {demo.ig}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Copy all button */}
+              <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+                <button
+                  onClick={() => handleCopyCaption("all", DEMOS.map(d => `━━━ ${d.name} ━━━\n${d.ig}`).join("\n\n"))}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "10px 28px",
+                    borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    border: "1px solid rgba(200,168,75,0.3)",
+                    background: copiedCaption === "all" ? "rgba(76,175,80,0.15)" : "rgba(200,168,75,0.1)",
+                    color: copiedCaption === "all" ? "#4caf50" : "#c8a84b",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {copiedCaption === "all"
+                    ? <><Check size={14} /> ¡Los 4 copiados!</>
+                    : <><Copy size={14} /> Copiar los 4 captions de golpe</>
+                  }
+                </button>
+              </div>
+            </div>
+
+            {/* Tips box */}
+            <div style={{
+              padding: "14px 18px", borderRadius: 12,
+              background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)",
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#93c5fd", marginBottom: 8 }}>💡 Tips para maximizar visibilidad en Instagram</div>
+              <ul style={{ margin: 0, padding: "0 0 0 18px", fontSize: 12, color: "#8b8b9e", lineHeight: 2 }}>
+                <li>Sube los demos como <strong style={{ color: "#c8c8d8" }}>Reels de 10–15 seg</strong> con la portada en el primer frame del formulario animándose</li>
+                <li>Publica <strong style={{ color: "#c8c8d8" }}>entre 18:00 y 20:00</strong> hora local para máximo alcance orgánico</li>
+                <li>Añade en Stories el mismo video con un <strong style={{ color: "#c8c8d8" }}>sticker de encuesta</strong> ("¿Tu tienda tiene estas animaciones?")</li>
+                <li>Los primeros <strong style={{ color: "#c8c8d8" }}>3 comentarios propios</strong> con emojis ayudan al algoritmo a clasificar el post</li>
+                <li>Usa el caption completo en el post y solo los <strong style={{ color: "#c8c8d8" }}>5 hashtags más relevantes</strong> en el primer comentario</li>
+              </ul>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ════════════════════════════════
           TAB: ARCHIVOS — Entity List
