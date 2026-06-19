@@ -740,7 +740,7 @@ export default function GlobalVault() {
           TAB: DEMO KIT IG
       ════════════════════════════════ */}
       {!selectedEntity && tab === "demos" && (() => {
-        const MOCKUP_BASE = window.location.origin + "/mockup-sandbox";
+        const MOCKUP_BASE = window.location.origin + "/__mockup";
         const DEMOS = [
           {
             id: "original",

@@ -20,20 +20,8 @@ const DEFAULT_MODULE_NAV = [
   { id: "pricing",     label: "Pricing",      icon: "💰" },
   { id: "seo",         label: "SEO Engine",   icon: "🔍" },
   { id: "vault",       label: "Repositorio",  icon: "🗄️" },
-  { id: "exports",     label: "Exportar",     icon: "📥" },
-  { id: "generator",   label: "Generador IA", icon: "✨" },
-  { id: "web-lab",     label: "Lab Web IA",              icon: "🔬" },
-  { id: "fusion-studio",     label: "Studio Fotografía IA",  icon: "🧬" },
-  { id: "fusion-studio-pro", label: "Studio Multimedia Pro", icon: "⚡" },
-  { id: "cards",             label: "Studio de Cards",       icon: "💳" },
-  { id: "campaign-kit",      label: "Kit de Campañas",       icon: "🎬" },
-  { id: "exploded-view",     label: "Vista Explosionada",    icon: "💥" },
-  { id: "ad-studio",         label: "Studio de Anuncios",    icon: "📺" },
-  { id: "tripo3d",           label: "Tripo 3D Studio",       icon: "🧊" },
-  { id: "meshy",             label: "Meshy Characters",      icon: "🧊✨" },
-  { id: "web-designer",      label: "Diseñador Web IA",      icon: "🎨" },
-  { id: "effects-studio",    label: "Studio de Efectos",     icon: "✦" },
-  { id: "suppliers",         label: "Proveedores",           icon: "🏭" },
+  { id: "tripo3d",     label: "Tripo 3D Studio", icon: "🧊" },
+  { id: "meshy",       label: "Meshy Characters", icon: "🧊✨" },
 ];
 
 const DEFAULT_SHOPYBRAIN_NAV = [
