@@ -6,7 +6,7 @@
  *  2. Editor de la tarjeta seleccionada (centro): datos, paleta, fonts, layout, fondo, QR
  *  3. Preview LIVE en CSS (derecha) + preview PNG generado + acciones
  */
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { useRoute } from "wouter";
 import {
   Loader2, Sparkles, Plus, Trash2, Download, Wand2,
@@ -14,7 +14,8 @@ import {
   Image as ImageIcon, FileText, QrCode, Move,
   Link2, Video, Frame, Smartphone, Copy, ExternalLink,
 } from "lucide-react";
-import CardStudioEditor, { type LayoutOverrides } from "./CardStudioEditor";
+import { type LayoutOverrides } from "./CardStudioEditor";
+const CardStudioEditor = lazy(() => import("./CardStudioEditor"));
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -799,43 +800,45 @@ export default function CardStudio() {
             <PreGenerationView card={selected} onGenerate={() => generateCard(selected.id)} />
           ) : (
             <div style={{ ...panelStyle, minHeight: 580 }}>
-              <CardStudioEditor
-                key={selected.id}
-                apiBase={API_BASE}
-                cardId={selected.id}
-                bgUrl={selected.bgUrl ? (selected.bgUrl.startsWith("http") ? selected.bgUrl : `${API_BASE}${selected.bgUrl}`) : null}
-                bgFrontUrl={selected.bgFrontUrl ? (selected.bgFrontUrl.startsWith("http") ? selected.bgFrontUrl : `${API_BASE}${selected.bgFrontUrl}`) : null}
-                bgBackUrl={selected.bgBackUrl ? (selected.bgBackUrl.startsWith("http") ? selected.bgBackUrl : `${API_BASE}${selected.bgBackUrl}`) : null}
-                frontUrl={selected.frontUrl.startsWith("http") ? selected.frontUrl : `${API_BASE}${selected.frontUrl}`}
-                backUrl={selected.backUrl ? (selected.backUrl.startsWith("http") ? selected.backUrl : `${API_BASE}${selected.backUrl}`) : null}
-                logoUrl={selected.logoUrl ? (selected.logoUrl.startsWith("http") ? selected.logoUrl : `${API_BASE}${selected.logoUrl}`) : null}
-                initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
-                generating={false}
-                qrType={selected.qrType || "vcard"}
-                qrContentUrl={selected.qrContentUrl ?? null}
-                onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
-                onRegenerate={async () => { await generateCard(selected.id); }}
-                onThemePrompt={async (prompt, side) => {
-                  const res = await fetch(`${API_BASE}/api/cards/${selected.id}/generate-bg`, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ prompt, side }),
-                  });
-                  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error || "Error generando fondo"); }
-                  const { results } = await res.json() as { results: { side: string; url: string }[] };
-                  const patch: Partial<BusinessCard> = {};
-                  for (const r of results) {
-                    if (r.side === "front") patch.bgFrontUrl = `${API_BASE}${r.url}`;
-                    if (r.side === "back")  patch.bgBackUrl  = `${API_BASE}${r.url}`;
-                  }
-                  updateLocal(patch);
-                }}
-                onQrDataChange={(type, url) => {
-                  updateLocal({ qrType: type, qrContentUrl: url ?? "" });
-                  updateCard(selected.id, { qrType: type, qrContentUrl: url ?? null } as any);
-                }}
-              />
+              <Suspense fallback={<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, color: "#8b8b9e" }}><Loader2 size={24} style={{ animation: "spin 1s linear infinite", marginRight: 10 }} /> Cargando editor…</div>}>
+                <CardStudioEditor
+                  key={selected.id}
+                  apiBase={API_BASE}
+                  cardId={selected.id}
+                  bgUrl={selected.bgUrl ? (selected.bgUrl.startsWith("http") ? selected.bgUrl : `${API_BASE}${selected.bgUrl}`) : null}
+                  bgFrontUrl={selected.bgFrontUrl ? (selected.bgFrontUrl.startsWith("http") ? selected.bgFrontUrl : `${API_BASE}${selected.bgFrontUrl}`) : null}
+                  bgBackUrl={selected.bgBackUrl ? (selected.bgBackUrl.startsWith("http") ? selected.bgBackUrl : `${API_BASE}${selected.bgBackUrl}`) : null}
+                  frontUrl={selected.frontUrl.startsWith("http") ? selected.frontUrl : `${API_BASE}${selected.frontUrl}`}
+                  backUrl={selected.backUrl ? (selected.backUrl.startsWith("http") ? selected.backUrl : `${API_BASE}${selected.backUrl}`) : null}
+                  logoUrl={selected.logoUrl ? (selected.logoUrl.startsWith("http") ? selected.logoUrl : `${API_BASE}${selected.logoUrl}`) : null}
+                  initialOverrides={(selected.layoutOverrides as LayoutOverrides) || {}}
+                  generating={false}
+                  qrType={selected.qrType || "vcard"}
+                  qrContentUrl={selected.qrContentUrl ?? null}
+                  onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
+                  onRegenerate={async () => { await generateCard(selected.id); }}
+                  onThemePrompt={async (prompt, side) => {
+                    const res = await fetch(`${API_BASE}/api/cards/${selected.id}/generate-bg`, {
+                      method: "POST",
+                      credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ prompt, side }),
+                    });
+                    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error || "Error generando fondo"); }
+                    const { results } = await res.json() as { results: { side: string; url: string }[] };
+                    const patch: Partial<BusinessCard> = {};
+                    for (const r of results) {
+                      if (r.side === "front") patch.bgFrontUrl = `${API_BASE}${r.url}`;
+                      if (r.side === "back")  patch.bgBackUrl  = `${API_BASE}${r.url}`;
+                    }
+                    updateLocal(patch);
+                  }}
+                  onQrDataChange={(type, url) => {
+                    updateLocal({ qrType: type, qrContentUrl: url ?? "" });
+                    updateCard(selected.id, { qrType: type, qrContentUrl: url ?? null } as any);
+                  }}
+                />
+              </Suspense>
             </div>
           )}
         </div>

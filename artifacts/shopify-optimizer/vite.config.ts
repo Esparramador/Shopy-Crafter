@@ -58,8 +58,8 @@ export default defineConfig({
     sourcemap:  false,
     target:     "es2020",
 
-    // Raise chunk-size warning threshold (we split explicitly below)
-    chunkSizeWarningLimit: 800,
+    // Raise chunk-size warning threshold — Three.js & Fabric are inherently large
+    chunkSizeWarningLimit: 1100,
 
     rollupOptions: {
       output: {
@@ -86,9 +86,17 @@ export default defineConfig({
           if (id.includes("node_modules/@radix-ui")) {
             return "vendor-radix";
           }
-          // Three.js (very heavy — keep isolated)
-          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three")) {
-            return "vendor-three";
+          // Three.js core (heavy — isolated so it's only loaded by 3D pages)
+          if (id.includes("node_modules/three/")) {
+            return "vendor-three-core";
+          }
+          // React Three Fiber
+          if (id.includes("node_modules/@react-three/fiber")) {
+            return "vendor-three-fiber";
+          }
+          // React Three Drei (large, many sub-modules)
+          if (id.includes("node_modules/@react-three/drei")) {
+            return "vendor-drei";
           }
           // Framer Motion
           if (id.includes("node_modules/framer-motion")) {
@@ -97,6 +105,22 @@ export default defineConfig({
           // Lucide icons
           if (id.includes("node_modules/lucide-react")) {
             return "vendor-icons";
+          }
+          // Fabric.js — canvas graphics (CardStudio only)
+          if (id.includes("node_modules/fabric")) {
+            return "vendor-fabric";
+          }
+          // Konva / react-konva — canvas lib (CardStudio only)
+          if (id.includes("node_modules/konva") || id.includes("node_modules/react-konva")) {
+            return "vendor-konva";
+          }
+          // D3 — data visualisation
+          if (id.includes("node_modules/d3") || id.includes("node_modules/d3-")) {
+            return "vendor-d3";
+          }
+          // JSZip — zip file generation
+          if (id.includes("node_modules/jszip")) {
+            return "vendor-jszip";
           }
           // All other node_modules
           if (id.includes("node_modules/")) {
