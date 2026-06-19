@@ -1571,10 +1571,38 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         if (!br.success) return `❌ **Error de navegación**: ${br.message}`;
         let msg = `🌐 **Navegación completada** — "${br.goal}"\n`;
         msg += `✅ ${br.stepsOk}/${br.stepsExecuted} pasos ejecutados\n`;
-        if (br.finalUrl) msg += `🔗 URL final: ${br.finalUrl}\n`;
+        if (br.finalUrl) msg += `🔗 URL: ${br.finalUrl}\n`;
         if (br.screenshots?.length) msg += `📸 ${br.screenshots.length} captura(s) tomadas\n`;
-        if (br.youtubeEmbed) msg += `\n▶️ **Vídeo de YouTube encontrado** — incrustado abajo.`;
-        if (br.extractedText) msg += `\n\n📄 **Texto extraído (fragmento):**\n${br.extractedText.slice(0, 400)}...`;
+        if (br.youtubeEmbed) msg += `\n▶️ **Vídeo encontrado** — reproduciendo abajo.`;
+        if (br.extractedText) msg += `\n\n📄 **Texto extraído:**\n${br.extractedText.slice(0, 400)}...`;
+        return msg;
+      }
+
+      case "browser_research": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.message}`;
+        let msg = `🔬 **Investigación completada**: "${r.topic}"\n`;
+        msg += `📚 ${r.sourcesCount || 0} fuentes web consultadas\n`;
+        if (r.vaultId) {
+          msg += `\n💾 **Informe guardado en el Vault** (ID: ${r.vaultId})\n`;
+          msg += `🌐 Ver informe: ${r.vaultUrl}\n`;
+          msg += `📥 Descargar PDF: ${r.vaultUrl}?format=pdf`;
+        }
+        return msg;
+      }
+
+      case "generate_brand_book": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.message}`;
+        let msg = `📖 **Brand Book generado**: "${r.brandName}"\n`;
+        if (r.tagline) msg += `💬 Tagline: "${r.tagline}"\n`;
+        if (r.archetype) msg += `🎭 Arquetipo: ${r.archetype}\n`;
+        if (r.colorsCount) msg += `🎨 ${r.colorsCount} colores | 💡 ${r.valuesCount || 0} valores\n`;
+        if (r.vaultId) {
+          msg += `\n💾 **Brand Book guardado en el Vault** (ID: ${r.vaultId})\n`;
+          msg += `🌐 Ver: ${r.vaultUrl}\n`;
+          msg += `📥 Descargar PDF: ${r.vaultUrl}?format=pdf`;
+        }
         return msg;
       }
 
@@ -2041,8 +2069,15 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 results.push(formatted);
                 const actionType = act.action === "search_suppliers" ? "supplier-research"
                   : act.action === "browser_action" ? "browser-action"
+                  : act.action === "browser_research" ? "browser-action"
+                  : act.action === "generate_brand_book" ? "browser-action"
                   : "shopify-action";
-                action = { type: actionType as ChatAction["type"], label: actionType === "supplier-research" ? "Descargar informe" : actionType === "browser-action" ? "Ver navegación" : "Ver resultado", data: actionResult, actionName: act.action, formattedContent: formatted };
+                const actionLabel = act.action === "search_suppliers" ? "Descargar informe"
+                  : act.action === "browser_action" ? "Ver navegación"
+                  : act.action === "browser_research" ? "Ver informe"
+                  : act.action === "generate_brand_book" ? "Ver Brand Book"
+                  : "Ver resultado";
+                action = { type: actionType as ChatAction["type"], label: actionLabel, data: actionResult, actionName: act.action, formattedContent: formatted };
               }
             }
             if (results.length > 0) {
@@ -2255,8 +2290,52 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                         <EntityResearchCard data={msg.action.data as EntityResearchResult} />
                       )}
                       {msg.action?.type === "browser-action" && (() => {
-                        const br = msg.action!.data as BrowserActionResult;
-                        if (!br) return null;
+                        const actionName = msg.action!.actionName;
+                        const data = msg.action!.data as any;
+                        if (!data) return null;
+
+                        // ── browser_research / generate_brand_book → Vault links ──
+                        if (actionName === "browser_research" || actionName === "generate_brand_book") {
+                          const icon = actionName === "generate_brand_book" ? "📖" : "📊";
+                          const label = actionName === "generate_brand_book" ? "Brand Book" : "Informe de investigación";
+                          const vaultUrl = data.vaultUrl;
+                          const topic = data.topic || data.brandName || "";
+                          return (
+                            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                              {vaultUrl ? (
+                                <div style={{ background: "rgba(196,165,90,0.07)", border: "1px solid rgba(196,165,90,0.25)", borderRadius: 10, padding: "14px 16px" }}>
+                                  <div style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700, marginBottom: 10 }}>{icon} {label}{topic ? ` — "${topic}"` : ""}</div>
+                                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                    <a href={vaultUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "rgba(196,165,90,0.15)", border: "1px solid rgba(196,165,90,0.4)", borderRadius: 7, fontSize: 11, color: "var(--gold)", textDecoration: "none", fontWeight: 600 }}>
+                                      🌐 Ver informe
+                                    </a>
+                                    <a href={`${vaultUrl}?format=pdf`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", background: "rgba(100,100,100,0.15)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 7, fontSize: 11, color: "#d0c8bc", textDecoration: "none" }}>
+                                      📥 Descargar PDF
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: 11, color: "var(--t3)", fontStyle: "italic" }}>⚠️ Sin projectId — el informe no se guardó en el Vault.</div>
+                              )}
+                              {data.screenshots?.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                  {data.screenshots.map((sc: { label: string; dataUrl: string }, i: number) => (
+                                    <div key={i} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--ink3)" }}>
+                                      <div style={{ padding: "4px 10px", background: "var(--ink2)", fontSize: 10, color: "var(--t3)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                        <span>📸 {sc.label}</span>
+                                        <a href={sc.dataUrl} download={`${sc.label}.jpg`} style={{ color: "var(--gold)", textDecoration: "none", fontSize: 10 }}>⬇</a>
+                                      </div>
+                                      <img src={sc.dataUrl} alt={sc.label} style={{ width: "100%", display: "block", maxHeight: 260, objectFit: "cover" }} />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        // ── browser_action → YouTube / URL / screenshots ──
+                        const br = data as BrowserActionResult;
                         return (
                           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
                             {br.youtubeEmbed && (
@@ -2264,21 +2343,21 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                                 <div style={{ padding: "6px 10px", background: "rgba(255,0,0,0.12)", display: "flex", alignItems: "center", gap: 6 }}>
                                   <span style={{ fontSize: 14 }}>▶️</span>
                                   <span style={{ fontSize: 11, color: "#ff4040", fontWeight: 600 }}>YouTube</span>
-                                  {br.finalUrl && <a href={br.finalUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "var(--gold)", marginLeft: "auto", textDecoration: "none" }}>Abrir en nueva pestaña ↗</a>}
+                                  {br.finalUrl && (
+                                    <a href={br.finalUrl} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: "var(--gold)", marginLeft: "auto", textDecoration: "none", padding: "3px 8px", background: "rgba(196,165,90,0.12)", borderRadius: 5, border: "1px solid rgba(196,165,90,0.3)" }}>
+                                      Abrir en nueva pestaña ↗
+                                    </a>
+                                  )}
                                 </div>
-                                <iframe
-                                  src={br.youtubeEmbed}
-                                  width="100%"
-                                  height="220"
+                                <iframe src={br.youtubeEmbed} width="100%" height="220"
                                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                  allowFullScreen
-                                  style={{ border: "none", display: "block" }}
-                                />
+                                  allowFullScreen style={{ border: "none", display: "block" }} />
                               </div>
                             )}
                             {!br.youtubeEmbed && br.finalUrl && (
-                              <a href={br.finalUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.3)", borderRadius: 8, fontSize: 11, color: "var(--gold)", textDecoration: "none", width: "fit-content" }}>
-                                🔗 Abrir URL: {br.finalUrl.length > 50 ? br.finalUrl.slice(0, 50) + "..." : br.finalUrl}
+                              <a href={br.finalUrl} target="_blank" rel="noreferrer"
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.35)", borderRadius: 8, fontSize: 11, color: "var(--gold)", textDecoration: "none", width: "fit-content", fontWeight: 600 }}>
+                                🔗 Abrir en nueva pestaña ↗ {br.finalUrl.length > 45 ? br.finalUrl.slice(0, 45) + "..." : br.finalUrl}
                               </a>
                             )}
                             {br.screenshots && br.screenshots.length > 0 && (

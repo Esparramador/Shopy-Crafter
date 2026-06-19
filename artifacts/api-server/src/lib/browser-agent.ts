@@ -330,6 +330,127 @@ export function extractYoutubeVideoId(url: string): string | null {
   return null;
 }
 
+// ─── Research multi-página (Google → extrae texto de resultados) ─────────────
+export interface ResearchPage {
+  url: string;
+  title: string;
+  text: string;
+  error?: string;
+}
+
+export interface BrowserResearchResult {
+  query: string;
+  pages: ResearchPage[];
+  totalChars: number;
+}
+
+/**
+ * Busca en Google y extrae el texto de los primeros N resultados.
+ * Devuelve páginas con URL, título y texto para que Claude sintetice.
+ */
+export async function browserResearchTopic(params: {
+  queries: string[];          // 1-3 búsquedas de Google
+  resultsPerQuery?: number;   // cuántos resultados seguir por búsqueda (default 3)
+  maxCharsPerPage?: number;   // chars a extraer por página (default 4000)
+  takeScreenshot?: boolean;   // screenshot de la SERP (default false)
+}): Promise<{ allPages: ResearchPage[]; screenshots: Array<{ label: string; base64: string }>; error?: string }> {
+  const { queries, resultsPerQuery = 3, maxCharsPerPage = 4000, takeScreenshot = false } = params;
+  const allPages: ResearchPage[] = [];
+  const screenshots: Array<{ label: string; base64: string }> = [];
+  let browser: any = null;
+  let page: any = null;
+
+  try {
+    const puppeteer = await import("puppeteer-core");
+    browser = await puppeteer.default.launch({
+      executablePath: CHROMIUM_PATH,
+      headless: true,
+      args: LAUNCH_ARGS,
+      timeout: 60000,
+    });
+    page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.setUserAgent(
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+    );
+
+    for (const query of queries.slice(0, 3)) {
+      try {
+        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=10&hl=es`;
+        await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+        await new Promise(r => setTimeout(r, 1500));
+
+        if (takeScreenshot) {
+          const buf = await page.screenshot({ type: "jpeg", quality: 70 });
+          screenshots.push({ label: `SERP_${query.slice(0, 30)}`, base64: Buffer.from(buf).toString("base64") });
+        }
+
+        // Extraer URLs de resultados orgánicos de Google
+        const resultUrls: string[] = await page.evaluate(() => {
+          const anchors = Array.from(document.querySelectorAll("a[href]")) as HTMLAnchorElement[];
+          const urls: string[] = [];
+          for (const a of anchors) {
+            const href = a.href;
+            if (
+              href &&
+              href.startsWith("http") &&
+              !href.includes("google.com") &&
+              !href.includes("youtube.com") && // skip YT for research
+              !href.includes("javascript:") &&
+              !urls.includes(href)
+            ) {
+              urls.push(href);
+            }
+          }
+          return urls.slice(0, 8);
+        });
+
+        // También intentar extraer texto del snippet directamente de la SERP
+        const serpText: string = await page.evaluate(() => {
+          const snippets = Array.from(document.querySelectorAll("[data-sncf], .VwiC3b, .lEBKkf, .hgKElc, .s3v9rd, div[data-content-feature='1']"));
+          return snippets.map((el: any) => el.innerText?.trim()).filter(Boolean).join("\n\n").slice(0, 3000);
+        });
+        if (serpText.length > 200) {
+          allPages.push({ url: searchUrl, title: `Resultados Google: "${query}"`, text: serpText });
+        }
+
+        // Visitar primeros N resultados
+        let visited = 0;
+        for (const url of resultUrls) {
+          if (visited >= resultsPerQuery) break;
+          try {
+            await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+            await new Promise(r => setTimeout(r, 1000));
+            const title: string = await page.title().catch(() => url);
+            const text: string = await page.evaluate((maxChars: number) => {
+              // Eliminar scripts, styles, nav, footer, ads
+              const remove = document.querySelectorAll("script, style, nav, footer, header, aside, iframe, .ad, [class*='cookie'], [class*='popup'], [id*='cookie'], [id*='banner']");
+              remove.forEach((el: any) => el.remove());
+              const main = document.querySelector("main, article, [role='main'], .content, #content, .post-content, .entry-content") as HTMLElement | null;
+              const el = main || document.body;
+              return (el?.innerText || "").replace(/\n{3,}/g, "\n\n").trim().slice(0, maxChars);
+            }, maxCharsPerPage);
+            if (text.length > 100) {
+              allPages.push({ url, title, text });
+              visited++;
+            }
+          } catch (err) {
+            allPages.push({ url, title: url, text: "", error: String(err) });
+          }
+        }
+      } catch (err) {
+        logger.warn({ query, err: String(err) }, "browserResearchTopic: query failed");
+      }
+    }
+
+    return { allPages, screenshots };
+  } catch (err) {
+    return { allPages, screenshots, error: String(err) };
+  } finally {
+    if (browser) { try { await browser.close(); } catch { /* ignore */ } }
+  }
+}
+
 // ─── Builder de steps comunes ────────────────────────────────────────────────
 export const BrowserRecipes = {
   youtubeSearch: (query: string): BrowserStep[] => [

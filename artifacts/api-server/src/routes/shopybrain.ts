@@ -792,6 +792,8 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Ir a Card Studio / abrir Card Studio / quiero ir al studio de tarjetas → directamente di la ruta: /projects/{projectId}/cards
   - Informe por niveles / informe nivel 2 / generar nivel 3 / report nivel / informe profesional / informe enterprise → run_leveled_report (genera informe con sistema de 5 niveles). Params: {projectId, type (tipo de informe), level (1-5), template?}
   - Subir archivo / procesar archivo / analizar archivo / importar archivo / CSV / PDF / Excel → upload_file (procesa archivo subido). Params: {fileContext? (descripción del archivo)}
+  - Investigar en internet / buscar información sobre / informe sobre / recopila información de / dime todo sobre / investiga / ¿qué es / cómo funciona / cómo se hace / tutorial / guía completa / análisis de / recopilatorio de / cuéntame sobre / busca y resume / genera informe de investigación / chistes de / recopilatorio de chistes / humor / memes de / cómo diseñar / cómo crear desde 0 → browser_research. Params: {topic (tema a investigar), queries? (array de búsquedas específicas), reportTitle? (título del informe), style? ("professional"|"fun" — "fun" para chistes/entretenimiento), projectId?}. Investigación REAL en Google: visita múltiples páginas y sintetiza con IA. SIEMPRE guarda en Vault si hay projectId. EJEMPLOS: {topic:"chistes de humor negro",style:"fun"} / {topic:"diseñar Plim Plim en Blender desde 0",style:"professional",projectId:X} / {topic:"estrategias marketing para Shopify"}
+  - Brand Book / Brand DNA / manual de marca / identidad visual / guía de estilo completa / DNA de marca / generar brand book / como google ai studio / identidad corporativa / dossier de marca / manual de identidad → generate_brand_book. Params: {brandName?, industry?, notes? (información adicional sobre la marca), projectId?}. Genera un brand book completo de 10+ secciones: misión/visión, valores, arquetipo, tono de voz, paleta de colores, tipografía, logo, audiencia, pilares de contenido, redes sociales, mensajes clave, posicionamiento. HTML profesional descargable guardado en Vault. EJEMPLOS: {brandName:"Nike",industry:"deportes"} / {brandName:"Mi Tienda",projectId:X,notes:"vendemos ropa sostenible para mujer"} 
   - Abrir web / navegar a / ir a / abre / visita / accede a / abre YouTube / pon canción / busca en Google / busca en YouTube / busca en internet / scraping / extrae info de web / analiza página / ¿qué dice esta web? / busca información online → browser_action (controla navegador real Chromium, navega, hace clic, escribe, hace capturas, extrae texto). Params: {goal (descripción en lenguaje natural de qué hacer), steps? (array de pasos explícitos si se quiere control preciso), url? (URL directa si es "abrir esta URL"), scrapeUrl? (URL para scraping)}. PASOS DISPONIBLES: navigate(url), type(selector,text), click(selector), click_text(text), press(key), wait(ms), screenshot(label?), get_url, get_text(selector?), scroll(direction,amount), search(engine:"google"|"youtube"|"bing", query), evaluate(script). RECETAS AUTOMÁTICAS: si el goal menciona "youtube" → busca en YouTube y abre el primer vídeo; si menciona "google" o "buscar" → búsqueda Google con capturas; si es una URL → abre y toma captura; cualquier otra cosa → búsqueda Google. EJEMPLOS: {goal:"Abre YouTube y pon canción de Omar Montes"} / {goal:"Busca en Google precio del oro hoy"} / {goal:"Navega a amazon.es y busca auriculares"} / {goal:"Extrae los precios de esta web", scrapeUrl:"https://ejemplo.com"}
   
   SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
@@ -10705,6 +10707,546 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             scriptId: savedId,
             message: `📝 Script cinematográfico guardado (id ${savedId}). Reutilízalo en create_long_ad pasando savedPromptId="${savedId}".`,
           };
+          break;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // BROWSER RESEARCH — Investigación web + informe profesional
+        // ══════════════════════════════════════════════════════════════════
+        case "browser_research": {
+          const { browserResearchTopic } = await import("../lib/browser-agent.js");
+          const topic: string = params?.topic || params?.query || "investigación general";
+          const projectId = params?.projectId ? Number(params.projectId) : (req.session as any)?.projectId;
+          const reportTitle: string = params?.reportTitle || `Investigación: ${topic}`;
+          const reportStyle: string = params?.style || "professional"; // professional | fun | technical
+
+          // Construir queries de búsqueda inteligentes
+          const queries: string[] = params?.queries || [topic];
+          if (queries.length === 1) {
+            queries.push(`${topic} guía completa`);
+            queries.push(`${topic} tutorial paso a paso`);
+          }
+
+          try {
+            // 1. Investigación web real
+            const research = await browserResearchTopic({
+              queries: queries.slice(0, 3),
+              resultsPerQuery: 3,
+              maxCharsPerPage: 5000,
+              takeScreenshot: false,
+            });
+
+            // 2. Preparar contexto de investigación para Claude
+            const rawContent = research.allPages
+              .filter((p: { text: string }) => p.text.length > 100)
+              .map((p: { url: string; title: string; text: string }, i: number) => `### Fuente ${i + 1}: ${p.title}\n🔗 ${p.url}\n\n${p.text}`)
+              .join("\n\n---\n\n")
+              .slice(0, 40000);
+
+            if (!rawContent && research.error) {
+              result = { error: true, message: `❌ Error de investigación web: ${research.error}` };
+              break;
+            }
+
+            // 3. Claude sintetiza y genera el contenido del informe
+            const synthesisPrompt = reportStyle === "fun"
+              ? `Eres un experto en síntesis de información y redacción creativa. 
+                 Con el siguiente contenido investigado sobre "${topic}", genera un RECOPILATORIO completo, 
+                 entretenido y bien estructurado. Si son chistes, preséntalo como "Los X mejores chistes de ${topic}" 
+                 con numeración clara. Si es otro tipo de contenido, adapta el tono.
+                 
+                 Formato de salida: HTML limpio con <h2>, <p>, <ol>/<ul>, <blockquote> para los chistes/fragmentos.
+                 Incluye introducción, secciones temáticas, y conclusión.`
+              : `Eres un analista experto con 20 años de experiencia. 
+                 Con el siguiente contenido investigado sobre "${topic}", redacta un INFORME PROFESIONAL COMPLETO.
+                 
+                 El informe debe incluir:
+                 1. Resumen ejecutivo (3-4 párrafos)
+                 2. Introducción y contexto
+                 3. Análisis detallado (mínimo 5 secciones temáticas con H2/H3)
+                 4. Puntos clave destacados
+                 5. Proceso paso a paso (si aplica)
+                 6. Recursos y herramientas recomendadas
+                 7. Conclusiones y recomendaciones
+                 8. Fuentes consultadas
+                 
+                 Tono: profesional, preciso, completo. Mínimo 1500 palabras.
+                 Formato: HTML con <h2>, <h3>, <p>, <ul>, <ol>, <strong>, <em>, <blockquote>.
+                 NO incluyas DOCTYPE, html, head, body — solo el contenido interior.`;
+
+            const { askClaude: ask } = await import("../lib/claude.js");
+            const synthesizedHtml = await ask({
+              system: synthesisPrompt,
+              messages: [{ role: "user", content: rawContent || `Genera un informe completo sobre: ${topic}` }],
+              model: "genius",
+              maxTokens: 8000,
+            });
+
+            // 4. Construir HTML profesional completo
+            const { buildCoverPage } = await import("../lib/report-cover.js");
+            const reportDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+            const sourcesHtml = research.allPages
+              .filter((p: { text: string }) => p.text.length > 50)
+              .map((p: { url: string; title: string }) => `<li><a href="${p.url}" target="_blank" style="color:#c4a55a;">${p.title || p.url}</a></li>`)
+              .join("\n");
+
+            const fullHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>${reportTitle}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0d0d0d;color:#e8e0d0;font-family:'Inter',sans-serif;line-height:1.8;font-size:15px}
+    .report-body{max-width:900px;margin:0 auto;padding:60px 40px}
+    h1{font-family:'Playfair Display',serif;font-size:2.2rem;color:#c4a55a;margin-bottom:1rem;line-height:1.3}
+    h2{font-family:'Playfair Display',serif;font-size:1.5rem;color:#c4a55a;margin:2.5rem 0 1rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(196,165,90,0.3)}
+    h3{font-size:1.1rem;color:#d4b870;margin:1.5rem 0 0.7rem;font-weight:600}
+    p{margin-bottom:1.2rem;color:#d4ccc0}
+    ul,ol{margin:1rem 0 1.2rem 2rem;color:#d4ccc0}
+    li{margin-bottom:0.5rem}
+    blockquote{border-left:3px solid #c4a55a;padding:1rem 1.5rem;margin:1.5rem 0;background:rgba(196,165,90,0.07);border-radius:0 8px 8px 0;font-style:italic;color:#c8b980}
+    strong{color:#e8d898;font-weight:600}
+    em{color:#b8d4b0}
+    .meta-bar{background:rgba(196,165,90,0.08);border:1px solid rgba(196,165,90,0.2);border-radius:10px;padding:16px 24px;margin:2rem 0;display:flex;gap:24px;flex-wrap:wrap}
+    .meta-item{font-size:12px;color:#8a8070}.meta-item span{color:#c4a55a;font-weight:600}
+    .sources{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:24px;margin-top:3rem}
+    .sources h2{color:#9a9080;font-size:1rem;border-bottom-color:rgba(154,144,128,0.3)}
+    .sources ul{color:#7a7068;font-size:13px}
+    .footer-brand{text-align:center;padding:3rem 0 1rem;color:#4a4038;font-size:12px;border-top:1px solid rgba(255,255,255,0.05);margin-top:3rem}
+    @media print{body{background:#fff;color:#000}.report-body{padding:20px}h1,h2,h3{color:#000}blockquote{border-left-color:#000;background:#f5f5f5}}
+  </style>
+</head>
+<body>
+${buildCoverPage({ reportTitle, reportSubtitle: `Investigación generada por IA — ${reportDate}`, companyName: "Shopy Crafter Research", date: reportDate, template: "prestige", includeBackCover: false })}
+<div class="report-body">
+  <div class="meta-bar">
+    <div class="meta-item">📅 Fecha: <span>${reportDate}</span></div>
+    <div class="meta-item">🔍 Fuentes: <span>${research.allPages.filter((p: { text: string }) => p.text.length > 50).length} páginas</span></div>
+    <div class="meta-item">📊 Queries: <span>${queries.slice(0, 3).join(" | ")}</span></div>
+    <div class="meta-item">🤖 IA: <span>Claude Genius + Chromium Browser</span></div>
+  </div>
+  
+  ${synthesizedHtml}
+  
+  ${sourcesHtml ? `<div class="sources"><h2>📚 Fuentes Consultadas</h2><ul>${sourcesHtml}</ul></div>` : ""}
+  
+  <div class="footer-brand">
+    Generado por Shopy Crafter Intelligence Engine · ${reportDate}<br>
+    Este informe fue creado mediante investigación web real con navegador Chromium + síntesis con IA.
+  </div>
+</div>
+</body>
+</html>`;
+
+            // 5. Guardar en Vault si hay projectId
+            let vaultId: number | null = null;
+            let vaultUrl: string | undefined;
+            if (projectId) {
+              vaultId = await saveToVault({
+                projectId,
+                fileType: "report",
+                category: "research",
+                title: reportTitle,
+                mimeType: "text/html",
+                content: Buffer.from(fullHtml).toString("base64"),
+              });
+              if (vaultId) vaultUrl = `/api/vault/${vaultId}/download`;
+            }
+
+            result = {
+              success: true,
+              topic,
+              reportTitle,
+              sourcesCount: research.allPages.filter((p: { text: string }) => p.text.length > 50).length,
+              vaultId,
+              vaultUrl,
+              htmlPreview: synthesizedHtml.slice(0, 500) + "...",
+              screenshots: research.screenshots.map((s: { label: string; base64: string }) => ({
+                label: s.label,
+                dataUrl: `data:image/jpeg;base64,${s.base64}`,
+              })),
+              message: vaultId
+                ? `📊 **Informe de investigación generado y guardado**\n\n📋 **${reportTitle}**\n🔍 ${research.allPages.filter((p: { text: string }) => p.text.length > 50).length} fuentes web consultadas\n📁 Queries: ${queries.slice(0, 3).join(" | ")}\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver informe: ${vaultUrl}\n📥 Descargar PDF: ${vaultUrl}?format=pdf`
+                : `📊 **Informe de investigación generado**\n\n${synthesizedHtml.replace(/<[^>]+>/g, " ").slice(0, 800)}`,
+            };
+          } catch (err) {
+            result = { error: true, message: `❌ Error en investigación: ${err instanceof Error ? err.message : String(err)}` };
+          }
+          break;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // BRAND BOOK — Manual de identidad visual completo (estilo AI Studio)
+        // ══════════════════════════════════════════════════════════════════
+        case "generate_brand_book": {
+          const projectId = params?.projectId ? Number(params.projectId) : null;
+          const brandName: string = params?.brandName || "Tu Marca";
+          const industry: string = params?.industry || "";
+          const customNotes: string = params?.notes || "";
+
+          try {
+            // Cargar Brand DNA si existe
+            let brandContext = "";
+            if (projectId) {
+              try {
+                brandContext = await buildBrandDnaContext(projectId);
+              } catch { /* no hay DNA, continuar */ }
+            }
+
+            const { askClaude: ask } = await import("../lib/claude.js");
+            const { buildCoverPage } = await import("../lib/report-cover.js");
+            const reportDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+            // Claude genera el contenido del brand book en JSON estructurado
+            const brandBookData = await ask({
+              system: `Eres un director creativo de alto nivel con 20 años de experiencia en branding global (Nike, Apple, Zara, etc.).
+Tu tarea es crear un BRAND BOOK / BRAND DNA completo y profesional similar al que genera Google AI Studio.
+
+Responde SIEMPRE en formato JSON válido con esta estructura exacta:
+{
+  "brandName": "nombre de la marca",
+  "tagline": "eslogan principal",
+  "mission": "misión de la marca (2-3 frases)",
+  "vision": "visión (2-3 frases)",
+  "brandStory": "historia de la marca (3-4 párrafos narrativos)",
+  "values": [{"name": "valor", "description": "descripción breve", "icon": "emoji"}],
+  "archetype": {"name": "arquetipo", "description": "explicación", "examples": ["marca1","marca2"]},
+  "personality": ["rasgo1", "rasgo2", "rasgo3", "rasgo4", "rasgo5"],
+  "toneOfVoice": {"primary": "tono principal", "description": "explicación", "dos": ["hacer1","hacer2","hacer3"], "donts": ["evitar1","evitar2","evitar3"]},
+  "colorPalette": [{"name": "nombre color", "hex": "#XXXXXX", "rgb": "rgb(x,y,z)", "usage": "uso principal", "psychology": "qué transmite"}],
+  "typography": {"primary": {"name": "fuente", "weights": ["400","600","700"], "usage": "titulares"}, "secondary": {"name": "fuente", "weights": ["300","400","500"], "usage": "cuerpo"}, "accent": {"name": "fuente", "weights": ["400"], "usage": "detalles"}},
+  "logoGuidelines": {"clearSpace": "descripción espacio mínimo", "minSize": "tamaño mínimo", "backgrounds": ["fondos correctos"], "prohibitions": ["prohibiciones"], "variations": ["variación principal","variación secundaria","versión monocroma"]},
+  "imagery": {"style": "estilo fotográfico", "composition": "descripción composición", "mood": "estado de ánimo visual", "avoidances": ["evitar1","evitar2"], "examples": ["tipo imagen 1","tipo imagen 2","tipo imagen 3"]},
+  "contentPillars": [{"pillar": "pilar temático", "description": "qué contenido incluye", "percentage": "% del contenido", "examples": ["ejemplo1","ejemplo2"]}],
+  "targetAudience": {"primary": {"name": "segmento", "age": "rango edad", "profile": "descripción", "painPoints": ["dolor1","dolor2"], "desires": ["deseo1","deseo2"]}, "secondary": {"name": "segmento secundario", "profile": "descripción breve"}},
+  "socialMedia": {"instagram": {"tone": "tono", "contentTypes": ["tipo1","tipo2"], "hashtags": ["#tag1","#tag2","#tag3","#tag4","#tag5"], "frequency": "frecuencia"}, "tiktok": {"tone": "tono", "format": "formato de vídeo"}, "linkedin": {"tone": "tono", "contentFocus": "enfoque"}},
+  "messagingFramework": {"valueProposition": "propuesta de valor principal", "keyMessages": ["mensaje1","mensaje2","mensaje3"], "elevator": "pitch de 30 segundos", "headlines": ["titular1","titular2","titular3"]},
+  "competitivePositioning": {"position": "posicionamiento diferencial", "differentiators": ["diferenciador1","diferenciador2","diferenciador3"], "competitors": [{"name": "competidor", "difference": "cómo nos diferenciamos"}]}
+}`,
+              messages: [{
+                role: "user",
+                content: `Genera un brand book completo para:
+Marca: ${brandName}
+Sector: ${industry || "e-commerce / Shopify"}
+${customNotes ? `Información adicional: ${customNotes}` : ""}
+${brandContext ? `\nBrand DNA extraído de la empresa:\n${brandContext.slice(0, 3000)}` : ""}
+
+Genera contenido específico, detallado y profesional. NO uses placeholders genéricos.`
+              }],
+              model: "genius",
+              maxTokens: 6000,
+            });
+
+            // Parsear JSON del brand book
+            let bb: Record<string, any> = {};
+            try {
+              const jsonMatch = brandBookData.match(/\{[\s\S]*\}/);
+              if (jsonMatch) bb = JSON.parse(jsonMatch[0]);
+            } catch { bb = { brandName, tagline: "", mission: "", vision: "", brandStory: "", values: [], archetype: {}, personality: [], toneOfVoice: {}, colorPalette: [], typography: {}, logoGuidelines: {}, imagery: {}, contentPillars: [], targetAudience: {}, socialMedia: {}, messagingFramework: {}, competitivePositioning: {} }; }
+
+            // ─── Render HTML del Brand Book ───────────────────────────────
+            const colors = (bb.colorPalette || []) as Array<{hex:string;name:string;usage:string;psychology:string}>;
+            const values = (bb.values || []) as Array<{icon:string;name:string;description:string}>;
+            const pillars = (bb.contentPillars || []) as Array<{pillar:string;percentage:string;description:string;examples:string[]}>;
+
+            const colorSwatches = colors.map(c => `
+              <div style="text-align:center">
+                <div style="width:80px;height:80px;border-radius:50%;background:${c.hex};margin:0 auto 10px;border:2px solid rgba(255,255,255,0.1)"></div>
+                <div style="font-size:13px;font-weight:600;color:#e8d898">${c.name}</div>
+                <div style="font-size:11px;color:#c4a55a;font-family:monospace">${c.hex}</div>
+                <div style="font-size:11px;color:#8a8070;margin-top:3px">${c.usage}</div>
+                <div style="font-size:10px;color:#6a6058;font-style:italic;margin-top:3px">${c.psychology}</div>
+              </div>`).join("");
+
+            const valuesCards = values.map(v => `
+              <div style="background:rgba(196,165,90,0.06);border:1px solid rgba(196,165,90,0.2);border-radius:12px;padding:20px;text-align:center">
+                <div style="font-size:2rem;margin-bottom:10px">${v.icon}</div>
+                <div style="font-size:14px;font-weight:700;color:#c4a55a;margin-bottom:8px">${v.name}</div>
+                <div style="font-size:12px;color:#a09880;line-height:1.6">${v.description}</div>
+              </div>`).join("");
+
+            const pillarCards = pillars.map(p => `
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:20px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                  <span style="font-size:14px;font-weight:700;color:#c4a55a">${p.pillar}</span>
+                  <span style="font-size:12px;color:#64a87c;font-weight:600">${p.percentage}</span>
+                </div>
+                <div style="font-size:12px;color:#9a9080;margin-bottom:12px">${p.description}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  ${(p.examples || []).map((e: string) => `<span style="font-size:11px;padding:3px 8px;background:rgba(196,165,90,0.08);border:1px solid rgba(196,165,90,0.15);border-radius:4px;color:#b8a868">${e}</span>`).join("")}
+                </div>
+              </div>`).join("");
+
+            const msgs = bb.messagingFramework || {};
+            const keyMsgs = (msgs.keyMessages || []).map((m: string) => `<li>${m}</li>`).join("");
+            const headlines = (msgs.headlines || []).map((h: string) => `<div style="padding:14px 18px;background:rgba(196,165,90,0.05);border-left:3px solid #c4a55a;border-radius:0 8px 8px 0;margin-bottom:10px;font-size:14px;color:#d4c888;font-style:italic">"${h}"</div>`).join("");
+
+            const ton = bb.toneOfVoice || {};
+            const dosList = (ton.dos || []).map((d: string) => `<li style="color:#64a87c">✓ ${d}</li>`).join("");
+            const dontsList = (ton.donts || []).map((d: string) => `<li style="color:#c86464">✗ ${d}</li>`).join("");
+
+            const sm = bb.socialMedia || {};
+            const smCards = Object.entries(sm).map(([net, data]: [string, any]) => `
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px">
+                <div style="font-size:13px;font-weight:700;color:#c4a55a;margin-bottom:8px;text-transform:capitalize">${net}</div>
+                <div style="font-size:12px;color:#8a8070;margin-bottom:8px">${data.tone || data.format || ""}</div>
+                ${data.hashtags ? `<div style="display:flex;flex-wrap:wrap;gap:4px">${(data.hashtags || []).map((h: string) => `<span style="font-size:11px;color:#64a87c;background:rgba(100,168,124,0.08);padding:2px 6px;border-radius:4px">${h}</span>`).join("")}</div>` : ""}
+                ${data.contentTypes ? `<div style="font-size:11px;color:#7a7068;margin-top:8px">${(data.contentTypes || []).join(" · ")}</div>` : ""}
+              </div>`).join("");
+
+            const brandBookHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Brand Book — ${bb.brandName || brandName}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0a0a0a;color:#e0d8cc;font-family:'Inter',sans-serif;line-height:1.7}
+    .bb-section{max-width:960px;margin:0 auto;padding:60px 40px}
+    .section-divider{border:none;border-top:1px solid rgba(196,165,90,0.15);margin:50px 0}
+    .section-tag{font-size:11px;color:#c4a55a;font-weight:600;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px}
+    h1{font-family:'Playfair Display',serif;font-size:3rem;color:#fff;margin-bottom:16px;line-height:1.2}
+    h2{font-family:'Playfair Display',serif;font-size:1.8rem;color:#c4a55a;margin-bottom:20px}
+    h3{font-size:1rem;font-weight:600;color:#d4b870;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
+    p{color:#b8b0a0;margin-bottom:14px;font-size:14px;max-width:700px}
+    .hero{background:linear-gradient(135deg,#0a0a0a 0%,#141008 50%,#0a0a0a 100%);padding:100px 40px;text-align:center;position:relative;overflow:hidden}
+    .hero::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(196,165,90,0.08) 0%,transparent 70%);pointer-events:none}
+    .tagline{font-size:1.1rem;color:#c4a55a;font-style:italic;font-family:'Playfair Display',serif;margin-bottom:30px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+    .grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:20px}
+    .card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:24px}
+    .card-gold{background:rgba(196,165,90,0.06);border:1px solid rgba(196,165,90,0.2);border-radius:14px;padding:24px}
+    .quote-block{border-left:3px solid #c4a55a;padding:16px 20px;margin:20px 0;background:rgba(196,165,90,0.05);border-radius:0 10px 10px 0;font-style:italic;color:#c8b880;font-size:14px}
+    .personality-tag{display:inline-block;padding:8px 16px;background:rgba(196,165,90,0.1);border:1px solid rgba(196,165,90,0.3);border-radius:20px;font-size:12px;color:#c4a55a;font-weight:500;margin:4px}
+    .do-dont{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px}
+    .do-box{background:rgba(100,168,124,0.06);border:1px solid rgba(100,168,124,0.2);border-radius:10px;padding:16px}
+    .dont-box{background:rgba(200,100,100,0.06);border:1px solid rgba(200,100,100,0.2);border-radius:10px;padding:16px}
+    .do-box h4{color:#64a87c;font-size:12px;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+    .dont-box h4{color:#c86464;font-size:12px;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px}
+    ul.styled{list-style:none;padding:0}
+    ul.styled li{padding:5px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    ul.styled li:last-child{border:none}
+    .font-sample{font-size:2rem;color:#e0d8cc;margin:8px 0;line-height:1.3}
+    .font-meta{font-size:11px;color:#6a6058}
+    .competitor-card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:10px}
+    .footer-bb{text-align:center;padding:40px;color:#3a3028;font-size:11px;border-top:1px solid rgba(255,255,255,0.05);margin-top:60px}
+    @media print{body{background:#fff;color:#000}h1,h2,h3{color:#000}.hero{background:#f0ede8;padding:60px 40px}.card,.card-gold{border:1px solid #ddd;background:#fafafa}}
+  </style>
+</head>
+<body>
+
+<!-- ── PORTADA ── -->
+${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName || brandName} · Manual de Identidad de Marca`, companyName: bb.brandName || brandName, date: reportDate, template: "prestige", includeBackCover: false })}
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="bb-section" style="padding:0;max-width:800px">
+    <div class="section-tag">Brand Book · Identidad de Marca</div>
+    <h1>${bb.brandName || brandName}</h1>
+    <div class="tagline">"${bb.tagline || ""}"</div>
+    <p style="max-width:600px;margin:0 auto;text-align:center;font-size:15px;color:#9a9080">${(bb.mission || "").slice(0, 200)}</p>
+  </div>
+</div>
+
+<div class="bb-section">
+
+  <!-- ── 1. HISTORIA Y PROPÓSITO ── -->
+  <div class="section-tag">01 · Propósito</div>
+  <h2>Misión, Visión & Origen</h2>
+  <div class="grid-2" style="margin-bottom:30px">
+    <div class="card-gold">
+      <h3>Misión</h3>
+      <p style="max-width:none">${bb.mission || ""}</p>
+    </div>
+    <div class="card">
+      <h3>Visión</h3>
+      <p style="max-width:none">${bb.vision || ""}</p>
+    </div>
+  </div>
+  <div class="quote-block">${(bb.brandStory || "").split("\n").slice(0, 2).join(" ")}</div>
+  <p>${(bb.brandStory || "").split("\n").slice(2).join(" ")}</p>
+
+  <hr class="section-divider"/>
+
+  <!-- ── 2. VALORES ── -->
+  <div class="section-tag">02 · Valores</div>
+  <h2>Los Pilares de la Marca</h2>
+  <div class="grid-3" style="margin-bottom:10px">${valuesCards}</div>
+
+  <hr class="section-divider"/>
+
+  <!-- ── 3. ARQUETIPO & PERSONALIDAD ── -->
+  <div class="section-tag">03 · Personalidad</div>
+  <h2>Arquetipo de Marca</h2>
+  <div class="grid-2" style="margin-bottom:30px">
+    <div class="card-gold">
+      <h3>Arquetipo: ${(bb.archetype || {}).name || ""}</h3>
+      <p style="max-width:none">${(bb.archetype || {}).description || ""}</p>
+      <div style="margin-top:12px;font-size:12px;color:#8a8070">Marcas similares: ${((bb.archetype || {}).examples || []).join(", ")}</div>
+    </div>
+    <div class="card">
+      <h3>Rasgos de Personalidad</h3>
+      <div style="margin-top:8px">${(bb.personality || []).map((t: string) => `<span class="personality-tag">${t}</span>`).join("")}</div>
+    </div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <!-- ── 4. TONO DE VOZ ── -->
+  <div class="section-tag">04 · Comunicación</div>
+  <h2>Tono de Voz</h2>
+  <div class="card-gold" style="margin-bottom:20px">
+    <h3>${ton.primary || "Tono Principal"}</h3>
+    <p style="max-width:none">${ton.description || ""}</p>
+  </div>
+  <div class="do-dont">
+    <div class="do-box"><h4>✓ Hacer</h4><ul class="styled">${dosList}</ul></div>
+    <div class="dont-box"><h4>✗ Evitar</h4><ul class="styled">${dontsList}</ul></div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <!-- ── 5. PALETA DE COLOR ── -->
+  <div class="section-tag">05 · Identidad Visual</div>
+  <h2>Paleta de Color</h2>
+  <div class="grid-auto" style="margin-bottom:30px">${colorSwatches || "<p>Paleta a definir</p>"}</div>
+
+  <!-- ── 6. TIPOGRAFÍA ── -->
+  <div style="margin-top:40px">
+    <h3>Sistema Tipográfico</h3>
+    <div class="grid-3">
+      ${(bb.typography?.primary ? `<div class="card"><div class="section-tag">Principal</div><div class="font-sample" style="font-family:'${bb.typography.primary.name}',serif">${bb.typography.primary.name}</div><div class="font-meta">Pesos: ${(bb.typography.primary.weights||[]).join(", ")}<br>${bb.typography.primary.usage}</div></div>` : "")}
+      ${(bb.typography?.secondary ? `<div class="card"><div class="section-tag">Secundaria</div><div class="font-sample" style="font-family:'${bb.typography.secondary.name}',sans-serif;font-size:1.5rem">${bb.typography.secondary.name}</div><div class="font-meta">Pesos: ${(bb.typography.secondary.weights||[]).join(", ")}<br>${bb.typography.secondary.usage}</div></div>` : "")}
+      ${(bb.typography?.accent ? `<div class="card"><div class="section-tag">Acento</div><div class="font-sample" style="font-family:'${bb.typography.accent.name}',cursive;font-size:1.5rem">${bb.typography.accent.name}</div><div class="font-meta">${bb.typography.accent.usage}</div></div>` : "")}
+    </div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <!-- ── 7. LOGO & USOS ── -->
+  <div class="section-tag">06 · Logo</div>
+  <h2>Directrices del Logotipo</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Variaciones</h3>
+      <ul class="styled">${((bb.logoGuidelines||{}).variations||[]).map((v: string) => `<li>${v}</li>`).join("")}</ul>
+    </div>
+    <div class="card">
+      <h3>Normas de Uso</h3>
+      <p style="max-width:none;font-size:13px">Espacio mínimo: ${(bb.logoGuidelines||{}).clearSpace || "–"}</p>
+      <p style="max-width:none;font-size:13px">Tamaño mínimo: ${(bb.logoGuidelines||{}).minSize || "–"}</p>
+      <p style="max-width:none;font-size:13px;color:#c86464;margin-top:8px">Prohibido: ${((bb.logoGuidelines||{}).prohibitions||[]).join(", ")}</p>
+    </div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <!-- ── 8. AUDIENCIA ── -->
+  <div class="section-tag">07 · Audiencia</div>
+  <h2>Público Objetivo</h2>
+  <div class="grid-2">
+    ${bb.targetAudience?.primary ? `<div class="card-gold">
+      <h3>Primario: ${bb.targetAudience.primary.name || ""}</h3>
+      <p style="max-width:none;font-size:13px;color:#c4a55a">${bb.targetAudience.primary.age || ""}</p>
+      <p style="max-width:none;font-size:13px">${bb.targetAudience.primary.profile || ""}</p>
+      <div style="margin-top:12px"><h4 style="font-size:11px;color:#c86464;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Pain Points</h4><ul class="styled">${(bb.targetAudience.primary.painPoints||[]).map((p: string) => `<li>${p}</li>`).join("")}</ul></div>
+      <div style="margin-top:12px"><h4 style="font-size:11px;color:#64a87c;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Deseos</h4><ul class="styled">${(bb.targetAudience.primary.desires||[]).map((d: string) => `<li>${d}</li>`).join("")}</ul></div>
+    </div>` : ""}
+    ${bb.targetAudience?.secondary ? `<div class="card">
+      <h3>Secundario: ${bb.targetAudience.secondary.name || ""}</h3>
+      <p style="max-width:none;font-size:13px">${bb.targetAudience.secondary.profile || ""}</p>
+    </div>` : ""}
+  </div>
+
+  <hr class="section-divider"/>
+
+  <!-- ── 9. PILARES DE CONTENIDO ── -->
+  <div class="section-tag">08 · Contenido</div>
+  <h2>Pilares de Contenido</h2>
+  <div class="grid-2" style="margin-bottom:20px">${pillarCards}</div>
+
+  <!-- ── 10. REDES SOCIALES ── -->
+  <div style="margin-top:40px">
+    <h3>Estrategia en Redes Sociales</h3>
+    <div class="grid-3">${smCards}</div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <!-- ── 11. MENSAJERÍA ── -->
+  <div class="section-tag">09 · Mensajes Clave</div>
+  <h2>Marco de Mensajería</h2>
+  <div class="card-gold" style="margin-bottom:24px">
+    <h3>Propuesta de Valor</h3>
+    <p style="max-width:none;font-size:15px;color:#e8d898">${msgs.valueProposition || ""}</p>
+  </div>
+  <div class="card" style="margin-bottom:24px">
+    <h3>Elevator Pitch (30 segundos)</h3>
+    <p style="max-width:none;font-style:italic;color:#c4a55a">"${msgs.elevator || ""}"</p>
+  </div>
+  <h3 style="margin-bottom:12px">Mensajes Clave</h3>
+  <ul class="styled" style="margin-bottom:24px">${keyMsgs}</ul>
+  <h3 style="margin-bottom:12px">Titulares de Marca</h3>
+  ${headlines}
+
+  <hr class="section-divider"/>
+
+  <!-- ── 12. POSICIONAMIENTO ── -->
+  <div class="section-tag">10 · Posicionamiento</div>
+  <h2>Ventaja Competitiva</h2>
+  <div class="card-gold" style="margin-bottom:20px">
+    <h3>Posición Única</h3>
+    <p style="max-width:none">${(bb.competitivePositioning || {}).position || ""}</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+      ${((bb.competitivePositioning || {}).differentiators || []).map((d: string) => `<span class="personality-tag">${d}</span>`).join("")}
+    </div>
+  </div>
+  ${((bb.competitivePositioning || {}).competitors || []).map((c: {name:string;difference:string}) => `<div class="competitor-card"><span style="font-size:13px;font-weight:600;color:#c4a55a;min-width:120px">${c.name}</span><span style="font-size:13px;color:#8a8070">${c.difference}</span></div>`).join("")}
+
+  <!-- ── FOOTER ── -->
+  <div class="footer-bb">
+    Brand Book · ${bb.brandName || brandName} · Generado por Shopy Crafter Intelligence Engine · ${reportDate}<br>
+    Documento confidencial — uso interno y para agencias autorizadas.
+  </div>
+</div>
+</body>
+</html>`;
+
+            // Guardar en Vault
+            let vaultId: number | null = null;
+            if (projectId) {
+              vaultId = await saveToVault({
+                projectId,
+                fileType: "brand_book",
+                category: "branding",
+                title: `Brand Book — ${bb.brandName || brandName}`,
+                mimeType: "text/html",
+                content: Buffer.from(brandBookHtml).toString("base64"),
+              });
+            }
+
+            result = {
+              success: true,
+              brandName: bb.brandName || brandName,
+              tagline: bb.tagline || "",
+              archetype: (bb.archetype || {}).name || "",
+              colorsCount: colors.length,
+              valuesCount: values.length,
+              vaultId,
+              vaultUrl: vaultId ? `/api/vault/${vaultId}/download` : undefined,
+              message: vaultId
+                ? `📖 **Brand Book generado y guardado**\n\n🏷️ **${bb.brandName || brandName}** — "${bb.tagline}"\n🎭 Arquetipo: **${(bb.archetype||{}).name}**\n🎨 ${colors.length} colores | 💡 ${values.length} valores | 📣 ${pillars.length} pilares de contenido\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver Brand Book: /api/vault/${vaultId}/download\n📥 Descargar PDF: /api/vault/${vaultId}/download?format=pdf`
+                : `📖 **Brand Book generado**\n\n🏷️ **${bb.brandName || brandName}** — "${bb.tagline}"\n🎭 Arquetipo: **${(bb.archetype||{}).name}**\n🎨 ${colors.length} colores | 💡 ${values.length} valores\n\n⚠️ No se pudo guardar en vault (falta projectId)`,
+            };
+          } catch (err) {
+            result = { error: true, message: `❌ Error generando Brand Book: ${err instanceof Error ? err.message : String(err)}` };
+          }
           break;
         }
 
