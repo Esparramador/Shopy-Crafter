@@ -206,6 +206,19 @@ type CMSContent = {
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+const LANDING_FALLBACK: CMSContent = {
+  site: { name: "Shopy Crafter", tagline: "Optimización IA para tu tienda Shopify", logo: { type: "text", value: "SC", imageUrl: null }, primaryColor: "#c8a84b", accentColor: "#2dd49f", font_heading: "Instrument Serif", font_body: "Geist" },
+  nav: { links: [{ id: "n1", label: "Motores", href: "#fp-engines" }, { id: "n2", label: "Demo", href: "#fp-demo" }, { id: "n3", label: "Precios", href: "#fp-pricing" }, { id: "n4", label: "Contactar", href: "#fp-contact" }], ctaPrimary: { label: "Solicitar acceso →", href: "#fp-contact" }, ctaSecondary: { label: "Iniciar sesión", href: "/login" } },
+  hero: { pill: { text: "7 motores de IA · Shopy Crafter 2.0", visible: true }, headline: "Optimizamos tu tienda\nShopify con IA\n24/7 por ti", headlineHighlight: "24/7", subheadline: "Shopy Crafter gestiona, optimiza y potencia tiendas Shopify de forma autónoma. Imágenes profesionales, pricing inteligente, SEO técnico y tests A/B — todo en piloto automático.", ctaPrimary: { label: "Descubre nuestros planes →", href: "#fp-pricing" }, ctaSecondary: { label: "▶ Ver en acción", href: "#fp-demo" }, trustItems: ["Sin tarjeta de crédito", "Setup en 5 minutos", "Cancela cuando quieras", "RGPD compliant"], imageUrl: null, scrollHint: "Desliza para explorar" },
+  features: { pill: "Motores IA", headline: "Seis motores. Una sola plataforma.", subheadline: "Cada motor trabaja de forma autónoma y coordinada para potenciar todos los aspectos de tu tienda.", items: [{ id: "f1", num: "M01", icon: "🖼️", iconBg: "rgba(45,212,159,0.1)", title: "Generación de Imágenes", description: "8 tipos de imagen profesional por producto usando flux-1.1-pro.", tags: ["flux-1.1-pro", "~€0.25/prod"], stats: [{ label: "Precisión", value: "94%" }] }, { id: "f2", num: "M02", icon: "🎨", iconBg: "rgba(200,168,75,0.1)", title: "Consistencia Visual", description: "Extrae el ADN visual de tu tienda y aplica StyleLock.", tags: ["StyleLock", "Visual DNA"], stats: [{ label: "Precisión", value: "97%" }] }, { id: "f3", num: "M03", icon: "⚗️", iconBg: "rgba(74,158,221,0.1)", title: "A/B Testing Automático", description: "Z-test estadístico al 95% de confianza, declaración automática de ganador.", tags: ["Z-test 95%", "Auto-winner"], stats: [{ label: "Confianza", value: "95%" }] }, { id: "f4", num: "M04", icon: "⚡", iconBg: "rgba(200,168,75,0.08)", title: "Auto-Pilot 24/7", description: "Webhook trigger en cada nuevo producto. Sin intervención manual.", tags: ["Webhook", "Cron jobs"], stats: [{ label: "Uptime", value: "99.9%" }] }, { id: "f5", num: "M05", icon: "📊", iconBg: "rgba(200,168,75,0.1)", title: "Pricing Financiero", description: "Motor COGS completo, análisis de competencia en tiempo real.", tags: ["COGS Engine", "P&L en vivo"], stats: [{ label: "Precisión", value: "92%" }] }, { id: "f6", num: "M06", icon: "🔍", iconBg: "rgba(45,212,159,0.08)", title: "SEO Técnico", description: "Schema JSON-LD, meta tags optimizados, Core Web Vitals y blog posts.", tags: ["Schema JSON-LD", "CWV"], stats: [{ label: "Precisión", value: "96%" }] }] },
+  stats: [{ id: "s1", num: "↑340%", label: "Conversión media" }, { id: "s2", num: "+2.8K", label: "Productos optimizados" }, { id: "s3", num: "99.9%", label: "Uptime garantizado" }, { id: "s4", num: "<48h", label: "Setup completo" }],
+  how: { pill: "Cómo funciona", headline: "De cero a piloto\nautomático", headlineHighlight: "piloto\nautomático", steps: [{ num: "01", title: "Conecta tu tienda", desc: "Vincula tu tienda Shopify en menos de 5 minutos." }, { num: "02", title: "Configura los motores", desc: "Activa los módulos que necesites según tu negocio." }, { num: "03", title: "Piloto automático", desc: "La IA trabaja 24/7 optimizando cada aspecto de tu tienda." }] },
+  pricing: { pill: "Precios", headline: "Un solo precio.", subheadline: "Sin sorpresas, sin tarjeta de crédito inicial.", plans: [{ id: "p1", name: "Starter", price: "97", currency: "€", period: "/mes", featured: false, badge: null, features: [{ text: "1 tienda Shopify", included: true }, { text: "3 motores activos", included: true }, { text: "500 imágenes/mes", included: true }, { text: "Soporte email", included: true }], cta: { label: "Empezar gratis", style: "ghost" } }, { id: "p2", name: "Pro", price: "197", currency: "€", period: "/mes", featured: true, badge: "Más popular", features: [{ text: "3 tiendas Shopify", included: true }, { text: "6 motores activos", included: true }, { text: "2.000 imágenes/mes", included: true }, { text: "Soporte prioritario", included: true }], cta: { label: "Comenzar ahora →", style: "gold" } }, { id: "p3", name: "Agency", price: "497", currency: "€", period: "/mes", featured: false, badge: null, features: [{ text: "Tiendas ilimitadas", included: true }, { text: "7 motores activos", included: true }, { text: "Imágenes ilimitadas", included: true }, { text: "Soporte 24/7 + CSM", included: true }], cta: { label: "Contactar ventas", style: "ghost" } }] },
+  testimonials: { pill: "Clientes", headline: "Lo que dicen\nnuestros clientes", headlineHighlight: "nuestros clientes", items: [{ id: "t1", stars: 5, text: "Desde que usamos Shopy Crafter, nuestras ventas han aumentado un 340%. La IA trabaja sola y los resultados son increíbles.", metric: "+340% conversión", author: "María González", role: "CEO · Moda Urbana", initials: "MG", avatarColor: "rgba(200,168,75,0.2)", avatarTextColor: "#c8a84b" }] },
+  cta: { pill: "Empieza hoy", headline: "¿Listo para automatizar\ntu tienda Shopify?", headlineHighlight: "automatizar", subheadline: "Únete a más de 200 tiendas que ya optimizan con IA.", placeholder: "tu@email.com", buttonLabel: "Solicitar acceso →", finePrint: "Sin tarjeta de crédito · Cancela cuando quieras" },
+  footer: { tagline: "Optimización IA para tiendas Shopify", columns: [], copyright: `© ${new Date().getFullYear()} Shopy Crafter`, badges: ["RGPD", "SSL", "Shopify Partner"] },
+};
+
 const FP_SECTION_IDS = ["fp-hero", "fp-engines", "fp-demo", "fp-results", "fp-pricing", "fp-calculator", "fp-contact"];
 const DEFAULT_SECTION_NAV = ["Inicio", "Motores", "Demo", "Resultados", "Precios", "Calculadora", "Contactar"];
 
@@ -240,7 +253,7 @@ export default function Landing() {
   const { user } = useAuth();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
   const isAdmin = !isPreview && user?.role === "admin";
-  const [content, setContent] = useState<CMSContent | null>(null);
+  const [content, setContent] = useState<CMSContent | null>(LANDING_FALLBACK);
   const [currentSection, setCurrentSection] = useState(0);
   const [activeEngine, setActiveEngine] = useState(0);
   const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});
@@ -411,7 +424,18 @@ export default function Landing() {
   const currentRef = useRef(0);
 
   useEffect(() => {
-    fetch(`${BASE_URL}/api/cms/content`, { credentials: "include" }).then(r => r.json()).then(setContent).catch(() => {});
+    let mounted = true;
+    const load = (attempt = 1) => {
+      fetch(`${BASE_URL}/api/cms/content`, { credentials: "include" })
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then(data => { if (mounted) setContent(data); })
+        .catch(() => {
+          if (!mounted) return;
+          if (attempt < 4) setTimeout(() => load(attempt + 1), 1500 * attempt);
+        });
+    };
+    load();
+    return () => { mounted = false; };
   }, []);
 
 

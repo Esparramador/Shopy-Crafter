@@ -179,7 +179,7 @@ function HomeRedirect() {
   if (!user) return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
   if (user.role === "client") return <Redirect to="/client" />;
   const saved = getLastRoute();
-  if (saved && saved !== "/" && saved !== "/login") {
+  if (saved && saved !== "/" && saved !== "/login" && saved !== "/tienda") {
     clearLastRoute();
     return <Redirect to={saved} />;
   }
@@ -249,7 +249,7 @@ function RoutePersistence() {
   const { user } = useAuth();
   const lastSaved = useRef("");
   useEffect(() => {
-    if (user && location !== lastSaved.current) {
+    if (user && location !== lastSaved.current && location !== "/tienda") {
       lastSaved.current = location;
       saveLastRoute(location);
     }
