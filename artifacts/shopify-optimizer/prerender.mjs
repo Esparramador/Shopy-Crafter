@@ -79,6 +79,108 @@ const ROUTES = [
     description: "Contacta con el equipo de Shopy Crafter. Respondemos en menos de 24 horas para resolver tus dudas sobre eCommerce e IA.",
     ssr: true,
   },
+
+  // ── Blog detail pages ────────────────────────────────────────────────────
+  {
+    path: "/blog/optimizar-fichas-google-shopping-2026",
+    title: "Cómo optimizar fichas de producto para Google Shopping en 2026 — Blog Shopy Crafter",
+    description: "Los schemas JSON-LD, las imágenes de alta calidad y las descripciones únicas son clave. Te mostramos el proceso exacto que usamos con nuestros clientes.",
+    ssr: true,
+  },
+  {
+    path: "/blog/claude-vs-gemini-ecommerce",
+    title: "Claude vs Gemini: qué modelo de IA es mejor para tu eCommerce — Blog Shopy Crafter",
+    description: "Hemos probado ambos modelos en 15.000+ generaciones reales. Te damos los resultados: cuándo usar cada uno y por qué no deberías elegir solo uno.",
+    ssr: true,
+  },
+  {
+    path: "/blog/guia-cogs-tiendas-online",
+    title: "La guía definitiva de COGS para tiendas online — Blog Shopy Crafter",
+    description: "Si no conoces tu coste real por producto, estás perdiendo dinero. Desglosamos las 9 categorías de costes que toda tienda debería trackear.",
+    ssr: true,
+  },
+  {
+    path: "/blog/ab-testing-automatizado-ia",
+    title: "A/B Testing automatizado: cómo dejamos que la IA elija el ganador — Blog Shopy Crafter",
+    description: "Nuestro motor de A/B testing compara imágenes, precios y descripciones con intervalos de confianza del 95%. Así funciona el auto-winner.",
+    ssr: true,
+  },
+  {
+    path: "/blog/comic-crafter-caso-exito",
+    title: "Cómo Comic Crafter aumentó ventas un 340% en 90 días — Blog Shopy Crafter",
+    description: "Auditoría completa + SEO automatizado + imágenes IA. El caso paso a paso de una tienda de cómics que multiplicó sus ventas sin pagar publicidad.",
+    ssr: true,
+  },
+  {
+    path: "/blog/17-motores-ia-ecommerce",
+    title: "17 motores de IA para eCommerce: qué hace cada uno — Blog Shopy Crafter",
+    description: "Audit, SEO, Images, A/B Testing, Pricing, WebLab, Fusion Studio... Explicamos cada motor y cuándo usarlo para sacar el máximo partido.",
+    ssr: true,
+  },
+
+  // ── Case study detail pages ──────────────────────────────────────────────
+  {
+    path: "/casos-de-exito/comic-crafter",
+    title: "Comic Crafter — Caso de éxito · Shopy Crafter",
+    description: "Comic Crafter (Cómics e ilustración personalizada): 12 ventas/mes sin SEO → +340% ventas en 90 días con 47 fichas optimizadas e imágenes IA.",
+    ssr: true,
+  },
+  {
+    path: "/casos-de-exito/sakura-studio",
+    title: "Sakura Studio — Caso de éxito · Shopy Crafter",
+    description: "Sakura Studio (camisetas Japón-inspired): sin tráfico orgánico → Top 3 Google en 18 keywords, +210% sesiones, 4× conversión.",
+    ssr: true,
+  },
+  {
+    path: "/casos-de-exito/audit-multipart",
+    title: "Audit Multipart — Caso de éxito · Shopy Crafter",
+    description: "Audit Multipart (repuestos automoción B2B): 1.200 productos auto-descritos en 2 semanas, +180% leads cualificados.",
+    ssr: true,
+  },
+
+  // ── Changelog release detail pages ──────────────────────────────────────
+  {
+    path: "/changelog/3.8.0",
+    title: "Shopy Crafter v3.8.0 — ShopyBrain OmniCore v3",
+    description: "La mayor actualización del motor de memoria e inteligencia acumulada. OmniCore v3 introduce aprendizaje continuo entre proyectos y sincronización multi-cuenta.",
+    ssr: true,
+  },
+  {
+    path: "/changelog/3.7.0",
+    title: "Shopy Crafter v3.7.0 — Ad Studio + Campaign Kit",
+    description: "Dos nuevos motores para marketing de pago: Ad Studio genera creatividades para Meta, Google y TikTok; Campaign Kit orquesta campañas completas con calendario y presupuesto.",
+    ssr: true,
+  },
+  {
+    path: "/changelog/3.6.0",
+    title: "Shopy Crafter v3.6.0 — Economista IA (Pricing COGS)",
+    description: "Análisis automático de costes reales de producto y fijación de precio óptimo con IA. Cubre las 9 categorías de COGS con 30+ campos de detalle.",
+    ssr: true,
+  },
+  {
+    path: "/changelog/3.5.0",
+    title: "Shopy Crafter v3.5.0 — A/B Testing con predicción IA",
+    description: "El motor de A/B Testing ahora predice resultados antes de ejecutar el experimento, basándose en datos históricos de tests similares en el mismo nicho.",
+    ssr: true,
+  },
+  {
+    path: "/changelog/3.4.0",
+    title: "Shopy Crafter v3.4.0 — Fusion Studio + Exploded View",
+    description: "Fusion Studio estrena canvas interactivo multi-capa. Exploded View introduce vistas despiece de producto generadas por IA para productos técnicos.",
+    ssr: true,
+  },
+  {
+    path: "/changelog/3.3.0",
+    title: "Shopy Crafter v3.3.0 — Sistema de Logros y Gamificación",
+    description: "Sistema de logros y progresión para facilitar la adopción. El roadmap 30-60-90 días guía al usuario por las acciones de mayor impacto.",
+    ssr: true,
+  },
+  {
+    path: "/changelog/3.2.0",
+    title: "Shopy Crafter v3.2.0 — Command Center + Universal Search",
+    description: "Rediseño del centro de operaciones: Command Center centraliza el estado de todos los motores y la búsqueda universal encuentra cualquier elemento desde cualquier pantalla.",
+    ssr: true,
+  },
 ];
 
 let render = null;
