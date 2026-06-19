@@ -140,36 +140,17 @@ export function AppLayout({ children }: AppLayoutProps) {
     adminToastTimer.current = setTimeout(() => setAdminToast(null), 6000);
   }, []);
   const { content: cmsContent } = useCms();
-  const cmsNav = cmsContent?.adminNav ?? null;
   const cmsPanel = cmsContent?.adminPanel ?? null;
   const cmsSite = cmsContent?.site ?? null;
   const siteLogoImageUrl: string | null = cmsSite?.logo?.imageUrl ?? null;
   const siteLogoEmoji: string = cmsSite?.logo?.value ?? "💎";
   const siteName: string = cmsSite?.name ?? "Shopy Crafter";
 
-  const moduleNav = Array.isArray(cmsNav?.modules)
-    ? cmsNav.modules : DEFAULT_MODULE_NAV;
-  const rawShopybrainNav = Array.isArray(cmsNav?.shopybrain)
-    ? cmsNav.shopybrain : DEFAULT_SHOPYBRAIN_NAV;
+  // Nav siempre viene del código — nunca del CMS (evita sidebars desactualizados en BD)
+  const moduleNav = DEFAULT_MODULE_NAV;
+  const shopybrainNav = DEFAULT_SHOPYBRAIN_NAV;
+  const adminNav: any[] = DEFAULT_ADMIN_NAV;
   const firstProjectId: number | null = projects?.[0]?.id ?? null;
-  const seenKeys = new Set<string>();
-  const shopybrainNav = rawShopybrainNav
-    .filter((item: any) => !item.href.includes("/projects/"))
-    .filter((item: any) => {
-      const key = `${item.href}::${item.label}`;
-      if (seenKeys.has(key)) return false;
-      seenKeys.add(key);
-      return true;
-    });
-  const seenAdminKeys = new Set<string>();
-  const rawAdminNav = Array.isArray(cmsNav?.admin)
-    ? cmsNav.admin : DEFAULT_ADMIN_NAV;
-  const adminNav: any[] = rawAdminNav.filter((item: any) => {
-    const key = `${item.href}::${item.label}`;
-    if (seenAdminKeys.has(key)) return false;
-    seenAdminKeys.add(key);
-    return true;
-  });
   const ap = cmsPanel ?? {};
 
   const pageLabels: Record<string, string> = {};
