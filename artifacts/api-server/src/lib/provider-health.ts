@@ -84,14 +84,26 @@ async function checkGemini(): Promise<ProviderHealth> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=100`, {
       signal: ctrl.signal,
     });
     clearTimeout(t);
     if (res.status === 401 || res.status === 403) return { provider: "gemini", status: "missing_key", hasKey: true, detail: `auth ${res.status}`, checkedAt };
-    if (res.status === 429)                       return { provider: "gemini", status: "rate_limited", hasKey: true, detail: "429 cuota agotada", checkedAt };
+    if (res.status === 429)                       return { provider: "gemini", status: "rate_limited", hasKey: true, detail: "429 cuota agotada — upgrading a Tier 1 resuelve esto", checkedAt };
     if (!res.ok)                                  return { provider: "gemini", status: "down", hasKey: true, detail: `HTTP ${res.status}`, checkedAt };
-    return { provider: "gemini", status: "ok", hasKey: true, checkedAt };
+    let detail: string | undefined;
+    try {
+      const j: any = await res.json();
+      const models: any[] = j?.models ?? [];
+      const geminiModels = models.filter((m: any) => String(m.name ?? "").includes("gemini"));
+      const count = geminiModels.length;
+      // Tier 1+ keys can access 20+ Gemini models including 3.x Pro variants.
+      // Free (Tier 0) keys typically return ≤8 models and lack gemini-3.x-pro.
+      const hasProModels = geminiModels.some((m: any) => /gemini-3\.\d-pro|gemini-3-pro/i.test(m.name ?? ""));
+      const tier = count >= 15 && hasProModels ? "Tier 1 (Standard)" : count > 0 ? "Tier 0 (Free)" : "unknown";
+      detail = `${count} modelos disponibles · ${tier}`;
+    } catch { /* ignore — key is valid, just couldn't parse model list */ }
+    return { provider: "gemini", status: "ok", hasKey: true, detail, checkedAt };
   } catch (e: any) {
     return { provider: "gemini", status: "down", hasKey: true, detail: e?.message || "fetch error", checkedAt };
   }
