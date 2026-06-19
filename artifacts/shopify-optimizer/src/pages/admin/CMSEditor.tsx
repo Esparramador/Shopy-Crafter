@@ -5,7 +5,7 @@ import {
   RotateCcw, Eye, X, Check, RefreshCw, ChevronDown, ChevronRight,
   PenLine, LayoutTemplate, Upload, Trash2, Image as ImageIcon, WifiOff,
   GripVertical, ArrowUp, ArrowDown, Film, Images, Atom, Plus,
-  ArrowLeft, Wand2, Layers,
+  ArrowLeft, Wand2, Layers, Bot, Code2, FolderCode, Cpu, Zap, AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDraftPersistence, useBeforeUnload, useOnlineStatus, useRetryFetch } from "@/hooks/use-draft-persistence";
