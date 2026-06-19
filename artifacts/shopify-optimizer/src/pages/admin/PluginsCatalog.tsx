@@ -36,6 +36,15 @@ const CATEGORY_META: Record<string, { icon: string; color: string; label: string
   automation: { icon: "⚡", color: "#f87171", label: "Automatización" },
   social: { icon: "📱", color: "#e879f9", label: "Social" },
   content: { icon: "✍️", color: "#94a3b8", label: "Contenido" },
+  design: { icon: "🎨", color: "#f472b6", label: "Diseño" },
+  email: { icon: "📧", color: "#34d399", label: "Email" },
+  video: { icon: "🎬", color: "#f87171", label: "Video" },
+  commerce: { icon: "🛒", color: "#fb923c", label: "Comercio" },
+  "3d": { icon: "🧊", color: "#60a5fa", label: "3D" },
+  code: { icon: "💻", color: "#4ade80", label: "Código" },
+  ai: { icon: "🤖", color: "#8b5cf6", label: "IA" },
+  crm: { icon: "🤝", color: "#22d3ee", label: "CRM" },
+  integration: { icon: "🔌", color: "#a78bfa", label: "Integración" },
 };
 
 const PRICING_META = {
@@ -109,7 +118,9 @@ export default function PluginsCatalog() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
-  const categories = Object.keys(CATEGORY_META);
+  const categories = Object.keys(stats.categories).length > 0
+    ? Object.keys(stats.categories).filter(c => CATEGORY_META[c])
+    : Object.keys(CATEGORY_META);
   const filtered = plugins.filter(p => {
     const q = search.toLowerCase();
     return (

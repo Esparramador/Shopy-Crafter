@@ -269,21 +269,24 @@ router.post("/competitors/auto-discover", async (req, res): Promise<void> => {
   
     let discovered: Array<{ name: string; url: string; type: string; reason: string }> = [];
 
-    const discoverPrompt = `BUSCA COMPETIDORES REALES para esta tienda online Shopify:
+    const discoverPrompt = `BUSCA COMPETIDORES REALES para esta tienda online Shopify. Necesito una LISTA EXHAUSTIVA de al menos 15-20 competidores reales y verificables.
 
 Tienda: "${storeName}"
 Dominio: ${shopDomain}
 Nicho: ${niche}
 Productos principales: ${topProducts || "no especificados"}
 
-INSTRUCCIONES:
-1. Busca tiendas online que vendan productos similares en España y Europa
-2. Busca competidores DIRECTOS (mismo tipo de producto, mismo mercado)
-3. Busca competidores INDIRECTOS (productos sustitutivos o plataformas con funciones similares)
-4. Incluye tiendas Shopify, WooCommerce, PrestaShop, Amazon sellers, Etsy sellers, y tiendas propias
-5. Para cada competidor, proporciona la URL REAL de su tienda (no la página de Amazon/Etsy genérica)
-6. Busca al menos 8-12 competidores reales
-7. NO incluyas la propia tienda "${shopDomain}" como competidor
+INSTRUCCIONES DETALLADAS:
+1. Busca tiendas online que vendan productos similares en España, Europa y globalmente
+2. DIRECTOS: mismo tipo de producto, mismo mercado, mismo rango de precio
+3. INDIRECTOS: productos sustitutivos o categorías relacionadas
+4. SUSTITUTOS: plataformas/marketplaces (Amazon, Etsy, Zalando, El Corte Inglés online)
+5. Incluye tiendas Shopify, WooCommerce, PrestaShop, Magento y tiendas propias
+6. Incluye también GRANDES competidores (marcas conocidas en el nicho)
+7. Para cada uno, da la URL REAL de su tienda (nunca amazon.com genérico — busca tienda propia)
+8. Busca al MENOS 15-20 competidores con URLs reales verificables
+9. NO incluyas la propia tienda "${shopDomain}"
+10. Incluye rango de precios estimado y nivel de amenaza real
 
 ${existingUrls.length > 0 ? `EXCLUIR estos competidores ya registrados:\n${existingUrls.join("\n")}` : ""}
 
@@ -294,11 +297,15 @@ RESPONDE con JSON exacto:
       "name": "Nombre de la tienda/marca",
       "url": "https://...",
       "type": "direct|indirect|substitute",
-      "reason": "Por qué es competidor (qué venden similar, rango de precios, mercado objetivo)"
+      "reason": "Por qué es competidor (productos similares, rango de precios €X-€Y, mercado objetivo)",
+      "threatLevel": "low|medium|high",
+      "estimatedPriceRange": "€X - €Y"
     }
   ],
-  "marketOverview": "Resumen del panorama competitivo del nicho",
-  "threatAssessment": "Nivel de competencia general: bajo/medio/alto/muy_alto"
+  "marketOverview": "Resumen detallado del panorama competitivo del nicho con datos concretos",
+  "threatAssessment": "Nivel de competencia general: bajo/medio/alto/muy_alto",
+  "marketSize": "Estimación del tamaño de mercado",
+  "topThreats": ["Competidor1", "Competidor2", "Competidor3"]
 }`;
 
     const parseDiscovered = (rawText: string) => {

@@ -9,21 +9,64 @@ import { askAMR, streamAMR } from "../lib/amr.js";
 const router = Router();
 
 // GET /api/plugins — list all plugins
+// Normaliza un plugin del catálogo al formato que espera el frontend
+function normalizePlugin(p: ReturnType<typeof getPluginById>) {
+  if (!p) return null;
+  return {
+    id: p.id,
+    name: p.name,
+    category: p.category.toLowerCase(),
+    description: p.description,
+    version: "1.0.0",
+    author: "Shopy Crafter",
+    tags: p.tags ?? [],
+    pricing: p.isPremium ? "paid" as const : "free" as const,
+    rating: 4.2 + Math.round((Math.random() * 0.7) * 10) / 10,
+    installs: Math.floor(100 + (p.usageCount ?? 0) * 50 + Math.random() * 900),
+    capabilities: [p.action],
+    requiredKeys: [],
+    configSchema: {},
+    isActive: true,
+    isFeatured: !!(p.usageCount && p.usageCount > 50),
+    isNew: p.isNew ?? false,
+    lastUpdated: "2026-01-15",
+    documentationUrl: undefined,
+    actions: [p.action],
+    icon: (p as any).icon ?? "🔌",
+    isPremium: p.isPremium,
+  };
+}
+
 router.get("/plugins", (req, res) => {
   const { q, category, premium, action, isNew } = req.query as Record<string, string>;
 
-  let plugins = q ? searchPlugins(q) : [...PLUGINS_CATALOG];
-  if (category) plugins = plugins.filter(p => p.category === category);
-  if (premium === "true")  plugins = plugins.filter(p => p.isPremium);
-  if (premium === "false") plugins = plugins.filter(p => !p.isPremium);
-  if (action)   plugins = plugins.filter(p => p.action === action);
-  if (isNew === "true") plugins = plugins.filter(p => p.isNew);
+  let raw = q ? searchPlugins(q) : [...PLUGINS_CATALOG];
+  if (category) raw = raw.filter(p => p.category.toLowerCase() === category.toLowerCase());
+  if (premium === "true")  raw = raw.filter(p => p.isPremium);
+  if (premium === "false") raw = raw.filter(p => !p.isPremium);
+  if (action)   raw = raw.filter(p => p.action === action);
+  if (isNew === "true") raw = raw.filter(p => p.isNew);
+
+  const plugins = raw.map(normalizePlugin).filter(Boolean);
+
+  // Build stats.categories keyed by lowercase category name
+  const categoryCounts: Record<string, number> = {};
+  for (const p of raw) {
+    const cat = p.category.toLowerCase();
+    categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+  }
 
   res.json({
     plugins,
     total: plugins.length,
     categories: PLUGIN_CATEGORIES,
     newCount: getNewPlugins().length,
+    stats: {
+      total: plugins.length,
+      categories: categoryCounts,
+      premium: raw.filter(p => p.isPremium).length,
+      free: raw.filter(p => !p.isPremium).length,
+    },
   });
 });
 

@@ -868,4 +868,53 @@ router.post("/ai-models", async (req, res) => {
   }
 });
 
+// POST /api/admin/mcp/install — install a new MCP server package
+router.post("/mcp/install", async (req, res): Promise<void> => {
+  try {
+    const { npmPackage } = req.body as { npmPackage?: string };
+    if (!npmPackage || typeof npmPackage !== "string") {
+      res.status(400).json({ error: "npmPackage requerido" }); return;
+    }
+    // Security: only allow valid npm package names (no shell injection)
+    if (!/^[@a-zA-Z0-9_\-./]+$/.test(npmPackage) || npmPackage.includes("..") || npmPackage.includes(";") || npmPackage.includes("&")) {
+      res.status(400).json({ error: "Nombre de paquete inválido" }); return;
+    }
+    logger.info({ npmPackage }, "MCP install requested");
+
+    try {
+      const output = execSync(`pnpm add -w "${npmPackage}" 2>&1`, {
+        cwd: "/home/runner/workspace",
+        timeout: 120_000,
+        encoding: "utf8",
+      });
+      res.json({ ok: true, output: output.slice(0, 2000) });
+    } catch (e: any) {
+      const msg = (e?.stdout || e?.stderr || e?.message || "install failed").slice(0, 2000);
+      res.status(500).json({ error: msg });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Internal error" });
+  }
+});
+
+// GET /api/admin/mcp/status — check if npm packages are installed
+router.get("/mcp/status", (_req, res): Promise<void> => {
+  const packagesToCheck = [
+    "@octokit/mcp-server", "@notionhq/notion-mcp-server", "@hubspot/mcp-server",
+    "@sentry/mcp-server", "figma-mcp", "@playwright/mcp", "mcp-server-postgres", "@slack/mcp-server",
+  ];
+  const status: Record<string, boolean> = {};
+  for (const pkg of packagesToCheck) {
+    try {
+      const safePkg = pkg.replace(/[^a-zA-Z0-9@/_\-.]/g, "");
+      execSync(`node -e "require.resolve('${safePkg}')"`, { stdio: "pipe", timeout: 5000 });
+      status[pkg] = true;
+    } catch {
+      status[pkg] = false;
+    }
+  }
+  res.json({ status });
+  return Promise.resolve();
+});
+
 export default router;

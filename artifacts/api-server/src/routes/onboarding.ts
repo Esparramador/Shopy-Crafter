@@ -12,16 +12,26 @@ import { cached } from "../lib/cache.js";
 const router = Router();
 
 const ACHIEVEMENTS_CATALOG = [
-  { key: "first_audit", title: "Primer Análisis", description: "Completaste tu primera auditoría IA", icon: "🔍", xp: 100 },
-  { key: "first_image", title: "Artista IA", description: "Generaste tu primera imagen con IA", icon: "🎨", xp: 150 },
-  { key: "first_abtest", title: "Científico de Datos", description: "Lanzaste tu primer test A/B", icon: "📊", xp: 200 },
-  { key: "first_price", title: "Estratega de Precios", description: "Optimizaste precios por primera vez", icon: "💰", xp: 150 },
-  { key: "first_seo", title: "Maestro SEO", description: "Aplicaste optimización SEO", icon: "🔍", xp: 150 },
-  { key: "first_client", title: "Agencia Pro", description: "Invitaste a tu primer cliente", icon: "👥", xp: 300 },
-  { key: "onboarding_complete", title: "Setup Completo", description: "Completaste el proceso de setup", icon: "⚡", xp: 500 },
-  { key: "revenue_1k", title: "€1K Atribuido", description: "Generaste €1,000 de revenue atribuido", icon: "💎", xp: 1000 },
-  { key: "products_10", title: "Escala Máxima", description: "Optimizaste 10+ productos", icon: "🚀", xp: 500 },
-  { key: "boost_masivo", title: "Boost Master", description: "Activaste Boost Masivo", icon: "⚡", xp: 250 },
+  { key: "first_audit",          title: "Primer Análisis",      description: "Completaste tu primera auditoría IA",          icon: "🔍", xp: 100,  category: "audit",   target: 1 },
+  { key: "audits_5",             title: "Analítico Serial",     description: "Completaste 5 auditorías IA",                  icon: "📋", xp: 300,  category: "audit",   target: 5 },
+  { key: "audits_20",            title: "Experto en Análisis",  description: "Completaste 20 auditorías IA",                 icon: "🏅", xp: 750,  category: "audit",   target: 20 },
+  { key: "first_image",          title: "Artista IA",           description: "Generaste tu primera imagen con IA",           icon: "🎨", xp: 150,  category: "image",   target: 1 },
+  { key: "images_10",            title: "Creador Visual",       description: "Generaste 10 imágenes con IA",                 icon: "🖼️", xp: 400,  category: "image",   target: 10 },
+  { key: "images_50",            title: "Estudio de Arte IA",   description: "Generaste 50 imágenes con IA",                 icon: "🎭", xp: 1000, category: "image",   target: 50 },
+  { key: "first_abtest",         title: "Científico de Datos",  description: "Lanzaste tu primer test A/B",                  icon: "📊", xp: 200,  category: "abtest",  target: 1 },
+  { key: "abtests_5",            title: "Optimizador",          description: "Lanzaste 5 tests A/B",                        icon: "🧪", xp: 600,  category: "abtest",  target: 5 },
+  { key: "first_price",          title: "Estratega de Precios", description: "Optimizaste precios por primera vez",          icon: "💰", xp: 150,  category: "price",   target: 1 },
+  { key: "prices_10",            title: "Alquimista del Precio", description: "Optimizaste precios de 10 productos",         icon: "💹", xp: 500,  category: "price",   target: 10 },
+  { key: "first_seo",            title: "Maestro SEO",          description: "Aplicaste optimización SEO",                  icon: "🔎", xp: 150,  category: "seo",     target: 1 },
+  { key: "seo_10",               title: "SEO Pro",              description: "Optimizaste SEO en 10 productos",             icon: "📈", xp: 450,  category: "seo",     target: 10 },
+  { key: "first_client",         title: "Agencia Pro",          description: "Invitaste a tu primer cliente",               icon: "👥", xp: 300,  category: "client",  target: 1 },
+  { key: "clients_5",            title: "Agencia Élite",        description: "Gestiona 5 clientes activos",                 icon: "🏢", xp: 800,  category: "client",  target: 5 },
+  { key: "onboarding_complete",  title: "Setup Completo",       description: "Completaste el proceso de setup",             icon: "⚡", xp: 500,  category: "onboard", target: 7 },
+  { key: "revenue_1k",           title: "€1K Atribuido",        description: "Generaste €1,000 de revenue atribuido",       icon: "💎", xp: 1000, category: "revenue", target: 1000 },
+  { key: "products_10",          title: "Escala Máxima",        description: "Optimizaste 10+ productos",                   icon: "🚀", xp: 500,  category: "products",target: 10 },
+  { key: "boost_masivo",         title: "Boost Master",         description: "Activaste Boost Masivo",                      icon: "⚡", xp: 250,  category: "boost",   target: 1 },
+  { key: "first_competitor",     title: "Espía de Mercado",     description: "Hiciste tu primer análisis de competidor",    icon: "🕵️", xp: 200,  category: "compete", target: 1 },
+  { key: "brand_dna",            title: "ADN de Marca",         description: "Extrajiste el Brand DNA de tu tienda",        icon: "🧬", xp: 350,  category: "brand",   target: 1 },
 ];
 
 router.get("/onboarding/progress", async (req, res): Promise<void> => {
@@ -220,19 +230,87 @@ router.get("/achievements", async (req, res): Promise<void> => {
   try {
     const userId = (req.session as any).userId;
     if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  
+
     const unlocked = await db.select().from(achievementsTable)
       .where(eq(achievementsTable.userId, userId));
-  
+
+    // Get real activity counts for progress bars
+    const projects = await db.select({ id: projectsTable.id }).from(projectsTable);
+    const projectId = projects[0]?.id ?? null;
+
+    let auditCount = 0, imageCount = 0, priceCount = 0, abCount = 0, seoCount = 0, clientCount = 0;
+    let completedSteps = 0;
+
+    if (projectId) {
+      const [a] = await db.select({ c: sql<number>`count(*)::int` }).from(auditResultsTable).where(eq(auditResultsTable.projectId, projectId));
+      auditCount = a?.c ?? 0;
+      const [i] = await db.select({ c: sql<number>`count(*)::int` }).from(generationJobsTable).where(eq(generationJobsTable.projectId, projectId));
+      imageCount = i?.c ?? 0;
+      const [p] = await db.select({ c: sql<number>`count(*)::int` }).from(priceHistoryTable).where(eq(priceHistoryTable.projectId, projectId));
+      priceCount = p?.c ?? 0;
+      const [ab] = await db.select({ c: sql<number>`count(*)::int` }).from(abTestsTable).where(eq(abTestsTable.projectId, projectId));
+      abCount = ab?.c ?? 0;
+      const [s] = await db.select({ c: sql<number>`count(*)::int` }).from(seoDataTable).where(eq(seoDataTable.projectId, projectId));
+      seoCount = s?.c ?? 0;
+      if (auditCount > 0) completedSteps++;
+      if (imageCount > 0) completedSteps++;
+      if (priceCount > 0) completedSteps++;
+      if (abCount > 0) completedSteps++;
+      if (seoCount > 0) completedSteps++;
+    }
+    const pidStr = projectId ? String(projectId) : null;
+    const [cr] = await db.select({ c: sql<number>`count(*)::int` }).from(usersTable).where(
+      pidStr ? and(eq(usersTable.role, "client"), eq(usersTable.clientId, pidStr))
+             : and(eq(usersTable.role, "client"), isNotNull(usersTable.clientId))
+    );
+    clientCount = cr?.c ?? 0;
+    if (clientCount > 0) completedSteps++;
+    if (projects.length > 0 && projects[0]) completedSteps++;
+
+    const progressMap: Record<string, number> = {
+      audit:    auditCount,
+      image:    imageCount,
+      price:    priceCount,
+      abtest:   abCount,
+      seo:      seoCount,
+      client:   clientCount,
+      onboard:  completedSteps,
+      revenue:  0,
+      products: auditCount,
+      boost:    0,
+      compete:  0,
+      brand:    0,
+    };
+
+    // Auto-unlock achievements based on real progress
     const unlockedKeys = new Set(unlocked.map(a => a.achievementKey));
-    const catalog = ACHIEVEMENTS_CATALOG.map(a => ({
-      ...a,
-      unlocked: unlockedKeys.has(a.key),
-      unlockedAt: unlocked.find(u => u.achievementKey === a.key)?.unlockedAt ?? null,
-    }));
-  
+    for (const ach of ACHIEVEMENTS_CATALOG) {
+      const current = progressMap[ach.category] ?? 0;
+      if (current >= ach.target && !unlockedKeys.has(ach.key)) {
+        try {
+          await db.insert(achievementsTable).values({ id: randomUUID(), userId, achievementKey: ach.key });
+          unlockedKeys.add(ach.key);
+        } catch { /* ignore duplicate */ }
+      }
+    }
+
+    const freshUnlocked = await db.select().from(achievementsTable).where(eq(achievementsTable.userId, userId));
+    const freshKeys = new Set(freshUnlocked.map(a => a.achievementKey));
+
+    const catalog = ACHIEVEMENTS_CATALOG.map(a => {
+      const current = Math.min(progressMap[a.category] ?? 0, a.target);
+      const progressPct = a.target > 0 ? Math.round((current / a.target) * 100) : 0;
+      return {
+        ...a,
+        unlocked: freshKeys.has(a.key),
+        unlockedAt: freshUnlocked.find(u => u.achievementKey === a.key)?.unlockedAt ?? null,
+        progress: current,
+        progressPct,
+      };
+    });
+
     const totalXp = catalog.filter(a => a.unlocked).reduce((s, a) => s + a.xp, 0);
-    res.json({ achievements: catalog, totalXp, unlocked: unlocked.length, total: ACHIEVEMENTS_CATALOG.length });
+    res.json({ achievements: catalog, totalXp, unlocked: freshUnlocked.length, total: ACHIEVEMENTS_CATALOG.length });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
