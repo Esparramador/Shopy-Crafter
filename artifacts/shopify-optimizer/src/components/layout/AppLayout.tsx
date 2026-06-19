@@ -396,12 +396,12 @@ export function AppLayout({ children }: AppLayoutProps) {
               </svg>
             </a>
 
-            {/* Store Link */}
+            {/* Shopy Crafter Web */}
             <a
-              href="https://comic-crafter.myshopify.com/"
+              href="https://shopycrafter.com"
               target="_blank"
               rel="noopener noreferrer"
-              title="Mi Tienda"
+              title="shopycrafter.com"
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 30, height: 30, borderRadius: 7,
@@ -409,40 +409,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                 border: "1px solid var(--bdr)",
                 textDecoration: "none", transition: "background 0.15s", flexShrink: 0,
               }}
-              onMouseOver={e => (e.currentTarget.style.background = "rgba(150,191,89,0.12)")}
+              onMouseOver={e => (e.currentTarget.style.background = "rgba(212,168,67,0.12)")}
               onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M15.5 3.5C15.5 3.5 15.1 3.5 14.8 3.7C14.6 2.5 13.9 1.5 12.7 1.5C12.4 1.5 12.1 1.6 11.8 1.8C11.5 1.4 11 1 10.3 1C8.1 1 7 3.7 6.7 5.1L5.1 5.6C4.6 5.8 4.6 5.8 4.5 6.3L3 18.3L14.5 20.5L20.5 19L18.5 5.5C18.4 5.5 15.5 3.5 15.5 3.5Z" fill="#96BF59"/>
-                <path d="M14.8 3.7C14.5 3.9 14.3 4.2 14.1 4.6L9.8 5.9C10.1 4.7 10.8 2.5 12.5 2.5C13.4 2.5 14 3 14.8 3.7Z" fill="#5E8E3E"/>
-                <path d="M12.5 7.5C12.5 7.5 12 7.5 11.5 7.7C11.3 7.2 10.9 7 10.5 7C9.5 7 9 8 9 8.5C9 9.7 12 10.5 12 12.5C12 14 11 14.5 10 14.5C8.6 14.5 7.9 13.5 7.9 13.5L8.3 12C8.3 12 9.1 12.8 10 12.8C10.5 12.8 10.7 12.5 10.7 12.2C10.7 10.5 8.2 10.4 8.2 8.6C8.2 7 9.3 5.5 11.3 5.5C12.1 5.5 12.5 5.8 12.5 5.8V7.5Z" fill="white"/>
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#d4a843" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </a>
-
-            {/* Comic Crafter App */}
-            <a
-              href="https://comic-crafter.myshopify.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="comic-crafter.myshopify.com"
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                width: 30, height: 30, borderRadius: 7,
-                background: "rgba(255,255,255,0.025)",
-                border: "1px solid var(--bdr)",
-                textDecoration: "none", transition: "background 0.15s", flexShrink: 0,
-              }}
-              onMouseOver={e => (e.currentTarget.style.background = "rgba(147,51,234,0.12)")}
-              onMouseOut={e => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
-            >
-              <img
-                src="https://comic-crafter.myshopify.com/cdn/shop/t/10/assets/logo-app.png"
-                alt="Comic Crafter"
-                width={16}
-                height={16}
-                style={{ borderRadius: 3, objectFit: "cover" }}
-                onError={e => { e.currentTarget.style.display = "none"; }}
-              />
             </a>
           </div>
         </div>
