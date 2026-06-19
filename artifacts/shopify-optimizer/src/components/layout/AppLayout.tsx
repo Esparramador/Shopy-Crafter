@@ -98,6 +98,7 @@ const DEFAULT_ADMIN_NAV = [
   { label: "APK Android", icon: "📱", href: "/admin/apk" },
   { label: "Tienda / Store", icon: "🛒", href: "/tienda" },
   { label: "System Health", icon: "🖥", href: "/admin/system" },
+  { label: "Conexiones / Integraciones", icon: "🔗", href: "/help/connections" },
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {

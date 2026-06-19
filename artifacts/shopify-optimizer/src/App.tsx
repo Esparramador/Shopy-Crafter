@@ -301,7 +301,7 @@ function Router() {
 
         {/* Admin home */}
         <Route path="/home">
-          <RequireAdmin><AppLayout><S><Home /></S></AppLayout></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><Home /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         {/* Admin base redirects */}
@@ -335,7 +335,7 @@ function Router() {
           <RequireAdmin><AdminWrapper><AppLayout><S><Intelligence /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/gemini-intel">
-          <RequireAdmin><AppLayout><S><GeminiIntelligence /></S></AppLayout></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><S><GeminiIntelligence /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/inventory">
           <RequireAdmin><AdminWrapper><AppLayout><S><Inventory /></S></AppLayout></AdminWrapper></RequireAdmin>
