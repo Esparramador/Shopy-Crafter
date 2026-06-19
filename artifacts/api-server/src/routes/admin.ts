@@ -1,6 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
+import { existsSync } from "fs";
+import { execSync } from "child_process";
 import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
@@ -578,7 +580,18 @@ router.get("/system-capabilities", async (_req, res): Promise<void> => {
     const githubConfigured = has("GITHUB_API_TOKEN");
     const vapidConfigured = has("VAPID_PUBLIC_KEY") && has("VAPID_PRIVATE_KEY");
     const objectStoreConfigured = has("PRIVATE_OBJECT_DIR") || has("PUBLIC_OBJECT_SEARCH_PATHS");
-    const chromiumConfigured = has("CHROMIUM_PATH", "PUPPETEER_EXECUTABLE_PATH");
+    const CHROMIUM_STATIC_PATHS = [
+      process.env.CHROMIUM_PATH,
+      process.env.PUPPETEER_EXECUTABLE_PATH,
+      "/usr/bin/chromium-browser",
+      "/usr/bin/chromium",
+      "/usr/bin/google-chrome",
+      "/usr/local/bin/chromium",
+    ].filter(Boolean) as string[];
+    const chromiumFoundInPath = (() => {
+      try { execSync("which chromium-browser || which chromium || which google-chrome", { stdio: "pipe", timeout: 2000 }); return true; } catch { return false; }
+    })();
+    const chromiumConfigured = has("CHROMIUM_PATH", "PUPPETEER_EXECUTABLE_PATH") || CHROMIUM_STATIC_PATHS.some(p => existsSync(p)) || chromiumFoundInPath;
 
     const claudeModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
     const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
