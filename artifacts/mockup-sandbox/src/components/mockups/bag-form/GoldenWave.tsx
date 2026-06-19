@@ -12,8 +12,9 @@
  */
 import { useState, useEffect, useRef } from "react";
 
-const VID_SRC    = "/assets/videos/alec_landing.mp4";
-const POSTER_SRC = "/assets/videos/alec_poster.jpg";
+const _BASE      = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+const VID_SRC    = `${_BASE}/assets/videos/alec_landing.mp4`;
+const POSTER_SRC = `${_BASE}/assets/videos/alec_poster.jpg`;
 const TRIGGER    = 7.5;
 const BAG_X      = 550;
 const BAG_Y      = 560;

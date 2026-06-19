@@ -11,8 +11,9 @@
  */
 import { useState, useEffect, useRef } from "react";
 
-const VID_SRC    = "/assets/videos/alec_landing.mp4";
-const POSTER_SRC = "/assets/videos/alec_poster.jpg";
+const _BASE      = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+const VID_SRC    = `${_BASE}/assets/videos/alec_landing.mp4`;
+const POSTER_SRC = `${_BASE}/assets/videos/alec_poster.jpg`;
 const TRIGGER    = 8.0;
 
 // Posición de la bolsa en viewport 1280×800 (solo usada en pantallas anchas ≥700px)
