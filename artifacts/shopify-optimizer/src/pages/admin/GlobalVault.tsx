@@ -179,6 +179,7 @@ export default function GlobalVault() {
   const [texturizeError, setTexturizeError] = useState<string | null>(null);
   const [recordingDemo, setRecordingDemo] = useState<string | null>(null);
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [loadedPreviews, setLoadedPreviews] = useState<Set<string>>(new Set());
 
   const handleRecord = useCallback(async (demoId: string, demoName: string) => {
     try {
@@ -871,7 +872,10 @@ Hemos trabajado con más de 50 tiendas Shopify en España y Latinoamérica — e
                         <ExternalLink size={12} /> Abrir
                       </a>
                       <button
-                        onClick={() => handleRecord(demo.id, demo.name)}
+                        onClick={() => {
+                          setLoadedPreviews(p => new Set([...p, demo.id]));
+                          handleRecord(demo.id, demo.name);
+                        }}
                         disabled={recordingDemo !== null}
                         style={{
                           display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
@@ -893,17 +897,35 @@ Hemos trabajado con más de 50 tiendas Shopify en España y Latinoamérica — e
                     </div>
                   </div>
 
-                  {/* Iframe preview */}
+                  {/* Iframe preview — solo carga al hacer clic */}
                   <div style={{ position: "relative", width: "100%", paddingBottom: "56.25%", background: "#0a0a10" }}>
-                    <iframe
-                      src={MOCKUP_BASE + demo.path}
-                      style={{
-                        position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
-                        border: "none",
-                      }}
-                      title={demo.name}
-                      loading="lazy"
-                    />
+                    {loadedPreviews.has(demo.id) ? (
+                      <iframe
+                        src={MOCKUP_BASE + demo.path}
+                        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                        title={demo.name}
+                        allow="autoplay"
+                      />
+                    ) : (
+                      <div
+                        onClick={() => setLoadedPreviews(p => new Set([...p, demo.id]))}
+                        style={{
+                          position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                          cursor: "pointer", gap: 12,
+                          background: "linear-gradient(135deg,#0d0d14,#111120)",
+                        }}
+                      >
+                        <div style={{
+                          width: 56, height: 56, borderRadius: "50%", display: "flex", alignItems: "center",
+                          justifyContent: "center", fontSize: 24,
+                          background: "rgba(200,168,75,0.12)", border: "1.5px solid rgba(200,168,75,0.3)",
+                          transition: "transform .15s",
+                        }}>▶</div>
+                        <div style={{ fontSize: 13, color: "#8b8b9e", letterSpacing: ".02em" }}>Clic para cargar preview</div>
+                        <div style={{ fontSize: 11, color: "#555", marginTop: -4 }}>o usa <strong style={{ color: "#fca5a5" }}>Grabar Demo</strong> para grabarlo directamente</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

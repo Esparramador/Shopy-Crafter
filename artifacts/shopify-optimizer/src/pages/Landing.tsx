@@ -5,6 +5,38 @@ import PageMeta from "@/components/PageMeta";
 import { VismeFormHero } from "@/components/VismeFormHero";
 import "./landing.css";
 
+function SectionVideoBg({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.play().catch(() => {});
+        } else {
+          el.pause();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [src]);
+  return (
+    <video
+      ref={videoRef}
+      className="fp-video-bg"
+      muted
+      loop
+      playsInline
+      preload="none"
+    >
+      <source src={src} />
+    </video>
+  );
+}
+
 function MagnetStoreButton() {
   const btnRef = useRef<HTMLAnchorElement>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -591,11 +623,7 @@ export default function Landing() {
     const bg = bgFor(section);
     if (bg.type !== "video" || !bg.videoUrl) return null;
     const src = bg.videoUrl.startsWith("/") ? `${API_BASE_LANDING}${bg.videoUrl}` : bg.videoUrl;
-    return (
-      <video className="fp-video-bg" autoPlay muted loop playsInline preload="auto" key={src}>
-        <source src={src} />
-      </video>
-    );
+    return <SectionVideoBg src={src} />;
   };
 
   const calcDefaults = { pill: "Calcula tu precio", headline: "¿Cuánto cuesta optimizar tu tienda?", headlineHighlight: "optimizar tu tienda", subheadline: "Selecciona los servicios que necesitas.", disclaimer: "* Precios orientativos.", resultLabel: "Precio estimado", oneTimeLabel: "Pago único", recurringLabel: "Suscripción mensual", ctaLabel: "Solicitar presupuesto →", emptyLabel: "Selecciona al menos un servicio", oneTimeServices: [] as { id: string; name: string; description: string; price: number; icon: string }[], recurringServices: [] as { id: string; name: string; description: string; price: number; period: string; icon: string }[] };
