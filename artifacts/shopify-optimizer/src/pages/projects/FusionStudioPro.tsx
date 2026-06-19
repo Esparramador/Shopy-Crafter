@@ -1738,9 +1738,9 @@ function DownloadsTab({ projectId, sessionItems, onError }: { projectId: number;
   );
 }
 
-// ─── TAB: PRO TOOLS (lip-sync · auto-subs · motion-transfer · concat) ───
+// ─── TAB: PRO TOOLS (lip-sync · auto-subs · motion-transfer) ───
 function ProToolsTab({ caps, projectId, sessionItems, onSuccess, onError }: { caps: Capabilities | null; projectId: number; sessionItems: VaultItem[]; onSuccess: (it: VaultItem) => void; onError: (m: string) => void }) {
-  const [mode, setMode] = useState<"lipsync" | "subs" | "motion" | "concat">("lipsync");
+  const [mode, setMode] = useState<"lipsync" | "subs" | "motion">("lipsync");
   const [busy, setBusy] = useState(false);
 
   // Lip-sync state
@@ -1755,11 +1755,6 @@ function ProToolsTab({ caps, projectId, sessionItems, onSuccess, onError }: { ca
   // Motion transfer state
   const [mtImage, setMtImage] = useState<File | null>(null);
   const [mtRef, setMtRef] = useState<File | null>(null);
-
-  // Concat state
-  const [concatIds, setConcatIds] = useState<number[]>([]);
-  const [transitionPreset, setTransitionPreset] = useState<string>("");
-  const [transitionDuration, setTransitionDuration] = useState<number>(0.5);
 
   const videoVaultItems = sessionItems.filter(it => it.mimeType?.startsWith("video"));
   const audioVaultItems = sessionItems.filter(it => it.mimeType?.startsWith("audio"));
@@ -1820,7 +1815,6 @@ function ProToolsTab({ caps, projectId, sessionItems, onSuccess, onError }: { ca
           { k: "lipsync", l: "Lip-sync" },
           { k: "subs",    l: "Subtítulos auto" },
           { k: "motion",  l: "Motion transfer" },
-          { k: "concat",  l: "Concat + transitions" },
         ].map(o => (
           <button key={o.k} onClick={() => setMode(o.k as any)} style={{ ...cardButton(mode === o.k), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
             {o.l}
@@ -1894,119 +1888,18 @@ function ProToolsTab({ caps, projectId, sessionItems, onSuccess, onError }: { ca
             </button>
           </>
         )}
-        {mode === "concat" && (
-          <>
-            <Section title="Disponibles">
-              {videoVaultItems.length === 0 ? (
-                <p style={{ fontSize: 11, color: "var(--t3)" }}>Genera primero al menos 2 videos.</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {videoVaultItems.filter(v => !concatIds.includes(v.vaultId)).map(v => (
-                    <button
-                      key={v.vaultId}
-                      onClick={() => setConcatIds(prev => [...prev, v.vaultId])}
-                      style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 6, background: "var(--ink2)", border: "1px solid var(--bdr)", cursor: "pointer", textAlign: "left", color: "var(--t2)", fontSize: 12 }}>
-                      <span style={{ flex: 1 }}>#{v.vaultId} · {v.label}</span>
-                      <span style={{ fontSize: 10, color: "var(--gold)" }}>+ añadir</span>
-                    </button>
-                  ))}
-                  {videoVaultItems.length > 0 && videoVaultItems.every(v => concatIds.includes(v.vaultId)) && (
-                    <p style={{ fontSize: 11, color: "var(--t3)", fontStyle: "italic" }}>Todos los videos ya están en el timeline.</p>
-                  )}
-                </div>
-              )}
-            </Section>
-            <Section title={`Timeline (${concatIds.length} clips · arrastra el orden con ↑↓)`}>
-              {concatIds.length === 0 ? (
-                <p style={{ fontSize: 11, color: "var(--t3)" }}>Añade clips desde la lista superior para construir tu secuencia.</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {concatIds.map((vaultId, idx) => {
-                    const v = videoVaultItems.find(x => x.vaultId === vaultId);
-                    const moveUp = () => setConcatIds(prev => {
-                      if (idx === 0) return prev;
-                      const next = [...prev]; [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]; return next;
-                    });
-                    const moveDown = () => setConcatIds(prev => {
-                      if (idx === prev.length - 1) return prev;
-                      const next = [...prev]; [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]; return next;
-                    });
-                    const remove = () => setConcatIds(prev => prev.filter(i => i !== vaultId));
-                    return (
-                      <div key={vaultId} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 8, background: "linear-gradient(90deg, rgba(200,168,75,0.10), rgba(200,168,75,0.02))", border: "1px solid rgba(200,168,75,0.35)" }}>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: "var(--gold)", minWidth: 28, textAlign: "center", padding: "4px 6px", borderRadius: 4, background: "rgba(0,0,0,0.3)" }}>#{idx + 1}</span>
-                        <span style={{ fontSize: 12, flex: 1, color: "var(--t1)" }}>#{vaultId} · {v?.label ?? "(?)"}</span>
-                        <button onClick={moveUp} disabled={idx === 0} title="Subir" style={{ ...pillButton(false), opacity: idx === 0 ? 0.3 : 1, cursor: idx === 0 ? "not-allowed" : "pointer", padding: "4px 8px" }}>↑</button>
-                        <button onClick={moveDown} disabled={idx === concatIds.length - 1} title="Bajar" style={{ ...pillButton(false), opacity: idx === concatIds.length - 1 ? 0.3 : 1, cursor: idx === concatIds.length - 1 ? "not-allowed" : "pointer", padding: "4px 8px" }}>↓</button>
-                        <button onClick={remove} title="Quitar" style={{ ...pillButton(false), padding: "4px 8px", color: "#ef4444", borderColor: "rgba(239,68,68,0.35)" }}>×</button>
-                      </div>
-                    );
-                  })}
-                  {concatIds.length >= 2 && (
-                    <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0 0", lineHeight: 1.4 }}>
-                      Resultado: secuencia de {concatIds.length} clips
-                      {transitionPreset ? ` con transición "${caps?.transitionPresets?.find(t => t.key === transitionPreset)?.label || transitionPreset}" (${transitionDuration.toFixed(1)}s)` : " unidos por corte directo"}.
-                    </p>
-                  )}
-                </div>
-              )}
-            </Section>
-            {caps?.transitionPresets && caps.transitionPresets.length > 0 && (
-              <Section title="Transición temática">
-                <select value={transitionPreset} onChange={e => setTransitionPreset(e.target.value)} style={inputStyle}>
-                  <option value="">Sin transición (corte directo)</option>
-                  {caps.transitionPresets.map(t => (
-                    <option key={t.key} value={t.key}>{t.label} ({t.xfade})</option>
-                  ))}
-                </select>
-                {transitionPreset && (
-                  <div style={{ marginTop: 10 }}>
-                    <label style={{ fontSize: 11, color: "var(--t3)" }}>Duración transición: {transitionDuration.toFixed(2)}s</label>
-                    <input type="range" min={0.2} max={2.0} step={0.1} value={transitionDuration} onChange={e => setTransitionDuration(parseFloat(e.target.value))} style={{ width: "100%" }} />
-                  </div>
-                )}
-              </Section>
-            )}
-            <button
-              onClick={async () => {
-                if (concatIds.length < 2) { onError("Selecciona al menos 2 videos"); return; }
-                setBusy(true);
-                try {
-                  const res = await fetch(`${API_BASE}/api/fs-pro/concat`, {
-                    method: "POST", credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      projectId, videoVaultIds: concatIds,
-                      transitionPreset: transitionPreset || undefined,
-                      crossfadeSec: transitionPreset ? transitionDuration : undefined,
-                    }),
-                  });
-                  const d = await res.json();
-                  if (!res.ok) { onError(d.error || `HTTP ${res.status}`); return; }
-                  onSuccess({ vaultId: d.vaultId, type: "video", label: `Concat ${concatIds.length} clips`, mimeType: "video/mp4" });
-                } catch (e: any) { onError(e?.message || "Error"); } finally { setBusy(false); }
-              }}
-              disabled={busy || concatIds.length < 2}
-              className="btn btn-gold" style={{ width: "100%", padding: "12px 20px", justifyContent: "center" }}>
-              {busy ? <Loader2 size={16} className="animate-spin" /> : <Palette size={16} />} {busy ? "Concatenando..." : `Concatenar ${concatIds.length} videos`}
-            </button>
-          </>
-        )}
-
         <div style={{ marginTop: 14 }}>
           <LiveOperation
             active={busy}
             title={
               mode === "lipsync" ? "Sincronizando labios con audio (lip-sync)" :
               mode === "subs" ? "Quemando subtítulos en el video" :
-              mode === "motion" ? "Transfiriendo movimiento entre clips" :
-              "Concatenando videos con FFmpeg"
+              "Transfiriendo movimiento entre clips"
             }
             estimatedSec={
               mode === "lipsync" ? 180 :
               mode === "subs" ? 60 :
-              mode === "motion" ? 240 :
-              45
+              240
             }
             messages={
               mode === "lipsync" ? [
@@ -2019,15 +1912,11 @@ function ProToolsTab({ caps, projectId, sessionItems, onSuccess, onError }: { ca
                 "Transcribiendo con Whisper en el idioma seleccionado…",
                 "Renderizando subtítulos con tu estilo configurado…",
                 "Re-encodeando MP4 final con subs quemados…",
-              ] : mode === "motion" ? [
+              ] : [
                 "Subiendo imagen base y video referencia…",
                 "Extrayendo trayectoria de movimiento del clip…",
                 "Aplicando movimiento sobre tu imagen — proceso muy pesado.",
                 "Puede tardar 3 a 5 minutos según resolución.",
-              ] : [
-                "Descargando los videos seleccionados del Vault…",
-                "Aplicando transición temática si la configuraste…",
-                "Re-encodeando concat final con FFmpeg…",
               ]
             }
             className="w-full"
