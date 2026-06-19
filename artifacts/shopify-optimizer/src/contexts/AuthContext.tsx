@@ -37,7 +37,14 @@ async function fetchMe(): Promise<AuthUser | null> {
 
 export function saveLastRoute(path: string) {
   try {
-    if (path && !path.startsWith("/login") && !path.startsWith("/landing") && path !== "/") {
+    if (
+      path &&
+      !path.startsWith("/login") &&
+      !path.startsWith("/landing") &&
+      !path.startsWith("/mockup-sandbox") &&
+      !path.startsWith("/mockup") &&
+      path !== "/"
+    ) {
       localStorage.setItem(LAST_ROUTE_KEY, path);
     }
   } catch {}

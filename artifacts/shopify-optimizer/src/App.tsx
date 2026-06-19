@@ -179,10 +179,18 @@ function HomeRedirect() {
   if (!user) return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
   if (user.role === "client") return <Redirect to="/client" />;
   const saved = getLastRoute();
-  if (saved && saved !== "/" && saved !== "/login" && saved !== "/tienda") {
+  if (
+    saved &&
+    saved !== "/" &&
+    saved !== "/login" &&
+    saved !== "/tienda" &&
+    !saved.startsWith("/mockup-sandbox") &&
+    !saved.startsWith("/mockup")
+  ) {
     clearLastRoute();
     return <Redirect to={saved} />;
   }
+  clearLastRoute();
   return <Redirect to="/home" />;
 }
 
@@ -249,7 +257,13 @@ function RoutePersistence() {
   const { user } = useAuth();
   const lastSaved = useRef("");
   useEffect(() => {
-    if (user && location !== lastSaved.current && location !== "/tienda") {
+    if (
+      user &&
+      location !== lastSaved.current &&
+      location !== "/tienda" &&
+      !location.startsWith("/mockup-sandbox") &&
+      !location.startsWith("/mockup")
+    ) {
       lastSaved.current = location;
       saveLastRoute(location);
     }
