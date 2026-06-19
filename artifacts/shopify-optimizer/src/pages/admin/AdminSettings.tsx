@@ -552,7 +552,7 @@ function CapabilitiesSummary() {
             <span style={{ color: tone, fontWeight: 700 }}>{caps.summary.configured}</span> de {caps.summary.total} integraciones activas · cobertura {coverage}%
           </p>
         </div>
-        <Link href="/admin/system-health">
+        <Link href="/admin/system">
           <span style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,

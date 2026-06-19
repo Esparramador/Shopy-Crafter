@@ -37,14 +37,26 @@ async function fetchMe(): Promise<AuthUser | null> {
 
 export function saveLastRoute(path: string) {
   try {
-    if (
+    const isAppRoute =
       path &&
-      !path.startsWith("/login") &&
-      !path.startsWith("/landing") &&
-      !path.startsWith("/mockup-sandbox") &&
-      !path.startsWith("/mockup") &&
-      path !== "/"
-    ) {
+      (path.startsWith("/admin") ||
+        path.startsWith("/home") ||
+        path.startsWith("/projects") ||
+        path.startsWith("/new-project") ||
+        path.startsWith("/web-designer") ||
+        path.startsWith("/effects-studio") ||
+        path.startsWith("/fusion-studio") ||
+        path.startsWith("/ad-studio") ||
+        path.startsWith("/cards") ||
+        path.startsWith("/campaign-kit") ||
+        path.startsWith("/tripo3d") ||
+        path.startsWith("/meshy") ||
+        path.startsWith("/generator") ||
+        path.startsWith("/suppliers") ||
+        path.startsWith("/web-lab") ||
+        path.startsWith("/audit") ||
+        path.startsWith("/help"));
+    if (isAppRoute) {
       localStorage.setItem(LAST_ROUTE_KEY, path);
     }
   } catch {}

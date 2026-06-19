@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { AuthProvider, useAuth, getLastRoute, saveLastRoute, clearLastRoute } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth, saveLastRoute } from "@/contexts/AuthContext";
 import { CmsProvider } from "@/contexts/CmsContext";
 import { ClientPreviewProvider } from "@/pages/client/ClientPreviewContext";
 import { Loader2 } from "lucide-react";
@@ -178,19 +178,6 @@ function HomeRedirect() {
   if (loading) return <LoadingScreen />;
   if (!user) return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
   if (user.role === "client") return <Redirect to="/client" />;
-  const saved = getLastRoute();
-  if (
-    saved &&
-    saved !== "/" &&
-    saved !== "/login" &&
-    saved !== "/tienda" &&
-    !saved.startsWith("/mockup-sandbox") &&
-    !saved.startsWith("/mockup")
-  ) {
-    clearLastRoute();
-    return <Redirect to={saved} />;
-  }
-  clearLastRoute();
   return <Redirect to="/home" />;
 }
 
@@ -257,13 +244,25 @@ function RoutePersistence() {
   const { user } = useAuth();
   const lastSaved = useRef("");
   useEffect(() => {
-    if (
-      user &&
-      location !== lastSaved.current &&
-      location !== "/tienda" &&
-      !location.startsWith("/mockup-sandbox") &&
-      !location.startsWith("/mockup")
-    ) {
+    const isAppRoute =
+      location.startsWith("/admin") ||
+      location.startsWith("/home") ||
+      location.startsWith("/projects") ||
+      location.startsWith("/new-project") ||
+      location.startsWith("/web-designer") ||
+      location.startsWith("/effects-studio") ||
+      location.startsWith("/fusion-studio") ||
+      location.startsWith("/ad-studio") ||
+      location.startsWith("/cards") ||
+      location.startsWith("/campaign-kit") ||
+      location.startsWith("/tripo3d") ||
+      location.startsWith("/meshy") ||
+      location.startsWith("/generator") ||
+      location.startsWith("/suppliers") ||
+      location.startsWith("/web-lab") ||
+      location.startsWith("/audit") ||
+      location.startsWith("/help");
+    if (user && location !== lastSaved.current && isAppRoute) {
       lastSaved.current = location;
       saveLastRoute(location);
     }
@@ -652,7 +651,20 @@ function PublicChatbotSlot() {
   const { loading } = useAuth();
   const [location] = useLocation();
   if (loading) return null;
-  const isPublicPath = !location.startsWith("/admin") && !location.startsWith("/client");
+  const isPublicPath =
+    location === "/" ||
+    location.startsWith("/landing") ||
+    location.startsWith("/sobre-nosotros") ||
+    location.startsWith("/casos-de-exito") ||
+    location.startsWith("/programa-de-afiliados") ||
+    location.startsWith("/faq") ||
+    location.startsWith("/blog") ||
+    location.startsWith("/changelog") ||
+    location.startsWith("/privacidad") ||
+    location.startsWith("/terminos") ||
+    location.startsWith("/cookies") ||
+    location.startsWith("/contacto") ||
+    location.startsWith("/tienda");
   if (!isPublicPath) return null;
   return (
     <Suspense fallback={null}>
