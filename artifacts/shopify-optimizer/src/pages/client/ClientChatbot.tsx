@@ -31,24 +31,40 @@ export function ClientChatbot() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, loading]);
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 120); }, [open]);
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const send = async (text: string) => {
     const t = text.trim();
     if (!t || loading) return;
     setMsgs(m => [...m, { role: "user", content: t }]);
     setInput("");
     setLoading(true);
+
+    if (abortRef.current) abortRef.current.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+
     try {
       const res = await fetch(`${API}/client/ai-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message: t, history: msgs.slice(-6) }),
+        signal: ctrl.signal,
+        body: JSON.stringify({ message: t, history: msgs.slice(-8) }),
       });
       const d = await res.json();
-      setMsgs(m => [...m, { role: "assistant", content: d.reply ?? d.error ?? "No pude procesar tu consulta en este momento." }]);
-    } catch {
-      setMsgs(m => [...m, { role: "assistant", content: "No pude conectar. Por favor inténtalo de nuevo." }]);
+      if (!res.ok) {
+        setMsgs(m => [...m, { role: "assistant", content: d.error ?? `Error ${res.status}. Por favor inténtalo de nuevo.` }]);
+      } else {
+        setMsgs(m => [...m, { role: "assistant", content: d.reply ?? "No pude procesar tu consulta en este momento." }]);
+      }
+    } catch (e: any) {
+      const isAbort = e?.name === "AbortError";
+      setMsgs(m => [...m, { role: "assistant", content: isAbort ? "La consulta tardó demasiado. Por favor inténtalo de nuevo." : "No pude conectar. Por favor inténtalo de nuevo." }]);
     } finally {
+      clearTimeout(timer);
+      abortRef.current = null;
       setLoading(false);
     }
   };

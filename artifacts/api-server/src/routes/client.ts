@@ -500,28 +500,27 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
     const scored = products.filter(p => p.auditScore !== null);
     const avgScore = scored.length ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length) : null;
 
-    const systemPrompt = `Eres el asistente IA personal de Shopy Crafter para este cliente. Eres experto en ecommerce Shopify y optimización de tiendas online.
+    const avgGrade = avgScore !== null ? (avgScore >= 80 ? "A" : avgScore >= 65 ? "B" : avgScore >= 50 ? "C" : "D") : null;
+    const systemPrompt = `Eres el asistente personal de Shopy Crafter para este cliente. Tu trabajo es ayudarle a entender el estado de su tienda, responder sus dudas y orientarle hacia las acciones de mayor impacto.
 
-DATOS ACTUALES DE LA TIENDA DEL CLIENTE:
-- Total de productos: ${products.length}
-- Productos auditados: ${scored.length}
-- Score promedio de calidad: ${avgScore ?? "Sin datos"}/100
-- Motores IA activos: 7 (Auditoría, Rediseño, Imágenes, Consistencia Visual, A/B Testing, SEO, Precios)
+ESTADO ACTUAL DE LA TIENDA:
+- Productos: ${products.length} (${scored.length} auditados${avgScore !== null ? `, score medio ${avgScore}/100 grado ${avgGrade}` : ""})
+- Motores IA activos: Auditoría, Rediseño, Imágenes, A/B Testing, SEO, Precios
 - Última actividad: ${recentActivity[0]?.details ?? "Sin actividad reciente"}
 
-PRODUCTOS (top 10 por score):
-${products.slice(0, 10).map(p => `- ${p.title}: €${p.price ?? "?"} | Score: ${p.auditScore ?? "?"}/100 (${p.auditGrade ?? "?"})`).join("\n")}
+${products.length > 0 ? `PRODUCTOS (sample):
+${products.slice(0, 8).map(p => `· ${p.title}: €${p.price ?? "?"} — ${p.auditScore ?? "?"}pts (${p.auditGrade ?? "?"})`).join("\n")}` : ""}
 
-ACTIVIDAD RECIENTE:
-${recentActivity.slice(0, 5).map(a => `- ${a.action}: ${a.details}`).join("\n")}
+${recentActivity.length > 0 ? `ACTIVIDAD RECIENTE:
+${recentActivity.slice(0, 4).map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
 
-INSTRUCCIONES:
-- Responde SIEMPRE en español
-- Sé conciso, amigable y profesional
-- Da consejos específicos basados en los datos reales de su tienda
-- Si no tienes datos suficientes, sé honesto pero proporciona asesoramiento general útil
-- Anima al cliente cuando sea apropiado
-- Máximo 200 palabras por respuesta`;
+COMPORTAMIENTO:
+- Habla de forma natural y cercana, como un experto de confianza
+- Basate SIEMPRE en los datos reales de la tienda que tienes arriba
+- Cuando identifiques un problema claro (score bajo, productos sin imágenes, etc.), dilo directamente con el dato concreto
+- Si no tienes datos suficientes para responder, dilo y sugiere cómo obtenerlos
+- Termina con una acción concreta que el cliente puede hacer ahora mismo
+- Máximo 180 palabras. Responde siempre en español.`;
 
     const messages: Array<{ role: "user" | "assistant"; content: string }> = [
       ...history.slice(-6).map(m => ({ role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant", content: m.content })),

@@ -10779,9 +10779,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               0,
               [{ role: "user" as const, content: rawContent || `Genera un informe completo sobre: ${topic}` }],
               synthesisPrompt,
-              8000,
+              5000,
               undefined,
-              { tier: "genius" as any },
+              { tier: "smart" as any },
             );
 
             // 4. Construir HTML profesional completo
@@ -10937,9 +10937,9 @@ ${brandContext ? `\nBrand DNA extraído de la empresa:\n${brandContext.slice(0, 
 
 Genera contenido específico, detallado y profesional. NO uses placeholders genéricos.` }],
               brandBookSystem,
-              6000,
+              4000,
               undefined,
-              { tier: "genius" as any },
+              { tier: "smart" as any },
             );
 
             // Parsear JSON del brand book
