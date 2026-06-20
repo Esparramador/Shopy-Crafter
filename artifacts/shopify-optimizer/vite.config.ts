@@ -73,8 +73,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Content-hashed file names for long-term cache
-        // SSR builds override entryFileNames to avoid hash so prerender.mjs can find the bundle predictably
-        entryFileNames:  process.env.SSR_BUILD === "1" ? "[name].js" : "assets/[name]-[hash].js",
+        entryFileNames:  "assets/[name]-[hash].js",
         chunkFileNames:  "assets/[name]-[hash].js",
         assetFileNames:  "assets/[name]-[hash][extname]",
 
