@@ -1,8 +1,20 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 
 const DIST = "dist/public";
-const SERVER_BUNDLE = "dist/server/entry-server.js";
+// SSR build may output with a hash (e.g. dist/server/assets/entry-server-abc123.js)
+// or directly as dist/server/entry-server.js — find whichever exists.
+function findServerBundle() {
+  const direct = "dist/server/entry-server.js";
+  if (existsSync(direct)) return direct;
+  const assetsDir = "dist/server/assets";
+  if (existsSync(assetsDir)) {
+    const files = readdirSync(assetsDir).filter(f => f.startsWith("entry-server") && f.endsWith(".js"));
+    if (files.length > 0) return join(assetsDir, files[0]);
+  }
+  return direct; // fallback – existsSync will return false and we'll warn
+}
+const SERVER_BUNDLE = findServerBundle();
 const DOMAIN = "https://shopycrafter.com";
 const DEFAULT_IMAGE = `${DOMAIN}/opengraph.jpg`;
 
