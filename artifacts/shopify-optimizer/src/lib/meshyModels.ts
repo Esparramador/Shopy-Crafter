@@ -162,7 +162,7 @@ const FULL_134 = [
 ];
 // 22 animations (batman, chico_casual, chico_formal)
 const FULL_22 = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","jump","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
-// 21 animations (7 new chars: spiderman, mickey, minnie, bob, bugs, plim_plim, chica_ejecutiva)
+// 21 animations (plim_plim, chica_ejecutiva and others)
 const FULL_21 = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
 // Basic 3 (TED — plan limit hit)
 const BASIC_3 = ["jump","run","walk"];
@@ -204,13 +204,6 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     animations: anims("chico_formal", FULL_22),
   },
   // ── Newly generated and rigged ──
-  {
-    id: "spiderman", name: "Spider-Man", emoji: "🕷️", category: "cartoon",
-    description: "El Hombre Araña. 21 animaciones.",
-    tags: ["marvel","superhéroe","acción","rigged"],
-    glbPath: "/assets/3d/models/spiderman.glb", rigStatus: "rigged",
-    animations: anims("spiderman", FULL_21),
-  },
   {
     id: "mickey_mouse", name: "Mickey Mouse", emoji: "🐭", category: "cartoon",
     description: "El personaje más icónico de Disney. 21 animaciones.",

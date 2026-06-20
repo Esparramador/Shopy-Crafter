@@ -880,7 +880,7 @@ export const DEFAULT_CMS_CONTENT = {
         { id: "store-nav-2", label: "Tienda", href: "/collections", visible: true },
         { id: "store-nav-3", label: "Planes", href: "/collections/suscripciones", visible: true },
         { id: "store-nav-4", label: "Créditos", href: "/collections/packs-de-creditos", visible: true },
-        { id: "store-nav-5", label: "Sobre Nosotros", href: "/pages/sobre-comic-crafter", visible: true },
+        { id: "store-nav-5", label: "Sobre Nosotros", href: "/pages/sobre-nosotros", visible: true },
         { id: "store-nav-6", label: "FAQ", href: "/pages/faq-preguntas-frecuentes", visible: true },
         { id: "store-nav-7", label: "Contacto", href: "/pages/contacto", visible: true },
       ],

@@ -3,7 +3,7 @@ import { requireAdmin } from "../lib/auth.js";
 
 const router = Router();
 
-const GITHUB_TOKEN = process.env.GITHUB_API_TOKEN ?? "";
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? process.env.GITHUB_API_TOKEN ?? "";
 const REPO = "Esparramador/Shopy-Crafter";
 const WORKFLOW_ID = "build-apk.yml";
 const RELEASE_TAG = "apk-latest";
@@ -23,7 +23,7 @@ async function ghFetch(path: string, opts: RequestInit = {}) {
 router.get("/apk/status", async (_req, res): Promise<void> => {
   try {
     if (!GITHUB_TOKEN) {
-      res.json({ available: false, building: false, error: "GITHUB_API_TOKEN no configurado" });
+      res.json({ available: false, building: false, error: "GITHUB_TOKEN no configurado" });
       return;
     }
     try {
@@ -55,7 +55,7 @@ router.get("/apk/status", async (_req, res): Promise<void> => {
 router.post("/apk/build", requireAdmin, async (_req, res): Promise<void> => {
   try {
     if (!GITHUB_TOKEN) {
-      res.status(503).json({ success: false, error: "GITHUB_API_TOKEN no configurado en el servidor" });
+      res.status(503).json({ success: false, error: "GITHUB_TOKEN no configurado en el servidor" });
       return;
     }
     try {
@@ -82,7 +82,7 @@ router.post("/apk/build", requireAdmin, async (_req, res): Promise<void> => {
 router.get("/apk/download", async (_req, res): Promise<void> => {
   try {
     if (!GITHUB_TOKEN) {
-      res.status(503).json({ error: "Descarga no disponible — GITHUB_API_TOKEN no configurado" });
+      res.status(503).json({ error: "Descarga no disponible — GITHUB_TOKEN no configurado" });
       return;
     }
     try {

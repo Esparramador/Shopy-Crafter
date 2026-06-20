@@ -302,11 +302,7 @@ router.get("/meshy/models-config", (_req, res) => {
     { id:"ted",             name:"TED (Oso)",            emoji:"🐻", category:"cartoon"   },
     { id:"chico_casual",    name:"Hombre Casual Tech",   emoji:"👨‍💻", category:"realistic" },
     { id:"chico_formal",    name:"Hombre Traje Formal",  emoji:"🤵", category:"realistic" },
-    { id:"spiderman",       name:"Spider-Man",           emoji:"🕷️", category:"cartoon"   },
-    { id:"mickey_mouse",    name:"Mickey Mouse",         emoji:"🐭", category:"cartoon"   },
-    { id:"minnie_mouse",    name:"Minnie Mouse",         emoji:"🎀", category:"cartoon"   },
-    { id:"bugs_bunny",      name:"Bugs Bunny",           emoji:"🐰", category:"cartoon"   },
-    { id:"pikachu",         name:"Pikachu",              emoji:"⚡", category:"cartoon"   },
+    { id:"payaso_plim_plim",name:"Payaso Plim Plim",    emoji:"🤡", category:"cartoon"   },
     { id:"bob_esponja",     name:"Bob Esponja",          emoji:"🧽", category:"cartoon"   },
     { id:"payaso_plim_plim",name:"Plim Plim",            emoji:"🤡", category:"cartoon"   },
     { id:"chica_ejecutiva", name:"Mujer Ejecutiva",      emoji:"👩‍💼", category:"realistic" },
@@ -858,12 +854,6 @@ router.post("/meshy/generate-character", upload.single("image"), async (req: Req
 // ── Text-to-Texture (apply PBR textures to existing untextured GLB) ──────────
 
 const CHARACTER_TEXTURE_PROMPTS: Record<string, { object_prompt: string; style_prompt: string }> = {
-  spiderman:        { object_prompt: "Spider-Man Marvel superhero full body character 3D model",           style_prompt: "Marvel comic book style, classic red and blue spandex suit with black spider web line pattern, white lenses on mask, muscular heroic figure, vibrant saturated colors, clean UV mapping" },
-  mickey_mouse:     { object_prompt: "Mickey Mouse Disney cartoon character 3D model",                     style_prompt: "classic Disney animation style, solid black body head and ears, white 4-finger gloves, bright red shorts with two white buttons, yellow shoes with white cuffs, cheerful expression" },
-  minnie_mouse:     { object_prompt: "Minnie Mouse Disney cartoon character 3D model",                     style_prompt: "classic Disney animation style, solid black body, white polka dot red dress with white trim, white gloves, large red polka dot bow on head, yellow heeled shoes, sweet expression" },
-  pikachu:          { object_prompt: "Pikachu Pokemon electric mouse character 3D model",                  style_prompt: "official Pokemon anime style, bright saturated yellow short fur, round bright red circular blush cheeks, brown horizontal stripe markings on back, lightning bolt shaped tail yellow-brown, big shiny black oval eyes, small black ears with red tips" },
-  bob_esponja:      { object_prompt: "SpongeBob SquarePants Nickelodeon cartoon character 3D model",       style_prompt: "Nickelodeon cartoon style, bright yellow square sponge porous body with brown irregular pores, blue eyes, brown pants with black belt and silver buckle, white shirt, red tie, brown shoes, cheerful buck teeth smile" },
-  bugs_bunny:       { object_prompt: "Bugs Bunny Looney Tunes cartoon character 3D model",                 style_prompt: "classic Looney Tunes style, light gray body fur, white belly and muzzle, pink inner ears, long upright ears, large white buck front teeth, white gloves, holding bright orange carrot with green top" },
   payaso_plim_plim: { object_prompt: "Plim Plim clown children cartoon character 3D model",                style_prompt: "vibrant children TV cartoon style, colorful star-shaped clown costume with rainbow primary colors, happy painted clown face with star makeup around eyes, oversized red round nose, fluffy ruffled collar, bright star emblems on costume" },
   chica_creativa:   { object_prompt: "Creative young woman cartoon character 3D model",                    style_prompt: "vibrant artistic street fashion, colorful patterned outfit with warm orange and teal tones, warm realistic beige-brown skin tone, expressive dark brown eyes, curly or wavy hair, creative artistic clothing with patterns and layers" },
   chica_ejecutiva:  { object_prompt: "Professional executive businesswoman 3D character model",            style_prompt: "modern corporate fashion, elegant dark charcoal navy blazer with light blouse, realistic warm skin tone, smooth dark hair, polished professional attire, subtle natural makeup, business formal look" },

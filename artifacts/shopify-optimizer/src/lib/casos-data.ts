@@ -12,8 +12,8 @@ export interface Caso {
 
 export const CASES: Caso[] = [
   {
-    slug: "comic-crafter",
-    name: "Comic Crafter",
+    slug: "tienda-comics",
+    name: "Tienda de Cómics",
     niche: "Cómics e ilustración personalizada",
     before: "12 ventas/mes, fichas sin SEO",
     after: "+340% ventas en 90 días, 47 fichas optimizadas, 6 imágenes IA por producto",
@@ -22,7 +22,7 @@ export const CASES: Caso[] = [
     highlight: "+340%",
     body: `
 <h2>El punto de partida</h2>
-<p>Comic Crafter es una tienda especializada en cómics de autor, ilustraciones personalizadas y merchandising de cultura pop. Cuando comenzaron con Shopy Crafter tenían 12 ventas mensuales y un tráfico orgánico de menos de 200 sesiones/mes. 47 productos con fichas genéricas, sin SEO, con imágenes de calidad irregular.</p>
+<p>Esta tienda especializada en cómics de autor, ilustraciones personalizadas y merchandising de cultura pop. Cuando comenzaron con Shopy Crafter tenían 12 ventas mensuales y un tráfico orgánico de menos de 200 sesiones/mes. 47 productos con fichas genéricas, sin SEO, con imágenes de calidad irregular.</p>
 
 <h2>El problema principal</h2>
 <p>Sus productos eran únicos y tenían demanda real, pero eran completamente invisibles para Google. Los títulos de producto no incluían ningún término de búsqueda relevante. Las imágenes, aunque con buen diseño artístico, no cumplían los requisitos de Google Shopping. Y la ausencia total de datos estructurados impedía que Google clasificara correctamente el tipo de contenido.</p>

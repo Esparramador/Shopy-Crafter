@@ -95,7 +95,7 @@ export default function ApkManager() {
   const steps: BuildStep[] = [
     { title: "Repo GitHub configurado", detail: `Esparramador/Shopy-Crafter con el código fuente`, done: true },
     { title: "GitHub Actions workflow", detail: `${WORKFLOW_FILE} ya existe en este proyecto`, done: true },
-    { title: "GITHUB_API_TOKEN en Replit", detail: "PAT con scope 'repo' — añadir en Secrets del proyecto", done: !status?.error?.includes("GITHUB_API_TOKEN") },
+    { title: "GITHUB_TOKEN en Replit", detail: "PAT con scope 'repo' — añadir en Secrets del proyecto como GITHUB_TOKEN", done: !status?.error?.includes("GITHUB_API_TOKEN") },
     { title: "APK publicado como Release", detail: "Tag: apk-latest — visible al pulsar 'Lanzar Build'", done: status?.available ?? false },
   ];
 
@@ -271,7 +271,7 @@ export default function ApkManager() {
           </div>
           <div style={{ padding: "10px 12px", background: "rgba(220,53,69,0.06)", borderRadius: 8, border: "1px solid rgba(220,53,69,0.15)" }}>
             <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: "var(--crim)", textTransform: "uppercase", letterSpacing: "0.8px" }}>Secret requerido en Replit</p>
-            <code style={{ fontSize: 12, color: "var(--t2)" }}>GITHUB_API_TOKEN</code>
+            <code style={{ fontSize: 12, color: "var(--t2)" }}>GITHUB_TOKEN</code>
             <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--t3)" }}>GitHub PAT con scope <code>repo</code> + <code>workflow</code> → Replit → Tools → Secrets</p>
           </div>
           <div style={{ padding: "10px 12px", background: "rgba(0,0,0,0.2)", borderRadius: 8 }}>

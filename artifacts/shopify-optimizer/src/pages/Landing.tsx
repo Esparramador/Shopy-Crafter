@@ -88,7 +88,7 @@ function MagnetStoreButton() {
   return (
     <a
       ref={btnRef}
-      href="https://comic-crafter.myshopify.com"
+      href="https://shopycrafter.com"
       target="_blank"
       rel="noopener noreferrer"
       style={{
@@ -298,8 +298,7 @@ export default function Landing() {
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [contactError, setContactError] = useState("");
-  const [spiderPhase, setSpiderPhase] = useState<"ready" | "waiting" | "celebrate">("ready");
-  void spiderPhase;
+
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
 
@@ -445,7 +444,6 @@ export default function Landing() {
       }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? (content?.errorMessages?.sendFail ?? "Error al enviar"));
-      setSpiderPhase("celebrate");
       setContactStatus("sent");
     } catch (err: unknown) {
       setContactStatus("error");

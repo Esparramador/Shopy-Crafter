@@ -7915,7 +7915,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const syncApiKey = params?.apiKey as string | undefined;
           const syncSource = params?.source as string | undefined;
           if (!syncUrl) {
-            result = { error: true, message: "URL requerida. Ejemplo: brain_sync {url: 'https://comic-crafter.myshopify.com', apiKey: 'sck_...'}" };
+            result = { error: true, message: "URL requerida. Ejemplo: brain_sync {url: 'https://tu-tienda.myshopify.com', apiKey: 'sck_...'}" };
             break;
           }
           try {

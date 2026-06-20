@@ -577,7 +577,7 @@ router.get("/system-capabilities", async (_req, res): Promise<void> => {
     }
     const klaviyoConfigured = has("KLAVIYO_API_KEY");
     const pageSpeedConfigured = has("GOOGLE_PAGESPEED_API_KEY");
-    const githubConfigured = has("GITHUB_API_TOKEN");
+    const githubConfigured = has("GITHUB_TOKEN") || has("GITHUB_API_TOKEN");
     const vapidConfigured = has("VAPID_PUBLIC_KEY") && has("VAPID_PRIVATE_KEY");
     const objectStoreConfigured = has("PRIVATE_OBJECT_DIR") || has("PUBLIC_OBJECT_SEARCH_PATHS");
     const CHROMIUM_STATIC_PATHS = [
@@ -703,7 +703,7 @@ router.get("/system-capabilities", async (_req, res): Promise<void> => {
             name: "GitHub API",
             badge: "REST + GraphQL",
             description: "Lectura de repositorios para análisis de stack, dependencias y changelog automático.",
-            envVars: ["GITHUB_API_TOKEN"],
+            envVars: ["GITHUB_TOKEN"],
             configured: githubConfigured,
             uses: ["Stack analysis", "Changelog automation", "Roadmap sync"],
           },
@@ -799,7 +799,7 @@ router.get("/system-capabilities", async (_req, res): Promise<void> => {
         SHOPIFY_CLIENT_SECRET: env("SHOPIFY_CLIENT_SECRET"),
         KLAVIYO_API_KEY: env("KLAVIYO_API_KEY"),
         GOOGLE_PAGESPEED_API_KEY: env("GOOGLE_PAGESPEED_API_KEY"),
-        GITHUB_API_TOKEN: env("GITHUB_API_TOKEN"),
+        GITHUB_TOKEN: env("GITHUB_TOKEN") || env("GITHUB_API_TOKEN"),
         DATABASE_URL: env("DATABASE_URL"),
         SESSION_SECRET: env("SESSION_SECRET"),
         ENCRYPTION_KEY: env("ENCRYPTION_KEY"),

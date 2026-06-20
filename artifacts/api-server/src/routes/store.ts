@@ -4,7 +4,7 @@ import { logger } from "../lib/logger.js";
 const router = Router();
 
 const STOREFRONT_ENDPOINT = () =>
-  `https://${process.env.SHOP_DOMAIN || "comic-crafter.myshopify.com"}/api/2024-10/graphql.json`;
+  `https://${process.env.SHOP_DOMAIN || ""}/api/2024-10/graphql.json`;
 
 const STOREFRONT_TOKEN = () =>
   process.env.STOREFRONT_ACCESS_TOKEN || "";
