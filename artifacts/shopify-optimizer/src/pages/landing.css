@@ -422,11 +422,12 @@ html, body {
   padding: 80px 48px;
   box-sizing: border-box;
 }
-/* Contact usa VismeFormHero (position:absolute;inset:0) — necesita altura definida */
+/* Contact: altura automática para que el footer no genere scroll interno */
 #fp-contact.fp-section {
   min-height: calc(100dvh - 64px);
-  height: calc(100dvh - 64px);
+  height: auto;
   padding: 0;
+  overflow: visible;
 }
 .fp-wrapper {
   width: 100%;
@@ -1739,8 +1740,8 @@ html, body {
 #fp-calculator,
 #fp-contact { justify-content: flex-start; }
 @media (min-width: 901px) {
-  #fp-calculator,
-  #fp-contact { overflow-y: auto; overflow-x: hidden; }
+  #fp-calculator { overflow-y: auto; overflow-x: hidden; }
+  /* #fp-contact NO lleva overflow-y:auto — su footer debe fluir sin scroll interno */
 }
 #fp-calculator .fp-content { padding-top: 60px; padding-bottom: 60px; }
 #fp-contact .fp-content { padding-top: 60px; padding-bottom: 40px; }

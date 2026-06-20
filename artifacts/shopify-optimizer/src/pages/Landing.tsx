@@ -1201,9 +1201,9 @@ export default function Landing() {
               background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(200,168,75,0.06) 0%, transparent 70%)",
             }} />
           </div>
-          <div className="fp-content fp-contact-visme" style={{ position: "absolute", inset: 0, maxWidth: "none", padding: 0, overflow: "hidden auto" }}>
-            {/* ── Video + form: fixed full-section height, footer scrolls below ── */}
-            <div className="fp-contact-visme-wrapper" style={{ position: "relative", height: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
+          <div className="fp-content fp-contact-visme" style={{ position: "relative", width: "100%", maxWidth: "none", padding: 0, overflow: "visible" }}>
+            {/* ── Video + form: full-viewport height, footer flows naturally below ── */}
+            <div className="fp-contact-visme-wrapper" style={{ position: "relative", minHeight: "calc(100dvh - 64px)", height: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
               <VismeFormHero isActive={isAnimated("fp-contact")} />
             </div>
 
