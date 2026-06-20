@@ -76,7 +76,12 @@ export function clearLastRoute() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Initialize loading=false when there is no stored session key — unauthenticated
+  // visitors (the vast majority) never see a loading flash. Only users who were
+  // previously logged in (SESSION_ALIVE_KEY present) wait for the auth check.
+  const [loading, setLoading] = useState(() => {
+    try { return !!localStorage.getItem(SESSION_ALIVE_KEY); } catch { return false; }
+  });
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const refreshingRef = useRef(false);
   const visibilityRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
