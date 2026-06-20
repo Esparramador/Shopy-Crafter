@@ -460,7 +460,7 @@ export default function Landing() {
     const load = (attempt = 1) => {
       fetch(`${BASE_URL}/api/cms/content`, { credentials: "include" })
         .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-        .then(data => { if (mounted) setContent(data); })
+        .then(data => { if (mounted && data?.hero) setContent({ ...LANDING_FALLBACK, ...data }); })
         .catch(() => {
           if (!mounted) return;
           if (attempt < 4) setTimeout(() => load(attempt + 1), 1500 * attempt);
@@ -607,15 +607,7 @@ export default function Landing() {
     };
   }, [isPreview]);
 
-  if (!content?.hero) {
-    return (
-      <div className="l-loading">
-        <div className="l-loader"></div>
-      </div>
-    );
-  }
-
-  const hLines = String(content.hero.headline ?? "").split("\n");
+  const hLines = String(content?.hero?.headline ?? "").split("\n");
   const progressPct = FP_SECTIONS.length > 1 ? (currentSection / (FP_SECTIONS.length - 1)) * 100 : 0;
 
   const bgFor = (section: string) => content.backgrounds?.[section] ?? { type: "none" };

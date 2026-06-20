@@ -174,11 +174,7 @@ function RequireClient({ children }: { children: React.ReactNode }) {
 }
 
 function HomeRedirect() {
-  const { user, loading } = useAuth();
-  if (!user) return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
-  if (loading) return <LoadingScreen />;
-  if (user.role === "client") return <Redirect to="/client" />;
-  return <Redirect to="/home" />;
+  return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
 }
 
 function ImpersonationBanner() {
