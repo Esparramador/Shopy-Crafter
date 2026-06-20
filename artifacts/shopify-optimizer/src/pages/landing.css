@@ -1,5 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap');
 
+/* ── GLOBAL scroll-lock: nunca scroll horizontal en ningún pixel ── */
+html, body {
+  overflow-x: hidden !important;
+  max-width: 100vw;
+}
+* { box-sizing: border-box; }
+
 :root {
   --l-ink:   #080810;
   --l-ink2:  #0e0e1a;
@@ -1286,11 +1293,13 @@
     height: auto !important;
     min-height: 600px !important;
     overflow: visible !important;
+    overflow-x: hidden !important;
   }
   .fp-contact-visme-wrapper {
     height: auto !important;
     min-height: 560px !important;
     overflow: visible !important;
+    overflow-x: hidden !important;
   }
   .fp-section:first-child {
     padding-top: 70px !important;
@@ -1382,8 +1391,11 @@
     padding-bottom: 60px !important;
     overflow: visible !important;
     overflow-y: visible !important;
+    overflow-x: hidden !important;
     justify-content: flex-start !important;
     overscroll-behavior: auto !important;
+    box-sizing: border-box;
+    max-width: 100vw;
   }
   .fp-section:first-child {
     padding-top: 80px !important;
@@ -1476,7 +1488,12 @@
   .fp-section {
     padding: 60px 20px 50px !important;
     align-items: flex-start !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box;
+    max-width: 100vw;
   }
+  .fp-contact-visme { max-width: 100% !important; width: 100% !important; }
+  #fp-contact.fp-section { overflow-x: hidden !important; }
   .fp-section:first-child {
     padding-top: 90px !important;
   }
@@ -1553,8 +1570,8 @@
   .fp-calc-tab { flex-shrink: 0; }
 
   /* Contact form scrollable */
-  .fp-contact-form { max-height: 80vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .fp-contact-form-v2 { max-height: none; overflow-y: visible; }
+  .fp-contact-form { max-height: 80vh; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+  .fp-contact-form-v2 { max-height: none; overflow-y: visible; overflow-x: hidden; }
 
   /* Testimonials */
   .fp-testi-carousel { height: auto !important; min-height: 280px; position: relative; }
@@ -1723,7 +1740,7 @@
 #fp-contact { justify-content: flex-start; }
 @media (min-width: 901px) {
   #fp-calculator,
-  #fp-contact { overflow-y: auto; }
+  #fp-contact { overflow-y: auto; overflow-x: hidden; }
 }
 #fp-calculator .fp-content { padding-top: 60px; padding-bottom: 60px; }
 #fp-contact .fp-content { padding-top: 60px; padding-bottom: 40px; }
@@ -2549,6 +2566,7 @@
 /* ─── FOOTER GLOW & GRADIENT ─────────────────────── */
 .fp-footer {
   position: relative;
+  overflow: hidden;
 }
 .fp-footer::before {
   content: '';
