@@ -2225,7 +2225,7 @@ router.post("/fs-pro/video/edit", requireAdmin, upload.single("video"), async (r
   enableLongRunning(res);
   try {
     const f = req.file;
-    const { projectId: pidStr, prompt, model } = req.body;
+    const { projectId: pidStr, prompt, model, videoUrl } = req.body;
     const projectId = parseInt(pidStr || "0", 10);
     if (!projectId || !prompt || !model) {
       res.status(400).json({ error: "projectId, prompt, model requeridos" }); return;
@@ -2238,9 +2238,16 @@ router.post("/fs-pro/video/edit", requireAdmin, upload.single("video"), async (r
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    if (!f) { res.status(400).json({ error: "Video requerido" }); return; }
+    let videoBuf: Buffer;
+    if (f) {
+      videoBuf = f.buffer;
+    } else if (videoUrl) {
+      videoBuf = await fetchToBuffer(videoUrl);
+    } else {
+      res.status(400).json({ error: "Video requerido (archivo o videoUrl)" }); return;
+    }
 
-    const out = await editVideoWithPrompt(f.buffer, prompt, model, getProjectReplicateToken(project));
+    const out = await editVideoWithPrompt(videoBuf, prompt, model, getProjectReplicateToken(project));
 
     const vaultId = await saveToVaultSmart({
       projectId, fileType: "fs-pro-video-edit", category: "fusion-studio-pro",
@@ -3648,14 +3655,18 @@ router.get("/fs-pro/audio/sfx-catalog", async (req, res) => {
 // ─── TTS: ADVANCED ───────────────────────────────────────────────────────
 router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
   try {
-    const { text, voiceId, model, stability, style, similarityBoost, outputFormat, projectId } = req.body;
+    const { text, voiceId, model, modelId, stability, style, similarityBoost, similarity, outputFormat, projectId } = req.body;
     if (!text || !voiceId) {
       res.status(400).json({ error: "text y voiceId requeridos" });
       return;
     }
 
     const audioBuffer = await generateVoiceWithClone(text, voiceId, {
-      model, stability, style, similarityBoost, outputFormat
+      model: model || modelId,
+      stability,
+      style,
+      similarityBoost: similarityBoost ?? similarity,
+      outputFormat,
     });
 
     const vaultId = await saveToVaultSmart({
@@ -3668,7 +3679,12 @@ router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
       generatedBy: "fs-pro:tts:advanced",
     });
 
-    res.json({ success: true, vaultId, url: `/api/vault/file/${vaultId}` });
+    res.json({
+      success: true,
+      vaultId,
+      url: `/api/vault/file/${vaultId}`,
+      dataUrl: `data:audio/mpeg;base64,${audioBuffer.toString("base64")}`,
+    });
   } catch (err: any) {
     logger.error({ err: err?.message }, "fs-pro tts/advanced failed");
     res.status(500).json({ error: err?.message || "Error en TTS avanzado" });
