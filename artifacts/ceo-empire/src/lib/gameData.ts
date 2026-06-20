@@ -130,21 +130,22 @@ export const VEHICLE_CONFIGS: VehicleConfig[] = [
   { id: "car5", color: "#eeeeee", pos: [60, 0, -50], name: "Porsche Blanco", speed: 20 },
 ];
 
+const _BASE = import.meta.env.BASE_URL;
 export const CHARACTER_MODELS: Record<string, { file: string; label: string; description: string; scale: number }> = {
-  alec_monopoly: { file: "/assets/models/alec_monopoly.glb", label: "Alec CEO", description: "El CEO millonario del mercado", scale: 1.0 },
-  chico_formal: { file: "/assets/models/chico_formal.glb", label: "CEO Formal", description: "Elegante y estratégico", scale: 1.0 },
-  chica_ejecutiva: { file: "/assets/models/chica_ejecutiva.glb", label: "CEO Ejecutiva", description: "Liderazgo con estilo", scale: 1.0 },
-  chica_creativa: { file: "/assets/models/chica_creativa.glb", label: "CEO Creativa", description: "Innovación sin límites", scale: 1.0 },
+  alec_monopoly: { file: `${_BASE}assets/models/alec_monopoly.glb`, label: "Alec CEO", description: "El CEO millonario del mercado", scale: 1.0 },
+  chico_formal: { file: `${_BASE}assets/models/chico_formal.glb`, label: "CEO Formal", description: "Elegante y estratégico", scale: 1.0 },
+  chica_ejecutiva: { file: `${_BASE}assets/models/chica_ejecutiva.glb`, label: "CEO Ejecutiva", description: "Liderazgo con estilo", scale: 1.0 },
+  chica_creativa: { file: `${_BASE}assets/models/chica_creativa.glb`, label: "CEO Creativa", description: "Innovación sin límites", scale: 1.0 },
 };
 
 export const ENEMY_MODELS: Record<string, string> = {
-  lord_tuetano: "/assets/models/lord_tuetano.glb",
-  majin_bu: "/assets/models/majin_bu.glb",
-  majin_bu_barca: "/assets/models/majin_bu_barca.glb",
-  illidan: "/assets/models/illidan.glb",
-  arthas: "/assets/models/arthas.glb",
-  bowser: "/assets/models/bowser.glb",
-  mini_goku: "/assets/models/mini_goku.glb",
+  lord_tuetano: `${_BASE}assets/models/lord_tuetano.glb`,
+  majin_bu: `${_BASE}assets/models/majin_bu.glb`,
+  majin_bu_barca: `${_BASE}assets/models/majin_bu_barca.glb`,
+  illidan: `${_BASE}assets/models/illidan.glb`,
+  arthas: `${_BASE}assets/models/arthas.glb`,
+  bowser: `${_BASE}assets/models/bowser.glb`,
+  mini_goku: `${_BASE}assets/models/mini_goku.glb`,
 };
 
 export const WORLD = {

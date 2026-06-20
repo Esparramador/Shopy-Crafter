@@ -5,12 +5,13 @@ import * as THREE from "three";
 import { useGame } from "../lib/gameStore";
 import { BUSINESSES, MISSIONS, NPC_CONFIGS } from "../lib/gameData";
 
+const BASE = import.meta.env.BASE_URL;
 const CHAR_MODELS: Record<string, string> = {
-  alec_monopoly:   "/assets/models/alec_monopoly.glb",
-  chico_formal:    "/assets/models/chico_formal.glb",
-  chica_ejecutiva: "/assets/models/chica_ejecutiva.glb",
-  chica_creativa:  "/assets/models/chica_creativa.glb",
-  chico_casual:    "/assets/models/chico_casual.glb",
+  alec_monopoly:   `${BASE}assets/models/alec_monopoly.glb`,
+  chico_formal:    `${BASE}assets/models/chico_formal.glb`,
+  chica_ejecutiva: `${BASE}assets/models/chica_ejecutiva.glb`,
+  chica_creativa:  `${BASE}assets/models/chica_creativa.glb`,
+  chico_casual:    `${BASE}assets/models/chico_casual.glb`,
 };
 
 const MOVE_SPEED   = 9;

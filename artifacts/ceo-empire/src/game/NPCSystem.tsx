@@ -5,18 +5,19 @@ import * as THREE from "three";
 import { NPC_CONFIGS, NpcConfig } from "../lib/gameData";
 import { useGame } from "../lib/gameStore";
 
+const BASE = import.meta.env.BASE_URL;
 const NPC_MODELS: Record<string, string> = {
-  chico_formal:    "/assets/models/chico_formal.glb",
-  chica_ejecutiva: "/assets/models/chica_ejecutiva.glb",
-  chica_creativa:  "/assets/models/chica_creativa.glb",
-  chico_casual:    "/assets/models/chico_casual.glb",
-  lord_tuetano:    "/assets/models/lord_tuetano.glb",
-  majin_bu:        "/assets/models/majin_bu.glb",
-  majin_bu_barca:  "/assets/models/majin_bu_barca.glb",
-  arthas:          "/assets/models/arthas.glb",
-  bowser:          "/assets/models/bowser.glb",
-  illidan:         "/assets/models/illidan.glb",
-  mini_goku:       "/assets/models/mini_goku.glb",
+  chico_formal:    `${BASE}assets/models/chico_formal.glb`,
+  chica_ejecutiva: `${BASE}assets/models/chica_ejecutiva.glb`,
+  chica_creativa:  `${BASE}assets/models/chica_creativa.glb`,
+  chico_casual:    `${BASE}assets/models/chico_casual.glb`,
+  lord_tuetano:    `${BASE}assets/models/lord_tuetano.glb`,
+  majin_bu:        `${BASE}assets/models/majin_bu.glb`,
+  majin_bu_barca:  `${BASE}assets/models/majin_bu_barca.glb`,
+  arthas:          `${BASE}assets/models/arthas.glb`,
+  bowser:          `${BASE}assets/models/bowser.glb`,
+  illidan:         `${BASE}assets/models/illidan.glb`,
+  mini_goku:       `${BASE}assets/models/mini_goku.glb`,
 };
 
 interface NpcState {
