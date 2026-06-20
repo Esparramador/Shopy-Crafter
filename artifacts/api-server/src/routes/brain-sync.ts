@@ -524,7 +524,7 @@ function buildPlatformSelfKnowledge(): { insights: Record<string, unknown>[]; me
       domain: "platform_identity",
       insightType: "self_knowledge",
       title: "Shopy Crafter — Identidad y Misión",
-      insight: "Shopy Crafter (shopycrafter.com) es una agencia de optimización Shopify 100% autónoma impulsada por ShopyBrain, un motor de IA dual (Claude + Gemini) con 46,000+ insights acumulados. Nombre público: 'Shopy Crafter'. Motor IA interno: 'ShopyBrain'. Propietario/admin: craftershopy@gmail.com. Email de comunicación: craftershopy@gmail.com. La plataforma gestiona, optimiza y potencia tiendas Shopify de manera completamente autónoma con 6 motores de IA especializados.",
+      insight: "Shopy Crafter (shopycrafter.com) es una agencia de optimización Shopify 100% autónoma impulsada por ShopyBrain, un motor de IA dual (Claude + Gemini) con 46,000+ insights acumulados. Nombre público: 'Shopy Crafter'. Motor IA interno: 'ShopyBrain'. Propietario/admin: craftershopy@gmail.com. Email de comunicación: craftershopy@gmail.com. La plataforma gestiona, optimiza y potencia tiendas Shopify de manera completamente autónoma con 6 motores de IA especializados. Tienda demo: comic-crafter.myshopify.com.",
       confidence: 0.99,
       impactScore: 1.0,
     },

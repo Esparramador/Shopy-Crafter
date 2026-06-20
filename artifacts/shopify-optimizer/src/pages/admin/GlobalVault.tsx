@@ -15,12 +15,19 @@ const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const CHARACTERS_3D = [
   { id: "alec_monopoly",    name: "Alec Monopoly",    emoji: "🎩", anims: 134, rigged: true,  textured: true,  size: "8.2MB" },
-  { id: "chico_casual",     name: "Chico Casual",      emoji: "👕", anims: 22,  rigged: true,  textured: true,  size: "6.8MB" },
-  { id: "chico_formal",     name: "Chico Formal",      emoji: "👔", anims: 22,  rigged: true,  textured: true,  size: "5.2MB" },
-  { id: "ted",              name: "Ted (Oso)",          emoji: "🧸", anims: 3,   rigged: true,  textured: true,  size: "7.3MB" },
-  { id: "payaso_plim_plim", name: "Payaso Plim Plim",   emoji: "🤡", anims: 21,  rigged: true,  textured: false, size: "1.5MB" },
-  { id: "chica_ejecutiva",  name: "Chica Ejecutiva",    emoji: "💼", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
-  { id: "chica_creativa",   name: "Chica Creativa",     emoji: "🎨", anims: 0,   rigged: false, textured: false, size: "1.3MB" },
+  { id: "batman",           name: "Batman",           emoji: "🦇", anims: 22,  rigged: true,  textured: true,  size: "5.1MB" },
+  { id: "spiderman",        name: "Spider-Man",       emoji: "🕷️", anims: 22,  rigged: true,  textured: true,  size: "4.9MB" },
+  { id: "chico_casual",     name: "Chico Casual",     emoji: "👕", anims: 22,  rigged: true,  textured: true,  size: "6.8MB" },
+  { id: "chico_formal",     name: "Chico Formal",     emoji: "👔", anims: 22,  rigged: true,  textured: true,  size: "5.2MB" },
+  { id: "mickey_mouse",     name: "Mickey Mouse",     emoji: "🐭", anims: 21,  rigged: true,  textured: false, size: "2.1MB" },
+  { id: "minnie_mouse",     name: "Minnie Mouse",     emoji: "🎀", anims: 21,  rigged: true,  textured: false, size: "2.0MB" },
+  { id: "bob_esponja",      name: "Bob Esponja",      emoji: "🧽", anims: 21,  rigged: true,  textured: false, size: "1.8MB" },
+  { id: "bugs_bunny",       name: "Bugs Bunny",       emoji: "🐰", anims: 21,  rigged: true,  textured: false, size: "1.7MB" },
+  { id: "ted",              name: "Ted (Oso)",         emoji: "🧸", anims: 3,   rigged: true,  textured: true,  size: "7.3MB" },
+  { id: "payaso_plim_plim", name: "Payaso Plim Plim",  emoji: "🤡", anims: 21,  rigged: true,  textured: false, size: "1.5MB" },
+  { id: "pikachu",          name: "Pikachu",           emoji: "⚡", anims: 0,   rigged: false, textured: false, size: "1.2MB" },
+  { id: "chica_ejecutiva",  name: "Chica Ejecutiva",   emoji: "💼", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
+  { id: "chica_creativa",   name: "Chica Creativa",    emoji: "🎨", anims: 0,   rigged: false, textured: false, size: "1.3MB" },
 ];
 
 const FOLDER_META: Record<string, { label: string; icon: typeof Image; color: string; group: string; description: string }> = {

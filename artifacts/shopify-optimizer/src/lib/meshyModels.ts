@@ -188,6 +188,13 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     animations: anims("batman", FULL_22),
   },
   {
+    id: "spiderman", name: "Spider-Man", emoji: "🕷️", category: "cartoon",
+    description: "El superhéroe arácnido de Marvel. 22 animaciones.",
+    tags: ["marvel","superhéroe","acción","rigged","full"],
+    glbPath: "/assets/3d/models/spiderman.glb", rigStatus: "rigged",
+    animations: anims("spiderman", FULL_22),
+  },
+  {
     id: "chico_casual", name: "Hombre Casual Tech", emoji: "👨‍💻", category: "realistic",
     description: "Dev casual. 22 animaciones completas.",
     tags: ["humano","casual","tech","rigged","full"],

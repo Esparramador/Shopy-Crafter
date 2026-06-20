@@ -144,15 +144,15 @@ export const POSTS: BlogPost[] = [
     `.trim(),
   },
   {
-    slug: "tienda-comics-caso-exito",
+    slug: "comic-crafter-caso-exito",
     date: "2026-02-28",
     tag: "Caso de éxito",
-    title: "Cómo una tienda de cómics aumentó ventas un 340% en 90 días",
+    title: "Cómo Comic Crafter aumentó ventas un 340% en 90 días",
     excerpt: "Auditoría completa + SEO automatizado + imágenes IA. El caso paso a paso de una tienda de cómics que multiplicó sus ventas sin pagar publicidad.",
     readTime: "5 min",
     body: `
 <h2>El punto de partida: 12 ventas al mes</h2>
-<p>Esta tienda especializada en cómics de autor, ilustraciones personalizadas y merchandising. Cuando empezaron a trabajar con Shopy Crafter en noviembre de 2025, tenían 12 ventas mensuales, un ticket medio de 28€ y un tráfico orgánico prácticamente inexistente (menos de 200 sesiones/mes desde Google).</p>
+<p>Comic Crafter es una tienda especializada en cómics de autor, ilustraciones personalizadas y merchandising de cultura pop. Cuando empezaron a trabajar con Shopy Crafter en noviembre de 2025, tenían 12 ventas mensuales, un ticket medio de 28€ y un tráfico orgánico prácticamente inexistente (menos de 200 sesiones/mes desde Google).</p>
 <p>Su principal problema: 47 productos con fichas de producto genéricas, sin SEO, con imágenes de calidad irregular y sin estrategia de contenido. Una tienda con productos únicos y una audiencia potencial real, pero invisible para los buscadores.</p>
 
 <h2>Fase 1: Auditoría completa (semana 1)</h2>

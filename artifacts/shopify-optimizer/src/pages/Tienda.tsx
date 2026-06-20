@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const STORE_URL = (import.meta as Record<string, any>).env?.VITE_STORE_URL || "https://shopycrafter.com";
+const STORE_URL = "https://comic-crafter.myshopify.com";
 
 export default function Tienda() {
   useEffect(() => {

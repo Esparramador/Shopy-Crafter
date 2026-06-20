@@ -88,7 +88,7 @@ function MagnetStoreButton() {
   return (
     <a
       ref={btnRef}
-      href="https://shopycrafter.com"
+      href="https://comic-crafter.myshopify.com"
       target="_blank"
       rel="noopener noreferrer"
       style={{

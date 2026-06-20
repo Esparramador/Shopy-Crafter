@@ -298,6 +298,11 @@ router.get("/meshy/models-config", (_req, res) => {
   const charStatus = getCharStatus();
   const models = [
     { id:"batman",          name:"Batman",              emoji:"🦇", category:"cartoon"   },
+    { id:"spiderman",       name:"Spider-Man",          emoji:"🕷️", category:"cartoon"   },
+    { id:"mickey_mouse",    name:"Mickey Mouse",        emoji:"🐭", category:"cartoon"   },
+    { id:"minnie_mouse",    name:"Minnie Mouse",        emoji:"🎀", category:"cartoon"   },
+    { id:"bugs_bunny",      name:"Bugs Bunny",          emoji:"🐰", category:"cartoon"   },
+    { id:"pikachu",         name:"Pikachu",             emoji:"⚡", category:"cartoon"   },
     { id:"alec_monopoly",   name:"Alec Monopoly",       emoji:"🎩", category:"cartoon"   },
     { id:"ted",             name:"TED (Oso)",            emoji:"🐻", category:"cartoon"   },
     { id:"chico_casual",    name:"Hombre Casual Tech",   emoji:"👨‍💻", category:"realistic" },
@@ -854,6 +859,13 @@ router.post("/meshy/generate-character", upload.single("image"), async (req: Req
 // ── Text-to-Texture (apply PBR textures to existing untextured GLB) ──────────
 
 const CHARACTER_TEXTURE_PROMPTS: Record<string, { object_prompt: string; style_prompt: string }> = {
+  batman:           { object_prompt: "Batman DC superhero 3D character model",                             style_prompt: "dark knight iconic black suit, grey chest armor with bat symbol, black cowl with pointed ears, dark navy/black color scheme, sleek superhero design" },
+  spiderman:        { object_prompt: "Spider-Man Marvel superhero 3D model",                               style_prompt: "iconic red and blue spiderweb suit, Marvel comics style, bright red face mask with black eye lenses, detailed web pattern texture on suit, glossy superhero material" },
+  mickey_mouse:     { object_prompt: "Mickey Mouse Disney cartoon character 3D model",                     style_prompt: "classic Disney animation style, iconic black mouse with round ears, white gloves, red shorts with yellow buttons, cheerful iconic design" },
+  minnie_mouse:     { object_prompt: "Minnie Mouse Disney cartoon character 3D model",                     style_prompt: "classic Disney style, iconic mouse with polka dot red dress and matching bow, white gloves, cute feminine design, bright cheerful colors" },
+  bugs_bunny:       { object_prompt: "Bugs Bunny Looney Tunes cartoon character 3D model",                 style_prompt: "classic Warner Bros cartoon style, grey rabbit with white belly, long ears, casual relaxed pose, smooth clean cartoon textures" },
+  pikachu:          { object_prompt: "Pikachu Pokemon character 3D model",                                 style_prompt: "official Pokemon style, bright yellow body with red cheek circles, black ear tips, lightning bolt tail, cute big brown eyes, smooth clean cartoon texture" },
+  bob_esponja:      { object_prompt: "SpongeBob SquarePants cartoon character 3D model",                   style_prompt: "classic Nickelodeon cartoon style, bright yellow sponge texture with square body, big blue eyes, buck teeth smile, brown square pants, white shirt, red tie" },
   payaso_plim_plim: { object_prompt: "Plim Plim clown children cartoon character 3D model",                style_prompt: "vibrant children TV cartoon style, colorful star-shaped clown costume with rainbow primary colors, happy painted clown face with star makeup around eyes, oversized red round nose, fluffy ruffled collar, bright star emblems on costume" },
   chica_creativa:   { object_prompt: "Creative young woman cartoon character 3D model",                    style_prompt: "vibrant artistic street fashion, colorful patterned outfit with warm orange and teal tones, warm realistic beige-brown skin tone, expressive dark brown eyes, curly or wavy hair, creative artistic clothing with patterns and layers" },
   chica_ejecutiva:  { object_prompt: "Professional executive businesswoman 3D character model",            style_prompt: "modern corporate fashion, elegant dark charcoal navy blazer with light blouse, realistic warm skin tone, smooth dark hair, polished professional attire, subtle natural makeup, business formal look" },
