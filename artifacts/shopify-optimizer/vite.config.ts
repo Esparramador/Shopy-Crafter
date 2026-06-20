@@ -30,7 +30,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
+    ...(!isProd ? [runtimeErrorOverlay()] : []),
     ...(!isProd && process.env.REPL_ID !== undefined
       ? [
           await import("@replit/vite-plugin-cartographer").then(m =>
