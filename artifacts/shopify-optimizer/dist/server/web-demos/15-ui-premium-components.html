@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI Premium Components — 21st.dev Style</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050508;
+  --surface:#0c0c14;
+  --surface2:#12121e;
+  --accent:#6366f1;
+  --accent2:#a855f7;
+  --accent3:#06b6d4;
+  --success:#22c55e;
+  --text:#f0f0ff;
+  --muted:rgba(240,240,255,.5);
+  --border:rgba(255,255,255,.07);
+  --font-h:'Space Grotesk',sans-serif;
+  --font-b:'Plus Jakarta Sans',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-b);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── NAV ── */
+.nav{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.9rem 2.5rem;
+  background:rgba(5,5,8,.8);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{
+  font-family:var(--font-h);
+  font-weight:800;font-size:1.1rem;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.nav-links{display:flex;gap:1.5rem;list-style:none;}
+.nav-links a{
+  color:var(--muted);font-size:.875rem;text-decoration:none;
+  transition:color .2s;
+}
+.nav-links a:hover{color:var(--text);}
+.nav-badge{
+  font-size:.75rem;padding:.25rem .75rem;
+  background:rgba(99,102,241,.15);
+  border:1px solid rgba(99,102,241,.3);
+  border-radius:20px;color:var(--accent);
+  font-family:var(--font-mono);
+}
+
+/* ── LAYOUT ── */
+.container{max-width:1200px;margin:0 auto;padding:4rem 2rem;}
+.page-header{text-align:center;margin-bottom:4rem;}
+.page-title{
+  font-family:var(--font-h);font-size:clamp(2rem,4vw,3.2rem);
+  font-weight:800;line-height:1.1;margin-bottom:.75rem;
+}
+.page-title span{
+  background:linear-gradient(135deg,var(--accent),var(--accent2),var(--accent3));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.page-sub{color:var(--muted);font-size:1.05rem;max-width:560px;margin:0 auto;}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(520px,1fr));
+  gap:1.5rem;
+}
+
+/* ── FX-CARD ── */
+.fx-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:2rem;
+  position:relative;
+  overflow:hidden;
+  transition:border-color .3s,box-shadow .3s;
+}
+.fx-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(99,102,241,.06) 0%, transparent 60%);
+  pointer-events:none;
+}
+.fx-card:hover{
+  border-color:rgba(99,102,241,.25);
+  box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+.card-header{
+  display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;
+}
+.card-icon{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;
+  background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.2);
+}
+.card-title{font-family:var(--font-h);font-weight:700;font-size:1rem;}
+.card-desc{font-size:.8rem;color:var(--muted);margin-top:.1rem;}
+
+/* ── BTN ── */
+.btn{
+  display:inline-flex;align-items:center;gap:.5rem;
+  padding:.55rem 1.2rem;border-radius:8px;
+  font-family:var(--font-b);font-size:.875rem;font-weight:600;
+  cursor:pointer;border:none;transition:all .2s;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;
+}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px);}
+.btn-ghost{
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border);
+  color:var(--text);
+}
+.btn-ghost:hover{background:rgba(255,255,255,.1);}
+
+/* ══════════════════════════════════════
+   BLOQUE 1 — MacOS Dock
+══════════════════════════════════════ */
+.dock-wrapper{
+  display:flex;justify-content:center;
+  padding:2rem 1rem 1rem;
+}
+.dock{
+  display:flex;align-items:flex-end;gap:6px;
+  padding:8px 14px;
+  background:rgba(255,255,255,.08);
+  backdrop-filter:blur(20px);
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.12);
+}
+.dock-item{
+  width:52px;height:52px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1), margin .2s;
+  position:relative;font-size:1.8rem;
+  background:rgba(255,255,255,.05);
+  user-select:none;
+}
+.dock-item:hover{background:rgba(255,255,255,.1);}
+.dock-label{
+  position:absolute;bottom:calc(100% + 8px);left:50%;
+  transform:translateX(-50%) scale(0);
+  padding:3px 8px;
+  background:rgba(0,0,0,.75);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:6px;font-size:.68rem;
+  white-space:nowrap;pointer-events:none;
+  transition:transform .15s;color:#fff;
+  font-family:var(--font-b);
+}
+.dock-item:hover .dock-label{transform:translateX(-50%) scale(1);}
+.dock-separator{
+  width:1px;height:36px;
+  background:rgba(255,255,255,.15);
+  margin:0 4px;align-self:center;
+}
+
+/* ══════════════════════════════════════
+   BLOQUE 2 — Command Palette
+══════════════════════════════════════ */
+.cmd-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.6);
+  backdrop-filter:blur(8px);
+  z-index:9000;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding-top:15vh;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s;
+}
+.cmd-overlay.open{opacity:1;pointer-events:all;}
+.cmd-box{
+  width:min(600px,92vw);
+  background:#12121e;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;overflow:hidden;
+  box-shadow:0 32px 80px rgba(0,0,0,.6);
+  transform:translateY(-12px);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1);
+}
+.cmd-overlay.open .cmd-box{transform:translateY(0);}
+.cmd-input-wrap{
+  display:flex;align-items:center;gap:.75rem;
+  padding:.85rem 1.25rem;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.cmd-icon{color:var(--muted);flex-shrink:0;font-size:1rem;}
+.cmd-input{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--text);font-size:1rem;font-family:var(--font-b);
+}
+.cmd-input::placeholder{color:var(--muted);}
+.cmd-esc{
+  font-size:.68rem;font-family:var(--font-mono);
+  color:var(--muted);background:rgba(255,255,255,.05);
+  padding:.15rem .45rem;border-radius:4px;
+  border:1px solid rgba(255,255,255,.08);cursor:pointer;
+}
+.cmd-results{max-height:360px;overflow-y:auto;padding:.5rem;}
+.cmd-results::-webkit-scrollbar{width:4px;}
+.cmd-results::-webkit-scrollbar-track{background:transparent;}
+.cmd-results::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+.cmd-group-label{
+  font-size:.68rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);
+  padding:.5rem .75rem .25rem;
+}
+.cmd-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.6rem .75rem;border-radius:8px;
+  cursor:pointer;transition:background .15s;gap:.75rem;
+}
+.cmd-item:hover,.cmd-item.selected{background:rgba(99,102,241,.15);}
+.cmd-item-left{display:flex;align-items:center;gap:.6rem;font-size:.875rem;}
+.cmd-item-icon{font-size:.9rem;width:20px;text-align:center;}
+.cmd-item mark{
+  background:rgba(99,102,241,.3);
+  color:var(--accent);border-radius:2px;
+  font-style:normal;
+}
+.cmd-shortcut{
+  font-size:.68rem;font-family:var(--font-mono);
+  color:var(--muted);background:rgba(255,255,255,.05);
+  padding:.15rem .45rem;border-radius:4px;
+  border:1px solid rgba(255,255,255,.08);
+  flex-shrink:0;white-space:nowrap;
+}
+.cmd-empty{
+  text-align:center;padding:2rem;
+  color:var(--muted);font-size:.875rem;
+}
+.cmd-footer{
+  padding:.6rem 1.25rem;
+  border-top:1px solid rgba(255,255,255,.07);
+  display:flex;gap:1rem;align-items:center;
+}
+.cmd-hint{font-size:.68rem;color:var(--muted);display:flex;align-items:center;gap:.3rem;}
+.cmd-hint kbd{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:3px;padding:.1rem .35rem;font-family:var(--font-mono);
+  font-size:.65rem;
+}
+
+/* ══════════════════════════════════════
+   BLOQUE 3 — Animated Terminal
+══════════════════════════════════════ */
+.terminal{
+  background:#0d1117;border-radius:12px;overflow:hidden;
+  font-family:var(--font-mono);font-size:.82rem;
+  border:1px solid rgba(255,255,255,.1);
+}
+.terminal-bar{
+  background:#1c1c28;padding:.6rem 1rem;
+  display:flex;gap:.5rem;align-items:center;
+}
+.terminal-dot{width:12px;height:12px;border-radius:50%;}
+.term-title{
+  flex:1;text-align:center;font-size:.75rem;
+  color:rgba(255,255,255,.4);font-family:var(--font-b);
+}
+.terminal-body{
+  padding:1.25rem;min-height:300px;line-height:1.8;
+  white-space:pre-wrap;word-break:break-all;
+}
+.term-line{display:block;margin-bottom:.1rem;}
+.term-prompt{color:#22c55e;}
+.term-cmd{color:#f0f0ff;}
+.term-output{color:rgba(240,240,255,.7);}
+.term-cursor{
+  display:inline-block;width:8px;height:1.1em;
+  background:var(--accent);vertical-align:text-bottom;
+  animation:blink .8s step-start infinite;
+}
+.term-action-row{
+  display:flex;gap:.75rem;padding:.75rem 1.25rem;
+  border-top:1px solid rgba(255,255,255,.06);
+  background:#0d1117;
+}
+@keyframes blink{50%{opacity:0;}}
+
+/* ══════════════════════════════════════
+   BLOQUE 4 — Sound Wave
+══════════════════════════════════════ */
+.sound-wave-card{grid-column:1/-1;}
+.wave-player{
+  background:linear-gradient(135deg,#0d0d1a 0%,#12121e 100%);
+  border-radius:16px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.06);
+}
+.wave-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.25rem 1.5rem .75rem;
+}
+.wave-track-info{}
+.wave-track-title{font-family:var(--font-h);font-weight:700;font-size:1rem;}
+.wave-track-sub{font-size:.8rem;color:var(--muted);margin-top:.15rem;}
+.wave-status{
+  display:flex;align-items:center;gap:.5rem;
+  font-size:.75rem;color:var(--muted);font-family:var(--font-mono);
+}
+.wave-live-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--success);
+  box-shadow:0 0 6px var(--success);
+  animation:pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+#waveCanvas{
+  display:block;width:100%;height:120px;cursor:pointer;
+}
+.wave-controls{
+  display:flex;align-items:center;gap:.75rem;
+  padding:.75rem 1.5rem 1rem;
+}
+.wave-btn{
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
+  color:var(--text);border-radius:50%;
+  width:36px;height:36px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:.9rem;transition:all .2s;
+  flex-shrink:0;
+}
+.wave-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);}
+.wave-btn-play{
+  width:46px;height:46px;font-size:1.1rem;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none;color:#fff;
+  box-shadow:0 4px 15px rgba(99,102,241,.4);
+}
+.wave-btn-play:hover{transform:scale(1.05);opacity:.95;}
+.wave-progress-wrap{flex:1;display:flex;flex-direction:column;gap:.35rem;}
+.wave-progress{
+  width:100%;height:4px;background:rgba(255,255,255,.1);
+  border-radius:2px;cursor:pointer;position:relative;
+}
+.wave-progress-fill{
+  height:100%;border-radius:2px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  width:35%;transition:width .5s linear;
+}
+.wave-time-row{display:flex;justify-content:space-between;}
+.wave-time{font-size:.7rem;color:var(--muted);font-family:var(--font-mono);}
+.wave-vol{
+  display:flex;align-items:center;gap:.5rem;margin-left:.5rem;
+}
+.wave-vol-icon{font-size:.85rem;color:var(--muted);}
+.wave-vol-bar{
+  width:70px;height:4px;background:rgba(255,255,255,.1);
+  border-radius:2px;cursor:pointer;
+}
+.wave-vol-fill{
+  height:100%;width:65%;border-radius:2px;
+  background:rgba(255,255,255,.3);
+}
+
+/* ══════════════════════════════════════
+   BLOQUE 5 — Notification Bell
+══════════════════════════════════════ */
+.notif-demo{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:1rem;}
+.bell-wrapper{position:relative;display:inline-flex;}
+.bell-btn{
+  width:44px;height:44px;border-radius:12px;
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:1.2rem;transition:all .2s;
+  position:relative;
+}
+.bell-btn:hover{background:rgba(255,255,255,.1);}
+.bell-icon{display:inline-block;transition:transform .1s;}
+@keyframes bellShake{
+  0%,100%{transform:rotate(0);}
+  15%{transform:rotate(15deg);}
+  30%{transform:rotate(-12deg);}
+  45%{transform:rotate(8deg);}
+  60%{transform:rotate(-5deg);}
+  75%{transform:rotate(3deg);}
+}
+.bell-icon.shake{animation:bellShake .5s ease;}
+.bell-badge{
+  position:absolute;top:-4px;right:-4px;
+  width:18px;height:18px;border-radius:50%;
+  background:linear-gradient(135deg,#ef4444,#dc2626);
+  color:#fff;font-size:.65rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--bg);
+  animation:badgePop .3s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes badgePop{from{transform:scale(0);}to{transform:scale(1);}}
+.notif-dropdown{
+  position:absolute;top:calc(100% + 10px);left:0;
+  width:320px;
+  background:#0f0f1c;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  overflow:hidden;
+  display:none;z-index:200;
+}
+.notif-dropdown.open{display:block;}
+.notif-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.85rem 1rem .6rem;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.notif-title{font-family:var(--font-h);font-weight:700;font-size:.875rem;}
+.notif-mark-read{
+  font-size:.72rem;color:var(--accent);cursor:pointer;
+  background:none;border:none;font-family:var(--font-b);
+}
+.notif-mark-read:hover{opacity:.8;}
+.notif-list{max-height:280px;overflow-y:auto;}
+.notif-list::-webkit-scrollbar{width:3px;}
+.notif-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);}
+.notif-item{
+  display:flex;gap:.75rem;padding:.75rem 1rem;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  cursor:pointer;transition:background .15s;
+  align-items:flex-start;
+}
+.notif-item:hover{background:rgba(255,255,255,.04);}
+.notif-item.unread{background:rgba(99,102,241,.05);}
+.notif-item-icon{font-size:1rem;margin-top:.1rem;flex-shrink:0;}
+.notif-item-body{flex:1;}
+.notif-item-text{font-size:.8rem;line-height:1.4;}
+.notif-item-time{font-size:.7rem;color:var(--muted);margin-top:.2rem;font-family:var(--font-mono);}
+.notif-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--accent);margin-top:.3rem;flex-shrink:0;
+}
+.notif-footer{
+  padding:.6rem 1rem;
+  border-top:1px solid rgba(255,255,255,.07);
+  text-align:center;
+}
+.notif-view-all{
+  font-size:.78rem;color:var(--accent);
+  cursor:pointer;background:none;border:none;
+  font-family:var(--font-b);
+}
+
+/* ══════════════════════════════════════
+   BLOQUE 6 — Context Menu
+══════════════════════════════════════ */
+.ctx-target{
+  width:100%;min-height:180px;
+  background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(168,85,247,.08));
+  border:2px dashed rgba(99,102,241,.25);
+  border-radius:12px;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:.5rem;cursor:context-menu;
+  user-select:none;transition:border-color .2s,background .2s;
+  position:relative;
+}
+.ctx-target:hover{
+  border-color:rgba(99,102,241,.4);
+  background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(168,85,247,.12));
+}
+.ctx-target-label{font-size:.875rem;color:var(--muted);}
+.ctx-target-icon{font-size:2rem;}
+.ctx-btn-hint{
+  font-size:.72rem;color:rgba(99,102,241,.7);
+  font-family:var(--font-mono);
+}
+
+#ctx-menu{
+  position:fixed;display:none;
+  width:200px;
+  background:#0f0f1c;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;
+  padding:.4rem;
+  box-shadow:0 16px 50px rgba(0,0,0,.5);
+  z-index:9999;overflow:hidden;
+}
+.ctx-item{
+  display:flex;align-items:center;gap:.65rem;
+  padding:.5rem .75rem;border-radius:8px;
+  font-size:.82rem;cursor:pointer;
+  transition:background .15s;
+  color:var(--text);
+}
+.ctx-item:hover{background:rgba(99,102,241,.15);}
+.ctx-item.danger:hover{background:rgba(239,68,68,.12);color:#ef4444;}
+.ctx-item-icon{width:16px;text-align:center;font-size:.85rem;}
+.ctx-sep{height:1px;background:rgba(255,255,255,.07);margin:.35rem 0;}
+.ctx-shortcut{margin-left:auto;font-size:.68rem;color:var(--muted);font-family:var(--font-mono);}
+
+/* ── Floating label for color pickers ── */
+.cp-label{
+  font-size:.72rem;color:var(--muted);
+  font-family:var(--font-mono);margin-top:.25rem;
+  text-align:center;
+}
+
+/* ── Section divider ── */
+.section-divider{
+  display:flex;align-items:center;gap:1rem;
+  margin:3.5rem 0 2rem;
+}
+.section-divider-line{flex:1;height:1px;background:var(--border);}
+.section-divider-label{
+  font-family:var(--font-h);font-size:.75rem;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  white-space:nowrap;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+
+/* ── Toasts ── */
+.toast-container{
+  position:fixed;bottom:2rem;right:2rem;
+  display:flex;flex-direction:column;gap:.5rem;
+  z-index:9999;
+}
+.toast{
+  background:#12121e;border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;padding:.65rem 1rem;
+  font-size:.8rem;display:flex;align-items:center;gap:.6rem;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  transform:translateX(200%);opacity:0;
+  font-family:var(--font-b);
+}
+.toast-icon{font-size:1rem;}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav class="nav">
+  <div class="nav-logo">21st.dev Premium UI</div>
+  <ul class="nav-links">
+    <li><a href="#dock">Dock</a></li>
+    <li><a href="#palette">Palette</a></li>
+    <li><a href="#terminal">Terminal</a></li>
+    <li><a href="#wave">Sound Wave</a></li>
+    <li><a href="#notifs">Notifs</a></li>
+    <li><a href="#ctx">Context</a></li>
+  </ul>
+  <span class="nav-badge">v2.1.0</span>
+</nav>
+
+<!-- ── HERO ── -->
+<div class="container">
+  <div class="page-header">
+    <h1 class="page-title">
+      Componentes <span>UI Premium</span>
+    </h1>
+    <p class="page-sub">Colección de componentes interactivos inspirados en 21st.dev. Dark theme, animaciones fluidas, 100% funcional.</p>
+  </div>
+
+  <!-- ══ BLOQUE 1 — MacOS Dock ══ -->
+  <div class="section-divider" id="dock">
+    <div class="section-divider-line"></div>
+    <span class="section-divider-label">MacOS Dock</span>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="fx-card" id="card-dock">
+    <div class="card-header">
+      <div class="card-icon">🍎</div>
+      <div>
+        <div class="card-title">MacOS Dock — Efecto Magnético</div>
+        <div class="card-desc">Hover sobre los iconos para activar la magnificación con física de resorte</div>
+      </div>
+    </div>
+    <div class="dock-wrapper">
+      <div class="dock" id="dock">
+        <div class="dock-item" data-label="Home">🏠<span class="dock-label">Home</span></div>
+        <div class="dock-item" data-label="Design">🎨<span class="dock-label">Design</span></div>
+        <div class="dock-item" data-label="Code">💻<span class="dock-label">Code</span></div>
+        <div class="dock-separator"></div>
+        <div class="dock-item" data-label="Analytics">📊<span class="dock-label">Analytics</span></div>
+        <div class="dock-item" data-label="IA">🤖<span class="dock-label">IA</span></div>
+        <div class="dock-item" data-label="Mobile">📱<span class="dock-label">Mobile</span></div>
+        <div class="dock-separator"></div>
+        <div class="dock-item" data-label="Web">🌐<span class="dock-label">Web</span></div>
+        <div class="dock-item" data-label="Settings">⚙️<span class="dock-label">Settings</span></div>
+        <div class="dock-item" data-label="Notifs">🔔<span class="dock-label">Notifs</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BLOQUE 2 — Command Palette ══ -->
+  <div class="section-divider" id="palette">
+    <div class="section-divider-line"></div>
+    <span class="section-divider-label">Command Palette</span>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="fx-card" id="card-palette">
+    <div class="card-header">
+      <div class="card-icon">⌘</div>
+      <div>
+        <div class="card-title">Command Palette — Linear / Vercel Style</div>
+        <div class="card-desc">Presiona <kbd style="font-family:var(--font-mono);font-size:.75rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:.1rem .4rem;">⌘K</kbd> o el botón para abrir. Filtrado en tiempo real con highlight.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="openCommandPalette()">⌘K Abrir Command Palette</button>
+      <button class="btn btn-ghost" onclick="openCommandPalette()">Probar filtrado en vivo</button>
+    </div>
+    <div style="margin-top:1rem;font-size:.78rem;color:var(--muted);font-family:var(--font-mono);">
+      Navegación: ↑↓ seleccionar · Enter ejecutar · Esc cerrar
+    </div>
+  </div>
+
+  <!-- Command Palette Overlay -->
+  <div class="cmd-overlay" id="cmdOverlay" onclick="handleOverlayClick(event)">
+    <div class="cmd-box" id="cmdBox">
+      <div class="cmd-input-wrap">
+        <span class="cmd-icon">🔍</span>
+        <input class="cmd-input" id="cmdInput" placeholder="Escribe para buscar comandos..." autocomplete="off" spellcheck="false">
+        <span class="cmd-esc" onclick="closeCommandPalette()">ESC</span>
+      </div>
+      <div class="cmd-results" id="cmdResults"></div>
+      <div class="cmd-footer">
+        <span class="cmd-hint"><kbd>↑↓</kbd> navegar</span>
+        <span class="cmd-hint"><kbd>↵</kbd> ejecutar</span>
+        <span class="cmd-hint"><kbd>ESC</kbd> cerrar</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BLOQUE 3 — Animated Terminal ══ -->
+  <div class="section-divider" id="terminal">
+    <div class="section-divider-line"></div>
+    <span class="section-divider-label">Animated Terminal</span>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="fx-card" id="card-terminal">
+    <div class="card-header">
+      <div class="card-icon">⚡</div>
+      <div>
+        <div class="card-title">Terminal Animada — Crafter AI CLI</div>
+        <div class="card-desc">Escritura caracter por caracter. Cursor parpadeante. Colores sintácticos.</div>
+      </div>
+    </div>
+    <div class="terminal" id="mainTerminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot" style="background:#ff5f57;"></div>
+        <div class="terminal-dot" style="background:#ffbd2e;"></div>
+        <div class="terminal-dot" style="background:#28c840;"></div>
+        <span class="term-title">crafter-cli — bash</span>
+      </div>
+      <div class="terminal-body" id="termBody"></div>
+    </div>
+    <div class="term-action-row">
+      <button class="btn btn-primary" id="termPlayBtn" onclick="startTerminal()">▶ Reproducir demo</button>
+      <button class="btn btn-ghost" onclick="resetTerminal()">↺ Reiniciar</button>
+    </div>
+  </div>
+
+  <!-- ══ BLOQUE 4 — Sound Wave ══ -->
+  <div class="section-divider" id="wave">
+    <div class="section-divider-line"></div>
+    <span class="section-divider-label">Sound Wave Visualizer</span>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="fx-card sound-wave-card" id="card-wave">
+    <div class="card-header">
+      <div class="card-icon">🎵</div>
+      <div>
+        <div class="card-title">Sound Wave Visualizer — Canvas animado</div>
+        <div class="card-desc">64 barras con animación basada en sin(). Click play para activar.</div>
+      </div>
+    </div>
+    <div class="wave-player">
+      <div class="wave-header">
+        <div class="wave-track-info">
+          <div class="wave-track-title">Crafter AI — Brand Voice Mix</div>
+          <div class="wave-track-sub">Generado por IA · 4:32 · Calidad Premium</div>
+        </div>
+        <div class="wave-status">
+          <div class="wave-live-dot" id="waveLiveDot"></div>
+          <span id="waveStatusText">En pausa</span>
+        </div>
+      </div>
+      <canvas id="waveCanvas" width="1200" height="120"></canvas>
+      <div class="wave-controls">
+        <button class="wave-btn" onclick="prevTrack()" title="Anterior">⏮</button>
+        <button class="wave-btn" onclick="seekBack()" title="Retroceder 10s">⏪</button>
+        <button class="wave-btn wave-btn-play" id="playBtn" onclick="togglePlay()">▶</button>
+        <button class="wave-btn" onclick="seekFwd()" title="Avanzar 10s">⏩</button>
+        <button class="wave-btn" onclick="nextTrack()" title="Siguiente">⏭</button>
+        <div class="wave-progress-wrap">
+          <div class="wave-progress" id="waveProgress" onclick="seekTo(event)">
+            <div class="wave-progress-fill" id="waveProgressFill"></div>
+          </div>
+          <div class="wave-time-row">
+            <span class="wave-time" id="waveCurrent">1:35</span>
+            <span class="wave-time">4:32</span>
+          </div>
+        </div>
+        <div class="wave-vol">
+          <span class="wave-vol-icon">🔊</span>
+          <div class="wave-vol-bar" onclick="setVolume(event)">
+            <div class="wave-vol-fill" id="waveVolFill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BLOQUE 5 — Notifications ══ -->
+  <div class="section-divider" id="notifs">
+    <div class="section-divider-line"></div>
+    <span class="section-divider-label">Notification Bell</span>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="fx-card" id="card-notifs">
+    <div class="card-header">
+      <div class="card-icon">🔔</div>
+      <div>
+        <div class="card-title">Notification Bell — Dropdown con GSAP</div>
+        <div class="card-desc">Badge animado, shake al recibir nueva notif, dropdown con slide-in.</div>
+      </div>
+    </div>
+    <div class="notif-demo">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div class="bell-wrapper">
+          <button class="bell-btn" id="bellBtn" onclick="toggleNotifDropdown()">
+            <span class="bell-icon" id="bellIcon">🔔</span>
+            <span class="bell-badge" id="bellBadge">3</span>
+          </button>
+          <div class="notif-dropdown" id="notifDropdown">
+            <div class="notif-header">
+              <span class="notif-title">Notificaciones</span>
+              <button class="notif-mark-read" onclick="markAllRead()">Marcar como leídas</button>
+            </div>
+            <div class="notif-list" id="notifList"></div>
+            <div class="notif-footer">
+              <button class="notif-view-all">Ver todas las notificaciones →</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-ghost" onclick="addNewNotification()">+ Nueva notificación</button>
+        <button class="btn btn-ghost" onclick="triggerBellShake()">🔔 Shake test</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BLOQUE 6 — Context Menu ══ -->
+  <div class="section-divider" id="ctx">
+    <div class="section-divider-line"></div>
+    <span class="section-divider-label">Context Menu Animado</span>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="fx-card" id="card-ctx">
+    <div class="card-header">
+      <div class="card-icon">🖱️</div>
+      <div>
+        <div class="card-title">Context Menu — GSAP Spring Animation</div>
+        <div class="card-desc">Click derecho en el área o usa el botón. Aparición con back.out(2).</div>
+      </div>
+    </div>
+    <div class="ctx-target" id="ctxTarget" oncontextmenu="showContextMenuAt(event)">
+      <div class="ctx-target-icon">📂</div>
+      <div class="ctx-target-label">Click derecho aquí para el menú contextual</div>
+      <div class="ctx-btn-hint">o usa el botón ↓</div>
+    </div>
+    <div style="margin-top:.75rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="showContextMenuCenter()">🖱️ Mostrar Context Menu</button>
+      <button class="btn btn-ghost" onclick="hideContextMenu()">Cerrar</button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Context Menu DOM -->
+<div id="ctx-menu">
+  <div class="ctx-item" onclick="ctxAction('Cortar')"><span class="ctx-item-icon">✂️</span>Cortar<span class="ctx-shortcut">⌘X</span></div>
+  <div class="ctx-item" onclick="ctxAction('Copiar')"><span class="ctx-item-icon">📋</span>Copiar<span class="ctx-shortcut">⌘C</span></div>
+  <div class="ctx-item" onclick="ctxAction('Pegar')"><span class="ctx-item-icon">📌</span>Pegar<span class="ctx-shortcut">⌘V</span></div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxAction('Renombrar')"><span class="ctx-item-icon">📝</span>Renombrar<span class="ctx-shortcut">F2</span></div>
+  <div class="ctx-item danger" onclick="ctxAction('Eliminar')"><span class="ctx-item-icon">🗑️</span>Eliminar<span class="ctx-shortcut">⌦</span></div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxAction('Compartir enlace')"><span class="ctx-item-icon">🔗</span>Compartir enlace</div>
+  <div class="ctx-item" onclick="ctxAction('Descargar')"><span class="ctx-item-icon">⬇️</span>Descargar</div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ════════════════════════════════════════════
+// CARD HOVER GLOW
+// ════════════════════════════════════════════
+document.querySelectorAll('.fx-card').forEach(card => {
+  card.addEventListener('mousemove', (e) => {
+    const r = card.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width * 100).toFixed(1);
+    const y = ((e.clientY - r.top) / r.height * 100).toFixed(1);
+    card.style.setProperty('--mx', x + '%');
+    card.style.setProperty('--my', y + '%');
+  });
+});
+
+// ════════════════════════════════════════════
+// BLOQUE 1 — MacOS Dock Magnification
+// ════════════════════════════════════════════
+const dockEl = document.getElementById('dock');
+const dockItems = dockEl.querySelectorAll('.dock-item');
+
+dockEl.addEventListener('mousemove', (e) => {
+  const mouseX = e.clientX;
+  dockItems.forEach((item) => {
+    const itemRect = item.getBoundingClientRect();
+    const itemCenterX = itemRect.left + itemRect.width / 2;
+    const distance = Math.abs(mouseX - itemCenterX);
+    const maxDist = 120;
+    if (distance < maxDist) {
+      const ratio = 1 - distance / maxDist;
+      const scale = 1 + ratio * 0.8;
+      const mb = ratio * 18;
+      item.style.transform = `scale(${scale})`;
+      item.style.marginBottom = mb + 'px';
+    } else {
+      item.style.transform = 'scale(1)';
+      item.style.marginBottom = '0';
+    }
+  });
+});
+
+dockEl.addEventListener('mouseleave', () => {
+  dockItems.forEach(item => {
+    item.style.transform = '';
+    item.style.marginBottom = '';
+  });
+});
+
+dockItems.forEach(item => {
+  item.addEventListener('click', () => {
+    showToast('🖥️', `Abriendo ${item.dataset.label}…`);
+    gsap.to(item, { y: -12, duration: .15, ease: 'power2.out', yoyo: true, repeat: 1 });
+  });
+});
+
+// ════════════════════════════════════════════
+// BLOQUE 2 — Command Palette
+// ════════════════════════════════════════════
+const PALETTE_ITEMS = [
+  { id: 1, label: 'Ir al Dashboard',       icon: '🏠', category: 'Navegar',    shortcut: '⌘D' },
+  { id: 2, label: 'Nuevo Proyecto',        icon: '✨', category: 'Crear',      shortcut: '⌘N' },
+  { id: 3, label: 'Abrir Asistente IA',    icon: '🤖', category: 'IA',         shortcut: '⌘I' },
+  { id: 4, label: 'Ver Analytics',         icon: '📊', category: 'Navegar',    shortcut: '⌘A' },
+  { id: 5, label: 'Exportar como PDF',     icon: '📄', category: 'Exportar',   shortcut: '⌘E' },
+  { id: 6, label: 'Configuración de Marca',icon: '🎨', category: 'Configurar', shortcut: '⌘B' },
+  { id: 7, label: 'Generar Landing Page',  icon: '⚡', category: 'IA',         shortcut: '⌘L' },
+  { id: 8, label: 'Publicar en Redes',     icon: '📢', category: 'Publicar',   shortcut: '⌘P' },
+  { id: 9, label: 'Modo Oscuro/Claro',     icon: '🌗', category: 'Apariencia', shortcut: '⌘T' },
+  { id:10, label: 'Cerrar Sesión',         icon: '🚪', category: 'Sistema',    shortcut: '' },
+];
+
+let paletteOpen = false;
+let selectedIdx = 0;
+let filteredItems = [...PALETTE_ITEMS];
+let searchQuery = '';
+
+function openCommandPalette() {
+  paletteOpen = true;
+  selectedIdx = 0;
+  searchQuery = '';
+  filteredItems = [...PALETTE_ITEMS];
+  document.getElementById('cmdOverlay').classList.add('open');
+  document.getElementById('cmdInput').value = '';
+  renderCmdItems();
+  setTimeout(() => document.getElementById('cmdInput').focus(), 50);
+}
+
+function closeCommandPalette() {
+  paletteOpen = false;
+  document.getElementById('cmdOverlay').classList.remove('open');
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('cmdOverlay')) closeCommandPalette();
+}
+
+function highlight(text, query) {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return text.slice(0, idx) +
+    '<mark>' + text.slice(idx, idx + query.length) + '</mark>' +
+    text.slice(idx + query.length);
+}
+
+function renderCmdItems() {
+  const container = document.getElementById('cmdResults');
+  if (filteredItems.length === 0) {
+    container.innerHTML = '<div class="cmd-empty">Sin resultados para "' + searchQuery + '"</div>';
+    return;
+  }
+  // Group by category
+  const groups = {};
+  filteredItems.forEach(item => {
+    if (!groups[item.category]) groups[item.category] = [];
+    groups[item.category].push(item);
+  });
+
+  let html = '';
+  let globalIdx = 0;
+  Object.entries(groups).forEach(([cat, items]) => {
+    html += `<div class="cmd-group-label">${cat}</div>`;
+    items.forEach(item => {
+      const isSelected = globalIdx === selectedIdx;
+      html += `
+        <div class="cmd-item ${isSelected ? 'selected' : ''}" data-idx="${globalIdx}" onclick="executeItem(${item.id})">
+          <div class="cmd-item-left">
+            <span class="cmd-item-icon">${item.icon}</span>
+            <span>${highlight(item.label, searchQuery)}</span>
+          </div>
+          ${item.shortcut ? `<span class="cmd-shortcut">${item.shortcut}</span>` : ''}
+        </div>`;
+      globalIdx++;
+    });
+  });
+
+  container.innerHTML = html;
+  // Scroll selected into view
+  const sel = container.querySelector('.selected');
+  if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+
+function executeItem(idOrObj) {
+  const item = typeof idOrObj === 'number'
+    ? PALETTE_ITEMS.find(i => i.id === idOrObj)
+    : idOrObj;
+  if (!item) return;
+  closeCommandPalette();
+  showToast(item.icon, item.label + ' ejecutado');
+}
+
+document.getElementById('cmdInput').addEventListener('input', (e) => {
+  searchQuery = e.target.value.trim();
+  filteredItems = PALETTE_ITEMS.filter(i =>
+    i.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    i.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  selectedIdx = 0;
+  renderCmdItems();
+});
+
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    paletteOpen ? closeCommandPalette() : openCommandPalette();
+    return;
+  }
+  if (e.key === 'Escape' && paletteOpen) { closeCommandPalette(); return; }
+  if (paletteOpen) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      selectedIdx = Math.min(selectedIdx + 1, filteredItems.length - 1);
+      renderCmdItems();
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      selectedIdx = Math.max(selectedIdx - 1, 0);
+      renderCmdItems();
+    }
+    if (e.key === 'Enter' && filteredItems[selectedIdx]) {
+      executeItem(filteredItems[selectedIdx]);
+    }
+  }
+});
+
+// ════════════════════════════════════════════
+// BLOQUE 3 — Animated Terminal
+// ════════════════════════════════════════════
+const COMMANDS = [
+  { type: 'input',  text: 'crafter init --brand "TechStart" --tone premium', delay: 800 },
+  { type: 'output', text: '✓ Brand knowledge loaded (1,247 tokens)\n✓ Tone analysis complete\n✓ Style guidelines applied', delay: 400 },
+  { type: 'input',  text: 'crafter generate landing --type hero --cta "Empezar gratis"', delay: 600 },
+  { type: 'output', text: '⚡ Generating hero section...\n✓ Headline: "Tecnología que transforma"\n✓ Subheadline: "IA generativa entrenada en tu marca"\n✓ CTA button: gradient indigo\n✓ Background: aurora effect\n📁 Output: ./landing/hero.html (248 lines)', delay: 500 },
+  { type: 'input',  text: 'crafter publish --platform instagram --format reel', delay: 400 },
+  { type: 'output', text: '📤 Publishing to Instagram...\n✓ Format: 9:16 vertical\n✓ Caption: AI-generated ✓\n✓ Hashtags: 28 optimized\n✓ Published! 2,847 views in 1h', delay: 300 },
+  { type: 'input',  text: 'crafter analytics --period 30d', delay: 300 },
+  { type: 'output', text: '📊 Analytics Report (30 days)\n━━━━━━━━━━━━━━━━━━━━\nConversions: +340% ↑\nROI:         8.4x\nReach:       127,492\nBest post:   "AI Design System"', delay: 0 },
+];
+
+let termRunning = false;
+let termTimeout = null;
+
+function resetTerminal() {
+  clearTimeout(termTimeout);
+  termRunning = false;
+  document.getElementById('termBody').innerHTML = '';
+  document.getElementById('termPlayBtn').textContent = '▶ Reproducir demo';
+}
+
+function startTerminal() {
+  if (termRunning) return;
+  resetTerminal();
+  termRunning = true;
+  document.getElementById('termPlayBtn').textContent = '⏳ Ejecutando…';
+  runCommands(0);
+}
+
+function runCommands(index) {
+  if (index >= COMMANDS.length) {
+    termRunning = false;
+    document.getElementById('termPlayBtn').textContent = '✓ Demo completado';
+    // Add final cursor
+    const body = document.getElementById('termBody');
+    const cursorLine = document.createElement('span');
+    cursorLine.className = 'term-line';
+    cursorLine.innerHTML = '<span class="term-prompt">crafterai</span><span class="term-cmd"> % </span><span class="term-cursor"></span>';
+    body.appendChild(cursorLine);
+    return;
+  }
+
+  const cmd = COMMANDS[index];
+
+  if (cmd.type === 'input') {
+    // Show prompt then type the command
+    const body = document.getElementById('termBody');
+    const line = document.createElement('span');
+    line.className = 'term-line';
+    line.innerHTML = '<span class="term-prompt">crafterai</span><span class="term-cmd"> % </span><span class="term-cmd" id="typing-' + index + '"></span><span class="term-cursor" id="cursor-' + index + '"></span>';
+    body.appendChild(line);
+    body.scrollTop = body.scrollHeight;
+
+    typeText('typing-' + index, cmd.text, 0, () => {
+      const cursor = document.getElementById('cursor-' + index);
+      if (cursor) cursor.remove();
+      termTimeout = setTimeout(() => runCommands(index + 1), cmd.delay);
+    });
+  } else {
+    // Output block
+    termTimeout = setTimeout(() => {
+      const body = document.getElementById('termBody');
+      const lines = cmd.text.split('\n');
+      lines.forEach((lineText, i) => {
+        const span = document.createElement('span');
+        span.className = 'term-line term-output';
+        span.textContent = lineText;
+        body.appendChild(span);
+      });
+      // Add blank separator
+      const blank = document.createElement('span');
+      blank.className = 'term-line';
+      blank.innerHTML = '&nbsp;';
+      body.appendChild(blank);
+      body.scrollTop = body.scrollHeight;
+      termTimeout = setTimeout(() => runCommands(index + 1), cmd.delay);
+    }, 200);
+  }
+}
+
+function typeText(elId, text, charIdx, onDone) {
+  if (charIdx >= text.length) {
+    if (onDone) onDone();
+    return;
+  }
+  const el = document.getElementById(elId);
+  if (!el) { if (onDone) onDone(); return; }
+  el.textContent += text[charIdx];
+  el.parentElement.parentElement.scrollTop = el.parentElement.parentElement.scrollHeight;
+  termTimeout = setTimeout(() => typeText(elId, text, charIdx + 1, onDone), 28 + Math.random() * 20);
+}
+
+// ════════════════════════════════════════════
+// BLOQUE 4 — Sound Wave Visualizer
+// ════════════════════════════════════════════
+const canvas = document.getElementById('waveCanvas');
+const ctx2d = canvas.getContext('2d');
+const BARS = 64;
+let isPlaying = false;
+let animFrame = null;
+let startTime = null;
+let progressPct = 35;
+let volumePct = 65;
+
+const barData = Array.from({ length: BARS }, (_, i) => ({
+  base: Math.random() * 30 + 12,
+  amp: Math.random() * 35 + 18,
+  speed: Math.random() * 2.5 + 0.8,
+  phase: (i / BARS) * Math.PI * 4
+}));
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx2d.scale(dpr, dpr);
+}
+
+function drawWave(t) {
+  const W = canvas.getBoundingClientRect().width;
+  const H = canvas.getBoundingClientRect().height;
+  ctx2d.clearRect(0, 0, W, H);
+
+  const barW = (W / BARS) - 2.5;
+
+  barData.forEach((b, i) => {
+    let h;
+    if (isPlaying) {
+      h = b.base + Math.abs(Math.sin(t * b.speed * 0.001 + b.phase)) * b.amp;
+    } else {
+      h = b.base * 0.25 + Math.abs(Math.sin(t * 0.0002 + b.phase)) * 4;
+    }
+
+    const x = i * (barW + 2.5) + 1;
+    const y = H / 2 - h / 2;
+    const hue = 240 + (i / BARS) * 65;
+    const lightness = isPlaying ? 60 : 28;
+    const sat = isPlaying ? 85 : 45;
+
+    ctx2d.fillStyle = `hsl(${hue}, ${sat}%, ${lightness}%)`;
+    const r = Math.min(barW / 2, 3.5);
+
+    // Main bar
+    ctx2d.beginPath();
+    if (ctx2d.roundRect) {
+      ctx2d.roundRect(x, y, barW, h, r);
+    } else {
+      ctx2d.rect(x, y, barW, h);
+    }
+    ctx2d.fill();
+
+    // Reflection
+    ctx2d.globalAlpha = 0.25;
+    const rh = h * 0.4;
+    ctx2d.beginPath();
+    if (ctx2d.roundRect) {
+      ctx2d.roundRect(x, H / 2 + 2, barW, rh, r);
+    } else {
+      ctx2d.rect(x, H / 2 + 2, barW, rh);
+    }
+    ctx2d.fill();
+    ctx2d.globalAlpha = 1;
+  });
+}
+
+function animLoop(ts) {
+  if (!startTime) startTime = ts;
+  drawWave(ts);
+  if (isPlaying) {
+    progressPct = Math.min(progressPct + 0.005, 99);
+    updateProgress();
+    updateTime();
+  }
+  animFrame = requestAnimationFrame(animLoop);
+}
+
+function updateProgress() {
+  document.getElementById('waveProgressFill').style.width = progressPct + '%';
+}
+
+function updateTime() {
+  const total = 272; // 4:32
+  const current = Math.floor(total * progressPct / 100);
+  const m = Math.floor(current / 60);
+  const s = current % 60;
+  document.getElementById('waveCurrent').textContent = m + ':' + String(s).padStart(2, '0');
+}
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('playBtn').textContent = isPlaying ? '⏸' : '▶';
+  document.getElementById('waveStatusText').textContent = isPlaying ? 'Reproduciendo' : 'En pausa';
+  document.getElementById('waveLiveDot').style.animationPlayState = isPlaying ? 'running' : 'paused';
+}
+
+function seekTo(e) {
+  const r = e.currentTarget.getBoundingClientRect();
+  progressPct = ((e.clientX - r.left) / r.width) * 100;
+  updateProgress();
+  updateTime();
+}
+
+function setVolume(e) {
+  const r = e.currentTarget.getBoundingClientRect();
+  volumePct = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
+  document.getElementById('waveVolFill').style.width = volumePct + '%';
+}
+
+function prevTrack() { progressPct = 0; updateProgress(); updateTime(); showToast('⏮', 'Pista anterior'); }
+function nextTrack() { progressPct = 0; updateProgress(); updateTime(); showToast('⏭', 'Pista siguiente'); }
+function seekBack() { progressPct = Math.max(0, progressPct - 3.8); updateProgress(); updateTime(); }
+function seekFwd() { progressPct = Math.min(99, progressPct + 3.8); updateProgress(); updateTime(); }
+
+// Init wave
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+requestAnimationFrame(animLoop);
+
+// ════════════════════════════════════════════
+// BLOQUE 5 — Notification Bell
+// ════════════════════════════════════════════
+let notifications = [
+  { id: 1, icon: '✓', text: 'Landing page generada en 2min', time: 'hace 5m', unread: true },
+  { id: 2, icon: '📊', text: 'Analytics semanal disponible', time: 'hace 1h', unread: true },
+  { id: 3, icon: '🤖', text: 'Nuevo modelo IA disponible', time: 'hace 3h', unread: true },
+  { id: 4, icon: '📱', text: 'Campaña publicada en Instagram', time: 'hace 1d', unread: false },
+  { id: 5, icon: '⚠️', text: 'API rate limit al 80%', time: 'hace 2d', unread: false },
+];
+let notifOpen = false;
+
+function renderNotifList() {
+  const list = document.getElementById('notifList');
+  list.innerHTML = notifications.map(n => `
+    <div class="notif-item ${n.unread ? 'unread' : ''}" onclick="readNotif(${n.id})">
+      <span class="notif-item-icon">${n.icon}</span>
+      <div class="notif-item-body">
+        <div class="notif-item-text">${n.text}</div>
+        <div class="notif-item-time">${n.time}</div>
+      </div>
+      ${n.unread ? '<div class="notif-dot"></div>' : ''}
+    </div>
+  `).join('');
+  const unreadCount = notifications.filter(n => n.unread).length;
+  const badge = document.getElementById('bellBadge');
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function toggleNotifDropdown() {
+  notifOpen = !notifOpen;
+  const dropdown = document.getElementById('notifDropdown');
+  if (notifOpen) {
+    dropdown.classList.add('open');
+    gsap.fromTo(dropdown,
+      { scale: 0.92, opacity: 0, y: -10 },
+      { scale: 1, opacity: 1, y: 0, duration: 0.3, ease: 'back.out(2)' }
+    );
+  } else {
+    gsap.to(dropdown, {
+      scale: 0.92, opacity: 0, y: -10, duration: 0.2,
+      onComplete: () => dropdown.classList.remove('open')
+    });
+  }
+}
+
+function readNotif(id) {
+  const n = notifications.find(x => x.id === id);
+  if (n) { n.unread = false; renderNotifList(); }
+}
+
+function markAllRead() {
+  notifications.forEach(n => n.unread = false);
+  renderNotifList();
+  showToast('✓', 'Todas marcadas como leídas');
+}
+
+function addNewNotification() {
+  const newNotifs = [
+    { icon: '🚀', text: 'Nuevo deploy completado exitosamente' },
+    { icon: '💬', text: 'Nuevo comentario en tu proyecto' },
+    { icon: '🎯', text: 'Meta de conversión alcanzada' },
+    { icon: '🔐', text: 'Inicio de sesión desde nuevo dispositivo' },
+  ];
+  const rnd = newNotifs[Math.floor(Math.random() * newNotifs.length)];
+  notifications.unshift({ id: Date.now(), ...rnd, time: 'ahora', unread: true });
+  if (notifications.length > 8) notifications.pop();
+  renderNotifList();
+  triggerBellShake();
+}
+
+function triggerBellShake() {
+  const icon = document.getElementById('bellIcon');
+  icon.classList.remove('shake');
+  void icon.offsetWidth; // reflow
+  icon.classList.add('shake');
+  setTimeout(() => icon.classList.remove('shake'), 600);
+}
+
+// Close notif on outside click
+document.addEventListener('click', (e) => {
+  const wrapper = document.querySelector('.bell-wrapper');
+  if (notifOpen && wrapper && !wrapper.contains(e.target)) {
+    notifOpen = false;
+    const dropdown = document.getElementById('notifDropdown');
+    gsap.to(dropdown, {
+      scale: 0.92, opacity: 0, y: -10, duration: 0.2,
+      onComplete: () => dropdown.classList.remove('open')
+    });
+  }
+});
+
+renderNotifList();
+
+// Auto shake after 2s
+setTimeout(() => triggerBellShake(), 2000);
+
+// ════════════════════════════════════════════
+// BLOQUE 6 — Context Menu
+// ════════════════════════════════════════════
+const ctxMenu = document.getElementById('ctx-menu');
+
+function showContextMenuAt(e) {
+  e.preventDefault();
+  const x = Math.min(e.clientX, window.innerWidth - 215);
+  const y = Math.min(e.clientY, window.innerHeight - 290);
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top = y + 'px';
+  ctxMenu.style.display = 'block';
+  gsap.fromTo(ctxMenu,
+    { scale: 0.92, opacity: 0, y: -8 },
+    { scale: 1, opacity: 1, y: 0, duration: 0.25, ease: 'back.out(2)' }
+  );
+}
+
+function showContextMenuCenter() {
+  const card = document.getElementById('card-ctx');
+  const target = document.getElementById('ctxTarget');
+  const r = target.getBoundingClientRect();
+  const x = r.left + r.width / 2 - 100;
+  const y = r.top + r.height / 2 - 40;
+  ctxMenu.style.left = Math.max(10, x) + 'px';
+  ctxMenu.style.top = Math.max(80, y) + 'px';
+  ctxMenu.style.display = 'block';
+  gsap.fromTo(ctxMenu,
+    { scale: 0.85, opacity: 0, y: -12 },
+    { scale: 1, opacity: 1, y: 0, duration: 0.3, ease: 'back.out(2.2)' }
+  );
+}
+
+function hideContextMenu() {
+  gsap.to(ctxMenu, {
+    scale: 0.92, opacity: 0, y: -8, duration: 0.2,
+    onComplete: () => { ctxMenu.style.display = 'none'; }
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (ctxMenu.style.display === 'block' && !ctxMenu.contains(e.target)) {
+    hideContextMenu();
+  }
+});
+
+document.addEventListener('contextmenu', (e) => {
+  const target = document.getElementById('ctxTarget');
+  if (!target.contains(e.target)) return; // only custom menu inside target
+});
+
+function ctxAction(action) {
+  hideContextMenu();
+  const icons = {
+    'Cortar': '✂️', 'Copiar': '📋', 'Pegar': '📌',
+    'Renombrar': '📝', 'Eliminar': '🗑️',
+    'Compartir enlace': '🔗', 'Descargar': '⬇️'
+  };
+  showToast(icons[action] || '✓', action + ' ejecutado');
+}
+
+// ════════════════════════════════════════════
+// TOAST SYSTEM
+// ════════════════════════════════════════════
+function showToast(icon, message) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `<span class="toast-icon">${icon}</span><span>${message}</span>`;
+  container.appendChild(toast);
+  gsap.to(toast, { x: 0, opacity: 1, duration: 0.35, ease: 'back.out(1.8)' });
+  setTimeout(() => {
+    gsap.to(toast, { x: 240, opacity: 0, duration: 0.25, onComplete: () => toast.remove() });
+  }, 2800);
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+// Auto-start terminal on load after small delay
+setTimeout(() => {
+  startTerminal();
+}, 800);
+</script>
+</body>
+</html>

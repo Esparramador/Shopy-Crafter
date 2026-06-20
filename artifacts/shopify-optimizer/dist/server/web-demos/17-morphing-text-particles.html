@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>17 — Morphing Text Particles | CRAFTER Demos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"}}</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --indigo: #6366f1;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+    --bg-deep: #050508;
+    --bg-dark: #0c0c14;
+    --bg-mid: #0f0f1a;
+    --text-primary: #f1f0ff;
+    --text-muted: #8b8aaa;
+    --font-main: 'Space Grotesk', sans-serif;
+    --font-alt: 'Plus Jakarta Sans', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    overflow-x: hidden;
+    line-height: 1.5;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 48px;
+    height: 64px;
+    background: rgba(5,5,8,0.7);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(99,102,241,0.12);
+  }
+  .nav-logo {
+    font-family: var(--font-main);
+    font-weight: 900;
+    font-size: 1.25rem;
+    letter-spacing: 0.15em;
+    background: linear-gradient(90deg, var(--indigo), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+  .nav-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border: 1px solid rgba(99,102,241,0.25);
+    padding: 4px 12px;
+    border-radius: 100px;
+  }
+  .nav-links {
+    display: flex;
+    gap: 32px;
+    list-style: none;
+  }
+  .nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text-primary); }
+
+  /* ── SECTION 1: PARTICLE HERO ── */
+  #s1-hero {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    min-height: 700px;
+    background: var(--bg-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #particle-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .hero-overlay-text {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(241,240,255,0.35);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .hero-word-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    text-align: center;
+  }
+  .hero-word-indicator p {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(99,102,241,0.4);
+    margin-top: 12px;
+  }
+  .hero-scroll-hint {
+    position: absolute;
+    bottom: 32px;
+    right: 48px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+  }
+  .hero-scroll-hint::before {
+    content: '';
+    display: block;
+    width: 24px;
+    height: 1px;
+    background: rgba(99,102,241,0.4);
+  }
+
+  /* ── SECTION 2: TEXT SCRAMBLE ── */
+  #s2-scramble {
+    background: var(--bg-dark);
+    padding: 120px 0 0;
+  }
+  .scramble-intro {
+    text-align: center;
+    padding: 0 48px 80px;
+  }
+  .scramble-intro .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--indigo);
+    margin-bottom: 16px;
+  }
+  .scramble-intro h2 {
+    font-size: clamp(1.8rem, 3vw, 2.8rem);
+    font-weight: 700;
+    color: var(--text-primary);
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .scramble-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .scramble-item {
+    position: relative;
+    padding: 80px 64px;
+    overflow: hidden;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  .scramble-item:nth-child(even) {
+    background: var(--bg-deep);
+  }
+  .scramble-item:nth-child(odd) {
+    background: var(--bg-dark);
+  }
+  .scramble-item-inner {
+    position: relative;
+    z-index: 2;
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 64px;
+  }
+  .scramble-item:nth-child(even) .scramble-item-inner {
+    direction: rtl;
+  }
+  .scramble-item:nth-child(even) .scramble-item-inner > * {
+    direction: ltr;
+  }
+  .scramble-img-wrap {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+  }
+  .scramble-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: saturate(0.7) brightness(0.6);
+    transition: filter 0.6s;
+  }
+  .scramble-item:hover .scramble-img-wrap img {
+    filter: saturate(1) brightness(0.8);
+  }
+  .scramble-img-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(168,85,247,0.2));
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+  .scramble-text-block {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .scramble-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    padding: 5px 14px;
+    border: 1px solid rgba(6,182,212,0.3);
+    border-radius: 100px;
+    width: fit-content;
+  }
+  .scramble-title {
+    font-size: clamp(2rem, 4vw, 3.8rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--text-primary);
+    cursor: default;
+    font-family: var(--font-main);
+  }
+  .scramble-title .char {
+    display: inline-block;
+    transition: color 0.1s;
+  }
+  .scramble-desc {
+    font-size: 1rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+    font-family: var(--font-alt);
+    max-width: 420px;
+  }
+  .scramble-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--indigo);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+    transition: gap 0.2s;
+  }
+  .scramble-link:hover { gap: 16px; }
+  .scramble-link::after {
+    content: '→';
+    font-size: 1.1em;
+  }
+
+  /* ── SECTION 3: KINETIC SCROLL ── */
+  #s3-kinetic {
+    background: #000;
+    padding: 160px 0;
+    overflow: hidden;
+  }
+  .kinetic-container {
+    width: 100%;
+    overflow: hidden;
+  }
+  .kinetic-line-wrap {
+    overflow: hidden;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  .kinetic-line-wrap:last-child {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .kinetic-line {
+    font-family: var(--font-main);
+    font-weight: 900;
+    font-size: clamp(5vw, 8vw, 7.5vw);
+    line-height: 1.1;
+    white-space: nowrap;
+    padding: 8px 64px;
+    will-change: transform;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    color: var(--text-primary);
+  }
+  .kinetic-line.odd { transform: translateX(-120px); }
+  .kinetic-line.even { transform: translateX(120px); }
+  .kinetic-accent {
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(99,102,241,0.5);
+  }
+  .kinetic-dot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--indigo), var(--purple));
+    flex-shrink: 0;
+  }
+  .kinetic-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(99,102,241,0.5);
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  /* ── SECTION 4: GOOEY TEXT ── */
+  #s4-gooey {
+    background: var(--bg-mid);
+    padding: 160px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+  .gooey-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--purple);
+    margin-bottom: 80px;
+  }
+  .gooey-filter-container {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gooey-scene {
+    filter: url(#goo);
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gooey-circles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .goo-blob {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--indigo);
+  }
+  .goo-blob:nth-child(1) { width: 80px; height: 80px; top: 15%; left: 5%;  background: var(--indigo); animation: blobDrift1 3.2s ease-in-out infinite; }
+  .goo-blob:nth-child(2) { width: 60px; height: 60px; top: 60%; left: 12%; background: var(--purple); animation: blobDrift2 2.7s ease-in-out infinite; }
+  .goo-blob:nth-child(3) { width: 100px;height: 100px;top: 10%; right: 8%; background: var(--purple); animation: blobDrift3 3.8s ease-in-out infinite; }
+  .goo-blob:nth-child(4) { width: 70px; height: 70px; bottom: 10%;right: 5%;  background: var(--indigo); animation: blobDrift1 2.9s ease-in-out infinite reverse; }
+  .goo-blob:nth-child(5) { width: 50px; height: 50px; top: 40%; left: 2%;  background: var(--cyan);   animation: blobDrift2 3.5s ease-in-out infinite reverse; }
+  .goo-blob:nth-child(6) { width: 65px; height: 65px; bottom: 15%;left: 30%; background: var(--purple); animation: blobDrift3 4s ease-in-out infinite; }
+
+  @keyframes blobDrift1 { 0%,100%{transform:translate(0,0);}33%{transform:translate(18px,-22px);}66%{transform:translate(-12px,14px);} }
+  @keyframes blobDrift2 { 0%,100%{transform:translate(0,0);}40%{transform:translate(-20px,16px);}80%{transform:translate(14px,-10px);} }
+  @keyframes blobDrift3 { 0%,100%{transform:translate(0,0);}25%{transform:translate(10px,20px);}75%{transform:translate(-16px,-18px);} }
+
+  .gooey-word {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    gap: 0;
+  }
+  .gooey-letter {
+    font-family: var(--font-main);
+    font-weight: 900;
+    font-size: clamp(5rem, 12vw, 10rem);
+    line-height: 1;
+    background: linear-gradient(135deg, var(--indigo) 0%, var(--purple) 50%, var(--cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-block;
+    will-change: transform;
+  }
+  .gooey-letter:nth-child(1) { animation: letterFloat1 2.3s ease-in-out infinite; }
+  .gooey-letter:nth-child(2) { animation: letterFloat2 2.8s ease-in-out infinite; }
+  .gooey-letter:nth-child(3) { animation: letterFloat1 3.1s ease-in-out infinite reverse; }
+  .gooey-letter:nth-child(4) { animation: letterFloat3 2.5s ease-in-out infinite; }
+  .gooey-letter:nth-child(5) { animation: letterFloat2 3.4s ease-in-out infinite reverse; }
+  .gooey-letter:nth-child(6) { animation: letterFloat1 2.9s ease-in-out infinite; }
+  .gooey-letter:nth-child(7) { animation: letterFloat3 3.2s ease-in-out infinite reverse; }
+
+  @keyframes letterFloat1 { 0%,100%{transform:translateY(0);}50%{transform:translateY(-12px);} }
+  @keyframes letterFloat2 { 0%,100%{transform:translateY(0);}50%{transform:translateY(11px);} }
+  @keyframes letterFloat3 { 0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);} }
+
+  .gooey-subtext {
+    margin-top: 60px;
+    text-align: center;
+    font-size: 1rem;
+    color: var(--text-muted);
+    font-family: var(--font-alt);
+    max-width: 500px;
+    line-height: 1.7;
+  }
+
+  /* ── SECTION 5: SPLIT CHAR REVEAL ── */
+  #s5-split {
+    background: var(--bg-dark);
+    padding: 160px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .split-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 48px;
+    text-align: center;
+  }
+  .split-headline {
+    font-family: var(--font-main);
+    font-weight: 900;
+    font-size: clamp(2rem, 4.5vw, 5rem);
+    line-height: 1.15;
+    text-align: center;
+    max-width: 1000px;
+    perspective: 600px;
+  }
+  .split-char-wrapper {
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: bottom;
+    padding-bottom: 0.05em;
+  }
+  .split-char {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(40px) rotateX(-90deg);
+    will-change: transform, opacity;
+    transform-origin: bottom center;
+  }
+  .split-char.space-char {
+    width: 0.28em;
+  }
+  .split-char.revealed {
+    opacity: 1;
+    transform: translateY(0) rotateX(0deg);
+  }
+  .split-meta {
+    margin-top: 64px;
+    display: flex;
+    gap: 40px;
+    align-items: center;
+    justify-content: center;
+  }
+  .split-meta-item {
+    text-align: center;
+  }
+  .split-meta-num {
+    font-size: 2.5rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--indigo), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: block;
+    line-height: 1;
+  }
+  .split-meta-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    letter-spacing: 0.08em;
+  }
+  .split-divider {
+    width: 1px;
+    height: 48px;
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* ── SECTION 6: TYPEWRITER CTA ── */
+  #s6-cta {
+    background: var(--bg-deep);
+    padding: 120px 48px 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cta-card {
+    width: 100%;
+    max-width: 760px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(99,102,241,0.18);
+    border-radius: 28px;
+    padding: 72px 64px;
+    text-align: center;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    position: relative;
+    overflow: hidden;
+  }
+  .cta-card::before {
+    content: '';
+    position: absolute;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 500px;
+    height: 300px;
+    background: radial-gradient(ellipse, rgba(99,102,241,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cta-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--purple);
+    margin-bottom: 32px;
+    display: block;
+  }
+  .cta-headline {
+    font-family: var(--font-main);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    line-height: 1.3;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+  }
+  .cta-static {
+    color: var(--text-primary);
+  }
+  .cta-dynamic-wrap {
+    display: inline;
+  }
+  .cta-dynamic {
+    color: var(--indigo);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    font-weight: 700;
+  }
+  .cta-cursor {
+    display: inline-block;
+    color: var(--purple);
+    font-family: var(--font-mono);
+    animation: cursorBlink 0.75s step-end infinite;
+  }
+  @keyframes cursorBlink { 0%,100%{opacity:1;} 50%{opacity:0;} }
+  .cta-sub {
+    font-size: 1rem;
+    color: var(--text-muted);
+    margin-top: 16px;
+    font-family: var(--font-alt);
+    line-height: 1.6;
+  }
+  .cta-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 36px;
+    margin-bottom: 40px;
+  }
+  .cta-chip {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 7px 18px;
+    border-radius: 100px;
+    border: 1px solid;
+  }
+  .cta-chip.chip-indigo {
+    color: var(--indigo);
+    border-color: rgba(99,102,241,0.35);
+    background: rgba(99,102,241,0.08);
+  }
+  .cta-chip.chip-purple {
+    color: var(--purple);
+    border-color: rgba(168,85,247,0.35);
+    background: rgba(168,85,247,0.08);
+  }
+  .cta-chip.chip-cyan {
+    color: var(--cyan);
+    border-color: rgba(6,182,212,0.35);
+    background: rgba(6,182,212,0.08);
+  }
+  .cta-btn {
+    display: inline-block;
+    padding: 16px 48px;
+    background: linear-gradient(135deg, var(--indigo), var(--purple));
+    color: #fff;
+    font-family: var(--font-main);
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+    border-radius: 100px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.4s cubic-bezier(.34,1.56,.64,1), box-shadow 0.3s;
+    box-shadow: 0 4px 30px rgba(99,102,241,0.3);
+  }
+  .cta-btn:hover {
+    transform: scale(1.06);
+    box-shadow: 0 8px 40px rgba(99,102,241,0.5);
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    background: #000;
+    padding: 40px 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  .footer-logo {
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    font-size: 1.1rem;
+    background: linear-gradient(90deg, var(--indigo), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .footer-right {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.2);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    nav { padding: 0 24px; }
+    .nav-links { display: none; }
+    .scramble-item { padding: 60px 24px; }
+    .scramble-item-inner { grid-template-columns: 1fr; gap: 32px; direction: ltr !important; }
+    .scramble-item:nth-child(even) .scramble-item-inner { direction: ltr; }
+    #s5-split { padding: 120px 24px; }
+    .cta-card { padding: 48px 32px; }
+    footer { flex-direction: column; gap: 12px; text-align: center; }
+    .kinetic-line { padding: 8px 24px; }
+    #s4-gooey { padding: 120px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">CRAFTER</a>
+  <ul class="nav-links">
+    <li><a href="#s2-scramble">Scramble</a></li>
+    <li><a href="#s3-kinetic">Kinetic</a></li>
+    <li><a href="#s4-gooey">Gooey</a></li>
+    <li><a href="#s5-split">Split</a></li>
+    <li><a href="#s6-cta">CTA</a></li>
+  </ul>
+  <span class="nav-badge">Demo 17</span>
+</nav>
+
+<!-- ══ SECTION 1: PARTICLE MORPH HERO ══ -->
+<section id="s1-hero">
+  <canvas id="particle-canvas"></canvas>
+  <div class="hero-word-indicator">
+    <p id="current-word-label">DESIGN</p>
+  </div>
+  <div class="hero-overlay-text">The future is crafted</div>
+  <div class="hero-scroll-hint">Scroll to explore</div>
+</section>
+
+<!-- ══ SECTION 2: TEXT SCRAMBLE ══ -->
+<section id="s2-scramble">
+  <div class="scramble-intro">
+    <p class="eyebrow">Effect 02 — Scramble Reveal</p>
+    <h2>Typography that demands attention</h2>
+  </div>
+  <div class="scramble-grid">
+
+    <div class="scramble-item" data-scramble>
+      <div class="scramble-item-inner">
+        <div class="scramble-img-wrap">
+          <img src="https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=900&q=80" alt="Immersive Experiences" loading="lazy"/>
+          <div class="scramble-img-overlay"></div>
+        </div>
+        <div class="scramble-text-block">
+          <span class="scramble-tag">Experience Design</span>
+          <h3 class="scramble-title" data-final="Immersive Experiences">Immersive Experiences</h3>
+          <p class="scramble-desc">We design environments that blur the line between the digital and the physical — where every scroll, click, and hover feels intentional and alive.</p>
+          <a href="#" class="scramble-link">Explore the work</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="scramble-item" data-scramble>
+      <div class="scramble-item-inner">
+        <div class="scramble-img-wrap">
+          <img src="https://images.unsplash.com/photo-1545235617-9465d2a55698?w=900&q=80" alt="Scroll Interactions" loading="lazy"/>
+          <div class="scramble-img-overlay"></div>
+        </div>
+        <div class="scramble-text-block">
+          <span class="scramble-tag">Interaction</span>
+          <h3 class="scramble-title" data-final="Scroll Interactions">Scroll Interactions</h3>
+          <p class="scramble-desc">Scroll-driven storytelling that unfolds your brand narrative frame by frame. Every pixel movement is choreographed with purpose and precision.</p>
+          <a href="#" class="scramble-link">See the demos</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="scramble-item" data-scramble>
+      <div class="scramble-item-inner">
+        <div class="scramble-img-wrap">
+          <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=900&q=80" alt="Motion Design" loading="lazy"/>
+          <div class="scramble-img-overlay"></div>
+        </div>
+        <div class="scramble-text-block">
+          <span class="scramble-tag">Motion Design</span>
+          <h3 class="scramble-title" data-final="Motion Design">Motion Design</h3>
+          <p class="scramble-desc">Animation isn't decoration — it's communication. We craft motion systems that guide, delight, and express what words alone cannot convey.</p>
+          <a href="#" class="scramble-link">View showcase</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══ SECTION 3: KINETIC SCROLL ══ -->
+<section id="s3-kinetic">
+  <div class="kinetic-container">
+    <p class="kinetic-label">Effect 03 — Kinetic Typography</p>
+    <div class="kinetic-line-wrap">
+      <div class="kinetic-line odd" id="kl1">
+        <span>We design</span>
+        <span class="kinetic-accent">digital worlds</span>
+        <span class="kinetic-dot"></span>
+        <span>that convert</span>
+      </div>
+    </div>
+    <div class="kinetic-line-wrap">
+      <div class="kinetic-line even" id="kl2">
+        <span class="kinetic-accent">Pixel-perfect</span>
+        <span class="kinetic-dot"></span>
+        <span>code-driven craft</span>
+        <span class="kinetic-dot"></span>
+      </div>
+    </div>
+    <div class="kinetic-line-wrap">
+      <div class="kinetic-line odd" id="kl3">
+        <span>From concept</span>
+        <span class="kinetic-dot"></span>
+        <span>to</span>
+        <span class="kinetic-accent">launch-ready</span>
+      </div>
+    </div>
+    <div class="kinetic-line-wrap">
+      <div class="kinetic-line even" id="kl4">
+        <span class="kinetic-dot"></span>
+        <span class="kinetic-accent">Bold ideas.</span>
+        <span>Flawless execution.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECTION 4: GOOEY TEXT ══ -->
+<section id="s4-gooey">
+  <!-- SVG FILTER -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden;" aria-hidden="true">
+    <defs>
+      <filter id="goo" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
+        <feColorMatrix in="blur" type="matrix"
+          values="1 0 0 0 0
+                  0 1 0 0 0
+                  0 0 1 0 0
+                  0 0 0 22 -11" result="goo"/>
+        <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <p class="gooey-eyebrow">Effect 04 — SVG Gooey Merge</p>
+  <div class="gooey-filter-container">
+    <div class="gooey-scene">
+      <div class="gooey-circles">
+        <div class="goo-blob"></div>
+        <div class="goo-blob"></div>
+        <div class="goo-blob"></div>
+        <div class="goo-blob"></div>
+        <div class="goo-blob"></div>
+        <div class="goo-blob"></div>
+      </div>
+      <div class="gooey-word">
+        <span class="gooey-letter">C</span>
+        <span class="gooey-letter">R</span>
+        <span class="gooey-letter">A</span>
+        <span class="gooey-letter">F</span>
+        <span class="gooey-letter">T</span>
+        <span class="gooey-letter">E</span>
+        <span class="gooey-letter">R</span>
+      </div>
+    </div>
+  </div>
+  <p class="gooey-subtext">
+    Letters and blobs share the same SVG gooey filter — when they drift close enough, they organically merge into fluid, liquid forms.
+  </p>
+</section>
+
+<!-- ══ SECTION 5: SPLIT CHAR REVEAL ══ -->
+<section id="s5-split">
+  <p class="split-eyebrow">Effect 05 — Split Character Reveal</p>
+  <h2 class="split-headline" id="split-headline">
+    <!-- populated by JS -->
+  </h2>
+  <div class="split-meta">
+    <div class="split-meta-item">
+      <span class="split-meta-num">6K</span>
+      <span class="split-meta-label">Particles</span>
+    </div>
+    <div class="split-divider"></div>
+    <div class="split-meta-item">
+      <span class="split-meta-num">6</span>
+      <span class="split-meta-label">Effects</span>
+    </div>
+    <div class="split-divider"></div>
+    <div class="split-meta-item">
+      <span class="split-meta-num">1</span>
+      <span class="split-meta-label">HTML File</span>
+    </div>
+    <div class="split-divider"></div>
+    <div class="split-meta-item">
+      <span class="split-meta-num">0</span>
+      <span class="split-meta-label">Placeholders</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECTION 6: TYPEWRITER CTA ══ -->
+<section id="s6-cta">
+  <div class="cta-card">
+    <span class="cta-eyebrow">Effect 06 — Typewriter CTA</span>
+    <h2 class="cta-headline">
+      <span class="cta-static">We craft stunning </span>
+      <span class="cta-dynamic-wrap"><span class="cta-dynamic" id="typewriter-text"></span><span class="cta-cursor">|</span></span>
+    </h2>
+    <p class="cta-sub">Real code, real effects, real results. No templates. No shortcuts. Just expert-crafted interactive experiences built for impact.</p>
+    <div class="cta-chips">
+      <span class="cta-chip chip-indigo">16+ Effects Built</span>
+      <span class="cta-chip chip-purple">100% Real Code</span>
+      <span class="cta-chip chip-cyan">Zero Placeholders</span>
+    </div>
+    <a href="#s1-hero" class="cta-btn">Start a Project</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span class="footer-logo">CRAFTER</span>
+  <span class="footer-right">Demo 17 — Morphing Text Particles &nbsp;·&nbsp; Three.js + GSAP</span>
+</footer>
+
+<!-- ══ SCRIPTS ══ -->
+<script type="module">
+import * as THREE from 'three';
+
+// Alias globals
+const gsap = window.gsap;
+gsap.registerPlugin(window.ScrollTrigger);
+
+/* ─────────────────────────────────────────
+   SECTION 1 — THREE.JS PARTICLE MORPH
+───────────────────────────────────────── */
+(function initParticleMorph() {
+  const PARTICLE_COUNT = 6000;
+  const WORDS = ['DESIGN', 'BUILD', 'LAUNCH', 'CRAFT'];
+
+  const canvas = document.getElementById('particle-canvas');
+  const hero = document.getElementById('s1-hero');
+  const wordLabel = document.getElementById('current-word-label');
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x050508, 1);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, hero.clientWidth / hero.clientHeight, 0.1, 1000);
+  camera.position.z = 5;
+
+  function resizeRenderer() {
+    const w = hero.clientWidth;
+    const h = hero.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  resizeRenderer();
+  window.addEventListener('resize', resizeRenderer);
+
+  /* ── Text sampling ── */
+  function sampleWord(word, count) {
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = 600;
+    offCanvas.height = 200;
+    const ctx = offCanvas.getContext('2d');
+    ctx.clearRect(0, 0, 600, 200);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 160px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(word, 300, 100);
+    const data = ctx.getImageData(0, 0, 600, 200).data;
+    const pixels = [];
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] > 128) {
+        const x = (i / 4) % 600;
+        const y = Math.floor((i / 4) / 600);
+        pixels.push([(x / 600 - 0.5) * 8, -(y / 200 - 0.5) * 2.5, 0]);
+      }
+    }
+    if (pixels.length === 0) {
+      // Fallback: scatter
+      const fallback = [];
+      for (let i = 0; i < count; i++) fallback.push([(Math.random()-0.5)*8, (Math.random()-0.5)*2.5, 0]);
+      return fallback;
+    }
+    const step = Math.max(1, Math.floor(pixels.length / count));
+    const sampled = [];
+    for (let i = 0; i < pixels.length && sampled.length < count; i += step) {
+      sampled.push(pixels[i]);
+    }
+    while (sampled.length < count) {
+      sampled.push([...sampled[Math.floor(Math.random() * sampled.length)]]);
+    }
+    return sampled;
+  }
+
+  /* ── Pre-sample all words ── */
+  const wordSamples = WORDS.map(w => sampleWord(w, PARTICLE_COUNT));
+
+  /* ── Geometry & Material ── */
+  const geometry = new THREE.BufferGeometry();
+
+  const positions   = new Float32Array(PARTICLE_COUNT * 3);
+  const targetPos   = new Float32Array(PARTICLE_COUNT * 3);
+  const colors      = new Float32Array(PARTICLE_COUNT * 3);
+  const sizes       = new Float32Array(PARTICLE_COUNT);
+  const phaseOffset = new Float32Array(PARTICLE_COUNT);
+
+  // Colour gradient: indigo → purple by index
+  const colA = new THREE.Color(0x6366f1);
+  const colB = new THREE.Color(0xa855f7);
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const t = i / PARTICLE_COUNT;
+    const col = colA.clone().lerp(colB, t);
+    colors[i * 3]     = col.r;
+    colors[i * 3 + 1] = col.g;
+    colors[i * 3 + 2] = col.b;
+    sizes[i]          = 2.5 + Math.random() * 2;
+    phaseOffset[i]    = Math.random() * Math.PI * 2;
+
+    // Start scattered
+    positions[i * 3]     = (Math.random() - 0.5) * 10;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 4;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 2;
+  }
+
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute('size',     new THREE.BufferAttribute(sizes, 1));
+
+  const material = new THREE.ShaderMaterial({
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    uniforms: { uTime: { value: 0 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+    vertexShader: `
+      attribute float size;
+      varying vec3 vColor;
+      uniform float uPixelRatio;
+      void main() {
+        vColor = color;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * uPixelRatio * (300.0 / -mv.z);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vColor;
+      void main() {
+        float d = length(gl_PointCoord - vec2(0.5));
+        if (d > 0.5) discard;
+        float alpha = 1.0 - smoothstep(0.3, 0.5, d);
+        gl_FragColor = vec4(vColor, alpha * 0.85);
+      }
+    `
+  });
+
+  const points = new THREE.Points(geometry, material);
+  scene.add(points);
+
+  /* ── Lerp state ── */
+  let currentWordIdx = 0;
+  let nextWordIdx    = 1;
+  let lerpProgress   = new Float32Array(PARTICLE_COUNT).fill(1.0);
+
+  // Current positions array (working copy for drift)
+  const workPos = new Float32Array(PARTICLE_COUNT * 3);
+  const startPos = new Float32Array(PARTICLE_COUNT * 3);
+
+  // Initialise to first word
+  const first = wordSamples[0];
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    workPos[i*3]   = startPos[i*3]   = positions[i*3]   = first[i][0];
+    workPos[i*3+1] = startPos[i*3+1] = positions[i*3+1] = first[i][1];
+    workPos[i*3+2] = startPos[i*3+2] = positions[i*3+2] = first[i][2];
+    targetPos[i*3]   = first[i][0];
+    targetPos[i*3+1] = first[i][1];
+    targetPos[i*3+2] = first[i][2];
+  }
+
+  /* ── Morph trigger ── */
+  let isMorphing = false;
+  const morphProgress = { val: 0 };
+
+  function triggerMorph() {
+    if (isMorphing) return;
+    isMorphing = true;
+    currentWordIdx = nextWordIdx;
+    nextWordIdx    = (nextWordIdx + 1) % WORDS.length;
+
+    wordLabel.textContent = WORDS[currentWordIdx];
+
+    // Snapshot current positions as start
+    for (let i = 0; i < PARTICLE_COUNT * 3; i++) startPos[i] = workPos[i];
+
+    // New target
+    const tgt = wordSamples[currentWordIdx];
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      targetPos[i*3]   = tgt[i][0];
+      targetPos[i*3+1] = tgt[i][1];
+      targetPos[i*3+2] = tgt[i][2];
+    }
+
+    morphProgress.val = 0;
+    gsap.to(morphProgress, {
+      val: 1,
+      duration: 1.4,
+      ease: 'power2.inOut',
+      onComplete: () => {
+        isMorphing = false;
+        // Schedule next morph
+        gsap.delayedCall(1.1, triggerMorph);
+      }
+    });
+  }
+
+  // Kick off first morph after a brief delay
+  gsap.delayedCall(1.8, triggerMorph);
+
+  /* ── Render loop ── */
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+    material.uniforms.uTime.value = t;
+
+    const pos = geometry.attributes.position.array;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const ix = i * 3;
+      const iy = ix + 1;
+      const iz = ix + 2;
+
+      // Lerp to target
+      const p = morphProgress.val;
+      const bx = startPos[ix]  + (targetPos[ix]  - startPos[ix])  * p;
+      const by = startPos[iy]  + (targetPos[iy]  - startPos[iy])  * p;
+      const bz = startPos[iz]  + (targetPos[iz]  - startPos[iz])  * p;
+
+      // Idle drift
+      const drift = 0.002;
+      const px = phaseOffset[i];
+      workPos[ix] = bx + Math.sin(t * 0.8 + px)          * drift * 30;
+      workPos[iy] = by + Math.sin(t * 0.6 + px + 1.2)    * drift * 30;
+      workPos[iz] = bz + Math.sin(t * 0.9 + px + 2.4)    * drift * 15;
+
+      pos[ix] = workPos[ix];
+      pos[iy] = workPos[iy];
+      pos[iz] = workPos[iz];
+    }
+
+    geometry.attributes.position.needsUpdate = true;
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+
+
+/* ─────────────────────────────────────────
+   SECTION 2 — TEXT SCRAMBLE
+───────────────────────────────────────── */
+(function initScramble() {
+  const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()';
+  const DURATION = 1200; // ms total
+
+  function scrambleElement(el) {
+    const final = el.dataset.final || el.textContent.trim();
+    const length = final.length;
+    const charDelay = DURATION / length;
+    el.innerHTML = '';
+
+    // Create spans
+    const spans = [];
+    for (let i = 0; i < length; i++) {
+      const span = document.createElement('span');
+      span.className = 'char';
+      span.textContent = CHARS[Math.floor(Math.random() * CHARS.length)];
+      el.appendChild(span);
+      spans.push(span);
+    }
+
+    // Settle chars left to right
+    spans.forEach((span, i) => {
+      const startTime = i * charDelay;
+      const cycleEnd  = startTime + charDelay * 4;
+
+      let startTs = null;
+      let settled = false;
+
+      function tick(ts) {
+        if (!startTs) startTs = ts;
+        const elapsed = ts - startTs;
+
+        if (elapsed < startTime) {
+          span.textContent = CHARS[Math.floor(Math.random() * CHARS.length)];
+          requestAnimationFrame(tick);
+          return;
+        }
+        if (!settled && elapsed < cycleEnd) {
+          span.textContent = CHARS[Math.floor(Math.random() * CHARS.length)];
+          requestAnimationFrame(tick);
+        } else if (!settled) {
+          settled = true;
+          span.textContent = final[i];
+          span.style.color = '';
+        }
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  const items = document.querySelectorAll('[data-scramble]');
+  const titles = document.querySelectorAll('.scramble-title[data-final]');
+
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        // Find title inside this item
+        const title = entry.target.querySelector('.scramble-title[data-final]');
+        if (title && !title.dataset.scrambled) {
+          title.dataset.scrambled = 'true';
+          scrambleElement(title);
+        }
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.3 });
+
+  items.forEach(item => obs.observe(item));
+})();
+
+
+/* ─────────────────────────────────────────
+   SECTION 3 — KINETIC SCROLL
+───────────────────────────────────────── */
+(function initKinetic() {
+  const lines = [
+    { el: document.getElementById('kl1'), dir: -1 },
+    { el: document.getElementById('kl2'), dir:  1 },
+    { el: document.getElementById('kl3'), dir: -1 },
+    { el: document.getElementById('kl4'), dir:  1 },
+  ];
+
+  lines.forEach(({ el, dir }) => {
+    if (!el) return;
+    gsap.fromTo(el,
+      {
+        x: dir * 120,
+        skewX: dir * -2
+      },
+      {
+        x: 0,
+        skewX: 0,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: el,
+          start: 'top bottom',
+          end: 'bottom top',
+          scrub: 1.5
+        }
+      }
+    );
+  });
+})();
+
+
+/* ─────────────────────────────────────────
+   SECTION 5 — SPLIT CHARACTER REVEAL
+───────────────────────────────────────── */
+(function initSplitReveal() {
+  const headline = document.getElementById('split-headline');
+  const text = "We build experiences that people remember long after they've left the screen.";
+
+  // Build spans
+  headline.innerHTML = '';
+  let charIndex = 0;
+
+  text.split('').forEach(char => {
+    const wrapper = document.createElement('span');
+    wrapper.className = 'split-char-wrapper';
+    wrapper.style.display = 'inline-block';
+    wrapper.style.overflow = 'hidden';
+    wrapper.style.verticalAlign = 'bottom';
+    wrapper.style.paddingBottom = '0.05em';
+
+    const span = document.createElement('span');
+    span.className = 'split-char';
+    if (char === ' ') {
+      span.className += ' space-char';
+      span.innerHTML = '&nbsp;';
+    } else {
+      span.textContent = char;
+    }
+    span.dataset.idx = charIndex++;
+
+    wrapper.appendChild(span);
+    headline.appendChild(wrapper);
+  });
+
+  // GSAP scroll trigger
+  const chars = headline.querySelectorAll('.split-char');
+
+  gsap.fromTo(chars,
+    {
+      opacity: 0,
+      y: 40,
+      rotateX: -90,
+    },
+    {
+      opacity: 1,
+      y: 0,
+      rotateX: 0,
+      duration: 0.7,
+      ease: 'back.out(1.5)',
+      stagger: 0.028,
+      scrollTrigger: {
+        trigger: headline,
+        start: 'top 80%',
+        end: 'bottom 20%',
+        toggleActions: 'play none none reverse'
+      }
+    }
+  );
+})();
+
+
+/* ─────────────────────────────────────────
+   SECTION 6 — TYPEWRITER CTA
+───────────────────────────────────────── */
+(function initTypewriter() {
+  const words = [
+    'landing pages',
+    'SaaS dashboards',
+    'portfolio sites',
+    'e-commerce stores',
+    'campaign microsites'
+  ];
+  const el = document.getElementById('typewriter-text');
+  let wordIdx = 0;
+  let charIdx = 0;
+  let deleting = false;
+  let paused = false;
+
+  const TYPE_SPEED   = 80;
+  const DELETE_SPEED = 45;
+  const PAUSE_AFTER  = 1800;
+  const PAUSE_BEFORE = 300;
+
+  function type() {
+    const current = words[wordIdx];
+
+    if (paused) return;
+
+    if (!deleting) {
+      el.textContent = current.slice(0, charIdx + 1);
+      charIdx++;
+      if (charIdx === current.length) {
+        paused = true;
+        setTimeout(() => {
+          paused = false;
+          deleting = true;
+          setTimeout(type, DELETE_SPEED);
+        }, PAUSE_AFTER);
+        return;
+      }
+      setTimeout(type, TYPE_SPEED);
+    } else {
+      el.textContent = current.slice(0, charIdx - 1);
+      charIdx--;
+      if (charIdx === 0) {
+        deleting = false;
+        wordIdx = (wordIdx + 1) % words.length;
+        paused = true;
+        setTimeout(() => {
+          paused = false;
+          setTimeout(type, TYPE_SPEED);
+        }, PAUSE_BEFORE);
+        return;
+      }
+      setTimeout(type, DELETE_SPEED);
+    }
+  }
+
+  // Start after a short delay
+  setTimeout(type, 800);
+})();
+
+</script>
+
+</body>
+</html>
