@@ -26,11 +26,12 @@
   font-family: var(--l-fb);
   background: var(--l-ink);
   color: var(--l-t);
-  overflow-x: hidden;
+  overflow-x: clip;
   min-height: 100dvh;
   line-height: 1.6;
   cursor: auto;
   position: relative;
+  touch-action: pan-y;
 }
 
 .l-root::before {
@@ -402,18 +403,20 @@
 /* FULLPAGE CONTAINER — scroll nativo del navegador */
 .fp-container {
   margin-top: 64px;
-  overflow-x: hidden;
+  overflow-x: clip;
+  touch-action: pan-y;
 }
 .fp-section {
   min-height: auto;
   position: relative;
-  overflow: hidden;
+  overflow: clip;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   padding: 80px 48px;
   box-sizing: border-box;
+  touch-action: pan-y;
 }
 /* Contact usa VismeFormHero (position:absolute;inset:0) — necesita altura definida */
 #fp-contact.fp-section {
@@ -1355,13 +1358,13 @@
 ════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
   .l-root {
-    overflow-y: scroll !important;
-    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    overflow-x: clip !important;
     height: auto !important;
     min-height: 100vh;
     min-height: 100dvh;
     cursor: auto !important;
-    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     overscroll-behavior-y: auto;
   }
   .l-root::before {
@@ -1392,8 +1395,9 @@
     height: auto !important;
     overflow: visible !important;
     overflow-y: visible !important;
-    overflow-x: hidden !important;
+    overflow-x: clip !important;
     overscroll-behavior: auto !important;
+    touch-action: pan-y !important;
   }
   .fp-wrapper {
     transform: none !important;

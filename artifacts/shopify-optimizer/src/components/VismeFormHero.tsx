@@ -258,14 +258,14 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
           width: 100% !important;
           margin: 0 !important;
           padding: 0 !important;
-          overflow: hidden auto !important;
+          overflow: clip !important;
         }
 
         /* ────── Root: fills fp-section on desktop ────── */
         .vfh-root {
           position: absolute;
           inset: 0;
-          overflow: hidden;
+          overflow: clip;
           z-index: 1;
         }
 
@@ -273,8 +273,9 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
         @media (max-width: 780px) {
           #fp-contact {
             min-height: calc(100dvh - 56px) !important;
+            height: auto !important;
             padding: 0 !important;
-            overflow: hidden !important;
+            overflow: visible !important;
           }
         }
 
@@ -335,6 +336,7 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
           flex-direction: column;
           justify-content: center;
           overflow-y: auto;
+          overscroll-behavior-y: contain;
           scrollbar-width: thin;
           scrollbar-color: rgba(212,168,67,.2) transparent;
           z-index: 2;

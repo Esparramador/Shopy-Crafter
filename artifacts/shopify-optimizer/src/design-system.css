@@ -40,7 +40,7 @@ body {
   color: var(--t);
   line-height: 1.6;
   font-size: 14px;
-  overflow-x: hidden;
+  overflow-x: clip;
   cursor: none;
 }
 a, button, input, select, textarea, [role="button"] { cursor: none; }
