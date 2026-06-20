@@ -2311,7 +2311,17 @@ html, body {
 /* ─── FOOTER GLOW & GRADIENT ─────────────────────── */
 .fp-footer {
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+/* Footer as direct sibling inside #fp-contact (no padding from section) */
+#fp-contact > .fp-footer {
+  padding: 32px 48px 40px;
+  box-sizing: border-box;
+  width: 100%;
+  align-self: stretch;
+  flex-shrink: 0;
 }
 .fp-footer::before {
   content: '';
@@ -3166,4 +3176,97 @@ html, body {
 @keyframes magnetDot {
   0%, 100% { transform: scale(1);   opacity: 1; }
   50%       { transform: scale(1.6); opacity: 0.4; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SCROLL FIX — prevenir overflow-x en TODOS los tamaños
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 1) Contención horizontal universal — sin excepciones */
+html, body, .l-root, .fp-container, .fp-wrapper {
+  overflow-x: hidden !important;
+  max-width: 100vw;
+}
+
+/* 2) Cada sección se limita al viewport de ancho */
+.fp-section {
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+/* 3) fp-content nunca excede el viewport */
+.fp-content {
+  max-width: min(1280px, 100vw);
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* 4) El contact-visme-wrapper nunca fuerza scroll horizontal */
+.fp-contact-visme-wrapper {
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+/* 5) Footer siempre visible sin dependencia de animaciones */
+.fp-footer {
+  display: block !important;
+  opacity: 1 !important;
+  transform: none !important;
+  visibility: visible !important;
+}
+
+/* ── Responsive footer dentro de #fp-contact ── */
+@media (max-width: 900px) {
+  #fp-contact > .fp-footer {
+    padding: 28px 24px 36px;
+  }
+}
+@media (max-width: 480px) {
+  #fp-contact > .fp-footer {
+    padding: 24px 16px 28px;
+  }
+}
+
+/* 6) Portrait mobile: el wrapper de contacto no es más alto que la pantalla */
+@media (max-width: 900px) and (orientation: portrait) {
+  .fp-contact-visme-wrapper {
+    min-height: 480px !important;
+    height: auto !important;
+    overflow: visible !important;
+    overflow-x: hidden !important;
+  }
+  #fp-contact.fp-section {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    overflow-x: hidden !important;
+  }
+}
+
+/* 7) Landscape móvil: mismas restricciones */
+@media (max-height: 620px) and (orientation: landscape) {
+  .fp-contact-visme-wrapper {
+    min-height: 420px !important;
+    height: auto !important;
+    overflow: visible !important;
+    overflow-x: hidden !important;
+  }
+  #fp-contact.fp-section {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    overflow-x: hidden !important;
+  }
+  #fp-contact > .fp-footer {
+    padding: 20px 24px 24px;
+  }
+}
+
+/* 8) Forzar scroll nativo en la raíz para todos los tamaños intermedios */
+@media (max-width: 1200px) {
+  .l-root {
+    overflow-y: auto;
+    overflow-x: hidden !important;
+    height: auto !important;
+  }
 }

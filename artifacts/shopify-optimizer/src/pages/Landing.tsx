@@ -1202,8 +1202,8 @@ export default function Landing() {
             }} />
           </div>
           <div className="fp-content fp-contact-visme" style={{ position: "relative", width: "100%", maxWidth: "none", padding: 0, overflow: "visible" }}>
-            {/* ── Video + form: full-viewport height, footer flows naturally below ── */}
-            <div className="fp-contact-visme-wrapper" style={{ position: "relative", minHeight: "calc(100dvh - 64px)", height: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
+            {/* ── Video + form: min-height so footer is always reachable ── */}
+            <div className="fp-contact-visme-wrapper" style={{ position: "relative", minHeight: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
               <VismeFormHero isActive={isAnimated("fp-contact")} />
             </div>
 
@@ -1442,8 +1442,8 @@ export default function Landing() {
               )}
             </div>
 
-            {/* ── FOOTER ── */}
-            <footer className={`fp-footer ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.3s", marginTop: 40, gridColumn: "1 / -1", gridRow: "3" }}>
+          </div>
+          <footer className="fp-footer" style={{ width: "100%" }}>
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
@@ -1516,8 +1516,7 @@ export default function Landing() {
                 <div className="l-footer-copy" {...cmsProps("footer.copyright")}>{content.footer.copyright}</div>
                 <div className="l-footer-badges">{content.footer.badges.map((b, i) => <span key={i} className="l-footer-badge">{b}</span>)}</div>
               </div>
-            </footer>
-          </div>
+          </footer>
         </section>
 
         </div>{/* /fp-wrapper */}
