@@ -248,7 +248,7 @@ const LANDING_FALLBACK: CMSContent = {
   pricing: { pill: "Precios", headline: "Un plan para cada negocio.", subheadline: "Sin sorpresas. Precios claros por lo que realmente hacemos.", plans: [{ id: "p1", name: "Starter", price: "97", currency: "€", period: "/mes", featured: false, badge: null, features: [{ text: "1 proyecto Shopify", included: true }, { text: "3 módulos de IA activos", included: true }, { text: "Imágenes IA a coste real (~€0.25/imagen)", included: true }, { text: "Soporte por email", included: true }], cta: { label: "Solicitar acceso →", style: "ghost" } }, { id: "p2", name: "Growth", price: "197", currency: "€", period: "/mes", featured: true, badge: "Más popular", features: [{ text: "Hasta 3 proyectos Shopify", included: true }, { text: "6 módulos de IA activos", included: true }, { text: "Imágenes IA a coste real (~€0.25/imagen)", included: true }, { text: "Soporte prioritario", included: true }], cta: { label: "Solicitar acceso →", style: "gold" } }, { id: "p3", name: "Agency", price: "397", currency: "€", period: "/mes", featured: false, badge: null, features: [{ text: "Proyectos ilimitados", included: true }, { text: "Todos los módulos de IA", included: true }, { text: "Imágenes IA a coste real (~€0.25/imagen)", included: true }, { text: "Soporte dedicado", included: true }], cta: { label: "Contactar →", style: "ghost" } }] },
   testimonials: { pill: "Clientes", headline: "Resultados\nreales", headlineHighlight: "reales", items: [] },
   cta: { pill: "Empieza hoy", headline: "¿Listo para optimizar\ntu tienda Shopify?", headlineHighlight: "optimizar", subheadline: "Cuéntanos tu caso y te preparamos una propuesta personalizada sin compromiso.", placeholder: "tu@email.com", buttonLabel: "Solicitar acceso →", finePrint: "Sin spam. Solo te contactamos para hablar de tu proyecto." },
-  footer: { tagline: "Optimización IA para tiendas Shopify", columns: [{ title: "Plataforma", links: [{ label: "Motores IA", href: "#fp-engines" }, { label: "Demostración", href: "#fp-demo" }, { label: "Precios", href: "#fp-pricing" }, { label: "Calculadora", href: "#fp-calculator" }] }, { title: "Empresa", links: [{ label: "Sobre nosotros", href: "#about-us" }, { label: "Casos de éxito", href: "#case-studies" }, { label: "Blog", href: "/blog" }, { label: "Afiliados", href: "#affiliates" }] }, { title: "Legal", links: [{ label: "Privacidad", href: "#legal:privacy" }, { label: "Términos de uso", href: "#legal:terms" }, { label: "Cookies", href: "#legal:cookies" }, { label: "Contacto", href: "/contacto" }] }], copyright: `© ${new Date().getFullYear()} Shopy Crafter`, badges: ["RGPD", "SSL", "Shopify Partner"] },
+  footer: { tagline: "Optimización IA para tiendas Shopify", columns: [{ title: "Plataforma", links: [{ label: "Motores IA", href: "#fp-engines" }, { label: "Demostración", href: "#fp-demo" }, { label: "Precios", href: "#fp-pricing" }, { label: "Calculadora", href: "#fp-calculator" }, { label: "Contactar", href: "#fp-contact" }] }, { title: "Empresa", links: [{ label: "Sobre nosotros", href: "#about-us" }, { label: "Casos de éxito", href: "#case-studies" }, { label: "Blog", href: "/blog" }, { label: "Programa de Afiliados", href: "#affiliates" }, { label: "Preguntas frecuentes", href: "/faq" }, { label: "Changelog", href: "/changelog" }] }, { title: "Soporte", links: [{ label: "Contacto", href: "/contacto" }, { label: "Iniciar sesión", href: "/login" }, { label: "Novedades", href: "/changelog" }] }, { title: "Legal", links: [{ label: "Política de Privacidad", href: "#legal:privacy" }, { label: "Términos y Condiciones", href: "#legal:terms" }, { label: "Política de Cookies", href: "#legal:cookies" }, { label: "Aviso RGPD", href: "#legal:gdpr" }] }], copyright: `© ${new Date().getFullYear()} Shopy Crafter · Todos los derechos reservados`, badges: ["RGPD Compliant", "SSL Seguro", "Shopify Partner"] },
 };
 
 const FP_SECTION_IDS = ["fp-hero", "fp-engines", "fp-demo", "fp-results", "fp-pricing", "fp-calculator", "fp-contact"];
@@ -1517,6 +1517,15 @@ export default function Landing() {
               </div>
               <div className="l-footer-bottom">
                 <div className="l-footer-copy" {...cmsProps("footer.copyright")}>{content.footer.copyright}</div>
+                <div className="l-footer-legal-links">
+                  <Link href="/privacidad">Privacidad</Link>
+                  <span className="l-footer-legal-sep">·</span>
+                  <Link href="/terminos">Términos</Link>
+                  <span className="l-footer-legal-sep">·</span>
+                  <Link href="/cookies">Cookies</Link>
+                  <span className="l-footer-legal-sep">·</span>
+                  <Link href="/contacto">Contacto</Link>
+                </div>
                 <div className="l-footer-badges">{content.footer.badges.map((b, i) => <span key={i} className="l-footer-badge">{b}</span>)}</div>
               </div>
           </footer>
