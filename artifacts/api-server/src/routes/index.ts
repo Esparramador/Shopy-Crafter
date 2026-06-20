@@ -68,7 +68,7 @@ import designSystemsRouter from "./design-systems.js";
 import pluginsRouter from "./plugins.js";
 import hyperframesRouter from "./hyperframes.js";
 import studioRouter from "./studio.js";
-import gameAiRouter from "./game-ai.js";
+
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -108,7 +108,6 @@ router.get("/report-templates/:token", (req, res, next) => {
   res.json(tpl);
 });
 
-router.use(gameAiRouter);
 router.use(requireAuth, meshyRouter);
 router.use(requireAuth, stitchRouter);
 
