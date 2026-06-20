@@ -1,9 +1,9 @@
-// Shopy Crafter Service Worker — v6
+// Shopy Crafter Service Worker — v7
 // CRITICAL: HTML is NEVER cached. Only assets with content-hash get cached.
 // This prevents stale index.html from breaking deploys when bundle hash changes.
-const STATIC_CACHE  = 'sc-static-v6';
-const FONT_CACHE    = 'sc-fonts-v6';
-const IMAGE_CACHE   = 'sc-images-v6';
+const STATIC_CACHE  = 'sc-static-v7';
+const FONT_CACHE    = 'sc-fonts-v7';
+const IMAGE_CACHE   = 'sc-images-v7';
 
 const PRECACHE = [
   '/icons/icon-192.png',
@@ -23,7 +23,7 @@ self.addEventListener('install', e => {
   );
 });
 
-// ── Activate: purge ALL old caches (v5 and below) ──────────────────────────
+// ── Activate: purge ALL old caches (v6 and below) ──────────────────────────
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
