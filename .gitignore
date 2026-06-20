@@ -1,7 +1,11 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
 # compiled output
-dist
+# Note: artifacts/shopify-optimizer/dist/public is intentionally NOT ignored — it must
+# be committed so the Replit deployment image has the pre-built frontend assets.
+/dist
+artifacts/api-server/dist/
+artifacts/mockup-sandbox/dist/
 tmp
 out-tsc
 *.tsbuildinfo
@@ -94,8 +98,8 @@ setup-secrets.sh
 shopify.app.toml.bak
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Android build artifacts (generados por GitHub Actions, no hace falta subir)
-artifacts/shopify-optimizer/dist/
+# shopify-optimizer dist: only exclude the heavy 3D assets subfolder
+artifacts/shopify-optimizer/dist/public/assets/3d/
 
 # ─── Carpetas grandes de assets — demasiado grandes para el deployment (>8 GB) ─
 # IMPORTANTE: si ya están en git, ejecutar: git rm --cached -r <carpeta>

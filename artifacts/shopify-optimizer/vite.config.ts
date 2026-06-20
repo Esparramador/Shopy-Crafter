@@ -23,8 +23,12 @@ if (!basePath && !isBuild) {
   throw new Error("BASE_PATH environment variable is required but was not provided.");
 }
 
+// During builds (production deployment), always use "/" — assets are served from root.
+// During dev, use BASE_PATH (Replit path-based routing proxy requires it).
+const viteBase = isBuild ? "/" : basePath;
+
 export default defineConfig({
-  base: basePath,
+  base: viteBase,
 
   plugins: [
     react(),
