@@ -650,7 +650,7 @@ export default function Landing() {
       <PageMeta
         title="Shopy Crafter — Optimización IA para tiendas Shopify"
         description="7 motores de IA para mejorar SEO, imágenes y conversión en tu tienda Shopify. Sin conocimientos técnicos. Prueba gratis 14 días."
-        canonical="https://shopycrafter.com/landing"
+        canonical="https://shopycrafter.com/"
       />
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">

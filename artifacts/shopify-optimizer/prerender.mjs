@@ -26,12 +26,6 @@ const ROUTES = [
     ssr: true,
   },
   {
-    path: "/landing",
-    title: "Shopy Crafter — Plataforma IA para eCommerce Shopify",
-    description: "Descubre los 7 motores de IA que automatizan SEO, imágenes, emails y estrategias de crecimiento para tu tienda Shopify.",
-    ssr: true,
-  },
-  {
     path: "/sobre-nosotros",
     title: "Sobre Nosotros — Shopy Crafter",
     description: "Conoce al equipo detrás de Shopy Crafter: ingenieros de IA y operadores de eCommerce que automatizamos el trabajo pesado para que tú crezcas.",

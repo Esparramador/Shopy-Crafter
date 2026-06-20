@@ -2,8 +2,11 @@ import { renderToString } from "react-dom/server";
 import type { ComponentType } from "react";
 import { Router } from "wouter";
 import Blog from "./pages/public/Blog";
+import BlogPost from "./pages/public/BlogPost";
 import CasosDeExito from "./pages/public/CasosDeExito";
+import CasoDeExitoDetail from "./pages/public/CasoDeExitoDetail";
 import Changelog from "./pages/public/Changelog";
+import ChangelogRelease from "./pages/public/ChangelogRelease";
 import Contacto from "./pages/public/Contacto";
 import Cookies from "./pages/public/Cookies";
 import FAQ from "./pages/public/FAQ";
@@ -25,8 +28,16 @@ const ROUTE_MAP: Record<string, ComponentType> = {
   "/contacto": Contacto,
 };
 
+function resolveComponent(path: string): ComponentType | null {
+  if (ROUTE_MAP[path]) return ROUTE_MAP[path];
+  if (path.startsWith("/blog/")) return BlogPost;
+  if (path.startsWith("/casos-de-exito/")) return CasoDeExitoDetail;
+  if (path.startsWith("/changelog/")) return ChangelogRelease;
+  return null;
+}
+
 export function render(path: string): string {
-  const Component = ROUTE_MAP[path];
+  const Component = resolveComponent(path);
   if (!Component) return "";
 
   return renderToString(

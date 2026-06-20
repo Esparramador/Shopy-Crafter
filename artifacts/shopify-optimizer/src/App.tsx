@@ -289,8 +289,8 @@ function Router() {
         <Route path="/tienda">{() => <S><Tienda /></S>}</Route>
         <Route path="/oauth-success">{() => <S><OAuthSuccess /></S>}</Route>
 
-        {/* Landing */}
-        <Route path="/landing">{() => <S><Landing /></S>}</Route>
+        {/* Landing — canonical is /, redirect /landing to avoid duplicate content */}
+        <Route path="/landing">{() => <Redirect to="/" />}</Route>
 
         {/* Public pages */}
         <Route path="/sobre-nosotros">{() => <S><SobreNosotros /></S>}</Route>
