@@ -172,14 +172,6 @@ const BASIC_3 = ["jump","run","walk"];
 export const MESHY_CHARACTERS: MeshyCharacter[] = [
   // ── Fully rigged with 22 animations ──
   {
-    id: "alec_monopoly", name: "Alec Monopoly", emoji: "🎩", category: "cartoon",
-    description: "El artista urbano más icónico. 134 animaciones — catálogo completo de Meshy.",
-    tags: ["arte","urbano","cartoon","rigged","full","134-anims"],
-    glbPath: "/assets/3d/models/alec_monopoly.glb", rigStatus: "rigged",
-    rigTaskId: "019ebb36-4f0c-7d21-a268-2ff6198aca60",
-    animations: anims("alec_monopoly", FULL_134),
-  },
-  {
     id: "batman", name: "Batman", emoji: "🦇", category: "cartoon",
     description: "El Caballero de la Noche. 22 animaciones completas.",
     tags: ["superhéroe","dc","acción","rigged","full"],
@@ -204,13 +196,6 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     animations: anims("chico_formal", FULL_22),
   },
   // ── Newly generated and rigged ──
-  {
-    id: "spiderman", name: "Spider-Man", emoji: "🕷️", category: "cartoon",
-    description: "El Hombre Araña. 21 animaciones.",
-    tags: ["marvel","superhéroe","acción","rigged"],
-    glbPath: "/assets/3d/models/spiderman.glb", rigStatus: "rigged",
-    animations: anims("spiderman", FULL_21),
-  },
   {
     id: "mickey_mouse", name: "Mickey Mouse", emoji: "🐭", category: "cartoon",
     description: "El personaje más icónico de Disney. 21 animaciones.",

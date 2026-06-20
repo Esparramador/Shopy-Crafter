@@ -14,12 +14,10 @@ import {
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const CHARACTERS_3D = [
-  { id: "alec_monopoly",    name: "Alec Monopoly",    emoji: "🎩", anims: 134, rigged: true,  textured: true,  size: "8.2MB" },
   { id: "batman",           name: "Batman",            emoji: "🦇", anims: 22,  rigged: true,  textured: true,  size: "6.7MB" },
   { id: "chico_casual",     name: "Chico Casual",      emoji: "👕", anims: 22,  rigged: true,  textured: true,  size: "6.8MB" },
   { id: "chico_formal",     name: "Chico Formal",      emoji: "👔", anims: 22,  rigged: true,  textured: true,  size: "5.2MB" },
   { id: "ted",              name: "Ted (Oso)",          emoji: "🧸", anims: 3,   rigged: true,  textured: true,  size: "7.3MB" },
-  { id: "spiderman",        name: "Spiderman",          emoji: "🕷️", anims: 21,  rigged: true,  textured: false, size: "1.3MB" },
   { id: "mickey_mouse",     name: "Mickey Mouse",       emoji: "🐭", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
   { id: "minnie_mouse",     name: "Minnie Mouse",       emoji: "🐭", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
   { id: "bob_esponja",      name: "Bob Esponja",        emoji: "🧽", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },

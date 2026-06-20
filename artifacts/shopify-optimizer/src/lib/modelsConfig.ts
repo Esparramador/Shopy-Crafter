@@ -15,19 +15,6 @@ export interface CharacterModel {
 export const MODELS: CharacterModel[] = [
   // ── Cartoon / Pop-Culture ────────────────────────────────────────────────
   {
-    id: "spiderman",
-    name: "Spider-Man",
-    category: "cartoon",
-    subcategory: "Superhéroe",
-    emoji: "🕷️",
-    description: "Peter Parker en traje de Spider-Man, pose heroica de A-Pose para rigging.",
-    path: "/assets/3d/models/spiderman.glb",
-    thumbnailPath: "/assets/3d/models/spiderman.txt",
-    pose: "A-Pose",
-    available: false,
-    tags: ["marvel", "superhero", "action", "iconic"],
-  },
-  {
     id: "bob_esponja",
     name: "Bob Esponja",
     category: "cartoon",
@@ -78,19 +65,6 @@ export const MODELS: CharacterModel[] = [
     pose: "A-Pose",
     available: false,
     tags: ["disney", "classic", "feminine", "iconic"],
-  },
-  {
-    id: "alec_monopoly",
-    name: "Alec Monopoly",
-    category: "cartoon",
-    subcategory: "Arte Urbano",
-    emoji: "🎩",
-    description: "El personaje de Alec Monopoly con sombrero de copa y traje del magnate.",
-    path: "/assets/3d/models/alec_monopoly.glb",
-    thumbnailPath: "/assets/3d/models/alec_monopoly.txt",
-    pose: "T-Pose",
-    available: false,
-    tags: ["streetart", "luxury", "monopoly", "urban"],
   },
   {
     id: "batman",
