@@ -285,6 +285,7 @@ export default function Landing() {
   const { user } = useAuth();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
   const isAdmin = !isPreview && user?.role === "admin";
+  const isClient = !isPreview && user?.role === "client";
   const [content, setContent] = useState<CMSContent | null>(LANDING_FALLBACK);
   const [currentSection, setCurrentSection] = useState(0);
   const [activeEngine, setActiveEngine] = useState(0);
@@ -671,7 +672,9 @@ export default function Landing() {
         </ul>
         <div className="l-nav-ctas">
           {isAdmin ? (
-            <Link href="/admin/clients" className="l-btn-gold">{content.adminBackLabel ?? "← Volver al panel"}</Link>
+            <Link href="/home" className="l-btn-gold">{content.adminBackLabel ?? "→ Ir al panel"}</Link>
+          ) : isClient ? (
+            <Link href="/client" className="l-btn-gold">→ Mi panel</Link>
           ) : (
             <>
               <Link href="/login" className="l-btn-ghost" {...cmsData("nav.ctaSecondary.label")}>{content.nav.ctaSecondary.label}</Link>
