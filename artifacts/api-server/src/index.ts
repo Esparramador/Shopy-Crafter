@@ -1,7 +1,7 @@
 import { validateEncryptionKey, encrypt, safeDecrypt } from "./lib/crypto.js";
 validateEncryptionKey();
 
-import app from "./app";
+import app, { setReady } from "./app";
 import { logger } from "./lib/logger";
 import {
   registerCronJobs,
@@ -373,6 +373,8 @@ const server = app.listen(port, (err?: Error) => {
     })
     .catch((err) => logger.error({ err }, "⚠️  Startup seeding failed — continuing startup"))
     .finally(() => {
+      setReady();
+      logger.info("✅ DB init complete — instance marked ready, traffic will be accepted");
       registerCronJobs();
       setTimeout(() => warmupProdKnowledge(), 5000);
     });

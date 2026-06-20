@@ -23,11 +23,19 @@ const app: Express = express();
 
 app.set("trust proxy", 1);
 
-// ── Health probes — registered BEFORE session/rate-limit middleware so that
-//    the Replit platform healthcheck never hits the DB-backed session store
-//    during startup (which would return 500 until the DB is ready).
-app.get("/api", (_req: Request, res: Response) => res.json({ ok: true, status: "healthy" }));
-app.get("/api/healthz", (_req: Request, res: Response) => res.json({ ok: true, status: "healthy" }));
+// ── Readiness flag — set to true after the DB init chain completes in index.ts
+//    Health probes return 503 during startup so Replit waits before routing
+//    traffic, preventing requests from hitting the session store before the DB
+//    is ready (which caused 500s on the first ~5 seconds of every cold start).
+let _isReady = false;
+export function setReady() { _isReady = true; }
+
+const healthHandler = (_req: Request, res: Response) => {
+  if (_isReady) return void res.json({ ok: true, status: "healthy" });
+  res.status(503).json({ ok: false, status: "initializing" });
+};
+app.get("/api", healthHandler);
+app.get("/api/healthz", healthHandler);
 
 // ── Security headers (Helmet) ─────────────────────────────────────────────
 app.use(helmet({

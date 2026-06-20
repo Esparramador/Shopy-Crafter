@@ -26,6 +26,7 @@ args = [ "pnpm", "--filter", "@workspace/shopify-optimizer", "run", "build" ]
 
 [services.production.build.env]
 NODE_ENV = "production"
+BASE_PATH = "/"
 
 [[services.production.rewrites]]
 from = "/*"
