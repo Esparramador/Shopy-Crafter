@@ -98,8 +98,9 @@ setup-secrets.sh
 shopify.app.toml.bak
 # ─────────────────────────────────────────────────────────────────────────────
 
-# shopify-optimizer dist: only exclude the heavy 3D assets subfolder
+# shopify-optimizer dist: commit dist/public (frontend pre-built), ignore the rest
 artifacts/shopify-optimizer/dist/public/assets/3d/
+artifacts/shopify-optimizer/dist/server/
 
 # ─── Carpetas grandes de assets — demasiado grandes para el deployment (>8 GB) ─
 # IMPORTANTE: si ya están en git, ejecutar: git rm --cached -r <carpeta>
