@@ -1,0 +1,114 @@
+# CorpScale Design System
+
+## Overview
+
+CorpScale is a professional, scalable design system built for large enterprise internal tools and ERP systems. It combines the gravitas of serif headings with the efficiency of a compact, grid-based layout to handle complex data tables, multi-step workflows, and dense forms. The navy-gray-blue palette conveys authority and trust while maintaining visual clarity. Every component is engineered for long-session productivity with minimal visual fatigue and maximum information density.
+
+---
+
+## Colors
+
+- **Primary** (#1E3A5F): Navy -- primary actions, navigation active
+- **Secondary** (#6B7280): Gray -- secondary actions, metadata
+- **Tertiary** (#2563EB): Blue -- links, tertiary actions, highlights
+- **Background** (#F8FAFC): App background, page canvas
+- **Surface** (#FFFFFF): Cards, panels, table backgrounds
+- **Success** (#16A34A): Approved status, completed steps
+- **Warning** (#CA8A04): Pending review, approaching limits
+- **Error** (#DC2626): Validation errors, rejected
+- **Info** (#2563EB): System notices, help indicators
+
+## Typography
+
+- **Headline Font**: Noto Serif
+- **Body Font**: Inter
+- **Mono Font**: JetBrains Mono
+
+- **Display**: Noto Serif 30px bold, 40px line height
+- **Headline**: Noto Serif 24px bold, 32px line height
+- **Subhead**: Noto Serif 18px semibold, 26px line height
+- **Body Large**: Inter 16px regular, 26px line height
+- **Body**: Inter 14px regular, 22px line height
+- **Body Small**: Inter 13px regular, 20px line height
+- **Caption**: Inter 12px medium, 18px line height
+- **Overline**: Inter 11px semibold, 16px line height
+- **Code**: JetBrains Mono 13px regular, 20px line height
+
+---
+
+## Spacing
+
+- **Base unit:** 4px
+- **Scale:** 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 / 96
+- **Component padding:** 8px (compact) | 12px (default) | 16px (relaxed)
+- **Section spacing:** 32px between major sections, 16px between related groups
+- **Data tables:** 8px cell padding, 12px header padding, 40px minimum row height
+
+## Border Radius
+
+- **None** (0px): Tables, full-width banners
+- **Small** (2px): Badges, inline status indicators
+- **Medium** (4px): Buttons, inputs, cards
+- **Large** (6px): Modals, dropdowns
+- **XL** (8px): Popovers, floating panels
+- **Full** (9999px): Avatar circles, status dots
+
+## Elevation
+
+Subtle, professional shadows that maintain a formal aesthetic.
+- **Subtle**: 1px offset, 2px blur, #0F172A at 4%. Cards, resting panels.
+- **Medium**: 2px offset, 6px blur, #0F172A at 6%. Dropdowns, hover cards.
+- **Large**: 6px offset, 16px blur, #0F172A at 8%. Modals, slide-out panels.
+- **Overlay**: 12px offset, 32px blur, #0F172A at 12%. Full-screen overlays.
+
+## Components
+
+### Buttons
+- **Primary**: #1E3A5F fill, #FFFFFF text, no border, #162D4A fill.
+- **Secondary**: #FFFFFF fill, #1E3A5F text, 1px #CBD5E1 border, #F1F5F9 fill.
+- **Ghost**: transparent fill, #475569 text, no border, #F1F5F9 fill.
+- **Destructive**: #DC2626 fill, #FFFFFF text, no border, #B91C1C fill.
+- **Sizes**: Small (28px height, 10px pad) | Medium (36px, 14px) | Large (44px, 18px)
+- **Disabled**: 45% opacity, disabled cursor, no hover state changes
+
+### Cards
+** Background #FFFFFF, border 1px #E2E8F0, radius 4px, padding 16px, shadow Subtle **default, ** Background #FFFFFF, no border, radius 4px, padding 16px, shadow Medium **elevated.
+- Data cards use a top header bar with title and actions, body with key-value pairs or tables
+
+### Inputs
+- **Default**: #CBD5E1 border, #FFFFFF fill, no shadow.
+- **Hover**: #94A3B8 border, #FFFFFF fill, no shadow.
+- **Focus**: #1E3A5F border, #FFFFFF fill, 2px ring #1E3A5F at 12% shadow.
+- **Error**: #DC2626 border, #FEF2F2 fill, 2px ring #DC2626 at 10% shadow.
+- **Disabled**: #E2E8F0 border, #F8FAFC fill, no shadow.
+** 13px, weight 500, color Text Primary, 4px below label **label, ** 12px, color Text Secondary; error helper uses Error color **helper text, 36px (standard), 32px (compact for table inline edits) input height.
+
+### Chips
+** Background #F1F5F9, text #1E3A5F, radius 2px, padding 4px 10px, toggleable **filter chip, ** Semantic background at 10% opacity, semantic text, radius 2px, padding 4px 10px **status chip, Approved=green, Pending=amber, Rejected=red, Draft=gray workflow chips.
+
+### Lists
+40px, padding 8px 12px row height, 1px #E2E8F0 between rows divider, background #EFF6FF, left border 2px #1E3A5F active/selected. Hover: background #F8FAFC.
+- Enterprise lists support column headers, sortable columns, and inline actions
+
+### Checkboxes
+16px square, radius 2px. Unchecked: border 2px #CBD5E1, background transparent. Checked: background #1E3A5F, white checkmark icon. Indeterminate: background #1E3A5F, white dash icon (for table bulk selection). Focus: ring 2px ring #1E3A5F at 15%. Disabled: 40% opacity.
+
+### Radio Buttons
+16px circle. border 2px #CBD5E1, background transparent unselected. Selected: border 2px #1E3A5F, inner dot 8px #1E3A5F. Focus: ring 2px ring #1E3A5F at 15%. Disabled: 40% opacity.
+
+### Tooltips
+#0F172A, text: #FFFFFF, radius 4px, padding 6px 10px fill. 12px Inter regular. 6px, matching background arrow, 260px max width, 400ms show, 100ms hide delay.
+---
+
+## Do's and Don'ts
+
+1. **Do** use serif headings (Noto Serif) for page titles and section headers to convey formality.
+2. **Do** design for data density -- enterprise users expect to see many records per screen.
+3. **Don't** use bright or playful colors; maintain the navy-gray palette for professional credibility.
+4. **Do** provide inline editing in data tables to reduce navigation steps in workflows.
+5. **Don't** use rounded corners larger than 8px -- formal interfaces demand restrained geometry.
+6. **Do** include bulk actions (select all, batch update, export) on all data table views.
+7. **Don't** hide critical workflow actions behind context menus alone -- provide visible button groups.
+8. **Do** support keyboard navigation throughout, especially in data-heavy table interfaces.
+9. **Don't** use animations longer than 200ms -- enterprise tools must feel instant and responsive.
+10. **Do** include clear breadcrumbs and page titles so users always know their location in the system.

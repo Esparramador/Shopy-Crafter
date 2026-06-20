@@ -18,14 +18,18 @@ localPort = 19080
 run = "pnpm --filter @workspace/shopify-optimizer run dev"
 
 [services.production]
-run = "node artifacts/shopify-optimizer/serve.mjs"
+publicDir = "artifacts/shopify-optimizer/dist/public"
+serve = "static"
 
 [services.production.build]
 args = [ "pnpm", "--filter", "@workspace/shopify-optimizer", "run", "build" ]
 
 [services.production.build.env]
 NODE_ENV = "production"
-BASE_PATH = "/"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
 
 [services.env]
 PORT = "19080"

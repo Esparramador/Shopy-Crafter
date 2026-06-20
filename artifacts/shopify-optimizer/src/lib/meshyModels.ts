@@ -170,7 +170,7 @@ const BASIC_3 = ["jump","run","walk"];
 // ── Character definitions ─────────────────────────────────────────────────────
 
 export const MESHY_CHARACTERS: MeshyCharacter[] = [
-  // ── Fully rigged with 134 animations ──
+  // ── Fully rigged with 22 animations ──
   {
     id: "alec_monopoly", name: "Alec Monopoly", emoji: "🎩", category: "cartoon",
     description: "El artista urbano más icónico. 134 animaciones — catálogo completo de Meshy.",
@@ -179,7 +179,6 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     rigTaskId: "019ebb36-4f0c-7d21-a268-2ff6198aca60",
     animations: anims("alec_monopoly", FULL_134),
   },
-  // ── Fully rigged with 22 animations ──
   {
     id: "batman", name: "Batman", emoji: "🦇", category: "cartoon",
     description: "El Caballero de la Noche. 22 animaciones completas.",

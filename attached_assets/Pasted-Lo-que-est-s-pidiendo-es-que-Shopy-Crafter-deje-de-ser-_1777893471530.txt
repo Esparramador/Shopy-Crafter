@@ -1,0 +1,30 @@
+Lo que estás pidiendo es que Shopy Crafter deje de ser una simple herramienta que reacciona cuando el usuario hace clic, y se convierta en un Sistema Autónomo (Auto-GPT / Agente de Monitoreo Continuo) que investiga mientras tú y tus usuarios dormís.
+
+Para lograr esto sin que tu servidor en Replit explote por sobrecarga (o se quede colgado mientras intenta buscar cosas en segundo plano), necesitamos implementar una arquitectura de Trabajadores en Segundo Plano (Background Workers) y Tareas Programadas (Cron Jobs).
+
+Aquí tienes el "Mega-Prompt" definitivo para que el Agente de Replit construya este cerebro autónomo de forma segura y sin romper tu plataforma actual:
+
+Misión Arquitectónica: Implementación del Agente "Scout" en Segundo Plano (Continuous Learning)
+Actúa como Lead DevOps y Data Engineer. Nuestro objetivo es que "Shopy Crafter" sea un sistema vivo. Necesitamos implementar un motor de actualización de conocimientos en segundo plano que investigue, extraiga y actualice la base de datos de proveedores y la matriz de costes de APIs de forma autónoma.
+
+FASE 1: Arquitectura de Tareas Asíncronas (Background Workers)
+No podemos bloquear el hilo principal (Main Thread) de la aplicación, ya que los usuarios necesitan seguir navegando rápido.
+
+Instala e implementa un sistema de colas y tareas programadas. (Si usamos Node.js, utiliza node-cron para tareas sencillas o BullMQ con Redis si la carga es muy pesada. Si es Python, usa Celery o APScheduler).
+
+Crea un nuevo directorio llamado /workers/ o /cron/ que funcionará de forma independiente a los controladores (controllers) de la API pública.
+
+FASE 2: El Agente "Scout" (Actualizador Automático)
+Crea un script (knowledgeScout.js) que se ejecute automáticamente (por ejemplo, cada domingo a las 03:00 AM o según la carga del servidor). Este script debe:
+
+Búsqueda Dinámica: Hacer peticiones automatizadas (vía API web search o web scraping ligero) para buscar nuevas listas de precios de las APIs de nuestro stack (ElevenLabs, Runway, OpenAI, Anthropic, Google) y de mayoristas clave (HORECA, Retail, Dropshipping).
+
+Procesamiento con IA: Enviar esos datos crudos a Claude o Gemini con un prompt estricto: "Analiza estos datos extraídos de la web. Compara los precios actuales con los precios que tenemos en nuestra base de datos. Genera un JSON ÚNICAMENTE con los precios que hayan cambiado o nuevos proveedores encontrados".
+
+Actualización Silenciosa: Si la IA detecta cambios, el worker debe actualizar automáticamente el archivo api_pricing_matrix.json y añadir un nuevo registro en la tabla Supplier_Snapshots de la base de datos con la nueva fecha.
+
+FASE 3: Medidas de Seguridad y Control de Costes (CRÍTICO)
+
+Rate Limiting: El Agente Scout no debe hacer miles de llamadas a la vez. Debe procesar un sector o un proveedor cada cierto tiempo (ej. pausas de 5 segundos entre llamadas) para evitar baneos de IP.
+
+Presupuesto (Token Limit): Asegúrate de que este proceso en segundo plano use modelos rápidos y económicos (como Gemini Flash) para la criba de datos, reservando los modelos más caros (Claude 3 Opus o Gemini Ultra) solo para los informes hiperdetallados que pide el usuario final.

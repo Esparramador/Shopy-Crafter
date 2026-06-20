@@ -1,0 +1,1743 @@
+es esto a lo que te refieres??
+
+element.style {
+
+position: relative;
+
+width: 100%;
+
+height: 100%;
+
+overflow: hidden;
+
+pointer-events: auto;
+
+}
+
+* {
+
+margin: 0;
+
+padding: 0;
+
+box-sizing: border-box;
+
+}
+
+
+
+* {
+
+margin: 0;
+
+padding: 0;
+
+touch-action: pan-x pan-y;
+
+}
+
+
+
+user agent stylesheet
+
+div {
+
+display: block;
+
+unicode-bidi: isolate;
+
+}
+
+
+
+
+
+.wrapper--_S0Nuyk {
+
+font-family: Lato, sans-serif;
+
+flex: 1;
+
+overflow: hidden;
+
+position: relative;
+
+}
+
+
+
+
+
+style attribute {
+
+--visme-forms-button-box-shadow: 0px 0px 0px 1px #ffffff00;
+
+--visme-forms-button-border-radius: 10;
+
+--visme-forms-button-background-color: #ecf777ff;
+
+--visme-forms-button-text-align: center;
+
+--visme-forms-button-text-transform: none;
+
+--visme-forms-button-color: #09081cff;
+
+--visme-forms-button-font-weight: normal;
+
+--visme-forms-button-font-size: 28px;
+
+--visme-forms-button-font-family: Inter;
+
+--visme-forms-button-font-style: normal;
+
+--visme-forms-button-padding: 20px;
+
+--visme-forms-card-background-color: transparent;
+
+--visme-forms-card-width: 750;
+
+--visme-forms-card-border-radius: 0;
+
+--visme-forms-card-box-shadow: none;
+
+--visme-forms-heading-text-align: left;
+
+--visme-forms-heading-text-transform: none;
+
+--visme-forms-heading-color: #ffffffff;
+
+--visme-forms-heading-font-weight: bold;
+
+--visme-forms-heading-font-size: 48px;
+
+--visme-forms-heading-font-family: Inter;
+
+--visme-forms-heading-font-style: normal;
+
+--visme-forms-heading-padding: 0px 0px;
+
+--visme-forms-form-background-color: #7c9934ff;
+
+--visme-forms-calendar-primary-text-color: #09081cff;
+
+}
+
+html {
+
+line-height: 1.15;
+
+-webkit-text-size-adjust: 100%;
+
+}
+
+
+
+::-webkit-scrollbar-track {
+
+background: #0000;
+
+}
+
+
+
+
+
+<style>
+
+@font-face {
+
+font-family: 'Lato';
+
+font-style: italic;
+
+font-weight: 400;
+
+font-display: swap;
+
+src: url(https://fonts.gstatic.com/s/lato/v25/S6u8w4BMUTPHjxsAUi-qJCY.woff2) format('woff2');
+
+unicode-range: U +0100 -02BA, U +02BD -02C5, U +02C7 -02CC, U +02CE -02D7, U +02DD -02FF, U +0304, U +0308, U +0329, U +1D00 -1DBF, U +1E00 -1E9F, U +1EF2 -1EFF, U +2020, U +20A0 -20AB, U +20AD -20C0, U +2113, U +2C60 -2C7F, U + A720-A7FF;
+
+} 
+
+¡Exactamente! Has dado en el clavo. Ese es el código que aparece cuando utilizas la herramienta "Inspeccionar" del navegador.
+
+Has logrado ver las tripas del diseño del formulario. Vamos a desglosar qué es lo que has encontrado y qué te falta por buscar para encontrar las animaciones:
+
+Lo que has encontrado (La apariencia estática)
+El código que me compartes define cómo se ve el formulario, pero no cómo se mueve. Aquí tienes lo más interesante de tu hallazgo:
+
+Variables CSS (--visme-forms-...): Esto es súper clave. Visme usa estas variables para que, cuando tú cambias un color o una fuente en su editor visual, el formulario se actualice. Por ejemplo, --visme-forms-button-background-color: #ecf777ff; es el color verde/amarillo brillante del botón.
+
+Reseteos básicos (* { margin: 0; ... }): Son reglas estándar de desarrollo web para limpiar los márgenes por defecto de los navegadores.
+
+Tipografía (@font-face): Están importando la fuente "Lato" directamente desde los servidores de Google Fonts para asegurarse de que el texto se vea igual en cualquier dispositivo.
+
+Lo que falta buscar (El motor de la animación)
+Como lo que tienes ahí es solo la "pintura" y el "tamaño" de las cosas, para encontrar cómo hacen las animaciones, tienes que seguir escarbando en ese mismo panel. Te sugiero buscar lo siguiente:
+
+Cambios dinámicos en el HTML: Mantén abierto el panel de "Elementos" e interactúa con el formulario (haz clic en un input, dale a siguiente). Verás que algunas partes del HTML parpadean en morado. Eso significa que JavaScript está añadiendo clases nuevas (por ejemplo, una clase llamada slide-out o active), y esas clases son las que disparan el movimiento.
+
+Propiedades de movimiento en CSS: En la misma columna donde encontraste esos estilos, busca palabras como transition, transform (suele estar acompañado de translateX o scale) o @keyframes. Eso es el CSS puro moviendo las cajas.
+
+Etiquetas <svg> o <canvas>: Si el formulario tiene ilustraciones o personajes animados que se mueven solos, expande las flechitas del código HTML (<div>). Si encuentras un <svg> lleno de números y coordenadas, o un <canvas>, ahí es donde vive la animación vectorial (probablemente Lottie, como te mencionaba antes).
+
+La pestaña "Network" (Red): Si quieres confirmar si usan Lottie (archivos JSON), ve a la pestaña Network de tu inspector, recarga la página con F5 y busca cualquier archivo .json que se descargue.
+
+¡Vas por excelente camino! Analizar código así es exactamente como los desarrolladores aprenden a replicar efectos y funcionalidades de plataformas top.
+
+element.style {
+
+
+
+}
+
+html, body, #root {
+
+width: 100%;
+
+min-height: 100%;
+
+overflow: hidden auto;
+
+height: 100%;
+
+}
+
+
+
+body {
+
+margin: 0;
+
+}
+
+
+
+* {
+
+box-sizing: border-box;
+
+margin: 0;
+
+padding: 0;
+
+}
+
+
+
+* {
+
+margin: 0;
+
+padding: 0;
+
+touch-action: pan-x pan-y;
+
+}
+
+
+
+user agent stylesheet
+
+body {
+
+display: block;
+
+margin: 8px;
+
+}
+
+
+
+
+
+style attribute {
+
+--vh-help-popup: 6.7700000000000005px;
+
+}
+
+:root {
+
+--color-droppper-handle-width: 81px;
+
+--color-droppper-handle-pixels-amount: 11;
+
+--color-droppper-handle-pointer-width: calc(var(--color-droppper-handle-width) / var(--color-droppper-handle-pixels-amount));
+
+--color-droppper-handle-stroke: #314152;
+
+}
+
+
+
+:root {
+
+--filemanager-navbar-width: 250px;
+
+}
+
+
+
+html {
+
+line-height: 1.15;
+
+-webkit-text-size-adjust: 100%;
+
+}
+
+
+
+::-webkit-scrollbar-track {
+
+background: #0000;
+
+}
+
+¡Veo que sigues escarbando! Este bloque de código es súper interesante, pero te has topado con la estructura principal de la aplicación o del editor, no con las animaciones del formulario en sí.
+
+Aquí te desgloso lo que nos revela este nuevo hallazgo:
+
+Qué nos dice este nuevo código
+El famoso #root: Esa regla html, body, #root es la prueba definitiva de que la plataforma (o al menos esa sección) está construida con React.js (una de las librerías de JavaScript más populares). React utiliza un contenedor vacío llamado root (raíz) donde inyecta y actualiza todo el contenido dinámico. Esto nos confirma que las interacciones están fuertemente controladas por el "estado" en JavaScript.
+
+Herramientas internas (--color-droppper y --filemanager): Fíjate en esas variables. Hablan de un "gotero de color" (color dropper) y de una "barra de navegación del administrador de archivos" (filemanager navbar). Esto indica que probablemente estás inspeccionando el editor visual de Visme, no el formulario final que ve tu usuario.
+
+Ajustes de pantalla completa: Las reglas height: 100% y overflow: hidden auto aseguran que la interfaz del programa ocupe exactamente el tamaño de la ventana de tu navegador, evitando que la página entera haga un scroll no deseado.
+
+Cómo retomar la pista de la animación
+Para encontrar cómo se mueven las piezas, necesitas aislar el formulario. Te recomiendo abrir la vista previa final o publicar el formulario y abrir ese enlace limpio en una pestaña nueva. Luego, inspecciona de nuevo buscando esto:
+
+Cambios de clases: Observa el HTML en las Herramientas de Desarrollador mientras haces clic en "Siguiente" dentro del formulario. Verás clases CSS que aparecen y desaparecen (como .is-active, .slide-out, etc.).
+
+Propiedades de movimiento: En lugar de colores o anchos, busca en el CSS palabras mágicas de animación como transition, transform, o @keyframes.
+
+¿Hay alguna animación en particular de esos formularios (como el deslizamiento fluido entre preguntas, el temblor cuando hay un error, o los iconos que rebotan) que te gustaría aprender a programar desde cero?
+
+
+
+element.style {
+
+
+
+}
+
+.forms--faUNk9J .body--EuCI543 {
+
+font-family: Lato, sans-serif;
+
+display: flex;
+
+flex-direction: column;
+
+height: 100%;
+
+}
+
+
+
+* {
+
+margin: 0;
+
+padding: 0;
+
+touch-action: pan-x pan-y;
+
+}
+
+
+
+user agent stylesheet
+
+div {
+
+display: block;
+
+unicode-bidi: isolate;
+
+}
+
+
+
+
+
+body {
+
+background: #fff;
+
+font-size: 16px;
+
+overflow: hidden;
+
+}
+
+
+
+
+
+style attribute {
+
+--vh: 6.7700000000000005px;
+
+--vh-help-popup: 6.7700000000000005px;
+
+}
+
+:root {
+
+--lists-bullet-offset: .3em;
+
+--lists-bullet-width: 1.2857em;
+
+--lists-text-offset: calc(var(--lists-bullet-offset) + var(--lists-bullet-width));
+
+}
+
+
+
+:root {
+
+--color-neutral-0: #fff;
+
+--color-neutral-50: #f5f8f8;
+
+--color-neutral-100: #ecf2f5;
+
+--color-neutral-150: #dae4ea;
+
+--color-neutral-200: #c7d5de;
+
+--color-neutral-300: #b2c2cc;
+
+--color-neutral-400: #a7b3c0;
+
+--color-neutral-500: #6d7f93;
+
+--color-neutral-600: #4d6071;
+
+--color-neutral-700: #3f5264;
+
+--color-neutral-800: #293745;
+
+--color-neutral-900: #2b3140;
+
+--color-neutral-1000: #000;
+
+--color-blue-100: #e4f2ff;
+
+--color-blue-200: #cbdef0;
+
+--color-blue-300: #95c0eb;
+
+--color-blue-400: #3d92e7;
+
+--color-blue-500: #2e90f3;
+
+--color-blue-600: #2d7cca;
+
+--color-blue-700: #1a5fa3;
+
+--color-blue-800: #154e86;
+
+--color-blue-900: #103c67;
+
+--color-red-100: #f9ebeb;
+
+--color-yellow-100: #f9f3e3;
+
+--color-yellow-200: #f3e9d0;
+
+--color-yellow-250: #fbe4a8;
+
+--color-yellow-300: #e8d4a0;
+
+--color-yellow-400: #fabf26;
+
+--color-yellow-500: #d8a218;
+
+--color-yellow-600: #b7880f;
+
+--color-yellow-700: #936e0c;
+
+--color-yellow-800: #725608;
+
+--color-yellow-900: #543f05;
+
+--color-green-100: #f0faf5;
+
+--color-decorative-azure-ai: #3b80e4;
+
+--color-decorative-azure-ai-light: #e7f0fc;
+
+--color-decorative-purple-ai: #9747ff;
+
+--color-decorative-purple-ai-light: #f2e9ff;
+
+--color-decorative-indigo-ai: #5f46d8;
+
+--color-decorative-violet-ai: #462bca;
+
+--color-green-200: #e6f5ee;
+
+--color-green-300: #b5e1cc;
+
+--color-green-400: #33b677;
+
+--color-green-500: #1c9e60;
+
+--color-green-600: #0d7b47;
+
+--color-green-700: #0a6339;
+
+--color-green-800: #084e2d;
+
+--color-green-900: #063b22;
+
+--color-red-200: #e5b3b3;
+
+--color-red-300: #d96c6c;
+
+Show all properties (69 more)
+
+}
+
+
+
+html {
+
+line-height: 1.15;
+
+-webkit-text-size-adjust: 100%;
+
+}
+
+
+
+::-webkit-scrollbar-track {
+
+background: #0000;
+
+}
+
+
+
+
+
+@font-face {
+
+font-family: 'Lato';
+
+font-style: italic;
+
+font-weight: 400;
+
+font-display: swap;
+
+src: url(https://fonts.gstatic.com/s/lato/v25/S6u8w4BMUTPHjxsAUi-qJCY.woff2) format('woff2');
+
+unicode-range: U +0100 -02BA, U +02BD -02C5, U +02C7 -02CC, U +02CE -02D7, U +02DD -02FF, U +0304, U +0308, U +0329, U +1D00 -1DBF, U +1E00 -1E9F, U +1EF2 -1EFF, U +2020, U +20A0 -20AB, U +20AD -20C0, U +2113, U +2C60 -2C7F, U + A720-A7FF;
+
+} 
+
+¡Veo que sigues excavando profundo! Lo que me acabas de compartir es otra pieza fundamental de la arquitectura web, pero, para ser totalmente sincero contigo, sigues viendo la "pintura" y no el "motor" de la animación.
+
+1. ¿Qué es este bloque de código?
+Lo que has encontrado aquí es lo que los desarrolladores llamamos un Sistema de Diseño (Design System):
+
+Paleta de Colores (:root { --color-... }): Esa enorme lista de colores (azul, amarillo, verde, rojo e incluso colores para la IA) es la paleta maestra de Visme. Usan estas variables globales para que toda la interfaz sea visualmente coherente y para poder cambiar de temas (oscuro/claro) fácilmente.
+
+Clases ofuscadas (.forms--faUNk9J): Esa terminación extraña (--faUNk9J) confirma al 100% que están usando un empaquetador moderno (probablemente con React y CSS Modules o Styled Components). El sistema genera esas letras aleatorias automáticamente para asegurarse de que los estilos de este formulario no "choquen" o rompan otra parte de la página.
+
+2. ¿Por qué es tan difícil extraer la animación directamente?
+Las plataformas modernas no suelen construir sus animaciones con un bloque de CSS estático que puedas simplemente copiar y pegar. Lo hacen de maneras que el navegador compila y oculta:
+
+Físicas en JavaScript: Usan librerías especializadas (como Framer Motion o GSAP). Estas herramientas calculan la física de la animación (el rebote, la velocidad, la fricción) en JavaScript y luego le inyectan los números al HTML milisegundo a milisegundo.
+
+Código Minificado: El código fuente real está comprimido. Las instrucciones claras que escribió el programador original se transforman en archivos ilegibles por humanos para que la web cargue más rápido.
+
+3. El truco avanzado para "cazar" el movimiento
+Si realmente quieres atrapar a la página en el acto de animarse, puedes usar una función de depuración avanzada en las Herramientas de Desarrollador de tu navegador:
+
+Ve a la pestaña Elements (Elementos) y localiza el contenedor principal de la pregunta del formulario.
+
+Haz clic derecho sobre esa línea de código HTML.
+
+Selecciona Break on (Interrumpir en) > Attribute modifications (Modificaciones de atributos).
+
+Vuelve a la pantalla e interactúa con el formulario (haz clic en un botón o en "Siguiente").
+
+La pantalla se congelará. El navegador pausará la ejecución exactamente en el milisegundo en el que el JavaScript intenta cambiar la clase o el estilo para iniciar la animación, llevándote al script responsable.
+
+En lugar de intentar aplicar ingeniería inversa a un código comprimido y ofuscado (que suele dar muchos dolores de cabeza), ¿te gustaría que te escriba un código limpio, comentado y desde cero de un formulario que se deslice suavemente entre pasos usando HTML, CSS y un poco de JavaScript?
+
+
+
+element.style {
+
+
+
+}
+
+.visible {
+
+display: block !important;
+
+}
+
+
+
+.forms--faUNk9J {
+
+position: fixed;
+
+width: 100%;
+
+height: 100%;
+
+background-color: #293042b3;
+
+top: 50%;
+
+left: 50%;
+
+transform: translate(-50%, -50%);
+
+z-index: 32;
+
+}
+
+
+
+* {
+
+margin: 0;
+
+padding: 0;
+
+touch-action: pan-x pan-y;
+
+}
+
+
+
+user agent stylesheet
+
+div {
+
+display: block;
+
+unicode-bidi: isolate;
+
+}
+
+
+
+
+
+body {
+
+background: #fff;
+
+font-size: 16px;
+
+overflow: hidden;
+
+}
+
+
+
+
+
+style attribute {
+
+--vh: 6.7700000000000005px;
+
+--vh-help-popup: 6.7700000000000005px;
+
+}
+
+:root {
+
+--lists-bullet-offset: .3em;
+
+--lists-bullet-width: 1.2857em;
+
+--lists-text-offset: calc(var(--lists-bullet-offset) + var(--lists-bullet-width));
+
+}
+
+
+
+:root {
+
+--color-neutral-0: #fff;
+
+--color-neutral-50: #f5f8f8;
+
+--color-neutral-100: #ecf2f5;
+
+--color-neutral-150: #dae4ea;
+
+--color-neutral-200: #c7d5de;
+
+--color-neutral-300: #b2c2cc;
+
+--color-neutral-400: #a7b3c0;
+
+--color-neutral-500: #6d7f93;
+
+--color-neutral-600: #4d6071;
+
+--color-neutral-700: #3f5264;
+
+--color-neutral-800: #293745;
+
+--color-neutral-900: #2b3140;
+
+--color-neutral-1000: #000;
+
+--color-blue-100: #e4f2ff;
+
+--color-blue-200: #cbdef0;
+
+--color-blue-300: #95c0eb;
+
+--color-blue-400: #3d92e7;
+
+--color-blue-500: #2e90f3;
+
+--color-blue-600: #2d7cca;
+
+--color-blue-700: #1a5fa3;
+
+--color-blue-800: #154e86;
+
+--color-blue-900: #103c67;
+
+--color-red-100: #f9ebeb;
+
+--color-yellow-100: #f9f3e3;
+
+--color-yellow-200: #f3e9d0;
+
+--color-yellow-250: #fbe4a8;
+
+--color-yellow-300: #e8d4a0;
+
+--color-yellow-400: #fabf26;
+
+--color-yellow-500: #d8a218;
+
+--color-yellow-600: #b7880f;
+
+--color-yellow-700: #936e0c;
+
+--color-yellow-800: #725608;
+
+--color-yellow-900: #543f05;
+
+--color-green-100: #f0faf5;
+
+--color-decorative-azure-ai: #3b80e4;
+
+--color-decorative-azure-ai-light: #e7f0fc;
+
+--color-decorative-purple-ai: #9747ff;
+
+--color-decorative-purple-ai-light: #f2e9ff;
+
+--color-decorative-indigo-ai: #5f46d8;
+
+--color-decorative-violet-ai: #462bca;
+
+--color-green-200: #e6f5ee;
+
+--color-green-300: #b5e1cc;
+
+--color-green-400: #33b677;
+
+--color-green-500: #1c9e60;
+
+--color-green-600: #0d7b47;
+
+--color-green-700: #0a6339;
+
+--color-green-800: #084e2d;
+
+--color-green-900: #063b22;
+
+--color-red-200: #e5b3b3;
+
+--color-red-300: #d96c6c;
+
+Show all properties (69 more)
+
+}
+
+
+
+html {
+
+line-height: 1.15;
+
+-webkit-text-size-adjust: 100%;
+
+}
+
+
+
+::-webkit-scrollbar-track {
+
+background: #0000;
+
+}
+
+¡Veo que no te rindes, me encanta esa persistencia! Lo que acabas de encontrar es una pieza súper importante del rompecabezas, aunque te soy sincero: todavía no es la animación en sí, sino la "caja" donde ocurre la magia.
+
+Vamos a analizar el tesoro que acabas de desenterrar:
+
+1. El Contenedor del Pop-up (Modal)
+Fíjate bien en este bloque:
+
+CSS
+.forms--faUNk9J {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    background-color: #293042b3;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 32;
+}
+Esto es el clásico código CSS para crear un Modal o Pop-up que oscurece el fondo.
+
+position: fixed; width: 100%; height: 100%;: Hace que la caja ocupe toda la pantalla de tu ordenador o móvil.
+
+background-color: #293042b3;: Es un color azul oscuro (#293042), y el b3 del final significa que tiene transparencia. Es esa capa oscura que se pone sobre la web para que te centres en el formulario.
+
+top: 50%; left: 50%; transform: translate(-50%, -50%);: Es la fórmula matemática exacta en CSS para centrar un elemento perfectamente en el medio de la pantalla.
+
+z-index: 32;: Asegura que el formulario aparezca por encima de cualquier otro elemento de la página.
+
+2. El "Interruptor"
+Y luego tienes esto:
+
+CSS
+.visible {
+    display: block !important;
+}
+Esta es una clase de "utilidad". Por defecto, el formulario probablemente esté oculto (display: none;). Cuando el usuario hace clic en un botón para abrir el formulario de Visme, el JavaScript entra en acción, le inyecta esta clase .visible a la caja, y ¡puf!, el formulario aparece en pantalla.
+
+La realidad sobre buscar el código
+Estás haciendo un trabajo de ingeniería inversa excelente (básicamente desarmando la web pieza a pieza). Sin embargo, plataformas grandes como Visme, Typeform o similares, casi nunca tienen una sola línea de código CSS que diga .animacion-del-formulario { ... }.
+
+Sus animaciones se calculan dinámicamente con JavaScript (cambiando posiciones y opacidades milisegundo a milisegundo) y están ocultas en archivos comprimidos que los humanos no podemos leer fácilmente en el panel de herramientas de desarrollo.
+
+En lugar de seguir peleando contra el código comprimido de Visme, ¿te gustaría que te escriba desde cero un código limpio, comentado y listo para usar de un formulario que se deslice suavemente entre preguntas usando HTML, CSS y JavaScript?
+
+element.style {
+
+
+
+}
+
+.HomeTemplateIframe--jByYDez iframe {
+
+width: 100%;
+
+height: calc(100% - 2px);
+
+border: none;
+
+}
+
+
+
+.Iframe--vdjjLDe {
+
+
+
+*, *:before, *:after {
+
+box-sizing: inherit;
+
+}
+
+
+
+* {
+
+margin: 0;
+
+padding: 0;
+
+outline: 0 none;
+
+-webkit-tap-highlight-color: hsla(0, 0%, 100%, 0);
+
+}
+
+
+
+user agent stylesheet
+
+iframe {
+
+overflow-clip-margin: content-box !important;
+
+overflow: clip !important;
+
+border-width: 2px;
+
+border-style: inset;
+
+border-color: currentcolor;
+
+border-image: initial;
+
+}
+
+
+
+
+
+body {
+
+display: block;
+
+min-height: 100vh;
+
+min-height: calc(var(--vh, 1vh) * 100);
+
+font-size: 14px;
+
+color: #314152;
+
+}
+
+
+
+
+
+style attribute {
+
+--navbar-width: 250px;
+
+--vh-help-popup: 6.79px;
+
+--empty-height: 579px;
+
+}
+
+:root {
+
+--toastify-color-light: #fff;
+
+--toastify-color-dark: #121212;
+
+--toastify-color-info: #3498db;
+
+--toastify-color-success: #07bc0c;
+
+--toastify-color-warning: #f1c40f;
+
+--toastify-color-error: #e74c3c;
+
+--toastify-color-transparent: rgba(255, 255, 255, .7);
+
+--toastify-icon-color-info: var(--toastify-color-info);
+
+--toastify-icon-color-success: var(--toastify-color-success);
+
+--toastify-icon-color-warning: var(--toastify-color-warning);
+
+--toastify-icon-color-error: var(--toastify-color-error);
+
+--toastify-toast-width: 320px;
+
+--toastify-toast-offset: 16px;
+
+--toastify-toast-top: max(var(--toastify-toast-offset), env(safe-area-inset-top));
+
+--toastify-toast-right: max(var(--toastify-toast-offset), env(safe-area-inset-right));
+
+--toastify-toast-left: max(var(--toastify-toast-offset), env(safe-area-inset-left));
+
+--toastify-toast-bottom: max(var(--toastify-toast-offset), env(safe-area-inset-bottom));
+
+--toastify-toast-background: #fff;
+
+--toastify-toast-min-height: 64px;
+
+--toastify-toast-max-height: 800px;
+
+--toastify-toast-bd-radius: 6px;
+
+--toastify-font-family: sans-serif;
+
+--toastify-z-index: 9999;
+
+--toastify-text-color-light: #757575;
+
+--toastify-text-color-dark: #fff;
+
+--toastify-text-color-info: #fff;
+
+--toastify-text-color-success: #fff;
+
+--toastify-text-color-warning: #fff;
+
+--toastify-text-color-error: #fff;
+
+--toastify-spinner-color: #616161;
+
+--toastify-spinner-color-empty-area: #e0e0e0;
+
+--toastify-color-progress-light: linear-gradient(to right, #4cd964, #5ac8fa, #007aff, #34aadc, #5856d6, #ff2d55);
+
+--toastify-color-progress-dark: #bb86fc;
+
+--toastify-color-progress-info: var(--toastify-color-info);
+
+--toastify-color-progress-success: var(--toastify-color-success);
+
+--toastify-color-progress-warning: var(--toastify-color-warning);
+
+--toastify-color-progress-error: var(--toastify-color-error);
+
+--toastify-color-progress-bgo: .2;
+
+}
+
+
+
+:root {
+
+
+
+html {
+
+font: 400 30px / 1.3 Lato, sans-serif, Montserrat;
+
+box-sizing: border-box;
+
+-ms-text-size-adjust: none;
+
+-webkit-text-size-adjust: none;
+
+-webkit-overflow-scrolling: touch;
+
+-webkit-font-smoothing: antialiased;
+
+}
+
+
+
+*, *:before, *:after {
+
+box-sizing: inherit;
+
+}
+
+
+
+*, *:before, *:after {
+
+box-sizing: inherit;
+
+}
+
+
+
+::selection {
+
+color: #fff;
+
+background: #64b9d3;
+
+}
+
+
+
+
+
+::selection {
+
+
+
+
+
+::selection {
+
+
+
+
+
+::selection {
+
+
+
+
+
+::selection {
+
+
+
+
+
+::selection {
+
+
+
+
+
+::selection {
+
+
+
+
+
+::selection {
+
+
+
+
+
+<style>
+
+@font-face {
+
+font-family: 'Lato';
+
+font-style: italic;
+
+font-weight: 400;
+
+font-display: swap;
+
+src: url(https://fonts.gstatic.com/s/lato/v25/S6u8w4BMUTPHjxsAUi-qJCY.woff2) format('woff2');
+
+unicode-range: U +0100 -02BA, U +02BD -02C5, U +02C7 -02CC, U +02CE -02D7, U +02DD -02FF, U +0304, U +0308, U +0329, U +1D00 -1DBF, U +1E00 -1E9F, U +1EF2 -1EFF, U +2020, U +20A0 -20AB, U +20AD -20C0, U +2113, U +2C60 -2C7F, U + A720-A7FF;
+
+} 
+
+¡BINGO! Acabas de encontrar la pieza maestra del rompecabezas. Este bloque de código nos dice exactamente por qué no lograbas encontrar la animación en tus intentos anteriores.
+
+Aquí está el secreto revelado en tu código:
+
+1. El famoso iframe (La ventana oculta)
+Fíjate en esto:
+
+CSS
+.HomeTemplateIframe--jByYDez iframe {
+    width: 100%;
+    height: calc(100% - 2px);
+    border: none;
+}
+Esto significa que el formulario no está realmente en la página que estás inspeccionando. Un iframe es como un agujero o una ventana en la página web que muestra otra página web distinta en su interior.
+
+Al inspeccionar el código, estabas mirando el "marco de la ventana" (la página principal de Visme), pero la animación ocurre en el "paisaje de afuera" (el documento dentro del iframe). Para inspeccionar el formulario real, tienes que hacer clic derecho directamente sobre el contenido del formulario dentro de esa ventana y buscar una opción que diga algo como "Ver origen del marco" (View frame source) o abrir el enlace de ese iframe en una pestaña nueva.
+
+2. Notificaciones Toastify
+También has descubierto esto:
+
+CSS
+--toastify-color-success: #07bc0c;
+--toastify-color-error: #e74c3c;
+Esto nos indica que están usando una librería muy famosa de React llamada React-Toastify. Es lo que hace que, cuando hay un error o el formulario se envía correctamente, aparezca un pequeño cartel emergente (toast) en una esquina de la pantalla avisándote.
+
+El veredicto final
+Has llegado al fondo de cómo estructuran su plataforma. Utilizan React, cargan el formulario a través de un iframe para aislarlo de la página principal, y manejan los estados y colores mediante variables CSS.
+
+Sin embargo, me reitero con total honestidad: el código que mueve las piezas del formulario (las transiciones de "Siguiente" y "Atrás") sigue estando encriptado en JavaScript compilado dentro de ese iframe. No existe un archivo mágico de CSS que puedas extraer y pegar en tu web para tener sus animaciones.
+
+Ya que has demostrado tener mucha curiosidad por entender cómo funciona esto por debajo, ¿te gustaría que te escriba un código limpio, comentado y desde cero de un formulario que se deslice suavemente entre pasos usando HTML, CSS y JavaScript para que puedas implementarlo en tus propios proyectos?
+
+element.style {
+
+--navbar-width: 250px;
+
+--vh-help-popup: 6.79px;
+
+--empty-height: 579px;
+
+}
+
+:root {
+
+--toastify-color-light: #fff;
+
+--toastify-color-dark: #121212;
+
+--toastify-color-info: #3498db;
+
+--toastify-color-success: #07bc0c;
+
+--toastify-color-warning: #f1c40f;
+
+--toastify-color-error: #e74c3c;
+
+--toastify-color-transparent: rgba(255, 255, 255, .7);
+
+--toastify-icon-color-info: var(--toastify-color-info);
+
+--toastify-icon-color-success: var(--toastify-color-success);
+
+--toastify-icon-color-warning: var(--toastify-color-warning);
+
+--toastify-icon-color-error: var(--toastify-color-error);
+
+--toastify-toast-width: 320px;
+
+--toastify-toast-offset: 16px;
+
+--toastify-toast-top: max(var(--toastify-toast-offset), env(safe-area-inset-top));
+
+--toastify-toast-right: max(var(--toastify-toast-offset), env(safe-area-inset-right));
+
+--toastify-toast-left: max(var(--toastify-toast-offset), env(safe-area-inset-left));
+
+--toastify-toast-bottom: max(var(--toastify-toast-offset), env(safe-area-inset-bottom));
+
+--toastify-toast-background: #fff;
+
+--toastify-toast-min-height: 64px;
+
+--toastify-toast-max-height: 800px;
+
+--toastify-toast-bd-radius: 6px;
+
+--toastify-font-family: sans-serif;
+
+--toastify-z-index: 9999;
+
+--toastify-text-color-light: #757575;
+
+--toastify-text-color-dark: #fff;
+
+--toastify-text-color-info: #fff;
+
+--toastify-text-color-success: #fff;
+
+--toastify-text-color-warning: #fff;
+
+--toastify-text-color-error: #fff;
+
+--toastify-spinner-color: #616161;
+
+--toastify-spinner-color-empty-area: #e0e0e0;
+
+--toastify-color-progress-light: linear-gradient(to right, #4cd964, #5ac8fa, #007aff, #34aadc, #5856d6, #ff2d55);
+
+--toastify-color-progress-dark: #bb86fc;
+
+--toastify-color-progress-info: var(--toastify-color-info);
+
+--toastify-color-progress-success: var(--toastify-color-success);
+
+--toastify-color-progress-warning: var(--toastify-color-warning);
+
+--toastify-color-progress-error: var(--toastify-color-error);
+
+--toastify-color-progress-bgo: .2;
+
+}
+
+
+
+:root {
+
+
+
+html {
+
+font: 400 30px / 1.3 Lato, sans-serif, Montserrat;
+
+box-sizing: border-box;
+
+-ms-text-size-adjust: none;
+
+-webkit-text-size-adjust: none;
+
+-webkit-overflow-scrolling: touch;
+
+-webkit-font-smoothing: antialiased;
+
+}
+
+
+
+html, body {
+
+margin: 0;
+
+height: 100%;
+
+}
+
+
+
+*, *:before, *:after {
+
+
+
+* {
+
+margin: 0;
+
+padding: 0;
+
+outline: 0 none;
+
+-webkit-tap-highlight-color: hsla(0, 0%, 100%, 0);
+
+}
+
+
+
+html[Attributes Style] {
+
+-webkit-locale: "es";
+
+}
+
+user agent stylesheet
+
+:root {
+
+view-transition-name: root;
+
+}
+
+
+
+user agent stylesheet
+
+html {
+
+display: block;
+
+}
+
+
+
+*, *:before, *:after {
+
+box-sizing: inherit;
+
+}
+
+
+
+*, *:before, *:after {
+
+box-sizing: inherit;
+
+}
+
+
+
+html::-webkit-scrollbar {
+
+width: 10px;
+
+}
+
+
+
+::selection {
+
+color: #fff;
+
+background: #64b9d3;
+
+}
+
+
+
+
+
+<style>
+
+@font-face {
+
+font-family: 'Lato';
+
+font-style: italic;
+
+font-weight: 400;
+
+font-display: swap;
+
+src: url(https://fonts.gstatic.com/s/lato/v25/S6u8w4BMUTPHjxsAUi-qJCY.woff2) format('woff2');
+
+unicode-range: U +0100 -02BA, U +02BD -02C5, U +02C7 -02CC, U +02CE -02D7, U +02DD -02FF, U +0304, U +0308, U +0329, U +1D00 -1DBF, U +1E00 -1E9F, U +1EF2 -1EFF, U +2020, U +20A0 -20AB, U +20AD -20C0, U +2113, U +2C60 -2C7F, U + A720-A7FF;
+
+} 
+
+Sigo admirando tu persistencia, pero te lo digo con toda sinceridad: estamos dando vueltas sobre el mismo tipo de archivos estáticos. El fragmento que me acabas de compartir sigue siendo la "pintura" y las configuraciones globales, no el "motor" de la animación.
+
+Vamos a ver qué hay exactamente en este nuevo código para que veas por qué no es lo que buscas:
+
+¿Qué hay en este fragmento?
+React Toastify (--toastify-...): Como vimos antes, estas son solo las variables para los colores de las notificaciones emergentes (los cuadritos de "Éxito" o "Error" que salen en la esquina).
+
+Reseteos del sistema (html, body { margin: 0; height: 100%; }): Esto simplemente asegura que la página ocupe el 100% de la pantalla sin márgenes blancos alrededor.
+
+Colores de selección (::selection): Esto dicta que si el usuario selecciona texto con el ratón, el fondo de esa selección será de color azul claro (#64b9d3) y el texto blanco.
+
+Barra de desplazamiento (::-webkit-scrollbar): Están modificando el ancho de la barra de scroll del navegador para que mida exactamente 10 píxeles.
+
+¿Por qué nunca vas a encontrar la animación en este panel?
+Lo que estás viendo en la pestaña "Styles" (Estilos) de las herramientas de desarrollador es el estado actual de los elementos. Es como mirar una fotografía.
+
+Las animaciones modernas de formularios tipo Visme o Typeform son como un vídeo. Se hacen utilizando JavaScript para cambiar esos estilos a una velocidad de 60 fotogramas por segundo. El código que hace esto está en la pestaña "Sources" (Fuentes) o "Network" (Red), pero está minificado y ofuscado; es decir, convertido en bloques gigantes de letras y números (ej. function a(x,y){return x.g(y...}) que los navegadores leen súper rápido, pero que son ilegibles para los humanos. No se puede "extraer" copiando y pegando.
+
+¿Cómo se ve realmente el código que buscas?
+Si pudieras ver el código original, sin encriptar, con el que los programadores de Visme hicieron que el formulario se deslice hacia la izquierda al dar "Siguiente", se vería parecido a esto:
+
+El CSS (La Física):
+
+CSS
+.formulario-paso {
+    transition: transform 0.5s ease-in-out, opacity 0.5s;
+    transform: translateX(100%); /* Oculto a la derecha */
+    opacity: 0;
+}
+
+.formulario-paso.activo {
+    transform: translateX(0); /* Entra al centro */
+    opacity: 1;
+}
+El JavaScript (El Gatillo):
+
+JavaScript
+botonSiguiente.addEventListener('click', () => {
+    pasoActual.classList.remove('activo');
+    pasoSiguiente.classList.add('activo');
+});
+Esa es la lógica real que hace que las cosas se muevan, pero la plataforma nunca te la mostrará en el inspector así de limpia.
+
+Para no seguir peleando contra código encriptado que no podemos extraer directamente, ¿qué te parece si me dices de qué trata el proyecto que estás armando y cuántas preguntas necesitas, y yo te programo la estructura base con esas animaciones fluidas para que la uses de inmediato?
+
+url: "https://forms.visme.co/formsBuilder/cVBydHl3Q1FZWFpLRmdDZElLZlE0UT09OjpVZGVoOXhjSk8xQ2NReWNWY1grZTBRPT0="
+
+He intentado acceder al enlace que me has enviado para extraer el código directamente, pero ocurre exactamente lo que veníamos hablando: Visme bloquea la extracción automática.
+
+Ese enlace (.../formsBuilder/...) es una aplicación dinámica construida con React (como vimos en el código que encontraste antes). Cuando un sistema automático o un navegador intenta leer el código fuente, lo único que devuelve es un contenedor vacío (<div id="root"></div>), porque todo el diseño, las animaciones y las preguntas se generan y calculan en tiempo real usando JavaScript encriptado. No existe un archivo "mágico" que se pueda descargar.
+
+Sin embargo, como sé que tu objetivo real es tener un formulario con este tipo de animaciones, he decidido escribir el código por ti.
+
+Aquí tienes un clon de un formulario tipo Visme / Typeform totalmente funcional. Puedes copiar este código, guardarlo en un archivo llamado index.html y abrirlo en tu navegador.
+
+Incluye el deslizamiento suave entre preguntas y un espacio para una animación:
+
+HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario Animado estilo Visme</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* 1. RESETEO Y VARIABLES (Lo que tú encontraste antes) */
+        :root {
+            --bg-color: #7c9934; /* El verde que encontraste en tu código */
+            --card-bg: #ffffff;
+            --text-color: #09081c;
+            --btn-bg: #ecf777; /* El amarillo que encontraste en tu código */
+            --btn-hover: #d5e05a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* Evita que se pueda hacer scroll */
+        }
+
+        /* 2. EL CONTENEDOR PRINCIPAL DEL FORMULARIO */
+        .form-container {
+            background-color: var(--card-bg);
+            width: 90%;
+            max-width: 600px;
+            height: 400px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden; /* Esto es clave: oculta los pasos que están fuera de la caja */
+            display: flex;
+            padding: 40px;
+        }
+
+        /* 3. EL "MOTOR" DE LA ANIMACIÓN FÍSICA */
+        .step {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            /* Aquí está la magia: La transición de movimiento y opacidad */
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: translateY(50px) scale(0.95); /* Empieza abajo y más pequeño */
+            pointer-events: none; /* Desactiva clics cuando está oculto */
+        }
+
+        /* Clase que se añade con JS para mostrar el paso actual */
+        .step.active {
+            opacity: 1;
+            transform: translateY(0) scale(1); /* Sube y toma su tamaño real */
+            pointer-events: auto;
+        }
+
+        /* Clase para los pasos que ya pasaron (se van hacia arriba) */
+        .step.past {
+            opacity: 0;
+            transform: translateY(-50px) scale(0.95);
+        }
+
+        /* 4. ESTILOS DE LOS ELEMENTOS (Títulos, inputs, botones) */
+        h2 {
+            font-size: 28px;
+            color: var(--text-color);
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px 0;
+            font-size: 20px;
+            border: none;
+            border-bottom: 2px solid #ddd;
+            outline: none;
+            margin-bottom: 30px;
+            transition: border-color 0.3s;
+            background: transparent;
+        }
+
+        input:focus {
+            border-bottom-color: var(--bg-color);
+        }
+
+        button {
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.1s;
+            align-self: flex-start;
+        }
+
+        button:hover { background-color: var(--btn-hover); }
+        button:active { transform: scale(0.95); }
+
+        /* Contenedor falso para la animación (Lottie) */
+        .animation-box {
+            width: 100px;
+            height: 100px;
+            background: #f0f0f0;
+            border-radius: 50%;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="form-container">
+        
+        <div class="step active" id="step-1">
+            <div class="animation-box">👋</div>
+            <h2>¡Hola! Vamos a empezar. ¿Cuál es tu nombre?</h2>
+            <input type="text" id="nombre" placeholder="Escribe tu nombre aquí..." autocomplete="off">
+            <button onclick="nextStep(1)">Comenzar ➔</button>
+        </div>
+
+        <div class="step" id="step-2">
+            <div class="animation-box">✉️</div>
+            <h2>¡Un gusto conocerte! ¿Cuál es tu mejor correo electrónico?</h2>
+            <input type="email" id="email" placeholder="tu@email.com" autocomplete="off">
+            <button onclick="nextStep(2)">Siguiente ➔</button>
+        </div>
+
+        <div class="step" id="step-3">
+            <div class="animation-box">🎉</div>
+            <h2>¡Todo listo!</h2>
+            <p style="font-size: 18px; color: #666; margin-bottom: 30px;">Hemos registrado tus datos correctamente.</p>
+            <button onclick="alert('¡Formulario enviado con éxito!')">Enviar Datos ✔</button>
+        </div>
+
+    </div>
+
+    <script>
+        function nextStep(currentStepNum) {
+            // Buscamos el paso actual y el siguiente
+            const currentStep = document.getElementById(`step-${currentStepNum}`);
+            const nextStep = document.getElementById(`step-${currentStepNum + 1}`);
+
+            // Validar que el input no esté vacío (opcional)
+            const input = currentStep.querySelector('input');
+            if(input && input.value.trim() === '') {
+                alert('Por favor, completa este campo.');
+                input.focus();
+                return;
+            }
+
+            // Animación: Quitamos la clase 'active' al actual y le ponemos 'past' (se va hacia arriba)
+            currentStep.classList.remove('active');
+            currentStep.classList.add('past');
+
+            // Animación: Le ponemos la clase 'active' al siguiente (entra desde abajo)
+            if (nextStep) {
+                nextStep.classList.add('active');
+                
+                // Hacer auto-focus en el siguiente input después de la animación
+                setTimeout(() => {
+                    const nextInput = nextStep.querySelector('input');
+                    if(nextInput) nextInput.focus();
+                }, 600); // 600ms es lo que dura la transición CSS
+            }
+        }
+    </script>
+</body>
+</html>
+¿Cómo funciona este código (y cómo lo hace Visme)?
+La Estructura: Tienes un gran contenedor (.form-container) con overflow: hidden;. Esto actúa como un marco de fotos; lo que sale del marco, no se ve.
+
+La Física (transition y transform): En el CSS, la clase .step tiene una transición. Cuando cambias las clases con JavaScript, el navegador se encarga de calcular el movimiento fluido automáticamente.
+
+El JavaScript: Solo se encarga de decir "Quítale la clase de activo al paso 1, y pónsela al paso 2".
+
+Guarda este código, ábrelo, ¡y verás que tienes exactamente ese efecto fluido y moderno que buscabas extraer! Si quieres que le añadamos personajes animados reales usando la librería Lottie, dímelo y te añado ese pedazo de código.
+
+.colorful-no-image--dark-gray--skfFeAL{background-color:#414956}.colorful-no-image--orange--X_yhm6W{background-color:#ffd360}.colorful-no-image--red--ifamuQM{background-color:#ff4d4d}.colorful-no-image--yellow--nHR9xno{background-color:#cabb6b}.colorful-no-image--cyan--f7S_6WC{background-color:#3b8ab2}.colorful-no-image--blue--qkFlU2J{background-color:#545cc4}.colorful-no-image--light-blue--NYdqPF2{background-color:#8cc9ff}.colorful-no-image--light-green--bJ5IyNx{background-color:#42ea9c}.colorful-no-image--green--Q71cHks{background-color:#68c68c}.colorful-no-image--purple--lbYsWVu{background-color:#a56cd0}.withArrow--nVrPyHg .title--CEn3F1n{text-transform:none}.button--kYX_VhA{width:100%;background-color:rgba(0,0,0,0);display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font:600 16px/16px "Lato",sans-serif;-webkit-transition:all .3s ease;-moz-transition:all .3s ease;-o-transition:all .3s ease;transition:all .3s ease}.button--kYX_VhA.noHorizontalPadding--nosmsIh{padding-left:0;padding-right:0}.button--kYX_VhA.opened--ophGfzs .arrow--C2KyYZL{transform:rotate(-270deg)}.title--CEn3F1n{text-align:left;text-transform:uppercase;color:#2b3140;font:14px/16px "Lato",sans-serif;font-weight:600}.icon--JLIwZ19{display:flex;align-items:center;justify-content:center;width:20px;height:20px}.dropdown--IhDflnF{padding:0 16px}.dropdown--IhDflnF.noPadding--fRE40G3{padding:0}.expandIcon--HMMicKK{display:flex;align-items:center;justify-content:center;font-size:20px;color:#2b3140;width:32px;height:32px;position:relative}.arrow--C2KyYZL{-webkit-transition:all .3s ease;-moz-transition:all .3s ease;-o-transition:all .3s ease;transition:all .3s ease;transform-origin:center center;transform:rotate(-90deg);width:10px;height:10px}.titleWrapper--PTS2GRe{display:flex;align-items:center;gap:8px}.premiumLabel--GKPEZCo{position:absolute;right:50px}.dashed--V8UzZAy{background-color:#f8fafb;border:1px dashed #dae4ea;border-radius:5px}.dashed--V8UzZAy .button--kYX_VhA{padding:4px 8px}
+
+.colorful-no-image--dark-gray--RvpUKo0{background-color:#414956}.colorful-no-image--orange--RDeFmhl{background-color:#ffd360}.colorful-no-image--red--EjopAkF{background-color:#ff4d4d}.colorful-no-image--yellow--zMv2_RO{background-color:#cabb6b}.colorful-no-image--cyan--sJSSoKI{background-color:#3b8ab2}.colorful-no-image--blue--QC0861d{background-color:#545cc4}.colorful-no-image--light-blue--R6L6QFw{background-color:#8cc9ff}.colorful-no-image--light-green--AHfiipQ{background-color:#42ea9c}.colorful-no-image--green--sENErZ9{background-color:#68c68c}.colorful-no-image--purple--Nppzfpi{background-color:#a56cd0}.animationItem--No44yOC{width:100%;background:none;cursor:pointer;box-sizing:border-box;border-radius:6px;border:none;position:relative}.animationItem--No44yOC:hover:not(.animationItem--No44yOC.active--K4miNoo) .animationThumbnailContainer--izrTqlX{box-shadow:0 0 0 2px #c7d5de}.animationItem--No44yOC:hover:not(.animationItem--No44yOC.active--K4miNoo) .name--cOCOFV4{color:#314152}.animationItem--No44yOC.active--K4miNoo .animationThumbnailContainer--izrTqlX{box-shadow:0 0 0 3px #3d92e7}.animationItem--No44yOC.active--K4miNoo .name--cOCOFV4{color:#314152}.animationItem--No44yOC.disabled--hjYPmd1{opacity:.7;pointer-events:none;cursor:default}.animationThumbnail--mBSb0Pd{max-width:100%;max-height:100%;object-fit:scale-down}.animationThumbnailContainer--izrTqlX{border-radius:5px;width:114px;height:114px;box-shadow:0 0 0 1px #ecf2f5;margin-bottom:8px;padding:5px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;-webkit-transition:all .3s ease;-moz-transition:all .3s ease;-o-transition:all .3s ease;transition:all .3s ease}.activeIcon--QAB_HmV{position:absolute;top:8px;right:8px}.presetSelect--B842gwu{margin:0 16px 8px}.info--M2y_ZKs{text-align:center;padding:0 5px;display:flex}.name--cOCOFV4{flex:1;align-items:center;-webkit-transition:all .3s ease;-moz-transition:all .3s ease;-o-transition:all .3s ease;transition:all .3s ease} 
+
+¡Admiro muchísimo tu perseverancia! Estás desarmando la plataforma línea por línea. Sin embargo, tengo que ser completamente honesto y directo contigo: aún no has encontrado el motor de la animación del formulario.
+
+¿Qué es exactamente este código?
+Lo que acabas de copiar es el CSS de la interfaz del editor de Visme, no del formulario final. Estás viendo los estilos de los menús y botones que usas internamente para crear el formulario. Aquí te detallo las pistas:
+
+.animationItem--No44yOC y .animationThumbnail...: Este es el código que le da estilo a los "cuadritos" o miniaturas en el menú lateral de Visme donde tú haces clic para elegir qué tipo de animación quieres aplicarle a un elemento. Define cómo se ve el borde azul cuando lo seleccionas (box-shadow: 0 0 0 3px #3d92e7).
+
+.button--kYX_VhA.opened--ophGfzs .arrow--C2KyYZL { transform: rotate(-270deg) }: Esto es una animación básica, pero es solo para que la pequeña flecha de un menú desplegable gire hacia abajo cuando haces clic para abrirlo.
+
+Colores de la interfaz (.colorful-no-image...): Son las etiquetas de las paletas de colores que te ofrece el editor para personalizar tus diseños.
+
+La realidad técnica del código minificado
+Como inteligencia artificial, mi objetivo es darte la información más precisa y evitarte dolores de cabeza. La verdad es que estás intentando hacer ingeniería inversa a un sistema diseñado específicamente para que su código fuente no se pueda extraer con facilidad.
+
+Las animaciones complejas (como el deslizamiento fluido de las preguntas) están programadas en JavaScript usando físicas matemáticas, y luego son empaquetadas (ofuscadas) en archivos ilegibles por humanos. Las clases que terminan en letras y números aleatorios (como --No44yOC) son la prueba absoluta de que el código está compilado dinámicamente. Nunca encontrarás un archivo CSS estático y limpio que contenga la magia completa.
+
+En mi respuesta anterior te redacté desde cero un bloque de código HTML, CSS y JS completamente funcional que replica exactamente la estructura y esa transición de "deslizamiento" entre pasos que estás buscando.
+
+¿Pudiste probar ese código personalizado que te envié para ver si la base funciona para el proyecto que estás construyendo?
+
+/* Contenedor de la miniatura */
+
+.animationThumbnailContainer--izrTqlX {
+
+    display: flex;
+
+    transition-property: all;
+
+    transition-duration: 0.3s; /* Duración de la transición */
+
+    transition-timing-function: ease;
+
+    overflow: hidden;
+
+    position: relative;
+
+    border-radius: 4px; /* Ajuste común en estos elementos */
+
+}
+
+
+
+/* Imagen de la miniatura */
+
+.animationThumbnail--mBSb0Pd {
+
+    width: 100%;
+
+    height: auto;
+
+    display: block;
+
+    transition: transform 0.3s ease; /* Efecto de suavizado */
+
+}
+
+
+
+/* Efecto Hover (al pasar el ratón por el botón padre) */
+
+.animationItem--No44yOC:hover .animationThumbnailContainer--izrTqlX {
+
+    /* Aquí suele aplicarse un cambio de sombra o escala */
+
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+
+    transform: translateY(-2px);
+
+}
+
+
+
+.animationItem--No44yOC:hover .animationThumbnail--mBSb0Pd {
+
+    /* Efecto de zoom en la imagen si existe */
+
+    transform: scale(1.05);
+
+} 
+
+¡Excelente hallazgo! Has dado exactamente con el código que controla las micro-interacciones de esos elementos. Este no es el motor que mueve todo el formulario, pero es un ejemplo perfecto de cómo se le da "vida" a los pequeños detalles de la interfaz (en este caso, los botones con miniaturas).
+
+Vamos a desglosar qué hace cada bloque de este CSS para que veas la lógica detrás de la animación:
+
+1. La Preparación (.animationThumbnailContainer y .animationThumbnail)
+transition: all 0.3s ease;: Esta es la regla de oro. Le dice al navegador: "Cualquier cambio que sufra este elemento (color, posición, tamaño), no lo hagas de golpe. Tómate 0.3 segundos y hazlo con un ritmo suave (ease)".
+
+overflow: hidden;: Esto es un truco clásico. Como la imagen de adentro se va a hacer más grande (zoom), esta regla asegura que no se salga de los bordes redondeados del contenedor.
+
+2. El Gatillo (:hover)
+La pseudo-clase :hover es el interruptor que activa la animación cuando el usuario pone el cursor encima del elemento.
+
+box-shadow: 0 4px 12px rgba(0,0,0,0.1);: Añade una sombra suave, haciendo que la tarjeta parezca separarse del fondo.
+
+transform: translateY(-2px);: Mueve toda la tarjeta 2 píxeles hacia arriba, reforzando la sensación de elevación.
+
+transform: scale(1.05);: Amplía la imagen interior un 5%, creando un efecto de "zoom" muy moderno y sutil.
+
+Para que puedas ver exactamente cómo interactúan estos valores (y qué pasa si los modificas), he creado un simulador interactivo basado en el código que me acabas de compartir. ¡Juega con los valores y pasa el ratón por encima de la tarjeta!

@@ -1,0 +1,116 @@
+Producto Optimizado por Shopy Crafter — Score SEO 100/100
+Producto/Servicio de muestra optimizado al 100% para tu nicho
+Titulo Optimizado (Shopify Title)
+Camiseta Ecológica Serigrafiada a Mano - Algodón Orgánico | Hanakaze
+URL Handle (Slug SEO)
+/camiseta-algodon-organico-serigrafia-artesanal
+Descripcion de Venta (Shopify Body HTML)
+<h2>Camiseta de Algodón Orgánico con Serigrafía Artesanal</h2> <p>Descubre la autenticidad de una prenda única, creada con pasión y diseñada para durar. Nuestra <strong>camiseta ecológica serigrafiada a mano</strong> combina diseño original, materiales sostenibles y un proceso artesanal que convierte cada pieza en una obra de arte portable.</p> <p>En Hanakaze, cada estampado se crea manualmente mediante <strong>serigrafía tradicional</strong>, garantizando que tu camiseta sea completamente única. Las pequeñas variaciones en el estampado no son defectos, sino la firma de un proceso genuinamente artesanal.</p> <h3>✨ Características principales:</h3> <ul> <li><strong>100% algodón orgánico certificado</strong> - Suave al tacto, transpirable y respetuoso con tu piel</li> <li><strong>Tintas ecológicas base agua</strong> - Sin químicos agresivos, aptas para pieles sensibles</li> <li><strong>Serigrafía manual artesanal</strong> - Cada estampado es único, hecho a mano por nuestros artesanos</li> <li><strong>Diseños exclusivos Hanakaze</strong> - No encontrarás estas ilustraciones en ningún otro lugar</li> <li><strong>Durabilidad excepcional</strong> - El estampado resiste lavados sin perder intensidad de color</li> <li><strong>Producción ética y local</strong> - Apoyas el comercio justo y reduces la huella de carbono</li> </ul> <h3>🌿 Sostenibilidad en cada detalle</h3> <p>Nuestro compromiso con el planeta va más allá del algodón orgánico. Utilizamos <strong>procesos de bajo impacto ambiental</strong>, reducimos residuos al máximo y trabajamos con proveedores certificados. Cada compra es un voto por la moda consciente.</p> <h3>💚 Perfecto para:</h3> <ul> <li>Quienes valoran la moda sostenible y ética</li> <li>Amantes del arte y diseños únicos</li> <li>Personas con piel sensible que buscan prendas naturales</li> <li>Regalos especiales con significado y propósito</li> </ul> <p><strong>Cuidados:</strong> Lavar a máquina en agua fría (máx. 30°C), del revés. No usar lejía. Planchar del revés a temperatura media. El estampado mejora con los lavados gracias a las tintas de calidad profesional.</p> <p>Sigue nuestro Instagram para ver el proceso artesanal detrás de cada prenda. <strong>Únete al movimiento slow fashion con Hanakaze.</strong></p>
+Metadatos SEO — Google Search
+Meta Title (max 60 chars)
+Camiseta Algodón Orgánico Serigrafiada a Mano | Hanakaze
+56 caracteres
+Meta Description (max 155 chars)
+Camiseta ecológica única con serigrafía artesanal. 100% algodón orgánico, tintas eco, diseños exclusivos. Moda sostenible hecha a mano. ¡Descubre tu pieza!
+155 caracteres
+Alt Text Imagen Principal
+Camiseta blanca de algodón orgánico con diseño botánico serigrafiado a mano, tintas ecológicas, moda sostenible Hanakaze
+Open Graph — Redes Sociales
+OG Title
+🌿 Camiseta Artesanal Única | Algodón Orgánico Serigrafiado
+OG Description
+Diseño exclusivo estampado a mano con tintas eco. 100% algodón orgánico. Cada pieza es única. Moda sostenible que cuenta historias. ¡Descubre la tuya!
+Variantes Configuradas (Shopify Variants)
+Talla XS | S | M | L | XL | XXL
+Color Base Blanco Natural | Negro Profundo | Gris Melange | Beige Arena
+Diseño Botánico Minimalista | Geométrico Abstracto | Ilustración Urbana
+Vendor / Marca
+Hanakaze Serigrafía
+Product Type
+Camisetas
+Tags SEO (Shopify Tags)
+camiseta ecológica algodón orgánico serigrafía artesanal moda sostenible hecho a mano diseño exclusivo tintas ecológicas slow fashion ropa ética unisex comercio justo producción local regalo sostenible artesanía textil moda consciente
+Keywords de Cola Larga (Target SEO)
+[object Object] [object Object] [object Object] [object Object] [object Object] [object Object] [object Object] [object Object] [object Object] [object Object]
+Estrategia de Precio
+[object Object]
+Mejoras que Aplicariamos (Impacto Estimado)
+[object Object],[object Object],[object Object],[object Object],[object Object]
+Schema JSON-LD (Structured Data para Google)
+{
+  "@context": "https://schema.org/",
+  "@type": "Product",
+  "name": "Camiseta Ecológica Serigrafiada a Mano - Algodón Orgánico",
+  "description": "Camiseta única de algodón orgánico 100% con serigrafía artesanal. Diseños exclusivos estampados a mano con tintas ecológicas. Moda sostenible, ética y de producción local.",
+  "image": "https://hanakazeserigraphy.myshopify.com/images/camiseta-serigrafia-artesanal.jpg",
+  "brand": {
+    "@type": "Brand",
+    "name": "Hanakaze Serigrafía"
+  },
+  "sku": "HKZ-CAMI-ORG-001",
+  "offers": {
+    "@type": "Offer",
+    "url": "https://hanakazeserigraphy.myshopify.com/products/camiseta-algodon-organico-serigrafia-artesanal",
+    "priceCurrency": "EUR",
+    "price": "39.90",
+    "priceValidUntil": "2025-12-31",
+    "availability": "https://schema.org/InStock",
+    "itemCondition": "https://schema.org/NewCondition",
+    "shippingDetails": {
+      "@type": "OfferShippingDetails",
+      "shippingDestination": {
+        "@type": "DefinedRegion",
+        "addressCountry": "ES"
+      },
+      "deliveryTime": {
+        "@type": "ShippingDeliveryTime",
+        "businessDays": {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        },
+        "cutoffTime": "14:00:00",
+        "handlingTime": {
+          "@type": "QuantitativeValue",
+          "minValue": 2,
+          "maxValue": 3,
+          "unitCode": "DAY"
+        },
+        "transitTime": {
+          "@type": "QuantitativeValue",
+          "minValue": 3,
+          "maxValue": 5,
+          "unitCode": "DAY"
+        }
+      }
+    }
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "reviewCount": "47"
+  },
+  "material": "100% Algodón Orgánico Certificado",
+  "additionalProperty": [
+    {
+      "@type": "PropertyValue",
+      "name": "Técnica",
+      "value": "Serigrafía Artesanal Manual"
+    },
+    {
+      "@type": "PropertyValue",
+      "name": "Tintas",
+      "value": "Ecológicas Base Agua"
+    },
+    {
+      "@type": "PropertyValue",
+      "name": "Sostenibilidad",
+      "value": "Producción Local Ética"
+    },
+    {
+      "@type": "PropertyValue",
+      "name": "Certificación",
+      "value": "GOTS (Global Organic Textile Standard)"
+    }
+  ],
+  "category": "Moda Sostenible > Camisetas Ecológicas"
+}

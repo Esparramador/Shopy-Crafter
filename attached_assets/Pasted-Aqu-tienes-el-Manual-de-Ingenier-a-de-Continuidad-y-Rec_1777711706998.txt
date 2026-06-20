@@ -1,0 +1,30 @@
+Aquí tienes el Manual de Ingeniería de Continuidad y Recuperación Autónoma, diseñado para ser el núcleo de inteligencia de tu aplicación. Este documento no es solo una guía; es la lógica de programación que permitirá a tu app generar vídeos de cualquier duración (desde 15 segundos hasta 15 minutos o más) con una coherencia absoluta, profesionalismo extremo y sin errores visuales.1. EL NÚCLEO: SISTEMA DE PERSISTENCIA DE ADN VISUAL (VDP)Para que la app nunca pierda el hilo, debe crear un "Archivo Maestro de Identidad" al inicio de cada proyecto. La app no "imagina" el objeto en cada clip; lo "reproduce" basándose en constantes matemáticas.Extracción de Firmas de Material: La app analiza la imagen original y extrae valores exactos de rugosidad, metalicidad y color. Para un Rolex Datejust, la app bloquea el valor del Oro Everose y el Acero Oystersteel.Anclaje de Semilla Espacial (Seed Anchoring): La app utiliza una semilla base fija para el ruido de la IA, pero añade un "Ruido de Evolución" controlado para que el fondo cambie mientras el producto permanece idéntico.Referencia Cruzada de Fotogramas (Frame-Loopback): La app utiliza el último fotograma generado del "Clip A" como la "Imagen de Referencia" obligatoria para el "Clip B". Esto garantiza que no existan saltos (jump-cuts) entre escenas.2. PROTOCOLO DE RECUPERACIÓN DE EMERGENCIA (ANTI-ALUCINACIÓN)Si la IA genera un clip donde el reloj se deforma o el texto es ilegible, la app debe detectar el error antes de mostrarlo. Este es el Manual de Prompting de Emergencia que la app inyectará automáticamente si detecta pérdida de coherencia:Si el objeto se deforma: [EMERGENCY_RE-ALIGN]: Force geometry to {Initial_Reference_Image}. Reset physical constraints. Apply strict rigid-body physics. Eliminate fluid morphing.Si el color varía: [COLOR_CORRECTION_INJECT]: Re-apply Master_LUT_01. Force hex color #E5D2A0 for gold surfaces. Correct white balance to 5500k.Si la cámara se vuelve errática: [MOTION_STABILIZE]: Override camera vector. Apply linear motion path. Smooth out jitter using temporal coherence weight 1.0.3. ORQUESTACIÓN CINEMATOGRÁFICA DE LARGA DURACIÓN (15 MINUTOS+)Para mantener al espectador pegado a la pantalla durante 15 minutos, la app sigue una Lógica de Escalamiento Emocional:Micro-Narrativas: Divide los 15 minutos en "Mini-Documentales" de 2 minutos. Cada uno explora un aspecto (la historia, el mecanismo, el prestigio, el diseño).Continuidad Auditiva Total (ASMR & Epic): El sonido es el pegamento. La app debe superponer una pista de audio "pad" (ambiente) que nunca se corta, mientras los efectos de sonido (clacks metálicos, aire, destellos) se sincronizan con los píxeles de movimiento.Transiciones Invisibles (Match-Cuts):Transición por Color: Una pantalla llena de diamantes blancos se convierte suavemente en un paisaje nevado donde el modelo lleva el reloj.Transición por Forma: El bisel circular del reloj se convierte en la lente de una cámara o en el sol de un amanecer.4. EL MOTOR DE TEXTO LEGIBLE Y ADAPTATIVOEl texto nunca debe ser parte del video de la IA. Tu app debe manejarlo en una Capa de Composición Superior (Z-Index: 999):Renderizado Vectorial: La app usa fuentes .otf de alta gama. El texto es 100% nítido porque no es un video, es una capa digital sobre el video.IA de Contexto de Texto: La app "lee" qué está pasando en el video. Si el video muestra el Bisel Estriado, la app busca en su base de datos y escribe: "El arte del estriado, una firma de distinción".Adaptabilidad de Contraste en Tiempo Real: Si el Rolex pasa por una zona de luz brillante, el texto cambia automáticamente de blanco a un gris carbón profundo con una sombra suave para mantenerse 100% legible.5. ARQUITECTURA TÉCNICA FINAL (JSON DE CONTROL TOTAL)Este es el esquema que debe gobernar cada milisegundo de tu aplicación:json{
+  "infinite_cinematic_engine": {
+    "continuity_system": {
+      "visual_dna_lock": "STRICT",
+      "frame_to_frame_sync": "ENABLED",
+      "motion_vector_persistence": "ON"
+    },
+    "duration_logic": {
+      "short_form_0_60s": "High_Intensity_VFX",
+      "long_form_1m_15m": "Narrative_Pacing_with_Micro_Climaxes",
+      "scene_transitions": "Seamless_Morphing_or_Match_Cut"
+    },
+    "audio_visual_bridge": {
+      "foley_trigger_sensitivity": 0.85,
+      "ambient_sound_continuity": "Master_Track_Gapless",
+      "sfx_spatial_tracking": "3D_Audio_Positioning"
+    },
+    "text_layer_intelligence": {
+      "rendering": "Vector_Overlay",
+      "readability_check": "Dynamic_Luminance_Detection",
+      "content_sync": "Visual_Tag_Recognition"
+    },
+    "emergency_failsafe": {
+      "auto_regenerate_on_glitch": true,
+      "coherence_threshold": 0.95,
+      "prompt_injection_recovery": "ACTIVE"
+    }
+  }
+}
+Usa el código con precaución.Resumen de Funcionamiento para tu App:Tu app ahora tiene un "Libro de Estilo" inamovible. Da igual si el usuario pide un anuncio de 10 segundos para Instagram o un documental de 15 minutos para una pantalla gigante; la app siempre:Analiza el objeto (ADN).Planifica la narrativa (Hilo conductor).Genera clips conectados (PCU).Sincroniza audio y texto profesional.Vigila que nada se deforme (Failsafe

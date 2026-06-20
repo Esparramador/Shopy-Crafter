@@ -1,0 +1,42 @@
+Para ser totalmente honestos contigo: ninguna IA (ni Claude, ni yo) puede generar una página web perfecta, compleja y 100% funcional si le pides que escupa todo el código en un solo bloque gigante. El código se corta, se mezclan estilos y deja de ser editable.
+
+Para que tu plataforma renderice esto de manera real, funcional y completamente editable, debes estructurar tu backend en Replit para que trabaje usando un sistema de "Design Tokens" (Variables de Diseño) y Generación Modular.
+
+Aquí tienes la arquitectura exacta y el prompt estricto que debes implementar para que Claude lo genere a la perfección:
+
+La Arquitectura del "Web Lab" (Cómo debe procesarlo tu sistema)
+Fase de Extracción (El ADN en JSON):
+Cuando el usuario pone la URL de Instagram, la IA no debe generar la web todavía. Primero, debe devolver un JSON con el "Sistema de Diseño".
+(Ejemplo: { "primary_color": "#FF5733", "font_heading": "Montserrat", "style": "minimalista y agresivo" }).
+
+Uso de Variables CSS (El secreto de la edición):
+Claude DEBE generar el CSS usando variables (:root { --primary: #FF5733; }). Esto es lo que permitirá que tu plataforma Shopy Crafter cambie los colores en tiempo real si el usuario mueve un deslizador, sin tener que regenerar todo el código.
+
+El Entorno de Renderizado (Iframe o Shadow DOM):
+Para que las dos cosas (HTML y CSS) se "mezclen visualmente" de forma segura en tu plataforma sin romper el diseño de tu propio SaaS, debes inyectar el código generado por Claude dentro de una etiqueta <iframe> o usar un Shadow DOM en tu frontend.
+
+El "Mega-Prompt" Estricto para Claude (Cópialo en tu backend)
+Para que Claude genere código impecable, real y listo para producción, debes inyectar esta instrucción en el System Prompt de tu Web Lab:
+
+Rol: Eres un Ingeniero Frontend Senior y Arquitecto UX/UI. Tu misión es generar código para páginas web listas para producción, basándote en el "ADN de marca" proporcionado.
+
+Reglas Estrictas de Salida (CRÍTICO):
+
+CERO CHARLA: No incluyas saludos, explicaciones, ni texto introductorio. Devuelve ÚNICAMENTE el código solicitado.
+
+SEPARACIÓN DE ARCHIVOS: Si se te pide HTML y CSS, devuélvelos separados claramente por delimitadores personalizados, por ejemplo: ===HTML_START=== [código] ===HTML_END=== y ===CSS_START=== [código] ===CSS_END===.
+
+MODULARIDAD HTML: Utiliza etiquetas semánticas de HTML5 (<header>, <main>, <section>, <footer>).
+
+SISTEMA CSS EDITABLE: Todo el CSS debe estar basado en Custom Properties (Variables CSS) en la pseudo-clase :root. No uses colores ni fuentes "quemadas" (hardcoded) en las clases. Ejemplo: color: var(--brand-primary);.
+
+DISEÑO RESPONSIVE: Incluye siempre Media Queries (@media) para móviles y tablets usando un enfoque Mobile-First. Flexbox y CSS Grid son obligatorios.
+
+IMÁGENES Y ASSETS: Si necesitas usar imágenes de relleno (placeholders), utiliza URLs genéricas de Unsplash que coincidan con la temática.
+
+Tarea actual: Genera una [Landing Page / Sección X] funcional aplicando este ADN de marca: [Inyectar aquí el JSON con los datos extraídos de Instagram/Google].
+
+Cómo implementarlo en Replit ahora mismo
+Para que Replit conecte esto correctamente, dile a su Agente de IA:
+
+"Necesito perfeccionar el módulo del Web Lab. Ajusta la llamada a la API de Claude para que incluya un 'System Prompt' estricto que exija variables CSS (:root) y separe el HTML del CSS usando delimitadores (ej. ===HTML_START===). Luego, en el frontend de nuestra plataforma, crea un componente que tome ese HTML y ese CSS y los inyecte de forma segura dentro de un elemento <iframe> para que el usuario tenga una previsualización en vivo 100% funcional y aislada del resto de la interfaz."

@@ -1,0 +1,39 @@
+Si Anthropic ha lanzado la familia Claude 4.5 o 4.7, y Runway ya va por Gen-4, significa que el mercado ha evolucionado brutalmente. Pero aquí viene mi dosis de candor técnico y realidad: tu aplicación en Replit no puede decirle mágicamente a las APIs "investígate a ti misma y cuéntame qué sabes hacer". Las APIs son puertas blindadas; solo responden a comandos específicos.
+
+Para que tu aplicación descubra, analice y entienda todas las capacidades de las últimas versiones de Claude, Gemini, Runway, ElevenLabs y Replicate (y sepa si usar Opus 4.7 o Sonnet 4.5), tenemos que construir un "Motor de Descubrimiento de Modelos" (Discovery Engine).
+
+Casi todas estas plataformas tienen un endpoint oculto (normalmente GET /v1/models) que devuelve la lista exacta de sus modelos actualizados, sus ventanas de contexto y sus capacidades.
+
+Copia este Mega-Prompt y dáselo a Replit para que tu plataforma se auto-eduque leyendo directamente desde las entrañas de los proveedores:
+
+Misión Crítica: Creación del "Motor de Descubrimiento de Capacidades" (API Discovery Engine)
+Actúa como Lead Backend Engineer. El ecosistema de IA ha evolucionado (Claude 4.5/4.7, Gen-4, etc.) y no podemos depender de documentación estática. Necesitamos que "Shopy Crafter" escanee los proveedores oficiales para auditar y descubrir qué modelos están disponibles y cuáles son sus capacidades exactas en tiempo real.
+
+FASE 1: El Escáner de Proveedores (API Polling)
+Crea un nuevo servicio en /services/capabilitiesScout.js. Este script debe realizar peticiones HTTP GET a los endpoints oficiales de información de modelos de nuestros proveedores para extraer la "Verdad Absoluta".
+
+Implementa las llamadas para:
+
+Anthropic (Claude): Llama a su API para listar modelos disponibles y extraer el string del modelo (ej. buscando opus-4.7, haiku-4.5).
+
+Replicate: Llama a GET [https://api.replicate.com/v1/models](https://api.replicate.com/v1/models) para listar las colecciones top (Video-to-Video, Image Restoration, Audio Generation).
+
+ElevenLabs: Llama a GET [https://api.elevenlabs.io/v1/models](https://api.elevenlabs.io/v1/models) para listar los modelos de síntesis de voz (ej. Turbo v2.5, Multilingual v3) y sus capacidades (ej. can_do_voice_conversion, can_do_sfx).
+
+Google (Gemini): Llama a la API de Google para listar los modelos de la familia Gemini disponibles y sus tokens máximos.
+
+FASE 2: El Cerebro Sintetizador (Auto-Auditoría con IA)
+Los datos crudos (JSON) que devuelven estas APIs son muy técnicos. Vamos a usar nuestro propio agente para que los traduzca.
+
+Toma todos esos JSON crudos recolectados en la FASE 1.
+
+Envíalos a nuestro modelo de razonamiento más potente configurado en el sistema con este System Prompt:
+"Eres el Arquitecto Jefe de Shopy Crafter. Te estoy pasando los datos crudos extraídos hoy de las APIs de Anthropic, Runway, Replicate, ElevenLabs y Gemini. Analiza estos datos hiperdetallados y genera un Mapa de Capacidades JSON estandarizado. Dime qué motor es el mejor para Texto, cuál para Vídeo, cuál para Voz, y qué nuevas funciones han añadido en estas últimas versiones."
+
+FASE 3: Almacenamiento del Conocimiento
+Guarda el resultado generado por la IA en un archivo active_capabilities_matrix.json. A partir de ahora, nuestra aplicación leerá este archivo para decidir qué modelo usar cuando un usuario pida una tarea.
+
+Tu Tarea: Escribe el esqueleto de /services/capabilitiesScout.js incluyendo las promesas (fetch/axios) para hacer ping a los endpoints /models de al menos dos de estos proveedores.
+
+El poder de este sistema
+Con esto, Shopy Crafter ya no depende de que tú (el creador) sepas si ha salido "Claude 4.8" o "Runway Gen-5". Tu servidor hará la consulta, verá que hay un modelo nuevo, leerá para qué sirve y lo integrará automáticamente en su base de datos de opciones. Es una aplicación que evoluciona sola.

@@ -248,7 +248,7 @@ const LANDING_FALLBACK: CMSContent = {
   pricing: { pill: "Precios", headline: "Un plan para cada negocio.", subheadline: "Sin sorpresas. Precios claros por lo que realmente hacemos.", plans: [{ id: "p1", name: "Starter", price: "97", currency: "€", period: "/mes", featured: false, badge: null, features: [{ text: "1 proyecto Shopify", included: true }, { text: "3 módulos de IA activos", included: true }, { text: "Imágenes IA a coste real (~€0.25/imagen)", included: true }, { text: "Soporte por email", included: true }], cta: { label: "Solicitar acceso →", style: "ghost" } }, { id: "p2", name: "Growth", price: "197", currency: "€", period: "/mes", featured: true, badge: "Más popular", features: [{ text: "Hasta 3 proyectos Shopify", included: true }, { text: "6 módulos de IA activos", included: true }, { text: "Imágenes IA a coste real (~€0.25/imagen)", included: true }, { text: "Soporte prioritario", included: true }], cta: { label: "Solicitar acceso →", style: "gold" } }, { id: "p3", name: "Agency", price: "397", currency: "€", period: "/mes", featured: false, badge: null, features: [{ text: "Proyectos ilimitados", included: true }, { text: "Todos los módulos de IA", included: true }, { text: "Imágenes IA a coste real (~€0.25/imagen)", included: true }, { text: "Soporte dedicado", included: true }], cta: { label: "Contactar →", style: "ghost" } }] },
   testimonials: { pill: "Clientes", headline: "Resultados\nreales", headlineHighlight: "reales", items: [] },
   cta: { pill: "Empieza hoy", headline: "¿Listo para optimizar\ntu tienda Shopify?", headlineHighlight: "optimizar", subheadline: "Cuéntanos tu caso y te preparamos una propuesta personalizada sin compromiso.", placeholder: "tu@email.com", buttonLabel: "Solicitar acceso →", finePrint: "Sin spam. Solo te contactamos para hablar de tu proyecto." },
-  footer: { tagline: "Optimización IA para tiendas Shopify", columns: [{ title: "Producto", links: [{ label: "Motores IA", href: "#fp-engines" }, { label: "Precios", href: "#fp-pricing" }, { label: "Calculadora", href: "#fp-calculator" }, { label: "Resultados", href: "#fp-results" }] }, { title: "Empresa", links: [{ label: "Sobre nosotros", href: "/sobre-nosotros" }, { label: "Casos de éxito", href: "/casos-de-exito" }, { label: "Afiliados", href: "/programa-de-afiliados" }, { label: "Contacto", href: "/contacto" }] }, { title: "Recursos", links: [{ label: "Blog", href: "/blog" }, { label: "Changelog", href: "/changelog" }, { label: "FAQ", href: "/faq" }, { label: "Documentación", href: "/faq" }] }, { title: "Legal", links: [{ label: "Privacidad", href: "#legal:privacy" }, { label: "Términos", href: "#legal:terms" }, { label: "Cookies", href: "#legal:cookies" }, { label: "RGPD", href: "#legal:gdpr" }] }], copyright: `© ${new Date().getFullYear()} Shopy Crafter · Agency Platform. Todos los derechos reservados`, badges: ["RGPD", "AES-256", "SOC2"] },
+  footer: { tagline: "Optimización IA para tiendas Shopify", columns: [], copyright: `© ${new Date().getFullYear()} Shopy Crafter`, badges: ["RGPD", "SSL", "Shopify Partner"] },
 };
 
 const FP_SECTION_IDS = ["fp-hero", "fp-engines", "fp-demo", "fp-results", "fp-pricing", "fp-calculator", "fp-contact"];
@@ -285,7 +285,6 @@ export default function Landing() {
   const { user } = useAuth();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
   const isAdmin = !isPreview && user?.role === "admin";
-  const isClient = !isPreview && user?.role === "client";
   const [content, setContent] = useState<CMSContent | null>(LANDING_FALLBACK);
   const [currentSection, setCurrentSection] = useState(0);
   const [activeEngine, setActiveEngine] = useState(0);
@@ -299,6 +298,8 @@ export default function Landing() {
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [contactError, setContactError] = useState("");
+  const [spiderPhase, setSpiderPhase] = useState<"ready" | "waiting" | "celebrate">("ready");
+  void spiderPhase;
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [refImagePreview, setRefImagePreview] = useState<string | null>(null);
 
@@ -444,6 +445,7 @@ export default function Landing() {
       }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? (content?.errorMessages?.sendFail ?? "Error al enviar"));
+      setSpiderPhase("celebrate");
       setContactStatus("sent");
     } catch (err: unknown) {
       setContactStatus("error");
@@ -651,7 +653,7 @@ export default function Landing() {
       <PageMeta
         title="Shopy Crafter — Optimización IA para tiendas Shopify"
         description="7 motores de IA para mejorar SEO, imágenes y conversión en tu tienda Shopify. Sin conocimientos técnicos. Prueba gratis 14 días."
-        canonical="https://shopycrafter.com/"
+        canonical="https://shopycrafter.com/landing"
       />
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">
@@ -672,9 +674,7 @@ export default function Landing() {
         </ul>
         <div className="l-nav-ctas">
           {isAdmin ? (
-            <Link href="/home" className="l-btn-gold">{content.adminBackLabel ?? "→ Ir al panel"}</Link>
-          ) : isClient ? (
-            <Link href="/client" className="l-btn-gold">→ Mi panel</Link>
+            <Link href="/admin/clients" className="l-btn-gold">{content.adminBackLabel ?? "← Volver al panel"}</Link>
           ) : (
             <>
               <Link href="/login" className="l-btn-ghost" {...cmsData("nav.ctaSecondary.label")}>{content.nav.ctaSecondary.label}</Link>
@@ -1204,9 +1204,9 @@ export default function Landing() {
               background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(200,168,75,0.06) 0%, transparent 70%)",
             }} />
           </div>
-          <div className="fp-content fp-contact-visme" style={{ position: "relative", width: "100%", maxWidth: "none", padding: 0, overflow: "visible" }}>
-            {/* ── Video + form: min-height so footer is always reachable ── */}
-            <div className="fp-contact-visme-wrapper" style={{ position: "relative", minHeight: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
+          <div className="fp-content fp-contact-visme" style={{ position: "absolute", inset: 0, maxWidth: "none", padding: 0, overflow: "hidden auto" }}>
+            {/* ── Video + form: fixed full-section height, footer scrolls below ── */}
+            <div className="fp-contact-visme-wrapper" style={{ position: "relative", height: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
               <VismeFormHero isActive={isAnimated("fp-contact")} />
             </div>
 
@@ -1445,8 +1445,8 @@ export default function Landing() {
               )}
             </div>
 
-          </div>
-          <footer className="fp-footer" style={{ width: "100%" }}>
+            {/* ── FOOTER ── */}
+            <footer className={`fp-footer ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.3s", marginTop: 40, gridColumn: "1 / -1", gridRow: "3" }}>
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
@@ -1517,18 +1517,10 @@ export default function Landing() {
               </div>
               <div className="l-footer-bottom">
                 <div className="l-footer-copy" {...cmsProps("footer.copyright")}>{content.footer.copyright}</div>
-                <div className="l-footer-legal-links">
-                  <Link href="/privacidad">Privacidad</Link>
-                  <span className="l-footer-legal-sep">·</span>
-                  <Link href="/terminos">Términos</Link>
-                  <span className="l-footer-legal-sep">·</span>
-                  <Link href="/cookies">Cookies</Link>
-                  <span className="l-footer-legal-sep">·</span>
-                  <Link href="/contacto">Contacto</Link>
-                </div>
                 <div className="l-footer-badges">{content.footer.badges.map((b, i) => <span key={i} className="l-footer-badge">{b}</span>)}</div>
               </div>
-          </footer>
+            </footer>
+          </div>
         </section>
 
         </div>{/* /fp-wrapper */}

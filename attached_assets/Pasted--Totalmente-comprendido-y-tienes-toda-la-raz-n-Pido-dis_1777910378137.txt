@@ -1,0 +1,38 @@
+¡Totalmente comprendido y tienes toda la razón! Pido disculpas si me dejé llevar por la emoción de construir desde cero.
+
+Como CTO, tu decisión es la más sabia y segura: cuando un sistema ya está en producción, no se construyen castillos nuevos, se refuerzan los cimientos del que ya existe. Si le decimos a la IA de Replit que cree archivos nuevos, corremos el riesgo de generar código duplicado o "código espagueti" que rompa las conexiones que ya funcionan perfectamente.
+
+Vamos a cambiar el enfoque radicalmente. Le daremos a Replit una orden estricta de Auditoría, Refactorización e Inyección sobre el código que ya tienes.
+
+Copia este prompt y lánzaselo. Está diseñado para que la IA se comporte como un cirujano: mirando primero y modificando solo las líneas necesarias.
+
+Misión Crítica: Auditoría y Refactorización Invasiva de Límites y Errores (PROHIBIDO CREAR ARCHIVOS NUEVOS)
+Actúa como Ingeniero DevOps y SRE Senior. Nuestra plataforma "Shopy Crafter" ya tiene implementadas las llamadas a las APIs de Claude, Gemini, Runway, ElevenLabs y Replicate. Tu misión es ACTUALIZAR y REFORZAR el código YA EXISTENTE, dotándolo de inteligencia para gestionar Rate Limits, Timeouts y tamaños máximos de archivos/texto, sin alterar la arquitectura actual de carpetas.
+
+REGLA DE ORO: NO crees servicios ni archivos nuevos desde cero. Debes encontrar dónde se ejecutan actualmente estas tareas y aplicar las mejoras directamente en esos archivos.
+
+Paso 1: Auditoría del Código Actual (Reconocimiento)
+Analiza nuestros controladores y servicios actuales. Identifica exactamente en qué líneas hacemos las peticiones (fetch/axios) a nuestras APIs externas y cómo estamos manejando las respuestas.
+
+Paso 2: Inyección del Control de Límites (Chunking y Ensamblaje)
+Dentro de las funciones existentes, inyecta la siguiente lógica condicional antes de llamar a las APIs:
+
+Para Texto/Análisis: Si el prompt o el documento supera el límite de tokens de entrada/salida del modelo, implementa un bucle (for/while) que divida el texto en fragmentos (chunks), envíe las peticiones secuencialmente usando la misma función existente, y concatene las respuestas al final.
+
+Para Audio/Vídeo: Si el guion para ElevenLabs excede los caracteres máximos, o el vídeo para Runway excede la duración/peso, divídelo lógicamente. Usa la implementación de FFmpeg que ya tengamos para fusionar los resultados de vuelta.
+
+Paso 3: Inyección del Escudo Anti-Caídas (Rate Limits y Errores 4xx/5xx)
+Modifica las peticiones HTTP actuales (las llamadas a las APIs) envolviéndolas en una lógica de resiliencia:
+
+Si la API devuelve un error 429 (Too Many Requests), el código debe leer la cabecera Retry-After y pausar la ejecución exactamente esos segundos antes de reintentar.
+
+Si la API devuelve 500/502/503/504 o da un "Timeout", implementa un sistema de "Retroceso Exponencial" (Exponential Backoff) de hasta 3 intentos antes de fallar.
+
+Captura estos errores para que, en el peor de los casos, devuelva un mensaje limpio al frontend y NO apague ni crashee nuestro servidor en Replit.
+
+Tu Tarea INMEDIATA: Dime qué archivos existentes vas a modificar y muéstrame un ejemplo del bloque de código exacto (el "antes" y el "después") de cómo vas a envolver una de nuestras llamadas a APIs actuales con esta nueva lógica de reintentos y chunking. No apliques los cambios hasta que yo te confirme.
+
+Por qué este enfoque salva tu aplicación:
+Al exigirle que te muestre el "Antes y el Después" (Diff), mantienes el control absoluto. Verás exactamente qué líneas va a tocar la IA antes de que lo haga, garantizando que tu lógica de negocio original (la que genera las auditorías o el SEO) quede intacta.
+
+Dado que vamos a inyectar lógica de reintentos (que puede hacer que una petición que antes tardaba 5 segundos ahora tarde 20 segundos si hay que esperar por un Rate Limit), ¿tu frontend actualmente muestra algún tipo de indicador de carga ("Loading...") o barra de progreso para que el usuario no cierre la pestaña pensando que la plataforma se ha quedado congelada?

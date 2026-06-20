@@ -1,0 +1,280 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crafter AI — Demo 03 · Glass Product 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,200;0,300;1,200;1,300&family=Inter:wght@200;300;400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+:root{--bg:#06060f;--bg2:#0a0a18;--gold:#c9a961;--violet:#8b5cf6;--pink:#ec4899;--text:#f0f0fa;--mute:#6a6a8a;--border:rgba(255,255,255,0.06);--glass:rgba(255,255,255,0.05)}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+h1,h2{font-family:'Cormorant Garamond',serif;font-weight:200;letter-spacing:-0.02em;line-height:1.02}
+h1{font-size:clamp(44px,7vw,120px)}
+h2{font-size:clamp(36px,5vw,80px);margin-bottom:28px}
+
+/* ── Hero canvas area ── */
+.hero{min-height:100svh;position:relative;display:flex;align-items:center;overflow:hidden}
+#canvas3d{position:absolute;inset:0;z-index:0}
+.hero-content{position:relative;z-index:2;padding:100px 6%;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;width:100%}
+@media(max-width:900px){.hero-content{grid-template-columns:1fr;padding:100px 5%}}
+.hero-text{max-width:520px}
+.eyebrow{font-size:9px;letter-spacing:0.32em;text-transform:uppercase;color:var(--gold);margin-bottom:24px;display:block}
+.hero-text h1 em{font-style:italic;color:var(--violet)}
+.hero-text p{margin:24px 0 36px;font-size:clamp(14px,1.2vw,17px);color:var(--mute);line-height:1.8;font-weight:300;max-width:460px}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn-primary{padding:13px 32px;background:linear-gradient(135deg,var(--violet),var(--pink));border:none;color:#fff;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .2s,transform .2s}
+.btn-primary:hover{opacity:.85;transform:translateY(-2px)}
+.btn-outline{padding:13px 32px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--text);border-radius:8px;font-size:13px;cursor:pointer;transition:all .2s}
+.btn-outline:hover{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.3)}
+.hero-spec{padding:28px;background:var(--glass);border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(20px);max-width:300px}
+.spec-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px}
+.spec-row:last-child{border-bottom:none}
+.spec-key{color:var(--mute)}
+.spec-val{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold)}
+
+/* ── Scroll indicator ── */
+.scroll-ind{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:5px;opacity:.35}
+.scroll-line{width:1px;height:40px;background:linear-gradient(to bottom,transparent,rgba(255,255,255,0.5),transparent);animation:scrollLine 2s infinite}
+@keyframes scrollLine{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform:scaleY(1);transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+.scroll-txt{font-size:8px;letter-spacing:0.25em;text-transform:uppercase;color:var(--mute)}
+
+/* ── Features ── */
+.features{padding:100px 6%}
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:50px}
+.feat-card{padding:32px;background:var(--glass);border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(16px);transition:border-color .3s,transform .3s}
+.feat-card:hover{border-color:rgba(139,92,246,0.35);transform:translateY(-5px)}
+.feat-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:20px;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.2)}
+.feat-card h3{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;margin-bottom:10px}
+.feat-card p{font-size:13px;color:var(--mute);line-height:1.7}
+
+/* ── 3D Gallery section ── */
+.gallery{padding:100px 6%;background:var(--bg2)}
+.gallery-scroll-hint{font-size:10px;color:var(--mute);margin-top:12px;letter-spacing:0.1em}
+.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px}
+@media(max-width:768px){.gallery-grid{grid-template-columns:1fr}}
+.gallery-item{aspect-ratio:4/5;border-radius:12px;border:1px solid var(--border);background:var(--glass);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:11px;color:var(--mute);transition:all .4s;overflow:hidden;position:relative;cursor:pointer}
+.gallery-item:hover{border-color:rgba(139,92,246,0.4);transform:scale(1.02)}
+.gallery-item::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(139,92,246,0.12),transparent 70%);opacity:0;transition:opacity .4s}
+.gallery-item:hover::before{opacity:1}
+.gallery-icon{font-size:40px;opacity:0.3}
+.gallery-label{letter-spacing:0.12em;text-transform:uppercase;font-size:9px}
+
+/* ── Testimonial ── */
+.testimonial{padding:120px 6%;text-align:center}
+blockquote{font-family:'Cormorant Garamond',serif;font-size:clamp(22px,3vw,40px);font-weight:200;font-style:italic;max-width:800px;margin:0 auto 32px;line-height:1.4;color:var(--text)}
+.cite{font-size:12px;color:var(--mute);letter-spacing:0.15em;text-transform:uppercase}
+
+/* ── CTA ── */
+.cta-section{padding:120px 6%;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;border-top:1px solid var(--border)}
+@media(max-width:768px){.cta-section{grid-template-columns:1fr}}
+.cta-section h2{margin-bottom:16px}
+.cta-section p{color:var(--mute);font-size:15px;line-height:1.7;margin-bottom:32px}
+.cta-form{display:flex;flex-direction:column;gap:14px}
+.cta-input{padding:14px 18px;background:var(--glass);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:13px;outline:none;backdrop-filter:blur(8px);transition:border-color .3s}
+.cta-input:focus{border-color:rgba(139,92,246,0.5)}
+.cta-input::placeholder{color:var(--mute)}
+
+/* ── Footer ── */
+footer{padding:40px 6%;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+.ft-brand{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:200;letter-spacing:0.05em}
+.ft-links{display:flex;gap:24px}
+.ft-links a{font-size:11px;color:var(--mute);text-decoration:none;letter-spacing:0.1em;transition:color .3s}
+.ft-links a:hover{color:var(--text)}
+.ft-copy{font-size:10px;color:rgba(255,255,255,0.18)}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <canvas id="canvas3d"></canvas>
+  <div class="hero-content">
+    <div class="hero-text">
+      <span class="eyebrow">Crafter Designer · 3D Web Studio</span>
+      <h1>Glass<br><em>objects</em><br>in motion</h1>
+      <p>Generate luxury 3D web experiences powered by Three.js MeshPhysicalMaterial — transparent glass, refractive crystal, liquid metal. Deployed in minutes.</p>
+      <div class="hero-cta">
+        <button class="btn-primary">→ Open Designer</button>
+        <button class="btn-outline">See templates</button>
+      </div>
+    </div>
+    <div class="hero-spec">
+      <div class="spec-row"><span class="spec-key">Renderer</span><span class="spec-val">Three.js r158</span></div>
+      <div class="spec-row"><span class="spec-key">Material</span><span class="spec-val">MeshPhysical</span></div>
+      <div class="spec-row"><span class="spec-key">Transmission</span><span class="spec-val">1.0</span></div>
+      <div class="spec-row"><span class="spec-key">IOR</span><span class="spec-val">1.5</span></div>
+      <div class="spec-row"><span class="spec-key">Clearcoat</span><span class="spec-val">1.0</span></div>
+      <div class="spec-row"><span class="spec-key">Engine</span><span class="spec-val">Claude Opus 4.5</span></div>
+    </div>
+  </div>
+  <div class="scroll-ind"><div class="scroll-line"></div><span class="scroll-txt">Scroll</span></div>
+</section>
+
+<section class="features">
+  <span class="eyebrow">02 — Designer Capabilities</span>
+  <h2>Every 3D effect.<br><em>One prompt.</em></h2>
+  <div class="feat-grid">
+    <div class="feat-card fc"><div class="feat-icon">✨</div><h3>Particle Fields</h3><p>3000+ BufferGeometry particles with custom shaders, UnrealBloom, mouse parallax. Hero sections that feel alive.</p></div>
+    <div class="feat-card fc"><div class="feat-icon">🎬</div><h3>Video Scrubbing</h3><p>Apple AirPods-style scroll storytelling. currentTime synced to scrollY, 300vh sticky, text reveals at milestones.</p></div>
+    <div class="feat-card fc"><div class="feat-icon">💎</div><h3>Glass Materials</h3><p>MeshPhysicalMaterial transmission + refraction. Crystal spheres, glass panels, liquid metal — all real-time WebGL.</p></div>
+    <div class="feat-card fc"><div class="feat-icon">⚡</div><h3>GSAP ScrollTrigger</h3><p>Cinematic text reveals (SplitType), horizontal galleries, parallax layers, SVG path drawing, clip-path wipes.</p></div>
+    <div class="feat-card fc"><div class="feat-icon">🏛️</div><h3>3D Venue Tours</h3><p>Procedural architectural interiors, click-to-teleport navigation, SVG minimap, floating HTML labels.</p></div>
+    <div class="feat-card fc"><div class="feat-icon">🎮</div><h3>Gaming Showcase</h3><p>RGB PointLights cycling, scan-line CSS, UnrealBloom, product exploded views, aggressive gaming aesthetics.</p></div>
+  </div>
+</section>
+
+<section class="gallery">
+  <span class="eyebrow">03 — Template Gallery</span>
+  <h2>27 ready-to-<br><em>generate</em> templates</h2>
+  <p class="gallery-scroll-hint">All generated by AI → ready to deploy in one click</p>
+  <div class="gallery-grid">
+    <div class="gallery-item gi"><span class="gallery-icon">✨</span><span class="gallery-label">Particle Hero SaaS</span></div>
+    <div class="gallery-item gi"><span class="gallery-icon">🎬</span><span class="gallery-label">Video Scrubbing</span></div>
+    <div class="gallery-item gi"><span class="gallery-icon">💎</span><span class="gallery-label">Glass Product 3D</span></div>
+    <div class="gallery-item gi"><span class="gallery-icon">⚡</span><span class="gallery-label">GSAP Cinematic</span></div>
+    <div class="gallery-item gi"><span class="gallery-icon">🌆</span><span class="gallery-label">Neon City 3D</span></div>
+    <div class="gallery-item gi"><span class="gallery-icon">🏛️</span><span class="gallery-label">3D Venue Tour</span></div>
+  </div>
+</section>
+
+<section class="testimonial">
+  <blockquote>"Crafter generated our entire brand site — particle hero, product 3D, mobile responsive — in under 4 minutes. We just typed what we wanted."</blockquote>
+  <div class="cite">— Laura M. · Founder, Atelier Lumière</div>
+</section>
+
+<section class="cta-section">
+  <div>
+    <span class="eyebrow">05 — Get started</span>
+    <h2>Build your<br><em>first 3D page</em></h2>
+    <p>Open Crafter Designer, type your prompt, pick your engine (Claude / Gemini / GPT-4.1), and get production-ready HTML in seconds.</p>
+    <button class="btn-primary" style="font-size:14px;padding:15px 40px">→ Open Designer Studio</button>
+  </div>
+  <div class="cta-form">
+    <input class="cta-input" type="text" placeholder="Your name">
+    <input class="cta-input" type="email" placeholder="your@email.com">
+    <textarea class="cta-input" rows="4" placeholder="Describe the page you want to build..." style="resize:none"></textarea>
+    <button class="btn-primary">Send project brief</button>
+  </div>
+</section>
+
+<footer>
+  <div class="ft-brand">Crafter <em>Agency AI</em></div>
+  <div class="ft-links"><a href="#">Designer</a><a href="#">Docs</a><a href="#">API</a><a href="#">GitHub</a></div>
+  <div class="ft-copy">© 2026 Crafter Agency · Barcelona</div>
+</footer>
+
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.158.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+gsap.registerPlugin(ScrollTrigger);
+
+// ── Three.js glass objects scene ──
+const canvas = document.getElementById('canvas3d');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = false;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 0, 8);
+
+// Environment for reflections (simple color scene)
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envScene = new THREE.Scene();
+envScene.background = new THREE.Color(0x0a0a20);
+const envTex = pmrem.fromScene(envScene).texture;
+scene.environment = envTex;
+
+// Glass material factory
+function glassMat(color, transmission=0.92, ior=1.5, roughness=0.05, thickness=1.2){
+  return new THREE.MeshPhysicalMaterial({
+    color, transmission, ior, roughness, thickness,
+    metalness:0.0, clearcoat:1.0, clearcoatRoughness:0.0,
+    envMapIntensity:1.2
+  });
+}
+
+// Glass objects
+const objects = [];
+const configs = [
+  {geo:new THREE.SphereGeometry(1.3,32,32),   mat:glassMat(0xaabbff,0.95,1.5),  pos:[-3.5,1,0],   speed:{y:0.004,x:0.002}},
+  {geo:new THREE.TorusGeometry(1.1,0.4,24,96), mat:glassMat(0xccaaff,0.90,1.7),  pos:[3.5,1.5,-1], speed:{y:0.003,z:0.003}},
+  {geo:new THREE.IcosahedronGeometry(1.1,1),   mat:glassMat(0xffbbcc,0.88,1.6),  pos:[0,-1.5,1],   speed:{y:0.005,x:0.003}},
+  {geo:new THREE.SphereGeometry(0.8,24,24),    mat:glassMat(0xbbffee,0.94,1.4),  pos:[-2,-2,-2],   speed:{x:0.003,z:0.004}},
+  {geo:new THREE.OctahedronGeometry(0.9,1),    mat:glassMat(0xffeebb,0.86,1.8),  pos:[2,-0.5,-3],  speed:{y:0.006,x:0.002}},
+  {geo:new THREE.TorusGeometry(0.7,0.3,20,64), mat:glassMat(0xaaffbb,0.91,1.6),  pos:[-1,2.5,-1],  speed:{z:0.004,x:0.005}},
+];
+configs.forEach((cfg,i) => {
+  const mesh = new THREE.Mesh(cfg.geo, cfg.mat);
+  mesh.position.set(...cfg.pos);
+  mesh._speed = cfg._speed || cfg.speed;
+  mesh._offset = i * 1.3;
+  scene.add(mesh);
+  objects.push(mesh);
+});
+
+// Lighting
+const rect1 = new THREE.RectAreaLight(0x8855ff, 8, 6, 6);
+rect1.position.set(-4, 4, 4);
+rect1.lookAt(0, 0, 0);
+scene.add(rect1);
+const rect2 = new THREE.RectAreaLight(0xffaa44, 5, 5, 5);
+rect2.position.set(5, -2, 3);
+rect2.lookAt(0, 0, 0);
+scene.add(rect2);
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+
+let mx=0, my=0, tx=0, ty=0;
+document.addEventListener('mousemove', e => {
+  mx = (e.clientX/innerWidth - 0.5) * 2;
+  my = (e.clientY/innerHeight - 0.5) * 2;
+});
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setSize(innerWidth, innerHeight);
+
+let t = 0;
+(function animate(){
+  requestAnimationFrame(animate);
+  t += 0.007;
+  tx += (mx * 0.8 - tx) * 0.035;
+  ty += (-my * 0.5 - ty) * 0.035;
+  camera.position.x = tx;
+  camera.position.y = ty;
+  objects.forEach((obj, i) => {
+    const spd = obj._speed;
+    obj.rotation.y += spd.y||0;
+    obj.rotation.x += spd.x||0;
+    obj.rotation.z += spd.z||0;
+    obj.position.y += Math.sin(t + obj._offset) * 0.0012;
+  });
+  renderer.render(scene, camera);
+})();
+
+// ── GSAP ScrollTrigger ──
+gsap.utils.toArray('.fc').forEach((el,i) => {
+  gsap.from(el, {opacity:0, y:50, duration:0.8, delay:i*0.09, ease:'power2.out',
+    scrollTrigger:{trigger:el, start:'top 86%', toggleActions:'play none none reverse'}});
+});
+gsap.utils.toArray('.gi').forEach((el,i) => {
+  gsap.from(el, {opacity:0, scale:0.92, duration:0.7, delay:i*0.07, ease:'back.out(1.3)',
+    scrollTrigger:{trigger:'.gallery-grid', start:'top 85%'}});
+});
+gsap.from('blockquote', {opacity:0, y:60, duration:1.2, ease:'expo.out',
+  scrollTrigger:{trigger:'.testimonial', start:'top 78%'}});
+gsap.from('.cta-section > div', {opacity:0, x:-50, duration:1, ease:'power2.out',
+  scrollTrigger:{trigger:'.cta-section', start:'top 80%'}});
+gsap.from('.cta-form', {opacity:0, x:50, duration:1, ease:'power2.out',
+  scrollTrigger:{trigger:'.cta-section', start:'top 80%'}});
+</script>
+
+<!-- __ Crafter AI - Asistente flotante persistente __ -->
+<script src="../js/crafter-assistant.js" defer></script>
+</body>
+</html>

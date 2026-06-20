@@ -1,0 +1,420 @@
+# SHOPY BRAIN — Sistema de Prompting Profesional
+
+Sistema completo para generar prompts de calidad profesional para
+informes, análisis y contenido en Shopy Crafter.
+
+---
+
+## 📦 Qué incluye este pack
+
+```
+shopy-brain-prompting/
+├── SHOPY_BRAIN_PROMPTING_BIBLE.md  # La constitución (lee esto primero)
+├── ShopyBrain.ts                    # Clase principal con cache + fallback
+├── templates.ts                     # 7 prompts maestros listos para usar
+└── README.md                        # Este archivo
+```
+
+---
+
+## 🎯 Qué resuelve
+
+Antes de Shopy Brain, cada llamada a Claude/Gemini era un copy-paste
+con prompts inconsistentes. Resultado: outputs irregulares, datos
+inventados, formatos incompatibles con los Builders de documentos.
+
+Con Shopy Brain:
+
+- **Calidad consistente** — todos los prompts siguen la misma estructura de 7 bloques
+- **Cero alucinaciones** — restricciones inviolables explícitas en cada prompt
+- **Fallback automático** — si Claude falla, prueba con Gemini sin avisar
+- **Caché inteligente** — no regenera el mismo informe si nada ha cambiado
+- **Costes controlados** — estimación previa, logging por llamada
+- **Versionado** — cambios de prompt trackeados, revertibles
+- **Outputs predecibles** — JSON validado contra schema antes de pasarlo al Builder
+
+---
+
+## 🚀 Integración (3 pasos)
+
+### 1. Copiar archivos
+
+```
+mkdir -p server/services/reports/ai
+cp SHOPY_BRAIN_PROMPTING_BIBLE.md server/services/reports/ai/
+cp ShopyBrain.ts server/services/reports/ai/
+cp templates.ts server/services/reports/ai/
+```
+
+### 2. Instalar dependencias
+
+```bash
+npm install @anthropic-ai/sdk @google/generative-ai
+```
+
+### 3. Configurar variables de entorno
+
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...   # opcional, para fallback
+```
+
+---
+
+## 💻 Uso desde cualquier endpoint
+
+### Ejemplo: Generar Excel COGS
+
+```typescript
+import { shopyBrain } from '@/services/reports/ai/ShopyBrain';
+import { ExcelBuilder } from '@/services/reports/excel/ExcelBuilder';
+
+router.post('/api/reports/excel/cogs', async (req, res) => {
+  const { productId } = req.body;
+
+  // 1. Cargar datos reales
+  const product = await getProduct(productId);
+  const branding = await getBrandConfig(req.shopId);
+
+  // 2. Pedir a Shopy Brain que estructure el contenido
+  const { data: structure, metadata } = await shopyBrain.generate('cogs-excel', {
+    shopId: req.shopId,
+    userId: req.user.id,
+    context: {
+      empresa: branding.companyName,
+      sector: 'hostelería',
+      tamaño: '38 habitaciones',
+      pais: 'España',
+      idioma: 'es',
+      moneda: 'EUR',
+      producto: product.title,
+      categoria: product.category,
+      periodo: 'Q1 2026',
+      destinatario: 'Director financiero',
+      objetivo: 'Decidir si optimizar costes con nuevo proveedor',
+    },
+    data: {
+      currentPrice: product.price,
+      currency: 'EUR',
+      monthlyVolume: { low: 80, avg: 100, high: 130 },
+      currentCOGS: product.cogs,
+      currentMargin: 0.42,
+      // ... resto de datos reales
+    },
+  });
+
+  console.log(`Generado en ${metadata.latencyMs}ms · Coste: €${metadata.costEur.toFixed(4)}`);
+  console.log(`Confianza: ${metadata.confidence} · Warnings: ${metadata.warnings.length}`);
+
+  // 3. Pasar al Builder de Excel
+  const excel = new ExcelBuilder()
+    .setBranding(branding)
+    .applyStructure(structure)
+    .build();
+
+  // 4. Devolver
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(excel);
+});
+```
+
+### Ejemplo: Generar PowerPoint Ejecutivo
+
+```typescript
+const { data: deck } = await shopyBrain.generate('executive-deck', {
+  shopId: req.shopId,
+  context: {
+    empresa: 'Hotel Mediterráneo',
+    sector: 'hostelería',
+    pais: 'España',
+    idioma: 'es',
+    audiencia: 'CEO + Inversores',
+    duracion: '5-7 minutos',
+  },
+  data: {
+    quarter: 'Q1 2026',
+    revenue: 84520,
+    revenueGrowth: 0.12,
+    margin: 0.34,
+    keyWins: ['Nuevo proveedor vinos -23% COGS', 'A/B test pack 3D +55% revenue'],
+    keyLosses: ['Tasa conversión móvil -8%'],
+    upcomingDecisions: ['Inversión nueva línea producto', 'Expansión Portugal'],
+  },
+});
+
+// deck.slides es un array de 12 slides estructurados
+// pásalo al PPTXBuilder
+```
+
+### Ejemplo: Análisis de imagen producto (Vision)
+
+```typescript
+const { data: analysis } = await shopyBrain.generate('image-analysis', {
+  shopId: req.shopId,
+  context: {
+    productName: 'NFT Arte IA Exclusivo 4K',
+    productCategory: 'digital_puro',
+    productPrice: 39.99,
+    audience: 'coleccionistas digitales 25-45',
+  },
+  data: {
+    imageUrl: 'https://...',
+    imageBase64: '...', // se inyecta como mensaje multimodal
+  },
+});
+
+console.log(`Score global: ${analysis.scoreOverall}/100`);
+analysis.improvementSuggestions.forEach(s => console.log(`- ${s.suggestion}`));
+```
+
+---
+
+## 📋 Templates disponibles
+
+| ID | Tipo de output | Coste estimado | Cache TTL |
+|----|---------------|----------------|-----------|
+| `cogs-excel` | Estructura JSON para Excel COGS | €0.05 | 24h |
+| `executive-deck` | Estructura para PPTX 12 slides | €0.20 | 24h |
+| `pricing-recommendation` | 3 niveles de precio + A/B test | €0.10 | 12h |
+| `supplier-comparison` | Comparativa TCO + plan transición | €0.15 | 48h |
+| `ab-test-report` | Análisis estadístico test A/B | €0.08 | 1h |
+| `contract-supplier` | Contrato Word completo | €0.12 | 168h (1 semana) |
+| `image-analysis` | Análisis 5 dimensiones imagen | €0.04 | 720h (30 días) |
+
+---
+
+## 🔄 Flujo interno de Shopy Brain
+
+```
+1. Recibe (reportType, inputs)
+   ↓
+2. Carga template del catálogo (ALL_TEMPLATES)
+   ↓
+3. Construye prompt con buildPromptFromTemplate()
+   ↓
+4. Valida prompt (rol presente, contexto suficiente, etc.)
+   ↓
+5. Calcula hash → busca en caché
+   ↓
+   └─ Si caché hit → return cached (cost: €0)
+   ↓
+6. Llama a Claude Opus 4.7
+   ↓
+   ├─ ¿OK? → continúa
+   └─ ¿Falla? → reintenta 1 vez → si falla → Gemini
+   ↓
+7. Parsea JSON, limpia markdown fences
+   ↓
+8. Valida output contra outputFormat schema
+   ↓
+9. Guarda en caché con TTL del template
+   ↓
+10. Loggea en ai_generations (BD)
+   ↓
+11. Devuelve { data, metadata }
+```
+
+---
+
+## 📊 Tabla de logging recomendada
+
+```sql
+CREATE TABLE ai_generations (
+  id TEXT PRIMARY KEY,
+  shop_id INTEGER NOT NULL,
+  user_id INTEGER,
+  report_type TEXT NOT NULL,
+  model_used TEXT NOT NULL,
+  prompt_version TEXT NOT NULL,
+  prompt_tokens INTEGER NOT NULL,
+  completion_tokens INTEGER NOT NULL,
+  cost_eur NUMERIC(10, 6) NOT NULL,
+  latency_ms INTEGER NOT NULL,
+  success BOOLEAN NOT NULL,
+  error_message TEXT,
+  prompt_hash TEXT NOT NULL,
+  output_summary TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_gen_shop_type ON ai_generations(shop_id, report_type, created_at DESC);
+CREATE INDEX idx_ai_gen_hash ON ai_generations(prompt_hash);
+```
+
+Para que el logger funcione contra esta tabla, implementa la
+interfaz `Logger` de `ShopyBrain.ts`:
+
+```typescript
+class DBLogger implements Logger {
+  async log(entry: AIGenerationLog): Promise<void> {
+    await db.insert(aiGenerations).values(entry);
+  }
+}
+
+export const shopyBrain = new ShopyBrain({
+  logger: new DBLogger(),
+  cache: new RedisCache(),
+});
+```
+
+---
+
+## 🧪 Testing
+
+### Test funcional básico
+
+```typescript
+import { shopyBrain } from './ShopyBrain';
+import { describe, it, expect } from 'vitest';
+
+describe('ShopyBrain', () => {
+  it('genera estructura COGS válida', async () => {
+    const { data, metadata } = await shopyBrain.generate('cogs-excel', {
+      shopId: 'test-shop',
+      context: {
+        empresa: 'Test Hotel',
+        sector: 'hostelería',
+        producto: 'Vino tinto Rioja',
+        idioma: 'es',
+        moneda: 'EUR',
+      },
+      data: {
+        currentPrice: 18.0,
+        currentCOGS: 5.36,
+        monthlyVolume: 200,
+      },
+    });
+
+    expect(data).toHaveProperty('metadata');
+    expect(data).toHaveProperty('assumptions');
+    expect(data).toHaveProperty('calculations');
+    expect(data).toHaveProperty('executiveSummary');
+    expect(data).toHaveProperty('dashboard');
+    expect(metadata.confidence).toBeGreaterThan(0.6);
+    expect(metadata.costEur).toBeLessThan(0.10);
+  });
+
+  it('usa caché en llamadas repetidas', async () => {
+    const inputs = { /* ... mismos inputs ... */ };
+    const r1 = await shopyBrain.generate('cogs-excel', inputs);
+    const r2 = await shopyBrain.generate('cogs-excel', inputs);
+
+    expect(r2.metadata.fromCache).toBe(true);
+    expect(r2.metadata.costEur).toBe(0);
+  });
+});
+```
+
+---
+
+## 🔧 Cómo añadir un nuevo template
+
+### 1. Define el template en `templates.ts`:
+
+```typescript
+export const SEO_CONTENT_TEMPLATE: PromptTemplate = {
+  id: 'seo-content',
+  version: '1.0',
+  type: 'seo-content',
+  modelPreferred: 'claude-opus-4-7',
+  estimatedCostEur: 0.06,
+  cacheTTLHours: 168,
+  role: `Eres SEO Manager senior con 10 años en e-commerce...`,
+  task: `Genera contenido SEO optimizado para...`,
+  constraints: [
+    'Mínimo 300 palabras por sección',
+    'Keyword density 1-2%',
+    'NO keyword stuffing',
+    // ...
+  ],
+  outputFormat: {
+    metadata: { /* ... */ },
+    metaTags: { title: 'string', description: 'string' },
+    content: { /* ... */ },
+  },
+};
+
+// Añadir al registro
+export const ALL_TEMPLATES = {
+  // ...
+  'seo-content': SEO_CONTENT_TEMPLATE,
+};
+```
+
+### 2. Úsalo desde código:
+
+```typescript
+const { data } = await shopyBrain.generate('seo-content', { ... });
+```
+
+### 3. Documentar en la BIBLE:
+
+Añade el rol, task y outputFormat a `SHOPY_BRAIN_PROMPTING_BIBLE.md`.
+
+---
+
+## ⚠️ Reglas de oro
+
+1. **NUNCA llames a Claude/Gemini directamente desde un endpoint.**
+   Pasa SIEMPRE por `shopyBrain.generate()`. Esto garantiza logging,
+   caché, fallback y validación.
+
+2. **NUNCA inventes datos en `inputs.data`.** Si falta un dato, pásalo
+   como `null` con razón. La BIBLE explica cómo.
+
+3. **NUNCA modifiques un template sin subir versión.** Cambias `v1.0`
+   → `v1.1` y documentas en `/docs/PROMPT_CHANGELOG.md`.
+
+4. **NUNCA pongas datos personales en prompts** sin verificar RGPD
+   (nombres clientes, emails, teléfonos). Los prompts se loggean.
+
+5. **SIEMPRE verifica `metadata.confidence`.** Si < 0.7, considera
+   regenerar con `forceFresh: true` o avisar al usuario.
+
+6. **SIEMPRE muestra `metadata.warnings` al usuario** si las hay.
+   La IA está avisando de algo.
+
+---
+
+## 📈 Métricas a monitorizar
+
+Configura un dashboard con estas métricas de la tabla `ai_generations`:
+
+- **Coste IA mensual** (suma de cost_eur por mes)
+- **Tasa de éxito por tipo** (success / total)
+- **Latencia P95 por tipo**
+- **Cache hit rate** (cached / total)
+- **Top 10 prompts más caros**
+- **Top 5 errores más frecuentes**
+- **Distribución de modelos usados** (Claude vs Gemini fallback)
+
+Si Gemini fallback supera el 5% → algo va mal con Claude (rate limits,
+errores) y hay que investigar.
+
+---
+
+## 💡 Tips finales
+
+**Para reducir costes IA un 40-60%:**
+- Configura caché bien (TTL adecuado por tipo de informe)
+- Detecta cambios menores (<5%) que no justifican regeneración
+- Usa Gemini para informes simples (tabular, extracción)
+- Reserva Claude para análisis complejo (estratégico, vision)
+
+**Para mejorar calidad un 20-30%:**
+- Añade ejemplos few-shot a templates problemáticos
+- Itera el `role` y `task` cuando outputs no convencen
+- Revisa los `warnings` que devuelve la IA — suelen señalar
+  agujeros en tus datos
+
+**Para acelerar generación:**
+- Genera en background con jobs (Bull, BullMQ)
+- Streaming response cuando uses Claude (no `await`, sino chunks)
+- Caché agresivo en informes tipo "última semana"
+
+---
+
+**FIN DEL README · SHOPY BRAIN v1.0**
+
+¿Dudas? Lee `SHOPY_BRAIN_PROMPTING_BIBLE.md` — es la constitución
+completa con todos los detalles.

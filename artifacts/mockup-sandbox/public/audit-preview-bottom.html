@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auditoria Completa — Comic Crafter — ShopyBrain</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #08080e; color: #f0f0f5; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 960px; margin: 0 auto; padding: 0; }
+
+  .cover { background: linear-gradient(160deg, #0e0e18 0%, #12121f 50%, #0a0a14 100%); padding: 56px 56px 48px; border-bottom: 1px solid #1a1a28; position: relative; overflow: hidden; }
+  .cover::before { content: ''; position: absolute; top: -120px; right: -80px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(200,168,75,.06) 0%, transparent 70%); pointer-events: none; }
+  .cover::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, #c8a84b44, transparent); }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; position: relative; z-index: 1; }
+  .cover-logo { display: flex; align-items: center; gap: 12px; }
+  .cover-logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #c8a84b, #8b6914); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: #0a0a0f; }
+  .cover-logo-text { font-size: 20px; font-weight: 800; color: #c8a84b; letter-spacing: -0.3px; }
+  .cover-badge { background: #16161f; border: 1px solid #24243a; border-radius: 8px; padding: 8px 16px; }
+  .cover-badge-label { font-size: 10px; color: #6b6b80; text-transform: uppercase; letter-spacing: 1.5px; }
+  .cover-badge-value { font-size: 13px; color: #f0f0f5; font-weight: 600; margin-top: 2px; }
+  .cover-title { position: relative; z-index: 1; }
+  .cover-title h1 { font-size: 32px; font-weight: 900; color: #f0f0f5; letter-spacing: -0.8px; line-height: 1.2; }
+  .cover-title h1 span { color: #c8a84b; }
+  .cover-title .subtitle { font-size: 15px; color: #9494a8; margin-top: 8px; font-weight: 400; }
+  .cover-meta { display: flex; gap: 24px; margin-top: 24px; position: relative; z-index: 1; }
+  .cover-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6b6b80; }
+  .cover-meta-dot { width: 6px; height: 6px; border-radius: 50%; background: #c8a84b; }
+
+  .body-content { padding: 40px 56px 48px; }
+
+  .section { margin-bottom: 40px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #1a1a28; }
+  .section-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .section-icon-gold { background: rgba(200,168,75,.1); border: 1px solid rgba(200,168,75,.2); }
+  .section-icon-jade { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); }
+  .section-icon-blue { background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2); }
+  .section-icon-red { background: rgba(244,63,94,.08); border: 1px solid rgba(244,63,94,.2); }
+  .section-icon-orange { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); }
+  .section-title { font-size: 18px; font-weight: 700; color: #f0f0f5; letter-spacing: -0.3px; }
+  .section-count { font-size: 11px; color: #6b6b80; background: #16161f; padding: 2px 8px; border-radius: 4px; margin-left: auto; }
+
+  .card { background: #101018; border: 1px solid #1a1a28; border-radius: 14px; padding: 24px; margin-bottom: 16px; transition: border-color .15s; }
+  .card:hover { border-color: #24243a; }
+
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .metric { background: #101018; border: 1px solid #1a1a28; border-radius: 12px; padding: 20px; text-align: center; position: relative; overflow: hidden; }
+  .metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #c8a84b33, transparent); }
+  .metric .value { font-size: 30px; font-weight: 900; color: #c8a84b; letter-spacing: -0.5px; line-height: 1.1; }
+  .metric .label { font-size: 10px; color: #6b6b80; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; font-weight: 600; }
+  .metric .delta { font-size: 11px; margin-top: 4px; font-weight: 600; }
+  .metric .delta-up { color: #34d399; }
+  .metric .delta-down { color: #f43f5e; }
+
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  thead { position: sticky; top: 0; }
+  th { background: #16161f; color: #c8a84b; font-weight: 700; text-align: left; padding: 12px 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child { border-radius: 0 8px 0 0; }
+  td { padding: 12px 16px; border-bottom: 1px solid #1a1a28; color: #f0f0f5; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(200,168,75,.02); }
+  tbody tr { transition: background .1s; }
+
+  .grade { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; padding: 4px 12px; border-radius: 6px; font-weight: 800; font-size: 12px; letter-spacing: 0.3px; }
+  .grade-a { background: rgba(52,211,153,.12); color: #34d399; }
+  .grade-b { background: rgba(200,168,75,.12); color: #c8a84b; }
+  .grade-c { background: rgba(245,158,11,.12); color: #f59e0b; }
+  .grade-d { background: rgba(244,63,94,.12); color: #f43f5e; }
+  .grade-f { background: rgba(244,63,94,.18); color: #f43f5e; }
+
+  .tag { display: inline-block; background: rgba(200,168,75,.08); color: #c8a84b; padding: 3px 10px; border-radius: 6px; font-size: 11px; margin: 2px 4px 2px 0; font-weight: 600; border: 1px solid rgba(200,168,75,.15); }
+  .tag-jade { background: rgba(52,211,153,.08); color: #34d399; border-color: rgba(52,211,153,.15); }
+  .tag-red { background: rgba(244,63,94,.08); color: #f43f5e; border-color: rgba(244,63,94,.15); }
+  .tag-blue { background: rgba(59,130,246,.08); color: #3b82f6; border-color: rgba(59,130,246,.15); }
+
+  .text-jade { color: #34d399; }
+  .text-red { color: #f43f5e; }
+  .text-gold { color: #c8a84b; }
+  .text-blue { color: #3b82f6; }
+  .text-orange { color: #f59e0b; }
+  .text-muted { color: #6b6b80; }
+  .text-white { color: #f0f0f5; }
+  .fw-600 { font-weight: 600; }
+  .fw-700 { font-weight: 700; }
+  .fw-800 { font-weight: 800; }
+  .fs-sm { font-size: 12px; }
+
+  .score-bar { height: 6px; border-radius: 3px; background: #1a1a28; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+
+  .recommendation { padding: 16px 20px; margin-bottom: 10px; border-radius: 10px; border-left: 3px solid #c8a84b; background: rgba(200,168,75,.03); font-size: 13px; line-height: 1.7; }
+  .recommendation-critical { border-left-color: #f43f5e; background: rgba(244,63,94,.08); }
+  .recommendation-success { border-left-color: #34d399; background: rgba(52,211,153,.08); }
+  .recommendation-info { border-left-color: #3b82f6; background: rgba(59,130,246,.08); }
+
+  .progress-ring { display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .progress-ring svg { transform: rotate(-90deg); }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .stat-item { padding: 16px 20px; background: #16161f; border-radius: 10px; border: 1px solid #1a1a28; }
+  .stat-item-label { font-size: 10px; color: #6b6b80; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+  .stat-item-value { font-size: 16px; font-weight: 700; color: #f0f0f5; margin-top: 4px; }
+
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, #1a1a28, transparent); margin: 32px 0; }
+
+  .blog-content { font-size: 14px; line-height: 1.8; }
+  .blog-content h1, .blog-content h2, .blog-content h3 { color: #c8a84b; margin: 20px 0 10px; }
+  .blog-content p { margin-bottom: 12px; }
+  .blog-content ul, .blog-content ol { margin: 10px 0 10px 20px; }
+
+  .footer { padding: 32px 56px; border-top: 1px solid #1a1a28; background: #0c0c14; text-align: center; }
+  .footer-brand { font-size: 14px; font-weight: 700; color: #c8a84b; }
+  .footer-sub { font-size: 11px; color: #6b6b80; margin-top: 6px; }
+  .footer-line { width: 40px; height: 2px; background: #c8a84b; margin: 12px auto; border-radius: 1px; }
+
+  @media print {
+    body { background: white; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { max-width: 100%; }
+    .cover { background: #f8f7f4; padding: 32px; }
+    .cover-title h1 { color: #1a1a1a; }
+    .card, .metric { background: #fafafa; border: 1px solid #e0e0e0; }
+    .metric .value { color: #8b6914; }
+    th { background: #f0f0f0; color: #8b6914; }
+    td { border-color: #e8e8e8; color: #1a1a1a; }
+    .footer { background: #fafafa; border-color: #e0e0e0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="cover">
+    <div class="cover-top">
+      <div class="cover-logo">
+        <div class="cover-logo-icon">S</div>
+        <div class="cover-logo-text">ShopyBrain</div>
+      </div>
+      <div class="cover-badge">
+        <div class="cover-badge-label">Fecha del informe</div>
+        <div class="cover-badge-value">29 de marzo de 2026</div>
+      </div>
+    </div>
+    <div class="cover-title">
+      <h1>Auditoria Completa — Comic Crafter</h1>
+      <p class="subtitle">comic-crafter.myshopify.com — comics y arte digital</p>
+    </div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Generado por IA</div>
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Datos reales</div>
+      <div class="cover-meta-item"><div class="cover-meta-dot"></div>Confidencial</div>
+    </div>
+  </div>
+  <div class="body-content">
+    
+    <!-- EXECUTIVE SUMMARY -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-gold">&#9733;</div>
+        <div class="section-title">Resumen Ejecutivo</div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:24px;margin-bottom:20px;">
+          <div style="text-align:center;">
+            <div style="width:80px;height:80px;border-radius:50%;border:3px solid #f43f5e;display:flex;align-items:center;justify-content:center;background:#f43f5e11;">
+              <span style="font-size:28px;font-weight:900;color:#f43f5e;">35</span>
+            </div>
+            <div style="font-size:11px;color:#f43f5e;font-weight:700;margin-top:6px;text-transform:uppercase;">Necesita atencion</div>
+          </div>
+          <div style="flex:1;">
+            <p style="font-size:15px;line-height:1.8;color:#9494a8;">
+              Auditoria completa de <strong style="color:#f0f0f5;">Comic Crafter</strong>
+              (<strong style="color:#f0f0f5;">comic-crafter.myshopify.com</strong>)
+              en el nicho de <strong style="color:#c8a84b;">comics y arte digital</strong>.
+              El catalogo cuenta con <strong style="color:#f0f0f5;">19 productos activos</strong>,
+              con un precio medio de <strong style="color:#f0f0f5;">58.13€</strong> y un rango de 4€–399€.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI GRID -->
+    <div class="metric-row">
+      <div class="metric"><div class="value">19</div><div class="label">Productos activos</div></div>
+      <div class="metric"><div class="value">58€</div><div class="label">Precio medio</div></div>
+      <div class="metric"><div class="value">100.0%</div><div class="label">Margen bruto</div></div>
+      <div class="metric"><div class="value">0</div><div class="label">Score SEO</div></div>
+      <div class="metric"><div class="value">0</div><div class="label">Imagenes IA</div></div>
+      <div class="metric"><div class="value">0</div><div class="label">A/B Tests</div></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- BRAND & IDENTITY -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-gold">&#127912;</div>
+        <div class="section-title">Identidad de Marca</div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-item"><div class="stat-item-label">Nicho</div><div class="stat-item-value">comics y arte digital</div></div>
+        <div class="stat-item"><div class="stat-item-label">Tono de marca</div><div class="stat-item-value">Creativo, apasionado y cercano</div></div>
+        <div class="stat-item"><div class="stat-item-label">Audiencia objetivo</div><div class="stat-item-value">Fans de cómics, manga y juegos de cartas coleccionables</div></div>
+        <div class="stat-item"><div class="stat-item-label">Mercados</div><div class="stat-item-value">España</div></div>
+      </div>
+      <div class="card" style="margin-top:12px;"><div class="stat-item-label" style="margin-bottom:8px;">Categorias de producto</div><div><span class="tag">Servicio Digital</span> <span class="tag">Merchandising</span> <span class="tag">Arte Impreso</span> <span class="tag">Consultoría</span> <span class="tag">Suscripción Mensual</span> <span class="tag">Pack Premium Digital</span> <span class="tag">Pack de Servicios</span> <span class="tag">Modelo 3D Digital</span> <span class="tag">Servicio Único</span> <span class="tag">Impresión 3D</span> <span class="tag">Figura 3D Personalizada</span> <span class="tag">Coleccionable Digital</span> <span class="tag">Pack de Créditos</span> <span class="tag">Créditos Digitales IA</span></div></div>
+      <div class="card"><div class="stat-item-label" style="margin-bottom:8px;">Proveedores</div><div><span class="tag">Propietario</span> <span class="tag">Comic Crafter</span> <span class="tag">ShopyBrain</span></div></div>
+      
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- SEO AUDIT -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-jade">&#128270;</div>
+        <div class="section-title">Auditoria SEO Tecnico</div>
+        <div class="section-count">0 auditados</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value">0<span style="font-size:14px;color:#6b6b80;">/100</span></div><div class="label">Score medio</div></div>
+        <div class="metric"><div class="value">0</div><div class="label">Con Schema</div></div>
+        <div class="metric"><div class="value">0</div><div class="label">Con Alt Texts</div></div>
+        <div class="metric"><div class="value">0<span style="font-size:14px;color:#6b6b80;">/29</span></div><div class="label">Auditados</div></div>
+      </div>
+      
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- FINANCIAL -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-orange">&#128176;</div>
+        <div class="section-title">Analisis Financiero y COGS</div>
+        <div class="section-count">0 con COGS</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value">1686€</div><div class="label">Revenue potencial</div></div>
+        <div class="metric"><div class="value">0€</div><div class="label">COGS total</div></div>
+        <div class="metric"><div class="value">1686€</div><div class="label">Beneficio bruto</div></div>
+        <div class="metric"><div class="value" style="color:#34d399;">100.0%</div><div class="label">Margen medio</div></div>
+      </div>
+      
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- A/B TESTING -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-blue">&#9879;</div>
+        <div class="section-title">A/B Testing</div>
+        <div class="section-count">0 tests</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value">0</div><div class="label">Tests totales</div></div>
+        <div class="metric"><div class="value" style="color:#34d399;">0</div><div class="label">Activos</div></div>
+        <div class="metric"><div class="value">0</div><div class="label">Completados</div></div>
+      </div>
+      <div class="card"><p class="text-muted" style="text-align:center;padding:16px;">No hay A/B tests registrados. Activar testing mejora conversion.</p></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- IMAGES AI -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-gold">&#127912;</div>
+        <div class="section-title">Imagenes IA Generadas</div>
+        <div class="section-count">0 exitosas</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="value" style="color:#34d399;">0</div><div class="label">Generadas</div></div>
+        <div class="metric"><div class="value" style="color:#6b6b80;">0</div><div class="label">Fallidas</div></div>
+        <div class="metric"><div class="value">0</div><div class="label">Fichas rediseñadas</div></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- COMPETITORS -->
+    
+
+    <!-- INVENTORY -->
+    
+
+    <!-- OMNICORE BRAIN -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-gold">&#129504;</div>
+        <div class="section-title">OmniCore Brain - IA</div>
+      </div>
+      <div class="card">
+        <div class="stat-grid">
+          <div class="stat-item"><div class="stat-item-label">Memorias consolidadas</div><div class="stat-item-value">Activo</div></div>
+          <div class="stat-item"><div class="stat-item-label">Piloto automatico</div><div class="stat-item-value"><span class="text-muted">Desactivado</span></div></div>
+          <div class="stat-item"><div class="stat-item-label">Plan activo</div><div class="stat-item-value text-gold fw-800" style="text-transform:uppercase;">admin</div></div>
+          <div class="stat-item"><div class="stat-item-label">Score audit medio</div><div class="stat-item-value">63/100</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="bottom-anchor"></div><!-- RECOMMENDATIONS -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-jade">&#9989;</div>
+        <div class="section-title">Recomendaciones y Acciones</div>
+      </div>
+      <div class="recommendation recommendation-success">Margen bruto del 100.0% — saludable y competitivo.</div>
+      <div class="recommendation">Solo 0/29 productos tienen Schema JSON-LD. Implementar structured data mejora CTR +30%.</div><div class="recommendation">Solo 0/29 productos tienen alt texts optimizados. Google Image Search puede generar hasta 20% trafico adicional.</div><div class="recommendation">Sin A/B tests activos. Activar testing continuo para mejorar conversion.</div>
+      
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- PRODUCT TABLE -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon section-icon-blue">&#128203;</div>
+        <div class="section-title">Detalle por Producto</div>
+        <div class="section-count">29 productos</div>
+      </div>
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Producto</th><th>Estado</th><th>Precio</th><th>COGS</th><th>Margen</th><th>SEO</th><th>Audit</th><th>Imgs</th></tr></thead>
+          <tbody><tr>
+      <td style="font-weight:600;">Ilustración de Portada Profesional con IA — Libros, Cómics y Álbumes | Comic Crafter</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">19.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>63</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Merchandising Personalizado con IA — Camisetas, Tazas y Más | Comic Crafter</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">19.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>67</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Pósters y Lienzos Canvas con Arte IA — Decoración Premium | Comic Crafter</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">24.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>67</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Sesión Estratégica 1:1 — 60 min</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">199.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>55</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">ShopyBrain Enterprise — Tiendas Ilimitadas</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">399.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>62</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Pack Identidad de Personaje 360° — Avatar Completo con IA | Comic Crafter</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">14.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>65</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">🎯 Creación Producto Unitario — 1 Producto con 3 Imágenes IA</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">7.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>57</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">💼 Pack 10 Productos — Catálogo Completo con IA</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">49.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>57</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">🏆 Pack 15 Productos — Escala tu Tienda Shopify</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">69.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>57</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">⚡ Pack 20 Productos — Catálogo Premium Shopify</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">89.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>57</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Logo Profesional — Identidad Visual para tu Marca | Comic Crafter</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">29.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>85</td>
+      <td>14</td>
+    </tr><tr>
+      <td style="font-weight:600;">Modelos 3D Realistas con IA — Personajes y Objetos para Juegos | Comic Crafter</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">19.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>67</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Análisis Completo One-Shot — 1 Tienda</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">79.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>55</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Impresión 3D de Figuras y Modelos Personalizados — Resina Premium | Comic Crafter</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">29.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>72</td>
+      <td>3</td>
+    </tr><tr>
+      <td style="font-weight:600;">ShopyBrain Starter — 1 Tienda</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">49.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>49</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">ShopyBrain Agency Pro — Hasta 5 Tiendas</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">149.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>54</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">🚀 Pack 5 Productos — Creación Completa con Imágenes IA</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">29.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>57</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Comics Personalizados con IA — Crea tu Cómic Profesional | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">14.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>67</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Funko Pop Personalizado 3D — Tu Personaje en Figura Coleccionable | Comic Crafter</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">24.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>67</td>
+      <td>2</td>
+    </tr><tr>
+      <td style="font-weight:600;">Campañas Virales 360° — Marketing IA para Instagram y TikTok | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">29.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>65</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Cartas Coleccionables TCG Personalizadas con IA | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">9.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>73</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Pack Director — 1150 Créditos | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">29.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>66</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Pack Estudio Completo — 3000 Créditos | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">49.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>66</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Pack Mega Créditos 4000 IA | Creación Ilimitada Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">79.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>65</td>
+      <td>0</td>
+    </tr><tr>
+      <td style="font-weight:600;">👑 Pack 30 Productos — Catálogo Completo Enterprise</td>
+      <td><span class="tag tag-jade">Activo</span></td>
+      <td style="font-weight:600;">119.00€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>59</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Pack Creador 3D — 550 Créditos | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">14.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>66</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Saga Épica Visual — Cómic Interactivo con Voces y Animación | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">19.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>65</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Pack Ilustrador — 110 Créditos | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">3.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>66</td>
+      <td>1</td>
+    </tr><tr>
+      <td style="font-weight:600;">Pack Narrador — 330 Créditos | Comic Crafter</td>
+      <td><span class="tag">Borrador</span></td>
+      <td style="font-weight:600;">9.99€</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>66</td>
+      <td>1</td>
+    </tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="footer-line"></div>
+    <div class="footer-brand">ShopyBrain AI</div>
+    <div class="footer-sub">Shopy Crafter — Shopy Crafter eCommerce &middot; 29 de marzo de 2026 &middot; Confidencial</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,344 @@
+Diseñó solución integral para automatizar estimación real de costos por tipo de producto
+Diseñó solución integral para automatizar estimación real de costos por tipo de producto
+Ahora veo exactamente el problema: tienes Comic Crafter con productos mixtos (digitales como NFT/Audiobooks, físicos como pósters/lienzos, servicios como Sesión Estratégica) y los botones de pricing son shells vacíos. Vamos directo al fix.
+
+🔍 Lo que está roto (visto en los screenshots)
+"Auto-estimar todos" — no clasifica el tipo de producto, no llama a IA, deja campos en 0.00
+"Auto-estimar con IA" del modal — el botón existe pero no rellena los 12+ campos de la estructura de costes
+"Simular" — debería abrir simulador de escenarios (precio +10%/-10%, volumen, conversión), no hace nada
+"Optimizar" — debería usar Claude para sugerir precio óptimo basado en COGS real + mercado, no funciona
+El problema raíz: no hay clasificador de tipo de producto. NFT y póster físico tienen COGS completamente distintos pero la app los trata igual.
+
+📋 PROMPT COMPLETO PARA REPLIT AGENT
+Copia esto tal cual y pásaselo:
+
+Tengo el módulo de Pricing en /pricing con 4 botones que NO funcionan correctamente:
+"Auto-estimar todos", "Auto-estimar con IA", "Simular", "Optimizar".
+
+Necesito que los hagas funcionales con lógica REAL de IA, no placeholders.
+El backend ya tiene Claude API integrada — úsala.
+
+═══════════════════════════════════════════════════════════════════
+PROBLEMA RAÍZ
+═══════════════════════════════════════════════════════════════════
+
+Mi tienda tiene 3 tipos de productos mezclados:
+  • DIGITAL_PURO: NFT, Audiobook, Pack Ilustrador, Pack Creador 3D
+  • FISICO: Póster, Lienzo, Productos impresos
+  • SERVICIO: Sesión Estratégica, Shopy Crafter Agency Pro
+  • HIBRIDO: Photoshoot Pro (digital + impresión opcional)
+  • DIGITAL_HIBRIDO: Manga Personalizado (digital + envío físico)
+
+Cada tipo tiene una estructura de COGS RADICALMENTE distinta. 
+Actualmente la app los trata todos igual → todos los campos en 0.00.
+
+═══════════════════════════════════════════════════════════════════
+PASO 1: CLASIFICADOR DE TIPO DE PRODUCTO (clasifyProductType.ts)
+═══════════════════════════════════════════════════════════════════
+
+Crea una función que clasifique CADA producto Shopify analizando:
+  - product.title, product.body_html, product.tags
+  - product.product_type, product.vendor
+  - product.weight (si > 0 → físico)
+  - product.requires_shipping (si false → digital probable)
+  - product.fulfillment_service
+
+Llama a Claude con este prompt:
+
+  "Clasifica este producto Shopify en UNA categoría:
+  digital_puro | fisico | servicio | hibrido | digital_hibrido
+  
+  Producto: {title}
+  Descripción: {body_html}
+  Tags: {tags}
+  Peso: {weight}g
+  Requiere envío: {requires_shipping}
+  
+  Responde SOLO con JSON:
+  {
+    \"category\": \"...\",
+    \"confidence\": 0-1,
+    \"signals\": [\"señal 1\", \"señal 2\"],
+    \"costStructure\": [\"campos relevantes que debe rellenar\"]
+  }"
+
+Cachea el resultado en la tabla products (campo cogs_category).
+
+═══════════════════════════════════════════════════════════════════
+PASO 2: ESTIMADOR DE COGS POR TIPO (cogsEstimator.ts)
+═══════════════════════════════════════════════════════════════════
+
+Según la categoría, llama a Claude con un prompt específico.
+
+─── DIGITAL_PURO (NFT, Audiobook, Pack Ilustrador) ──────────
+COGS típico: 5-15% del precio venta. Componentes:
+
+  • Créditos IA generación (Claude Opus, Gemini, Runway, ElevenLabs)
+  • Almacenamiento + bandwidth (Cloudflare/AWS)
+  • Payment fees (Stripe 1.5% + €0.25)
+  • Royalties/licencias si aplica
+  • Coste plataforma minteo (NFT)
+
+Tabla de referencia 2026 (úsala en el prompt a Claude):
+  - Generación imagen IA premium: €0.30-0.80/imagen
+  - Generación video IA (Runway 5s): €1.50-3.00
+  - Voz IA ElevenLabs (1 min): €0.15-0.40
+  - Audiobook completo (1h): €8-20
+  - Pack ilustrador 110 créditos: COGS ~€2-5
+  - Pack 3D 550 modelos: COGS ~€15-40
+  - Mint NFT (Polygon): €0.50-2.00
+  - Storage 1GB/mes: €0.02
+  - Bandwidth 1GB: €0.05
+
+─── FISICO (Póster, Lienzo) ─────────────────────────────────
+COGS típico: 35-65% del precio venta. Componentes:
+
+  • Impresión (papel/tela/lienzo)
+  • Materiales (marco, soporte, embalaje rígido)
+  • Mano de obra de montaje
+  • Etiquetado y embalaje
+  • Envío nacional/internacional
+  • Rotura/devoluciones (5-10%)
+  • Payment fees
+  • Almacenamiento
+
+Tabla de referencia 2026:
+  - Póster A3 papel premium: €2.50-5.00
+  - Póster A2: €4-7
+  - Lienzo 50x70cm: €15-25
+  - Lienzo 70x100cm: €28-45
+  - Marco básico A3: €8-15
+  - Embalaje rígido: €1.50-3.00
+  - Envío nacional ES (peninsular): €4.50-7.50
+  - Envío internacional EU: €12-20
+  - Rotura print-on-demand: 5-8%
+
+─── SERVICIO (Sesión Estratégica, Agency) ───────────────────
+COGS típico: 25-50% del precio venta. Componentes:
+
+  • Horas consultor × tarifa interna
+  • Herramientas/software prorrateado
+  • Tiempo preparación + ejecución + entrega
+  • Overhead (admin, fiscal, formación)
+  • Payment fees
+
+Tabla de referencia 2026:
+  - Tarifa consultor junior: €25-40/h
+  - Tarifa consultor senior: €60-120/h
+  - Tools (Shopify Plus, Klaviyo, etc.): prorrateado
+  - Sesión Shopify 1h: COGS €30-60
+  - Agency Pro retainer: 30-45% del precio
+
+─── HIBRIDO / DIGITAL_HIBRIDO ───────────────────────────────
+Combina los componentes anteriores según peso digital/físico.
+
+EL PROMPT A CLAUDE para estimar (cogsEstimator.ts):
+
+  "Eres experto en pricing de productos {category} en e-commerce.
+  
+  Estima el COGS real de este producto:
+  Nombre: {title}
+  Precio venta: €{price}
+  Categoría detectada: {category}
+  Descripción: {body_html}
+  Peso: {weight}g
+  
+  Usa estos rangos de mercado 2026:
+  {tabla_de_referencia_segun_categoria}
+  
+  Devuelve JSON con TODOS los campos en €/unidad:
+  {
+    \"costeUnitario\": X,
+    \"materiales\": X,
+    \"impresionDigital\": X,
+    \"montaje\": X,
+    \"manoObra\": X,
+    \"controlCalidad\": X,
+    \"embalaje\": X,
+    \"etiquetado\": X,
+    \"envioNacional\": X,
+    \"envioInternacional\": X,
+    \"fulfillment\": X,
+    \"almacenamiento\": X,
+    \"creditosIA\": X,
+    \"paymentFees\": X,
+    \"rotura\": X,
+    \"cogsTotal\": X,
+    \"cogsLow\": X,    // -8% conservador
+    \"cogsHigh\": X,   // +8% pesimista
+    \"margenBruto\": X,
+    \"margenPct\": X,
+    \"confidence\": 0-1,
+    \"warnings\": [\"...\"],
+    \"assumptions\": [\"asunción 1\", \"asunción 2\"]
+  }
+  
+  REGLAS:
+  - Si un campo no aplica al tipo de producto, pon 0
+  - Sé REALISTA, no optimista
+  - Si margen <20%, añade warning
+  - NUNCA inventes datos ridículos"
+
+═══════════════════════════════════════════════════════════════════
+PASO 3: BOTÓN "AUTO-ESTIMAR CON IA" (modal individual)
+═══════════════════════════════════════════════════════════════════
+
+Cuando se clickea EN EL MODAL "Estructura de Costes Real":
+
+1. Mostrar loading state ("Analizando producto con IA…" 
+   con spinner teal sobre el botón)
+2. POST /api/pricing/estimate-cogs con productId
+3. Backend:
+   a. Detecta categoría (clasifyProductType)
+   b. Llama estimador (cogsEstimator)
+   c. Guarda en cogs_calculations
+   d. Retorna JSON
+4. Frontend: rellena CADA input del modal con valores reales
+   - Animación: cada campo aparece con stagger (50ms entre cada uno)
+5. Mostrar al final un toast: "COGS estimado · Margen: X% · 
+   Confianza: Y%"
+6. Si confidence < 0.6 → toast warning amarillo:
+   "Estimación tentativa, revisa los assumptions"
+
+═══════════════════════════════════════════════════════════════════
+PASO 4: BOTÓN "AUTO-ESTIMAR TODOS" (header)
+═══════════════════════════════════════════════════════════════════
+
+1. Confirmación modal: "Vas a estimar COGS para N productos. 
+   Coste IA estimado: ~€X. ¿Continuar?"
+2. POST /api/pricing/estimate-cogs/batch
+3. Backend procesa en PARALELO con Promise.all en lotes de 10 
+   (no más, para no saturar Anthropic API)
+4. Frontend: barra de progreso real en top fixed bar:
+   "Procesando: 23/87 productos · 3 errores"
+5. Tras completar: refresh de la tabla con todos los COGS rellenos
+6. Mostrar resumen en modal:
+   - Total estimado: N productos
+   - Margen bruto promedio: X%
+   - Productos con margen <20%: N (link "ver detalles")
+   - Productos con margen <15%: N (alerta roja)
+
+═══════════════════════════════════════════════════════════════════
+PASO 5: BOTÓN "SIMULAR" (por producto)
+═══════════════════════════════════════════════════════════════════
+
+Abrir un drawer lateral derecho con:
+
+1. SLIDERS interactivos:
+   - Precio venta: rango ±50% del actual
+   - Volumen mensual estimado: 0-1000
+   - Conversión rate: 0-15%
+   - Coste adquisición cliente (CAC): 0-50€
+
+2. CÁLCULOS EN TIEMPO REAL (sin llamar IA, solo math):
+   - Revenue mensual proyectado
+   - COGS total mensual
+   - Beneficio bruto
+   - Beneficio neto (descontando CAC)
+   - Punto de equilibrio (unidades)
+
+3. GRÁFICO de sensibilidad:
+   - Eje X: variación precio (-30% a +30%)
+   - Eje Y: beneficio neto
+   - Línea teal con punto destacado en precio actual
+   - Usa Recharts o Chart.js (lo que ya tengas)
+
+4. BOTÓN "Aplicar este precio" si encuentra mejor escenario.
+
+═══════════════════════════════════════════════════════════════════
+PASO 6: BOTÓN "OPTIMIZAR" (por producto)
+═══════════════════════════════════════════════════════════════════
+
+POST /api/pricing/optimize con productId.
+
+Backend llama a Claude con:
+
+  "Eres experto en pricing strategy. Optimiza el precio de:
+  
+  Producto: {title}
+  Precio actual: €{price}
+  COGS unitario: €{cogs}
+  Margen actual: {margin}%
+  Categoría: {category}
+  Score imagen: {imageScore}/100
+  Ventas últimos 90d: {sales}
+  Competencia precios: {competitors}  // de tu engine de búsqueda
+  
+  Devuelve JSON:
+  {
+    \"precioOptimo\": X,
+    \"precioConservador\": X,    // menor riesgo
+    \"precioAgresivo\": X,        // mayor margen pero menos volumen
+    \"margenObjetivo\": X,
+    \"justificacion\": \"...\",
+    \"riesgos\": [\"...\"],
+    \"abTestSugerido\": {
+      \"variantA\": precio actual,
+      \"variantB\": precio optimo,
+      \"duracionDias\": N,
+      \"trafficoMinimo\": N
+    },
+    \"upsellOportunidades\": [\"...\"]
+  }"
+
+Frontend muestra resultado en modal con:
+  - Comparativa visual: precio actual vs óptimo (barras)
+  - Justificación de Claude
+  - Botón "Aplicar precio óptimo" → actualiza Shopify via API
+  - Botón "Crear A/B test" → integra con tu módulo A/B Testing
+
+═══════════════════════════════════════════════════════════════════
+ESTADOS UI OBLIGATORIOS (todos los botones)
+═══════════════════════════════════════════════════════════════════
+
+idle      → botón normal
+loading   → spinner + texto cambiado ("Estimando...", "Optimizando...")
+success   → check verde 1.5s + toast con resultado
+error     → cruz roja 1.5s + toast con mensaje claro + botón "Reintentar"
+disabled  → si producto sin precio o sin datos suficientes
+
+NUNCA dejes un botón sin feedback visual. NUNCA hagas alert().
+Usa el sistema de toasts ya existente.
+
+═══════════════════════════════════════════════════════════════════
+ENDPOINTS QUE DEBEN EXISTIR (verifica primero, crea si faltan)
+═══════════════════════════════════════════════════════════════════
+
+POST /api/pricing/classify-product       → clasifica tipo
+POST /api/pricing/estimate-cogs          → estima 1 producto
+POST /api/pricing/estimate-cogs/batch    → estima todos
+POST /api/pricing/simulate               → cálculo simulación
+POST /api/pricing/optimize               → optimización con IA
+PATCH /api/pricing/apply                 → aplica precio a Shopify
+GET  /api/pricing/competitors/:productId → busca competencia
+
+═══════════════════════════════════════════════════════════════════
+ANTES DE EMPEZAR
+═══════════════════════════════════════════════════════════════════
+
+1. Lee los archivos actuales de /pricing y dime qué endpoints YA 
+   existen y cuáles tendría que crear
+2. Verifica que ANTHROPIC_API_KEY está configurada
+3. Verifica que tienes el cliente Shopify ya autenticado
+4. Confirma que la tabla products tiene columnas para guardar 
+   cogs_category, cogs_data, last_estimated_at
+5. Muéstrame plan en orden de prioridad ANTES de tocar código
+
+NO toques otros módulos (Auditoría, Rediseño, A/B Testing, SEO).
+SOLO el módulo Pricing.
+💡 Tips críticos al usar este prompt
+Pásaselo en 2 partes si Replit Agent se atraganta: primero la clasificación + estimación (Pasos 1-2), y cuando funcione, los botones (Pasos 3-6).
+
+Antes de aprobar, asegúrate de que el Agent te muestre:
+
+Qué endpoints YA tienes vs qué va a crear
+Si va a tocar la tabla products o crear cogs_calculations separada
+Cómo va a manejar el rate limit de Anthropic en el batch
+Para validar que funciona, prueba con estos 3 productos de tu screenshot:
+
+NFT Arte IA Exclusivo 4K → debería detectar digital_puro, COGS €2-4 (créditos IA + mint)
+Pack Creador 3D 550 modelos → digital_puro, COGS €0.50-2 (storage + bandwidth)
+Sesión Estratégica Shopify 1h → servicio, COGS €30-50 (horas consultor)
+Si los tres devuelven valores en esos rangos, la lógica está bien. Si todos te dan números similares, el clasificador no está distinguiendo y hay que revisar el prompt de clasifyProductType.
+
+Los warnings de margen que ya tienes ("Margen bruto global por debajo del 20%", "50 productos con margen < 15%") deberían recalcularse automáticamente tras cada batch de auto-estimación. Verifica que esa parte se conecte con el dashboard superior.

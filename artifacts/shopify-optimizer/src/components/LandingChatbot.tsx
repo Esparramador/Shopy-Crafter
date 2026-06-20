@@ -318,7 +318,7 @@ export default function LandingChatbot() {
               💰 Ver precios
             </a>
             <a
-              href="/contacto"
+              href="/register"
               style={{
                 flex: 1, textAlign: "center", padding: "8px 0",
                 borderRadius: 10, border: "none",

@@ -1,0 +1,1071 @@
+Implement ALL of the following features in this exact order.
+Work through each phase completely before starting the next.
+Do not skip any section. This is the complete platform buildout.
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 1 — REVENUE INTELLIGENCE 360°                         ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Connect all 6 existing motors to a unified attribution engine.
+
+DATABASE — Add to SQLite:
+CREATE TABLE events (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  -- Types: image_generated | price_changed | ab_winner |
+  --        seo_applied | audit_run | boost_run |
+  --        inventory_alert | competitor_change
+  product_id TEXT,
+  payload TEXT, -- JSON with event details
+  revenue_before REAL,
+  revenue_after REAL,
+  revenue_delta REAL,
+  attributed_revenue REAL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE revenue_snapshots (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  date TEXT NOT NULL, -- YYYY-MM-DD
+  revenue REAL,
+  orders INTEGER,
+  conversion_rate REAL,
+  aov REAL,
+  gross_margin REAL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE forecasts (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  forecast_date TEXT,
+  forecast_type TEXT, -- revenue | conversion | stock_out | demand
+  product_id TEXT,
+  predicted_value REAL,
+  confidence_low REAL,
+  confidence_high REAL,
+  confidence_pct INTEGER,
+  reasoning TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CRON JOB — Daily at 2am per active project:
+1. Pull today's Shopify revenue snapshot
+   GET /admin/api/2024-01/reports/sales.json?since_id=...
+2. Compare with yesterday's snapshot
+3. Correlate delta with events in last 24h
+4. Store attribution estimate per event
+
+ATTRIBUTION ENGINE:
+POST /api/intelligence/attribute
+Body: { projectId }
+
+Claude prompt:
+"You are a quantitative eCommerce analyst.
+Given these events (with timestamps) and this revenue timeline
+for store [storeName], calculate attribution:
+- Which actions correlate most strongly with revenue increases?
+- Estimate % of revenue change attributable to each motor:
+  M1 images, M2 consistency, M3 A/B, M4 autopilot, 
+  M5 pricing, M6 SEO
+- Note any events that correlate with drops (negative attribution)
+Return JSON: { attributions: [{motor, euros, pct, confidence}],
+  insight: '2-sentence plain Spanish summary',
+  nextBestAction: 'single most impactful thing to do now' }"
+
+REVENUE INTELLIGENCE DASHBOARD — /admin/intelligence:
+1. WATERFALL CHART (HTML Canvas or SVG):
+   Base revenue → +M1 → +M3 → +M5 → +M6 = Total
+   Each bar colored by motor, shows €amount
+
+2. MOTOR ROI TABLE:
+   | Motor | Coste | Revenue atribuido | ROI |
+   | M1 imgs | €67 | €2,840 | 42x |
+   | M5 pricing | €0 | €1,200 | ∞ |
+
+3. NEXT BEST ACTION card (from Claude):
+   Big gold card showing the single highest-impact action right now
+
+4. 90-DAY PROJECTION:
+   Line chart with confidence band
+   "Proyección: €42K-€51K en 90 días"
+
+5. INSIGHT FEED:
+   Weekly Claude-generated narrative:
+   "Esta semana las imágenes lifestyle generaron +34% conversión
+    en los productos donde se aplicaron vs los que no."
+
+══════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 2 — M7: INTELLIGENT INVENTORY ENGINE                  ║
+╚═══════════════════════════════════════════════════════════════╝
+
+DATABASE — Add to SQLite:
+CREATE TABLE inventory_tracking (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  variant_id TEXT,
+  product_title TEXT,
+  current_stock INTEGER,
+  avg_daily_sales REAL,
+  days_remaining INTEGER,
+  restock_threshold INTEGER DEFAULT 15,
+  supplier_email TEXT,
+  supplier_lead_days INTEGER DEFAULT 14,
+  last_restock_date TEXT,
+  status TEXT, -- healthy | warning | critical | out_of_stock | dead_stock
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE restock_orders (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  product_id TEXT,
+  quantity_suggested INTEGER,
+  urgency TEXT, -- immediate | soon | planned
+  email_draft TEXT,
+  sent_at TEXT,
+  admin_approved INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+INVENTORY SYNC — CRON daily 7am:
+For each active project:
+1. GET /admin/api/2024-01/inventory_levels.json
+2. GET /admin/api/2024-01/orders.json?status=any&limit=250
+   (last 30 days to calculate avg_daily_sales)
+3. Calculate: avg_daily_sales = units_sold_30d / 30
+4. Calculate: days_remaining = current_stock / avg_daily_sales
+5. Classify status:
+   days_remaining > 45 AND avg_daily_sales < 0.1 → dead_stock
+   days_remaining > 30 → healthy
+   days_remaining 15-30 → warning
+   days_remaining < 15 → critical
+   current_stock = 0 → out_of_stock
+6. If critical/out_of_stock AND days_remaining < supplier_lead_days:
+   → Create restock alert + draft supplier email via Claude
+   → Push notification to admin
+
+M7 DASHBOARD — /admin/inventory:
+1. HEALTH OVERVIEW:
+   4 metric cards: Healthy / Warning / Critical / Out of Stock
+   Color-coded (jade/amber/red/black)
+
+2. INVENTORY TABLE (sortable):
+   Columns: Product | Stock | Daily Sales | Days Left | Status | Action
+   Rows colored by status
+   "Action" column: [Pedir stock] [Liquidar] [Crear urgencia]
+
+3. STOCK TIMELINE CHART:
+   Per product: bar chart showing projected stock depletion
+   Red line = lead time threshold (must order before this)
+
+4. DEAD STOCK DETECTOR:
+   Section showing products with >90 days stock at current pace
+   Claude recommendation per product:
+   "Este producto lleva 95 días de stock. Opciones:
+    A) Descuento 30% → proyección liquidación en 18 días
+    B) Bundle con Bomber Jacket → aumenta AOV €22
+    C) Campaña email a clientes anteriores"
+   Buttons: [Aplicar descuento] [Crear bundle] [Email campaña]
+
+5. RESTOCK ORDERS:
+   Pending approvals list
+   Each: product photo, units to order, urgency, supplier
+   Draft email preview (editable)
+   [Aprobar y enviar] button → sends via Nodemailer
+
+6. AUTO-URGENCY TOGGLE per product:
+   When ON: automatically adds Shopify metafield
+   { namespace: 'inventory', key: 'show_urgency', value: 'true' }
+   Theme reads this to show "¡Solo X unidades disponibles!"
+
+7. SEASONAL PREDICTOR:
+   Claude analyzes same period last year if data available:
+   "El año pasado en Noviembre vendiste 3x más chaquetas.
+    Necesitas pedir 45 unidades adicionales antes del 15 Oct."
+
+SUPPLIER EMAIL DRAFT (Claude generates):
+"Asunto: Pedido de reposición — [ProductName]
+
+Estimado proveedor,
+
+Necesitamos reponer el producto [ProductName] (SKU: [sku]).
+Cantidad solicitada: [qty] unidades.
+Fecha de entrega requerida: [date] (en [lead_days] días).
+
+Por favor confirme disponibilidad y precio.
+
+Saludos,
+[AgencyName]"
+
+══════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 3 — ONBOARDING INTERACTIVO + ACHIEVEMENT SYSTEM       ║
+╚═══════════════════════════════════════════════════════════════╝
+
+DATABASE — Add to SQLite:
+CREATE TABLE onboarding_progress (
+  user_id TEXT PRIMARY KEY,
+  project_id TEXT,
+  step_store_connected INTEGER DEFAULT 0,
+  step_audit_run INTEGER DEFAULT 0,
+  step_image_generated INTEGER DEFAULT 0,
+  step_price_optimized INTEGER DEFAULT 0,
+  step_ab_test_active INTEGER DEFAULT 0,
+  step_seo_applied INTEGER DEFAULT 0,
+  step_client_invited INTEGER DEFAULT 0,
+  completion_pct INTEGER DEFAULT 0,
+  onboarding_completed INTEGER DEFAULT 0,
+  completed_at TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE achievements (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  achievement_key TEXT NOT NULL, -- primera_optimizacion, boost_activado, etc.
+  unlocked_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, achievement_key)
+);
+
+PROGRESS TRACKING:
+After every action, call:
+POST /api/onboarding/mark-step
+Body: { userId, step: 'step_audit_run' }
+→ Updates progress, recalculates completion_pct
+→ Checks if achievement unlocked
+→ Returns { newAchievement: null | { key, title, icon } }
+
+ONBOARDING CHECKLIST COMPONENT:
+Floating card, bottom-left corner, collapsible
+Show until completion_pct = 100
+
+HTML structure for sidebar injection:
+<div id="onboarding-widget" class="onboarding-card">
+  <div class="ob-header" onclick="toggleOnboarding()">
+    <div class="ob-progress-ring"><!-- SVG ring --></div>
+    <div class="ob-title">Configura tu tienda</div>
+    <div class="ob-pct" id="ob-pct">3/7</div>
+    <div class="ob-chevron">▾</div>
+  </div>
+  <div class="ob-steps" id="ob-steps">
+    <!-- Steps rendered dynamically -->
+  </div>
+</div>
+
+Each step:
+<div class="ob-step done|pending" onclick="navigateToStep('audit')">
+  <div class="ob-step-check">✓ OR ○</div>
+  <div class="ob-step-label">Ejecutar primera auditoría</div>
+  <div class="ob-step-arrow">→</div>
+</div>
+
+CSS for onboarding widget:
+.onboarding-card {
+  position: fixed; bottom: 20px; left: 230px;
+  width: 240px;
+  background: var(--ink2);
+  border: 1px solid var(--bdr2);
+  border-radius: 14px;
+  box-shadow: 0 20px 48px rgba(0,0,0,0.5);
+  z-index: 100;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.ob-header {
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; border-bottom: 1px solid var(--bdr);
+  background: rgba(200,168,75,0.04);
+}
+.ob-step {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px; font-size: 12px;
+  border-bottom: 1px solid var(--bdr);
+  cursor: pointer; transition: background 0.15s;
+}
+.ob-step:hover { background: var(--ink3); }
+.ob-step.done { color: var(--t2); }
+.ob-step.done .ob-step-check { color: var(--jade); }
+.ob-step.active { color: var(--gold3); font-weight: 600; }
+.ob-step.pending { color: var(--t3); }
+
+ACHIEVEMENT SYSTEM:
+Define achievements:
+const ACHIEVEMENTS = [
+  { key: 'primera_conexion', icon: '🔌', title: 'Primera conexión', desc: 'Conectaste tu primera tienda Shopify' },
+  { key: 'primera_auditoria', icon: '🔍', title: 'Inspector', desc: 'Ejecutaste tu primera auditoría completa' },
+  { key: 'primera_imagen', icon: '🎨', title: 'Director creativo', desc: 'Generaste tus primeras imágenes con IA' },
+  { key: 'boost_activado', icon: '⚡', title: 'Boost activado', desc: 'Activaste el Boost Masivo por primera vez' },
+  { key: 'cien_imagenes', icon: '📸', title: '100 imágenes', desc: 'Generaste 100 imágenes profesionales' },
+  { key: 'primer_ab_ganador', icon: '🏆', title: 'Ganador', desc: 'Tu primer A/B test declaró un ganador' },
+  { key: 'primer_revenue_atribuido', icon: '💰', title: 'Primera atribución', desc: 'La IA generó revenue verificable' },
+  { key: 'tres_clientes', icon: '👥', title: 'Agencia', desc: 'Gestionas 3 tiendas activas' },
+  { key: 'autopilot_7dias', icon: '🤖', title: 'Piloto automático', desc: '7 días con Auto-Pilot activo' },
+];
+
+ACHIEVEMENT UNLOCK TOAST (special, bigger):
+When achievement unlocked, show special celebration toast:
+<div class="achievement-toast">
+  <div class="ach-icon">[icon]</div>
+  <div class="ach-body">
+    <div class="ach-title">¡Logro desbloqueado!</div>
+    <div class="ach-name">[title]</div>
+    <div class="ach-desc">[desc]</div>
+  </div>
+</div>
+CSS: gold border, larger (380px), stays 8 seconds
+Trigger confetti animation: 40 gold/jade particles fall
+(pure CSS keyframes, no library)
+
+ACHIEVEMENTS PAGE /admin/achievements:
+Grid of all achievements
+Unlocked: full color, date
+Locked: grayscale, blurred description "???"
+Progress bar: "8/21 logros desbloqueados"
+
+CONTEXTUAL COACH MARKS:
+On first visit to each main section, show spotlight:
+1. Dim overlay (rgba 0,0,0,0.7)
+2. Cutout over target element (box-shadow trick)
+3. Tooltip card next to element
+4. [Entendido] button dismisses
+5. Store dismissal in localStorage per section
+
+Sections with coach marks:
+- /admin → highlights Boost Masivo button
+- /admin/products → highlights "Generar con IA" button  
+- /admin/images → highlights image type grid
+- /admin/pricing → highlights COGS form
+- /admin/intelligence → highlights waterfall chart
+
+30-60-90 SUCCESS ROADMAP /admin/roadmap:
+Visual timeline (horizontal scrollable):
+Phase 1 (Days 1-30): "Setup" — 4 milestones
+Phase 2 (Days 31-60): "Optimización" — 4 milestones
+Phase 3 (Days 61-90): "Escala" — 4 milestones
+Each milestone: icon, title, status (done/active/pending)
+Overall: % completed, projected completion date
+
+══════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 4 — COMPETITOR INTELLIGENCE AUTOMÁTICO                ║
+╚═══════════════════════════════════════════════════════════════╝
+
+DATABASE:
+CREATE TABLE competitors (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  type TEXT DEFAULT 'direct', -- direct | indirect | aspirational
+  last_scanned TEXT,
+  active INTEGER DEFAULT 1
+);
+
+CREATE TABLE competitor_snapshots (
+  id TEXT PRIMARY KEY,
+  competitor_id TEXT NOT NULL,
+  scanned_at TEXT DEFAULT (datetime('now')),
+  products_found INTEGER,
+  price_min REAL,
+  price_max REAL,
+  price_median REAL,
+  new_products TEXT, -- JSON array
+  out_of_stock TEXT, -- JSON array  
+  promotions_detected TEXT, -- JSON
+  meta_title TEXT,
+  meta_description TEXT,
+  raw_data TEXT -- full JSON snapshot
+);
+
+CREATE TABLE competitor_alerts (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  competitor_id TEXT NOT NULL,
+  alert_type TEXT, -- price_drop | new_product | stock_out | promotion
+  severity TEXT, -- high | medium | low
+  title TEXT,
+  description TEXT,
+  action_suggestion TEXT,
+  dismissed INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+SCAN ENGINE — CRON daily 6am:
+For each active competitor per active project:
+1. Fetch competitor URL with axios + cheerio
+2. Extract: page title, meta desc, prices, product names,
+   stock indicators ("agotado", "out of stock", "sold out"),
+   promotion text ("% descuento", "oferta", "sale")
+3. Compare with previous snapshot
+4. Generate alerts for significant changes:
+   Price drop >8%: alert severity=high
+   New product detected: alert severity=medium
+   Stock out detected: alert severity=medium (opportunity!)
+   Promotion started: alert severity=high
+
+COMPETITOR INTELLIGENCE PAGE /admin/competitors:
+
+1. COMPETITOR LIST:
+   Cards showing each competitor:
+   Logo/favicon, name, URL, last scan time
+   Quick stats: avg price, products tracked, alerts count
+   [Escanear ahora] [Editar] [Eliminar]
+   [+ Añadir competidor] form
+
+2. ALERT CENTER:
+   Sorted by severity and recency
+   Each alert card:
+   - Severity badge (red/amber/gray)
+   - What changed (specific, not vague)
+   - Claude's suggested action
+   - [Aplicar sugerencia] [Ignorar] buttons
+   
+3. PRICE COMPARISON MAP:
+   Scatter plot: Price (Y) vs perceived quality/reviews (X)
+   Your store as gold dot, competitors as gray dots
+   Updates weekly
+
+4. MARKET INTELLIGENCE REPORT (weekly, Claude-generated):
+   Card with narrative + bullet points:
+   "Esta semana en tu mercado:
+    • Tu competidor A bajó precios en 3 productos (-12%)
+    • El competidor B lanzó 2 nuevos productos en moda urbana
+    • Hay escasez general en talla L — oportunidad de stock
+    Recomendaciones para esta semana: [3 acciones concretas]"
+
+5. GAP ANALYSIS:
+   Claude compares competitor catalogs vs your catalog:
+   "Productos que venden tus competidores y tú no tienes:
+    1. Sudadera oversize [vendida por A, B, C] — precio medio €45
+    2. Gorro logo [vendido por A] — precio medio €22
+    3. Calcetines branded [vendido por B, C] — precio medio €12"
+   [Crear ficha de producto] button per gap item
+
+══════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 5 — STRIPE BILLING + AFFILIATE PROGRAM                ║
+╚═══════════════════════════════════════════════════════════════╝
+
+INSTALL: npm install stripe
+
+ENV VARIABLES to add:
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_STARTER=price_...
+STRIPE_PRICE_AGENCY=price_...
+STRIPE_PRICE_ENTERPRISE=price_...
+
+DATABASE:
+CREATE TABLE subscriptions (
+  user_id TEXT PRIMARY KEY,
+  stripe_customer_id TEXT UNIQUE,
+  stripe_subscription_id TEXT,
+  plan TEXT DEFAULT 'trial', -- trial|starter|agency|enterprise
+  status TEXT DEFAULT 'active', -- active|past_due|canceled|trialing
+  trial_ends_at TEXT,
+  current_period_end TEXT,
+  stores_limit INTEGER DEFAULT 1,
+  images_included INTEGER DEFAULT 100,
+  images_used INTEGER DEFAULT 0,
+  cancel_at_period_end INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE affiliates (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  referral_code TEXT UNIQUE NOT NULL, -- 8-char uppercase
+  clicks INTEGER DEFAULT 0,
+  signups INTEGER DEFAULT 0,
+  conversions INTEGER DEFAULT 0,
+  pending_payout REAL DEFAULT 0,
+  total_earned REAL DEFAULT 0,
+  stripe_connect_id TEXT, -- for payouts
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE referral_tracking (
+  id TEXT PRIMARY KEY,
+  affiliate_id TEXT NOT NULL,
+  referred_user_id TEXT,
+  signup_date TEXT,
+  converted_date TEXT,
+  commission_rate REAL DEFAULT 0.20,
+  commission_earned REAL DEFAULT 0,
+  status TEXT DEFAULT 'pending' -- pending|active|paid
+);
+
+PLAN LIMITS ENFORCEMENT:
+Middleware that checks before every action:
+- Image generation: check images_used < images_included
+  If over: show upgrade modal OR charge overage via Stripe
+- Store creation: check projects count < stores_limit
+  If over: show upgrade modal
+- Premium features (A/B tests, API): check plan >= agency
+
+BILLING ROUTES:
+POST /billing/checkout
+  Body: { plan: 'agency', referralCode?: 'ABC12345' }
+  → Create Stripe Checkout Session
+  → Set metadata: { userId, plan, referralCode }
+  → Redirect to Stripe hosted checkout
+
+GET /billing/success?session_id=...
+  → Verify session
+  → Update subscription record
+  → If referralCode valid: link referral
+  → Redirect to /admin with success toast
+
+GET /billing/portal
+  → Create Stripe Customer Portal Session
+  → Redirect to Stripe portal
+
+POST /billing/webhook (stripe signature verified)
+  Handle events:
+  customer.subscription.updated → update plan/status
+  customer.subscription.deleted → downgrade to free
+  invoice.payment_failed → send warning email + UI alert
+  invoice.payment_succeeded → reset images_used, log
+
+UPGRADE MODAL (shown when limit hit):
+<div class="upgrade-modal">
+  <div class="um-icon">⚡</div>
+  <div class="um-title">Límite alcanzado</div>
+  <div class="um-desc">
+    Has usado [X] de [Y] imágenes de tu plan [Plan].
+    Actualiza para continuar sin interrupciones.
+  </div>
+  <div class="um-plans">
+    <!-- Mini pricing cards -->
+  </div>
+  <button onclick="redirectToUpgrade()">Actualizar ahora →</button>
+</div>
+
+BILLING PAGE /admin/billing:
+1. CURRENT PLAN card:
+   Plan name, price, renewal date, usage bars
+   [Cambiar plan] [Cancelar]
+
+2. USAGE METERS:
+   Tiendas: X/Y
+   Imágenes: X/Y (progress bar)
+   A/B Tests activos: X
+   
+3. INVOICE HISTORY:
+   Table: date, amount, status, [Descargar PDF]
+
+4. AFFILIATE SECTION:
+   Unique referral link: app.shopifyai.pro/ref/[CODE]
+   [Copiar link] button
+   Stats: Clicks / Registros / Conversiones / Ganado
+   Payout status + [Solicitar pago] when > €50
+
+AFFILIATE DASHBOARD /admin/affiliates:
+- Referral link with copy button + QR code
+- Performance chart (monthly earnings)
+- Referred users list (anonymized: "Usuario en Madrid")
+- Commission structure explained
+- Payout history
+- Stripe Connect onboarding for payouts
+
+TRIAL EXPIRY SYSTEM:
+- Day 10 of trial: email "Tu prueba termina en 4 días"
+- Day 13: in-app banner (gold, non-dismissible)
+- Day 14: downgrade, show paywall on premium actions
+- Banner message: "Tu prueba gratuita terminó. 
+  Tus datos están seguros — activa tu plan para continuar."
+- [Activar por €49/mes] gold CTA
+
+══════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 6 — ML PREDICTIVE ENGINE                              ║
+╚═══════════════════════════════════════════════════════════════╝
+
+PREDICTION ENGINE — CRON weekly Sunday 3am:
+
+For each active project, Claude generates predictions:
+
+1. REVENUE FORECAST (90 days):
+Claude prompt:
+"You are a quantitative eCommerce forecasting analyst.
+Given this revenue data for store [name]:
+- Last 90 days daily revenue: [array]
+- Last year same period (if available): [array]  
+- Recent trend: [7-day moving average]
+- Active optimizations: [list of recent motor actions]
+- Industry: [niche]
+
+Generate a 90-day revenue forecast:
+1. Point estimate (most likely scenario)
+2. Optimistic scenario (+1 standard deviation)
+3. Pessimistic scenario (-1 standard deviation)
+4. Key assumptions (2-3 bullets)
+5. Biggest risks to the forecast (2 bullets)
+6. Biggest upside catalysts (2 bullets)
+
+Return JSON: {
+  forecast: [{date, pessimistic, base, optimistic}], // 90 entries
+  summary: 'One sentence plain Spanish',
+  assumptions: string[],
+  risks: string[],
+  catalysts: string[]
+}"
+
+2. DEMAND FORECAST per product:
+For top 20 products by revenue:
+"Given sales velocity of [product] (avg [X] units/day,
+trend: [up/down/flat], last 30d: [X] units):
+Predict demand for next 30 days.
+Consider: seasonality, current stock level, promotions.
+Return: { predicted_units: N, confidence: pct, 
+          restock_urgency: 'immediate|soon|planned|none' }"
+
+3. CONVERSION PREDICTION:
+"Given current conversion rate [X%], active A/B tests,
+images coverage [Y%], SEO score [Z]:
+Predict conversion rate in 30 and 60 days.
+Assume current optimization pace continues.
+Return: { day30: X, day60: X, day30_range: [low,high] }"
+
+FORECAST DASHBOARD /admin/forecast:
+1. REVENUE FORECAST CHART:
+   Line chart with 3 lines (pessimistic/base/optimistic)
+   Confidence band between pessimistic and optimistic
+   Historical line (solid) + forecast (dashed)
+   X-axis: dates, Y-axis: €revenue
+   Today marker (vertical line)
+
+2. DEMAND FORECAST TABLE:
+   Top products by importance:
+   | Product | Stock | Predicted Demand | Status |
+   | Bomber Jacket | 23 | 28 units/30d | ⚠️ Pide stock |
+
+3. CONVERSION FORECAST:
+   Current: 4.2% → Predicted day30: 4.8% → day60: 5.1%
+   Shown as gauge/progress
+   "A este ritmo, superarás el 5% en ~45 días"
+
+4. OPPORTUNITY ALERTS (Claude-generated):
+   "Alta probabilidad de stock-out en Sneakers 
+    antes del Black Friday. Pide 40 unidades ahora."
+   "Tu conversión podría alcanzar 5.5% si activas 
+    A/B tests en los 12 productos sin test activo."
+
+══════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 7 — VOICE INTERFACE                                   ║
+╚═══════════════════════════════════════════════════════════════╝
+
+No external APIs needed — uses browser Web Speech API (free).
+
+VOICE BUTTON:
+Floating button, bottom-right corner (above toast container):
+<div id="voice-btn" class="voice-btn" onclick="toggleVoice()">
+  <div class="voice-icon">🎙️</div>
+  <div class="voice-ring"></div>
+</div>
+
+CSS:
+.voice-btn {
+  position: fixed; bottom: 24px; right: 24px;
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(200,168,75,0.4);
+  z-index: 200; transition: all 0.2s;
+}
+.voice-btn.listening {
+  animation: voice-pulse 1s infinite;
+  box-shadow: 0 0 0 0 rgba(200,168,75,0.4);
+}
+@keyframes voice-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(200,168,75,0.5); }
+  70% { box-shadow: 0 0 0 16px rgba(200,168,75,0); }
+  100% { box-shadow: 0 0 0 0 rgba(200,168,75,0); }
+}
+
+VOICE TRANSCRIPT BUBBLE (shows above mic button):
+<div id="voice-bubble" class="voice-bubble hidden">
+  <div class="vb-transcript" id="vb-transcript">Escuchando...</div>
+  <div class="vb-response" id="vb-response"></div>
+</div>
+
+VOICE ENGINE (JavaScript):
+let recognition = null;
+
+function initVoice() {
+  if (!('webkitSpeechRecognition' in window) && 
+      !('SpeechRecognition' in window)) {
+    showToast('warning', 'Voz no disponible', 
+      'Tu navegador no soporta reconocimiento de voz');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'es-ES';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    document.getElementById('vb-transcript').textContent = transcript;
+    if (e.results[0].isFinal) processVoiceCommand(transcript);
+  };
+  
+  recognition.onerror = (e) => {
+    showToast('error', 'Error de voz', e.error);
+    stopListening();
+  };
+}
+
+function toggleVoice() {
+  const btn = document.getElementById('voice-btn');
+  if (btn.classList.contains('listening')) {
+    stopListening();
+  } else {
+    startListening();
+  }
+}
+
+function startListening() {
+  document.getElementById('voice-btn').classList.add('listening');
+  document.getElementById('voice-bubble').classList.remove('hidden');
+  document.getElementById('vb-transcript').textContent = 'Escuchando...';
+  recognition.start();
+}
+
+function stopListening() {
+  document.getElementById('voice-btn').classList.remove('listening');
+  recognition.stop();
+}
+
+async function processVoiceCommand(transcript) {
+  stopListening();
+  document.getElementById('vb-transcript').textContent = `"${transcript}"`;
+  document.getElementById('vb-response').textContent = 'Procesando...';
+  
+  const currentProject = getCurrentProjectId(); // from app state
+  
+  const response = await fetch('/api/voice/command', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      transcript, 
+      projectId: currentProject,
+      currentPage: window.location.pathname
+    })
+  });
+  
+  const { action, response: textResponse, executed } = await response.json();
+  
+  // Show text response
+  document.getElementById('vb-response').textContent = textResponse;
+  
+  // Speak response
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(textResponse);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  }
+  
+  // Execute action if any
+  if (action) executeVoiceAction(action);
+  
+  // Hide bubble after 5 seconds
+  setTimeout(() => {
+    document.getElementById('voice-bubble').classList.add('hidden');
+  }, 5000);
+}
+
+VOICE COMMAND API:
+POST /api/voice/command
+Requires auth (admin or client)
+
+Claude system prompt:
+"You are a voice assistant for ShopifyAI Pro, a Shopify 
+optimization platform. The user manages store: [storeName].
+Current page: [currentPage].
+
+Interpret this voice command in natural Spanish and return:
+1. A natural Spanish spoken response (max 2 sentences, 
+   no markdown, conversational tone)
+2. An action to execute (if applicable)
+
+Available actions:
+- get_revenue: { period: 'today|week|month' }
+- get_top_products: { limit: N }  
+- run_audit: { projectId }
+- run_boost: { projectId }
+- generate_images: { productId, types: [] }
+- change_price: { productId, newPrice }
+- get_ab_status: {}
+- get_inventory_alerts: {}
+- navigate: { path: '/admin/products' }
+- search_product: { query: 'string' }
+
+Return JSON:
+{
+  response: 'Respuesta hablada natural en español',
+  action: null | { type, params },
+  confidence: 0.0-1.0
+}
+
+If confidence < 0.6, response should ask for clarification.
+Never make up data — if you don't have it, say so."
+
+EXAMPLE COMMANDS AND RESPONSES:
+"¿Cuánto hemos vendido hoy?"
+→ action: get_revenue(today) → "Hoy habéis vendido €843 en 12 pedidos."
+
+"Genera imágenes para la bomber jacket"
+→ action: generate_images(search:bomber) → "Lanzando generación de imágenes para la Bomber Jacket AW24. Estaré listo en unos minutos."
+
+"¿Qué productos me preocupan?"
+→ action: get_inventory_alerts() → "Tienes 3 productos en nivel crítico: Sneakers talla 41 se agota en 6 días,..."
+
+"Activa el boost masivo"
+→ action: run_boost(currentProject) → "Activando Boost Masivo para Moda Urbana. Los 6 motores están en marcha."
+
+"Llévame a los precios"
+→ action: navigate('/admin/pricing') → "Navegando a Pricing y P&L."
+
+══════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 8 — MOBILE PWA                                        ║
+╚═══════════════════════════════════════════════════════════════╝
+
+Make the app installable on iOS and Android as a PWA.
+
+1. CREATE /public/manifest.json:
+{
+  "name": "ShopifyAI Pro",
+  "short_name": "ShopifyAI",
+  "description": "Gestión inteligente de tiendas Shopify",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#080810",
+  "theme_color": "#c8a84b",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
+
+2. CREATE /public/sw.js (Service Worker):
+const CACHE = 'shopifyai-v1';
+const STATIC = ['/css/design-system.css', '/js/app.js'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request).catch(() => caches.match(e.request))
+  );
+});
+
+// Push notifications handler
+self.addEventListener('push', e => {
+  const data = e.data?.json() || {};
+  e.waitUntil(self.registration.showNotification(
+    data.title || 'ShopifyAI Pro',
+    {
+      body: data.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/badge-72.png',
+      data: { url: data.url || '/admin' },
+      actions: data.actions || []
+    }
+  ));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.openWindow(e.notification.data.url));
+});
+
+3. REGISTER SERVICE WORKER in app.js:
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+
+4. WEB PUSH NOTIFICATIONS:
+INSTALL: npm install web-push
+Generate VAPID keys: npx web-push generate-vapid-keys
+Store in .env: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY
+
+API endpoints:
+POST /api/push/subscribe → saves push subscription per user
+POST /api/push/send (internal) → sends notification
+
+Trigger push notifications for:
+- A/B test winner declared → "🏆 Test ganador: +28% conversión"
+- Competitor price drop → "⚠️ Competidor bajó precios"  
+- Stock critical → "📦 Stock crítico: Bomber Jacket"
+- Revenue milestone → "💰 ¡Nuevo récord! €X en un día"
+- Boost Masivo completed → "⚡ Boost completado en [store]"
+
+5. ADD TO HOME SCREEN PROMPT:
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstallBanner();
+});
+
+function showInstallBanner() {
+  // Show gold banner at top:
+  // "📱 Instala ShopifyAI Pro en tu móvil — acceso rápido + notificaciones"
+  // [Instalar] [Ahora no]
+}
+
+6. RESPONSIVE MOBILE LAYOUT adjustments:
+In design-system.css add:
+@media (max-width: 600px) {
+  .app-shell { flex-direction: column; }
+  .sidebar { 
+    width: 100%; height: 52px; min-width: 100%;
+    flex-direction: row; overflow-x: auto;
+  }
+  .sidebar-clients, .sidebar-bottom { display: none; }
+  .sidebar-nav { 
+    display: flex; flex-direction: row; 
+    padding: 0 8px; overflow-x: auto;
+  }
+  .nav-item { 
+    flex-direction: column; min-width: 60px;
+    font-size: 10px; padding: 6px 8px; gap: 3px;
+    white-space: nowrap;
+  }
+  .nav-item .nav-icon { font-size: 18px; }
+  .topbar { display: none; }
+  .main-content { padding: 12px; }
+  .grid-4 { grid-template-columns: 1fr 1fr; }
+}
+
+══════════════════════════════════════════════════════════════════
+
+╔═══════════════════════════════════════════════════════════════╗
+║  PHASE 9 — FINAL POLISH & INTEGRATION                        ║
+╚═══════════════════════════════════════════════════════════════╝
+
+After all phases are complete:
+
+1. UNIFIED NAVIGATION:
+   Add new sections to sidebar:
+   - /admin/intelligence (Revenue Intelligence)
+   - /admin/inventory (M7 Inventario)
+   - /admin/competitors (Competitor Intel)
+   - /admin/forecast (Predicciones ML)
+   - /admin/billing (Billing + Afiliados)
+   - /admin/achievements (Logros)
+   - /admin/roadmap (Plan 30-60-90)
+
+2. GLOBAL SEARCH (Cmd+K):
+   Command palette across entire app:
+   Search products, clients, actions, pages
+   Recent actions shortcut
+   Voice command shortcut
+   CSS: .command-palette overlay with search input
+   JS: listen for Ctrl+K / Cmd+K
+
+3. KEYBOARD SHORTCUTS:
+   Ctrl+B → Boost Masivo (with confirmation)
+   Ctrl+A → Run Audit on current store  
+   Ctrl+I → Navigate to Intelligence
+   Ctrl+K → Open command palette
+   G then D → Go to Dashboard
+   G then P → Go to Products
+   Show shortcuts with ? key
+
+4. NOTIFICATION CENTER (full panel):
+   Persistent history of all notifications
+   Grouped by: Today / Yesterday / This Week
+   Filter by: All / Alerts / Achievements / System
+   Mark all read / Clear all
+
+5. DARK/LIGHT MODE TOGGLE:
+   User preference stored in DB
+   Light mode: swap --ink vars for light equivalents
+   --ink: #f8f8ff, --ink2: #ffffff, --t: #0c0c14
+   Toggle in topbar, smooth transition
+
+6. EXPORT CAPABILITIES:
+   From any data table: Export CSV button
+   From Intelligence page: Export PDF report
+   From Inventory: Export restock list as CSV
+   From Competitors: Export comparison as PDF
+
+7. HEALTH CHECK PAGE /admin/system:
+   Shows status of all integrations:
+   - Shopify API: Connected ✓ / Error ✗
+   - Claude API: Active ✓ / Rate limited ⚠
+   - Replicate API: Active ✓
+   - Stripe: Active ✓  
+   - Database: Healthy ✓
+   - Last successful cron runs
+   - Error log (last 10 errors with stack traces)
+
+8. RATE LIMIT HANDLING for all Claude calls:
+   If 429 received: exponential backoff (2s, 4s, 8s, 16s)
+   Show user: "Procesando... (alta demanda, un momento)"
+   Queue system: max 3 concurrent Claude calls
+   Estimate wait time shown to user
+
+9. ACCESSIBILITY:
+   All interactive elements have aria-labels
+   Tab navigation works correctly throughout
+   Focus visible on all inputs (gold ring)
+   Screen reader announcements for toasts
+   Reduced motion: @media (prefers-reduced-motion: reduce)
+   removes all animations
+
+10. ERROR BOUNDARY:
+    Global error handler:
+    window.onerror = (msg, src, line, col, err) => {
+      // Log to /api/errors endpoint
+      // Show user-friendly toast (not stack trace)
+      showToast('error', 'Algo fue mal', 
+        'El equipo ha sido notificado. Intenta de nuevo.');
+    };
+
+══════════════════════════════════════════════════════════════════
+END OF IMPLEMENTATION — VERIFY EACH PHASE BEFORE PUBLISHING
+══════════════════════════════════════════════════════════════════
+
+FINAL CHECKLIST before considering complete:
+□ All 9 phases implemented and tested
+□ All new pages use design-system.css classes
+□ All new DB tables created with proper indexes
+□ All cron jobs registered and tested
+□ All Claude prompts return valid JSON when structured output needed
+□ All Stripe webhooks verified with test events
+□ PWA manifest validated at web.dev/measure
+□ Mobile layout tested at 375px width
+□ All new sections added to sidebar navigation
+□ Voice interface tested in Chrome (best support)
+□ All error states handled gracefully
+□ No console errors on any page
+□ Loading states on all async operations
+□ Empty states on all list/table views

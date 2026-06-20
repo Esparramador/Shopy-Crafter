@@ -9,45 +9,21 @@ Shopy Crafter es una plataforma de optimización con inteligencia artificial par
 - **Precio inicial:** Desde €0/mes (plan gratuito disponible)
 - **Idioma principal:** Español
 
-## Páginas principales
+## Páginas importantes
 
-- / — Página principal con presentación del producto, precios y formulario de contacto
+- / — Página principal con presentación del producto
+- /landing — Landing page con detalles del servicio y precios
 - /sobre-nosotros — Equipo y misión de Shopy Crafter
 - /casos-de-exito — Casos de uso reales con resultados medibles
-- /programa-de-afiliados — Información sobre el programa de afiliados (30% comisión recurrente)
+- /programa-de-afiliados — Información sobre el programa de afiliados
 - /faq — Preguntas frecuentes sobre la plataforma
-- /blog — Artículos sobre optimización Shopify, SEO y ecommerce con IA
+- /blog — Artículos sobre optimización Shopify, SEO y ecommerce
 - /changelog — Historial de actualizaciones y nuevas funciones
-- /privacidad — Política de privacidad (RGPD)
+- /privacidad — Política de privacidad
 - /terminos — Términos y condiciones de uso
 - /cookies — Política de cookies
 - /contacto — Formulario de contacto y soporte
 
-## Artículos del blog
-
-- /blog/optimizar-fichas-google-shopping-2026 — Cómo optimizar fichas de producto para Google Shopping en 2026: schemas JSON-LD, imágenes de alta calidad y descripciones únicas
-- /blog/claude-vs-gemini-ecommerce — Claude vs Gemini: qué modelo de IA es mejor para tu eCommerce tras 15.000+ generaciones reales
-- /blog/guia-cogs-tiendas-online — La guía definitiva de COGS para tiendas online: 9 categorías de costes que toda tienda debería trackear
-- /blog/ab-testing-automatizado-ia — A/B Testing automatizado con IA: intervalos de confianza del 95% y auto-winner
-- /blog/comic-crafter-caso-exito — Cómo Comic Crafter aumentó ventas un 340% en 90 días con SEO automatizado e imágenes IA
-- /blog/17-motores-ia-ecommerce — 17 motores de IA para eCommerce: Audit, SEO, Images, A/B Testing, Pricing, WebLab, Fusion Studio y más
-
-## Casos de éxito
-
-- /casos-de-exito/comic-crafter — Comic Crafter (cómics e ilustración): de 12 ventas/mes a +340% ventas en 90 días con 47 fichas optimizadas
-- /casos-de-exito/sakura-studio — Sakura Studio (camisetas Japón-inspired): Top 3 Google en 18 keywords, +210% sesiones, 4× conversión
-- /casos-de-exito/audit-multipart — Audit Multipart (repuestos automoción B2B): 1.200 productos auto-descritos en 2 semanas, +180% leads
-
-## Changelog (versiones recientes)
-
-- /changelog/3.8.0 — ShopyBrain OmniCore v3: aprendizaje continuo entre proyectos y sincronización multi-cuenta
-- /changelog/3.7.0 — Ad Studio + Campaign Kit: creatividades para Meta, Google y TikTok con calendario de campaña
-- /changelog/3.6.0 — Economista IA: análisis automático de COGS con 9 categorías de coste
-- /changelog/3.5.0 — A/B Testing con predicción IA basada en datos históricos del mismo nicho
-- /changelog/3.4.0 — Fusion Studio canvas multi-capa + Exploded View para productos técnicos
-- /changelog/3.3.0 — Sistema de logros y gamificación con roadmap 30-60-90 días
-- /changelog/3.2.0 — Command Center centralizado + búsqueda universal
-
 ## Tecnología
 
-Shopy Crafter utiliza modelos de IA líderes del mercado (Claude, GPT-4, Gemini) para generar contenido de alta conversión adaptado a cada nicho de producto y mercado objetivo. Integración directa con la API de Shopify para sincronización automática de productos, inventario y métricas.
+Shopy Crafter utiliza modelos de IA líderes del mercado (Claude, GPT-4, Gemini) para generar contenido de alta conversión adaptado a cada nicho de producto y mercado objetivo.

@@ -1,0 +1,145 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "Lazzer",
+      "role": "heading"
+    },
+    {
+      "family": "Inter",
+      "role": "body"
+    }
+  ],
+  "colors": {
+    "primary": "#DCEEEB",
+    "accent": "#C190FF",
+    "background": "#FFFFFF",
+    "textPrimary": "#181E15",
+    "link": "#C190FF"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Inter",
+      "heading": "Lazzer"
+    },
+    "fontStacks": {
+      "heading": [
+        "Lazzer",
+        "sans-serif"
+      ],
+      "body": [
+        "Inter",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Lazzer",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "84px",
+      "h2": "64px",
+      "body": "18px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "5px"
+  },
+  "components": {
+    "input": {
+      "background": "transparent",
+      "textColor": "#181E15",
+      "borderColor": null,
+      "borderRadius": "0px",
+      "borderRadiusCorners": {
+        "topLeft": "0px",
+        "topRight": "0px",
+        "bottomRight": "0px",
+        "bottomLeft": "0px"
+      },
+      "shadow": "none"
+    },
+    "buttonPrimary": {
+      "background": "#C190FF",
+      "textColor": "#181E15",
+      "borderRadius": "100px",
+      "borderRadiusCorners": {
+        "topLeft": "100px",
+        "topRight": "100px",
+        "bottomRight": "100px",
+        "bottomLeft": "100px"
+      },
+      "shadow": "none"
+    },
+    "buttonSecondary": {
+      "background": "transparent",
+      "textColor": "#181E15",
+      "borderColor": "#181E15",
+      "borderRadius": "100px",
+      "borderRadiusCorners": {
+        "topLeft": "100px",
+        "topRight": "100px",
+        "bottomRight": "100px",
+        "bottomLeft": "100px"
+      },
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "logo": "File saved at: attached_assets/logo.svg",
+    "favicon": "File saved at: attached_assets/favicon.png",
+    "ogImage": "File saved at: attached_assets/ogImage.png",
+    "logoHref": "File saved at: attached_assets/logoHref.html",
+    "logoAlt": "Semrush homepage"
+  },
+  "__llm_logo_reasoning": {
+    "selectedIndex": 13,
+    "reasoning": "Selected #13 because it is visible, located in the header, and has an alt text matching the brand 'Semrush'. It links to the homepage, making it the primary brand logo.",
+    "confidence": 0.95,
+    "source": "llm"
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": 6,
+      "text": "Start free trial",
+      "reasoning": "Button #6 'Start free trial' uses the vibrant brand color #C190FF, which is a strong indicator of a primary CTA. The text is action-oriented, encouraging users to start a trial, aligning with common primary CTA practices."
+    },
+    "secondary": {
+      "index": 9,
+      "text": "Try for free",
+      "reasoning": "Button #9 'Try for free' has a transparent background with a border, making it a suitable secondary CTA. It provides an alternative action with a less prominent style compared to the primary button."
+    },
+    "confidence": 0.95
+  },
+  "personality": {
+    "tone": "professional",
+    "energy": "medium",
+    "targetAudience": "business professionals and marketers"
+  },
+  "designSystem": {
+    "framework": "custom",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0.95,
+    "colors": 0.9,
+    "overall": 0.925
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": true,
+      "llmSucceeded": true,
+      "finalSource": "llm",
+      "rawLogoSelection": {
+        "selectedLogoIndex": 13,
+        "selectedLogoReasoning": "Selected #13 because it is visible, located in the header, and has an alt text matching the brand 'Semrush'. It links to the homepage, making it the primary brand logo.",
+        "confidence": 0.95
+      }
+    },
+    "buttonClassification": {
+      "llmCalled": true,
+      "llmSucceeded": true
+    }
+  }
+}

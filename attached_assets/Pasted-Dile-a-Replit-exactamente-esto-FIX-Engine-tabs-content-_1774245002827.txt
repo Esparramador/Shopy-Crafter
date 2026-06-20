@@ -1,0 +1,87 @@
+Dile a Replit exactamente esto:
+
+FIX: Engine tabs — content disappears after animation
+
+The problem is in renderEngine(). When it rebuilds the 
+panel HTML, new elements get class "fp-animate fp-animated"
+hardcoded, which triggers the animation. But the animation 
+ends and something resets opacity back to 0.
+
+ROOT CAUSE: The fp-animate class has opacity:0 as base style.
+When animation finishes, if the element still has fp-animate 
+class, it reverts to opacity:0 after the animation ends.
+
+THE FIX — two changes:
+
+1. In CSS, add this rule:
+   .fp-animated {
+     opacity: 1 !important;
+     transform: translateY(0) !important;
+   }
+   
+   This ensures after animation ends, the element 
+   stays visible regardless of the fp-animate base style.
+
+2. In renderEngine() function, do NOT add fp-animate 
+   to the new elements at all. Just add fp-animated:
+
+   WRONG (current):
+   '<div class="fp-animate fp-animated">'
+   
+   CORRECT (fix):
+   '<div class="fp-engine-icon-wrap" 
+         style="animation: fp-enter 0.5s ease both;">'
+
+   OR even simpler — remove both classes from renderEngine
+   and just use inline animation style:
+
+   function renderEngine(i) {
+     if (!panel) return;
+     const e = ENGINE_DATA[i];
+     const anim = 'animation: fp-enter 0.55s cubic-bezier(0.22,1,0.36,1) both;';
+     const anim2 = 'animation: fp-enter 0.55s cubic-bezier(0.22,1,0.36,1) 0.08s both;';
+     const anim3 = 'animation: fp-enter 0.55s cubic-bezier(0.22,1,0.36,1) 0.16s both;';
+     
+     panel.innerHTML =
+       '<div class="fp-engine-icon-wrap" style="' + anim + '">' +
+         '<div class="fp-engine-icon-large" style="background:' + e.bg + '">' + 
+           e.icon + 
+         '</div>' +
+         '<div class="fp-engine-num-badge">' + e.num + '</div>' +
+       '</div>' +
+       '<div style="' + anim2 + '">' +
+         '<div class="fp-engine-title">' + e.title + '</div>' +
+         '<div class="fp-engine-desc">' + e.desc + '</div>' +
+         '<div class="fp-engine-tags">' +
+           e.tags.map(t => 
+             '<span class="fp-engine-tag">' + t + '</span>'
+           ).join('') +
+         '</div>' +
+       '</div>' +
+       '<div class="fp-engine-stats" style="' + anim3 + '">' +
+         e.stats.map(s =>
+           '<div class="fp-engine-stat">' +
+             '<div class="fp-engine-stat-val" style="color:var(--l-gold2)">' + 
+               s.val + 
+             '</div>' +
+             '<div class="fp-engine-stat-lbl">' + s.lbl + '</div>' +
+           '</div>'
+         ).join('') +
+       '</div>';
+   }
+
+3. Make sure @keyframes fp-enter is defined as:
+   @keyframes fp-enter {
+     from { opacity: 0; transform: translateY(20px); }
+     to   { opacity: 1; transform: translateY(0); }
+   }
+   The "both" fill-mode means it starts at "from" state
+   BEFORE the delay and stays at "to" state AFTER it ends.
+   This prevents the flash.
+
+4. Also add to CSS:
+   .fp-engine-panel * {
+     opacity: 1;
+   }
+   This catches any child elements that might inherit
+   opacity:0 from a parent class unexpectedly.

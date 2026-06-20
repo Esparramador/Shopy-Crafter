@@ -1,0 +1,312 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "source": "21st.dev inspired — adapted for Crafter Agency AI client DNA system",
+    "description": "Auth forms, dashboards, contact, blog, onboarding, and special effects. All prompts use {{CLIENT_*}} DNA variables.",
+    "total": 32,
+    "categories": ["auth", "dashboard", "contact", "blog", "onboarding", "special"]
+  },
+  "templates": [
+
+    {
+      "id": "tpl_166",
+      "name": "Auth — Split-Screen Login (Form + Visual)",
+      "category": "auth",
+      "tags": ["auth", "login", "split", "form", "onboarding"],
+      "description": "Form fields on one side, branded visual panel on the other. Professional login/signup page.",
+      "prompt": "Build a split-screen authentication page for {{CLIENT_NAME}}.\n\nFull-viewport layout: 2 columns (50/50), no scroll.\n\nLEFT panel (form side): background:#08080f, padding:60px, display:flex, align-items:center, justify-content:center.\nForm container: max-width:400px, width:100%.\n- Logo: '{{CLIENT_NAME}}' + {{CLIENT_LOGO_URL}} if available, mb:32px.\n- H1: 'Welcome back' (or 'Create your account'), 28px, {{CLIENT_FONT}}, 700.\n- Sub: '{{CLIENT_TAGLINE}}', 14px muted, mb:32px.\n- Email input: label 'Email', input type:email, full-width, height:48px, background:#0e0e1e, border:1px solid rgba(255,255,255,0.1), border-radius:10px, padding:0 16px, color:white, font-family:{{CLIENT_FONT}}. Focus: border-color:{{CLIENT_COLORS first}}, box-shadow:0 0 0 3px rgba({{CLIENT_COLORS first}},0.15).\n- Password input: same style + show/hide toggle eye icon.\n- 'Forgot password?' link right-aligned below password.\n- Submit: '{{CLIENT_CTA_PRIMARY}}' full-width, 48px, gradient {{CLIENT_COLORS}}, border-radius:10px, font-weight:700.\n- OR divider (thin lines + 'or' text centered).\n- Social: Google + GitHub buttons (border style, full-width, 44px, icons left).\n- Switch: 'Don't have an account? Sign up →' or vice versa.\n\nRIGHT panel (visual side): background:linear-gradient(135deg, {{CLIENT_COLORS}}), padding:60px. Contains: large quote/benefit text, 3 feature bullets with icons, floating client logos or avatars as social proof.\n\nMobile: hide right panel, form goes full-width.\nFont: {{CLIENT_FONT}}. Tone: {{CLIENT_TONE}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_LOGO_URL", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_TONE", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_167",
+      "name": "Auth — Centered Card on Dark Background",
+      "category": "auth",
+      "tags": ["auth", "login", "card", "centered", "clean"],
+      "description": "Floating card with heading, email, password, CTA, and sign-up link on a full-page dark background.",
+      "prompt": "Build a centered card authentication page for {{CLIENT_NAME}}.\n\nFull-viewport: background:#050510, display:flex, align-items:center, justify-content:center.\nOptional background: animated gradient mesh in {{CLIENT_COLORS}} at 8% opacity (same blob technique as tpl_104).\n\nCard: background:#0c0c1a, border:1px solid rgba(255,255,255,0.08), border-radius:20px, padding:48px, width:min(440px,90vw), box-shadow:0 24px 80px rgba(0,0,0,0.5).\n\nInside card:\n- Logo centered: '{{CLIENT_NAME}}', font-family:{{CLIENT_FONT}}, font-weight:700, mb:8px.\n- H2: 'Sign in to your account', 22px, centered.\n- Sub: '{{CLIENT_TAGLINE}}', 13px muted, centered, mb:28px.\n- Inputs: Email + Password (same styles as tpl_166).\n- 'Remember me' checkbox left + 'Forgot password?' right (flex space-between).\n- Submit button: '{{CLIENT_CTA_PRIMARY}}', full-width, gradient {{CLIENT_COLORS}}.\n- OR divider.\n- Google button (single social option or add GitHub).\n- Footer: 'No account? {{CLIENT_CTA_SECONDARY}}' link.\n\nSubtle card glow: box-shadow includes 0 0 60px rgba({{CLIENT_COLORS first}},0.06).\nFont: {{CLIENT_FONT}}. Tone: {{CLIENT_TONE}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_LOGO_URL", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_CTA_SECONDARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_TONE"]
+    },
+
+    {
+      "id": "tpl_168",
+      "name": "Auth — Social-First Login",
+      "category": "auth",
+      "tags": ["auth", "social", "oauth", "google", "github", "quick"],
+      "description": "Social login buttons primary at top, email/password secondary below a divider. Optimizes for quick login.",
+      "prompt": "Build a social-first auth page for {{CLIENT_NAME}}.\n\nFull-viewport centered layout. Card: max-width:400px, background:#0c0c1a, border-radius:20px, padding:40px.\n\nTop: logo + 'Sign in to {{CLIENT_NAME}}' heading.\n\nSocial buttons FIRST (primary section):\n- Google: white background, black text, Google logo SVG left. Full-width, 48px, border-radius:10px. Hover: slight shadow.\n- GitHub: dark background #24292e, white text, GitHub Octocat SVG left. Full-width, 48px.\n- Optional: Apple ID button (black).\nAll buttons have border:1px solid rgba(255,255,255,0.1) on dark backgrounds.\n\nOR divider: mt:24px mb:24px.\n\nEmail/password section (secondary, smaller visual weight):\n- Inputs more compact (42px height). Same focus styles.\n- Submit: filled but slightly smaller, gradient {{CLIENT_COLORS}}, 'Sign in with Email'.\n- 'Forgot password?' text link.\n\nBottom: 'New to {{CLIENT_NAME}}? {{CLIENT_CTA_PRIMARY}}' (register link in {{CLIENT_COLORS}}).\n\nPrivacy note: 'By signing in you agree to our Terms & Privacy' — 11px muted, centered.\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_CTA_PRIMARY", "CLIENT_LOGO_URL", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_TAGLINE"]
+    },
+
+    {
+      "id": "tpl_169",
+      "name": "Auth — Magic Link (Passwordless)",
+      "category": "auth",
+      "tags": ["auth", "magic-link", "passwordless", "email", "modern"],
+      "description": "Single email input, one CTA. No password. Magic link flow with confirmation state.",
+      "prompt": "Build a magic link passwordless auth page for {{CLIENT_NAME}}.\n\nMinimal centered card: max-width:380px, centered vertically, background:#0c0c1a, border-radius:20px, padding:48px.\n\nStep 1 (initial state):\n- Large magic wand or envelope emoji icon, centered, 48px.\n- H2: 'Sign in to {{CLIENT_NAME}}', centered, {{CLIENT_FONT}}, 24px.\n- Sub: 'We'll email you a secure link — no password needed.', 14px muted, centered, mb:28px.\n- Email input: full-width, 50px, bold font-size:16px. Focus border {{CLIENT_COLORS first}}.\n- Submit button: '{{CLIENT_CTA_PRIMARY}}' full-width, 50px, gradient {{CLIENT_COLORS}}.\n\nStep 2 (after submit — show via JS hiding step 1, showing step 2):\n- Large ✉️ icon animated (slight bounce @keyframes).\n- H2: 'Check your inbox!'\n- Sub: 'We sent a sign-in link to [email]. Check spam if you don't see it.'\n- Smaller link: '← Use a different email' (resets to step 1).\n- '{{CLIENT_USP_1}} · {{CLIENT_USP_2}}' trust line below.\n\nTransition: step 1 fades out (opacity:0, pointer-events:none), step 2 fades in.\nFont: {{CLIENT_FONT}}. Tone: {{CLIENT_TONE}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_CTA_PRIMARY", "CLIENT_TONE", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2"]
+    },
+
+    {
+      "id": "tpl_170",
+      "name": "Auth — Multi-Step Signup Wizard",
+      "category": "auth",
+      "tags": ["auth", "signup", "multi-step", "wizard", "onboarding"],
+      "description": "Progress indicator at top, signup split across 2-3 logical steps with back/next navigation.",
+      "prompt": "Build a multi-step signup wizard for {{CLIENT_NAME}}.\n\nFull-viewport: dark background with subtle gradient blob {{CLIENT_COLORS}} 8% opacity.\nCard: max-width:480px, centered, background:#0c0c1a, border-radius:20px, padding:48px.\n\nProgress bar: at top of card. 3 steps. Active step: {{CLIENT_COLORS}} fill. Completed: checkmark. Inactive: muted circle. Label below each: 'Account', 'Profile', 'Setup'.\n\nStep 1 — Account:\n- H2: 'Create your account' + sub '{{CLIENT_TAGLINE}}'.\n- Full name input + Email input + Password input (with strength indicator bar below — 4 segments: weak/fair/good/strong in red/yellow/green/{{CLIENT_COLORS}}).\n- 'Next →' button, full-width, {{CLIENT_COLORS}}.\n- 'Already have an account? Sign in' link.\n\nStep 2 — Profile:\n- H2: 'Tell us about yourself'.\n- Dropdown: 'Your role' (Developer, Designer, Marketer, Founder, Other).\n- Input: 'Company name' (optional).\n- Checkboxes: '{{CLIENT_USP_1}}', '{{CLIENT_USP_2}}', '{{CLIENT_USP_3}}' — 'I want to...' multi-select.\n- Back + Next buttons (flex row).\n\nStep 3 — Done:\n- Large ✓ checkmark animation (SVG stroke animation, draws the check).\n- H2: 'You're all set!'\n- '{{CLIENT_CTA_PRIMARY}}' full-width button — takes to app.\n\nStep transitions: current step fades out (opacity:0, x:-20px), next slides in from right (x:20px→0).\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_171",
+      "name": "Auth — Minimal Single Column",
+      "category": "auth",
+      "tags": ["auth", "minimal", "simple", "clean", "no-card"],
+      "description": "Logo, heading, fields, and CTA stacked cleanly with no card container. Architectural minimalism.",
+      "prompt": "Build an ultra-minimal auth page for {{CLIENT_NAME}} (tone: {{CLIENT_TONE}}).\n\nFull-viewport: background:#050510 (or pure white if {{CLIENT_TONE}} is light). No card container — form floats directly on background.\nVertical center: padding:60px 24px.\n\nColumn: max-width:360px, centered.\n- Logo: '{{CLIENT_NAME}}' text only, 24px, font-weight:700, {{CLIENT_FONT}}, mb:48px.\n- H1: 'Sign in', 32px, font-weight:300, mb:8px. (Deliberately light weight — contrast with boldness elsewhere.)\n- Sub: '{{CLIENT_TAGLINE}}', 14px muted, mb:32px.\n- Email input: no visible border except bottom border (1px solid rgba(255,255,255,0.2)). Minimal style. On focus: bottom border color:{{CLIENT_COLORS first}}.\n- Password input: same style.\n- Submit: text-only button or extremely minimal fill — '{{CLIENT_CTA_PRIMARY}} →', 16px, font-weight:600, color:{{CLIENT_COLORS first}}. No background. Or minimal pill.\n- 'Forgot password' link + 'Sign up' link: very small 12px, muted.\n\nNo decorative elements. Zero excess. Background can have a single 1px horizontal rule or nothing.\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_TONE", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_LOGO_URL"]
+    },
+
+    {
+      "id": "tpl_172",
+      "name": "Dashboard — Sidebar + Main Content Layout",
+      "category": "dashboard",
+      "tags": ["dashboard", "sidebar", "layout", "app", "analytics"],
+      "description": "Full app dashboard layout: sidebar nav + main content area with metric cards and chart area.",
+      "prompt": "Build a full dashboard layout for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).\n\nOuter: height:100vh, display:grid, grid-template-columns:240px 1fr, background:#050510.\n\nSidebar (tpl_116 pattern): background:#07070f, border-right:1px solid rgba(255,255,255,0.05), overflow-y:auto.\n- Logo + version, nav groups, user section bottom.\n\nMain area: overflow-y:auto.\n\nTop header bar: background:#07070f, border-bottom:1px solid rgba(255,255,255,0.05), padding:14px 28px, display:flex, justify-content:space-between.\n- Left: page title + breadcrumb.\n- Right: notification bell icon + avatar menu + '{{CLIENT_CTA_PRIMARY}}' button.\n\nContent area padding:28px:\n\n1. KPI row: 4 metric cards (same flex/grid). Each: background:#0c0c1a, border:1px solid rgba(255,255,255,0.05), border-radius:12px, padding:20px. Title (12px muted uppercase), big number (32px, {{CLIENT_FONT}}, white), delta badge (green/red small pill: '+12% vs last month').\nMetrics: {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}, 'Revenue'.\n\n2. Chart area: large card below KPIs, background:#0c0c1a, border-radius:12px, padding:24px. Title row left + timeframe selector pills right. Chart placeholder: SVG sparkline or canvas drawn as a fake line chart with grid lines (draw using SVG path).\n\n3. Table section: 'Recent Activity' card. Table with columns: Name, Status, Date, Amount. 5 rows of mock data. Status badges (colored pills). Sortable header (arrow icons).\n\nFont: {{CLIENT_FONT}}. Tailwind CDN. Responsive: sidebar collapses on < 900px.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_LOGO_URL", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_173",
+      "name": "Dashboard — Metric Cards + Line Chart",
+      "category": "dashboard",
+      "tags": ["dashboard", "metrics", "chart", "kpi", "analytics"],
+      "description": "Grid of metric cards at top with a larger interactive chart below. Pure data visualization.",
+      "prompt": "Build a metrics dashboard section for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).\n\nBackground: #07070f, padding:32px.\n\n4-column KPI grid (2 on mobile):\nEach card: background:#0c0c1a, border:1px solid rgba(255,255,255,0.05), border-radius:14px, padding:22px.\n- Metric title: 11px uppercase letter-spacing:0.15em, muted. E.g.: '{{CLIENT_USP_1}}', '{{CLIENT_USP_2}}', '{{CLIENT_USP_3}}', 'Total Revenue'.\n- Value: 36px, font-weight:300, {{CLIENT_FONT}}, white.\n- Delta: pill badge — green (▲ +8.2%) or red (▼ -3.1%). 11px, font-weight:700.\n- Sparkline: tiny 60px wide SVG line chart in card bottom-right showing trend.\n\nMain chart card (below KPIs, mt:20px): background:#0c0c1a, border-radius:14px, padding:24px.\n- Header: title left, period selector pills right (7d / 30d / 90d / 1y). Active pill: {{CLIENT_COLORS}} bg.\n- Chart area: min-height:300px. Draw a smooth SVG line chart:\n  * X axis: 12 date labels.\n  * Y axis: 5 value labels.\n  * Grid lines: horizontal dashes rgba(255,255,255,0.04).\n  * Line path: smooth cubic bezier in {{CLIENT_COLORS first}}, stroke-width:2.5.\n  * Area fill: same color at 10% opacity.\n  * Hover tooltip: vertical line + dot + value popup.\n- Period selector JS: updates chart data arrays and redraws.\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_174",
+      "name": "Dashboard — Kanban Board",
+      "category": "dashboard",
+      "tags": ["dashboard", "kanban", "board", "tasks", "drag-drop"],
+      "description": "Columns representing stages with draggable cards within each. Full Kanban with drag-drop.",
+      "prompt": "Build a Kanban board for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).\n\nFull page layout: background:#050510, overflow-x:auto.\nTopbar: '{{CLIENT_NAME}} Board' title, '+ Add Task' button ({{CLIENT_COLORS}}), filter pills (All / Mine / Due Today).\n\nKanban columns: flex row, gap:16px, padding:24px, min-width:max-content.\n4 columns: 'Backlog' | 'In Progress' | 'Review' | 'Done'.\n\nEach column: min-width:280px, background:#07070a, border-radius:14px, padding:16px, flex:0 0 280px.\n- Column header: flex space-between — label (13px, 600, {{CLIENT_FONT}}) + count badge ({{CLIENT_COLORS}} pill) + '+' add button.\n- Cards container: flex column, gap:10px.\n\nEach card: background:#0d0d1a, border:1px solid rgba(255,255,255,0.06), border-radius:10px, padding:14px, cursor:grab.\n- Priority dot (top-right): red/yellow/green.\n- Title: 14px, white, 600.\n- Description: 12px, muted, 2 lines max.\n- Bottom row: avatar circle + due date (12px muted) + label pill (category: e.g. '{{CLIENT_SECTOR}}' or feature name).\n\nDrag: HTML5 draggable=true + dragstart/dragover/drop events. On drop: move card to new column. Visual feedback: dragging card opacity:0.5, target column highlights.\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1"]
+    },
+
+    {
+      "id": "tpl_175",
+      "name": "Dashboard — Three-Pane Layout",
+      "category": "dashboard",
+      "tags": ["dashboard", "three-pane", "sidebar", "list", "detail"],
+      "description": "Sidebar, middle list/feed pane, and detail panel on the right. Email/Slack-style app layout.",
+      "prompt": "Build a three-pane dashboard layout for {{CLIENT_NAME}}.\n\nFull viewport: display:grid, grid-template-columns:220px 320px 1fr, background:#040409.\n\nPane 1 (leftmost sidebar): background:#07070d, border-right:1px solid rgba(255,255,255,0.04), overflow-y:auto. Logo at top + vertical nav (same as tpl_116 compact). Icons + labels.\n\nPane 2 (middle list): background:#09090f, border-right:1px solid rgba(255,255,255,0.04), overflow-y:auto.\n- Top: search input (full-width, 36px, #0e0e1e bg, {{CLIENT_FONT}}) + filter icons row.\n- Pane title: '{{CLIENT_USP_1}}' (14px bold, padding:16px).\n- List of items (8-12): each item = clickable row, padding:12px 16px, border-bottom:1px solid rgba(255,255,255,0.03).\n  Row: avatar (32px) + right content: title (13px bold white) + preview (12px muted, truncated) + time (11px muted, right).\n  Active item: background:rgba({{CLIENT_COLORS first}},0.08), border-left:2px solid {{CLIENT_COLORS first}}.\n  Hover: background:rgba(255,255,255,0.02).\n\nPane 3 (detail view): background:#07070d, padding:28px, overflow-y:auto.\n- Header: title (20px bold), subtitle (13px muted), action buttons row (Reply, Archive, etc.).\n- Content area: full detail view with metadata + body text.\n- Bottom: action bar with input + send button.\n\nFont: {{CLIENT_FONT}}. Tailwind CDN. Responsive: panes collapse on mobile (show one at a time with back button).",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_CTA_PRIMARY", "CLIENT_LOGO_URL"]
+    },
+
+    {
+      "id": "tpl_176",
+      "name": "Dashboard — Empty State",
+      "category": "dashboard",
+      "tags": ["dashboard", "empty-state", "onboarding", "first-run", "blank"],
+      "description": "Centered illustration or icon, heading, supporting sentence, and CTA to get started. For first-time users.",
+      "prompt": "Build an empty state screen for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).\n\nFull content area: display:flex, align-items:center, justify-content:center, min-height:60vh, background:#07070f.\n\nCentered column: text-align:center, max-width:400px.\n\nIllustration: large SVG illustration or emoji/icon composition (80px). Possible: a rounded rectangle card with dotted border + '+' icon in center (100px × 80px, border:2px dashed rgba(255,255,255,0.15), border-radius:16px, background:rgba({{CLIENT_COLORS first}},0.04)). Or use a CSS-only abstract shape.\n\nH2: 'No {{CLIENT_PRODUCT}} yet' or '{{CLIENT_HERO_HEADLINE}}', 22px, {{CLIENT_FONT}}, 600, mt:24px.\nSub: '{{CLIENT_TAGLINE}}', 14px, muted, line-height:1.6, mb:28px.\n\nCTA: '{{CLIENT_CTA_PRIMARY}}' button, filled {{CLIENT_COLORS}}, pill shape, 48px.\nSecondary: '{{CLIENT_CTA_SECONDARY}}' text link below button.\n\nOptional: 3-step mini guide below CTA ('1 → Upload · 2 → Configure · 3 → Launch') in pill steps, 12px muted.\n\nAnimation: SVG illustration has subtle CSS float animation (translateY 0→-8px, 3s ease-in-out infinite).\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_PRODUCT", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_CTA_SECONDARY", "CLIENT_COLORS", "CLIENT_FONT"]
+    },
+
+    {
+      "id": "tpl_177",
+      "name": "Contact — Split Form + Contact Details",
+      "category": "contact",
+      "tags": ["contact", "form", "split", "details", "agency"],
+      "description": "Contact form on one side, contact details (email, phone, address, hours) on the other.",
+      "prompt": "Build a contact section for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}, {{CLIENT_LOCATION}}).\n\nSection: padding:100px 0, background:#07070f.\nHeader: '{{CLIENT_HERO_HEADLINE}}', sub: '{{CLIENT_TAGLINE}}', centered, mb:64px.\n\n2-column grid (1 on mobile), gap:64px, max-width:1100px:\n\nLEFT — Form:\nH3: 'Send us a message', mb:24px.\n- Name input (full-width).\n- Email input.\n- Select: 'I'm interested in...' dropdown with options: {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}, 'Other'.\n- Textarea: 'Message' — min-height:120px.\n- Submit: '{{CLIENT_CTA_PRIMARY}}' full-width gradient {{CLIENT_COLORS}}.\n- All inputs: background:#0c0c1a, border:1px solid rgba(255,255,255,0.08), border-radius:10px, padding:12px 16px, color:white, font-family:{{CLIENT_FONT}}. Focus: border-color:{{CLIENT_COLORS first}}.\n\nRIGHT — Details: background:#0c0c1a, border-radius:16px, padding:36px, border:1px solid rgba(255,255,255,0.06).\n- Section heading '{{CLIENT_NAME}}'.\n- Contact items (icon + text, 3 rows):\n  📧 Email address placeholder.\n  📍 {{CLIENT_LOCATION}}.\n  📸 Instagram: {{CLIENT_INSTAGRAM}}.\n- Business hours block.\n- Map placeholder: div with border-radius:12px, background:rgba({{CLIENT_COLORS first}},0.06), height:160px, centered 'Open in Maps →' link.\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_LOCATION", "CLIENT_INSTAGRAM", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_178",
+      "name": "Contact — Support Channel Cards",
+      "category": "contact",
+      "tags": ["contact", "support", "channels", "cards", "helpdesk"],
+      "description": "Grid of cards for different support channels with icon, title, description, and CTA link.",
+      "prompt": "Build a support channels section for {{CLIENT_NAME}}.\n\nSection: background:#07070f, padding:100px 0.\nHeader: 'How Can We Help?' centered. Sub: '{{CLIENT_TAGLINE}}'.\n\nGrid: 3 cols (1 on mobile), gap:20px, max-width:960px, mt:48px.\n\n6 channel cards:\n1. 💬 Live Chat — 'Talk to a real human' — 'Open Chat →' link. Status badge: '● Online' (green).\n2. 📧 Email Support — '{{CLIENT_USP_1}}' — 'Send Email →' mailto link.\n3. 📚 Documentation — '{{CLIENT_USP_2}}' — 'Browse Docs →'.\n4. 🐛 Bug Report — 'Found an issue?' — 'Submit Report →'.\n5. 🤝 Enterprise Support — '{{CLIENT_USP_3}}' — 'Contact Sales →' (primary CTA style).\n6. 💡 Community — 'Join the {{CLIENT_NAME}} community' — 'Join Forum →'.\n\nEach card: background:#0c0c1a, border-radius:16px, border:1px solid rgba(255,255,255,0.06), padding:28px.\n- Icon: 44px, background:rgba({{CLIENT_COLORS first}},0.1), border-radius:12px, mb:16px.\n- Title: 16px, 700, white, {{CLIENT_FONT}}.\n- Description: 13px, muted, line-height:1.5, mb:16px.\n- CTA link: 13px, {{CLIENT_COLORS first}}, '→' arrow.\n\nHover: border-color rgba({{CLIENT_COLORS first}},0.3), translateY(-4px).\nFont: {{CLIENT_FONT}}. GSAP stagger. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_TAGLINE", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3", "CLIENT_CTA_PRIMARY"]
+    },
+
+    {
+      "id": "tpl_179",
+      "name": "Contact — Full-Page Minimal Form",
+      "category": "contact",
+      "tags": ["contact", "form", "full-page", "minimal", "agency"],
+      "description": "Full-page centered form with large heading, minimal fields, and a prominent submit button.",
+      "prompt": "Build a full-page minimal contact form for {{CLIENT_NAME}} (tone: {{CLIENT_TONE}}).\n\nFull-viewport: background:#050510, display:flex, align-items:center, justify-content:center.\n\nForm: max-width:560px, width:100%, padding:60px 0.\n\nTop: eyebrow '{{CLIENT_SECTOR}} · {{CLIENT_LOCATION}}', small uppercase 11px.\nH1: '{{CLIENT_HERO_HEADLINE}}' — 48px, {{CLIENT_FONT}}, font-weight:700, mb:8px.\nSub: '{{CLIENT_TAGLINE}}' — 16px muted, mb:48px.\n\nFields (underline-only style — minimal):\n- Each field: full-width, border:none, border-bottom:1px solid rgba(255,255,255,0.15), background:transparent, padding:12px 0, font-size:16px, color:white, font-family:{{CLIENT_FONT}}, outline:none.\n- Focus: border-bottom-color:{{CLIENT_COLORS first}}, transition:0.3s.\n- Floating label: label starts inside field, on focus/fill floats above (translateY(-24px), font-size:11px, color:{{CLIENT_COLORS first)}}.\n- Fields: Name, Company (optional), Email, Message (textarea 4 rows, resize:none).\n\nSubmit: mt:40px, display:flex, align-items:center, gap:12px.\n- '{{CLIENT_CTA_PRIMARY}}' styled as text + large arrow → that slides right on hover (transform:translateX(6px), transition:0.3s).\nOR as standard pill button in {{CLIENT_COLORS}}.\n\nBackground decoration: one color blob {{CLIENT_COLORS}} far right, blur:140px, 10% opacity.\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_LOCATION", "CLIENT_TONE", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT"]
+    },
+
+    {
+      "id": "tpl_180",
+      "name": "Blog — Magazine Grid Layout",
+      "category": "blog",
+      "tags": ["blog", "magazine", "grid", "featured", "articles"],
+      "description": "Large featured post at top with smaller cards in a grid beneath. Editorial magazine style.",
+      "prompt": "Build a blog/magazine grid for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).\n\nSection: background:#07070f, padding:80px 0.\nHeader: '{{CLIENT_HERO_HEADLINE}}', sub: '{{CLIENT_TAGLINE}}'. Category filter pills: All, {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}.\n\nFeatured post (top row, full width): horizontal card, 2 cols (visual 55% + content 45%), background:#0c0c1a, border-radius:16px, overflow:hidden, min-height:360px.\n- Left: image placeholder (gradient {{CLIENT_COLORS}}, aspect fill).\n- Right: padding:40px. Category pill ({{CLIENT_COLORS}}). H2 (28px, 700). Excerpt (14px muted, 3 lines). Read time + date metadata. Author row: avatar + name + '5 min read'.\n\nSmaller cards grid (below featured): 3-col (2 on tablet, 1 on mobile), gap:20px, mt:20px.\nEach card: background:#0c0c1a, border-radius:12px, overflow:hidden.\n- Image top: 200px, gradient placeholder.\n- Content: padding:20px. Category pill small. Title (16px bold). Excerpt (13px muted, 2 lines). Bottom: date + read time.\n\nHover: scale:1.02, box-shadow:0 20px 60px rgba(0,0,0,0.4), transition:0.3s.\n'Load more' button below grid.\n\nGSAP stagger reveal. Font: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3", "CLIENT_COLORS", "CLIENT_FONT"]
+    },
+
+    {
+      "id": "tpl_181",
+      "name": "Blog — Single Article Reading View",
+      "category": "blog",
+      "tags": ["blog", "article", "reading", "long-form", "clean"],
+      "description": "Clean single-column article with generous line spacing, readable width, and sticky TOC.",
+      "prompt": "Build a blog article reading page for {{CLIENT_NAME}}.\n\nLayout: 2-col — article body left (650px) + sticky TOC sidebar right (220px), max-width:1000px, centered, padding:60px 24px.\n\nArticle:\n- Eyebrow: category pill + read time + date.\n- H1: '{{CLIENT_HERO_HEADLINE}}' — 40px, {{CLIENT_FONT}}, font-weight:700, line-height:1.2.\n- Author row: avatar + '{{CLIENT_NAME}} Team' + date.\n- Hero image placeholder: full-width, aspect-ratio:16/9, border-radius:12px, background:gradient {{CLIENT_COLORS}}.\n- Article body: font-size:17px, line-height:1.8, color:rgba(255,255,255,0.8), font-family:{{CLIENT_FONT}}.\n  * H2 headings: 22px, border-left:3px solid {{CLIENT_COLORS first}}, pl:16px.\n  * Blockquote: italic, border-left:4px solid {{CLIENT_COLORS first}}, pl:20px, my:32px.\n  * Code blocks: background:#0d0d1e, font-family:monospace, border-radius:8px, padding:16px.\n  * 4 paragraphs of placeholder content referencing {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}.\n\nSticky TOC (desktop only): position:sticky, top:80px. Heading 'Table of Contents' 12px uppercase. Links scroll smoothly to H2 sections. Active link: {{CLIENT_COLORS first}}.\n\nProgress bar: thin line at very top of viewport, width fills as user reads.\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_182",
+      "name": "Blog — Card Grid with Category Filters",
+      "category": "blog",
+      "tags": ["blog", "grid", "cards", "filter", "category"],
+      "description": "Post card grid with category filter tags above. Instant filter with JS. Clean modern layout.",
+      "prompt": "Build a filterable blog card grid for {{CLIENT_NAME}}.\n\nSection: padding:80px 0, background:#07070f.\nHeader: '{{CLIENT_HERO_HEADLINE}}', centered.\n\nFilter bar: flex, centered, gap:10px, mb:40px.\nFilter pills: All | {{CLIENT_USP_1}} | {{CLIENT_USP_2}} | {{CLIENT_USP_3}} | {{CLIENT_SECTOR}}.\nEach pill: border:1px solid rgba(255,255,255,0.1), border-radius:100px, padding:6px 16px, 13px. Active: background:{{CLIENT_COLORS first}}, border:transparent, white. Hover: border-color:{{CLIENT_COLORS first}}.\n\nCards grid: auto-fill minmax(300px,1fr), gap:20px.\n9 cards, each with data-category attribute matching filter pills.\n\nEach card: background:#0c0c1a, border-radius:14px, overflow:hidden, border:1px solid rgba(255,255,255,0.05).\n- Image top: 200px gradient placeholder.\n- Tags row: category pill (11px, colored by category).\n- Title: 16px bold, 2 lines max, {{CLIENT_FONT}}.\n- Excerpt: 13px muted.\n- Bottom: date + reading time + author avatar (28px).\n\nFilter JS: click pill → filter cards (cards with non-matching category get opacity:0 + scale:0.96, matching ones animate in). Smooth CSS transitions.\n\nGSAP scroll reveal. Font: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_HERO_HEADLINE", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_183",
+      "name": "Blog — Sidebar Table of Contents",
+      "category": "blog",
+      "tags": ["blog", "toc", "sidebar", "sticky", "navigation"],
+      "description": "Article with sticky sidebar TOC that highlights the current section as user scrolls.",
+      "prompt": "Build a long-form article with sticky sidebar TOC for {{CLIENT_NAME}}.\n\nSame layout as tpl_181 but TOC is the star feature:\n\nTOC sidebar: position:sticky, top:80px, max-height:calc(100vh - 100px), overflow-y:auto, padding-right:12px.\n- Heading: '{{CLIENT_HERO_HEADLINE}}' 11px uppercase letter-spacing:0.2em, muted, mb:16px.\n- 7 TOC links corresponding to H2 sections. Each: display:block, padding:6px 0 6px 12px, font-size:13px, border-left:2px solid transparent, transition:all 0.25s, text-decoration:none.\n- Inactive: color:rgba(255,255,255,0.35), border-color:transparent.\n- Active: color:white, border-color:{{CLIENT_COLORS first}}, font-weight:500, background:rgba({{CLIENT_COLORS first}},0.06).\n\nJS: IntersectionObserver on each H2. When H2 enters viewport: find matching TOC link, set active class, remove from others. Smooth transitions.\n\nSmooth scroll: all TOC links use scrollIntoView({behavior:'smooth'}).\n\nProgress indicator: thin vertical line between TOC and article, fills with {{CLIENT_COLORS}} as reading progress advances.\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_HERO_HEADLINE", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_SECTOR"]
+    },
+
+    {
+      "id": "tpl_184",
+      "name": "Onboarding — Checklist with Progress",
+      "category": "onboarding",
+      "tags": ["onboarding", "checklist", "progress", "first-run", "setup"],
+      "description": "Checklist of setup tasks with progress indicators and expandable items. Guide users to activation.",
+      "prompt": "Build an onboarding checklist for {{CLIENT_NAME}} new users.\n\nComponent: max-width:600px, background:#0c0c1a, border-radius:16px, border:1px solid rgba(255,255,255,0.07), padding:32px.\n\nTop: H3 'Get started with {{CLIENT_NAME}}', sub '{{CLIENT_TAGLINE}}'. Progress bar: full-width, 8px height, border-radius:100px, background:rgba(255,255,255,0.06). Fill: {{CLIENT_COLORS}} gradient, width updates as steps complete. Progress text: '2 of 5 complete'.\n\n5 checklist items (vertical stack, gap:4px):\nEach item: flex row, padding:12px, border-radius:10px.\n- Checkbox left: 22px circle. Incomplete: border:2px solid rgba(255,255,255,0.2). Complete: filled {{CLIENT_COLORS}}, white checkmark SVG inside.\n- Center: title (14px, 600, white) + sub (12px, muted) + expand arrow (right).\n- On expand: slide-down content shows action button '{{CLIENT_CTA_PRIMARY}}' or instructions.\n\nItems: 'Connect your account', 'Set up {{CLIENT_PRODUCT}}', '{{CLIENT_USP_1}}', '{{CLIENT_USP_2}}', 'Invite your team'.\n\nCompleted item: title has strikethrough + opacity:0.4. Checkbox filled.\nFirst 2 items pre-completed by default (demo state).\n\nBottom: '{{CLIENT_USP_3}}' milestone celebration when all done (confetti burst: CSS @keyframes particles).\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_PRODUCT", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_185",
+      "name": "Onboarding — Guided Tour Tooltips",
+      "category": "onboarding",
+      "tags": ["onboarding", "tour", "tooltips", "overlay", "guided"],
+      "description": "Guided product tour with tooltip callouts pointing to specific UI elements. Step-by-step with overlay.",
+      "prompt": "Build an interactive guided tour for {{CLIENT_NAME}} UI.\n\nTour overlay system (vanilla JS):\n\nTrigger: 'Take a Tour' button — starts tour, shows step 1.\n\nDim overlay: position:fixed inset:0, background:rgba(0,0,0,0.65), z-index:1000, pointer-events:none. Has a 'spotlight' cutout: box-shadow: 0 0 0 9999px rgba(0,0,0,0.65) — centered on highlighted element.\n\nTooltip card: position:fixed, z-index:1001, background:#0e0e1a, border:1px solid rgba(255,255,255,0.12), border-radius:14px, padding:20px, max-width:280px, box-shadow:0 20px 60px rgba(0,0,0,0.5).\n- Step indicator: '2 of 5' in {{CLIENT_COLORS}}, 11px.\n- Title: '{{CLIENT_USP_1}}' or step-specific feature name, 15px bold {{CLIENT_FONT}}.\n- Description: 13px muted, 2-3 sentences.\n- Arrow: CSS triangle pointing to highlighted element.\n- Bottom: 'Skip tour' link left + 'Next →' button right ({{CLIENT_COLORS}} fill).\n\n5 tour steps targeting common page elements by selector. Each step:\n- targetSelector: '#element-id'\n- title: feature name\n- description: brief explanation\n- tooltipPosition: 'bottom' | 'right' | 'left'\n\nJS: step.nextStep() updates spotlight position + tooltip content + arrow direction. Smooth transitions.\n\nFont: {{CLIENT_FONT}}. Works on any existing page. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_186",
+      "name": "Onboarding — Video Walkthrough Modal",
+      "category": "onboarding",
+      "tags": ["onboarding", "video", "modal", "walkthrough", "welcome"],
+      "description": "Welcome modal with embedded walkthrough video and get-started CTA. Triggers on first visit.",
+      "prompt": "Build a welcome/walkthrough video modal for {{CLIENT_NAME}}.\n\nTrigger: auto-opens on first visit (check localStorage 'has_seen_welcome'). Also triggerable via 'Watch Demo' button.\n\nModal overlay: position:fixed, inset:0, background:rgba(0,0,0,0.8), backdrop-filter:blur(8px), z-index:9999, display:flex, align-items:center, justify-content:center.\n\nModal panel: background:#0c0c1a, border-radius:20px, border:1px solid rgba(255,255,255,0.08), width:min(800px,90vw), overflow:hidden, box-shadow:0 40px 100px rgba(0,0,0,0.6).\n\nTop bar: '{{CLIENT_NAME}} · Quick Start' title (left) + × close button (right). Padding:20px 24px. Border-bottom.\n\nVideo container: background:#000, aspect-ratio:16/9. If {{CLIENT_VIDEO_URL}} set: <iframe> or <video> embed. Else: elegant placeholder with play button + '{{CLIENT_HERO_HEADLINE}}' text overlay + gradient background {{CLIENT_COLORS}}.\n\nBottom section: padding:24px. Left: H3 '{{CLIENT_TAGLINE}}' + 3 feature bullets ({{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}) checkmarks. Right: '{{CLIENT_CTA_PRIMARY}}' button + 'Skip for now' link.\n\nClose behavior: × click or Escape key. Sets localStorage. Modal exit animation: scale 1→0.95, opacity 0.\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_VIDEO_URL", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_187",
+      "name": "Onboarding — Illustrated Empty State Starter",
+      "category": "onboarding",
+      "tags": ["onboarding", "empty-state", "illustration", "starter", "first-run"],
+      "description": "Custom illustration-style empty state with animated elements, heading, and primary action.",
+      "prompt": "Build an animated illustrated empty state for {{CLIENT_NAME}} (tone: {{CLIENT_TONE}}).\n\nFull content area or section: min-height:70vh, display:flex, align-items:center, justify-content:center, background:#07070f.\n\nCenter column: max-width:480px, text-align:center.\n\nSVG illustration (150px): CSS-only abstract composition:\n- Outer circle: 120px, border:2px dashed rgba({{CLIENT_COLORS first}},0.3), border-radius:50%, animation: spin 20s linear infinite.\n- Inner shapes: 3 small circles at different positions on the ring, filled {{CLIENT_COLORS}} at 60%.\n- Center: {{CLIENT_NAME}} initial letter in large font, gradient {{CLIENT_COLORS}}, 48px.\n- Floating micro dots: 4 small dots orbiting with different @keyframes durations.\n\nText below illustration:\n- H2: '{{CLIENT_HERO_HEADLINE}}', 26px, 700, {{CLIENT_FONT}}, mt:32px.\n- P: '{{CLIENT_TAGLINE}}', 15px, muted, line-height:1.7, mb:32px.\n\nAction group:\n- '{{CLIENT_CTA_PRIMARY}}' primary button ({{CLIENT_COLORS}} gradient, pill, 50px).\n- Or '{{CLIENT_CTA_SECONDARY}}' secondary below.\n\nMini steps hint: 3 pill steps '1 Sign up · 2 Configure · 3 Launch' in a row, 12px muted.\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_TONE", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_CTA_SECONDARY", "CLIENT_COLORS", "CLIENT_FONT"]
+    },
+
+    {
+      "id": "tpl_188",
+      "name": "Special — Cookie Banner (GDPR)",
+      "category": "special",
+      "tags": ["cookie", "gdpr", "banner", "privacy", "legal"],
+      "description": "Bottom-corner GDPR cookie banner with accept/reject/settings. Minimal and clean.",
+      "prompt": "Build a GDPR cookie consent banner for {{CLIENT_NAME}}.\n\nBanner: position:fixed, bottom:24px, left:24px, z-index:9998, max-width:400px, background:#0e0e1a, border:1px solid rgba(255,255,255,0.1), border-radius:16px, padding:20px 24px, box-shadow:0 16px 48px rgba(0,0,0,0.6).\n\nInitial state: translateY(120px) opacity:0. On DOMContentLoaded (if no cookie set): animate to translateY(0) opacity:1 after 1.5s delay.\n\nContent:\n- Title: '🍪 Cookie Preferences' — 14px bold, {{CLIENT_FONT}}.\n- Text: '{{CLIENT_NAME}} uses cookies to improve your experience. By continuing you accept our ' + 'Privacy Policy' link ({{CLIENT_COLORS first}}). — 12px muted, mb:16px.\n- Button row: flex, gap:8px, flex-wrap:wrap.\n  * 'Accept All' — filled {{CLIENT_COLORS}}, 36px, border-radius:8px, 13px bold.\n  * 'Reject All' — ghost/outline, same size.\n  * 'Customize' — text link 12px.\n- On Accept/Reject: banner slides down + fades. Set cookie 'cookie_consent' = 'accepted'/'rejected', expires 365d.\n\nCustomize: expands panel below showing toggle switches for: Necessary (locked on), Analytics, Marketing, Personalization.\n'Save Preferences' button.\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_COLORS", "CLIENT_FONT"]
+    },
+
+    {
+      "id": "tpl_189",
+      "name": "Special — 404 Page",
+      "category": "special",
+      "tags": ["404", "error", "not-found", "page", "branded"],
+      "description": "Branded 404 error page with message, explanation, and navigation CTAs.",
+      "prompt": "Build a branded 404 not found page for {{CLIENT_NAME}} (tone: {{CLIENT_TONE}}).\n\nFull viewport: background:#050510, display:flex, align-items:center, justify-content:center.\n\nCenter content:\n- Large '404' in {{CLIENT_FONT}}: font-size:clamp(80px,20vw,180px), font-weight:900, background:linear-gradient(135deg, {{CLIENT_COLORS}}), -webkit-background-clip:text, -webkit-text-fill-color:transparent. Subtle shadow behind it.\n- H1: 'Oops, lost in space' or 'Page not found' — 24px, 600, white, mt:8px.\n- Sub: 'The page you're looking for doesn't exist or has moved.', 15px muted, max-width:400px, text-align:center, mb:32px.\n- Button row: '← Go Home' filled {{CLIENT_COLORS}} + '{{CLIENT_CTA_PRIMARY}}' ghost.\n- Search box optional: small input with placeholder 'Search {{CLIENT_NAME}}...'.\n\nDecorative:\n- Floating CSS particles (20 small dots) slowly drifting upward (CSS animation).\n- Or: large muted '404' in background at 3% opacity, behind the real 404 text.\n- {{CLIENT_NAME}} logo top-left as a minimal link back to home.\n\nAnimation: the foreground 404 has a very subtle glitch effect (CSS @keyframes: occasional offset translateX(±2px) brightness flicker).\n\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_TONE", "CLIENT_CTA_PRIMARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_LOGO_URL"]
+    },
+
+    {
+      "id": "tpl_190",
+      "name": "Special — Skeleton Loading State",
+      "category": "special",
+      "tags": ["loading", "skeleton", "shimmer", "placeholder", "ux"],
+      "description": "Skeleton loading layout mirroring final content with shimmer animation. Professional loading UX.",
+      "prompt": "Build a skeleton loading screen for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).\n\nCreate a full-page skeleton that mirrors a typical {{CLIENT_SECTOR}} dashboard/page layout.\n\nShimmer animation: @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }. Apply to all skeleton elements: background:linear-gradient(90deg, #0e0e1e 25%, #1a1a2e 50%, #0e0e1e 75%), background-size:800px 100%. Animation:shimmer 1.5s infinite linear.\n\nLayout mirrors actual page:\n- Topbar skeleton: full-width bar, height:60px, background:#0e0e1e. Inside: circle (logo), 2 small rectangles (nav items), circle (avatar).\n- Content padding:28px.\n- KPI row: 4 cards side by side. Each: border-radius:12px, height:100px, shimmer.\n- Chart area: large card, height:280px, shimmer.\n- Table: 5 rows. Each row: flex — circle + 3 rectangles of varying widths (60%, 40%, 20%) + smaller circle. Rows separated by 1px border.\n- Sidebar skeleton (if sidebar layout): column of circles + rectangles.\n\nAll elements: border-radius varies (circles are 50%, rectangles are 6-8px).\n\nAfter 2.5s (simulated load): JS transitions skeleton to real content (opacity:0→1 on real content, skeleton fades out).\n\nColors: base:#0e0e1e, shimmer highlight:#1e1e38 (adjust for {{CLIENT_TONE}}).\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_TONE", "CLIENT_FONT", "CLIENT_COLORS"]
+    },
+
+    {
+      "id": "tpl_191",
+      "name": "Special — Magnetic Cursor Effect",
+      "category": "special",
+      "tags": ["cursor", "magnetic", "interactive", "premium", "hover"],
+      "description": "Custom cursor with magnetic attraction to buttons and links. Premium interactive experience.",
+      "prompt": "Build a magnetic cursor system for {{CLIENT_NAME}} (tone: {{CLIENT_TONE}}).\n\nCustom cursor: on desktop only (pointer device), hide default cursor (body{cursor:none}), create 2 cursor elements:\n1. Dot: 10px, border-radius:50%, background:{{CLIENT_COLORS first}}, position:fixed, z-index:99999, pointer-events:none, transition: none (raw position).\n2. Follower ring: 36px, border:2px solid rgba({{CLIENT_COLORS first}},0.5), border-radius:50%, position:fixed, z-index:99998, pointer-events:none, transition:transform 0.15s ease, width/height 0.2s, opacity 0.2s.\n\nJS: document.addEventListener('mousemove', e => { dot.style.left/top = e.clientX/Y + 'px'; follower uses lerp to smoothly follow }).\n\nMagnetic buttons: all .btn, a, button elements — on mouseenter, compute element center, on mousemove within 60px of element: element translates toward cursor (offset × 0.3), cursor ring scales:1.6 + opacity:0.3 (absorbed look).\nOn mouseleave: element springs back to origin (transition 0.4s elastic).\n\nState changes:\n- Hover text: follower ring scales:2.0, dot disappears, 'Read' text inside ring (font:11px {{CLIENT_FONT}}).\n- Hover button: ring fills with {{CLIENT_COLORS first}} 30% opacity.\n- Hover image: ring scale:3, mix-blend-mode:difference if on light.\n\nWorks alongside existing page content. Disable on touch devices (matchMedia hover:none).\nVanilla HTML + Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_TONE", "CLIENT_COLORS", "CLIENT_FONT"]
+    },
+
+    {
+      "id": "tpl_192",
+      "name": "Special — Page Transitions (Curtain/Fade)",
+      "category": "special",
+      "tags": ["transitions", "page", "animation", "curtain", "smooth"],
+      "description": "Animated page transitions with curtain slide or fade effect between internal page loads.",
+      "prompt": "Build a page transition system for {{CLIENT_NAME}} multi-page site.\n\nTransition overlay: position:fixed, inset:0, z-index:9999, pointer-events:none.\n\nStyle: curtain wipe using {{CLIENT_COLORS}} gradient. A div that slides from bottom (translateY:100%) to cover screen (translateY:0%) over 0.4s, then new page loads, then curtain retreats upward (translateY:-100%) over 0.4s.\n\nJS:\n1. document.querySelectorAll('a[href]') — intercept internal link clicks.\n2. On click: prevent default. Add .is-exiting class to body. Overlay animates in.\n3. After 0.4s (transition in): window.location.href = link.href.\n4. On DOMContentLoaded: overlay is visible (translateY:0). Add class to animate OUT (translateY:-100%, 0.4s).\n5. After out animation: remove overlay or hide.\n\nAlternative GSAP version: timeline — tl.to(overlay, {yPercent:0, duration:0.4, ease:'power2.in'}) → navigate → tl.to(overlay, {yPercent:-100, duration:0.4, ease:'power2.out'}).\n\nCurtain color: {{CLIENT_COLORS first}} or solid dark (#050510). Optional: {{CLIENT_NAME}} logo appears centered while curtain is closed (logo fades in during in-animation, fades out during out-animation).\n\nBackup: simple fade (body opacity:0→1 on load, 0.3s) as fallback.\n\nFont: {{CLIENT_FONT}}. Vanilla JS. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_LOGO_URL"]
+    },
+
+    {
+      "id": "tpl_193",
+      "name": "Special — Announcement Modal / Popup",
+      "category": "special",
+      "tags": ["modal", "popup", "announcement", "launch", "promotion"],
+      "description": "Branded announcement modal for promotions, new features, or important news. Exit-intent or timed.",
+      "prompt": "Build an announcement popup modal for {{CLIENT_NAME}}.\n\nTrigger options (implement all, configurable via data attribute):\n- Timed: shows after 8 seconds on page.\n- Exit intent: mouseleave event on document (cursor moves toward top of viewport).\n- Scroll depth: shows after 60% page scroll.\n\nModal overlay: position:fixed, inset:0, background:rgba(0,0,0,0.75), backdrop-filter:blur(6px), z-index:9999.\n\nModal card: centered, background:#0c0c1a, border:1px solid rgba(255,255,255,0.1), border-radius:20px, max-width:500px, overflow:hidden, box-shadow:0 40px 100px rgba(0,0,0,0.7).\n\nTop: visual band — linear-gradient(135deg, {{CLIENT_COLORS}}), height:6px (or 120px header with illustration/image).\n\nContent: padding:36px.\n- Badge: '{{CLIENT_SECTOR}} · Limited Offer' pill.\n- H2: '{{CLIENT_HERO_HEADLINE}}' — 26px, 700, {{CLIENT_FONT}}.\n- Sub: '{{CLIENT_TAGLINE}}' — 14px muted.\n- Highlight box: background:rgba({{CLIENT_COLORS first}},0.08), border-radius:10px, padding:16px. 3 bullets: {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}.\n- CTA: '{{CLIENT_CTA_PRIMARY}}' full-width gradient button.\n- Below: '{{CLIENT_CTA_SECONDARY}}' ghost or 'No thanks' text link (closes modal).\n\nClose: × top-right, Escape key. Sets sessionStorage on close.\nFont: {{CLIENT_FONT}}. Tailwind CDN.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_CTA_SECONDARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3"]
+    },
+
+    {
+      "id": "tpl_194",
+      "name": "Special — Confetti / Success Celebration",
+      "category": "special",
+      "tags": ["confetti", "celebration", "success", "animation", "gamification"],
+      "description": "Canvas-based confetti burst for celebrating user milestones, form submissions, or achievements.",
+      "prompt": "Build a confetti celebration system for {{CLIENT_NAME}}.\n\nCreate a reusable confettiBlast() function triggered on milestone events (form submit, plan upgrade, etc.).\n\n<canvas id='confetti-canvas'> positioned:fixed, inset:0, z-index:99998, pointer-events:none, width:100vw, height:100vh.\n\nJS confetti particles:\n- 120 particles created at blast() call.\n- Each particle: x:random(0,canvas.width), y:canvas.height×0.6 (emit from center), vx:random(-8,8), vy:random(-18,-6), gravity:0.4, rotation:random(0,360), rotationSpeed:random(-8,8), size:random(6,14), shape: random from ['rect','circle','triangle'], color: random from [{{CLIENT_COLORS first}}, {{CLIENT_COLORS second}}, '#ffffff', '#ffd700', '#ff69b4', '#00ff88'].\n\nAnimation loop: requestAnimationFrame. Each frame: update particle positions + rotation + apply gravity. Draw each particle at new position. Fade opacity after 1.5s (lifetime). Stop animation when all particles off-screen.\n\nSuccess overlay (optional): before confetti, briefly show centered message:\n- ✓ checkmark SVG animates (stroke-dashoffset draw animation).\n- H2: '{{CLIENT_USP_1}}!' or 'You did it!'.\n- Fades out after 2s.\n\nExpose: window.{{CLIENT_NAME}}Confetti = { blast: confettiBlast }. Call with window.CrafterConfetti.blast().\n\nTone: {{CLIENT_TONE}}. Vanilla JS only. No dependencies.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_TONE", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_USP_1"]
+    },
+
+    {
+      "id": "tpl_195",
+      "name": "Special — Full Landing Page (21st.dev Complete)",
+      "category": "special",
+      "tags": ["landing", "full", "complete", "21st.dev", "all-sections"],
+      "description": "Complete single-page landing combining: navbar → hero → stats → features bento → testimonials → pricing → FAQ → CTA → footer. Production-ready.",
+      "prompt": "Build a COMPLETE production landing page for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}, tone: {{CLIENT_TONE}}) in the style of top 21st.dev components.\n\nFull single HTML file with all sections:\n\n1. NAVBAR: floating pill (tpl_112 pattern), transparent→solid on scroll. Logo '{{CLIENT_NAME}}', links, CTA '{{CLIENT_CTA_PRIMARY}}'.\n\n2. HERO: split layout (tpl_102 pattern). Left: H1 '{{CLIENT_HERO_HEADLINE}}', tagline '{{CLIENT_TAGLINE}}', CTA pair, social proof strip. Right: visual card (gradient {{CLIENT_COLORS}} with product mockup idea). GSAP entrance animation.\n\n3. STATS BAR: 4 numbers (tpl_142). Count-up on IntersectionObserver. Stats: adapt to {{CLIENT_USP_1/2/3}}.\n\n4. FEATURES BENTO: asymmetric grid (tpl_128). 6 tiles. Highlight {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}. GSAP scroll reveal.\n\n5. TESTIMONIALS: 3-column cards (tpl_147). 3 compelling quotes mentioning {{CLIENT_NAME}}.\n\n6. PRICING: 3-tier cards (tpl_119). Monthly/annual toggle. Middle card highlighted.\n\n7. FAQ: single-column accordion (tpl_160). 8 questions relevant to {{CLIENT_SECTOR}}.\n\n8. CTA BANNER: full-bleed gradient (tpl_135). '{{CLIENT_HERO_HEADLINE}}', '{{CLIENT_CTA_PRIMARY}}'.\n\n9. FOOTER: multi-column (tpl_155). Social: {{CLIENT_INSTAGRAM}}. Location: {{CLIENT_LOCATION}}.\n\nGlobal: background:#050510, Tailwind CDN, {{CLIENT_FONT}} Google Font, {{CLIENT_COLORS}} as CSS variables (--primary: X; --secondary: Y), GSAP CDN, ScrollTrigger. Smooth scroll: scroll-behavior:smooth. Mobile responsive throughout.",
+      "dna_vars": ["CLIENT_NAME", "CLIENT_SECTOR", "CLIENT_TONE", "CLIENT_HERO_HEADLINE", "CLIENT_TAGLINE", "CLIENT_CTA_PRIMARY", "CLIENT_CTA_SECONDARY", "CLIENT_COLORS", "CLIENT_FONT", "CLIENT_INSTAGRAM", "CLIENT_LOCATION", "CLIENT_USP_1", "CLIENT_USP_2", "CLIENT_USP_3", "CLIENT_LOGO_URL"]
+    }
+
+  ]
+}

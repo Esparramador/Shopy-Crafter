@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth, getLastRoute, clearLastRoute } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
-import { Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -36,22 +36,6 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <Link
-        href="/"
-        style={{
-          position: "fixed", top: 20, left: 20,
-          display: "flex", alignItems: "center", gap: 6,
-          color: "var(--t3)", textDecoration: "none", fontSize: 13,
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 8, padding: "7px 12px",
-          transition: "color 0.15s, background 0.15s",
-        }}
-        onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--gold)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(200,168,75,0.08)"; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--t3)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.04)"; }}
-      >
-        <ArrowLeft size={14} />
-        Inicio
-      </Link>
       <div style={{ width: "100%", maxWidth: 400 }}>
         <div className="login-logo">
           <div className="logo-gem">⚡</div>

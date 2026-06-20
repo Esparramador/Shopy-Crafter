@@ -1,0 +1,484 @@
+Add OmniCore Memory Engine — the platform's "megabrain".
+This is a persistent knowledge base that makes the AI smarter
+with every store managed. It learns what works per niche,
+remembers competitor data, successful prompts, pricing patterns,
+and applies that knowledge instantly when a similar store arrives.
+
+INSTALL: npm install natural (for text similarity)
+
+═══════════════════════════════════════════════
+PART 1: DATABASE SCHEMA
+═══════════════════════════════════════════════
+
+CREATE TABLE omnicore_memories (
+  id TEXT PRIMARY KEY,
+  -- WHAT TYPE OF MEMORY
+  memory_type TEXT NOT NULL,
+  -- Types:
+  -- niche_keyword: a keyword that converts in a specific niche
+  -- pricing_pattern: a price point that works for a product type
+  -- image_pattern: an image type/style that converts
+  -- prompt_template: a Claude prompt that produces great results
+  -- competitor_intel: competitor data for a niche
+  -- ab_insight: what wins in A/B tests per niche
+  -- seasonal_pattern: seasonal sales patterns per niche
+  -- product_gap: product types missing in a niche
+  -- supplier_intel: supplier info for a product type
+  
+  -- CONTEXT
+  niche TEXT,           -- moda, tecnologia, deporte, hogar, belleza...
+  sub_niche TEXT,       -- moda_urbana, running, gaming...
+  product_type TEXT,    -- chaqueta, zapatillas, auriculares...
+  market TEXT,          -- es, mx, co, latam, global
+  
+  -- THE MEMORY CONTENT
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,      -- the actual knowledge (JSON or text)
+  confidence REAL DEFAULT 0.5, -- 0.0-1.0, increases with validation
+  use_count INTEGER DEFAULT 0, -- how many times applied
+  success_count INTEGER DEFAULT 0, -- how many times it worked
+  success_rate REAL DEFAULT 0.0,
+  
+  -- SOURCE (anonymized, never reveals which client)
+  source_type TEXT,  -- manual | learned_audit | learned_ab | 
+                     -- learned_pricing | learned_image | scraped
+  
+  -- METADATA
+  tags TEXT,         -- JSON array of tags for fast filtering
+  embedding TEXT,    -- future: vector embedding for semantic search
+  created_at TEXT DEFAULT (datetime('now')),
+  last_used_at TEXT,
+  last_updated_at TEXT DEFAULT (datetime('now')),
+  is_verified INTEGER DEFAULT 0  -- manually verified by admin
+);
+
+CREATE TABLE omnicore_niche_profiles (
+  id TEXT PRIMARY KEY,
+  niche TEXT UNIQUE NOT NULL,
+  sub_niches TEXT,        -- JSON array
+  
+  -- MARKET INTELLIGENCE
+  avg_price_min REAL,
+  avg_price_max REAL,
+  avg_price_sweet_spot REAL,
+  typical_margin_pct REAL,
+  seasonal_peaks TEXT,    -- JSON: { month: multiplier }
+  
+  -- CONTENT PATTERNS
+  top_keywords TEXT,      -- JSON array, sorted by conversion
+  top_image_types TEXT,   -- JSON: { type: conversion_rate }
+  best_cta_words TEXT,    -- JSON array
+  tone_description TEXT,
+  
+  -- COMPETITIVE LANDSCAPE
+  known_competitors TEXT, -- JSON array (anonymized)
+  avg_competitor_count INTEGER,
+  market_saturation TEXT, -- low | medium | high
+  
+  -- AI PATTERNS
+  best_prompt_style TEXT,
+  product_description_template TEXT,
+  pricing_psychology TEXT,
+  
+  -- STATS
+  stores_analyzed INTEGER DEFAULT 0,
+  last_updated TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE omnicore_prompt_library (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  niche TEXT,            -- NULL = universal
+  use_case TEXT,         -- product_description | ab_variant | 
+                         -- email_subject | image_brief | seo_title
+  prompt_template TEXT NOT NULL,  -- with {{variables}}
+  variables TEXT,        -- JSON: list of required variables
+  avg_quality_score REAL DEFAULT 0,
+  use_count INTEGER DEFAULT 0,
+  created_by TEXT,       -- 'system' | admin user id
+  is_public INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE omnicore_search_cache (
+  id TEXT PRIMARY KEY,
+  query_hash TEXT UNIQUE,  -- hash of niche+query
+  query TEXT,
+  niche TEXT,
+  results TEXT,            -- JSON cached results
+  created_at TEXT DEFAULT (datetime('now')),
+  expires_at TEXT          -- 7 days for most, 1 day for prices
+);
+
+═══════════════════════════════════════════════
+PART 2: MEMORY LEARNING ENGINE
+═══════════════════════════════════════════════
+
+AUTOMATIC LEARNING — After every significant action:
+
+1. AFTER SUCCESSFUL IMAGE GENERATION:
+   Extract pattern → store as image_pattern memory
+   POST /api/omnicore/learn
+   Body: {
+     event: 'image_success',
+     niche: project.niche,
+     productType: product.type,
+     imageType: 'lifestyle',
+     promptUsed: '...',
+     shopifyImageId: '...'
+   }
+   
+   If A/B test later shows this image won:
+   → Update memory confidence +0.15
+   → Increment success_count
+
+2. AFTER A/B TEST WINNER:
+   Extract insight → store as ab_insight memory
+   Body: {
+     event: 'ab_winner',
+     niche: project.niche,
+     productType: product.type,
+     winnerType: 'lifestyle_vs_studio',
+     lift: 0.28,
+     confidence: 0.96,
+     visitorsNeeded: 342
+   }
+   OmniCore learns: "In [niche], lifestyle images beat studio
+   by average [X]% with [Y]% confidence"
+
+3. AFTER PRICING SUCCESS:
+   When price change → revenue increases within 7 days:
+   Extract pattern → store as pricing_pattern memory
+   Body: {
+     event: 'price_success',
+     niche: project.niche,
+     productType: product.type,
+     oldPrice: 79.99,
+     newPrice: 89.99,
+     marginBefore: 45,
+     marginAfter: 55,
+     conversionChange: +0.3
+   }
+
+4. AFTER AUDIT:
+   Extract niche insights from audit results:
+   For each F/D product: what's typically wrong in this niche?
+   Aggregate across stores in same niche
+
+5. AFTER COMPETITOR SCAN:
+   Store competitor intel per niche:
+   Avg prices, common product types, promotion patterns
+
+LEARNING API ENDPOINT:
+POST /api/omnicore/learn
+Requires: requireAdmin OR internal system call
+
+async function learnFromEvent(event) {
+  // Build memory object
+  const memory = await buildMemoryFromEvent(event);
+  
+  // Check if similar memory exists (by niche + type + title similarity)
+  const existing = await findSimilarMemory(memory);
+  
+  if (existing && similarity > 0.85) {
+    // Update existing: increase confidence, update content
+    await updateMemory(existing.id, {
+      content: mergeMemories(existing.content, memory.content),
+      confidence: Math.min(1.0, existing.confidence + 0.05),
+      use_count: existing.use_count + 1,
+      last_updated_at: new Date().toISOString()
+    });
+  } else {
+    // Create new memory
+    await createMemory(memory);
+  }
+  
+  // Update niche profile aggregate
+  await updateNicheProfile(event.niche, event);
+}
+
+═══════════════════════════════════════════════
+PART 3: MEMORY RETRIEVAL — Smart Context Injection
+═══════════════════════════════════════════════
+
+This is the key: BEFORE every Claude call, retrieve relevant
+memories and inject them as context. Claude becomes smarter.
+
+MEMORY RETRIEVAL FUNCTION:
+async function getRelevantMemories(niche, useCase, productType, limit=10) {
+  return db.prepare(`
+    SELECT * FROM omnicore_memories
+    WHERE (niche = ? OR niche IS NULL OR niche = 'universal')
+    AND (
+      memory_type LIKE ? OR
+      tags LIKE ?
+    )
+    AND confidence > 0.3
+    ORDER BY 
+      CASE WHEN niche = ? THEN 10 ELSE 0 END +  -- exact niche match
+      CASE WHEN product_type = ? THEN 5 ELSE 0 END +  -- product match
+      (confidence * 4) +  -- high confidence
+      (success_rate * 3) +  -- proven success
+      (use_count * 0.5)  -- frequently used
+    DESC
+    LIMIT ?
+  `).all(niche, '%'+useCase+'%', '%'+useCase+'%', niche, productType, limit);
+}
+
+CONTEXT INJECTION — Modify ALL existing Claude system prompts:
+
+Original system prompt:
+"You are ShopifyAI Expert..."
+
+New system prompt WITH OmniCore:
+async function buildSystemPrompt(project, useCase) {
+  const memories = await getRelevantMemories(
+    project.niche, useCase, productType
+  );
+  const nicheProfile = await getNicheProfile(project.niche);
+  
+  const memoryContext = memories.length > 0 ? `
+═══ OMNICORE MEMORY — Conocimiento acumulado para ${project.niche} ═══
+${memories.map(m => `
+[${m.memory_type.toUpperCase()}] ${m.title} (confianza: ${Math.round(m.confidence*100)}%)
+${m.content}
+`).join('\n')}
+═══ FIN OMNICORE ═══
+` : '';
+
+  const nicheContext = nicheProfile ? `
+PERFIL DEL NICHO "${project.niche}":
+- Precio dulce del mercado: €${nicheProfile.avg_price_sweet_spot}
+- Margen típico: ${nicheProfile.typical_margin_pct}%
+- Top keywords que convierten: ${nicheProfile.top_keywords}
+- Tipos de imagen con mejor conversión: ${nicheProfile.top_image_types}
+- Tono que funciona en este nicho: ${nicheProfile.tone_description}
+- Picos estacionales: ${nicheProfile.seasonal_peaks}
+` : '';
+
+  return `Eres ShopifyAI Expert...
+${memoryContext}
+${nicheContext}
+Contexto tienda activa: ${project.name} | Nicho: ${project.niche}
+`;
+}
+
+WHY THIS IS POWERFUL:
+Week 1, first sports store:
+→ No memories → Claude works from general knowledge
+→ Generates content, images, prices
+→ A/B tests run, results come in
+→ OmniCore learns: "En deportes, imágenes de acción 
+  convierten 41% mejor que producto solo"
+→ OmniCore learns: "Precio dulce zapatillas running: €89-119"
+→ OmniCore learns: "Keywords: rendimiento, transpirable, 
+  amortiguación, kilómetros, PRO"
+
+Week 3, second sports store:
+→ OmniCore has 47 memories about sports niche
+→ Claude gets all this context injected automatically
+→ First product description is ALREADY optimized for sports
+→ Images generated with sports action style by default
+→ Price suggestion already market-calibrated
+→ Time to first optimization: minutes instead of days
+
+Month 6, you have 8 sports stores:
+→ OmniCore has 300+ sports memories with proven confidence
+→ Your platform knows sports eCommerce better than any human
+→ New sports client onboards and gets results WEEK ONE
+
+═══════════════════════════════════════════════
+PART 4: OMNICORE SEARCH — Smarter than Google for eCommerce
+═══════════════════════════════════════════════
+
+When admin or AI needs to research a niche/product:
+Instead of web search every time → check OmniCore first.
+
+SEARCH FLOW:
+1. Check omnicore_search_cache (hash of query+niche)
+   If cache hit and not expired → return instantly (0ms)
+   If cache miss → proceed
+
+2. Check omnicore_memories for relevant stored knowledge
+   If confidence > 0.7 memories exist → use them (10ms)
+   
+3. If gaps exist → do web search + Claude analysis
+   Store results in OmniCore for future use
+
+4. Return combined result: cached + new knowledge
+
+OMNICORE SEARCH API:
+POST /api/omnicore/search
+Body: { query, niche, searchType, projectId }
+
+searchTypes:
+- competitor_prices: "What do competitors charge for [product]?"
+- market_trends: "What's trending in [niche] right now?"  
+- keyword_research: "Best converting keywords for [product] in [niche]"
+- image_strategy: "What image style works best for [product] in [niche]?"
+- product_gaps: "What products are missing in [niche] store?"
+
+Response includes:
+{
+  source: 'omnicore_cache' | 'omnicore_memory' | 'web_search' | 'mixed',
+  confidence: 0.0-1.0,
+  age: 'instant' | '2h ago' | '3 days ago',
+  results: [...],
+  saved_to_omnicore: true
+}
+
+Show to user: "Respuesta desde OmniCore (instantáneo) ⚡" 
+vs "Búsqueda web + aprendido para futuro 🔍→🧠"
+
+═══════════════════════════════════════════════
+PART 5: PROMPT LIBRARY — Battle-tested templates
+═══════════════════════════════════════════════
+
+Pre-seed with high-quality prompts per niche.
+Admin can add/edit/rate prompts.
+System learns which prompts produce best results.
+
+UNIVERSAL PROMPTS (work for any niche):
+1. Product description — conversion focused
+2. Hero image brief — studio quality
+3. Email subject — A/B optimized
+4. SEO meta title — click-optimized
+5. Carrito abandonado — urgency email
+
+NICHE-SPECIFIC PROMPTS auto-created by OmniCore:
+When a niche profile reaches 5+ stores:
+Claude generates optimized prompt templates for that niche:
+"Based on what works in [niche], create a specialized 
+product description template that incorporates:
+[top keywords], [tone that works], [pain points of audience],
+[proven CTA words]"
+
+PROMPT LIBRARY UI /admin/omnicore/prompts:
+Grid of prompt cards
+Filter by: niche / use_case / quality_score
+Each card: name, use_case, niche, quality badge, use count
+[Usar este prompt] → opens with variables pre-filled
+[Editar] [Duplicar] [Valorar]
+[+ Crear prompt] form
+
+═══════════════════════════════════════════════
+PART 6: OMNICORE DASHBOARD /admin/omnicore
+═══════════════════════════════════════════════
+
+THE BRAIN VISUALIZATION:
+
+1. KNOWLEDGE STATS (top row):
+   Total Memories: 1,247
+   Niches Covered: 8
+   Avg Confidence: 74%
+   Cache Hit Rate: 89%
+
+2. NICHE INTELLIGENCE MAP:
+   Hexagonal grid (CSS, no library):
+   Each hex = one niche
+   Size = number of memories
+   Color intensity = avg confidence
+   Hover → shows niche stats
+   Click → opens niche deep-dive
+
+3. LEARNING VELOCITY CHART:
+   Line chart: memories learned per week
+   Shows platform getting smarter over time
+   "Esta semana OmniCore aprendió 47 nuevos patrones"
+
+4. TOP MEMORIES (most used + highest confidence):
+   Table showing most impactful memories
+   | Memory | Niche | Type | Uses | Success Rate |
+   [Ver] [Editar] [Verificar]
+
+5. SEARCH EFFICIENCY:
+   Pie chart: Cache hits vs Web searches
+   "El 89% de búsquedas se resuelven desde OmniCore
+    Ahorro estimado esta semana: €12 en llamadas API"
+
+6. NICHE PROFILES:
+   Cards per covered niche showing:
+   Stores analyzed, knowledge depth score,
+   Top 5 insights, market sweet spot price
+   
+7. MEMORY EDITOR:
+   For each memory: view, edit, verify, delete
+   Manual memory creation (add your own expertise)
+   Import memories from CSV
+
+8. CROSS-CLIENT INSIGHTS (anonymized):
+   "En tiendas de moda de tu plataforma:
+    - Las imágenes lifestyle convierten 38% mejor
+    - El precio €X-Y es el sweet spot  
+    - El 73% usa envío gratis como principal CTA"
+   All data anonymized — no client name revealed
+
+═══════════════════════════════════════════════
+PART 7: OMNICORE PRIVACY & ISOLATION
+═══════════════════════════════════════════════
+
+CRITICAL: Memory is anonymized and shared only at niche level.
+Never at client level.
+
+WHAT IS SHARED (anonymized):
+✓ "In sports niche, lifestyle images convert better" (pattern)
+✓ "Price sweet spot for running shoes: €89-119" (market data)
+✓ "Keyword 'transpirable' converts in sports" (keyword insight)
+
+WHAT IS NEVER SHARED:
+✗ Client name, domain, revenue numbers
+✗ Specific product titles or SKUs
+✗ Client's pricing strategy
+✗ Client's customer data
+✗ Anything that could identify a specific store
+
+MEMORY OWNERSHIP:
+- Each client's RAW DATA belongs only to that client
+- Only derived insights (anonymized patterns) feed OmniCore
+- Client can opt-out of contributing to OmniCore (toggle in settings)
+- Opting out = no cross-learning benefit (explain in UI)
+
+GDPR COMPLIANCE:
+- No personal data in memories
+- All client data deletable without affecting OmniCore memories
+- OmniCore memories are aggregate patterns, not personal data
+- Privacy policy clearly explains the anonymized learning
+
+═══════════════════════════════════════════════
+PART 8: OMNICORE API for Claude Integration
+═══════════════════════════════════════════════
+
+Wrap OmniCore retrieval so every existing API route benefits:
+
+// Middleware: inject OmniCore context into every Claude call
+async function withOmniCore(projectId, useCase, claudeOptions) {
+  const project = await getProject(projectId);
+  const memories = await getRelevantMemories(
+    project.niche, useCase, null, 8
+  );
+  const nicheProfile = await getNicheProfile(project.niche);
+  
+  // Inject into system prompt
+  claudeOptions.system = buildSystemPrompt(
+    project, memories, nicheProfile, claudeOptions.system
+  );
+  
+  // Track that these memories were used
+  await trackMemoryUsage(memories.map(m => m.id), projectId);
+  
+  return claudeOptions;
+}
+
+// Use in EVERY existing Claude call:
+// Before:
+const response = await callClaude({ system: basePrompt, ... });
+// After:
+const enhanced = await withOmniCore(projectId, 'product_description', 
+  { system: basePrompt, ... });
+const response = await callClaude(enhanced);
+
+VISIBLE INDICATOR in UI:
+When OmniCore memories were used, show badge:
+"🧠 OmniCore: 8 memorias aplicadas de nicho moda"
+Clicking the badge shows which memories were used.

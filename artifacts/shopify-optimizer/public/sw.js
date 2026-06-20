@@ -1,18 +1,18 @@
-// Shopy Crafter Service Worker — v6
-// CRITICAL: HTML is NEVER cached. Only assets with content-hash get cached.
-// This prevents stale index.html from breaking deploys when bundle hash changes.
-const STATIC_CACHE  = 'sc-static-v6';
-const FONT_CACHE    = 'sc-fonts-v6';
-const IMAGE_CACHE   = 'sc-images-v6';
+// Shopy Crafter Service Worker — v5
+const STATIC_CACHE  = 'sc-static-v5';
+const FONT_CACHE    = 'sc-fonts-v5';
+const IMAGE_CACHE   = 'sc-images-v5';
+const PAGE_CACHE    = 'sc-pages-v5';
 
 const PRECACHE = [
+  '/css/design-system.css',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/manifest.json',
   '/favicon.png',
 ];
 
-const ALL_CACHES = [STATIC_CACHE, FONT_CACHE, IMAGE_CACHE];
+const ALL_CACHES = [STATIC_CACHE, FONT_CACHE, IMAGE_CACHE, PAGE_CACHE];
 
 // ── Install: precache critical statics ─────────────────────────────────────
 self.addEventListener('install', e => {
@@ -23,7 +23,7 @@ self.addEventListener('install', e => {
   );
 });
 
-// ── Activate: purge ALL old caches (v5 and below) ──────────────────────────
+// ── Activate: purge old caches ──────────────────────────────────────────────
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -40,43 +40,41 @@ self.addEventListener('fetch', e => {
 
   const url = new URL(e.request.url);
 
-  // 1. Skip: API, Shopify proxy, hot-reload, dev tools
+  // 1. Skip: API, Shopify proxy, hot-reload
   if (url.pathname.startsWith('/api/')) return;
   if (url.pathname.startsWith('/shopify/')) return;
   if (url.pathname.includes('hot-update')) return;
   if (url.pathname.includes('@vite') || url.pathname.includes('@react-refresh')) return;
 
-  // 2. Google Fonts: cache-first (fonts never change)
+  // 2. Google Fonts CSS + gstatic: cache-first (fonts rarely change)
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     e.respondWith(cacheFirst(e.request, FONT_CACHE));
     return;
   }
 
-  // 3. Cross-origin — network only
+  // 3. Cross-origin (analytics, etc.) — network only
   if (url.origin !== self.location.origin) return;
 
-  // 4. HTML navigations: ALWAYS network-only, NEVER cache
-  //    Caching index.html breaks deploys — Vite changes bundle hash each build.
+  // 4. HTML navigations: network-first → offline fallback
   if (e.request.headers.get('accept')?.includes('text/html')) {
-    e.respondWith(networkOnlyWithOfflineFallback(e.request));
+    e.respondWith(networkFirstWithOffline(e.request));
     return;
   }
 
-  // 5. Images: stale-while-revalidate
+  // 5. Images: stale-while-revalidate (fast first paint, updates in background)
   if (/\.(png|jpe?g|webp|avif|gif|svg|ico)$/i.test(url.pathname)) {
     e.respondWith(staleWhileRevalidate(e.request, IMAGE_CACHE));
     return;
   }
 
-  // 6. Hashed JS/CSS bundles (content-hash in filename): cache-forever
-  //    Safe to cache permanently — Vite adds unique hash per build.
-  if (/\/assets\/[^/]+-[A-Za-z0-9_-]+\.(js|css)(\?.*)?$/.test(url.pathname)) {
+  // 6. Hashed JS/CSS bundles: cache-forever (Vite adds content hash)
+  if (/\.(js|css)$/.test(url.pathname) && (url.pathname.includes('-') || url.pathname.includes('.'))) {
     e.respondWith(cacheFirst(e.request, STATIC_CACHE));
     return;
   }
 
-  // 7. Everything else: pass through to network
-  return;
+  // 7. Everything else: network-first
+  e.respondWith(networkFirst(e.request, PAGE_CACHE));
 });
 
 // ── Strategies ─────────────────────────────────────────────────────────────
@@ -99,11 +97,30 @@ async function staleWhileRevalidate(request, cacheName) {
   return cached || networkReq;
 }
 
-// HTML: always network, offline page only on true network failure
-async function networkOnlyWithOfflineFallback(request) {
+async function networkFirst(request, cacheName) {
   try {
-    return await fetch(request);
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+    }
+    return response;
   } catch {
+    return caches.match(request);
+  }
+}
+
+async function networkFirstWithOffline(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(PAGE_CACHE);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
     return new Response(`<!DOCTYPE html>
 <html lang="es">
 <head>

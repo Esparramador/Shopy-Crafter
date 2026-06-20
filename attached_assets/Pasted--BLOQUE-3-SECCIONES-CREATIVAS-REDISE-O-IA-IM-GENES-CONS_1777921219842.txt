@@ -1,0 +1,181 @@
+🎯 BLOQUE 3 — SECCIONES CREATIVAS (REDISEÑO IA, IMÁGENES, CONSISTENCIA)
+BLOQUE 3: Refactor de las secciones creativas/visuales.
+
+═══════════════════════════════════════════════════════════════════
+SECCIÓN: REDISEÑO IA
+═══════════════════════════════════════════════════════════════════
+
+  • "Rediseñar producto" → genera nueva versión con IA
+    Modal: elegir aspecto a rediseñar (imagen, título, descripción, 
+    landing completa)
+    Confirmación con coste estimado en créditos
+    Progreso real con preview en streaming si es posible
+
+  • "Generar variaciones" → 3-5 versiones alternativas
+    Grid con previews + botón "Aplicar esta" en cada una
+
+  • "Comparar antes/después" → split view con slider
+
+  • "Aplicar rediseño" → push a Shopify
+    Confirmación: "Reemplazará el contenido actual. ¿Backup automático?"
+    Si sí → snapshot en tabla product_snapshots
+
+  • "Revertir a versión anterior" → desde historial
+    Lista de snapshots con timestamp y preview
+
+═══════════════════════════════════════════════════════════════════
+SECCIÓN: IMÁGENES
+═══════════════════════════════════════════════════════════════════
+
+  • "Auto-mejorar imagen" → upscale + denoise (Replicate/Real-ESRGAN)
+  • "Eliminar fondo" → remove.bg API o Replicate
+  • "Generar mockup" → producto en contexto (Runway/Stable Diffusion)
+  • "Optimizar para web" → WebP + compresión sin pérdida visible
+  • "Generar alt text con IA" → accesibilidad automatizada
+  • "Detectar duplicados" → hash perceptual (pHash)
+  • "Subir nueva imagen" → drag&drop con preview
+  • "Aplicar a todos los productos" → batch con confirmación
+
+Cada uno con preview ANTES/DESPUÉS antes de aplicar.
+
+═══════════════════════════════════════════════════════════════════
+SECCIÓN: CONSISTENCIA
+═══════════════════════════════════════════════════════════════════
+
+  • "Analizar consistencia de marca" → detecta:
+    - Tono de voz inconsistente entre productos
+    - Estilos de imagen mezclados
+    - Variaciones de naming
+    - Diferencias de formato en descripciones
+
+  • "Establecer brand guidelines con IA" → Claude genera guía
+    desde productos top de tu tienda
+
+  • "Aplicar guía a producto" / "a todos"
+    Reescribe descripciones manteniendo info pero con tono unificado
+
+  • "Detectar outliers" → productos que rompen la coherencia
+    Tabla con score de consistencia + botón "Corregir"
+
+═══════════════════════════════════════════════════════════════════
+ENTREGABLES BLOQUE 3
+═══════════════════════════════════════════════════════════════════
+
+Igual que Bloque 2: antes/después + endpoints + tests.
+
+ESPECIAL ATENCIÓN: las acciones de imagen pueden ser caras en créditos IA. 
+SIEMPRE muestra estimatedCost en el ActionButton de variante "ai".
+
+🎯 BLOQUE 4 — SECCIONES RESTANTES + QA FINAL
+BLOQUE 4: Resto de secciones (las 4-5 que aún no hemos tocado) + QA global.
+
+═══════════════════════════════════════════════════════════════════
+TAREA 4.1 — REFACTOR SECCIONES RESTANTES
+═══════════════════════════════════════════════════════════════════
+
+Aplica el mismo patrón <ActionButton> + useAIAction a todas las secciones 
+que queden. Para cada una:
+
+1. Lee /docs/buttons-audit.md (del Bloque 1) y trata todos los botones 
+   marcados como 🔴 ROTO o 🟡 PARCIAL
+2. Identifica el endpoint que debe llamar (verifica que existe)
+3. Aplica el patrón estándar
+4. Documenta en /docs/section-refactor-{nombre}.md
+
+Si encuentras una sección con botones puramente decorativos o sin lógica
+clara, MUÉSTRAMELOS antes de tocar para que decida si eliminarlos o 
+darles funcionalidad.
+
+═══════════════════════════════════════════════════════════════════
+TAREA 4.2 — DASHBOARD GLOBAL DE ACCIONES IA
+═══════════════════════════════════════════════════════════════════
+
+Crea /client/src/pages/AIActions.tsx — un panel central que muestre:
+
+  • Acciones IA en curso (con su progreso real, cancelables)
+  • Historial de últimas 50 acciones (success/error/cancelled)
+  • Coste IA acumulado del mes (suma de todos los estimatedCost reales)
+  • Top acciones más usadas
+  • Alertas: "5 acciones fallaron en la última hora"
+
+Backend: tabla ai_actions_log con columnas:
+  id, shop_id, user_id, action_type, endpoint, status, 
+  cost_estimated, cost_real, started_at, completed_at, error_message,
+  payload (jsonb), result_summary (jsonb)
+
+Cada llamada via useAIAction debe loggear automáticamente aquí.
+
+═══════════════════════════════════════════════════════════════════
+TAREA 4.3 — QA AUTOMATIZADO
+═══════════════════════════════════════════════════════════════════
+
+Crea /scripts/qa-buttons.ts que:
+
+1. Re-ejecute la auditoría del Bloque 1
+2. Compare contra el reporte original
+3. Genere /docs/buttons-audit-final.md con:
+   - Antes: X verdes, Y amarillos, Z rojos
+   - Ahora: X' verdes, Y' amarillos, Z' rojos
+   - Mejora: %
+   - Botones que SIGUEN rojos (con razón)
+   - Botones nuevos que se hayan introducido
+
+4. Tests E2E con Playwright (si está instalado) o Cypress:
+   - Por cada sección, simula click en cada botón principal
+   - Verifica que aparece estado loading
+   - Verifica que aparece estado success o error
+   - Verifica que NO hay console.error inesperados
+   - Captura screenshots antes/después
+
+═══════════════════════════════════════════════════════════════════
+TAREA 4.4 — DOCUMENTACIÓN FINAL
+═══════════════════════════════════════════════════════════════════
+
+Genera /docs/UI-ACTIONS-GUIDE.md con:
+
+  - Cómo usar <ActionButton> (con ejemplos de cada variante)
+  - Cómo usar useAIAction
+  - Convenciones de naming de endpoints
+  - Patrón estándar de confirmación + loading + success/error
+  - Cómo añadir un botón nuevo (checklist)
+  - Cómo loggear costes IA correctamente
+
+═══════════════════════════════════════════════════════════════════
+ENTREGABLES FINALES
+═══════════════════════════════════════════════════════════════════
+
+  1. /docs/buttons-audit-final.md (comparativa antes/después)
+  2. /docs/UI-ACTIONS-GUIDE.md (guía dev)
+  3. /client/src/pages/AIActions.tsx (dashboard global)
+  4. Screenshots de cada sección con botones funcionando
+  5. Resumen ejecutivo:
+     - N botones auditados
+     - N botones arreglados
+     - N endpoints conectados/creados
+     - N estados UI implementados
+     - Coste IA mensual proyectado
+
+REGLA DE ORO FINAL:
+Ningún botón en la app debe quedar sin onClick funcional, sin estado de
+loading, sin manejo de error, y sin feedback visual al usuario. CERO 
+botones decorativos.
+
+📋 CÓMO USAR ESTOS 4 BLOQUES
+Orden estricto:
+
+Pega Bloque 1 → espera a que el Agent te muestre el reporte de auditoría → revísalo
+Solo cuando apruebes el reporte y el <ActionButton> funcione, pega Bloque 2
+Tras validar Pricing/Auditoría/SEO/A/B Testing, pega Bloque 3
+Cuando termine creativas, pega Bloque 4 para cerrar
+
+Antes de pegar cada bloque, dile al Agent:
+
+"Vas a recibir el bloque N de 4. Confirma que el bloque anterior está completo y pasados los tests antes de empezar"
+
+Si el Agent intenta saltarse pasos (típico cuando tiene prisa):
+
+"STOP. No has completado la tarea X.Y del bloque anterior. Vuelve atrás y termínala antes de continuar"
+
+Si en mitad de un bloque encuentra algo raro en tu código:
+
+"Si algo del código actual no encaja con el plan, NO lo borres. Documéntalo en /docs/incompatibilities.md y dime qué encontraste antes de tocarlo"

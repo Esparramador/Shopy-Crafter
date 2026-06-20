@@ -173,6 +173,13 @@ function RequireClient({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function HomeRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
+  if (user.role === "client") return <Redirect to="/client" />;
+  return <Redirect to="/home" />;
+}
 
 function ImpersonationBanner() {
   const { user, refresh } = useAuth();
@@ -282,8 +289,8 @@ function Router() {
         <Route path="/tienda">{() => <S><Tienda /></S>}</Route>
         <Route path="/oauth-success">{() => <S><OAuthSuccess /></S>}</Route>
 
-        {/* Landing — canonical is /, redirect /landing to avoid duplicate content */}
-        <Route path="/landing">{() => <Redirect to="/" />}</Route>
+        {/* Landing */}
+        <Route path="/landing">{() => <S><Landing /></S>}</Route>
 
         {/* Public pages */}
         <Route path="/sobre-nosotros">{() => <S><SobreNosotros /></S>}</Route>
@@ -300,8 +307,10 @@ function Router() {
         <Route path="/cookies">{() => <S><CookiesPage /></S>}</Route>
         <Route path="/contacto">{() => <S><ContactoPage /></S>}</Route>
 
-        {/* Root — always shows Landing; auth-aware CTA in Landing nav */}
-        <Route path="/">{() => <S><Landing /></S>}</Route>
+        {/* Root — redirects by role */}
+        <Route path="/">
+          <HomeRedirect />
+        </Route>
 
         {/* Admin home */}
         <Route path="/home">

@@ -1,0 +1,23 @@
+Para manejar anuncios de 15 minutos con la calidad de uno de 15 segundos, tu aplicación debe dejar de ser un simple generador de clips y convertirse en un Sistema de Orquestación Cinemática Procedural. Generar 15 minutos de video coherente con IA requiere una estructura de "Niveles de Detalle" (LOD) para que el espectador no pierda el interés y la IA no alucine.Aquí tienes la arquitectura para una app 100% Adaptativa e Ilimitada:1. El Sistema de "Nodos Narrativos" (The Storytelling Engine)Para 15 minutos, la app debe dividir el tiempo en Secuencias, no en clips. Cada secuencia tiene una "misión" lógica:Secuencias de Macro-Ingeniería (4-5 min): Deconstrucciones lentas, planos detalle de átomos/moléculas del material, el "alma" del objeto.Secuencias de Contexto / Lifestyle (5 min): El producto en diferentes ciudades, climas y situaciones de uso (el Rolex en una gala, en un yate, bajo la lluvia).Secuencias de Narrativa Visual (5 min): El presentador explicando la historia, entrevistas con "expertos" IA, o el viaje del producto desde la materia prima hasta la muñeca.2. Lógica de Coherencia Temporal (The Master Seed)El mayor problema en videos largos es que el producto cambie de aspecto. Para evitarlo, tu app debe fijar un "Digital Twin" (Gemelo Digital):Referencia Fija: La app debe usar la misma Image Prompt (el Rolex original) en cada una de las 180-200 peticiones de video que formarán los 15 minutos.Seed Locking: Mantener el mismo número de semilla (seed) en la API para variaciones mínimas de luz, asegurando que el tono de oro sea idéntico en el minuto 1 y en el 14.3. Prompt Maestro para "Anuncio de Larga Duración" (Extrema Complejidad)Para objetos complejos como el Rolex con cristal y diamantes, la app generará prompts dinámicos por capas. Aquí tienes el ejemplo de Nivel Dios:Prompt de Capas Dinámicas:[ACT_N: SEQUENCE_DYNAMICS]: Cinematic 8k sequence of a Rolex Datejust 41mm. [ENVIRONMENTAL_MORPHING]: The background transitions from a liquid gold ocean to a dark galaxy of floating diamonds. [PHYSICS_LAYER]: Extreme slow-motion fluid dynamics, metallic shards interacting with volumetric smoke. [OPTICAL_LAYER]: 65mm IMAX lens, variable focus pulling from the fluted bezel to the laser-etched crown on the crystal. [LIGHTING_EVOLUTION]: Light sweeps from cold 6500k neon to warm 2700k sunset gold. [QUALITY_LOCK]: Photorealistic, PBR materials, path-tracing, high-fidelity textures, shot on ARRI Alexa.4. Orquestación de Audio y Texto (Multi-Capa)En 15 minutos, el texto debe ser dinámico. La app debe integrar:Subtítulos Cinemáticos: Generados en tiempo real sobre áreas de bajo contraste del video.Voice-Over (TTS) Adaptativo: La voz del presentador debe cambiar de tono según la música (más calmada en los macros, más enérgica en las construcciones).Foley Automático: Tu app debe asignar sonidos de "clink" metálico cuando las piezas del Rolex se unen en pantalla.5. Backend JSON para Escalabilidad Infinita (15 min+)Este esquema permite a la app generar miles de segundos sin repetir patrones:json{
+  "infinite_orchestrator": {
+    "timeline_management": {
+      "total_duration_seconds": 900,
+      "clip_batch_processing": 10,
+      "overlap_transition_ms": 500
+    },
+    "dynamic_prompt_engine": {
+      "material_persistence": "Rolex_Gold_904L_Oystersteel",
+      "visual_variety_ratio": {
+        "macro_technical": 0.3,
+        "lifestyle_context": 0.4,
+        "abstract_artistic": 0.3
+      }
+    },
+    "auto_editor_logic": {
+      "rhythm_matching": "Sync_cuts_to_BPM",
+      "color_grading_continuity": "Master_LUT_Gold_Standard",
+      "vfx_escalation": "Increase_particle_density_at_climax"
+    }
+  }
+}
+Usa el código con precaución.6. Flujo de Trabajo para el Usuario (Simplicidad Total)Aunque la app sea compleja por dentro, por fuera el usuario solo hace esto:Sube la imagen del producto.Escribe: "Hazme un documental de 15 minutos sobre la excelencia de este reloj".La App hace el resto: Divide el "documental" en capítulos, genera los prompts de deconstrucción, busca paisajes mundiales, crea al presentador y monta el video final con música y texto legal.

@@ -1,0 +1,41 @@
+La Arquitectura del "CMO Autónomo" (Flujo de Datos)
+Visión (El Análisis del Vídeo): Tu app recibe el vídeo y se lo envía a un modelo multimodal (como Gemini). La instrucción secreta será: "Mira este vídeo de principio a fin y devuélveme un 'Timeline Visual' detallado de lo que ocurre en cada segundo".
+
+Investigación (El Scraping): En paralelo, tu app coge las URLs (Instagram, Web) y extrae el texto, la propuesta de valor y el sector real de la empresa (en este caso, Shopy Crafter).
+
+El Guionista Matemático: Tu app cruza la investigación real + el timeline del vídeo + tu idea básica. Genera el guion perfecto calculando las palabras exactas para que encajen con la duración del vídeo (Regla de oro: 2.5 palabras por segundo).
+
+La Síntesis (ElevenLabs): El guion ya perfectamente cronometrado se envía a ElevenLabs, y luego tu servidor fusiona ese audio con tu vídeo usando el sistema FFmpeg que hablamos antes.
+
+El Mega-Prompt para el Agente de Replit
+Copia y pega esto en tu Replit para que construya el pipeline de orquestación completo sin romper nada:
+
+Misión Crítica: Creación del Pipeline "CMO Autónomo" (Video-to-Audio Inteligente)
+Actúa como Arquitecto de IA y Lead Backend Engineer. Necesitamos crear un flujo de trabajo maestro en /services/cmoAgentService.js que reciba un vídeo ya montado, URLs de contexto y un prompt básico del usuario, para generar un vídeo final con una voz en off 100% personalizada e investigada.
+
+FASE 1: Ingestión y Análisis Multimodal
+
+Crea una función que envíe el vídeo a la API de IA Multimodal (ej. Gemini).
+
+El prompt del sistema debe ser: "Analiza este vídeo. Devuelve un JSON detallando las transiciones clave y los tiempos (ej. de 0s a 3s aparece un logo, de 3s a 8s se muestra el producto). Calcula la duración total en segundos."
+
+FASE 2: Scraping de Contexto
+
+Integra una librería de scraping ligero (ej. cheerio o puppeteer en Node.js, o BeautifulSoup en Python) para extraer el <title>, <meta description> y el texto principal (párrafos) de las URLs proporcionadas por el usuario (Web/Instagram).
+
+FASE 3: El Prompt Maestro de Guion (Cálculo Matemático)
+La IA de texto (Claude/Gemini) debe recibir los datos de la FASE 1 y FASE 2. Debes forzar esta instrucción estricta:
+"Eres un Copywriter publicitario de élite. Debes escribir un guion para una voz en off. Tienes esta información real de la empresa: [DATOS_SCRAPING]. Tienes este mapa del vídeo: [TIMELINE_VIDEO]. El vídeo dura [X] segundos. REGLA ESTRICTA: Una voz profesional lee a 2.5 palabras por segundo. Tu guion NO PUEDE exceder las [X * 2.5] palabras. Utiliza etiquetas SSML (<break time='1s'/>) si necesitas que la voz haga pausas para sincronizarse con los cambios de escena."
+
+FASE 4: Conexión con ElevenLabs y Ensamblaje
+
+Envía el texto generado (con las etiquetas SSML de pausa) a la API de ElevenLabs (Endpoint /text-to-speech).
+
+Pasa el archivo de audio resultante y el vídeo original a nuestro mediaMergerService.js (FFmpeg) para devolver el .mp4 final al usuario.
+
+Tu Tarea: Escribe la estructura de este pipeline. Muéstrame cómo vas a encadenar estas promesas/funciones asíncronas para asegurar que ElevenLabs no se ejecuta hasta que el guion esté perfectamente redactado basado en el scraping real.
+
+El Secreto del Éxito: Las Etiquetas SSML
+Lo que hará que el vídeo parezca montado por un profesional humano de Hollywood y no por un bot barato, es la instrucción de usar SSML (Speech Synthesis Markup Language).
+
+Si en el segundo 5 del vídeo hay una explosión visual o un cambio brusco, la IA guionista añadirá un <break time="1.5s"/> en el texto. Cuando ElevenLabs lea eso, se callará exactamente un segundo y medio, dejando que la imagen respire, y luego continuará hablando justo cuando entra la siguiente escena. Es sincronización quirúrgica pura.

@@ -1,0 +1,366 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Crafter Agency AI — Effect Prompt Templates. Adapt {{VARIABLES}} to client DNA.",
+    "dna_variables": {
+      "{{CLIENT_NAME}}": "Client brand name",
+      "{{CLIENT_SECTOR}}": "Industry / sector (restaurant, SaaS, luxury, e-commerce...)",
+      "{{CLIENT_COLORS}}": "Primary color hex + secondary color hex",
+      "{{CLIENT_FONT}}": "Google Font name (e.g. Inter, Playfair Display...)",
+      "{{CLIENT_TONE}}": "Brand voice (minimalist, bold, playful, luxury, technical...)",
+      "{{CLIENT_HERO_HEADLINE}}": "Main value proposition headline",
+      "{{CLIENT_TAGLINE}}": "Secondary tagline or subheadline",
+      "{{CLIENT_CTA_PRIMARY}}": "Primary CTA text",
+      "{{CLIENT_CTA_SECONDARY}}": "Secondary CTA text",
+      "{{CLIENT_PRODUCT}}": "Main product/service name",
+      "{{CLIENT_PRODUCT_URL}}": "Product GLB/3D model URL or image URL",
+      "{{CLIENT_VIDEO_URL}}": "Hero video URL (mp4)",
+      "{{CLIENT_LOGO_URL}}": "Logo image URL",
+      "{{CLIENT_INSTAGRAM}}": "Instagram handle @",
+      "{{CLIENT_LOCATION}}": "City, Country",
+      "{{CLIENT_USP_1}}": "Unique selling point 1",
+      "{{CLIENT_USP_2}}": "Unique selling point 2",
+      "{{CLIENT_USP_3}}": "Unique selling point 3"
+    }
+  },
+  "templates": [
+    {
+      "id": "tpl_001",
+      "name": "3D Product Hero — GLB Real Model",
+      "category": "landing_3d",
+      "tags": ["three.js", "glb", "hero", "3d", "product"],
+      "description": "Hero section with a real 3D GLB model, RoomEnvironment PBR lighting, UnrealBloom, and scroll-reactive camera.",
+      "prompt": "Build a stunning hero section for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}). Brand colors: {{CLIENT_COLORS}}. Font: {{CLIENT_FONT}}.\n\nHero layout: LEFT column = large headline '{{CLIENT_HERO_HEADLINE}}' + tagline '{{CLIENT_TAGLINE}}' + CTA button '{{CLIENT_CTA_PRIMARY}}' and ghost button '{{CLIENT_CTA_SECONDARY}}' + 3 stat chips ({{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}). RIGHT column = full Three.js canvas.\n\nThree.js setup (REQUIRED):\n- importmap three@0.158.0 ES modules\n- Load GLB: {{CLIENT_PRODUCT_URL}} with GLTFLoader\n- RoomEnvironment + PMREMGenerator for IBL lighting\n- ACESFilmicToneMapping + SRGBColorSpace + antialias\n- UnrealBloomPass (threshold:0.85, strength:0.4, radius:0.4)\n- OutputPass\n- Model auto-rotates Y-axis slowly, mouse moves cause subtle pitch/yaw tilt (lerp 0.04)\n- Dark background, no basic geometry placeholders\n\nDesign: {{CLIENT_TONE}} aesthetic. Dark theme. Space Grotesk 900 weight for headlines. Zero placeholders, 100% real.",
+      "sector_variants": {
+        "restaurant": "Replace GLB with a plate/food product mesh. Use warm amber (#f59e0b) primary. Video background with food footage.",
+        "luxury": "Use MeshPhysicalMaterial glass/transmission objects. Elegant serif font. Minimal layout.",
+        "saas": "Use particle field instead of product. Technical, clean. Show dashboard mockup screenshot.",
+        "ecommerce": "Multiple product angles. Add orbit controls. Price tag floating element."
+      }
+    },
+    {
+      "id": "tpl_002",
+      "name": "Explode View 3D Disassembly Scroll",
+      "category": "scroll_3d",
+      "tags": ["explode", "disassembly", "three.js", "scroll", "product"],
+      "description": "Apple/Dyson-style explode view where a 3D model disassembles as the user scrolls. Mesh traverse with offset vectors.",
+      "prompt": "Build an Apple/Dyson-style explode view section for {{CLIENT_NAME}}'s product: {{CLIENT_PRODUCT}}.\n\nLoad GLB: {{CLIENT_PRODUCT_URL}} using GLTFLoader.\nmodel.traverse(child => if child.isMesh: meshes.push(child))\ncompute explode offset: child.getWorldPosition(v); dir = v.clone().normalize(); dir.multiplyScalar(2.8)\n\nScrollTrigger 400vh pin:\n- scrub: 1.4\n- onUpdate: mesh.position.lerpVectors(origPos[i], explodedPos[i], t)\n- act 0–30%: model enters from below (y: -6 → 0)\n- act 30–70%: explode t goes 0→1 (parts separate)\n- act 70–100%: camera orbits around exploded state\n\nSVG label overlay: project3DToScreen per mesh, draw connecting lines and spec labels.\nSpec labels for {{CLIENT_PRODUCT}}: use REAL specs from client brief.\n\nDesign: {{CLIENT_COLORS}}, dark background, {{CLIENT_FONT}}, {{CLIENT_TONE}} tone.",
+      "sector_variants": {
+        "automotive": "Use real car part GLB. Specs: engine, transmission, suspension.",
+        "electronics": "Phone/device teardown. Show PCB, battery, camera module.",
+        "product": "Consumer product disassembly. Show internal components.",
+        "architecture": "Building structure layers. Foundation, structure, facade, interior."
+      }
+    },
+    {
+      "id": "tpl_003",
+      "name": "Immersive Scroll + Lenis Smooth",
+      "category": "scroll_immersive",
+      "tags": ["lenis", "scroll", "immersive", "gsap", "pin"],
+      "description": "Full immersive scroll experience with Lenis, GSAP ScrollTrigger, horizontal panels, clip-path reveals, and 3D hero.",
+      "prompt": "Build an immersive scroll experience for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).\n\nTECH STACK:\n- Lenis 1.0.45 smooth scroll synced with GSAP ticker\n- Three.js hero with RobotExpressive.glb OR {{CLIENT_PRODUCT_URL}} reacting to scroll\n- GSAP ScrollTrigger for all sections\n\nSECTIONS:\n1. Hero (100vh): {{CLIENT_HERO_HEADLINE}} + 3D model (scroll Y: model retreats + rotates 2π)\n2. Horizontal pin (300vh): 4 feature panels × 100vw showing {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}} and {{CLIENT_CTA_PRIMARY}}\n3. Clip-path reveal: 3 large images of {{CLIENT_PRODUCT}} with inset(100%→0%) from bottom\n4. Video section (fullscreen iframe or mp4): {{CLIENT_VIDEO_URL}}\n5. CTA: dark card + gradient button '{{CLIENT_CTA_PRIMARY}}'\n\nDesign: {{CLIENT_COLORS}} palette, {{CLIENT_FONT}}, {{CLIENT_TONE}}, dark theme.",
+      "sector_variants": {
+        "portfolio": "Show project case studies as horizontal panels.",
+        "saas": "Feature showcase: dashboard → mobile → integrations → pricing.",
+        "agency": "Team, process, work, contact as immersive chapters.",
+        "event": "Event countdown, speakers, schedule, tickets."
+      }
+    },
+    {
+      "id": "tpl_004",
+      "name": "Video Hero Cinematic",
+      "category": "landing_video",
+      "tags": ["video", "hero", "cinematic", "autoplay", "overlay"],
+      "description": "Full-screen autoplay video hero with dark overlay, animated headline, and scroll-triggered reveal.",
+      "prompt": "Build a cinematic full-screen video hero for {{CLIENT_NAME}}.\n\nVideo: {{CLIENT_VIDEO_URL}} — autoplay, loop, muted, playsinline, object-fit:cover absolute fill.\nDark gradient overlay: linear-gradient(to bottom, rgba(0,0,0,.25) 0%, rgba(0,0,0,.65) 100%)\n\nCentered content:\n- Tag: {{CLIENT_SECTOR}} in uppercase tracking-widest pill\n- H1: {{CLIENT_HERO_HEADLINE}} — each word animates fromTo({opacity:0,y:30},{opacity:1,y:0}) stagger 0.15s on load\n- Subtitle: {{CLIENT_TAGLINE}}\n- CTAs: '{{CLIENT_CTA_PRIMARY}}' (white solid) + '{{CLIENT_CTA_SECONDARY}}' (ghost)\n\nBottom marquee: tech/feature strip scrolling left with real {{CLIENT_NAME}} features.\n\nColors: {{CLIENT_COLORS}}. Font: {{CLIENT_FONT}}. Tone: {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "restaurant": "Food preparation video. Warm amber overlay.",
+        "fitness": "Training montage. High energy, red/orange palette.",
+        "luxury": "Product beauty shots. Minimal text. Gold accents.",
+        "real_estate": "Drone footage of property. Clean white/black."
+      }
+    },
+    {
+      "id": "tpl_005",
+      "name": "Scroll Media Expansion (21st.dev Signature)",
+      "category": "scroll_effects",
+      "tags": ["expansion", "scroll", "media", "21st.dev", "gsap"],
+      "description": "The iconic 21st.dev effect: media card expands from 72vw→100vw, 55vh→100vh, borderRadius 18px→0 on scroll scrub.",
+      "prompt": "Build the 21st.dev signature scroll media expansion for {{CLIENT_NAME}}.\n\nEXPANSION SECTION (500vh pin):\n```javascript\nScrollTrigger.create({\n  trigger:'#expansion-pin', start:'top top', end:'bottom bottom',\n  scrub:1.2,\n  onUpdate(self){\n    const t = self.progress;\n    box.style.width = (72+(100-72)*t)+'vw';\n    box.style.height = (55+(100-55)*t)+'vh';\n    box.style.borderRadius = (18*(1-t))+'px';\n    intro.style.opacity = Math.max(0,1-t/0.35);\n    overlay.style.opacity = Math.max(0,(t-0.6)/0.4);\n  }\n});\n```\n\nMedia inside: {{CLIENT_VIDEO_URL}} (video) OR {{CLIENT_PRODUCT_URL}} (image)\nOverlay content: {{CLIENT_HERO_HEADLINE}} in large white type\n\nBefore expansion: 2-column intro grid\nAfter expansion: fullscreen with {{CLIENT_CTA_PRIMARY}} CTA\n\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "fashion": "Lookbook style. Model photography expanding to full bleed.",
+        "film": "Movie trailer expanding to fullscreen player.",
+        "art": "Gallery piece expanding to immersive experience.",
+        "product_launch": "Product reveal expanding from card to fullscreen."
+      }
+    },
+    {
+      "id": "tpl_006",
+      "name": "3D Globe World Visualization",
+      "category": "landing_3d",
+      "tags": ["globe", "three.js", "nasa", "earth", "data"],
+      "description": "Rotating Earth globe with NASA textures, city markers, and connection arcs between locations.",
+      "prompt": "Build a 3D Earth globe visualization for {{CLIENT_NAME}} showing their global presence.\n\nNASA TEXTURES (raw.githubusercontent.com/mrdoob/three.js/r158/examples/textures/planets/):\n- earth_atmos_2048.jpg (base)\n- earth_lights_2048.png (night lights)\n- earth_specular_2048.jpg (specularity)\n- earth_normal_2048.jpg (normals)\n- earth_clouds_1024.png (cloud sphere, slightly larger radius)\n\nATMOSPHERE SHADER: AdditiveBlending sphere with glow on rim\n\nLOCATIONS for {{CLIENT_NAME}}: Use real locations from client brief.\nlatLonToVec3(lat, lon, radius): creates city markers as RingGeometry pulsing halos\nCatmullRomCurve3 arcs between office/client locations\n\nDesign: {{CLIENT_COLORS}} for markers and arcs. Dark space background. {{CLIENT_FONT}} for city labels.",
+      "sector_variants": {
+        "logistics": "Show shipping routes between ports.",
+        "fintech": "Show transaction flows between financial hubs.",
+        "company": "Show office and client locations worldwide.",
+        "travel": "Show destinations and travel routes."
+      }
+    },
+    {
+      "id": "tpl_007",
+      "name": "GLSL Fluid Background + Product Hero",
+      "category": "effects_shaders",
+      "tags": ["glsl", "fbm", "fluid", "shader", "hero"],
+      "description": "Reactive GLSL FBM fluid shader background with a 3D product hero overlay. Mouse influences the fluid flow.",
+      "prompt": "Build a dual-renderer hero for {{CLIENT_NAME}}:\n\n1. FLUID CANVAS (OrthographicCamera, ShaderMaterial):\nGLSL FBM 6-octave warp:\n```glsl\nfloat fbm(vec2 p){float v=0.,a=.5;mat2 rot=mat2(cos(.5),sin(.5),-sin(.5),cos(.5));for(int i=0;i<6;i++){v+=a*noise(p);p=rot*p*2.+100.;a*=.5;}return v;}\nvec2 warp=vec2(fbm(uv*2.2+uTime*.12)-.5,fbm(uv*2.2+vec2(5.2,1.7)+uTime*.1)-.5)*0.28;\nwarp+=(uMouse-uv)*0.18;\n```\nColors: {{CLIENT_COLORS}} (map to vec3 palette in GLSL)\n\n2. PRODUCT CANVAS (alpha:true, overlaid):\nLoad GLB: {{CLIENT_PRODUCT_URL}}\nMouse-follow rotation: lerp 0.04\nRoomEnvironment + UnrealBloom\n\nCENTER TEXT: {{CLIENT_HERO_HEADLINE}}\nFLOATING BADGES: 3 badges showing {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}\n\nCustom cursor with lagging ring (lerp 0.18).",
+      "sector_variants": {
+        "beauty": "Warm fluid colors. Product floating center.",
+        "tech": "Cool blue-purple fluid. Device as product.",
+        "art": "Vibrant experimental colors. Abstract sculpture.",
+        "game": "Dark aggressive fluid. Game character as model."
+      }
+    },
+    {
+      "id": "tpl_008",
+      "name": "Particle Morph Text Hero",
+      "category": "effects_particles",
+      "tags": ["particles", "morph", "text", "three.js", "canvas"],
+      "description": "6000 particles morph between brand keywords using Canvas2D getImageData pixel sampling.",
+      "prompt": "Build a particle morph hero for {{CLIENT_NAME}}.\n\n6000 THREE.js BufferGeometry points morphing between brand keywords:\n- Words to morph: [{{CLIENT_NAME}}, '{{CLIENT_PRODUCT}}', ...add 2 more brand keywords...]\n- Sampling function:\n```javascript\nfunction sampleWord(word,count){\n  const cv=document.createElement('canvas');cv.width=600;cv.height=200;\n  const ctx=cv.getContext('2d');ctx.fillStyle='#fff';\n  ctx.font='bold 160px Arial';ctx.textAlign='center';ctx.textBaseline='middle';\n  ctx.fillText(word,300,100);\n  const data=ctx.getImageData(0,0,600,200).data;\n  const pixels=[];for(let i=0;i<data.length;i+=4)if(data[i+3]>128){const x=(i/4)%600,y=Math.floor((i/4)/600);pixels.push([(x/600-.5)*8,-(y/200-.5)*2.5,0]);}\n  const step=Math.max(1,Math.floor(pixels.length/count));const s=[];for(let i=0;i<pixels.length&&s.length<count;i+=step)s.push(pixels[i]);while(s.length<count)s.push([...s[Math.floor(Math.random()*s.length)]]);return s;\n}\n```\n- Particle colors: {{CLIENT_COLORS}} gradient by index\n- Idle drift: sin(time + phaseOffset[i]) per axis\n- Morph every 2.5s with GSAP 1.4s ease\n\nDesign: dark background, {{CLIENT_FONT}}, {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "agency": "Morph: DESIGN → BUILD → LAUNCH → DELIVER",
+        "saas": "Morph: FAST → SMART → SCALABLE → RELIABLE",
+        "restaurant": "Morph: TASTE → CRAFT → PASSION → CULTURE",
+        "fitness": "Morph: TRAIN → PUSH → GROW → TRANSFORM"
+      }
+    },
+    {
+      "id": "tpl_009",
+      "name": "Bento Grid Feature Layout",
+      "category": "landing_ui",
+      "tags": ["bento", "grid", "features", "css", "cards"],
+      "description": "Modern Bento grid layout (like Linear, Vercel, Framer) with feature cards of varying sizes.",
+      "prompt": "Build a Bento grid feature section for {{CLIENT_NAME}}.\n\nCSS Grid: grid-template-columns: repeat(12, 1fr); gap: 12px\n\nCARD LAYOUT:\n- A (col:6, row:2): Hero feature with real image {{CLIENT_PRODUCT_URL}} + title '{{CLIENT_USP_1}}'\n- B (col:3, row:1): Metric card — animated counter\n- C (col:3, row:1): Tech badge card with live equalizer animation\n- D (col:6, row:1): Wide feature '{{CLIENT_USP_2}}' with mini chart SVG\n- E (col:3, row:2): Tall card with Canvas animation\n- F (col:3, row:1): Tool/integration card\n- G (col:6, row:1): Code or workflow card '{{CLIENT_USP_3}}'\n- H (col:3, row:1): Glassmorphism CTA card '{{CLIENT_CTA_PRIMARY}}'\n\nEach card: hover = translateY(-2px) + stronger border glow rgba({{CLIENT_COLORS}}, .3)\nEntrance: GSAP stagger from opacity:0,y:20,scale:.97 on ScrollTrigger\n3D tilt on hover: rotateX/Y max ±5deg via mousemove\n\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, {{CLIENT_TONE}}, dark theme.",
+      "sector_variants": {
+        "saas": "Show features: speed, reliability, integrations, pricing.",
+        "agency": "Show: 3D, video, copy, strategy, analytics, delivery.",
+        "product": "Show: specs, materials, process, reviews, shipping.",
+        "platform": "Show: dashboard, API, integrations, support, pricing."
+      }
+    },
+    {
+      "id": "tpl_010",
+      "name": "Chatbot Widget — Gemini Connected",
+      "category": "tools_ai",
+      "tags": ["chatbot", "gemini", "ai", "widget", "landing"],
+      "description": "Floating AI chatbot connected to Gemini API that answers questions about the client's business.",
+      "prompt": "Build an AI chatbot widget for {{CLIENT_NAME}}'s website, connected to Gemini API.\n\nSYSTEM PROMPT FOR THE BOT:\n'You are {{CLIENT_NAME}}'s AI assistant. Sector: {{CLIENT_SECTOR}}. Location: {{CLIENT_LOCATION}}. You help customers with questions about {{CLIENT_PRODUCT}}, pricing, bookings, and general inquiries. Respond in the same language as the user. Be helpful, professional, and represent the brand voice: {{CLIENT_TONE}}.'\n\nBOT KNOWLEDGE BASE (inject in system prompt):\n- Main product/service: {{CLIENT_PRODUCT}}\n- USPs: {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}\n- CTA: Direct to {{CLIENT_CTA_PRIMARY}}\n- Contact: {{CLIENT_INSTAGRAM}}, {{CLIENT_LOCATION}}\n\nGEMINI CALL:\n```javascript\nconst response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key='+GEMINI_KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:fullPrompt}]}]})});\n```\n\nUI: Floating bubble (bottom-right), slide-up panel, message bubbles with typing indicator, {{CLIENT_COLORS}} accent.",
+      "sector_variants": {
+        "restaurant": "Menu inquiries, table booking, delivery info, opening hours.",
+        "ecommerce": "Product questions, sizing, shipping, returns, tracking.",
+        "saas": "Feature questions, pricing, onboarding, technical support.",
+        "real_estate": "Property inquiries, viewings, pricing, mortgage calculator."
+      }
+    },
+    {
+      "id": "tpl_011",
+      "name": "Landing Completa — Full Page",
+      "category": "landing_full",
+      "tags": ["landing", "full", "complete", "adaptive", "client"],
+      "description": "Complete single-page landing with all sections adapted to client DNA. The master template.",
+      "prompt": "Build a complete landing page for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}) in {{CLIENT_LOCATION}}.\n\nBRAND DNA:\n- Colors: {{CLIENT_COLORS}}\n- Font: {{CLIENT_FONT}}\n- Tone: {{CLIENT_TONE}}\n- Logo: {{CLIENT_LOGO_URL}}\n\nSECTIONS TO INCLUDE:\n1. NAV: Logo + nav links + CTA button\n2. HERO: Choose best hero type for {{CLIENT_SECTOR}}:\n   - Has video ({{CLIENT_VIDEO_URL}})? → Video hero with cinematic overlay\n   - Has 3D model ({{CLIENT_PRODUCT_URL}})? → Split hero with Three.js right panel\n   - Otherwise? → Bold text hero with gradient mesh background\n3. SERVICES: 3-4 service cards with icons, {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}}\n4. ABOUT/STORY: Image + text block, brand story\n5. SOCIAL PROOF: Testimonials with photos, star ratings, client names\n6. CTA SECTION: Dark gradient band, '{{CLIENT_CTA_PRIMARY}}' button\n7. FOOTER: Logo, links, {{CLIENT_INSTAGRAM}}, location, copyright\n\nAll content must use REAL {{CLIENT_NAME}} information. No lorem ipsum. No placeholders.",
+      "sector_variants": {
+        "restaurant": "Add: Menu preview, reservation form, hours/location map, Instagram feed strip.",
+        "saas": "Add: Pricing table, feature comparison, integration logos, free trial CTA.",
+        "agency": "Add: Portfolio grid with hover effects, team section, process timeline.",
+        "ecommerce": "Add: Featured products, discount banner, size guide, reviews.",
+        "gym": "Add: Class schedule, transformation photos, trainer profiles, membership pricing.",
+        "hotel": "Add: Room gallery, amenities grid, booking widget, local attractions."
+      }
+    },
+    {
+      "id": "tpl_012",
+      "name": "Scroll Storytelling — Narrative Sections",
+      "category": "scroll_3d",
+      "tags": ["scroll", "narrative", "pinned", "chapters", "apple"],
+      "description": "Apple-style scroll narrative with 5 act structure, pinned camera, and GLB model reactions.",
+      "prompt": "Build an Apple-style scroll narrative for {{CLIENT_NAME}} featuring {{CLIENT_PRODUCT}}.\n\nNARRATIVE STRUCTURE (600vh total):\n- Act 1 (0-20%): {{CLIENT_PRODUCT}} enters frame, camera far → zoom in. Text: '{{CLIENT_USP_1}}'\n- Act 2 (20-40%): Camera orbits left, model detail reveal. Text: '{{CLIENT_USP_2}}'\n- Act 3 (40-60%): Camera rises, product scale up. Text: '{{CLIENT_USP_3}}'\n- Act 4 (60-80%): Explode view / feature callouts. Text: key specs\n- Act 5 (80-100%): CTA finale. Text: '{{CLIENT_CTA_PRIMARY}}'\n\nThree.js setup:\n- Load GLB: {{CLIENT_PRODUCT_URL}}\n- RoomEnvironment + PMREMGenerator + ACESFilmicToneMapping\n- EffectComposer + UnrealBloom\n- AnimationMixer if model has animations\n- Camera lerp state machine between acts\n\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "watch": "Watch mechanism reveal. Focus on craftsmanship.",
+        "phone": "Feature reveal like iPhone announcement.",
+        "car": "Vehicle exterior → interior → engine → driving experience.",
+        "perfume": "Bottle reveal → ingredients → mood → lifestyle."
+      }
+    },
+    {
+      "id": "tpl_013",
+      "name": "Aurora / FBM Background Hero",
+      "category": "effects_shaders",
+      "tags": ["aurora", "shader", "background", "glsl", "webgl"],
+      "description": "Full-screen aurora borealis or FBM fluid background shader as hero section.",
+      "prompt": "Build an aurora/fluid GLSL background hero for {{CLIENT_NAME}}.\n\nAURORA SHADER (Three.js OrthographicCamera):\n```glsl\nfor(int i=0;i<5;i++){\n  float fi=float(i);\n  vec2 uv2=uv+vec2(0.,fbm(uv*1.4+uTime*(0.07+fi*.015)+fi*2.3)-.5)*.3;\n  float y=uv2.y-(.3+fi*.07);\n  float stripe=smoothstep(.025,.0,abs(y+sin(uv2.x*3.+uTime*.5+fi)*0.12));\n  vec3 rc=mix(vec3(.1,.9,.5),vec3(.05,.3,.95),fi/4.5);\n  col+=rc*stripe*(1.2-fi*.15)*2.5;\n}\n```\nADAPT COLORS to {{CLIENT_COLORS}}:\n- Replace vec3(.1,.9,.5) with client primary\n- Replace vec3(.05,.3,.95) with client secondary\n\nCENTER CONTENT:\n- Headline: {{CLIENT_HERO_HEADLINE}}\n- Subline: {{CLIENT_TAGLINE}}\n- CTA: {{CLIENT_CTA_PRIMARY}}\n\nDesign: {{CLIENT_FONT}}, {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "spa": "Soft aurora in lavender and teal. Calm, meditative.",
+        "nightclub": "Aggressive neon aurora. Purple, pink, electric.",
+        "tech": "Cool blue-purple aurora. Clean and futuristic.",
+        "nature": "Green aurora. Earth tones mixed in."
+      }
+    },
+    {
+      "id": "tpl_014",
+      "name": "Magnetic Cursor + Interactive Cards",
+      "category": "effects_ui",
+      "tags": ["cursor", "magnetic", "tilt", "hover", "interactive"],
+      "description": "Custom cursor with states + magnetic buttons + 3D tilt cards for premium agency/portfolio sites.",
+      "prompt": "Build a magnetic cursor and interactive card section for {{CLIENT_NAME}}.\n\nCUSTOM CURSOR:\n- Dot: 10px, color {{CLIENT_COLORS}} primary\n- Ring: 40px, border, lags at lerp 0.12\n- States: hover (scale 2.5x), drag (square), text (caret), hidden\n\nMAGNETIC BUTTONS:\n- On mousemove within 80px: btn.translate(dx*.35, dy*.35)\n- Text inner: translate(dx*.55, dy*.55) — stronger for depth\n- On mouseleave: GSAP back.out(2.5) spring\n- Buttons: '{{CLIENT_CTA_PRIMARY}}', '{{CLIENT_CTA_SECONDARY}}', and key nav items\n\n3D TILT CARDS (6 cards):\n- Product images or work portfolio: {{CLIENT_PRODUCT_URL}}\n- rotateX = -(mouseY/h-.5)*20deg, rotateY = (mouseX/w-.5)*20deg\n- Radial shine follows mouse\n\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "agency": "Tilt cards show portfolio projects.",
+        "ecommerce": "Tilt cards show products with price tag.",
+        "portfolio": "Tilt cards show work samples.",
+        "events": "Tilt cards show event photos."
+      }
+    },
+    {
+      "id": "tpl_015",
+      "name": "TikTok / Viral Video Script + Visual Brief",
+      "category": "content_video",
+      "tags": ["tiktok", "viral", "video", "script", "social"],
+      "description": "Generate 3 viral TikTok video concepts with scripts, visual directions, and trend analysis for any client.",
+      "prompt": "Generate 3 viral TikTok video concepts for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}) in {{CLIENT_LOCATION}}.\n\nBRAND DNA: {{CLIENT_TONE}} tone, {{CLIENT_COLORS}} visual palette, target: [describe audience from DNA].\n\nFor EACH video provide:\n1. HOOK (first 3 seconds): what stops the scroll\n2. TREND REFERENCE: which current TikTok trend/audio to leverage\n3. VISUAL DIRECTION: shot list, transitions, text overlays\n4. SCRIPT (15-30 seconds): word-for-word dialogue or narration\n5. CTA: what action to drive (follow, click link, comment)\n6. HASHTAGS: 10 relevant hashtags\n7. VIRALIDAD SCORE: 1-10 estimated viral potential + reasoning\n\nVideo 1: Education/Value content ('did you know {{CLIENT_SECTOR}} ...')\nVideo 2: Behind-the-scenes / process reveal for {{CLIENT_PRODUCT}}\nVideo 3: Trending challenge or duet format adapted to {{CLIENT_NAME}}\n\nAll content must reflect {{CLIENT_NAME}}'s real products and values. No generic content.",
+      "sector_variants": {
+        "restaurant": "Food ASMR, cooking process, menu reveal, kitchen tour.",
+        "fitness": "Transformation story, workout demo, nutrition tips.",
+        "fashion": "Outfit transitions, styling tips, fabric quality.",
+        "service": "Client result before/after, process reveal, testimonial."
+      }
+    },
+    {
+      "id": "tpl_016",
+      "name": "Data Dashboard — Animated Analytics",
+      "category": "landing_ui",
+      "tags": ["dashboard", "charts", "analytics", "svg", "canvas"],
+      "description": "Animated data visualization dashboard with live charts, KPI cards, and real-looking metrics.",
+      "prompt": "Build an animated analytics dashboard section for {{CLIENT_NAME}}.\n\nKPI CARDS (4): adapt these metrics to {{CLIENT_SECTOR}}:\n- Revenue/GMV: animated counter with trend sparkline\n- Main KPI 2 (users/bookings/visits): counter + trend\n- Performance metric: conversion/satisfaction/uptime %\n- Growth metric: MoM change\n\nCHARTS:\n1. SVG Line Chart: 12-month trend. stroke-dashoffset animation on scroll enter. Area fill gradient.\n2. Bar Chart: channel breakdown. scaleY 0→final on scroll.\n3. Donut Chart: CSS conic-gradient animated on scroll.\n\nAll data must look REAL and plausible for {{CLIENT_SECTOR}} at {{CLIENT_LOCATION}} scale.\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, dark glassmorphism cards.",
+      "sector_variants": {
+        "ecommerce": "Revenue, orders, cart abandonment, top products.",
+        "saas": "MRR, churn, DAU, NPS score.",
+        "restaurant": "Covers, revenue per seat, avg ticket, reviews.",
+        "social_media": "Followers, reach, engagement, conversions."
+      }
+    },
+    {
+      "id": "tpl_017",
+      "name": "Instagram-Ready Post Generator",
+      "category": "content_social",
+      "tags": ["instagram", "social", "copy", "visual", "post"],
+      "description": "Generate complete Instagram post suite (caption + visual brief + hashtags) adapted to brand DNA.",
+      "prompt": "Generate a complete Instagram post suite for {{CLIENT_NAME}} ({{CLIENT_INSTAGRAM}}).\n\nBRAND DNA: {{CLIENT_TONE}} voice, {{CLIENT_COLORS}} visual identity, sector: {{CLIENT_SECTOR}}.\n\nCreate 5 ready-to-post Instagram posts:\n\n1. PRODUCT HERO POST\n   - Visual: {{CLIENT_PRODUCT}} on clean background\n   - Caption (150 chars): highlight {{CLIENT_USP_1}}\n   - 30 hashtags in comment\n\n2. BEHIND THE SCENES\n   - Visual: process/team/workspace\n   - Caption: storytelling format\n   - Hashtags: brand + process focused\n\n3. CLIENT TESTIMONIAL\n   - Visual: quote card with {{CLIENT_COLORS}}\n   - Caption: introduce the testimonial\n\n4. EDUCATIONAL/VALUE POST\n   - Visual: infographic or tip card\n   - Caption: hook + value + CTA\n\n5. PROMOTIONAL\n   - Visual: {{CLIENT_CTA_PRIMARY}} offer visual\n   - Caption: urgency + CTA to {{CLIENT_INSTAGRAM}}\n\nAll copy in the language of {{CLIENT_LOCATION}}. Match {{CLIENT_TONE}} voice exactly.",
+      "sector_variants": {
+        "restaurant": "Food photography, chef stories, daily specials, recipes.",
+        "fitness": "Transformation stories, workout videos, nutrition tips.",
+        "luxury": "Product details, craftsmanship, lifestyle photography.",
+        "service": "Client results, process, team expertise, testimonials."
+      }
+    },
+    {
+      "id": "tpl_018",
+      "name": "Gradient Mesh Animated Background",
+      "category": "effects_backgrounds",
+      "tags": ["gradient", "mesh", "animated", "css", "background"],
+      "description": "Multi-layer animated CSS gradient mesh background for hero sections.",
+      "prompt": "Build an animated gradient mesh background hero for {{CLIENT_NAME}}.\n\nCSS GRADIENT MESH (adapt colors to {{CLIENT_COLORS}}):\n```css\n#g1{background:radial-gradient(ellipse 70% 60% at 20% 20%,rgba(PRIMARY,.75),transparent);animation:g1 8s ease-in-out infinite}\n#g2{background:radial-gradient(ellipse 60% 50% at 80% 80%,rgba(SECONDARY,.65),transparent);animation:g2 10s ease-in-out infinite}\n#g3{background:radial-gradient(ellipse 50% 70% at 50% 50%,rgba(ACCENT,.5),transparent);animation:g3 12s ease-in-out infinite}\n#g4{background:radial-gradient(ellipse 40% 40% at 10% 70%,rgba(ACCENT2,.45),transparent);animation:g1 14s ease-in-out infinite reverse}\n```\n\nNOISE OVERLAY: Canvas 512×512 with random pixels at 4% opacity.\nVIGNETTE: radial-gradient dark at edges.\n\nCONTENT:\n- Headline: {{CLIENT_HERO_HEADLINE}}\n- Subline: {{CLIENT_TAGLINE}}\n- CTA: {{CLIENT_CTA_PRIMARY}}\n\nDesign: {{CLIENT_FONT}}, {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "spa": "Soft lavender + teal + rose gradients.",
+        "tech": "Deep blue + electric cyan + purple.",
+        "agency": "Bold violet + hot pink + indigo.",
+        "nature": "Forest green + earth brown + sky blue."
+      }
+    },
+    {
+      "id": "tpl_019",
+      "name": "Page Transitions — Curtain/Iris/Wipe",
+      "category": "effects_transitions",
+      "tags": ["transitions", "page", "curtain", "wipe", "gsap"],
+      "description": "Premium page transition effects (curtain, iris, wipe, pixel dissolve) for multi-page sites.",
+      "prompt": "Add premium page transition effects to {{CLIENT_NAME}}'s website.\n\nIMPLEMENT ALL 4 TRANSITIONS:\n1. CURTAIN SPLIT: Left+right panels close (translateX 0), hold 0.3s, open\n2. GRADIENT WIPE: Full-screen {{CLIENT_COLORS}} gradient scaleX left→right, then right→left\n3. IRIS OPEN: Circle expands from click point to fullscreen, then collapses\n4. PIXEL DISSOLVE: 20×12 grid of squares fills/clears randomly\n\nUSAGE: Trigger on all <a href> navigation links\n```javascript\ndocument.querySelectorAll('a[href]').forEach(link=>{\n  link.addEventListener('click',e=>{\n    e.preventDefault();\n    const href=link.getAttribute('href');\n    runTransition(PREFERRED_TYPE,()=>window.location.href=href);\n  });\n});\n```\n\nPage Enter: matching reveal animation when new page loads\n\nDesign: overlay uses {{CLIENT_COLORS}} for the transition color.",
+      "sector_variants": {
+        "luxury": "Elegant curtain or iris. Slow, deliberate.",
+        "tech": "Fast pixel dissolve or wipe. Efficient.",
+        "creative": "Glitch or paint-drip transition. Expressive.",
+        "corporate": "Simple fade or slide. Professional."
+      }
+    },
+    {
+      "id": "tpl_020",
+      "name": "Pricing Table — Animated",
+      "category": "landing_ui",
+      "tags": ["pricing", "table", "toggle", "cards", "cta"],
+      "description": "Animated pricing section with monthly/annual toggle, feature comparison, and highlighted recommended plan.",
+      "prompt": "Build an animated pricing section for {{CLIENT_NAME}}.\n\nPRICING TIERS: Define 3 tiers appropriate for {{CLIENT_SECTOR}}:\n- Starter/Basic: entry level\n- Pro/Growth: recommended (highlighted with gradient border)\n- Enterprise/Custom: contact sales\n\nFEATURES: Use REAL features of {{CLIENT_PRODUCT}} / {{CLIENT_NAME}}'s services.\n\nTOGGLE (monthly/annual):\n- GSAP back.out(2) animation on price change\n- Annual shows 20% savings badge\n- Smooth number transition\n\nCTA: Each tier: '{{CLIENT_CTA_PRIMARY}}' (or 'Contact Sales' for Enterprise)\n\nBELOW PRICING: Feature comparison table. Real features, not lorem.\n\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, {{CLIENT_TONE}}, dark theme.",
+      "sector_variants": {
+        "saas": "Free/Pro/Team/Enterprise tiers. Feature flags matrix.",
+        "agency": "Starter/Growth/Agency/White-label packages.",
+        "subscription": "Monthly subscription with feature unlocks.",
+        "service": "Project-based pricing with scope inclusions."
+      }
+    },
+    {
+      "id": "tpl_021",
+      "name": "Instagram/Social Media Feed Section",
+      "category": "landing_social",
+      "tags": ["instagram", "feed", "masonry", "social", "gallery"],
+      "description": "Embedded Instagram-style feed section showing real client social content.",
+      "prompt": "Build an Instagram feed section for {{CLIENT_NAME}} ({{CLIENT_INSTAGRAM}}).\n\nFEED GRID: 6-9 images in CSS masonry grid (3 columns)\nImages: use real {{CLIENT_NAME}} content from {{CLIENT_INSTAGRAM}} (or placeholders with specific Unsplash URLs matching {{CLIENT_SECTOR}})\nHover: overlay with likes/comments count + Instagram icon\nClick: lightbox with GSAP flip animation\n\nFOLLOW CTA: '@{{CLIENT_INSTAGRAM}}' button linking to profile\nSECTION HEADER: 'Follow our journey'\n\nFor image sourcing:\n- If website URL provided: attempt to extract OG images\n- Otherwise: use Unsplash images matching {{CLIENT_SECTOR}} aesthetic\n- Tag images with {{CLIENT_COLORS}} filter overlay\n\nDesign: {{CLIENT_FONT}}, {{CLIENT_TONE}}, matches brand palette.",
+      "sector_variants": {
+        "food": "Food shots, plating, team, atmosphere.",
+        "fashion": "Products, lookbooks, behind-the-scenes, customers.",
+        "fitness": "Training, transformations, events, products.",
+        "travel": "Destinations, experiences, testimonials."
+      }
+    },
+    {
+      "id": "tpl_022",
+      "name": "Testimonials & Social Proof",
+      "category": "landing_social_proof",
+      "tags": ["testimonials", "reviews", "marquee", "social_proof"],
+      "description": "Marquee testimonials with real client quotes, star ratings, and company logos.",
+      "prompt": "Build a testimonials and social proof section for {{CLIENT_NAME}}.\n\nSECTION 1 — Marquee Reviews (double row, opposite directions):\n- Row 1: scrolls left at 40s\n- Row 2: scrolls right at 50s\n- Each card: avatar + name + company + 5 stars + real quote\n- Use REAL testimonials from {{CLIENT_NAME}} or generate plausible ones for {{CLIENT_SECTOR}}\n\nSECTION 2 — Featured Testimonial:\n- Large quote in 1.5rem\n- Attribution: Name, Title, Company\n- Real photo (or Unsplash portrait)\n\nSECTION 3 — Logos Strip:\n- Client/partner logos (or industry associations)\n- Grayscale with hover → color\n\nSECTION 4 — Stats:\n- 4 animated counters: Reviews count, Average rating, Years in business, Clients served\n\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "b2b": "Focus on company names and ROI metrics.",
+        "b2c": "Real people photos, emotional quotes, product focus.",
+        "local": "Google Maps stars, local names, neighborhood mentions.",
+        "digital": "Screenshot-style review cards, platform badges."
+      }
+    },
+    {
+      "id": "tpl_023",
+      "name": "FAQ Section — Animated Accordion",
+      "category": "landing_ui",
+      "tags": ["faq", "accordion", "questions", "landing"],
+      "description": "FAQ accordion section with smooth animations and real questions for the client's business.",
+      "prompt": "Build an FAQ accordion section for {{CLIENT_NAME}} ({{CLIENT_SECTOR}}).\n\nGENERATE 8-10 REAL FAQ questions appropriate for {{CLIENT_SECTOR}}. Examples:\n- Pricing/payment questions\n- Product/service questions\n- Delivery/timeline questions\n- Technical/compatibility questions\n- Return/refund/cancellation\n- How to get started\n- What makes {{CLIENT_NAME}} different\n- Contact/support\n\nANIMATION:\n```javascript\nconst ans = item.querySelector('.faq-ans');\nconst isOpen = item.classList.contains('open');\ngsap.to(ans,{height:isOpen?0:ans.scrollHeight,opacity:isOpen?0:1,duration:.4,ease:'cubic.inOut'});\n```\nRotating chevron: 0→45deg on open\n\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, {{CLIENT_TONE}}, dark theme. Search bar above to filter questions.",
+      "sector_variants": {
+        "ecommerce": "Shipping, returns, sizing, payment methods.",
+        "saas": "Features, integrations, security, pricing, cancellation.",
+        "service": "Process, timeline, revisions, communication, payment.",
+        "restaurant": "Reservations, dietary options, events, delivery."
+      }
+    },
+    {
+      "id": "tpl_024",
+      "name": "Footer — Complete with Social Icons",
+      "category": "landing_sections",
+      "tags": ["footer", "social", "links", "contact", "cta"],
+      "description": "Complete footer with social media icons, navigation links, contact info, and newsletter.",
+      "prompt": "Build a complete footer for {{CLIENT_NAME}}.\n\nLAYOUT (4 columns):\n1. Brand: Logo, tagline '{{CLIENT_TAGLINE}}', social icons\n2. Navigation: main site links\n3. Services: {{CLIENT_USP_1}}, {{CLIENT_USP_2}}, {{CLIENT_USP_3}} + others\n4. Contact: {{CLIENT_LOCATION}}, email, phone\n\nSOCIAL ICONS (SVG icons, real links):\n- Instagram: {{CLIENT_INSTAGRAM}}\n- Facebook, TikTok, LinkedIn, Twitter/X (include whichever are relevant for {{CLIENT_SECTOR}})\n- Each: 40px circle with border, hover = gradient fill\n\nNEWSLETTER: Email input + '{{CLIENT_CTA_SECONDARY}}' button\n\nBOTTOM BAR: Copyright © 2025 {{CLIENT_NAME}} · Privacy · Terms · Cookies\n\nDesign: {{CLIENT_COLORS}}, {{CLIENT_FONT}}, {{CLIENT_TONE}}.",
+      "sector_variants": {
+        "restaurant": "Add: Hours, reservation link, delivery platforms.",
+        "ecommerce": "Add: Payment method icons, secure badges.",
+        "saas": "Add: Status page link, documentation, API.",
+        "service": "Add: Calendly booking link, Trustpilot badge."
+      }
+    }
+  ]
+}

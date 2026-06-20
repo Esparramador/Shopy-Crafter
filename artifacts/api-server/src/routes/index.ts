@@ -68,7 +68,6 @@ import designSystemsRouter from "./design-systems.js";
 import pluginsRouter from "./plugins.js";
 import hyperframesRouter from "./hyperframes.js";
 import studioRouter from "./studio.js";
-
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();

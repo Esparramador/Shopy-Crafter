@@ -1,0 +1,63 @@
+¡Te explicas a la perfección! Lo que buscas es el "Santo Grial" de la generación de vídeo con IA: un efecto de Exploded View (Vista Explosionada) hiperrealista, donde las piezas flotan, se separan y se ensamblan con una precisión quirúrgica, como si fuera un render 3D de estudio de millones de dólares, pero generado uniendo clips cortos de manera indetectable.
+
+Para lograr esto y que no parezcan "vídeos pegados", te voy a dar una dosis de realidad técnica (candor): No puedes lanzar los prompts en paralelo solo con texto si quieres una coherencia matemática frame a frame. Las IAs de vídeo actuales alucinan variaciones microscópicas.
+
+El secreto de los estudios top para hacer esto es la técnica "Last Frame = First Frame" (Image-to-Video). Generas el Clip 1 (0-2s), extraes el último fotograma exacto, y lo usas como imagen de inicio para el Clip 2 (2-4s).
+
+Aquí tienes la Secuencia de Prompts Masterclass (diseñada para exprimir al máximo motores visuales avanzados, basándonos en la estructura de prompts técnicos de herramientas de vanguardia).
+
+Vamos a usar como ejemplo un Reloj Mecánico Premium, ya que es perfecto para el efecto de ensamblaje/desensamblaje.
+
+REGLAS GLOBALES (El "ADN" que debes pegar al final de cada prompt)
+Para mantener la coherencia de iluminación y textura en todos los clips, este bloque debe ir SIEMPRE al final de cada petición:
+
+Cinematic lighting, 8k resolution, photorealistic, octane render style, macro probe lens, ultra-detailed metallic textures, dramatic volumetric shadows, deep depth of field, black studio background. Exact spatial consistency.
+
+SECUENCIA 1: DECONSTRUCCIÓN (DISASSEMBLED)
+CLIP 1: El Arranque (Segundos 0.0 a 2.0)
+
+Técnica: Text-to-Video o Image-to-Video (con tu foto del producto).
+
+Prompt:
+
+Macro extreme close-up of a luxury mechanical watch. The camera slowly tracks forward seamlessly. Suddenly, the front glass screen elegantly detaches and floats exactly 2 inches upwards in slow motion. The metal bezel starts to unscrew autonomously. Fluid, hyper-smooth motion. No morphing. [REGLAS GLOBALES]
+
+CLIP 2: La Explosión Controlada (Segundos 2.0 a 4.0)
+
+Técnica: Image-to-Video (Usa el ÚLTIMO FRAME del Clip 1 como imagen inicial).
+
+Prompt:
+
+Starting exactly from the provided image, the internal gears, springs, and titanium screws of the watch burst outward into a perfect 3D isometric exploded view. The components float in mid-air, suspended in zero gravity. The camera begins a slow, perfectly horizontal pan to the right. Micro-details of dust particles catching the light. [REGLAS GLOBALES]
+
+CLIP 3: El Cenit y la Rotación (Segundos 4.0 a 6.0)
+
+Técnica: Image-to-Video (ÚLTIMO FRAME del Clip 2).
+
+Prompt:
+
+Starting exactly from the provided image of floating watch components. The camera slowly orbits 15 degrees around the suspended, exploded mechanical parts. The gears are slowly spinning on their own axes while floating. The lighting shifts dynamically to reveal the brushed steel textures. Absolute structural stability, no pieces melting or morphing. [REGLAS GLOBALES]
+
+SECUENCIA 2: ENSAMBLAJE (ASSEMBLED)
+CLIP 4: El Magnetismo (Segundos 6.0 a 8.0)
+
+Técnica: Image-to-Video (ÚLTIMO FRAME del Clip 3).
+
+Prompt:
+
+Starting exactly from the provided image. Time-lapse effect. A strong magnetic force violently but precisely pulls the floating gears, screws, and watch hands back towards the center core. The pieces lock into their mechanical places with satisfying precision. Camera slowly zooms out. [REGLAS GLOBALES]
+
+CLIP 5: El Cierre Hermético (Segundos 8.0 a 10.0)
+
+Técnica: Image-to-Video (ÚLTIMO FRAME del Clip 4).
+
+Prompt:
+
+Starting exactly from the provided image. The outer titanium shell, bezel, and front glass snap forcefully back onto the main watch body. The watch is fully assembled and perfectly intact. A singular ray of dramatic studio light sweeps across the glass face reflecting perfectly. Camera locks into a static, triumphant product shot. [REGLAS GLOBALES]
+
+El "Truco del Almendruco" para la Edición Final:
+Cuando lleves estos 5 clips de 2 segundos a tu editor (Premiere, DaVinci Resolve, o tu plataforma), para asegurar que el corte quirúrgico sea perfecto:
+
+Aplica un Optical Flow (Flujo Óptico) o Morph Cut: Si hay un salto de 1 píxel entre el Clip 1 y el Clip 2 por culpa de la IA, una transición de interpolación de fotogramas (Optical Flow) de 2 fotogramas de duración disolverá cualquier micro-salto, haciendo que la transición sea literalmente invisible al ojo humano.
+
+Si prefieres trabajar "En Paralelo": Si no tienes tiempo de esperar a que termine el Clip 1 para sacar el fotograma, el truco es bloquear la cámara estática. Escribe STATIC LOCK-OFF CAMERA, zero camera movement en todos los prompts. De esta manera, el producto explota y se reensambla en el mismo eje exacto, y puedes fusionarlos por corte de opacidad.

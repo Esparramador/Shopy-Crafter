@@ -1,0 +1,19 @@
+{
+  "id": "image_gen",
+  "name": "Prompt para Imagen IA",
+  "description": "Prompt optimizado para DALL-E / Stable Diffusion",
+  "category": "image",
+  "prompt": "Crea un prompt para generación de imagen con IA para: {{descripcion_imagen}}. Estilo visual: {{estilo}}. Paleta de colores: {{colores}}. Ambiente/mood: {{mood}}. Incluye detalles técnicos de calidad (4K, fotorrealista, iluminación, composición).",
+  "variables": [
+    "{{descripcion_imagen}}",
+    "{{estilo}}",
+    "{{colores}}",
+    "{{mood}}"
+  ],
+  "tags": [
+    "imagen",
+    "dall-e",
+    "stable-diffusion",
+    "prompt"
+  ]
+}

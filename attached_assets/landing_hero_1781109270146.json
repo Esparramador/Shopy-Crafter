@@ -1,0 +1,19 @@
+{
+  "id": "landing_hero",
+  "name": "Landing Page Hero Section",
+  "description": "Crea el copy del hero de una landing page",
+  "category": "landing",
+  "prompt": "Crea el copy completo del hero section para una landing page de {{producto_o_servicio}} dirigido a {{audiencia_objetivo}}. Incluye: headline principal (max 8 palabras), subheadline (max 20 palabras), 3 bullet points de beneficios, y CTA. Tono: {{tono}}. Diferenciador clave: {{diferenciador}}.",
+  "variables": [
+    "{{producto_o_servicio}}",
+    "{{audiencia_objetivo}}",
+    "{{tono}}",
+    "{{diferenciador}}"
+  ],
+  "tags": [
+    "landing",
+    "copy",
+    "hero",
+    "conversion"
+  ]
+}

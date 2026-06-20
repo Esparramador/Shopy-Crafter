@@ -1,0 +1,142 @@
+# LearnFlow Design System
+
+## Overview
+
+LearnFlow is a bright, encouraging, and progress-driven design system built for online learning platforms and learning management systems. Every element is crafted to motivate learners, celebrate milestones, and make educational journeys feel rewarding. The visual language uses warm orange energy paired with trustworthy blue and success green to guide students from lesson to lesson with clarity and confidence.
+
+---
+
+## Colors
+
+- **Primary** (#F97316): Primary actions, CTAs
+- **Secondary** (#3B82F6): Links, informational UI
+- **Tertiary** (#22C55E): Success, completion, progress
+- **Surface Base** (#FFFFFF): Page background
+- **Success** (#22C55E): Correct answers, completion
+- **Warning** (#EAB308): Partial credit, caution
+- **Error** (#EF4444): Incorrect answers, errors
+- **Info** (#3B82F6): Hints, tips
+
+## Typography
+
+- **Headline Font**: Fredoka
+- **Body Font**: Poppins
+- **Mono Font**: Roboto Mono
+
+- **h1**: Fredoka 36px bold, 1.2 line height. Page titles.
+- **h2**: Fredoka 28px bold, 1.25 line height. Section headings.
+- **h3**: Fredoka 22px semibold, 1.3 line height. Subsection headings.
+- **h4**: Fredoka 18px semibold, 1.35 line height. Card titles.
+- **body**: Poppins 16px regular, 1.6 line height. Paragraph text.
+- **sm**: Poppins 14px regular, 1.5 line height. Captions, labels.
+- **xs**: Poppins 12px medium, 1.4 line height. Badges, timestamps.
+- **mono**: Roboto Mono 14px regular, 1.6 line height. Code snippets.
+
+---
+
+## Spacing
+
+Base unit: **8px**
+- **sp-1**: 4px — Inline icon gaps
+- **sp-2**: 8px — Tight padding, chip gaps
+- **sp-3**: 12px — Input padding
+- **sp-4**: 16px — Card inner padding
+- **sp-5**: 24px — Section gaps
+- **sp-6**: 32px — Card-to-card spacing
+- **sp-7**: 48px — Major section separation
+- **sp-8**: 64px — Page-level vertical rhythm
+
+## Border Radius
+
+- **radius-sm** (6px): Inputs, small elements
+- **radius-md** (12px): Cards, buttons, modals
+- **radius-lg** (16px): Feature cards, hero panels
+- **radius-pill** (9999px): Progress badges, tags
+- **radius-circle** (50%): Avatars, status indicators
+
+## Elevation (Material-Style)
+
+- **shadow-sm**: 1px offset, 2px blur, #000000 at 6%. Subtle lift.
+- **shadow-md**: 4px offset, 6px blur, -1px spread, #000000 at 10%. Cards, dropdowns.
+- **shadow-lg**: 10px offset, 15px blur, -3px spread, #000000 at 10%. Modals, popovers.
+- **shadow-xl**: 20px offset, 25px blur, -5px spread, #000000 at 10%. Hero sections.
+- **shadow-focus**: 3px ring #F97316 at 30%. Focus rings.
+
+## Components
+
+### Buttons
+#### Variants
+- **Primary**: #F97316 fill, #FFFFFF text, no border. Hover: #EA580C.
+- **Secondary**: #FFFFFF fill, #F97316 text, 1px #F97316 border. Hover: #FFF7ED.
+- **Ghost**: transparent fill, #F97316 text, no border. Hover: #FFF7ED.
+- **Destructive**: #EF4444 fill, #FFFFFF text, no border. Hover: #DC2626.
+#### Sizes
+Sizes: Small (6px 12px, 14px, 12px), Medium (10px 20px, 16px, 12px), Large (14px 28px, 18px, 12px).
+#### Disabled State
+0.5 opacity, disabled cursor.
+- No hover/focus effects
+
+### Cards
+#FFFFFF fill, 1px #E5E7EB border, 12px radius, 24px padding, shadow-md shadow, shadow-lg hover shadow, box-shadow 0.2s ease transition.
+Variants: **Lesson Card** (with progress bar), **Course Card** (with thumbnail + badge), **Stat Card** (centered metric).
+
+### Inputs
+- **Default**: #D1D5DB border color, #FFFFFF fill, no shadow.
+- **Hover**: #9CA3AF border color, #FFFFFF fill, no shadow.
+- **Focus**: #F97316 border color, #FFFFFF fill, shadow-focus shadow.
+- **Error**: #EF4444 border color, #FEF2F2 fill, 3px ring #EF4444 at 20% shadow.
+- **Disabled**: #E5E7EB border color, #F9FAFB fill, no shadow.
+6px corners. Poppins 16px. 12px/16px padding.
+
+### Chips
+#### Filter Chips
+- **Default**: #F3F4F6 fill, #4B5563 text, 1px #E5E7EB border.
+- **Selected**: #FFF7ED fill, #F97316 text, 1px #F97316 border.
+- **Hover**: #E5E7EB fill, #4B5563 text, 1px #D1D5DB border.
+#### Status Chips
+- **Completed**: #BBF7D0 fill, #15803D text.
+- **In Progress**: #FED7AA fill, #C2410C text.
+- **Not Started**: #F3F4F6 fill, #6B7280 text.
+- **Locked**: #E5E7EB fill, #9CA3AF text.
+radius-pill corners. 4px/12px padding, 12px, weight 500 font size.
+
+### Lists
+12px 16px row padding, 1px #F3F4F6 divider, #F9FAFB hover background, #FFF7ED active background, 3px left border #F97316 active indicator, 16px font size.
+Variants: **Lesson List** (numbered with completion checkmark), **Module List** (collapsible, indented children).
+
+### Checkboxes
+- **Unchecked**: #D1D5DB border, #FFFFFF fill.
+- **Checked**: #F97316 border, #F97316 fill, #FFFFFF checkmark.
+- **Indeterminate**: #F97316 border, #F97316 fill, #FFFFFF checkmark.
+- **Disabled**: #E5E7EB border, #F3F4F6 fill, #9CA3AF checkmark.
+20px, 4px corners. background 0.15s ease` transition.
+
+### Radio Buttons
+- **Unselected**: #D1D5DB outer border, #FFFFFF fill.
+- **Selected**: #F97316 outer border, #F97316 fill, #FFFFFF fill.
+- **Hover**: #F97316 outer border, #FFF7ED fill.
+- **Disabled**: #E5E7EB outer border, #D1D5DB fill, #F3F4F6 fill.
+20px. 10px inner dot, circle shape.
+
+### Tooltips
+#111827 fill, #FFFFFF text, 13px font size, 8px 12px padding, 8px radius, 240px max width, 6px triangle arrow, 300ms show, 100ms hide delay, shadow-md shadow.
+---
+
+## Do's and Don'ts
+
+### Do's
+
+1. **Make progress visible everywhere** -- show completion percentages, progress bars, and step indicators prominently on every learning screen.
+2. **Celebrate milestones** -- use confetti animations, success modals, and badge unlocks when learners complete lessons, modules, or courses.
+3. **Use gamification cues** -- streak counters, XP points, and leaderboard positions to sustain motivation.
+4. **Keep content accessible** -- ensure all video has captions, all images have alt text, and content meets WCAG 2.1 AA contrast standards.
+5. **Provide clear navigation breadcrumbs** -- learners should always know where they are in a course hierarchy.
+
+### Don'ts
+
+1. **Don't hide the next step** -- always surface a clear "Continue" or "Next Lesson" action so learners maintain momentum.
+2. **Don't use red for incomplete items** -- incomplete is a neutral state, not an error; use gray or muted tones instead.
+3. **Don't overwhelm with options** -- present one clear learning path; save branching for advanced settings.
+4. **Don't auto-play video without consent** -- respect learner control; always start videos paused.
+5. **Don't make assessments feel punishing** -- frame incorrect answers as learning opportunities with encouraging language.
+6. **Don't neglect mobile layouts** -- most learners access content on phones; ensure all components scale gracefully.

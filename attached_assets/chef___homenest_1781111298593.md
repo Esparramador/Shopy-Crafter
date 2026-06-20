@@ -1,0 +1,134 @@
+# HomeNest Design System
+
+## Overview
+
+HomeNest is a warm, aspirational design system that evokes the feeling of finding your dream home. Built for residential real estate and home buying platforms, it uses earthy warm browns, sage greens, and creamy backgrounds to create an inviting, trustworthy aesthetic. The approachable serif headlines paired with friendly body text make every listing feel personal and welcoming.
+
+---
+
+## Colors
+
+- **Primary Warm Brown** (#92400E): Primary actions, key accents
+- **Secondary Sage** (#84CC16): Secondary actions, tags
+- **Tertiary Cream** (#FEF3C7): Highlights, background fills
+- **Background** (#FEF3C7): Page background
+- **Surface Default** (#FFFBEB): Card backgrounds
+- **Success** (#16A34A): Available, just listed
+- **Warning** (#D97706): Price change, pending
+- **Error** (#DC2626): Sold, off-market, errors
+- **Info** (#0284C7): Open house, virtual tour
+
+## Typography
+
+- **Headline Font**: Alike
+- **Body Font**: Nunito
+- **Mono Font**: Source Code Pro
+
+- **Display**: Alike 36px regular, 1.2 line height
+- **H1**: Alike 30px regular, 1.25 line height
+- **H2**: Alike 24px regular, 1.3 line height
+- **H3**: Alike 20px regular, 1.35 line height
+- **H4**: Alike 16px regular, 1.4 line height
+- **Body LG**: Nunito 18px regular, 1.65 line height
+- **Body**: Nunito 16px regular, 1.65 line height
+- **Body SM**: Nunito 14px regular, 1.5 line height
+- **Caption**: Nunito 12px semibold, 1.4 line height
+- **Code**: Source Code Pro 14px regular, 1.6 line height
+
+---
+
+## Spacing
+
+Base unit: **8px**
+- **xs**: 4px — Inline icon gaps
+- **sm**: 8px — Tight component padding
+- **md**: 16px — Default padding
+- **lg**: 24px — Card padding, section gaps
+- **xl**: 32px — Layout gaps
+- **2xl**: 48px — Major layout sections
+- **3xl**: 64px — Page-level spacing
+
+## Border Radius
+
+- **sm** (4px): Chips, small badges
+- **DEFAULT** (8px): Buttons, cards, inputs
+- **md** (12px): Modals, large containers
+- **lg** (16px): Image galleries
+- **full** (9999px): Avatars, agent photos
+
+## Elevation
+
+Subtle, warm-toned shadows that reinforce the cozy aesthetic.
+- **sm**: 1px offset, 3px blur, #92400E at 6%. Buttons, chips.
+- **DEFAULT**: 2px offset, 8px blur, #92400E at 8%. Cards, dropdowns.
+- **md**: 4px offset, 16px blur, #92400E at 10%. Elevated cards.
+- **lg**: 8px offset, 32px blur, #92400E at 14%. Modals, lightboxes.
+
+## Components
+
+### Buttons
+#### Variants
+- **Primary**: #92400E fill, #FFFFFF text, no border, #78350F fill.
+- **Secondary**: transparent fill, #92400E text, 1px #92400E border, #92400E0C fill.
+- **Ghost**: transparent fill, #1C1917 text, no border, #F5F5F4 fill.
+- **Destructive**: #DC2626 fill, #FFFFFF text, no border, #B91C1C fill.
+#### Sizes
+Sizes: sm (6px 14px, 14px, 34px), md (8px 20px, 16px, 42px), lg (12px 28px, 18px, 50px).
+#### Disabled State
+0.5 opacity.
+- disabled cursor
+- No hover or focus transitions
+---
+
+### Cards
+- **Default**: #FFFBEB fill, 1px #E7E5E4 border, sm shadow, 8px radius.
+- **Elevated**: #FFFFFF fill, no border, md shadow, 8px radius.
+** 20px **padding, ** top slot, border-radius 8px 8px 0 0, aspect ratio 4:3 **image area, ** absolute top-right 12px, heart outline #92400E, filled on active **favorite icon.
+---
+
+### Inputs
+- **Default**: 1px #E7E5E4 border, #FFFFFF fill, no shadow.
+- **Hover**: 1px #92400E border, #FFFFFF fill, no shadow.
+- **Focus**: 2px #92400E border, #FFFFFF fill, 3px ring #92400E20 shadow.
+- **Error**: 2px #DC2626 border, #FFFFFF fill, 3px ring #DC262620 shadow.
+- **Disabled**: 1px #E7E5E4 border, #F5F5F4 fill, no shadow.
+** 42px | **Padding:** 10px 14px | **Radius:** 8px **height, ** Nunito 14px/600, color #1C1917, bottom margin 6px **label, ** Nunito 12px/400, color #78716C, top margin 4px **helper text, ** Nunito 12px/400, color #DC2626, top margin 4px **error text.
+---
+
+### Chips
+- **Filter**: #FFFBEB fill, #1C1917 text, 1px #E7E5E4 border.
+- **Filter Active**: #92400E fill, #FFFFFF text, no border.
+- **Status Success**: #16A34A18 fill, #16A34A text, no border.
+- **Status Warning**: #D9770618 fill, #D97706 text, no border.
+- **Status Error**: #DC262618 fill, #DC2626 text, no border.
+** 6px 14px | **Radius:** 4px | **Font:** 12px/600 **padding.
+---
+
+### Lists
+** 52px **row height, ** 10px 16px **padding, ** 1px #F5F5F4 **divider, ** #FEF3C720 **hover background, ** #92400E08 **active background, ** Nunito 16px/400 for label, 14px/400 #78716C for description **font, ** 44px x 44px, radius 8px, 12px right margin **leading thumbnail.
+---
+
+### Checkboxes
+** 20px x 20px | **Radius:** 4px **size, ** border 2px #D6D3D1, background #FFFFFF **unchecked, ** background #92400E, border none, checkmark #FFFFFF **checked, ** background #92400E, dash #FFFFFF **indeterminate, ** 50% opacity, disabled cursor **disabled, ** 8px left of label text **label spacing.
+---
+
+### Radio Buttons
+** 20px x 20px | **Radius:** full (circle) **size, ** border 2px #D6D3D1, background #FFFFFF **unchecked, ** border 2px #92400E, inner dot 10px #92400E **selected, ** 50% opacity, disabled cursor **disabled, ** 8px left of label text **label spacing.
+---
+
+### Tooltips
+** #1C1917 **background, ** #FFFBEB, Nunito 12px/400 **text, ** 6px 12px | **Radius:** 8px **padding, ** 6px triangle matching background **arrow, ** 240px **max width, ** 200ms show, 0ms hide **delay.
+---
+
+## Do's and Don'ts
+
+1. **Do** use warm, lifestyle photography that evokes the feeling of home -- avoid sterile staging shots.
+2. **Do** keep the Cream background (#FEF3C7) as the dominant base; it defines the HomeNest warmth.
+3. **Do** use Alike serif for headlines to maintain an inviting, editorial character.
+4. **Don't** use harsh, high-contrast color combinations that clash with the warm palette.
+5. **Don't** overcrowd listing cards with data; highlight price, beds, baths, and a key feature.
+6. **Do** include agent photos with full-round avatars to humanize the experience.
+7. **Don't** use sharp, clinical UI patterns; soften with 8px radius and warm shadows.
+8. **Do** use Sage green (#84CC16) sparingly for positive-sentiment elements like new listings.
+9. **Don't** auto-play video tours; let users opt in to immersive content.
+10. **Do** ensure mortgage calculator and cost breakdowns use the Mono font (Source Code Pro) for clarity.
