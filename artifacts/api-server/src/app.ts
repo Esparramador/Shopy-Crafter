@@ -23,6 +23,12 @@ const app: Express = express();
 
 app.set("trust proxy", 1);
 
+// ── Health probes — registered BEFORE session/rate-limit middleware so that
+//    the Replit platform healthcheck never hits the DB-backed session store
+//    during startup (which would return 500 until the DB is ready).
+app.get("/api", (_req: Request, res: Response) => res.json({ ok: true, status: "healthy" }));
+app.get("/api/healthz", (_req: Request, res: Response) => res.json({ ok: true, status: "healthy" }));
+
 // ── Security headers (Helmet) ─────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: false,
