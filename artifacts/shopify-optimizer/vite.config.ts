@@ -61,6 +61,15 @@ export default defineConfig({
     // Raise chunk-size warning threshold — Three.js & Fabric are inherently large
     chunkSizeWarningLimit: 1100,
 
+    // Disable automatic modulepreload injection.
+    // With a single SPA entry, Vite would emit <link rel="modulepreload"> for every
+    // vendor chunk — including Three.js, D3, and heavy admin bundles — on every page,
+    // even on lightweight public content pages (/blog, /changelog, /casos-de-exito)
+    // that never touch those libraries. Turning this off lets browsers load each
+    // chunk on-demand only when a lazy route actually needs it, which meaningfully
+    // reduces the initial parse/compile work for public content pages.
+    modulePreload: false,
+
     rollupOptions: {
       output: {
         // Content-hashed file names for long-term cache

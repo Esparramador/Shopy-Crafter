@@ -86,7 +86,7 @@ export default function BlogPost() {
             ¿Listo para optimizar tu tienda con IA?
           </p>
           <p style={{ fontSize: 13, color: "var(--t3, #999)", marginBottom: 16 }}>14 días gratis, sin tarjeta de crédito.</p>
-          <a href="/register" style={{
+          <a href="/contacto" style={{
             display: "inline-block", padding: "12px 28px", borderRadius: 10,
             background: "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000",
             fontWeight: 700, fontSize: 14, textDecoration: "none",
