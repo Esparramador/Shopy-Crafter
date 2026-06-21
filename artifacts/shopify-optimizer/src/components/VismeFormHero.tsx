@@ -336,7 +336,7 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
           flex-direction: column;
           justify-content: center;
           overflow-y: auto;
-          overscroll-behavior-y: contain;
+          overscroll-behavior-y: auto;
           scrollbar-width: thin;
           scrollbar-color: rgba(212,168,67,.2) transparent;
           z-index: 2;
