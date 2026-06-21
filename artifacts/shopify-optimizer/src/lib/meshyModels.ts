@@ -11,6 +11,7 @@ export interface MeshyCharacter {
   rigStatus: "rigged" | "pending" | "missing";
   animations: ModelAnimation[];
   rigTaskId?: string;
+  regenPrompt?: { prompt: string; art_style: string };
 }
 
 // ── 22 animation definitions (all 20 action_ids + run + jump) ─────────────────
@@ -177,6 +178,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     tags: ["arte","urbano","cartoon","rigged","full","134-anims"],
     glbPath: "/assets/3d/models/alec_monopoly.glb", rigStatus: "rigged",
     rigTaskId: "019ebb36-4f0c-7d21-a268-2ff6198aca60",
+    regenPrompt: { prompt: "Alec Monopoly street artist cartoon character, male figure wearing top hat and suit with money symbols, graffiti art style, full body A-pose arms at 45 degrees, humanoid proportions, bold colorful style, game-ready 3D model", art_style: "cartoon" },
     animations: anims("alec_monopoly", FULL_134),
   },
   {
@@ -185,6 +187,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     tags: ["superhéroe","dc","acción","rigged","full"],
     glbPath: "/assets/3d/models/batman.glb", rigStatus: "rigged",
     rigTaskId: "019ebb36-4f15-7f7e-af4e-3148857adbfe",
+    regenPrompt: { prompt: "Batman DC comics superhero, dark knight, full body A-pose arms at 45 degrees, black armored suit with bat symbol on chest, cowl with pointed ears, humanoid athletic proportions, detailed texture, game-ready 3D", art_style: "realistic" },
     animations: anims("batman", FULL_22),
   },
   {
@@ -192,6 +195,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "El superhéroe arácnido de Marvel. 22 animaciones.",
     tags: ["marvel","superhéroe","acción","rigged","full"],
     glbPath: "/assets/3d/models/spiderman.glb", rigStatus: "rigged",
+    regenPrompt: { prompt: "Spider-Man Marvel superhero, full body A-pose arms at 45 degrees, red and blue tight suit with web pattern, spider logo on chest, humanoid athletic build, full face mask, game-ready 3D model", art_style: "realistic" },
     animations: anims("spiderman", FULL_22),
   },
   {
@@ -200,6 +204,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     tags: ["humano","casual","tech","rigged","full"],
     glbPath: "/assets/3d/models/chico_casual.glb", rigStatus: "rigged",
     rigTaskId: "019ebb36-4f25-7f7f-b072-2ef66d123f7d",
+    regenPrompt: { prompt: "Young professional male developer, casual tech style, jeans and hoodie, full body A-pose arms at 45 degrees, realistic human proportions, clean facial features, mid-20s appearance, game-ready character", art_style: "realistic" },
     animations: anims("chico_casual", FULL_22),
   },
   {
@@ -208,6 +213,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     tags: ["humano","formal","corporativo","rigged","full"],
     glbPath: "/assets/3d/models/chico_formal.glb", rigStatus: "rigged",
     rigTaskId: "019ebb36-4eef-728c-87b1-6f3f022a9a2e",
+    regenPrompt: { prompt: "Professional businessman wearing formal dark suit and tie, full body A-pose arms at 45 degrees, realistic human proportions, clean professional appearance, mid-30s male, business executive look, game-ready 3D character", art_style: "realistic" },
     animations: anims("chico_formal", FULL_22),
   },
   // ── Newly generated and rigged ──
@@ -216,6 +222,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "El personaje más icónico de Disney. 21 animaciones.",
     tags: ["disney","cartoon","clásico","rigged"],
     glbPath: "/assets/3d/models/mickey_mouse.glb", rigStatus: "rigged",
+    regenPrompt: { prompt: "Mickey Mouse Disney cartoon character, bipedal anthropomorphic mouse standing upright, full body A-pose arms at 45 degrees, round black ears, red shorts with white buttons, white gloves, yellow shoes, cheerful expression, humanoid proportions", art_style: "cartoon" },
     animations: anims("mickey_mouse", FULL_21),
   },
   {
@@ -223,6 +230,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "La ratoncita elegante de Disney. 21 animaciones.",
     tags: ["disney","cartoon","clásico","rigged"],
     glbPath: "/assets/3d/models/minnie_mouse.glb", rigStatus: "rigged",
+    regenPrompt: { prompt: "Minnie Mouse Disney cartoon character, bipedal anthropomorphic female mouse standing upright, full body A-pose arms at 45 degrees, round black ears with pink polka dot bow, pink polka dot dress, white gloves, red heels, humanoid proportions", art_style: "cartoon" },
     animations: anims("minnie_mouse", FULL_21),
   },
   {
@@ -230,6 +238,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "La esponja de Fondo de Bikini. 21 animaciones.",
     tags: ["nickelodeon","cartoon","humor","rigged"],
     glbPath: "/assets/3d/models/bob_esponja.glb", rigStatus: "rigged",
+    regenPrompt: { prompt: "SpongeBob SquarePants Nickelodeon cartoon character, bipedal yellow square sponge body, full body A-pose arms at 45 degrees, brown pants with a belt, white shirt, red tie, big blue eyes, buck teeth, humanoid proportions standing upright", art_style: "cartoon" },
     animations: anims("bob_esponja", FULL_21),
   },
   {
@@ -237,6 +246,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "El conejo de Looney Tunes. 21 animaciones.",
     tags: ["warner","cartoon","clásico","rigged"],
     glbPath: "/assets/3d/models/bugs_bunny.glb", rigStatus: "rigged",
+    regenPrompt: { prompt: "Bugs Bunny Looney Tunes cartoon character, bipedal grey rabbit standing upright, full body A-pose arms at 45 degrees, long ears pointing up, white face, big buck teeth, humanoid proportions, classic Looney Tunes cartoon style", art_style: "cartoon" },
     animations: anims("bugs_bunny", FULL_21),
   },
   {
@@ -244,6 +254,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "El payaso mágico para niños. 21 animaciones.",
     tags: ["infantil","cartoon","latam","rigged"],
     glbPath: "/assets/3d/models/payaso_plim_plim.glb", rigStatus: "rigged",
+    regenPrompt: { prompt: "Plim Plim magical clown character for children, colorful clown costume with ruffled collar, full body A-pose arms at 45 degrees, star-shaped makeup on face, vibrant colors, friendly child-safe clown, humanoid proportions, 3D cartoon style", art_style: "cartoon" },
     animations: anims("payaso_plim_plim", FULL_21),
   },
   {
@@ -251,6 +262,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "Profesional corporativa. 21 animaciones.",
     tags: ["humano","ejecutiva","corporativo","rigged"],
     glbPath: "/assets/3d/models/chica_ejecutiva.glb", rigStatus: "rigged",
+    regenPrompt: { prompt: "Professional businesswoman wearing executive pantsuit, full body A-pose arms at 45 degrees, realistic human female proportions, mid-30s appearance, confident professional look, clean business attire, game-ready 3D character", art_style: "realistic" },
     animations: anims("chica_ejecutiva", FULL_21),
   },
   {
@@ -258,6 +270,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "Diseñadora de agencia. Modelo 3D listo, rig pendiente.",
     tags: ["humano","creativa","agencia"],
     glbPath: "/assets/3d/models/chica_creativa.glb", rigStatus: "pending",
+    regenPrompt: { prompt: "Creative young woman designer, casual artistic clothing, colorful accessories, full body A-pose arms at 45 degrees, realistic human female proportions, late-20s appearance, artistic bohemian style, game-ready 3D character", art_style: "realistic" },
     animations: [],
   },
   // ── Plan limit (TED only has basic 3) ──
@@ -267,6 +280,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     tags: ["oso","humor","cartoon","rigged"],
     glbPath: "/assets/3d/models/ted.glb", rigStatus: "rigged",
     rigTaskId: "019ebb36-4f56-728f-bb13-5654f37c1b41",
+    regenPrompt: { prompt: "TED teddy bear movie character, bipedal plush stuffed teddy bear standing upright, full body A-pose arms at 45 degrees, brown fur texture, soft plush toy appearance, humanoid proportions, expressive cartoon face", art_style: "cartoon" },
     animations: anims("ted", BASIC_3),
   },
   // ── Missing (rig failed — pose estimation) ──
@@ -275,6 +289,7 @@ export const MESHY_CHARACTERS: MeshyCharacter[] = [
     description: "El Pokémon eléctrico. Rig pendiente.",
     tags: ["pokemon","nintendo","cartoon"],
     glbPath: "/assets/3d/models/pikachu.glb", rigStatus: "pending",
+    regenPrompt: { prompt: "Pikachu Pokemon character, yellow electric mouse standing bipedal upright, full body A-pose arms at 45 degrees, round chubby body, large pointy ears with black tips, red cheeks, lightning bolt tail, humanoid proportions, cute cartoon style", art_style: "cartoon" },
     animations: [],
   },
 ];

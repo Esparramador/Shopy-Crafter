@@ -127,6 +127,74 @@ export default function MeshyStudio() {
   const stopRigRef = useRef<(() => void) | null>(null);
   const stopAnimGenRef = useRef<(() => void) | null>(null);
 
+  // ── Recovery state (restore missing GLBs from Meshy rig task IDs) ─────────
+  const [recoverMap, setRecoverMap] = useState<Record<string, "idle" | "running" | "done" | "error">>({});
+  const [missingGlbs, setMissingGlbs] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetch(`${API}/api/meshy/models-config`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d?.models) return;
+        const missing = new Set<string>(
+          (d.models as any[]).filter(m => m.rig_status === "missing").map((m: any) => m.id as string)
+        );
+        setMissingGlbs(missing);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleRecover = async (charId: string, rigTaskId: string) => {
+    setRecoverMap(prev => ({ ...prev, [charId]: "running" }));
+    try {
+      const res = await fetch(`${API}/api/meshy/recover-char`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ char_id: charId, rig_task_id: rigTaskId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Error desconocido");
+      setRecoverMap(prev => ({ ...prev, [charId]: "done" }));
+      setMissingGlbs(prev => { const s = new Set(prev); s.delete(charId); return s; });
+    } catch {
+      setRecoverMap(prev => ({ ...prev, [charId]: "error" }));
+    }
+  };
+
+  // ── Text-based character regeneration (texto → 3D + auto-rig) ────────────
+  const generateCharacterFromText = useCallback((charId: string, prompt: string, artStyle: string) => {
+    setFactoryItems(prev => prev.map(i =>
+      i.char.id === charId ? { ...i, status: "running", progress: 0, error: undefined } : i
+    ));
+    setTab("factory");
+    const cancel = streamSSE(
+      `${API}/api/meshy/pipeline/text-rig`,
+      JSON.stringify({ char_id: charId, prompt, art_style: artStyle }),
+      { "Content-Type": "application/json" },
+      (e) => {
+        if (e.event === "phase" || e.event === "progress" || e.event === "started") {
+          setFactoryItems(prev => prev.map(i =>
+            i.char.id === charId ? { ...i, progress: e.progress ?? i.progress } : i
+          ));
+        } else if (e.event === "done") {
+          setFactoryItems(prev => prev.map(i =>
+            i.char.id === charId ? { ...i, status: "done", progress: 100, glbPath: e.glb_path, thumbnailUrl: e.thumbnail_url } : i
+          ));
+          setMissingGlbs(prev => { const s = new Set(prev); s.delete(charId); return s; });
+          setRecoverMap(prev => ({ ...prev, [charId]: "done" }));
+        } else if (e.event === "error") {
+          setFactoryItems(prev => prev.map(i =>
+            i.char.id === charId ? { ...i, status: "error", error: e.error ?? "Error generando" } : i
+          ));
+          setRecoverMap(prev => ({ ...prev, [charId]: "error" }));
+        }
+      },
+      () => {}
+    );
+    return cancel;
+  }, []);
+
   // ── Text-to-3D ─────────────────────────────────────────────────────────────
   const [txtPrompt, setTxtPrompt]   = useState("");
   const [txtNeg, setTxtNeg]         = useState("");
@@ -518,20 +586,66 @@ export default function MeshyStudio() {
               Modelos Rigged
             </div>
 
-            {RIGGED_CHARACTERS.map(c => (
-              <button key={c.id} onClick={() => { setSelectedChar(c); setCustomModel(null); setSelectedAnimPath(null); }} style={{
-                padding: "8px 10px", border: "1px solid", borderRadius: 8, cursor: "pointer",
-                textAlign: "left", display: "flex", alignItems: "center", gap: 8, transition: "all 0.12s",
-                borderColor: !customModel && selectedChar.id === c.id ? "var(--l-gold)" : "rgba(255,255,255,0.07)",
-                background: !customModel && selectedChar.id === c.id ? "rgba(212,168,67,0.08)" : "rgba(255,255,255,0.02)",
-              }}>
-                <span style={{ fontSize: 20 }}>{c.emoji}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--l-t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-                  <div style={{ fontSize: 9, color: "var(--l-t4)" }}>✅ {c.animations.length} anim.</div>
+            {RIGGED_CHARACTERS.map(c => {
+              const isMissing = missingGlbs.has(c.id);
+              const recoverSt = recoverMap[c.id] ?? "idle";
+              return (
+                <div key={c.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                  <button onClick={() => { setSelectedChar(c); setCustomModel(null); setSelectedAnimPath(null); }} style={{
+                    padding: "8px 10px", border: "1px solid", borderRadius: isMissing ? "8px 8px 0 0" : 8, cursor: "pointer",
+                    textAlign: "left", display: "flex", alignItems: "center", gap: 8, transition: "all 0.12s",
+                    borderColor: !customModel && selectedChar.id === c.id ? "var(--l-gold)" : isMissing ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.07)",
+                    background: !customModel && selectedChar.id === c.id ? "rgba(212,168,67,0.08)" : isMissing ? "rgba(239,68,68,0.04)" : "rgba(255,255,255,0.02)",
+                  }}>
+                    <span style={{ fontSize: 20 }}>{c.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--l-t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                      <div style={{ fontSize: 9, color: isMissing ? "#ef4444" : "var(--l-t4)" }}>
+                        {isMissing ? "⚠ GLB faltante" : `✅ ${c.animations.length} anim.`}
+                      </div>
+                    </div>
+                  </button>
+                  {isMissing && c.regenPrompt && recoverSt !== "done" && (
+                    <button
+                      onClick={() => c.regenPrompt && generateCharacterFromText(c.id, c.regenPrompt.prompt, c.regenPrompt.art_style)}
+                      disabled={recoverSt === "running"}
+                      style={{
+                        padding: "4px 8px", fontSize: 9, fontWeight: 700, cursor: recoverSt === "running" ? "default" : "pointer",
+                        border: "1px solid", borderTop: "none", borderRadius: "0 0 8px 8px",
+                        borderColor: recoverSt === "error" ? "rgba(239,68,68,0.3)" : "rgba(212,168,67,0.3)",
+                        background: recoverSt === "error" ? "rgba(239,68,68,0.08)" : "rgba(212,168,67,0.08)",
+                        color: recoverSt === "error" ? "#ef4444" : "var(--l-gold)",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 3,
+                      }}
+                    >
+                      {recoverSt === "running" && <><Loader2 size={8} className="animate-spin" /> Generando en Fábrica…</>}
+                      {recoverSt === "error" && "❌ Error · Reintentar"}
+                      {recoverSt === "idle" && "✏ Regenerar (Texto→3D+Rig)"}
+                    </button>
+                  )}
+                  {isMissing && recoverSt === "done" && (
+                    <div style={{
+                      padding: "3px 8px", fontSize: 9, borderRadius: "0 0 8px 8px",
+                      border: "1px solid rgba(0,200,100,0.3)", borderTop: "none",
+                      background: "rgba(0,200,100,0.08)", color: "#00c864",
+                      textAlign: "center",
+                    }}>
+                      ✅ Generado · Recarga la página
+                    </div>
+                  )}
+                  {isMissing && !c.regenPrompt && recoverSt === "idle" && (
+                    <div style={{
+                      padding: "3px 8px", fontSize: 9, borderRadius: "0 0 8px 8px",
+                      border: "1px solid rgba(239,68,68,0.2)", borderTop: "none",
+                      background: "rgba(239,68,68,0.03)", color: "#666",
+                      textAlign: "center",
+                    }}>
+                      Sin prompt · usar pestaña Fábrica
+                    </div>
+                  )}
                 </div>
-              </button>
-            ))}
+              );
+            })}
 
             {/* Separator */}
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "4px 0" }} />
@@ -1058,6 +1172,9 @@ export default function MeshyStudio() {
                   <FactoryCard key={item.char.id} item={item}
                     onFileSelect={f => handleFactoryFile(item.char.id, f)}
                     onGenerate={() => generateCharacter(item.char.id)}
+                    onGenerateText={item.char.regenPrompt
+                      ? () => generateCharacterFromText(item.char.id, item.char.regenPrompt!.prompt, item.char.regenPrompt!.art_style)
+                      : undefined}
                   />
                 ))}
               </div>
@@ -1110,8 +1227,8 @@ function ModelResultCard({ output }: { output: MeshyOutput }) {
   );
 }
 
-function FactoryCard({ item, onFileSelect, onGenerate }: {
-  item: FactoryItem; onFileSelect: (f: File) => void; onGenerate: () => void;
+function FactoryCard({ item, onFileSelect, onGenerate, onGenerateText }: {
+  item: FactoryItem; onFileSelect: (f: File) => void; onGenerate: () => void; onGenerateText?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { char: c, status, progress, error, thumbnailUrl, glbPath } = item;
@@ -1139,6 +1256,9 @@ function FactoryCard({ item, onFileSelect, onGenerate }: {
           <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
             <div style={{ width: `${progress}%`, height: "100%", background: "var(--l-gold)", transition: "width 0.5s" }} />
           </div>
+          <div style={{ fontSize: 9, color: "var(--l-t4)", marginTop: 3, textAlign: "center" }}>
+            Texto→3D+Rig · ~8 min
+          </div>
         </div>
       )}
       {status === "error" && error && (
@@ -1158,21 +1278,32 @@ function FactoryCard({ item, onFileSelect, onGenerate }: {
           <input ref={inputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) onFileSelect(f); }} />
         </>
       )}
-      <div style={{ display: "flex", gap: 5 }}>
+      <div style={{ display: "flex", gap: 5, flexDirection: "column" }}>
         {status === "done" && glbPath && (
           <a href={glbPath} download style={{ flex: 1, textAlign: "center", fontSize: 10, padding: "5px 8px", borderRadius: 6, background: "rgba(0,200,100,0.1)", border: "1px solid rgba(0,200,100,0.3)", color: "#00c864", textDecoration: "none" }}>
             ⬇ GLB
           </a>
         )}
         {status !== "running" && status !== "done" && (
-          <button onClick={onGenerate} disabled={!item.file} style={{
-            flex: 1, padding: "5px 8px", borderRadius: 6, fontSize: 10, cursor: item.file ? "pointer" : "not-allowed",
-            background: item.file ? "rgba(212,168,67,0.15)" : "rgba(255,255,255,0.03)", border: "1px solid",
-            borderColor: item.file ? "rgba(212,168,67,0.3)" : "rgba(255,255,255,0.07)",
-            color: item.file ? "var(--l-gold)" : "var(--l-t4)", fontWeight: 600,
-          }}>
-            <Film size={10} style={{ display: "inline", marginRight: 3 }} />Generar
-          </button>
+          <div style={{ display: "flex", gap: 5 }}>
+            <button onClick={onGenerate} disabled={!item.file} style={{
+              flex: 1, padding: "5px 8px", borderRadius: 6, fontSize: 10, cursor: item.file ? "pointer" : "not-allowed",
+              background: item.file ? "rgba(212,168,67,0.15)" : "rgba(255,255,255,0.03)", border: "1px solid",
+              borderColor: item.file ? "rgba(212,168,67,0.3)" : "rgba(255,255,255,0.07)",
+              color: item.file ? "var(--l-gold)" : "var(--l-t4)", fontWeight: 600,
+            }}>
+              <Film size={10} style={{ display: "inline", marginRight: 3 }} />📷 Imagen
+            </button>
+            {onGenerateText && c.regenPrompt && (
+              <button onClick={onGenerateText} style={{
+                flex: 1, padding: "5px 8px", borderRadius: 6, fontSize: 10, cursor: "pointer",
+                background: "rgba(100,220,160,0.1)", border: "1px solid rgba(100,220,160,0.3)",
+                color: "var(--l-jade)", fontWeight: 600,
+              }}>
+                ✏ Texto
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -245,9 +245,10 @@ async function meshyFetch(path: string, options: RequestInit = {}, base = MESHY_
 }
 
 async function downloadToFile(url: string, dest: string): Promise<void> {
-  await mkdir(MODELS_DIR, { recursive: true });
+  const { dirname } = await import("path");
+  await mkdir(dirname(dest), { recursive: true });
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Download error: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Download error: HTTP ${res.status} for ${url}`);
   const buf = Buffer.from(await res.arrayBuffer());
   await writeFile(dest, buf);
 }
@@ -1050,6 +1051,89 @@ router.post("/meshy/image-to-3d-multiview", upload.fields([
     res.json(data);
   } catch (e: any) {
     logger.error({ err: e }, "meshy/image-to-3d-multiview error");
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// ── Recover a character's GLBs from a Meshy rig task ID ─────────────────────
+// Uses the stored rigTaskId (hardcoded in meshyModels.ts) to re-download the
+// base model GLB and the rigged GLB without regenerating from scratch.
+
+router.post("/meshy/recover-char", async (req: Request, res: Response) => {
+  const { char_id, rig_task_id } = req.body ?? {};
+  if (!char_id || !rig_task_id) {
+    return res.status(400).json({ error: "char_id y rig_task_id requeridos" });
+  }
+  if (!/^[a-z0-9_]+$/i.test(char_id)) {
+    return res.status(400).json({ error: "char_id inválido" });
+  }
+
+  try {
+    // 1. Fetch rig task from Meshy
+    const rigData = await meshyFetch(`/rigging/${rig_task_id}`);
+
+    if (rigData.status !== "SUCCEEDED") {
+      return res.status(400).json({ error: `Tarea de rig no exitosa: ${rigData.status}` });
+    }
+
+    const modelUrl: string = rigData.model_url ?? "";
+    const riggedUrl: string = rigData.result?.rigged_character_glb_url ?? "";
+
+    let modelSaved = false;
+    let riggedSaved = false;
+
+    // 2. Download base model GLB
+    if (modelUrl) {
+      const dest = join(MODELS_DIR, `${char_id}.glb`);
+      await downloadToFile(modelUrl, dest);
+      modelSaved = true;
+      logger.info({ char_id, dest }, "Base model GLB recovered");
+    } else {
+      logger.warn({ char_id, rig_task_id }, "No model_url in rig task — base GLB not recovered");
+    }
+
+    // 3. Download rigged GLB
+    const charAnimDir = join(ANIMS_DIR, char_id);
+    if (riggedUrl) {
+      await downloadToFile(riggedUrl, join(charAnimDir, "rigged.glb"));
+      const meta = { char_id, rig_task_id, recovered_at: new Date().toISOString() };
+      await writeFile(join(charAnimDir, "meta.json"), JSON.stringify(meta, null, 2));
+      riggedSaved = true;
+      logger.info({ char_id }, "Rigged GLB recovered");
+    }
+
+    return res.json({
+      ok: true, char_id,
+      model_saved: modelSaved,
+      rigged_saved: riggedSaved,
+      glb_path: modelSaved ? `/assets/3d/models/${char_id}.glb` : null,
+      rigged_path: riggedSaved ? `/assets/3d/animations/${char_id}/rigged.glb` : null,
+      note: !modelUrl ? "model_url no disponible en la tarea — puede que el modelo original haya expirado" : undefined,
+    });
+  } catch (e: any) {
+    logger.error({ err: e, char_id, rig_task_id }, "recover-char error");
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ── List recent Meshy rigging tasks (to discover task IDs) ──────────────────
+
+router.get("/meshy/list-rig-tasks", async (_req, res) => {
+  try {
+    const data = await meshyFetch("/rigging?page_num=1&page_size=50&sort_by=-created_at");
+    res.json(data);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// ── List recent Meshy text-to-3D tasks (to discover t2d task IDs) ───────────
+
+router.get("/meshy/list-t2d-tasks", async (_req, res) => {
+  try {
+    const data = await meshyFetch("/text-to-3d?page_num=1&page_size=50&sort_by=-created_at", {}, MESHY_BASE_V2);
+    res.json(data);
+  } catch (e: any) {
     res.status(400).json({ error: e.message });
   }
 });

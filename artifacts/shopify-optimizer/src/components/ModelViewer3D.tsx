@@ -4,19 +4,17 @@ import { useGLTF, useAnimations, OrbitControls, Environment, ContactShadows, Htm
 import * as THREE from "three";
 import { Play, Pause, RotateCcw, Sun } from "lucide-react";
 
+// ── Last-resort React ErrorBoundary (for non-GLB Canvas errors) ───────────────
 class ModelErrorBoundary extends Component<
-  { children: ReactNode; glbPath: string; height: string | number },
+  { children: ReactNode; height: string | number },
   { hasError: boolean }
 > {
-  constructor(props: { children: ReactNode; glbPath: string; height: string | number }) {
+  constructor(props: { children: ReactNode; height: string | number }) {
     super(props);
     this.state = { hasError: false };
   }
   static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(_err: Error, _info: ErrorInfo) {}
-  componentDidUpdate(prev: { glbPath: string }) {
-    if (prev.glbPath !== this.props.glbPath) this.setState({ hasError: false });
-  }
   render() {
     if (this.state.hasError) {
       const h = typeof this.props.height === "number" ? `${this.props.height}px` : this.props.height;
@@ -112,9 +110,6 @@ function BaseModel({ glbPath, onReady }: { glbPath: string; onReady?: () => void
 }
 
 // ── Animated model ────────────────────────────────────────────────────────────
-// Meshy animation GLBs ARE the full animated character — they include the mesh
-// AND the baked animation. We load animGlbPath as the display scene so bones
-// and animation clips are from the same GLB (guaranteed to match).
 
 function AnimatedModel({
   animGlbPath, looping, onReady,
@@ -211,6 +206,25 @@ function Spinner() {
   );
 }
 
+// ── HEAD pre-check hook ───────────────────────────────────────────────────────
+// Checks if a GLB file actually exists BEFORE passing it to useGLTF.
+// This prevents the Vite runtime-error overlay from appearing when a file
+// returns HTML 404 instead of a valid GLB binary.
+
+function useGlbExists(path: string | null | undefined): "checking" | "ok" | "missing" {
+  const [status, setStatus] = useState<"checking" | "ok" | "missing">("checking");
+  useEffect(() => {
+    if (!path) { setStatus("ok"); return; }
+    let active = true;
+    setStatus("checking");
+    fetch(path, { method: "HEAD" })
+      .then(r => { if (active) setStatus(r.ok ? "ok" : "missing"); })
+      .catch(() => { if (active) setStatus("missing"); });
+    return () => { active = false; };
+  }, [path]);
+  return status;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 const ENV_PRESETS = ["sunset", "city", "dawn", "warehouse", "forest"] as const;
@@ -246,72 +260,115 @@ export default function ModelViewer3D({
   const envPreset = ENV_PRESETS[envIdx % ENV_PRESETS.length];
   const h = typeof height === "number" ? `${height}px` : height;
 
+  // ── HEAD pre-checks: verify files exist before touching useGLTF ──────────
+  const baseStatus = useGlbExists(glbPath);
+  const animStatus = useGlbExists(effectiveAnimPath ?? null);
+
+  // If animation GLB is missing, fall back to base pose silently
+  const safeAnimPath = effectiveAnimPath && animStatus === "ok" ? effectiveAnimPath : undefined;
+
+  // ── Fallback tile ─────────────────────────────────────────────────────────
+  const missingTile = (
+    <div style={{
+      height: h, display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", gap: 8, background: "#0a0a0a",
+      border: "1px solid rgba(212,168,67,0.12)", borderRadius: 8,
+    }}>
+      <span style={{ fontSize: 28 }}>🧊</span>
+      <span style={{ color: "#444", fontSize: 11, fontFamily: "monospace" }}>
+        Modelo 3D no disponible
+      </span>
+      <span style={{ color: "#333", fontSize: 10, fontFamily: "monospace" }}>
+        Genera el personaje en Meshy Studio
+      </span>
+    </div>
+  );
+
+  const checkingTile = (
+    <div style={{
+      height: h, display: "flex", alignItems: "center", justifyContent: "center",
+      background: "#0a0a0a", border: "1px solid rgba(212,168,67,0.12)", borderRadius: 8,
+    }}>
+      <div style={{
+        width: 24, height: 24,
+        border: "2px solid #d4a84344",
+        borderTopColor: "#d4a843",
+        borderRadius: "50%",
+        animation: "mv3d-spin 1s linear infinite",
+      }} />
+    </div>
+  );
+
   return (
     <div
       className={className}
       style={{ display: "flex", flexDirection: "column", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(212,168,67,0.2)", background: "#0a0a0a" }}
     >
-      {/* 3D Canvas */}
-      <ModelErrorBoundary glbPath={glbPath} height={height}>
-      <div style={{ height: h, position: "relative" }}>
-        <Canvas
-          shadows
-          camera={{ position: [0, 1.5, 4], fov: 45 }}
-          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
-          style={{ background: "radial-gradient(ellipse at 50% 65%, #1a1206 0%, #080808 100%)" }}
-        >
-          <Suspense fallback={<Spinner />}>
-            <ModelSwitcher
-              glbPath={glbPath}
-              animGlbPath={effectiveAnimPath}
-              looping={effectiveLooping}
-              autoRotate={autoRotate && !paused}
-              envPreset={envPreset}
-              onRigStatus={onRigStatus}
-            />
-          </Suspense>
-        </Canvas>
+      {/* 3D Canvas — only rendered when base GLB confirmed to exist */}
+      {baseStatus === "checking" ? checkingTile
+        : baseStatus === "missing" ? missingTile
+        : (
+        <ModelErrorBoundary height={height}>
+        <div style={{ height: h, position: "relative" }}>
+          <Canvas
+            shadows
+            camera={{ position: [0, 1.5, 4], fov: 45 }}
+            gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+            style={{ background: "radial-gradient(ellipse at 50% 65%, #1a1206 0%, #080808 100%)" }}
+          >
+            <Suspense fallback={<Spinner />}>
+              <ModelSwitcher
+                glbPath={glbPath}
+                animGlbPath={safeAnimPath}
+                looping={effectiveLooping}
+                autoRotate={autoRotate && !paused}
+                envPreset={envPreset}
+                onRigStatus={onRigStatus}
+              />
+            </Suspense>
+          </Canvas>
 
-        {characterName && (
-          <div style={{
-            position: "absolute", top: 10, left: 10,
-            background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)",
-            borderRadius: 8, padding: "5px 12px",
-            border: "1px solid rgba(212,168,67,0.35)",
-            color: "#d4a843", fontWeight: 600, fontSize: 13, pointerEvents: "none",
-          }}>
-            {characterName}
-          </div>
-        )}
+          {characterName && (
+            <div style={{
+              position: "absolute", top: 10, left: 10,
+              background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)",
+              borderRadius: 8, padding: "5px 12px",
+              border: "1px solid rgba(212,168,67,0.35)",
+              color: "#d4a843", fontWeight: 600, fontSize: 13, pointerEvents: "none",
+            }}>
+              {characterName}
+            </div>
+          )}
 
-        {effectiveAnimPath && (
-          <div style={{
-            position: "absolute", bottom: 10, left: 10,
-            background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
-            borderRadius: 6, padding: "3px 10px",
-            border: "1px solid rgba(212,168,67,0.2)",
-            color: "#d4a843", fontSize: 11, pointerEvents: "none",
-          }}>
-            ▶ {effectiveAnimPath.split("/").pop()?.replace(".glb", "") ?? ""}
-          </div>
-        )}
+          {safeAnimPath && (
+            <div style={{
+              position: "absolute", bottom: 10, left: 10,
+              background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
+              borderRadius: 6, padding: "3px 10px",
+              border: "1px solid rgba(212,168,67,0.2)",
+              color: "#d4a843", fontSize: 11, pointerEvents: "none",
+            }}>
+              ▶ {safeAnimPath.split("/").pop()?.replace(".glb", "") ?? ""}
+            </div>
+          )}
 
-        <button
-          onClick={() => setEnvIdx(i => i + 1)}
-          style={{
-            position: "absolute", top: 10, right: 10,
-            background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)",
-            borderRadius: 8, padding: "6px 8px",
-            border: "1px solid rgba(212,168,67,0.35)",
-            cursor: "pointer", color: "#d4a843",
-            display: "flex", alignItems: "center",
-          }}
-          title={`Ambiente: ${envPreset}`}
-        >
-          <Sun size={14} />
-        </button>
-      </div>
-      </ModelErrorBoundary>
+          <button
+            onClick={() => setEnvIdx(i => i + 1)}
+            style={{
+              position: "absolute", top: 10, right: 10,
+              background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)",
+              borderRadius: 8, padding: "6px 8px",
+              border: "1px solid rgba(212,168,67,0.35)",
+              cursor: "pointer", color: "#d4a843",
+              display: "flex", alignItems: "center",
+            }}
+            title={`Ambiente: ${envPreset}`}
+          >
+            <Sun size={14} />
+          </button>
+        </div>
+        </ModelErrorBoundary>
+      )}
 
       {/* Controls bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: "rgba(20,15,5,0.95)", borderTop: "1px solid rgba(212,168,67,0.12)" }}>
@@ -336,9 +393,9 @@ export default function ModelViewer3D({
           <RotateCcw size={14} />
         </button>
 
-        <span style={{ flex: 1, textAlign: "center", fontSize: 11, color: overrideAnimPath !== undefined ? "#d4a843" : "#555", fontWeight: overrideAnimPath !== undefined ? 600 : 400 }}>
-          {overrideAnimPath !== undefined
-            ? (overrideAnimPath ? `▶ ${overrideAnimPath.split("/").pop()?.replace(".glb", "")}` : "Pose base")
+        <span style={{ flex: 1, textAlign: "center", fontSize: 11, color: safeAnimPath ? "#d4a843" : "#555", fontWeight: safeAnimPath ? 600 : 400 }}>
+          {safeAnimPath
+            ? `▶ ${safeAnimPath.split("/").pop()?.replace(".glb", "")}`
             : (currentAnim ? currentAnim.label : "Pose base · arrastra para rotar")}
         </span>
 
