@@ -1470,8 +1470,11 @@ export default function Landing() {
               )}
             </div>
 
-            {/* ── FOOTER ── */}
-            <footer className={`fp-footer ${!isAnimated("fp-contact") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.3s", marginTop: 40, gridColumn: "1 / -1", gridRow: "3" }}>
+          </div>
+        </section>
+
+        {/* ── FOOTER (standalone block — always visible for users & SEO) ── */}
+        <footer className="fp-footer fp-footer-standalone">
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
@@ -1545,8 +1548,6 @@ export default function Landing() {
                 <div className="l-footer-badges">{content.footer.badges.map((b, i) => <span key={i} className="l-footer-badge">{b}</span>)}</div>
               </div>
             </footer>
-          </div>
-        </section>
 
         </div>{/* /fp-wrapper */}
       </div>{/* /fp-container */}

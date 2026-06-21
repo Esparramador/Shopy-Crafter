@@ -1220,6 +1220,23 @@
 .fp-footer-col .l-footer-col-title { margin-bottom: 12px; }
 .fp-footer-col .l-footer-links { gap: 7px; }
 
+/* Standalone footer — normal-flow block after the last section, always visible */
+.fp-footer-standalone {
+  background: var(--l-ink2);
+  border-top: 1px solid rgba(200,168,75,0.12);
+  padding: 56px 48px 40px;
+  margin-top: 0;
+}
+.fp-footer-standalone .fp-footer-inner,
+.fp-footer-standalone .l-footer-bottom {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+@media (max-width: 640px) {
+  .fp-footer-standalone { padding: 40px 20px 32px; }
+}
+
 /* ════════════════════════════════════════════════════
    DESKTOP SHORT VIEWPORT — wide screen, short height
    (landscape monitors, split-screen, ultra-wide)
@@ -1570,7 +1587,7 @@
   .fp-footer-inner { grid-template-columns: 1fr !important; gap: 24px; }
   .fp-footer-brand { grid-column: auto !important; }
   .l-footer-desc { max-width: 100% !important; }
-  .fp-footer-col { display: none; }
+  .fp-footer-col { display: block; }
   .l-footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
   .l-footer-badges { flex-wrap: wrap; justify-content: center; gap: 8px; }
 
@@ -1662,7 +1679,7 @@
   .fp-contact-form-v2 .fp-contact-row { grid-template-columns: 1fr !important; }
 
   .fp-footer-inner { grid-template-columns: 1fr !important; gap: 18px; }
-  .fp-footer-col { display: none; }
+  .fp-footer-col { display: block; }
   .l-footer-bottom { flex-direction: column; gap: 10px; text-align: center; }
   .l-footer-badges { justify-content: center; }
 
