@@ -1,0 +1,1 @@
+import{r as t}from"./vendor-react-DqW1pDqK.js";function o(){const e=t.useRef(new Set);return t.useEffect(()=>()=>{e.current.forEach(clearTimeout),e.current.clear()},[]),t.useCallback((u,c)=>{const r=setTimeout(()=>{e.current.delete(r),u()},c);return e.current.add(r),r},[])}export{o as u};

@@ -1,1 +1,0 @@
-import{a as t,j as a}from"./vendor-react-D81lGkAY.js";import{o as s,n}from"./index-DuDdhPQh.js";const l=t.memo(function({grade:r,className:o}){const e=r||"N/A";return a.jsx("div",{className:s("inline-flex items-center justify-center font-display font-bold w-10 h-10 rounded-xl border-2",n(e),o),children:e})});export{l as G};

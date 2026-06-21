@@ -73,8 +73,20 @@ export default defineConfig({
 
         // Manual chunks: keep heavy vendor libs in separate cacheable files
         manualChunks(id) {
-          // React core — changes very rarely
-          if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+          // React core — changes very rarely.
+          // CRITICAL: scheduler + react runtime deps MUST live in the SAME chunk as
+          // react/react-dom. If scheduler lands in vendor-misc, vendor-react imports it
+          // back from vendor-misc while vendor-misc imports react from vendor-react,
+          // creating a circular ESM chunk dependency. In production that cycle evaluates
+          // with `React` still undefined → "Cannot set properties of undefined (setting
+          // 'Children')" → React never initializes → blank/black screen (SSR shell stays).
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/scheduler/") ||
+            id.includes("node_modules/react-is/") ||
+            id.includes("node_modules/use-sync-external-store/")
+          ) {
             return "vendor-react";
           }
           // Router
