@@ -11284,9 +11284,58 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         // BROWSER AGENT — Navegación real con Puppeteer/Chromium
         // ══════════════════════════════════════════════════════════════════
         case "browser_action": {
-          const { executeBrowserAgent, BrowserRecipes, extractYoutubeVideoId } = await import("../lib/browser-agent.js");
+          const { executeBrowserAgent, BrowserRecipes, extractYoutubeVideoId, resolveYoutubeWatchUrl } = await import("../lib/browser-agent.js");
           const goal: string = params?.goal || "Navegar a una página web";
           let steps = params?.steps;
+
+          const gLower = goal.toLowerCase();
+          const rawDirectUrl: string | null = params?.url || (/^https?:\/\//i.test(goal.trim()) ? goal.trim() : null);
+          // Solo permitimos http(s) — nunca javascript:/data:/file: etc.
+          const isSafeHttpUrl = (u: unknown): u is string => {
+            if (typeof u !== "string") return false;
+            try { const p = new URL(u); return p.protocol === "http:" || p.protocol === "https:"; }
+            catch { return false; }
+          };
+          const directUrl: string | null = isSafeHttpUrl(rawDirectUrl) ? rawDirectUrl : null;
+          const wantsScrape = !!params?.scrapeUrl || /scrap|extrae|extraer|analiz|qué dice|que dice|contenido de|texto de/i.test(gLower);
+          const hasExplicitSteps = Array.isArray(steps) && steps.length > 0;
+
+          // ── FAST PATH 1: "abrir/poner/reproducir" en YouTube → resolver URL real
+          // del vídeo vía HTML (sin Playwright ni YouTube Data API). El frontend
+          // abre una pestaña real con reproducción automática.
+          if (!hasExplicitSteps && /youtube/.test(gLower) && !wantsScrape) {
+            const searchMatch = goal.match(/(?:busca?r?|search|pon|play|reproduce|abre?|encuentra?|escucha|quiero(?:\s+escuchar)?)\s+(?:en\s+youtube\s+)?(.+?)(?:\s+en\s+youtube)?$/i);
+            const ytQuery = (searchMatch?.[1] || goal.replace(/\b(en\s+)?youtube\b/ig, "").replace(/\b(abre?|abrir|pon|reproduce|play|busca?r?|escucha)\b/ig, "").trim()) || goal;
+            const yt = await resolveYoutubeWatchUrl(ytQuery);
+            if (yt) {
+              result = {
+                success: true,
+                goal,
+                openUrl: yt.watchUrl,
+                finalUrl: yt.watchUrl,
+                youtubeEmbed: yt.embedUrl,
+                title: yt.title,
+                browserType: "fast-resolver",
+                message: `▶️ **Abriendo en YouTube**: ${yt.title || ytQuery}\n\n🔗 ${yt.watchUrl}\n\nSe abre en una pestaña nueva con reproducción automática.`,
+              };
+              break;
+            }
+            // Si el resolver falla, caemos al agente Chromium como respaldo.
+            steps = BrowserRecipes.youtubeSearch(ytQuery);
+          }
+
+          // ── FAST PATH 2: abrir una URL directa (sin scraping) → devolver openUrl
+          if (!hasExplicitSteps && !steps && directUrl && !wantsScrape) {
+            result = {
+              success: true,
+              goal,
+              openUrl: directUrl,
+              finalUrl: directUrl,
+              browserType: "fast-resolver",
+              message: `🌐 **Abriendo**: ${directUrl}\n\nSe abre en una pestaña nueva.`,
+            };
+            break;
+          }
 
           // Si no vienen steps explícitos, usar recetas automáticas según goal
           if (!steps || !Array.isArray(steps) || steps.length === 0) {
@@ -11334,6 +11383,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
               success: agentResult.success,
               goal,
               finalUrl: agentResult.finalUrl,
+              // Solo auto-abrimos en el navegador si NO era una tarea de scraping.
+              openUrl: wantsScrape ? undefined : agentResult.finalUrl,
               screenshots,
               youtubeEmbed,
               extractedText: agentResult.extractedText?.slice(0, 2000),

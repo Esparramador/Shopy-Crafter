@@ -1059,6 +1059,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
       if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
       setDeepScan(data.result);
       setTab("security" as any);
+      loadHistory();
     } catch (e: any) {
       setDeepScanError(e.message || "Error en el escaneo profundo");
     } finally {
@@ -1077,11 +1078,12 @@ function WebLabInner({ projectId }: { projectId: number }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ html: content }),
+        body: JSON.stringify({ html: content, projectId, sourceUrl: url.trim() || undefined }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
       setSecretsReport(data);
+      loadHistory();
     } catch (e: any) {
       setSecretsError(e.message || "Error en el análisis de secretos");
     } finally {

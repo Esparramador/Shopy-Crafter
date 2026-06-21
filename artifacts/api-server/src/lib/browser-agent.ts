@@ -453,6 +453,40 @@ export async function browserResearchTopic(params: {
 }
 
 // ─── Builder de steps comunes ────────────────────────────────────────────────
+/**
+ * Resuelve una búsqueda de YouTube a una URL de vídeo REAL sin usar Playwright
+ * ni la YouTube Data API (deshabilitada en este proyecto Google). Hace fetch del
+ * HTML de resultados y extrae el primer videoId. Rápido (~1-2s) y fiable.
+ */
+export async function resolveYoutubeWatchUrl(query: string): Promise<{ videoId: string; watchUrl: string; embedUrl: string; title?: string } | null> {
+  try {
+    const resp = await fetch(
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&hl=es&gl=ES`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+          "Cookie": "CONSENT=YES+1",
+          "Accept-Language": "es-ES,es;q=0.9",
+        },
+        signal: AbortSignal.timeout(12_000),
+      },
+    );
+    const t = await resp.text();
+    const m = t.match(/"videoId":"([\w-]{11})"/);
+    if (!m) return null;
+    const videoId = m[1];
+    const tm = t.match(/"title":\{"runs":\[\{"text":"([^"]+)"/);
+    return {
+      videoId,
+      watchUrl: `https://www.youtube.com/watch?v=${videoId}`,
+      embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1`,
+      title: tm?.[1],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const BrowserRecipes = {
   youtubeSearch: (query: string): BrowserStep[] => [
     { type: "navigate", url: "https://www.youtube.com" },

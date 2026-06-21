@@ -41,6 +41,8 @@ interface BrowserActionResult {
   success: boolean;
   goal: string;
   finalUrl?: string;
+  openUrl?: string;
+  title?: string;
   screenshots: Array<{ label: string; dataUrl: string }>;
   youtubeEmbed?: string;
   extractedText?: string;
@@ -1791,6 +1793,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
   // ─── Send message ──────────────────────────────────────────────────────────
   const abortRef = useRef<AbortController | null>(null);
+  // Pestaña pre-abierta dentro del gesto del usuario (evita bloqueo de pop-ups).
+  // Se navega a la URL resuelta cuando el backend responde, o se cierra si no hay.
+  const pendingTabRef = useRef<Window | null>(null);
 
   const sendMessage = useCallback(async (text?: string) => {
     const content = (text ?? input).trim();
@@ -1817,6 +1822,20 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     setMessages(m => [...m, userMsg, { id: thinkingId, role: "assistant" as const, content: "🧠 Analizando tu solicitud...", timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain" }]);
     setInput(""); setAttachFile(null); setAttachFiles([]); setAttachUrl(""); setShowAttach(false);
     setLoading(true);
+
+    // ── Pre-abrir una pestaña EN BLANCO dentro del gesto del usuario si la
+    // intención parece "abrir/reproducir/visitar una web". Así, cuando el backend
+    // resuelva la URL real (p.ej. vídeo de YouTube), la navegamos sin que el
+    // bloqueador de pop-ups la cierre (window.open tras await sería bloqueado).
+    const openIntent =
+      /\bhttps?:\/\//i.test(content) ||
+      /\b(abre|abrir|ábre| abreme|ábreme|pon|ponme|reproduce|reproducir|reprodúce|play|escucha|escuchar|open|visita|visitar|navega|navegar|ve a|youtube)\b/i.test(content);
+    if (openIntent) {
+      try { pendingTabRef.current = window.open("about:blank", "_blank"); } catch { pendingTabRef.current = null; }
+    } else {
+      pendingTabRef.current = null;
+    }
+    let resolvedOpenUrl: string | undefined;
 
     const fetchWithTimeout = (url: string, opts: RequestInit, timeoutMs = 120000): Promise<Response> => {
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -2144,6 +2163,14 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   : act.action === "generate_brand_book" ? "Ver Brand Book"
                   : "Ver resultado";
                 action = { type: actionType as ChatAction["type"], label: actionLabel, data: actionResult, actionName: act.action, formattedContent: formatted };
+                // Captura la primera URL "abrible" devuelta por el backend,
+                // restringida a http(s) por seguridad (nunca javascript:/data:).
+                if (!resolvedOpenUrl && typeof actionResult.openUrl === "string" && actionResult.openUrl) {
+                  try {
+                    const proto = new URL(actionResult.openUrl).protocol;
+                    if (proto === "http:" || proto === "https:") resolvedOpenUrl = actionResult.openUrl;
+                  } catch { /* URL inválida → ignorar */ }
+                }
               }
             }
             if (results.length > 0) {
@@ -2176,6 +2203,17 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return [...filtered, { id: uuid(), role: "assistant" as const, content: displayMsg, timestamp: new Date() }];
       });
     } finally {
+      // Navegar la pestaña pre-abierta a la URL resuelta, o cerrarla si no hubo.
+      if (pendingTabRef.current) {
+        try {
+          if (resolvedOpenUrl) {
+            pendingTabRef.current.location.href = resolvedOpenUrl;
+          } else {
+            pendingTabRef.current.close();
+          }
+        } catch { /* la pestaña pudo cerrarse manualmente */ }
+        pendingTabRef.current = null;
+      }
       setLoading(false);
       abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -2404,8 +2442,20 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
                         // ── browser_action → YouTube / URL / screenshots ──
                         const br = data as BrowserActionResult;
+                        const safeHttp = (u?: string) => {
+                          if (!u) return undefined;
+                          try { const p = new URL(u).protocol; return (p === "http:" || p === "https:") ? u : undefined; }
+                          catch { return undefined; }
+                        };
+                        const openHref = safeHttp(br.openUrl) || safeHttp(br.finalUrl);
                         return (
                           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                            {openHref && (
+                              <a href={openHref} target="_blank" rel="noreferrer"
+                                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 16px", background: "linear-gradient(135deg, rgba(196,165,90,0.9), rgba(160,130,60,0.9))", border: "1px solid var(--gold)", borderRadius: 10, fontSize: 13, color: "#1a1408", textDecoration: "none", width: "fit-content", fontWeight: 800, boxShadow: "0 2px 10px rgba(196,165,90,0.25)" }}>
+                                ▶️ Abrir ahora{br.title ? ` — ${br.title.length > 50 ? br.title.slice(0, 50) + "…" : br.title}` : ""}
+                              </a>
+                            )}
                             {br.youtubeEmbed && (
                               <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--ink3)" }}>
                                 <div style={{ padding: "6px 10px", background: "rgba(255,0,0,0.12)", display: "flex", alignItems: "center", gap: 6 }}>

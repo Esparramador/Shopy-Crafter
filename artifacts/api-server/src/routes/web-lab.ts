@@ -1624,12 +1624,13 @@ function buildReportBody(
   return html;
 }
 
-function escapeHtml(text: string): string {
-  return text
+function escapeHtml(text: unknown): string {
+  return String(text ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ─── Manual edit save: persist user-edited HTML/CSS as a NEW vault version ──
@@ -2385,7 +2386,30 @@ router.post("/web-lab/deep-scan", async (req: Request, res: Response): Promise<v
       },
     };
 
-    res.json({ success: true, result });
+    // ── Persistir el escaneo en el vault para que aparezca en el historial ──
+    let vaultId: number | null = null;
+    const pid = projectId ? Number(projectId) : 0;
+    if (pid && !isNaN(pid)) {
+      try {
+        const reportHtml = buildDeepScanReportHtml(result);
+        vaultId = await saveToVault({
+          projectId: pid,
+          fileType: "web-lab-report",
+          category: "web-lab",
+          title: `🔒 Escaneo de Seguridad — ${normalizedUrl}`,
+          description: `Seguridad ${result.security.score}/100 · ${result.security.vulnerabilities.length} vulnerabilidades · ${result.security.exposedSecrets.length} secretos · ${result.dom.totalElements} elementos DOM`,
+          originalUrl: normalizedUrl,
+          mimeType: "text/html",
+          generatedBy: "web-lab-deep-scan",
+          content: reportHtml,
+          // OJO: usamos `scanUrl` (no `url`) para que download-report sirva el HTML
+          // almacenado tal cual y no intente re-renderizar como informe de diseño.
+          metadata: { kind: "deep-scan", scanUrl: normalizedUrl, score: result.security.score, scannedAt: result.scannedAt, template: "prestige" },
+        });
+      } catch (e) { logger.warn({ e }, "deep-scan vault save failed"); }
+    }
+
+    res.json({ success: true, result, vaultId });
   } catch (err: any) {
     logger.error({ err }, "Web Lab deep-scan failed");
     res.status(500).json({ error: err.message || "Error en el análisis profundo" });
@@ -2964,7 +2988,7 @@ Genera el HTML COMPLETO ahora:`;
 // ── Standalone Secrets Scanner (acepta HTML/código crudo sin URL) ──────────
 router.post("/web-lab/scan-secrets", async (req: Request, res: Response): Promise<void> => {
   try {
-    const { html, source } = req.body as { html?: string; source?: string };
+    const { html, source, projectId, sourceUrl } = req.body as { html?: string; source?: string; projectId?: number; sourceUrl?: string };
     const content = html ?? source ?? "";
     if (!content.trim()) { res.status(400).json({ error: "Proporciona HTML, JS o código a analizar" }); return; }
     if (content.length > 5_000_000) { res.status(400).json({ error: "Contenido demasiado grande (máx 5 MB)" }); return; }
@@ -2986,11 +3010,187 @@ router.post("/web-lab/scan-secrets", async (req: Request, res: Response): Promis
       contentLength: content.length,
     };
 
-    res.json({ success: true, summary, secrets });
+    // ── Persistir el escaneo de secretos en el vault (historial) ──
+    let vaultId: number | null = null;
+    const pid = projectId ? Number(projectId) : 0;
+    if (pid && !isNaN(pid)) {
+      try {
+        const reportHtml = buildSecretsReportHtml(summary, secrets, sourceUrl);
+        vaultId = await saveToVault({
+          projectId: pid,
+          fileType: "web-lab-report",
+          category: "web-lab",
+          title: `🕵️ Escaneo de Secretos${sourceUrl ? ` — ${sourceUrl}` : ""}`,
+          description: `${summary.total} secretos expuestos (${summary.critical} críticos · ${summary.high} altos) · Riesgo ${summary.riskScore}/100`,
+          originalUrl: sourceUrl || undefined,
+          mimeType: "text/html",
+          generatedBy: "web-lab-scan-secrets",
+          content: reportHtml,
+          metadata: { kind: "secrets-scan", scanUrl: sourceUrl, score: summary.riskScore, scannedAt: summary.scannedAt, template: "prestige" },
+        });
+      } catch (e) { logger.warn({ e }, "scan-secrets vault save failed"); }
+    }
+
+    res.json({ success: true, summary, secrets, vaultId });
   } catch (err: any) {
     logger.error({ err }, "Secrets scan failed");
     res.status(500).json({ error: err.message || "Error en el análisis de secretos" });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════
+// HTML REPORT BUILDERS — escaneos persistidos en el vault (historial)
+// Producen un documento HTML autocontenido (tema oro/negro) que
+// `download-report/:vaultId` sirve tal cual.
+// ═══════════════════════════════════════════════════════════════
+const SEV_COLOR: Record<string, string> = {
+  critical: "#ff4d4d", high: "#ff9f40", medium: "#ffd24d", low: "#7fd4a0", info: "#8fb8ff",
+};
+
+function scanReportShell(title: string, subtitle: string, score: number, bodyHtml: string): string {
+  const date = new Date().toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" });
+  const sc = Math.max(0, Math.min(100, Math.round(score)));
+  const scoreColor = sc >= 80 ? "#7fd4a0" : sc >= 50 ? "#ffd24d" : "#ff4d4d";
+  return `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>${escapeHtml(title)}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0b0b0d;color:#e8e0d0;font-family:'Inter',sans-serif;line-height:1.7;font-size:14px}
+  .wrap{max-width:900px;margin:0 auto;padding:48px 32px}
+  .hero{text-align:center;padding:32px 0 40px;border-bottom:1px solid rgba(196,165,90,0.25);margin-bottom:32px}
+  h1{font-family:'Playfair Display',serif;font-size:2rem;color:#c4a55a;margin-bottom:8px}
+  .sub{color:#9a9080;font-size:13px;word-break:break-all}
+  .score-badge{display:inline-flex;align-items:center;justify-content:center;width:120px;height:120px;border-radius:50%;border:4px solid ${scoreColor};margin:24px auto 8px;font-size:2.4rem;font-weight:700;color:${scoreColor};font-family:'Playfair Display',serif}
+  h2{font-family:'Playfair Display',serif;font-size:1.4rem;color:#c4a55a;margin:2.2rem 0 1rem;padding-bottom:.5rem;border-bottom:1px solid rgba(196,165,90,0.25)}
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top}
+  th{color:#c4a55a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .ok{color:#7fd4a0}.no{color:#ff6b6b}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:1rem 0}
+  .stat{background:rgba(196,165,90,0.06);border:1px solid rgba(196,165,90,0.18);border-radius:10px;padding:14px}
+  .stat .n{font-size:1.6rem;font-weight:700;color:#e8d898;font-family:'Playfair Display',serif}
+  .stat .l{font-size:11px;color:#9a9080;margin-top:2px}
+  .card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin:10px 0}
+  .card .t{font-weight:600;color:#e8d898;margin-bottom:4px}
+  .card .d{color:#c8c0b4;font-size:13px}
+  .card .r{color:#9a9080;font-size:12px;margin-top:6px;font-style:italic}
+  code{background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;font-size:12px;color:#d4b870;word-break:break-all}
+  .empty{color:#7fd4a0;padding:14px;background:rgba(127,212,160,0.07);border-radius:10px;border:1px solid rgba(127,212,160,0.2)}
+  .footer{text-align:center;color:#4a4038;font-size:12px;margin-top:3rem;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,0.05)}
+  @media print{body{background:#fff;color:#000}h1,h2{color:#000}}
+</style></head><body><div class="wrap">
+  <div class="hero">
+    <h1>${escapeHtml(title)}</h1>
+    <div class="sub">${escapeHtml(subtitle)}</div>
+    <div class="score-badge">${sc}</div>
+    <div class="sub">Puntuación · ${date}</div>
+  </div>
+  ${bodyHtml}
+  <div class="footer">Generado por Shopy Crafter · Lab Web</div>
+</div></body></html>`;
+}
+
+function buildDeepScanReportHtml(r: DeepScanResult): string {
+  const sec = r.security;
+  const dom = r.dom;
+  const perf = r.performance;
+  const seo = r.seo;
+  const js = r.javascript;
+
+  const headersRows = sec.headers.map(h =>
+    `<tr><td>${escapeHtml(h.name)}</td>
+      <td><span class="pill ${h.present ? "ok" : "no"}">${h.present ? "✓ Presente" : "✗ Ausente"}</span></td>
+      <td style="color:${SEV_COLOR[h.severity] || "#aaa"}">${escapeHtml(h.severity)}</td>
+      <td style="color:#9a9080">${escapeHtml(h.description)}</td></tr>`).join("");
+
+  const vulnsHtml = sec.vulnerabilities.length
+    ? sec.vulnerabilities.map(v =>
+        `<div class="card"><div class="t" style="color:${SEV_COLOR[v.severity] || "#e8d898"}">${escapeHtml(v.type)} · ${escapeHtml(v.severity)}</div>
+         <div class="d">${escapeHtml(v.description)}</div><div class="r">💡 ${escapeHtml(v.recommendation)}</div></div>`).join("")
+    : `<div class="empty">✓ No se detectaron vulnerabilidades evidentes.</div>`;
+
+  const secretsHtml = sec.exposedSecrets.length
+    ? sec.exposedSecrets.map((s: any) =>
+        `<div class="card"><div class="t" style="color:${SEV_COLOR[s.severity] || "#e8d898"}">${escapeHtml(s.service || s.type)} · ${escapeHtml(s.severity)}</div>
+         <div class="d">${escapeHtml(s.description || s.match || "")}</div></div>`).join("")
+    : `<div class="empty">✓ No se detectaron secretos expuestos en el HTML.</div>`;
+
+  const perfHtml = perf.issues.length
+    ? perf.issues.map(p =>
+        `<div class="card"><div class="t" style="color:${SEV_COLOR[p.severity] || "#e8d898"}">${escapeHtml(p.type)} · ${escapeHtml(p.severity)}</div>
+         <div class="d">${escapeHtml(p.detail)}</div></div>`).join("")
+    : `<div class="empty">✓ Sin problemas de rendimiento destacables.</div>`;
+
+  const a11yHtml = dom.accessibilityIssues.length
+    ? dom.accessibilityIssues.map(a =>
+        `<div class="card"><div class="t" style="color:${SEV_COLOR[a.severity] || "#e8d898"}">${escapeHtml(a.type)} (${a.count}) · ${escapeHtml(a.severity)}</div>
+         <div class="d">${escapeHtml(a.detail)}</div></div>`).join("")
+    : `<div class="empty">✓ Sin problemas de accesibilidad destacables.</div>`;
+
+  const libsHtml = js.libraries.length
+    ? `<div class="grid">${js.libraries.map(l => `<div class="stat"><div class="n" style="font-size:1.1rem">${escapeHtml(l.name)}${l.version ? ` <span style="font-size:.8rem;color:#9a9080">${escapeHtml(l.version)}</span>` : ""}</div><div class="l">${escapeHtml(l.category)}</div></div>`).join("")}</div>`
+    : `<div class="empty">No se detectaron librerías JS conocidas.</div>`;
+
+  const body = `
+  <h2>🔒 Seguridad — ${sec.score}/100</h2>
+  <div class="grid">
+    <div class="stat"><div class="n">${sec.https ? "✓" : "✗"}</div><div class="l">HTTPS</div></div>
+    <div class="stat"><div class="n">${sec.mixedContent ? "⚠️" : "✓"}</div><div class="l">Contenido mixto</div></div>
+    <div class="stat"><div class="n">${sec.vulnerabilities.length}</div><div class="l">Vulnerabilidades</div></div>
+    <div class="stat"><div class="n">${sec.exposedSecrets.length}</div><div class="l">Secretos expuestos</div></div>
+  </div>
+  ${sec.serverInfo ? `<p style="color:#9a9080">Servidor: <code>${escapeHtml(sec.serverInfo)}</code></p>` : ""}
+  <h2>🛡️ Cabeceras de seguridad</h2>
+  <table><thead><tr><th>Cabecera</th><th>Estado</th><th>Severidad</th><th>Descripción</th></tr></thead><tbody>${headersRows}</tbody></table>
+  <h2>⚠️ Vulnerabilidades</h2>${vulnsHtml}
+  <h2>🕵️ Secretos expuestos</h2>${secretsHtml}
+  <h2>📐 DOM & Estructura</h2>
+  <div class="grid">
+    <div class="stat"><div class="n">${dom.totalElements}</div><div class="l">Elementos DOM</div></div>
+    <div class="stat"><div class="n">${dom.maxDepth}</div><div class="l">Profundidad máx.</div></div>
+    <div class="stat"><div class="n">${dom.images.withoutAlt}</div><div class="l">Imágenes sin alt</div></div>
+    <div class="stat"><div class="n">${dom.links.total}</div><div class="l">Enlaces</div></div>
+  </div>
+  <h2>♿ Accesibilidad</h2>${a11yHtml}
+  <h2>⚡ Rendimiento</h2>${perfHtml}
+  <h2>🔎 SEO — ${seo.score}/100</h2>
+  <div class="card"><div class="t">Título (${seo.titleLength}) · ${escapeHtml(seo.titleStatus)}</div><div class="d">${escapeHtml(seo.title || "—")}</div></div>
+  <div class="card"><div class="t">Meta descripción (${seo.metaDescriptionLength}) · ${escapeHtml(seo.metaDescriptionStatus)}</div><div class="d">${escapeHtml(seo.metaDescription || "—")}</div></div>
+  <h2>📚 Librerías JS</h2>${libsHtml}
+  `;
+  return scanReportShell(`🔒 Escaneo de Seguridad`, r.url, sec.score, body);
+}
+
+function buildSecretsReportHtml(
+  summary: { total: number; critical: number; high: number; medium: number; services: string[]; riskScore: number; contentLength: number },
+  secrets: Array<any>,
+  sourceUrl?: string,
+): string {
+  const list = secrets.length
+    ? secrets.map(s =>
+        `<div class="card"><div class="t" style="color:${SEV_COLOR[s.severity] || "#e8d898"}">${escapeHtml(s.service || s.type || "Secreto")} · ${escapeHtml(s.severity)}</div>
+         <div class="d">${escapeHtml(s.description || "")}</div>
+         ${s.match ? `<div class="r">Coincidencia: <code>${escapeHtml(String(s.match).slice(0, 80))}</code></div>` : ""}
+         ${s.recommendation ? `<div class="r">💡 ${escapeHtml(s.recommendation)}</div>` : ""}</div>`).join("")
+    : `<div class="empty">✓ No se detectaron secretos ni credenciales expuestas en el contenido analizado.</div>`;
+
+  const body = `
+  <h2>📊 Resumen</h2>
+  <div class="grid">
+    <div class="stat"><div class="n">${summary.total}</div><div class="l">Secretos totales</div></div>
+    <div class="stat"><div class="n" style="color:${SEV_COLOR.critical}">${summary.critical}</div><div class="l">Críticos</div></div>
+    <div class="stat"><div class="n" style="color:${SEV_COLOR.high}">${summary.high}</div><div class="l">Altos</div></div>
+    <div class="stat"><div class="n" style="color:${SEV_COLOR.medium}">${summary.medium}</div><div class="l">Medios</div></div>
+  </div>
+  ${summary.services.length ? `<p style="color:#9a9080">Servicios detectados: ${summary.services.map(s => `<code>${escapeHtml(s)}</code>`).join(" ")}</p>` : ""}
+  <p style="color:#9a9080">Contenido analizado: ${summary.contentLength.toLocaleString("es-ES")} caracteres</p>
+  <h2>🕵️ Hallazgos</h2>${list}
+  `;
+  return scanReportShell(`🕵️ Escaneo de Secretos`, sourceUrl || "Código / HTML pegado", summary.riskScore, body);
+}
 
 export default router;
