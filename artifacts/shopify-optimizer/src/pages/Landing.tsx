@@ -285,7 +285,7 @@ export default function Landing() {
   const { user } = useAuth();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
   const isAdmin = !isPreview && user?.role === "admin";
-  const [content, setContent] = useState<CMSContent | null>(LANDING_FALLBACK);
+  const [content, setContent] = useState<CMSContent>(LANDING_FALLBACK);
   const [currentSection, setCurrentSection] = useState(0);
   const [activeEngine, setActiveEngine] = useState(0);
   const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});

@@ -290,8 +290,8 @@ export default function AMRStudio() {
               {filtered.map(model => {
                 const isSelected = selectedModels.includes(model.id);
                 const provColor = PROVIDER_COLORS[model.provider] || "var(--gold)";
-                const speed = SPEED_LABELS[model.speed];
-                const cost = COST_LABELS[model.costTier];
+                const speed = model.speed ? SPEED_LABELS[model.speed] : undefined;
+                const cost = model.costTier ? COST_LABELS[model.costTier] : undefined;
                 return (
                   <div
                     key={model.id}

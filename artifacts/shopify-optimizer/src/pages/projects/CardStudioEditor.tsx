@@ -371,7 +371,7 @@ async function populateCanvas(
   apiBase: string,
   cardId: number,
 ) {
-  const toRemove = canvas.getObjects().filter(o => o !== guide);
+  const toRemove = canvas.getObjects().filter((o: any) => o !== guide);
   canvas.remove(...toRemove);
 
   for (const el of elements) {
@@ -401,7 +401,7 @@ async function populateCanvas(
       const blobUrl = await fetchBlob(logoUrl);
       if (blobUrl) {
         await new Promise<void>((res) => {
-          fabric.Image.fromURL(blobUrl, (img) => {
+          fabric.Image.fromURL(blobUrl, (img: any) => {
             URL.revokeObjectURL(blobUrl);
             if (!img) { res(); return; }
             const sw = img.width || 1;
@@ -436,7 +436,7 @@ async function populateCanvas(
       const qrBlobUrl = await fetchBlob(qrSrc);
       if (qrBlobUrl) {
         await new Promise<void>((res) => {
-          fabric.Image.fromURL(qrBlobUrl, (img) => {
+          fabric.Image.fromURL(qrBlobUrl, (img: any) => {
             URL.revokeObjectURL(qrBlobUrl);
             if (!img) { res(); return; }
             const sw = img.width || 1200;
@@ -952,7 +952,7 @@ export default function CardStudioEditor({
     }));
     const blobUrl = await fetchBlob(buildQrUrl(defaultUrl, defaultFg, defaultBg));
     if (blobUrl) {
-      fabric.Image.fromURL(blobUrl, (img) => {
+      fabric.Image.fromURL(blobUrl, (img: any) => {
         URL.revokeObjectURL(blobUrl);
         if (!img) return;
         const sw = img.width || 1200;
@@ -1461,9 +1461,10 @@ export default function CardStudioEditor({
                           setOverrides(prev => ({ ...prev, extras: (prev.extras || []).filter(ex => ex.id !== exId) }));
                         } else {
                           setOverrides(prev => {
-                            const sideOv = { ...(prev[el._side] ?? {}) };
+                            const side = el._side as "front" | "back";
+                            const sideOv = { ...(prev[side] ?? {}) };
                             sideOv[el.id] = { ...(sideOv[el.id] ?? {}), hidden: true };
-                            return { ...prev, [el._side]: sideOv };
+                            return { ...prev, [side]: sideOv };
                           });
                         }
                       }} style={iconBtn} title={el.id.startsWith("extra-") ? "Eliminar" : "Ocultar"}>

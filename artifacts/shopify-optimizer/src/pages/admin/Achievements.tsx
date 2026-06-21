@@ -94,7 +94,7 @@ export default function Achievements() {
     return true;
   });
 
-  const categories = [...new Set(achievements.map((a: any) => a.category as string))];
+  const categories = [...new Set(achievements.map((a: any) => a.category as string))] as string[];
 
   return (
     <div>
