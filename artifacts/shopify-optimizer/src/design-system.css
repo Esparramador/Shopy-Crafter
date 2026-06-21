@@ -965,6 +965,17 @@ code {
   /* All table containers: horizontal scroll */
   .main-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+  /* Inline-styled grids (admin panels use style={{gridTemplateColumns}} instead
+     of the .grid-* classes) → collapse to a single column on phones. */
+  .main-content [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+
+  /* Let flex/grid children actually shrink instead of overflowing the viewport. */
+  .main-content [style*="display: flex"],
+  .main-content [style*="display:flex"] { min-width: 0; max-width: 100%; }
+
+  /* Fixed pixel-width inline containers: never exceed the viewport width. */
+  .main-content [style*="width:"] { max-width: 100%; }
+
   /* Toast system: mobile-safe */
   #toast-container { left: 12px; right: 12px; bottom: 12px; }
   .toast { min-width: auto; max-width: 100%; }

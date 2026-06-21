@@ -494,6 +494,41 @@ export default function Landing() {
     if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  // Resolve a CMS href (e.g. "#cta", "#contact", "#fp-pricing", "planes") to a
+  // real landing section id. Returns null when it can't be mapped to a section.
+  const resolveSectionId = useCallback((href?: string): string | null => {
+    if (!href) return null;
+    const id = href.trim().replace(/^#/, "").toLowerCase();
+    if (!id) return null;
+    const alias: Record<string, string> = {
+      cta: "fp-contact", "fp-cta": "fp-contact",
+      contact: "fp-contact", contacto: "fp-contact", contacta: "fp-contact", contactar: "fp-contact",
+      how: "fp-demo", "fp-how": "fp-demo", como: "fp-demo", "cómo": "fp-demo",
+      planes: "fp-pricing", precios: "fp-pricing", pricing: "fp-pricing",
+      demo: "fp-demo", resultados: "fp-results", results: "fp-results",
+      motores: "fp-engines", engines: "fp-engines",
+      calculadora: "fp-calculator", calculator: "fp-calculator",
+      inicio: "fp-hero", home: "fp-hero",
+    };
+    if (alias[id]) return alias[id];
+    if (FP_SECTION_IDS.includes(id)) return id;
+    if (FP_SECTION_IDS.includes(`fp-${id}`)) return `fp-${id}`;
+    return null;
+  }, []);
+
+  // Navigate based on a CMS-configured href, honoring its target instead of a
+  // hardcoded section index. Falls back to the given index when unmappable.
+  const goToHref = useCallback((href: string | undefined, fallbackIndex: number) => {
+    const id = resolveSectionId(href);
+    if (id) {
+      const idx = FP_SECTION_IDS.indexOf(id);
+      if (idx !== -1) { goToSection(idx); setHashRobust(id); return; }
+    }
+    if (href && /^https?:\/\//i.test(href)) { window.open(href, "_blank", "noopener"); return; }
+    if (href && href.startsWith("/")) { window.location.assign(href); return; }
+    goToSection(fallbackIndex);
+  }, [resolveSectionId, goToSection, setHashRobust]);
+
   useEffect(() => {
     if (!content) return;
     setAnimatedSections(prev => new Set([...prev, FP_SECTION_IDS[0]]));
@@ -746,8 +781,8 @@ export default function Landing() {
               </h1>
               <p className={`l-hero-sub ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.22s" }} onClick={cmsClick("hero.subheadline")} {...cmsData("hero.subheadline")}>{content.hero.subheadline}</p>
               <div className={`l-hero-ctas ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.34s" }}>
-                <a href="#fp-pricing" className="l-btn-primary btn-jelly" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaPrimary.label", e) : goToSection(4); }} {...cmsData("hero.ctaPrimary.label")}>{content.hero.ctaPrimary?.label ?? "Ver planes →"}</a>
-                <a href="#fp-demo" className="l-btn-secondary btn-jelly" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaSecondary.label", e) : goToSection(2); }} {...cmsData("hero.ctaSecondary.label")}>{content.hero.ctaSecondary.label}</a>
+                <a href={`#${resolveSectionId(content.hero.ctaPrimary?.href) ?? "fp-pricing"}`} className="l-btn-primary btn-jelly" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaPrimary.label", e) : goToHref(content.hero.ctaPrimary?.href, 4); }} {...cmsData("hero.ctaPrimary.label")}>{content.hero.ctaPrimary?.label ?? "Ver planes →"}</a>
+                <a href={`#${resolveSectionId(content.hero.ctaSecondary?.href) ?? "fp-demo"}`} className="l-btn-secondary btn-jelly" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaSecondary.label", e) : goToHref(content.hero.ctaSecondary?.href, 2); }} {...cmsData("hero.ctaSecondary.label")}>{content.hero.ctaSecondary.label}</a>
               </div>
               
               <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
