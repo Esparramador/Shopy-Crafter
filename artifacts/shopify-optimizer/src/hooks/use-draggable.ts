@@ -50,6 +50,22 @@ export function useDraggable({ storageKey, defaultBottom, defaultRight, dragFrom
     };
   }, []);
 
+  // Re-clamp on mount and on viewport resize so a position saved on a large
+  // screen never leaves the widget stranded off-screen on a smaller one.
+  useEffect(() => {
+    const reclamp = () => setPosition(p => {
+      const next = clamp(p);
+      return next.bottom === p.bottom && next.right === p.right ? p : next;
+    });
+    reclamp();
+    window.addEventListener("resize", reclamp);
+    window.addEventListener("orientationchange", reclamp);
+    return () => {
+      window.removeEventListener("resize", reclamp);
+      window.removeEventListener("orientationchange", reclamp);
+    };
+  }, [clamp]);
+
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (!dragFromAnywhere) {
       const target = e.target as HTMLElement;

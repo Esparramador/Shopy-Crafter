@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { X, ChevronRight, ChevronLeft, RotateCcw } from "lucide-react";
 
 const COACH_MARKS_KEY = "shopycrafter_coach_dismissed";
@@ -46,6 +46,8 @@ export function CoachMarks() {
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
     const dismissed = localStorage.getItem(COACH_MARKS_KEY);
@@ -72,6 +74,20 @@ export function CoachMarks() {
     };
   }, [updateRect]);
 
+  // Measure the actual rendered tooltip so positioning/clamping uses real
+  // dimensions instead of a fixed estimate (height varies with content/locale).
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const el = tooltipRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setMeasured(prev =>
+      prev && Math.abs(prev.w - r.width) < 1 && Math.abs(prev.h - r.height) < 1
+        ? prev
+        : { w: r.width, h: r.height }
+    );
+  }, [visible, step, targetRect]);
+
   const dismiss = () => {
     setVisible(false);
     localStorage.setItem(COACH_MARKS_KEY, "1");
@@ -93,6 +109,14 @@ export function CoachMarks() {
 
   const current = STEPS[step];
 
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const isMobile = vw <= 600;
+  const TW = Math.min(320, vw - 24);
+  // Use measured dimensions once available, falling back to estimates on first paint.
+  const TWc = measured?.w ?? TW;
+  const THc = measured?.h ?? 220;
+
   const tooltipStyle: React.CSSProperties = {
     position: "fixed",
     zIndex: 10001,
@@ -100,34 +124,51 @@ export function CoachMarks() {
     border: "1px solid rgba(200,168,75,0.4)",
     borderRadius: 14,
     padding: "20px 22px",
-    width: 320,
+    width: TW,
+    maxWidth: "calc(100vw - 24px)",
+    maxHeight: "calc(100vh - 24px)",
+    overflowY: "auto",
+    boxSizing: "border-box",
     boxShadow: "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(200,168,75,0.1)",
   };
 
-  if (targetRect) {
-    const gap = 14;
-    switch (current.position) {
-      case "right":
-        tooltipStyle.left = targetRect.right + gap;
-        tooltipStyle.top = targetRect.top + targetRect.height / 2 - 60;
-        break;
-      case "bottom":
-        tooltipStyle.left = targetRect.left + targetRect.width / 2 - 160;
-        tooltipStyle.top = targetRect.bottom + gap;
-        break;
-      case "left":
-        tooltipStyle.right = window.innerWidth - targetRect.left + gap;
-        tooltipStyle.top = targetRect.top + targetRect.height / 2 - 60;
-        break;
-      case "top":
-        tooltipStyle.left = targetRect.left + targetRect.width / 2 - 160;
-        tooltipStyle.bottom = window.innerHeight - targetRect.top + gap;
-        break;
+  // On phones the sidebar targets are re-laid-out (horizontal/hidden), so a
+  // positioned tooltip would land off-screen — pin it as a centered bottom sheet.
+  if (isMobile || !targetRect) {
+    tooltipStyle.left = "50%";
+    if (isMobile && targetRect) {
+      tooltipStyle.bottom = 16;
+      tooltipStyle.transform = "translateX(-50%)";
+    } else {
+      tooltipStyle.top = "50%";
+      tooltipStyle.transform = "translate(-50%, -50%)";
     }
   } else {
-    tooltipStyle.top = "50%";
-    tooltipStyle.left = "50%";
-    tooltipStyle.transform = "translate(-50%, -50%)";
+    const gap = 14;
+    let left: number;
+    let top: number;
+    switch (current.position) {
+      case "right":
+        left = targetRect.right + gap;
+        top = targetRect.top + targetRect.height / 2 - THc / 2;
+        break;
+      case "left":
+        left = targetRect.left - gap - TWc;
+        top = targetRect.top + targetRect.height / 2 - THc / 2;
+        break;
+      case "top":
+        left = targetRect.left + targetRect.width / 2 - TWc / 2;
+        top = targetRect.top - gap - THc;
+        break;
+      case "bottom":
+      default:
+        left = targetRect.left + targetRect.width / 2 - TWc / 2;
+        top = targetRect.bottom + gap;
+        break;
+    }
+    // Clamp into the viewport so the tooltip is never cut off.
+    tooltipStyle.left = Math.max(12, Math.min(left, vw - TWc - 12));
+    tooltipStyle.top = Math.max(12, Math.min(top, vh - THc - 12));
   }
 
   return (
@@ -161,7 +202,7 @@ export function CoachMarks() {
         />
       )}
 
-      <div style={tooltipStyle}>
+      <div ref={tooltipRef} style={tooltipStyle}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--gold)", fontWeight: 700 }}>
             Paso {step + 1} de {STEPS.length}
