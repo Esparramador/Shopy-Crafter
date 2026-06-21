@@ -38,11 +38,31 @@ interface WebLabAnalysis {
   summary: string;
 }
 
+interface PsiDiagnostic {
+  id: string;
+  title: string;
+  description: string;
+  displayValue: string | null;
+  score: number | null;
+  savingsMs: number | null;
+  savingsBytes: number | null;
+  impact: "high" | "medium" | "low" | "info";
+  items: Array<{ label: string; detail: string }>;
+}
+interface PsiCwvMetric { value: number | null; unit: string; status: string }
+interface PageSpeedData {
+  mobile: Record<string, number> | null;
+  desktop: Record<string, number> | null;
+  coreWebVitals: Record<string, PsiCwvMetric> | null;
+  diagnostics: PsiDiagnostic[];
+  diagnosticsDesktop: PsiDiagnostic[] | null;
+}
+
 interface AnalysisResult {
   analysis: WebLabAnalysis;
   reportHtml?: string;
   vaultIds: { report: number | null; css: number | null; html: number | null };
-  pageSpeed: any;
+  pageSpeed: PageSpeedData | null;
   scraperData: any;
   analyticsDetection?: {
     hasGoogleAnalytics: boolean;
@@ -469,6 +489,50 @@ function DomPanel({ scan }: { scan: DeepScanResult }) {
         ) : (
           <p style={{ color: "#555", fontSize: 12 }}>No se detectaron librerías conocidas (puede que estén minificadas o bajo CDN desconocido)</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+function PsiDiagnosticsList({ list, device }: { list: PsiDiagnostic[] | null | undefined; device: string }) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const fmtSavings = (bytes: number | null, ms: number | null) =>
+    [
+      bytes ? (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MiB` : `${Math.round(bytes / 1024)} KiB`) : null,
+      ms ? (ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`) : null,
+    ].filter(Boolean).join(" · ");
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <h4 style={{ fontSize: 13, fontWeight: 700, color: "#f97316", margin: "0 0 8px" }}>
+        🔬 Diagnósticos y oportunidades ({list.length}) — {device}
+      </h4>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {list.map(d => {
+          const impactColor = d.impact === "high" ? "#ef4444" : d.impact === "medium" ? "#eab308" : "#3b82f6";
+          const impactLabel = d.impact === "high" ? "Alto" : d.impact === "medium" ? "Medio" : "Info";
+          const savings = fmtSavings(d.savingsBytes, d.savingsMs);
+          return (
+            <div key={d.id} style={{ background: "#0a0a14", borderRadius: 8, padding: "12px 14px", border: `1px solid ${impactColor}22` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: impactColor, background: `${impactColor}22`, padding: "2px 7px", borderRadius: 5 }}>{impactLabel}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#eee" }}>{d.title}</span>
+                {savings && <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", marginLeft: "auto" }}>Ahorro: {savings}</span>}
+                {!savings && d.displayValue && <span style={{ fontSize: 11, color: "#aaa", marginLeft: "auto" }}>{d.displayValue}</span>}
+              </div>
+              {d.description && <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0", lineHeight: 1.45 }}>{d.description}</p>}
+              {Array.isArray(d.items) && d.items.length > 0 && (
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+                  {d.items.map((it, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, fontSize: 10, color: "#999", fontFamily: "monospace" }}>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.label}</span>
+                      {it.detail && <span style={{ color: "#d4a843", flexShrink: 0 }}>{it.detail}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -2320,19 +2384,62 @@ ${body}
                   </div>
                 )}
 
-                {result.pageSpeed && (
+                {result.pageSpeed && (() => {
+                  const ps = result.pageSpeed!;
+                  return (
                   <div>
-                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⚡ PageSpeed</h3>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
-                      {Object.entries(result.pageSpeed.mobile || {}).map(([k, v]) => (
-                        <div key={k} style={{ background: "#0a0a14", padding: 10, borderRadius: 8, textAlign: "center" }}>
-                          <div style={{ fontSize: 22, fontWeight: 700, color: scoreColor(v as number) }}>{v as number}</div>
-                          <div style={{ fontSize: 11, color: "#888" }}>{k}</div>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>⚡ PageSpeed Insights (Google)</h3>
+
+                    {/* Scores móvil vs escritorio */}
+                    {(["mobile", "desktop"] as const).map(dev => (
+                      ps[dev] && (
+                        <div key={dev} style={{ marginBottom: 14 }}>
+                          <p style={{ fontSize: 12, color: "#888", margin: "0 0 6px" }}>{dev === "mobile" ? "📱 Móvil" : "🖥️ Escritorio"}</p>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
+                            {Object.entries(ps[dev] || {}).map(([k, v]) => (
+                              <div key={k} style={{ background: "#0a0a14", padding: 10, borderRadius: 8, textAlign: "center" }}>
+                                <div style={{ fontSize: 22, fontWeight: 700, color: scoreColor(v as number) }}>{v as number}</div>
+                                <div style={{ fontSize: 11, color: "#888" }}>{k}</div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      )
+                    ))}
+
+                    {/* Core Web Vitals con estado real */}
+                    {ps.coreWebVitals && (
+                      <div style={{ marginBottom: 18 }}>
+                        <h4 style={{ fontSize: 13, fontWeight: 700, color: "#d4a843", margin: "0 0 8px" }}>Core Web Vitals</h4>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 8 }}>
+                          {[
+                            { key: "lcp", label: "LCP", unit: "s" },
+                            { key: "cls", label: "CLS", unit: "" },
+                            { key: "inp", label: "INP", unit: "ms" },
+                            { key: "fcp", label: "FCP", unit: "s" },
+                            { key: "tbt", label: "TBT", unit: "ms" },
+                            { key: "si", label: "Speed Index", unit: "s" },
+                          ].map(({ key, label, unit }) => {
+                            const cwv = ps.coreWebVitals?.[key];
+                            if (!cwv || cwv.value == null) return null;
+                            const color = cwv.status === "good" ? "#22c55e" : cwv.status === "needs-improvement" ? "#eab308" : "#ef4444";
+                            return (
+                              <div key={key} style={{ background: "#0a0a14", padding: "10px 12px", borderRadius: 8, border: `1px solid ${color}33` }}>
+                                <div style={{ fontSize: 11, color: "#888" }}>{label}</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color }}>{cwv.value}{unit}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Diagnósticos / oportunidades reales con ahorros estimados */}
+                    <PsiDiagnosticsList list={ps.diagnostics} device="móvil" />
+                    <PsiDiagnosticsList list={ps.diagnosticsDesktop} device="escritorio" />
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* ── Analytics & Tracking Detection ─────────────────────────── */}
                 {result.analyticsDetection && (

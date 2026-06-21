@@ -1,5 +1,17 @@
 import { logger } from "./logger.js";
 
+export interface PageSpeedDiagnostic {
+  id: string;
+  title: string;
+  description: string;
+  displayValue: string | null;
+  score: number | null;
+  savingsMs: number | null;
+  savingsBytes: number | null;
+  impact: "high" | "medium" | "low" | "info";
+  items: Array<{ label: string; detail: string }>;
+}
+
 export interface PageSpeedResult {
   url: string;
   strategy: "mobile" | "desktop";
@@ -26,6 +38,150 @@ export interface PageSpeedResult {
   issues: string[];
   fixes: string[];
   opportunities: Array<{ title: string; savings: string; impact: "high" | "medium" | "low" }>;
+  diagnostics: PageSpeedDiagnostic[];
+}
+
+// Auditorías "opportunities" + "diagnostics" reales de Lighthouse que la API de
+// PageSpeed devuelve pero que antes no extraíamos. Estas contienen los ahorros
+// estimados (KiB/ms) y los recursos concretos que causan cada problema.
+const DIAGNOSTIC_AUDIT_IDS = [
+  "uses-long-cache-ttl",
+  "unused-javascript",
+  "unused-css-rules",
+  "modern-image-formats",
+  "uses-optimized-images",
+  "uses-responsive-images",
+  "render-blocking-resources",
+  "uses-text-compression",
+  "efficient-animated-content",
+  "duplicated-javascript",
+  "legacy-javascript",
+  "total-byte-weight",
+  "layout-shift-elements",
+  "dom-size",
+  "mainthread-work-breakdown",
+  "bootup-time",
+  "third-party-summary",
+  "server-response-time",
+  "redirects",
+  "uses-rel-preconnect",
+] as const;
+
+type PsiAudit = {
+  id?: string;
+  title?: string;
+  description?: string;
+  numericValue?: number;
+  displayValue?: string;
+  score?: number | null;
+  scoreDisplayMode?: string;
+  details?: {
+    type?: string;
+    overallSavingsMs?: number;
+    overallSavingsBytes?: number;
+    items?: Array<Record<string, unknown>>;
+  };
+};
+
+function pickString(...vals: unknown[]): string {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim()) return v;
+  }
+  return "";
+}
+
+function fmtBytes(bytes: number | null | undefined): string | null {
+  if (bytes == null || bytes <= 0) return null;
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+  return `${Math.round(bytes / 1024)} KiB`;
+}
+
+function fmtMs(ms: number | null | undefined): string | null {
+  if (ms == null || ms <= 0) return null;
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
+}
+
+function extractDiagnostics(audits: Record<string, PsiAudit>): PageSpeedDiagnostic[] {
+  const out: PageSpeedDiagnostic[] = [];
+
+  for (const id of DIAGNOSTIC_AUDIT_IDS) {
+    const a = audits[id];
+    if (!a) continue;
+    if (a.scoreDisplayMode === "notApplicable" || a.scoreDisplayMode === "manual") continue;
+
+    const score = a.score ?? null;
+    const savingsBytes = a.details?.overallSavingsBytes ?? null;
+    const savingsMs = a.details?.overallSavingsMs ?? null;
+
+    // Omite auditorías que ya pasan sin ahorros accionables.
+    if (score != null && score >= 0.9 && !savingsBytes && !savingsMs) continue;
+
+    const impact: PageSpeedDiagnostic["impact"] =
+      score == null ? "info" : score < 0.5 ? "high" : score < 0.9 ? "medium" : "info";
+
+    const items: Array<{ label: string; detail: string }> = [];
+    const rawItems = Array.isArray(a.details?.items) ? a.details!.items! : [];
+    for (const raw of rawItems.slice(0, 5)) {
+      const it = raw as Record<string, unknown>;
+
+      // Etiqueta: cubre items basados en url, en entidad (third-party), en nodo
+      // del DOM (layout-shift-elements) y en estadística (dom-size).
+      let label = pickString(it.url, it.source, it.label, it.name, it.statistic, it.groupLabel);
+      if (!label) {
+        const entity = it.entity;
+        if (typeof entity === "string") label = entity;
+        else if (entity && typeof entity === "object") label = pickString((entity as Record<string, unknown>).text);
+      }
+      if (!label) {
+        const node = it.node;
+        if (node && typeof node === "object") {
+          const n = node as Record<string, unknown>;
+          label = pickString(n.nodeLabel, n.snippet);
+        }
+      }
+      if (!label) label = a.displayValue ?? id;
+      if (label.length > 64) label = "…" + label.slice(-61);
+
+      const wastedBytes = it.wastedBytes as number | undefined;
+      const wastedMs = it.wastedMs as number | undefined;
+      const totalBytes = it.totalBytes as number | undefined;
+      const transferSize = it.transferSize as number | undefined;
+      const mainThreadTime = it.mainThreadTime as number | undefined;
+      const blockingTime = it.blockingTime as number | undefined;
+      const duration = it.duration as number | undefined;
+      const total = it.total as number | undefined;
+
+      const b = fmtBytes(wastedBytes ?? transferSize ?? totalBytes);
+      const m = fmtMs(wastedMs ?? mainThreadTime ?? blockingTime ?? duration ?? total);
+      // dom-size usa `value` numérico; layout-shift-elements usa `score` (aporte CLS).
+      const numericValue = typeof it.value === "number" ? String(it.value) : null;
+      const shiftScore = typeof it.score === "number" ? `CLS ${(it.score as number).toFixed(3)}` : null;
+      const detail = [b, m, numericValue, shiftScore].filter(Boolean).join(" · ");
+
+      items.push({ label, detail: detail || (a.displayValue ?? "") });
+    }
+
+    out.push({
+      id,
+      title: a.title ?? id,
+      description: (a.description ?? "").replace(/\s*\[([^\]]+)\]\([^)]*\)/g, " $1").trim(),
+      displayValue: a.displayValue ?? null,
+      score,
+      savingsMs,
+      savingsBytes,
+      impact,
+      items,
+    });
+  }
+
+  const impactRank: Record<PageSpeedDiagnostic["impact"], number> = { high: 0, medium: 1, info: 2, low: 3 };
+  out.sort(
+    (a, b) =>
+      impactRank[a.impact] - impactRank[b.impact] ||
+      (b.savingsBytes ?? 0) - (a.savingsBytes ?? 0) ||
+      (b.savingsMs ?? 0) - (a.savingsMs ?? 0)
+  );
+  return out;
 }
 
 export async function runPageSpeedAudit(
@@ -147,6 +303,8 @@ export async function runPageSpeedAudit(
     fixes.push("Inline el CSS crítico, elimina render-blocking resources del <head>");
   }
 
+  const diagnostics = extractDiagnostics(audits as Record<string, PsiAudit>);
+
   const metricStatus = (val: number | null, good: number, mid: number) =>
     val == null ? "unknown" : val <= good ? "good" : val <= mid ? "needs-improvement" : "poor";
 
@@ -178,6 +336,7 @@ export async function runPageSpeedAudit(
     issues,
     fixes,
     opportunities,
+    diagnostics,
   };
 }
 
@@ -243,6 +402,17 @@ export async function runDualPageSpeed(url: string): Promise<{
     lines.push(`  FCP=${v(d.coreWebVitals.fcp.value, "s")}, TBT=${v(d.coreWebVitals.tbt.value, "ms")}, SI=${v(d.coreWebVitals.si.value, "s")}, TTI=${v(d.coreWebVitals.tti.value, "s")}, TTFB=${v(d.coreWebVitals.ttfb.value, "ms")}`);
     if (d.fieldData.category) lines.push(`  Experiencia de campo: ${d.fieldData.category}`);
     if (d.issues.length > 0) lines.push(`  Problemas: ${d.issues.join("; ")}`);
+    if (d.diagnostics.length > 0) {
+      lines.push(`  Diagnósticos Lighthouse (datos reales):`);
+      d.diagnostics.slice(0, 12).forEach(diag => {
+        const sv = [
+          diag.savingsBytes ? `ahorro ${Math.round(diag.savingsBytes / 1024)} KiB` : null,
+          diag.savingsMs ? `${Math.round(diag.savingsMs)} ms` : null,
+        ].filter(Boolean).join(", ");
+        const tail = sv ? ` — ${sv}` : diag.displayValue ? ` — ${diag.displayValue}` : "";
+        lines.push(`    • [${diag.impact}] ${diag.title}${tail}`);
+      });
+    }
   };
 
   if (mobile) renderDevice("📱 MÓVIL", mobile);

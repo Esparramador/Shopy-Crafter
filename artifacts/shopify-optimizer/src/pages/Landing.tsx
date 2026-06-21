@@ -684,7 +684,7 @@ export default function Landing() {
       <nav className="l-nav l-nav-fp">
         <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
           {content.site.logo.imageUrl ? (
-            <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt={content.site.name} style={{ height: 32, width: "auto", borderRadius: 6 }} />
+            <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt="" width={32} height={32} style={{ height: 32, width: 32, borderRadius: 6 }} />
           ) : (
             <div className="l-nav-gem">{content.site.logo.value}</div>
           )}
@@ -1479,7 +1479,7 @@ export default function Landing() {
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
                     {content.site.logo.imageUrl ? (
-                      <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt={content.site.name} style={{ height: 28, width: "auto", borderRadius: 6 }} />
+                      <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt="" width={28} height={28} style={{ height: 28, width: 28, borderRadius: 6 }} />
                     ) : (
                       <div className="l-nav-gem">{content.site.logo.value}</div>
                     )}

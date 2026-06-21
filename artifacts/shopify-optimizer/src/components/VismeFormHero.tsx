@@ -418,7 +418,7 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
           poster={POSTER_SRC}
           muted
           playsInline
-          preload="auto"
+          preload="none"
         />
 
         {/* ── Gradient overlay ──────────────────────────────────────────────── */}

@@ -33,6 +33,26 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      // Cache-Control para la build de producción servida con `vite preview`.
+      // Los assets con hash de contenido (/assets/*.js|css|fuentes) son inmutables;
+      // medios (vídeos/imágenes) reciben max-age largo; el HTML nunca se cachea
+      // para que cada deploy entregue las referencias de assets más recientes.
+      name: "cache-control-headers",
+      configurePreviewServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const url = (req.url || "").split("?")[0];
+          if (/\/assets\/(?!videos\/).*\.(js|mjs|css|woff2?|ttf|otf|eot)$/i.test(url)) {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          } else if (/\.(mp4|webm|mov|jpe?g|png|webp|avif|gif|svg|ico)$/i.test(url)) {
+            res.setHeader("Cache-Control", "public, max-age=2592000");
+          } else if (/\.html?$/i.test(url) || url === "/" || !/\.[a-z0-9]+$/i.test(url)) {
+            res.setHeader("Cache-Control", "no-cache");
+          }
+          next();
+        });
+      },
+    },
     ...(!isProd ? [await import("@replit/vite-plugin-runtime-error-modal").then(m => m.default())] : []),
     ...(!isProd && process.env.REPL_ID !== undefined
       ? [

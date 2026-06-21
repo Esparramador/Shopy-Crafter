@@ -464,6 +464,7 @@
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  contain: layout paint;
 }
 .hero-aurora-inner {
   position: absolute;

@@ -662,6 +662,8 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
         mobile: { performance: pageSpeed.performanceScore, seo: pageSpeed.seoScore, accessibility: pageSpeed.accessibilityScore, bestPractices: pageSpeed.bestPracticesScore },
         desktop: pageSpeedDesktop ? { performance: pageSpeedDesktop.performanceScore, seo: pageSpeedDesktop.seoScore, accessibility: pageSpeedDesktop.accessibilityScore } : null,
         coreWebVitals: pageSpeed.coreWebVitals,
+        diagnostics: pageSpeed.diagnostics,
+        diagnosticsDesktop: pageSpeedDesktop?.diagnostics ?? null,
       } : null,
       scraperData: scraperData ? {
         title: scraperData.title,
