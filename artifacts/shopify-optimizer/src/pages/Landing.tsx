@@ -1487,6 +1487,7 @@ export default function Landing() {
                   </a>
                   <p className="l-footer-desc" {...cmsProps("footer.tagline")}>{content.footer.tagline}</p>
                 </div>
+                <div className="fp-footer-cols">
                 {content.footer.columns.slice(0, 4).map((col, i) => (
                   <div key={i} className="fp-footer-col">
                     <div className="l-footer-col-title" {...cmsProps(`footer.columns.${i}.title`)}>{col.title}</div>
@@ -1542,6 +1543,7 @@ export default function Landing() {
                     </ul>
                   </div>
                 ))}
+                </div>
               </div>
               <div className="l-footer-bottom">
                 <div className="l-footer-copy" {...cmsProps("footer.copyright")}>{content.footer.copyright}</div>

@@ -1213,12 +1213,19 @@
   padding-top: 24px;
 }
 .fp-footer-inner {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 32px; margin-bottom: 16px;
-  align-items: start;
 }
-.fp-footer-brand .l-footer-desc { font-size: 12.5px; max-width: 200px; margin-top: 10px; line-height: 1.55; }
+.fp-footer-brand { flex: 1 1 220px; min-width: 180px; }
+.fp-footer-cols {
+  flex: 3 1 480px;
+  display: flex;
+  gap: 28px;
+}
+.fp-footer-cols > .fp-footer-col { flex: 1 1 0; min-width: 0; }
+.fp-footer-brand .l-footer-desc { font-size: 12.5px; max-width: 220px; margin-top: 10px; line-height: 1.55; }
 .fp-footer-col .l-footer-col-title { margin-bottom: 12px; }
 .fp-footer-col .l-footer-links { gap: 7px; }
 
@@ -1457,8 +1464,8 @@
   .fp-pricing-arrow { width: 30px; height: 30px; font-size: 16px; }
   .fp-pricing-arrow-left { left: 4px; }
   .fp-pricing-arrow-right { right: 48px; }
-  .fp-footer-inner { grid-template-columns: 1fr 1fr; }
-  .fp-footer-brand { grid-column: 1 / -1; }
+  .fp-footer-brand { flex: 1 1 100%; }
+  .fp-footer-cols { gap: 20px; }
   .l-features-grid { grid-template-columns: 1fr 1fr; }
   .fp-engine-tabs { gap: 6px; }
   .fp-etab { padding: 6px 12px; }
@@ -1586,10 +1593,10 @@
   .fp-testi-card.active { position: relative !important; transform: none !important; }
 
   /* Footer */
-  .fp-footer-inner { grid-template-columns: 1fr !important; gap: 24px; }
-  .fp-footer-brand { grid-column: auto !important; }
+  .fp-footer-inner { gap: 22px; }
+  .fp-footer-brand { flex: 1 1 100% !important; }
   .l-footer-desc { max-width: 100% !important; }
-  .fp-footer-col { display: block; }
+  .fp-footer-cols { gap: 14px; }
   .l-footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
   .l-footer-badges { flex-wrap: wrap; justify-content: center; gap: 8px; }
 
@@ -1680,8 +1687,10 @@
   }
   .fp-contact-form-v2 .fp-contact-row { grid-template-columns: 1fr !important; }
 
-  .fp-footer-inner { grid-template-columns: 1fr !important; gap: 18px; }
-  .fp-footer-col { display: block; }
+  .fp-footer-inner { gap: 16px; }
+  .fp-footer-cols { gap: 10px; }
+  .fp-footer-cols .l-footer-col-title { font-size: 10px; letter-spacing: 0.8px; }
+  .fp-footer-cols .l-footer-links a { font-size: 12px; }
   .l-footer-bottom { flex-direction: column; gap: 10px; text-align: center; }
   .l-footer-badges { justify-content: center; }
 
