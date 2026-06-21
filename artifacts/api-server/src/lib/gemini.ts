@@ -237,6 +237,95 @@ async function askGemini(prompt: string, systemInstruction?: string, useProModel
   }
 }
 
+// ─── Multi-turn conversational chat (no search) ───────────────────────────────
+// For conversational assistants (e.g. the landing pre-sales bot). Maps a
+// user/assistant transcript to Gemini `contents` (user/model roles), applies the
+// same circuit-breaker + timeout + usage-recording + Claude-fallback patterns as
+// askGemini. A modest thinkingBudget gives real reasoning while staying fast.
+export interface GeminiChatMessage { role: "user" | "assistant"; content: string }
+
+export async function askGeminiChat(
+  messages: GeminiChatMessage[],
+  systemInstruction?: string,
+  opts: { useProModel?: boolean; maxOutputTokens?: number; thinkingBudget?: number } = {},
+): Promise<string> {
+  const { useProModel = false, maxOutputTokens = 2048, thinkingBudget = 1024 } = opts;
+
+  const contents = messages
+    .filter(m => m.content && (m.role === "user" || m.role === "assistant"))
+    .map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+
+  if (contents.length === 0) return "";
+
+  const claudeFallback = async (): Promise<string> => {
+    const { askClaudeWithBrain } = await import("./claude.js");
+    const claudeMsgs = messages
+      .filter(m => m.content)
+      .map(m => ({ role: m.role, content: m.content }));
+    return askClaudeWithBrain(0, claudeMsgs, systemInstruction ?? "Eres un asistente útil.", "general");
+  };
+
+  if (isGeminiGenerationBlocked()) {
+    logger.warn("[askGeminiChat] Circuit breaker open — falling back to Claude");
+    try { return await claudeFallback(); }
+    catch (err) { logger.error({ err: String(err) }, "[askGeminiChat] Claude fallback also failed"); return ""; }
+  }
+
+  try {
+    const ai    = getGeminiClient();
+    const model = useProModel ? geminiPro() : geminiFast();
+
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model,
+        contents,
+        config: {
+          ...(systemInstruction ? { systemInstruction } : {}),
+          maxOutputTokens,
+          ...(thinkingBudget != null ? { thinkingConfig: { thinkingBudget } } : {}),
+        },
+      }),
+      GEMINI_CALL_TIMEOUT_MS,
+      `askGeminiChat(${model})`,
+    );
+
+    const candidate = response.candidates?.[0];
+    if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+      logger.warn({ model, maxOutputTokens }, "[Gemini Chat] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+    }
+
+    try {
+      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+      const usage = (response as any).usageMetadata ?? {};
+      const inTok = Number(usage.promptTokenCount) || 0;
+      const outTok = Number(usage.candidatesTokenCount) || 0;
+      void recordApiUsage({
+        provider: "gemini",
+        operation: "askGeminiChat",
+        model,
+        inputUnits: inTok,
+        outputUnits: outTok,
+        unitsLabel: "tokens",
+        costUsd: calcGeminiCost(model, inTok, outTok),
+      });
+    } catch { /* nunca bloquea */ }
+
+    const text = response.text ?? "";
+    if (text.trim()) return text;
+
+    // Empty body (e.g. thinking consumed budget) → try Claude rather than returning blank
+    logger.warn("[askGeminiChat] Empty Gemini response — falling back to Claude");
+    try { return await claudeFallback(); } catch { return ""; }
+  } catch (err) {
+    if (isPermissionDenied(err)) {
+      tripGenerationCircuit();
+      logger.warn("[askGeminiChat] 403 detected — falling back to Claude");
+      try { return await claudeFallback(); } catch { return ""; }
+    }
+    throw err;
+  }
+}
+
 // ─── JSON-structured generation ───────────────────────────────────────────────
 async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: string, useProModel = false): Promise<T> {
   if (isGeminiGenerationBlocked()) {

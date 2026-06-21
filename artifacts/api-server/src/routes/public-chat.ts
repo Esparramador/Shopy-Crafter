@@ -1,9 +1,9 @@
 import { Router } from "express";
-import Anthropic from "@anthropic-ai/sdk";
+import { askGeminiChat } from "../lib/gemini.js";
+import { MASTER_CATALOG } from "../lib/master-skills-injector.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // INTENT CLASSIFIER — patrones extraídos de Rasa NLU (rasa-demo/data/nlu/)
@@ -313,18 +313,27 @@ router.post("/public/landing-chat", async (req, res) => {
       : { intent: "general", entities: {}, confidence: 0.5, needsHumanHandoff: false, buyingIntent: false };
 
     const stage = getConversationStage(sanitized.slice(0, -1));
-    const systemPrompt = buildDynamicSystemPrompt(intent, stage);
+
+    // MEGA CEREBRO: inject the platform's full capability catalog so the bot can
+    // speak accurately and with reasoning about everything Shopy Crafter can do.
+    const megaBrain = `\n\n== MEGA CEREBRO DE LA PLATAFORMA (conocimiento interno real) ==
+Este es el catálogo completo de capacidades reales de Shopy Crafter. Úsalo como tu base de conocimiento para responder con precisión, coherencia lógica y razonamiento sobre lo que la plataforma puede hacer por la tienda del visitante. Eres pre-venta: NO ejecutas estas skills, pero SÍ las conoces a fondo y puedes explicar con ejemplos concretos cómo cada una resolvería el problema del visitante. No copies el catálogo literalmente — sintetiza y aplica solo lo relevante a su pregunta.
+${MASTER_CATALOG}`;
+
+    const systemPrompt = buildDynamicSystemPrompt(intent, stage) + megaBrain;
 
     logger.info({ intent: intent.intent, stage: stage.stage, confidence: intent.confidence }, "landing-chat intent classified");
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 450,
-      system: systemPrompt,
-      messages: sanitized,
+    const text = await askGeminiChat(sanitized, systemPrompt, {
+      maxOutputTokens: 2048,
+      thinkingBudget: 1024,
     });
 
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+    if (!text.trim()) {
+      res.status(502).json({ error: "El asistente no pudo generar una respuesta ahora mismo. Inténtalo de nuevo." });
+      return;
+    }
+
     res.json({ content: text, _intent: intent.intent, _stage: stage.stage });
   } catch (err) {
     logger.error({ err }, "landing-chat error");
