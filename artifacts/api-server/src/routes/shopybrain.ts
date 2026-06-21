@@ -7,7 +7,7 @@ import { requireAdmin } from "../lib/auth.js";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
 import { buildMasterSkillsBlock } from "../lib/master-skills-injector.js";
-import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain } from "../lib/shopify.js";
+import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation, askClaude, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
 import { auditProduct, scoreToGrade } from "../lib/audit.js";
@@ -28,6 +28,22 @@ import {
 import multer from "multer";
 import * as fs from "fs";
 import * as path from "path";
+
+function handleRouteError(res: any, err: any): void {
+  if (err instanceof ShopifyAuthError) {
+    const isUninstalled = String(err.message).includes("app_not_installed");
+    const isUnavailable = String(err.message).includes("store unavailable") || String(err.message).includes("Token generation failed (404)");
+    const userMsg = isUninstalled
+      ? "La app de Shopify fue desinstalada. Ve a tu panel de Shopify y reinstala la app, luego reconecta la tienda."
+      : isUnavailable
+        ? "La tienda de Shopify no está disponible. Verifica el estado de tu tienda en el panel de Shopify."
+        : "La conexión con Shopify expiró. Reconecta tu tienda en Configuración.";
+    res.status(422).json({ error: userMsg, shopify_auth_error: true });
+    return;
+  }
+  const msg = err instanceof Error ? err.message : "Internal server error";
+  res.status(500).json({ error: msg });
+}
 
 type ReportTemplate = "classic" | "elegance" | "prestige";
 const VALID_TEMPLATES = new Set<ReportTemplate>(["classic", "elegance", "prestige"]);
@@ -324,7 +340,7 @@ router.get("/shopybrain/quick-actions", requireAdmin, async (req, res): Promise<
 
     res.json({ actions: [...globalActions, ...contextActions] });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message || "quick-actions failed" });
+    handleRouteError(res, err);
   }
 });
 
@@ -352,8 +368,7 @@ router.get("/shopybrain/status", requireAdmin, async (_req, res): Promise<void> 
         : 0,
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -369,8 +384,7 @@ router.get("/shopybrain/memories", requireAdmin, async (req, res): Promise<void>
     const memories = await query.orderBy(desc(omnicoreMemoriesTable.confidence)).limit(parseInt(limit));
     res.json(memories);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -398,8 +412,7 @@ router.post("/shopybrain/memories", requireAdmin, async (req, res): Promise<void
     await db.insert(omnicoreMemoriesTable).values(memory);
     res.json(memory);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -408,8 +421,7 @@ router.delete("/shopybrain/memories/:id", requireAdmin, async (req, res): Promis
     await db.delete(omnicoreMemoriesTable).where(eq(omnicoreMemoriesTable.id, String(req.params.id)));
     res.json({ success: true });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -443,8 +455,7 @@ router.post("/shopybrain/learn", requireAdmin, async (req, res): Promise<void> =
     await db.insert(omnicoreMemoriesTable).values(memory);
     res.json({ success: true, memoryId: memory.id });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1635,8 +1646,7 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
       message: "🔍→🧠 Búsqueda + aprendido para el futuro",
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1658,8 +1668,7 @@ router.get("/shopybrain/insights", requireAdmin, async (req, res): Promise<void>
       .orderBy(desc(omnicoreKnowledgeDomainsTable.knowledgeDepth));
     res.json({ insights, domains: domains.map(d => ({ ...d, label: DOMAIN_LABELS[d.domain] ?? d.domain })) });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1767,8 +1776,7 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
       durationMs: Date.now() - startTime,
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1779,8 +1787,7 @@ router.get("/shopybrain/sessions", requireAdmin, async (_req, res): Promise<void
       .limit(20);
     res.json(sessions);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1790,8 +1797,7 @@ router.get("/shopybrain/niche-profiles", requireAdmin, async (_req, res): Promis
       .orderBy(desc(omnicoreNicheProfilesTable.storesAnalyzed));
     res.json(profiles);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1812,8 +1818,7 @@ router.post("/shopybrain/niche-profiles", requireAdmin, async (req, res): Promis
       res.json(profile);
     }
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1823,8 +1828,7 @@ router.get("/shopybrain/prompt-library", requireAdmin, async (_req, res): Promis
       .orderBy(desc(omnicorePromptLibraryTable.useCount));
     res.json(prompts);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1844,8 +1848,7 @@ router.post("/shopybrain/prompt-library", requireAdmin, async (req, res): Promis
     await db.insert(omnicorePromptLibraryTable).values(prompt);
     res.json(prompt);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -1923,8 +1926,7 @@ router.get("/shopybrain/schedule", requireAdmin, async (_req, res): Promise<void
       },
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -11505,8 +11507,7 @@ router.post("/shopybrain/run/retroanalysis", requireAdmin, async (_req, res): Pr
     runRetroactiveReanalysis().catch(e => logger.error(e));
     res.json({ message: "Retroactive reanalysis started in background" });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -11516,8 +11517,7 @@ router.post("/shopybrain/run/self-evaluation", requireAdmin, async (_req, res): 
     runMonthlySelfEvaluation().catch(e => logger.error(e));
     res.json({ message: "Monthly self-evaluation started in background" });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 

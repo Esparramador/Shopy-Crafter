@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "build": "vite build --config vite.config.ts && vite build --ssr src/entry-server.tsx --outDir dist/server --config vite.config.ts && node prerender.mjs && node -e \"const fs=require('fs');const isProd=process.env.NODE_ENV==='production';const paths=['dist/public/assets/3d'];if(isProd){paths.push('public/assets/3d','../../attached_assets')}paths.forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('Removed '+p+' (deployment size optimization)')}catch(e){}});\"",
+    "build": "vite build --config vite.config.ts && vite build --ssr src/entry-server.tsx --outDir dist/server --config vite.config.ts && node prerender.mjs && node -e \"const fs=require('fs');const isDeployment=process.env.REPLIT_DEPLOYMENT==='1';const paths=['dist/public/assets/3d'];if(isDeployment){paths.push('public/assets/3d','../../attached_assets')}paths.forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('Removed '+p+' (deployment size optimization)')}catch(e){}});\"",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

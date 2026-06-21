@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import { projectsTable, platformSettingsTable } from "@workspace/db";
 import type { PlatformType } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { refreshToken, validateToken, normalizeShopDomain } from "../lib/shopify";
+import { refreshToken, validateToken, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { getConnector, PlatformNotSupportedError } from "../lib/connectors/index";
@@ -12,6 +12,22 @@ import { learnFromOperation } from "../lib/claude";
 import { cached, invalidateCache } from "../lib/cache.js";
 
 const router = Router();
+
+function handleRouteError(res: any, err: any): void {
+  if (err instanceof ShopifyAuthError) {
+    const isUninstalled = String(err.message).includes("app_not_installed");
+    const isUnavailable = String(err.message).includes("store unavailable") || String(err.message).includes("Token generation failed (404)");
+    const userMsg = isUninstalled
+      ? "La app de Shopify fue desinstalada. Ve a tu panel de Shopify y reinstala la app, luego reconecta la tienda."
+      : isUnavailable
+        ? "La tienda de Shopify no está disponible. Verifica el estado de tu tienda en el panel de Shopify."
+        : "La conexión con Shopify expiró. Reconecta tu tienda en Configuración.";
+    res.status(422).json({ error: userMsg, shopify_auth_error: true });
+    return;
+  }
+  const msg = err instanceof Error ? err.message : "Internal server error";
+  res.status(500).json({ error: msg });
+}
 
 async function getShopifyCredentials(): Promise<{ clientId: string; clientSecret: string }> {
   try {
@@ -97,8 +113,7 @@ router.post("/shopify/oauth/start", async (req, res): Promise<void> => {
     const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${encodeURIComponent(OAUTH_SCOPES)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
     res.json({ authUrl, state });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -128,8 +143,7 @@ router.get("/shopify/oauth/start", async (req, res): Promise<void> => {
     const authUrl = `https://${shopDomain}/admin/oauth/authorize?client_id=${clientId}&scope=${encodeURIComponent(OAUTH_SCOPES)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
     res.json({ authUrl, state });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -205,8 +219,7 @@ router.get("/shopify/oauth/callback", async (req, res): Promise<void> => {
     const appUrl = getAppUrl();
     res.redirect(`${appUrl}/oauth-success?projectId=${projectId}&shop=${encodeURIComponent(shopDomain)}`);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -218,8 +231,7 @@ router.get("/shopify/oauth/check", async (_req, res): Promise<void> => {
       clientId: clientId ? clientId.slice(0, 8) + "••••••••" : null,
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -243,8 +255,7 @@ router.get("/projects", async (_req, res): Promise<void> => {
   
     res.json(sanitized);
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -467,8 +478,7 @@ router.post("/projects", async (req, res): Promise<void> => {
       updatedAt: refreshed.updatedAt.toISOString(),
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -492,8 +502,7 @@ router.get("/projects/:projectId", async (req, res): Promise<void> => {
       updatedAt: project.updatedAt.toISOString(),
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -554,8 +563,7 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
       updatedAt: updated.updatedAt.toISOString(),
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -579,8 +587,7 @@ router.post("/projects/:projectId/disconnect", async (req, res): Promise<void> =
       message: "Tienda desconectada. Las credenciales se han eliminado pero todo el trabajo generado (imágenes, rediseños, SEO, etc.) se conserva.",
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -621,8 +628,7 @@ router.post("/projects/:projectId/reconnect", async (req, res): Promise<void> =>
       res.status(400).json({ error: `No se pudo reconectar: ${message}` });
     }
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -661,8 +667,7 @@ router.delete("/projects/:projectId", async (req, res): Promise<void> => {
       res.json({ success: true, message: "Proyecto eliminado completamente" });
     }
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -681,8 +686,7 @@ router.get("/projects/:projectId/reveal-token", async (req, res): Promise<void> 
       note: "Token enmascarado por seguridad. Usa el panel de Shopify Partners para ver el token completo.",
     });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -736,8 +740,7 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
       res.status(400).json({ error: message });
     }
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -867,8 +870,7 @@ router.post("/projects/test-connection-presave", async (req, res): Promise<void>
       });
     }
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 
@@ -928,8 +930,7 @@ router.post("/projects/:projectId/test-connection", async (req, res): Promise<vo
       });
     }
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    handleRouteError(res, err);
   }
 });
 

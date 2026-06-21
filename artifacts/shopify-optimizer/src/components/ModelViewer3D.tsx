@@ -1,8 +1,39 @@
-import { Suspense, useRef, useEffect, useState } from "react";
+import { Suspense, useRef, useEffect, useState, Component, type ErrorInfo, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations, OrbitControls, Environment, ContactShadows, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { Play, Pause, RotateCcw, Sun } from "lucide-react";
+
+class ModelErrorBoundary extends Component<
+  { children: ReactNode; glbPath: string; height: string | number },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; glbPath: string; height: string | number }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(_err: Error, _info: ErrorInfo) {}
+  componentDidUpdate(prev: { glbPath: string }) {
+    if (prev.glbPath !== this.props.glbPath) this.setState({ hasError: false });
+  }
+  render() {
+    if (this.state.hasError) {
+      const h = typeof this.props.height === "number" ? `${this.props.height}px` : this.props.height;
+      return (
+        <div style={{
+          height: h, display: "flex", alignItems: "center", justifyContent: "center",
+          background: "#0a0a0a", borderRadius: 8,
+          color: "#444", fontSize: 11, fontFamily: "monospace",
+          border: "1px solid rgba(212,168,67,0.1)",
+        }}>
+          Modelo 3D no disponible
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export interface ModelAnimation {
   name: string;
@@ -221,6 +252,7 @@ export default function ModelViewer3D({
       style={{ display: "flex", flexDirection: "column", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(212,168,67,0.2)", background: "#0a0a0a" }}
     >
       {/* 3D Canvas */}
+      <ModelErrorBoundary glbPath={glbPath} height={height}>
       <div style={{ height: h, position: "relative" }}>
         <Canvas
           shadows
@@ -279,6 +311,7 @@ export default function ModelViewer3D({
           <Sun size={14} />
         </button>
       </div>
+      </ModelErrorBoundary>
 
       {/* Controls bar */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: "rgba(20,15,5,0.95)", borderTop: "1px solid rgba(212,168,67,0.12)" }}>

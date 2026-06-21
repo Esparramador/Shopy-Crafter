@@ -7,6 +7,14 @@ import { encrypt, safeDecrypt } from "./crypto.js";
 const SHOPIFY_FETCH_TIMEOUT = 45_000;
 const TOKEN_OP_TIMEOUT = 20_000;
 
+export class ShopifyAuthError extends Error {
+  statusCode = 422;
+  constructor(message: string) {
+    super(message);
+    this.name = "ShopifyAuthError";
+  }
+}
+
 export function normalizeShopDomain(domain: string): string {
   return domain.replace("https://", "").replace("http://", "").replace(/\/$/, "");
 }
@@ -41,7 +49,7 @@ export async function refreshToken(
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`Token generation failed (${resp.status}): ${text}`);
+    throw new ShopifyAuthError(`Token generation failed (${resp.status}): ${text}`);
   }
 
   const data = (await resp.json()) as { access_token: string; expires_in?: number };
