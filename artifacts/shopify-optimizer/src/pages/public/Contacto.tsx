@@ -296,25 +296,32 @@ export default function Contacto() {
   const [formReady, setFormReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Timer-based fallback (in case video doesn't autoplay)
+  // Timecodes calibrated to video gestures (alec_landing.mp4, 24fps, 10s loop):
+  //  1.1s → Alec at peak of swing, mid-air, scanning the room  → 🔍 Escaneando
+  //  2.6s → Alec lands, umbrella FULLY OPEN above him           → 🧠 Activando motores
+  //  3.9s → Alec stands up, confident presenting pose            → ✨ Preparando
+  //  5.0s → Alec relaxed, bag clearly in hand — goods ready     → Formulario revelado
+  const VIDEO_T1 = 1.1, VIDEO_T2 = 2.6, VIDEO_T3 = 3.9, VIDEO_TF = 5.0;
+
+  // Fallback timers (for browsers/mobile where autoplay is blocked)
   useEffect(() => {
-    const t1 = setTimeout(() => setCardPhase(p => Math.max(p,1)), 500);
-    const t2 = setTimeout(() => setCardPhase(p => Math.max(p,2)), 1500);
-    const t3 = setTimeout(() => setCardPhase(p => Math.max(p,3)), 2500);
-    const tf = setTimeout(() => setFormReady(true), 4000);
+    const t1 = setTimeout(() => setCardPhase(p => Math.max(p,1)), VIDEO_T1 * 1000);
+    const t2 = setTimeout(() => setCardPhase(p => Math.max(p,2)), VIDEO_T2 * 1000);
+    const t3 = setTimeout(() => setCardPhase(p => Math.max(p,3)), VIDEO_T3 * 1000);
+    const tf = setTimeout(() => setFormReady(true),               VIDEO_TF * 1000);
     return () => [t1,t2,t3,tf].forEach(clearTimeout);
   }, []);
 
-  // Also sync with video time
+  // Primary: sync with actual video currentTime (overrides fallback via Math.max)
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const onTime = () => {
       const t = v.currentTime;
-      if (t >= 0.5)  setCardPhase(p => Math.max(p,1));
-      if (t >= 1.5)  setCardPhase(p => Math.max(p,2));
-      if (t >= 2.5)  setCardPhase(p => Math.max(p,3));
-      if (t >= 4.0)  setFormReady(fr => fr || true);
+      if (t >= VIDEO_T1) setCardPhase(p => Math.max(p,1));
+      if (t >= VIDEO_T2) setCardPhase(p => Math.max(p,2));
+      if (t >= VIDEO_T3) setCardPhase(p => Math.max(p,3));
+      if (t >= VIDEO_TF) setFormReady(true);
     };
     v.addEventListener("timeupdate", onTime);
     return () => v.removeEventListener("timeupdate", onTime);
