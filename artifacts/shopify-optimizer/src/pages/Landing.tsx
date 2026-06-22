@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import PageMeta from "@/components/PageMeta";
 import { VismeFormHero } from "@/components/VismeFormHero";
+import { CANONICAL_PLANS } from "@/lib/pricing-plans";
 import "./landing.css";
 
 function SectionVideoBg({ src }: { src: string }) {
@@ -294,6 +295,7 @@ export default function Landing() {
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set(["fp-hero"]));
   const pricingRowRef = useRef<HTMLDivElement>(null);
   const [pricingIdx, setPricingIdx] = useState(0);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "", suppliers: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -1015,12 +1017,20 @@ export default function Landing() {
               <h2 className="l-h2" onClick={cmsClick("pricing.headline")} {...cmsData("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub" {...cmsProps("pricing.subheadline")}>{content.pricing.subheadline}</p>
             </div>
+            <div className="fp-billing-toggle">
+              <button type="button" className={`fp-bt-btn${billingPeriod === "monthly" ? " active" : ""}`} onClick={() => { setBillingPeriod("monthly"); setPricingIdx(0); }}>
+                Mensual
+              </button>
+              <button type="button" className={`fp-bt-btn${billingPeriod === "annual" ? " active" : ""}`} onClick={() => { setBillingPeriod("annual"); setPricingIdx(0); }}>
+                Anual <span className="fp-bt-save">2 meses gratis</span>
+              </button>
+            </div>
             <div className="fp-pricing-carousel-wrap">
               {pricingIdx > 0 && (
                 <button type="button" className="fp-pricing-arrow fp-pricing-arrow-left" onClick={() => scrollPricing(-1)} aria-label="Plan anterior">‹</button>
               )}
               <div ref={pricingRowRef} className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"} fp-pricing-3d-container`} style={{ animationDelay: "0.1s" }}>
-                {content.pricing.plans.map((plan, planIdx) => (
+                {CANONICAL_PLANS.map((plan, planIdx) => (
                   <div
                     key={plan.id}
                     className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}
@@ -1031,10 +1041,16 @@ export default function Landing() {
                     {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
                     {plan.featured && <div className="pc-savings-tag">✨ MÁS POPULAR</div>}
                     <div className="l-pricing-plan" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
-                    {planIdx === 1 && <div className="pc-roi-badge">📈 ROI medio 3.8× en 60 días</div>}
-                    {planIdx === 2 && <div className="pc-roi-badge">🚀 ROI medio 6.2× en 30 días</div>}
-                    <div className="l-pricing-price" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.price`)}><span>{plan.currency}</span>{plan.price}</div>
-                    <div className="l-pricing-period" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.period`)}>{plan.period}</div>
+                    {plan.id === "starter" && <div className="pc-roi-badge">📈 ROI medio 2.4× en 90 días</div>}
+                    {plan.id === "agency_pro" && <div className="pc-roi-badge">📈 ROI medio 3.8× en 60 días</div>}
+                    {plan.id === "enterprise" && <div className="pc-roi-badge">🚀 ROI medio 6.2× en 30 días</div>}
+                    <div className="l-pricing-price" style={{ position: "relative", zIndex: 2 }}><span>{plan.currency}</span>{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</div>
+                    <div className="l-pricing-period" style={{ position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "/mes · sin permanencia" : "/mes · facturado anual"}</div>
+                    {billingPeriod === "annual" && (
+                      <div style={{ textAlign: "center", fontSize: 10.5, color: "#2dd49f", fontWeight: 700, marginTop: 2, position: "relative", zIndex: 2 }}>
+                        {plan.currency}{plan.priceAnnual}/año · ahorras {plan.currency}{plan.priceMonthly * 2}
+                      </div>
+                    )}
                     {plan.featured && (
                       <div className="pc-urgency">
                         <div className="pc-urgency-dot"></div>
@@ -1057,16 +1073,16 @@ export default function Landing() {
                       onClick={e => { const href = plan.cta.href || "#fp-contact"; if (href.startsWith("#")) { e.preventDefault(); const idx = FP_SECTION_IDS.indexOf(href.replace("#", "")); if (idx >= 0) goToSection(idx); } }}
                       {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}
                     >{plan.cta.label}</a>
-                    {planIdx > 0 && <p style={{ textAlign: "center", fontSize: 10.5, color: "rgba(255,255,255,0.3)", marginTop: 10, position: "relative", zIndex: 2 }}>Sin permanencia · Cancela cuando quieras</p>}
+                    <p style={{ textAlign: "center", fontSize: 10.5, color: "rgba(255,255,255,0.3)", marginTop: 10, position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "Sin permanencia · Cancela cuando quieras" : "Renovación anual · Cancela antes del vencimiento"}</p>
                   </div>
                 ))}
               </div>
-              {pricingIdx < (content.pricing.plans.length - 1) && (
+              {pricingIdx < (CANONICAL_PLANS.length - 1) && (
                 <button type="button" className="fp-pricing-arrow fp-pricing-arrow-right" onClick={() => scrollPricing(1)} aria-label="Plan siguiente">›</button>
               )}
             </div>
             <div className="fp-pricing-dots">
-              {content.pricing.plans.map((plan, i) => (
+              {CANONICAL_PLANS.map((plan, i) => (
                 <button key={plan.id} type="button" className={`fp-pricing-dot${i === pricingIdx ? " active" : ""}`}
                   onClick={() => { const row = pricingRowRef.current; if (row) { const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card"); if (cards[i]) { cards[i].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" }); setPricingIdx(i); } } }}
                   aria-label={plan.name} />

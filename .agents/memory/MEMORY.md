@@ -1,3 +1,4 @@
+- [Canonical Pricing Plans](canonical-pricing.md) — prices live in src/lib/pricing-plans.ts (NOT CMS); Landing uses CANONICAL_PLANS; billing.ts keys: emprendedor/starter/agency_pro/enterprise; GET /billing/plans filters visible!=false.
 - [Social/URL ingestion provenance](social-url-ingestion.md) — IG/FB can't be scraped without official APIs; X oEmbed 404s; degrade via oEmbed→OG→AI-inference and LABEL the source honestly.
 - [Replicate upscaling (image+video)](replicate-upscaling.md) — verify model schemas via GET /v1/models; community models need latest_version resolver; video inputs via Files API not data-URI.
 - [API Model Catalog June 2026](api-model-catalog-june-2026.md) — all AI providers verified live; Claude smart→sonnet-4-6/genius→opus-4-8; eleven_v3 is new TTS default (74 langs); Runway gen4.5/seedance2; Replicate recraft-v4/flux-kontext-max/ideogram-v3-quality/wan-2.5-t2v/seedance-1-lite

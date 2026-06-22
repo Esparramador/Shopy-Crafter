@@ -27,7 +27,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanConfig> = {
     productsPerMonth: 60,
     imagesPerProduct: 5,
     maxImagesPerMonth: 300,
-    label: "Agency Pro €149/mes",
+    label: "Growth €149/mes",
   },
   starter: {
     productsPerMonth: 15,

@@ -10,23 +10,36 @@ const router = Router();
 
 const PLANS: Record<string, {
   name: string; price: number; storesLimit: number; imagesIncluded: number; features: string[];
-  periodDays: number;
+  periodDays: number; visible?: boolean;
 }> = {
+  emprendedor: {
+    name: "Emprendedor", price: 19, storesLimit: 1, imagesIncluded: 10, periodDays: 30,
+    features: ["1 tienda", "5 productos/mes", "10 imágenes IA/mes", "Auditoría Shopify", "Chatbot IA", "SEO básico"],
+  },
+  starter: {
+    name: "Starter", price: 49, storesLimit: 3, imagesIncluded: 45, periodDays: 30,
+    features: ["3 tiendas", "15 productos/mes", "45 imágenes IA/mes", "Todos los módulos IA", "SEO técnico", "Pricing dinámico", "Soporte prioritario"],
+  },
+  agency_pro: {
+    name: "Growth", price: 149, storesLimit: 10, imagesIncluded: 300, periodDays: 30,
+    features: ["10 tiendas", "60 productos/mes", "300 imágenes IA/mes", "A/B Testing", "Informes Pro", "Análisis competidores", "API Access"],
+  },
+  enterprise: {
+    name: "Enterprise", price: 399, storesLimit: -1, imagesIncluded: 1200, periodDays: 30,
+    features: ["Tiendas ilimitadas", "200 productos/mes", "1.200 imágenes IA/mes", "A/B Testing ilimitado", "White-label", "Account Manager", "Soporte 24/7"],
+  },
   trial: {
     name: "Trial", price: 0, storesLimit: 1, imagesIncluded: 100, periodDays: 14,
     features: ["1 tienda", "100 imágenes IA", "Auditoría básica"],
-  },
-  starter: {
-    name: "Starter", price: 97, storesLimit: 3, imagesIncluded: 500, periodDays: 30,
-    features: ["3 tiendas", "500 imágenes IA", "Todas las funciones", "Soporte email"],
+    visible: false,
   },
   pro: {
-    name: "Pro", price: 297, storesLimit: 10, imagesIncluded: 2000, periodDays: 30,
-    features: ["10 tiendas", "2000 imágenes IA", "API access", "Soporte prioritario", "Afiliados"],
+    name: "Pro (legado)", price: 297, storesLimit: 10, imagesIncluded: 2000, periodDays: 30,
+    features: ["Legado"], visible: false,
   },
   agency: {
-    name: "Agency", price: 697, storesLimit: -1, imagesIncluded: -1, periodDays: 30,
-    features: ["Tiendas ilimitadas", "Imágenes ilimitadas", "White label", "Soporte dedicado", "Revenue sharing"],
+    name: "Agency (legado)", price: 697, storesLimit: -1, imagesIncluded: -1, periodDays: 30,
+    features: ["Legado"], visible: false,
   },
 };
 
@@ -66,7 +79,9 @@ router.get("/billing/subscription", async (req, res): Promise<void> => {
 
 router.get("/billing/plans", async (_req, res): Promise<void> => {
   try {
-    res.json(Object.entries(PLANS).map(([id, plan]) => ({ id, ...plan })));
+    res.json(Object.entries(PLANS)
+      .filter(([, plan]) => plan.visible !== false)
+      .map(([id, plan]) => ({ id, ...plan })));
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
