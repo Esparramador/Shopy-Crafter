@@ -37,24 +37,24 @@ const revenueOptions = ["Menos de €1.000","€1.000 – €5.000","€5.000 �
 const serviceOptions = ["Auditoría completa","Generación de imágenes IA","SEO y schemas","A/B Testing","Pricing y COGS","Rediseño web","Programa de afiliados","Plan personalizado"];
 
 const CSS = `
-/* ─── ROOT ─── */
+/* ─── ROOT — block flow, no overflow clip ─── */
 .ctc-root {
   position: relative;
   width: 100%;
-  min-height: calc(100vh - 64px);
-  overflow: hidden;
   background: #05030c;
 }
 
-/* ─── VIDEO / OVERLAY ─── */
+/* ─── VIDEO / OVERLAY — FIXED so they stay while page scrolls ─── */
 .ctc-video {
-  position: absolute; inset: 0;
+  position: fixed;
+  inset: 0;
   width: 100%; height: 100%;
   object-fit: cover; object-position: left center;
   z-index: 0;
+  pointer-events: none;
 }
 .ctc-overlay {
-  position: absolute; inset: 0; z-index: 1;
+  position: fixed; inset: 0; z-index: 1;
   pointer-events: none;
   background:
     linear-gradient(90deg,
@@ -72,28 +72,30 @@ const CSS = `
     );
 }
 
-/* ─── RIGHT FORM PANEL ─── */
-.ctc-panel {
-  position: absolute;
-  right: 0; top: 0; bottom: 0;
-  width: 44%;
-  overflow-y: auto; overscroll-behavior-y: auto;
-  padding: 56px 36px 56px 24px;
-  display: flex; flex-direction: column; justify-content: center;
+/* ─── LAYOUT — flex row on desktop ─── */
+.ctc-layout {
+  position: relative;
   z-index: 5;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(200,168,75,.18) transparent;
+  min-height: 100dvh;
+  display: flex;
+  align-items: stretch;
 }
-.ctc-panel::-webkit-scrollbar { width: 4px; }
-.ctc-panel::-webkit-scrollbar-track { background: transparent; }
-.ctc-panel::-webkit-scrollbar-thumb { background: rgba(200,168,75,.18); border-radius: 99px; }
 
-/* ─── INFO CARDS ROW (desktop: bottom-left of video area) ─── */
+/* ─── LEFT AREA — holds info cards at bottom ─── */
+.ctc-left {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 16px 48px;
+}
+
+/* ─── INFO CARDS ROW ─── */
 .ctc-cards-row {
-  position: absolute;
-  left: 0; right: 44%; bottom: 44px;
-  display: flex; justify-content: center; align-items: flex-end;
-  gap: 14px; padding: 0 16px; z-index: 10; flex-wrap: wrap;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
 }
 .ctc-card {
   flex: 1 1 130px; max-width: 190px;
@@ -117,6 +119,21 @@ const CSS = `
   text-decoration: none; word-break: break-word;
 }
 .ctc-card-value:hover { text-decoration: underline; }
+
+/* ─── RIGHT FORM PANEL ─── */
+.ctc-panel {
+  width: min(44%, 520px);
+  min-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  padding: 56px 36px 56px 24px;
+  display: flex; flex-direction: column; justify-content: center;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200,168,75,.18) transparent;
+}
+.ctc-panel::-webkit-scrollbar { width: 4px; }
+.ctc-panel::-webkit-scrollbar-track { background: transparent; }
+.ctc-panel::-webkit-scrollbar-thumb { background: rgba(200,168,75,.18); border-radius: 99px; }
 
 /* ─── BUILDING ANIMATION ─── */
 .ctc-building {
@@ -220,24 +237,27 @@ const CSS = `
   cursor: pointer; transition: all .15s; font-family: inherit;
 }
 
-/* ─── MOBILE ─── */
-@media (max-width: 780px) {
-  .ctc-root {
-    overflow-y: auto;
-    overflow-x: hidden;
-    min-height: 100dvh;
-    /* let children flow normally */
-    display: flex;
-    flex-direction: column;
+/* ─── TABLET (≤900px) ─── */
+@media (max-width: 900px) {
+  .ctc-layout { flex-direction: column; }
+  .ctc-panel {
+    width: 100%;
+    min-height: auto;
+    padding: 72px 20px 32px;
+    justify-content: flex-start;
+    overflow-y: visible;
   }
-  .ctc-video {
-    position: fixed;
-    height: 100dvh;
-    z-index: 0;
+  .ctc-left {
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px 48px;
   }
+  .ctc-card { flex: 1 1 120px; max-width: 160px; padding: 16px 10px 14px; }
+  .ctc-card-icon { font-size: 20px; margin-bottom: 6px; }
+  .ctc-card-label { font-size: 8px; }
+  .ctc-card-value { font-size: 11px; }
+  .ctc-build-orb { width: 60px; height: 60px; font-size: 22px; margin-bottom: 22px; }
   .ctc-overlay {
-    position: fixed;
-    z-index: 1;
     background:
       linear-gradient(180deg,
         rgba(5,3,12,.65) 0%,
@@ -246,44 +266,36 @@ const CSS = `
         rgba(5,3,12,.99) 100%
       );
   }
+}
 
-  /* FORM PANEL — comes FIRST in DOM, stays first on mobile */
+/* ─── LANDSCAPE SHORT (e.g. iPhone landscape) ─── */
+@media (max-height: 560px) and (orientation: landscape) {
+  .ctc-layout { flex-direction: row; min-height: 100dvh; }
   .ctc-panel {
-    position: relative;
-    top: auto; right: auto; bottom: auto; left: auto;
-    width: 100%;
-    min-height: auto;
-    padding: 72px 20px 32px;
+    width: 55%;
+    min-height: 100dvh;
+    padding: 12px 20px 12px 16px;
     justify-content: flex-start;
-    background: transparent;
-    overflow-y: visible;
-    z-index: 5;
-    order: 1;
+    overflow-y: auto;
   }
+  .ctc-left {
+    width: 45%;
+    padding: 0 12px 24px;
+    align-items: flex-end;
+  }
+  .ctc-building { padding: 16px 16px; }
+  .ctc-build-orb { width: 48px; height: 48px; font-size: 18px; margin-bottom: 14px; }
+  .ctc-card { padding: 12px 8px 10px; }
+  .ctc-card-icon { font-size: 16px; margin-bottom: 4px; }
+}
 
-  /* CARDS — come AFTER in DOM, show after form on mobile */
-  .ctc-cards-row {
-    position: relative;
-    top: auto; right: auto; bottom: auto; left: auto;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: stretch;
-    gap: 10px;
-    padding: 8px 16px 52px;
-    z-index: 5;
-    order: 2;
-  }
-  .ctc-card {
-    flex: 1 1 120px;
-    max-width: 160px;
-    padding: 16px 10px 14px;
-  }
-  .ctc-card-icon { font-size: 20px; margin-bottom: 6px; }
-  .ctc-card-label { font-size: 8px; }
-  .ctc-card-value { font-size: 11px; }
-  .ctc-build-orb { width: 60px; height: 60px; font-size: 22px; margin-bottom: 22px; }
+/* ─── MOBILE (≤480px) ─── */
+@media (max-width: 480px) {
+  .ctc-panel { padding: 56px 14px 24px; }
+  .ctc-card { flex: 1 1 100%; max-width: none; }
+  .ctc-cards-row { flex-direction: column; gap: 8px; }
+  .ctc-card { padding: 14px 16px; text-align: left; flex-direction: row; align-items: center; gap: 12px; }
+  .ctc-card-icon { font-size: 22px; flex-shrink: 0; margin-bottom: 0; }
 }
 `;
 
@@ -296,14 +308,8 @@ export default function Contacto() {
   const [formReady, setFormReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Timecodes calibrated to video gestures (alec_landing.mp4, 24fps, 10s loop):
-  //  1.1s → Alec at peak of swing, mid-air, scanning the room  → 🔍 Escaneando
-  //  2.6s → Alec lands, umbrella FULLY OPEN above him           → 🧠 Activando motores
-  //  3.9s → Alec stands up, confident presenting pose            → ✨ Preparando
-  //  5.0s → Alec relaxed, bag clearly in hand — goods ready     → Formulario revelado
   const VIDEO_T1 = 1.1, VIDEO_T2 = 2.6, VIDEO_T3 = 3.9, VIDEO_TF = 5.0;
 
-  // Fallback timers (for browsers/mobile where autoplay is blocked)
   useEffect(() => {
     const t1 = setTimeout(() => setCardPhase(p => Math.max(p,1)), VIDEO_T1 * 1000);
     const t2 = setTimeout(() => setCardPhase(p => Math.max(p,2)), VIDEO_T2 * 1000);
@@ -312,7 +318,6 @@ export default function Contacto() {
     return () => [t1,t2,t3,tf].forEach(clearTimeout);
   }, []);
 
-  // Primary: sync with actual video currentTime (overrides fallback via Math.max)
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -389,181 +394,176 @@ export default function Contacto() {
           />
           <div className="ctc-overlay" />
 
-          {/* ─── FORM PANEL — first in DOM = first on mobile ─── */}
-          <div className="ctc-panel">
-            {!formReady ? (
-              /* ── DYNAMIC BUILDING ANIMATION ── */
-              <div className="ctc-building">
-                <div className="ctc-build-orb">🤖</div>
-                <div className="ctc-build-rail">
-                  <div className="ctc-build-beam" />
-                </div>
-                {BUILD_STEPS.map((step, i) => (
-                  <div key={i} className={`ctc-build-step${cardPhase > i ? " ctc-step-on" : ""}`}>
-                    <div className="ctc-step-dot">{step.icon}</div>
-                    <span className="ctc-step-text">{step.text}</span>
-                    <span className="ctc-step-check">✓</span>
-                  </div>
-                ))}
-                <div className={`ctc-build-ready${cardPhase >= 3 ? " ctc-ready-on" : ""}`}>
-                  ✦ Formulario listo ✦
-                </div>
-              </div>
-            ) : status === "sent" ? (
-              <div style={{ textAlign:"center", padding:"40px 20px" }}>
-                <div style={{ fontSize:52, marginBottom:18 }}>✅</div>
-                <h3 style={{ fontSize:24, fontWeight:800, color:"#2dd49f", marginBottom:12 }}>¡Solicitud recibida!</h3>
-                <p style={{ color:"#888", fontSize:14, lineHeight:1.7, marginBottom:8 }}>
-                  Nuestra IA ya está analizando tu negocio, mercado, competencia y SEO.
-                </p>
-                <p style={{ color:"#555", fontSize:12 }}>Te contactaremos con un informe detallado en menos de 24h.</p>
-              </div>
-            ) : (
-              <div className={`ctc-form-wrap${formReady ? " ctc-form-ready" : ""}`}>
+          {/* ─── MAIN LAYOUT: left (info cards) + right (form panel) ─── */}
+          <div className="ctc-layout">
 
-                {/* Header */}
-                <div className="ctc-field" style={{ marginBottom:6 }}>
-                  <span style={{
-                    display:"inline-block", padding:"5px 14px", borderRadius:999,
-                    background:GOLD_BG, color:GOLD, border:`1px solid ${GOLD_BORDER}`,
-                    fontSize:10, fontWeight:700, letterSpacing:"1px", textTransform:"uppercase",
-                    marginBottom:14,
-                  }}>Trabaja con nosotros</span>
-                  <h2 style={{ fontSize:"clamp(22px,3.2vw,34px)", fontWeight:800, color:"#eee", lineHeight:1.15, marginBottom:10 }}>
-                    Cuéntanos sobre<br />tu negocio.
-                  </h2>
-                  <p style={{ fontSize:13.5, color:"#777", lineHeight:1.65 }}>
-                    Analizamos tu tienda con IA antes de contactarte.<br />Respuesta personalizada en &lt;24h.
+            {/* ─── LEFT: info cards at bottom ─── */}
+            <div className="ctc-left">
+              <div className="ctc-cards-row">
+                {cards}
+              </div>
+            </div>
+
+            {/* ─── RIGHT: form panel ─── */}
+            <div className="ctc-panel">
+              {!formReady ? (
+                <div className="ctc-building">
+                  <div className="ctc-build-orb">🤖</div>
+                  <div className="ctc-build-rail">
+                    <div className="ctc-build-beam" />
+                  </div>
+                  {BUILD_STEPS.map((step, i) => (
+                    <div key={i} className={`ctc-build-step${cardPhase > i ? " ctc-step-on" : ""}`}>
+                      <div className="ctc-step-dot">{step.icon}</div>
+                      <span className="ctc-step-text">{step.text}</span>
+                      <span className="ctc-step-check">✓</span>
+                    </div>
+                  ))}
+                  <div className={`ctc-build-ready${cardPhase >= 3 ? " ctc-ready-on" : ""}`}>
+                    ✦ Formulario listo ✦
+                  </div>
+                </div>
+              ) : status === "sent" ? (
+                <div style={{ textAlign:"center", padding:"40px 20px" }}>
+                  <div style={{ fontSize:52, marginBottom:18 }}>✅</div>
+                  <h3 style={{ fontSize:24, fontWeight:800, color:"#2dd49f", marginBottom:12 }}>¡Solicitud recibida!</h3>
+                  <p style={{ color:"#888", fontSize:14, lineHeight:1.7, marginBottom:8 }}>
+                    Nuestra IA ya está analizando tu negocio, mercado, competencia y SEO.
                   </p>
+                  <p style={{ color:"#555", fontSize:12 }}>Te contactaremos con un informe detallado en menos de 24h.</p>
                 </div>
+              ) : (
+                <div className={`ctc-form-wrap${formReady ? " ctc-form-ready" : ""}`}>
 
-                <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
-
-                  {/* Nombre + Email */}
-                  <div className="ctc-field">
-                    <div className="ctc-row">
-                      <div>
-                        <label className="ctc-label">Nombre completo *</label>
-                        <input type="text" required value={form.name} onChange={CF("name")} placeholder="Tu nombre y apellidos" className="ctc-input" />
-                      </div>
-                      <div>
-                        <label className="ctc-label">Email de contacto *</label>
-                        <input type="email" required value={form.email} onChange={CF("email")} placeholder="tu@email.com" className="ctc-input" />
-                      </div>
-                    </div>
+                  <div className="ctc-field" style={{ marginBottom:6 }}>
+                    <span style={{
+                      display:"inline-block", padding:"5px 14px", borderRadius:999,
+                      background:GOLD_BG, color:GOLD, border:`1px solid ${GOLD_BORDER}`,
+                      fontSize:10, fontWeight:700, letterSpacing:"1px", textTransform:"uppercase",
+                      marginBottom:14,
+                    }}>Trabaja con nosotros</span>
+                    <h2 style={{ fontSize:"clamp(22px,3.2vw,34px)", fontWeight:800, color:"#eee", lineHeight:1.15, marginBottom:10 }}>
+                      Cuéntanos sobre<br />tu negocio.
+                    </h2>
+                    <p style={{ fontSize:13.5, color:"#777", lineHeight:1.65 }}>
+                      Analizamos tu tienda con IA antes de contactarte.<br />Respuesta personalizada en &lt;24h.
+                    </p>
                   </div>
 
-                  {/* Teléfono + Store */}
-                  <div className="ctc-field">
-                    <div className="ctc-row">
-                      <div>
-                        <label className="ctc-label">Teléfono</label>
-                        <input type="tel" value={form.phone} onChange={CF("phone")} placeholder="+34 600 000 000" className="ctc-input" />
-                      </div>
-                      <div>
-                        <label className="ctc-label">URL de tu tienda</label>
-                        <input type="text" value={form.storeUrl} onChange={CF("storeUrl")} placeholder="mitienda.com" className="ctc-input" />
-                      </div>
-                    </div>
-                  </div>
+                  <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-                  {/* Nicho + Facturación */}
-                  <div className="ctc-field">
-                    <div className="ctc-row">
-                      <div>
-                        <label className="ctc-label">Nicho / tipo de productos</label>
-                        <select value={form.niche} onChange={CF("niche")} className="ctc-input" style={{ cursor:"pointer" }}>
-                          <option value="">Selecciona tu nicho</option>
-                          {nicheOptions.map(o => <option key={o}>{o}</option>)}
-                        </select>
-                        {form.niche === "Otro" && (
-                          <input type="text" value={form.customNiche} onChange={CF("customNiche")} placeholder="Describe tu nicho..." className="ctc-input" style={{ marginTop:8 }} />
-                        )}
-                      </div>
-                      <div>
-                        <label className="ctc-label">Facturación mensual aprox.</label>
-                        <select value={form.revenue} onChange={CF("revenue")} className="ctc-input" style={{ cursor:"pointer" }}>
-                          <option value="">Selecciona rango</option>
-                          {revenueOptions.map(o => <option key={o}>{o}</option>)}
-                        </select>
+                    <div className="ctc-field">
+                      <div className="ctc-row">
+                        <div>
+                          <label className="ctc-label">Nombre completo *</label>
+                          <input type="text" required value={form.name} onChange={CF("name")} placeholder="Tu nombre y apellidos" className="ctc-input" />
+                        </div>
+                        <div>
+                          <label className="ctc-label">Email de contacto *</label>
+                          <input type="email" required value={form.email} onChange={CF("email")} placeholder="tu@email.com" className="ctc-input" />
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Redes sociales */}
-                  <div className="ctc-field">
-                    <label className="ctc-label">Redes sociales / Instagram</label>
-                    <input type="text" value={form.socialMedia} onChange={CF("socialMedia")} placeholder="@tu_cuenta o URL" className="ctc-input" />
-                  </div>
-
-                  {/* Servicios */}
-                  <div className="ctc-field">
-                    <label className="ctc-label">¿Qué servicios te interesan?</label>
-                    <div style={{ display:"flex", flexWrap:"wrap", gap:7, marginTop:4 }}>
-                      {serviceOptions.map(s => (
-                        <button key={s} type="button" onClick={() => toggleService(s)} className="ctc-service-btn"
-                          style={{
-                            border:`1px solid ${services.includes(s) ? GOLD_BORDER : "rgba(255,255,255,0.09)"}`,
-                            background: services.includes(s) ? GOLD_BG : "transparent",
-                            color: services.includes(s) ? GOLD : "#777",
-                          }}>{s}</button>
-                      ))}
+                    <div className="ctc-field">
+                      <div className="ctc-row">
+                        <div>
+                          <label className="ctc-label">Teléfono</label>
+                          <input type="tel" value={form.phone} onChange={CF("phone")} placeholder="+34 600 000 000" className="ctc-input" />
+                        </div>
+                        <div>
+                          <label className="ctc-label">URL de tu tienda</label>
+                          <input type="text" value={form.storeUrl} onChange={CF("storeUrl")} placeholder="mitienda.com" className="ctc-input" />
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Mensaje */}
-                  <div className="ctc-field">
-                    <label className="ctc-label">Mensaje</label>
-                    <textarea value={form.message} onChange={CF("message")} rows={4}
-                      placeholder="Cuéntanos sobre tu tienda, tus retos actuales o lo que quieres conseguir…"
-                      className="ctc-input" style={{ resize:"vertical", minHeight:100 }} />
-                  </div>
+                    <div className="ctc-field">
+                      <div className="ctc-row">
+                        <div>
+                          <label className="ctc-label">Nicho / tipo de productos</label>
+                          <select value={form.niche} onChange={CF("niche")} className="ctc-input" style={{ cursor:"pointer" }}>
+                            <option value="">Selecciona tu nicho</option>
+                            {nicheOptions.map(o => <option key={o}>{o}</option>)}
+                          </select>
+                          {form.niche === "Otro" && (
+                            <input type="text" value={form.customNiche} onChange={CF("customNiche")} placeholder="Describe tu nicho..." className="ctc-input" style={{ marginTop:8 }} />
+                          )}
+                        </div>
+                        <div>
+                          <label className="ctc-label">Facturación mensual aprox.</label>
+                          <select value={form.revenue} onChange={CF("revenue")} className="ctc-input" style={{ cursor:"pointer" }}>
+                            <option value="">Selecciona rango</option>
+                            {revenueOptions.map(o => <option key={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Error */}
-                  {status === "error" && (
+                    <div className="ctc-field">
+                      <label className="ctc-label">Redes sociales / Instagram</label>
+                      <input type="text" value={form.socialMedia} onChange={CF("socialMedia")} placeholder="@tu_cuenta o URL" className="ctc-input" />
+                    </div>
+
+                    <div className="ctc-field">
+                      <label className="ctc-label">¿Qué servicios te interesan?</label>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:7, marginTop:4 }}>
+                        {serviceOptions.map(s => (
+                          <button key={s} type="button" onClick={() => toggleService(s)} className="ctc-service-btn"
+                            style={{
+                              border:`1px solid ${services.includes(s) ? GOLD_BORDER : "rgba(255,255,255,0.09)"}`,
+                              background: services.includes(s) ? GOLD_BG : "transparent",
+                              color: services.includes(s) ? GOLD : "#777",
+                            }}>{s}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="ctc-field">
+                      <label className="ctc-label">Mensaje</label>
+                      <textarea value={form.message} onChange={CF("message")} rows={4}
+                        placeholder="Cuéntanos sobre tu tienda, tus retos actuales o lo que quieres conseguir…"
+                        className="ctc-input" style={{ resize:"vertical", minHeight:100 }} />
+                    </div>
+
+                    {status === "error" && (
+                      <div className="ctc-field" style={{
+                        padding:"11px 15px", background:"rgba(232,69,88,.08)",
+                        border:"1px solid rgba(232,69,88,.25)", borderRadius:10, color:"#e84558", fontSize:13,
+                      }}>{error}</div>
+                    )}
+
                     <div className="ctc-field" style={{
-                      padding:"11px 15px", background:"rgba(232,69,88,.08)",
-                      border:"1px solid rgba(232,69,88,.25)", borderRadius:10, color:"#e84558", fontSize:13,
-                    }}>{error}</div>
-                  )}
-
-                  {/* Privacy */}
-                  <div className="ctc-field" style={{
-                    padding:"11px 15px", background:"rgba(200,168,75,.04)",
-                    border:`1px solid ${GOLD_BORDER}`, borderRadius:10,
-                    display:"flex", gap:9, alignItems:"flex-start",
-                  }}>
-                    <span style={{ fontSize:15, flexShrink:0, marginTop:1 }}>🔒</span>
-                    <p style={{ margin:0, fontSize:11.5, color:"#585858", lineHeight:1.6 }}>
-                      Tus datos se usan exclusivamente para contactarte sobre tu proyecto. Sin spam, nunca.
-                    </p>
-                  </div>
-
-                  {/* Submit */}
-                  <div className="ctc-field" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
-                    <p style={{ fontSize:11.5, color:"#4a4a4a", flex:1, margin:0 }}>
-                      Respuesta personalizada en &lt;24h con análisis previo de tu tienda.
-                    </p>
-                    <button type="submit" disabled={status === "sending"} style={{
-                      opacity: status === "sending" ? .68 : 1,
-                      minWidth:200, padding:"13px 28px", fontSize:13.5,
-                      borderRadius:12, border:"none", cursor:"pointer", fontWeight:800,
-                      background:"linear-gradient(135deg,#d4a843,#b8860b)",
-                      color:"#000", letterSpacing:".5px",
-                      boxShadow:"0 4px 20px rgba(200,168,75,.22)",
-                      transition:"opacity .2s",
+                      padding:"11px 15px", background:"rgba(200,168,75,.04)",
+                      border:`1px solid ${GOLD_BORDER}`, borderRadius:10,
+                      display:"flex", gap:9, alignItems:"flex-start",
                     }}>
-                      {status === "sending" ? "Enviando…" : "ENVIAR SOLICITUD →"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-          </div>
+                      <span style={{ fontSize:15, flexShrink:0, marginTop:1 }}>🔒</span>
+                      <p style={{ margin:0, fontSize:11.5, color:"#585858", lineHeight:1.6 }}>
+                        Tus datos se usan exclusivamente para contactarte sobre tu proyecto. Sin spam, nunca.
+                      </p>
+                    </div>
 
-          {/* ─── INFO CARDS — after panel in DOM = below form on mobile ─── */}
-          <div className="ctc-cards-row">
-            {cards}
+                    <div className="ctc-field" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
+                      <p style={{ fontSize:11.5, color:"#4a4a4a", flex:1, margin:0 }}>
+                        Respuesta personalizada en &lt;24h con análisis previo de tu tienda.
+                      </p>
+                      <button type="submit" disabled={status === "sending"} style={{
+                        opacity: status === "sending" ? .68 : 1,
+                        minWidth:200, padding:"13px 28px", fontSize:13.5,
+                        borderRadius:12, border:"none", cursor:"pointer", fontWeight:800,
+                        background:"linear-gradient(135deg,#d4a843,#b8860b)",
+                        color:"#000", letterSpacing:".5px",
+                        boxShadow:"0 4px 20px rgba(200,168,75,.22)",
+                        transition:"opacity .2s",
+                      }}>
+                        {status === "sending" ? "Enviando…" : "ENVIAR SOLICITUD →"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
           </div>
 
         </div>

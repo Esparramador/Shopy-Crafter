@@ -93,7 +93,7 @@ async function ensureBillingPlansTable(): Promise<void> {
         features JSONB DEFAULT '[]',
         cta_label TEXT DEFAULT 'Contactar →',
         cta_style TEXT DEFAULT 'ghost',
-        cta_href TEXT DEFAULT '/contacto',
+        cta_href TEXT DEFAULT '#fp-contact',
         stores_limit INTEGER DEFAULT 1,
         images_included INTEGER DEFAULT 10,
         period_days INTEGER DEFAULT 30,
@@ -109,7 +109,7 @@ async function ensureBillingPlansTable(): Promise<void> {
 ensureBillingPlansTable();
 
 // ── Seed canonical plans once per deploy (idempotent via version tag) ─────────
-const CANONICAL_SEED_VERSION = "v3-canonical-2026";
+const CANONICAL_SEED_VERSION = "v4-fp-contact-2026";
 const CANONICAL_BILLING_PLANS = [
   {
     id: "emprendedor",
@@ -126,7 +126,7 @@ const CANONICAL_BILLING_PLANS = [
       { text: "A/B Testing", included: false },
       { text: "API Access", included: false },
     ],
-    ctaLabel: "Empezar →", ctaStyle: "ghost", ctaHref: "/contacto",
+    ctaLabel: "Empezar →", ctaStyle: "ghost", ctaHref: "#fp-contact",
     storesLimit: 1, imagesIncluded: 10, sortOrder: 0,
   },
   {
@@ -144,7 +144,7 @@ const CANONICAL_BILLING_PLANS = [
       { text: "A/B Testing", included: false },
       { text: "API Access", included: false },
     ],
-    ctaLabel: "Solicitar acceso →", ctaStyle: "ghost", ctaHref: "/contacto",
+    ctaLabel: "Solicitar acceso →", ctaStyle: "ghost", ctaHref: "#fp-contact",
     storesLimit: 3, imagesIncluded: 45, sortOrder: 1,
   },
   {
@@ -162,7 +162,7 @@ const CANONICAL_BILLING_PLANS = [
       { text: "API Access + Webhooks", included: true },
       { text: "Soporte prioritario 12h", included: true },
     ],
-    ctaLabel: "Empezar ahora →", ctaStyle: "gold", ctaHref: "/contacto",
+    ctaLabel: "Empezar ahora →", ctaStyle: "gold", ctaHref: "#fp-contact",
     storesLimit: 10, imagesIncluded: 300, sortOrder: 2,
   },
   {
@@ -180,7 +180,7 @@ const CANONICAL_BILLING_PLANS = [
       { text: "API privada + acceso prioritario", included: true },
       { text: "Soporte 24/7 dedicado", included: true },
     ],
-    ctaLabel: "Hablar con ventas →", ctaStyle: "ghost", ctaHref: "/contacto",
+    ctaLabel: "Hablar con ventas →", ctaStyle: "ghost", ctaHref: "#fp-contact",
     storesLimit: -1, imagesIncluded: 1200, sortOrder: 3,
   },
 ];

@@ -317,7 +317,7 @@ export default function Landing() {
                 features: Array.isArray(p.features)
                   ? p.features.map((f: any) => typeof f === "string" ? { text: f, included: true } : f)
                   : [],
-                cta: { label: p.ctaLabel ?? "Contactar →", style: p.ctaStyle ?? "ghost", href: p.ctaHref ?? "/contacto" },
+                cta: { label: p.ctaLabel ?? "Contactar →", style: p.ctaStyle ?? "ghost", href: p.ctaHref ?? "#fp-contact" },
               }))
             : []
         );
@@ -347,7 +347,7 @@ export default function Landing() {
           features: Array.isArray(p.features)
             ? p.features.map((f: any) => typeof f === "string" ? { text: f, included: true } : f)
             : [],
-          cta: { label: p.cta?.label ?? "Contactar →", style: p.cta?.style ?? "ghost", href: p.cta?.href ?? "/contacto" },
+          cta: { label: p.cta?.label ?? "Contactar →", style: p.cta?.style ?? "ghost", href: p.cta?.href ?? "#fp-contact" },
         } as CanonicalPlan;
       });
     }
