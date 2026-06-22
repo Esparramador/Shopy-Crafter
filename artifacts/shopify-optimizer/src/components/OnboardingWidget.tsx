@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type CSSProperties } from "react";
 import { ChevronDown, ChevronUp, CheckCircle, Circle, ExternalLink } from "lucide-react";
 import { useLocation, useRoute } from "wouter";
 import { useDraggable } from "@/hooks/use-draggable";
@@ -74,9 +74,22 @@ export function OnboardingWidget() {
   const [details, setDetails] = useState<Record<string, any> | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [location, navigate] = useLocation();
   const [routeMatch, routeParams] = useRoute("/projects/:id/*");
   const { position: dragPos, dragHandlers: widgetDragHandlers } = useDraggable({ storageKey: "onboarding", defaultBottom: 16, defaultRight: 16, dragFromAnywhere: false });
+
+  // Auto-collapse and detect mobile
+  useEffect(() => {
+    const check = () => {
+      const mobile = window.innerWidth < 640;
+      setIsMobile(mobile);
+      if (mobile) setCollapsed(true);
+    };
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const urlProjectId = routeMatch ? parseInt(routeParams.id) : null;
 
@@ -113,17 +126,31 @@ export function OnboardingWidget() {
     navigate(route);
   };
 
+  // Mobile: bottom-center full-width panel; Desktop: draggable corner widget
+  const mobileStyle: CSSProperties = {
+    position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 800,
+    background: "var(--ink2, #111113)",
+    borderTop: "1px solid var(--gold, #c8a84b)",
+    borderRadius: "14px 14px 0 0",
+    boxShadow: "0 -4px 24px rgba(0,0,0,0.6), 0 0 20px rgba(200,168,75,0.08)",
+    width: "100%",
+    maxHeight: collapsed ? "56px" : "60vh",
+    overflow: "hidden",
+    display: "flex", flexDirection: "column",
+    transition: "max-height 0.35s cubic-bezier(.22,1,.36,1)",
+  };
+  const desktopStyle: CSSProperties = {
+    position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 800,
+    background: "var(--ink2, #111113)", border: "1px solid var(--gold, #c8a84b)",
+    borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(200,168,75,0.1)",
+    width: "min(320px, calc(100vw - 32px))",
+    maxHeight: "calc(100vh - 32px)",
+    overflow: "hidden",
+    display: "flex", flexDirection: "column",
+  };
+
   return (
-    <div
-      style={{
-        position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 800,
-        background: "var(--ink2, #111113)", border: "1px solid var(--gold, #c8a84b)",
-        borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(200,168,75,0.1)",
-        width: "min(320px, calc(100vw - 32px))",
-        maxHeight: "calc(100vh - 32px)",
-        overflow: "hidden",
-        display: "flex", flexDirection: "column",
-      }}>
+    <div style={isMobile ? mobileStyle : desktopStyle}>
       <div
         {...widgetDragHandlers}
         style={{
