@@ -108,6 +108,125 @@ async function ensureBillingPlansTable(): Promise<void> {
 }
 ensureBillingPlansTable();
 
+// ── Seed canonical plans once per deploy (idempotent via version tag) ─────────
+const CANONICAL_SEED_VERSION = "v3-canonical-2026";
+const CANONICAL_BILLING_PLANS = [
+  {
+    id: "emprendedor",
+    name: "Emprendedor",
+    price: 19, priceAnnual: 190,
+    currency: "€", featured: false, badge: null,
+    features: [
+      { text: "5 productos/mes", included: true },
+      { text: "10 imágenes IA/mes", included: true },
+      { text: "Auditoría de tienda Shopify", included: true },
+      { text: "Chatbot IA de atención", included: true },
+      { text: "SEO básico automático", included: true },
+      { text: "Soporte por email", included: true },
+      { text: "A/B Testing", included: false },
+      { text: "API Access", included: false },
+    ],
+    ctaLabel: "Empezar →", ctaStyle: "ghost", ctaHref: "/contacto",
+    storesLimit: 1, imagesIncluded: 10, sortOrder: 0,
+  },
+  {
+    id: "starter",
+    name: "Starter",
+    price: 49, priceAnnual: 490,
+    currency: "€", featured: false, badge: null,
+    features: [
+      { text: "15 productos/mes", included: true },
+      { text: "45 imágenes IA/mes", included: true },
+      { text: "Todos los módulos de IA", included: true },
+      { text: "SEO técnico automático", included: true },
+      { text: "Pricing dinámico con IA", included: true },
+      { text: "Soporte prioritario", included: true },
+      { text: "A/B Testing", included: false },
+      { text: "API Access", included: false },
+    ],
+    ctaLabel: "Solicitar acceso →", ctaStyle: "ghost", ctaHref: "/contacto",
+    storesLimit: 3, imagesIncluded: 45, sortOrder: 1,
+  },
+  {
+    id: "agency_pro",
+    name: "Growth",
+    price: 149, priceAnnual: 1490,
+    currency: "€", featured: true, badge: "Más popular",
+    features: [
+      { text: "60 productos/mes", included: true },
+      { text: "300 imágenes IA/mes", included: true },
+      { text: "Todos los módulos de IA", included: true },
+      { text: "A/B Testing (hasta 10 activos)", included: true },
+      { text: "Informes Pro mensuales", included: true },
+      { text: "Análisis de competidores en vivo", included: true },
+      { text: "API Access + Webhooks", included: true },
+      { text: "Soporte prioritario 12h", included: true },
+    ],
+    ctaLabel: "Empezar ahora →", ctaStyle: "gold", ctaHref: "/contacto",
+    storesLimit: 10, imagesIncluded: 300, sortOrder: 2,
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: 399, priceAnnual: 3990,
+    currency: "€", featured: false, badge: null,
+    features: [
+      { text: "200 productos/mes", included: true },
+      { text: "1.200 imágenes IA/mes", included: true },
+      { text: "A/B Testing ilimitado", included: true },
+      { text: "Informes ejecutivos semanales", included: true },
+      { text: "White-label & Multi-tienda", included: true },
+      { text: "Account Manager dedicado", included: true },
+      { text: "API privada + acceso prioritario", included: true },
+      { text: "Soporte 24/7 dedicado", included: true },
+    ],
+    ctaLabel: "Hablar con ventas →", ctaStyle: "ghost", ctaHref: "/contacto",
+    storesLimit: -1, imagesIncluded: 1200, sortOrder: 3,
+  },
+];
+
+async function seedCanonicalBillingPlans(): Promise<void> {
+  try {
+    const existing = await db.execute(sql`
+      SELECT id FROM billing_plans WHERE id = 'seed-version-tag' LIMIT 1
+    `).catch(() => ({ rows: [] as any[] }));
+    const versionRow = await db.execute(sql`
+      SELECT badge FROM billing_plans WHERE id = ${CANONICAL_SEED_VERSION} LIMIT 1
+    `).catch(() => ({ rows: [] as any[] }));
+    if (versionRow.rows.length > 0) return;
+
+    logger.info("🌱 Seeding canonical billing plans...");
+    await db.execute(sql`UPDATE billing_plans SET visible = FALSE`);
+    for (const p of CANONICAL_BILLING_PLANS) {
+      await db.execute(sql`
+        INSERT INTO billing_plans
+          (id,name,price,price_annual,currency,period,featured,badge,features,cta_label,cta_style,cta_href,stores_limit,images_included,period_days,visible,sort_order)
+        VALUES (
+          ${p.id}, ${p.name}, ${p.price}, ${p.priceAnnual}, ${p.currency}, '/mes',
+          ${p.featured}, ${p.badge ?? null}, ${JSON.stringify(p.features)},
+          ${p.ctaLabel}, ${p.ctaStyle}, ${p.ctaHref},
+          ${p.storesLimit}, ${p.imagesIncluded}, 30, TRUE, ${p.sortOrder}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          name=EXCLUDED.name, price=EXCLUDED.price, price_annual=EXCLUDED.price_annual,
+          featured=EXCLUDED.featured, badge=EXCLUDED.badge, features=EXCLUDED.features,
+          cta_label=EXCLUDED.cta_label, cta_style=EXCLUDED.cta_style, cta_href=EXCLUDED.cta_href,
+          stores_limit=EXCLUDED.stores_limit, images_included=EXCLUDED.images_included,
+          visible=TRUE, sort_order=EXCLUDED.sort_order
+      `);
+    }
+    await db.execute(sql`
+      INSERT INTO billing_plans (id,name,price,visible,sort_order)
+      VALUES (${CANONICAL_SEED_VERSION}, 'seed-version', 0, FALSE, 999)
+      ON CONFLICT (id) DO NOTHING
+    `);
+    logger.info("✅ Canonical billing plans seeded");
+  } catch (err) {
+    logger.warn({ err }, "billing plans seed warning (non-fatal)");
+  }
+}
+seedCanonicalBillingPlans();
+
 function rowToPlan(row: any) {
   return {
     id: row.id,

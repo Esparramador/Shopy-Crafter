@@ -14,20 +14,20 @@ import {
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const CHARACTERS_3D = [
-  { id: "alec_monopoly",    name: "Alec Monopoly",    emoji: "🎩", anims: 134, rigged: true,  textured: true,  size: "8.2MB" },
-  { id: "batman",           name: "Batman",           emoji: "🦇", anims: 22,  rigged: true,  textured: true,  size: "5.1MB" },
-  { id: "spiderman",        name: "Spider-Man",       emoji: "🕷️", anims: 22,  rigged: true,  textured: true,  size: "4.9MB" },
-  { id: "chico_casual",     name: "Chico Casual",     emoji: "👕", anims: 22,  rigged: true,  textured: true,  size: "6.8MB" },
-  { id: "chico_formal",     name: "Chico Formal",     emoji: "👔", anims: 22,  rigged: true,  textured: true,  size: "5.2MB" },
-  { id: "mickey_mouse",     name: "Mickey Mouse",     emoji: "🐭", anims: 21,  rigged: true,  textured: false, size: "2.1MB" },
-  { id: "minnie_mouse",     name: "Minnie Mouse",     emoji: "🎀", anims: 21,  rigged: true,  textured: false, size: "2.0MB" },
-  { id: "bob_esponja",      name: "Bob Esponja",      emoji: "🧽", anims: 21,  rigged: true,  textured: false, size: "1.8MB" },
-  { id: "bugs_bunny",       name: "Bugs Bunny",       emoji: "🐰", anims: 21,  rigged: true,  textured: false, size: "1.7MB" },
-  { id: "ted",              name: "Ted (Oso)",         emoji: "🧸", anims: 3,   rigged: true,  textured: true,  size: "7.3MB" },
-  { id: "payaso_plim_plim", name: "Payaso Plim Plim",  emoji: "🤡", anims: 21,  rigged: true,  textured: false, size: "1.5MB" },
-  { id: "pikachu",          name: "Pikachu",           emoji: "⚡", anims: 0,   rigged: false, textured: false, size: "1.2MB" },
-  { id: "chica_ejecutiva",  name: "Chica Ejecutiva",   emoji: "💼", anims: 21,  rigged: true,  textured: false, size: "1.4MB" },
-  { id: "chica_creativa",   name: "Chica Creativa",    emoji: "🎨", anims: 0,   rigged: false, textured: false, size: "1.3MB" },
+  { id: "alec_monopoly",    name: "Alec Monopoly",    emoji: "🎩", anims: 134, rigged: true,  textured: true,  size: "8.2MB", rigTaskId: "019ebb36-4f0c-7d21-a268-2ff6198aca60" },
+  { id: "batman",           name: "Batman",           emoji: "🦇", anims: 22,  rigged: true,  textured: true,  size: "5.1MB", rigTaskId: "019ebb36-4f15-7f7e-af4e-3148857adbfe" },
+  { id: "spiderman",        name: "Spider-Man",       emoji: "🕷️", anims: 22,  rigged: true,  textured: true,  size: "4.9MB", rigTaskId: null },
+  { id: "chico_casual",     name: "Chico Casual",     emoji: "👕", anims: 22,  rigged: true,  textured: true,  size: "6.8MB", rigTaskId: "019ebb36-4f25-7f7f-b072-2ef66d123f7d" },
+  { id: "chico_formal",     name: "Chico Formal",     emoji: "👔", anims: 22,  rigged: true,  textured: true,  size: "5.2MB", rigTaskId: "019ebb36-4eef-728c-87b1-6f3f022a9a2e" },
+  { id: "mickey_mouse",     name: "Mickey Mouse",     emoji: "🐭", anims: 21,  rigged: true,  textured: false, size: "2.1MB", rigTaskId: null },
+  { id: "minnie_mouse",     name: "Minnie Mouse",     emoji: "🎀", anims: 21,  rigged: true,  textured: false, size: "2.0MB", rigTaskId: null },
+  { id: "bob_esponja",      name: "Bob Esponja",      emoji: "🧽", anims: 21,  rigged: true,  textured: false, size: "1.8MB", rigTaskId: null },
+  { id: "bugs_bunny",       name: "Bugs Bunny",       emoji: "🐰", anims: 21,  rigged: true,  textured: false, size: "1.7MB", rigTaskId: null },
+  { id: "ted",              name: "Ted (Oso)",         emoji: "🧸", anims: 3,   rigged: true,  textured: true,  size: "7.3MB", rigTaskId: "019ebb36-4f56-728f-bb13-5654f37c1b41" },
+  { id: "payaso_plim_plim", name: "Payaso Plim Plim",  emoji: "🤡", anims: 21,  rigged: true,  textured: false, size: "1.5MB", rigTaskId: null },
+  { id: "pikachu",          name: "Pikachu",           emoji: "⚡", anims: 0,   rigged: false, textured: false, size: "1.2MB", rigTaskId: null },
+  { id: "chica_ejecutiva",  name: "Chica Ejecutiva",   emoji: "💼", anims: 21,  rigged: true,  textured: false, size: "1.4MB", rigTaskId: null },
+  { id: "chica_creativa",   name: "Chica Creativa",    emoji: "🎨", anims: 0,   rigged: false, textured: false, size: "1.3MB", rigTaskId: null },
 ];
 
 const FOLDER_META: Record<string, { label: string; icon: typeof Image; color: string; group: string; description: string }> = {
@@ -177,6 +177,11 @@ export default function GlobalVault() {
   const [texturizingMsg, setTexturizingMsg] = useState("");
   const [texturedNow, setTexturedNow] = useState<Set<string>>(new Set());
   const [texturizeError, setTexturizeError] = useState<string | null>(null);
+  // ── Recovery state ──
+  type RecoverPhase = "recovering" | "animating" | "done" | "error";
+  const [recoverState, setRecoverState] = useState<{
+    id: string; phase: RecoverPhase; downloaded: number; total: number; msg: string;
+  } | null>(null);
   const [recordingDemo, setRecordingDemo] = useState<string | null>(null);
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
   const [loadedPreviews, setLoadedPreviews] = useState<Set<string>>(new Set());
@@ -254,6 +259,56 @@ export default function GlobalVault() {
       setTexturizingId(null);
     }
   }, []);
+
+  const handleRecoverChar = useCallback(async (charId: string, rigTaskId: string) => {
+    if (recoverState) return;
+    setRecoverState({ id: charId, phase: "recovering", downloaded: 0, total: 0, msg: "Contactando Meshy…" });
+    try {
+      // Phase 1: re-download base model + rigged.glb (sync JSON)
+      const r1 = await fetch(`${API_BASE}/api/meshy/recover-char`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ char_id: charId, rig_task_id: rigTaskId }),
+      });
+      const d1 = await r1.json();
+      if (!r1.ok) throw new Error(d1.error ?? `HTTP ${r1.status}`);
+      setRecoverState(s => s ? { ...s, phase: "animating", msg: `GLB base ${d1.model_saved ? "✓" : "⚠ sin URL"}. Rigged ${d1.rigged_saved ? "✓" : "⚠ sin URL"}. Lanzando animaciones…` } : null);
+
+      // Phase 2: bulk-animate (SSE stream)
+      const r2 = await fetch(`${API_BASE}/api/meshy/admin/bulk-animate`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ char_id: charId, rig_task_id: rigTaskId }),
+      });
+      if (!r2.ok || !r2.body) throw new Error(`bulk-animate HTTP ${r2.status}`);
+      const reader = r2.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          try {
+            const e = JSON.parse(line.slice(5).trim());
+            if (e.event === "started")           setRecoverState(s => s ? { ...s, total: e.missing_count ?? 0, msg: `Lanzando ${e.missing_count} animaciones…` } : null);
+            if (e.event === "tasks_launched")    setRecoverState(s => s ? { ...s, msg: `${e.count} tareas en cola…` } : null);
+            if (e.event === "animation_ready")   setRecoverState(s => s ? { ...s, downloaded: s.downloaded + 1, msg: `✓ ${e.anim_name} (${s.downloaded + 1}/${s.total})` } : null);
+            if (e.event === "poll")              setRecoverState(s => s ? { ...s, msg: `Descargando… ${e.downloaded}/${s.total || "?"} · ${e.remaining} restantes` } : null);
+            if (e.event === "done")              setRecoverState(s => s ? { ...s, phase: "done", downloaded: e.downloaded, msg: `✅ ${e.downloaded} animaciones recuperadas` } : null);
+            if (e.event === "error")             throw new Error(e.error ?? "Error en bulk-animate");
+          } catch (parseErr) { /* skip malformed line */ }
+        }
+      }
+      setTimeout(() => setRecoverState(null), 5000);
+    } catch (err: any) {
+      setRecoverState(s => s ? { ...s, phase: "error", msg: err.message ?? "Error" } : null);
+      setTimeout(() => setRecoverState(null), 6000);
+    }
+  }, [recoverState]);
 
   const loadEntities = useCallback(async () => {
     setLoading(true);
@@ -730,6 +785,55 @@ export default function GlobalVault() {
                       {texturizingId !== null ? "Texturizando otro…" : "Texturizar con Meshy"}
                     </button>
                   )}
+
+                  {/* ── Recover button — chars with known rigTaskId ── */}
+                  {char.rigTaskId && (() => {
+                    const rs = recoverState?.id === char.id ? recoverState : null;
+                    const busy = !!recoverState;
+                    if (rs) return (
+                      <div style={{ flex: "0 0 100%" }}>
+                        <div style={{
+                          height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)",
+                          overflow: "hidden", marginBottom: 5,
+                        }}>
+                          <div style={{
+                            height: "100%",
+                            width: rs.phase === "done" ? "100%" : rs.total > 0 ? `${Math.round(rs.downloaded / rs.total * 100)}%` : "100%",
+                            background: rs.phase === "error"
+                              ? "linear-gradient(90deg,#ef5350,#e53935)"
+                              : rs.phase === "done"
+                              ? "linear-gradient(90deg,#4caf50,#66bb6a)"
+                              : "linear-gradient(90deg,#00bcd4,#26c6da)",
+                            borderRadius: 2,
+                            animation: rs.phase === "animating" && rs.total === 0 ? "ctcBeam 1.3s ease-in-out infinite" : "none",
+                            transition: "width 0.4s ease",
+                          }} />
+                        </div>
+                        <div style={{ fontSize: 10, color: rs.phase === "error" ? "#ef5350" : rs.phase === "done" ? "#4caf50" : "#8b8b9e", textAlign: "center", lineHeight: 1.4 }}>
+                          {rs.msg}
+                        </div>
+                      </div>
+                    );
+                    return (
+                      <button
+                        onClick={() => handleRecoverChar(char.id, char.rigTaskId!)}
+                        disabled={busy}
+                        style={{
+                          flex: "0 0 100%",
+                          background: busy ? "rgba(255,255,255,0.03)" : "linear-gradient(135deg,rgba(0,188,212,0.12),rgba(0,188,212,0.06))",
+                          border: `1px solid ${busy ? "rgba(255,255,255,0.07)" : "rgba(0,188,212,0.28)"}`,
+                          borderRadius: 8, padding: "7px 0", fontSize: 11, fontWeight: 700,
+                          color: busy ? "#444" : "#00bcd4",
+                          cursor: busy ? "not-allowed" : "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        <RefreshCw size={11} />
+                        {busy ? "Recuperando otro…" : "🔄 Recuperar GLBs"}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
