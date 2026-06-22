@@ -318,7 +318,7 @@ export default function LandingChatbot() {
               💰 Ver precios
             </a>
             <a
-              href="/register"
+              href="/contacto"
               style={{
                 flex: 1, textAlign: "center", padding: "8px 0",
                 borderRadius: 10, border: "none",
@@ -330,7 +330,7 @@ export default function LandingChatbot() {
               onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.9"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
             >
-              🚀 Empezar gratis
+              📩 Contactar
             </a>
           </div>
         </div>

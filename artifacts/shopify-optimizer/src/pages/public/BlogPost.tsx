@@ -85,12 +85,12 @@ export default function BlogPost() {
           <p style={{ fontSize: 15, color: "var(--t, #eee)", fontWeight: 600, marginBottom: 8 }}>
             ¿Listo para optimizar tu tienda con IA?
           </p>
-          <p style={{ fontSize: 13, color: "var(--t3, #999)", marginBottom: 16 }}>14 días gratis, sin tarjeta de crédito.</p>
-          <a href="/register" style={{
+          <p style={{ fontSize: 13, color: "var(--t3, #999)", marginBottom: 16 }}>Cuéntanos tu proyecto y te preparamos una propuesta sin compromiso.</p>
+          <a href="/contacto" style={{
             display: "inline-block", padding: "12px 28px", borderRadius: 10,
             background: "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000",
             fontWeight: 700, fontSize: 14, textDecoration: "none",
-          }}>Empezar gratis →</a>
+          }}>Contactar →</a>
         </div>
 
         <div style={{ marginTop: 40, paddingTop: 32, borderTop: "1px solid var(--ink3, #1e1e22)" }}>

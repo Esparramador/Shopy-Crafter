@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { subscriptionsTable, affiliatesTable, referralTrackingTable, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
@@ -77,14 +77,113 @@ router.get("/billing/subscription", async (req, res): Promise<void> => {
   }
 });
 
+// ── Billing Plans DB table (no-migration approach: raw SQL) ─────────────────
+async function ensureBillingPlansTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS billing_plans (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT '',
+        price REAL NOT NULL DEFAULT 0,
+        price_annual REAL DEFAULT 0,
+        currency TEXT DEFAULT '€',
+        period TEXT DEFAULT '/mes',
+        featured BOOLEAN DEFAULT FALSE,
+        badge TEXT,
+        features JSONB DEFAULT '[]',
+        cta_label TEXT DEFAULT 'Contactar →',
+        cta_style TEXT DEFAULT 'ghost',
+        cta_href TEXT DEFAULT '/contacto',
+        stores_limit INTEGER DEFAULT 1,
+        images_included INTEGER DEFAULT 10,
+        period_days INTEGER DEFAULT 30,
+        visible BOOLEAN DEFAULT TRUE,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch (err) {
+    logger.warn({ err }, "billing_plans table setup warning");
+  }
+}
+ensureBillingPlansTable();
+
+function rowToPlan(row: any) {
+  return {
+    id: row.id,
+    name: row.name,
+    price: Number(row.price),
+    priceAnnual: Number(row.price_annual ?? row.price * 10),
+    currency: row.currency ?? "€",
+    period: row.period ?? "/mes",
+    featured: !!row.featured,
+    badge: row.badge ?? null,
+    features: Array.isArray(row.features) ? row.features : JSON.parse(row.features ?? "[]"),
+    ctaLabel: row.cta_label ?? "Contactar →",
+    ctaStyle: row.cta_style ?? "ghost",
+    ctaHref: row.cta_href ?? "/contacto",
+    storesLimit: Number(row.stores_limit ?? 1),
+    imagesIncluded: Number(row.images_included ?? 10),
+  };
+}
+
 router.get("/billing/plans", async (_req, res): Promise<void> => {
   try {
-    res.json(Object.entries(PLANS)
-      .filter(([, plan]) => plan.visible !== false)
-      .map(([id, plan]) => ({ id, ...plan })));
+    const result = await db.execute(sql`
+      SELECT * FROM billing_plans WHERE visible = TRUE ORDER BY sort_order ASC, created_at ASC
+    `);
+    res.json(result.rows.map(rowToPlan));
+  } catch {
+    res.json([]);
+  }
+});
+
+router.post("/billing/plans", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { id, name, price, priceAnnual, currency = "€", period = "/mes", featured = false,
+      badge = null, features = [], ctaLabel = "Contactar →", ctaStyle = "ghost",
+      ctaHref = "/contacto", storesLimit = 1, imagesIncluded = 10 } = req.body as Record<string, any>;
+    if (!id || !name || price == null) { res.status(400).json({ error: "id, name y price son requeridos" }); return; }
+    const maxRes = await db.execute(sql`SELECT COALESCE(MAX(sort_order), -1)::int AS m FROM billing_plans`);
+    const nextOrder = Number((maxRes.rows[0] as any)?.m ?? -1) + 1;
+    await db.execute(sql`
+      INSERT INTO billing_plans (id,name,price,price_annual,currency,period,featured,badge,features,cta_label,cta_style,cta_href,stores_limit,images_included,period_days,visible,sort_order)
+      VALUES (${id},${name},${Number(price)},${Number(priceAnnual ?? price * 10)},${currency},${period},${!!featured},${badge ?? null},${JSON.stringify(features)},${ctaLabel},${ctaStyle},${ctaHref},${Number(storesLimit)},${Number(imagesIncluded)},30,TRUE,${nextOrder})
+    `);
+    logger.info({ id, name }, "✅ billing_plan created");
+    res.json({ ok: true, id });
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+router.put("/billing/plans/:planId", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { planId } = req.params;
+    const { name, price, priceAnnual, currency, period, featured, badge, features,
+      ctaLabel, ctaStyle, ctaHref, storesLimit, imagesIncluded } = req.body as Record<string, any>;
+    await db.execute(sql`
+      UPDATE billing_plans SET
+        name=${name}, price=${Number(price)}, price_annual=${Number(priceAnnual ?? price * 10)},
+        currency=${currency ?? "€"}, period=${period ?? "/mes"}, featured=${!!featured},
+        badge=${badge ?? null}, features=${JSON.stringify(features ?? [])},
+        cta_label=${ctaLabel ?? "Contactar →"}, cta_style=${ctaStyle ?? "ghost"}, cta_href=${ctaHref ?? "/contacto"},
+        stores_limit=${Number(storesLimit ?? 1)}, images_included=${Number(imagesIncluded ?? 10)}
+      WHERE id=${planId}
+    `);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+router.delete("/billing/plans/:planId", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { planId } = req.params;
+    await db.execute(sql`UPDATE billing_plans SET visible=FALSE WHERE id=${planId}`);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
   }
 });
 

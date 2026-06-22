@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import PageMeta from "@/components/PageMeta";
 import { VismeFormHero } from "@/components/VismeFormHero";
-import { CANONICAL_PLANS } from "@/lib/pricing-plans";
+import { CANONICAL_PLANS, type CanonicalPlan } from "@/lib/pricing-plans";
 import "./landing.css";
 
 function SectionVideoBg({ src }: { src: string }) {
@@ -296,6 +296,64 @@ export default function Landing() {
   const pricingRowRef = useRef<HTMLDivElement>(null);
   const [pricingIdx, setPricingIdx] = useState(0);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
+  // "loading" while the fetch is in flight; CanonicalPlan[] once resolved (may be empty)
+  const [apiPlansState, setApiPlansState] = useState<CanonicalPlan[] | "loading">("loading");
+
+  useEffect(() => {
+    const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
+    fetch(`${base}/api/billing/plans`)
+      .then(r => r.ok ? r.json() : [])
+      .then((plans: any[]) => {
+        setApiPlansState(
+          Array.isArray(plans) && plans.length > 0
+            ? plans.map(p => ({
+                id: String(p.id),
+                name: String(p.name),
+                priceMonthly: Number(p.price ?? 0),
+                priceAnnual: Number(p.priceAnnual ?? (p.price ?? 0) * 10),
+                currency: p.currency ?? "€",
+                featured: !!p.featured,
+                badge: p.badge ?? null,
+                features: Array.isArray(p.features)
+                  ? p.features.map((f: any) => typeof f === "string" ? { text: f, included: true } : f)
+                  : [],
+                cta: { label: p.ctaLabel ?? "Contactar →", style: p.ctaStyle ?? "ghost", href: p.ctaHref ?? "/contacto" },
+              }))
+            : []
+        );
+      })
+      .catch(() => setApiPlansState([]));
+  }, []);
+
+  // Priority: API plans (admin-managed) → CMS plans → CANONICAL_PLANS
+  const displayPlans = useMemo<CanonicalPlan[]>(() => {
+    // While loading, show CANONICAL_PLANS so nothing flickers
+    if (apiPlansState === "loading") return CANONICAL_PLANS;
+    // Admin has plans configured in billing admin → use those exclusively
+    if (apiPlansState.length > 0) return apiPlansState;
+    // API is empty → try CMS plans
+    const cmsRaw = content?.pricing?.plans;
+    if (Array.isArray(cmsRaw) && cmsRaw.length > 0) {
+      return cmsRaw.map((p: any) => {
+        const monthly = Number(p.price ?? p.priceMonthly ?? 0);
+        return {
+          id: String(p.id ?? p.name),
+          name: String(p.name),
+          priceMonthly: monthly,
+          priceAnnual: Number(p.priceAnnual ?? monthly * 10),
+          currency: p.currency ?? "€",
+          featured: !!p.featured,
+          badge: p.badge ?? null,
+          features: Array.isArray(p.features)
+            ? p.features.map((f: any) => typeof f === "string" ? { text: f, included: true } : f)
+            : [],
+          cta: { label: p.cta?.label ?? "Contactar →", style: p.cta?.style ?? "ghost", href: p.cta?.href ?? "/contacto" },
+        } as CanonicalPlan;
+      });
+    }
+    // Final fallback
+    return CANONICAL_PLANS;
+  }, [apiPlansState, content?.pricing?.plans]);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "", suppliers: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -1030,7 +1088,7 @@ export default function Landing() {
                 <button type="button" className="fp-pricing-arrow fp-pricing-arrow-left" onClick={() => scrollPricing(-1)} aria-label="Plan anterior">‹</button>
               )}
               <div ref={pricingRowRef} className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"} fp-pricing-3d-container`} style={{ animationDelay: "0.1s" }}>
-                {CANONICAL_PLANS.map((plan, planIdx) => (
+                {displayPlans.map((plan, planIdx) => (
                   <div
                     key={plan.id}
                     className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}
@@ -1077,12 +1135,12 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-              {pricingIdx < (CANONICAL_PLANS.length - 1) && (
+              {pricingIdx < (displayPlans.length - 1) && (
                 <button type="button" className="fp-pricing-arrow fp-pricing-arrow-right" onClick={() => scrollPricing(1)} aria-label="Plan siguiente">›</button>
               )}
             </div>
             <div className="fp-pricing-dots">
-              {CANONICAL_PLANS.map((plan, i) => (
+              {displayPlans.map((plan, i) => (
                 <button key={plan.id} type="button" className={`fp-pricing-dot${i === pricingIdx ? " active" : ""}`}
                   onClick={() => { const row = pricingRowRef.current; if (row) { const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card"); if (cards[i]) { cards[i].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" }); setPricingIdx(i); } } }}
                   aria-label={plan.name} />

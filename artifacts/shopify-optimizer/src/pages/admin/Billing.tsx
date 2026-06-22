@@ -1,18 +1,28 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Check, Copy, AlertTriangle, RefreshCcw } from "lucide-react";
-import { apiGet, apiPost, ApiError } from "@/lib/api";
+import { CreditCard, Check, Copy, AlertTriangle, RefreshCcw, Plus, Trash2, Pencil, X } from "lucide-react";
+import { apiGet, apiPost, apiPut, apiDelete, ApiError } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
-const PLAN_ICONS: Record<string, string> = { trial: "🆓", starter: "🚀", pro: "⚡", agency: "🏆" };
+const PLAN_ICONS: Record<string, string> = { trial: "🆓", starter: "🚀", pro: "⚡", agency: "🏆", emprendedor: "🌱", agency_pro: "⚡", enterprise: "🏢" };
 
 interface Plan {
   id: string;
   name: string;
   price: number;
+  priceAnnual?: number;
+  currency?: string;
+  period?: string;
+  featured?: boolean;
+  badge?: string | null;
   storesLimit: number;
   imagesIncluded: number;
   features: string[];
+  ctaLabel?: string;
+  ctaStyle?: string;
+  ctaHref?: string;
 }
+
 interface Subscription {
   id: string | number;
   userId: string;
@@ -60,7 +70,9 @@ const billingKeys = {
 
 export default function Billing() {
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"subscription" | "affiliate" | "invoices">("subscription");
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const [activeTab, setActiveTab] = useState<"subscription" | "affiliate" | "invoices" | "planes">("subscription");
   const [copied, setCopied] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ type: "success" | "manual" | "redirect"; message: string; contactEmail?: string; checkoutUrl?: string } | null>(null);
 
@@ -175,12 +187,13 @@ export default function Billing() {
           { id: "subscription" as const, label: "Suscripción" },
           { id: "affiliate" as const, label: "Afiliados" },
           { id: "invoices" as const, label: "Facturas" },
+          ...(isAdmin ? [{ id: "planes" as const, label: "✦ Planes" }] : []),
         ]).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
             padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer",
             fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
             background: activeTab === tab.id ? "var(--ink3)" : "transparent",
-            color: activeTab === tab.id ? "var(--t)" : "var(--t3)",
+            color: activeTab === tab.id ? (tab.id === "planes" ? "var(--gold)" : "var(--t)") : "var(--t3)",
             transition: "all 0.15s",
           }}>{tab.label}</button>
         ))}
@@ -335,6 +348,14 @@ export default function Billing() {
           invoices={invoices.data ?? []}
         />
       )}
+
+      {activeTab === "planes" && isAdmin && (
+        <PlanManagerTab
+          plans={plans.data ?? []}
+          loading={plans.isLoading}
+          onRefresh={() => qc.invalidateQueries({ queryKey: billingKeys.plans })}
+        />
+      )}
     </div>
   );
 }
@@ -461,6 +482,188 @@ function InvoicesTab(props: { loading: boolean; error: string | null; invoices: 
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+const EMPTY_PLAN: Omit<Plan, "storesLimit" | "imagesIncluded"> & { storesLimit: string; imagesIncluded: string } = {
+  id: "", name: "", price: 0, priceAnnual: 0, currency: "€", period: "/mes",
+  featured: false, badge: "", features: [], ctaLabel: "Contactar →",
+  ctaStyle: "ghost", ctaHref: "/contacto", storesLimit: "1", imagesIncluded: "10",
+};
+
+function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading: boolean; onRefresh: () => void }) {
+  const [form, setForm] = useState<typeof EMPTY_PLAN>({ ...EMPTY_PLAN });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [featuresText, setFeaturesText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const openCreate = () => {
+    setForm({ ...EMPTY_PLAN }); setFeaturesText(""); setEditId(null); setShowForm(true); setError(null);
+  };
+  const openEdit = (p: Plan) => {
+    setForm({
+      id: p.id, name: p.name, price: p.price, priceAnnual: p.priceAnnual ?? p.price * 10,
+      currency: p.currency ?? "€", period: p.period ?? "/mes", featured: p.featured ?? false,
+      badge: p.badge ?? "", features: p.features, ctaLabel: p.ctaLabel ?? "Contactar →",
+      ctaStyle: p.ctaStyle ?? "ghost", ctaHref: p.ctaHref ?? "/contacto",
+      storesLimit: String(p.storesLimit), imagesIncluded: String(p.imagesIncluded),
+    });
+    setFeaturesText(p.features.join("\n")); setEditId(p.id); setShowForm(true); setError(null);
+  };
+
+  const handleSave = async () => {
+    if (!form.name || !form.id) { setError("ID y nombre son requeridos"); return; }
+    setSaving(true); setError(null);
+    try {
+      const payload = {
+        ...form, price: Number(form.price), priceAnnual: Number(form.priceAnnual),
+        storesLimit: Number(form.storesLimit), imagesIncluded: Number(form.imagesIncluded),
+        badge: form.badge || null,
+        features: featuresText.split("\n").map(s => s.trim()).filter(Boolean),
+      };
+      if (editId) {
+        await apiPut(`/api/billing/plans/${editId}`, payload);
+      } else {
+        await apiPost(`/api/billing/plans`, payload);
+      }
+      setShowForm(false); setEditId(null); onRefresh();
+    } catch (e: any) { setError(e.message ?? "Error guardando el plan"); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm(`¿Eliminar el plan "${id}" de la landing? (se ocultará, no se borrará)`)) return;
+    setDeleting(id);
+    try {
+      await apiDelete(`/api/billing/plans/${id}`);
+      onRefresh();
+    } catch (e: any) { setError(e.message ?? "Error eliminando"); }
+    finally { setDeleting(null); }
+  };
+
+  const inp = (field: keyof typeof form, numeric?: boolean) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [field]: numeric ? e.target.value : e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value }));
+
+  if (loading) return <div className="skeleton" style={{ height: 300, borderRadius: 12 }} />;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <p style={{ fontSize: 13, color: "var(--t3)" }}>
+          Los planes creados aquí aparecen automáticamente en la sección de precios de la landing.
+        </p>
+        <button className="btn-primary" onClick={openCreate} style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+          <Plus size={14} /> Nuevo plan
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ background: "rgba(220,53,69,0.1)", border: "1px solid var(--crim)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, color: "var(--crim)", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+          {error} <button onClick={() => setError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--crim)" }}><X size={12} /></button>
+        </div>
+      )}
+
+      {showForm && (
+        <div className="glass-card" style={{ padding: 20, marginBottom: 20, borderColor: "var(--gold)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>{editId ? "Editar plan" : "Crear nuevo plan"}</h3>
+            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)" }}><X size={16} /></button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 12 }}>
+            {[
+              { label: "ID (slug)", field: "id" as const, disabled: !!editId, placeholder: "ej: fotoshoot_pro" },
+              { label: "Nombre", field: "name" as const, placeholder: "ej: Fotoshoot Pro" },
+              { label: "Precio mensual (€)", field: "price" as const, type: "number" },
+              { label: "Precio anual (€)", field: "priceAnnual" as const, type: "number" },
+              { label: "Tiendas límite", field: "storesLimit" as const, type: "number" },
+              { label: "Imágenes/mes", field: "imagesIncluded" as const, type: "number" },
+              { label: "Badge (opcional)", field: "badge" as const, placeholder: "ej: Más popular" },
+              { label: "CTA texto", field: "ctaLabel" as const, placeholder: "Contactar →" },
+              { label: "CTA href", field: "ctaHref" as const, placeholder: "/contacto" },
+            ].map(({ label, field, disabled, placeholder, type }) => (
+              <div key={field}>
+                <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>{label}</label>
+                <input
+                  value={String(form[field] ?? "")}
+                  onChange={inp(field, type === "number")}
+                  disabled={disabled}
+                  placeholder={placeholder}
+                  type={type ?? "text"}
+                  style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 6, padding: "7px 10px", color: "var(--t)", fontSize: 12, boxSizing: "border-box" }}
+                />
+              </div>
+            ))}
+            <div>
+              <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Estilo CTA</label>
+              <select value={form.ctaStyle ?? "ghost"} onChange={inp("ctaStyle")} style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 6, padding: "7px 10px", color: "var(--t)", fontSize: 12 }}>
+                <option value="ghost">ghost (borde)</option>
+                <option value="gold">gold (dorado)</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 16 }}>
+              <input type="checkbox" id="feat-chk" checked={!!form.featured} onChange={inp("featured")} style={{ width: 16, height: 16 }} />
+              <label htmlFor="feat-chk" style={{ fontSize: 12, color: "var(--t)", cursor: "pointer" }}>Destacado (MÁS POPULAR)</label>
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Features (una por línea)</label>
+            <textarea
+              value={featuresText}
+              onChange={e => setFeaturesText(e.target.value)}
+              rows={5}
+              placeholder={"10 tiendas\n60 productos/mes\n300 imágenes IA/mes"}
+              style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 6, padding: "8px 10px", color: "var(--t)", fontSize: 12, resize: "vertical", boxSizing: "border-box" }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={() => setShowForm(false)} className="btn-secondary" style={{ fontSize: 12 }}>Cancelar</button>
+            <button onClick={handleSave} className="btn-primary" disabled={saving} style={{ fontSize: 12 }}>
+              {saving ? "Guardando..." : editId ? "Guardar cambios" : "Crear plan"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 14 }}>
+        {plans.map(plan => (
+          <div key={plan.id} className="glass-card" style={{ padding: 18, position: "relative", borderColor: plan.featured ? "var(--gold)" : "transparent" }}>
+            {plan.featured && (
+              <div style={{ position: "absolute", top: 0, right: 0, background: "var(--gold)", color: "#000", fontSize: 9, fontWeight: 800, padding: "3px 8px", borderBottomLeftRadius: 8 }}>DESTACADO</div>
+            )}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div>
+                <span style={{ fontSize: 22 }}>{PLAN_ICONS[plan.id] || "📦"}</span>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--t)", margin: "4px 0 2px" }}>{plan.name}</h3>
+                {plan.badge && <span style={{ fontSize: 10, color: "var(--jade)", fontWeight: 600 }}>{plan.badge}</span>}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => openEdit(plan)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", padding: 4 }} title="Editar"><Pencil size={13} /></button>
+                <button onClick={() => handleDelete(plan.id)} disabled={deleting === plan.id} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--crim)", padding: 4 }} title="Eliminar"><Trash2 size={13} /></button>
+              </div>
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "var(--gold)", marginBottom: 4 }}>€{plan.price}<span style={{ fontSize: 12, color: "var(--t3)", fontWeight: 400 }}>/mes</span></div>
+            {plan.priceAnnual && <div style={{ fontSize: 11, color: "var(--jade)" }}>€{plan.priceAnnual}/año</div>}
+            <div style={{ marginTop: 10 }}>
+              {plan.features.slice(0, 4).map(f => (
+                <div key={f} style={{ display: "flex", gap: 5, fontSize: 11, color: "var(--t2)", marginBottom: 4 }}>
+                  <span style={{ color: "var(--jade)" }}>✓</span> {f}
+                </div>
+              ))}
+              {plan.features.length > 4 && <div style={{ fontSize: 10, color: "var(--t4)", marginTop: 2 }}>+{plan.features.length - 4} más</div>}
+            </div>
+          </div>
+        ))}
+        {plans.length === 0 && (
+          <div className="glass-card" style={{ padding: 40, textAlign: "center", gridColumn: "1/-1" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+            <p style={{ fontSize: 13, color: "var(--t3)" }}>No hay planes configurados. Crea el primero con el botón de arriba.</p>
+          </div>
+        )}
       </div>
     </div>
   );
