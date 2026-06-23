@@ -1585,7 +1585,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .l-nav-links {
   display: flex; align-items: center; gap: 26px;
   list-style: none; margin: 0; padding: 0;
-  flex: 1; justify-content: center;
 }
 .l-nav-links li { display: flex; }
 .l-nav-ctas {
@@ -1837,7 +1836,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .l-pricing-inner { max-width: 1100px; }
 .l-pricing-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
 
-.l-pricing-card:hover { transform: translateY(-4px); }
+.l-pricing-card:hover {
+  transform: translateY(-6px) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 32px rgba(200,168,75,0.12), 0 0 0 1px rgba(200,168,75,0.18) !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+.l-pricing-featured:hover {
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 40px rgba(200,168,75,0.2), 0 0 0 1px rgba(200,168,75,0.3) !important;
+}
 
 .l-pricing-featured::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--l-gold), var(--l-gold2), var(--l-gold), transparent); }
 .l-pricing-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, var(--l-gold), var(--l-gold2)); color: #060500; font-size: 10px; font-weight: 800; padding: 4px 14px; border-radius: 100px; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
@@ -3404,6 +3410,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     gap: 24px;
   }
   .fp-calc-summary { position: static; }
+}
+@media (max-width: 768px) {
+  #fp-calculator.fp-section {
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding-top: 80px !important;
+    padding-bottom: 40px !important;
+  }
+  .fp-calc-grid { grid-template-columns: 1fr !important; gap: 20px !important; }
+  .fp-calc-items { max-height: 320px; }
 }
 
 /* ── CMS Preview Mode: click-to-edit hover indicators ── */

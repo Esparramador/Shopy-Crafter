@@ -58,45 +58,47 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       </main>
 
       {footer && (
-        <footer style={{ borderTop: "1px solid var(--ink3, #1e1e22)", padding: "48px 24px 24px", background: "var(--ink2, #111113)" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 32, marginBottom: 32 }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <footer className="fp-footer fp-footer-standalone">
+          <div className="fp-footer-inner">
+            <div className="fp-footer-brand">
+              <Link href="/" className="l-nav-logo" style={{ textDecoration: "none" }}>
                 {footer.site.logo.imageUrl ? (
-                  <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt={footer.site.name} style={{ height: 22, borderRadius: 4 }} />
+                  <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt={footer.site.name} style={{ height: 28, width: 28, borderRadius: 6 }} />
                 ) : (
-                  <span style={{ fontSize: 18 }}>{footer.site.logo.value}</span>
+                  <div className="l-nav-gem">{footer.site.logo.value}</div>
                 )}
-                <span style={{ fontSize: 14, fontWeight: 700 }}>{footer.site.name}</span>
-              </div>
-              <p style={{ fontSize: 12, color: "var(--t4, #666)", lineHeight: 1.5, margin: 0 }}>{footer.footer.tagline}</p>
+                <div className="l-nav-logo-text">{footer.site.name}</div>
+              </Link>
+              <p className="l-footer-desc">{footer.footer.tagline}</p>
             </div>
-            {footer.footer.columns.map((col, i) => (
-              <div key={i}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--t3, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>{col.title}</div>
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-                  {col.links.map((l, li) => {
-                    const href = (l.href || "").trim();
-                    if (href.startsWith("/") && !href.startsWith("//")) {
-                      return <li key={li}><Link href={href} style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{l.label}</Link></li>;
-                    }
-                    if (href.startsWith("http")) {
-                      return <li key={li}><a href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{l.label}</a></li>;
-                    }
-                    if (href.startsWith("mailto:") || href.startsWith("tel:")) {
-                      return <li key={li}><a href={href} style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{l.label}</a></li>;
-                    }
-                    return <li key={li}><span style={{ fontSize: 13, color: "var(--t4, #555)", cursor: "default" }}>{l.label}</span></li>;
-                  })}
-                </ul>
-              </div>
-            ))}
+            <div className="fp-footer-cols">
+              {footer.footer.columns.map((col, i) => (
+                <div key={i} className="fp-footer-col">
+                  <div className="l-footer-col-title">{col.title}</div>
+                  <ul className="l-footer-links">
+                    {col.links.map((l, li) => {
+                      const href = (l.href || "").trim();
+                      if (href.startsWith("/") && !href.startsWith("//")) {
+                        return <li key={li}><Link href={href}>{l.label}</Link></li>;
+                      }
+                      if (href.startsWith("http")) {
+                        return <li key={li}><a href={href} target="_blank" rel="noopener noreferrer">{l.label}</a></li>;
+                      }
+                      if (href.startsWith("mailto:") || href.startsWith("tel:")) {
+                        return <li key={li}><a href={href}>{l.label}</a></li>;
+                      }
+                      return <li key={li}><span style={{ color: "var(--t4, #555)", cursor: "default" }}>{l.label}</span></li>;
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </div>
-          <div style={{ borderTop: "1px solid var(--ink3, #1e1e22)", paddingTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-            <div style={{ fontSize: 12, color: "var(--t4, #555)" }}>{footer.footer.copyright}</div>
-            <div style={{ display: "flex", gap: 8 }}>
+          <div className="l-footer-bottom">
+            <div className="l-footer-copy">{footer.footer.copyright}</div>
+            <div className="l-footer-badges">
               {footer.footer.badges.map((b, i) => (
-                <span key={i} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: "rgba(200,168,75,0.08)", color: "var(--t4, #666)", border: "1px solid rgba(200,168,75,0.15)" }}>{b}</span>
+                <span key={i} className="l-footer-badge">{b}</span>
               ))}
             </div>
           </div>

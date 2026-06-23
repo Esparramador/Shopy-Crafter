@@ -297,6 +297,7 @@ export default function Landing() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   // "loading" while the fetch is in flight; CanonicalPlan[] once resolved (may be empty)
   const [apiPlansState, setApiPlansState] = useState<CanonicalPlan[] | "loading">("loading");
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
@@ -403,47 +404,11 @@ export default function Landing() {
     setHeroTilt({ x: 0, y: 0 });
   }, []);
 
-  const handleCardMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const card = e.currentTarget;
-    const rect = card.getBoundingClientRect();
-    const rx = ((e.clientX - rect.left) / rect.width - 0.5) * 32;
-    const ry = ((e.clientY - rect.top) / rect.height - 0.5) * 26;
-    const mx = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
-    const my = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
-    card.style.transition = "box-shadow 0.18s ease";
-    card.style.transform = `perspective(560px) rotateY(${rx}deg) rotateX(${-ry}deg) scale3d(1.06,1.06,1.06)`;
-    card.style.boxShadow = `${-rx * 2.2}px ${ry * 2.2}px 70px rgba(0,0,0,0.65), 0 0 50px rgba(200,168,75,0.18), inset 0 0 0 1px rgba(255,255,255,0.06)`;
-    card.style.opacity = "1";
-    card.style.filter = "";
-    card.style.setProperty("--mx", `${mx}%`);
-    card.style.setProperty("--my", `${my}%`);
-  }, []);
-
   const handleCardMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const card = e.currentTarget;
-    // Restore scroll-depth state if available
-    const row = card.closest<HTMLElement>(".fp-pricing-row");
-    card.style.transition = "transform 0.4s ease, box-shadow 0.4s ease, opacity 0.4s ease";
+    card.style.transition = "transform 0.35s ease, box-shadow 0.35s ease";
+    card.style.transform = "";
     card.style.boxShadow = "";
-    card.style.removeProperty("--mx");
-    card.style.removeProperty("--my");
-    if (row) {
-      const rowRect = row.getBoundingClientRect();
-      const rowCenter = rowRect.left + rowRect.width / 2;
-      const cRect = card.getBoundingClientRect();
-      const cardCenter = cRect.left + cRect.width / 2;
-      const dist = Math.abs(cardCenter - rowCenter);
-      const norm = Math.min(dist / (rowRect.width * 0.5), 1);
-      const side = cardCenter < rowCenter ? 1 : -1;
-      const rotY = side * norm * 28;
-      const tz = -norm * 60;
-      const sc = 1 - norm * 0.08;
-      card.style.transform = `perspective(1000px) rotateY(${rotY}deg) translateZ(${tz}px) scale(${sc})`;
-      card.style.opacity = String(Math.max(0.55, 1 - norm * 0.45));
-      card.style.filter = norm > 0.2 ? `brightness(${Math.max(0.65, 1 - norm * 0.35)})` : "";
-    } else {
-      card.style.transform = "";
-    }
   }, []);
 
   useEffect(() => {
@@ -452,26 +417,11 @@ export default function Landing() {
     const applyScrollDepth = () => {
       const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card");
       if (!cards.length) return;
-      const rowRect = row.getBoundingClientRect();
-      const rowCenter = rowRect.left + rowRect.width / 2;
-      let closest = 0;
-      let minDist = Infinity;
+      const rowCenter = row.getBoundingClientRect().left + row.getBoundingClientRect().width / 2;
+      let closest = 0, minDist = Infinity;
       cards.forEach((c, i) => {
-        const cRect = c.getBoundingClientRect();
-        const cardCenter = cRect.left + cRect.width / 2;
-        const dist = Math.abs(cardCenter - rowCenter);
+        const dist = Math.abs(c.getBoundingClientRect().left + c.getBoundingClientRect().width / 2 - rowCenter);
         if (dist < minDist) { minDist = dist; closest = i; }
-        // 3D depth: cards farther from center rotate & shrink on Z axis
-        const norm = Math.min(dist / (rowRect.width * 0.5), 1);
-        const side = cardCenter < rowCenter ? 1 : -1;
-        const rotY = side * norm * 28;
-        const scaleZ = 1 - norm * 0.08;
-        const tz = -norm * 60;
-        if (!c.matches(":hover")) {
-          c.style.transform = `perspective(1000px) rotateY(${rotY}deg) translateZ(${tz}px) scale(${scaleZ})`;
-          c.style.opacity = String(Math.max(0.55, 1 - norm * 0.45));
-          c.style.filter = norm > 0.2 ? `brightness(${Math.max(0.65, 1 - norm * 0.35)})` : "";
-        }
       });
       setPricingIdx(closest);
     };
@@ -754,8 +704,8 @@ export default function Landing() {
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">
         <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
-          {content.site.logo.imageUrl ? (
-            <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt="" width={32} height={32} style={{ height: 32, width: 32, borderRadius: 6 }} />
+          {content.site.logo.imageUrl && !logoError ? (
+            <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt="" width={32} height={32} style={{ height: 32, width: 32, borderRadius: 6 }} onError={() => setLogoError(true)} />
           ) : (
             <div className="l-nav-gem">{content.site.logo.value}</div>
           )}
@@ -1086,7 +1036,7 @@ export default function Landing() {
               <h2 className="l-h2" onClick={cmsClick("pricing.headline")} {...cmsData("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub" {...cmsProps("pricing.subheadline")}>{content.pricing.subheadline}</p>
             </div>
-            <div className="fp-billing-toggle-wrap">
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 18 }}>
               <div className="fp-billing-toggle" data-period={billingPeriod}>
                 <div className={`fp-bt-pill${billingPeriod === "annual" ? " fp-bt-pill-right" : ""}`} />
                 <button type="button" className={`fp-bt-btn${billingPeriod === "monthly" ? " active" : ""}`} onClick={() => { setBillingPeriod("monthly"); setPricingIdx(0); }}>
@@ -1102,12 +1052,11 @@ export default function Landing() {
               {pricingIdx > 0 && (
                 <button type="button" className="fp-pricing-arrow fp-pricing-arrow-left" onClick={() => scrollPricing(-1)} aria-label="Plan anterior">‹</button>
               )}
-              <div ref={pricingRowRef} className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"} fp-pricing-3d-container`} style={{ animationDelay: "0.1s" }}>
+              <div ref={pricingRowRef} className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
                 {displayPlans.map((plan, planIdx) => (
                   <div
                     key={plan.id}
                     className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}
-                    onMouseMove={handleCardMouseMove}
                     onMouseLeave={handleCardMouseLeave}
                   >
                     <div className="l-pricing-spin" />
@@ -1574,8 +1523,8 @@ export default function Landing() {
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
                   <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
-                    {content.site.logo.imageUrl ? (
-                      <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt="" width={28} height={28} style={{ height: 28, width: 28, borderRadius: 6 }} />
+                    {content.site.logo.imageUrl && !logoError ? (
+                      <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt="" width={28} height={28} style={{ height: 28, width: 28, borderRadius: 6 }} onError={() => setLogoError(true)} />
                     ) : (
                       <div className="l-nav-gem">{content.site.logo.value}</div>
                     )}
