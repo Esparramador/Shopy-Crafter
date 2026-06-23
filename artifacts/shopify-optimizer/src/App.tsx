@@ -590,12 +590,6 @@ function Router() {
         <Route path="/meshy">
           <RequireAdmin><AdminWrapper><AppLayout><S><MeshyStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
-        <Route path="/web-designer">
-          <RequireAdmin><AdminWrapper><AppLayout><S><WebDesigner /></S></AppLayout></AdminWrapper></RequireAdmin>
-        </Route>
-        <Route path="/effects-studio">
-          <RequireAdmin><AdminWrapper><AppLayout><S><EffectsStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
-        </Route>
 
         {/* Studio IA routes */}
         <Route path="/admin/amr-studio">

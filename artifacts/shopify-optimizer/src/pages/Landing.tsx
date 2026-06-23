@@ -1074,12 +1074,13 @@ export default function Landing() {
               <h2 className="l-h2" onClick={cmsClick("pricing.headline")} {...cmsData("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub" {...cmsProps("pricing.subheadline")}>{content.pricing.subheadline}</p>
             </div>
-            <div className="fp-billing-toggle">
+            <div className="fp-billing-toggle" data-period={billingPeriod}>
+              <div className={`fp-bt-pill${billingPeriod === "annual" ? " fp-bt-pill-right" : ""}`} />
               <button type="button" className={`fp-bt-btn${billingPeriod === "monthly" ? " active" : ""}`} onClick={() => { setBillingPeriod("monthly"); setPricingIdx(0); }}>
                 Mensual
               </button>
               <button type="button" className={`fp-bt-btn${billingPeriod === "annual" ? " active" : ""}`} onClick={() => { setBillingPeriod("annual"); setPricingIdx(0); }}>
-                Anual <span className="fp-bt-save">2 meses gratis</span>
+                Anual <span className="fp-bt-save">Ahorra 17%</span>
               </button>
             </div>
             <div className="fp-pricing-carousel-wrap">
@@ -1102,13 +1103,16 @@ export default function Landing() {
                     {plan.id === "starter" && <div className="pc-roi-badge">📈 ROI medio 2.4× en 90 días</div>}
                     {plan.id === "agency_pro" && <div className="pc-roi-badge">📈 ROI medio 3.8× en 60 días</div>}
                     {plan.id === "enterprise" && <div className="pc-roi-badge">🚀 ROI medio 6.2× en 30 días</div>}
-                    <div className="l-pricing-price" style={{ position: "relative", zIndex: 2 }}><span>{plan.currency}</span>{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</div>
+                    <div style={{ position: "relative", zIndex: 2 }}>
+                      <div className="l-pricing-price"><span>{plan.currency}</span>{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</div>
+                      {billingPeriod === "annual" && (
+                        <div className="pc-annual-pill">
+                          <span className="pc-annual-pill-pct">−17%</span>
+                          <span className="pc-annual-pill-txt">{plan.currency}{plan.priceAnnual}/año · ahorras {plan.currency}{plan.priceMonthly * 2}</span>
+                        </div>
+                      )}
+                    </div>
                     <div className="l-pricing-period" style={{ position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "/mes · sin permanencia" : "/mes · facturado anual"}</div>
-                    {billingPeriod === "annual" && (
-                      <div style={{ textAlign: "center", fontSize: 10.5, color: "#2dd49f", fontWeight: 700, marginTop: 2, position: "relative", zIndex: 2 }}>
-                        {plan.currency}{plan.priceAnnual}/año · ahorras {plan.currency}{plan.priceMonthly * 2}
-                      </div>
-                    )}
                     {plan.featured && (
                       <div className="pc-urgency">
                         <div className="pc-urgency-dot"></div>
