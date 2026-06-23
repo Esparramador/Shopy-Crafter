@@ -308,7 +308,7 @@ export default function Contacto() {
   const [formReady, setFormReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const VIDEO_T1 = 1.1, VIDEO_T2 = 2.6, VIDEO_T3 = 3.9, VIDEO_TF = 5.0;
+  const VIDEO_T1 = 0.5, VIDEO_T2 = 1.5, VIDEO_T3 = 2.5, VIDEO_TF = 4.0;
 
   useEffect(() => {
     const t1 = setTimeout(() => setCardPhase(p => Math.max(p,1)), VIDEO_T1 * 1000);

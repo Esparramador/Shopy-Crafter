@@ -1,4 +1,4 @@
-import { Suspense, useRef, useEffect, useState, Component, type ErrorInfo, type ReactNode } from "react";
+import { Suspense, useRef, useEffect, useState, useMemo, Component, type ErrorInfo, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations, OrbitControls, Environment, ContactShadows, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -88,24 +88,35 @@ function normalizeScene(scene: THREE.Object3D) {
 
 function BaseModel({ glbPath, onReady }: { glbPath: string; onReady?: () => void }) {
   const group = useRef<THREE.Group>(null!);
-  const { scene, animations } = useGLTF(glbPath);
+  const { scene: rawScene, animations } = useGLTF(glbPath);
+  // Clone scene so cached useGLTF data isn't mutated across remounts
+  const scene = useMemo(() => rawScene.clone(true), [rawScene]);
   const { actions, mixer } = useAnimations(animations, group);
+  const animStarted = useRef(false);
 
   useEffect(() => {
     if (!scene) return;
     normalizeScene(scene);
     onReady?.();
+    animStarted.current = false;
   }, [glbPath]);
 
-  useEffect(() => {
-    const keys = Object.keys(actions);
-    if (keys.length === 0) return;
-    Object.values(actions).forEach(a => a?.stop());
-    const first = actions[keys[0]];
-    if (first) { first.reset(); first.setLoop(THREE.LoopRepeat, Infinity); first.play(); }
-  }, [JSON.stringify(Object.keys(actions))]);
+  // Use useFrame to start animation — actions are populated AFTER useEffect runs
+  // (drei uses Object.defineProperty mutations), so useFrame is the reliable trigger
+  useFrame((_, dt) => {
+    mixer.update(dt);
+    if (!animStarted.current) {
+      const key = Object.keys(actions)[0];
+      const action = key ? actions[key] : null;
+      if (action) {
+        action.reset();
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.play();
+        animStarted.current = true;
+      }
+    }
+  });
 
-  useFrame((_, dt) => mixer.update(dt));
   return <group ref={group}><primitive object={scene} /></group>;
 }
 
@@ -119,29 +130,35 @@ function AnimatedModel({
   onReady?: () => void;
 }) {
   const group = useRef<THREE.Group>(null!);
-  const { scene, animations } = useGLTF(animGlbPath);
+  const { scene: rawScene, animations } = useGLTF(animGlbPath);
+  // Clone scene so cached useGLTF data isn't mutated across remounts
+  const scene = useMemo(() => rawScene.clone(true), [rawScene]);
   const { actions, mixer } = useAnimations(animations, group);
+  const animStarted = useRef(false);
 
   useEffect(() => {
     if (!scene) return;
     normalizeScene(scene);
     onReady?.();
+    animStarted.current = false;
   }, [animGlbPath]);
 
-  useEffect(() => {
-    const keys = Object.keys(actions);
-    Object.values(actions).forEach(a => a?.stop());
-    if (keys.length === 0) return;
-    const target = actions[keys[0]];
-    if (target) {
-      target.reset();
-      target.setLoop(looping ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-      target.clampWhenFinished = !looping;
-      target.play();
+  // Use useFrame to start animation — actions are populated AFTER useEffect runs
+  useFrame((_, dt) => {
+    mixer.update(dt);
+    if (!animStarted.current) {
+      const key = Object.keys(actions)[0];
+      const action = key ? actions[key] : null;
+      if (action) {
+        action.reset();
+        action.setLoop(looping ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+        action.clampWhenFinished = !looping;
+        action.play();
+        animStarted.current = true;
+      }
     }
-  }, [animGlbPath, looping, JSON.stringify(Object.keys(actions))]);
+  });
 
-  useFrame((_, dt) => mixer.update(dt));
   return <group ref={group}><primitive object={scene} /></group>;
 }
 

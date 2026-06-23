@@ -549,7 +549,7 @@ export default function MeshyStudio() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "var(--l-t)" }}>Meshy Studio — Character Lab</h1>
           <p style={{ margin: 0, fontSize: 12, color: "var(--l-t3)" }}>
-            {riggedCount} personajes rigged · {totalAnims} animaciones · {totalModels} modelos · sin créditos para animar
+            {riggedCount} personajes rigged · {totalAnims} animaciones · {totalModels} modelos
           </p>
         </div>
         <div className="msy-header-stats">
@@ -558,6 +558,54 @@ export default function MeshyStudio() {
           <StatPill label="Anims"     value={`${totalAnims}`}   color="purple" />
         </div>
       </div>
+
+      {/* Missing models banner */}
+      {missingGlbs.size > 0 && (
+        <div style={{
+          marginBottom: 16, padding: "14px 18px", borderRadius: 10,
+          background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)",
+          display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap",
+        }}>
+          <div style={{ fontSize: 20, flexShrink: 0 }}>⚠️</div>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>
+              {missingGlbs.size} modelo{missingGlbs.size > 1 ? "s" : ""} sin GLB
+            </div>
+            <div style={{ fontSize: 11, color: "rgba(248,113,113,0.75)", lineHeight: 1.5 }}>
+              Meshy retiene assets solo 3 días. Usa <strong>Regenerar</strong> para recrearlos vía Text→3D + Auto-Rig automático.
+              Los personajes con prompt configurado se regeneran solos.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
+            <button
+              onClick={() => {
+                const toRegen = MESHY_CHARACTERS.filter(c => missingGlbs.has(c.id) && c.regenPrompt);
+                toRegen.forEach(c => {
+                  if (c.regenPrompt) generateCharacterFromText(c.id, c.regenPrompt.prompt, c.regenPrompt.art_style);
+                });
+                setTab("factory");
+              }}
+              style={{
+                padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700,
+                background: "linear-gradient(135deg, rgba(212,168,67,0.25), rgba(212,168,67,0.12))",
+                border: "1px solid rgba(212,168,67,0.5)", color: "var(--l-gold)",
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <RefreshCw size={13} /> Regenerar Todos ({MESHY_CHARACTERS.filter(c => missingGlbs.has(c.id) && c.regenPrompt).length})
+            </button>
+            <button
+              onClick={() => setTab("factory")}
+              style={{
+                padding: "8px 14px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                background: "transparent", border: "1px solid rgba(255,255,255,0.12)", color: "var(--l-t3)",
+              }}
+            >
+              Ver Fábrica →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="msy-tabs-bar">
