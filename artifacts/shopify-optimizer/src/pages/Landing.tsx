@@ -93,8 +93,8 @@ function MagnetStoreButton() {
       rel="noopener noreferrer"
       style={{
         position: "absolute",
-        bottom: 72,
-        right: 36,
+        bottom: 30,
+        right: 72,
         zIndex: 30,
         display: "inline-flex",
         alignItems: "center",
