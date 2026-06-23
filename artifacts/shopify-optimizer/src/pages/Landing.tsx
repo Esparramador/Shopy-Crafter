@@ -1096,46 +1096,48 @@ export default function Landing() {
                     onMouseLeave={handleCardMouseLeave}
                   >
                     <div className="l-pricing-spin" />
-                    <div className="pc-glare" />
-                    {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
-                    {plan.featured && <div className="pc-savings-tag">✨ MÁS POPULAR</div>}
-                    <div className="l-pricing-plan" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
-                    {plan.id === "starter" && <div className="pc-roi-badge">📈 ROI medio 2.4× en 90 días</div>}
-                    {plan.id === "agency_pro" && <div className="pc-roi-badge">📈 ROI medio 3.8× en 60 días</div>}
-                    {plan.id === "enterprise" && <div className="pc-roi-badge">🚀 ROI medio 6.2× en 30 días</div>}
-                    <div style={{ position: "relative", zIndex: 2 }}>
-                      <div className="l-pricing-price"><span>{plan.currency}</span>{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</div>
-                      {billingPeriod === "annual" && (
-                        <div className="pc-annual-pill">
-                          <span className="pc-annual-pill-pct">−17%</span>
-                          <span className="pc-annual-pill-txt">{plan.currency}{plan.priceAnnual}/año · ahorras {plan.currency}{plan.priceMonthly * 2}</span>
+                    <div className="l-pricing-body">
+                      <div className="pc-glare" />
+                      {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
+                      {plan.featured && <div className="pc-savings-tag">✨ MÁS POPULAR</div>}
+                      <div className="l-pricing-plan" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
+                      {plan.id === "starter" && <div className="pc-roi-badge">📈 ROI medio 2.4× en 90 días</div>}
+                      {plan.id === "agency_pro" && <div className="pc-roi-badge">📈 ROI medio 3.8× en 60 días</div>}
+                      {plan.id === "enterprise" && <div className="pc-roi-badge">🚀 ROI medio 6.2× en 30 días</div>}
+                      <div style={{ position: "relative", zIndex: 2 }}>
+                        <div className="l-pricing-price"><span>{plan.currency}</span>{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</div>
+                        {billingPeriod === "annual" && (
+                          <div className="pc-annual-pill">
+                            <span className="pc-annual-pill-pct">−17%</span>
+                            <span className="pc-annual-pill-txt">{plan.currency}{plan.priceAnnual}/año · ahorras {plan.currency}{plan.priceMonthly * 2}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="l-pricing-period" style={{ position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "/mes · sin permanencia" : "/mes · facturado anual"}</div>
+                      {plan.featured && (
+                        <div className="pc-urgency">
+                          <div className="pc-urgency-dot"></div>
+                          <span>Quedan 3 plazas este mes</span>
                         </div>
                       )}
+                      <div className="l-pricing-divider" style={{ position: "relative", zIndex: 2 }}></div>
+                      <ul className="l-pricing-features" style={{ position: "relative", zIndex: 2 }}>
+                        {plan.features.map((f, fi) => (
+                          <li key={fi} className="l-pricing-feature">
+                            <div className={f.included ? "l-pricing-check" : "l-pricing-x"}>{f.included ? "✓" : "✕"}</div>
+                            <span style={f.included ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <a
+                        href="#fp-contact"
+                        className={`l-pricing-cta btn-jelly ${plan.cta.style}`}
+                        style={{ position: "relative", zIndex: 2 }}
+                        onClick={e => { e.preventDefault(); const idx = FP_SECTION_IDS.indexOf("fp-contact"); if (idx >= 0) goToSection(idx); setHashRobust("fp-contact"); }}
+                        {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}
+                      >{plan.cta.label}</a>
+                      <p style={{ textAlign: "center", fontSize: 10.5, color: "rgba(255,255,255,0.3)", marginTop: 10, position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "Sin permanencia · Cancela cuando quieras" : "Renovación anual · Cancela antes del vencimiento"}</p>
                     </div>
-                    <div className="l-pricing-period" style={{ position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "/mes · sin permanencia" : "/mes · facturado anual"}</div>
-                    {plan.featured && (
-                      <div className="pc-urgency">
-                        <div className="pc-urgency-dot"></div>
-                        <span>Quedan 3 plazas este mes</span>
-                      </div>
-                    )}
-                    <div className="l-pricing-divider" style={{ position: "relative", zIndex: 2 }}></div>
-                    <ul className="l-pricing-features" style={{ position: "relative", zIndex: 2 }}>
-                      {plan.features.map((f, fi) => (
-                        <li key={fi} className="l-pricing-feature">
-                          <div className={f.included ? "l-pricing-check" : "l-pricing-x"}>{f.included ? "✓" : "✕"}</div>
-                          <span style={f.included ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <a
-                      href={plan.cta.href || "#fp-contact"}
-                      className={`l-pricing-cta btn-jelly ${plan.cta.style}`}
-                      style={{ position: "relative", zIndex: 2 }}
-                      onClick={e => { const href = plan.cta.href || "#fp-contact"; if (href.startsWith("#")) { e.preventDefault(); const idx = FP_SECTION_IDS.indexOf(href.replace("#", "")); if (idx >= 0) goToSection(idx); } }}
-                      {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}
-                    >{plan.cta.label}</a>
-                    <p style={{ textAlign: "center", fontSize: 10.5, color: "rgba(255,255,255,0.3)", marginTop: 10, position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "Sin permanencia · Cancela cuando quieras" : "Renovación anual · Cancela antes del vencimiento"}</p>
                   </div>
                 ))}
               </div>
