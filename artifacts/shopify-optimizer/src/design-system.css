@@ -1589,6 +1589,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .l-nav-links li { display: flex; }
 .l-nav-ctas {
   display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  margin-left: auto;
 }
 
 .l-nav-scrolled {
