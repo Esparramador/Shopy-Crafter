@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import PageMeta from "@/components/PageMeta";
 import { VismeFormHero } from "@/components/VismeFormHero";
 import { CANONICAL_PLANS, type CanonicalPlan } from "@/lib/pricing-plans";
-import "./landing.css";
 
 function SectionVideoBg({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
