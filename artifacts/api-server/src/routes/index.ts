@@ -111,8 +111,8 @@ router.get("/report-templates/:token", (req, res, next) => {
 router.use(billingRouter);
 router.use(tiendaRouter);
 
-router.use(requireAuth, meshyRouter);
-router.use(requireAuth, stitchRouter);
+router.use(requireAdmin, meshyRouter);
+router.use(requireAdmin, stitchRouter);
 
 router.use(requireAdmin);
 router.use(projectsRouter);

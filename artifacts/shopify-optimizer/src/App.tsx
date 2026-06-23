@@ -171,7 +171,13 @@ function RequireClient({ children }: { children: React.ReactNode }) {
   if (loading) return <LoadingScreen />;
   if (!user) return <Redirect to="/" />;
   // Admin can access client panel in preview / impersonation mode
-  return <>{children}</>;
+  return <ClientPreviewProvider>{children}</ClientPreviewProvider>;
+}
+
+function ExportCenterRoute() {
+  const [location] = useLocation();
+  const pid = Number(new URLSearchParams(location.split("?")[1] ?? "").get("project")) || 0;
+  return <S><ExportCenter projectId={pid} /></S>;
 }
 
 function HomeRedirect() {
@@ -236,29 +242,21 @@ function AdminOnlyExtras() {
   return <Suspense fallback={null}><CommandPalette /></Suspense>;
 }
 
+const APP_ROUTE_PREFIXES = [
+  "/admin", "/home", "/projects", "/new-project", "/help",
+  "/web-designer", "/effects-studio", "/fusion-studio", "/fusion-studio-pro",
+  "/ad-studio", "/cards", "/campaign-kit", "/tripo3d", "/meshy",
+  "/generator", "/suppliers", "/web-lab", "/audit", "/redesign",
+  "/images", "/consistency", "/ab-testing", "/pricing", "/seo",
+  "/vault", "/exports", "/exploded-view",
+];
+
 function RoutePersistence() {
   const [location] = useLocation();
   const { user } = useAuth();
   const lastSaved = useRef("");
   useEffect(() => {
-    const isAppRoute =
-      location.startsWith("/admin") ||
-      location.startsWith("/home") ||
-      location.startsWith("/projects") ||
-      location.startsWith("/new-project") ||
-      location.startsWith("/web-designer") ||
-      location.startsWith("/effects-studio") ||
-      location.startsWith("/fusion-studio") ||
-      location.startsWith("/ad-studio") ||
-      location.startsWith("/cards") ||
-      location.startsWith("/campaign-kit") ||
-      location.startsWith("/tripo3d") ||
-      location.startsWith("/meshy") ||
-      location.startsWith("/generator") ||
-      location.startsWith("/suppliers") ||
-      location.startsWith("/web-lab") ||
-      location.startsWith("/audit") ||
-      location.startsWith("/help");
+    const isAppRoute = APP_ROUTE_PREFIXES.some(p => location.startsWith(p));
     if (user && location !== lastSaved.current && isAppRoute) {
       lastSaved.current = location;
       saveLastRoute(location);
@@ -555,7 +553,7 @@ function Router() {
           <RequireAdmin><AdminWrapper><AppLayout><S><ProjectVault /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/exports">
-          <RequireAdmin><AdminWrapper><AppLayout><S><ExportCenter projectId={0} /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><ExportCenterRoute /></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/generator">
           <RequireAdmin><AdminWrapper><AppLayout><S><UniversalGenerator /></S></AppLayout></AdminWrapper></RequireAdmin>
@@ -614,27 +612,25 @@ function Router() {
           <RequireAdmin><AdminWrapper><AppLayout><S><TiendaAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
-        {/* Client routes */}
-        <ClientPreviewProvider>
-          <Route path="/client">
-            <RequireClient><S><ClientDashboard /></S></RequireClient>
-          </Route>
-          <Route path="/client/products">
-            <RequireClient><S><ClientProducts /></S></RequireClient>
-          </Route>
-          <Route path="/client/approvals">
-            <RequireClient><S><ClientApprovals /></S></RequireClient>
-          </Route>
-          <Route path="/client/messages">
-            <RequireClient><S><ClientMessages /></S></RequireClient>
-          </Route>
-          <Route path="/client/reports">
-            <RequireClient><S><ClientReports /></S></RequireClient>
-          </Route>
-          <Route path="/client/tienda">
-            <RequireClient><S><ClientTienda /></S></RequireClient>
-          </Route>
-        </ClientPreviewProvider>
+        {/* Client routes — ClientPreviewProvider lives inside RequireClient */}
+        <Route path="/client">
+          <RequireClient><S><ClientDashboard /></S></RequireClient>
+        </Route>
+        <Route path="/client/products">
+          <RequireClient><S><ClientProducts /></S></RequireClient>
+        </Route>
+        <Route path="/client/approvals">
+          <RequireClient><S><ClientApprovals /></S></RequireClient>
+        </Route>
+        <Route path="/client/messages">
+          <RequireClient><S><ClientMessages /></S></RequireClient>
+        </Route>
+        <Route path="/client/reports">
+          <RequireClient><S><ClientReports /></S></RequireClient>
+        </Route>
+        <Route path="/client/tienda">
+          <RequireClient><S><ClientTienda /></S></RequireClient>
+        </Route>
 
         <Route>{() => <S><NotFound /></S>}</Route>
       </Switch>

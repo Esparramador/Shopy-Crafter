@@ -2796,6 +2796,10 @@ async function researchBrand(brand: string, domain: string, social: Record<strin
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SSE routes: /weblab/analyze  /weblab/improve  /weblab/proxy
+// NOTE: legacy prefix — canonical prefix is /web-lab/* (with hyphen).
+// These routes are intentionally kept separate: they implement SSE streaming
+// for brand-DNA + research analysis, whereas /web-lab/analyze is a REST endpoint
+// for CSS/design audit. Both serve distinct purposes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 router.get("/weblab/proxy", async (req: Request, res: Response): Promise<void> => {
