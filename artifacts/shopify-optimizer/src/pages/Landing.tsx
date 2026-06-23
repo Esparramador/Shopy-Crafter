@@ -120,13 +120,12 @@ function MagnetStoreButton() {
         userSelect: "none",
         whiteSpace: "nowrap",
       }}
-    >
+      className="justify-start items-center text-center">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
         <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-      Visitar Comic Crafter
-      <span style={{
+      </svg>Visitar Comic Crafter
+            <span style={{
         display: "inline-block",
         width: 8, height: 8,
         borderRadius: "50%",
