@@ -54,6 +54,7 @@ import charactersRouter from "./characters.js";
 import cardsRouter from "./cards.js";
 import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
+import stripeConnectRouter from "./stripe-connect.js";
 import brandDnaRouter from "./brand-dna.js";
 import tripo3dRouter from "./tripo3d.js";
 import meshyRouter from "./meshy.js";
@@ -110,6 +111,7 @@ router.get("/report-templates/:token", (req, res, next) => {
 
 router.use(billingRouter);
 router.use(tiendaRouter);
+router.use(stripeConnectRouter);
 
 router.use(requireAdmin, meshyRouter);
 router.use(requireAdmin, stitchRouter);
