@@ -734,6 +734,18 @@ export default function Landing() {
 
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
+      {/* ── CURSOR GLOW SPOTLIGHT ── */}
+      <div
+        className="fp-cursor-glow"
+        ref={(el) => {
+          if (!el) return;
+          const move = (e: MouseEvent) => {
+            el.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%))`;
+          };
+          window.addEventListener("mousemove", move, { passive: true });
+          (el as any).__cleanup = () => window.removeEventListener("mousemove", move);
+        }}
+      />
       <PageMeta
         title="Shopy Crafter — Optimización IA para tiendas Shopify"
         description="7 motores de IA para mejorar SEO, imágenes y conversión en tu tienda Shopify. Sin conocimientos técnicos. Prueba gratis 14 días."
@@ -1074,14 +1086,17 @@ export default function Landing() {
               <h2 className="l-h2" onClick={cmsClick("pricing.headline")} {...cmsData("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
               <p className="l-sub" {...cmsProps("pricing.subheadline")}>{content.pricing.subheadline}</p>
             </div>
-            <div className="fp-billing-toggle" data-period={billingPeriod}>
-              <div className={`fp-bt-pill${billingPeriod === "annual" ? " fp-bt-pill-right" : ""}`} />
-              <button type="button" className={`fp-bt-btn${billingPeriod === "monthly" ? " active" : ""}`} onClick={() => { setBillingPeriod("monthly"); setPricingIdx(0); }}>
-                Mensual
-              </button>
-              <button type="button" className={`fp-bt-btn${billingPeriod === "annual" ? " active" : ""}`} onClick={() => { setBillingPeriod("annual"); setPricingIdx(0); }}>
-                Anual <span className="fp-bt-save">Ahorra 17%</span>
-              </button>
+            <div className="fp-billing-toggle-wrap">
+              <div className="fp-billing-toggle" data-period={billingPeriod}>
+                <div className={`fp-bt-pill${billingPeriod === "annual" ? " fp-bt-pill-right" : ""}`} />
+                <button type="button" className={`fp-bt-btn${billingPeriod === "monthly" ? " active" : ""}`} onClick={() => { setBillingPeriod("monthly"); setPricingIdx(0); }}>
+                  Mensual
+                </button>
+                <button type="button" className={`fp-bt-btn${billingPeriod === "annual" ? " active" : ""}`} onClick={() => { setBillingPeriod("annual"); setPricingIdx(0); }}>
+                  Anual
+                </button>
+              </div>
+              <span className="fp-bt-save-ext" style={{ opacity: billingPeriod === "annual" ? 1 : 0.45 }}>Ahorra 17%</span>
             </div>
             <div className="fp-pricing-carousel-wrap">
               {pricingIdx > 0 && (
@@ -1104,9 +1119,10 @@ export default function Landing() {
                       {plan.id === "starter" && <div className="pc-roi-badge">📈 ROI medio 2.4× en 90 días</div>}
                       {plan.id === "agency_pro" && <div className="pc-roi-badge">📈 ROI medio 3.8× en 60 días</div>}
                       {plan.id === "enterprise" && <div className="pc-roi-badge">🚀 ROI medio 6.2× en 30 días</div>}
+                      {plan.id === "personalizado" && <div className="pc-roi-badge">🤝 Solución 100% a medida</div>}
                       <div style={{ position: "relative", zIndex: 2 }}>
-                        <div className="l-pricing-price"><span>{plan.currency}</span>{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</div>
-                        {billingPeriod === "annual" && (
+                        <div className="l-pricing-price">{plan.priceMonthly === 0 ? <span style={{ fontSize: "0.55em", letterSpacing: "-1px" }}>A medida</span> : <>{plan.currency}{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</>}</div>
+                        {billingPeriod === "annual" && plan.priceMonthly > 0 && (
                           <div className="pc-annual-pill">
                             <span className="pc-annual-pill-pct">−17%</span>
                             <span className="pc-annual-pill-txt">{plan.currency}{plan.priceAnnual}/año · ahorras {plan.currency}{plan.priceMonthly * 2}</span>

@@ -109,7 +109,7 @@ async function ensureBillingPlansTable(): Promise<void> {
 ensureBillingPlansTable();
 
 // ── Seed canonical plans once per deploy (idempotent via version tag) ─────────
-const CANONICAL_SEED_VERSION = "v4-fp-contact-2026";
+const CANONICAL_SEED_VERSION = "v5-fp-personalizado-2026";
 const CANONICAL_BILLING_PLANS = [
   {
     id: "emprendedor",
@@ -182,6 +182,24 @@ const CANONICAL_BILLING_PLANS = [
     ],
     ctaLabel: "Hablar con ventas →", ctaStyle: "ghost", ctaHref: "#fp-contact",
     storesLimit: -1, imagesIncluded: 1200, sortOrder: 3,
+  },
+  {
+    id: "personalizado",
+    name: "Personalizado",
+    price: 0, priceAnnual: 0,
+    currency: "€", featured: false, badge: null,
+    features: [
+      { text: "Productos ilimitados", included: true },
+      { text: "Imágenes IA ilimitadas", included: true },
+      { text: "Infraestructura dedicada", included: true },
+      { text: "Integraciones a medida", included: true },
+      { text: "SLA garantizado (99.99%)", included: true },
+      { text: "Onboarding & formación del equipo", included: true },
+      { text: "Soporte 24/7 con SLA", included: true },
+      { text: "Precio según volumen", included: true },
+    ],
+    ctaLabel: "Contactar →", ctaStyle: "ghost", ctaHref: "#fp-contact",
+    storesLimit: -1, imagesIncluded: -1, sortOrder: 4,
   },
 ];
 
