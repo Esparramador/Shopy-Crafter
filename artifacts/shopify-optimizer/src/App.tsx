@@ -283,7 +283,7 @@ function Router() {
         <Route path="/forgot-password">{() => <S><ForgotPassword /></S>}</Route>
         <Route path="/reset-password">{() => <S><ResetPassword /></S>}</Route>
         <Route path="/invite/:token">{() => <S><InviteSetupPage /></S>}</Route>
-        <Route path="/tienda">{() => <Redirect to="/client/tienda" />}</Route>
+
         <Route path="/oauth-success">{() => <S><OAuthSuccess /></S>}</Route>
 
         {/* Landing */}
@@ -660,8 +660,7 @@ function PublicChatbotSlot() {
     location.startsWith("/privacidad") ||
     location.startsWith("/terminos") ||
     location.startsWith("/cookies") ||
-    location.startsWith("/contacto") ||
-    location.startsWith("/tienda");
+    location.startsWith("/contacto");
   if (!isPublicPath) return null;
   return (
     <Suspense fallback={null}>

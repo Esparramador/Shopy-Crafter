@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { sql } from "drizzle-orm";
-import { requireAdmin } from "../lib/auth.js";
+import { createHmac, timingSafeEqual } from "crypto";
+import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -284,6 +285,111 @@ router.delete("/tienda/services/:id", requireAdmin, async (req: Request, res: Re
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── CLIENT: POST /tienda/create-checkout ─────────────────────────────────────
+// Generates a Shopify checkout URL pre-filled with the user's email + a ref
+// token (userId:planId) so the orders/paid webhook can activate the right plan.
+router.post("/tienda/create-checkout", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { planId } = req.body ?? {};
+    const userId = (req as any).session?.userId;
+    if (!planId) return void res.status(400).json({ error: "planId requerido" });
+
+    const db = await getDb();
+
+    const planRes = await db.execute(sql`
+      SELECT id, name, shopify_checkout_url FROM billing_plans
+      WHERE id = ${planId} AND visible = TRUE
+    `);
+    const plan = planRes.rows[0] as any;
+    if (!plan) return void res.status(404).json({ error: "Plan no encontrado" });
+    if (!plan.shopify_checkout_url) {
+      return void res.status(400).json({ error: "URL de checkout no configurada para este plan" });
+    }
+
+    const userRes = await db.execute(sql`SELECT email FROM users WHERE id = ${userId}`);
+    const userEmail = (userRes.rows[0] as any)?.email ?? "";
+
+    const ref = `${userId}:${planId}`;
+    const url = new URL(plan.shopify_checkout_url);
+    if (userEmail) url.searchParams.set("email", userEmail);
+    url.searchParams.set("note_attributes[ref]", ref);
+    url.searchParams.set("note_attributes[plan]", String(plan.name));
+
+    logger.info({ userId, planId, ref }, "Checkout URL generada");
+    res.json({ checkoutUrl: url.toString() });
+  } catch (err: any) {
+    logger.error({ err }, "POST /tienda/create-checkout error");
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── WEBHOOK: POST /api/webhooks/shopify/orders-paid ──────────────────────────
+// Configure in Shopify Admin → Settings → Notifications → Webhooks
+// Topic: orders/paid  |  URL: https://yourdomain.com/api/webhooks/shopify/orders-paid
+// Secret: value of SHOPIFY_WEBHOOK_SECRET env var
+router.post("/webhooks/shopify/orders-paid", async (req: Request, res: Response) => {
+  try {
+    const secret = process.env.SHOPIFY_WEBHOOK_SECRET ?? "";
+    const hmacHeader = (req.headers["x-shopify-hmac-sha256"] as string) ?? "";
+
+    if (secret) {
+      const rawBody: Buffer = (req as any).rawBody ?? Buffer.from(JSON.stringify(req.body));
+      const digest = createHmac("sha256", secret).update(rawBody).digest("base64");
+      const digestBuf = Buffer.from(digest);
+      const headerBuf = Buffer.from(hmacHeader);
+      const valid = digestBuf.length === headerBuf.length && timingSafeEqual(digestBuf, headerBuf);
+      if (!valid) {
+        logger.warn("Shopify webhook HMAC inválido");
+        return void res.status(401).json({ error: "HMAC inválido" });
+      }
+    }
+
+    const order = req.body as any;
+    const noteAttributes: { name: string; value: string }[] = order.note_attributes ?? [];
+    const refAttr = noteAttributes.find(a => a.name === "ref");
+
+    if (!refAttr?.value) {
+      logger.warn({ orderId: order.id }, "Webhook orders/paid sin ref — ignorado");
+      return void res.sendStatus(200);
+    }
+
+    const [userId, planId] = refAttr.value.split(":");
+    if (!userId || !planId) return void res.sendStatus(200);
+
+    const db = await getDb();
+
+    const planRes = await db.execute(sql`
+      SELECT id, period_days FROM billing_plans WHERE id = ${planId}
+    `);
+    const plan = planRes.rows[0] as any;
+    if (!plan) {
+      logger.warn({ planId }, "Plan no encontrado en webhook");
+      return void res.sendStatus(200);
+    }
+
+    const periodDays = plan.period_days ?? 30;
+    const periodEnd = new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000);
+
+    await db.execute(sql`
+      INSERT INTO subscriptions (user_id, plan, status, period_end, shopify_order_id, updated_at)
+      VALUES (${userId}, ${planId}, 'active', ${periodEnd.toISOString()}, ${String(order.id ?? "")}, NOW())
+      ON CONFLICT (user_id)
+      DO UPDATE SET
+        plan            = EXCLUDED.plan,
+        status          = 'active',
+        period_end      = EXCLUDED.period_end,
+        shopify_order_id = EXCLUDED.shopify_order_id,
+        updated_at      = NOW()
+    `);
+
+    logger.info({ userId, planId, orderId: order.id }, "✅ Plan activado via Shopify webhook");
+    res.sendStatus(200);
+  } catch (err: any) {
+    logger.error({ err }, "POST /webhooks/shopify/orders-paid error");
+    res.sendStatus(200);
   }
 });
 
