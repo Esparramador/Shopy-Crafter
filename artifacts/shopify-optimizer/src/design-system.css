@@ -2408,7 +2408,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .fp-hero-left .l-hero-sub { margin: 0 0 32px; max-width: 480px; }
 .fp-hero-left .l-hero-ctas { justify-content: flex-start; }
-.fp-hero-left .l-hero-trust { justify-content: flex-start; margin-top: 40px; }
+.l-hero-trust { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 16px; }
+.fp-hero-left .l-hero-trust { justify-content: flex-start; margin-top: 32px; }
+.l-trust-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--l-t2); white-space: nowrap; }
 .fp-hero-left .l-hero-pill { margin-bottom: 24px; }
 .fp-hero-left .l-hero-h1 { font-size: clamp(40px, 4.5vw, 64px); margin-bottom: 20px; }
 .fp-hero-right {
