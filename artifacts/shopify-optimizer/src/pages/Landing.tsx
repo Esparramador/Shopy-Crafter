@@ -817,7 +817,7 @@ export default function Landing() {
               <div className="l-preview-glow"></div>
               {content.hero.imageUrl ? (
                 <div className="l-preview-frame" style={{ padding: 0, overflow: "hidden" }}>
-                  <img src={`${API_BASE_LANDING}${content.hero.imageUrl}`} alt="Hero" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }} />
+                  <img src={`${API_BASE_LANDING}${content.hero.imageUrl}`} alt="Hero" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }} onError={e => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
                 </div>
               ) : (
                 <div className="hero-visual-float">
