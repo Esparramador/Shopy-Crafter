@@ -1058,7 +1058,6 @@ export default function Landing() {
                     className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}
                     onMouseLeave={handleCardMouseLeave}
                   >
-                    <div className="l-pricing-spin" />
                     <div className="l-pricing-body">
                       <div className="pc-glare" />
                       {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}

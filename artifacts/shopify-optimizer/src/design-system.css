@@ -3560,34 +3560,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   overflow: hidden;
 }
 
-/* ── Rotating conic-gradient border (same pattern as Tienda.tsx ts-border-spin) ── */
-.l-pricing-spin {
-  position: absolute;
-  top: -100%; left: -100%;
-  width: 300%; height: 300%;
-  pointer-events: none;
-  z-index: 0;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%, transparent 58%,
-    rgba(200,168,75,.25) 63%, rgba(200,168,75,.65) 68%, rgba(200,168,75,.25) 73%,
-    transparent 78%
-  );
-  animation: lPricingSpin 7s linear infinite;
-}
-.l-pricing-featured .l-pricing-spin {
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%, transparent 40%,
-    rgba(200,168,75,.35) 47%, rgba(200,168,75,1) 52%,
-    rgba(45,212,159,.7) 57%, rgba(200,168,75,.35) 64%,
-    transparent 71%
-  );
-  animation-duration: 3.8s;
-}
-@keyframes lPricingSpin {
-  to { transform: rotate(360deg); }
-}
 
 .l-pricing-price {
   font-size: 60px !important;
