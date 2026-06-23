@@ -101,6 +101,7 @@ const DesignSystems = lazy(() => import("@/pages/admin/DesignSystems"));
 const PluginsCatalog = lazy(() => import("@/pages/admin/PluginsCatalog"));
 const HyperFrames = lazy(() => import("@/pages/admin/HyperFrames"));
 const DeckBuilder = lazy(() => import("@/pages/admin/DeckBuilder"));
+const TiendaAdmin = lazy(() => import("@/pages/admin/TiendaAdmin"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -614,6 +615,9 @@ function Router() {
         </Route>
         <Route path="/admin/deck-builder">
           <RequireAdmin><AdminWrapper><AppLayout><S><DeckBuilder /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/tienda">
+          <RequireAdmin><AdminWrapper><AppLayout><S><TiendaAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         {/* Client routes */}

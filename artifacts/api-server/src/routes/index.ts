@@ -33,6 +33,7 @@ import absorberRouter from "./absorber.js";
 import entityResearchRouter from "./entity-research.js";
 import contactRouter from "./contact.js";
 import apkRouter from "./apk.js";
+import tiendaRouter from "./tienda.js";
 import plansRouter from "./plans.js";
 import exportsRouter from "./exports.js";
 import scripttagRouter from "./scripttag.js";
@@ -108,6 +109,7 @@ router.get("/report-templates/:token", (req, res, next) => {
 });
 
 router.use(billingRouter);
+router.use(tiendaRouter);
 
 router.use(requireAuth, meshyRouter);
 router.use(requireAuth, stitchRouter);

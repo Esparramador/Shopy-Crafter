@@ -76,6 +76,7 @@ const DEFAULT_ADMIN_NAV = [
   { label: "Automaciones", icon: "⚡", href: "/admin/automations" },
   { label: "Revenue & CRM", icon: "💰", href: "/admin/revenue" },
   { label: "Facturación & Plan", icon: "💳", href: "/admin/billing" },
+  { label: "Tienda Pública", icon: "🛍️", href: "/admin/tienda" },
   { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },
   { label: "Gemini Research", icon: "🔬", href: "/admin/gemini-intel" },
   { label: "M7 Inventario", icon: "🗄", href: "/admin/inventory" },
