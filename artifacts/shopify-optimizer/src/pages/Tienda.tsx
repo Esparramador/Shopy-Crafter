@@ -4,7 +4,8 @@ import PageMeta from "@/components/PageMeta";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-function safeFeatures(f: unknown): { text: string; included: boolean }[] {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+export function safeFeatures(f: unknown): { text: string; included: boolean }[] {
   if (!f) return [];
   const arr = typeof f === "string" ? JSON.parse(f) : f;
   if (!Array.isArray(arr)) return [];
@@ -13,7 +14,7 @@ function safeFeatures(f: unknown): { text: string; included: boolean }[] {
   );
 }
 
-function planIcon(name: string) {
+export function planIcon(name: string) {
   if (/emprendedor/i.test(name)) return "🌱";
   if (/starter/i.test(name)) return "🚀";
   if (/growth/i.test(name)) return "⚡";
@@ -22,7 +23,11 @@ function planIcon(name: string) {
 }
 
 // ── 3D Tilt Plan Card ────────────────────────────────────────────────────────
-function PlanCard({ plan, annual }: { plan: any; annual: boolean }) {
+export function PlanCard({ plan, annual, fallbackHref = "#fp-contact" }: {
+  plan: any;
+  annual: boolean;
+  fallbackHref?: string;
+}) {
   const tiltRef = useRef<HTMLDivElement>(null);
 
   const onMove = useCallback((e: React.MouseEvent) => {
@@ -55,7 +60,7 @@ function PlanCard({ plan, annual }: { plan: any; annual: boolean }) {
     : 0;
   const features = safeFeatures(plan.features);
   const isFeatured = !!plan.featured;
-  const checkoutUrl = plan.shopify_checkout_url || plan.cta_href || "#fp-contact";
+  const checkoutUrl = plan.shopify_checkout_url || plan.cta_href || fallbackHref;
   const isExternal = checkoutUrl.startsWith("http");
 
   return (
@@ -109,10 +114,13 @@ function PlanCard({ plan, annual }: { plan: any; annual: boolean }) {
 }
 
 // ── Service Card ─────────────────────────────────────────────────────────────
-function ServiceCard({ svc }: { svc: any }) {
+export function ServiceCard({ svc, fallbackHref = "/contacto" }: {
+  svc: any;
+  fallbackHref?: string;
+}) {
   const feats = safeFeatures(svc.features);
   const isJade = svc.color_accent === "jade";
-  const href = svc.cta_url || "/contacto";
+  const href = svc.cta_url || fallbackHref;
 
   return (
     <div className={`ts-svc${isJade ? " ts-svc-jade" : ""}`}>
@@ -135,14 +143,12 @@ function ServiceCard({ svc }: { svc: any }) {
 }
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
-function Skeleton({ h = 420 }: { h?: number }) {
+export function Skeleton({ h = 420 }: { h?: number }) {
   return <div className="ts-skeleton" style={{ height: h }} />;
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
-export default function Tienda() {
-  const [tab, setTab] = useState<"planes" | "servicios">("planes");
-  const [annual, setAnnual] = useState(false);
+// ── useTiendaData hook ────────────────────────────────────────────────────────
+export function useTiendaData() {
   const [plans, setPlans] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
@@ -160,6 +166,15 @@ export default function Tienda() {
       .catch(() => setSvcsLoading(false));
   }, []);
 
+  return { plans, services, plansLoading, svcsLoading };
+}
+
+// ── Public Tienda Page ────────────────────────────────────────────────────────
+export default function Tienda() {
+  const [tab, setTab] = useState<"planes" | "servicios">("planes");
+  const [annual, setAnnual] = useState(false);
+  const { plans, services, plansLoading, svcsLoading } = useTiendaData();
+
   return (
     <>
       <PageMeta
@@ -171,7 +186,6 @@ export default function Tienda() {
       <PublicLayout>
         <div className="ts-root">
 
-          {/* ── Background ── */}
           <div className="ts-bg" aria-hidden>
             <div className="ts-orb ts-orb-gold" />
             <div className="ts-orb ts-orb-jade" />
@@ -180,7 +194,6 @@ export default function Tienda() {
 
           <div className="ts-content">
 
-            {/* ── Hero ── */}
             <header className="ts-hero">
               <div className="ts-pill">
                 <span className="ts-pill-dot" />
@@ -196,26 +209,17 @@ export default function Tienda() {
               </p>
             </header>
 
-            {/* ── Tab Nav ── */}
             <nav className="ts-tabs" aria-label="Secciones de la tienda">
-              <button
-                className={`ts-tab${tab === "planes" ? " ts-tab-on" : ""}`}
-                onClick={() => setTab("planes")}
-              >
+              <button className={`ts-tab${tab === "planes" ? " ts-tab-on" : ""}`} onClick={() => setTab("planes")}>
                 📦 Planes
               </button>
-              <button
-                className={`ts-tab${tab === "servicios" ? " ts-tab-on" : ""}`}
-                onClick={() => setTab("servicios")}
-              >
+              <button className={`ts-tab${tab === "servicios" ? " ts-tab-on" : ""}`} onClick={() => setTab("servicios")}>
                 ⚡ Servicios
               </button>
             </nav>
 
-            {/* ── PLANES ── */}
             {tab === "planes" && (
               <section className="ts-section">
-                {/* Toggle mensual / anual */}
                 <div className="ts-toggle-wrap">
                   <span className={`ts-tog-label${!annual ? " ts-tog-on" : ""}`}>Mensual</span>
                   <button
@@ -233,7 +237,7 @@ export default function Tienda() {
                 <div className="ts-plans-grid">
                   {plansLoading
                     ? [1, 2, 3, 4].map(i => <Skeleton key={i} />)
-                    : plans.map(p => <PlanCard key={p.id} plan={p} annual={annual} />)
+                    : plans.map(p => <PlanCard key={p.id} plan={p} annual={annual} fallbackHref="#fp-contact" />)
                   }
                 </div>
 
@@ -245,7 +249,6 @@ export default function Tienda() {
               </section>
             )}
 
-            {/* ── SERVICIOS ── */}
             {tab === "servicios" && (
               <section className="ts-section">
                 <div className="ts-svc-header">
@@ -255,13 +258,12 @@ export default function Tienda() {
                 <div className="ts-svcs-grid">
                   {svcsLoading
                     ? [1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} h={380} />)
-                    : services.map(s => <ServiceCard key={s.id} svc={s} />)
+                    : services.map(s => <ServiceCard key={s.id} svc={s} fallbackHref="/contacto" />)
                   }
                 </div>
               </section>
             )}
 
-            {/* ── Bottom CTA ── */}
             <div className="ts-bottom-cta">
               <div className="ts-bottom-inner">
                 <span className="ts-bottom-icon">💬</span>
@@ -280,7 +282,7 @@ export default function Tienda() {
   );
 }
 
-// ── CSS ───────────────────────────────────────────────────────────────────────
+// ── CSS (shared via <style> tag) ──────────────────────────────────────────────
 const CSS = `
 /* ROOT */
 .ts-root {
@@ -634,128 +636,97 @@ const CSS = `
 .ts-svc-jade:hover { border-color: rgba(45,212,159,0.3); }
 .ts-svc-icon {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 54px; height: 54px; border-radius: 15px; font-size: 26px;
-  background: rgba(200,168,75,0.07); border: 1px solid rgba(200,168,75,0.14);
-  margin-bottom: 18px;
+  width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(200,168,75,0.08); border: 1px solid rgba(200,168,75,0.18);
+  font-size: 22px; margin-bottom: 16px;
 }
-.ts-svc-jade .ts-svc-icon {
-  background: rgba(45,212,159,0.07); border-color: rgba(45,212,159,0.14);
+.ts-svc.ts-svc-jade .ts-svc-icon {
+  background: rgba(45,212,159,0.07); border-color: rgba(45,212,159,0.18);
 }
 .ts-svc-badge {
-  position: absolute; top: 18px; right: 18px;
-  padding: 4px 10px; border-radius: 6px;
-  background: rgba(200,168,75,0.1); border: 1px solid rgba(200,168,75,0.22);
-  font-size: 9px; font-weight: 800; color: rgba(200,168,75,0.9);
-  text-transform: uppercase; letter-spacing: 1px;
+  position: absolute; top: 14px; right: 14px;
+  padding: 3px 10px; border-radius: 99px;
+  background: rgba(45,212,159,0.1); border: 1px solid rgba(45,212,159,0.25);
+  font-size: 10px; font-weight: 700; color: #2dd49f; letter-spacing: .5px;
 }
 .ts-svc-name {
   font-family: var(--fh, 'Instrument Serif', serif);
-  font-size: 20px; font-weight: 400; color: #eee; margin: 0 0 8px;
+  font-size: 22px; font-weight: 400; color: #eee;
+  margin: 0 0 10px;
 }
 .ts-svc-short {
-  font-size: 13px; color: rgba(255,255,255,0.42); line-height: 1.65; margin: 0 0 14px;
-  flex: 1;
+  font-size: 13px; color: rgba(255,255,255,0.42); line-height: 1.65;
+  margin: 0 0 16px; flex: 1;
 }
 .ts-svc-price {
-  font-size: 16px; font-weight: 700; color: rgba(200,168,75,0.92);
-  margin-bottom: 16px;
+  font-size: 18px; font-weight: 800; color: rgba(200,168,75,0.9);
+  margin-bottom: 14px; letter-spacing: -.3px;
 }
-.ts-svc-jade .ts-svc-price { color: rgba(45,212,159,0.92); }
 .ts-svc-feats {
-  list-style: none; padding: 0; margin: 0 0 20px;
+  list-style: none; margin: 0 0 20px; padding: 0;
   display: flex; flex-direction: column; gap: 7px;
 }
 .ts-svc-feats li {
-  display: flex; gap: 8px; font-size: 12.5px; color: rgba(255,255,255,0.58);
-  line-height: 1.4;
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12.5px; color: rgba(255,255,255,0.65); line-height: 1.4;
 }
-.ts-svc-feats li span { color: #2dd49f; flex-shrink: 0; font-weight: 700; }
-.ts-svc-more { color: rgba(255,255,255,0.28) !important; font-style: italic; }
+.ts-svc-feats li > span { color: #2dd49f; font-weight: 700; flex-shrink: 0; font-size: 11px; }
+.ts-svc-more {
+  font-size: 11.5px; color: rgba(200,168,75,0.6) !important; font-style: italic;
+}
 .ts-svc-cta {
-  display: block; padding: 11px 16px;
-  text-align: center; border-radius: 10px;
-  background: rgba(200,168,75,0.07); border: 1px solid rgba(200,168,75,0.22);
-  color: rgba(200,168,75,0.92); font-size: 13px; font-weight: 700;
-  text-decoration: none; transition: all .2s;
-  font-family: var(--fb, 'Geist', sans-serif);
-  margin-top: auto;
+  display: block; width: 100%; padding: 11px 18px;
+  text-align: center; border-radius: 10px; text-decoration: none;
+  font-size: 13px; font-weight: 700; letter-spacing: .3px;
+  background: rgba(200,168,75,0.07); border: 1px solid rgba(200,168,75,0.28);
+  color: rgba(200,168,75,0.92); transition: all .2s; font-family: inherit;
 }
-.ts-svc-jade .ts-svc-cta {
-  background: rgba(45,212,159,0.06); border-color: rgba(45,212,159,0.22);
-  color: rgba(45,212,159,0.92);
-}
-.ts-svc-cta:hover { filter: brightness(1.25); transform: translateY(-1px); }
-
-/* SKELETON */
-.ts-skeleton {
-  border-radius: 20px;
-  background: linear-gradient(90deg,
-    rgba(255,255,255,0.04) 25%,
-    rgba(255,255,255,0.07) 50%,
-    rgba(255,255,255,0.04) 75%
-  );
-  background-size: 200% 100%;
-  animation: tsSkel 1.5s ease-in-out infinite;
-}
-@keyframes tsSkel {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
+.ts-svc-cta:hover { background: rgba(200,168,75,0.14); border-color: rgba(200,168,75,0.5); }
 
 /* BOTTOM CTA */
 .ts-bottom-cta {
-  margin-top: 72px; padding: 1px; border-radius: 22px;
-  background: linear-gradient(135deg, rgba(200,168,75,0.3), rgba(45,212,159,0.15), rgba(200,168,75,0.3));
-  position: relative; overflow: hidden;
-}
-.ts-bottom-cta::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(90deg,
-    rgba(200,168,75,0.15) 0%, rgba(45,212,159,0.08) 50%, rgba(200,168,75,0.15) 100%
-  );
-  animation: tsShimmer 4s ease-in-out infinite;
-}
-@keyframes tsShimmer {
-  0%,100% { opacity: 0.6; }
-  50%      { opacity: 1; }
+  margin-top: 72px; padding: 32px 28px;
+  border-radius: 20px;
+  background: rgba(200,168,75,0.04);
+  border: 1px solid rgba(200,168,75,0.12);
 }
 .ts-bottom-inner {
-  position: relative; border-radius: 21px;
-  background: rgba(8,8,16,0.92); backdrop-filter: blur(20px);
-  padding: 32px 40px;
-  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 24px;
+  flex-wrap: wrap; max-width: 900px; margin: 0 auto;
 }
-.ts-bottom-icon { font-size: 36px; flex-shrink: 0; }
+.ts-bottom-icon { font-size: 32px; flex-shrink: 0; }
+.ts-bottom-inner > div { flex: 1; min-width: 200px; }
 .ts-bottom-title {
   font-family: var(--fh, 'Instrument Serif', serif);
   font-size: 22px; font-weight: 400; color: #eee; margin: 0 0 6px;
 }
 .ts-bottom-sub {
-  font-size: 13.5px; color: rgba(255,255,255,0.45); margin: 0;
+  font-size: 13px; color: rgba(255,255,255,0.38); margin: 0; line-height: 1.6;
 }
 .ts-bottom-btn {
-  margin-left: auto; white-space: nowrap;
-  padding: 14px 28px; border-radius: 12px;
+  padding: 13px 28px; border-radius: 11px; text-decoration: none;
   background: linear-gradient(135deg, #d4a843, #b8860b);
-  color: #000; font-size: 14px; font-weight: 700;
-  text-decoration: none; transition: all .2s;
+  color: #000; font-size: 13.5px; font-weight: 800;
+  white-space: nowrap; transition: all .2s;
   box-shadow: 0 4px 20px rgba(200,168,75,0.3);
-  font-family: var(--fb, 'Geist', sans-serif);
 }
-.ts-bottom-btn:hover { box-shadow: 0 8px 32px rgba(200,168,75,0.5); transform: translateY(-1px); }
+.ts-bottom-btn:hover { box-shadow: 0 8px 32px rgba(200,168,75,0.45); transform: translateY(-1px); }
 
-/* RESPONSIVE */
-@media (max-width: 860px) {
-  .ts-hero { padding: 48px 0 36px; }
-  .ts-plans-grid { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
-  .ts-bottom-inner { padding: 24px 20px; flex-direction: column; align-items: flex-start; }
-  .ts-bottom-btn { margin-left: 0; width: 100%; text-align: center; }
+/* SKELETON */
+.ts-skeleton {
+  border-radius: 22px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: tsSkel 1.4s ease-in-out infinite;
 }
-@media (max-width: 540px) {
-  .ts-plans-grid, .ts-svcs-grid { grid-template-columns: 1fr; }
-  .ts-hero h1 { font-size: 38px; }
-  .ts-tabs { width: 100%; max-width: 320px; }
-  .ts-tab { padding: 11px 20px; font-size: 11.5px; }
+@keyframes tsSkel {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (max-width: 600px) {
+  .ts-hero { padding: 48px 0 36px; }
+  .ts-bottom-inner { flex-direction: column; text-align: center; }
+  .ts-bottom-btn { width: 100%; text-align: center; }
 }
 `;
