@@ -15,6 +15,7 @@ const DEFAULT_NAV_ITEMS = [
   { href: "/client/approvals", label: "Aprobaciones", icon: "✅" },
   { href: "/client/messages",  label: "Mensajes",     icon: "💬" },
   { href: "/client/reports",   label: "Reportes",     icon: "📈" },
+  { href: "/client/tienda",    label: "Mis Planes",   icon: "🛒" },
 ];
 
 interface ClientCmsPanel {

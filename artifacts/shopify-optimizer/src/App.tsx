@@ -15,7 +15,6 @@ import { initGlobalErrorHandlers } from "@/lib/global-error-handler";
 const Home = lazy(() => import("@/pages/Home"));
 const NewProject = lazy(() => import("@/pages/NewProject"));
 const Landing = lazy(() => import("@/pages/Landing"));
-const Tienda = lazy(() => import("@/pages/Tienda"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const OAuthSuccess = lazy(() => import("@/pages/OAuthSuccess"));
 const LoginPage = lazy(() => import("@/pages/Login"));
@@ -108,6 +107,7 @@ const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
 const ClientMessages = lazy(() => import("@/pages/client/ClientMessages"));
 const ClientProducts = lazy(() => import("@/pages/client/ClientProducts"));
 const ClientReports = lazy(() => import("@/pages/client/ClientReports"));
+const ClientTienda = lazy(() => import("@/pages/client/ClientTienda"));
 
 const VoiceButton = lazy(() => import("@/components/VoiceButton").then(m => ({ default: m.VoiceButton })));
 const CommandPalette = lazy(() => import("@/components/CommandPalette").then(m => ({ default: m.CommandPalette })));
@@ -283,7 +283,7 @@ function Router() {
         <Route path="/forgot-password">{() => <S><ForgotPassword /></S>}</Route>
         <Route path="/reset-password">{() => <S><ResetPassword /></S>}</Route>
         <Route path="/invite/:token">{() => <S><InviteSetupPage /></S>}</Route>
-        <Route path="/tienda">{() => <S><Tienda /></S>}</Route>
+        <Route path="/tienda">{() => <Redirect to="/client/tienda" />}</Route>
         <Route path="/oauth-success">{() => <S><OAuthSuccess /></S>}</Route>
 
         {/* Landing */}
@@ -636,6 +636,9 @@ function Router() {
           </Route>
           <Route path="/client/reports">
             <RequireClient><S><ClientReports /></S></RequireClient>
+          </Route>
+          <Route path="/client/tienda">
+            <RequireClient><S><ClientTienda /></S></RequireClient>
           </Route>
         </ClientPreviewProvider>
 
