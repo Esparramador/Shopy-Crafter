@@ -24,7 +24,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
   
     const [project, products, pendingApprovals, recentActivity] = await Promise.all([
-      db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain })
+      db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain, platformType: (projectsTable as any).platformType })
         .from(projectsTable).where(eq(projectsTable.id, parseInt(projectId))).limit(1),
       db.select({
         id: productsTable.id,
@@ -54,6 +54,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
       lastOptimized: recentActivity[0]?.createdAt ?? null,
       projectName: project[0]?.name ?? null,
       shopDomain: project[0]?.shopDomain ?? null,
+      platformType: (project[0] as any)?.platformType ?? "shopify",
     });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
@@ -553,6 +554,97 @@ ${recentActivity.slice(0, 5).map(a => `· ${a.action}: ${a.details}`).join("\n")
   } catch (err: any) {
     logger.error({ err: err.message }, "client ai-chat error");
     res.status(500).json({ error: "Error al procesar tu consulta. Por favor inténtalo de nuevo." });
+  }
+});
+
+// ─── GET /api/client/platform-data ───────────────────────────────────────────
+// Returns real financial analytics for any CMS (Shopify, WooCommerce, PrestaShop, Stripe)
+router.get("/platform-data", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+
+    const pid = parseInt(projectId);
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, pid)).limit(1);
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const platformType: string = ((project as any).platformType as string) ?? "shopify";
+
+    // Last 30 days revenue snapshots
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600_000).toISOString().split("T")[0];
+    const snapshots = await db.execute(sql`
+      SELECT date, revenue, orders, aov
+      FROM revenue_snapshots
+      WHERE project_id = ${String(pid)} AND date >= ${thirtyDaysAgo}
+      ORDER BY date ASC
+    `).catch(() => ({ rows: [] }));
+    const rows = (snapshots.rows ?? []) as Array<{ date: string; revenue: number; orders: number; aov: number }>;
+
+    // Prior 30 days for comparison
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 3600_000).toISOString().split("T")[0];
+    const priorRows = await db.execute(sql`
+      SELECT SUM(revenue) as total_revenue, SUM(orders) as total_orders
+      FROM revenue_snapshots
+      WHERE project_id = ${String(pid)} AND date >= ${sixtyDaysAgo} AND date < ${thirtyDaysAgo}
+    `).catch(() => ({ rows: [{ total_revenue: 0, total_orders: 0 }] }));
+    const prior = (priorRows.rows?.[0] ?? { total_revenue: 0, total_orders: 0 }) as { total_revenue: number; total_orders: number };
+
+    const currentRevenue = rows.reduce((s, r) => s + parseFloat(String(r.revenue ?? 0)), 0);
+    const currentOrders = rows.reduce((s, r) => s + parseInt(String(r.orders ?? 0)), 0);
+    const avgAov = currentOrders > 0 ? currentRevenue / currentOrders : 0;
+    const priorRevenue = parseFloat(String(prior.total_revenue ?? 0));
+    const revenueTrend = priorRevenue > 0 ? ((currentRevenue - priorRevenue) / priorRevenue) * 100 : 0;
+
+    // Top products by audit score
+    const topProducts = await db.execute(sql`
+      SELECT title, price, audit_score, audit_grade, handle
+      FROM products
+      WHERE project_id = ${pid} AND audit_score IS NOT NULL
+      ORDER BY audit_score DESC LIMIT 5
+    `).catch(() => ({ rows: [] }));
+
+    // Recent events
+    const events = await db.execute(sql`
+      SELECT event_type, payload, created_at
+      FROM events
+      WHERE project_id = ${String(pid)}
+      ORDER BY created_at DESC LIMIT 15
+    `).catch(() => ({ rows: [] }));
+
+    // Inventory alerts
+    const invAlerts = await db.execute(sql`
+      SELECT product_title, variant_title, current_stock, days_remaining, status, sku
+      FROM inventory_tracking
+      WHERE project_id = ${String(pid)} AND status IN ('critical','warning')
+      ORDER BY days_remaining ASC NULLS LAST LIMIT 8
+    `).catch(() => ({ rows: [] }));
+
+    // COGS data
+    const cogsData = await db.execute(sql`
+      SELECT p.title, c.total_cogs, c.unit_cost, c.shopify_payment_fee, c.shipping_cost_domestic
+      FROM cogs c
+      JOIN products p ON p.id = c.product_id
+      WHERE p.project_id = ${pid}
+      ORDER BY c.total_cogs DESC LIMIT 8
+    `).catch(() => ({ rows: [] }));
+
+    res.json({
+      platformType,
+      revenue: {
+        total30d: parseFloat(currentRevenue.toFixed(2)),
+        orders30d: currentOrders,
+        aov: parseFloat(avgAov.toFixed(2)),
+        trend: parseFloat(revenueTrend.toFixed(1)),
+        dailyChart: rows.map(r => ({ date: r.date, revenue: parseFloat(String(r.revenue ?? 0)), orders: parseInt(String(r.orders ?? 0)) })),
+      },
+      topProducts: (topProducts.rows ?? []),
+      events: (events.rows ?? []),
+      inventoryAlerts: (invAlerts.rows ?? []),
+      cogsData: (cogsData.rows ?? []),
+    });
+  } catch (err: any) {
+    logger.error({ err: err.message }, "GET /client/platform-data error");
+    res.status(500).json({ error: "Error al cargar datos de plataforma" });
   }
 });
 

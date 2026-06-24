@@ -56,6 +56,7 @@ import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
 import stripeConnectRouter from "./stripe-connect.js";
 import stripeMasterRouter from "./stripe-master.js";
+import webhookGatewayRouter from "./webhook-gateway.js";
 import brandDnaRouter from "./brand-dna.js";
 import tripo3dRouter from "./tripo3d.js";
 import meshyRouter from "./meshy.js";
@@ -112,6 +113,7 @@ router.get("/report-templates/:token", (req, res, next) => {
 
 router.use(billingRouter);
 router.use(tiendaRouter);
+router.use(webhookGatewayRouter);
 router.use(stripeConnectRouter);
 router.use(stripeMasterRouter);
 

@@ -98,7 +98,9 @@ export async function runRevenueSnapshots() {
   try {
     const projects = await db.select().from(projectsTable);
     for (const project of projects) {
-      if (!project.accessToken) continue;
+      // Support all CMS platforms: Shopify (accessToken), WooCommerce (clientId), PrestaShop (clientSecret as apiKey)
+      const p = project as Record<string, unknown>;
+      if (!p.accessToken && !p.clientId && !p.clientSecret) continue;
       try {
         const now = new Date();
         const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
@@ -149,7 +151,9 @@ export async function runInventorySync() {
   try {
     const projects = await db.select().from(projectsTable);
     for (const project of projects) {
-      if (!project.accessToken) continue;
+      // Support all CMS platforms: Shopify (accessToken), WooCommerce (clientId), PrestaShop (clientSecret as apiKey)
+      const pInv = project as Record<string, unknown>;
+      if (!pInv.accessToken && !pInv.clientId && !pInv.clientSecret) continue;
       try {
         type InventoryProduct = { id: number; title: string; product_type: string; vendor: string; options: Array<{ name: string }>; variants: Array<{ id: number; inventory_quantity: number; sku: string; barcode: string; product_id: number; title: string; price: string; compare_at_price: string | null; option1: string | null; option2: string | null; option3: string | null; weight: number | null; weight_unit: string | null; inventory_policy: string; inventory_management: string | null; requires_shipping: boolean }> };
         let allProducts: InventoryProduct[] = [];

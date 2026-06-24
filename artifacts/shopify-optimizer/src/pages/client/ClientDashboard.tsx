@@ -5,6 +5,9 @@ import { ClientLayout } from "./ClientLayout";
 import { useClientPreview } from "./ClientPreviewContext";
 import { Link } from "wouter";
 import { timeSince } from "@/lib/utils";
+import WooCommerceDashboard from "./WooCommerceDashboard";
+import PrestaShopDashboard from "./PrestaShopDashboard";
+import StripeDashboard from "./StripeDashboard";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -12,7 +15,7 @@ interface DashData {
   totalProducts: number; avgScore: number | null; pendingApprovals: number;
   enginesActive: number; lastOptimized: string | null;
   recentActivity: Array<{ id: string; action: string; details: string; createdAt: string }>;
-  projectName: string | null; shopDomain: string | null;
+  projectName: string | null; shopDomain: string | null; platformType?: string | null;
 }
 interface VaultFile { id: string; title: string; category: string; fileType: string; createdAt: string; downloadUrl?: string; }
 
@@ -121,6 +124,37 @@ export default function ClientDashboard() {
     { label: "Motores IA", value: eng, suffix: "", icon: "⚡", color: "var(--gold)", spark: [4,5,5,6,6,data?.enginesActive??6], sub: "activos 24/7", href: null },
     { label: "Aprobaciones", value: pend, suffix: "", icon: "✅", color: "#f59e0b", spark: [0,1,2,3,2,data?.pendingApprovals??0], sub: "pendientes", href: "/client/approvals" },
   ];
+
+  // ── PLATFORM ROUTING ─────────────────────────────────────────────────────────
+  const platformType = data?.platformType ?? null;
+  if (!loading && platformType === "woocommerce") {
+    return (
+      <ClientLayout>
+        <div style={{ maxWidth: 1020 }}>
+          <WooCommerceDashboard apid={apid} />
+        </div>
+      </ClientLayout>
+    );
+  }
+  if (!loading && platformType === "prestashop") {
+    return (
+      <ClientLayout>
+        <div style={{ maxWidth: 1020 }}>
+          <PrestaShopDashboard apid={apid} />
+        </div>
+      </ClientLayout>
+    );
+  }
+  if (!loading && platformType === "stripe") {
+    return (
+      <ClientLayout>
+        <div style={{ maxWidth: 1020 }}>
+          <StripeDashboard apid={apid} />
+        </div>
+      </ClientLayout>
+    );
+  }
+  // ── SHOPIFY / DEFAULT (existing dashboard) ────────────────────────────────────
 
   return (
     <ClientLayout>
