@@ -78,6 +78,7 @@ const DEFAULT_ADMIN_NAV = [
   { label: "Facturación & Plan", icon: "💳", href: "/admin/billing" },
   { label: "Tienda Pública", icon: "🛍️", href: "/admin/tienda" },
   { label: "Stripe Manager", icon: "💳", href: "/admin/stripe" },
+  { label: "⚡ God Mode — Stripe Hub", icon: "👑", href: "/admin/stripe-master" },
   { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },
   { label: "Gemini Research", icon: "🔬", href: "/admin/gemini-intel" },
   { label: "M7 Inventario", icon: "🗄", href: "/admin/inventory" },
