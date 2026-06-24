@@ -61,6 +61,26 @@ const DOMAIN_MAP: Record<string, string[]> = {
     "subtitle", "subtítulo", "srt", "deliverable", "entregable",
     "holographic", "holográf", "6 segundo", "6-sec",
   ],
+  stripe_payments: [
+    "stripe", "pasarela", "pago", "payment", "checkout", "tarjeta", "card",
+    "chargeback", "disputa", "dispute", "fraud", "fraude", "radar",
+    "connect", "billing", "subscription", "suscripci", "recurring",
+    "sepa", "ach", "klarna", "afterpay", "bnpl", "apple pay", "google pay",
+    "webhook", "intent", "paymentintent", "refund", "reembolso",
+    "tasa de aprobaci", "authorization rate", "instant payout", "sigma",
+    "issuing", "treasury", "tax stripe", "identity stripe", "atlas",
+    "shopify payments", "transaction fee", "interchange", "adyen", "mollie",
+    "paypal", "braintree", "square payments", "procesamiento de pago",
+    "comisi", "fee pasarela", "coste procesamiento",
+  ],
+  payment_orchestration: [
+    "orchestration", "routing", "multi-gateway", "gateway mix", "fallback payment",
+    "payment provider", "procesador", "adquirente", "acquirer", "merchant account",
+    "pci", "compliance pago", "3ds", "3d secure", "strong authentication",
+    "sca", "psd2", "open banking", "transferencia bancaria", "payout",
+    "liquidaci", "settlement", "reconciliaci", "dunning", "smart retry",
+    "churn involuntario", "failed payment", "pago fallido", "renewal",
+  ],
 };
 
 function detectDomains(text: string): string[] {

@@ -371,6 +371,10 @@ const server = app.listen(port, (err?: Error) => {
     .then((seeded) => {
       if (seeded && seeded > 0) logger.info({ seeded }, "🌱 Seed insights loaded on first run");
     })
+    .then(async () => {
+      const { seedStripeKnowledge } = await import("./lib/stripe-brain-seeder.js");
+      return seedStripeKnowledge();
+    })
     .catch((err) => logger.error({ err }, "⚠️  Startup seeding failed — continuing startup"))
     .finally(() => {
       registerCronJobs();

@@ -239,6 +239,8 @@ const DOMAIN_LABELS: Record<string, string> = {
   email_automation:     "Email Marketing · Klaviyo · Segmentación · Flows",
   marketplace:          "Marketplaces · Amazon · Etsy · Omnichannel",
   taxes_accounting:     "Impuestos · Contabilidad · IVA · Facturación",
+  stripe_payments:      "Stripe · Pagos · Pasarelas · Connect · Billing · Radar · Fraud",
+  payment_orchestration:"Orquestación de Pagos · Multi-gateway · 3DS · SCA · PSD2 · Settlement",
   general:              "Conocimiento General · Multidisciplinar",
   "Conversion Rate Optimization":     "CRO · Tests A/B · Funnels · Optimización de conversión",
   "Copywriting & Product Descriptions": "Copywriting · Fichas de producto · SEO Copy · Storytelling",
@@ -322,6 +324,15 @@ router.get("/shopybrain/quick-actions", requireAdmin, async (req, res): Promise<
       contextActions = [
         { icon: "📧", label: "Crear flujo Klaviyo", prompt: "Genera un workflow completo de Klaviyo con los 6 flujos esenciales." },
         { icon: "✉️", label: "Plantilla bienvenida", prompt: "Crea una plantilla de email de bienvenida en HTML profesional." },
+      ];
+    } else if (r.startsWith("/admin/stripe")) {
+      contextActions = [
+        { icon: "📊", label: "Análisis de fees", prompt: "Analiza mis costes de procesamiento en Stripe. ¿Cuál es mi tasa efectiva y cómo puedo reducirla?" },
+        { icon: "🛡", label: "Auditoría de fraude", prompt: "Revisa mis métricas de disputas y fraude en Stripe. ¿Estoy por debajo del umbral del 0,75%? ¿Qué Radar rules debería activar?" },
+        { icon: "💶", label: "SEPA vs tarjeta", prompt: "¿Cuánto podría ahorrar cambiando mis suscripciones UE de tarjeta a SEPA Direct Debit? Calcula el ahorro mensual." },
+        { icon: "🔄", label: "Smart Retries config", prompt: "Explícame cómo configurar Smart Retries en Stripe Billing para recuperar el máximo MRR perdido por pagos fallidos." },
+        { icon: "🏦", label: "Stripe vs Adyen", prompt: "¿Cuándo me convendría migrar de Stripe a Adyen? Analiza mi volumen actual vs el punto de inflexión de interchange++." },
+        { icon: "🌍", label: "Métodos de pago por país", prompt: "¿Qué métodos de pago locales debería activar en Stripe según mis mercados principales? (iDEAL, Bancontact, giropay, etc.)" },
       ];
     } else if (r.startsWith("/admin/avatar-studio")) {
       contextActions = [
