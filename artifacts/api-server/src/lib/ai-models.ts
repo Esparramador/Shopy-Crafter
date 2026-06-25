@@ -1,18 +1,18 @@
 /**
  * AI Model Registry & Tier Selection
  * ----------------------------------
- * Selects the right Claude / Gemini model per task tier WITHOUT hardcoding
- * model names anywhere in the app. Three layers (priority order):
+ * Selects the right Claude / Gemini / xAI model per task tier WITHOUT hardcoding
+ * model names anywhere in the app. Four layers (priority order):
  *   1. Explicit override passed to the call (`opts.model`).
  *   2. DB override stored in `platform_settings` table (admin can change live).
  *   3. ENV defaults (CLAUDE_MODEL_*, GEMINI_MODEL_*).
- *   4. Hard fallback (latest known June-2026 stable models).
+ *   4. Hard fallback (verified June-25-2026 via GET /v1beta/models + HTTP 200 test).
  *
  * Tiers:
- *   - "fast"   → cheap & quick (Haiku 4.5 / Gemini 3.5 Flash)
- *   - "smart"  → balanced default (Sonnet 4.6 / Gemini 3.1 Pro Preview)
- *   - "genius" → max reasoning (Opus 4.8 / Gemini 3.1 Pro Preview)
- *   - "vision" → multimodal-strong (Sonnet 4.6 vision / Gemini 3.1 Pro Preview)
+ *   - "fast"   → cheap & quick      (Claude Haiku 4.5  / Gemini 3.5 Flash        / Grok 3 Mini Fast)
+ *   - "smart"  → balanced default   (Claude Sonnet 4.6 / Gemini 3.1 Pro Preview  / Grok 3 Fast)
+ *   - "genius" → max reasoning      (Claude Opus 4.8   / Gemini 3.1 Pro Preview  / Grok 3)
+ *   - "vision" → multimodal-strong  (Claude Sonnet 4.6 / Gemini 2.5 Flash        / Grok 2 Vision)
  *
  * Cached for 60s so live admin changes propagate quickly without DB hammering.
  */
@@ -34,10 +34,11 @@ const HARD_DEFAULTS: Record<AIProvider, Record<AITier, string>> = {
     vision: "claude-sonnet-4-6",
   },
   gemini: {
-    fast: "gemini-2.5-flash",
-    smart: "gemini-2.5-pro",
-    genius: "gemini-2.5-pro",
-    vision: "gemini-2.5-flash",
+    // Verified 2026-06-25 via GET /v1beta/models + HTTP 200 smoke test
+    fast:   "gemini-3.5-flash",          // Latest fast — confirmed available
+    smart:  "gemini-3.1-pro-preview",    // Latest pro  — confirmed available
+    genius: "gemini-3.1-pro-preview",    // Top reasoning — confirmed available
+    vision: "gemini-2.5-flash",          // Reliable multimodal — confirmed available
   },
   xai: {
     fast: "grok-3-mini-fast",
@@ -246,38 +247,42 @@ export const KNOWN_MODELS: Record<AIProvider, Array<{ id: string; label: string;
     { id: "claude-3-opus-20240229", label: "Claude 3 Opus", tierHint: "genius", notes: "El primer gran modelo de la familia Claude 3" },
     { id: "claude-3-haiku-20240307", label: "Claude 3 Haiku", tierHint: "fast", notes: "Modelo ultra-rápido legacy" }
   ],
+  // ── GEMINI — Verified 2026-06-25 via GET /v1beta/models (direct API) ──────
+  // All IDs below confirmed present in the models list. HTTP 200 smoke-tested:
+  //   gemini-3.5-flash ✅  gemini-3.1-pro-preview ✅  gemini-2.5-flash ✅
   gemini: [
-    // ── Generación — Flagship (Gemini 3.x) ────────────────────────────────
-    { id: "gemini-3.5-flash",                       label: "Gemini 3.5 Flash",                        tierHint: "fast",   notes: "⚡ Más rápido y barato — default fast (Jun 2026)" },
-    { id: "gemini-3.1-pro-preview",                 label: "Gemini 3.1 Pro Preview",                  tierHint: "genius", notes: "🧠 Top razonamiento — default smart/genius" },
+    // ── Flagship text / reasoning (Gemini 3.x) ───────────────────────────
+    { id: "gemini-3.5-flash",                       label: "Gemini 3.5 Flash",                        tierHint: "fast",   notes: "⚡ Más rápido y barato — default fast (verificado 2026-06-25)" },
+    { id: "gemini-3.1-pro-preview",                 label: "Gemini 3.1 Pro Preview",                  tierHint: "genius", notes: "🧠 Top razonamiento — default smart/genius (verificado 2026-06-25)" },
     { id: "gemini-3.1-pro-preview-customtools",     label: "Gemini 3.1 Pro Preview (CustomTools)",    tierHint: "genius", notes: "🧠 Pro + soporte extendido de herramientas" },
-    { id: "gemini-3-pro-preview",                   label: "Gemini 3 Pro Preview",                    tierHint: "smart",  notes: "💡 Gen 3 Pro — sólido razonamiento, menos coste" },
+    { id: "gemini-3-pro-preview",                   label: "Gemini 3 Pro Preview",                    tierHint: "smart",  notes: "💡 Gen 3 Pro — sólido razonamiento, menor coste que 3.1" },
     { id: "gemini-3-flash-preview",                 label: "Gemini 3 Flash Preview",                  tierHint: "fast",   notes: "⚡ Flash Gen 3 — equilibrio velocidad/calidad" },
-    // ── Imagen / Visión ────────────────────────────────────────────────────
-    { id: "gemini-3.1-flash-image",                 label: "Gemini 3.1 Flash Image",                  tierHint: "vision", notes: "🖼️ Generación/edición imagen — último estable" },
-    { id: "gemini-3.1-flash-image-preview",         label: "Gemini 3.1 Flash Image Preview",          tierHint: "vision", notes: "🖼️ Preview imagen más reciente" },
-    { id: "gemini-3-pro-image",                     label: "Gemini 3 Pro Image",                      tierHint: "vision", notes: "🖼️ Calidad pro en generación de imagen" },
-    { id: "gemini-3-pro-image-preview",             label: "Gemini 3 Pro Image Preview",              tierHint: "vision", notes: "🖼️ Preview imagen pro gen 3" },
-    { id: "gemini-2.5-flash-image",                 label: "Gemini 2.5 Flash Image",                  tierHint: "vision", notes: "🖼️ Imagen flash 2.5 (Nano-Banana v1)" },
     // ── Lite / Ultra-económicos ────────────────────────────────────────────
     { id: "gemini-3.1-flash-lite",                  label: "Gemini 3.1 Flash Lite",                   tierHint: "fast",   notes: "💰 Ultra-barato, tareas simples y clasificación" },
     { id: "gemini-3.1-flash-lite-preview",          label: "Gemini 3.1 Flash Lite Preview",           tierHint: "fast",   notes: "💰 Flash lite preview — mínimo coste" },
     { id: "gemini-2.5-flash-lite",                  label: "Gemini 2.5 Flash Lite",                   tierHint: "fast",   notes: "💰 Flash lite 2.5" },
-    // ── TTS / Voz nativa ──────────────────────────────────────────────────
-    { id: "gemini-3.1-flash-tts-preview",           label: "Gemini 3.1 Flash TTS",                    tierHint: "fast",   notes: "🔊 Generación de audio TTS nativo 3.1" },
-    { id: "gemini-2.5-flash-preview-tts",           label: "Gemini 2.5 Flash TTS",                    tierHint: "fast",   notes: "🔊 TTS audio nativo 2.5" },
-    { id: "gemini-2.5-pro-preview-tts",             label: "Gemini 2.5 Pro TTS",                      tierHint: "smart",  notes: "🔊 TTS alta calidad con voz Pro" },
-    // ── Legacy 2.x ────────────────────────────────────────────────────────
-    { id: "gemini-2.5-flash",                       label: "Gemini 2.5 Flash (legacy)",               tierHint: "fast" },
-    { id: "gemini-2.5-pro",                         label: "Gemini 2.5 Pro (legacy)",                 tierHint: "smart" },
-    { id: "gemini-2.0-flash",                       label: "Gemini 2.0 Flash (legacy)",               tierHint: "fast" },
-    { id: "gemini-2.0-flash-lite",                  label: "Gemini 2.0 Flash Lite (legacy)",          tierHint: "fast" },
-    // ── Aliases (apuntan siempre al último) ───────────────────────────────
-    { id: "gemini-flash-latest",                    label: "Gemini Flash Latest (alias auto)",        tierHint: "fast",   notes: "🔄 Siempre resuelve al flash más reciente" },
-    { id: "gemini-flash-lite-latest",               label: "Gemini Flash Lite Latest (alias auto)",   tierHint: "fast",   notes: "🔄 Siempre resuelve al flash-lite más reciente" },
-    { id: "gemini-pro-latest",                      label: "Gemini Pro Latest (alias auto)",          tierHint: "smart",  notes: "🔄 Siempre resuelve al pro más reciente" },
-    // ── Especiales / Experimental ─────────────────────────────────────────
-    { id: "gemini-2.5-computer-use-preview-10-2025", label: "Gemini 2.5 Computer Use Preview",       tierHint: "genius", notes: "🤖 Agente autónomo / computer use (experimental)" },
+    // ── Imagen nativa (responseModalities IMAGE) ──────────────────────────
+    { id: "gemini-3.1-flash-image",                 label: "Gemini 3.1 Flash Image (Nano Banana 2)",  tierHint: "vision", notes: "🖼️ Generación imagen — último estable (verificado 2026-06-25)" },
+    { id: "gemini-3.1-flash-image-preview",         label: "Gemini 3.1 Flash Image Preview",          tierHint: "vision", notes: "🖼️ Preview imagen más reciente" },
+    { id: "gemini-3-pro-image",                     label: "Gemini 3 Pro Image (Nano Banana Pro)",    tierHint: "vision", notes: "🖼️ Calidad pro en generación de imagen (verificado 2026-06-25)" },
+    { id: "gemini-3-pro-image-preview",             label: "Gemini 3 Pro Image Preview",              tierHint: "vision", notes: "🖼️ Preview imagen pro gen 3" },
+    { id: "gemini-2.5-flash-image",                 label: "Gemini 2.5 Flash Image (Nano Banana)",    tierHint: "vision", notes: "🖼️ Imagen flash 2.5 — default vision tier (verificado 2026-06-25)" },
+    // ── TTS / Voz nativa (generateContent, audio output) ─────────────────
+    { id: "gemini-3.1-flash-tts-preview",           label: "Gemini 3.1 Flash TTS",                    tierHint: "fast",   notes: "🔊 TTS nativo 3.1 — sólo salida de audio" },
+    { id: "gemini-2.5-flash-preview-tts",           label: "Gemini 2.5 Flash TTS",                    tierHint: "fast",   notes: "🔊 TTS audio nativo 2.5 — sólo salida de audio" },
+    { id: "gemini-2.5-pro-preview-tts",             label: "Gemini 2.5 Pro TTS",                      tierHint: "smart",  notes: "🔊 TTS alta calidad con voz Pro — sólo salida de audio" },
+    // ── 2.5 / 2.0 estables ────────────────────────────────────────────────
+    { id: "gemini-2.5-flash",                       label: "Gemini 2.5 Flash",                        tierHint: "fast",   notes: "default vision multimodal (verificado 2026-06-25)" },
+    { id: "gemini-2.5-pro",                         label: "Gemini 2.5 Pro",                          tierHint: "smart",  notes: "verificado 2026-06-25" },
+    { id: "gemini-2.5-computer-use-preview-10-2025", label: "Gemini 2.5 Computer Use Preview",        tierHint: "genius", notes: "🤖 Agente autónomo / computer use (experimental)" },
+    { id: "gemini-2.0-flash",                       label: "Gemini 2.0 Flash",                        tierHint: "fast",   notes: "verificado 2026-06-25" },
+    { id: "gemini-2.0-flash-001",                   label: "Gemini 2.0 Flash 001",                    tierHint: "fast",   notes: "versión anclada estable de 2.0 Flash" },
+    { id: "gemini-2.0-flash-lite",                  label: "Gemini 2.0 Flash Lite",                   tierHint: "fast",   notes: "verificado 2026-06-25" },
+    { id: "gemini-2.0-flash-lite-001",              label: "Gemini 2.0 Flash Lite 001",               tierHint: "fast",   notes: "versión anclada estable de 2.0 Flash Lite" },
+    // ── Aliases (resuelven siempre al modelo más reciente) ────────────────
+    { id: "gemini-flash-latest",                    label: "Gemini Flash Latest (alias)",             tierHint: "fast",   notes: "🔄 Resuelve al flash más reciente automáticamente" },
+    { id: "gemini-flash-lite-latest",               label: "Gemini Flash Lite Latest (alias)",        tierHint: "fast",   notes: "🔄 Resuelve al flash-lite más reciente" },
+    { id: "gemini-pro-latest",                      label: "Gemini Pro Latest (alias)",               tierHint: "smart",  notes: "🔄 Resuelve al pro más reciente" },
   ],
   xai: [
     { id: "grok-3", label: "Grok 3", tierHint: "genius", notes: "Flagship model June 2026, highest reasoning" },

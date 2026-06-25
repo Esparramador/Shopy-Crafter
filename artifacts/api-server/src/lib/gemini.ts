@@ -1111,10 +1111,11 @@ export async function askGeminiGenerateImage(
   modelOverride?: string,
 ): Promise<{ b64_json: string; mimeType: string; model: string }> {
   const ai = getGeminiClient();
-  // Primer intento: modelo del catálogo (gemini-3.1-flash-image o el configurado)
+  // Cadena de fallback verificada 2026-06-25 via GET /v1beta/models.
+  // Sólo modelos con responseModalities IMAGE (los de texto/chat fallarían).
   const candidates = modelOverride
     ? [modelOverride]
-    : [pickModelSync("gemini", "vision"), "gemini-2.5-flash-image", "gemini-3.1-flash-image"];
+    : ["gemini-3.1-flash-image", "gemini-2.5-flash-image", "gemini-3-pro-image"];
 
   for (const imageModel of candidates) {
     try {
