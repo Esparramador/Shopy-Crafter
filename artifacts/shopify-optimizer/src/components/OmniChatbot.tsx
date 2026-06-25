@@ -123,19 +123,73 @@ function classifyUrl(url: string): { type: string; icon: React.ReactNode; label:
 
 const URL_REGEX = /https?:\/\/[^\s\])"'>]+/g;
 
-function formatMessage(content: string): React.ReactNode {
-  const parts = content.split(/(\*\*[^*]+\*\*|`[^`]+`|\n|https?:\/\/[^\s\])"'>]+)/g);
+function GeminiImageCard({ src, alt }: { src: string; alt: string }) {
+  const handleDownload = () => {
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = "gemini-imagen.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+  const handleFullscreen = () => {
+    const win = window.open("", "_blank", "noopener,noreferrer");
+    if (win) {
+      win.opener = null;
+      const doc = win.document;
+      doc.title = "Gemini Image";
+      const style = doc.createElement("style");
+      style.textContent = "body{margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;}img{max-width:100vw;max-height:100vh;object-fit:contain;}";
+      doc.head.appendChild(style);
+      const img = doc.createElement("img");
+      img.src = src;
+      img.alt = alt;
+      doc.body.appendChild(img);
+    }
+  };
+  return (
+    <div style={{ margin: "10px 0", display: "inline-block", maxWidth: "100%" }}>
+      <img
+        src={src}
+        alt={alt}
+        style={{ maxWidth: "100%", maxHeight: 400, borderRadius: 8, display: "block", border: "1px solid var(--ink3)", cursor: "pointer" }}
+        onClick={handleFullscreen}
+        title="Haz clic para ver en pantalla completa"
+      />
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        <button
+          onClick={handleDownload}
+          style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "1px solid var(--ink3)", background: "var(--ink2)", color: "var(--t)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+        >
+          ⬇ Descargar
+        </button>
+        <button
+          onClick={handleFullscreen}
+          style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "1px solid var(--ink3)", background: "var(--ink2)", color: "var(--t)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+        >
+          ⛶ Pantalla completa
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function formatInlineText(content: string, segIdx: number): React.ReactNode[] {
+  const parts = content.split(/(\*\*[^*]+\*\*|`[^`]+`|_[^_\n]+_|\n|https?:\/\/[^\s\])"'>]+)/g);
   return parts.map((part, i) => {
+    const key = `s${segIdx}-${i}`;
     if (part.startsWith("**") && part.endsWith("**"))
-      return <strong key={i} style={{ color: "var(--gold)", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+      return <strong key={key} style={{ color: "var(--gold)", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
     if (part.startsWith("`") && part.endsWith("`"))
-      return <code key={i} style={{ background: "var(--ink3)", padding: "1px 5px", borderRadius: 4, fontSize: 11, fontFamily: "monospace", color: "var(--jade)" }}>{part.slice(1, -1)}</code>;
-    if (part === "\n") return <br key={i} />;
+      return <code key={key} style={{ background: "var(--ink3)", padding: "1px 5px", borderRadius: 4, fontSize: 11, fontFamily: "monospace", color: "var(--jade)" }}>{part.slice(1, -1)}</code>;
+    if (part.startsWith("_") && part.endsWith("_"))
+      return <em key={key} style={{ opacity: 0.75, fontStyle: "italic" }}>{part.slice(1, -1)}</em>;
+    if (part === "\n") return <br key={key} />;
     if (URL_REGEX.test(part)) {
       URL_REGEX.lastIndex = 0;
       return (
         <a
-          key={i}
+          key={key}
           href={part}
           target="_blank"
           rel="noreferrer"
@@ -148,6 +202,32 @@ function formatMessage(content: string): React.ReactNode {
     }
     return part;
   });
+}
+
+// IMAGE_MD_RE matches ![alt](data:... or https://...)
+const IMAGE_MD_RE = /!\[([^\]]*)\]\(((?:data:|https?:\/\/)[^)]{4,})\)/g;
+
+function formatMessage(content: string): React.ReactNode {
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let segIdx = 0;
+  let match: RegExpExecArray | null;
+
+  IMAGE_MD_RE.lastIndex = 0;
+  while ((match = IMAGE_MD_RE.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(...formatInlineText(content.slice(lastIndex, match.index), segIdx++));
+    }
+    nodes.push(<GeminiImageCard key={`img-${segIdx}`} src={match[2]} alt={match[1] || "Imagen generada"} />);
+    segIdx++;
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    nodes.push(...formatInlineText(content.slice(lastIndex), segIdx));
+  }
+
+  return nodes.length > 0 ? nodes : formatInlineText(content, 0);
 }
 
 function createSpeechRecognition(): any | null {
@@ -2156,15 +2236,18 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             } else {
               setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: `🎨 Generando imagen con Gemini...\n\n_"${imagePrompt}"_\n\n_Puede tardar 15-30s..._`, model: "gemini-image" } : msg));
               try {
+                const imgT0 = Date.now();
                 const imgRes = await fetchWithTimeout(`${API}/api/shopybrain/gemini-image`, {
                   method: "POST", credentials: "include",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ prompt: imagePrompt }),
                 }, 90000);
                 if (imgRes.ok) {
-                  const imgData = await imgRes.json() as { dataUrl?: string; b64_json?: string; mimeType?: string };
+                  const imgData = await imgRes.json() as { dataUrl?: string; b64_json?: string; mimeType?: string; model?: string; generationTimeMs?: number };
                   if (imgData.dataUrl) {
-                    assistantContent = `🎨 **Imagen generada con Gemini**\n\n_Prompt: "${imagePrompt}"_\n\n![Imagen generada por Gemini](${imgData.dataUrl})`;
+                    const elapsedSec = ((imgData.generationTimeMs ?? (Date.now() - imgT0)) / 1000).toFixed(1);
+                    const modelLabel = imgData.model ?? "gemini-image";
+                    assistantContent = `🎨 **Imagen generada con Gemini**\n\n_Prompt: "${imagePrompt}"_\n_Modelo: ${modelLabel} · ${elapsedSec}s_\n\n![Imagen generada por Gemini](${imgData.dataUrl})`;
                   } else {
                     assistantContent = `❌ Gemini no devolvió imagen. Prueba con una descripción más detallada.`;
                   }

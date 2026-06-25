@@ -11675,12 +11675,16 @@ router.post("/shopybrain/gemini-image", requireAdmin, async (req, res): Promise<
     }
 
     const { askGeminiGenerateImage } = await import("../lib/gemini.js");
+    const t0 = Date.now();
     const result = await askGeminiGenerateImage(prompt.trim(), model);
+    const generationTimeMs = Date.now() - t0;
 
     res.json({
       success: true,
       b64_json: result.b64_json,
       mimeType: result.mimeType,
+      model: result.model,
+      generationTimeMs,
       dataUrl: `data:${result.mimeType};base64,${result.b64_json}`,
     });
   } catch (err) {

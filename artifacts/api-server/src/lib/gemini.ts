@@ -1109,7 +1109,7 @@ export async function* askGeminiStream(
 export async function askGeminiGenerateImage(
   prompt: string,
   modelOverride?: string,
-): Promise<{ b64_json: string; mimeType: string }> {
+): Promise<{ b64_json: string; mimeType: string; model: string }> {
   const ai = getGeminiClient();
   // Primer intento: modelo del catálogo (gemini-3.1-flash-image o el configurado)
   const candidates = modelOverride
@@ -1133,7 +1133,7 @@ export async function askGeminiGenerateImage(
         const p = part as any;
         if (p.inlineData?.data) {
           logger.info({ model: imageModel }, "[Gemini Image] Generated successfully");
-          return { b64_json: p.inlineData.data, mimeType: p.inlineData.mimeType || "image/png" };
+          return { b64_json: p.inlineData.data, mimeType: p.inlineData.mimeType || "image/png", model: imageModel };
         }
       }
       // Si no hay imagen inline, intentar con el siguiente modelo
