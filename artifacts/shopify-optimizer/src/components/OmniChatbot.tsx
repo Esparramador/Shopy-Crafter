@@ -1072,6 +1072,22 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { transcript, response } = (e as CustomEvent<{ transcript: string; response: string }>).detail;
+      setOpen(true);
+      setMinimized(false);
+      const now = new Date();
+      setMessages(prev => [
+        ...prev,
+        { id: `voice-u-${Date.now()}`, role: "user" as const, timestamp: now, content: transcript },
+        { id: `voice-a-${Date.now() + 1}`, role: "assistant" as const, timestamp: now, model: "omnicore", content: response },
+      ]);
+    };
+    window.addEventListener("shopy:voice-chat", handler);
+    return () => window.removeEventListener("shopy:voice-chat", handler);
+  }, []);
+
   // Fetch contextual quick actions when panel opens or route changes
   useEffect(() => {
     if (!open) return;

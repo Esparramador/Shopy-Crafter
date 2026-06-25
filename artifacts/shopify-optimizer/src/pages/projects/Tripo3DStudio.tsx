@@ -87,6 +87,9 @@ export default function Tripo3DStudio() {
   // Multi-view
   const [views, setViews] = useState<{ front?: File; left?: File; back?: File; right?: File }>({});
   const [viewPreviews, setViewPreviews] = useState<Record<string, string>>({});
+  const [mvAutoPrompt, setMvAutoPrompt] = useState("");
+  const [mvAutoGenerating, setMvAutoGenerating] = useState(false);
+  const [mvAutoError, setMvAutoError] = useState("");
 
   // Batch
   const [batchFiles, setBatchFiles] = useState<BatchItem[]>([]);
@@ -248,6 +251,45 @@ export default function Tripo3DStudio() {
       }
       if (e.event === "error") { setAnimStatus("error"); setAnimLog(`Error: ${e.error}`); }
     });
+  };
+
+  // ── Auto-generate 4 view images with AI ───────────────────────────────────
+  const autoGenerateViews = async () => {
+    if (!mvAutoPrompt.trim()) return;
+    setMvAutoGenerating(true);
+    setMvAutoError("");
+    try {
+      const r = await fetch(`${API}/api/tripo3d/generate-views`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ prompt: mvAutoPrompt.trim() }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMvAutoError(d.error ?? "Error generando vistas"); return; }
+      const { views: generated } = d as { views: Record<string, string> };
+      const newPreviews: Record<string, string> = {};
+      const newViews: { front?: File; left?: File; back?: File; right?: File } = {};
+      await Promise.all(
+        (["front", "left", "back", "right"] as const).map(async (key) => {
+          const url = generated[key];
+          if (!url) return;
+          newPreviews[key] = url;
+          try {
+            const imgRes = await fetch(url);
+            const blob = await imgRes.blob();
+            const ext = blob.type.includes("png") ? "png" : "jpg";
+            newViews[key] = new File([blob], `${key}-view.${ext}`, { type: blob.type });
+          } catch { /* if URL not fetchable, keep preview only */ }
+        })
+      );
+      setViewPreviews(p => ({ ...p, ...newPreviews }));
+      setViews(v => ({ ...v, ...newViews }));
+    } catch (e: any) {
+      setMvAutoError(e.message ?? "Error generando vistas");
+    } finally {
+      setMvAutoGenerating(false);
+    }
   };
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -422,6 +464,34 @@ export default function Tripo3DStudio() {
                 <h3 className="font-semibold text-sm text-foreground">Multi-Vista → Modelo 3D (4 fotos)</h3>
               </div>
               <p className="text-xs text-muted-foreground">Sube hasta 4 vistas del mismo objeto (frontal + lateral + trasera + ¾) para mayor precisión geométrica</p>
+
+              {/* ── Auto-generar vistas con IA ── */}
+              <div style={{ background: "rgba(59,128,228,0.06)", border: "1px solid rgba(59,128,228,0.18)", borderRadius: 10, padding: "12px 14px" }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Wand2 size={13} style={{ color: "var(--sc-ai-azure)", flexShrink: 0 }} />
+                  <span className="text-xs font-semibold" style={{ color: "var(--sc-ai-azure)" }}>Auto-generar 4 vistas con IA</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={mvAutoPrompt}
+                    onChange={e => setMvAutoPrompt(e.target.value)}
+                    placeholder="Ej: zapatilla deportiva roja Nike"
+                    className="sc-form-input text-xs flex-1"
+                    style={{ fontSize: 12, padding: "7px 10px" }}
+                    onKeyDown={e => e.key === "Enter" && autoGenerateViews()}
+                  />
+                  <button
+                    onClick={autoGenerateViews}
+                    disabled={!mvAutoPrompt.trim() || mvAutoGenerating}
+                    style={{ background: "var(--sc-ai-azure)", color: "#fff", border: "none", borderRadius: 8, padding: "0 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, opacity: !mvAutoPrompt.trim() || mvAutoGenerating ? 0.5 : 1, whiteSpace: "nowrap", flexShrink: 0 }}
+                  >
+                    {mvAutoGenerating ? <><Loader2 size={12} className="animate-spin" /> Generando...</> : <><Wand2 size={12} /> Generar vistas</>}
+                  </button>
+                </div>
+                {mvAutoError && <p className="text-xs mt-2" style={{ color: "#ff4757" }}>{mvAutoError}</p>}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 {(["front","left","back","right"] as const).map(v => {
                   const labels = { front: "Frontal *", left: "Lateral izq.", back: "Trasera", right: "Lateral der." };

@@ -1,3 +1,4 @@
+- [Missing :root CSS vars (white screen)](missing-root-css-vars.md) — design-system.css :root block MUST have dark-mode vars (--ink,--t,--gold,etc.) + Tailwind HSL tokens; if empty, body shows white.
 - [Canonical Pricing Plans](canonical-pricing.md) — prices live in src/lib/pricing-plans.ts (NOT CMS); Landing uses CANONICAL_PLANS; billing.ts keys: emprendedor/starter/agency_pro/enterprise; GET /billing/plans filters visible!=false.
 - [Express router.use without path intercepts ALL routes](express-router-use-no-path.md) — router.use(requireAuth, someRouter) without a path prefix runs requireAuth on EVERY subsequent request; public routes must be mounted BEFORE any such line; fix: move public routes above, or add path prefix.
 - [Social/URL ingestion provenance](social-url-ingestion.md) — IG/FB can't be scraped without official APIs; X oEmbed 404s; degrade via oEmbed→OG→AI-inference and LABEL the source honestly.

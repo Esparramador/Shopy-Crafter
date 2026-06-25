@@ -271,9 +271,14 @@ export function AppLayout({ children }: AppLayoutProps) {
   useEffect(() => {
     if (darkMode) {
       document.documentElement.removeAttribute("data-theme");
+      try { localStorage.setItem("shopy-dark", "true"); } catch(e){}
     } else {
       document.documentElement.setAttribute("data-theme", "light");
+      try { localStorage.setItem("shopy-dark", "false"); } catch(e){}
     }
+    return () => {
+      document.documentElement.removeAttribute("data-theme");
+    };
   }, [darkMode]);
 
   const toggleDarkMode = () => setDarkMode(d => !d);

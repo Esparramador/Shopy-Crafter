@@ -177,6 +177,14 @@
     </script>
   </head>
   <body>
+    <script>
+      (function(){
+        try {
+          var d = localStorage.getItem('shopy-dark');
+          if (d === 'false') document.documentElement.setAttribute('data-theme','light');
+        } catch(e){}
+      })();
+    </script>
     <div class="gold-line"></div>
     <div id="root"><!--app-html--></div>
     <script type="module" src="/src/main.tsx"></script>

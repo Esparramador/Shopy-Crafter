@@ -910,4 +910,58 @@ router.post("/api/tripo3d/text-to-model-advanced", async (req: Request, res: Res
   }
 });
 
+/* POST /api/tripo3d/generate-views — text prompt → 4 angle images via xAI Aurora */
+router.post("/api/tripo3d/generate-views", async (req: Request, res: Response): Promise<any> => {
+  const { prompt } = req.body ?? {};
+  if (!prompt || typeof prompt !== "string") {
+    return res.status(400).json({ error: "Se requiere un prompt" });
+  }
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ error: "XAI_API_KEY no configurada" });
+  }
+  const angles = [
+    { key: "front", desc: "frontal view, facing camera" },
+    { key: "left",  desc: "left side view, profile" },
+    { key: "back",  desc: "back view, rear" },
+    { key: "right", desc: "right side view, profile" },
+  ] as const;
+
+  const generate = async (desc: string): Promise<string> => {
+    const fullPrompt = `${desc} of ${prompt}, product photography, clean white background, studio lighting, centered, high quality`;
+    const r = await fetch("https://api.x.ai/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: "aurora", prompt: fullPrompt, n: 1 }),
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error(`xAI ${r.status}: ${txt.slice(0, 200)}`);
+    }
+    const d = await r.json();
+    const item = d.data?.[0];
+    if (!item) throw new Error("No se recibió imagen de xAI");
+    if (item.url)      return item.url;
+    if (item.b64_json) return `data:image/jpeg;base64,${item.b64_json}`;
+    throw new Error("Formato de respuesta xAI desconocido");
+  };
+
+  try {
+    const results = await Promise.allSettled(angles.map(a => generate(a.desc)));
+    const views: Record<string, string> = {};
+    angles.forEach((a, i) => {
+      const r = results[i];
+      if (r.status === "fulfilled") views[a.key] = r.value;
+    });
+    if (!views.front) {
+      const firstErr = results.find(r => r.status === "rejected") as PromiseRejectedResult | undefined;
+      return res.status(500).json({ error: (firstErr?.reason as Error)?.message ?? "Error generando vistas" });
+    }
+    return res.json({ views });
+  } catch (e: any) {
+    logger.error({ err: e }, "tripo3d generate-views error");
+    return res.status(500).json({ error: e.message ?? "Error generando vistas" });
+  }
+});
+
 export default router;

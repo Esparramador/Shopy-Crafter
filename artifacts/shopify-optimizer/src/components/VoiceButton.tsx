@@ -181,6 +181,10 @@ export function VoiceButton() {
 
       speakSpanish(data.response);
 
+      window.dispatchEvent(new CustomEvent("shopy:voice-chat", {
+        detail: { transcript: text, response: data.response },
+      }));
+
       if (data.action?.type === "navigate" && data.action.params?.path) {
         navigate(data.action.params.path);
       } else if (data.action?.type && data.confidence >= 0.6 && EXECUTABLE_ACTIONS.includes(data.action.type)) {

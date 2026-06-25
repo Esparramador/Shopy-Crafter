@@ -10,8 +10,62 @@
    ============================================================ */
 
 /* ── SECTION 1: APP-WIDE DESIGN SYSTEM ─────────────────────── */
-/* ── ROOT VARIABLES ── */
+/* ── ROOT VARIABLES (dark mode = default) ── */
+:root {
+  /* ── App color tokens ── */
+  --ink:   #0a0a14;
+  --ink2:  #111121;
+  --ink3:  #181826;
+  --ink4:  #1f1f30;
+  --ink5:  #26263c;
+  --gold:  #c8a84b;
+  --gold2: #d2b86b;
+  --gold3: #e4d4a5;
+  --jade:  #2dd49f;
+  --jade2: #5bddb4;
+  --sky:   #4a9edd;
+  --crim:  #e84558;
+  --t:     #f2f0ff;
+  --t2:    #9896ba;
+  --t3:    #58567a;
+  --t4:    #35334f;
+  --bdr:   rgba(255,255,255,0.06);
+  --bdr2:  rgba(255,255,255,0.10);
+  --sh:    0 8px 32px rgba(0,0,0,0.35);
+  --sh2:   0 16px 48px rgba(0,0,0,0.50);
+  --r:     8px;
+  --r2:    10px;
+  --r4:    12px;
+  --fh:    'Instrument Serif', serif;
+  --fb:    'Geist', sans-serif;
+  --fm:    'Geist Mono', monospace;
 
+  /* ── Tailwind HSL tokens (dark) ── */
+  --background:                 233 18% 7%;
+  --foreground:                 245 50% 96%;
+  --card:                       233 18% 10%;
+  --card-foreground:            245 50% 96%;
+  --primary:                    45 60% 54%;
+  --primary-foreground:         40 100% 4%;
+  --secondary:                  233 18% 15%;
+  --secondary-foreground:       245 50% 96%;
+  --muted:                      233 18% 14%;
+  --muted-foreground:           246 18% 55%;
+  --accent:                     233 18% 15%;
+  --accent-foreground:          245 50% 96%;
+  --destructive:                352 76% 59%;
+  --destructive-foreground:     245 50% 96%;
+  --border:                     233 18% 20%;
+  --input:                      233 18% 18%;
+  --ring:                       45 60% 54%;
+  --sidebar:                    233 18% 8%;
+  --sidebar-foreground:         245 50% 96%;
+  --sidebar-border:             233 18% 15%;
+  --sidebar-primary:            45 60% 54%;
+  --sidebar-primary-foreground: 40 100% 4%;
+  --sidebar-accent:             233 18% 12%;
+  --sidebar-accent-foreground:  245 50% 96%;
+}
 
 /* ── BASE ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -927,7 +981,7 @@ code {
 }
 
 /* ── LANDSCAPE MOBILE (short viewport, landscape) ──────────────────────────── */
-@media (max-width: 960px) and (max-height: 550px) and (orientation: landscape) {
+@media (max-height: 550px) and (orientation: landscape) {
   .app-shell {
     height: auto !important;
     min-height: 100vh;
@@ -1088,6 +1142,33 @@ code {
   --bdr:    rgba(12,12,20,0.08);
   --bdr2:   rgba(12,12,20,0.15);
   --sh:     0 8px 32px rgba(0,0,0,0.1);
+  --sh2:    0 16px 48px rgba(0,0,0,0.15);
+
+  /* Tailwind HSL tokens (light) */
+  --background:                 240 30% 99%;
+  --foreground:                 233 18% 8%;
+  --card:                       0 0% 100%;
+  --card-foreground:            233 18% 8%;
+  --primary:                    45 60% 54%;
+  --primary-foreground:         40 100% 4%;
+  --secondary:                  240 10% 94%;
+  --secondary-foreground:       233 18% 8%;
+  --muted:                      240 10% 94%;
+  --muted-foreground:           233 20% 45%;
+  --accent:                     240 10% 92%;
+  --accent-foreground:          233 18% 8%;
+  --destructive:                352 76% 59%;
+  --destructive-foreground:     0 0% 100%;
+  --border:                     233 15% 88%;
+  --input:                      233 15% 88%;
+  --ring:                       45 60% 54%;
+  --sidebar:                    240 20% 97%;
+  --sidebar-foreground:         233 18% 8%;
+  --sidebar-border:             233 15% 88%;
+  --sidebar-primary:            45 60% 54%;
+  --sidebar-primary-foreground: 40 100% 4%;
+  --sidebar-accent:             240 10% 94%;
+  --sidebar-accent-foreground:  233 18% 8%;
 }
 
 /* ── TOUCH DEVICE: disable custom cursor ── */
