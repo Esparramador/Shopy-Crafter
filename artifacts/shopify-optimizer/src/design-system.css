@@ -467,6 +467,25 @@ body::after {
 
 /* ── MAIN CONTENT ── */
 
+/* Desktop layout: main-area fills remaining space, main-content scrolls */
+.main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.main-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  padding: 20px 24px;
+}
+
 /* ── CARDS ── */
 .card {
   background: var(--ink2);
