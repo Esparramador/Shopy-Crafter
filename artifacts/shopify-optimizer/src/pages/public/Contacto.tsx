@@ -541,7 +541,7 @@ export default function Contacto() {
             className="ctc-video"
             src={VIDEO_SRC}
             poster={POSTER_SRC}
-            autoPlay muted playsInline loop
+            autoPlay muted playsInline
             preload="metadata"
           />
           <div className="ctc-overlay" />
