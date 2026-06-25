@@ -480,10 +480,15 @@ body::after {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+}
+
+/* Page inner: standard content container with padding */
+.page-inner {
   padding: 20px 24px;
+  max-width: 100%;
 }
 
 /* ── CARDS ── */
@@ -885,7 +890,9 @@ code {
     transform: translateX(0);
     width: 220px; min-width: 220px;
   }
-  .main-area { width: 100%; }
+  .main-area { width: 100%; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  /* page-inner padding comes from main-content on tablet */
+  .page-inner { padding: 0; }
 
   /* Grid adjustments for tablet */
 
@@ -1111,7 +1118,7 @@ code {
   .grid-r4 { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
   .grid-r3 { grid-template-columns: 1fr !important; gap: 10px !important; }
   .grid-r2 { grid-template-columns: 1fr !important; gap: 10px !important; }
-  .page-inner { padding: 12px !important; }
+  .page-inner { padding: 0 !important; }
   .flex-header { flex-direction: column; align-items: flex-start; }
 
   /* Select fields go full width on mobile */
