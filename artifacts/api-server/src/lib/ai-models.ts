@@ -34,10 +34,10 @@ const HARD_DEFAULTS: Record<AIProvider, Record<AITier, string>> = {
     vision: "claude-sonnet-4-6",
   },
   gemini: {
-    fast: "gemini-3.5-flash",
-    smart: "gemini-3.1-pro-preview",
-    genius: "gemini-3.1-pro-preview",
-    vision: "gemini-3.1-pro-preview",
+    fast: "gemini-2.5-flash",
+    smart: "gemini-2.5-pro",
+    genius: "gemini-2.5-pro",
+    vision: "gemini-2.5-flash",
   },
   xai: {
     fast: "grok-3-mini-fast",

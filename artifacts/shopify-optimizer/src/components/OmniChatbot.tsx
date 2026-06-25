@@ -2132,11 +2132,27 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         // ── Gemini nativo: imagen, código o streaming SSE ──
         if (engineMode === "gemini") {
 
+          // Normalizar prefijos de slash skills escritos directamente
+          let geminiContent = content;
+          if (/^\/imagen-gemini\s+/i.test(geminiContent)) {
+            geminiContent = "[GEMINI-IMAGE] " + geminiContent.replace(/^\/imagen-gemini\s+/i, "");
+          } else if (/^\/codigo-gemini\s+/i.test(geminiContent)) {
+            geminiContent = "[GEMINI-CODE] " + geminiContent.replace(/^\/codigo-gemini\s+/i, "");
+          }
+
+          // Auto-detectar solicitudes de análisis de datos que se benefician del código Python
+          const isCodeAnalyticsRequest = !geminiContent.startsWith("[GEMINI-IMAGE] ") && !geminiContent.startsWith("[GEMINI-CODE] ") && (() => {
+            const lower = geminiContent.toLowerCase();
+            const codeWords = ["calcula", "calcular", "cálculo", "python", "ejecuta código", "analiza datos", "analizar datos", "procesa datos", "compute", "calculate", "grafica los datos", "graficamente", "estadísticas de mi tienda"];
+            const dataWords = ["datos de mi tienda", "data de ventas", "métricas de conversión", "kpis de", "revenue de mi", "ventas de mi tienda", "aov de mi"];
+            return codeWords.some(w => lower.includes(w)) && dataWords.some(w => lower.includes(w));
+          })();
+
           // A) Generación de imagen nativa
-          if (content.startsWith("[GEMINI-IMAGE] ")) {
-            const imagePrompt = content.replace("[GEMINI-IMAGE] ", "").trim();
+          if (geminiContent.startsWith("[GEMINI-IMAGE] ")) {
+            const imagePrompt = geminiContent.replace("[GEMINI-IMAGE] ", "").trim();
             if (!imagePrompt) {
-              assistantContent = "✍️ Escribe una descripción de la imagen que quieres generar tras el comando. Ejemplo: `/imagen-gemini un producto de lujo sobre fondo negro con iluminación dramática`";
+              assistantContent = "✍️ Escribe una descripción de la imagen que quieres generar. Ejemplo: `/imagen-gemini un producto de lujo sobre fondo negro con iluminación dramática`";
             } else {
               setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: `🎨 Generando imagen con Gemini...\n\n_"${imagePrompt}"_\n\n_Puede tardar 15-30s..._`, model: "gemini-image" } : msg));
               try {
@@ -2157,13 +2173,15 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   assistantContent = `❌ Error generando imagen (${imgRes.status}): ${errText.slice(0, 200)}`;
                 }
               } catch (imgErr) {
-                assistantContent = `❌ Error: ${imgErr instanceof Error ? imgErr.message : String(imgErr)}`;
+                assistantContent = `❌ Error imagen: ${imgErr instanceof Error ? imgErr.message : String(imgErr)}`;
               }
             }
 
-          // B) Ejecución de código Python con Gemini
-          } else if (content.startsWith("[GEMINI-CODE] ")) {
-            const codePrompt = content.replace("[GEMINI-CODE] ", "").trim();
+          // B) Ejecución de código Python (explícita o auto-detectada)
+          } else if (geminiContent.startsWith("[GEMINI-CODE] ") || isCodeAnalyticsRequest) {
+            const codePrompt = geminiContent.startsWith("[GEMINI-CODE] ")
+              ? geminiContent.replace("[GEMINI-CODE] ", "").trim()
+              : geminiContent;
             setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: `💻 Ejecutando análisis con código Python...\n\n_Gemini ejecutará código real y mostrará los resultados._\n\n_⏱️ 15-30 segundos..._`, model: "gemini-code" } : msg));
             try {
               const codeRes = await fetchWithTimeout(`${API}/api/shopybrain/gemini-code`, {
@@ -2183,10 +2201,10 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 assistantContent = `❌ Error ejecutando código (${codeRes.status}): ${errText.slice(0, 200)}`;
               }
             } catch (codeErr) {
-              assistantContent = `❌ Error: ${codeErr instanceof Error ? codeErr.message : String(codeErr)}`;
+              assistantContent = `❌ Error código: ${codeErr instanceof Error ? codeErr.message : String(codeErr)}`;
             }
 
-          // C) Chat normal con Gemini en streaming SSE
+          // C) Chat normal con Gemini en streaming SSE + fallback automático
           } else {
             const convHistoryArr = messages.slice(-8).map(m => ({
               role: m.role as "user" | "assistant",
@@ -2194,53 +2212,95 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             }));
             convHistoryArr.push({ role: "user", content });
 
-            const streamRes = await fetchWithTimeout(`${API}/api/shopybrain/gemini-stream`, {
-              method: "POST", credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                messages: convHistoryArr,
-                systemPrompt: SYSTEM_PROMPT,
-                thinkingBudget: deepThinkMode ? 20000 : 0,
-                useSearch: true,
-              }),
-            }, 180000);
+            let streamFailed = false;
+            try {
+              const streamRes = await fetchWithTimeout(`${API}/api/shopybrain/gemini-stream`, {
+                method: "POST", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  messages: convHistoryArr,
+                  systemPrompt: SYSTEM_PROMPT,
+                  thinkingBudget: deepThinkMode ? 20000 : 0,
+                  useSearch: true,
+                }),
+              }, 180000);
 
-            if (!streamRes.ok || !streamRes.body) {
-              const errText = await streamRes.text().catch(() => "");
-              assistantContent = `❌ Error Gemini Stream (${streamRes.status}): ${errText.slice(0, 200)}`;
-            } else {
-              const reader = streamRes.body.getReader();
-              const decoder = new TextDecoder();
-              let streamBuffer = "";
-              let isFirstChunk = true;
-              let sseLineBuf = "";
+              if (!streamRes.ok || !streamRes.body) {
+                streamFailed = true;
+              } else {
+                const reader = streamRes.body.getReader();
+                const decoder = new TextDecoder();
+                let streamBuffer = "";
+                let isFirstChunk = true;
+                let sseLineBuf = "";
 
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                sseLineBuf += decoder.decode(value, { stream: true });
-                const lines = sseLineBuf.split("\n");
-                sseLineBuf = lines.pop() ?? "";
-                for (const line of lines) {
-                  if (!line.startsWith("data: ")) continue;
-                  try {
-                    const ev = JSON.parse(line.slice(6)) as { text?: string; done?: boolean; error?: string };
-                    if (ev.error) {
-                      assistantContent = `❌ Gemini error: ${ev.error}`;
-                    } else if (ev.text) {
-                      streamBuffer += ev.text;
-                      const snap = streamBuffer;
-                      if (isFirstChunk) {
-                        isFirstChunk = false;
-                        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: snap + " ▋", model: deepThinkMode ? "gemini+think" : "gemini+search" } : msg));
-                      } else {
-                        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: snap + " ▋" } : msg));
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  sseLineBuf += decoder.decode(value, { stream: true });
+                  const lines = sseLineBuf.split("\n");
+                  sseLineBuf = lines.pop() ?? "";
+                  for (const line of lines) {
+                    if (!line.startsWith("data: ")) continue;
+                    try {
+                      const ev = JSON.parse(line.slice(6)) as { text?: string; done?: boolean; error?: string };
+                      if (ev.error) {
+                        streamFailed = true;
+                      } else if (ev.text) {
+                        streamBuffer += ev.text;
+                        const snap = streamBuffer;
+                        if (isFirstChunk) {
+                          isFirstChunk = false;
+                          setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: snap + " ▋", model: deepThinkMode ? "gemini+think" : "gemini+search" } : msg));
+                        } else {
+                          setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: snap + " ▋" } : msg));
+                        }
+                      }
+                    } catch { /* ignore SSE parse errors */ }
+                  }
+                }
+                if (streamBuffer && !streamFailed) {
+                  assistantContent = streamBuffer;
+                  // Detectar y ejecutar acciones Shopify incrustadas (:::ACTION:::...:::END_ACTION:::)
+                  const streamActionRegex = /:::ACTION:::([\s\S]*?):::END_ACTION:::/g;
+                  let aMatch;
+                  const streamActions: { action: string; params: Record<string, unknown> }[] = [];
+                  while ((aMatch = streamActionRegex.exec(assistantContent)) !== null) {
+                    try { streamActions.push(JSON.parse(aMatch[1])); } catch { /* skip invalid */ }
+                  }
+                  if (streamActions.length > 0) {
+                    assistantContent = assistantContent.replace(/:::ACTION:::[\s\S]*?:::END_ACTION:::/g, "").trim();
+                    for (const act of streamActions) {
+                      const actionResult = await executeShopifyAction(act.action, act.params);
+                      if (actionResult) {
+                        assistantContent += "\n\n" + formatActionResult(act.action, actionResult);
+                        action = { type: "shopify-action", label: "Ver resultado", data: actionResult };
                       }
                     }
-                  } catch { /* ignore SSE parse errors */ }
+                  }
+                } else {
+                  streamFailed = true;
                 }
               }
-              if (!assistantContent) assistantContent = streamBuffer || "Gemini no generó respuesta.";
+            } catch {
+              streamFailed = true;
+            }
+
+            // Fallback automático: SSE falló → endpoint de búsqueda estándar
+            if (streamFailed) {
+              const convHistory = messages.slice(-8).map(m => `${m.role === "user" ? "Usuario" : "Shopy Crafter"}: ${m.content}`).join("\n\n");
+              const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
+              const fallbackRes = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
+                method: "POST", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode }),
+              });
+              if (fallbackRes.ok) {
+                const fd = await fallbackRes.json();
+                assistantContent = fd.answer ?? fd.result ?? "No pude procesar la respuesta.";
+              } else {
+                assistantContent = "❌ Gemini no disponible temporalmente. Prueba con **Auto** o **Claude**.";
+              }
             }
           }
 
