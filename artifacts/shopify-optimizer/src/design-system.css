@@ -2586,13 +2586,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .fp-pricing-dot {
   width: 10px; height: 10px; border-radius: 50%;
-  border: 1px solid rgba(200,168,75,0.3);
-  background: transparent; cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  border: 1.5px solid rgba(200,168,75,0.65);
+  background: rgba(200,168,75,0.18); cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
   padding: 0;
+  box-shadow: 0 0 4px rgba(200,168,75,0.2);
 }
-.fp-pricing-dot.active { background: var(--l-gold); border-color: var(--l-gold); }
-.fp-pricing-dot:hover { border-color: var(--l-gold); }
+.fp-pricing-dot.active {
+  background: var(--l-gold); border-color: var(--l-gold);
+  box-shadow: 0 0 8px rgba(200,168,75,0.55);
+  transform: scale(1.25);
+}
+.fp-pricing-dot:hover { border-color: var(--l-gold); background: rgba(200,168,75,0.35); }
 /* ─── PRICING CARD 3D FOUNDATION ─────────────────────── */
 .fp-pricing-card {
   padding: 16px 14px !important;

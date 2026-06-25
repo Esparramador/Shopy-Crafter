@@ -1195,6 +1195,344 @@ export const EFFECT_SNIPPETS: EffectSnippet[] = [
 .fx-sk-pct{color:__PRIMARY__;font-size:.75rem;font-weight:700;text-align:right;}`,
     js: `var io4=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){e.target.querySelectorAll('.fx-sk-bar').forEach(function(b){b.style.width=b.style.getPropertyValue('--w')||'70%';});io4.unobserve(e.target);}});},{threshold:.3});document.querySelectorAll('.fx-skills').forEach(function(el){io4.observe(el);});`,
   },
+
+  // ── 18 New Effects from code_wars_official ────────────────────────────────
+  {
+    id: "text_masking_image",
+    name: "Text Masking con Imagen",
+    category: "text_effects",
+    description: "Imagen visible sólo a través del texto — background-clip:text, sin deps",
+    libs: [],
+    html: '<h1 class="fx-img-mask">__NAME__</h1>',
+    css: `.fx-img-mask{font-family:__FONT__,sans-serif;font-size:clamp(4rem,14vw,10rem);font-weight:900;letter-spacing:-2px;margin:0;
+background-image:url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=900&q=80');
+background-size:cover;background-position:center;
+-webkit-background-clip:text;background-clip:text;
+-webkit-text-fill-color:transparent;color:transparent;
+animation:mask-pan 8s ease-in-out infinite alternate;}
+@keyframes mask-pan{from{background-position:0% 50%}to{background-position:100% 50%}}`,
+    js: "",
+  },
+  {
+    id: "birthday_card_animated",
+    name: "Tarjeta Cumpleaños Animada",
+    category: "celebration_effects",
+    description: "Tarjeta de cumpleaños kawaii con confetti y estrellas — CSS puro",
+    libs: [],
+    html: `<div class="fx-bday">
+  <div class="fx-bday-left">
+    <h2>Happy<br>Birthday!</h2>
+    <p class="fx-bday-date">🎂 __NAME__</p>
+    <button class="fx-bday-btn">__CTA__</button>
+  </div>
+  <div class="fx-bday-right">
+    <div class="fx-bday-circle">🎉</div>
+  </div>
+  <div class="fx-bday-stars"><span>✦</span><span>✦</span><span>✦</span><span>✦</span></div>
+</div>`,
+    css: `.fx-bday{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#fff0f3,#ffe8f0);border-radius:20px;padding:32px;gap:20px;font-family:__FONT__,sans-serif;position:relative;overflow:hidden;max-width:560px;}
+.fx-bday-left h2{font-size:2.4rem;font-weight:900;color:#d63384;line-height:1.1;margin:0 0 8px;}
+.fx-bday-date{color:#6c757d;font-size:.9rem;margin:0 0 16px;}
+.fx-bday-btn{background:__PRIMARY__;color:#fff;border:none;padding:10px 22px;border-radius:100px;font-weight:600;cursor:pointer;font-size:.9rem;}
+.fx-bday-circle{width:120px;height:120px;border-radius:50%;border:4px solid #d63384;display:flex;align-items:center;justify-content:center;font-size:3rem;animation:bday-spin 6s linear infinite;}
+@keyframes bday-spin{to{transform:rotate(360deg)}}
+.fx-bday-stars{position:absolute;inset:0;pointer-events:none;}
+.fx-bday-stars span{position:absolute;font-size:1.2rem;animation:star-float 3s ease-in-out infinite alternate;}
+.fx-bday-stars span:nth-child(1){top:12%;left:8%;animation-delay:0s;}
+.fx-bday-stars span:nth-child(2){top:20%;right:10%;animation-delay:.5s;}
+.fx-bday-stars span:nth-child(3){bottom:18%;left:15%;animation-delay:1s;}
+.fx-bday-stars span:nth-child(4){bottom:10%;right:8%;animation-delay:1.5s;}
+@keyframes star-float{from{transform:translateY(0) scale(1);}to{transform:translateY(-12px) scale(1.3);}}`,
+    js: "",
+  },
+  {
+    id: "dragon_cursor_trail",
+    name: "Trail de Cursor Dragón",
+    category: "interactive_effects",
+    description: "Rastro suave de partículas que sigue al cursor — Canvas 2D, sin deps",
+    libs: [],
+    html: '<canvas id="fx-dragon-trail" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>',
+    css: `body{cursor:none;}`,
+    js: `(function(){var c=document.getElementById('fx-dragon-trail');if(!c)return;var ctx=c.getContext('2d');c.width=window.innerWidth;c.height=window.innerHeight;window.addEventListener('resize',function(){c.width=window.innerWidth;c.height=window.innerHeight;});var trail=[];var mouse={x:-999,y:-999};window.addEventListener('mousemove',function(e){mouse.x=e.clientX;mouse.y=e.clientY;trail.push({x:e.clientX,y:e.clientY,r:8,a:1,hue:Math.random()*60+180});if(trail.length>60)trail.shift();});(function loop(){ctx.clearRect(0,0,c.width,c.height);trail.forEach(function(p,i){p.r*=0.95;p.a*=0.92;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='hsla('+p.hue+',80%,60%,'+p.a+')';ctx.shadowColor='hsla('+p.hue+',80%,60%,0.8)';ctx.shadowBlur=12;ctx.fill();});ctx.shadowBlur=0;requestAnimationFrame(loop);})();})();`,
+  },
+  {
+    id: "deadline_countdown",
+    name: "Barra de Deadline Animada",
+    category: "charts",
+    description: "Barra de progreso de cuenta regresiva con personajes — CSS + JS puro",
+    libs: [],
+    html: `<div class="fx-deadline">
+  <div class="fx-dl-bar-wrap"><div class="fx-dl-bar" id="fx-dl-bar"></div></div>
+  <div class="fx-dl-label">Deadline: <span id="fx-dl-days">7</span> días</div>
+</div>`,
+    css: `.fx-deadline{background:#111;border-radius:16px;padding:32px 24px;font-family:__FONT__,sans-serif;max-width:480px;}
+.fx-dl-bar-wrap{height:18px;background:#222;border-radius:100px;overflow:hidden;margin-bottom:12px;}
+.fx-dl-bar{height:100%;width:0%;background:linear-gradient(90deg,__PRIMARY__,#ff4757);border-radius:100px;transition:width 1s cubic-bezier(.215,.61,.355,1);}
+.fx-dl-label{color:rgba(255,255,255,.7);font-size:.9rem;text-align:center;}
+.fx-dl-label span{color:__PRIMARY__;font-weight:700;font-size:1.1rem;}`,
+    js: `(function(){var days=7,total=7;var bar=document.getElementById('fx-dl-bar');var lbl=document.getElementById('fx-dl-days');if(!bar||!lbl)return;function update(){var pct=((total-days)/total)*100;bar.style.width=Math.min(pct,100)+'%';lbl.textContent=days;}update();var iv=setInterval(function(){if(days<=0){clearInterval(iv);bar.style.background='#ff4757';lbl.textContent='¡Hoy!';return;}days--;update();},1200);})();`,
+  },
+  {
+    id: "interactive_card_gallery",
+    name: "Galería de Tarjetas Interactiva",
+    category: "cards",
+    description: "Tarjetas de destino con overlay de información al hover — CSS puro",
+    libs: [],
+    html: `<div class="fx-card-gallery">
+  <div class="fx-cg-card" style="background-image:url('https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&q=70')">
+    <div class="fx-cg-info"><h3>__NAME__</h3><p>__TAGLINE__</p><a class="fx-cg-link">__CTA__ →</a></div>
+  </div>
+  <div class="fx-cg-card" style="background-image:url('https://images.unsplash.com/photo-1533105079780-92b9be482077?w=400&q=70')">
+    <div class="fx-cg-info"><h3>Explore</h3><p>__USP_1__</p><a class="fx-cg-link">Discover →</a></div>
+  </div>
+</div>`,
+    css: `.fx-card-gallery{display:flex;gap:16px;flex-wrap:wrap;}
+.fx-cg-card{position:relative;width:240px;height:320px;border-radius:16px;background-size:cover;background-position:center;overflow:hidden;cursor:pointer;}
+.fx-cg-info{position:absolute;inset:0;padding:20px 16px;background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,0) 60%);display:flex;flex-direction:column;justify-content:flex-end;transform:translateY(60px);transition:transform .4s cubic-bezier(.215,.61,.355,1);}
+.fx-cg-card:hover .fx-cg-info{transform:translateY(0);}
+.fx-cg-info h3{color:#fff;font-family:__FONT__,sans-serif;font-size:1.2rem;margin:0 0 4px;}
+.fx-cg-info p{color:rgba(255,255,255,.7);font-size:.8rem;margin:0 0 10px;}
+.fx-cg-link{color:__PRIMARY__;font-size:.8rem;font-weight:600;text-decoration:none;font-family:__FONT__,sans-serif;}`,
+    js: "",
+  },
+  {
+    id: "avatar_scale_cursor",
+    name: "Cursor Avatar Escalado",
+    category: "interactive_effects",
+    description: "Cursor personalizado que crece sobre links y botones — JS + CSS",
+    libs: [],
+    html: '<div class="fx-cursor-ring" id="fx-cursor"></div>',
+    css: `.fx-cursor-ring{position:fixed;width:28px;height:28px;border:2px solid __PRIMARY__;border-radius:50%;pointer-events:none;z-index:99999;transition:transform .15s ease,border-color .15s ease,width .2s ease,height .2s ease;transform:translate(-50%,-50%);top:0;left:0;mix-blend-mode:difference;}
+.fx-cursor-ring.grow{width:52px;height:52px;border-color:__SECONDARY__;}
+.fx-cursor-ring.grow-small{width:18px;height:18px;}
+body{cursor:none;}`,
+    js: `(function(){var cur=document.getElementById('fx-cursor');if(!cur)return;window.addEventListener('mousemove',function(e){cur.style.left=e.clientX+'px';cur.style.top=e.clientY+'px';});document.querySelectorAll('a,button,[data-hover]').forEach(function(el){el.addEventListener('mouseenter',function(){cur.classList.add('grow');});el.addEventListener('mouseleave',function(){cur.classList.remove('grow');});});})();`,
+  },
+  {
+    id: "lightbulb_svg_toggle",
+    name: "Bombilla SVG Interactiva",
+    category: "animated_icons",
+    description: "Bombilla SVG que se enciende/apaga al hacer clic — CSS + JS puro",
+    libs: [],
+    html: `<div class="fx-bulb-wrap">
+  <svg class="fx-bulb" id="fx-bulb" viewBox="0 0 120 180" xmlns="http://www.w3.org/2000/svg">
+    <circle class="fx-bulb-glow" cx="60" cy="60" r="55" fill="none"/>
+    <path class="fx-bulb-body" d="M35 70 Q20 50 35 30 Q50 10 75 15 Q95 20 95 45 Q100 60 85 70 L82 100 Q82 108 60 108 Q38 108 38 100 Z" fill="#e8e8e8" stroke="#aaa" stroke-width="2"/>
+    <rect class="fx-bulb-base" x="43" y="108" width="34" height="8" rx="4" fill="#888"/>
+    <rect class="fx-bulb-base" x="46" y="118" width="28" height="8" rx="4" fill="#888"/>
+    <line class="fx-bulb-filament" x1="52" y1="65" x2="60" y2="80" stroke="#ccc" stroke-width="2.5" stroke-linecap="round"/>
+    <line class="fx-bulb-filament" x1="68" y1="65" x2="60" y2="80" stroke="#ccc" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+  <p class="fx-bulb-label">Click to toggle</p>
+</div>`,
+    css: `.fx-bulb-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;cursor:pointer;user-select:none;}
+.fx-bulb{width:120px;height:180px;transition:filter .4s ease;}
+.fx-bulb-wrap.on .fx-bulb{filter:drop-shadow(0 0 24px #ffe066) drop-shadow(0 0 48px #ffb700);}
+.fx-bulb-wrap.on .fx-bulb-body{fill:#fff9c4;stroke:#f5c400;}
+.fx-bulb-wrap.on .fx-bulb-glow{fill:rgba(255,230,50,.18);}
+.fx-bulb-wrap.on .fx-bulb-filament{stroke:#ff9800;stroke-width:3;}
+.fx-bulb-label{font-family:__FONT__,sans-serif;color:rgba(255,255,255,.6);font-size:.85rem;transition:color .4s;}
+.fx-bulb-wrap.on .fx-bulb-label{color:#ffe066;}`,
+    js: `(function(){var wrap=document.querySelector('.fx-bulb-wrap');if(!wrap)return;wrap.addEventListener('click',function(){wrap.classList.toggle('on');});})();`,
+  },
+  {
+    id: "futuristic_dark_toggle",
+    name: "Toggle Futurista Dark/Light",
+    category: "micro_interactions",
+    description: "Switch modo oscuro/claro estilo sci-fi con animación — CSS + JS",
+    libs: [],
+    html: `<div class="fx-toggle-wrap">
+  <span class="fx-toggle-label">DARK SIDE</span>
+  <button class="fx-toggle-btn" id="fx-theme-toggle" aria-label="Toggle theme">
+    <span class="fx-toggle-thumb"></span>
+  </button>
+  <span class="fx-toggle-label">LIGHT</span>
+</div>`,
+    css: `.fx-toggle-wrap{display:flex;align-items:center;gap:16px;font-family:__FONT__,sans-serif;}
+.fx-toggle-label{color:rgba(255,255,255,.7);font-size:.75rem;letter-spacing:.15em;font-weight:700;}
+.fx-toggle-btn{position:relative;width:72px;height:36px;background:linear-gradient(90deg,#1a1a2e,#16213e);border:1px solid __PRIMARY__;border-radius:100px;cursor:pointer;outline:none;transition:background .4s;box-shadow:0 0 12px __PRIMARY__40;}
+.fx-toggle-btn.light{background:linear-gradient(90deg,#e8c97c,#f5e88a);border-color:#e8c97c;box-shadow:0 0 16px rgba(232,201,124,.5);}
+.fx-toggle-thumb{position:absolute;top:4px;left:4px;width:28px;height:28px;border-radius:50%;background:__PRIMARY__;transition:transform .4s cubic-bezier(.215,.61,.355,1),background .4s;box-shadow:0 0 8px __PRIMARY__80;}
+.fx-toggle-btn.light .fx-toggle-thumb{transform:translateX(36px);background:#1a1a2e;}`,
+    js: `(function(){var btn=document.getElementById('fx-theme-toggle');if(!btn)return;btn.addEventListener('click',function(){btn.classList.toggle('light');document.body.classList.toggle('fx-light-mode');});})();`,
+  },
+  {
+    id: "glowing_color_buttons",
+    name: "Botones Neón Coloreados",
+    category: "micro_interactions",
+    description: "Botones con borde neon animado usando CSS custom properties — CSS puro",
+    libs: [],
+    html: `<div class="fx-glow-btns">
+  <a class="fx-glow-btn" style="--color:#00e5ff">__CTA__</a>
+  <a class="fx-glow-btn" style="--color:__PRIMARY__">__USP_1__</a>
+  <a class="fx-glow-btn" style="--color:#ff6b9d">__USP_2__</a>
+</div>`,
+    css: `.fx-glow-btns{display:flex;gap:20px;flex-wrap:wrap;}
+.fx-glow-btn{position:relative;display:inline-flex;align-items:center;padding:14px 32px;font-family:__FONT__,sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--color);border:2px solid var(--color);border-radius:4px;text-decoration:none;cursor:pointer;transition:color .4s,background .4s;overflow:hidden;box-shadow:0 0 10px var(--color),inset 0 0 10px transparent;}
+.fx-glow-btn::before,.fx-glow-btn::after{content:'';position:absolute;background:var(--color);}
+.fx-glow-btn::before{width:2px;height:0;top:0;left:20%;transition:height .4s;}
+.fx-glow-btn::after{width:0;height:2px;bottom:0;right:20%;transition:width .4s;}
+.fx-glow-btn:hover{color:#fff;background:var(--color);box-shadow:0 0 20px var(--color),0 0 40px var(--color);}
+.fx-glow-btn:hover::before{height:100%;}
+.fx-glow-btn:hover::after{width:60%;}`,
+    js: "",
+  },
+  {
+    id: "heart_canvas_burst",
+    name: "Corazón Canvas Animado",
+    category: "celebration_effects",
+    description: "Corazón con rayos animados en Canvas 2D usando requestAnimationFrame — puro JS",
+    libs: [],
+    html: '<canvas id="fx-heart-canvas" width="400" height="300" style="background:#000;border-radius:12px;display:block;"></canvas>',
+    css: ``,
+    js: `(function(){var c=document.getElementById('fx-heart-canvas');if(!c)return;var ctx=c.getContext('2d');var W=c.width,H=c.height,cx=W/2,cy=H/2;var lines=[];for(var i=0;i<80;i++){var a=Math.random()*Math.PI*2;lines.push({angle:a,len:0,speed:1.5+Math.random()*3,alpha:1,color:'hsl('+(Math.random()*30+340)+',80%,'+(50+Math.random()*20)+'%)'});}(function loop(){ctx.fillStyle='rgba(0,0,0,0.06)';ctx.fillRect(0,0,W,H);lines.forEach(function(l){l.len+=l.speed;l.alpha=Math.max(0,(1-l.len/140)*0.9);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(l.angle)*l.len,cy+Math.sin(l.angle)*l.len);ctx.strokeStyle=l.color;ctx.globalAlpha=l.alpha;ctx.lineWidth=1.5;ctx.stroke();ctx.globalAlpha=1;if(l.len>140){l.len=0;l.angle=Math.random()*Math.PI*2;}});var t=Date.now()/800;ctx.save();ctx.translate(cx,cy);ctx.scale(0.9+Math.sin(t)*0.1,0.9+Math.cos(t)*0.1);ctx.beginPath();ctx.moveTo(0,-10);ctx.bezierCurveTo(10,-22,28,-22,28,-8);ctx.bezierCurveTo(28,4,0,24,0,24);ctx.bezierCurveTo(0,24,-28,4,-28,-8);ctx.bezierCurveTo(-28,-22,-10,-22,0,-10);ctx.fillStyle='rgba(220,30,60,0.95)';ctx.fill();ctx.restore();requestAnimationFrame(loop);})();})();`,
+  },
+  {
+    id: "interactive_flower_canvas",
+    name: "Flor Interactiva Canvas",
+    category: "particle_effects",
+    description: "Flor paramétrica animada con Canvas 2D usando curvas Bézier — puro JS",
+    libs: [],
+    html: '<canvas id="fx-flower" width="420" height="420" style="background:#0a0a0f;border-radius:12px;display:block;"></canvas>',
+    css: ``,
+    js: `(function(){var c=document.getElementById('fx-flower');if(!c)return;var ctx=c.getContext('2d');var W=c.width,H=c.height,Cw=W/2,Ch=H/2;var Rx=120,Ry=120,kx=3.2,ky=2.8;var frames=0;(function loop(){frames+=0.3;var t=frames*0.01;ctx.clearRect(0,0,W,H);ctx.strokeStyle='rgba(0,210,200,0.55)';ctx.lineWidth=1.2;ctx.globalCompositeOperation='lighter';for(var i=0;i<360;i+=2){var rad=i*Math.PI/180;var rx2=Rx*Math.abs(Math.cos(kx*rad+t))+40;var ry2=Ry*Math.abs(Math.sin(ky*rad+t))+40;var x=Cw+rx2*Math.cos(kx*rad+Math.PI/2);var y=Ch+ry2*Math.sin(ky*rad+Math.PI/2);var x1=Cw+rx2*Math.sin(kx*rad+t);var y1=Ch-ry2*Math.cos(ky*rad+t);var x2=Cw+rx2*Math.sin(kx*rad+Math.PI);var y2=Ch-ry2*Math.cos(ky*rad+Math.PI);ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x1,y1,x2,y2);ctx.stroke();}ctx.globalCompositeOperation='source-over';requestAnimationFrame(loop);})();})();`,
+  },
+  {
+    id: "product_card_reveal",
+    name: "Tarjeta Producto con Reveal",
+    category: "cards",
+    description: "Tarjeta de producto con información que aparece al hover — CSS puro",
+    libs: [],
+    html: `<div class="fx-prod-card">
+  <div class="fx-prod-img" style="background:linear-gradient(135deg,__PRIMARY__20,__SECONDARY__30);"></div>
+  <div class="fx-prod-content">
+    <h2>__NAME__</h2>
+    <p>__TAGLINE__</p>
+    <a class="fx-prod-btn" href="#">__CTA__</a>
+  </div>
+</div>`,
+    css: `.fx-prod-card{position:relative;width:280px;height:360px;border-radius:20px;overflow:hidden;background:__SURFACE__;box-shadow:0 8px 40px rgba(0,0,0,.5);cursor:pointer;}
+.fx-prod-img{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .6s cubic-bezier(.215,.61,.355,1);}
+.fx-prod-card:hover .fx-prod-img{transform:scale(1.08);}
+.fx-prod-content{position:absolute;bottom:0;left:0;right:0;padding:20px;background:linear-gradient(to top,rgba(0,0,0,.9) 0%,transparent 100%);opacity:0;transform:translateY(20px);transition:opacity .5s,transform .5s;transition-delay:.05s;}
+.fx-prod-card:hover .fx-prod-content{opacity:1;transform:translateY(0);}
+.fx-prod-content h2{font-family:__FONT__,sans-serif;font-size:1.3rem;color:#fff;margin:0 0 6px;text-transform:uppercase;}
+.fx-prod-content p{color:rgba(255,255,255,.7);font-size:.8rem;margin:0 0 12px;}
+.fx-prod-btn{display:inline-block;padding:9px 20px;background:__PRIMARY__;color:#fff;border-radius:100px;font-family:__FONT__,sans-serif;font-size:.8rem;font-weight:700;text-decoration:none;}`,
+    js: "",
+  },
+  {
+    id: "neon_skew_button",
+    name: "Botón Neon con Trazo Diagonal",
+    category: "micro_interactions",
+    description: "Botón con borde neon y decoración diagonal animada — CSS puro",
+    libs: [],
+    html: '<div class="fx-neon-btns"><a class="fx-nb" href="#">__CTA__</a><a class="fx-nb fx-nb-2" href="#">__NAME__</a></div>',
+    css: `.fx-neon-btns{display:flex;gap:24px;flex-wrap:wrap;}
+.fx-nb{position:relative;display:inline-flex;align-items:center;padding:13px 30px;font-family:__FONT__,sans-serif;font-size:.9rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.25);border-radius:2px;text-decoration:none;z-index:1;overflow:hidden;transition:color .4s,border-color .4s;}
+.fx-nb i{position:absolute;display:block;background:__PRIMARY__;}
+.fx-nb::before{content:'';position:absolute;bottom:0;left:20%;width:10px;height:4px;background:__PRIMARY__;transform:translateX(-50%);skewX(325deg);transition:width .4s,left .4s;}
+.fx-nb::after{content:'';position:absolute;inset:2px;border:1px solid transparent;transition:border-color .3s;}
+.fx-nb:hover{color:#fff;border-color:__PRIMARY__;}
+.fx-nb:hover::before{width:20px;left:80%;}
+.fx-nb:hover::after{border-color:__PRIMARY__40;}
+.fx-nb-2{border-color:__SECONDARY__40;}.fx-nb-2:hover{border-color:__SECONDARY__;}
+.fx-nb-2::before{background:__SECONDARY__;}`,
+    js: "",
+  },
+  {
+    id: "color_swatch_product",
+    name: "Página Producto con Swatches",
+    category: "interactive_effects",
+    description: "Selector de color con vista previa dinámica para producto — CSS + JS puro",
+    libs: [],
+    html: `<div class="fx-swatches-wrap">
+  <div class="fx-sw-preview" id="fx-sw-preview"></div>
+  <div class="fx-sw-info">
+    <h2 class="fx-sw-name" id="fx-sw-name">__NAME__</h2>
+    <p class="fx-sw-price">__PRICE__</p>
+    <div class="fx-sw-colors" id="fx-sw-colors">
+      <span class="fx-sw-swatch active" data-color="#3674be" data-label="Ocean Blue" style="background:#3674be"></span>
+      <span class="fx-sw-swatch" data-color="#d42b81" data-label="Rose Red" style="background:#d42b81"></span>
+      <span class="fx-sw-swatch" data-color="#1a1a1a" data-label="Midnight" style="background:#1a1a1a"></span>
+      <span class="fx-sw-swatch" data-color="#e8c97c" data-label="Gold" style="background:#e8c97c"></span>
+    </div>
+    <button class="fx-sw-btn">__CTA__</button>
+  </div>
+</div>`,
+    css: `.fx-swatches-wrap{display:flex;gap:24px;flex-wrap:wrap;font-family:__FONT__,sans-serif;max-width:560px;}
+.fx-sw-preview{width:240px;height:300px;border-radius:16px;background:#3674be;transition:background .5s ease;flex-shrink:0;}
+.fx-sw-info{flex:1;min-width:180px;display:flex;flex-direction:column;gap:12px;}
+.fx-sw-name{font-size:1.4rem;font-weight:800;color:__TEXT__;margin:0;}
+.fx-sw-price{font-size:1.1rem;color:__PRIMARY__;font-weight:700;margin:0;}
+.fx-sw-colors{display:flex;gap:10px;}
+.fx-sw-swatch{width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform .2s,border-color .2s;}
+.fx-sw-swatch.active{border-color:#fff;transform:scale(1.2);}
+.fx-sw-btn{padding:12px 28px;background:__PRIMARY__;color:#fff;border:none;border-radius:100px;font-weight:700;cursor:pointer;font-family:__FONT__,sans-serif;}`,
+    js: `(function(){var swatches=document.querySelectorAll('.fx-sw-swatch');var preview=document.getElementById('fx-sw-preview');if(!preview)return;swatches.forEach(function(s){s.addEventListener('click',function(){document.querySelectorAll('.fx-sw-swatch').forEach(function(x){x.classList.remove('active');});s.classList.add('active');preview.style.background=s.dataset.color;});});})();`,
+  },
+  {
+    id: "threejs_galaxy",
+    name: "Galaxia de Partículas 3D",
+    category: "3d_effects",
+    description: "Galaxia espiral interactiva con Three.js — requiere three.min.js",
+    libs: ["https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"],
+    html: '<div id="fx-galaxy" style="width:100%;height:420px;border-radius:12px;overflow:hidden;background:#000;"></div>',
+    css: `#fx-galaxy canvas{display:block;}`,
+    js: `(function(){var container=document.getElementById('fx-galaxy');if(!container||!window.THREE)return;var W=container.clientWidth,H=container.clientHeight;var renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(W,H);renderer.setPixelRatio(Math.min(devicePixelRatio,2));container.appendChild(renderer.domElement);var scene=new THREE.Scene();var camera=new THREE.PerspectiveCamera(75,W/H,0.1,1000);camera.position.set(0,3,8);var geo=new THREE.BufferGeometry();var N=8000;var positions=new Float32Array(N*3);var colors=new Float32Array(N*3);for(var i=0;i<N;i++){var r=Math.random()*4+0.5;var spin=r*2;var branch=Math.floor(Math.random()*3)*(Math.PI*2/3);var rand=(Math.pow(Math.random(),3)*(Math.random()>.5?1:-1))*0.3;var angle=branch+spin;positions[i*3]=Math.cos(angle)*r+rand;positions[i*3+1]=(Math.random()-0.5)*0.5;positions[i*3+2]=Math.sin(angle)*r+rand;var mix=r/5;colors[i*3]=0.8-mix*0.4;colors[i*3+1]=0.4+mix*0.3;colors[i*3+2]=0.1+mix*0.9;}geo.setAttribute('position',new THREE.BufferAttribute(positions,3));geo.setAttribute('color',new THREE.BufferAttribute(colors,3));var mat=new THREE.PointsMaterial({size:0.02,sizeAttenuation:true,vertexColors:true,depthWrite:false,blending:THREE.AdditiveBlending});var galaxy=new THREE.Points(geo,mat);scene.add(galaxy);(function tick(){galaxy.rotation.y+=0.0015;renderer.render(scene,camera);requestAnimationFrame(tick);})();window.addEventListener('resize',function(){var nW=container.clientWidth;camera.aspect=nW/H;camera.updateProjectionMatrix();renderer.setSize(nW,H);});})();`,
+  },
+  {
+    id: "glassmorphism_login",
+    name: "Formulario Login Glassmorphism",
+    category: "forms_surveys",
+    description: "Login con fondo de escena y panel de vidrio esmerilado — CSS puro",
+    libs: [],
+    html: `<div class="fx-glass-login">
+  <div class="fx-gl-bg"></div>
+  <div class="fx-gl-form">
+    <h2>Sign In</h2>
+    <div class="fx-gl-field"><input type="text" placeholder="Username" /></div>
+    <div class="fx-gl-field"><input type="password" placeholder="Password" /></div>
+    <button class="fx-gl-btn">__CTA__</button>
+    <a class="fx-gl-link" href="#">Forgot Password?</a>
+  </div>
+</div>`,
+    css: `.fx-glass-login{position:relative;width:100%;min-height:380px;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.fx-gl-bg{position:absolute;inset:0;background:linear-gradient(135deg,#e8a87c 0%,#e07b39 40%,#c0392b 100%);opacity:.8;}
+.fx-gl-bg::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 80%,rgba(34,139,34,.3),transparent 60%);}
+.fx-gl-form{position:relative;z-index:1;background:rgba(255,255,255,0.18);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.35);border-radius:16px;padding:36px 32px;min-width:260px;display:flex;flex-direction:column;gap:16px;box-shadow:0 8px 40px rgba(0,0,0,.3);}
+.fx-gl-form h2{text-align:center;color:#fff;font-family:__FONT__,sans-serif;margin:0;font-size:1.4rem;}
+.fx-gl-field input{width:100%;padding:13px 16px;font-size:.95rem;color:#333;background:#fff;border:none;border-radius:8px;outline:none;font-family:__FONT__,sans-serif;box-sizing:border-box;}
+.fx-gl-btn{padding:13px;background:__PRIMARY__;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:__FONT__,sans-serif;font-size:.95rem;}
+.fx-gl-link{text-align:center;color:rgba(255,255,255,.8);font-size:.8rem;cursor:pointer;text-decoration:underline;font-family:__FONT__,sans-serif;}`,
+    js: "",
+  },
+  {
+    id: "holographic_ghost_card",
+    name: "Tarjeta Holográfica 3D",
+    category: "3d_effects",
+    description: "Tarjeta holográfica con efecto glow y tilt 3D — CSS + JS puro",
+    libs: [],
+    html: `<div class="fx-holo-card" id="fx-holo">
+  <div class="fx-holo-inner">
+    <div class="fx-holo-shine"></div>
+    <div class="fx-holo-content">
+      <div class="fx-holo-num">__PRICE__</div>
+      <h3 class="fx-holo-title">__NAME__</h3>
+      <p class="fx-holo-sub">__TAGLINE__</p>
+    </div>
+  </div>
+</div>`,
+    css: `.fx-holo-card{perspective:800px;display:inline-block;cursor:pointer;}
+.fx-holo-inner{position:relative;width:220px;height:320px;border-radius:20px;background:linear-gradient(135deg,#1a0030,#0d001a);border:1px solid rgba(180,100,255,.4);transform-style:preserve-3d;transition:transform .1s linear;overflow:hidden;box-shadow:0 0 30px rgba(180,100,255,.3),inset 0 0 30px rgba(180,100,255,.05);}
+.fx-holo-shine{position:absolute;inset:0;background:linear-gradient(135deg,transparent 40%,rgba(180,100,255,.15) 50%,transparent 60%);transform:translateX(-100%);transition:transform .6s ease;pointer-events:none;}
+.fx-holo-card:hover .fx-holo-shine{transform:translateX(100%);}
+.fx-holo-content{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:24px;background:linear-gradient(to top,rgba(100,0,180,.7) 0%,transparent 60%);}
+.fx-holo-num{font-family:monospace;font-size:1.3rem;letter-spacing:.15em;color:rgba(255,255,255,.5);margin-bottom:16px;}
+.fx-holo-title{font-family:__FONT__,sans-serif;font-size:1.4rem;font-weight:800;color:#fff;margin:0 0 4px;text-shadow:0 0 16px rgba(200,100,255,.8);}
+.fx-holo-sub{font-family:__FONT__,sans-serif;font-size:.8rem;color:rgba(255,255,255,.6);margin:0;}`,
+    js: `(function(){var card=document.getElementById('fx-holo');if(!card)return;var inner=card.querySelector('.fx-holo-inner');card.addEventListener('mousemove',function(e){var r=card.getBoundingClientRect();var x=((e.clientX-r.left)/r.width-.5)*28;var y=((e.clientY-r.top)/r.height-.5)*(-28);inner.style.transform='rotateY('+x+'deg) rotateX('+y+'deg)';});card.addEventListener('mouseleave',function(){inner.style.transform='rotateY(0) rotateX(0)';});})();`,
+  },
 ];
 
 // ── Visme templates (loaded lazily) ──────────────────────────────────────────
