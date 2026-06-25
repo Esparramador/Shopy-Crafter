@@ -79,16 +79,21 @@ export function OnboardingWidget() {
   const [routeMatch, routeParams] = useRoute("/projects/:id/*");
   const { position: dragPos, dragHandlers: widgetDragHandlers } = useDraggable({ storageKey: "onboarding", defaultBottom: 16, defaultRight: 16, dragFromAnywhere: false });
 
-  // Auto-collapse and detect mobile
+  // Auto-collapse and detect mobile (including landscape phones)
   useEffect(() => {
     const check = () => {
-      const mobile = window.innerWidth < 640;
+      const isLandscapePhone = window.innerHeight < 560 && window.matchMedia("(orientation: landscape)").matches;
+      const mobile = window.innerWidth < 640 || isLandscapePhone;
       setIsMobile(mobile);
       if (mobile) setCollapsed(true);
     };
     check();
     window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    window.addEventListener("orientationchange", check);
+    return () => {
+      window.removeEventListener("resize", check);
+      window.removeEventListener("orientationchange", check);
+    };
   }, []);
 
   const urlProjectId = routeMatch ? parseInt(routeParams.id) : null;

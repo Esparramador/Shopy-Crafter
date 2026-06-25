@@ -268,10 +268,15 @@ export function AppLayout({ children }: AppLayoutProps) {
     return () => clearInterval(t);
   }, [user?.role]);
 
-  const toggleDarkMode = () => {
-    setDarkMode(d => !d);
-    document.documentElement.setAttribute("data-theme", darkMode ? "light" : "dark");
-  };
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  }, [darkMode]);
+
+  const toggleDarkMode = () => setDarkMode(d => !d);
 
   return (
     <div className="app-shell">
