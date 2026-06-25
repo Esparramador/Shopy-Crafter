@@ -681,17 +681,12 @@ export default function PromptLibrary() {
   const LIMIT = 24;
 
   const loadItems = useCallback(async (key: string, q: string, off: number, append = false) => {
-    if (!key && !q.trim()) {
-      if (!append) setItems([]);
-      setHasMore(false);
-      setTotalInLib(0);
-      return;
-    }
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: String(LIMIT), offset: String(off) });
       if (key) params.set("library", key);
       if (q.trim()) params.set("search", q.trim());
+      if (!key && !q.trim()) params.set("all", "1");
       const r = await fetch(`${API_BASE}/api/fs-pro/prompt-library-master?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error("failed");
       const data = await r.json();
@@ -741,7 +736,8 @@ export default function PromptLibrary() {
   useEffect(() => {
     loadIndex();
     loadProjects();
-  }, [loadIndex, loadProjects]);
+    loadItems("", "", 0);
+  }, [loadIndex, loadProjects, loadItems]);
 
   const handleCategorySelect = (key: string) => {
     setActiveCategory(key);

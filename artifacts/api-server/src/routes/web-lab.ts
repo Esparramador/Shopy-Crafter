@@ -689,6 +689,32 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
   }
 });
 
+router.get("/web-lab/fetch-source", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const raw = String(req.query.url || "").trim();
+    if (!raw) { res.status(400).json({ error: "url requerida" }); return; }
+    const targetUrl = raw.startsWith("http") ? raw : `https://${raw}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ShopyCrafter/1.0; +https://shopycrafter.com)",
+        "Accept": "text/html,application/xhtml+xml,*/*",
+      },
+    }).finally(() => clearTimeout(timer));
+    if (!response.ok) { res.status(502).json({ error: `HTTP ${response.status} de ${targetUrl}` }); return; }
+    const ct = response.headers.get("content-type") || "";
+    if (!ct.includes("html") && !ct.includes("text")) {
+      res.status(415).json({ error: "La URL no devuelve HTML" }); return;
+    }
+    const html = await response.text();
+    res.json({ html: html.slice(0, 500_000) });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || "Error al obtener fuente" });
+  }
+});
+
 router.get("/web-lab/history/:projectId", async (req: Request, res: Response): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId));

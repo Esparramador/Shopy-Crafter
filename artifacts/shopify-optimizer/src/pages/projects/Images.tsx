@@ -793,6 +793,8 @@ export default function ImagesPage() {
   const { data: enginesData } = useListImageEngines();
   const engines = (enginesData as { engines?: Array<{ id: string; label: string; model: string; cost: number; description?: string }> } | undefined)?.engines ?? [];
 
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+
   const [bulkJobId, setBulkJobId] = useState<string | null>(() => {
     try {
       const saved = localStorage.getItem(`img-bulk-${projectId}`);
@@ -1320,14 +1322,18 @@ export default function ImagesPage() {
                           <>
                             {imageUrl && (
                               <>
-                                <a
-                                  href={imageUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                <button
+                                  onClick={() => {
+                                    if (imageUrl.startsWith("data:") || imageUrl.startsWith("blob:")) {
+                                      setLightboxImg(imageUrl);
+                                    } else {
+                                      window.open(imageUrl, "_blank", "noreferrer");
+                                    }
+                                  }}
                                   className="w-full text-xs bg-white/10 text-foreground px-2 py-1.5 rounded-lg font-medium hover:bg-white/20 flex items-center justify-center gap-1"
                                 >
                                   <Eye className="w-3 h-3" /> Ver
-                                </a>
+                                </button>
                                 <button
                                   onClick={() =>
                                     downloadDataUri(
@@ -1413,6 +1419,13 @@ export default function ImagesPage() {
           );
         })()}
       </AnimatePresence>
+      {lightboxImg && (
+        <ImageLightbox
+          src={lightboxImg}
+          onClose={() => setLightboxImg(null)}
+          onDownload={() => downloadDataUri(lightboxImg, `imagen-${Date.now()}.${extFromDataUri(lightboxImg)}`)}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useRoute } from "wouter";
 import { Loader2, Upload, Box, Wand2, Image, Layers, Play, Download, RefreshCw, ChevronRight, CheckCircle2, AlertCircle, Zap, Info } from "lucide-react";
+
 
 const API = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -267,6 +268,17 @@ export default function Tripo3DStudio() {
   const previewImg = result?.output?.rendered_image;
   const animModelUrl = animResult?.output?.model;
   const animPreviewImg = animResult?.output?.rendered_image;
+  const [viewerMode, setViewerMode] = useState<"img" | "3d">("3d");
+
+  // Load model-viewer web component once
+  useEffect(() => {
+    if (document.getElementById("model-viewer-script")) return;
+    const s = document.createElement("script");
+    s.id = "model-viewer-script";
+    s.type = "module";
+    s.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
+    document.head.appendChild(s);
+  }, []);
 
   const filteredAnims = animations.filter(a => a.category === animCat);
 
@@ -650,7 +662,48 @@ export default function Tripo3DStudio() {
               {/* Result preview */}
               {status === "done" && result && (
                 <div className="space-y-2 pt-2 border-t border-white/5">
-                  {previewImg && <img src={previewImg} alt="preview" style={{ width: "100%", borderRadius: 8, objectFit: "contain", background: "#0a0a12" }} />}
+                  {/* Toggle image/3D viewer */}
+                  {(modelUrl || previewImg) && (
+                    <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                      {modelUrl && (
+                        <button
+                          onClick={() => setViewerMode("3d")}
+                          style={{ padding: "4px 10px", borderRadius: 6, border: "none", fontSize: 11, cursor: "pointer", background: viewerMode === "3d" ? "var(--sc-ai-azure)" : "rgba(255,255,255,0.08)", color: viewerMode === "3d" ? "#fff" : "rgba(255,255,255,0.5)", transition: "all 0.2s" }}
+                        >
+                          🔮 Vista 3D
+                        </button>
+                      )}
+                      {previewImg && (
+                        <button
+                          onClick={() => setViewerMode("img")}
+                          style={{ padding: "4px 10px", borderRadius: 6, border: "none", fontSize: 11, cursor: "pointer", background: viewerMode === "img" ? "var(--sc-ai-azure)" : "rgba(255,255,255,0.08)", color: viewerMode === "img" ? "#fff" : "rgba(255,255,255,0.5)", transition: "all 0.2s" }}
+                        >
+                          🖼️ Preview
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {/* 3D interactive viewer */}
+                  {viewerMode === "3d" && modelUrl ? (
+                    <div style={{ width: "100%", aspectRatio: "1", borderRadius: 10, overflow: "hidden", background: "#07071a", border: "1px solid rgba(59,130,246,0.2)", position: "relative" }}>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {React.createElement("model-viewer" as any, {
+                        src: modelUrl,
+                        "auto-rotate": "true",
+                        "camera-controls": "true",
+                        "shadow-intensity": "1",
+                        "environment-image": "neutral",
+                        style: { width: "100%", height: "100%", background: "transparent" },
+                        alt: "Modelo 3D generado",
+                        loading: "eager",
+                      })}
+                      <div style={{ position: "absolute", bottom: 8, left: 8, fontSize: 9, color: "rgba(59,130,246,0.6)", pointerEvents: "none" }}>
+                        🖱 Arrastra para rotar · Scroll para zoom
+                      </div>
+                    </div>
+                  ) : previewImg ? (
+                    <img src={previewImg} alt="preview" style={{ width: "100%", borderRadius: 8, objectFit: "contain", background: "#0a0a12" }} />
+                  ) : null}
                   {modelUrl && (
                     <a href={modelUrl} target="_blank" rel="noreferrer" className="sc-form-button flex items-center justify-center gap-2" style={{ textDecoration: "none", fontSize: 13, padding: "8px 14px" }}>
                       <Download size={13} /> Descargar modelo 3D

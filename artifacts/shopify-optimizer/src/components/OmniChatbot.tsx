@@ -121,13 +121,31 @@ function classifyUrl(url: string): { type: string; icon: React.ReactNode; label:
   return { type: "url", icon: <Globe size={12} />, label: "Web URL" };
 }
 
+const URL_REGEX = /https?:\/\/[^\s\])"'>]+/g;
+
 function formatMessage(content: string): React.ReactNode {
-  return content.split(/(\*\*[^*]+\*\*|`[^`]+`|\n)/g).map((part, i) => {
+  const parts = content.split(/(\*\*[^*]+\*\*|`[^`]+`|\n|https?:\/\/[^\s\])"'>]+)/g);
+  return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**"))
       return <strong key={i} style={{ color: "var(--gold)", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
     if (part.startsWith("`") && part.endsWith("`"))
       return <code key={i} style={{ background: "var(--ink3)", padding: "1px 5px", borderRadius: 4, fontSize: 11, fontFamily: "monospace", color: "var(--jade)" }}>{part.slice(1, -1)}</code>;
     if (part === "\n") return <br key={i} />;
+    if (URL_REGEX.test(part)) {
+      URL_REGEX.lastIndex = 0;
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: "var(--gold)", textDecoration: "underline", wordBreak: "break-all" }}
+          onClick={(e) => { e.stopPropagation(); window.open(part, "_blank", "noreferrer"); e.preventDefault(); }}
+        >
+          {part}
+        </a>
+      );
+    }
     return part;
   });
 }
@@ -959,6 +977,7 @@ const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la pla
 • Detecta el estado emocional del usuario: si hay frustración, valídala primero ("Entiendo que es frustrante...") antes de dar la solución
 • Haz preguntas de seguimiento cuando necesites contexto, pero sólo UNA por mensaje
 • Termina SIEMPRE con un siguiente paso concreto o acción que el usuario pueda hacer ahora mismo
+• Puedes hacer humor negro, ironía y sarcasmo cuando el usuario lo pide o está claro por contexto que es el registro buscado — mantenlo ingenioso, no cruel
 
 ═══ CAPACIDADES ═══
 • 3 motores de análisis: Google Search (tiempo real), Claude (razonamiento estratégico), Memoria permanente (contexto acumulado)
@@ -1163,17 +1182,21 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     if (!cleaned.trim()) return;
     const utter = new SpeechSynthesisUtterance(cleaned);
     utter.lang = "es-ES";
-    utter.rate = 0.93;
-    utter.pitch = 1.06;
+    utter.rate = 0.88;
+    utter.pitch = 1.0;
+    utter.volume = 1.0;
     const trySpeak = () => {
       const voices = window.speechSynthesis.getVoices();
       if (voices.length > 0) {
-        const best = voices.find(v => v.lang.startsWith("es") && (
-          v.name.includes("Google") || v.name.includes("Microsoft") ||
-          v.name.includes("Paulina") || v.name.includes("Monica") ||
-          v.name.includes("Jorge") || v.name.includes("Conchita") ||
-          v.name.includes("Sabina") || v.name.includes("Diego")
-        )) || voices.find(v => v.lang.startsWith("es"));
+        const best =
+          voices.find(v => v.lang === "es-ES" && v.name.includes("Google español de España")) ||
+          voices.find(v => v.lang === "es-ES" && v.name.includes("Conchita")) ||
+          voices.find(v => v.lang === "es-ES" && v.name.includes("Monica")) ||
+          voices.find(v => v.lang === "es-ES" && v.name.includes("Sabina")) ||
+          voices.find(v => v.lang === "es-ES" && (v.name.includes("Google") || v.name.includes("Microsoft"))) ||
+          voices.find(v => v.lang === "es-ES") ||
+          voices.find(v => v.lang.startsWith("es") && !v.lang.includes("MX") && !v.lang.includes("US")) ||
+          voices.find(v => v.lang.startsWith("es"));
         if (best) utter.voice = best;
       }
       utter.onend = () => {
@@ -1823,18 +1846,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     setInput(""); setAttachFile(null); setAttachFiles([]); setAttachUrl(""); setShowAttach(false);
     setLoading(true);
 
-    // ── Pre-abrir una pestaña EN BLANCO dentro del gesto del usuario si la
-    // intención parece "abrir/reproducir/visitar una web". Así, cuando el backend
-    // resuelva la URL real (p.ej. vídeo de YouTube), la navegamos sin que el
-    // bloqueador de pop-ups la cierre (window.open tras await sería bloqueado).
-    const openIntent =
-      /\bhttps?:\/\//i.test(content) ||
-      /\b(abre|abrir|ábre| abreme|ábreme|pon|ponme|reproduce|reproducir|reprodúce|play|escucha|escuchar|open|visita|visitar|navega|navegar|ve a|youtube)\b/i.test(content);
-    if (openIntent) {
-      try { pendingTabRef.current = window.open("about:blank", "_blank"); } catch { pendingTabRef.current = null; }
-    } else {
-      pendingTabRef.current = null;
-    }
+    pendingTabRef.current = null;
     let resolvedOpenUrl: string | undefined;
 
     const fetchWithTimeout = (url: string, opts: RequestInit, timeoutMs = 120000): Promise<Response> => {
@@ -2203,17 +2215,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return [...filtered, { id: uuid(), role: "assistant" as const, content: displayMsg, timestamp: new Date() }];
       });
     } finally {
-      // Navegar la pestaña pre-abierta a la URL resuelta, o cerrarla si no hubo.
-      if (pendingTabRef.current) {
-        try {
-          if (resolvedOpenUrl) {
-            pendingTabRef.current.location.href = resolvedOpenUrl;
-          } else {
-            pendingTabRef.current.close();
-          }
-        } catch { /* la pestaña pudo cerrarse manualmente */ }
-        pendingTabRef.current = null;
+      // Si se resolvió una URL durante la respuesta, abrirla directamente ahora
+      // (estamos en el finally del evento de usuario original, el bloqueador no aplica).
+      if (resolvedOpenUrl) {
+        try { window.open(resolvedOpenUrl, "_blank", "noreferrer"); } catch {}
       }
+      pendingTabRef.current = null;
       setLoading(false);
       abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 100);

@@ -109,7 +109,7 @@ async function ensureBillingPlansTable(): Promise<void> {
 ensureBillingPlansTable();
 
 // ── Seed canonical plans once per deploy (idempotent via version tag) ─────────
-const CANONICAL_SEED_VERSION = "v9-canonical-5plans-2026";
+const CANONICAL_SEED_VERSION = "v10-canonical-5plans-2026";
 const CANONICAL_BILLING_PLANS = [
   {
     id: "emprendedor",

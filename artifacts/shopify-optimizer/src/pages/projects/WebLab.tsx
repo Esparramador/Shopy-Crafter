@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { scoreColor } from "@/lib/utils";
 import { LiveOperation } from "@/components/LiveOperation";
 
@@ -725,6 +725,7 @@ function Effects3DPanel({ data, activeTab, setActiveTab, copied, setCopied }: {
 }
 
 function WebLabInner({ projectId }: { projectId: number }) {
+  const [, navigate] = useLocation();
   const [labMode, setLabMode] = useState<"analysis" | "demos">("analysis");
   const [url, setUrl] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -970,8 +971,10 @@ function WebLabInner({ projectId }: { projectId: number }) {
     }
   }, [stitchPrompt, stitchPageType, stitchProjectId, brandName, loadHistory]);
 
-  const analyzeDna = useCallback(async () => {
-    if (!dnaUrl.trim()) return;
+  const analyzeDna = useCallback(async (urlOverride?: string) => {
+    const targetUrl = (urlOverride ?? dnaUrl).trim();
+    if (!targetUrl) return;
+    if (urlOverride) setDnaUrl(urlOverride);
     setDnaAnalyzing(true);
     setDnaProgress([{ text: "Iniciando análisis…", status: "info" }]);
     setDnaDna(null);
@@ -983,7 +986,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ url: dnaUrl.trim(), deep: dnaDeep }),
+        body: JSON.stringify({ url: targetUrl, deep: dnaDeep }),
       });
       if (!res.ok || !res.body) {
         const d = await res.json().catch(() => ({})) as any;
@@ -1016,6 +1019,41 @@ function WebLabInner({ projectId }: { projectId: number }) {
       setDnaAnalyzing(false);
     }
   }, [dnaUrl, dnaDeep]);
+
+  const autoScanUrlSecrets = useCallback(async (targetUrl: string) => {
+    if (!targetUrl.trim()) return;
+    setSecretsLoading(true);
+    setSecretsError("");
+    setSecretsInput("Obteniendo código fuente de " + targetUrl + "…");
+    try {
+      const res = await fetch(`${API_BASE}/api/web-lab/fetch-source?url=${encodeURIComponent(targetUrl)}`, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { html } = await res.json();
+      setSecretsInput(html || "");
+      if (html) {
+        // auto-run scanner with fetched HTML
+        setSecretsLoading(false);
+        const content = html.trim();
+        if (content) {
+          const r2 = await fetch(`${API_BASE}/api/weblab/scan-secrets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ content }),
+          });
+          if (r2.ok) {
+            const d = await r2.json();
+            setSecretsReport(d);
+          }
+        }
+      }
+    } catch (e: any) {
+      setSecretsInput("");
+      setSecretsError(`No se pudo obtener el código fuente: ${e.message}. Pega el HTML manualmente.`);
+    } finally {
+      setSecretsLoading(false);
+    }
+  }, []);
 
   const generateDnaRedesign = useCallback(async () => {
     if (!dnaDna) return;
@@ -1609,60 +1647,45 @@ ${body}
             {deepScanLoading ? "Escaneando…" : deepScan ? "✅ Re-escanear" : "🔍 Escaneo Profundo"}
           </button>
           <button
-            onClick={generate3dEffects}
-            disabled={effects3dLoading || (!url.trim() && !a?.improvedCss)}
-            title="Genera código listo: GSAP ScrollTrigger, CSS 3D, Three.js, Vista Explosionada, Parallax Inmersivo"
-            style={{
-              padding: "12px 18px",
-              background: effects3dLoading ? "#333" : effects3d ? "linear-gradient(135deg, #7c3aed22, #6d28d922)" : "transparent",
-              border: effects3d ? "1px solid #7c3aed55" : "1px solid var(--border, #333)",
-              borderRadius: 10,
-              color: effects3dLoading ? "#555" : effects3d ? "#a78bfa" : "var(--t2, #aaa)",
-              cursor: effects3dLoading || (!url.trim() && !a?.improvedCss) ? "not-allowed" : "pointer",
-              fontSize: 13,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {effects3dLoading ? "Generando…" : effects3d ? "✨ Re-generar 3D" : "✨ Efectos 3D"}
-          </button>
-          <button
-            onClick={() => setShowScratch(s => !s)}
+            onClick={() => navigate("/admin/web-designer")}
+            title="Diseñador Web con IA — genera páginas completas con efectos 3D, GSAP, Three.js y más"
             style={{
               padding: "12px 16px",
-              background: showScratch ? "linear-gradient(135deg, #d4a843, #b8860b)" : "transparent",
+              background: "transparent",
               border: "1px solid var(--border, #333)",
               borderRadius: 10,
-              color: showScratch ? "#000" : "var(--t2, #aaa)",
+              color: "var(--t2, #aaa)",
               cursor: "pointer",
               fontSize: 13,
-              fontWeight: showScratch ? 700 : 400,
+              whiteSpace: "nowrap",
             }}
           >
             ✨ Crear desde cero
           </button>
           <button
-            onClick={() => {
-              const next = !showStitch;
-              setShowStitch(next);
-              if (next && stitchStatus === "unknown") checkStitchStatus();
-            }}
-            title="Google Stitch AI — genera landing pages, product pages y páginas completas con HTML/Tailwind desde un prompt"
+            onClick={() => navigate("/admin/web-designer")}
+            title="Diseñador Web con IA — Google Stitch, Claude, Gemini para páginas completas"
             style={{
               padding: "12px 16px",
-              background: showStitch ? "linear-gradient(135deg, #3b82f6, #1d4ed8)" : "transparent",
-              border: showStitch ? "none" : "1px solid var(--border, #333)",
+              background: "transparent",
+              border: "1px solid var(--border, #333)",
               borderRadius: 10,
-              color: showStitch ? "#fff" : "var(--t2, #aaa)",
+              color: "var(--t2, #aaa)",
               cursor: "pointer",
               fontSize: 13,
-              fontWeight: showStitch ? 700 : 400,
               whiteSpace: "nowrap",
             }}
           >
             🪡 Stitch AI
           </button>
           <button
-            onClick={() => setShowDna(s => !s)}
+            onClick={() => {
+              const next = !showDna;
+              setShowDna(next);
+              if (next && url.trim()) {
+                analyzeDna(url.trim());
+              }
+            }}
             title="Extrae paleta, fuentes, tagline, CTA e investiga la marca en paralelo — genera un rediseño premium con Claude streaming"
             style={{
               padding: "12px 16px",
@@ -1679,8 +1702,14 @@ ${body}
             🧬 Extractor DNA
           </button>
           <button
-            onClick={() => setShowSecrets(s => !s)}
-            title="Pega HTML o código JS y detecta API Keys, tokens y credenciales expuestas con 30+ patrones — Stripe, OpenAI, AWS, GitHub, Shopify…"
+            onClick={() => {
+              const next = !showSecrets;
+              setShowSecrets(next);
+              if (next && url.trim()) {
+                autoScanUrlSecrets(url.trim());
+              }
+            }}
+            title="Escanea automáticamente la URL y detecta API Keys, tokens y credenciales expuestas con 30+ patrones"
             style={{
               padding: "12px 16px",
               background: showSecrets ? "linear-gradient(135deg, #ef4444, #b91c1c)" : "transparent",
@@ -1899,7 +1928,7 @@ ${body}
               Investigación profunda
             </label>
             <button
-              onClick={analyzeDna}
+              onClick={() => analyzeDna()}
               disabled={dnaAnalyzing || !dnaUrl.trim()}
               style={{
                 padding: "10px 22px",
