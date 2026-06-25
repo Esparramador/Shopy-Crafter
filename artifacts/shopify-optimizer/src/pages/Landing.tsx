@@ -1069,7 +1069,7 @@ export default function Landing() {
                       {plan.id === "personalizado" && <div className="pc-roi-badge">🤝 Solución 100% a medida</div>}
                       <div style={{ position: "relative", zIndex: 2 }}>
                         <div className="l-pricing-price">{plan.priceMonthly === 0 ? <span style={{ fontSize: "0.55em", letterSpacing: "-1px" }}>A medida</span> : <>{plan.currency}{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</>}</div>
-                        <div className="pc-annual-pill" style={{ opacity: billingPeriod === "annual" && plan.priceMonthly > 0 ? 1 : 0, pointerEvents: billingPeriod === "annual" && plan.priceMonthly > 0 ? "auto" : "none", transition: "opacity 0.3s ease", minHeight: "22px" }}>
+                        <div className={`pc-annual-pill${billingPeriod === "annual" && plan.priceMonthly > 0 ? " visible" : ""}`}>
                           <span className="pc-annual-pill-pct">−17%</span>
                           <span className="pc-annual-pill-txt">{plan.currency}{plan.priceAnnual > 0 ? plan.priceAnnual : "—"}/año · ahorras {plan.currency}{plan.priceMonthly * 2}</span>
                         </div>

@@ -2732,21 +2732,35 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 2px 8px; white-space: nowrap;
 }
 /* ─── ANNUAL SAVINGS PILL ON EACH PRICING CARD ──────────── */
+/* Hidden by default — collapses to 0px so it never pushes card content */
 .pc-annual-pill {
   display: flex; align-items: center; gap: 7px;
-  justify-content: center; margin-top: 6px; margin-bottom: 2px;
-  min-height: 26px;
-  padding: 4px 10px;
+  justify-content: center;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin-top: 0; margin-bottom: 0;
+  padding: 0 10px;
   background: rgba(45,212,159,0.07);
-  border: 1px solid rgba(45,212,159,0.18);
+  border: 1px solid transparent;
   border-radius: 10px;
+  pointer-events: none;
+  transition: max-height 0.35s ease, opacity 0.3s ease, margin 0.3s ease, padding 0.3s ease, border-color 0.3s ease;
+}
+/* Visible when annual period is active */
+.pc-annual-pill.visible {
+  max-height: 40px;
+  opacity: 1;
+  margin-top: 6px; margin-bottom: 2px;
+  padding: 4px 10px;
+  border-color: rgba(45,212,159,0.18);
+  pointer-events: auto;
 }
 .pc-annual-pill-pct {
   font-size: 12px; font-weight: 900; letter-spacing: .5px;
   background: linear-gradient(135deg, #2dd49f, #5bddb4);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   background-clip: text;
-  border-radius: 99px;
   white-space: nowrap;
 }
 .pc-annual-pill-txt {
