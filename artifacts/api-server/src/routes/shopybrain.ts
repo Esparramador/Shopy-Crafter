@@ -11618,4 +11618,95 @@ router.post("/shopybrain/upload", requireAdmin, upload.array("file", 10), async 
   }
 });
 
+// ─── GEMINI STREAM SSE ────────────────────────────────────────────────────────
+// Endpoint para streaming real de Gemini hacia el chatbot admin.
+// Emite eventos SSE: data: {"text":"..."} y data: {"done":true,"sources":[...]}
+router.post("/shopybrain/gemini-stream", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { messages, systemPrompt, thinkingBudget = 0, useSearch = true, useProModel = false } = req.body as {
+      messages?: Array<{ role: "user" | "assistant"; content: string }>;
+      systemPrompt?: string;
+      thinkingBudget?: number;
+      useSearch?: boolean;
+      useProModel?: boolean;
+    };
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      res.status(400).json({ error: "messages requerido" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+
+    const { askGeminiStream } = await import("../lib/gemini.js");
+    const sysInstr = systemPrompt ?? "Eres Shopy Crafter, asistente experto de eCommerce Shopify. Responde SIEMPRE en español. Sé directo y accionable.";
+
+    const generator = askGeminiStream(messages, sysInstr, { useProModel, thinkingBudget, useSearch });
+
+    for await (const chunk of generator) {
+      if (res.destroyed) break;
+      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      (res as any).flush?.();
+    }
+
+    if (!res.destroyed) res.end();
+  } catch (err) {
+    logger.error({ err }, "[gemini-stream] Error");
+    if (!res.headersSent) res.status(500).json({ error: String(err) });
+    else {
+      res.write(`data: ${JSON.stringify({ error: String(err), done: true })}\n\n`);
+      res.end();
+    }
+  }
+});
+
+// ─── GEMINI IMAGEN NATIVA ─────────────────────────────────────────────────────
+// Genera imágenes con el modelo nativo de imagen de Gemini.
+router.post("/shopybrain/gemini-image", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { prompt, model } = req.body as { prompt?: string; model?: string };
+    if (!prompt?.trim()) {
+      res.status(400).json({ error: "prompt requerido" });
+      return;
+    }
+
+    const { askGeminiGenerateImage } = await import("../lib/gemini.js");
+    const result = await askGeminiGenerateImage(prompt.trim(), model);
+
+    res.json({
+      success: true,
+      b64_json: result.b64_json,
+      mimeType: result.mimeType,
+      dataUrl: `data:${result.mimeType};base64,${result.b64_json}`,
+    });
+  } catch (err) {
+    logger.error({ err }, "[gemini-image] Error");
+    handleRouteError(res, err);
+  }
+});
+
+// ─── GEMINI CODE EXECUTION ────────────────────────────────────────────────────
+// Activa la tool codeExecution de Gemini para análisis de datos con Python real.
+router.post("/shopybrain/gemini-code", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { prompt, systemInstruction } = req.body as { prompt?: string; systemInstruction?: string };
+    if (!prompt?.trim()) {
+      res.status(400).json({ error: "prompt requerido" });
+      return;
+    }
+
+    const { askGeminiWithCode } = await import("../lib/gemini.js");
+    const result = await askGeminiWithCode(prompt.trim(), systemInstruction);
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    logger.error({ err }, "[gemini-code] Error");
+    handleRouteError(res, err);
+  }
+});
+
 export default router;

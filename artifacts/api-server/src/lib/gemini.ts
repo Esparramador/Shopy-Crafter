@@ -1052,4 +1052,137 @@ export async function askGeminiVisionJson<T = unknown>(
   }
 }
 
+// ─── STREAMING para el chatbot admin ─────────────────────────────────────────
+// Devuelve un async-generator que emite { text } chunks conforme llegan.
+// Soporta Google Search grounding y thinkingBudget.
+export async function* askGeminiStream(
+  messages: GeminiChatMessage[],
+  systemInstruction?: string,
+  opts: { useProModel?: boolean; thinkingBudget?: number; useSearch?: boolean } = {},
+): AsyncGenerator<{ text?: string; done?: boolean; sources?: string[]; error?: string }> {
+  const { useProModel = false, thinkingBudget = 0, useSearch = false } = opts;
+
+  const contents = messages
+    .filter(m => m.content && (m.role === "user" || m.role === "assistant"))
+    .map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+
+  if (contents.length === 0) { yield { done: true }; return; }
+
+  const ai = getGeminiClient();
+  const model = useProModel ? geminiPro() : geminiFast();
+
+  const config: Record<string, unknown> = { maxOutputTokens: 65_536 };
+  if (systemInstruction) config.systemInstruction = systemInstruction;
+  if (thinkingBudget > 0) config.thinkingConfig = { thinkingBudget };
+  if (useSearch) {
+    config.tools = [{ googleSearch: { dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.0 } } }];
+  }
+
+  try {
+    const stream = await ai.models.generateContentStream({ model, contents, config });
+    const allSources: string[] = [];
+
+    for await (const chunk of stream) {
+      const text = chunk.text;
+      if (text) yield { text };
+
+      // Extraer sources de grounding si hay
+      const cand = (chunk as any).candidates?.[0];
+      const gm = cand?.groundingMetadata as Record<string, unknown> | undefined;
+      const chunks = gm?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
+      if (chunks) {
+        for (const c of chunks) { if (c.web?.uri) allSources.push(c.web.uri); }
+      }
+    }
+
+    yield { done: true, sources: [...new Set(allSources)] };
+  } catch (err) {
+    logger.error({ err: String(err) }, "[askGeminiStream] Error");
+    yield { error: String(err) };
+    yield { done: true };
+  }
+}
+
+// ─── GENERACIÓN DE IMÁGENES NATIVA GEMINI ─────────────────────────────────────
+// Usa el modelo de imagen nativo de Gemini (gemini-2.5-flash-image o alias del catálogo).
+// Devuelve { b64_json, mimeType } compatible con el resto de la plataforma.
+export async function askGeminiGenerateImage(
+  prompt: string,
+  modelOverride?: string,
+): Promise<{ b64_json: string; mimeType: string }> {
+  const ai = getGeminiClient();
+  // Primer intento: modelo del catálogo (gemini-3.1-flash-image o el configurado)
+  const candidates = modelOverride
+    ? [modelOverride]
+    : [pickModelSync("gemini", "vision"), "gemini-2.5-flash-image", "gemini-3.1-flash-image"];
+
+  for (const imageModel of candidates) {
+    try {
+      const response = await withTimeout(
+        ai.models.generateContent({
+          model: imageModel,
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          config: { responseModalities: ["IMAGE", "TEXT"] } as any,
+        }),
+        60_000,
+        `askGeminiGenerateImage(${imageModel})`
+      );
+
+      const candidate = response.candidates?.[0];
+      for (const part of (candidate?.content?.parts ?? [])) {
+        const p = part as any;
+        if (p.inlineData?.data) {
+          logger.info({ model: imageModel }, "[Gemini Image] Generated successfully");
+          return { b64_json: p.inlineData.data, mimeType: p.inlineData.mimeType || "image/png" };
+        }
+      }
+      // Si no hay imagen inline, intentar con el siguiente modelo
+      logger.warn({ model: imageModel }, "[Gemini Image] No inline image in response — trying next model");
+    } catch (err) {
+      logger.warn({ model: imageModel, err: String(err) }, "[Gemini Image] Model failed — trying next");
+    }
+  }
+  throw new Error("Gemini no pudo generar la imagen con ninguno de los modelos disponibles");
+}
+
+// ─── CODE EXECUTION TOOL ──────────────────────────────────────────────────────
+// Activa la tool codeExecution de Gemini para ejecutar código Python real
+// (análisis de datos, cálculos, gráficas). Devuelve texto, código y output.
+export async function askGeminiWithCode(
+  prompt: string,
+  systemInstruction?: string,
+): Promise<{ text: string; code: string; output: string }> {
+  const ai = getGeminiClient();
+  const model = geminiPro();
+
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: systemInstruction ?? "Eres un analista de datos experto en Python. Usa code execution para resolver problemas, calcular métricas y analizar datos. Muestra siempre el código y los resultados. Responde en español.",
+        tools: [{ codeExecution: {} }],
+        maxOutputTokens: 65_536,
+      } as any,
+    }),
+    GEMINI_CALL_TIMEOUT_MS,
+    `askGeminiWithCode(${model})`
+  );
+
+  let text = "";
+  let code = "";
+  let output = "";
+
+  const cand = response.candidates?.[0];
+  for (const part of (cand?.content?.parts ?? [])) {
+    const p = part as any;
+    if (p.text) text += p.text;
+    else if (p.executableCode?.code) code += p.executableCode.code;
+    else if (p.codeExecutionResult?.output) output += p.codeExecutionResult.output;
+  }
+
+  logger.info({ model, codeLen: code.length, outputLen: output.length }, "[Gemini Code] Executed");
+  return { text, code, output };
+}
+
 export { askGemini, askGeminiJson };

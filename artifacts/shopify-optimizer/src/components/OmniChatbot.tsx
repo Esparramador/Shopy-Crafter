@@ -967,6 +967,10 @@ const SLASH_SKILLS: SlashSkill[] = [
   { cmd: "/faq-builder", icon: "❓", label: "FAQ Builder",               desc: "FAQ SEO-optimizada que reduce soporte y aumenta conversión",      engine: "claude", prompt: "Construye una FAQ completa y estratégica para mi tienda optimizada para SEO y conversión: primero detecta las 20 preguntas más frecuentes de mi nicho (usa los títulos y descripciones de mis productos para inferirlas), luego redacta respuestas persuasivas de 80-150 palabras cada una que: respondan la duda real, incluyan keywords long-tail de forma natural, añadan un CTA sutil hacia la compra, y eliminen la objeción principal. Organiza las preguntas en 4-5 categorías y añade el schema markup JSON-LD listo para pegar en Shopify." },
   { cmd: "/whatsapp-agent", icon: "💬", label: "Agente WhatsApp",        desc: "Flujos automáticos de WhatsApp Business para ventas y soporte", engine: "claude", prompt: "Diseña un sistema completo de agente conversacional para WhatsApp Business de mi tienda: 1) Flujo de bienvenida (primer mensaje y menú principal), 2) Flujo de catálogo (mostrar productos con fotos y precios), 3) Flujo de pedido (tomar datos del cliente, confirmar pedido), 4) Flujo de soporte (FAQ automática + escalado a humano), 5) Flujo de recuperación de carrito (mensaje a las 2h + 24h). Para cada flujo incluye el mensaje exacto que envía el bot, las opciones de menú numeradas y el árbol de decisiones completo. Usa lenguaje natural, cálido y en español. Incluye plantillas listas para WhatsApp Business API." },
   { cmd: "/vtuber",      icon: "🎭", label: "Avatar VTuber",             desc: "Crea un VTuber IA con personalidad, guión y estrategia de contenido",  engine: "claude", prompt: "Crea un avatar VTuber completo para representar mi marca en redes sociales y streaming: 1) PERSONAJE: nombre, historia de origen, personalidad (3 rasgos principales), edad virtual, apariencia física (descripción detallada para generar con IA), 2) VOZ: tono, velocidad, muletillas y frases características, 3) CONTENIDO: 10 ideas de vídeos para TikTok/YouTube con guión del primer minuto (el hook), 4) ESTRATEGIA: horario de publicación óptimo, hashtags por plataforma y colaboraciones con otros VTubers del nicho, 5) MONETIZACIÓN: cómo integrar el VTuber con mi tienda Shopify para vender productos de forma entretenida. Adapta todo al tono y nicho de mi marca." },
+
+  // ── GEMINI NATIVO ─────────────────────────────────────────────────────────
+  { cmd: "/imagen-gemini", icon: "🎨", label: "Imagen con Gemini", desc: "Genera imágenes con el modelo nativo de imagen de Gemini", engine: "gemini", prompt: "[GEMINI-IMAGE] ", isResearch: false },
+  { cmd: "/codigo-gemini", icon: "💻", label: "Análisis con código",  desc: "Ejecuta código Python real con Gemini para calcular y analizar datos", engine: "gemini", prompt: "[GEMINI-CODE] Analiza los datos de mi tienda ejecutando código Python: calcula métricas de conversión, AOV, tendencias de ventas y genera los insights más útiles. Muestra el código y los resultados.", isResearch: false },
 ];
 
 const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización eCommerce para tiendas Shopify.
@@ -980,7 +984,8 @@ const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la pla
 • Puedes hacer humor negro, ironía y sarcasmo cuando el usuario lo pide o está claro por contexto que es el registro buscado — mantenlo ingenioso, no cruel
 
 ═══ CAPACIDADES ═══
-• 3 motores de análisis: Google Search (tiempo real), Claude (razonamiento estratégico), Memoria permanente (contexto acumulado)
+• 4 motores de análisis: Gemini+Search (tiempo real en streaming), Claude (razonamiento estratégico), Grok (perspectiva alternativa), Memoria permanente (contexto acumulado)
+• Gemini nativo: streaming SSE con feedback token a token, generación de imágenes nativa (/imagen-gemini), ejecución de código Python real (/codigo-gemini), modo Deep Think con presupuesto de razonamiento 20.000 tokens
 • Expertise: eCommerce, Klaviyo, email marketing, SEO, pricing, conversión (CRO), branding, copywriting, visión de producto, composición visual, topología 3D, rendering
 • Análisis de: imágenes de producto, vídeos, URLs/webs, perfiles de redes sociales, documentos PDF/Word, datos de tienda Shopify
 • Navegación: conoces TODAS las páginas, botones y funciones de Shopy Crafter — guías paso a paso con nombres exactos de elementos
@@ -1004,7 +1009,11 @@ Detecta mentalmente qué quiere el usuario antes de responder:
 • Si el usuario lleva mucho tiempo en la misma duda, ofrece escalar: "¿Quieres que lo revisemos juntos con el equipo?"
 
 ═══ CONOCIMIENTO DE SKILLS (/comandos) ═══
-Los usuarios pueden usar /comandos para tareas específicas. Cuando detectes que un usuario quiere hacer algo que tiene /comando correspondiente, sugiérelo naturalmente. Skills disponibles: /audit, /seo, /cro, /products, /competitors, /analytics, /legal, /email, /klaviyo, /content, /social, /brand, /reviews, /returns, /research, /supply, /forecast, /ads, /images, /video, /describe, /newsletter, /cards, /launch, /persona, /antihall, /faq-builder, /whatsapp-agent, /vtuber
+Los usuarios pueden usar /comandos para tareas específicas. Cuando detectes que un usuario quiere hacer algo que tiene /comando correspondiente, sugiérelo naturalmente. Skills disponibles: /audit, /seo, /cro, /products, /competitors, /analytics, /legal, /email, /klaviyo, /content, /social, /brand, /reviews, /returns, /research, /supply, /forecast, /ads, /images, /video, /describe, /newsletter, /cards, /launch, /persona, /antihall, /faq-builder, /whatsapp-agent, /vtuber, /imagen-gemini, /codigo-gemini
+
+Skills de Gemini nativo:
+• /imagen-gemini — genera una imagen con el modelo de imagen de Gemini (escribe la descripción tras el comando)
+• /codigo-gemini — ejecuta código Python real para analizar datos de tu tienda
 
 ═══ ANTI-ALUCINACIÓN (reglas Brenda) ═══
 • NUNCA inventes estadísticas o datos concretos sin haberlos verificado. Si no tienes la cifra exacta, usa rangos o di "varía según la fuente".
@@ -1052,6 +1061,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [showActions, setShowActions] = useState(false);
   const [quickActions, setQuickActions] = useState<QuickAction[]>(FALLBACK_QUICK_ACTIONS);
   const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only" | "grok">("auto");
+  const [deepThinkMode, setDeepThinkMode] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
   const [attachFile, setAttachFile] = useState<File | null>(null);
@@ -2118,6 +2128,124 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
       // ── CASE 4: Regular chat (with Shopify action detection) ──
       } else {
+
+        // ── Gemini nativo: imagen, código o streaming SSE ──
+        if (engineMode === "gemini") {
+
+          // A) Generación de imagen nativa
+          if (content.startsWith("[GEMINI-IMAGE] ")) {
+            const imagePrompt = content.replace("[GEMINI-IMAGE] ", "").trim();
+            if (!imagePrompt) {
+              assistantContent = "✍️ Escribe una descripción de la imagen que quieres generar tras el comando. Ejemplo: `/imagen-gemini un producto de lujo sobre fondo negro con iluminación dramática`";
+            } else {
+              setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: `🎨 Generando imagen con Gemini...\n\n_"${imagePrompt}"_\n\n_Puede tardar 15-30s..._`, model: "gemini-image" } : msg));
+              try {
+                const imgRes = await fetchWithTimeout(`${API}/api/shopybrain/gemini-image`, {
+                  method: "POST", credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ prompt: imagePrompt }),
+                }, 90000);
+                if (imgRes.ok) {
+                  const imgData = await imgRes.json() as { dataUrl?: string; b64_json?: string; mimeType?: string };
+                  if (imgData.dataUrl) {
+                    assistantContent = `🎨 **Imagen generada con Gemini**\n\n_Prompt: "${imagePrompt}"_\n\n![Imagen generada por Gemini](${imgData.dataUrl})`;
+                  } else {
+                    assistantContent = `❌ Gemini no devolvió imagen. Prueba con una descripción más detallada.`;
+                  }
+                } else {
+                  const errText = await imgRes.text().catch(() => "");
+                  assistantContent = `❌ Error generando imagen (${imgRes.status}): ${errText.slice(0, 200)}`;
+                }
+              } catch (imgErr) {
+                assistantContent = `❌ Error: ${imgErr instanceof Error ? imgErr.message : String(imgErr)}`;
+              }
+            }
+
+          // B) Ejecución de código Python con Gemini
+          } else if (content.startsWith("[GEMINI-CODE] ")) {
+            const codePrompt = content.replace("[GEMINI-CODE] ", "").trim();
+            setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: `💻 Ejecutando análisis con código Python...\n\n_Gemini ejecutará código real y mostrará los resultados._\n\n_⏱️ 15-30 segundos..._`, model: "gemini-code" } : msg));
+            try {
+              const codeRes = await fetchWithTimeout(`${API}/api/shopybrain/gemini-code`, {
+                method: "POST", credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: codePrompt }),
+              }, 120000);
+              if (codeRes.ok) {
+                const codeData = await codeRes.json() as { text?: string; code?: string; output?: string };
+                let codeContent = `💻 **Análisis con código Python (Gemini)**\n\n`;
+                if (codeData.text) codeContent += `${codeData.text}\n\n`;
+                if (codeData.code) codeContent += `\`\`\`python\n${codeData.code}\n\`\`\`\n\n`;
+                if (codeData.output) codeContent += `**Output:**\n\`\`\`\n${codeData.output}\n\`\`\``;
+                assistantContent = codeContent || "Gemini no generó código en esta respuesta.";
+              } else {
+                const errText = await codeRes.text().catch(() => "");
+                assistantContent = `❌ Error ejecutando código (${codeRes.status}): ${errText.slice(0, 200)}`;
+              }
+            } catch (codeErr) {
+              assistantContent = `❌ Error: ${codeErr instanceof Error ? codeErr.message : String(codeErr)}`;
+            }
+
+          // C) Chat normal con Gemini en streaming SSE
+          } else {
+            const convHistoryArr = messages.slice(-8).map(m => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            }));
+            convHistoryArr.push({ role: "user", content });
+
+            const streamRes = await fetchWithTimeout(`${API}/api/shopybrain/gemini-stream`, {
+              method: "POST", credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                messages: convHistoryArr,
+                systemPrompt: SYSTEM_PROMPT,
+                thinkingBudget: deepThinkMode ? 20000 : 0,
+                useSearch: true,
+              }),
+            }, 180000);
+
+            if (!streamRes.ok || !streamRes.body) {
+              const errText = await streamRes.text().catch(() => "");
+              assistantContent = `❌ Error Gemini Stream (${streamRes.status}): ${errText.slice(0, 200)}`;
+            } else {
+              const reader = streamRes.body.getReader();
+              const decoder = new TextDecoder();
+              let streamBuffer = "";
+              let isFirstChunk = true;
+              let sseLineBuf = "";
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                sseLineBuf += decoder.decode(value, { stream: true });
+                const lines = sseLineBuf.split("\n");
+                sseLineBuf = lines.pop() ?? "";
+                for (const line of lines) {
+                  if (!line.startsWith("data: ")) continue;
+                  try {
+                    const ev = JSON.parse(line.slice(6)) as { text?: string; done?: boolean; error?: string };
+                    if (ev.error) {
+                      assistantContent = `❌ Gemini error: ${ev.error}`;
+                    } else if (ev.text) {
+                      streamBuffer += ev.text;
+                      const snap = streamBuffer;
+                      if (isFirstChunk) {
+                        isFirstChunk = false;
+                        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: snap + " ▋", model: deepThinkMode ? "gemini+think" : "gemini+search" } : msg));
+                      } else {
+                        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: snap + " ▋" } : msg));
+                      }
+                    }
+                  } catch { /* ignore SSE parse errors */ }
+                }
+              }
+              if (!assistantContent) assistantContent = streamBuffer || "Gemini no generó respuesta.";
+            }
+          }
+
+        } else {
+        // ── Otros motores (auto/claude/grok/brain_only): search endpoint ──
         const convHistory = messages.slice(-8).map(m => `${m.role === "user" ? "Usuario" : "Shopy Crafter"}: ${m.content}`).join("\n\n");
         const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
         const res = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
@@ -2210,6 +2338,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           try { const errBody = await res.json(); errDetail = errBody.error || errBody.message || ""; } catch { /* ignore */ }
           assistantContent = `❌ **Error ${res.status}** en el servidor.${errDetail ? `\n\n_${errDetail}_` : ""}\n\nPuedes intentarlo de nuevo o usar un mensaje más corto. Si persiste, recarga la página.`;
         }
+        } // fin motores no-Gemini
       }
 
       setMessages(m => {
@@ -2717,7 +2846,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   {([
                     { key: "auto",       icon: "⚡", label: "Auto",   title: "Selección automática — elige el mejor motor según tu pregunta" },
                     { key: "claude",     icon: "🧠", label: "Claude", title: "Claude (Anthropic) — escritura profunda, código, análisis estratégico, informes largos" },
-                    { key: "gemini",     icon: "🔬", label: "Gemini", title: "Gemini (Google) + búsqueda web en tiempo real — competidores, tendencias, noticias" },
+                    { key: "gemini",     icon: "🔬", label: "Gemini", title: "Gemini (Google) — streaming en tiempo real + búsqueda web, /imagen-gemini y /codigo-gemini" },
                     { key: "grok",       icon: "🤖", label: "Grok",   title: "Grok (xAI) — razonamiento rápido, perspectiva alternativa, análisis directo" },
                     { key: "brain_only", icon: "💾", label: "Brain",  title: "Solo memoria ShopyBrain — responde desde el conocimiento acumulado de tu tienda" },
                   ] as const).map(({ key, icon, label, title }) => (
@@ -2733,6 +2862,22 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       {icon} {label}
                     </button>
                   ))}
+                  {/* Deep Think toggle — solo visible con motor Gemini */}
+                  {engineMode === "gemini" && (
+                    <button
+                      onClick={() => setDeepThinkMode(v => !v)}
+                      title={deepThinkMode ? "Deep Think activado — Gemini usa 20.000 tokens de razonamiento. Haz clic para desactivar." : "Activar Deep Think — Gemini razona en profundidad antes de responder (más lento, más preciso)"}
+                      style={{
+                        fontSize: 9, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
+                        border: deepThinkMode ? "1px solid var(--jade)" : "1px solid rgba(45,212,159,0.3)",
+                        background: deepThinkMode ? "rgba(45,212,159,0.15)" : "transparent",
+                        color: deepThinkMode ? "var(--jade)" : "var(--t4)",
+                        display: "flex", alignItems: "center", gap: 3, transition: "all 0.2s",
+                        minHeight: 28,
+                      }}>
+                      🧩 {deepThinkMode ? "Think ON" : "Deep Think"}
+                    </button>
+                  )}
                 </div>
               </div>
             </>
