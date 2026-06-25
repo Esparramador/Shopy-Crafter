@@ -103,6 +103,7 @@ const DeckBuilder = lazy(() => import("@/pages/admin/DeckBuilder"));
 const TiendaAdmin = lazy(() => import("@/pages/admin/TiendaAdmin"));
 const StripeManager = lazy(() => import("@/pages/admin/StripeManager"));
 const StripeMasterHub = lazy(() => import("@/pages/admin/StripeMasterHub"));
+const ApiUsage = lazy(() => import("@/pages/admin/ApiUsage"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -433,6 +434,9 @@ function Router() {
         </Route>
         <Route path="/admin/automations">
           <RequireAdmin><AdminWrapper><AppLayout><S><AdminAutomations /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/api-usage">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ApiUsage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         {/* Base project route → audit */}
