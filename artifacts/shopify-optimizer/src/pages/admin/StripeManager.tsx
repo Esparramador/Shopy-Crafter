@@ -441,7 +441,7 @@ export default function StripeManager() {
 
               {/* Tabs */}
               <div style={S.tabs}>
-                {(["overview", "transactions", "customers", "subscriptions"] as Tab[]).map(t => (
+                {(["overview", "transactions", "customers", "subscriptions"] as const).map(t => (
                   <button key={t} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }} onClick={() => setTab(t)}>
                     {{ overview: "📊 Overview", transactions: "💰 Transacciones", customers: "👥 Clientes", subscriptions: "🔄 Suscripciones" }[t]}
                   </button>

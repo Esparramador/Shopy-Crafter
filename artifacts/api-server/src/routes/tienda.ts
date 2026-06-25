@@ -209,13 +209,13 @@ router.put("/tienda/plans/:planId/checkout-url", requireAdmin, async (req: Reque
 });
 
 // ── ADMIN: POST /tienda/services ─────────────────────────────────────────────
-router.post("/tienda/services", requireAdmin, async (req: Request, res: Response) => {
+router.post("/tienda/services", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       name, description, short_desc, icon, price_display,
       features, cta_label, cta_url, badge, color_accent, sort_order, visible,
     } = req.body ?? {};
-    if (!name) return res.status(400).json({ error: "name requerido" });
+    if (!name) { res.status(400).json({ error: "name requerido" }); return; }
     const db = await getDb();
     const result = await db.execute(sql`
       INSERT INTO tienda_services

@@ -163,7 +163,7 @@ router.post("/webhooks/shopify/refunds", async (req: Request, res: Response) => 
 // URL: /api/webhooks/woocommerce/:projectId
 router.post("/webhooks/woocommerce/:projectId", async (req: Request, res: Response) => {
   try {
-    const { projectId } = req.params;
+    const projectId = String(req.params.projectId);
     const project = await getProjectByCriteria("id", projectId);
     if (!project) return void res.status(404).json({ error: "Proyecto no encontrado" });
 
@@ -223,7 +223,7 @@ router.post("/webhooks/woocommerce/:projectId", async (req: Request, res: Respon
 // URL: /api/webhooks/prestashop/:projectId
 router.post("/webhooks/prestashop/:projectId", async (req: Request, res: Response) => {
   try {
-    const { projectId } = req.params;
+    const projectId = String(req.params.projectId);
     const project = await getProjectByCriteria("id", projectId);
     if (!project) return void res.status(404).json({ error: "Proyecto no encontrado" });
 

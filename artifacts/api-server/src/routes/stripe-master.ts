@@ -189,7 +189,7 @@ router.post("/admin/stripe/assign-key", requireAdmin, async (req: Request, res: 
 // Re-encripta la clave — útil tras rotación en Stripe Dashboard
 router.post("/admin/stripe/rotate-key/:projectId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const { secretKey } = req.body as any;
     if (!secretKey) { res.status(400).json({ error: "secretKey requerido" }); return; }
 
@@ -203,7 +203,7 @@ router.post("/admin/stripe/rotate-key/:projectId", requireAdmin, async (req: Req
 // ── DELETE /admin/stripe/accounts/:projectId ─────────────────────────────────
 router.delete("/admin/stripe/accounts/:projectId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const db = await getDb();
     await db.execute(sql`DELETE FROM stripe_accounts WHERE project_id = ${projectId}`);
     res.json({ success: true, message: "Cuenta Stripe desvinculada" });
@@ -216,7 +216,7 @@ router.delete("/admin/stripe/accounts/:projectId", requireAdmin, async (req: Req
 // Balance en tiempo real del proyecto (cualquier modo)
 router.get("/admin/stripe/balance/:projectId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const { resolveStripeForProject } = await import("../lib/stripe-tenant.js");
     const { stripe, mode } = await resolveStripeForProject(projectId);
 
@@ -234,7 +234,7 @@ router.get("/admin/stripe/balance/:projectId", requireAdmin, async (req: Request
 // ── GET /admin/stripe/transactions/:projectId ────────────────────────────────
 router.get("/admin/stripe/transactions/:projectId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
     const { resolveStripeForProject } = await import("../lib/stripe-tenant.js");
     const { stripe } = await resolveStripeForProject(projectId);

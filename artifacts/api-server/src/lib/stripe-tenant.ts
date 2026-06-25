@@ -28,7 +28,7 @@ export interface StripeTenantRequest extends Request {
   tenantProjectId?: number;
 }
 
-const STRIPE_API_VERSION = "2024-11-20.acacia" as const;
+const STRIPE_API_VERSION = "2026-05-27.dahlia" as const;
 
 function getPlatformStripeKey(): string {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -158,7 +158,7 @@ export async function saveDirectApiKey(
   }
 
   const tempStripe = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION });
-  const account = await tempStripe.accounts.retrieve();
+  const account = await (tempStripe.accounts as any).retrieve();
 
   const keyEnc = encrypt(secretKey);
   const mode = secretKey.startsWith("sk_live_") ? "live" : "test";

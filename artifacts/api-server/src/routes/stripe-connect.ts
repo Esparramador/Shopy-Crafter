@@ -15,7 +15,7 @@ function getAppUrl() {
 function getPlatformStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY no configurado");
-  return new Stripe(key, { apiVersion: "2024-11-20.acacia" });
+  return new Stripe(key, { apiVersion: "2026-05-27.dahlia" });
 }
 
 async function getDb() {
@@ -212,7 +212,7 @@ router.get("/stripe/accounts/:accountId/overview", requireAuth, async (req: Requ
     if (!row) { res.status(404).json({ error: "Cuenta Stripe no encontrada" }); return; }
 
     const accessToken = decrypt(row.access_token_enc);
-    const stripe = new Stripe(accessToken, { apiVersion: "2024-11-20.acacia" });
+    const stripe = new Stripe(accessToken, { apiVersion: "2026-05-27.dahlia" });
 
     const [balance, charges, customers, subscriptions] = await Promise.all([
       stripe.balance.retrieve(),
@@ -289,7 +289,7 @@ router.get("/stripe/accounts/:accountId/transactions", requireAuth, async (req: 
     const row = result.rows[0] as any;
     if (!row) { res.status(404).json({ error: "Cuenta no encontrada" }); return; }
 
-    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2024-11-20.acacia" });
+    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2026-05-27.dahlia" });
 
     const params: Stripe.ChargeListParams = { limit };
     if (startingAfter) params.starting_after = startingAfter;
@@ -333,7 +333,7 @@ router.get("/stripe/accounts/:accountId/customers", requireAuth, async (req: Req
     const row = result.rows[0] as any;
     if (!row) { res.status(404).json({ error: "Cuenta no encontrada" }); return; }
 
-    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2024-11-20.acacia" });
+    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2026-05-27.dahlia" });
     const params: Stripe.CustomerListParams = { limit };
     if (startingAfter) params.starting_after = startingAfter;
 
@@ -370,7 +370,7 @@ router.get("/stripe/accounts/:accountId/subscriptions", requireAuth, async (req:
     const row = result.rows[0] as any;
     if (!row) { res.status(404).json({ error: "Cuenta no encontrada" }); return; }
 
-    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2024-11-20.acacia" });
+    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2026-05-27.dahlia" });
     const subs = await stripe.subscriptions.list({ limit, status: "all" });
 
     res.json({
@@ -378,8 +378,8 @@ router.get("/stripe/accounts/:accountId/subscriptions", requireAuth, async (req:
         id: s.id,
         status: s.status,
         customer: typeof s.customer === "string" ? s.customer : (s.customer as any)?.id,
-        currentPeriodEnd: s.current_period_end,
-        currentPeriodStart: s.current_period_start,
+        currentPeriodEnd: (s as any).current_period_end,
+        currentPeriodStart: (s as any).current_period_start,
         cancelAtPeriodEnd: s.cancel_at_period_end,
         created: s.created,
         items: s.items.data.map(i => ({
@@ -409,7 +409,7 @@ router.delete("/stripe/accounts/:accountId/disconnect", requireAuth, async (req:
       const clientId = process.env.STRIPE_CLIENT_ID;
       if (clientId) {
         const stripe = getPlatformStripe();
-        await stripe.oauth.deauthorize({ client_id: clientId, stripe_user_id: accountId });
+        await stripe.oauth.deauthorize({ client_id: clientId, stripe_user_id: String(accountId) });
       }
     } catch (revokeErr) {
       logger.warn({ revokeErr }, "Stripe token revoke failed (non-fatal)");
@@ -436,8 +436,8 @@ router.post("/stripe/accounts/:accountId/sync", requireAuth, async (req: Request
     const row = result.rows[0] as any;
     if (!row) { res.status(404).json({ error: "Cuenta no encontrada" }); return; }
 
-    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2024-11-20.acacia" });
-    const account = await stripe.accounts.retrieve(accountId);
+    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2026-05-27.dahlia" });
+    const account = await stripe.accounts.retrieve(String(accountId));
 
     await db.execute(sql`
       UPDATE stripe_accounts SET
