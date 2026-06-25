@@ -18,6 +18,15 @@ import { useDraggable } from "@/hooks/use-draggable";
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
+interface MsgUsage {
+  inputTokens: number;
+  outputTokens: number;
+  thinkingTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  model: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -27,6 +36,18 @@ interface Message {
   attachmentType?: "image" | "video" | "url";
   attachmentName?: string;
   action?: ChatAction;
+  usage?: MsgUsage;
+}
+
+function fmtTokens(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+function fmtCost(usd: number): string {
+  if (usd < 0.0001) return "$0.00";
+  if (usd < 0.01) return `$${usd.toFixed(4)}`;
+  return `$${usd.toFixed(3)}`;
 }
 
 interface ChatAction {
@@ -1153,6 +1174,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
   const [slashFilter, setSlashFilter] = useState("");
   const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
+  const [sessionUsage, setSessionUsage] = useState({ totalTokens: 0, totalCostUsd: 0, msgCount: 0 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1963,6 +1985,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     try {
       let assistantContent = "";
       let action: ChatAction | undefined;
+      let streamUsage: MsgUsage | undefined;
 
       // ── Detect product creation intent from text ──
       const isProductCreationIntent = (text: string) => {
@@ -2326,9 +2349,11 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   for (const line of lines) {
                     if (!line.startsWith("data: ")) continue;
                     try {
-                      const ev = JSON.parse(line.slice(6)) as { text?: string; done?: boolean; error?: string };
+                      const ev = JSON.parse(line.slice(6)) as { text?: string; done?: boolean; error?: string; usage?: MsgUsage };
                       if (ev.error) {
                         streamFailed = true;
+                      } else if (ev.done) {
+                        if (ev.usage) streamUsage = ev.usage;
                       } else if (ev.text) {
                         streamBuffer += ev.text;
                         const snap = streamBuffer;
@@ -2484,11 +2509,19 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         } // fin motores no-Gemini
       }
 
+      const finalUsage = streamUsage;
       setMessages(m => {
         const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia", "Creando producto profesional", "Rediseñando producto", "Rediseño masivo", "Auditoría SEO Semrush", "Investigando keywords", "Generando estrategia de blog", "Escribiendo artículo SEO", "Configuración completa de tienda", "Creando flujo de email", "Generando forecast financiero", "Generando propuesta comercial", "Generando imágenes IA", "Analizando tu solicitud"];
         const filtered = m.filter(msg => msg.id !== thinkingId && !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
-        return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain", action }];
+        return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain", action, usage: finalUsage }];
       });
+      if (finalUsage) {
+        setSessionUsage(prev => ({
+          totalTokens: prev.totalTokens + finalUsage.totalTokens,
+          totalCostUsd: prev.totalCostUsd + finalUsage.costUsd,
+          msgCount: prev.msgCount + 1,
+        }));
+      }
       if (voiceEnabled && assistantContent) {
         setTimeout(() => speakText(assistantContent), 200);
       }
@@ -2625,7 +2658,16 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Shopy Crafter · Asistente</p>
-              {!minimized && <p style={{ margin: 0, fontSize: 9, color: "var(--jade)" }}>🔬 Gemini · 🧠 Claude · 💾 Brain — Listo</p>}
+              {!minimized && (
+                <p style={{ margin: 0, fontSize: 9, color: "var(--jade)" }}>
+                  🔬 Gemini · 🧠 Claude · 💾 Brain — Listo
+                  {sessionUsage.msgCount > 0 && (
+                    <span style={{ color: "var(--t4)", marginLeft: 5 }}>
+                      · {fmtTokens(sessionUsage.totalTokens)} tok · {fmtCost(sessionUsage.totalCostUsd)}
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button onClick={() => setMinimized(!minimized)} aria-label={minimized ? "Expandir chat" : "Minimizar chat"} style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -2681,6 +2723,27 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                         </div>
                       )}
                       <div>{formatMessage(msg.content)}</div>
+                      {msg.usage && (
+                        <div style={{ marginTop: 5, paddingTop: 5, borderTop: "1px solid var(--ink3)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 9, color: "var(--t4)", display: "flex", alignItems: "center", gap: 3 }}>
+                            🔢 <strong style={{ color: "var(--t3)" }}>{fmtTokens(msg.usage.totalTokens)}</strong> tokens
+                          </span>
+                          <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
+                          <span style={{ fontSize: 9, color: "var(--t4)" }}>
+                            in <strong style={{ color: "var(--t3)" }}>{fmtTokens(msg.usage.inputTokens)}</strong> · out <strong style={{ color: "var(--t3)" }}>{fmtTokens(msg.usage.outputTokens)}</strong>
+                          </span>
+                          {msg.usage.thinkingTokens > 0 && (
+                            <>
+                              <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
+                              <span style={{ fontSize: 9, color: "var(--jade)", display: "flex", alignItems: "center", gap: 2 }}>
+                                🧩 <strong>{fmtTokens(msg.usage.thinkingTokens)}</strong> think
+                              </span>
+                            </>
+                          )}
+                          <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
+                          <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 600 }}>{fmtCost(msg.usage.costUsd)}</span>
+                        </div>
+                      )}
                       {msg.action?.type === "absorb-result" && (
                         <AbsorbResultCard data={msg.action.data as AbsorbResult} />
                       )}

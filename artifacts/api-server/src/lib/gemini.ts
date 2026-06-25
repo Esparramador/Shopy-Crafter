@@ -1054,12 +1054,23 @@ export async function askGeminiVisionJson<T = unknown>(
 
 // ─── STREAMING para el chatbot admin ─────────────────────────────────────────
 // Devuelve un async-generator que emite { text } chunks conforme llegan.
+// El evento { done: true } incluye usageMetadata (tokens + coste estimado).
 // Soporta Google Search grounding y thinkingBudget.
+
+export interface GeminiStreamUsage {
+  inputTokens: number;
+  outputTokens: number;
+  thinkingTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  model: string;
+}
+
 export async function* askGeminiStream(
   messages: GeminiChatMessage[],
   systemInstruction?: string,
   opts: { useProModel?: boolean; thinkingBudget?: number; useSearch?: boolean } = {},
-): AsyncGenerator<{ text?: string; done?: boolean; sources?: string[]; error?: string }> {
+): AsyncGenerator<{ text?: string; done?: boolean; sources?: string[]; error?: string; usage?: GeminiStreamUsage }> {
   const { useProModel = false, thinkingBudget = 0, useSearch = false } = opts;
 
   const contents = messages
@@ -1081,21 +1092,49 @@ export async function* askGeminiStream(
   try {
     const stream = await ai.models.generateContentStream({ model, contents, config });
     const allSources: string[] = [];
+    let lastUsageMeta: Record<string, unknown> | null = null;
 
     for await (const chunk of stream) {
       const text = chunk.text;
       if (text) yield { text };
 
+      // Acumular usage metadata (el último chunk tiene los totales definitivos)
+      const um = (chunk as any).usageMetadata as Record<string, unknown> | undefined;
+      if (um) lastUsageMeta = um;
+
       // Extraer sources de grounding si hay
       const cand = (chunk as any).candidates?.[0];
       const gm = cand?.groundingMetadata as Record<string, unknown> | undefined;
-      const chunks = gm?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
-      if (chunks) {
-        for (const c of chunks) { if (c.web?.uri) allSources.push(c.web.uri); }
+      const groundChunks = gm?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
+      if (groundChunks) {
+        for (const c of groundChunks) { if (c.web?.uri) allSources.push(c.web.uri); }
       }
     }
 
-    yield { done: true, sources: [...new Set(allSources)] };
+    // Construir y emitir usage en el evento done
+    let usage: GeminiStreamUsage | undefined;
+    if (lastUsageMeta) {
+      const inTok  = Number(lastUsageMeta.promptTokenCount)     || 0;
+      const outTok = Number(lastUsageMeta.candidatesTokenCount) || 0;
+      const thinkTok = Number(lastUsageMeta.thoughtsTokenCount) || 0;
+      const totalTok = Number(lastUsageMeta.totalTokenCount)    || (inTok + outTok + thinkTok);
+      try {
+        const { calcGeminiCost, recordApiUsage } = await import("./api-usage.js");
+        const costUsd = calcGeminiCost(model, inTok, outTok);
+        usage = { inputTokens: inTok, outputTokens: outTok, thinkingTokens: thinkTok, totalTokens: totalTok, costUsd, model };
+        void recordApiUsage({
+          provider: "gemini",
+          operation: "chatbot-stream",
+          model,
+          inputUnits: inTok,
+          outputUnits: outTok,
+          unitsLabel: "tokens",
+          costUsd,
+        });
+      } catch { /* never blocks the stream */ }
+    }
+
+    yield { done: true, sources: [...new Set(allSources)], ...(usage ? { usage } : {}) };
   } catch (err) {
     logger.error({ err: String(err) }, "[askGeminiStream] Error");
     yield { error: String(err) };
