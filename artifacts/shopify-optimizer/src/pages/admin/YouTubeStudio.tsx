@@ -241,17 +241,35 @@ export default function YouTubeStudio() {
   async function fetchTrends() {
     setLoadingTrends(true);
     try {
-      const r = await fetch(`${BASE}/api/viral/trends?country=${encodeURIComponent(trendsCountry)}`, { credentials: "include" });
+      const r = await fetch(
+        `${BASE}/api/viral/trends?country=${encodeURIComponent(trendsCountry)}&sector=${encodeURIComponent(trendsSector)}`,
+        { credentials: "include" }
+      );
       if (r.ok) setTrendsData(await r.json());
       else setError("Error obteniendo tendencias");
     } catch (e: any) { setError(e.message); }
     setLoadingTrends(false);
   }
 
+  // Mapea sector de tendencias → categoría del Creador IA
+  const SECTOR_TO_CAT: Record<string, string> = {
+    politica_satira: "politica",
+    tecnologia: "ia-tech",
+    ecommerce_shopify: "entretenimiento",
+    fitness_salud: "lifestyle",
+    moda_belleza: "lifestyle",
+    educacion_cursos: "educativo",
+    general: "politica",
+  };
+
   function selectNewsForScript(item: any) {
     setSelectedNews(item);
     const text = typeof item === "object" ? `${item.headline || item.title || ""}: ${item.summary || ""}` : String(item);
     setScriptForm(f => ({ ...f, newsText: text }));
+    // pre-seleccionar categoría coherente con el sector de tendencias elegido
+    const mappedCat = SECTOR_TO_CAT[trendsSector] || "politica";
+    setStudioCategory(mappedCat);
+    setTemplateId(null);
     setTab("satirico");
     setScriptResult(null); setVideoResult(null);
   }
@@ -710,21 +728,48 @@ export default function YouTubeStudio() {
       {tab === "trends" && (
         <div>
           {/* Header + fetch button */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-            <div style={{ flex: 1 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t)" }}>📰 Tendencias Virales del Día</h2>
-              <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3)" }}>Noticias políticas con mayor potencial satírico · {trendsData?.timestamp ? new Date(trendsData.timestamp).toLocaleTimeString("es") : "Sin cargar"}</p>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1 }}>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t)" }}>📰 Tendencias Virales del Día</h2>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3)" }}>Selecciona categoría y país · {trendsData?.timestamp ? new Date(trendsData.timestamp).toLocaleTimeString("es") : "Sin cargar"}</p>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <select value={trendsCountry} onChange={e => setTrendsCountry(e.target.value)}
+                  style={{ background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "6px 10px", color: "var(--t)", fontSize: 12 }}>
+                  {["España", "México", "Argentina", "Colombia", "Chile", "EEUU"].map(c => <option key={c}>{c}</option>)}
+                </select>
+                <button onClick={fetchTrends} disabled={loadingTrends}
+                  style={{ padding: "8px 16px", background: "var(--gold)", color: "#000", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                  {loadingTrends ? <RefreshCw size={14} className="spin" /> : <TrendingUp size={14} />}
+                  {loadingTrends ? "Analizando…" : "Obtener Tendencias"}
+                </button>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <select value={trendsCountry} onChange={e => setTrendsCountry(e.target.value)}
-                style={{ background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "6px 10px", color: "var(--t)", fontSize: 12 }}>
-                {["España", "México", "Argentina", "Colombia", "Chile", "EEUU"].map(c => <option key={c}>{c}</option>)}
-              </select>
-              <button onClick={fetchTrends} disabled={loadingTrends}
-                style={{ padding: "8px 16px", background: "var(--gold)", color: "#000", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                {loadingTrends ? <RefreshCw size={14} className="spin" /> : <TrendingUp size={14} />}
-                {loadingTrends ? "Analizando…" : "Obtener Tendencias"}
-              </button>
+
+            {/* Selector de categoría */}
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+              {([
+                { id: "general",          emoji: "🌍", label: "General" },
+                { id: "politica_satira",  emoji: "🏛️", label: "Política / Sátira" },
+                { id: "tecnologia",       emoji: "💻", label: "IA / Tecnología" },
+                { id: "ecommerce_shopify",emoji: "🏪", label: "Ecommerce" },
+                { id: "fitness_salud",    emoji: "💪", label: "Fitness / Salud" },
+                { id: "moda_belleza",     emoji: "👗", label: "Moda / Belleza" },
+                { id: "educacion_cursos", emoji: "🎓", label: "Educación" },
+              ] as const).map(s => (
+                <button key={s.id} type="button"
+                  onClick={() => { setTrendsSector(s.id); setTrendsData(null); }}
+                  style={{
+                    padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    border: trendsSector === s.id ? "2px solid var(--gold)" : "1px solid var(--ink4)",
+                    background: trendsSector === s.id ? "rgba(251,191,36,0.15)" : "var(--ink2)",
+                    color: trendsSector === s.id ? "var(--gold)" : "var(--t3)",
+                    transition: "all .15s",
+                  }}>
+                  {s.emoji} {s.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -736,7 +781,7 @@ export default function YouTubeStudio() {
                 Pulsa <strong>Obtener Tendencias</strong> para analizar con Gemini Search las noticias políticas con mayor potencial satírico del día.
               </div>
               <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-                {["🎭 Sátira política", "📰 Noticias virales", "🎬 Formatos YouTube", "🔥 Tendencias TikTok"].map(t => (
+                {["1️⃣ Elige categoría", "2️⃣ Elige país", "3️⃣ Obtener Tendencias", "4️⃣ Pulsa Satirizar →"].map(t => (
                   <span key={t} style={{ padding: "4px 12px", background: "var(--ink2)", borderRadius: 20, fontSize: 12, color: "var(--t3)" }}>{t}</span>
                 ))}
               </div>
