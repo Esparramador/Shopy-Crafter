@@ -326,6 +326,8 @@ body::after {
   flex-shrink: 2; min-width: 0;
 }
 .topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* Mobile-only elements (hidden on desktop by default) */
+.tb-show-sm { display: none; }
 
 /* Status chip */
 .status-chip {
@@ -919,6 +921,24 @@ code {
 
   .app-shell { flex-direction: column; height: 100vh; height: 100dvh; }
   .hamburger-btn { display: none; }
+
+  /* ── Topbar móvil: limpio, accesible, bonito ───────── */
+  .topbar { height: 48px; padding: 0 12px; gap: 6px; }
+  .topbar-client { font-size: 13px; font-style: normal; font-weight: 600; }
+  .topbar-sep { display: none; }
+  .topbar-page { display: none; }
+  /* Ocultar elementos de escritorio en móvil */
+  .tb-hide-sm { display: none !important; }
+  /* Mostrar elementos solo-móvil */
+  .tb-show-sm {
+    display: flex !important;
+    align-items: center; justify-content: center;
+  }
+  /* Ocultar secciones no-nav del sidebar en la barra horizontal */
+  .sidebar-label { display: none !important; }
+  .sidebar-promo { display: none !important; }
+  .sidebar-bottom { display: none !important; }
+
   .sidebar {
     width: 100% !important; height: 52px; min-width: 100%;
     flex-direction: row; overflow-x: auto; overflow-y: hidden;

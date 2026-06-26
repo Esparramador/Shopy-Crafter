@@ -607,7 +607,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
             </Link>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div className="tb-hide-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <kbd style={{
                 padding: "2px 6px", borderRadius: 4, fontSize: 10,
                 background: "var(--ink3)", border: "1px solid var(--ink4)",
@@ -617,6 +617,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               >⌘K</kbd>
             </div>
             <a
+              className="tb-hide-sm"
               href={`${BASE_URL}/landing`}
               target="_blank"
               rel="noopener noreferrer"
@@ -634,6 +635,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               🌐 <span>Ver Landing</span>
             </a>
             <a
+              className="tb-hide-sm"
               href={`${BASE_URL}/client`}
               style={{
                 display: "flex", alignItems: "center", gap: 5,
@@ -648,10 +650,23 @@ export function AppLayout({ children }: AppLayoutProps) {
             >
               👤 <span>Panel Cliente</span>
             </a>
-            <div className="status-chip">
+            <div className="status-chip tb-hide-sm">
               <div className="status-pulse" />
               {ap.header?.active ?? "Activo"}
             </div>
+            {/* Ajustes — visible solo en móvil */}
+            <Link href="/admin/settings" className="tb-show-sm" title="Ajustes de cuenta" aria-label="Ajustes">
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 32, height: 32, borderRadius: 8,
+                background: location === "/admin/settings" ? "rgba(200,168,75,0.15)" : "var(--ink3)",
+                border: `1px solid ${location === "/admin/settings" ? "rgba(200,168,75,0.5)" : "var(--bdr2)"}`,
+                color: location === "/admin/settings" ? "var(--gold2)" : "var(--t2)",
+                transition: "all 0.15s", flexShrink: 0,
+              }}>
+                <Settings size={14} />
+              </div>
+            </Link>
             <div style={{ position: "relative" }}>
               <button
                 className="notif-btn"

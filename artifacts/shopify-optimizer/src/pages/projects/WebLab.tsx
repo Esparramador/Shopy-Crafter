@@ -2604,21 +2604,87 @@ ${body}
                     </button>
                     <button
                       onClick={() => {
+                        const siteUrl = result?.url || url || "";
+                        let origin = "";
+                        try { origin = new URL(siteUrl).origin + "/"; } catch {}
                         const fragments = (a.improvedHtmlFragments || []).map((f: any) => f.improved).join("\n");
-                        const toolbarCss = `.shopy-preview-toolbar{position:fixed;bottom:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#0a0a1a,#1a1a2e);border-top:2px solid #d4a843;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#ccc;font-size:12px;box-shadow:0 -4px 20px rgba(0,0,0,0.5)}.shopy-preview-toolbar a{color:#d4a843;text-decoration:none;font-weight:600}`;
-                        const toolbar = `<div class="shopy-preview-toolbar"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px;font-weight:700;background:linear-gradient(135deg,#d4a843,#b8860b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Shopy Crafter</span><span style="font-size:11px;color:#888">Preview Visual — CSS Mejorado</span></div><div><span style="color:#888">Fuente: ${url}</span> · <a href="https://shopycrafter.com" target="_blank">shopycrafter.com</a></div></div>`;
-                        const fullHtml = `<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Preview Visual — CSS Mejorado</title>\n<style>\n${a.improvedCss}\nbody{margin:0;padding:0;min-height:100vh}\n${toolbarCss}\n</style>\n</head>\n<body>\n${fragments}\n${toolbar}\n</body>\n</html>`;
-                        downloadFile(fullHtml, "preview-visual.html", "text/html");
+                        const hasFragments = fragments.trim().length > 0;
+                        const dateStr = new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" });
+                        const bannerCss = `
+.sc-banner{position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#080812 0%,#10102a 100%);border-bottom:2px solid #d4a843;padding:9px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 2px 24px rgba(0,0,0,0.7);transition:transform 0.3s ease}
+.sc-banner.hidden{transform:translateY(-100%)}
+.sc-banner-logo{font-size:13px;font-weight:800;background:linear-gradient(135deg,#d4a843,#f0c060);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.3px;white-space:nowrap}
+.sc-banner-meta{font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.sc-banner-cta{padding:5px 14px;background:linear-gradient(135deg,#d4a843,#b8860b);color:#000;font-weight:700;font-size:11px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;text-decoration:none;white-space:nowrap;flex-shrink:0}
+.sc-banner-close{background:none;border:1px solid #333;color:#666;font-size:12px;padding:3px 8px;border-radius:4px;cursor:pointer;flex-shrink:0;line-height:1}
+body{margin:0;padding-top:${hasFragments ? "48px" : "0"}!important;min-height:100vh}`;
+                        const bannerHtml = `<div class="sc-banner" id="sc-banner">
+  <div style="display:flex;align-items:center;gap:10px;min-width:0">
+    <span class="sc-banner-logo">⚡ Shopy Crafter</span>
+    <span style="color:#444;font-size:12px;flex-shrink:0">|</span>
+    <span class="sc-banner-meta">Preview Rediseño · ${siteUrl || "Tu tienda"} · ${dateStr}</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <a href="https://shopycrafter.com" target="_blank" rel="noopener" class="sc-banner-cta">Ver plataforma →</a>
+    <button class="sc-banner-close" onclick="document.getElementById('sc-banner').classList.toggle('hidden')" title="Ocultar banner">✕</button>
+  </div>
+</div>`;
+                        const noFragmentsBody = `<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f8f8;text-align:center">
+  <div style="max-width:560px">
+    <div style="font-size:48px;margin-bottom:16px">🎨</div>
+    <h1 style="font-size:22px;font-weight:800;margin:0 0 8px;color:#111">CSS Mejorado Listo</h1>
+    <p style="font-size:14px;color:#666;line-height:1.7;margin:0 0 28px">Este archivo contiene el CSS optimizado para tu tienda Shopify.<br>Ábrelo en un navegador para ver el código, o aplícalo en tu tienda.</p>
+    ${siteUrl ? `<a href="${siteUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#d4a843,#b8860b);color:#000;font-weight:700;font-size:14px;border-radius:10px;text-decoration:none;margin-bottom:16px">↗ Abrir tienda original</a><br>` : ""}
+    <p style="font-size:12px;color:#999;margin-top:20px">Para aplicar el CSS: Shopify Admin → Tienda Online → Temas → Editar código → assets/custom.css</p>
+  </div>
+  <details style="margin-top:40px;width:100%;max-width:800px;text-align:left">
+    <summary style="cursor:pointer;font-size:13px;font-weight:600;color:#d4a843;padding:12px 16px;background:#111;border-radius:8px;list-style:none">▸ Ver CSS mejorado completo</summary>
+    <pre style="background:#0d1117;color:#c9d1d9;padding:24px;border-radius:0 0 8px 8px;overflow:auto;font-size:12px;line-height:1.6;margin:0;white-space:pre-wrap;word-break:break-word"><code>/* CSS MEJORADO POR SHOPY CRAFTER — ${dateStr} */\n/* Fuente: ${siteUrl} */\n\n</code></pre>
+  </details>
+</div>`;
+                        const fullHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview Rediseño${siteUrl ? " — " + siteUrl : ""}</title>
+<meta name="description" content="Preview de rediseño visual generado por Shopy Crafter">
+${origin ? `<base href="${origin}">` : ""}
+<style>
+/* ── Reset ──────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+img,video{max-width:100%;height:auto}
+a{color:inherit}
+h1,h2,h3,h4,h5,h6{margin:.5em 0;line-height:1.2}
+p{margin:.5em 0}
+button,input,select,textarea{font:inherit}
+
+/* ── Banner Shopy Crafter ───────────────────────────── */
+${bannerCss}
+
+/* ── CSS Mejorado ───────────────────────────────────── */
+${a.improvedCss}
+</style>
+</head>
+<body>
+${bannerHtml}
+${hasFragments ? fragments : noFragmentsBody}
+</body>
+</html>`;
+                        const filename = `preview-rediseno-${(siteUrl || "pagina").replace(/https?:\/\//,"").replace(/[^a-z0-9]/gi,"-").slice(0,30)}-${new Date().toISOString().slice(0,10)}.html`;
+                        downloadFile(fullHtml, filename, "text/html");
                       }}
                       style={{
                         padding: "8px 16px",
-                        background: "linear-gradient(135deg, #22c55e22, #16a34a22)",
-                        border: "1px solid #22c55e44",
-                        borderRadius: 8, color: "#22c55e",
-                        cursor: "pointer", fontSize: 13,
+                        background: "linear-gradient(135deg, rgba(212,168,67,0.15), rgba(212,168,67,0.08))",
+                        border: "1px solid rgba(212,168,67,0.5)",
+                        borderRadius: 8, color: "#d4a843",
+                        cursor: "pointer", fontSize: 13, fontWeight: 600,
+                        display: "flex", alignItems: "center", gap: 6,
                       }}
                     >
-                      👁️ Descargar Preview HTML
+                      🚀 HTML Completo (enviar cliente)
                     </button>
                     <button
                       onClick={() => {
@@ -2685,18 +2751,45 @@ ${body}
                     </button>
                     <button
                       onClick={() => {
-                        const all = (a.improvedHtmlFragments || []).map(f => `<!-- ${f.section} -->\n${f.improved}`).join("\n\n");
-                        downloadFile(all, "improved-fragments.html", "text/html");
+                        const siteUrl2 = result?.url || url || "";
+                        let origin2 = "";
+                        try { origin2 = new URL(siteUrl2).origin + "/"; } catch {}
+                        const frags = (a.improvedHtmlFragments || []).map((f: any) => `<!-- ${f.section} -->\n${f.improved}`).join("\n\n");
+                        const fullDoc = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML Mejorado${siteUrl2 ? " — " + siteUrl2 : ""}</title>
+${origin2 ? `<base href="${origin2}">` : ""}
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;color:#1a1a1a;background:#fff}
+img,video{max-width:100%;height:auto}
+a{color:inherit}
+h1,h2,h3,h4,h5,h6{margin:.5em 0;line-height:1.2}
+p{margin:.5em 0}
+button,input,select,textarea{font:inherit}
+/* CSS Mejorado */
+${a.improvedCss || ""}
+</style>
+</head>
+<body>
+${frags || "<!-- Sin fragmentos HTML generados -->"}
+</body>
+</html>`;
+                        downloadFile(fullDoc, `html-mejorado-${new Date().toISOString().slice(0,10)}.html`, "text/html");
                       }}
                       style={{
                         padding: "8px 16px",
-                        background: "#1a1a2e",
-                        border: "1px solid #333",
-                        borderRadius: 8, color: "#ccc",
-                        cursor: "pointer", fontSize: 13,
+                        background: "linear-gradient(135deg, rgba(212,168,67,0.12), rgba(212,168,67,0.06))",
+                        border: "1px solid rgba(212,168,67,0.4)",
+                        borderRadius: 8, color: "#d4a843",
+                        cursor: "pointer", fontSize: 13, fontWeight: 600,
                       }}
                     >
-                      💾 Descargar .html
+                      🚀 HTML + CSS completo
                     </button>
                   </div>
                 </div>
