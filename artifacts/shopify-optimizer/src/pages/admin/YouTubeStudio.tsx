@@ -78,6 +78,11 @@ export default function YouTubeStudio() {
   const [satiricoProjectId, setSatiricoProjectId] = useState<string>("");
   const [satiricoModel, setSatiricoModel] = useState("grok-video-1");
   const [scriptEngine, setScriptEngine] = useState<"grok" | "claude" | "gemini">("grok");
+  const [videoFormat, setVideoFormat] = useState("satira-politica");
+  const [comedyPromptId, setComedyPromptId] = useState<string | null>(null);
+  const [trendsSector, setTrendsSector] = useState("general");
+  const [viralScore, setViralScore] = useState<{ score: number; breakdown: Record<string, number>; recommendations: string[] } | null>(null);
+  const [showFormats, setShowFormats] = useState(false);
 
   const [form, setForm] = useState({
     title: "", description: "", tags: "", privacy: "public", categoryId: "22",
@@ -228,11 +233,15 @@ export default function YouTubeStudio() {
           duration: parseInt(scriptForm.duration),
           style: scriptForm.style,
           engine: scriptEngine,
+          format: videoFormat,
+          sector: trendsSector !== "general" ? trendsSector : undefined,
+          comedyPromptId: comedyPromptId || undefined,
         }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
       const d = await r.json();
       setScriptResult(d.script);
+      setViralScore(d.viralScore || null);
       setScriptExpanded(false);
     } catch (e: any) { setError(e.message); }
     setGeneratingScript(false);
@@ -755,35 +764,114 @@ export default function YouTubeStudio() {
             </div>
           )}
 
+          {/* ── Comedy Prompts Panel ─────────────────────────────────────────── */}
+          <div style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", marginBottom: 10 }}>🎭 PLANTILLAS DE COMEDIA (activa una para aplicarla)</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[
+                { id: "satirico-politico",    emoji: "🎙️", name: "Analista Sarcástico",   desc: "Estilo El Intermedio / Daily Show" },
+                { id: "entrevistador-incomodo",emoji: "🎤", name: "Entrevistador Incómodo", desc: "Vox Pop de comedia absurda" },
+                { id: "detector-hipocresia",   emoji: "🔍", name: "Detector de Hipocresía", desc: "Fact-checker cómico para Shorts" },
+              ].map(p => (
+                <button key={p.id} type="button"
+                  onClick={() => setComedyPromptId(comedyPromptId === p.id ? null : p.id)}
+                  style={{
+                    flex: 1, minWidth: 150, padding: "10px 12px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                    border: comedyPromptId === p.id ? "2px solid var(--gold)" : "1px solid var(--ink4)",
+                    background: comedyPromptId === p.id ? "rgba(251,191,36,0.12)" : "var(--ink2)",
+                    transition: "all .15s",
+                  }}>
+                  <div style={{ fontSize: 18, marginBottom: 2 }}>{p.emoji}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: comedyPromptId === p.id ? "var(--gold)" : "var(--t2)" }}>{p.name}</div>
+                  <div style={{ fontSize: 10, color: "var(--t3)" }}>{p.desc}</div>
+                  {comedyPromptId === p.id && <div style={{ fontSize: 9, color: "var(--gold)", marginTop: 4 }}>✓ ACTIVA</div>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Video Format Selector ─────────────────────────────────────────── */}
+          <div style={{ background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
+            <button type="button" onClick={() => setShowFormats(f => !f)}
+              style={{ width: "100%", padding: "12px 16px", background: "none", border: "none", color: "var(--t)", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, fontWeight: 700 }}>
+              <span>🎬 Formato de vídeo — <span style={{ color: "var(--gold)" }}>{videoFormat}</span></span>
+              <ChevronDown size={14} style={{ transform: showFormats ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+            </button>
+            {showFormats && (
+              <div style={{ padding: "0 14px 14px", display: "grid", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+                {[
+                  { cat: "⚡ Shorts / Vertical",    ids: ["short-hook","short-tutorial","short-poc"] },
+                  { cat: "📱 UGC",                   ids: ["ugc-review","ugc-testimonial","ugc-unboxing"] },
+                  { cat: "🎓 Educativo",              ids: ["explainer-animated","how-to-step","listicle"] },
+                  { cat: "🛍️ Producto / Ecommerce",  ids: ["product-demo","explode-view","disassemble-assemble","comparison","ecommerce-haul","shopify-tutorial"] },
+                  { cat: "🎙️ Podcast",               ids: ["podcast-full","podcast-clip"] },
+                  { cat: "🎥 Trailer",               ids: ["channel-trailer","video-trailer","product-launch-trailer"] },
+                  { cat: "📹 Storytelling",           ids: ["vlog-day","story-transformation","mini-documentary","behind-scenes"] },
+                  { cat: "😱 Reacción",               ids: ["reaction"] },
+                  { cat: "🎭 Sátira / Comedia",       ids: ["satira-politica","satira-sketch","vox-pop","fact-check-comico"] },
+                ].map(group => (
+                  <div key={group.cat}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", padding: "6px 0 4px", textTransform: "uppercase", letterSpacing: 1 }}>{group.cat}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                      {group.ids.map(id => (
+                        <button key={id} type="button" onClick={() => { setVideoFormat(id); setShowFormats(false); }}
+                          style={{
+                            padding: "4px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer",
+                            border: videoFormat === id ? "1px solid var(--gold)" : "1px solid var(--ink4)",
+                            background: videoFormat === id ? "rgba(251,191,36,0.15)" : "var(--ink3)",
+                            color: videoFormat === id ? "var(--gold)" : "var(--t3)",
+                            fontWeight: videoFormat === id ? 700 : 400,
+                          }}>{id}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <form onSubmit={generateScript} style={{ display: "grid", gap: 14, marginBottom: 24 }}>
             {/* Noticia input */}
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Noticia a satirizar *</label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Noticia / Tema a desarrollar *</label>
               <textarea value={scriptForm.newsText} onChange={e => setScriptForm(f => ({ ...f, newsText: e.target.value }))}
-                placeholder="Pega el titular o describe la noticia que quieres convertir en sátira política…"
+                placeholder="Pega un titular, describe el tema, producto, tutorial o idea para el vídeo…"
                 rows={3} style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 10, padding: "10px 14px", color: "var(--t)", fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Tono</label>
                 <select value={scriptForm.tone} onChange={e => setScriptForm(f => ({ ...f, tone: e.target.value }))}
                   style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 9, padding: "9px 12px", color: "var(--t)", fontSize: 13 }}>
-                  {["ácido", "absurdo", "irónico", "sarcástico", "tierno"].map(t => <option key={t}>{t}</option>)}
+                  {["ácido","absurdo","irónico","sarcástico","educativo","épico","emotivo","tierno","urgente","inspirador"].map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Formato</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Estilo</label>
                 <select value={scriptForm.style} onChange={e => setScriptForm(f => ({ ...f, style: e.target.value }))}
                   style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 9, padding: "9px 12px", color: "var(--t)", fontSize: 13 }}>
-                  {["monólogo", "sketch", "reportaje falso", "entrevista imaginaria"].map(s => <option key={s}>{s}</option>)}
+                  {["monólogo","sketch","reportaje falso","entrevista imaginaria","tutorial","listicle","storytelling","documental","reacción","vox pop"].map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Duración (seg)</label>
                 <select value={scriptForm.duration} onChange={e => setScriptForm(f => ({ ...f, duration: e.target.value }))}
                   style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 9, padding: "9px 12px", color: "var(--t)", fontSize: 13 }}>
-                  {["30", "60", "90", "120", "180"].map(d => <option key={d}>{d}s</option>)}
+                  {["30","60","90","120","180","300","600"].map(d => <option key={d} value={d}>{d}s {d === "60" ? "(Short)" : d === "300" ? "(5min)" : d === "600" ? "(10min)" : ""}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Sector</label>
+                <select value={trendsSector} onChange={e => setTrendsSector(e.target.value)}
+                  style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 9, padding: "9px 12px", color: "var(--t)", fontSize: 13 }}>
+                  <option value="general">General</option>
+                  <option value="ecommerce_shopify">🏪 Ecommerce / Shopify</option>
+                  <option value="politica_satira">🎭 Política / Sátira</option>
+                  <option value="tecnologia">💻 Tecnología / IA</option>
+                  <option value="fitness_salud">💪 Fitness / Salud</option>
+                  <option value="moda_belleza">👗 Moda / Belleza</option>
+                  <option value="educacion_cursos">🎓 Educación / Cursos</option>
                 </select>
               </div>
             </div>
@@ -857,8 +945,78 @@ export default function YouTubeStudio() {
                 )}
               </div>
 
-              {/* Voiceover + visual prompt + copy actions */}
+              {/* Voiceover + visual prompt + new fields */}
               <div style={{ padding: "12px 18px", display: "grid", gap: 10 }}>
+
+                {/* Virality Score */}
+                {viralScore && (
+                  <div style={{ background: "var(--ink3)", borderRadius: 9, padding: 12, border: "1px solid rgba(251,191,36,0.2)" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", marginBottom: 8 }}>📊 PUNTUACIÓN DE VIRALIDAD</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                      <div style={{
+                        width: 56, height: 56, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                        background: `conic-gradient(${viralScore.score >= 70 ? "#10b981" : viralScore.score >= 50 ? "#f59e0b" : "#ef4444"} ${viralScore.score * 3.6}deg, var(--ink4) 0deg)`,
+                        flexShrink: 0,
+                      }}>
+                        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--ink3)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+                          <span style={{ fontSize: 16, fontWeight: 900, color: viralScore.score >= 70 ? "#10b981" : viralScore.score >= 50 ? "#f59e0b" : "#ef4444" }}>{viralScore.score}</span>
+                          <span style={{ fontSize: 8, color: "var(--t3)" }}>/ 100</span>
+                        </div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                          {Object.entries(viralScore.breakdown).filter(([,v]) => (v as number) > 0).map(([k,v]) => (
+                            <span key={k} style={{ fontSize: 9, padding: "2px 7px", background: "rgba(16,185,129,0.15)", borderRadius: 20, color: "#10b981" }}>+{v as number} {k}</span>
+                          ))}
+                        </div>
+                        {viralScore.recommendations?.length > 0 && (
+                          <div style={{ fontSize: 10, color: "var(--t3)", lineHeight: 1.6 }}>
+                            ⚡ {viralScore.recommendations[0]}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Title alternatives */}
+                {scriptResult.titleAlternatives?.length > 0 && (
+                  <div style={{ background: "var(--ink3)", borderRadius: 9, padding: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", marginBottom: 6 }}>🅰️ TÍTULOS A/B TEST</div>
+                    {scriptResult.titleAlternatives.map((t: string, i: number) => (
+                      <div key={i} style={{ fontSize: 12, color: "var(--t2)", padding: "4px 0", borderBottom: i < scriptResult.titleAlternatives.length - 1 ? "1px solid var(--ink4)" : "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>{t}</span>
+                        <button onClick={() => navigator.clipboard.writeText(t)} style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer", padding: "0 4px" }}><Copy size={10} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Thumbnail prompt */}
+                {scriptResult.thumbnailPrompt && (
+                  <div style={{ background: "var(--ink3)", borderRadius: 9, padding: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", marginBottom: 6 }}>🖼️ THUMBNAIL (descripción para diseñar)</div>
+                    <div style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.7 }}>{scriptResult.thumbnailPrompt}</div>
+                    <button onClick={() => navigator.clipboard.writeText(scriptResult.thumbnailPrompt)}
+                      style={{ marginTop: 8, padding: "4px 10px", background: "var(--ink4)", border: "none", borderRadius: 6, fontSize: 11, color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      <Copy size={10} /> Copiar
+                    </button>
+                  </div>
+                )}
+
+                {/* Shorts version */}
+                {scriptResult.shortsVersion && (
+                  <div style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 9, padding: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#f87171", marginBottom: 6 }}>⚡ VERSIÓN SHORT (60s)</div>
+                    <div style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{scriptResult.shortsVersion}</div>
+                    <button onClick={() => navigator.clipboard.writeText(scriptResult.shortsVersion)}
+                      style={{ marginTop: 8, padding: "4px 10px", background: "var(--ink4)", border: "none", borderRadius: 6, fontSize: 11, color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      <Copy size={10} /> Copiar versión Short
+                    </button>
+                  </div>
+                )}
+
+                {/* Voiceover */}
                 {scriptResult.voiceoverText && (
                   <div style={{ background: "var(--ink3)", borderRadius: 9, padding: 12 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", marginBottom: 6 }}>🎙 VOZ EN OFF (para TTS)</div>
@@ -869,6 +1027,7 @@ export default function YouTubeStudio() {
                     </button>
                   </div>
                 )}
+
                 {scriptResult.visualPrompt && (
                   <div style={{ background: "var(--ink3)", borderRadius: 9, padding: 12 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", marginBottom: 6 }}>🎬 PROMPT VISUAL (para vídeo IA)</div>
@@ -879,6 +1038,14 @@ export default function YouTubeStudio() {
                     </button>
                   </div>
                 )}
+
+                {/* Posting recommendation */}
+                {scriptResult.postingRecommendation && (
+                  <div style={{ fontSize: 12, color: "#60a5fa", padding: "8px 12px", background: "rgba(96,165,250,0.08)", borderRadius: 8, border: "1px solid rgba(96,165,250,0.2)" }}>
+                    📅 Mejor momento para publicar: <strong>{scriptResult.postingRecommendation}</strong>
+                  </div>
+                )}
+
                 {scriptResult.callToAction && (
                   <div style={{ fontSize: 12, color: "var(--jade)", padding: "8px 12px", background: "rgba(16,185,129,0.08)", borderRadius: 8, border: "1px solid rgba(16,185,129,0.2)" }}>
                     📣 CTA: <strong>{scriptResult.callToAction}</strong>

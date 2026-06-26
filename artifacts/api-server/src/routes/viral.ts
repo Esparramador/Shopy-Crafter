@@ -1,10 +1,15 @@
 /**
- * Viral Comedy Studio — backend
+ * Viral Comedy Studio — backend mejorado con YouTube Knowledge Base
  * ─────────────────────────────────────────────────────────────────────────────
- * GET  /viral/trends         — tendencias políticas del día (Gemini Search + YouTube)
- * POST /viral/script         — genera guión satírico con Claude
- * POST /viral/log            — registra acción para aprendizaje del chatbot
- * GET  /viral/log            — historial de acciones (chatbot y UI)
+ * GET  /viral/trends         — tendencias del día (Gemini Search + YouTube)
+ * POST /viral/script         — genera guión con motor seleccionable
+ * POST /viral/score          — calcula puntuación de viralidad
+ * GET  /viral/formats        — catálogo completo de formatos de vídeo
+ * GET  /viral/comedy-prompts — los 3 prompts de comedia guardados
+ * GET  /viral/hooks          — frameworks de hooks
+ * GET  /viral/sector/:id     — estrategia por sector
+ * POST /viral/log            — registra acción para aprendizaje
+ * GET  /viral/log            — historial de acciones
  */
 
 import { Router, Request, Response } from "express";
@@ -14,6 +19,11 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { askGeminiWithSearch, askGeminiChat } from "../lib/gemini.js";
 import { askClaudeJson } from "../lib/claude.js";
+import {
+  VIDEO_FORMATS, COMEDY_PROMPTS, HOOK_FRAMEWORKS, SECTOR_STRATEGIES,
+  ALGORITHM_SIGNALS, TITLE_PATTERNS, VIRALITY_SIGNALS, buildYouTubeExpertPrompt,
+  calculateViralityScore, type ViralityInput,
+} from "../lib/youtube-knowledge.js";
 
 const router = Router();
 
@@ -44,21 +54,15 @@ async function searchYouTubeTrending(query: string, maxResults = 6): Promise<Arr
   if (!key) return [];
   try {
     const params = new URLSearchParams({
-      part: "snippet",
-      q: query,
-      type: "video",
-      order: "viewCount",
-      relevanceLanguage: "es",
-      regionCode: "ES",
-      maxResults: String(maxResults),
-      key,
+      part: "snippet", q: query, type: "video", order: "viewCount",
+      relevanceLanguage: "es", regionCode: "ES",
+      maxResults: String(maxResults), key,
     });
     const r = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
     if (!r.ok) return [];
     const data = await r.json() as any;
     const ids = (data.items || []).map((i: any) => i.id?.videoId).filter(Boolean).join(",");
     if (!ids) return [];
-    // Get stats
     const statsR = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${ids}&key=${key}`);
     const stats: Record<string, any> = {};
     if (statsR.ok) {
@@ -69,16 +73,14 @@ async function searchYouTubeTrending(query: string, maxResults = 6): Promise<Arr
       const vid = item.id?.videoId;
       const s = stats[vid] || {};
       const iso = s.contentDetails?.duration || "";
-      const dur = iso.replace("PT", "").replace("H", "h ").replace("M", "m ").replace("S", "s").trim();
+      const dur = iso.replace("PT","").replace("H","h ").replace("M","m ").replace("S","s").trim();
       return {
-        videoId: vid,
-        title: item.snippet?.title || "",
+        videoId: vid, title: item.snippet?.title || "",
         channelTitle: item.snippet?.channelTitle || "",
         thumbnail: item.snippet?.thumbnails?.medium?.url || "",
         viewCount: s.statistics?.viewCount || "0",
         watchUrl: `https://www.youtube.com/watch?v=${vid}`,
-        duration: dur,
-        publishedAt: item.snippet?.publishedAt || "",
+        duration: dur, publishedAt: item.snippet?.publishedAt || "",
       };
     }).filter((v: any) => v.videoId);
   } catch (e) {
@@ -90,26 +92,33 @@ async function searchYouTubeTrending(query: string, maxResults = 6): Promise<Arr
 // ─── GET /viral/trends ────────────────────────────────────────────────────────
 router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) => {
   const country = (req.query.country as string) || "España";
+  const sector  = (req.query.sector as string)  || "general";
   try {
+    const sectorStrategy = SECTOR_STRATEGIES[sector];
+    const ytQuery = sectorStrategy
+      ? `${sectorStrategy.viralTriggers[0]} ${country} 2026`
+      : `tendencias virales YouTube ${country} 2026`;
+
     const [newsResult, viralFormats, ytVideosResult] = await Promise.allSettled([
       askGeminiWithSearch(
-        `Dame las 8 noticias políticas más impactantes e importantes de hoy en ${country}.
+        `Dame las 8 noticias más impactantes e importantes de hoy en ${country}${sector !== "general" ? ` sobre el sector ${sector}` : ""}.
         Para cada una incluye:
-        - titular impactante
+        - titular impactante (máx 80 chars)
         - resumen de 2 líneas
         - protagonistas principales
         - por qué es viral o polémica
         - potencial cómico/satírico (1-10)
-        Devuelve JSON con array "news" de objetos: {headline, summary, protagonists, virality, comedyScore}`,
-        "Eres un analista de noticias políticas español especializado en detectar contenido viral.",
+        - formato de vídeo recomendado (uno de: Short, Tutorial, Sátira, Reacción, Documental)
+        Devuelve JSON con array "news" de objetos: {headline, summary, protagonists, virality, comedyScore, recommendedFormat}`,
+        "Eres un analista de contenido digital español especializado en detectar tendencias virales.",
       ),
       askGeminiWithSearch(
-        `Analiza los formatos de vídeo de humor político más virales en YouTube, TikTok e Instagram en ${country} actualmente.
-        Dame los 5 formatos más efectivos con: nombre, descripción, duración media, tasa de engagement típica, por qué funciona.
-        Devuelve JSON con array "formats": {name, description, avgDuration, engagement, whyWorks}`,
-        "Eres experto en marketing de contenidos y análisis de tendencias virales.",
+        `Analiza los 5 formatos de vídeo más virales en YouTube, TikTok e Instagram en ${country} esta semana${sector !== "general" ? ` para el sector ${sector}` : ""}.
+        Para cada formato: nombre, descripción breve, duración media, engagement típico, por qué funciona ahora.
+        Devuelve JSON con array "formats": {name, description, avgDuration, engagement, whyWorks, exampleChannel}`,
+        "Eres experto en marketing de contenidos y análisis de tendencias virales en habla hispana.",
       ),
-      searchYouTubeTrending("sátira política humor España 2025", 6),
+      searchYouTubeTrending(ytQuery, 6),
     ]);
 
     let news: any[] = [];
@@ -122,9 +131,13 @@ router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) =>
     }
     const ytVideos = ytVideosResult.status === "fulfilled" ? ytVideosResult.value : [];
 
-    await db.execute(sql`INSERT INTO viral_log (action, data) VALUES ('trend_search', ${JSON.stringify({ country, newsCount: news.length, formatsCount: formats.length, ytCount: ytVideos.length })})`);
+    await db.execute(sql`INSERT INTO viral_log (action, data) VALUES ('trend_search', ${JSON.stringify({ country, sector, newsCount: news.length })})` );
 
-    res.json({ news, formats, youtubeVideos: ytVideos, country, timestamp: new Date().toISOString() });
+    res.json({
+      news, formats, youtubeVideos: ytVideos, country, sector,
+      algorithmSignals: ALGORITHM_SIGNALS,
+      timestamp: new Date().toISOString(),
+    });
   } catch (err: any) {
     logger.error({ err }, "viral/trends failed");
     res.status(500).json({ error: err?.message || "Error obteniendo tendencias" });
@@ -133,30 +146,62 @@ router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) =>
 
 // ─── POST /viral/script ───────────────────────────────────────────────────────
 router.post("/viral/script", requireAdmin, async (req: Request, res: Response) => {
-  const { newsItem, tone = "ácido", duration = 60, style = "monólogo", country = "España", engine = "claude" } = req.body;
+  const {
+    newsItem, tone = "ácido", duration = 60, style = "monólogo",
+    country = "España", engine = "claude",
+    format = "satira-politica", sector,
+    comedyPromptId,
+  } = req.body;
   if (!newsItem) { res.status(400).json({ error: "newsItem requerido" }); return; }
 
-  const PROMPT = `Eres el mejor guionista de comedia política de ${country}. Tu estilo mezcla El Intermedio, Wyoming, La Resistencia y el humor absurdo de Facu Díaz.
+  const formatKB  = VIDEO_FORMATS.find(f => f.id === format);
+  const expertCtx = buildYouTubeExpertPrompt(sector, format);
 
-Noticia a satirizar:
+  const comedyCtx = comedyPromptId
+    ? COMEDY_PROMPTS.find(p => p.id === comedyPromptId)?.prompt || ""
+    : "";
+
+  const PROMPT = `${expertCtx}
+
+---
+Eres el mejor guionista de contenido viral de ${country}. Tu estilo domina: El Intermedio, La Resistencia, The Daily Show, Facu Díaz, humor absurdo y sátira política inteligente.
+
+${comedyCtx ? `PLANTILLA DE COMEDIA A APLICAR:\n${comedyCtx}\n---` : ""}
+
+NOTICIA/TEMA A DESARROLLAR:
 "${typeof newsItem === "object" ? JSON.stringify(newsItem) : newsItem}"
 
-Parámetros del vídeo:
+PARÁMETROS DEL VÍDEO:
+- Formato: ${formatKB ? formatKB.name : style}
 - Tono: ${tone}
 - Duración objetivo: ${duration} segundos
-- Formato: ${style}
+- País/Contexto: ${country}
+${formatKB ? `- Estructura recomendada: ${formatKB.structure.join(" → ")}` : ""}
+${formatKB ? `- Hook framework: ${formatKB.hook}` : ""}
 
-Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks) con esta estructura exacta:
+SEÑALES DE VIRALIDAD A INCLUIR (por orden de prioridad):
+1. Hook brutal en los primeros 3 segundos
+2. Pico emocional genuino (sorpresa, incredulidad, humor)
+3. Opinión bomba / statement polarizante
+4. Momento de revelación que reencuadra la situación
+5. One-liner quotable para recortar como Short
+
+Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks):
 {
-  "title": "título viral para YouTube (max 60 chars, con gancho emocional)",
-  "description": "descripción SEO de 150 palabras con keywords políticas relevantes",
-  "tags": ["array", "de", "15", "tags", "relevantes"],
-  "hook": "primeros 5 segundos — frase gancho brutal que para el scroll",
-  "script": "guión completo con indicaciones de tono, pausa, énfasis [PAUSA], [ÉNFASIS], [TONO IRÓNICO]",
-  "voiceoverText": "texto limpio para TTS sin corchetes ni acotaciones",
-  "visualPrompt": "descripción visual cinematográfica para generar vídeo con IA (en inglés, estilo Midjourney/Runway)",
-  "callToAction": "CTA final para que se suscriban, máximo 10 palabras",
-  "comedyTechniques": ["lista de técnicas cómicas usadas (absurdo, hipérbole, etc.)"]
+  "title": "título viral (max 60 chars, con gancho emocional, patrón high-performing)",
+  "titleAlternatives": ["3 títulos alternativos A/B test"],
+  "description": "descripción SEO de 150 palabras con keywords relevantes",
+  "tags": ["array de 15 tags SEO relevantes"],
+  "hook": "primeros 3-5 segundos — frase gancho brutal que para el scroll",
+  "script": "guión completo con acotaciones [PAUSA], [ÉNFASIS], [TONO IRÓNICO], [CARA DE INCREDULIDAD]",
+  "voiceoverText": "texto limpio para TTS/narración sin corchetes ni acotaciones",
+  "visualPrompt": "prompt cinematográfico en inglés para generar vídeo con IA (estilo Runway/Veo/Grok Video)",
+  "thumbnailPrompt": "descripción del thumbnail ideal: composición, colores, texto, emoción facial",
+  "callToAction": "CTA final para suscripción, máximo 10 palabras",
+  "comedyTechniques": ["técnicas cómicas usadas: ironía, hipérbole, absurdo, etc."],
+  "viralSignals": {"hasStrongHook": true, "hasEmotionalPeak": true, "hasConflict": false, "hasPracticalValue": false, "hasStoryArc": true},
+  "shortsVersion": "versión comprimida de 60 segundos para YouTube Shorts",
+  "postingRecommendation": "mejor día y hora para publicar basado en el tema"
 }`;
 
   try {
@@ -171,10 +216,8 @@ Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks) con esta estruct
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${xaiKey}` },
         body: JSON.stringify({
-          model: grokModel,
-          messages: [{ role: "user", content: PROMPT }],
-          temperature: 0.9,
-          max_tokens: 4000,
+          model: grokModel, messages: [{ role: "user", content: PROMPT }],
+          temperature: 0.9, max_tokens: 5000,
         }),
       });
       if (!grokRes.ok) {
@@ -193,23 +236,65 @@ Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks) con esta estruct
       engineUsed = "gemini";
 
     } else {
-      // Default: Claude
-      script = await askClaudeJson<{
-        title: string; description: string; tags: string[];
-        hook: string; script: string; voiceoverText: string;
-        visualPrompt: string; callToAction: string;
-        comedyTechniques: string[];
-      }>(PROMPT);
+      script = await askClaudeJson<any>(PROMPT);
       engineUsed = "claude";
     }
 
-    await db.execute(sql`INSERT INTO viral_log (action, data) VALUES ('script_generated', ${JSON.stringify({ tone, duration, style, engine: engineUsed, title: script?.title || "" })})`);
+    // Auto-calculate virality score if signals present
+    let viralScore: any = null;
+    if (script?.viralSignals) {
+      const inp: ViralityInput = {
+        ...script.viralSignals,
+        titleScore: script.title?.length > 20 ? 12 : 6,
+        hasNumberInTitle: /\d/.test(script.title || ""),
+        estimatedDurationSecs: Number(duration),
+        sector,
+      };
+      viralScore = calculateViralityScore(inp);
+    }
 
-    res.json({ success: true, script, engineUsed });
+    await db.execute(sql`INSERT INTO viral_log (action, data) VALUES ('script_generated', ${JSON.stringify({ tone, duration, style, format, engine: engineUsed, title: script?.title || "" })})` );
+
+    res.json({ success: true, script, engineUsed, viralScore });
   } catch (err: any) {
     logger.error({ err }, "viral/script failed");
     res.status(500).json({ error: err?.message || "Error generando guión" });
   }
+});
+
+// ─── POST /viral/score ────────────────────────────────────────────────────────
+router.post("/viral/score", requireAdmin, async (req: Request, res: Response) => {
+  const input = req.body as ViralityInput;
+  try {
+    const result = calculateViralityScore(input);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message });
+  }
+});
+
+// ─── GET /viral/formats ───────────────────────────────────────────────────────
+router.get("/viral/formats", requireAdmin, (_req: Request, res: Response) => {
+  res.json({ formats: VIDEO_FORMATS, count: VIDEO_FORMATS.length });
+});
+
+// ─── GET /viral/comedy-prompts ────────────────────────────────────────────────
+router.get("/viral/comedy-prompts", requireAdmin, (_req: Request, res: Response) => {
+  res.json({ prompts: COMEDY_PROMPTS });
+});
+
+// ─── GET /viral/hooks ─────────────────────────────────────────────────────────
+router.get("/viral/hooks", requireAdmin, (_req: Request, res: Response) => {
+  res.json({ hooks: HOOK_FRAMEWORKS, titlePatterns: TITLE_PATTERNS });
+});
+
+// ─── GET /viral/sector/:id ────────────────────────────────────────────────────
+router.get("/viral/sector/:id", requireAdmin, (req: Request, res: Response) => {
+  const strategy = SECTOR_STRATEGIES[req.params.id];
+  if (!strategy) {
+    return res.json({ sectors: Object.keys(SECTOR_STRATEGIES), viralitySignals: VIRALITY_SIGNALS });
+  }
+  res.json({ sector: req.params.id, strategy, viralitySignals: VIRALITY_SIGNALS });
 });
 
 // ─── POST /viral/log ──────────────────────────────────────────────────────────
@@ -227,7 +312,7 @@ router.post("/viral/log", requireAdmin, async (req: Request, res: Response) => {
 // ─── GET /viral/log ───────────────────────────────────────────────────────────
 router.get("/viral/log", requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const rows = await db.execute(sql`SELECT id, action, data, created_at FROM viral_log ORDER BY created_at DESC LIMIT 50`);
+    const rows = await db.execute(sql`SELECT id, action, data, created_at FROM viral_log ORDER BY created_at DESC LIMIT 100`);
     res.json({ log: rows.rows });
   } catch (err: any) {
     res.status(500).json({ error: err?.message });
