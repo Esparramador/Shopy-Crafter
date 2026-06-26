@@ -120,7 +120,7 @@ async function fetchChannelInfo(accessToken: string) {
 }
 
 // ─── PUBLIC: YouTube Search ───────────────────────────────────────────────────
-router.get("/api/youtube/search", async (req: Request, res: Response) => {
+router.get("/youtube/search", async (req: Request, res: Response) => {
   try {
     const q = String(req.query.q || "").trim();
     const maxResults = Math.min(Number(req.query.max) || 5, 10);
@@ -166,7 +166,7 @@ router.get("/api/youtube/search", async (req: Request, res: Response) => {
 });
 
 // ─── ADMIN: OAuth URL ─────────────────────────────────────────────────────────
-router.get("/api/youtube/oauth/url", requireAdmin, (req: Request, res: Response) => {
+router.get("/youtube/oauth/url", requireAdmin, (req: Request, res: Response) => {
   const clientId = OAUTH.clientId();
   if (!clientId) {
     return res.status(400).json({
@@ -189,7 +189,7 @@ router.get("/api/youtube/oauth/url", requireAdmin, (req: Request, res: Response)
 });
 
 // ─── ADMIN: OAuth Callback ────────────────────────────────────────────────────
-router.get("/api/youtube/oauth/callback", requireAdmin, async (req: Request, res: Response) => {
+router.get("/youtube/oauth/callback", requireAdmin, async (req: Request, res: Response) => {
   const code = String(req.query.code || "");
   if (!code) return res.status(400).send("Sin código de autorización");
 
@@ -246,7 +246,7 @@ router.get("/api/youtube/oauth/callback", requireAdmin, async (req: Request, res
 });
 
 // ─── ADMIN: Channel Info ──────────────────────────────────────────────────────
-router.get("/api/youtube/channel", requireAdmin, async (req: Request, res: Response) => {
+router.get("/youtube/channel", requireAdmin, async (req: Request, res: Response) => {
   try {
     const userId = (req.user as any)?.id || "admin";
     const rows = await db.execute<{
@@ -274,7 +274,7 @@ router.get("/api/youtube/channel", requireAdmin, async (req: Request, res: Respo
 });
 
 // ─── ADMIN: List Channel Videos ──────────────────────────────────────────────
-router.get("/api/youtube/videos", requireAdmin, async (req: Request, res: Response) => {
+router.get("/youtube/videos", requireAdmin, async (req: Request, res: Response) => {
   try {
     const userId = (req.user as any)?.id || "admin";
     const token = await getValidToken(userId);
@@ -323,7 +323,7 @@ router.get("/api/youtube/videos", requireAdmin, async (req: Request, res: Respon
 
 // ─── ADMIN: Upload Video ──────────────────────────────────────────────────────
 router.post(
-  "/api/youtube/upload",
+  "/youtube/upload",
   requireAdmin,
   upload.fields([
     { name: "video", maxCount: 1 },
@@ -432,7 +432,7 @@ router.post(
 );
 
 // ─── ADMIN: Delete Video ──────────────────────────────────────────────────────
-router.delete("/api/youtube/videos/:videoId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/youtube/videos/:videoId", requireAdmin, async (req: Request, res: Response) => {
   try {
     const userId = (req.user as any)?.id || "admin";
     const token = await getValidToken(userId);
@@ -452,7 +452,7 @@ router.delete("/api/youtube/videos/:videoId", requireAdmin, async (req: Request,
 });
 
 // ─── ADMIN: Disconnect Channel ────────────────────────────────────────────────
-router.delete("/api/youtube/channel", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/youtube/channel", requireAdmin, async (req: Request, res: Response) => {
   try {
     const userId = (req.user as any)?.id || "admin";
     await db.execute(sql`DELETE FROM youtube_tokens WHERE user_id = ${userId}`);
