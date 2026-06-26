@@ -217,7 +217,7 @@ function formatInlineText(content: string, segIdx: number): React.ReactNode[] {
           target="_blank"
           rel="noreferrer"
           style={{ color: "var(--gold)", textDecoration: "underline", wordBreak: "break-all" }}
-          onClick={(e) => { e.stopPropagation(); window.open(part, "_blank", "noreferrer"); e.preventDefault(); }}
+          onClick={(e) => e.stopPropagation()}
         >
           {part}
         </a>

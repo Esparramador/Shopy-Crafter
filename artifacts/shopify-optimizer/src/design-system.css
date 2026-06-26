@@ -959,15 +959,16 @@ code {
     display: flex !important;
     align-items: center; justify-content: center;
   }
-  /* Ocultar secciones no-nav del sidebar en la barra horizontal cerrada */
-  .sidebar-label { display: none !important; }
-  .sidebar-promo { display: none !important; }
-  .sidebar-bottom { display: none !important; }
-  /* Ocultar el selector de tiendas en la barra horizontal — no hay espacio */
-  .sidebar-clients { display: none !important; }
+  /*
+   * HEADER ÚNICO EN MÓVIL:
+   * Ocultar la barra horizontal del sidebar — el topbar es el único header.
+   * La nav completa se abre con el hamburger como overlay (posición fija).
+   */
+  .sidebar { display: none !important; }
 
   /* ── Sidebar overlay completo cuando está abierto en móvil ─── */
   .sidebar.open {
+    display: flex !important;
     position: fixed !important;
     top: 0; left: 0; bottom: 0;
     z-index: 100;

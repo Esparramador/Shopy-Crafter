@@ -9,8 +9,8 @@ const PLAN_ICONS: Record<string, string> = { trial: "🆓", starter: "🚀", pro
 interface Plan {
   id: string;
   name: string;
-  price: number;
-  priceAnnual?: number;
+  price: number | null;
+  priceAnnual?: number | null;
   currency?: string;
   period?: string;
   featured?: boolean;
@@ -289,8 +289,11 @@ export default function Billing() {
                     fontSize: 28, fontWeight: 800,
                     color: plan.id === "trial" ? "var(--jade)" : "var(--gold)", marginBottom: 12,
                   }}>
-                    {plan.price === 0 ? "Gratis" : `€${plan.price}`}
-                    {plan.price > 0 && <span style={{ fontSize: 12, color: "var(--t3)", fontWeight: 400 }}>/mes</span>}
+                    {plan.price == null
+                      ? <span style={{ fontSize: 18, fontStyle: "italic", color: "var(--t3)" }}>A medida</span>
+                      : plan.price === 0 ? "Gratis" : `€${plan.price}`
+                    }
+                    {plan.price != null && plan.price > 0 && <span style={{ fontSize: 12, color: "var(--t3)", fontWeight: 400 }}>/mes</span>}
                   </div>
                   <ul style={{ listStyle: "none", padding: 0, margin: "0 0 16px" }}>
                     {plan.features.map(f => (
@@ -488,7 +491,7 @@ function InvoicesTab(props: { loading: boolean; error: string | null; invoices: 
 }
 
 const EMPTY_PLAN: Omit<Plan, "storesLimit" | "imagesIncluded"> & { storesLimit: string; imagesIncluded: string } = {
-  id: "", name: "", price: 0, priceAnnual: 0, currency: "€", period: "/mes",
+  id: "", name: "", price: null, priceAnnual: null, currency: "€", period: "/mes",
   featured: false, badge: "", features: [], ctaLabel: "Contactar →",
   ctaStyle: "ghost", ctaHref: "/contacto", storesLimit: "1", imagesIncluded: "10",
 };
@@ -507,7 +510,7 @@ function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading:
   };
   const openEdit = (p: Plan) => {
     setForm({
-      id: p.id, name: p.name, price: p.price, priceAnnual: p.priceAnnual ?? p.price * 10,
+      id: p.id, name: p.name, price: p.price ?? null, priceAnnual: p.priceAnnual ?? null,
       currency: p.currency ?? "€", period: p.period ?? "/mes", featured: p.featured ?? false,
       badge: p.badge ?? "", features: p.features, ctaLabel: p.ctaLabel ?? "Contactar →",
       ctaStyle: p.ctaStyle ?? "ghost", ctaHref: p.ctaHref ?? "/contacto",
@@ -521,7 +524,9 @@ function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading:
     setSaving(true); setError(null);
     try {
       const payload = {
-        ...form, price: Number(form.price), priceAnnual: Number(form.priceAnnual),
+        ...form,
+        price: (form.price === null || form.price === "" as any) ? null : Number(form.price),
+        priceAnnual: (form.priceAnnual === null || form.priceAnnual === "" as any) ? null : Number(form.priceAnnual),
         storesLimit: Number(form.storesLimit), imagesIncluded: Number(form.imagesIncluded),
         badge: form.badge || null,
         features: featuresText.split("\n").map(s => s.trim()).filter(Boolean),
@@ -578,8 +583,8 @@ function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading:
             {[
               { label: "ID (slug)", field: "id" as const, disabled: !!editId, placeholder: "ej: fotoshoot_pro" },
               { label: "Nombre", field: "name" as const, placeholder: "ej: Fotoshoot Pro" },
-              { label: "Precio mensual (€)", field: "price" as const, type: "number" },
-              { label: "Precio anual (€)", field: "priceAnnual" as const, type: "number" },
+              { label: "Precio mensual (€) — vacío = A medida", field: "price" as const, type: "number" },
+              { label: "Precio anual (€) — vacío = A medida", field: "priceAnnual" as const, type: "number" },
               { label: "Tiendas límite", field: "storesLimit" as const, type: "number" },
               { label: "Imágenes/mes", field: "imagesIncluded" as const, type: "number" },
               { label: "Badge (opcional)", field: "badge" as const, placeholder: "ej: Más popular" },
@@ -646,8 +651,13 @@ function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading:
                 <button onClick={() => handleDelete(plan.id)} disabled={deleting === plan.id} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--crim)", padding: 4 }} title="Eliminar"><Trash2 size={13} /></button>
               </div>
             </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "var(--gold)", marginBottom: 4 }}>€{plan.price}<span style={{ fontSize: 12, color: "var(--t3)", fontWeight: 400 }}>/mes</span></div>
-            {plan.priceAnnual && <div style={{ fontSize: 11, color: "var(--jade)" }}>€{plan.priceAnnual}/año</div>}
+            <div style={{ fontSize: 24, fontWeight: 800, color: "var(--gold)", marginBottom: 4 }}>
+              {plan.price == null
+                ? <span style={{ fontSize: 16, color: "var(--t3)", fontStyle: "italic" }}>A medida</span>
+                : <>{plan.price === 0 ? "Gratis" : `€${plan.price}`}<span style={{ fontSize: 12, color: "var(--t3)", fontWeight: 400 }}>/mes</span></>
+              }
+            </div>
+            {plan.priceAnnual != null && <div style={{ fontSize: 11, color: "var(--jade)" }}>€{plan.priceAnnual}/año</div>}
             <div style={{ marginTop: 10 }}>
               {plan.features.slice(0, 4).map(f => (
                 <div key={f} style={{ display: "flex", gap: 5, fontSize: 11, color: "var(--t2)", marginBottom: 4 }}>
