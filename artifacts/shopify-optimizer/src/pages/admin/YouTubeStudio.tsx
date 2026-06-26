@@ -77,6 +77,7 @@ export default function YouTubeStudio() {
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [satiricoProjectId, setSatiricoProjectId] = useState<string>("");
   const [satiricoModel, setSatiricoModel] = useState("seedance-1-lite");
+  const [scriptEngine, setScriptEngine] = useState<"grok" | "claude" | "gemini">("grok");
 
   const [form, setForm] = useState({
     title: "", description: "", tags: "", privacy: "public", categoryId: "22",
@@ -226,6 +227,7 @@ export default function YouTubeStudio() {
           tone: scriptForm.tone,
           duration: parseInt(scriptForm.duration),
           style: scriptForm.style,
+          engine: scriptEngine,
         }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
@@ -786,9 +788,35 @@ export default function YouTubeStudio() {
               </div>
             </div>
 
+            {/* Engine selector */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 8, display: "block" }}>Motor IA para el guión</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {([
+                  { id: "grok",   label: "Grok 3",   icon: "⚡", desc: "xAI · recomendado",  color: "#00b4d8" },
+                  { id: "claude", label: "Claude",    icon: "🧠", desc: "Anthropic",          color: "#f59e0b" },
+                  { id: "gemini", label: "Gemini",    icon: "♊", desc: "Google",              color: "#34d399" },
+                ] as const).map(eng => (
+                  <button key={eng.id} type="button" onClick={() => setScriptEngine(eng.id)}
+                    style={{
+                      flex: 1, minWidth: 110, padding: "10px 14px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                      border: scriptEngine === eng.id ? `2px solid ${eng.color}` : "2px solid var(--ink4)",
+                      background: scriptEngine === eng.id ? `color-mix(in srgb, ${eng.color} 12%, transparent)` : "var(--ink2)",
+                      transition: "all .15s",
+                    }}>
+                    <div style={{ fontSize: 16, marginBottom: 2 }}>{eng.icon}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: scriptEngine === eng.id ? eng.color : "var(--t2)" }}>{eng.label}</div>
+                    <div style={{ fontSize: 10, color: "var(--t3)" }}>{eng.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button type="submit" disabled={generatingScript || !scriptForm.newsText.trim()}
               style={{ padding: "12px 24px", background: generatingScript ? "var(--ink3)" : "linear-gradient(135deg,var(--gold),#f59e0b)", color: "#000", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: generatingScript ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              {generatingScript ? <><RefreshCw size={16} className="spin" /> Generando guión con Claude…</> : <><Zap size={16} /> Generar Guión Satírico</>}
+              {generatingScript
+                ? <><RefreshCw size={16} className="spin" /> Generando con {scriptEngine === "grok" ? "Grok 3" : scriptEngine === "gemini" ? "Gemini" : "Claude"}…</>
+                : <><Zap size={16} /> Generar con {scriptEngine === "grok" ? "⚡ Grok 3" : scriptEngine === "gemini" ? "♊ Gemini" : "🧠 Claude"}</>}
             </button>
           </form>
 

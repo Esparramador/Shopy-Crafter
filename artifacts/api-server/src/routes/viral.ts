@@ -12,7 +12,7 @@ import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { askGeminiWithSearch } from "../lib/gemini.js";
+import { askGeminiWithSearch, askGeminiChat } from "../lib/gemini.js";
 import { askClaudeJson } from "../lib/claude.js";
 
 const router = Router();
@@ -133,27 +133,20 @@ router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) =>
 
 // ─── POST /viral/script ───────────────────────────────────────────────────────
 router.post("/viral/script", requireAdmin, async (req: Request, res: Response) => {
-  const { newsItem, tone = "ácido", duration = 60, style = "monólogo", country = "España" } = req.body;
+  const { newsItem, tone = "ácido", duration = 60, style = "monólogo", country = "España", engine = "claude" } = req.body;
   if (!newsItem) { res.status(400).json({ error: "newsItem requerido" }); return; }
 
-  try {
-    const script = await askClaudeJson<{
-      title: string; description: string; tags: string[];
-      hook: string; script: string; voiceoverText: string;
-      visualPrompt: string; callToAction: string;
-      comedyTechniques: string[];
-    }>(
-      `Eres el mejor guionista de comedia política de ${country}. Tu estilo mezcla El Intermedio, Wyoming, La Resistencia y el humor absurdo de Facu Díaz.
+  const PROMPT = `Eres el mejor guionista de comedia política de ${country}. Tu estilo mezcla El Intermedio, Wyoming, La Resistencia y el humor absurdo de Facu Díaz.
 
 Noticia a satirizar:
 "${typeof newsItem === "object" ? JSON.stringify(newsItem) : newsItem}"
 
 Parámetros del vídeo:
-- Tono: ${tone} (opciones: ácido, absurdo, irónico, sarcástico, tierno)
+- Tono: ${tone}
 - Duración objetivo: ${duration} segundos
-- Formato: ${style} (opciones: monólogo, sketch, reportaje falso, entrevista imaginaria)
+- Formato: ${style}
 
-Genera un guión satírico completo devolviendo JSON con:
+Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks) con esta estructura exacta:
 {
   "title": "título viral para YouTube (max 60 chars, con gancho emocional)",
   "description": "descripción SEO de 150 palabras con keywords políticas relevantes",
@@ -164,12 +157,55 @@ Genera un guión satírico completo devolviendo JSON con:
   "visualPrompt": "descripción visual cinematográfica para generar vídeo con IA (en inglés, estilo Midjourney/Runway)",
   "callToAction": "CTA final para que se suscriban, máximo 10 palabras",
   "comedyTechniques": ["lista de técnicas cómicas usadas (absurdo, hipérbole, etc.)"]
-}`,
-    );
+}`;
 
-    await db.execute(sql`INSERT INTO viral_log (action, data) VALUES ('script_generated', ${JSON.stringify({ tone, duration, style, title: script?.title || "" })})`);
+  try {
+    let script: any = null;
+    let engineUsed = engine;
 
-    res.json({ success: true, script });
+    if (engine === "grok") {
+      const xaiKey = process.env.XAI_API_KEY;
+      if (!xaiKey) { res.status(500).json({ error: "XAI_API_KEY no configurada" }); return; }
+      const grokModel = process.env.GROK_MODEL || "grok-3";
+      const grokRes = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${xaiKey}` },
+        body: JSON.stringify({
+          model: grokModel,
+          messages: [{ role: "user", content: PROMPT }],
+          temperature: 0.9,
+          max_tokens: 4000,
+        }),
+      });
+      if (!grokRes.ok) {
+        const errText = await grokRes.text().catch(() => "");
+        throw new Error(`Grok API error (${grokRes.status}): ${errText.slice(0, 300)}`);
+      }
+      const grokData = await grokRes.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const raw = grokData.choices?.[0]?.message?.content || "";
+      script = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      engineUsed = grokModel;
+
+    } else if (engine === "gemini") {
+      const result = await askGeminiChat([{ role: "user", content: PROMPT }]);
+      const raw = typeof result === "string" ? result : (result as any).text || "";
+      script = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      engineUsed = "gemini";
+
+    } else {
+      // Default: Claude
+      script = await askClaudeJson<{
+        title: string; description: string; tags: string[];
+        hook: string; script: string; voiceoverText: string;
+        visualPrompt: string; callToAction: string;
+        comedyTechniques: string[];
+      }>(PROMPT);
+      engineUsed = "claude";
+    }
+
+    await db.execute(sql`INSERT INTO viral_log (action, data) VALUES ('script_generated', ${JSON.stringify({ tone, duration, style, engine: engineUsed, title: script?.title || "" })})`);
+
+    res.json({ success: true, script, engineUsed });
   } catch (err: any) {
     logger.error({ err }, "viral/script failed");
     res.status(500).json({ error: err?.message || "Error generando guión" });
