@@ -27,6 +27,15 @@ import {
 
 const router = Router();
 
+// ─── GET /viral/engines — qué motores tienen su API key configurada ──────────
+router.get("/viral/engines", requireAdmin, (_req: Request, res: Response) => {
+  res.json({
+    grok:   !!process.env.XAI_API_KEY,
+    claude: !!process.env.ANTHROPIC_API_KEY,
+    gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+  });
+});
+
 // ─── Ensure DB table ──────────────────────────────────────────────────────────
 async function ensureViralTable() {
   try {

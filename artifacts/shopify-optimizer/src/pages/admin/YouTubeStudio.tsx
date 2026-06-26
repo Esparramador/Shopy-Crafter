@@ -83,6 +83,7 @@ export default function YouTubeStudio() {
   const [trendsSector, setTrendsSector] = useState("general");
   const [viralScore, setViralScore] = useState<{ score: number; breakdown: Record<string, number>; recommendations: string[] } | null>(null);
   const [showFormats, setShowFormats] = useState(false);
+  const [engines, setEngines] = useState<{ grok: boolean; claude: boolean; gemini: boolean } | null>(null);
 
   const [form, setForm] = useState({
     title: "", description: "", tags: "", privacy: "public", categoryId: "22",
@@ -92,7 +93,18 @@ export default function YouTubeStudio() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [thumbFile, setThumbFile] = useState<File | null>(null);
 
-  useEffect(() => { loadChannel(); }, []);
+  useEffect(() => {
+    loadChannel();
+    fetch(`${BASE}/api/viral/engines`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) {
+          setEngines(d);
+          if (!d.grok && d.claude) setScriptEngine("claude");
+          else if (!d.grok && !d.claude && d.gemini) setScriptEngine("gemini");
+        }
+      }).catch(() => {});
+  }, []);
 
   async function loadChannel() {
     setLoadingChannel(true);
@@ -881,22 +893,36 @@ export default function YouTubeStudio() {
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 8, display: "block" }}>Motor IA para el guión</label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {([
-                  { id: "grok",   label: "Grok 3",   icon: "⚡", desc: "xAI · recomendado",  color: "#00b4d8" },
-                  { id: "claude", label: "Claude",    icon: "🧠", desc: "Anthropic",          color: "#f59e0b" },
-                  { id: "gemini", label: "Gemini",    icon: "♊", desc: "Google",              color: "#34d399" },
-                ] as const).map(eng => (
-                  <button key={eng.id} type="button" onClick={() => setScriptEngine(eng.id)}
-                    style={{
-                      flex: 1, minWidth: 110, padding: "10px 14px", borderRadius: 10, cursor: "pointer", textAlign: "left",
-                      border: scriptEngine === eng.id ? `2px solid ${eng.color}` : "2px solid var(--ink4)",
-                      background: scriptEngine === eng.id ? `color-mix(in srgb, ${eng.color} 12%, transparent)` : "var(--ink2)",
-                      transition: "all .15s",
-                    }}>
-                    <div style={{ fontSize: 16, marginBottom: 2 }}>{eng.icon}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: scriptEngine === eng.id ? eng.color : "var(--t2)" }}>{eng.label}</div>
-                    <div style={{ fontSize: 10, color: "var(--t3)" }}>{eng.desc}</div>
-                  </button>
-                ))}
+                  { id: "grok",   label: "Grok 3",   icon: "⚡", desc: "xAI",       color: "#00b4d8" },
+                  { id: "claude", label: "Claude",    icon: "🧠", desc: "Anthropic", color: "#f59e0b" },
+                  { id: "gemini", label: "Gemini",    icon: "♊", desc: "Google",    color: "#34d399" },
+                ] as const).map(eng => {
+                  const available = engines ? engines[eng.id] : true;
+                  const active = scriptEngine === eng.id;
+                  return (
+                    <button key={eng.id} type="button"
+                      onClick={() => available && setScriptEngine(eng.id)}
+                      title={available ? undefined : `${eng.label}: API key no configurada`}
+                      style={{
+                        flex: 1, minWidth: 110, padding: "10px 14px", borderRadius: 10,
+                        cursor: available ? "pointer" : "not-allowed", textAlign: "left",
+                        opacity: available ? 1 : 0.45,
+                        border: active ? `2px solid ${eng.color}` : "2px solid var(--ink4)",
+                        background: active ? `color-mix(in srgb, ${eng.color} 12%, transparent)` : "var(--ink2)",
+                        transition: "all .15s", position: "relative",
+                      }}>
+                      <div style={{ fontSize: 16, marginBottom: 2 }}>{eng.icon}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: active ? eng.color : "var(--t2)" }}>{eng.label}</div>
+                      <div style={{ fontSize: 10, color: "var(--t3)" }}>{eng.desc}</div>
+                      {engines && (
+                        <div style={{ position: "absolute", top: 6, right: 8, fontSize: 10, fontWeight: 700,
+                          color: available ? "#10b981" : "#ef4444" }}>
+                          {available ? "✓" : "✗"}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
