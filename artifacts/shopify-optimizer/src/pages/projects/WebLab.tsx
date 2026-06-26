@@ -97,6 +97,32 @@ interface SecretsReport {
   summary: { total: number; critical: number; high: number; medium: number; services: string[]; riskScore: number; scannedAt: string; contentLength: number };
   secrets: ExposedSecret[];
 }
+
+interface AuditFinding {
+  id: string;
+  category: string;
+  type: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  title: string;
+  description: string;
+  evidence: string;
+  lineNumber?: number;
+  attackScenario: string;
+  dbImpact?: string;
+  fix: string;
+  fixCode?: string;
+  cvss?: number;
+}
+interface SecurityAuditResult {
+  findings: AuditFinding[];
+  stats: { critical: number; high: number; medium: number; low: number; total: number };
+  categories: string[];
+  secScore: number;
+  dbRisk: "critical" | "high" | "medium" | "low";
+  scannedAt: string;
+  contentLength: number;
+  vaultId?: number | null;
+}
 interface DeepScanResult {
   url: string;
   scannedAt: string;
@@ -768,6 +794,14 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const [secretsReport, setSecretsReport] = useState<SecretsReport | null>(null);
   const [secretsLoading, setSecretsLoading] = useState(false);
   const [secretsError, setSecretsError] = useState("");
+
+  // Security Audit state
+  const [auditReport, setAuditReport] = useState<SecurityAuditResult | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState("");
+  const [auditInput, setAuditInput] = useState("");
+  const [auditCatFilter, setAuditCatFilter] = useState<string>("all");
+  const [auditExpandedId, setAuditExpandedId] = useState<string | null>(null);
   // 3D Effects state
   const [effects3d, setEffects3d] = useState<Effects3DResult | null>(null);
   const [effects3dLoading, setEffects3dLoading] = useState(false);
@@ -1035,11 +1069,11 @@ function WebLabInner({ projectId }: { projectId: number }) {
         setSecretsLoading(false);
         const content = html.trim();
         if (content) {
-          const r2 = await fetch(`${API_BASE}/api/weblab/scan-secrets`, {
+          const r2 = await fetch(`${API_BASE}/api/web-lab/scan-secrets`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ content }),
+            body: JSON.stringify({ html: content }),
           });
           if (r2.ok) {
             const d = await r2.json();
@@ -1190,6 +1224,33 @@ function WebLabInner({ projectId }: { projectId: number }) {
       setSecretsError(e.message || "Error en el análisis de secretos");
     } finally {
       setSecretsLoading(false);
+    }
+  };
+
+  const runSecurityAudit = async (overrideHtml?: string, overrideUrl?: string) => {
+    const html = overrideHtml ?? auditInput.trim();
+    const targetUrl = overrideUrl ?? url.trim();
+    if (!html && !targetUrl) return;
+    setAuditLoading(true);
+    setAuditError("");
+    setAuditReport(null);
+    setAuditCatFilter("all");
+    setAuditExpandedId(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/web-lab/security-audit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ html: html || undefined, url: targetUrl || undefined, projectId }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Error ${res.status}`);
+      setAuditReport(data);
+      loadHistory();
+    } catch (e: any) {
+      setAuditError(e.message || "Error en la auditoría de seguridad");
+    } finally {
+      setAuditLoading(false);
     }
   };
 
@@ -1705,24 +1766,24 @@ ${body}
             onClick={() => {
               const next = !showSecrets;
               setShowSecrets(next);
-              if (next && url.trim()) {
-                autoScanUrlSecrets(url.trim());
+              if (next && url.trim() && !auditReport && !auditLoading) {
+                runSecurityAudit(undefined, url.trim());
               }
             }}
-            title="Escanea automáticamente la URL y detecta API Keys, tokens y credenciales expuestas con 30+ patrones"
+            title="Auditoría de seguridad completa: secretos, XSS, SQLi, CSRF, bugs, exposición de BD, escenarios de ataque"
             style={{
               padding: "12px 16px",
-              background: showSecrets ? "linear-gradient(135deg, #ef4444, #b91c1c)" : "transparent",
-              border: showSecrets ? "none" : "1px solid var(--border, #333)",
+              background: showSecrets ? "linear-gradient(135deg, #ef4444, #7f1d1d)" : "transparent",
+              border: showSecrets ? "none" : `1px solid ${auditReport && auditReport.stats.critical > 0 ? "#ef444466" : "var(--border, #333)"}`,
               borderRadius: 10,
-              color: showSecrets ? "#fff" : secretsReport && secretsReport.summary.critical > 0 ? "#ef4444" : "var(--t2, #aaa)",
+              color: showSecrets ? "#fff" : auditReport && auditReport.stats.critical > 0 ? "#ef4444" : "var(--t2, #aaa)",
               cursor: "pointer",
               fontSize: 13,
               fontWeight: showSecrets ? 700 : 400,
               whiteSpace: "nowrap",
             }}
           >
-            🔐 Inspector Secretos
+            🔒 Auditoría Seguridad{auditReport ? ` (${auditReport.stats.total})` : ""}
           </button>
         </div>
       </div>
@@ -2080,66 +2141,189 @@ ${body}
         </div>
       )}
 
-      {/* ── Inspector de Secretos ─────────────────────────── */}
+      {/* ── Auditoría de Seguridad Completa ─────────────────── */}
       {showSecrets && (
         <div style={{ background: "var(--card, #111)", borderRadius: 16, padding: 24, marginBottom: 24, border: "1px solid #ef444433" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-            <span style={{ fontSize: 28 }}>🔐</span>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: "#fca5a5" }}>Inspector de Secretos Expuestos</h3>
-              <p style={{ color: "#888", fontSize: 12, margin: "2px 0 0" }}>Pega el código fuente HTML/JS de cualquier página y detecta API Keys, tokens y credenciales expuestas con 30+ patrones</p>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20 }}>
+            <div style={{ width: 72, height: 72, borderRadius: "50%", border: `4px solid ${auditReport ? (auditReport.secScore >= 70 ? "#22c55e" : auditReport.secScore >= 40 ? "#eab308" : "#ef4444") : "#ef4444"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {auditLoading
+                ? <span style={{ fontSize: 28, animation: "pulse 1s infinite" }}>🔍</span>
+                : <span style={{ fontSize: 22, fontWeight: 800, color: auditReport ? (auditReport.secScore >= 70 ? "#22c55e" : auditReport.secScore >= 40 ? "#eab308" : "#ef4444") : "#ef4444" }}>{auditReport ? auditReport.secScore : "?"}</span>
+              }
+            </div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: "#fca5a5" }}>🔒 Auditoría de Seguridad Completa</h3>
+              <p style={{ color: "#888", fontSize: 12, margin: "4px 0 8px" }}>
+                8 categorías de análisis: secretos, XSS, SQL/NoSQL injection, CSRF, bugs de código, exposición de BD, datos sensibles e infraestructura. Incluye escenarios de ataque reales y pasos de corrección.
+              </p>
+              {auditReport && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {[
+                    { label: `${auditReport.stats.critical} Críticos`, color: "#ef4444", show: auditReport.stats.critical > 0 },
+                    { label: `${auditReport.stats.high} Altos`, color: "#f97316", show: auditReport.stats.high > 0 },
+                    { label: `${auditReport.stats.medium} Medios`, color: "#eab308", show: auditReport.stats.medium > 0 },
+                    { label: `DB Risk: ${auditReport.dbRisk.toUpperCase()}`, color: auditReport.dbRisk === "critical" ? "#ef4444" : auditReport.dbRisk === "high" ? "#f97316" : auditReport.dbRisk === "medium" ? "#eab308" : "#22c55e", show: true },
+                    { label: `${(auditReport.contentLength / 1024).toFixed(0)} KB analizados`, color: "#60a5fa", show: true },
+                  ].filter(b => b.show).map((b, i) => (
+                    <span key={i} style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: b.color + "22", color: b.color, border: `1px solid ${b.color}44` }}>{b.label}</span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Input manual + botones */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <textarea
-              value={secretsInput}
-              onChange={e => setSecretsInput(e.target.value)}
-              placeholder="Pega aquí el HTML/JS de tu página, bundle.js, theme.liquid, o cualquier archivo de código fuente…&#10;&#10;Detecta: Stripe, OpenAI, Anthropic, Google API, AWS, GitHub, Shopify, SendGrid, Twilio, Firebase, Slack, Telegram, JWT, contraseñas hardcodeadas, certificados RSA…"
-              rows={10}
-              style={{
-                width: "100%", padding: "12px 14px",
-                background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10,
-                color: "#eee", fontSize: 12, resize: "vertical", lineHeight: 1.5,
-                boxSizing: "border-box", outline: "none", fontFamily: "monospace",
-              }}
+              value={auditInput}
+              onChange={e => setAuditInput(e.target.value)}
+              placeholder={url.trim() ? `URL detectada: ${url} — pulsa Analizar para auditar automáticamente.\n\nO pega aquí HTML/JS adicional para analizar junto a la URL…` : "Pega aquí el HTML, JS minificado, bundle.js, theme.liquid o cualquier código fuente a auditar.\n\nEl auditor detecta: secretos hardcodeados · XSS (innerHTML, eval) · SQL injection · CSRF · bugs de código · exposición de BD · datos sensibles · infraestructura interna…"}
+              rows={5}
+              style={{ width: "100%", padding: "12px 14px", background: "#0a0a0a", border: "1px solid #2a2a30", borderRadius: 10, color: "#eee", fontSize: 12, resize: "vertical", lineHeight: 1.5, boxSizing: "border-box", outline: "none", fontFamily: "monospace" }}
             />
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <button
-                onClick={() => runSecretsScanner()}
-                disabled={secretsLoading || !secretsInput.trim()}
-                style={{
-                  padding: "10px 24px",
-                  background: secretsLoading || !secretsInput.trim() ? "#2a2a30" : "linear-gradient(135deg, #ef4444, #b91c1c)",
-                  border: "none", borderRadius: 10,
-                  color: secretsLoading || !secretsInput.trim() ? "#666" : "#fff",
-                  fontWeight: 700, cursor: secretsLoading || !secretsInput.trim() ? "not-allowed" : "pointer",
-                  fontSize: 13, whiteSpace: "nowrap",
-                }}
+                onClick={() => runSecurityAudit()}
+                disabled={auditLoading || (!auditInput.trim() && !url.trim())}
+                style={{ padding: "10px 22px", background: auditLoading ? "#2a2a30" : "linear-gradient(135deg, #ef4444, #7f1d1d)", border: "none", borderRadius: 10, color: auditLoading ? "#666" : "#fff", fontWeight: 700, cursor: auditLoading ? "not-allowed" : "pointer", fontSize: 13, whiteSpace: "nowrap" }}
               >
-                {secretsLoading ? "🔍 Escaneando…" : "🔐 Escanear Secretos"}
+                {auditLoading ? "🔍 Auditando…" : "🔒 Analizar Seguridad"}
               </button>
-              {secretsInput.trim() && (
-                <span style={{ fontSize: 11, color: "#666" }}>
-                  {(secretsInput.length / 1024).toFixed(1)} KB de código
-                </span>
+              {url.trim() && (
+                <span style={{ fontSize: 11, color: "#888" }}>🌐 Se analizará: <strong style={{ color: "#d4a843" }}>{url.slice(0, 60)}</strong>{url.length > 60 ? "…" : ""} + JS bundles</span>
               )}
-              {secretsReport && (
-                <span style={{ fontSize: 11, color: secretsReport.summary.total === 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
-                  {secretsReport.summary.total === 0 ? "✅ Sin secretos expuestos" : `⚠️ ${secretsReport.summary.total} secreto(s) encontrado(s)`}
-                </span>
+              {auditInput.trim() && (
+                <span style={{ fontSize: 11, color: "#666" }}>{(auditInput.length / 1024).toFixed(1)} KB pegados</span>
               )}
             </div>
-            {secretsError && (
-              <div style={{ padding: "10px 14px", background: "#2a0000", border: "1px solid #4a1111", borderRadius: 8, color: "#fca5a5", fontSize: 12 }}>
-                ❌ {secretsError}
-              </div>
+            {auditError && (
+              <div style={{ padding: "10px 14px", background: "#2a0000", border: "1px solid #4a1111", borderRadius: 8, color: "#fca5a5", fontSize: 12 }}>❌ {auditError}</div>
             )}
           </div>
 
-          {secretsReport && (
+          {/* Resultados */}
+          {auditLoading && (
+            <div style={{ marginTop: 24, padding: 24, background: "#0a0a14", borderRadius: 12, textAlign: "center", border: "1px solid #ef444422" }}>
+              <div style={{ fontSize: 32, marginBottom: 8, animation: "pulse 1.5s infinite" }}>🔍</div>
+              <p style={{ color: "#fca5a5", fontWeight: 700, margin: "0 0 4px" }}>Auditando seguridad…</p>
+              <p style={{ color: "#888", fontSize: 12 }}>Descargando código fuente, analizando 8 categorías de vulnerabilidades y generando escenarios de ataque</p>
+            </div>
+          )}
+
+          {auditReport && !auditLoading && (
             <div style={{ marginTop: 24 }}>
-              <SecretsScanPanel report={secretsReport} onDownload={downloadSecretsReport} />
+              {/* Resumen por categoría */}
+              {auditReport.stats.total === 0 ? (
+                <div style={{ padding: 24, background: "#0a1a0a", borderRadius: 12, border: "1px solid #22c55e33", textAlign: "center" }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
+                  <p style={{ color: "#22c55e", fontWeight: 700, fontSize: 16, margin: "0 0 4px" }}>Sin vulnerabilidades detectadas</p>
+                  <p style={{ color: "#888", fontSize: 12 }}>No se encontraron patrones de riesgo conocidos en el código analizado.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Filtro por categoría */}
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+                    <button onClick={() => setAuditCatFilter("all")} style={{ padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, border: "1px solid #444", background: auditCatFilter === "all" ? "#ef4444" : "transparent", color: auditCatFilter === "all" ? "#fff" : "#888", cursor: "pointer" }}>
+                      Todos ({auditReport.stats.total})
+                    </button>
+                    {auditReport.categories.map(cat => {
+                      const count = auditReport.findings.filter(f => f.category === cat).length;
+                      const hasCrit = auditReport.findings.some(f => f.category === cat && f.severity === "critical");
+                      return (
+                        <button key={cat} onClick={() => setAuditCatFilter(cat)} style={{ padding: "5px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, border: `1px solid ${hasCrit ? "#ef444466" : "#333"}`, background: auditCatFilter === cat ? (hasCrit ? "#ef4444" : "#333") : "transparent", color: auditCatFilter === cat ? "#fff" : hasCrit ? "#fca5a5" : "#888", cursor: "pointer" }}>
+                          {cat} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Cards de hallazgos */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {auditReport.findings.filter(f => auditCatFilter === "all" || f.category === auditCatFilter).map(f => {
+                      const sevColor = { critical: "#ef4444", high: "#f97316", medium: "#eab308", low: "#22c55e", info: "#60a5fa" }[f.severity] || "#888";
+                      const isExpanded = auditExpandedId === f.id;
+                      return (
+                        <div key={f.id} style={{ background: "#0a0a14", borderRadius: 12, border: `1px solid ${sevColor}33`, borderLeft: `4px solid ${sevColor}`, overflow: "hidden" }}>
+                          {/* Cabecera clickable */}
+                          <div
+                            onClick={() => setAuditExpandedId(isExpanded ? null : f.id)}
+                            style={{ padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 12 }}
+                          >
+                            <div style={{ flexShrink: 0, marginTop: 2 }}>
+                              <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 800, background: sevColor + "22", color: sevColor, textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.severity}</span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 10, color: "#666" }}>{f.category}</span>
+                                {f.cvss && <span style={{ fontSize: 10, color: sevColor, fontWeight: 700 }}>CVSS {f.cvss}</span>}
+                                {f.lineNumber && <span style={{ fontSize: 10, color: "#555" }}>línea {f.lineNumber}</span>}
+                              </div>
+                              <p style={{ fontSize: 13, fontWeight: 700, color: "#eee", margin: "2px 0 0" }}>{f.title}</p>
+                              <p style={{ fontSize: 11, color: "#888", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.description}</p>
+                            </div>
+                            <span style={{ color: "#555", fontSize: 14, flexShrink: 0 }}>{isExpanded ? "▲" : "▼"}</span>
+                          </div>
+
+                          {/* Detalle expandible */}
+                          {isExpanded && (
+                            <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${sevColor}22` }}>
+                              {/* Evidencia */}
+                              <div style={{ marginTop: 12 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.5px" }}>Evidencia en código</span>
+                                <pre style={{ background: "#050505", borderRadius: 6, padding: "8px 12px", fontSize: 11, color: "#f87171", fontFamily: "monospace", margin: "4px 0 0", overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{f.evidence}</pre>
+                              </div>
+
+                              {/* Escenario de ataque */}
+                              <div style={{ marginTop: 12, background: "#1a0d2e", borderRadius: 8, padding: "10px 14px" }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.5px" }}>⚔️ Escenario de ataque real</span>
+                                <p style={{ fontSize: 12, color: "#e9d5ff", margin: "6px 0 0", lineHeight: 1.6 }}>{f.attackScenario}</p>
+                              </div>
+
+                              {/* Impacto en BD */}
+                              {f.dbImpact && (
+                                <div style={{ marginTop: 10, background: "#1a0000", borderRadius: 8, padding: "10px 14px", border: "1px solid #ef444433" }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.5px" }}>🗄️ Impacto en base de datos</span>
+                                  <p style={{ fontSize: 12, color: "#fca5a5", margin: "6px 0 0", lineHeight: 1.6 }}>{f.dbImpact}</p>
+                                </div>
+                              )}
+
+                              {/* Fix */}
+                              <div style={{ marginTop: 10, background: "#0a1a0a", borderRadius: 8, padding: "10px 14px" }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.5px" }}>💡 Cómo corregirlo</span>
+                                <p style={{ fontSize: 12, color: "#86efac", margin: "6px 0 0", lineHeight: 1.6 }}>{f.fix}</p>
+                              </div>
+
+                              {/* Fix Code snippet */}
+                              {f.fixCode && (
+                                <div style={{ marginTop: 8 }}>
+                                  <pre style={{ background: "#0d1117", borderRadius: 8, padding: "10px 14px", fontSize: 11, color: "#86efac", fontFamily: "monospace", margin: 0, overflow: "auto", lineHeight: 1.6 }}>{f.fixCode}</pre>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Resumen de riesgo BD */}
+                  {auditReport.findings.some(f => f.dbImpact) && (
+                    <div style={{ marginTop: 20, padding: "16px 20px", background: auditReport.dbRisk === "critical" ? "#1a000033" : "#0a1a0a", border: `1px solid ${auditReport.dbRisk === "critical" ? "#ef4444" : auditReport.dbRisk === "high" ? "#f97316" : "#eab308"}66`, borderRadius: 12 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: auditReport.dbRisk === "critical" ? "#ef4444" : auditReport.dbRisk === "high" ? "#f97316" : "#eab308", margin: "0 0 8px" }}>
+                        🗄️ Evaluación de Compromiso de Base de Datos — Riesgo {auditReport.dbRisk.toUpperCase()}
+                      </h4>
+                      <p style={{ fontSize: 12, color: "#aaa", margin: 0, lineHeight: 1.7 }}>
+                        {auditReport.dbRisk === "critical"
+                          ? "⚠️ RIESGO CRÍTICO: Se detectaron credenciales de BD o vectores de SQL injection que en caso de explotación darían al atacante acceso completo a la base de datos. Posibles consecuencias: robo de todos los datos de usuarios, modificación de pedidos/precios, creación de usuarios administradores, borrado masivo (ransomware), exfiltración de datos privados y PII. PRIORIDAD MÁXIMA: corregir de inmediato."
+                          : auditReport.dbRisk === "high"
+                          ? "⚠️ RIESGO ALTO: Vectores detectados que podrían comprometer la BD indirectamente. Un atacante con acceso al servidor podría pivotar hacia la BD. Corregir los hallazgos 'high' relacionados con BD urgentemente."
+                          : "⚠️ RIESGO MEDIO: Información de infraestructura expuesta que facilita el reconocimiento previo a un ataque. No hay acceso directo a BD, pero reduce significativamente el esfuerzo del atacante."}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>

