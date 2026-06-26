@@ -38,6 +38,7 @@ interface Message {
   attachmentName?: string;
   action?: ChatAction;
   usage?: MsgUsage;
+  sources?: string[];
 }
 
 function fmtTokens(n: number): string {
@@ -1988,6 +1989,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       let assistantContent = "";
       let action: ChatAction | undefined;
       let streamUsage: MsgUsage | undefined;
+      let streamSources: string[] | undefined;
 
       // ── Detect product creation intent from text ──
       const isProductCreationIntent = (text: string) => {
@@ -2351,11 +2353,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   for (const line of lines) {
                     if (!line.startsWith("data: ")) continue;
                     try {
-                      const ev = JSON.parse(line.slice(6)) as { text?: string; done?: boolean; error?: string; usage?: MsgUsage };
+                      const ev = JSON.parse(line.slice(6)) as { text?: string; done?: boolean; error?: string; usage?: MsgUsage; sources?: string[] };
                       if (ev.error) {
                         streamFailed = true;
                       } else if (ev.done) {
                         if (ev.usage) streamUsage = ev.usage;
+                        if (ev.sources?.length) streamSources = ev.sources;
                       } else if (ev.text) {
                         streamBuffer += ev.text;
                         const snap = streamBuffer;
@@ -2534,10 +2537,11 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }
 
       const finalUsage = streamUsage;
+      const finalSources = streamSources;
       setMessages(m => {
         const progressIndicators = ["Absorbiendo", "Generando workflow", "detectada. Absorbiendo", "Investigación exhaustiva paralela iniciada", "Investigación de mercado en curso", "Auditando la oferta", "Escaneando tienda", "Optimización masiva con IA", "Diseñando páginas de la tienda", "Investigando proveedores...", "Diagnóstico de la app en curso", "Ejecutando", "acciones en secuencia", "Creando producto profesional", "Rediseñando producto", "Rediseño masivo", "Auditoría SEO Semrush", "Investigando keywords", "Generando estrategia de blog", "Escribiendo artículo SEO", "Configuración completa de tienda", "Creando flujo de email", "Generando forecast financiero", "Generando propuesta comercial", "Generando imágenes IA", "Analizando tu solicitud"];
         const filtered = m.filter(msg => msg.id !== thinkingId && !(msg.role === "assistant" && progressIndicators.some(p => msg.content.includes(p))));
-        return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain", action, usage: finalUsage }];
+        return [...filtered, { id: uuid(), role: "assistant" as const, content: assistantContent, timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain", action, usage: finalUsage, sources: finalSources }];
       });
       if (finalUsage) {
         setSessionUsage(prev => ({
@@ -2761,27 +2765,57 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                         </div>
                       )}
                       <div>{formatMessage(msg.content)}</div>
-                      {msg.usage && (
-                        <div style={{ marginTop: 5, paddingTop: 5, borderTop: "1px solid var(--ink3)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: 9, color: "var(--t4)", display: "flex", alignItems: "center", gap: 3 }}>
-                            🔢 <strong style={{ color: "var(--t3)" }}>{fmtTokens(msg.usage.totalTokens)}</strong> tokens
-                          </span>
-                          <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
-                          <span style={{ fontSize: 9, color: "var(--t4)" }}>
-                            in <strong style={{ color: "var(--t3)" }}>{fmtTokens(msg.usage.inputTokens)}</strong> · out <strong style={{ color: "var(--t3)" }}>{fmtTokens(msg.usage.outputTokens)}</strong>
-                          </span>
-                          {msg.usage.thinkingTokens > 0 && (
-                            <>
-                              <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
-                              <span style={{ fontSize: 9, color: "var(--jade)", display: "flex", alignItems: "center", gap: 2 }}>
-                                🧩 <strong>{fmtTokens(msg.usage.thinkingTokens)}</strong> think
+                      {msg.usage && (() => {
+                        const isGeminiMsg = msg.model?.toLowerCase().includes("gemini") ?? false;
+                        const tokenColor = isGeminiMsg ? "var(--jade)" : "var(--t3)";
+                        const labelColor = isGeminiMsg ? "rgba(45,212,159,0.7)" : "var(--t4)";
+                        const usageModelName = msg.usage.model;
+                        const showActualModel = isGeminiMsg && usageModelName && usageModelName !== msg.model;
+                        return (
+                          <div style={{ marginTop: 5, paddingTop: 5, borderTop: "1px solid var(--ink3)", display: "flex", flexDirection: "column", gap: 4 }}>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 9, color: labelColor, display: "flex", alignItems: "center", gap: 3 }}>
+                                🔢 <strong style={{ color: tokenColor }}>{fmtTokens(msg.usage.totalTokens)}</strong> tokens
                               </span>
-                            </>
-                          )}
-                          <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
-                          <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 600 }}>{fmtCost(msg.usage.costUsd)}</span>
-                        </div>
-                      )}
+                              <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
+                              <span style={{ fontSize: 9, color: "var(--t4)" }}>
+                                in <strong style={{ color: tokenColor }}>{fmtTokens(msg.usage.inputTokens)}</strong> · out <strong style={{ color: tokenColor }}>{fmtTokens(msg.usage.outputTokens)}</strong>
+                              </span>
+                              {msg.usage.thinkingTokens > 0 && (
+                                <>
+                                  <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
+                                  <span style={{ fontSize: 9, color: "var(--jade)", display: "flex", alignItems: "center", gap: 2 }}>
+                                    🧩 <strong>{fmtTokens(msg.usage.thinkingTokens)}</strong> think
+                                  </span>
+                                </>
+                              )}
+                              <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
+                              <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 600 }}>{fmtCost(msg.usage.costUsd)}</span>
+                              {showActualModel && (
+                                <>
+                                  <span style={{ fontSize: 9, color: "var(--t4)" }}>·</span>
+                                  <span style={{ fontSize: 8, color: "var(--jade)", background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.2)", borderRadius: 3, padding: "1px 4px", fontWeight: 600 }}>{getModelShortName(usageModelName)}</span>
+                                </>
+                              )}
+                            </div>
+                            {isGeminiMsg && msg.sources && msg.sources.length > 0 && (
+                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                                <span style={{ fontSize: 8, color: "var(--t4)" }}>🔗</span>
+                                {msg.sources.slice(0, 4).map((src, i) => {
+                                  let host = src;
+                                  try { host = new URL(src).hostname.replace(/^www\./, ""); } catch { /* keep raw */ }
+                                  return (
+                                    <a key={i} href={src} target="_blank" rel="noopener noreferrer" style={{ fontSize: 8, color: "rgba(45,212,159,0.65)", textDecoration: "none", background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 3, padding: "1px 4px", whiteSpace: "nowrap", maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", display: "inline-block" }}>{host}</a>
+                                  );
+                                })}
+                                {msg.sources.length > 4 && (
+                                  <span style={{ fontSize: 8, color: "var(--t4)" }}>+{msg.sources.length - 4}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {msg.action?.type === "absorb-result" && (
                         <AbsorbResultCard data={msg.action.data as AbsorbResult} />
                       )}
