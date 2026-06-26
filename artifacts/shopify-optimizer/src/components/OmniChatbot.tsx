@@ -1077,6 +1077,9 @@ const SLASH_SKILLS: SlashSkill[] = [
   // ── GEMINI NATIVO ─────────────────────────────────────────────────────────
   { cmd: "/imagen-gemini", icon: "🎨", label: "Imagen con Gemini", desc: "Genera imágenes con el modelo nativo de imagen de Gemini", engine: "gemini", prompt: "[GEMINI-IMAGE] ", isResearch: false },
   { cmd: "/codigo-gemini", icon: "💻", label: "Análisis con código",  desc: "Ejecuta código Python real con Gemini para calcular y analizar datos", engine: "gemini", prompt: "[GEMINI-CODE] Analiza los datos de mi tienda ejecutando código Python: calcula métricas de conversión, AOV, tendencias de ventas y genera los insights más útiles. Muestra el código y los resultados.", isResearch: false },
+
+  // ── GRABACIÓN DE PANTALLA ─────────────────────────────────────────────────
+  { cmd: "/grabar", icon: "🔴", label: "Grabar pantalla", desc: "Inicia grabación de pantalla — el navegador pedirá permiso una vez", engine: "auto", prompt: "grábame trabajando" },
 ];
 
 const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización eCommerce para tiendas Shopify.
@@ -1192,6 +1195,83 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [slashFilter, setSlashFilter] = useState("");
   const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
   const [sessionUsage, setSessionUsage] = useState({ totalTokens: 0, totalCostUsd: 0, msgCount: 0 });
+
+  // ── Screen Recording ────────────────────────────────────────────────────────
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [lastRecordingUrl, setLastRecordingUrl] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopScreenRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (recordingStreamRef.current) {
+      recordingStreamRef.current.getTracks().forEach(t => t.stop());
+      recordingStreamRef.current = null;
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+  };
+
+  const startScreenRecording = async (): Promise<string> => {
+    if (isRecording) return "Ya hay una grabación en curso. Di 'para la grabación' para detenerla.";
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30 },
+        audio: true,
+      });
+      recordingStreamRef.current = stream;
+      recordingChunksRef.current = [];
+
+      const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : MediaRecorder.isTypeSupported("video/webm")
+        ? "video/webm"
+        : "video/mp4";
+
+      const mr = new MediaRecorder(stream, { mimeType: mime });
+      mediaRecorderRef.current = mr;
+
+      mr.ondataavailable = e => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: mime });
+        const url = URL.createObjectURL(blob);
+        setLastRecordingUrl(url);
+        // Auto-download
+        const a = document.createElement("a");
+        a.href = url;
+        const ts = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+        a.download = `ShopyCrafter_${ts}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+
+      // Si el usuario para la pantalla compartida manualmente desde el navegador
+      stream.getVideoTracks()[0].onended = () => stopScreenRecording();
+
+      mr.start(1000); // chunk cada segundo
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => setRecordingDuration(d => d + 1), 1000);
+
+      return "✅ **Grabación iniciada** — estoy grabando tu pantalla. Puedes trabajar con normalidad. Cuando termines dime 'para la grabación' y guardaré el vídeo automáticamente.";
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError") {
+        return "❌ Permiso denegado. El navegador requiere que aceptes el permiso de grabación de pantalla. Cuando aparezca la ventana del navegador selecciona la pantalla o pestaña que quieres grabar y pulsa 'Compartir'.";
+      }
+      return `❌ No se pudo iniciar la grabación: ${err?.message || String(err)}`;
+    }
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2006,6 +2086,30 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       let streamUsage: MsgUsage | undefined;
       let streamSources: string[] | undefined;
 
+      // ── CASE 0: Comandos de grabación de pantalla ──────────────────────────
+      const lowerContent = content.toLowerCase();
+      const isStartRecording = /\b(gr[aá]b[ae]me|graba|grabar|inicia\s+(la\s+)?grabaci[oó]n|empieza\s+(a\s+)?grabar|start\s+recording|graba\s+la\s+pantalla|graba\s+esto|necesito\s+que\s+grab|quiero\s+(que\s+)?grab)\b/.test(lowerContent);
+      const isStopRecording = /\b(para\s+(la\s+)?grabaci[oó]n|detener?\s+(la\s+)?grabaci[oó]n|stop\s+grabaci[oó]n|stop\s+recording|termina\s+(la\s+)?grabaci[oó]n|deja\s+de\s+grabar|fin\s+(de\s+la\s+)?grabaci[oó]n|acaba\s+(la\s+)?grabaci[oó]n)\b/.test(lowerContent);
+
+      if (isStartRecording || isStopRecording) {
+        setLoading(false);
+        let recMsg = "";
+        if (isStopRecording) {
+          if (isRecording) {
+            stopScreenRecording();
+            const mins = Math.floor(recordingDuration / 60);
+            const secs = recordingDuration % 60;
+            recMsg = `⏹️ **Grabación detenida** — Duración: ${mins > 0 ? `${mins}m ` : ""}${secs}s\n\n📥 El vídeo se está descargando automáticamente como **ShopyCrafter_FECHA.webm**. Puedes abrirlo con cualquier reproductor de vídeo o subirlo directamente a YouTube.`;
+          } else {
+            recMsg = "ℹ️ No hay ninguna grabación activa en este momento.";
+          }
+        } else {
+          recMsg = await startScreenRecording();
+        }
+        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: recMsg } : msg));
+        return;
+      }
+
       // ── Detect product creation intent from text ──
       const isProductCreationIntent = (text: string) => {
         const lower = text.toLowerCase();
@@ -2702,17 +2806,36 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Shopy Crafter · Asistente</p>
               {!minimized && (
-                <p style={{ margin: 0, fontSize: 9, color: "var(--jade)" }}>
-                  🔬 Gemini · 🧠 Claude · 💾 Brain — Listo
-                  {sessionUsage.msgCount > 0 && (
-                    <span style={{ color: "var(--t4)", marginLeft: 5 }}>
-                      · {fmtTokens(sessionUsage.totalTokens)} tok · {fmtCost(sessionUsage.totalCostUsd)}
+                <p style={{ margin: 0, fontSize: 9, color: isRecording ? "#ff4444" : "var(--jade)" }}>
+                  {isRecording ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ff4444", display: "inline-block", animation: "pulseGold 1s ease-in-out infinite" }} />
+                      GRABANDO — {String(Math.floor(recordingDuration / 60)).padStart(2, "0")}:{String(recordingDuration % 60).padStart(2, "0")}
+                      <span style={{ color: "var(--t4)", fontSize: 8 }}> · Di "para la grabación" para detener</span>
                     </span>
+                  ) : (
+                    <>
+                      🔬 Gemini · 🧠 Claude · 💾 Brain — Listo
+                      {sessionUsage.msgCount > 0 && (
+                        <span style={{ color: "var(--t4)", marginLeft: 5 }}>
+                          · {fmtTokens(sessionUsage.totalTokens)} tok · {fmtCost(sessionUsage.totalCostUsd)}
+                        </span>
+                      )}
+                    </>
                   )}
                 </p>
               )}
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              {isRecording && (
+                <button
+                  onClick={() => { stopScreenRecording(); }}
+                  title="Detener grabación"
+                  style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: "rgba(255,68,68,0.18)", color: "#ff4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", animation: "pulseGold 1.5s ease-in-out infinite" }}
+                >
+                  ⏹
+                </button>
+              )}
               <button onClick={() => setMinimized(!minimized)} aria-label={minimized ? "Expandir chat" : "Minimizar chat"} style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: "var(--ink2)", color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {minimized ? <Maximize2 size={isMobile ? 18 : 14} /> : <Minimize2 size={isMobile ? 18 : 14} />}
               </button>
