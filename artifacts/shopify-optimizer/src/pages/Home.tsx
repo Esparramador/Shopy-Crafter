@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Plus, Brain, Zap, Users, TrendingUp, TrendingDown, ShoppingCart, DollarSign, BarChart3, RefreshCw, Globe, Activity, Package, Eye } from "lucide-react";
+import { Plus, Brain, Zap, Users, TrendingUp, TrendingDown, ShoppingCart, DollarSign, BarChart3, RefreshCw, Globe, Activity, Package, Eye, MessageSquare } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
@@ -25,6 +25,14 @@ interface BrainStatus {
   totalMemories: number;
   totalInsights: number;
   brainHealth: number;
+}
+
+interface ChatSummary {
+  sessions: number;
+  messages: number;
+  costEur: number;
+  avgTokens: number;
+  avgCostEur: number;
 }
 
 function Sparkline({ data, color = "var(--gold)" }: { data: number[]; color?: string }) {
@@ -162,6 +170,7 @@ export default function Home() {
   const [, navigate] = useLocation();
   const { data: projects, isLoading } = useListProjects();
   const [brainStatus, setBrainStatus] = useState<BrainStatus | null>(null);
+  const [chatSummary, setChatSummary] = useState<ChatSummary | null>(null);
   const [stores, setStores] = useState<StoreSummary[]>([]);
   const [syncingAll, setSyncingAll] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -178,6 +187,13 @@ export default function Home() {
   useEffect(() => {
     fetch(`${API_BASE}/api/shopybrain/status`, { credentials: "include" })
       .then(r => r.json()).then(setBrainStatus).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/api-usage/chat-summary`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setChatSummary(d); })
+      .catch(() => {});
   }, []);
 
   const loadStoreSummaries = useCallback(async () => {
@@ -442,6 +458,42 @@ export default function Home() {
               <div className="skeleton" style={{ height: 80, borderRadius: 8 }} />
             )}
           </div>
+
+          {/* Chatbot cost summary card */}
+          <Link href="/admin/api-usage">
+            <div className="glass-card card-hover" style={{
+              padding: "16px", cursor: "pointer",
+              background: "linear-gradient(135deg, rgba(45,212,159,0.07) 0%, rgba(0,0,0,0) 100%)",
+              border: "1px solid rgba(45,212,159,0.18)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <MessageSquare size={13} style={{ color: "var(--jade)", flexShrink: 0 }} />
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--jade)" }}>
+                  Chatbot IA · este mes
+                </span>
+              </div>
+              {chatSummary ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                  {[
+                    { label: "Coste total", value: `€${chatSummary.costEur.toFixed(4)}`, color: "var(--jade)" },
+                    { label: "Conversaciones", value: chatSummary.sessions.toLocaleString("es-ES"), color: "var(--t)" },
+                    { label: "Tokens / msg", value: chatSummary.avgTokens > 0 ? chatSummary.avgTokens.toLocaleString("es-ES") : "—", color: "var(--t3)" },
+                    { label: "Coste / sesión", value: chatSummary.sessions > 0 ? `€${chatSummary.avgCostEur.toFixed(4)}` : "—", color: "var(--t3)" },
+                  ].map(row => (
+                    <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 11, color: "var(--t4)" }}>{row.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: row.color }}>{row.value}</span>
+                    </div>
+                  ))}
+                  <p style={{ fontSize: 10, color: "var(--jade)", fontWeight: 600, marginTop: 2, textAlign: "right" }}>
+                    Ver sesiones completas →
+                  </p>
+                </div>
+              ) : (
+                <div className="skeleton" style={{ height: 72, borderRadius: 8 }} />
+              )}
+            </div>
+          </Link>
 
           <Link href="/admin/revenue">
             <div className="glass-card card-hover" style={{ padding: "12px 16px", cursor: "pointer", textAlign: "center", border: "1px solid rgba(200,168,75,0.2)" }}>

@@ -880,6 +880,9 @@ code {
 /* ── RESPONSIVE TABLET (769px – 1024px) ────────────────────────────────────── */
 @media (min-width: 601px) and (max-width: 1024px) {
 
+  /* Hamburger: show on tablet (sidebar is off-canvas) */
+  .hamburger-btn { display: flex; }
+
   /* Sidebar: off-canvas by default, slides in when .open */
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 50;

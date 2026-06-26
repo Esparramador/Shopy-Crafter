@@ -352,6 +352,45 @@ router.get("/api-usage/chat-session/:sessionId", async (req, res): Promise<void>
   }
 });
 
+router.get("/api-usage/chat-summary", async (req, res): Promise<void> => {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const conditions = [
+      gte(apiUsageLogTable.createdAt, monthStart),
+      lte(apiUsageLogTable.createdAt, now),
+      eq(apiUsageLogTable.operation, "chat"),
+    ];
+
+    const [totals] = await db
+      .select({
+        sessions:    sql<number>`count(distinct coalesce(${apiUsageLogTable.sessionId}, ${apiUsageLogTable.id}))`,
+        messages:    sql<number>`count(*)`,
+        costUsd:     sql<number>`coalesce(sum(${apiUsageLogTable.costUsd}), 0)`,
+        costEur:     sql<number>`coalesce(sum(${apiUsageLogTable.costEur}), 0)`,
+        inputTokens: sql<number>`coalesce(sum(${apiUsageLogTable.inputUnits}), 0)`,
+        outputTokens:sql<number>`coalesce(sum(${apiUsageLogTable.outputUnits}), 0)`,
+      })
+      .from(apiUsageLogTable)
+      .where(and(...conditions));
+
+    const sessions    = Number(totals?.sessions    ?? 0);
+    const messages    = Number(totals?.messages    ?? 0);
+    const costUsd     = Number(totals?.costUsd     ?? 0);
+    const costEur     = Number(totals?.costEur     ?? 0);
+    const inputTok    = Number(totals?.inputTokens ?? 0);
+    const outputTok   = Number(totals?.outputTokens ?? 0);
+    const totalTokens = inputTok + outputTok;
+    const avgTokens   = messages > 0 ? Math.round(totalTokens / messages) : 0;
+    const avgCostEur  = sessions > 0 ? costEur / sessions : 0;
+
+    res.json({ sessions, messages, costUsd, costEur, totalTokens, avgTokens, avgCostEur });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
 router.post("/api-usage/send-email", async (req, res): Promise<void> => {
   try {
     if (!isGmailAvailable()) {
