@@ -76,7 +76,7 @@ export default function YouTubeStudio() {
   const [videoResult, setVideoResult] = useState<{ vaultId: number; sizeBytes: number } | null>(null);
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [satiricoProjectId, setSatiricoProjectId] = useState<string>("");
-  const [satiricoModel, setSatiricoModel] = useState("seedance-1-lite");
+  const [satiricoModel, setSatiricoModel] = useState("grok-video-1");
   const [scriptEngine, setScriptEngine] = useState<"grok" | "claude" | "gemini">("grok");
 
   const [form, setForm] = useState({
@@ -907,11 +907,58 @@ export default function YouTubeStudio() {
                     <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 5, display: "block" }}>Modelo de vídeo</label>
                     <select value={satiricoModel} onChange={e => setSatiricoModel(e.target.value)}
                       style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", color: "var(--t)", fontSize: 13 }}>
-                      <option value="seedance-1-lite">Seedance 1 Lite ⚡</option>
-                      <option value="runway-gen4">Runway Gen4</option>
-                      <option value="kling-2.1">Kling 2.1</option>
-                      <option value="hailuo-02">Hailuo 02</option>
-                      <option value="veo-3">Veo 3 (Google)</option>
+                      <optgroup label="⚡ xAI / Grok">
+                        <option value="grok-video-1">Grok Video 1 — flagship T2V/I2V, hasta 15s ★★★★★</option>
+                        <option value="grok-imagine-video-1.5">Grok Imagine Video 1.5 Preview — max calidad 720p ★★★★★</option>
+                        <option value="grok-imagine-video">Grok Imagine Video — T2V/I2V 720p económico ★★★★☆</option>
+                      </optgroup>
+                      <optgroup label="🏃 Runway">
+                        <option value="runway-gen4.5">Runway Gen 4.5 — última gen Jun-2026, 4K + audio ★★★★★</option>
+                        <option value="runway-gen4.5-turbo">Runway Gen 4.5 Turbo — rápido 1080p + audio ★★★★★</option>
+                        <option value="runway-seedance2">Runway Seedance 2 — cinematográfico ★★★★★</option>
+                        <option value="runway-seedance2-fast">Runway Seedance 2 Fast — rápido y barato ★★★★☆</option>
+                        <option value="runway-gen4-turbo">Runway Gen 4 Turbo — control fino 5/10s ★★★★★</option>
+                      </optgroup>
+                      <optgroup label="🔵 Google / Veo">
+                        <option value="veo-4">Veo 4 — nueva generación 2026, coherencia máxima ★★★★★</option>
+                        <option value="veo-4-fast">Veo 4 Fast — rápido + audio nativo ★★★★★</option>
+                        <option value="veo-3.1">Veo 3.1 — última gen + audio nativo (8s) ★★★★★</option>
+                        <option value="veo-3.1-fast">Veo 3.1 Fast — rápido + audio ★★★★★</option>
+                        <option value="veo-3">Veo 3 — max calidad + audio (8s) ★★★★★</option>
+                        <option value="veo-3-fast">Veo 3 Fast — rápido + audio ★★★★★</option>
+                        <option value="veo-2">Veo 2 — 9:16/16:9, hasta 8s ★★★★☆</option>
+                      </optgroup>
+                      <optgroup label="🌀 Kling (Replicate)">
+                        <option value="kling-3.0-master">Kling V3.0 Omni — multimodal, audio, hasta 15s ★★★★★</option>
+                        <option value="kling-3.0-omni">Kling V3.0 Omni (alias) — refs+audio+style ★★★★★</option>
+                        <option value="kling-3.0-turbo">Kling V3.0 Turbo — cinematic T2V+I2V 1080p ★★★★★</option>
+                        <option value="kling-v1.6-pro">Kling v1.6 Pro — alta calidad profesional ★★★★★</option>
+                        <option value="kling-v1.6-standard">Kling v1.6 Standard — balanceado ★★★★☆</option>
+                      </optgroup>
+                      <optgroup label="🌱 Seedance (Replicate)">
+                        <option value="seedance-1-pro">Seedance 1 Pro — calidad profesional ByteDance ★★★★★</option>
+                        <option value="seedance-pro">Seedance Pro — cinema-quality, multi-ref ★★★★★</option>
+                        <option value="seedance-fast">Seedance Fast — rápido y barato ★★★★☆</option>
+                        <option value="seedance-1-lite">Seedance 1 Lite — económico ★★★☆☆</option>
+                      </optgroup>
+                      <optgroup label="🌊 Hailuo / MiniMax (Replicate)">
+                        <option value="hailuo-2.3">Hailuo 2.3 — última gen, 1080p T2V+I2V ★★★★☆</option>
+                        <option value="hailuo-02-master">Hailuo 02 Master — max calidad cinematográfica ★★★★★</option>
+                        <option value="hailuo-02">Hailuo 02 — buen balance velocidad/calidad ★★★★☆</option>
+                        <option value="hailuo-02-fast">Hailuo 02 Fast — rápido y barato ★★★☆☆</option>
+                        <option value="minimax-video-01">MiniMax Video-01 — modelo base MiniMax ★★★★☆</option>
+                      </optgroup>
+                      <optgroup label="🐉 Wan (Replicate / Open-source)">
+                        <option value="wan-2.7">Wan 2.7 — última gen open-source, hasta 1080p 15s ★★★★☆</option>
+                        <option value="wan-2.5-t2v-720p">Wan 2.5 T2V 720p — alta calidad solo texto ★★★★☆</option>
+                        <option value="wan-2.5-t2v">Wan 2.5 T2V — solo texto open-source ★★★☆☆</option>
+                        <option value="wan-2.5">Wan 2.5 — image-to-video open-source ★★★★☆</option>
+                        <option value="wan-2.5-i2v-480p">Wan 2.5 I2V 480p — animación imagen rápida ★★★☆☆</option>
+                        <option value="wan-2.5-t2v-480p">Wan 2.5 T2V 480p — económico texto ★★★☆☆</option>
+                      </optgroup>
+                      <optgroup label="🤖 OpenAI (Replicate)">
+                        <option value="sora-2">Sora 2 — narrativa cinematográfica, hasta 12s ★★★★★</option>
+                      </optgroup>
                     </select>
                   </div>
                   <button onClick={generateViralVideo} disabled={generatingVideo || !satiricoProjectId}
