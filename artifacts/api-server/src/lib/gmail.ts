@@ -109,6 +109,79 @@ export async function sendEmail(
   }
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+  mimeType: string;
+}
+
+export async function sendEmailWithAttachment(
+  to: string,
+  subject: string,
+  htmlBody: string,
+  attachments: EmailAttachment[],
+  fromName = "Shopy Crafter",
+): Promise<boolean> {
+  try {
+    const gmail = await getGmailClient();
+
+    const outer = "outer_" + Date.now();
+    const inner = "inner_" + Date.now();
+
+    const lines: string[] = [
+      `From: ${fromName} <${OFFICIAL_EMAIL}>`,
+      `To: ${to}`,
+      `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
+      "MIME-Version: 1.0",
+      `Content-Type: multipart/mixed; boundary="${outer}"`,
+      "",
+      `--${outer}`,
+      `Content-Type: multipart/alternative; boundary="${inner}"`,
+      "",
+      `--${inner}`,
+      "Content-Type: text/plain; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(htmlBody.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ")).toString("base64"),
+      "",
+      `--${inner}`,
+      "Content-Type: text/html; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(htmlBody).toString("base64"),
+      "",
+      `--${inner}--`,
+    ];
+
+    for (const att of attachments) {
+      lines.push(
+        "",
+        `--${outer}`,
+        `Content-Type: ${att.mimeType}; name="${att.filename}"`,
+        `Content-Disposition: attachment; filename="${att.filename}"`,
+        "Content-Transfer-Encoding: base64",
+        "",
+        Buffer.from(att.content).toString("base64"),
+      );
+    }
+
+    lines.push("", `--${outer}--`);
+
+    const raw = Buffer.from(lines.join("\r\n"))
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+    logger.info({ to, subject, attachments: attachments.map(a => a.filename) }, "Gmail: email with attachment sent");
+    return true;
+  } catch (err) {
+    logger.error({ err, to, subject }, "Gmail: failed to send email with attachment");
+    return false;
+  }
+}
+
 export function isGmailAvailable(): boolean {
   return !!(
     process.env.REPLIT_CONNECTORS_HOSTNAME &&

@@ -4,7 +4,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Minus, RefreshCw, ChevronLeft, ChevronRight,
-  DollarSign, Zap, Activity, BarChart2, Download,
+  DollarSign, Zap, Activity, BarChart2, Download, Mail, CheckCircle, AlertCircle,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -146,6 +146,8 @@ export default function ApiUsage() {
   const [loading,     setLoading]     = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [exporting,   setExporting]   = useState(false);
+  const [sending,     setSending]     = useState(false);
+  const [toast,       setToast]       = useState<{ type: "ok" | "err"; msg: string } | null>(null);
 
   const loadStats = useCallback(async () => {
     setLoading(true);
@@ -202,11 +204,53 @@ export default function ApiUsage() {
     }
   }
 
+  async function handleSendEmail() {
+    setSending(true);
+    setToast(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/api-usage/send-email`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to, provider }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error ?? `Error ${r.status}`);
+      setToast({ type: "ok", msg: `✅ Informe enviado a craftershopy@gmail.com (${data.rows} registros)` });
+    } catch (err) {
+      setToast({ type: "err", msg: `❌ ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setSending(false);
+      setTimeout(() => setToast(null), 6000);
+    }
+  }
+
   const providers = stats ? [...new Set(stats.daily.map(d => d.provider))] : [];
   const chartData = stats ? buildChartData(stats.daily, provider) : [];
 
   return (
     <div style={{ padding: "24px 28px", minHeight: "100vh", background: "var(--ink,#0f0f1a)" }}>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 20, right: 24, zIndex: 9999,
+          display: "flex", alignItems: "center", gap: 10,
+          background: toast.type === "ok" ? "rgba(45,212,159,0.12)" : "rgba(239,68,68,0.12)",
+          border: `1px solid ${toast.type === "ok" ? "rgba(45,212,159,0.35)" : "rgba(239,68,68,0.35)"}`,
+          borderRadius: 10, padding: "12px 18px", maxWidth: 460,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+          color: toast.type === "ok" ? "#2dd49f" : "#ef4444",
+          fontSize: 13, fontWeight: 500,
+          animation: "fadeInRight 0.25s ease",
+        }}>
+          {toast.type === "ok"
+            ? <CheckCircle size={16} style={{ flexShrink: 0 }} />
+            : <AlertCircle size={16} style={{ flexShrink: 0 }} />}
+          {toast.msg}
+          <button onClick={() => setToast(null)} style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 16, lineHeight: 1, padding: 0, opacity: 0.7 }}>×</button>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
@@ -233,6 +277,23 @@ export default function ApiUsage() {
           >
             <Download size={14} style={{ animation: exporting ? "spin 0.6s linear infinite" : "none" }} />
             {exporting ? "Exportando…" : "Exportar CSV"}
+          </button>
+          <button
+            onClick={handleSendEmail}
+            disabled={sending}
+            title="Enviar el informe CSV del período seleccionado por email"
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: sending ? "rgba(45,212,159,0.04)" : "rgba(45,212,159,0.08)",
+              border: "1px solid rgba(45,212,159,0.28)",
+              borderRadius: 8, padding: "7px 14px",
+              color: sending ? "rgba(45,212,159,0.4)" : "#2dd49f",
+              cursor: sending ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+          >
+            <Mail size={14} style={{ animation: sending ? "spin 0.6s linear infinite" : "none" }} />
+            {sending ? "Enviando…" : "Enviar por email"}
           </button>
           <button
             onClick={() => { loadStats(); loadLogs(page); }}
