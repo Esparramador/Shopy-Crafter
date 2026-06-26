@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Youtube, Upload, Trash2, ExternalLink, Search, CheckCircle, AlertCircle, RefreshCw, Link2, Users, Video, Eye, ThumbsUp, MessageSquare, X } from "lucide-react";
+import { Youtube, Upload, Trash2, ExternalLink, Search, CheckCircle, AlertCircle, RefreshCw, Link2, Users, Video, Eye, ThumbsUp, MessageSquare, X, TrendingUp, Mic, Copy, Play, Zap, ChevronDown, ChevronUp } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -51,7 +51,7 @@ export default function YouTubeStudio() {
   const [videos, setVideos] = useState<YtVideo[]>([]);
   const [loadingChannel, setLoadingChannel] = useState(true);
   const [loadingVideos, setLoadingVideos] = useState(false);
-  const [tab, setTab] = useState<"upload" | "videos" | "search">("upload");
+  const [tab, setTab] = useState<"upload" | "videos" | "search" | "trends" | "satirico">("upload");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<{ watchUrl: string; title: string } | null>(null);
@@ -61,6 +61,22 @@ export default function YouTubeStudio() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [activeEmbed, setActiveEmbed] = useState<string | null>(null);
+
+  // ── Trends tab state ──────────────────────────────────────────────────────
+  const [trendsData, setTrendsData] = useState<{ news: any[]; formats: any[]; youtubeVideos: any[]; timestamp?: string } | null>(null);
+  const [loadingTrends, setLoadingTrends] = useState(false);
+  const [trendsCountry, setTrendsCountry] = useState("España");
+  const [selectedNews, setSelectedNews] = useState<any | null>(null);
+
+  // ── Satírico IA tab state ────────────────────────────────────────────────
+  const [scriptForm, setScriptForm] = useState({ newsText: "", tone: "ácido", duration: "60", style: "monólogo" });
+  const [generatingScript, setGeneratingScript] = useState(false);
+  const [scriptResult, setScriptResult] = useState<any | null>(null);
+  const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [videoResult, setVideoResult] = useState<{ vaultId: number; sizeBytes: number } | null>(null);
+  const [scriptExpanded, setScriptExpanded] = useState(false);
+  const [satiricoProjectId, setSatiricoProjectId] = useState<string>("");
+  const [satiricoModel, setSatiricoModel] = useState("seedance-1-lite");
 
   const [form, setForm] = useState({
     title: "", description: "", tags: "", privacy: "public", categoryId: "22",
@@ -177,6 +193,73 @@ export default function YouTubeStudio() {
     setSearching(false);
   }
 
+  // ── Trends functions ──────────────────────────────────────────────────────
+  async function fetchTrends() {
+    setLoadingTrends(true);
+    try {
+      const r = await fetch(`${BASE}/api/viral/trends?country=${encodeURIComponent(trendsCountry)}`, { credentials: "include" });
+      if (r.ok) setTrendsData(await r.json());
+      else setError("Error obteniendo tendencias");
+    } catch (e: any) { setError(e.message); }
+    setLoadingTrends(false);
+  }
+
+  function selectNewsForScript(item: any) {
+    setSelectedNews(item);
+    const text = typeof item === "object" ? `${item.headline || item.title || ""}: ${item.summary || ""}` : String(item);
+    setScriptForm(f => ({ ...f, newsText: text }));
+    setTab("satirico");
+    setScriptResult(null); setVideoResult(null);
+  }
+
+  // ── Script generation ─────────────────────────────────────────────────────
+  async function generateScript(e: React.FormEvent) {
+    e.preventDefault();
+    if (!scriptForm.newsText.trim()) return setError("Introduce la noticia a satirizar");
+    setGeneratingScript(true); setScriptResult(null); setVideoResult(null); setError(null);
+    try {
+      const r = await fetch(`${BASE}/api/viral/script`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          newsItem: scriptForm.newsText,
+          tone: scriptForm.tone,
+          duration: parseInt(scriptForm.duration),
+          style: scriptForm.style,
+        }),
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+      const d = await r.json();
+      setScriptResult(d.script);
+      setScriptExpanded(false);
+    } catch (e: any) { setError(e.message); }
+    setGeneratingScript(false);
+  }
+
+  async function generateViralVideo() {
+    if (!scriptResult?.visualPrompt) return;
+    if (!satiricoProjectId) return setError("Introduce un Project ID para generar el vídeo");
+    setGeneratingVideo(true); setVideoResult(null); setError(null);
+    try {
+      await fetch(`${BASE}/api/viral/log`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "video_generated", data: { title: scriptResult.title, model: satiricoModel } }),
+      });
+      const fd = new FormData();
+      fd.append("projectId", satiricoProjectId);
+      fd.append("model", satiricoModel);
+      fd.append("prompt", scriptResult.visualPrompt);
+      fd.append("duration", "5");
+      fd.append("aspect", "9:16");
+      const r = await fetch(`${BASE}/api/fs-pro/generate-video`, { method: "POST", credentials: "include", body: fd });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+      const d = await r.json();
+      setVideoResult(d);
+    } catch (e: any) { setError(e.message); }
+    setGeneratingVideo(false);
+  }
+
   const fmt = (n?: string) => n ? Number(n).toLocaleString("es") : "—";
 
   return (
@@ -249,15 +332,17 @@ export default function YouTubeStudio() {
       )}
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, background: "var(--ink2)", borderRadius: 10, padding: 4, marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 4, background: "var(--ink2)", borderRadius: 10, padding: 4, marginBottom: 20, flexWrap: "wrap" }}>
         {[
-          { id: "upload", label: "Subir Vídeo", icon: <Upload size={14} /> },
-          { id: "videos", label: "Mis Vídeos", icon: <Video size={14} /> },
-          { id: "search", label: "Buscar en YouTube", icon: <Search size={14} /> },
+          { id: "upload",   label: "Subir Vídeo",     icon: <Upload size={13} /> },
+          { id: "videos",   label: "Mis Vídeos",       icon: <Video size={13} /> },
+          { id: "search",   label: "Buscar",           icon: <Search size={13} /> },
+          { id: "trends",   label: "Tendencias 🔥",   icon: <TrendingUp size={13} /> },
+          { id: "satirico", label: "Satírico IA 🎭",  icon: <Mic size={13} /> },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)}
-            style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all .15s",
-              background: tab === t.id ? "var(--gold)" : "transparent",
+            style={{ flex: 1, minWidth: 100, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, transition: "all .15s",
+              background: tab === t.id ? (t.id === "trends" || t.id === "satirico" ? "linear-gradient(135deg,var(--gold),#f59e0b)" : "var(--gold)") : "transparent",
               color: tab === t.id ? "#000" : "var(--t3)" }}>
             {t.icon} {t.label}
           </button>
@@ -513,6 +598,331 @@ export default function YouTubeStudio() {
               <Youtube size={36} color="#ff0000" style={{ marginBottom: 10, opacity: 0.6 }} /><br />
               <div style={{ fontWeight: 600, color: "var(--t2)", marginBottom: 6 }}>Busca cualquier vídeo de YouTube</div>
               <div style={{ fontSize: 12 }}>Canciones, tutoriales, música de fondo para tus anuncios…</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: TENDENCIAS ── */}
+      {tab === "trends" && (
+        <div>
+          {/* Header + fetch button */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t)" }}>📰 Tendencias Virales del Día</h2>
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3)" }}>Noticias políticas con mayor potencial satírico · {trendsData?.timestamp ? new Date(trendsData.timestamp).toLocaleTimeString("es") : "Sin cargar"}</p>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <select value={trendsCountry} onChange={e => setTrendsCountry(e.target.value)}
+                style={{ background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "6px 10px", color: "var(--t)", fontSize: 12 }}>
+                {["España", "México", "Argentina", "Colombia", "Chile", "EEUU"].map(c => <option key={c}>{c}</option>)}
+              </select>
+              <button onClick={fetchTrends} disabled={loadingTrends}
+                style={{ padding: "8px 16px", background: "var(--gold)", color: "#000", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                {loadingTrends ? <RefreshCw size={14} className="spin" /> : <TrendingUp size={14} />}
+                {loadingTrends ? "Analizando…" : "Obtener Tendencias"}
+              </button>
+            </div>
+          </div>
+
+          {!trendsData && !loadingTrends && (
+            <div style={{ textAlign: "center", padding: 60, color: "var(--t3)" }}>
+              <TrendingUp size={40} style={{ marginBottom: 12, opacity: 0.25 }} /><br />
+              <div style={{ fontWeight: 600, color: "var(--t2)", marginBottom: 6 }}>Viral Comedy Studio</div>
+              <div style={{ fontSize: 12, maxWidth: 380, margin: "0 auto 20px" }}>
+                Pulsa <strong>Obtener Tendencias</strong> para analizar con Gemini Search las noticias políticas con mayor potencial satírico del día.
+              </div>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                {["🎭 Sátira política", "📰 Noticias virales", "🎬 Formatos YouTube", "🔥 Tendencias TikTok"].map(t => (
+                  <span key={t} style={{ padding: "4px 12px", background: "var(--ink2)", borderRadius: 20, fontSize: 12, color: "var(--t3)" }}>{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {loadingTrends && (
+            <div style={{ textAlign: "center", padding: 60, color: "var(--t3)" }}>
+              <RefreshCw size={32} className="spin" style={{ marginBottom: 12, color: "var(--gold)" }} /><br />
+              <div style={{ fontWeight: 600, color: "var(--t2)", marginBottom: 4 }}>Analizando tendencias con Gemini Search…</div>
+              <div style={{ fontSize: 12 }}>Buscando noticias virales, formatos exitosos y vídeos trending</div>
+            </div>
+          )}
+
+          {trendsData && !loadingTrends && (
+            <div>
+              {/* Noticias */}
+              {trendsData.news.length > 0 && (
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 14, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ background: "rgba(251,191,36,0.15)", border: "1px solid var(--gold)", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>🔥 {trendsData.news.length} NOTICIAS</span>
+                    Potencial Satírico Político
+                  </div>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {trendsData.news.map((item: any, i: number) => (
+                      <div key={i} style={{ background: "var(--ink2)", borderRadius: 12, padding: 14, border: "1px solid var(--ink3)", display: "flex", gap: 14, alignItems: "flex-start" }}>
+                        {/* Comedy score badge */}
+                        <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 10, background: (item.comedyScore || 5) >= 8 ? "rgba(251,191,36,0.2)" : "var(--ink3)", border: `1px solid ${(item.comedyScore || 5) >= 8 ? "var(--gold)" : "var(--ink4)"}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                          <div style={{ fontSize: 16, fontWeight: 900, color: (item.comedyScore || 5) >= 8 ? "var(--gold)" : "var(--t2)" }}>{item.comedyScore || "?"}</div>
+                          <div style={{ fontSize: 9, color: "var(--t3)" }}>🎭</div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 13, marginBottom: 4, lineHeight: 1.35 }}>{item.headline || item.title}</div>
+                          {item.summary && <div style={{ fontSize: 12, color: "var(--t3)", marginBottom: 6, lineHeight: 1.5 }}>{item.summary}</div>}
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                            {item.protagonists && <span style={{ fontSize: 11, color: "var(--t3)", padding: "2px 8px", background: "var(--ink3)", borderRadius: 6 }}>👤 {Array.isArray(item.protagonists) ? item.protagonists.join(", ") : item.protagonists}</span>}
+                            {item.virality && <span style={{ fontSize: 11, color: "var(--jade)", padding: "2px 8px", background: "rgba(16,185,129,0.1)", borderRadius: 6 }}>📈 Virality: {item.virality}</span>}
+                            <button onClick={() => selectNewsForScript(item)}
+                              style={{ marginLeft: "auto", padding: "5px 12px", background: "var(--gold)", color: "#000", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                              <Mic size={11} /> Satirizar →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* YouTube trending videos */}
+              {trendsData.youtubeVideos.length > 0 && (
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 14, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ background: "rgba(255,0,0,0.1)", border: "1px solid rgba(255,0,0,0.3)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#ff4444" }}>▶ {trendsData.youtubeVideos.length} VÍDEOS</span>
+                    Trending en YouTube — Sátira Política
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 10 }}>
+                    {trendsData.youtubeVideos.map((v: any) => (
+                      <div key={v.videoId} style={{ background: "var(--ink2)", borderRadius: 10, overflow: "hidden", border: "1px solid var(--ink3)" }}>
+                        {v.thumbnail && <img src={v.thumbnail} alt={v.title} style={{ width: "100%", height: 140, objectFit: "cover" }} />}
+                        <div style={{ padding: 10 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t)", marginBottom: 4, lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{v.title}</div>
+                          <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 8 }}>{v.channelTitle} · {Number(v.viewCount || 0).toLocaleString("es")} views</div>
+                          <a href={v.watchUrl} target="_blank" rel="noreferrer"
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "rgba(255,0,0,0.15)", borderRadius: 7, fontSize: 11, color: "#ff4444", textDecoration: "none", fontWeight: 600 }}>
+                            <Play size={10} /> Ver vídeo
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Viral formats */}
+              {trendsData.formats.length > 0 && (
+                <div>
+                  <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 14, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ background: "rgba(16,185,129,0.1)", border: "1px solid var(--jade)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "var(--jade)" }}>🎬 {trendsData.formats.length} FORMATOS</span>
+                    Formatos Virales Más Efectivos Ahora
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 10 }}>
+                    {trendsData.formats.map((f: any, i: number) => (
+                      <div key={i} style={{ background: "var(--ink2)", borderRadius: 10, padding: 14, border: "1px solid var(--ink3)" }}>
+                        <div style={{ fontWeight: 700, color: "var(--jade)", fontSize: 13, marginBottom: 6 }}>{f.name}</div>
+                        {f.description && <div style={{ fontSize: 12, color: "var(--t3)", marginBottom: 8, lineHeight: 1.5 }}>{f.description}</div>}
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {f.avgDuration && <span style={{ fontSize: 10, padding: "2px 7px", background: "var(--ink3)", borderRadius: 5, color: "var(--t3)" }}>⏱ {f.avgDuration}</span>}
+                          {f.engagement && <span style={{ fontSize: 10, padding: "2px 7px", background: "rgba(251,191,36,0.1)", borderRadius: 5, color: "var(--gold)" }}>📈 {f.engagement}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: SATÍRICO IA ── */}
+      {tab === "satirico" && (
+        <div>
+          <div style={{ marginBottom: 20 }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t)" }}>🎭 Generador de Guiones Satíricos</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3)" }}>Convierte una noticia política en guión viral · Estilo El Intermedio · La Resistencia · Wyoming</p>
+          </div>
+
+          {selectedNews && (
+            <div style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 10, padding: 12, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <TrendingUp size={14} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600, marginBottom: 2 }}>NOTICIA SELECCIONADA</div>
+                <div style={{ fontSize: 12, color: "var(--t2)" }}>{selectedNews.headline || selectedNews.title}</div>
+              </div>
+              <button onClick={() => setSelectedNews(null)} style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer" }}><X size={14} /></button>
+            </div>
+          )}
+
+          <form onSubmit={generateScript} style={{ display: "grid", gap: 14, marginBottom: 24 }}>
+            {/* Noticia input */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Noticia a satirizar *</label>
+              <textarea value={scriptForm.newsText} onChange={e => setScriptForm(f => ({ ...f, newsText: e.target.value }))}
+                placeholder="Pega el titular o describe la noticia que quieres convertir en sátira política…"
+                rows={3} style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 10, padding: "10px 14px", color: "var(--t)", fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Tono</label>
+                <select value={scriptForm.tone} onChange={e => setScriptForm(f => ({ ...f, tone: e.target.value }))}
+                  style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 9, padding: "9px 12px", color: "var(--t)", fontSize: 13 }}>
+                  {["ácido", "absurdo", "irónico", "sarcástico", "tierno"].map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Formato</label>
+                <select value={scriptForm.style} onChange={e => setScriptForm(f => ({ ...f, style: e.target.value }))}
+                  style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 9, padding: "9px 12px", color: "var(--t)", fontSize: 13 }}>
+                  {["monólogo", "sketch", "reportaje falso", "entrevista imaginaria"].map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Duración (seg)</label>
+                <select value={scriptForm.duration} onChange={e => setScriptForm(f => ({ ...f, duration: e.target.value }))}
+                  style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 9, padding: "9px 12px", color: "var(--t)", fontSize: 13 }}>
+                  {["30", "60", "90", "120", "180"].map(d => <option key={d}>{d}s</option>)}
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" disabled={generatingScript || !scriptForm.newsText.trim()}
+              style={{ padding: "12px 24px", background: generatingScript ? "var(--ink3)" : "linear-gradient(135deg,var(--gold),#f59e0b)", color: "#000", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, cursor: generatingScript ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              {generatingScript ? <><RefreshCw size={16} className="spin" /> Generando guión con Claude…</> : <><Zap size={16} /> Generar Guión Satírico</>}
+            </button>
+          </form>
+
+          {/* Script result */}
+          {scriptResult && (
+            <div style={{ background: "var(--ink2)", borderRadius: 14, border: "1px solid var(--ink3)", overflow: "hidden", marginBottom: 20 }}>
+              {/* Title + meta */}
+              <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--ink3)", background: "rgba(251,191,36,0.05)" }}>
+                <div style={{ fontWeight: 800, color: "var(--gold)", fontSize: 15, marginBottom: 6 }}>{scriptResult.title}</div>
+                {scriptResult.comedyTechniques?.length > 0 && (
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                    {scriptResult.comedyTechniques.map((t: string) => (
+                      <span key={t} style={{ fontSize: 10, padding: "2px 8px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 20, color: "var(--gold)" }}>🎭 {t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Hook */}
+              {scriptResult.hook && (
+                <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--ink3)", background: "rgba(239,68,68,0.05)" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>🎯 HOOK — primeros 5 segundos</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--t)", fontStyle: "italic" }}>"{scriptResult.hook}"</div>
+                </div>
+              )}
+
+              {/* Script toggle */}
+              <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--ink3)" }}>
+                <button onClick={() => setScriptExpanded(x => !x)}
+                  style={{ background: "none", border: "none", color: "var(--t2)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, padding: 0 }}>
+                  {scriptExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  {scriptExpanded ? "Ocultar" : "Ver"} guión completo
+                </button>
+                {scriptExpanded && (
+                  <div style={{ marginTop: 12, fontSize: 12, color: "var(--t2)", lineHeight: 1.8, whiteSpace: "pre-wrap", background: "var(--ink3)", borderRadius: 8, padding: 14 }}>
+                    {scriptResult.script}
+                  </div>
+                )}
+              </div>
+
+              {/* Voiceover + visual prompt + copy actions */}
+              <div style={{ padding: "12px 18px", display: "grid", gap: 10 }}>
+                {scriptResult.voiceoverText && (
+                  <div style={{ background: "var(--ink3)", borderRadius: 9, padding: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", marginBottom: 6 }}>🎙 VOZ EN OFF (para TTS)</div>
+                    <div style={{ fontSize: 12, color: "var(--t2)", lineHeight: 1.7 }}>{scriptResult.voiceoverText}</div>
+                    <button onClick={() => navigator.clipboard.writeText(scriptResult.voiceoverText)}
+                      style={{ marginTop: 8, padding: "4px 10px", background: "var(--ink4)", border: "none", borderRadius: 6, fontSize: 11, color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      <Copy size={10} /> Copiar texto
+                    </button>
+                  </div>
+                )}
+                {scriptResult.visualPrompt && (
+                  <div style={{ background: "var(--ink3)", borderRadius: 9, padding: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", marginBottom: 6 }}>🎬 PROMPT VISUAL (para vídeo IA)</div>
+                    <div style={{ fontSize: 12, color: "var(--t2)", fontFamily: "monospace", lineHeight: 1.7 }}>{scriptResult.visualPrompt}</div>
+                    <button onClick={() => navigator.clipboard.writeText(scriptResult.visualPrompt)}
+                      style={{ marginTop: 8, padding: "4px 10px", background: "var(--ink4)", border: "none", borderRadius: 6, fontSize: 11, color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                      <Copy size={10} /> Copiar prompt
+                    </button>
+                  </div>
+                )}
+                {scriptResult.callToAction && (
+                  <div style={{ fontSize: 12, color: "var(--jade)", padding: "8px 12px", background: "rgba(16,185,129,0.08)", borderRadius: 8, border: "1px solid rgba(16,185,129,0.2)" }}>
+                    📣 CTA: <strong>{scriptResult.callToAction}</strong>
+                  </div>
+                )}
+                {scriptResult.tags?.length > 0 && (
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                    {scriptResult.tags.map((tag: string) => (
+                      <span key={tag} style={{ fontSize: 10, padding: "2px 8px", background: "var(--ink3)", borderRadius: 20, color: "var(--t3)" }}>#{tag}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Generate video section */}
+              <div style={{ padding: "14px 18px", borderTop: "1px solid var(--ink3)", background: "rgba(16,185,129,0.03)" }}>
+                <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 13, marginBottom: 10 }}>🎬 Generar Vídeo IA con este prompt</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 5, display: "block" }}>Project ID</label>
+                    <input value={satiricoProjectId} onChange={e => setSatiricoProjectId(e.target.value)}
+                      placeholder="ID del proyecto (número)"
+                      style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", color: "var(--t)", fontSize: 13, boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 5, display: "block" }}>Modelo de vídeo</label>
+                    <select value={satiricoModel} onChange={e => setSatiricoModel(e.target.value)}
+                      style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", color: "var(--t)", fontSize: 13 }}>
+                      <option value="seedance-1-lite">Seedance 1 Lite ⚡</option>
+                      <option value="runway-gen4">Runway Gen4</option>
+                      <option value="kling-2.1">Kling 2.1</option>
+                      <option value="hailuo-02">Hailuo 02</option>
+                      <option value="veo-3">Veo 3 (Google)</option>
+                    </select>
+                  </div>
+                  <button onClick={generateViralVideo} disabled={generatingVideo || !satiricoProjectId}
+                    style={{ padding: "8px 16px", background: generatingVideo ? "var(--ink3)" : "var(--jade)", color: generatingVideo ? "var(--t3)" : "#000", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: generatingVideo ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                    {generatingVideo ? <RefreshCw size={14} className="spin" /> : <Play size={14} />}
+                    {generatingVideo ? "Generando…" : "Generar Vídeo"}
+                  </button>
+                </div>
+
+                {videoResult && (
+                  <div style={{ marginTop: 12, padding: 12, background: "rgba(16,185,129,0.1)", border: "1px solid var(--jade)", borderRadius: 9, display: "flex", alignItems: "center", gap: 10 }}>
+                    <CheckCircle size={18} color="var(--jade)" />
+                    <div>
+                      <div style={{ fontWeight: 700, color: "var(--jade)", fontSize: 13 }}>¡Vídeo generado! Guardado en Vault #{videoResult.vaultId}</div>
+                      <div style={{ fontSize: 11, color: "var(--t3)" }}>{((videoResult.sizeBytes || 0) / 1024 / 1024).toFixed(1)} MB · Ahora puedes subírselo a YouTube desde la pestaña <strong>Subir Vídeo</strong></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Description for YouTube */}
+              {scriptResult.description && (
+                <div style={{ padding: "10px 18px", borderTop: "1px solid var(--ink3)" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--t3)", marginBottom: 6 }}>📝 DESCRIPCIÓN YOUTUBE (SEO)</div>
+                  <div style={{ fontSize: 12, color: "var(--t3)", lineHeight: 1.6 }}>{scriptResult.description}</div>
+                  <button onClick={() => navigator.clipboard.writeText(scriptResult.description)}
+                    style={{ marginTop: 6, padding: "4px 10px", background: "var(--ink3)", border: "none", borderRadius: 6, fontSize: 11, color: "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                    <Copy size={10} /> Copiar descripción
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!scriptResult && !generatingScript && (
+            <div style={{ textAlign: "center", padding: 40, color: "var(--t3)" }}>
+              <Mic size={32} style={{ marginBottom: 10, opacity: 0.25 }} /><br />
+              <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 4 }}>Introduce una noticia y pulsa Generar</div>
+              <div style={{ fontSize: 12 }}>O vete a Tendencias 🔥 y pulsa <strong>Satirizar →</strong> en cualquier noticia</div>
             </div>
           )}
         </div>
