@@ -160,4 +160,71 @@ router.get("/api-usage/logs", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/api-usage/export", async (req, res): Promise<void> => {
+  try {
+    const { from, to, provider } = req.query as Record<string, string>;
+
+    const now = new Date();
+    const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+    const rangeFrom = from ? new Date(from) : defaultFrom;
+    const rangeTo   = to   ? new Date(to)   : now;
+
+    const conditions = [
+      gte(apiUsageLogTable.createdAt, rangeFrom),
+      lte(apiUsageLogTable.createdAt, rangeTo),
+    ];
+    if (provider && provider !== "all") {
+      conditions.push(eq(apiUsageLogTable.provider, provider));
+    }
+
+    const rows = await db
+      .select({
+        createdAt:   apiUsageLogTable.createdAt,
+        projectName: projectsTable.name,
+        shopDomain:  projectsTable.shopDomain,
+        provider:    apiUsageLogTable.provider,
+        model:       apiUsageLogTable.model,
+        operation:   apiUsageLogTable.operation,
+        inputUnits:  apiUsageLogTable.inputUnits,
+        outputUnits: apiUsageLogTable.outputUnits,
+        costUsd:     apiUsageLogTable.costUsd,
+        costEur:     apiUsageLogTable.costEur,
+        success:     apiUsageLogTable.success,
+      })
+      .from(apiUsageLogTable)
+      .leftJoin(projectsTable, eq(apiUsageLogTable.projectId, projectsTable.id))
+      .where(and(...conditions))
+      .orderBy(desc(apiUsageLogTable.createdAt));
+
+    const HEADERS = ["Fecha", "Proyecto", "Tienda", "Motor", "Modelo", "Operacion", "Tokens Entrada", "Tokens Salida", "Coste USD", "Coste EUR", "Estado"];
+    const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csvLines = [
+      HEADERS.map(escape).join(","),
+      ...rows.map(r => [
+        new Date(r.createdAt).toISOString().replace("T", " ").slice(0, 19),
+        r.projectName ?? "",
+        r.shopDomain  ?? "",
+        r.provider,
+        r.model       ?? "",
+        r.operation,
+        String(r.inputUnits  ?? 0),
+        String(r.outputUnits ?? 0),
+        Number(r.costUsd ?? 0).toFixed(6),
+        Number(r.costEur ?? 0).toFixed(6),
+        r.success === 1 ? "OK" : "Error",
+      ].map(escape).join(",")),
+    ];
+
+    const fromLabel = (from ?? rangeFrom.toISOString().slice(0, 10));
+    const toLabel   = (to   ?? rangeTo.toISOString().slice(0, 10));
+    const filename  = `costes-ia-${fromLabel}_${toLabel}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send("\uFEFF" + csvLines.join("\n"));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
 export default router;

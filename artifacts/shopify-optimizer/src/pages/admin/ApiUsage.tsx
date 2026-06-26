@@ -4,7 +4,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Minus, RefreshCw, ChevronLeft, ChevronRight,
-  DollarSign, Zap, Activity, BarChart2,
+  DollarSign, Zap, Activity, BarChart2, Download,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -142,9 +142,10 @@ export default function ApiUsage() {
   const [provider, setProvider] = useState<Provider>("all");
   const [stats,    setStats]    = useState<StatsData | null>(null);
   const [logs,     setLogs]     = useState<LogsData | null>(null);
-  const [page,     setPage]     = useState(1);
-  const [loading,  setLoading]  = useState(false);
+  const [page,        setPage]        = useState(1);
+  const [loading,     setLoading]     = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [exporting,   setExporting]   = useState(false);
 
   const loadStats = useCallback(async () => {
     setLoading(true);
@@ -179,6 +180,28 @@ export default function ApiUsage() {
     loadLogs(np);
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const qs = new URLSearchParams({ from, to, provider }).toString();
+      const r = await fetch(`${API_BASE}/api/api-usage/export?${qs}`, { credentials: "include" });
+      if (!r.ok) throw new Error(`Error ${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `costes-ia-${from}_${to}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(`No se pudo exportar: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const providers = stats ? [...new Set(stats.daily.map(d => d.provider))] : [];
   const chartData = stats ? buildChartData(stats.daily, provider) : [];
 
@@ -194,18 +217,36 @@ export default function ApiUsage() {
             Uso real de APIs externas por proyecto · coste en USD y EUR
           </p>
         </div>
-        <button
-          onClick={() => { loadStats(); loadLogs(page); }}
-          disabled={loading}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: "none", border: "1px solid var(--border,rgba(255,255,255,0.12))",
-            borderRadius: 8, padding: "7px 14px", color: "var(--t3,#888)", cursor: "pointer", fontSize: 13,
-          }}
-        >
-          <RefreshCw size={14} style={{ animation: loading ? "spin 0.6s linear infinite" : "none" }} />
-          Actualizar
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: exporting ? "rgba(200,168,75,0.08)" : "rgba(200,168,75,0.12)",
+              border: "1px solid rgba(200,168,75,0.35)",
+              borderRadius: 8, padding: "7px 14px",
+              color: exporting ? "rgba(200,168,75,0.5)" : "var(--gold,#f59e0b)",
+              cursor: exporting ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+          >
+            <Download size={14} style={{ animation: exporting ? "spin 0.6s linear infinite" : "none" }} />
+            {exporting ? "Exportando…" : "Exportar CSV"}
+          </button>
+          <button
+            onClick={() => { loadStats(); loadLogs(page); }}
+            disabled={loading}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "none", border: "1px solid var(--border,rgba(255,255,255,0.12))",
+              borderRadius: 8, padding: "7px 14px", color: "var(--t3,#888)", cursor: "pointer", fontSize: 13,
+            }}
+          >
+            <RefreshCw size={14} style={{ animation: loading ? "spin 0.6s linear infinite" : "none" }} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
