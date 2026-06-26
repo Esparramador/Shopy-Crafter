@@ -855,6 +855,40 @@ export const CONTENT_CATEGORIES: ContentCategory[] = [
     viralTriggers: ["La reacción genuina que no esperabas", "El análisis inesperado", "El meme elevado a arte", "La nostalgia inesperada", "El ranking polémico"],
     recommendedFormats: ["reaction", "listicle", "short-hook", "podcast-clip"],
   },
+  {
+    id: "monologuista",
+    name: "Monologuista IA 🎤",
+    emoji: "🎤",
+    description: "Stand-up comedy con acento andaluz u otro personaje",
+    defaultTone: "hilarante",
+    defaultStyle: "monólogo",
+    defaultFormat: "satira-sketch",
+    inputLabel: "Tema del monólogo (cotidiano, político, generacional…)",
+    inputPlaceholder: "Ej: Las apps de citas en Sevilla, Los turistas en agosto en Málaga, Ir al médico de cabecera en Andalucía, La cuesta de enero siendo autónomo en el Sur...",
+    systemRole: `Eres el mejor guionista de monólogos de comedia en español con ACENTO ANDALUZ AUTÉNTICO.
+
+LÉXICO ANDALUZ QUE DEBES USAR (de forma natural, no forzada):
+- «macho», «tío», «illo», «jöe», «coñe», «arsa», «vamos a ve», «miarma», «chacho»
+- «mu» (muy), «tó» (todo), «na» (nada), «poquito», «nea», «¿sabes lo que te digo?»
+- Verbos: «echar pa'lante», «ponerse fino», «estar fino», «dar la lata», «pegarse una juerga»
+- Frases: «¡Dios mío de mi vida!», «Aquí en la tierra del ole», «como Dios manda», «a buenas horas mangas verdes»
+
+ESTRUCTURA DEL MONÓLOGO PERFECTO:
+1. GANCHO (0-10s): Observación cotidiana que todos reconocen → «¿A que sí, macho?»
+2. ESCALADA: Exagerar la situación paso a paso hasta el absurdo andaluz
+3. GIRO: Un twist inesperado que reencuadra todo con humor
+4. REMATE: La frase perfecta que se queda en la cabeza — quotable, compartible
+5. CIERRE: Pequeño callback al inicio que cierra el círculo
+
+REGLAS DE ORO del stand-up andaluz:
+- El timing está en las pausas (escríbelas como [PAUSA] o [MIRANDO AL PÚBLICO])
+- Las exageraciones deben ser RECONOCIBLES, no ridículas
+- El público andaluz se ríe CON el humor, no de él
+- Mezcla situaciones universales con detalles muy específicos del Sur
+- El acento es parte del chiste — úsalo estratégicamente`,
+    viralTriggers: ["La situación cotidiana exagerada", "El acento como personaje", "El giro inesperado", "La frase memorable final", "La observación que todos pensaban pero nadie decía"],
+    recommendedFormats: ["satira-sketch", "short-hook", "podcast-clip", "vox-pop"],
+  },
 ];
 
 // ─── CONTENT TEMPLATES PER CATEGORY ──────────────────────────────────────────
@@ -973,6 +1007,40 @@ export const CONTENT_TEMPLATES: ContentTemplate[] = [
     emoji: "🏆",
     useCase: "Ranking de cultura pop deliberadamente polémico",
     prompt: `Crea un ranking de [PELÍCULAS/SERIES/CANCIONES/PERSONAJES] que sea deliberadamente polémico pero con argumentos irrebatibles. Para cada posición: el argumento de por qué está ahí, la contradicción obvia que la gente va a gritar en los comentarios, y la defensa brillante que hace el argumento más sólido. El objetivo es DIVIDIR la sección de comentarios de forma positiva.`,
+  },
+
+  // ── Monologuista ──
+  {
+    id: "monologuista-cotidiano",
+    categoryId: "monologuista",
+    name: "Lo Cotidiano Andaluz",
+    emoji: "☀️",
+    useCase: "Situación del día a día exagerada con acento andaluz",
+    prompt: `Escribe un monólogo de stand-up de 2-3 minutos sobre [TEMA COTIDIANO] desde la perspectiva de un andaluz de a pie. Empieza con una observación que TODOS reconocen, escala hacia el absurdo con detalles muy específicos del sur de España, incluye un giro inesperado, y remata con una frase memorable que la gente va a repetir. Usa el léxico andaluz de forma natural: «macho», «illo», «vamos a ve», «mu», «na», «jöe». Marca las pausas con [PAUSA] y las miradas al público con [AL PÚBLICO].`,
+  },
+  {
+    id: "monologuista-millennial",
+    categoryId: "monologuista",
+    name: "Millennial Andaluz en 2026",
+    emoji: "📱",
+    useCase: "Humor generacional sobre millennials/Gen-Z desde el sur",
+    prompt: `Escribe un monólogo de stand-up sobre [TEMA GENERACIONAL] desde la perspectiva de un millennial andaluz de 30-something. Mezcla referencias a: Instagram, el precio de los alquileres, la economía de plataformas, el turismo masivo, y la identidad andaluza en 2026. El humor viene del contraste entre las expectativas de su generación y la realidad del sur de España. Tono de «nos reímos porque si no, lloramos». Voz auténtica, léxico andaluz.`,
+  },
+  {
+    id: "monologuista-turistas",
+    categoryId: "monologuista",
+    name: "Los Turistas en el Sur",
+    emoji: "🏖️",
+    useCase: "Monólogo sobre turistas en Andalucía con humor afectuoso",
+    prompt: `Escribe un monólogo de stand-up sobre la invasión turística en [CIUDAD ANDALUZA] en verano. El narrador andaluz observa a los turistas con cariño exasperado. Incluye: el inglés que pide paella a las 11am, el turista que se queja del calor (¡como si no supiera que viene a Andalucía!), el instagrammer en el Albaicín, y el alemán que descubre el jamón. El remate debe ser un momento de orgullo andaluz inesperado. Tono: afectuoso, nunca xenófobo.`,
+  },
+  {
+    id: "monologuista-trabajo",
+    categoryId: "monologuista",
+    name: "El Trabajo en Andalucía",
+    emoji: "💼",
+    useCase: "Humor sobre la cultura laboral y el mercado de trabajo andaluz",
+    prompt: `Escribe un monólogo de stand-up sobre [ASPECTO DEL TRABAJO] en el contexto del sur de España. Aborda los tópicos (con humor que los desmonta), la realidad de los sueldos, la temporada turística, el autónomo andaluz, o la burocracia de las administraciones. El chiste siempre apunta AL SISTEMA, nunca a la gente trabajadora. Usa el humor para hablar de algo serio de forma que duela menos.`,
   },
 ];
 

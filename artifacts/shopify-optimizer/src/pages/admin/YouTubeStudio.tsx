@@ -87,6 +87,16 @@ export default function YouTubeStudio() {
   const [viralScore, setViralScore] = useState<{ score: number; breakdown: Record<string, number>; recommendations: string[] } | null>(null);
   const [showFormats, setShowFormats] = useState(false);
   const [engines, setEngines] = useState<{ grok: boolean; claude: boolean; gemini: boolean } | null>(null);
+  // ── TTS + Voice cloning ──────────────────────────────────────────────────────
+  const [studioVoiceId, setStudioVoiceId] = useState<string>("");
+  const [generatingVoice, setGeneratingVoice] = useState(false);
+  const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
+  const [cloningVoice, setCloningVoice] = useState(false);
+  const [clonedVoices, setClonedVoices] = useState<Array<{voice_id: string; name: string}>>([]);
+  const [voiceCloneFile, setVoiceCloneFile] = useState<File | null>(null);
+  const [voiceCloneName, setVoiceCloneName] = useState("");
+  const [showVoiceCloner, setShowVoiceCloner] = useState(false);
+  const voiceFileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     title: "", description: "", tags: "", privacy: "public", categoryId: "22",
@@ -240,6 +250,58 @@ export default function YouTubeStudio() {
     setScriptForm(f => ({ ...f, newsText: text }));
     setTab("satirico");
     setScriptResult(null); setVideoResult(null);
+  }
+
+  // ── Voice cloning ──────────────────────────────────────────────────────────
+  async function loadClonedVoices() {
+    try {
+      const r = await fetch(`${BASE}/api/voice/cloned`, { credentials: "include" });
+      if (r.ok) { const d = await r.json(); setClonedVoices(d.voices || []); }
+    } catch {}
+  }
+
+  async function handleCloneVoice() {
+    if (!voiceCloneFile || !voiceCloneName.trim()) return;
+    setCloningVoice(true);
+    try {
+      const fd = new FormData();
+      fd.append("files", voiceCloneFile, voiceCloneFile.name);
+      fd.append("name", voiceCloneName.trim());
+      fd.append("description", "Voz clonada desde Creador IA — Acento andaluz");
+      const r = await fetch(`${BASE}/api/voice/clone`, { method: "POST", credentials: "include", body: fd });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Error clonando voz"); }
+      const d = await r.json();
+      setClonedVoices(v => [...v, { voice_id: d.voiceId, name: voiceCloneName.trim() }]);
+      setStudioVoiceId(d.voiceId);
+      setVoiceCloneName(""); setVoiceCloneFile(null); setShowVoiceCloner(false);
+    } catch (err: any) { setError(err.message); }
+    finally { setCloningVoice(false); }
+  }
+
+  async function generateVoice() {
+    const text = scriptResult?.voiceoverText || scriptResult?.script;
+    if (!text) return;
+    setGeneratingVoice(true); setVoiceAudioUrl(null);
+    try {
+      const r = await fetch(`${BASE}/api/voice/tts`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          voiceId: studioVoiceId || undefined,
+          modelId: "eleven_v3",
+          languageCode: "es",
+          voiceSettings: studioCategory === "monologuista"
+            ? { stability: 0.30, similarity_boost: 0.90, style: 0.70, use_speaker_boost: true }
+            : { stability: 0.40, similarity_boost: 0.85, style: 0.40, use_speaker_boost: true },
+        }),
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Error generando voz"); }
+      const blob = await r.blob();
+      if (voiceAudioUrl) URL.revokeObjectURL(voiceAudioUrl);
+      setVoiceAudioUrl(URL.createObjectURL(blob));
+    } catch (err: any) { setError(err.message); }
+    finally { setGeneratingVoice(false); }
   }
 
   // ── Script generation ─────────────────────────────────────────────────────
@@ -784,11 +846,13 @@ export default function YouTubeStudio() {
           { id: "finanzas",       emoji: "💰", name: "Finanzas & Emprendimiento", desc: "Dinero y negocios sin filtros", inputLabel: "Estrategia financiera o error", placeholder: "Ej: Cómo invertir con 100€, El error que te hace pobre..." },
           { id: "ciencia",        emoji: "🔬", name: "Ciencia & Naturaleza",  desc: "Divulgación científica viral", inputLabel: "Fenómeno o paradoja científica", placeholder: "Ej: Por qué el espacio huele a bistec, El animal que no muere..." },
           { id: "entretenimiento",emoji: "😂", name: "Entretenimiento",       desc: "Humor, memes y cultura pop", inputLabel: "Tendencia, meme o fenómeno viral", placeholder: "Ej: Los peores anuncios del año, React a los TikToks más absurdos..." },
+          { id: "monologuista",   emoji: "🎤", name: "Monologuista IA",       desc: "Stand-up con acento andaluz", inputLabel: "Tema del monólogo (cotidiano, político, generacional…)", placeholder: "Ej: Las apps de citas en Sevilla, Los turistas en agosto en Málaga, La cuesta de enero siendo autónomo..." },
         ];
         const activeCat = CATS.find(c => c.id === studioCategory) || CATS[0];
 
         // Templates per category
         const TEMPLATES: Record<string, Array<{id:string;emoji:string;name:string;desc:string}>> = {
+          monologuista: [{ id:"monologuista-cotidiano", emoji:"☀️", name:"Lo Cotidiano Andaluz", desc:"Día a día exagerado" }, { id:"monologuista-millennial", emoji:"📱", name:"Millennial Andaluz", desc:"Humor generacional" }, { id:"monologuista-turistas", emoji:"🏖️", name:"Los Turistas", desc:"Turistas en el Sur" }, { id:"monologuista-trabajo", emoji:"💼", name:"El Trabajo en Andalucía", desc:"Cultura laboral" }],
           politica:  [{ id:"satirico-politico", emoji:"🎙️", name:"Analista Sarcástico", desc:"Estilo El Intermedio" }, { id:"entrevistador-incomodo", emoji:"🎤", name:"Entrevistador Incómodo", desc:"Vox Pop absurdo" }, { id:"detector-hipocresia", emoji:"🔍", name:"Detector Hipocresía", desc:"Fact-checker cómico" }],
           historia:  [{ id:"historia-dato-secreto", emoji:"🕵️", name:"El Dato Secreto", desc:"Revelación que cambia todo" }, { id:"historia-personaje-olvidado", emoji:"🎖️", name:"El Genio Olvidado", desc:"Personaje histórico olvidado" }],
           "ia-tech": [{ id:"ia-explica-simple", emoji:"🧩", name:"IA Sin Tecnicismos", desc:"Explicación con analogía" }, { id:"ia-vs-humano", emoji:"⚔️", name:"IA vs Humano", desc:"Experimento comparativo" }],
@@ -1119,6 +1183,85 @@ export default function YouTubeStudio() {
                     </button>
                   </div>
                 )}
+
+                {/* ── TTS Panel ─────────────────────────────────────────────── */}
+                <div style={{ background: "linear-gradient(135deg,rgba(139,92,246,0.08),rgba(251,191,36,0.06))", border: "1px solid rgba(139,92,246,0.3)", borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontWeight: 700, color: "#a78bfa", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                    🎙️ Generar Voz con IA
+                    {studioCategory === "monologuista" && <span style={{ fontSize: 10, background: "rgba(139,92,246,0.2)", padding: "2px 8px", borderRadius: 20, color: "#c4b5fd" }}>Ajustado para stand-up / acento andaluz</span>}
+                  </div>
+
+                  {/* Voice selector */}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+                    <select value={studioVoiceId} onChange={e => setStudioVoiceId(e.target.value)}
+                      style={{ flex: 1, minWidth: 180, background: "var(--ink2)", border: "1px solid rgba(139,92,246,0.4)", borderRadius: 8, padding: "8px 12px", color: "var(--t)", fontSize: 12 }}>
+                      <option value="">🤖 Voz automática (español)</option>
+                      <optgroup label="— Voces clonadas tuyas —">
+                        {clonedVoices.map(v => (
+                          <option key={v.voice_id} value={v.voice_id}>🎤 {v.name} (clonada)</option>
+                        ))}
+                        {clonedVoices.length === 0 && <option disabled>Ninguna — sube un audio abajo para clonar</option>}
+                      </optgroup>
+                      <optgroup label="— Voces ElevenLabs disponibles —">
+                        <option value="IKne3meq5aSn9XLyUdCD">Charlie (multilingüe)</option>
+                        <option value="N2lVS1w4EtoT3dr4eOWO">Callum (expresivo)</option>
+                        <option value="TX3LPaxmHKxFdv7VOQHJ">Liam (natural)</option>
+                        <option value="XB0fDUnXU5powFXDhCwa">Charlotte (femenina)</option>
+                        <option value="pqHfZKP75CvOlQylNhV4">Bill (grave)</option>
+                      </optgroup>
+                    </select>
+
+                    <button onClick={generateVoice} disabled={generatingVoice}
+                      style={{ padding: "9px 18px", background: generatingVoice ? "var(--ink3)" : "linear-gradient(135deg,#7c3aed,#a78bfa)", color: generatingVoice ? "var(--t3)" : "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: generatingVoice ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                      {generatingVoice ? <><RefreshCw size={14} className="spin" /> Generando…</> : <><Mic size={14} /> Generar voz</>}
+                    </button>
+                  </div>
+
+                  {voiceAudioUrl && (
+                    <div style={{ background: "rgba(139,92,246,0.1)", borderRadius: 9, padding: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", marginBottom: 6 }}>✅ AUDIO GENERADO — Escúchalo y descárgalo</div>
+                      <audio controls src={voiceAudioUrl} style={{ width: "100%" }} />
+                      <a href={voiceAudioUrl} download={`monologuista_${Date.now()}.mp3`}
+                        style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.4)", borderRadius: 6, fontSize: 11, color: "#a78bfa", textDecoration: "none" }}>
+                        ⬇️ Descargar MP3
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Voice cloner toggle */}
+                  <button type="button" onClick={() => { setShowVoiceCloner(v => !v); if (!showVoiceCloner) loadClonedVoices(); }}
+                    style={{ marginTop: 10, background: "none", border: "1px dashed rgba(139,92,246,0.4)", color: "#a78bfa", borderRadius: 8, padding: "6px 14px", fontSize: 11, cursor: "pointer", width: "100%" }}>
+                    {showVoiceCloner ? "▲ Ocultar clonar voz" : "🧬 Clonar mi voz (sube un audio en andaluz)"}
+                  </button>
+
+                  {showVoiceCloner && (
+                    <div style={{ marginTop: 10, padding: 12, background: "var(--ink2)", borderRadius: 10, border: "1px solid rgba(139,92,246,0.25)" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#a78bfa", marginBottom: 8 }}>🧬 CLONAR VOZ — ElevenLabs Instant Voice Cloning</div>
+                      <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 10, lineHeight: 1.5 }}>
+                        Sube 1-3 minutos de audio limpio (sin música de fondo). Cuanto más claro y expresivo, mejor resultado.
+                        Formatos: MP3, WAV, M4A, OGG, FLAC. Máx 25 MB.
+                      </div>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <input
+                          type="text" value={voiceCloneName} onChange={e => setVoiceCloneName(e.target.value)}
+                          placeholder="Nombre para la voz (ej: Manolo Andaluz, Pepa Sevillana…)"
+                          style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", color: "var(--t)", fontSize: 12, boxSizing: "border-box" }}
+                        />
+                        <input ref={voiceFileRef} type="file" accept="audio/*" style={{ display: "none" }}
+                          onChange={e => setVoiceCloneFile(e.target.files?.[0] || null)} />
+                        <button type="button" onClick={() => voiceFileRef.current?.click()}
+                          style={{ padding: "8px 14px", background: "var(--ink3)", border: "1px dashed var(--ink4)", borderRadius: 8, color: "var(--t2)", fontSize: 12, cursor: "pointer", textAlign: "left" }}>
+                          {voiceCloneFile ? `✅ ${voiceCloneFile.name} (${(voiceCloneFile.size/1024/1024).toFixed(1)} MB)` : "📎 Seleccionar archivo de audio…"}
+                        </button>
+                        <button type="button" onClick={handleCloneVoice}
+                          disabled={cloningVoice || !voiceCloneFile || !voiceCloneName.trim()}
+                          style={{ padding: "9px 18px", background: (!voiceCloneFile || !voiceCloneName.trim() || cloningVoice) ? "var(--ink3)" : "linear-gradient(135deg,#7c3aed,#a78bfa)", color: (!voiceCloneFile || !voiceCloneName.trim() || cloningVoice) ? "var(--t3)" : "#fff", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: (!voiceCloneFile || !voiceCloneName.trim() || cloningVoice) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                          {cloningVoice ? <><RefreshCw size={14} className="spin" /> Clonando voz en ElevenLabs…</> : "🧬 Clonar esta voz"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {scriptResult.visualPrompt && (
                   <div style={{ background: "var(--ink3)", borderRadius: 9, padding: 12 }}>

@@ -310,3 +310,91 @@ export async function listVoices(): Promise<Array<{ voice_id: string; name: stri
   const data = (await res.json()) as { voices?: Array<{ voice_id: string; name: string; labels?: Record<string, string> }> };
   return data.voices ?? [];
 }
+
+// ─── VOICE CLONING ────────────────────────────────────────────────────────────
+
+export interface ClonedVoice {
+  voice_id: string;
+  name: string;
+  category: string;
+  description?: string;
+  preview_url?: string;
+}
+
+/**
+ * Instant Voice Cloning via ElevenLabs /v1/voices/add.
+ * Accepts 1-25 audio files (min 1s each, max 25MB total).
+ * Returns the new voice_id.
+ */
+export async function cloneVoice(
+  name: string,
+  audioFiles: Array<{ buffer: Buffer; filename: string; mimeType?: string }>,
+  description?: string,
+): Promise<string> {
+  const apiKey = getApiKey();
+  if (!name || name.trim().length < 2) throw new Error("name requerido (mín. 2 caracteres)");
+  if (!audioFiles.length) throw new Error("Al menos un archivo de audio requerido");
+  if (audioFiles.length > 25) throw new Error("Máximo 25 archivos de audio");
+
+  const form = new FormData();
+  form.append("name", name.trim());
+  if (description) form.append("description", description.trim());
+
+  for (const af of audioFiles) {
+    const blob = new Blob([af.buffer], { type: af.mimeType || "audio/mpeg" });
+    form.append("files", blob, af.filename);
+  }
+
+  const res = await fetch(`${ELEVEN_BASE}/voices/add`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey },
+    body: form,
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs clone voice ${res.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as { voice_id: string };
+  logger.info({ voiceId: data.voice_id, name }, "ElevenLabs: voz clonada creada");
+  return data.voice_id;
+}
+
+/**
+ * Delete a cloned voice by voice_id.
+ */
+export async function deleteClonedVoice(voiceId: string): Promise<void> {
+  const apiKey = getApiKey();
+  validateVoiceId(voiceId);
+
+  const res = await fetch(`${ELEVEN_BASE}/voices/${encodeURIComponent(voiceId)}`, {
+    method: "DELETE",
+    headers: { "xi-api-key": apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs delete voice ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  logger.info({ voiceId }, "ElevenLabs: voz clonada eliminada");
+}
+
+/**
+ * List only cloned voices (category === "cloned") from the account.
+ */
+export async function listClonedVoices(): Promise<ClonedVoice[]> {
+  const voices = await listAllVoices();
+  return voices
+    .filter((v: any) => v.category === "cloned" || v.category === "professional")
+    .map((v: any) => ({
+      voice_id: v.voice_id,
+      name: v.name,
+      category: v.category,
+      description: v.description ?? "",
+      preview_url: v.preview_url ?? "",
+    }));
+}

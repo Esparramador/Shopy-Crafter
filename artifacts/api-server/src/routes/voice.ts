@@ -3,7 +3,20 @@ import { db, projectsTable, productsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
-import { synthesizeSpeech, listVoices, listAllVoices, type ElevenModel, type ElevenOutputFormat } from "../lib/elevenlabs.js";
+import { synthesizeSpeech, listVoices, listAllVoices, cloneVoice, deleteClonedVoice, listClonedVoices, type ElevenModel, type ElevenOutputFormat } from "../lib/elevenlabs.js";
+import multer from "multer";
+
+const cloneUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 10 },
+  fileFilter: (_req, file, cb) => {
+    if (/^audio\//i.test(file.mimetype) || /\.(mp3|wav|m4a|ogg|flac|aac|webm)$/i.test(file.originalname)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se admiten archivos de audio (mp3, wav, m4a, ogg, flac)"));
+    }
+  },
+});
 import { logger } from "../lib/logger.js";
 import { recommendVoiceForProduct, type VoiceGenderPref, type VoiceLanguage } from "../lib/voice-recommender.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -307,6 +320,69 @@ router.get("/voice/recommend", requireAdmin, async (req, res) => {
   } catch (err: any) {
     logger.error({ err: err?.message }, "voice/recommend failed");
     res.status(500).json({ error: err?.message || "Error recomendando voz" });
+  }
+});
+
+// ─── GET /voice/cloned — listar voces clonadas ───────────────────────────────
+router.get("/voice/cloned", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const voices = await listClonedVoices();
+    res.json({ voices });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "voice/cloned list failed");
+    res.status(500).json({ error: err?.message || "Error listando voces clonadas" });
+  }
+});
+
+// ─── POST /voice/clone — clonar voz desde audio ──────────────────────────────
+router.post("/voice/clone",
+  requireAdmin,
+  (req, res, next) => cloneUpload.array("files", 10)(req, res, (err) => {
+    if (err) { res.status(400).json({ error: err.message }); return; }
+    next();
+  }),
+  async (req: any, res): Promise<void> => {
+    try {
+      const { name, description } = req.body ?? {};
+      if (!name || typeof name !== "string" || name.trim().length < 2) {
+        res.status(400).json({ error: "name requerido (mín. 2 caracteres)" });
+        return;
+      }
+      const files: Express.Multer.File[] = req.files ?? [];
+      if (!files.length) {
+        res.status(400).json({ error: "Al menos un archivo de audio requerido" });
+        return;
+      }
+
+      const audioFiles = files.map(f => ({
+        buffer: f.buffer,
+        filename: f.originalname || `audio_${Date.now()}.mp3`,
+        mimeType: f.mimetype || "audio/mpeg",
+      }));
+
+      const voiceId = await cloneVoice(name.trim(), audioFiles, description?.trim());
+      logger.info({ voiceId, name }, "Voz clonada OK");
+      res.json({ success: true, voiceId, name: name.trim() });
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "voice/clone failed");
+      res.status(500).json({ error: err?.message || "Error clonando voz" });
+    }
+  },
+);
+
+// ─── DELETE /voice/clone/:voiceId ────────────────────────────────────────────
+router.delete("/voice/clone/:voiceId", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { voiceId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(voiceId)) {
+      res.status(400).json({ error: "voiceId inválido" });
+      return;
+    }
+    await deleteClonedVoice(voiceId);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "voice/clone delete failed");
+    res.status(500).json({ error: err?.message || "Error eliminando voz" });
   }
 });
 
