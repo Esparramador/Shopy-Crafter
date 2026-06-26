@@ -2022,15 +2022,26 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
   try {
     const f = req.file;
     const { projectId: pidStr, model, prompt, duration, aspect, sourceImageUrl, cameraPreset } = req.body;
-    const projectId = parseInt(pidStr || "0", 10);
-    if (!projectId || !model || !prompt) { res.status(400).json({ error: "projectId, model, prompt requeridos" }); return; }
+    if (!model || !prompt) { res.status(400).json({ error: "model y prompt son requeridos" }); return; }
+
+    // projectId opcional — si no se indica o es 0, usa el primer proyecto disponible
+    let projectId = parseInt(pidStr || "0", 10);
+    let project: typeof projectsTable.$inferSelect | null = null;
+    if (projectId > 0) {
+      const [found] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+      if (!found) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+      project = found;
+    } else {
+      const [first] = await db.select().from(projectsTable).orderBy(projectsTable.id).limit(1);
+      project = first ?? null;
+      projectId = project?.id ?? 0;
+    }
 
     const VIDEO_CREDITS = 4;
-    const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
-    if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
-
-    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+    if (projectId > 0) {
+      const limit = await checkProductionLimit(projectId, "image", VIDEO_CREDITS);
+      if (!limit.allowed) { res.status(402).json({ error: limit.reason }); return; }
+    }
 
     // Imagen origen opcional → text-to-video puro permitido si el modelo lo soporta
     let buf: Buffer | null = null;
@@ -2046,12 +2057,12 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
     });
 
     const vaultId = await saveToVaultSmart({
-      projectId, fileType: "fs-pro-video", category: "fusion-studio-pro",
+      projectId: projectId || 0, fileType: "fs-pro-video", category: "fusion-studio-pro",
       title: `FS Pro Video: ${prompt.slice(0, 60)}`,
       mimeType: "video/mp4", generatedBy: `fs-pro:${model}`,
       buffer: out,
     });
-    await recordUsage(projectId, "image", VIDEO_CREDITS);
+    if (projectId > 0) await recordUsage(projectId, "image", VIDEO_CREDITS);
 
     res.json({ success: true, vaultId, model, sizeBytes: out.length });
   } catch (err: any) {

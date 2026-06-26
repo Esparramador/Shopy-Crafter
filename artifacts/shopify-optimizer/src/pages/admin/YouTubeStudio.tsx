@@ -76,6 +76,7 @@ export default function YouTubeStudio() {
   const [videoResult, setVideoResult] = useState<{ vaultId: number; sizeBytes: number } | null>(null);
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [satiricoProjectId, setSatiricoProjectId] = useState<string>("");
+  const [satiricoProjects, setSatiricoProjects] = useState<{ id: number; storeName: string }[]>([]);
   const [satiricoModel, setSatiricoModel] = useState("grok-video-1");
   const [scriptEngine, setScriptEngine] = useState<"grok" | "claude" | "gemini">("grok");
   const [videoFormat, setVideoFormat] = useState("satira-politica");
@@ -95,6 +96,15 @@ export default function YouTubeStudio() {
 
   useEffect(() => {
     loadChannel();
+    // Cargar proyectos para el selector de vídeo
+    fetch(`${BASE}/api/projects`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then((list: any[]) => {
+        const ps = list.map((p: any) => ({ id: p.id, storeName: p.storeName || p.store_name || `Proyecto ${p.id}` }));
+        setSatiricoProjects(ps);
+        if (ps.length > 0) setSatiricoProjectId(String(ps[0].id));
+      })
+      .catch(() => {});
     fetch(`${BASE}/api/viral/engines`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -1091,10 +1101,19 @@ export default function YouTubeStudio() {
                 <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 13, marginBottom: 10 }}>🎬 Generar Vídeo IA con este prompt</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
                   <div>
-                    <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 5, display: "block" }}>Project ID</label>
-                    <input value={satiricoProjectId} onChange={e => setSatiricoProjectId(e.target.value)}
-                      placeholder="ID del proyecto (número)"
-                      style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", color: "var(--t)", fontSize: 13, boxSizing: "border-box" }} />
+                    <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 5, display: "block" }}>Proyecto</label>
+                    {satiricoProjects.length > 0 ? (
+                      <select value={satiricoProjectId} onChange={e => setSatiricoProjectId(e.target.value)}
+                        style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", color: "var(--t)", fontSize: 13 }}>
+                        {satiricoProjects.map(p => (
+                          <option key={p.id} value={String(p.id)}>{p.storeName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input value={satiricoProjectId} onChange={e => setSatiricoProjectId(e.target.value)}
+                        placeholder="ID del proyecto"
+                        style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", color: "var(--t)", fontSize: 13, boxSizing: "border-box" }} />
+                    )}
                   </div>
                   <div>
                     <label style={{ fontSize: 11, color: "var(--t3)", marginBottom: 5, display: "block" }}>Modelo de vídeo</label>
@@ -1154,7 +1173,7 @@ export default function YouTubeStudio() {
                       </optgroup>
                     </select>
                   </div>
-                  <button onClick={generateViralVideo} disabled={generatingVideo || !satiricoProjectId}
+                  <button onClick={generateViralVideo} disabled={generatingVideo}
                     style={{ padding: "8px 16px", background: generatingVideo ? "var(--ink3)" : "var(--jade)", color: generatingVideo ? "var(--t3)" : "#000", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: generatingVideo ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                     {generatingVideo ? <RefreshCw size={14} className="spin" /> : <Play size={14} />}
                     {generatingVideo ? "Generando…" : "Generar Vídeo"}
