@@ -278,8 +278,8 @@ export default function PluginsCatalog() {
                     {/* Health indicator */}
                     {isActive && health !== "checking" && (
                       <div style={{ position: "absolute", top: 10, right: 74, display: "flex", alignItems: "center" }}>
-                        {health === "ok" && <CheckCircle size={12} color="#4ade80" title="Operativo" />}
-                        {health === "error" && <XCircle size={12} color="#f87171" title="Error de conexión" />}
+                        {health === "ok" && <CheckCircle size={12} color="#4ade80" aria-label="Operativo" />}
+                        {health === "error" && <XCircle size={12} color="#f87171" aria-label="Error de conexión" />}
                       </div>
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>

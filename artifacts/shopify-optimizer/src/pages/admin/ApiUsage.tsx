@@ -117,9 +117,9 @@ interface LogsData {
   totalPages: number;
 }
 
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+function Card({ children, style, id }: { children: React.ReactNode; style?: React.CSSProperties; id?: string }) {
   return (
-    <div style={{
+    <div id={id} style={{
       background: "var(--ink2,#1a1a2e)", border: "1px solid var(--border,rgba(255,255,255,0.08))",
       borderRadius: 12, padding: "20px 24px", ...style,
     }}>
