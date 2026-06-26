@@ -79,11 +79,11 @@ export default function YouTubeStudio() {
   const [satiricoProjects, setSatiricoProjects] = useState<{ id: number; storeName: string }[]>([]);
   const [satiricoModel, setSatiricoModel] = useState("grok-video-1");
   const [scriptEngine, setScriptEngine] = useState<"grok" | "claude" | "gemini">("grok");
-  const [videoFormat, setVideoFormat] = useState("satira-politica");
+  const [videoFormat, setVideoFormat] = useState("product-demo");
   const [comedyPromptId, setComedyPromptId] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState<string | null>(null);
-  const [trendsSector, setTrendsSector] = useState("general");
-  const [studioCategory, setStudioCategory] = useState("politica");
+  const [trendsSector, setTrendsSector] = useState("ecommerce_shopify");
+  const [studioCategory, setStudioCategory] = useState("entretenimiento");
   const [viralScore, setViralScore] = useState<{ score: number; breakdown: Record<string, number>; recommendations: string[] } | null>(null);
   const [showFormats, setShowFormats] = useState(false);
   const [engines, setEngines] = useState<{ grok: boolean; claude: boolean; gemini: boolean } | null>(null);
@@ -253,14 +253,23 @@ export default function YouTubeStudio() {
 
   // Mapea sector de tendencias → categoría del Creador IA
   const SECTOR_TO_CAT: Record<string, string> = {
-    politica_satira: "politica",
-    tecnologia: "ia-tech",
-    ecommerce_shopify: "entretenimiento",
-    fitness_salud: "lifestyle",
-    moda_belleza: "lifestyle",
-    educacion_cursos: "educativo",
-    general: "politica",
+    ecommerce_shopify:    "entretenimiento",
+    dropshipping:         "entretenimiento",
+    moda_shopify:         "lifestyle",
+    belleza_shopify:      "lifestyle",
+    gadgets_shopify:      "entretenimiento",
+    hogar_shopify:        "lifestyle",
+    alimentacion_shopify: "lifestyle",
+    politica_satira:      "politica",
+    tecnologia:           "ia-tech",
+    fitness_salud:        "lifestyle",
+    moda_belleza:         "lifestyle",
+    educacion_cursos:     "educativo",
+    general:              "entretenimiento",
   };
+
+  const isEcommerceSector = ["ecommerce_shopify","dropshipping","moda_shopify","belleza_shopify",
+    "gadgets_shopify","hogar_shopify","alimentacion_shopify"].includes(trendsSector);
 
   function selectNewsForScript(item: any) {
     setSelectedNews(item);
@@ -747,17 +756,18 @@ export default function YouTubeStudio() {
               </div>
             </div>
 
-            {/* Selector de categoría */}
-            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+            {/* Selector de categoría — Shopify first */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {/* ── Nichos Shopify ── */}
               {([
-                { id: "general",          emoji: "🌍", label: "General" },
-                { id: "politica_satira",  emoji: "🏛️", label: "Política / Sátira" },
-                { id: "tecnologia",       emoji: "💻", label: "IA / Tecnología" },
-                { id: "ecommerce_shopify",emoji: "🏪", label: "Ecommerce" },
-                { id: "fitness_salud",    emoji: "💪", label: "Fitness / Salud" },
-                { id: "moda_belleza",     emoji: "👗", label: "Moda / Belleza" },
-                { id: "educacion_cursos", emoji: "🎓", label: "Educación" },
-              ] as const).map(s => (
+                { id: "ecommerce_shopify",    emoji: "🏪", label: "Shopify / General" },
+                { id: "dropshipping",         emoji: "📦", label: "Dropshipping" },
+                { id: "moda_shopify",         emoji: "👗", label: "Moda & Ropa" },
+                { id: "belleza_shopify",      emoji: "💄", label: "Belleza & Skincare" },
+                { id: "gadgets_shopify",      emoji: "📱", label: "Gadgets & Tech" },
+                { id: "hogar_shopify",        emoji: "🏠", label: "Hogar & Deco" },
+                { id: "alimentacion_shopify", emoji: "🍃", label: "Alimentación" },
+              ]).map(s => (
                 <button key={s.id} type="button"
                   onClick={() => { setTrendsSector(s.id); setTrendsData(null); }}
                   style={{
@@ -770,18 +780,45 @@ export default function YouTubeStudio() {
                   {s.emoji} {s.label}
                 </button>
               ))}
+              {/* ── Separador ── */}
+              <span style={{ borderLeft: "1px solid var(--ink4)", margin: "0 4px" }} />
+              {/* ── Otros géneros ── */}
+              {([
+                { id: "politica_satira", emoji: "🏛️", label: "Sátira" },
+                { id: "tecnologia",      emoji: "💻", label: "Tech / IA" },
+                { id: "educacion_cursos",emoji: "🎓", label: "Educación" },
+              ]).map(s => (
+                <button key={s.id} type="button"
+                  onClick={() => { setTrendsSector(s.id); setTrendsData(null); }}
+                  style={{
+                    padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    border: trendsSector === s.id ? "2px solid rgba(99,102,241,0.6)" : "1px solid var(--ink4)",
+                    background: trendsSector === s.id ? "rgba(99,102,241,0.12)" : "var(--ink2)",
+                    color: trendsSector === s.id ? "#818cf8" : "var(--t3)",
+                    transition: "all .15s",
+                  }}>
+                  {s.emoji} {s.label}
+                </button>
+              ))}
             </div>
           </div>
 
           {!trendsData && !loadingTrends && (
             <div style={{ textAlign: "center", padding: 60, color: "var(--t3)" }}>
               <TrendingUp size={40} style={{ marginBottom: 12, opacity: 0.25 }} /><br />
-              <div style={{ fontWeight: 600, color: "var(--t2)", marginBottom: 6 }}>Viral Comedy Studio</div>
-              <div style={{ fontSize: 12, maxWidth: 380, margin: "0 auto 20px" }}>
-                Pulsa <strong>Obtener Tendencias</strong> para analizar con Gemini Search las noticias políticas con mayor potencial satírico del día.
+              <div style={{ fontWeight: 600, color: "var(--t2)", marginBottom: 6 }}>
+                {isEcommerceSector ? "🛍️ Detector de Nichos Shopify con IA" : "🎬 Viral Content Studio"}
               </div>
-              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-                {["1️⃣ Elige categoría", "2️⃣ Elige país", "3️⃣ Obtener Tendencias", "4️⃣ Pulsa Satirizar →"].map(t => (
+              <div style={{ fontSize: 12, maxWidth: 420, margin: "0 auto 20px", lineHeight: 1.6 }}>
+                {isEcommerceSector
+                  ? <>Pulsa <strong>Obtener Tendencias</strong> para descubrir los <strong>productos y nichos más virales</strong> del momento con Gemini Search — adaptado a tu tienda Shopify.</>
+                  : <>Pulsa <strong>Obtener Tendencias</strong> para analizar con Gemini Search las tendencias con mayor potencial viral del día.</>}
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                {(isEcommerceSector
+                  ? ["1️⃣ Elige nicho Shopify", "2️⃣ Elige país", "3️⃣ Obtener Tendencias", "4️⃣ Crear Vídeo de Producto →"]
+                  : ["1️⃣ Elige categoría", "2️⃣ Elige país", "3️⃣ Obtener Tendencias", "4️⃣ Usar Tendencia →"]
+                ).map(t => (
                   <span key={t} style={{ padding: "4px 12px", background: "var(--ink2)", borderRadius: 20, fontSize: 12, color: "var(--t3)" }}>{t}</span>
                 ))}
               </div>
@@ -791,37 +828,58 @@ export default function YouTubeStudio() {
           {loadingTrends && (
             <div style={{ textAlign: "center", padding: 60, color: "var(--t3)" }}>
               <RefreshCw size={32} className="spin" style={{ marginBottom: 12, color: "var(--gold)" }} /><br />
-              <div style={{ fontWeight: 600, color: "var(--t2)", marginBottom: 4 }}>Analizando tendencias con Gemini Search…</div>
-              <div style={{ fontSize: 12 }}>Buscando noticias virales, formatos exitosos y vídeos trending</div>
+              <div style={{ fontWeight: 600, color: "var(--t2)", marginBottom: 4 }}>
+                {isEcommerceSector ? "Detectando nichos y productos virales con Gemini…" : "Analizando tendencias con Gemini Search…"}
+              </div>
+              <div style={{ fontSize: 12 }}>
+                {isEcommerceSector
+                  ? "Analizando TikTok Shop, Amazon, YouTube y Shopify para encontrar los nichos del momento"
+                  : "Buscando tendencias virales, formatos exitosos y vídeos trending"}
+              </div>
             </div>
           )}
 
           {trendsData && !loadingTrends && (
             <div>
-              {/* Noticias */}
+              {/* Noticias / Productos Trending */}
               {trendsData.news.length > 0 && (
                 <div style={{ marginBottom: 28 }}>
                   <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 14, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ background: "rgba(251,191,36,0.15)", border: "1px solid var(--gold)", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>🔥 {trendsData.news.length} NOTICIAS</span>
-                    Potencial Satírico Político
+                    <span style={{ background: "rgba(251,191,36,0.15)", border: "1px solid var(--gold)", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>
+                      {isEcommerceSector ? `🛍️ ${trendsData.news.length} NICHOS` : `🔥 ${trendsData.news.length} TENDENCIAS`}
+                    </span>
+                    {isEcommerceSector ? "Nichos & Productos Virales para tu Shopify" : "Tendencias con Mayor Potencial Viral"}
                   </div>
                   <div style={{ display: "grid", gap: 10 }}>
                     {trendsData.news.map((item: any, i: number) => (
                       <div key={i} style={{ background: "var(--ink2)", borderRadius: 12, padding: 14, border: "1px solid var(--ink3)", display: "flex", gap: 14, alignItems: "flex-start" }}>
-                        {/* Comedy score badge */}
-                        <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 10, background: (item.comedyScore || 5) >= 8 ? "rgba(251,191,36,0.2)" : "var(--ink3)", border: `1px solid ${(item.comedyScore || 5) >= 8 ? "var(--gold)" : "var(--ink4)"}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                          <div style={{ fontSize: 16, fontWeight: 900, color: (item.comedyScore || 5) >= 8 ? "var(--gold)" : "var(--t2)" }}>{item.comedyScore || "?"}</div>
-                          <div style={{ fontSize: 9, color: "var(--t3)" }}>🎭</div>
+                        {/* Score badge */}
+                        <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 10, background: (item.comedyScore || 5) >= 8 ? "rgba(251,191,36,0.2)" : "var(--ink3)", border: `1px solid ${(item.comedyScore || 5) >= 8 ? "var(--gold)" : "var(--ink4)"}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                          <div style={{ fontSize: 15, fontWeight: 900, color: (item.comedyScore || 5) >= 8 ? "var(--gold)" : "var(--t2)" }}>{item.comedyScore || "?"}</div>
+                          <div style={{ fontSize: 9, color: "var(--t3)" }}>{isEcommerceSector ? "📈 viral" : "🎭 cómico"}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 13, marginBottom: 4, lineHeight: 1.35 }}>{item.headline || item.title}</div>
                           {item.summary && <div style={{ fontSize: 12, color: "var(--t3)", marginBottom: 6, lineHeight: 1.5 }}>{item.summary}</div>}
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                            {item.protagonists && <span style={{ fontSize: 11, color: "var(--t3)", padding: "2px 8px", background: "var(--ink3)", borderRadius: 6 }}>👤 {Array.isArray(item.protagonists) ? item.protagonists.join(", ") : item.protagonists}</span>}
-                            {item.virality && <span style={{ fontSize: 11, color: "var(--jade)", padding: "2px 8px", background: "rgba(16,185,129,0.1)", borderRadius: 6 }}>📈 Virality: {item.virality}</span>}
+                            {item.protagonists && (
+                              <span style={{ fontSize: 11, color: isEcommerceSector ? "var(--jade)" : "var(--t3)", padding: "2px 8px", background: isEcommerceSector ? "rgba(16,185,129,0.1)" : "var(--ink3)", borderRadius: 6 }}>
+                                {isEcommerceSector ? "💰" : "👤"} {Array.isArray(item.protagonists) ? item.protagonists.join(", ") : item.protagonists}
+                              </span>
+                            )}
+                            {item.virality && (
+                              <span style={{ fontSize: 11, color: "var(--jade)", padding: "2px 8px", background: "rgba(16,185,129,0.1)", borderRadius: 6 }}>
+                                {isEcommerceSector ? `🏪 Competencia: ${item.virality}` : `📈 Virality: ${item.virality}`}
+                              </span>
+                            )}
+                            {item.recommendedFormat && (
+                              <span style={{ fontSize: 11, color: "var(--t3)", padding: "2px 8px", background: "var(--ink3)", borderRadius: 6 }}>
+                                🎬 {item.recommendedFormat}
+                              </span>
+                            )}
                             <button onClick={() => selectNewsForScript(item)}
                               style={{ marginLeft: "auto", padding: "5px 12px", background: "var(--gold)", color: "#000", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                              <Mic size={11} /> Satirizar →
+                              <Mic size={11} /> {isEcommerceSector ? "Crear Vídeo →" : "Usar →"}
                             </button>
                           </div>
                         </div>

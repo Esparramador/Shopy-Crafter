@@ -108,13 +108,19 @@ async function searchYouTubeTrending(query: string, maxResults = 6): Promise<Arr
 
 // ─── Sector → AI video search queries ────────────────────────────────────────
 const AI_VIDEO_QUERIES: Record<string, string> = {
-  general:          "vídeo generado con inteligencia artificial viral youtube 2025 2026 español",
-  politica_satira:  "sátira política inteligencia artificial vídeo viral youtube 2026",
-  tecnologia:       "tutorial tecnología inteligencia artificial vídeo viral youtube 2026",
-  ecommerce_shopify:"vídeo producto tienda online inteligencia artificial viral youtube 2026",
-  fitness_salud:    "rutina fitness inteligencia artificial vídeo viral youtube 2026",
-  moda_belleza:     "moda belleza inteligencia artificial vídeo viral youtube 2026",
-  educacion_cursos: "educación explicación inteligencia artificial vídeo viral youtube 2026",
+  general:               "vídeo generado con inteligencia artificial viral youtube 2025 2026 español",
+  politica_satira:       "sátira política inteligencia artificial vídeo viral youtube 2026",
+  tecnologia:            "tutorial tecnología inteligencia artificial vídeo viral youtube 2026",
+  ecommerce_shopify:     "vídeo producto shopify dropshipping viral tiktok youtube 2026 IA",
+  dropshipping:          "dropshipping producto ganador vídeo viral tiktok 2026",
+  moda_shopify:          "vídeo moda ropa tienda online viral tiktok 2026 ugc",
+  belleza_shopify:       "vídeo belleza skincare viral tiktok ugc shopify 2026",
+  gadgets_shopify:       "gadget tecnología producto viral tiktok shopify 2026",
+  hogar_shopify:         "producto hogar decoración viral tiktok shopify 2026",
+  alimentacion_shopify:  "producto alimentación gourmet viral tiktok shopify 2026",
+  fitness_salud:         "rutina fitness inteligencia artificial vídeo viral youtube 2026",
+  moda_belleza:          "moda belleza inteligencia artificial vídeo viral youtube 2026",
+  educacion_cursos:      "educación explicación inteligencia artificial vídeo viral youtube 2026",
 };
 
 // ─── GET /viral/trends ────────────────────────────────────────────────────────
@@ -129,19 +135,40 @@ router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) =>
     const aiQuery   = AI_VIDEO_QUERIES[sector] || AI_VIDEO_QUERIES.general;
 
     const sectorLabel = {
-      general: "cualquier temática",
-      politica_satira: "sátira política",
-      tecnologia: "tecnología e IA",
-      ecommerce_shopify: "ecommerce y Shopify",
-      fitness_salud: "fitness y salud",
-      moda_belleza: "moda y belleza",
-      educacion_cursos: "educación y cursos",
+      general:              "cualquier temática",
+      politica_satira:      "sátira política",
+      tecnologia:           "tecnología e IA",
+      ecommerce_shopify:    "ecommerce y Shopify",
+      dropshipping:         "dropshipping y productos ganadores",
+      moda_shopify:         "moda y ropa online",
+      belleza_shopify:      "belleza y skincare",
+      gadgets_shopify:      "gadgets y tecnología",
+      hogar_shopify:        "hogar y decoración",
+      alimentacion_shopify: "alimentación y gourmet",
+      fitness_salud:        "fitness y salud",
+      moda_belleza:         "moda y belleza",
+      educacion_cursos:     "educación y cursos",
     }[sector] || sector;
 
-    const [newsResult, aiAnalysisResult, ytVideosResult, aiVideosResult] = await Promise.allSettled([
-      // ── 15 noticias/tendencias ──────────────────────────────────────────────
-      askGeminiWithSearch(
-        `Dame las 15 noticias y tendencias más impactantes e importantes de hoy en ${country}${sector !== "general" ? ` sobre ${sectorLabel}` : ""}.
+    // ── Prompts adaptados por sector ─────────────────────────────────────────
+    const isEcommerce = sector === "ecommerce_shopify" || sector === "dropshipping"
+      || sector === "moda_shopify" || sector === "belleza_shopify"
+      || sector === "gadgets_shopify" || sector === "hogar_shopify"
+      || sector === "alimentacion_shopify";
+
+    const newsPrompt = isEcommerce
+      ? `Eres un experto en ecommerce, Shopify y dropshipping en ${country}.
+        Dame las 15 OPORTUNIDADES DE PRODUCTO Y NICHOS MÁS VIRALES ahora mismo para vender en una tienda Shopify en ${country}${sector !== "ecommerce_shopify" ? ` — nicho específico: ${sectorLabel}` : ""}.
+        Para cada oportunidad incluye:
+        - nombre del producto o nicho (titular corto, máx 80 chars)
+        - por qué está explotando ahora (tendencia, viralidad TikTok, seasonal, problema que resuelve)
+        - margen estimado y rango de precio de venta
+        - competencia actual (baja/media/alta)
+        - potencial viral para crear contenido (1-10)
+        - formato de vídeo recomendado para venderlo (uno de: UGC, Demo, Short, Tutorial, Reacción, Haul, Storytelling)
+        Devuelve JSON con array "news" de 15 objetos: {headline, summary, protagonists, virality, comedyScore, recommendedFormat}
+        (usa protagonists para "margen estimado + precio de venta", virality para "competencia: baja/media/alta")`
+      : `Dame las 15 noticias y tendencias más impactantes e importantes de hoy en ${country}${sector !== "general" ? ` sobre ${sectorLabel}` : ""}.
         Para cada una incluye:
         - titular impactante (máx 80 chars)
         - resumen de 2 líneas
@@ -149,12 +176,29 @@ router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) =>
         - por qué es viral o polémica
         - potencial cómico/satírico (1-10)
         - formato de vídeo recomendado (uno de: Short, Tutorial, Sátira, Reacción, Documental)
-        Devuelve JSON con array "news" de 15 objetos: {headline, summary, protagonists, virality, comedyScore, recommendedFormat}`,
-        "Eres un analista de contenido digital español especializado en detectar tendencias virales. Devuelve EXACTAMENTE 15 elementos en el array news.",
-      ),
-      // ── Análisis real de vídeos IA virales ─────────────────────────────────
-      askGeminiWithSearch(
-        `Busca y analiza 6 vídeos reales ya publicados en YouTube que sean VIRALES y estén generados o asistidos con inteligencia artificial en la temática de ${sectorLabel} en español.
+        Devuelve JSON con array "news" de 15 objetos: {headline, summary, protagonists, virality, comedyScore, recommendedFormat}`;
+
+    const newsSystemPrompt = isEcommerce
+      ? "Eres un experto en ecommerce, dropshipping y Shopify. Identificas productos y nichos ganadores antes de que saturen el mercado. Devuelve EXACTAMENTE 15 elementos en el array news."
+      : "Eres un analista de contenido digital español especializado en detectar tendencias virales. Devuelve EXACTAMENTE 15 elementos en el array news.";
+
+    const aiAnalysisPrompt = isEcommerce
+      ? `Busca y analiza 6 vídeos reales ya publicados en YouTube, TikTok o Instagram que sean VIRALES de tiendas Shopify, dropshipping, o productos de ecommerce${sector !== "ecommerce_shopify" ? ` en el nicho de ${sectorLabel}` : ""} — especialmente vídeos de producto generados o asistidos con inteligencia artificial.
+
+        Para cada vídeo real encontrado, desglosa en profundidad:
+        1. Título exacto y canal/cuenta
+        2. Views/likes aproximados
+        3. Hook (primeros 3-5 segundos): qué muestra del producto, qué frase de apertura, qué emoción/necesidad activa
+        4. Estructura del vídeo de producto: cómo presenta el producto (problema → solución → demo → precio → CTA)
+        5. Estilo visual IA del producto: tipo de imágenes (lifestyle, 3D render, UGC real, unboxing, comparativa antes/después, texto animado)
+        6. Narración: texto en pantalla, voz en off, música
+        7. Por qué vendió / fue viral: triggers de compra usados (urgencia, FOMO, aspiración, prueba social, precio, exclusividad)
+        8. Prompt visual replicable: escribe un prompt exacto de 2-3 frases para generar imágenes/vídeo similares con IA para vender un producto similar
+        9. Script de venta replicable: hook + 3 puntos clave + CTA exacto para replicar este vídeo con cualquier producto del mismo nicho
+
+        Devuelve JSON con array "aiVideos" de 6 objetos:
+        {title, channel, estimatedViews, hook, structure, visualStyle, narration, whyViral, replicationPrompt, replicationFormula}`
+      : `Busca y analiza 6 vídeos reales ya publicados en YouTube que sean VIRALES y estén generados o asistidos con inteligencia artificial en la temática de ${sectorLabel} en español.
 
         Para cada vídeo real encontrado, desglosa en profundidad:
         1. Título exacto del vídeo y canal
@@ -168,9 +212,15 @@ router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) =>
         9. Fórmula replicable: cómo yo podría replicar exactamente este vídeo para ${sectorLabel}
 
         Devuelve JSON con array "aiVideos" de 6 objetos:
-        {title, channel, estimatedViews, thumbnail_desc, hook, structure, visualStyle, narration, whyViral, replicationPrompt, replicationFormula}`,
-        "Eres un experto en ingeniería inversa de vídeos virales de YouTube generados con IA. Tu misión es desmontar cada vídeo capa por capa para que cualquiera pueda replicarlo.",
-      ),
+        {title, channel, estimatedViews, thumbnail_desc, hook, structure, visualStyle, narration, whyViral, replicationPrompt, replicationFormula}`;
+
+    const aiAnalysisSystemPrompt = isEcommerce
+      ? "Eres un experto en ingeniería inversa de vídeos virales de producto para ecommerce y Shopify. Desmonta cada vídeo de producto para que cualquier tienda online pueda replicarlo y vender más."
+      : "Eres un experto en ingeniería inversa de vídeos virales de YouTube generados con IA. Tu misión es desmontar cada vídeo capa por capa para que cualquiera pueda replicarlo.";
+
+    const [newsResult, aiAnalysisResult, ytVideosResult, aiVideosResult] = await Promise.allSettled([
+      askGeminiWithSearch(newsPrompt, newsSystemPrompt),
+      askGeminiWithSearch(aiAnalysisPrompt, aiAnalysisSystemPrompt),
       // ── Vídeos trending reales en YouTube ──────────────────────────────────
       searchYouTubeTrending(ytQuery, 10),
       // ── Vídeos IA virales reales en YouTube ────────────────────────────────
