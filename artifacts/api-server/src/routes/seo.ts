@@ -1238,6 +1238,19 @@ Return specific numbers and URLs you found in the search results.`,
 
     const homepagePageSpeed = psResult.status === "fulfilled" ? psResult.value : null;
     const serpRaw = serpResult.status === "fulfilled" ? serpResult.value : null;
+    if (serpRaw && (serpRaw as any)?.usage) {
+      void recordApiUsage({
+        provider: "gemini",
+        operation: "seo/full-scan-serp",
+        model: (serpRaw as any).usage.model,
+        projectId,
+        inputUnits: (serpRaw as any).usage.inputTokens,
+        outputUnits: (serpRaw as any).usage.outputTokens,
+        unitsLabel: "tokens",
+        costUsd: (serpRaw as any).usage.costUsd,
+        success: true,
+      });
+    }
     const serpData = serpRaw ? { text: (serpRaw as any)?.text?.slice(0, 3000) ?? "", sources: (serpRaw as any)?.sources?.slice(0, 10) ?? [] } : null;
 
     // Scrape en vivo de cada producto (lotes de 5)

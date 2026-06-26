@@ -22,6 +22,7 @@ import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
 import { omnicoreMemoriesTable, omnicoreAbsorbedContentTable } from "@workspace/db/schema";
 import { deepEntityResearch, askGeminiWithSearch, askGeminiJson } from "../lib/gemini.js";
+import { recordApiUsage } from "../lib/api-usage.js";
 import { learnFromOperation, askClaudeJsonWithBrain } from "../lib/claude.js";
 import { runDualPageSpeed, formatPageSpeedForPrompt } from "../lib/pagespeed.js";
 import { randomUUID } from "crypto";
@@ -596,6 +597,18 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
           );
           extraInsights = igRes.text;
           research.allSources.push(...igRes.sources);
+          if (igRes.usage) {
+            void recordApiUsage({
+              provider: "gemini",
+              operation: "entity-research/instagram",
+              model: igRes.usage.model,
+              inputUnits: igRes.usage.inputTokens,
+              outputUnits: igRes.usage.outputTokens,
+              unitsLabel: "tokens",
+              costUsd: igRes.usage.costUsd,
+              success: true,
+            });
+          }
         } catch { /* non-critical */ }
       }
   
