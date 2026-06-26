@@ -15,14 +15,53 @@ interface ShopifySettings {
 }
 
 interface Plan {
-  id: string | number;
+  id: string;
   name: string;
   price: number;
+  priceAnnual?: number;
   price_annual?: number;
   currency?: string;
+  period?: string;
   featured?: boolean;
+  badge?: string;
+  features?: { text: string; included: boolean }[] | string;
+  ctaLabel?: string;
+  cta_label?: string;
+  ctaStyle?: string;
+  cta_style?: string;
+  ctaHref?: string;
+  cta_href?: string;
+  storesLimit?: number;
+  stores_limit?: number;
+  imagesIncluded?: number;
+  images_included?: number;
   shopify_checkout_url?: string;
 }
+
+interface PlanForm {
+  id: string;
+  name: string;
+  price: number;
+  priceAnnual: number;
+  currency: string;
+  period: string;
+  featured: boolean;
+  badge: string;
+  featuresText: string;
+  ctaLabel: string;
+  ctaStyle: string;
+  ctaHref: string;
+  storesLimit: number;
+  imagesIncluded: number;
+  shopify_checkout_url: string;
+}
+
+const BLANK_PLAN: PlanForm = {
+  id: "", name: "", price: 0, priceAnnual: 0, currency: "€", period: "/mes",
+  featured: false, badge: "", featuresText: "", ctaLabel: "Contactar →",
+  ctaStyle: "ghost", ctaHref: "#fp-contact", storesLimit: 1,
+  imagesIncluded: 10, shopify_checkout_url: "",
+};
 
 interface TiendaService {
   id?: number;
@@ -181,85 +220,295 @@ function ShopifyTab({ show }: { show: (msg: string, ok?: boolean) => void }) {
   );
 }
 
+// ── Plan Modal ────────────────────────────────────────────────────────────────
+function PlanModal({
+  plan, onClose, onSave, show,
+}: { plan: PlanForm | null; onClose: () => void; onSave: () => void; show: (msg: string, ok?: boolean) => void }) {
+  const isNew = !plan?.id || plan.id === "__new__";
+  const [form, setForm] = useState<PlanForm>(plan ?? BLANK_PLAN);
+  const [saving, setSaving] = useState(false);
+
+  const set = (k: keyof PlanForm, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  const featuresToPayload = () =>
+    form.featuresText.split("\n").map(s => s.trim()).filter(Boolean)
+      .map(s => {
+        const excluded = s.startsWith("-");
+        return { text: excluded ? s.slice(1).trim() : s, included: !excluded };
+      });
+
+  const save = async () => {
+    if (!form.name.trim()) return;
+    if (isNew && !form.id.trim()) return;
+    setSaving(true);
+    try {
+      const payload = {
+        id: form.id.trim(),
+        name: form.name.trim(),
+        price: Number(form.price),
+        priceAnnual: Number(form.priceAnnual),
+        currency: form.currency || "€",
+        period: form.period || "/mes",
+        featured: !!form.featured,
+        badge: form.badge.trim() || null,
+        features: featuresToPayload(),
+        ctaLabel: form.ctaLabel || "Contactar →",
+        ctaStyle: form.ctaStyle || "ghost",
+        ctaHref: form.ctaHref || "#fp-contact",
+        storesLimit: Number(form.storesLimit),
+        imagesIncluded: Number(form.imagesIncluded),
+      };
+      let ok = false;
+      if (isNew) {
+        const r = await apiFetch("/billing/plans", { method: "POST", body: JSON.stringify(payload) });
+        ok = r.ok;
+      } else {
+        const r = await apiFetch(`/billing/plans/${form.id}`, { method: "PUT", body: JSON.stringify(payload) });
+        ok = r.ok;
+      }
+      if (ok && form.shopify_checkout_url !== undefined) {
+        await apiFetch(`/tienda/plans/${form.id}/checkout-url`, {
+          method: "PUT",
+          body: JSON.stringify({ shopify_checkout_url: form.shopify_checkout_url || null }),
+        });
+      }
+      if (ok) { onSave(); onClose(); }
+      else show("❌ Error al guardar el plan", false);
+    } catch { show("❌ Error de red", false); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="ta-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="ta-modal" style={{ maxWidth: 680 }}>
+        <div className="ta-modal-header">
+          <h3>{isNew ? "➕ Nuevo plan" : `✏️ Editar plan — ${plan?.name}`}</h3>
+          <button className="ta-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="ta-modal-body">
+          <div className="ta-form-grid">
+
+            <div className="ta-field ta-half">
+              <label>ID único *</label>
+              <input value={form.id} onChange={e => set("id", e.target.value.toLowerCase().replace(/\s+/g, "_"))}
+                placeholder="emprendedor" className="ta-input" disabled={!isNew} />
+              <span className="ta-hint">Solo letras, números y guiones bajos. No editable después.</span>
+            </div>
+            <div className="ta-field ta-half">
+              <label>Nombre visible *</label>
+              <input value={form.name} onChange={e => set("name", e.target.value)}
+                placeholder="Emprendedor" className="ta-input" />
+            </div>
+
+            <div className="ta-field ta-half">
+              <label>Precio mensual (€)</label>
+              <input type="number" min={0} value={form.price} onChange={e => set("price", e.target.value)}
+                className="ta-input" />
+            </div>
+            <div className="ta-field ta-half">
+              <label>Precio anual (€)</label>
+              <input type="number" min={0} value={form.priceAnnual} onChange={e => set("priceAnnual", e.target.value)}
+                className="ta-input" />
+            </div>
+
+            <div className="ta-field ta-half">
+              <label>Moneda</label>
+              <select value={form.currency} onChange={e => set("currency", e.target.value)} className="ta-input">
+                <option value="€">€ Euro</option>
+                <option value="$">$ Dólar</option>
+                <option value="£">£ Libra</option>
+              </select>
+            </div>
+            <div className="ta-field ta-half">
+              <label>Badge (opcional)</label>
+              <input value={form.badge} onChange={e => set("badge", e.target.value)}
+                placeholder="Más popular" className="ta-input" />
+            </div>
+
+            <div className="ta-field ta-half">
+              <label>CTA texto</label>
+              <input value={form.ctaLabel} onChange={e => set("ctaLabel", e.target.value)}
+                placeholder="Contactar →" className="ta-input" />
+            </div>
+            <div className="ta-field ta-half">
+              <label>CTA estilo</label>
+              <select value={form.ctaStyle} onChange={e => set("ctaStyle", e.target.value)} className="ta-input">
+                <option value="ghost">Ghost (borde dorado)</option>
+                <option value="gold">Gold (fondo dorado)</option>
+              </select>
+            </div>
+            <div className="ta-field ta-full">
+              <label>CTA enlace</label>
+              <input value={form.ctaHref} onChange={e => set("ctaHref", e.target.value)}
+                placeholder="#fp-contact o /client/messages" className="ta-input" />
+            </div>
+
+            <div className="ta-field ta-half">
+              <label>Límite de tiendas</label>
+              <input type="number" min={-1} value={form.storesLimit} onChange={e => set("storesLimit", e.target.value)}
+                className="ta-input" />
+              <span className="ta-hint">-1 = ilimitado</span>
+            </div>
+            <div className="ta-field ta-half">
+              <label>Imágenes IA incluidas</label>
+              <input type="number" min={-1} value={form.imagesIncluded} onChange={e => set("imagesIncluded", e.target.value)}
+                className="ta-input" />
+              <span className="ta-hint">-1 = ilimitado</span>
+            </div>
+
+            <div className="ta-field ta-full">
+              <label>URL Checkout Shopify</label>
+              <input value={form.shopify_checkout_url} onChange={e => set("shopify_checkout_url", e.target.value)}
+                placeholder="https://tutienda.myshopify.com/cart/12345:1" className="ta-input" />
+              <span className="ta-hint">Redirige al cliente a Shopify para pagar</span>
+            </div>
+
+            <div className="ta-field ta-full">
+              <label>Características (una por línea · prefija con - para excluida)</label>
+              <textarea value={form.featuresText} onChange={e => set("featuresText", e.target.value)}
+                placeholder={"5 productos/mes\n10 imágenes IA/mes\nSEO básico\n- A/B Testing"}
+                className="ta-input ta-textarea" rows={7} />
+              <span className="ta-hint">Líneas sin guión = incluidas ✓ · Con guión = excluidas ✕</span>
+            </div>
+
+            <div className="ta-field ta-full ta-visible-row">
+              <label className="ta-check-label">
+                <input type="checkbox" checked={form.featured} onChange={e => set("featured", e.target.checked)} />
+                Plan destacado (aparece como "Más popular" con borde dorado)
+              </label>
+            </div>
+          </div>
+        </div>
+        <div className="ta-modal-footer">
+          <button className="ta-btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="ta-btn-primary" onClick={save}
+            disabled={saving || !form.name.trim() || (isNew && !form.id.trim())}>
+            {saving ? "Guardando…" : (isNew ? "➕ Crear plan" : "💾 Guardar cambios")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Planes Tab ────────────────────────────────────────────────────────────────
 function PlanesTab({ show }: { show: (msg: string, ok?: boolean) => void }) {
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [urls, setUrls] = useState<Record<string | number, string>>({});
-  const [saving, setSaving] = useState<Record<string | number, boolean>>({});
+  const [modal, setModal] = useState<PlanForm | null | "new">(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const normFeats = (raw: any): string => {
+    if (!raw) return "";
+    const arr: { text: string; included: boolean }[] = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(arr)) return "";
+    return arr.map(f => (f.included !== false ? f.text : `- ${f.text}`)).join("\n");
+  };
+
+  const load = useCallback(() => {
+    setLoading(true);
     apiFetch("/billing/plans")
       .then(r => r.ok ? r.json() : [])
-      .then((d: Plan[]) => {
-        setPlans(d);
-        const init: Record<string | number, string> = {};
-        d.forEach(p => { init[p.id] = p.shopify_checkout_url ?? ""; });
-        setUrls(init);
-      })
-      .catch(() => {});
+      .then((d: Plan[]) => { setPlans(d); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
-  const savePlan = async (planId: string | number) => {
-    setSaving(s => ({ ...s, [planId]: true }));
+  useEffect(() => { load(); }, [load]);
+
+  const openEdit = (p: Plan) => {
+    const pf: PlanForm = {
+      id: String(p.id),
+      name: p.name,
+      price: p.price,
+      priceAnnual: Number(p.priceAnnual ?? p.price_annual ?? p.price * 10),
+      currency: p.currency ?? "€",
+      period: p.period ?? "/mes",
+      featured: !!p.featured,
+      badge: p.badge ?? "",
+      featuresText: normFeats(p.features),
+      ctaLabel: p.ctaLabel ?? p.cta_label ?? "Contactar →",
+      ctaStyle: p.ctaStyle ?? p.cta_style ?? "ghost",
+      ctaHref: p.ctaHref ?? p.cta_href ?? "#fp-contact",
+      storesLimit: Number(p.storesLimit ?? p.stores_limit ?? 1),
+      imagesIncluded: Number(p.imagesIncluded ?? p.images_included ?? 10),
+      shopify_checkout_url: p.shopify_checkout_url ?? "",
+    };
+    setModal(pf);
+  };
+
+  const del = async (planId: string, name: string) => {
+    if (!confirm(`¿Ocultar el plan "${name}"? Dejará de aparecer en la tienda pero no se elimina de la base de datos.`)) return;
+    setDeleting(planId);
     try {
-      const r = await apiFetch(`/tienda/plans/${planId}/checkout-url`, {
-        method: "PUT",
-        body: JSON.stringify({ shopify_checkout_url: urls[planId] || null }),
-      });
-      if (r.ok) show(`✅ URL guardada para ${plans.find(p => p.id === planId)?.name}`);
-      else show("❌ Error al guardar", false);
+      const r = await apiFetch(`/billing/plans/${planId}`, { method: "DELETE" });
+      if (r.ok) { show(`🗑️ Plan "${name}" ocultado`); load(); }
+      else show("❌ Error al ocultar el plan", false);
     } catch { show("❌ Error de red", false); }
-    setSaving(s => ({ ...s, [planId]: false }));
+    setDeleting(null);
   };
 
   return (
     <div className="ta-section">
       <div className="ta-section-header">
-        <h2>📦 Planes — URLs de Checkout Shopify</h2>
-        <p>Asigna una URL de checkout de Shopify a cada plan. Cuando un cliente haga clic en "Comprar", será redirigido a tu Shopify para completar el pago.</p>
+        <h2>📦 Planes de suscripción</h2>
+        <p>Crea, edita u oculta los planes que aparecen en la <strong>landing</strong> (sección Precios) y en la <strong>tienda del cliente</strong>.</p>
+        <button className="ta-btn-primary ta-btn-sm" onClick={() => setModal("new")}>
+          ➕ Crear plan
+        </button>
       </div>
 
       <div className="ta-info-banner">
         <span>💡</span>
         <div>
-          Crea un producto en Shopify por cada plan, copia su URL de checkout y pégala aquí.
-          Ejemplo: <code>https://tutienda.myshopify.com/cart/12345678:1</code>
+          Los planes activos se publican automáticamente en la landing y en el panel del cliente.
+          Asigna una <strong>URL de checkout Shopify</strong> para activar el botón de pago directo.
         </div>
       </div>
 
-      <div className="ta-plans-list">
-        {plans.map(plan => (
-          <div key={plan.id} className={`ta-plan-row${plan.featured ? " ta-plan-featured" : ""}`}>
-            <div className="ta-plan-info">
-              <div className="ta-plan-name">
-                {plan.featured && <span className="ta-feat-badge">★ DESTACADO</span>}
-                {plan.name}
+      {loading ? (
+        <div className="ta-empty">Cargando planes…</div>
+      ) : (
+        <div className="ta-plans-list">
+          {plans.map(plan => (
+            <div key={plan.id} className={`ta-plan-row${plan.featured ? " ta-plan-featured" : ""}`}>
+              <div className="ta-plan-info">
+                <div className="ta-plan-name">
+                  {plan.featured && <span className="ta-feat-badge">★ DESTACADO</span>}
+                  {plan.name}
+                  <span className="ta-plan-id">#{plan.id}</span>
+                </div>
+                <div className="ta-plan-price">
+                  {plan.currency ?? "€"}{plan.price}/mes · {plan.currency ?? "€"}{plan.priceAnnual ?? plan.price_annual ?? plan.price * 10}/año
+                  {plan.shopify_checkout_url && <span className="ta-shopify-pill">🛍️ Shopify</span>}
+                </div>
               </div>
-              <div className="ta-plan-price">
-                {plan.currency ?? "€"}{plan.price}/mes · {plan.currency ?? "€"}{plan.price_annual ?? plan.price * 10}/año
+              <div className="ta-svc-actions">
+                <button className="ta-btn-edit" onClick={() => openEdit(plan)}>✏️ Editar</button>
+                <button
+                  className="ta-btn-del"
+                  onClick={() => del(String(plan.id), plan.name)}
+                  disabled={deleting === String(plan.id)}
+                  title="Ocultar plan (soft delete)"
+                >
+                  {deleting === String(plan.id) ? "…" : "🗑️"}
+                </button>
               </div>
             </div>
-            <div className="ta-plan-url-wrap">
-              <input
-                value={urls[plan.id] ?? ""}
-                onChange={e => setUrls(u => ({ ...u, [plan.id]: e.target.value }))}
-                placeholder="https://tutienda.myshopify.com/cart/..."
-                className="ta-input ta-url-input"
-              />
-              <button
-                className="ta-btn-save"
-                onClick={() => savePlan(plan.id)}
-                disabled={saving[plan.id]}
-              >
-                {saving[plan.id] ? "…" : "💾"}
-              </button>
-            </div>
-          </div>
-        ))}
-        {plans.length === 0 && (
-          <div className="ta-empty">Cargando planes…</div>
-        )}
-      </div>
+          ))}
+          {plans.length === 0 && (
+            <div className="ta-empty">No hay planes visibles. Crea el primero con "➕ Crear plan".</div>
+          )}
+        </div>
+      )}
+
+      {modal !== null && (
+        <PlanModal
+          plan={modal === "new" ? null : (modal as PlanForm)}
+          onClose={() => setModal(null)}
+          onSave={() => { load(); show("✅ Plan guardado correctamente"); }}
+          show={show}
+        />
+      )}
     </div>
   );
 }
@@ -641,9 +890,13 @@ const CSS = `
   background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);
 }
 .ta-plan-row.ta-plan-featured { border-color: rgba(200,168,75,0.25); background: rgba(200,168,75,0.05); }
-.ta-plan-info { min-width: 160px; }
+.ta-plan-info { min-width: 180px; flex: 1; }
 .ta-plan-name {
-  font-size: 15px; font-weight: 700; color: #eee; display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 700; color: #eee; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.ta-plan-id {
+  font-size: 10px; color: rgba(255,255,255,0.25); font-family: var(--fm, monospace);
+  background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;
 }
 .ta-feat-badge {
   padding: 2px 8px; border-radius: 5px;
@@ -651,7 +904,15 @@ const CSS = `
   font-size: 9px; font-weight: 800; color: rgba(200,168,75,0.9);
   letter-spacing: .5px; text-transform: uppercase;
 }
-.ta-plan-price { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+.ta-plan-price {
+  font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.ta-shopify-pill {
+  font-size: 10px; padding: 2px 8px; border-radius: 99px;
+  background: rgba(120,190,120,0.1); border: 1px solid rgba(120,190,120,0.25);
+  color: #78be78;
+}
 .ta-plan-url-wrap { display: flex; gap: 8px; flex: 1; min-width: 240px; }
 .ta-url-input { flex: 1; }
 .ta-btn-save {

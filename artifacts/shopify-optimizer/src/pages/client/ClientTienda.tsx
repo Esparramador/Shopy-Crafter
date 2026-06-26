@@ -181,6 +181,7 @@ export default function ClientTienda() {
       <div className="ts-content">
 
         <header className="ts-hero ct-hero">
+          <a href="/client" className="ct-back-btn">← Volver al panel</a>
           <div className="ts-pill"><span className="ts-pill-dot" />PLANES Y SERVICIOS</div>
           <h1>Tu plan de<br /><span className="ts-gradient-text">crecimiento.</span></h1>
           <p className="ts-hero-sub">Planes IA para tu tienda Shopify o servicios a medida. Sin permanencia. Actívalo hoy.</p>
@@ -246,6 +247,14 @@ const CSS = `
 .ct-client-tienda .ts-content { padding-top: 0; }
 .ct-hero { padding: 32px 0 36px; }
 .ct-hero h1 { font-size: clamp(32px, 4.5vw, 58px); }
+.ct-back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 20px; padding: 7px 16px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.5); font-size: 12.5px; font-weight: 600;
+  text-decoration: none; transition: all .2s; font-family: var(--fb,'Geist',sans-serif);
+}
+.ct-back-btn:hover { border-color: rgba(200,168,75,0.3); color: rgba(200,168,75,0.9); background: rgba(200,168,75,0.06); }
 
 .ts-root { background: var(--ink,#0a0a0c); position: relative; overflow-x: hidden; }
 .ts-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
