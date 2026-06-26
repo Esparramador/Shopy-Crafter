@@ -5,8 +5,15 @@ description: xAI API endpoints, models, polling, and ProviderId type sync requir
 
 # xAI Grok — Fusion Studio Pro Integration
 
+## ⚠️ Secret name: GROK_API_KEY (not XAI_API_KEY)
+The Replit secret is stored as **`GROK_API_KEY`**, not `XAI_API_KEY`. Always read with fallback:
+```ts
+const key = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
+```
+Fixed in (2026-06-26): `fusion-studio-pro.ts`, `provider-health.ts`, `card-studio.ts`, `studio.ts`, `tripo3d.ts`, `shopybrain.ts`, `viral.ts` — all 7 files now use this fallback pattern.
+
 ## API base
-`https://api.x.ai/v1` — auth: `Authorization: Bearer $XAI_API_KEY`
+`https://api.x.ai/v1` — auth: `Authorization: Bearer $GROK_API_KEY` (env var name)
 
 ## Endpoints used
 - **Image gen**: `POST /v1/images/generations` — models `grok-imagine-image` ($0.02) / `grok-imagine-image-quality` ($0.05-0.07). Returns `{data:[{url}]}`.

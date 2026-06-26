@@ -100,7 +100,7 @@ function getElevenKey(): string {
 }
 
 function getXaiKey(): string {
-  const k = process.env.XAI_API_KEY;
+  const k = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
   if (!k) throw new Error("XAI_API_KEY no configurada — contacta al administrador");
   return k;
 }

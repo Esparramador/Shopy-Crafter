@@ -29,10 +29,17 @@ const router = Router();
 
 // ─── GET /viral/engines — qué motores tienen su API key configurada ──────────
 router.get("/viral/engines", requireAdmin, (_req: Request, res: Response) => {
+  const grokKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
   res.json({
-    grok:   !!process.env.XAI_API_KEY,
+    grok:   !!grokKey,
     claude: !!process.env.ANTHROPIC_API_KEY,
     gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+    _debug: {
+      XAI_API_KEY:    !!process.env.XAI_API_KEY,
+      GROK_API_KEY:   !!process.env.GROK_API_KEY,
+      ANTHROPIC:      !!process.env.ANTHROPIC_API_KEY,
+      GEMINI:         !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+    },
   });
 });
 
@@ -218,8 +225,8 @@ Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks):
     let engineUsed = engine;
 
     if (engine === "grok") {
-      const xaiKey = process.env.XAI_API_KEY;
-      if (!xaiKey) { res.status(500).json({ error: "XAI_API_KEY no configurada" }); return; }
+      const xaiKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
+      if (!xaiKey) { res.status(500).json({ error: "XAI_API_KEY no configurada — ve a Secrets y verifica que existe la variable XAI_API_KEY con tu clave de api.x.ai" }); return; }
       const grokModel = process.env.GROK_MODEL || "grok-3";
       const grokRes = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",

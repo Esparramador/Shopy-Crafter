@@ -1495,7 +1495,7 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
         engineUsed = engine === "auto" ? "auto→gemini+search" : "gemini+search";
       } else if (engine === "grok") {
         // Grok (xAI): razonamiento rápido, análisis en tiempo real, perspectiva alternativa
-        const xaiKey = process.env.XAI_API_KEY;
+        const xaiKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
         if (!xaiKey) throw new Error("XAI_API_KEY no configurada — contacta al administrador");
         const grokModel = process.env.GROK_MODEL || "grok-3";
         const grokRes = await fetch("https://api.x.ai/v1/chat/completions", {

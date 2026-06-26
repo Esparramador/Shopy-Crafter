@@ -144,7 +144,7 @@ async function checkElevenLabs(): Promise<ProviderHealth> {
 }
 
 async function checkXai(): Promise<ProviderHealth> {
-  const key = process.env.XAI_API_KEY;
+  const key = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
   const checkedAt = Date.now();
   if (!key) return { provider: "xai", status: "missing_key", hasKey: false, checkedAt };
   try {

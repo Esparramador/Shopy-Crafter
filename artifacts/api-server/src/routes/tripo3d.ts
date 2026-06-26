@@ -916,7 +916,7 @@ router.post("/api/tripo3d/generate-views", async (req: Request, res: Response): 
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Se requiere un prompt" });
   }
-  const apiKey = process.env.XAI_API_KEY;
+  const apiKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
   if (!apiKey) {
     return res.status(503).json({ error: "XAI_API_KEY no configurada" });
   }

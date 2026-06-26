@@ -489,7 +489,7 @@ async function enhanceCardBackgroundPrompt(
     jobTitle?: string | null;
   },
 ): Promise<string> {
-  const apiKey = process.env.XAI_API_KEY;
+  const apiKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
   if (!apiKey) return userPrompt; // sin key → pass-through
 
   // Si el prompt ya es largo y descriptivo, no lo toquemos

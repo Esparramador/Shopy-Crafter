@@ -1,6 +1,7 @@
 import { validateEncryptionKey, encrypt, safeDecrypt } from "./lib/crypto.js";
 validateEncryptionKey();
 
+
 import app from "./app";
 import { logger } from "./lib/logger";
 import {

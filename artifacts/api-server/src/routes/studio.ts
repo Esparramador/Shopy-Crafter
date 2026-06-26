@@ -92,7 +92,7 @@ ${original}
       });
       modified = resp.text ?? "";
     } else if (model === "grok") {
-      const key = process.env.XAI_API_KEY;
+      const key = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
       if (!key) throw new Error("XAI_API_KEY no configurado");
       const resp = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
