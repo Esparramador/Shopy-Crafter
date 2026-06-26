@@ -193,6 +193,67 @@ async function resolveClaudeModel(opts?: ClaudeCallOpts): Promise<string> {
   }
 }
 
+export interface ClaudeUsage {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  model: string;
+}
+
+export async function askClaudeWithUsage(
+  projectId: number,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  systemPrompt?: string,
+  maxTokens = 32000,
+  timeoutMs = 300_000,
+  opts?: ClaudeCallOpts,
+): Promise<{ text: string; usage: ClaudeUsage }> {
+  const { withClaudeQueue } = await import("./claude-queue.js");
+  return withClaudeQueue(async () => {
+    const client = await getClaudeClient(projectId);
+    const model = await resolveClaudeModel(opts);
+
+    const stream = client.messages.stream(
+      {
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
+        messages,
+      },
+      { signal: AbortSignal.timeout(timeoutMs) }
+    );
+    const response = await stream.finalMessage();
+
+    if (response.stop_reason === "max_tokens") {
+      logger.warn({ maxTokens, model, inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
+    }
+
+    const inTok = response.usage?.input_tokens ?? 0;
+    const outTok = response.usage?.output_tokens ?? 0;
+    try {
+      const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
+      const costUsd = calcClaudeCost(model, inTok, outTok);
+      void recordApiUsage({
+        provider: "claude",
+        operation: "askClaudeWithUsage",
+        model,
+        projectId: projectId || null,
+        inputUnits: inTok,
+        outputUnits: outTok,
+        unitsLabel: "tokens",
+        costUsd,
+      });
+      const content = response.content[0];
+      if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
+      return { text: content.text, usage: { inputTokens: inTok, outputTokens: outTok, costUsd, model } };
+    } catch (err) {
+      const content = response.content[0];
+      if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
+      return { text: content.text, usage: { inputTokens: inTok, outputTokens: outTok, costUsd: 0, model } };
+    }
+  });
+}
+
 export async function askClaude(
   projectId: number,
   messages: Array<{ role: "user" | "assistant"; content: string }>,

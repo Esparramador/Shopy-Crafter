@@ -2406,6 +2406,17 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               if (fallbackRes.ok) {
                 const fd = await fallbackRes.json();
                 assistantContent = fd.answer ?? fd.result ?? "No pude procesar la respuesta.";
+                if (fd.usage) {
+                  const u = fd.usage;
+                  streamUsage = {
+                    inputTokens: u.inputTokens ?? 0,
+                    outputTokens: u.outputTokens ?? 0,
+                    thinkingTokens: 0,
+                    totalTokens: (u.inputTokens ?? 0) + (u.outputTokens ?? 0),
+                    costUsd: u.costUsd ?? 0,
+                    model: u.model ?? "claude",
+                  };
+                }
               } else {
                 assistantContent = "❌ Gemini no disponible temporalmente. Prueba con **Auto** o **Claude**.";
               }
@@ -2424,6 +2435,17 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         if (res.ok) {
           const d = await res.json();
           assistantContent = d.answer ?? d.result ?? "No pude procesar la respuesta.";
+          if (d.usage) {
+            const u = d.usage;
+            streamUsage = {
+              inputTokens: u.inputTokens ?? 0,
+              outputTokens: u.outputTokens ?? 0,
+              thinkingTokens: 0,
+              totalTokens: (u.inputTokens ?? 0) + (u.outputTokens ?? 0),
+              costUsd: u.costUsd ?? 0,
+              model: u.model ?? (engineLabels[engineMode as keyof typeof engineLabels] ?? "claude"),
+            };
+          }
 
           const longActions: Record<string, string> = {
             generate_competitive_pricing: "🔍 **Investigación de mercado en curso...**\n\n**Paso 1** — Buscando precios reales de competidores con Google Search\n**Paso 2** — Analizando posicionamiento del mercado\n**Paso 3** — Generando catálogo de precios competitivo\n**Paso 4** — Actualizando CMS y creando productos en tu tienda\n\n_⏱️ Esto toma 30-90 segundos. Investigando datos reales del mercado..._",

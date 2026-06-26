@@ -9,7 +9,7 @@ import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from 
 import { buildMasterSkillsBlock } from "../lib/master-skills-injector.js";
 import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
-import { learnFromOperation, askClaude, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
+import { learnFromOperation, askClaude, askClaudeWithUsage, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
 import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
@@ -1411,6 +1411,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
 
       let answer = "";
       let engineUsed = "claude+omnicore";
+      let searchUsage: { inputTokens: number; outputTokens: number; costUsd: number; model: string } | undefined;
 
       // ── CLASIFICADOR DE TAREAS (Routing Matrix por Gemini) ───────────────────
       // Si el usuario eligió "auto", clasificamos automáticamente la consulta
@@ -1472,12 +1473,14 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
 
         const brainUserContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + memoriesContext;
 
-        answer = await askClaude(
+        const brainResult = await askClaudeWithUsage(
           0,
           [{ role: "user", content: brainUserContent }],
           brainSynthesisPrompt,
           32000,
         );
+        answer = brainResult.text;
+        searchUsage = brainResult.usage;
         engineUsed = "brain_only";
       } else if (engine === "gemini" || (engine === "auto" && classifyQueryEngine(query) === "gemini")) {
         // Gemini: investigación de mercado, análisis de vídeo, tendencias, búsqueda en tiempo real
@@ -1511,17 +1514,31 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           const errText = await grokRes.text().catch(() => "");
           throw new Error(`Grok API error (${grokRes.status}): ${errText.slice(0, 300)}`);
         }
-        const grokData = await grokRes.json() as { choices?: Array<{ message?: { content?: string } }> };
+        const grokData = await grokRes.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
         answer = grokData.choices?.[0]?.message?.content || "Grok no pudo generar una respuesta. Prueba con otro motor.";
         engineUsed = `${grokModel}`;
+        if (grokData.usage) {
+          const inTok = grokData.usage.prompt_tokens ?? 0;
+          const outTok = grokData.usage.completion_tokens ?? 0;
+          const GROK_PRICING: Record<string, { input: number; output: number }> = {
+            "grok-3-mini": { input: 0.30, output: 0.50 },
+            "grok-3": { input: 3.0, output: 15.0 },
+          };
+          const grokPriceKey = Object.keys(GROK_PRICING).find(k => grokModel.includes(k)) ?? "grok-3";
+          const grokPrice = GROK_PRICING[grokPriceKey];
+          const costUsd = (inTok / 1_000_000) * grokPrice.input + (outTok / 1_000_000) * grokPrice.output;
+          searchUsage = { inputTokens: inTok, outputTokens: outTok, costUsd, model: grokModel };
+        }
       } else {
         // Claude: escritura profunda, guiones, código, JSON estructurado, razonamiento complejo
-        answer = await askClaude(
+        const claudeResult = await askClaudeWithUsage(
           resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
           [{ role: "user", content: userContent }],
           sysPrompt,
           32000,
         );
+        answer = claudeResult.text;
+        searchUsage = claudeResult.usage;
         engineUsed = engine === "claude" ? "claude" : engine === "auto" ? "auto→claude+omnicore" : "claude+omnicore";
       }
 
@@ -1546,6 +1563,7 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
         answer: cleanAnswer,
         source: engineUsed,
         engine,
+        usage: searchUsage ?? null,
         entityKnowledgeUsed: !!entityKnowledgeContext,
         potentialEntity: potentialEntity ?? null,
         detectedAction,
