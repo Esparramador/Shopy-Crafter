@@ -76,7 +76,7 @@ const DEFAULT_ADMIN_NAV = [
   { label: "Automaciones", icon: "⚡", href: "/admin/automations" },
   { label: "Revenue & CRM", icon: "💰", href: "/admin/revenue" },
   { label: "Facturación & Plan", icon: "💳", href: "/admin/billing" },
-  { label: "Tienda Pública", icon: "🛍️", href: "/admin/tienda" },
+  { label: "Planes & Servicios", icon: "📦", href: "/admin/tienda" },
   { label: "Stripe Manager", icon: "💳", href: "/admin/stripe" },
   { label: "⚡ God Mode — Stripe Hub", icon: "👑", href: "/admin/stripe-master" },
   { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },

@@ -102,6 +102,7 @@ async function ensureBillingPlansTable(): Promise<void> {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    await db.execute(sql`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS shopify_checkout_url TEXT`);
   } catch (err) {
     logger.warn({ err }, "billing_plans table setup warning");
   }
