@@ -206,6 +206,7 @@ export default function ApiUsage() {
   const [expandedSession,   setExpandedSession]   = useState<string | null>(null);
   const [sessionDetail,     setSessionDetail]     = useState<ChatSessionDetail[] | null>(null);
   const [sessionDetailLoad, setSessionDetailLoad] = useState(false);
+  const [logsSessionId,     setLogsSessionId]     = useState<string | null>(null);
 
   const loadChatSessions = useCallback(async (p: number) => {
     setChatSessionsLoad(true);
@@ -255,16 +256,34 @@ export default function ApiUsage() {
     }
   }, [from, to, provider]);
 
-  const loadLogs = useCallback(async (p: number) => {
+  const loadLogs = useCallback(async (p: number, sid?: string | null) => {
     setLogsLoading(true);
     try {
-      const qs = new URLSearchParams({ from, to, provider, page: String(p) }).toString();
+      const params: Record<string, string> = { from, to, provider, page: String(p) };
+      const effectiveSid = sid !== undefined ? sid : logsSessionId;
+      if (effectiveSid) params.sessionId = effectiveSid;
+      const qs = new URLSearchParams(params).toString();
       const r = await fetch(`${API_BASE}/api/api-usage/logs?${qs}`, { credentials: "include" });
       if (r.ok) setLogs(await r.json());
     } finally {
       setLogsLoading(false);
     }
-  }, [from, to, provider]);
+  }, [from, to, provider, logsSessionId]);
+
+  function jumpToLogsForSession(sid: string) {
+    setLogsSessionId(sid);
+    setPage(1);
+    loadLogs(1, sid);
+    setTimeout(() => {
+      document.getElementById("logs-table-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
+
+  function clearSessionFilter() {
+    setLogsSessionId(null);
+    setPage(1);
+    loadLogs(1, null);
+  }
 
   useEffect(() => {
     setPage(1);
@@ -849,14 +868,29 @@ export default function ApiUsage() {
                               );
                             })}
                             <div style={{
-                              display: "flex", justifyContent: "flex-end", gap: 16,
+                              display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16,
                               padding: "6px 10px 2px",
                               borderTop: "1px solid rgba(255,255,255,0.04)",
                               fontSize: 11, color: "var(--t3,#666)",
                             }}>
-                              <span>Total: <strong style={{ color: "var(--gold,#f59e0b)" }}>{fmt(sess.costUsd, 4)}</strong></span>
-                              <span>{fmtNum(Number(sess.inputTokens) + Number(sess.outputTokens))} tokens totales</span>
-                              <span>{fmtEur(sess.costEur, 4)}</span>
+                              <div style={{ display: "flex", gap: 16 }}>
+                                <span>Total: <strong style={{ color: "var(--gold,#f59e0b)" }}>{fmt(sess.costUsd, 4)}</strong></span>
+                                <span>{fmtNum(Number(sess.inputTokens) + Number(sess.outputTokens))} tokens totales</span>
+                                <span>{fmtEur(sess.costEur, 4)}</span>
+                              </div>
+                              <button
+                                onClick={() => jumpToLogsForSession(sess.sessionId)}
+                                title="Filtrar el registro de llamadas por esta sesión"
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 5,
+                                  background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.3)",
+                                  borderRadius: 6, padding: "4px 10px",
+                                  color: "var(--gold,#f59e0b)", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                Ver en registro ↓
+                              </button>
                             </div>
                           </div>
                         ) : null}
@@ -893,11 +927,32 @@ export default function ApiUsage() {
       </Card>
 
       {/* Logs table */}
-      <Card>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, color: "var(--t,#fff)", fontSize: 14 }}>
-            Registro de llamadas
-            {logs && <span style={{ marginLeft: 8, fontSize: 12, color: "var(--t3,#666)", fontWeight: 400 }}>({fmtNum(logs.total)} total)</span>}
+      <Card id="logs-table-card">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontWeight: 600, color: "var(--t,#fff)", fontSize: 14 }}>
+              Registro de llamadas
+              {logs && <span style={{ marginLeft: 8, fontSize: 12, color: "var(--t3,#666)", fontWeight: 400 }}>({fmtNum(logs.total)} total)</span>}
+            </div>
+            {logsSessionId && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.3)",
+                borderRadius: 6, padding: "3px 8px 3px 10px",
+              }}>
+                <span style={{ fontSize: 11, color: "var(--gold,#f59e0b)", fontFamily: "monospace" }}>
+                  sesión: {logsSessionId.slice(0, 16)}…
+                </span>
+                <button
+                  onClick={clearSessionFilter}
+                  title="Quitar filtro de sesión"
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "rgba(200,168,75,0.7)", padding: "0 2px", lineHeight: 1, fontSize: 13,
+                  }}
+                >×</button>
+              </div>
+            )}
           </div>
         </div>
 

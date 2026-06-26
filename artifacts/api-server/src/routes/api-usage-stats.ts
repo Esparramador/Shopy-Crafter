@@ -133,7 +133,7 @@ router.get("/api-usage/by-project", async (req, res): Promise<void> => {
 
 router.get("/api-usage/logs", async (req, res): Promise<void> => {
   try {
-    const { from, to, provider, page, projectId } = req.query as Record<string, string>;
+    const { from, to, provider, page, projectId, sessionId } = req.query as Record<string, string>;
     const PAGE_SIZE = 50;
     const pageNum   = Math.max(1, parseInt(page ?? "1", 10));
     const offset    = (pageNum - 1) * PAGE_SIZE;
@@ -153,6 +153,9 @@ router.get("/api-usage/logs", async (req, res): Promise<void> => {
     }
     if (projectId) {
       conditions.push(eq(apiUsageLogTable.projectId, parseInt(projectId, 10)));
+    }
+    if (sessionId) {
+      conditions.push(eq(apiUsageLogTable.sessionId, sessionId));
     }
 
     const [{ total }] = await db
