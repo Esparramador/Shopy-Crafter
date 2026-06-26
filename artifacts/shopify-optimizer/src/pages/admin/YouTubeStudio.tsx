@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Youtube, Upload, Trash2, ExternalLink, Search, CheckCircle, AlertCircle, RefreshCw, Link2, Users, Video, Eye, ThumbsUp, MessageSquare, X } from "lucide-react";
-import { API } from "@/lib/api";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 interface Channel {
   connected: boolean;
@@ -74,7 +75,7 @@ export default function YouTubeStudio() {
   async function loadChannel() {
     setLoadingChannel(true);
     try {
-      const r = await fetch(`${API}/api/youtube/channel`, { credentials: "include" });
+      const r = await fetch(`${BASE}/api/youtube/channel`, { credentials: "include" });
       if (r.ok) setChannel(await r.json());
     } catch {}
     setLoadingChannel(false);
@@ -83,7 +84,7 @@ export default function YouTubeStudio() {
   async function loadVideos() {
     setLoadingVideos(true);
     try {
-      const r = await fetch(`${API}/api/youtube/videos`, { credentials: "include" });
+      const r = await fetch(`${BASE}/api/youtube/videos`, { credentials: "include" });
       if (r.ok) { const d = await r.json(); setVideos(d.videos || []); }
     } catch {}
     setLoadingVideos(false);
@@ -93,7 +94,7 @@ export default function YouTubeStudio() {
 
   async function connectYouTube() {
     try {
-      const r = await fetch(`${API}/api/youtube/oauth/url`, { credentials: "include" });
+      const r = await fetch(`${BASE}/api/youtube/oauth/url`, { credentials: "include" });
       if (!r.ok) { const d = await r.json(); return setError(d.error); }
       const { url } = await r.json();
       window.location.href = url;
@@ -104,7 +105,7 @@ export default function YouTubeStudio() {
 
   async function disconnect() {
     if (!confirm("¿Desconectar el canal de YouTube? Perderás acceso a subir vídeos.")) return;
-    await fetch(`${API}/api/youtube/channel`, { method: "DELETE", credentials: "include" });
+    await fetch(`${BASE}/api/youtube/channel`, { method: "DELETE", credentials: "include" });
     setChannel({ connected: false });
     setVideos([]);
   }
@@ -130,7 +131,7 @@ export default function YouTubeStudio() {
         setUploadProgress(p => p < 85 ? p + Math.random() * 8 : p);
       }, 800);
 
-      const r = await fetch(`${API}/api/youtube/upload`, {
+      const r = await fetch(`${BASE}/api/youtube/upload`, {
         method: "POST", credentials: "include", body: fd,
       });
       clearInterval(simulateProgress);
@@ -154,7 +155,7 @@ export default function YouTubeStudio() {
     if (!confirm("¿Eliminar este vídeo de YouTube? Esta acción no se puede deshacer.")) return;
     setDeleting(videoId);
     try {
-      const r = await fetch(`${API}/api/youtube/videos/${videoId}`, { method: "DELETE", credentials: "include" });
+      const r = await fetch(`${BASE}/api/youtube/videos/${videoId}`, { method: "DELETE", credentials: "include" });
       if (r.ok) setVideos(v => v.filter(x => x.videoId !== videoId));
       else setError("No se pudo eliminar el vídeo");
     } catch (e: any) { setError(e.message); }
@@ -166,7 +167,7 @@ export default function YouTubeStudio() {
     if (!searchQuery.trim()) return;
     setSearching(true); setSearchResults([]);
     try {
-      const r = await fetch(`${API}/api/youtube/search?q=${encodeURIComponent(searchQuery)}&max=8`, { credentials: "include" });
+      const r = await fetch(`${BASE}/api/youtube/search?q=${encodeURIComponent(searchQuery)}&max=8`, { credentials: "include" });
       if (r.ok) {
         const d = await r.json();
         if (d.results?.length) setSearchResults(d.results);
