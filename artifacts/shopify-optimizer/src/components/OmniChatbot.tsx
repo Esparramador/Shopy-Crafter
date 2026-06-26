@@ -1205,6 +1205,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Sequential Task Queue ───────────────────────────────────────────────────
+  const taskQueueRef = useRef<string[]>([]);
+  const taskQueueMeta = useRef({ total: 0, completed: 0, isActive: false, recordingMode: false });
+  const prevLoadingRef = useRef(false);
+  const sendMessageRef = useRef<((text: string) => void) | null>(null);
+
   const stopScreenRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
@@ -2086,27 +2092,140 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       let streamUsage: MsgUsage | undefined;
       let streamSources: string[] | undefined;
 
-      // ── CASE 0: Comandos de grabación de pantalla ──────────────────────────
+      // ── CASE 0: Grabación y multi-tarea secuencial ─────────────────────────
       const lowerContent = content.toLowerCase();
       const isStartRecording = /\b(gr[aá]b[ae]me|graba|grabar|inicia\s+(la\s+)?grabaci[oó]n|empieza\s+(a\s+)?grabar|start\s+recording|graba\s+la\s+pantalla|graba\s+esto|necesito\s+que\s+grab|quiero\s+(que\s+)?grab)\b/.test(lowerContent);
       const isStopRecording = /\b(para\s+(la\s+)?grabaci[oó]n|detener?\s+(la\s+)?grabaci[oó]n|stop\s+grabaci[oó]n|stop\s+recording|termina\s+(la\s+)?grabaci[oó]n|deja\s+de\s+grabar|fin\s+(de\s+la\s+)?grabaci[oó]n|acaba\s+(la\s+)?grabaci[oó]n)\b/.test(lowerContent);
 
-      if (isStartRecording || isStopRecording) {
+      if (isStopRecording) {
         setLoading(false);
         let recMsg = "";
-        if (isStopRecording) {
-          if (isRecording) {
-            stopScreenRecording();
-            const mins = Math.floor(recordingDuration / 60);
-            const secs = recordingDuration % 60;
-            recMsg = `⏹️ **Grabación detenida** — Duración: ${mins > 0 ? `${mins}m ` : ""}${secs}s\n\n📥 El vídeo se está descargando automáticamente como **ShopyCrafter_FECHA.webm**. Puedes abrirlo con cualquier reproductor de vídeo o subirlo directamente a YouTube.`;
-          } else {
-            recMsg = "ℹ️ No hay ninguna grabación activa en este momento.";
-          }
+        if (isRecording) {
+          stopScreenRecording();
+          const mins = Math.floor(recordingDuration / 60);
+          const secs = recordingDuration % 60;
+          recMsg = `⏹️ **Grabación detenida** — Duración: ${mins > 0 ? `${mins}m ` : ""}${secs}s\n\n📥 El vídeo se está descargando automáticamente como **ShopyCrafter_FECHA.webm**.`;
         } else {
-          recMsg = await startScreenRecording();
+          recMsg = "ℹ️ No hay ninguna grabación activa en este momento.";
         }
         setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: recMsg } : msg));
+        return;
+      }
+
+      if (isStartRecording) {
+        // Check if there are multiple tasks embedded in the message
+        const tasks = parseMultipleTasks(content);
+        if (tasks && tasks.length > 1) {
+          // Multi-task recording mode: start recording then execute tasks sequentially
+          setMessages(m => m.map(msg => msg.id === thinkingId ? {
+            ...msg,
+            content: `🔴 **Modo grabación secuencial — ${tasks.length} tareas detectadas**\n\n${tasks.map((t, i) => `**${i + 1}.** ${t}`).join("\n")}\n\n_Iniciando grabación…_`
+          } : msg));
+
+          const recMsg = await startScreenRecording();
+          const started = recMsg.startsWith("✅");
+
+          if (!started) {
+            setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: recMsg } : msg));
+            setLoading(false);
+            return;
+          }
+
+          // Queue tasks 2..N, then kick off task 1 immediately
+          taskQueueRef.current = tasks.slice(1);
+          taskQueueMeta.current = { total: tasks.length, completed: 1, isActive: true, recordingMode: true };
+
+          setMessages(m => [...m.map(msg => msg.id === thinkingId ? {
+            ...msg, content: `${recMsg}\n\n▶️ **[1/${tasks.length}]** Iniciando: ${tasks[0]}`
+          } : msg)]);
+          setLoading(false);
+          setTimeout(() => sendMessageRef.current?.(tasks[0]), 400);
+          return;
+        }
+
+        // Single grabar command (no multi-tasks)
+        setLoading(false);
+        const recMsg = await startScreenRecording();
+        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: recMsg } : msg));
+        return;
+      }
+
+      // ── CASE 0b: Ejecución directa de try-on ─────────────────────────────
+      const isTryOnIntent = /\b(try.?on|probador\s*virtual|prueba\s+virtual|virtual\s+try.?on|gen[ea]r[ae].*try.?on|genera.*probador|ponme\s+(con|este)|muéstrame\s+(con|usando))\b/i.test(lowerContent);
+      if (isTryOnIntent) {
+        const projectIdFromUrl = location.match(/\/projects\/(\d+)/)?.[1];
+        const tryOnPrompt = content
+          .replace(/\b(gr[aá]b[ae]me\s+)?genera[r]?\s+(un|una\s+)?try.?on\s+(con\s+)?/i, "")
+          .trim() || "professional virtual try-on, person wearing the product, realistic studio lighting, white background, fashion editorial";
+
+        if (!projectIdFromUrl) {
+          assistantContent = "⚠️ **Necesito un proyecto activo** para generar el try-on. Ve a tus proyectos y abre uno, luego vuelve a pedírmelo.";
+        } else if (!hasAttach) {
+          assistantContent = "📎 **Adjunta la imagen** del producto (o de la persona) para generar el virtual try-on. Puedes arrastrarla al chat o usar el clip.";
+        } else if (attachFile && attachType === "image") {
+          setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: "🎭 **Generando Virtual Try-On…**\n\n_Procesando imagen con IA (Flux Kontext)…_", model: "flux-kontext" } : msg));
+          try {
+            const formData = new FormData();
+            formData.append("image", attachFile);
+            formData.append("projectId", projectIdFromUrl);
+            formData.append("model", "flux-kontext-pro");
+            formData.append("prompt", `${tryOnPrompt}, high quality fashion photography, clean background, professional lighting, 4K`);
+            formData.append("aspectRatio", "1:1");
+            const tryOnRes = await fetchWithTimeout(`${API}/api/fs-pro/edit-image`, { method: "POST", credentials: "include", body: formData }, 90000);
+            if (tryOnRes.ok) {
+              const tryOnData = await tryOnRes.json() as { dataUrl?: string; vaultId?: number; model?: string };
+              if (tryOnData.dataUrl) {
+                assistantContent = `🎭 **Virtual Try-On generado**\n\n![Try-On](${tryOnData.dataUrl})\n\n_Modelo: ${tryOnData.model ?? "flux-kontext-pro"} · Guardado en Bóveda${tryOnData.vaultId ? ` #${tryOnData.vaultId}` : ""}_`;
+              } else {
+                assistantContent = "❌ El servidor no devolvió imagen. Prueba con una imagen más clara del producto.";
+              }
+            } else {
+              const errTxt = await tryOnRes.text().catch(() => "");
+              assistantContent = `❌ Error generando try-on (${tryOnRes.status}): ${errTxt.slice(0, 200)}`;
+            }
+          } catch (tryOnErr: any) {
+            assistantContent = `❌ Error try-on: ${tryOnErr?.message ?? String(tryOnErr)}`;
+          }
+        } else {
+          assistantContent = "📎 Necesito una **imagen** (no vídeo ni PDF) para el try-on. Adjunta la foto del producto.";
+        }
+
+        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: assistantContent, model: "flux-kontext-pro" } : msg));
+        setLoading(false);
+        return;
+      }
+
+      // ── CASE 0c: Listado real de prompts ─────────────────────────────────
+      const isPromptListIntent = /\b(list[ae]me?\s+(los\s+)?prompt|mu[eé]strame\s+(los\s+)?prompt|dame\s+(los\s+)?prompt|qu[eé]\s+prompt[s]?\s+(hay|tienes|existen)|cat[aá]logo\s+de\s+prompt)\b/i.test(lowerContent);
+      if (isPromptListIntent) {
+        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: "📚 Cargando biblioteca de prompts…" } : msg));
+        try {
+          const plRes = await fetchWithTimeout(`${API}/api/shopybrain/prompt-library`, { credentials: "include" }, 15000);
+          if (plRes.ok) {
+            const plData = await plRes.json() as { prompts?: Array<{ category?: string; name?: string; prompt?: string; tags?: string[] }> };
+            const prompts = plData.prompts ?? [];
+            if (prompts.length === 0) {
+              assistantContent = "📚 La biblioteca de prompts está vacía. Puedes añadir prompts desde la sección Prompt Library.";
+            } else {
+              const grouped: Record<string, typeof prompts> = {};
+              prompts.forEach(p => { const cat = p.category ?? "General"; (grouped[cat] = grouped[cat] ?? []).push(p); });
+              assistantContent = `📚 **Biblioteca de Prompts** — ${prompts.length} prompts disponibles\n\n`;
+              Object.entries(grouped).slice(0, 10).forEach(([cat, items]) => {
+                assistantContent += `### ${cat}\n`;
+                items.slice(0, 5).forEach(p => { assistantContent += `- **${p.name ?? "Sin nombre"}**${p.tags?.length ? ` · \`${p.tags.slice(0, 3).join(", ")}\`` : ""}\n`; });
+                if (items.length > 5) assistantContent += `  _… y ${items.length - 5} más en esta categoría_\n`;
+                assistantContent += "\n";
+              });
+              if (Object.keys(grouped).length > 10) assistantContent += `_…y ${Object.keys(grouped).length - 10} categorías más. Visita la sección Prompt Library para explorar todos._`;
+            }
+          } else {
+            assistantContent = "❌ No pude cargar la biblioteca de prompts. Prueba visitando la sección Prompt Library directamente.";
+          }
+        } catch {
+          assistantContent = "❌ Error cargando prompts. Verifica tu conexión e inténtalo de nuevo.";
+        }
+        setMessages(m => m.map(msg => msg.id === thinkingId ? { ...msg, content: assistantContent } : msg));
+        setLoading(false);
         return;
       }
 
@@ -2702,6 +2821,68 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       sendMessage(t);
     }
   }, [isListening, sendMessage]);
+
+  // Keep sendMessageRef updated so the queue effect can call it safely
+  useEffect(() => { sendMessageRef.current = (text: string) => sendMessage(text); }, [sendMessage]);
+
+  // ── Sequential task queue auto-executor ──────────────────────────────────
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+    if (!wasLoading || loading) return; // only fire on true→false transition
+    if (!taskQueueMeta.current.isActive) return;
+
+    if (taskQueueRef.current.length > 0) {
+      const next = taskQueueRef.current.shift()!;
+      taskQueueMeta.current.completed++;
+      const { completed, total } = taskQueueMeta.current;
+      setTimeout(() => {
+        setMessages(m => [...m, {
+          id: uuid(), role: "assistant" as const,
+          content: `▶️ **[${completed}/${total}]** Iniciando tarea ${completed}…`,
+          timestamp: new Date(), model: "task-runner",
+        }]);
+        setTimeout(() => sendMessageRef.current?.(next), 200);
+      }, 600);
+    } else {
+      // All tasks done
+      taskQueueMeta.current.isActive = false;
+      const total = taskQueueMeta.current.total;
+      const wasRec = taskQueueMeta.current.recordingMode;
+      taskQueueMeta.current = { total: 0, completed: 0, isActive: false, recordingMode: false };
+      setMessages(m => [...m, {
+        id: uuid(), role: "assistant" as const,
+        content: `✅ **¡${total} tareas completadas!**${wasRec && isRecording ? "\n\n🔴 La grabación continúa. Di **'para la grabación'** cuando quieras." : ""}`,
+        timestamp: new Date(), model: "task-runner",
+      }]);
+    }
+  }, [loading, isRecording]);
+
+  // ── Helper: parse multiple tasks from a compound message ─────────────────
+  const parseMultipleTasks = (msg: string): string[] | null => {
+    // Strip the grabar prefix to get just the tasks part
+    const stripped = msg
+      .replace(/^.*?gr[aá]b[ae]me\s+(haciendo|generando|ejecutando|mientras\s+hago?|las\s+acciones:?\s*|esto:?\s*)/i, "")
+      .replace(/^gr[aá]b[ae]\s+(las\s+)?acciones:?\s*/i, "")
+      .trim();
+
+    if (!stripped || stripped === msg.trim()) return null; // nothing to strip = single grabar cmd
+
+    // Try numbered list: "1. X 2. Y 3. Z"
+    const numbered = stripped.match(/\d+[\.\)]\s*.+?(?=(?:\d+[\.\)]|$))/gs);
+    if (numbered && numbered.length > 1) {
+      return numbered.map(t => t.replace(/^\d+[\.\)]\s*/, "").trim()).filter(t => t.length > 3);
+    }
+
+    // Try splitting by sequential connectors
+    const parts = stripped
+      .split(/\s*[,;]\s*|\s+(?:y\s+)?luego\s+|\s+después\s+(?:de\s+eso\s+)?|\s+también\s+|\s+además\s+/i)
+      .map(t => t.trim())
+      .filter(t => t.length > 3);
+    if (parts.length > 1) return parts;
+
+    return null;
+  };
 
   const getFilteredSkills = () => SLASH_SKILLS.filter(s =>
     !slashFilter ||
