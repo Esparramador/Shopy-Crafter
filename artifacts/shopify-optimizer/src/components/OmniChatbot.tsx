@@ -2733,9 +2733,22 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       fontSize: isMobile ? 14 : 12, lineHeight: 1.6, color: "var(--t)",
                     }}>
                       {msg.role === "assistant" && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5, flexWrap: "wrap" }}>
                           <Brain size={10} style={{ color: "var(--gold)", flexShrink: 0 }} />
                           <span style={{ fontSize: 9, color: "var(--gold)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Shopy Crafter</span>
+                          {msg.model && (() => {
+                            const m = msg.model.toLowerCase();
+                            const isGemini = m.includes("gemini");
+                            const isClaude = m.includes("claude") || m.includes("anthropic");
+                            const color = isGemini ? "var(--jade)" : isClaude ? "var(--gold)" : "var(--t4)";
+                            const bg = isGemini ? "rgba(45,212,159,0.10)" : isClaude ? "rgba(200,168,75,0.10)" : "rgba(255,255,255,0.05)";
+                            const icon = isGemini ? "🔬" : isClaude ? "🧠" : "💡";
+                            return (
+                              <span style={{ fontSize: 8, color, background: bg, border: `1px solid ${color}`, borderRadius: 4, padding: "1px 5px", fontWeight: 600, letterSpacing: "0.3px", whiteSpace: "nowrap" }}>
+                                {icon} {msg.model}
+                              </span>
+                            );
+                          })()}
                         </div>
                       )}
                       {msg.attachmentType && (
