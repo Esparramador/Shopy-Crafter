@@ -22,6 +22,7 @@ import { askClaudeJson } from "../lib/claude.js";
 import {
   VIDEO_FORMATS, COMEDY_PROMPTS, HOOK_FRAMEWORKS, SECTOR_STRATEGIES,
   ALGORITHM_SIGNALS, TITLE_PATTERNS, VIRALITY_SIGNALS, buildYouTubeExpertPrompt,
+  CONTENT_CATEGORIES, CONTENT_TEMPLATES, buildCategoryPrompt,
   calculateViralityScore, type ViralityInput,
 } from "../lib/youtube-knowledge.js";
 
@@ -160,47 +161,74 @@ router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) =>
   }
 });
 
+// ─── GET /viral/categories ────────────────────────────────────────────────────
+router.get("/viral/categories", requireAdmin, (_req: Request, res: Response) => {
+  res.json(CONTENT_CATEGORIES.map(c => ({
+    id: c.id, name: c.name, emoji: c.emoji, description: c.description,
+    defaultTone: c.defaultTone, defaultStyle: c.defaultStyle, defaultFormat: c.defaultFormat,
+    inputLabel: c.inputLabel, inputPlaceholder: c.inputPlaceholder,
+    viralTriggers: c.viralTriggers, recommendedFormats: c.recommendedFormats,
+  })));
+});
+
+// ─── GET /viral/templates/:categoryId ────────────────────────────────────────
+router.get("/viral/templates/:categoryId", requireAdmin, (req: Request, res: Response) => {
+  const { categoryId } = req.params;
+  const templates = CONTENT_TEMPLATES.filter(t => t.categoryId === categoryId);
+  res.json(templates.map(t => ({ id: t.id, name: t.name, emoji: t.emoji, useCase: t.useCase })));
+});
+
 // ─── POST /viral/script ───────────────────────────────────────────────────────
 router.post("/viral/script", requireAdmin, async (req: Request, res: Response) => {
   const {
-    newsItem, tone = "ácido", duration = 60, style = "monólogo",
+    newsItem, tone, duration = 60, style,
     country = "España", engine = "claude",
-    format = "satira-politica", sector,
-    comedyPromptId,
+    format, sector,
+    comedyPromptId, templateId,
+    category = "politica",
   } = req.body;
   if (!newsItem) { res.status(400).json({ error: "newsItem requerido" }); return; }
 
-  const formatKB  = VIDEO_FORMATS.find(f => f.id === format);
-  const expertCtx = buildYouTubeExpertPrompt(sector, format);
+  // Resolve category — supports legacy politica flow + new multi-category
+  const cat = CONTENT_CATEGORIES.find(c => c.id === category) || CONTENT_CATEGORIES[0];
+  const resolvedTone  = tone  || cat.defaultTone;
+  const resolvedStyle = style || cat.defaultStyle;
+  const resolvedFormat = format || cat.defaultFormat;
 
-  const comedyCtx = comedyPromptId
-    ? COMEDY_PROMPTS.find(p => p.id === comedyPromptId)?.prompt || ""
-    : "";
+  const formatKB   = VIDEO_FORMATS.find(f => f.id === resolvedFormat);
+  const templateCtx = templateId
+    ? CONTENT_TEMPLATES.find(t => t.id === templateId)?.prompt || ""
+    : comedyPromptId
+      ? (COMEDY_PROMPTS.find(p => p.id === comedyPromptId)?.prompt || "")
+      : "";
 
-  const PROMPT = `${expertCtx}
+  const categoryCtx = buildCategoryPrompt(category, resolvedFormat, templateId || undefined);
+
+  const PROMPT = `${categoryCtx}
 
 ---
-Eres el mejor guionista de contenido viral de ${country}. Tu estilo domina: El Intermedio, La Resistencia, The Daily Show, Facu Díaz, humor absurdo y sátira política inteligente.
+IDIOMA: Español (${country})
+CATEGORÍA: ${cat.name} ${cat.emoji}
 
-${comedyCtx ? `PLANTILLA DE COMEDIA A APLICAR:\n${comedyCtx}\n---` : ""}
+${templateCtx ? `PLANTILLA/ESTRUCTURA A APLICAR:\n${templateCtx}\n---` : ""}
 
-NOTICIA/TEMA A DESARROLLAR:
+TEMA/CONTENIDO A DESARROLLAR:
 "${typeof newsItem === "object" ? JSON.stringify(newsItem) : newsItem}"
 
 PARÁMETROS DEL VÍDEO:
-- Formato: ${formatKB ? formatKB.name : style}
-- Tono: ${tone}
+- Formato: ${formatKB ? formatKB.name : resolvedStyle}
+- Tono: ${resolvedTone}
 - Duración objetivo: ${duration} segundos
 - País/Contexto: ${country}
 ${formatKB ? `- Estructura recomendada: ${formatKB.structure.join(" → ")}` : ""}
 ${formatKB ? `- Hook framework: ${formatKB.hook}` : ""}
 
 SEÑALES DE VIRALIDAD A INCLUIR (por orden de prioridad):
-1. Hook brutal en los primeros 3 segundos
-2. Pico emocional genuino (sorpresa, incredulidad, humor)
-3. Opinión bomba / statement polarizante
-4. Momento de revelación que reencuadra la situación
-5. One-liner quotable para recortar como Short
+1. Hook brutal en los primeros 3 segundos — detiene el scroll
+2. Pico emocional genuino (sorpresa, incredulidad, humor, asombro)
+3. Statement polarizante o revelación que reencuadra todo
+4. Momento de valor práctico o dato impactante
+5. One-liner quotable — la frase que se comparte sola
 
 Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks):
 {
@@ -208,16 +236,16 @@ Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks):
   "titleAlternatives": ["3 títulos alternativos A/B test"],
   "description": "descripción SEO de 150 palabras con keywords relevantes",
   "tags": ["array de 15 tags SEO relevantes"],
-  "hook": "primeros 3-5 segundos — frase gancho brutal que para el scroll",
-  "script": "guión completo con acotaciones [PAUSA], [ÉNFASIS], [TONO IRÓNICO], [CARA DE INCREDULIDAD]",
+  "hook": "primeros 3-5 segundos — frase gancho brutal que detiene el scroll",
+  "script": "guión completo con acotaciones de dirección [PAUSA], [ÉNFASIS], [CORTE], [IMAGEN: descripción]",
   "voiceoverText": "texto limpio para TTS/narración sin corchetes ni acotaciones",
   "visualPrompt": "prompt cinematográfico en inglés para generar vídeo con IA (estilo Runway/Veo/Grok Video)",
   "thumbnailPrompt": "descripción del thumbnail ideal: composición, colores, texto, emoción facial",
   "callToAction": "CTA final para suscripción, máximo 10 palabras",
-  "comedyTechniques": ["técnicas cómicas usadas: ironía, hipérbole, absurdo, etc."],
+  "contentTechniques": ["técnicas narrativas usadas: ironía, hipérbole, storytelling, analogía, etc."],
   "viralSignals": {"hasStrongHook": true, "hasEmotionalPeak": true, "hasConflict": false, "hasPracticalValue": false, "hasStoryArc": true},
   "shortsVersion": "versión comprimida de 60 segundos para YouTube Shorts",
-  "postingRecommendation": "mejor día y hora para publicar basado en el tema"
+  "postingRecommendation": "mejor día y hora para publicar basado en el tema y categoría"
 }`;
 
   try {

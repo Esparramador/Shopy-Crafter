@@ -712,6 +712,311 @@ export const SECTOR_STRATEGIES: Record<string, {
   },
 };
 
+// ─── CONTENT CATEGORIES ───────────────────────────────────────────────────────
+export interface ContentCategory {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  defaultTone: string;
+  defaultStyle: string;
+  defaultFormat: string;
+  inputLabel: string;
+  inputPlaceholder: string;
+  systemRole: string;
+  viralTriggers: string[];
+  recommendedFormats: string[];
+}
+
+export const CONTENT_CATEGORIES: ContentCategory[] = [
+  {
+    id: "politica",
+    name: "Sátira Política",
+    emoji: "🏛️",
+    description: "Análisis y humor político inteligente",
+    defaultTone: "ácido",
+    defaultStyle: "monólogo",
+    defaultFormat: "satira-politica",
+    inputLabel: "Noticia o tema político",
+    inputPlaceholder: "Ej: Óscar López llama 'payaso' a Feijóo, La nueva ley del impuesto digital, El debate sobre las saunas...",
+    systemRole: "Eres el mejor guionista de sátira política en español. Tu estilo domina El Intermedio, La Resistencia, The Daily Show y Wyoming. Combinas ironía inteligente, humor absurdo y crítica política constructiva.",
+    viralTriggers: ["Contradicción política", "Promesa incumplida", "Escándalo", "Hipocresía flagrante", "Debate absurdo"],
+    recommendedFormats: ["satira-politica", "fact-check-comico", "vox-pop", "short-hook", "podcast-clip"],
+  },
+  {
+    id: "historia",
+    name: "Historia & Documentales",
+    emoji: "🏺",
+    description: "Relatos históricos que enganchan desde el primer segundo",
+    defaultTone: "épico",
+    defaultStyle: "storytelling",
+    defaultFormat: "mini-documental",
+    inputLabel: "Período histórico, personaje o evento",
+    inputPlaceholder: "Ej: La caída del Imperio Romano, Los piratas del Caribe reales, Por qué Cleopatra no era egipcia, El inventor que Tesla plagió...",
+    systemRole: "Eres el mejor narrador de historia para YouTube en español, con el talento narrativo de YouTube Canales Historia en Mapas, Draw Curiosities y Kurzgesagt adaptado al castellano. Haces los momentos históricos APASIONANTES y relevantes para hoy.",
+    viralTriggers: ["El dato que nadie conoce", "La conspiración real", "El personaje olvidado", "El giro histórico inesperado", "La conexión con el presente"],
+    recommendedFormats: ["mini-documental", "listicle", "short-hook", "explainer-animated"],
+  },
+  {
+    id: "ia-tech",
+    name: "IA & Tecnología",
+    emoji: "🤖",
+    description: "Divulgación tech educativa y viral",
+    defaultTone: "asombrado",
+    defaultStyle: "explainer",
+    defaultFormat: "explainer-animated",
+    inputLabel: "Tema de IA, software o tecnología",
+    inputPlaceholder: "Ej: Claude 4 vs ChatGPT en la vida real, Cómo funciona un LLM explicado con patatas, La IA que dejará sin trabajo a los diseñadores...",
+    systemRole: "Eres el mejor divulgador de inteligencia artificial y tecnología en YouTube español. Tienes el don de 3Blue1Brown para visualizar lo abstracto, la accesibilidad de Dot CSV y la energía de Fireship. Haces que lo más complejo sea fascinante en 60 segundos.",
+    viralTriggers: ["IA que supera al humano", "Herramienta que no conoces", "El futuro ya está aquí", "Riesgo real de la IA", "El truco técnico revelador"],
+    recommendedFormats: ["explainer-animated", "short-tutorial", "listicle", "short-hook", "comparison"],
+  },
+  {
+    id: "personajes",
+    name: "Personajes & Objetos",
+    emoji: "🍋",
+    description: "Frutas, objetos y personajes que explican el mundo",
+    defaultTone: "divertido",
+    defaultStyle: "personaje-explica",
+    defaultFormat: "short-hook",
+    inputLabel: "Concepto a explicar y personaje narrador",
+    inputPlaceholder: "Ej: Una manzana explica la inflación, Tipos de jefes como frutas, Un robot bipolar explica la depresión, El aguacate más ansioso del mundo explica el mercado inmobiliario...",
+    systemRole: "Eres el mejor guionista de contenido con personajes animados o metafóricos para YouTube. Te especializas en hacer que frutas, animales, objetos cotidianos o personajes abstractos expliquen conceptos complejos de forma viral, divertida y memorable. Tu estilo combina la narrativa de Pixar con la pedagogía de Sal Khan y el humor de South Park.",
+    viralTriggers: ["El personaje inesperado", "La metáfora perfecta", "El concepto complejo hecho ridículamente simple", "El final giro de guión", "La voz del personaje"],
+    recommendedFormats: ["short-hook", "short-tutorial", "explainer-animated", "satira-politica"],
+  },
+  {
+    id: "educativo",
+    name: "Educativo con Personaje",
+    emoji: "🎓",
+    description: "Aprendizaje con narrador que engancha",
+    defaultTone: "didáctico",
+    defaultStyle: "storytelling",
+    defaultFormat: "explainer-animated",
+    inputLabel: "Concepto, habilidad o materia + personaje narrador",
+    inputPlaceholder: "Ej: Un detective explica la psicología del engaño, Una bruja explica la química, Un astronauta enseña productividad desde el espacio...",
+    systemRole: "Eres el mejor guionista de contenido educativo con personajes narradores para YouTube. Creas mundos donde un personaje memorable (robot, mago, detective, animal, fantasma) enseña conceptos complejos de forma entretenida y memorable. Combinas la narrativa de Pixar con la pedagogía de Sal Khan.",
+    viralTriggers: ["El personaje que engancha emocionalmente", "La revelación pedagógica", "El método inesperado para enseñar", "El giro que lo cambia todo"],
+    recommendedFormats: ["explainer-animated", "short-tutorial", "mini-documental", "short-hook"],
+  },
+  {
+    id: "lifestyle",
+    name: "Lifestyle & Bienestar",
+    emoji: "✨",
+    description: "Vida sana, productividad, hábitos y bienestar",
+    defaultTone: "inspirador",
+    defaultStyle: "vlog",
+    defaultFormat: "vlog-day",
+    inputLabel: "Hábito, rutina, consejo o transformación",
+    inputPlaceholder: "Ej: Mi rutina de 5am que cambió todo, Cómo dejé de procrastinar para siempre, El método japonés que me cura la ansiedad...",
+    systemRole: "Eres el mejor creador de contenido de lifestyle, productividad y bienestar de YouTube en español. Combinas la honestidad de Ali Abdaal, la energía de Lewis Howes y la profundidad de Jay Shetty adaptado al público hispanohablante. Haces el contenido de bienestar HONESTO, práctico y sin positividad tóxica.",
+    viralTriggers: ["El hábito que cambia todo", "La rutina secreta de los exitosos", "El error que todos cometen", "El resultado en X días", "La verdad incómoda del bienestar"],
+    recommendedFormats: ["vlog-day", "listicle", "short-tutorial", "short-hook", "how-to-step"],
+  },
+  {
+    id: "finanzas",
+    name: "Finanzas & Emprendimiento",
+    emoji: "💰",
+    description: "Dinero, inversión y negocios sin filtros",
+    defaultTone: "directo",
+    defaultStyle: "listicle",
+    defaultFormat: "listicle",
+    inputLabel: "Estrategia financiera, error o secreto de negocios",
+    inputPlaceholder: "Ej: Cómo invertir con 100€, El error que te hace pobre, Los negocios que no requieren capital, Por qué la clase media no ahorra nunca...",
+    systemRole: "Eres el mejor divulgador de finanzas personales y emprendimiento de YouTube en español. Combinas la claridad de Andynsane, la profundidad de Ben Felix y la practicidad de Graham Stephan para el mercado hispano. Eres radical y honesto — no vendes humo.",
+    viralTriggers: ["El secreto que los ricos conocen", "El error financiero del común", "Cómo ganar sin invertir", "La estrategia del 1%", "Lo que nadie te dice del dinero"],
+    recommendedFormats: ["listicle", "how-to-step", "comparison", "short-hook", "explainer-animated"],
+  },
+  {
+    id: "ciencia",
+    name: "Ciencia & Naturaleza",
+    emoji: "🔬",
+    description: "Divulgación científica que vuela la cabeza",
+    defaultTone: "asombrado",
+    defaultStyle: "documental",
+    defaultFormat: "mini-documental",
+    inputLabel: "Fenómeno, descubrimiento o paradoja científica",
+    inputPlaceholder: "Ej: Por qué el espacio huele a bistec, El animal que no puede morir, El descubrimiento que rompió la física, Si el Sol desapareciera ahora mismo...",
+    systemRole: "Eres el mejor divulgador científico de YouTube en español, con el talento de Vsauce para hacer preguntas que explotan el cerebro, la profundidad de Carl Sagan y la accesibilidad de SciShow. Haces la ciencia PERTURBADORAMENTE fascinante.",
+    viralTriggers: ["El dato que te vuela la cabeza", "La pregunta que nadie se hace", "La paradoja científica", "El descubrimiento que cambia todo", "Lo que la ciencia AÚN no entiende"],
+    recommendedFormats: ["mini-documental", "explainer-animated", "short-hook", "listicle"],
+  },
+  {
+    id: "entretenimiento",
+    name: "Entretenimiento & Humor",
+    emoji: "😂",
+    description: "Humor, trends y análisis de cultura pop",
+    defaultTone: "hilarante",
+    defaultStyle: "reacción",
+    defaultFormat: "reaction",
+    inputLabel: "Tendencia, meme, película, serie o fenómeno viral",
+    inputPlaceholder: "Ej: Los peores anuncios de 2026, React a los TikToks más absurdos del año, Por qué [SERIE] no tiene sentido, El ranking de las películas más ridículas...",
+    systemRole: "Eres el mejor creador de entretenimiento de YouTube en español. Dominas el humor situacional, las reacciones auténticas y el análisis de cultura pop con toque cómico. Combinas la energía de Ibai, la profundidad crítica de NostalgiCritic y la accesibilidad de Willyrex pero con contenido más elaborado y guionizado.",
+    viralTriggers: ["La reacción genuina que no esperabas", "El análisis inesperado", "El meme elevado a arte", "La nostalgia inesperada", "El ranking polémico"],
+    recommendedFormats: ["reaction", "listicle", "short-hook", "podcast-clip"],
+  },
+];
+
+// ─── CONTENT TEMPLATES PER CATEGORY ──────────────────────────────────────────
+export interface ContentTemplate {
+  id: string;
+  categoryId: string;
+  name: string;
+  emoji: string;
+  useCase: string;
+  prompt: string;
+}
+
+export const CONTENT_TEMPLATES: ContentTemplate[] = [
+  // ── Política ──
+  ...COMEDY_PROMPTS.map(p => ({ ...p, categoryId: "politica" })),
+
+  // ── Historia ──
+  {
+    id: "historia-dato-secreto",
+    categoryId: "historia",
+    name: "El Dato que Nadie Sabe",
+    emoji: "🕵️",
+    useCase: "Historia con revelación inesperada",
+    prompt: `Narra la historia de [TEMA] revelando UN dato completamente desconocido por el gran público que cambia cómo se ve todo. Estructura: [Dato impactante al inicio] → [Contexto histórico] → [Por qué importa hoy] → [La revelación que reencuadra todo]. Tono épico pero accesible. Velocidad narrativa alta.`,
+  },
+  {
+    id: "historia-personaje-olvidado",
+    categoryId: "historia",
+    name: "El Genio Olvidado",
+    emoji: "🎖️",
+    useCase: "Historia de un personaje histórico que merece reconocimiento",
+    prompt: `Cuenta la historia de [PERSONAJE] como si fuera la película de acción más épica que nadie filmó. Empieza con una escena dramática de su vida. Incluye: quién era, qué logró, por qué la historia lo olvidó, y por qué debería importarnos hoy. Ritmo cinematográfico.`,
+  },
+
+  // ── IA & Tech ──
+  {
+    id: "ia-explica-simple",
+    categoryId: "ia-tech",
+    name: "La IA Explicada Sin Tecnicismos",
+    emoji: "🧩",
+    useCase: "Explicar un concepto técnico de forma viral",
+    prompt: `Explica [CONCEPTO TÉCNICO] como si tu audiencia fueran estudiantes de 15 años inteligentes pero sin conocimientos técnicos. Usa una analogía del mundo real poderosa. Estructura: [Analogía hook] → [Cómo funciona realmente] → [Para qué sirve en la práctica] → [Dato que sorprende]. Sin jerga. Sin condescendencia.`,
+  },
+  {
+    id: "ia-vs-humano",
+    categoryId: "ia-tech",
+    name: "IA vs Humano: El Experimento",
+    emoji: "⚔️",
+    useCase: "Comparativa IA vs humano con resultado sorprendente",
+    prompt: `Diseña un experimento donde [IA/HERRAMIENTA] y un humano experto compiten en [TAREA]. Empieza con el resultado final (quién ganó) y luego narra el proceso. Incluye momentos donde la IA sorprendió, momentos donde falló inesperadamente, y la conclusión honesta sobre lo que esto significa para el futuro.`,
+  },
+
+  // ── Personajes ──
+  {
+    id: "fruta-explica",
+    categoryId: "personajes",
+    name: "La Fruta que Explica el Mundo",
+    emoji: "🍊",
+    useCase: "Una fruta u objeto explicando un concepto complejo",
+    prompt: `Escribe un monólogo en primera persona de [FRUTA/OBJETO] que explica [CONCEPTO ECONÓMICO/SOCIAL/CIENTÍFICO]. El personaje tiene una personalidad exagerada y usa su propia naturaleza como metáfora perfecta. Ej: "Soy un aguacate y voy a explicarte por qué no puedes comprar una casa". El humor viene de la metáfora siendo PERFECTAMENTE acertada.`,
+  },
+  {
+    id: "tipos-como-frutas",
+    categoryId: "personajes",
+    name: "Tipos de [X] como Frutas",
+    emoji: "🫐",
+    useCase: "Clasificación viral de arquetipos usando frutas",
+    prompt: `Crea un vídeo tipo "Los 5 tipos de [TIPO DE PERSONA/TRABAJADOR/SITUACIÓN] como si fueran frutas". Cada fruta debe ser una metáfora perfecta y divertida del arquetipo. El humor viene de lo EXACTAMENTE ACERTADO que es cada comparación. Incluye una descripción visual de cómo se comporta cada "fruta" en situaciones específicas.`,
+  },
+
+  // ── Educativo ──
+  {
+    id: "detective-explica",
+    categoryId: "educativo",
+    name: "El Detective que Investiga",
+    emoji: "🔍",
+    useCase: "Un detective investiga y explica un concepto",
+    prompt: `Un detective (o científico forense) investiga [CONCEPTO/PROBLEMA] como si fuera un crimen. Usa terminología policial aplicada al tema. El "caso" se resuelve enseñando el concepto. Estructura: [El crimen/misterio] → [Pistas/evidencias] → [Sospechosos/teorías] → [La resolución que lo explica todo]. Tono serio pero con humor de noir.`,
+  },
+
+  // ── Lifestyle ──
+  {
+    id: "rutina-secreta",
+    categoryId: "lifestyle",
+    name: "La Rutina Que No Esperabas",
+    emoji: "⏰",
+    useCase: "Rutina o hábito con giro inesperado",
+    prompt: `Presenta una rutina o hábito [TEMA] pero con un giro: empieza mostrando el resultado transformador, luego el proceso contraintuitivo, y finalmente la ciencia que lo explica. El tono es honesto sobre lo que ES difícil y lo que NO lo es. Nada de positividad tóxica. Incluye el fracaso que tuviste antes de que funcionara.`,
+  },
+
+  // ── Finanzas ──
+  {
+    id: "secreto-rico",
+    categoryId: "finanzas",
+    name: "Lo Que Los Ricos Hacen Diferente",
+    emoji: "💎",
+    useCase: "Revelación financiera contraintuitiva",
+    prompt: `Revela UN comportamiento financiero específico que separa a los que construyen riqueza de los que no. Empieza con la estadística o dato impactante, explica la mentalidad detrás, da el paso concreto que puede hacer alguien hoy con cualquier nivel de ingresos, y desmonta el mito más común sobre ese tema. Honesto y sin productos que vender.`,
+  },
+
+  // ── Ciencia ──
+  {
+    id: "pregunta-vsauce",
+    categoryId: "ciencia",
+    name: "La Pregunta que Rompe el Cerebro",
+    emoji: "🌌",
+    useCase: "Pregunta científica fascinante con respuesta que sorprende",
+    prompt: `Empieza con una pregunta aparentemente simple sobre [TEMA] que tiene una respuesta que CAMBIA cómo ves la realidad. Estilo Vsauce: la pregunta lleva a otra pregunta más profunda, hasta revelar algo sobre la naturaleza del universo/vida/mente que es perturbadoramente bello. Incluye un dato científico reciente que nadie conoce.`,
+  },
+
+  // ── Entretenimiento ──
+  {
+    id: "ranking-polemico",
+    categoryId: "entretenimiento",
+    name: "El Ranking Que Va a Enfadar a Alguien",
+    emoji: "🏆",
+    useCase: "Ranking de cultura pop deliberadamente polémico",
+    prompt: `Crea un ranking de [PELÍCULAS/SERIES/CANCIONES/PERSONAJES] que sea deliberadamente polémico pero con argumentos irrebatibles. Para cada posición: el argumento de por qué está ahí, la contradicción obvia que la gente va a gritar en los comentarios, y la defensa brillante que hace el argumento más sólido. El objetivo es DIVIDIR la sección de comentarios de forma positiva.`,
+  },
+];
+
+// ─── CATEGORY PROMPT BUILDER ──────────────────────────────────────────────────
+export function buildCategoryPrompt(categoryId: string, format?: string, templateId?: string): string {
+  const category = CONTENT_CATEGORIES.find(c => c.id === categoryId) || CONTENT_CATEGORIES[0];
+  const formatKB  = format ? VIDEO_FORMATS.find(f => f.id === format) : null;
+  const template  = templateId ? CONTENT_TEMPLATES.find(t => t.id === templateId) : null;
+
+  return `${category.systemRole}
+
+## TU ESPECIALIDAD: ${category.name} ${category.emoji}
+${category.description}
+
+## TRIGGERS VIRALES PARA ESTA CATEGORÍA
+${category.viralTriggers.map((t, i) => `${i + 1}. ${t}`).join("\n")}
+
+## SEÑALES UNIVERSALES DE VIRALIDAD (algoritmo YouTube)
+${VIRALITY_SIGNALS.slice(0, 5).map(s => `${s.rank}. **${s.name}**: ${s.desc}`).join("\n")}
+
+## SEÑALES DEL ALGORITMO 2026
+- CTR objetivo: >4% en nichos competidos
+- Retención media objetivo: >50%
+- Los primeros 30 segundos son críticos — el algoritmo juzga aquí
+- Velocidad de visualizaciones en 24-48h = señal de momentum
+
+## PATRONES DE TÍTULO DE ALTO RENDIMIENTO
+${TITLE_PATTERNS.high_performing.slice(0, 4).map(p => `• ${p.pattern} (${p.avgShareBoost}): "${p.example}"`).join("\n")}
+
+## HOOKS MÁS EFECTIVOS
+${HOOK_FRAMEWORKS.slice(0, 4).map(h => `• **${h.name}**: ${h.template}`).join("\n")}
+
+${formatKB ? `
+## FORMATO SELECCIONADO: ${formatKB.name} ${formatKB.emoji}
+- Duración: ${formatKB.duration} | Aspecto: ${formatKB.aspect}
+- Estructura: ${formatKB.structure.join(" → ")}
+- Tips clave: ${formatKB.tips.slice(0, 3).join("; ")}
+` : ""}
+
+${template ? `## PLANTILLA A APLICAR: ${template.name} ${template.emoji}
+${template.prompt}
+` : ""}`;
+}
+
 // ─── CONTENT TYPE DETECTION PROMPT (from SamurAIGPT highlights.py) ───────────
 export const CONTENT_TYPE_PROMPT = `Analiza este transcript de vídeo y clasifica el tipo de contenido.
 Elige uno: podcast, interview, tutorial, lecture, commentary, debate, vlog, satira, ugc, product_review, other.

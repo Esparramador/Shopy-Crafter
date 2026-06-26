@@ -81,7 +81,9 @@ export default function YouTubeStudio() {
   const [scriptEngine, setScriptEngine] = useState<"grok" | "claude" | "gemini">("grok");
   const [videoFormat, setVideoFormat] = useState("satira-politica");
   const [comedyPromptId, setComedyPromptId] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState<string | null>(null);
   const [trendsSector, setTrendsSector] = useState("general");
+  const [studioCategory, setStudioCategory] = useState("politica");
   const [viralScore, setViralScore] = useState<{ score: number; breakdown: Record<string, number>; recommendations: string[] } | null>(null);
   const [showFormats, setShowFormats] = useState(false);
   const [engines, setEngines] = useState<{ grok: boolean; claude: boolean; gemini: boolean } | null>(null);
@@ -255,9 +257,11 @@ export default function YouTubeStudio() {
           duration: parseInt(scriptForm.duration),
           style: scriptForm.style,
           engine: scriptEngine,
-          format: videoFormat,
+          format: videoFormat || undefined,
           sector: trendsSector !== "general" ? trendsSector : undefined,
           comedyPromptId: comedyPromptId || undefined,
+          templateId: templateId || undefined,
+          category: studioCategory,
         }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
@@ -371,7 +375,7 @@ export default function YouTubeStudio() {
           { id: "videos",   label: "Mis Vídeos",       icon: <Video size={13} /> },
           { id: "search",   label: "Buscar",           icon: <Search size={13} /> },
           { id: "trends",   label: "Tendencias 🔥",   icon: <TrendingUp size={13} /> },
-          { id: "satirico", label: "Satírico IA 🎭",  icon: <Mic size={13} /> },
+          { id: "satirico", label: "Creador IA 🎬",   icon: <Mic size={13} /> },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)}
             style={{ flex: 1, minWidth: 100, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, transition: "all .15s",
@@ -767,50 +771,99 @@ export default function YouTubeStudio() {
         </div>
       )}
 
-      {/* ── TAB: SATÍRICO IA ── */}
-      {tab === "satirico" && (
+      {/* ── TAB: CREADOR IA ── */}
+      {tab === "satirico" && (() => {
+        // ── Inline category definitions (no extra API call) ──────────────────
+        const CATS = [
+          { id: "politica",       emoji: "🏛️", name: "Sátira Política",      desc: "Análisis político con humor", inputLabel: "Noticia o tema político", placeholder: "Ej: Feijóo vs Pedro Sánchez en el debate de las saunas..." },
+          { id: "historia",       emoji: "🏺", name: "Historia",              desc: "Relatos históricos épicos",   inputLabel: "Período, personaje o evento histórico", placeholder: "Ej: Por qué Cleopatra no era egipcia, Los piratas reales..." },
+          { id: "ia-tech",        emoji: "🤖", name: "IA & Tecnología",       desc: "Divulgación tech viral",     inputLabel: "Tema de IA o tecnología", placeholder: "Ej: Claude vs ChatGPT, Cómo funciona un LLM con patatas..." },
+          { id: "personajes",     emoji: "🍋", name: "Personajes & Objetos",  desc: "Frutas/objetos que explican", inputLabel: "Concepto + personaje narrador", placeholder: "Ej: Una manzana explica la inflación, Tipos de jefes como frutas..." },
+          { id: "educativo",      emoji: "🎓", name: "Educativo con Personaje",desc: "Un narrador enseña conceptos", inputLabel: "Concepto + narrador", placeholder: "Ej: Un detective explica la psicología, Una bruja explica la química..." },
+          { id: "lifestyle",      emoji: "✨", name: "Lifestyle & Bienestar", desc: "Hábitos, rutinas, bienestar", inputLabel: "Hábito, rutina o transformación", placeholder: "Ej: Mi rutina de 5am, Cómo dejé de procrastinar para siempre..." },
+          { id: "finanzas",       emoji: "💰", name: "Finanzas & Emprendimiento", desc: "Dinero y negocios sin filtros", inputLabel: "Estrategia financiera o error", placeholder: "Ej: Cómo invertir con 100€, El error que te hace pobre..." },
+          { id: "ciencia",        emoji: "🔬", name: "Ciencia & Naturaleza",  desc: "Divulgación científica viral", inputLabel: "Fenómeno o paradoja científica", placeholder: "Ej: Por qué el espacio huele a bistec, El animal que no muere..." },
+          { id: "entretenimiento",emoji: "😂", name: "Entretenimiento",       desc: "Humor, memes y cultura pop", inputLabel: "Tendencia, meme o fenómeno viral", placeholder: "Ej: Los peores anuncios del año, React a los TikToks más absurdos..." },
+        ];
+        const activeCat = CATS.find(c => c.id === studioCategory) || CATS[0];
+
+        // Templates per category
+        const TEMPLATES: Record<string, Array<{id:string;emoji:string;name:string;desc:string}>> = {
+          politica:  [{ id:"satirico-politico", emoji:"🎙️", name:"Analista Sarcástico", desc:"Estilo El Intermedio" }, { id:"entrevistador-incomodo", emoji:"🎤", name:"Entrevistador Incómodo", desc:"Vox Pop absurdo" }, { id:"detector-hipocresia", emoji:"🔍", name:"Detector Hipocresía", desc:"Fact-checker cómico" }],
+          historia:  [{ id:"historia-dato-secreto", emoji:"🕵️", name:"El Dato Secreto", desc:"Revelación que cambia todo" }, { id:"historia-personaje-olvidado", emoji:"🎖️", name:"El Genio Olvidado", desc:"Personaje histórico olvidado" }],
+          "ia-tech": [{ id:"ia-explica-simple", emoji:"🧩", name:"IA Sin Tecnicismos", desc:"Explicación con analogía" }, { id:"ia-vs-humano", emoji:"⚔️", name:"IA vs Humano", desc:"Experimento comparativo" }],
+          personajes:[{ id:"fruta-explica", emoji:"🍊", name:"La Fruta que Explica", desc:"Objeto/fruta con personalidad" }, { id:"tipos-como-frutas", emoji:"🫐", name:"Tipos como Frutas", desc:"Clasificación viral de arquetipos" }],
+          educativo: [{ id:"detective-explica", emoji:"🔍", name:"El Detective Investiga", desc:"Narrador tipo noir" }],
+          lifestyle: [{ id:"rutina-secreta", emoji:"⏰", name:"La Rutina Inesperada", desc:"Hábito con giro honesto" }],
+          finanzas:  [{ id:"secreto-rico", emoji:"💎", name:"Lo Que Los Ricos Hacen", desc:"Revelación financiera" }],
+          ciencia:   [{ id:"pregunta-vsauce", emoji:"🌌", name:"La Pregunta Que Rompe", desc:"Pregunta estilo Vsauce" }],
+          entretenimiento:[{ id:"ranking-polemico", emoji:"🏆", name:"El Ranking Polémico", desc:"Divide los comentarios" }],
+        };
+        const catTemplates = TEMPLATES[studioCategory] || [];
+        const activeTemplate = templateId ? catTemplates.find(t => t.id === templateId) : null;
+
+        return (
         <div>
-          <div style={{ marginBottom: 20 }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t)" }}>🎭 Generador de Guiones Satíricos</h2>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3)" }}>Convierte una noticia política en guión viral · Estilo El Intermedio · La Resistencia · Wyoming</p>
+          <div style={{ marginBottom: 16 }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--t)" }}>🎬 Creador de Vídeos con IA</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--t3)" }}>Sin tienda requerida · Genera cualquier tipo de vídeo viral · Los archivos se guardan en tu Shopy Crafter</p>
           </div>
 
           {selectedNews && (
             <div style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 10, padding: 12, marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
               <TrendingUp size={14} style={{ color: "var(--gold)", flexShrink: 0, marginTop: 2 }} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600, marginBottom: 2 }}>NOTICIA SELECCIONADA</div>
+                <div style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600, marginBottom: 2 }}>CONTENIDO SELECCIONADO</div>
                 <div style={{ fontSize: 12, color: "var(--t2)" }}>{selectedNews.headline || selectedNews.title}</div>
               </div>
               <button onClick={() => setSelectedNews(null)} style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer" }}><X size={14} /></button>
             </div>
           )}
 
-          {/* ── Comedy Prompts Panel ─────────────────────────────────────────── */}
-          <div style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", marginBottom: 10 }}>🎭 PLANTILLAS DE COMEDIA (activa una para aplicarla)</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {[
-                { id: "satirico-politico",    emoji: "🎙️", name: "Analista Sarcástico",   desc: "Estilo El Intermedio / Daily Show" },
-                { id: "entrevistador-incomodo",emoji: "🎤", name: "Entrevistador Incómodo", desc: "Vox Pop de comedia absurda" },
-                { id: "detector-hipocresia",   emoji: "🔍", name: "Detector de Hipocresía", desc: "Fact-checker cómico para Shorts" },
-              ].map(p => (
-                <button key={p.id} type="button"
-                  onClick={() => setComedyPromptId(comedyPromptId === p.id ? null : p.id)}
+          {/* ── Category Picker ─────────────────────────────────────────────── */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--t3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>🎯 Tipo de contenido</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 7 }}>
+              {CATS.map(cat => (
+                <button key={cat.id} type="button"
+                  onClick={() => { setStudioCategory(cat.id); setTemplateId(null); setComedyPromptId(null); setVideoFormat(cat.id === "politica" ? "satira-politica" : "short-hook"); }}
                   style={{
-                    flex: 1, minWidth: 150, padding: "10px 12px", borderRadius: 10, cursor: "pointer", textAlign: "left",
-                    border: comedyPromptId === p.id ? "2px solid var(--gold)" : "1px solid var(--ink4)",
-                    background: comedyPromptId === p.id ? "rgba(251,191,36,0.12)" : "var(--ink2)",
+                    padding: "8px 10px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                    border: studioCategory === cat.id ? "2px solid var(--gold)" : "1px solid var(--ink4)",
+                    background: studioCategory === cat.id ? "rgba(251,191,36,0.12)" : "var(--ink2)",
                     transition: "all .15s",
                   }}>
-                  <div style={{ fontSize: 18, marginBottom: 2 }}>{p.emoji}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: comedyPromptId === p.id ? "var(--gold)" : "var(--t2)" }}>{p.name}</div>
-                  <div style={{ fontSize: 10, color: "var(--t3)" }}>{p.desc}</div>
-                  {comedyPromptId === p.id && <div style={{ fontSize: 9, color: "var(--gold)", marginTop: 4 }}>✓ ACTIVA</div>}
+                  <div style={{ fontSize: 18, marginBottom: 2 }}>{cat.emoji}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: studioCategory === cat.id ? "var(--gold)" : "var(--t2)", lineHeight: 1.2 }}>{cat.name}</div>
+                  <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2, lineHeight: 1.3 }}>{cat.desc}</div>
                 </button>
               ))}
             </div>
           </div>
+
+          {/* ── Templates for selected category ─────────────────────────────── */}
+          {catTemplates.length > 0 && (
+            <div style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.18)", borderRadius: 12, padding: 12, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", marginBottom: 8 }}>📋 PLANTILLAS — elige una estructura o escribe libre</div>
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                {catTemplates.map(p => (
+                  <button key={p.id} type="button"
+                    onClick={() => setTemplateId(templateId === p.id ? null : p.id)}
+                  style={{
+                    flex: 1, minWidth: 150, padding: "10px 12px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                    border: templateId === p.id ? "2px solid var(--gold)" : "1px solid var(--ink4)",
+                    background: templateId === p.id ? "rgba(251,191,36,0.12)" : "var(--ink2)",
+                    transition: "all .15s",
+                  }}>
+                  <div style={{ fontSize: 18, marginBottom: 2 }}>{p.emoji}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: templateId === p.id ? "var(--gold)" : "var(--t2)" }}>{p.name}</div>
+                  <div style={{ fontSize: 10, color: "var(--t3)" }}>{p.desc}</div>
+                  {templateId === p.id && <div style={{ fontSize: 9, color: "var(--gold)", marginTop: 4 }}>✓ ACTIVA</div>}
+                </button>
+              ))}
+            </div>
+          </div>
+          )}
 
           {/* ── Video Format Selector ─────────────────────────────────────────── */}
           <div style={{ background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 12, marginBottom: 16, overflow: "hidden" }}>
@@ -855,9 +908,12 @@ export default function YouTubeStudio() {
           <form onSubmit={generateScript} style={{ display: "grid", gap: 14, marginBottom: 24 }}>
             {/* Noticia input */}
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>Noticia / Tema a desarrollar *</label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--t2)", marginBottom: 6, display: "block" }}>
+                {activeCat.inputLabel} *
+                {activeTemplate && <span style={{ marginLeft: 8, fontSize: 10, color: "var(--gold)", fontWeight: 400 }}>— Plantilla: {catTemplates.find(t => t.id === templateId)?.name}</span>}
+              </label>
               <textarea value={scriptForm.newsText} onChange={e => setScriptForm(f => ({ ...f, newsText: e.target.value }))}
-                placeholder="Pega un titular, describe el tema, producto, tutorial o idea para el vídeo…"
+                placeholder={selectedNews ? (selectedNews.headline || selectedNews.title) : activeCat.placeholder}
                 rows={3} style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 10, padding: "10px 14px", color: "var(--t)", fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />
             </div>
 
@@ -950,10 +1006,10 @@ export default function YouTubeStudio() {
               {/* Title + meta */}
               <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--ink3)", background: "rgba(251,191,36,0.05)" }}>
                 <div style={{ fontWeight: 800, color: "var(--gold)", fontSize: 15, marginBottom: 6 }}>{scriptResult.title}</div>
-                {scriptResult.comedyTechniques?.length > 0 && (
+                {(scriptResult.contentTechniques || scriptResult.comedyTechniques)?.length > 0 && (
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                    {scriptResult.comedyTechniques.map((t: string) => (
-                      <span key={t} style={{ fontSize: 10, padding: "2px 8px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 20, color: "var(--gold)" }}>🎭 {t}</span>
+                    {(scriptResult.contentTechniques || scriptResult.comedyTechniques).map((t: string) => (
+                      <span key={t} style={{ fontSize: 10, padding: "2px 8px", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 20, color: "var(--gold)" }}>✨ {t}</span>
                     ))}
                   </div>
                 )}
@@ -1208,12 +1264,12 @@ export default function YouTubeStudio() {
           {!scriptResult && !generatingScript && (
             <div style={{ textAlign: "center", padding: 40, color: "var(--t3)" }}>
               <Mic size={32} style={{ marginBottom: 10, opacity: 0.25 }} /><br />
-              <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 4 }}>Introduce una noticia y pulsa Generar</div>
+              <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 4 }}>Elige un tipo de contenido, introduce tu tema y pulsa Generar</div>
               <div style={{ fontSize: 12 }}>O vete a Tendencias 🔥 y pulsa <strong>Satirizar →</strong> en cualquier noticia</div>
             </div>
           )}
         </div>
-      )}
+      ); })()}
     </div>
   );
 }
