@@ -920,7 +920,9 @@ code {
   a, button, input, select, textarea, [role="button"] { cursor: auto !important; }
 
   .app-shell { flex-direction: column; height: 100vh; height: 100dvh; }
-  .hamburger-btn { display: none; }
+
+  /* Hamburger visible en móvil para abrir sidebar como overlay */
+  .hamburger-btn { display: flex !important; }
 
   /* ── Topbar móvil: limpio, accesible, bonito ───────── */
   .topbar { height: 48px; padding: 0 12px; gap: 6px; }
@@ -934,10 +936,48 @@ code {
     display: flex !important;
     align-items: center; justify-content: center;
   }
-  /* Ocultar secciones no-nav del sidebar en la barra horizontal */
+  /* Ocultar secciones no-nav del sidebar en la barra horizontal cerrada */
   .sidebar-label { display: none !important; }
   .sidebar-promo { display: none !important; }
   .sidebar-bottom { display: none !important; }
+
+  /* ── Sidebar overlay completo cuando está abierto en móvil ─── */
+  .sidebar.open {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+    width: 240px !important; min-width: 240px !important;
+    height: 100dvh !important;
+    flex-direction: column !important;
+    overflow-x: hidden !important; overflow-y: auto !important;
+    box-shadow: 4px 0 40px rgba(0,0,0,0.75);
+    animation: mobileSlideIn 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+  @keyframes mobileSlideIn {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(0); }
+  }
+  /* Secciones del sidebar visibles en el overlay abierto */
+  .sidebar.open .sidebar-label { display: block !important; }
+  .sidebar.open .sidebar-promo { display: block !important; }
+  .sidebar.open .sidebar-bottom { display: flex !important; flex-direction: column !important; }
+  /* Nav items: formato vertical en overlay */
+  .sidebar.open .sidebar-nav {
+    flex-direction: column !important;
+    overflow-x: hidden !important; overflow-y: visible !important;
+    padding: 4px 8px !important;
+  }
+  .sidebar.open .nav-item {
+    flex-direction: row !important;
+    height: auto !important; min-width: 0 !important;
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+    justify-content: flex-start !important;
+    border-radius: 8px !important;
+    white-space: normal !important;
+    gap: 10px !important;
+  }
+  .sidebar.open .nav-item .nav-icon { font-size: 15px !important; line-height: 1 !important; }
 
   .sidebar {
     width: 100% !important; height: 52px; min-width: 100%;
