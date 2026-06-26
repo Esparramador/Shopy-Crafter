@@ -56,6 +56,7 @@ const Billing = lazy(() => import("@/pages/admin/Billing"));
 const BrainSync = lazy(() => import("@/pages/admin/BrainSync"));
 const AdStudio = lazy(() => import("@/pages/projects/AdStudio"));
 const AvatarStudio = lazy(() => import("@/pages/admin/AvatarStudio"));
+const YouTubeStudio = lazy(() => import("@/pages/admin/YouTubeStudio"));
 const PromptLibrary = lazy(() => import("@/pages/admin/PromptLibrary"));
 
 const SobreNosotros = lazy(() => import("@/pages/public/SobreNosotros"));
@@ -613,6 +614,9 @@ function Router() {
         </Route>
         <Route path="/admin/deck-builder">
           <RequireAdmin><AdminWrapper><AppLayout><S><DeckBuilder /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/youtube-studio">
+          <RequireAdmin><AdminWrapper><AppLayout><S><YouTubeStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/tienda">
           <RequireAdmin><AdminWrapper><AppLayout><S><TiendaAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>

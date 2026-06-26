@@ -56,6 +56,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Buscador Universal", icon: "🔎", href: "/admin/search" },
   { label: "Template Studio", icon: "🎨", href: "/admin/template-studio" },
   { label: "Avatar Studio", icon: "🎬", href: "/admin/avatar-studio" },
+  { label: "YouTube Studio", icon: "▶️", href: "/admin/youtube-studio" },
   { label: "Meshy Character Lab", icon: "🧊", href: "/admin/meshy-studio" },
   { label: "MCP Manager", icon: "🔌", href: "/admin/mcp-manager" },
 
