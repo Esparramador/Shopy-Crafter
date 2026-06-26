@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Puzzle, Play, Search, Copy, Check, Star, Loader2, AlertCircle, X, ChevronRight, Zap, Shield } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Puzzle, Play, Search, Copy, Check, Star, Loader2, AlertCircle, X, ChevronRight, Zap, Shield, ToggleLeft, ToggleRight, Settings, RefreshCw, CheckCircle, XCircle } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -63,6 +63,18 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+// Mapa en memoria de plugins activos (persiste en sessionStorage)
+const STORAGE_KEY = "sc_active_plugins";
+function loadActivePlugins(): Record<string, boolean> {
+  try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
+}
+function saveActivePlugins(m: Record<string, boolean>) {
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(m)); } catch {}
+}
+
+// Estado de salud real de una integración (ping al backend)
+type HealthStatus = "unknown" | "checking" | "ok" | "error";
+
 export default function PluginsCatalog() {
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +88,11 @@ export default function PluginsCatalog() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<{ total: number; categories: Record<string, number> }>({ total: 0, categories: {} });
   const [showFeatured, setShowFeatured] = useState(false);
+  // Activación real
+  const [activePlugins, setActivePlugins] = useState<Record<string, boolean>>(loadActivePlugins);
+  const [healthMap, setHealthMap] = useState<Record<string, HealthStatus>>({});
+  const [showConfigId, setShowConfigId] = useState<string | null>(null);
+  const [configInputs, setConfigInputs] = useState<Record<string, string>>({});
 
   useEffect(() => { fetchPlugins(); }, []);
 
@@ -93,6 +110,35 @@ export default function PluginsCatalog() {
     }
   }
 
+  const togglePlugin = useCallback(async (pluginId: string) => {
+    const next = !activePlugins[pluginId];
+    const updated = { ...activePlugins, [pluginId]: next };
+    setActivePlugins(updated);
+    saveActivePlugins(updated);
+
+    if (next) {
+      // Verificar salud: ejecutar acción ping/health del plugin
+      setHealthMap(h => ({ ...h, [pluginId]: "checking" }));
+      try {
+        const r = await fetch(`${API_BASE}/api/plugins/${pluginId}/execute`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action: "health_check", config: configInputs }),
+        });
+        const data = await r.json();
+        setHealthMap(h => ({ ...h, [pluginId]: r.ok && !data.error ? "ok" : "error" }));
+        if (r.ok && !data.error && data.output) {
+          setExecResults(prev => ({ ...prev, [`${pluginId}:health`]: data.output }));
+        }
+      } catch {
+        setHealthMap(h => ({ ...h, [pluginId]: "error" }));
+      }
+    } else {
+      setHealthMap(h => ({ ...h, [pluginId]: "unknown" }));
+    }
+  }, [activePlugins, configInputs]);
+
   async function executeAction(pluginId: string, action: string) {
     const key = `${pluginId}:${action}`;
     setExecuting(key);
@@ -101,15 +147,24 @@ export default function PluginsCatalog() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action, config: {} }),
+        body: JSON.stringify({ action, config: configInputs }),
       });
       const data = await r.json();
-      setExecResults(prev => ({ ...prev, [key]: data.result || data.message || JSON.stringify(data, null, 2) }));
+      setExecResults(prev => ({ ...prev, [key]: data.output || data.result || data.message || JSON.stringify(data, null, 2) }));
     } catch (e: unknown) {
       setExecResults(prev => ({ ...prev, [key]: `Error: ${e instanceof Error ? e.message : "Desconocido"}` }));
     } finally {
       setExecuting(null);
     }
+  }
+
+  function healthIcon(id: string) {
+    const s = healthMap[id];
+    if (!activePlugins[id]) return null;
+    if (s === "checking") return <Loader2 size={11} style={{ animation: "spin 0.6s linear infinite", color: "#fbbf24" }} />;
+    if (s === "ok") return <CheckCircle size={11} color="#4ade80" />;
+    if (s === "error") return <XCircle size={11} color="#f87171" />;
+    return <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ade80", display: "inline-block" }} />;
   }
 
   function copyText(text: string, id: string) {
@@ -201,14 +256,31 @@ export default function PluginsCatalog() {
                 const catMeta = CATEGORY_META[plugin.category] || { icon: "🔧", color: "var(--gold)", label: plugin.category };
                 const priceMeta = PRICING_META[plugin.pricing];
                 const isSelected = selected?.id === plugin.id;
+                const isActive = !!activePlugins[plugin.id];
+                const health = healthMap[plugin.id];
                 return (
                   <div
                     key={plugin.id}
+                    style={{ background: isActive ? `${catMeta.color}11` : isSelected ? "var(--s2)" : "var(--s1)", border: isActive ? `1.5px solid ${catMeta.color}` : isSelected ? "1.5px solid var(--border)" : "1px solid var(--border)", borderRadius: 12, padding: 14, transition: "all 0.15s", position: "relative", cursor: "pointer" }}
                     onClick={() => setSelected(plugin)}
-                    style={{ background: isSelected ? `${catMeta.color}11` : "var(--s1)", border: isSelected ? `1.5px solid ${catMeta.color}` : "1px solid var(--border)", borderRadius: 12, padding: 14, cursor: "pointer", transition: "all 0.15s", position: "relative" }}
                   >
-                    {plugin.isFeatured && (
-                      <div style={{ position: "absolute", top: 10, right: 10, fontSize: 11, color: "#fbbf24" }}>⭐</div>
+                    {/* Toggle Activar */}
+                    <button
+                      title={isActive ? "Desactivar plugin" : "Activar plugin"}
+                      onClick={e => { e.stopPropagation(); togglePlugin(plugin.id); }}
+                      style={{ position: "absolute", top: 10, right: 10, background: isActive ? catMeta.color : "var(--s2)", border: "none", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", color: isActive ? "#000" : "var(--t3)", display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      {health === "checking"
+                        ? <Loader2 size={10} style={{ animation: "spin 0.6s linear infinite" }} />
+                        : isActive ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                      {isActive ? "Activo" : "Activar"}
+                    </button>
+                    {/* Health indicator */}
+                    {isActive && health !== "checking" && (
+                      <div style={{ position: "absolute", top: 10, right: 74, display: "flex", alignItems: "center" }}>
+                        {health === "ok" && <CheckCircle size={12} color="#4ade80" title="Operativo" />}
+                        {health === "error" && <XCircle size={12} color="#f87171" title="Error de conexión" />}
+                      </div>
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                       <div style={{ fontSize: 22 }}>{catMeta.icon}</div>
@@ -237,18 +309,85 @@ export default function PluginsCatalog() {
         </div>
 
         {/* Detail Panel */}
-        {selected && (
-          <div style={{ background: "var(--s1)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", alignSelf: "start", position: "sticky", top: 20 }}>
+        {selected && (() => {
+          const isActive = !!activePlugins[selected.id];
+          const health = healthMap[selected.id];
+          const catMeta = CATEGORY_META[selected.category] || { icon: "🔧", color: "var(--gold)", label: selected.category };
+          return (
+          <div style={{ background: "var(--s1)", border: `1px solid ${isActive ? catMeta.color : "var(--border)"}`, borderRadius: 14, overflow: "hidden", alignSelf: "start", position: "sticky", top: 20 }}>
             <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border)", display: "flex", gap: 10, alignItems: "flex-start" }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: "var(--t1)" }}>{selected.name}</div>
                 <div style={{ fontSize: 12, color: "var(--t3)", marginTop: 2 }}>{selected.author} · v{selected.version}</div>
-                <div style={{ marginTop: 6 }}><StarRating rating={selected.rating} /></div>
+                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                  <StarRating rating={selected.rating} />
+                  {isActive && (
+                    <span style={{ fontSize: 10, background: catMeta.color + "22", color: catMeta.color, padding: "2px 8px", borderRadius: 20, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                      {health === "checking" ? <Loader2 size={9} style={{ animation: "spin 0.6s linear infinite" }} /> : health === "ok" ? <CheckCircle size={9} /> : health === "error" ? <XCircle size={9} /> : null}
+                      {health === "ok" ? "Operativo" : health === "error" ? "Error" : health === "checking" ? "Verificando…" : "Activo"}
+                    </span>
+                  )}
+                </div>
               </div>
               <button onClick={() => setSelected(null)} style={{ background: "var(--s2)", border: "none", borderRadius: 6, padding: 6, cursor: "pointer", color: "var(--t3)" }}><X size={14} /></button>
             </div>
             <div style={{ padding: 18, maxHeight: "70vh", overflowY: "auto" }}>
               <div style={{ fontSize: 13, color: "var(--t2)", marginBottom: 14, lineHeight: 1.6 }}>{selected.description}</div>
+
+              {/* Botón Activar/Desactivar principal */}
+              <button
+                onClick={() => togglePlugin(selected.id)}
+                style={{
+                  width: "100%", marginBottom: 14, padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  background: isActive ? "rgba(239,68,68,0.1)" : `linear-gradient(135deg,${catMeta.color},${catMeta.color}cc)`,
+                  border: isActive ? "1px solid rgba(239,68,68,0.3)" : "none",
+                  color: isActive ? "#f87171" : "#000",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                }}
+              >
+                {health === "checking"
+                  ? <><Loader2 size={14} style={{ animation: "spin 0.6s linear infinite" }} /> Verificando conexión…</>
+                  : isActive
+                  ? <><ToggleRight size={16} /> Desactivar plugin</>
+                  : <><ToggleLeft size={16} /> Activar plugin</>
+                }
+              </button>
+
+              {/* Config panel (API keys si tiene) */}
+              {selected.requiredKeys.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <button
+                    onClick={() => setShowConfigId(showConfigId === selected.id ? null : selected.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "var(--t3)", fontSize: 11, cursor: "pointer", fontWeight: 700, marginBottom: 6 }}
+                  >
+                    <Settings size={12} />
+                    {showConfigId === selected.id ? "▲ Ocultar configuración" : "⚙️ Configurar credenciales"}
+                  </button>
+                  {showConfigId === selected.id && (
+                    <div style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, padding: 12 }}>
+                      {selected.requiredKeys.map(k => (
+                        <div key={k} style={{ marginBottom: 8 }}>
+                          <label style={{ fontSize: 11, color: "var(--t3)", display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
+                            <Shield size={10} color="#fbbf24" /> <code style={{ background: "var(--s2)", padding: "1px 6px", borderRadius: 4 }}>{k}</code>
+                          </label>
+                          <input
+                            type="password"
+                            placeholder={`Introduce ${k}…`}
+                            value={configInputs[k] || ""}
+                            onChange={e => setConfigInputs(prev => ({ ...prev, [k]: e.target.value }))}
+                            style={{ width: "100%", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 6, padding: "7px 10px", fontSize: 12, color: "var(--t1)", boxSizing: "border-box" }}
+                          />
+                        </div>
+                      ))}
+                      {execResults[`${selected.id}:health`] && (
+                        <div style={{ marginTop: 8, fontSize: 11, color: "#4ade80", background: "rgba(74,222,128,0.05)", borderRadius: 6, padding: "6px 10px", border: "1px solid rgba(74,222,128,0.2)" }}>
+                          ✅ {execResults[`${selected.id}:health`]}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Capabilities */}
               <div style={{ marginBottom: 14 }}>
@@ -260,22 +399,11 @@ export default function PluginsCatalog() {
                 ))}
               </div>
 
-              {/* Required Keys */}
-              {selected.requiredKeys.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, color: "var(--t4)", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>CLAVES REQUERIDAS</div>
-                  {selected.requiredKeys.map(k => (
-                    <div key={k} style={{ display: "flex", gap: 6, marginBottom: 4, fontSize: 12, color: "#fbbf24" }}>
-                      <Shield size={12} style={{ flexShrink: 0, marginTop: 1 }} />
-                      <code style={{ background: "var(--s2)", borderRadius: 4, padding: "1px 6px" }}>{k}</code>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Actions */}
+              {/* Actions — solo si está activo */}
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: "var(--t4)", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>ACCIONES</div>
+                <div style={{ fontSize: 11, color: "var(--t4)", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  ACCIONES {!isActive && <span style={{ fontWeight: 400, color: "var(--t4)", textTransform: "none" }}>— activa el plugin para ejecutar</span>}
+                </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {selected.actions.map(action => {
                     const key = `${selected.id}:${action}`;
@@ -285,14 +413,15 @@ export default function PluginsCatalog() {
                       <div key={action}>
                         <button
                           onClick={() => executeAction(selected.id, action)}
-                          disabled={!!executing}
-                          style={{ width: "100%", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "var(--t1)", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, textAlign: "left" }}
+                          disabled={!!executing || !isActive}
+                          title={!isActive ? "Activa el plugin primero" : `Ejecutar: ${action}`}
+                          style={{ width: "100%", background: isActive ? "var(--s2)" : "var(--s1)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: isActive ? "var(--t1)" : "var(--t4)", cursor: isActive ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6, textAlign: "left", opacity: isActive ? 1 : 0.5 }}
                         >
-                          {isRunning ? <Loader2 size={12} style={{ animation: "spin 0.6s linear infinite" }} /> : <Play size={12} color="var(--jade)" />}
+                          {isRunning ? <Loader2 size={12} style={{ animation: "spin 0.6s linear infinite" }} /> : <Play size={12} color={isActive ? "var(--jade)" : "var(--t4)"} />}
                           {action}
                         </button>
                         {result && (
-                          <div style={{ marginTop: 4, background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 6, padding: "8px 10px", fontSize: 11, color: "var(--t2)", whiteSpace: "pre-wrap" }}>
+                          <div style={{ marginTop: 4, background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.2)", borderRadius: 6, padding: "8px 10px", fontSize: 11, color: "var(--t2)", whiteSpace: "pre-wrap", maxHeight: 200, overflowY: "auto" }}>
                             {result}
                           </div>
                         )}
@@ -310,7 +439,8 @@ export default function PluginsCatalog() {
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

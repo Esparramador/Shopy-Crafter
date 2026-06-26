@@ -97,6 +97,10 @@ export default function YouTubeStudio() {
   const [voiceCloneName, setVoiceCloneName] = useState("");
   const [showVoiceCloner, setShowVoiceCloner] = useState(false);
   const voiceFileRef = useRef<HTMLInputElement>(null);
+  // ── Avatar / referencia visual ───────────────────────────────────────────
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     title: "", description: "", tags: "", privacy: "public", categoryId: "22",
@@ -1183,6 +1187,84 @@ export default function YouTubeStudio() {
                     </button>
                   </div>
                 )}
+
+                {/* ── Avatar / Referencia Visual ────────────────────────────── */}
+                <div style={{ background: "linear-gradient(135deg,rgba(251,191,36,0.06),rgba(16,185,129,0.06))", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 12, padding: 14, marginBottom: 10 }}>
+                  <div style={{ fontWeight: 700, color: "var(--gold)", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                    🎭 Avatar / Imagen de referencia
+                    <span style={{ fontSize: 10, background: "rgba(251,191,36,0.12)", padding: "2px 8px", borderRadius: 20, color: "var(--gold)" }}>
+                      {studioCategory === "monologuista" ? "Monologuista visual · se usará como portada y prompt de vídeo" : "Referencia visual para el personaje / presentador"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    {/* Preview */}
+                    <div
+                      onClick={() => avatarFileRef.current?.click()}
+                      style={{
+                        width: 100, height: 100, borderRadius: 12, flexShrink: 0, cursor: "pointer",
+                        border: avatarPreview ? "2px solid var(--gold)" : "2px dashed rgba(251,191,36,0.4)",
+                        background: avatarPreview ? "transparent" : "rgba(251,191,36,0.04)",
+                        display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+                        position: "relative",
+                      }}
+                    >
+                      {avatarPreview
+                        ? <img src={avatarPreview} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : <div style={{ textAlign: "center", color: "rgba(251,191,36,0.6)", fontSize: 11 }}>
+                            <div style={{ fontSize: 28, marginBottom: 4 }}>🎭</div>
+                            <div>Subir foto</div>
+                          </div>
+                      }
+                      {avatarPreview && (
+                        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity .2s" }}
+                          onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+                          onMouseLeave={e => (e.currentTarget.style.opacity = "0")}>
+                          <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>Cambiar</span>
+                        </div>
+                      )}
+                    </div>
+                    <input ref={avatarFileRef} type="file" accept="image/*" style={{ display: "none" }}
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        setAvatarFile(f);
+                        const url = URL.createObjectURL(f);
+                        setAvatarPreview(url);
+                      }}
+                    />
+                    {/* Info + acciones */}
+                    <div style={{ flex: 1, fontSize: 12, color: "var(--t2)", lineHeight: 1.6 }}>
+                      {avatarFile ? (
+                        <div>
+                          <div style={{ fontWeight: 700, color: "var(--t1)", marginBottom: 4 }}>✅ {avatarFile.name}</div>
+                          <div style={{ color: "var(--t3)", fontSize: 11, marginBottom: 8 }}>{(avatarFile.size / 1024).toFixed(0)} KB · Se usará como imagen de portada y referencia para generar el vídeo con tu monologuista</div>
+                          {studioCategory === "monologuista" && (
+                            <div style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, padding: "8px 10px", fontSize: 11, color: "var(--t2)" }}>
+                              💡 <strong>Tip:</strong> Usa una foto tuya, un personaje diseñado en Tripo3D, o cualquier imagen que represente al monologuista. Cuanto más expresiva, mejor capturará la IA el estilo.
+                            </div>
+                          )}
+                          <button type="button" onClick={() => { setAvatarFile(null); setAvatarPreview(null); if (avatarFileRef.current) avatarFileRef.current.value = ""; }}
+                            style={{ marginTop: 8, background: "none", border: "1px solid rgba(239,68,68,0.4)", borderRadius: 6, padding: "4px 10px", fontSize: 11, color: "#f87171", cursor: "pointer" }}>
+                            🗑 Quitar imagen
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ marginBottom: 6 }}>Sube una foto de tu avatar/monologuista para:</div>
+                          <ul style={{ margin: 0, paddingLeft: 16, color: "var(--t3)", fontSize: 11 }}>
+                            <li>Usarla como portada del vídeo en YouTube</li>
+                            <li>Dar contexto visual al generador de vídeo IA</li>
+                            {studioCategory === "monologuista" && <li>Referenciar el personaje en el prompt del monólogo</li>}
+                          </ul>
+                          <button type="button" onClick={() => avatarFileRef.current?.click()}
+                            style={{ marginTop: 10, background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 8, padding: "7px 14px", fontSize: 12, color: "var(--gold)", cursor: "pointer", fontWeight: 600 }}>
+                            📁 Seleccionar imagen
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 {/* ── TTS Panel ─────────────────────────────────────────────── */}
                 <div style={{ background: "linear-gradient(135deg,rgba(139,92,246,0.08),rgba(251,191,36,0.06))", border: "1px solid rgba(139,92,246,0.3)", borderRadius: 12, padding: 14 }}>
