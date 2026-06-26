@@ -8,7 +8,7 @@ const router = Router();
 
 router.get("/api-usage/stats", async (req, res): Promise<void> => {
   try {
-    const { from, to, provider } = req.query as Record<string, string>;
+    const { from, to, provider, projectId } = req.query as Record<string, string>;
 
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -24,6 +24,9 @@ router.get("/api-usage/stats", async (req, res): Promise<void> => {
     ];
     if (provider && provider !== "all") {
       conditions.push(eq(apiUsageLogTable.provider, provider));
+    }
+    if (projectId) {
+      conditions.push(eq(apiUsageLogTable.projectId, parseInt(projectId, 10)));
     }
 
     const daily = await db
@@ -59,6 +62,9 @@ router.get("/api-usage/stats", async (req, res): Promise<void> => {
     ];
     if (provider && provider !== "all") {
       lastMonthConditions.push(eq(apiUsageLogTable.provider, provider));
+    }
+    if (projectId) {
+      lastMonthConditions.push(eq(apiUsageLogTable.projectId, parseInt(projectId, 10)));
     }
 
     const [lastTotals] = await db
@@ -99,9 +105,35 @@ router.get("/api-usage/stats", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/api-usage/by-project", async (req, res): Promise<void> => {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const rows = await db
+      .select({
+        projectId:   apiUsageLogTable.projectId,
+        projectName: projectsTable.name,
+        shopDomain:  projectsTable.shopDomain,
+        costUsd:     sql<number>`coalesce(sum(${apiUsageLogTable.costUsd}),0)`,
+        costEur:     sql<number>`coalesce(sum(${apiUsageLogTable.costEur}),0)`,
+        calls:       sql<number>`count(*)`,
+      })
+      .from(apiUsageLogTable)
+      .leftJoin(projectsTable, eq(apiUsageLogTable.projectId, projectsTable.id))
+      .where(gte(apiUsageLogTable.createdAt, monthStart))
+      .groupBy(apiUsageLogTable.projectId, projectsTable.name, projectsTable.shopDomain)
+      .orderBy(desc(sql`sum(${apiUsageLogTable.costUsd})`));
+
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
 router.get("/api-usage/logs", async (req, res): Promise<void> => {
   try {
-    const { from, to, provider, page } = req.query as Record<string, string>;
+    const { from, to, provider, page, projectId } = req.query as Record<string, string>;
     const PAGE_SIZE = 50;
     const pageNum   = Math.max(1, parseInt(page ?? "1", 10));
     const offset    = (pageNum - 1) * PAGE_SIZE;
@@ -118,6 +150,9 @@ router.get("/api-usage/logs", async (req, res): Promise<void> => {
     ];
     if (provider && provider !== "all") {
       conditions.push(eq(apiUsageLogTable.provider, provider));
+    }
+    if (projectId) {
+      conditions.push(eq(apiUsageLogTable.projectId, parseInt(projectId, 10)));
     }
 
     const [{ total }] = await db

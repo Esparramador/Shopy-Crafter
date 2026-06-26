@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
-import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle, ClipboardList, Eye, CreditCard, Sparkles, ChevronRight, RotateCcw } from "lucide-react";
+import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle, ClipboardList, Eye, CreditCard, Sparkles, ChevronRight, RotateCcw, DollarSign, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { timeSince } from "@/lib/utils";
+import { getModelShortName } from "@/lib/model-aliases";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -989,6 +990,148 @@ function PlansModal({ client, onClose }: PlansModalProps) {
   );
 }
 
+// ─── ProjectCostModal ─────────────────────────────────────────────────────────
+interface ProjectCostModalProps { client: User; onClose: () => void; }
+
+const PROVIDER_COLORS: Record<string, string> = {
+  gemini: "#2dd49f", claude: "#c8a84b", openai: "#10a37f",
+  replicate: "#6366f1", runway: "#e779c1", elevenlabs: "#f97316",
+  pagespeed: "#60a5fa", shopify: "#95bf47", other: "#888",
+};
+
+function ProjectCostModal({ client, onClose }: ProjectCostModalProps) {
+  const projectId = client.clientId;
+  const [stats, setStats] = useState<any>(null);
+  const [logs, setLogs]   = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!projectId) return;
+    setLoading(true);
+    Promise.all([
+      fetch(`${API_BASE}/api/api-usage/stats?projectId=${projectId}`, { credentials: "include" }).then(r => r.json()),
+      fetch(`${API_BASE}/api/api-usage/logs?projectId=${projectId}&page=1`, { credentials: "include" }).then(r => r.json()),
+    ]).then(([s, l]) => {
+      setStats(s);
+      setLogs(l.rows ?? []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [projectId]);
+
+  const now = new Date();
+  const monthName = now.toLocaleString("es-ES", { month: "long", year: "numeric" });
+  const cur = stats?.totals?.current;
+  const prev = stats?.totals?.previousMonth;
+  const pct = stats?.totals?.pctChange;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ background: "var(--ink,#0f0f1a)", border: "1px solid var(--bdr,rgba(255,255,255,0.1))", borderRadius: 14, width: "100%", maxWidth: 700, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 48px rgba(0,0,0,0.6)" }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid var(--bdr,rgba(255,255,255,0.08))" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <DollarSign size={16} style={{ color: "var(--gold,#c8a84b)" }} />
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--t,#fff)" }}>Costes IA — {client.name}</h2>
+            </div>
+            <p style={{ margin: "3px 0 0 24px", fontSize: 12, color: "var(--t3,#666)" }}>
+              Proyecto #{projectId} · {monthName}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3,#666)", fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
+        </div>
+
+        <div style={{ padding: "18px 22px" }}>
+          {loading ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+              <Loader2 size={24} style={{ color: "var(--gold,#c8a84b)", animation: "spin 0.6s linear infinite" }} />
+            </div>
+          ) : !projectId ? (
+            <p style={{ textAlign: "center", color: "var(--t3)", padding: 40 }}>Este cliente no tiene proyecto asignado.</p>
+          ) : (
+            <>
+              {/* KPI cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+                <div style={{ background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.18)", borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ fontSize: 10, color: "var(--t3,#666)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Coste este mes</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "var(--gold,#c8a84b)" }}>${Number(cur?.costUsd ?? 0).toFixed(4)}</div>
+                  <div style={{ fontSize: 11, color: "var(--t3,#666)" }}>€{Number(cur?.costEur ?? 0).toFixed(4)}</div>
+                </div>
+                <div style={{ background: "rgba(45,212,159,0.05)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ fontSize: 10, color: "var(--t3,#666)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Llamadas API</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#2dd49f" }}>{Number(cur?.calls ?? 0).toLocaleString("es-ES")}</div>
+                  <div style={{ fontSize: 11, color: "var(--t3,#666)" }}>{(Number(cur?.inputTokens ?? 0) + Number(cur?.outputTokens ?? 0)).toLocaleString("es-ES")} tokens</div>
+                </div>
+                <div style={{ background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ fontSize: 10, color: "var(--t3,#666)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Mes anterior</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#a5b4fc" }}>${Number(prev?.costUsd ?? 0).toFixed(4)}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
+                    {pct === null ? <Minus size={11} style={{ color: "var(--t3)" }} /> : pct > 0 ? <TrendingUp size={11} style={{ color: "#ef4444" }} /> : pct < 0 ? <TrendingDown size={11} style={{ color: "#2dd49f" }} /> : <Minus size={11} style={{ color: "var(--t3)" }} />}
+                    <span style={{ fontSize: 11, color: pct === null ? "var(--t3)" : pct > 0 ? "#ef4444" : pct < 0 ? "#2dd49f" : "var(--t3)" }}>
+                      {pct === null ? "—" : `${pct > 0 ? "+" : ""}${Number(pct).toFixed(1)}%`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Provider breakdown */}
+              {stats?.byProvider && stats.byProvider.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, color: "var(--t3,#666)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Por motor</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {stats.byProvider.map((p: any) => (
+                      <div key={p.provider} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--ink2,#1a1a2e)", border: `1px solid ${PROVIDER_COLORS[p.provider] ?? "#888"}33`, borderRadius: 8, padding: "6px 12px" }}>
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: PROVIDER_COLORS[p.provider] ?? "#888", flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: "var(--t2,#ccc)", fontWeight: 600 }}>{p.provider}</span>
+                        <span style={{ fontSize: 11, color: "var(--gold,#c8a84b)", fontWeight: 700 }}>${Number(p.costUsd).toFixed(4)}</span>
+                        <span style={{ fontSize: 10, color: "var(--t3,#666)" }}>({Number(p.calls)} calls)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent logs */}
+              <div style={{ fontSize: 11, color: "var(--t3,#666)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Últimas operaciones</div>
+              {logs.length === 0 ? (
+                <p style={{ fontSize: 12, color: "var(--t3,#666)", textAlign: "center", padding: 20 }}>Sin actividad este mes.</p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--bdr,rgba(255,255,255,0.08))" }}>
+                        {["Fecha", "Motor", "Modelo", "Operación", "Tokens in/out", "Coste USD"].map(h => (
+                          <th key={h} style={{ padding: "6px 8px", color: "var(--t3,#666)", fontWeight: 600, textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logs.slice(0, 20).map((row: any) => (
+                        <tr key={row.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ padding: "6px 8px", color: "var(--t3,#666)", whiteSpace: "nowrap" }}>
+                            {new Date(row.createdAt).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </td>
+                          <td style={{ padding: "6px 8px" }}>
+                            <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: `${PROVIDER_COLORS[row.provider] ?? "#888"}22`, color: PROVIDER_COLORS[row.provider] ?? "#888", fontWeight: 700 }}>{row.provider}</span>
+                          </td>
+                          <td style={{ padding: "6px 8px", color: "var(--t3,#888)" }} title={row.model ?? undefined}>{getModelShortName(row.model)}</td>
+                          <td style={{ padding: "6px 8px", color: "var(--t2,#ccc)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.operation}>{row.operation}</td>
+                          <td style={{ padding: "6px 8px", color: "var(--t3,#888)", fontFamily: "monospace" }}>{row.inputUnits ?? 0} / {row.outputUnits ?? 0}</td>
+                          <td style={{ padding: "6px 8px", color: "var(--gold,#c8a84b)", fontFamily: "monospace", fontWeight: 600 }}>${Number(row.costUsd ?? 0).toFixed(5)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminClients() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1001,6 +1144,8 @@ export default function AdminClients() {
   const [paymentClient, setPaymentClient] = useState<User | null>(null);
   const [suggestionClient, setSuggestionClient] = useState<User | null>(null);
   const [plansClient, setPlansClient] = useState<User | null>(null);
+  const [costsClient, setCostsClient] = useState<User | null>(null);
+  const [costByProject, setCostByProject] = useState<Record<string, { costUsd: number; calls: number }>>({});
 
   const load = () => {
     fetch(`${API_BASE}/api/admin/users`, { credentials: "include" })
@@ -1009,7 +1154,18 @@ export default function AdminClients() {
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  const loadCosts = () => {
+    fetch(`${API_BASE}/api/api-usage/by-project`, { credentials: "include" })
+      .then(r => r.json())
+      .then((rows: any[]) => {
+        const map: Record<string, { costUsd: number; calls: number }> = {};
+        rows.forEach(r => { if (r.projectId) map[String(r.projectId)] = { costUsd: Number(r.costUsd), calls: Number(r.calls) }; });
+        setCostByProject(map);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => { load(); loadCosts(); }, []);
 
   const toggleActive = async (u: User) => {
     setProcessing(u.id);
@@ -1086,6 +1242,12 @@ export default function AdminClients() {
           onClose={() => setPlansClient(null)}
         />
       )}
+      {costsClient && (
+        <ProjectCostModal
+          client={costsClient}
+          onClose={() => setCostsClient(null)}
+        />
+      )}
 
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
         {/* Header */}
@@ -1138,6 +1300,7 @@ export default function AdminClients() {
                 <tr>
                   <th>Cliente</th>
                   <th>Proyecto</th>
+                  <th>Coste IA (mes)</th>
                   <th>Último acceso</th>
                   <th>Estado</th>
                   <th style={{ textAlign: "right" }}>Acciones</th>
@@ -1161,6 +1324,24 @@ export default function AdminClients() {
                       <span style={{ fontFamily: "var(--fm)", fontSize: 12, color: "var(--t2)" }}>
                         {u.clientId ? `#${u.clientId}` : "–"}
                       </span>
+                    </td>
+                    <td>
+                      {u.clientId && costByProject[u.clientId] ? (
+                        <button
+                          onClick={() => setCostsClient(u)}
+                          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
+                          title="Ver desglose de costes IA"
+                        >
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--gold,#c8a84b)", fontFamily: "monospace" }}>
+                            ${Number(costByProject[u.clientId]!.costUsd).toFixed(4)}
+                          </span>
+                          <span style={{ fontSize: 10, color: "var(--t3,#666)", marginLeft: 4 }}>
+                            ({costByProject[u.clientId]!.calls} calls)
+                          </span>
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 11, color: "var(--t3,#555)" }}>—</span>
+                      )}
                     </td>
                     <td>
                       <span style={{ fontSize: 12, color: "var(--t2)" }}>{timeSince(u.lastLogin)}</span>
@@ -1209,6 +1390,15 @@ export default function AdminClients() {
                             >
                               <CreditCard size={11} />
                               Plan
+                            </button>
+                            <button
+                              onClick={() => setCostsClient(u)}
+                              className="btn btn-sm btn-ghost"
+                              title="Ver costes de IA de este cliente"
+                              style={{ borderColor: "rgba(200,168,75,0.2)", color: "var(--gold)" }}
+                            >
+                              <DollarSign size={11} />
+                              Costes
                             </button>
                           </>
                         )}
