@@ -568,6 +568,11 @@ export default function Landing() {
     const THROTTLE = 700; // ms entre saltos de sección
     let lastNav = 0;
 
+    // Solo activar snap en desktop real: ancho > 900px Y alto > 600px.
+    // En landscape de phone (ej. Pixel ~915×412) el alto < 600, así que
+    // el scroll nativo funciona sin interferencia.
+    const isFullpageMode = () => window.innerWidth > 900 && window.innerHeight > 600;
+
     // Comprueba si el elemento o algún ancestro es scrollable (excluyendo window/body)
     const isInsideScrollable = (el: EventTarget | null): boolean => {
       let node = el as HTMLElement | null;
@@ -590,25 +595,29 @@ export default function Landing() {
       setHashRobust(FP_SECTION_IDS[next]);
     };
 
-    // Wheel
+    // Wheel — solo en desktop
     const onWheel = (e: WheelEvent) => {
+      if (!isFullpageMode()) return;
       if (isInsideScrollable(e.target)) return;
       if (Math.abs(e.deltaY) < 30) return; // ignorar trackpad fino
       e.preventDefault();
       navigate(e.deltaY > 0 ? 1 : -1);
     };
 
-    // Teclado
+    // Teclado — solo en desktop
     const onKey = (e: KeyboardEvent) => {
+      if (!isFullpageMode()) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); navigate(1); }
       if (e.key === "ArrowUp"   || e.key === "PageUp")                    { e.preventDefault(); navigate(-1); }
     };
 
-    // Touch swipe
+    // Touch swipe — solo en desktop (tablets grandes > 900×600)
+    // En phone (portrait o landscape) el scroll nativo es libre.
     let touchStartY = 0;
     const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
     const onTouchEnd   = (e: TouchEvent) => {
+      if (!isFullpageMode()) return;
       if (isInsideScrollable(e.target)) return;
       const dy = touchStartY - e.changedTouches[0].clientY;
       if (Math.abs(dy) < 50) return; // swipe mínimo de 50px
