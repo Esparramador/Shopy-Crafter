@@ -63,7 +63,7 @@ export default function YouTubeStudio() {
   const [activeEmbed, setActiveEmbed] = useState<string | null>(null);
 
   // ── Trends tab state ──────────────────────────────────────────────────────
-  const [trendsData, setTrendsData] = useState<{ news: any[]; formats: any[]; youtubeVideos: any[]; timestamp?: string } | null>(null);
+  const [trendsData, setTrendsData] = useState<{ news: any[]; formats?: any[]; youtubeVideos: any[]; aiYoutubeVideos?: any[]; aiVideoAnalysis?: any[]; timestamp?: string } | null>(null);
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [trendsCountry, setTrendsCountry] = useState("España");
   const [selectedNews, setSelectedNews] = useState<any | null>(null);
@@ -831,24 +831,70 @@ export default function YouTubeStudio() {
                 </div>
               )}
 
-              {/* YouTube trending videos */}
-              {trendsData.youtubeVideos.length > 0 && (
+              {/* ── 🤖 Laboratorio de Vídeos IA Virales ── */}
+              {(trendsData.aiVideoAnalysis?.length ?? 0) > 0 && (
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 14, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ background: "rgba(255,0,0,0.1)", border: "1px solid rgba(255,0,0,0.3)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#ff4444" }}>▶ {trendsData.youtubeVideos.length} VÍDEOS</span>
-                    Trending en YouTube — Sátira Política
+                  <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 14, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.4)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#818cf8" }}>🤖 {trendsData.aiVideoAnalysis!.length} VÍDEOS IA</span>
+                    Laboratorio — Ingeniería Inversa de Virales IA
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 10 }}>
-                    {trendsData.youtubeVideos.map((v: any) => (
-                      <div key={v.videoId} style={{ background: "var(--ink2)", borderRadius: 10, overflow: "hidden", border: "1px solid var(--ink3)" }}>
-                        {v.thumbnail && <img src={v.thumbnail} alt={v.title} style={{ width: "100%", height: 140, objectFit: "cover" }} />}
-                        <div style={{ padding: 10 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t)", marginBottom: 4, lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{v.title}</div>
-                          <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 8 }}>{v.channelTitle} · {Number(v.viewCount || 0).toLocaleString("es")} views</div>
-                          <a href={v.watchUrl} target="_blank" rel="noreferrer"
-                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "rgba(255,0,0,0.15)", borderRadius: 7, fontSize: 11, color: "#ff4444", textDecoration: "none", fontWeight: 600 }}>
-                            <Play size={10} /> Ver vídeo
-                          </a>
+                  <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 12, marginTop: 0 }}>Vídeos reales ya publicados, analizados capa por capa. Pulsa <strong style={{ color: "var(--gold)" }}>Replicar →</strong> para copiar la fórmula al Creador IA.</p>
+                  <div style={{ display: "grid", gap: 14 }}>
+                    {trendsData.aiVideoAnalysis!.map((v: any, i: number) => (
+                      <div key={i} style={{ background: "var(--ink2)", borderRadius: 14, border: "1px solid rgba(99,102,241,0.25)", overflow: "hidden" }}>
+                        {/* Header */}
+                        <div style={{ padding: "12px 14px 10px", display: "flex", gap: 12, alignItems: "flex-start", borderBottom: "1px solid var(--ink3)" }}>
+                          <div style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, background: "rgba(99,102,241,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🤖</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 13, lineHeight: 1.3, marginBottom: 3 }}>{v.title}</div>
+                            <div style={{ fontSize: 11, color: "var(--t3)" }}>
+                              {v.channel && <span style={{ marginRight: 8 }}>📺 {v.channel}</span>}
+                              {v.estimatedViews && <span style={{ color: "var(--jade)" }}>👁 {v.estimatedViews}</span>}
+                            </div>
+                          </div>
+                          <button onClick={() => {
+                            const prompt = [
+                              v.replicationFormula || v.replicationPrompt || "",
+                              v.hook ? `Hook: ${v.hook}` : "",
+                              v.structure ? `Estructura: ${v.structure}` : "",
+                            ].filter(Boolean).join("\n\n");
+                            selectNewsForScript({ headline: v.title, summary: prompt });
+                          }} style={{ flexShrink: 0, padding: "6px 12px", background: "var(--gold)", color: "#000", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                            <Mic size={11} /> Replicar →
+                          </button>
+                        </div>
+                        {/* Analysis grid */}
+                        <div style={{ padding: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          {v.hook && (
+                            <div style={{ background: "rgba(251,191,36,0.07)", borderRadius: 9, padding: "8px 10px", borderLeft: "3px solid var(--gold)" }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>⚡ Hook (primeros 5s)</div>
+                              <div style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.45 }}>{v.hook}</div>
+                            </div>
+                          )}
+                          {v.structure && (
+                            <div style={{ background: "rgba(16,185,129,0.07)", borderRadius: 9, padding: "8px 10px", borderLeft: "3px solid var(--jade)" }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--jade)", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>🏗 Estructura</div>
+                              <div style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.45 }}>{v.structure}</div>
+                            </div>
+                          )}
+                          {v.visualStyle && (
+                            <div style={{ background: "rgba(99,102,241,0.07)", borderRadius: 9, padding: "8px 10px", borderLeft: "3px solid #818cf8" }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "#818cf8", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>🎨 Estilo Visual IA</div>
+                              <div style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.45 }}>{v.visualStyle}</div>
+                            </div>
+                          )}
+                          {v.whyViral && (
+                            <div style={{ background: "rgba(239,68,68,0.07)", borderRadius: 9, padding: "8px 10px", borderLeft: "3px solid #ef4444" }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>🔥 Por qué fue viral</div>
+                              <div style={{ fontSize: 11, color: "var(--t2)", lineHeight: 1.45 }}>{v.whyViral}</div>
+                            </div>
+                          )}
+                          {v.replicationPrompt && (
+                            <div style={{ gridColumn: "1/-1", background: "rgba(0,0,0,0.25)", borderRadius: 9, padding: "8px 10px", border: "1px dashed rgba(251,191,36,0.3)" }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>🎯 Prompt Visual Replicable</div>
+                              <div style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.5, fontFamily: "monospace" }}>{v.replicationPrompt}</div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -856,21 +902,55 @@ export default function YouTubeStudio() {
                 </div>
               )}
 
-              {/* Viral formats */}
-              {trendsData.formats.length > 0 && (
-                <div>
+              {/* ── Vídeos IA reales en YouTube ── */}
+              {(trendsData.aiYoutubeVideos?.length ?? 0) > 0 && (
+                <div style={{ marginBottom: 28 }}>
                   <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 14, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ background: "rgba(16,185,129,0.1)", border: "1px solid var(--jade)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "var(--jade)" }}>🎬 {trendsData.formats.length} FORMATOS</span>
-                    Formatos Virales Más Efectivos Ahora
+                    <span style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#818cf8" }}>🤖 {trendsData.aiYoutubeVideos!.length} REALES</span>
+                    Vídeos IA Virales — Encontrados en YouTube
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 10 }}>
-                    {trendsData.formats.map((f: any, i: number) => (
-                      <div key={i} style={{ background: "var(--ink2)", borderRadius: 10, padding: 14, border: "1px solid var(--ink3)" }}>
-                        <div style={{ fontWeight: 700, color: "var(--jade)", fontSize: 13, marginBottom: 6 }}>{f.name}</div>
-                        {f.description && <div style={{ fontSize: 12, color: "var(--t3)", marginBottom: 8, lineHeight: 1.5 }}>{f.description}</div>}
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {f.avgDuration && <span style={{ fontSize: 10, padding: "2px 7px", background: "var(--ink3)", borderRadius: 5, color: "var(--t3)" }}>⏱ {f.avgDuration}</span>}
-                          {f.engagement && <span style={{ fontSize: 10, padding: "2px 7px", background: "rgba(251,191,36,0.1)", borderRadius: 5, color: "var(--gold)" }}>📈 {f.engagement}</span>}
+                    {trendsData.aiYoutubeVideos!.map((v: any) => (
+                      <div key={v.videoId} style={{ background: "var(--ink2)", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(99,102,241,0.2)" }}>
+                        {v.thumbnail && <img src={v.thumbnail} alt={v.title} style={{ width: "100%", height: 130, objectFit: "cover" }} />}
+                        <div style={{ padding: 10 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t)", marginBottom: 4, lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{v.title}</div>
+                          <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 8 }}>{v.channelTitle} · {Number(v.viewCount || 0).toLocaleString("es")} views</div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <a href={v.watchUrl} target="_blank" rel="noreferrer"
+                              style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "5px 0", background: "rgba(99,102,241,0.15)", borderRadius: 7, fontSize: 11, color: "#818cf8", textDecoration: "none", fontWeight: 600 }}>
+                              <Play size={10} /> Ver
+                            </a>
+                            <button onClick={() => selectNewsForScript({ headline: v.title, summary: `Analiza este vídeo viral de YouTube y crea uno similar: ${v.title} (canal: ${v.channelTitle})` })}
+                              style={{ flex: 1, padding: "5px 0", background: "rgba(251,191,36,0.15)", borderRadius: 7, fontSize: 11, color: "var(--gold)", fontWeight: 700, cursor: "pointer", border: "none" }}>
+                              <Mic size={10} /> Replicar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Trending general en YouTube ── */}
+              {trendsData.youtubeVideos.length > 0 && (
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontWeight: 700, color: "var(--t)", fontSize: 14, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ background: "rgba(255,0,0,0.1)", border: "1px solid rgba(255,0,0,0.3)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#ff4444" }}>▶ {trendsData.youtubeVideos.length} TRENDING</span>
+                    Más Vistos en YouTube — Categoría Seleccionada
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 10 }}>
+                    {trendsData.youtubeVideos.map((v: any) => (
+                      <div key={v.videoId} style={{ background: "var(--ink2)", borderRadius: 10, overflow: "hidden", border: "1px solid var(--ink3)" }}>
+                        {v.thumbnail && <img src={v.thumbnail} alt={v.title} style={{ width: "100%", height: 130, objectFit: "cover" }} />}
+                        <div style={{ padding: 10 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t)", marginBottom: 4, lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{v.title}</div>
+                          <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 8 }}>{v.channelTitle} · {Number(v.viewCount || 0).toLocaleString("es")} views</div>
+                          <a href={v.watchUrl} target="_blank" rel="noreferrer"
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "rgba(255,0,0,0.15)", borderRadius: 7, fontSize: 11, color: "#ff4444", textDecoration: "none", fontWeight: 600 }}>
+                            <Play size={10} /> Ver vídeo
+                          </a>
                         </div>
                       </div>
                     ))}

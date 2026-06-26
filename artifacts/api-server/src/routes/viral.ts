@@ -106,19 +106,42 @@ async function searchYouTubeTrending(query: string, maxResults = 6): Promise<Arr
   }
 }
 
+// ─── Sector → AI video search queries ────────────────────────────────────────
+const AI_VIDEO_QUERIES: Record<string, string> = {
+  general:          "vídeo generado con inteligencia artificial viral youtube 2025 2026 español",
+  politica_satira:  "sátira política inteligencia artificial vídeo viral youtube 2026",
+  tecnologia:       "tutorial tecnología inteligencia artificial vídeo viral youtube 2026",
+  ecommerce_shopify:"vídeo producto tienda online inteligencia artificial viral youtube 2026",
+  fitness_salud:    "rutina fitness inteligencia artificial vídeo viral youtube 2026",
+  moda_belleza:     "moda belleza inteligencia artificial vídeo viral youtube 2026",
+  educacion_cursos: "educación explicación inteligencia artificial vídeo viral youtube 2026",
+};
+
 // ─── GET /viral/trends ────────────────────────────────────────────────────────
 router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) => {
   const country = (req.query.country as string) || "España";
   const sector  = (req.query.sector as string)  || "general";
   try {
     const sectorStrategy = SECTOR_STRATEGIES[sector];
-    const ytQuery = sectorStrategy
+    const ytQuery   = sectorStrategy
       ? `${sectorStrategy.viralTriggers[0]} ${country} 2026`
       : `tendencias virales YouTube ${country} 2026`;
+    const aiQuery   = AI_VIDEO_QUERIES[sector] || AI_VIDEO_QUERIES.general;
 
-    const [newsResult, viralFormats, ytVideosResult] = await Promise.allSettled([
+    const sectorLabel = {
+      general: "cualquier temática",
+      politica_satira: "sátira política",
+      tecnologia: "tecnología e IA",
+      ecommerce_shopify: "ecommerce y Shopify",
+      fitness_salud: "fitness y salud",
+      moda_belleza: "moda y belleza",
+      educacion_cursos: "educación y cursos",
+    }[sector] || sector;
+
+    const [newsResult, aiAnalysisResult, ytVideosResult, aiVideosResult] = await Promise.allSettled([
+      // ── 15 noticias/tendencias ──────────────────────────────────────────────
       askGeminiWithSearch(
-        `Dame las 8 noticias más impactantes e importantes de hoy en ${country}${sector !== "general" ? ` sobre el sector ${sector}` : ""}.
+        `Dame las 15 noticias y tendencias más impactantes e importantes de hoy en ${country}${sector !== "general" ? ` sobre ${sectorLabel}` : ""}.
         Para cada una incluye:
         - titular impactante (máx 80 chars)
         - resumen de 2 líneas
@@ -126,32 +149,58 @@ router.get("/viral/trends", requireAdmin, async (req: Request, res: Response) =>
         - por qué es viral o polémica
         - potencial cómico/satírico (1-10)
         - formato de vídeo recomendado (uno de: Short, Tutorial, Sátira, Reacción, Documental)
-        Devuelve JSON con array "news" de objetos: {headline, summary, protagonists, virality, comedyScore, recommendedFormat}`,
-        "Eres un analista de contenido digital español especializado en detectar tendencias virales.",
+        Devuelve JSON con array "news" de 15 objetos: {headline, summary, protagonists, virality, comedyScore, recommendedFormat}`,
+        "Eres un analista de contenido digital español especializado en detectar tendencias virales. Devuelve EXACTAMENTE 15 elementos en el array news.",
       ),
+      // ── Análisis real de vídeos IA virales ─────────────────────────────────
       askGeminiWithSearch(
-        `Analiza los 5 formatos de vídeo más virales en YouTube, TikTok e Instagram en ${country} esta semana${sector !== "general" ? ` para el sector ${sector}` : ""}.
-        Para cada formato: nombre, descripción breve, duración media, engagement típico, por qué funciona ahora.
-        Devuelve JSON con array "formats": {name, description, avgDuration, engagement, whyWorks, exampleChannel}`,
-        "Eres experto en marketing de contenidos y análisis de tendencias virales en habla hispana.",
+        `Busca y analiza 6 vídeos reales ya publicados en YouTube que sean VIRALES y estén generados o asistidos con inteligencia artificial en la temática de ${sectorLabel} en español.
+
+        Para cada vídeo real encontrado, desglosa en profundidad:
+        1. Título exacto del vídeo y canal
+        2. Número aproximado de views
+        3. Hook (primeros 3-5 segundos): qué dice exactamente, qué imagen aparece, qué emoción dispara
+        4. Estructura del vídeo: cómo está construido (intro / desarrollo / giro / CTA)
+        5. Estilo visual IA: qué tipo de imágenes/animaciones usa (stock realista, anime, 3D, avatares, texto animado, etc.)
+        6. Narración: voz en off (cómo suena), subtítulos, música de fondo
+        7. Por qué fue viral: triggers psicológicos usados (curiosidad, miedo, aspiración, humor, sorpresa, etc.)
+        8. Prompt visual replicable: escribe un prompt exacto de 2-3 frases para generar imágenes/vídeo similares con IA
+        9. Fórmula replicable: cómo yo podría replicar exactamente este vídeo para ${sectorLabel}
+
+        Devuelve JSON con array "aiVideos" de 6 objetos:
+        {title, channel, estimatedViews, thumbnail_desc, hook, structure, visualStyle, narration, whyViral, replicationPrompt, replicationFormula}`,
+        "Eres un experto en ingeniería inversa de vídeos virales de YouTube generados con IA. Tu misión es desmontar cada vídeo capa por capa para que cualquiera pueda replicarlo.",
       ),
-      searchYouTubeTrending(ytQuery, 6),
+      // ── Vídeos trending reales en YouTube ──────────────────────────────────
+      searchYouTubeTrending(ytQuery, 10),
+      // ── Vídeos IA virales reales en YouTube ────────────────────────────────
+      searchYouTubeTrending(aiQuery, 8),
     ]);
 
-    let news: any[] = [];
-    let formats: any[] = [];
-    if (newsResult.status === "fulfilled") {
-      try { const p = JSON.parse(newsResult.value.text.replace(/```json|```/g, "").trim()); news = p.news || []; } catch (_) {}
-    }
-    if (viralFormats.status === "fulfilled") {
-      try { const p = JSON.parse(viralFormats.value.text.replace(/```json|```/g, "").trim()); formats = p.formats || []; } catch (_) {}
-    }
-    const ytVideos = ytVideosResult.status === "fulfilled" ? ytVideosResult.value : [];
+    let news: any[]     = [];
+    let aiVideos: any[] = [];
 
-    await db.execute(sql`INSERT INTO viral_log (action, data) VALUES ('trend_search', ${JSON.stringify({ country, sector, newsCount: news.length })})` );
+    if (newsResult.status === "fulfilled") {
+      try {
+        const p = JSON.parse(newsResult.value.text.replace(/```json|```/g, "").trim());
+        news = p.news || [];
+      } catch (_) {}
+    }
+    if (aiAnalysisResult.status === "fulfilled") {
+      try {
+        const p = JSON.parse(aiAnalysisResult.value.text.replace(/```json|```/g, "").trim());
+        aiVideos = p.aiVideos || [];
+      } catch (_) {}
+    }
+    const ytVideos  = ytVideosResult.status  === "fulfilled" ? ytVideosResult.value  : [];
+    const aiYtVideos = aiVideosResult.status === "fulfilled" ? aiVideosResult.value  : [];
+
+    await db.execute(sql`INSERT INTO viral_log (action, data) VALUES ('trend_search', ${JSON.stringify({ country, sector, newsCount: news.length, aiVideosCount: aiVideos.length })})` );
 
     res.json({
-      news, formats, youtubeVideos: ytVideos, country, sector,
+      news, aiVideoAnalysis: aiVideos,
+      youtubeVideos: ytVideos, aiYoutubeVideos: aiYtVideos,
+      country, sector,
       algorithmSignals: ALGORITHM_SIGNALS,
       timestamp: new Date().toISOString(),
     });
