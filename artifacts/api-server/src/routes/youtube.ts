@@ -53,8 +53,13 @@ const YT_API_KEY = () =>
 const OAUTH = {
   clientId: () => process.env.YOUTUBE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "",
   clientSecret: () => process.env.YOUTUBE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || "",
-  redirectUri: () =>
-    `${process.env.APP_URL || "https://shopycrafter.com"}/api/youtube/oauth/callback`,
+  redirectUri: () => {
+    if (process.env.YOUTUBE_REDIRECT_URI) return process.env.YOUTUBE_REDIRECT_URI;
+    if (process.env.NODE_ENV === "development" && process.env.REPLIT_DEV_DOMAIN) {
+      return `https://${process.env.REPLIT_DEV_DOMAIN}/api/youtube/oauth/callback`;
+    }
+    return `${process.env.APP_URL || "https://shopycrafter.com"}/api/youtube/oauth/callback`;
+  },
 };
 
 async function getValidToken(userId: string): Promise<string | null> {
