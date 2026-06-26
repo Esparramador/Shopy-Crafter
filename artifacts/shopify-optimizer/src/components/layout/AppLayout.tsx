@@ -175,6 +175,23 @@ export function AppLayout({ children }: AppLayoutProps) {
   const locationRef = useRef(location);
   useEffect(() => { locationRef.current = location; }, [location]);
 
+  // SCROLL FIX: Cuando el admin panel está montado, forzar overflow:hidden
+  // en html/body para que Android Chrome delegue el scroll a .main-content
+  // y no intente scrollear el documento (que no se mueve).
+  // Se restaura al desmontar (e.g. navegar a la landing pública).
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, []);
+
   const playBeep = useCallback(() => {
     try {
       const ctx = new AudioContext();

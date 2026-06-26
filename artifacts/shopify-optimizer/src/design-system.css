@@ -69,7 +69,12 @@
 
 /* ── BASE ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* height:100% sin overflow:hidden — el admin AppLayout lo pone vía JS
+     para no romper la landing page pública */
+  height: 100%;
+}
 body {
   font-family: var(--fb);
   background: var(--ink);
@@ -77,6 +82,7 @@ body {
   line-height: 1.6;
   font-size: 14px;
   overflow-x: clip;
+  height: 100%;
   cursor: none;
 }
 a, button, input, select, textarea, [role="button"] { cursor: none; }
@@ -355,6 +361,8 @@ body::after {
   border-bottom: 1px solid var(--bdr);
   position: relative;
   flex-shrink: 0;
+  /* Tabs scroll horizontally — don't intercept vertical pan gestures */
+  touch-action: pan-x;
 }
 .module-tabs-arrow {
   display: flex; align-items: center; justify-content: center;
@@ -919,7 +927,22 @@ code {
   body { cursor: auto !important; }
   a, button, input, select, textarea, [role="button"] { cursor: auto !important; }
 
-  .app-shell { flex-direction: column; height: 100vh; height: 100dvh; }
+  /*
+   * FIX SCROLL MÓVIL — Bug raíz:
+   * Con height:100dvh en el flujo normal, html/body siguen siendo
+   * scroll containers para Android Chrome → el navegador intenta
+   * scrollear el documento (que no se mueve), no el .main-content.
+   *
+   * Solución: position:fixed saca .app-shell del flujo del documento,
+   * document height → 0, el navegador DEBE delegar scroll a .main-content.
+   */
+  .app-shell {
+    flex-direction: column;
+    position: fixed !important;
+    inset: 0 !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+  }
 
   /* Hamburger visible en móvil para abrir sidebar como overlay */
   .hamburger-btn { display: flex !important; }
@@ -940,6 +963,8 @@ code {
   .sidebar-label { display: none !important; }
   .sidebar-promo { display: none !important; }
   .sidebar-bottom { display: none !important; }
+  /* Ocultar el selector de tiendas en la barra horizontal — no hay espacio */
+  .sidebar-clients { display: none !important; }
 
   /* ── Sidebar overlay completo cuando está abierto en móvil ─── */
   .sidebar.open {
@@ -1022,6 +1047,8 @@ code {
     min-height: 0;
     display: flex;
     flex-direction: column;
+    /* Propagar gestos verticales al scroll container hijo (.main-content) */
+    touch-action: pan-y;
   }
 
   /* Section headers: stack title + actions vertically */
@@ -1080,17 +1107,19 @@ code {
 /* ── LANDSCAPE MOBILE (short viewport, landscape) ──────────────────────────── */
 @media (max-height: 550px) and (orientation: landscape) {
   .app-shell {
-    height: auto !important;
-    min-height: 100vh;
-    overflow: visible !important;
+    /* Mantener fixed para no romper la cadena de scroll en landscape */
+    position: fixed !important;
+    inset: 0 !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
   }
   .main-area {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    overflow: visible;
-    padding-top: 44px;
+    overflow: hidden !important;
+    touch-action: pan-y;
   }
   .main-content {
     overflow-y: auto !important;
@@ -1099,7 +1128,6 @@ code {
     padding: 10px;
     flex: 1;
     min-height: 0;
-    height: calc(100dvh - 44px) !important;
   }
   .sidebar {
     position: fixed;
