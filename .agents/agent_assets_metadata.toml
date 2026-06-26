@@ -557,3 +557,9 @@ id = "pyT5wOB0b1Lp237xFSm6O"
 uri = "file://ultimo_frame_landing.jpg"
 type = "image"
 title = "Último frame — vídeo de fondo landing"
+
+[[outputs]]
+id = "8vfYneV-Q2gl2v1a9-Yzk"
+uri = "file://artifacts/shopify-optimizer/public/videos/monologuista_sevillano.mp4"
+type = "video"
+title = "🎤 El Monologuista Sevillano — Turistas en Andalucía"
