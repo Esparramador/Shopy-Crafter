@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini";
+import { recordApiUsage } from "../lib/api-usage.js";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
@@ -511,7 +512,22 @@ router.post("/projects/:projectId/seo/keyword-intelligence", async (req, res): P
     ]);
   
     const searchResults = geminiSearches.map((r, i) => {
-      if (r.status === "fulfilled") return r.value;
+      if (r.status === "fulfilled") {
+        if (r.value.usage) {
+          void recordApiUsage({
+            provider: "gemini",
+            operation: "seo/keywords-research",
+            model: r.value.usage.model,
+            projectId,
+            inputUnits: r.value.usage.inputTokens,
+            outputUnits: r.value.usage.outputTokens,
+            unitsLabel: "tokens",
+            costUsd: r.value.usage.costUsd,
+            success: true,
+          });
+        }
+        return r.value;
+      }
       return { text: `Search ${i + 1} failed`, sources: [], queries: [] };
     });
   
@@ -598,6 +614,19 @@ router.post("/projects/:projectId/seo/blog-strategy", async (req, res): Promise<
         `You are a content strategy researcher. Find REAL trending blog topics, popular questions, and high-performing content in this niche from Google Search. Return specific data from actual search results.`
       );
       trendData = trendSearch.text.slice(0, 4000);
+      if (trendSearch.usage) {
+        void recordApiUsage({
+          provider: "gemini",
+          operation: "seo/blog-strategy",
+          model: trendSearch.usage.model,
+          projectId,
+          inputUnits: trendSearch.usage.inputTokens,
+          outputUnits: trendSearch.usage.outputTokens,
+          unitsLabel: "tokens",
+          costUsd: trendSearch.usage.costUsd,
+          success: true,
+        });
+      }
     } catch { trendData = ""; }
   
     const prompt = `Crea una estrategia de contenido de blog para la tienda "${project?.name}" (nicho: ${niche}, audiencia: ${project?.targetAudience ?? "adultos"}).

@@ -160,6 +160,19 @@ FORMATO DE RESPUESTA — SOLO UN JSON válido, sin texto adicional, sin comentar
         aiText = geminiResult.text;
         sources = geminiResult.sources;
         queries = geminiResult.queries;
+        if (geminiResult.usage) {
+          void recordApiUsage({
+            provider: "gemini",
+            operation: "suppliers/research",
+            model: geminiResult.usage.model,
+            projectId: projectIdNum,
+            inputUnits: geminiResult.usage.inputTokens,
+            outputUnits: geminiResult.usage.outputTokens,
+            unitsLabel: "tokens",
+            costUsd: geminiResult.usage.costUsd,
+            success: true,
+          });
+        }
       }
 
       const geminiParsed = safeJsonParse<{ summary?: string; suppliers?: SupplierJson[] }>(aiText);

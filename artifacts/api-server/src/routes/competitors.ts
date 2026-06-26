@@ -5,6 +5,7 @@ import { eq, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
+import { recordApiUsage } from "../lib/api-usage.js";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
 import net from "net";
@@ -347,6 +348,19 @@ RESPONDE con JSON exacto:
         if (result.text) {
           discovered = parseDiscovered(result.text);
         }
+        if (result.usage) {
+          void recordApiUsage({
+            provider: "gemini",
+            operation: "competitors/discover",
+            model: result.usage.model,
+            projectId: pid,
+            inputUnits: result.usage.inputTokens,
+            outputUnits: result.usage.outputTokens,
+            unitsLabel: "tokens",
+            costUsd: result.usage.costUsd,
+            success: true,
+          });
+        }
         if (discovered.length === 0) {
           logger.info("Competitor auto-discover: Gemini returned empty, falling back to Claude");
           const claudeText = await askClaudeWithBrain(
@@ -548,12 +562,25 @@ DEVUELVE SOLO un JSON válido:
       } catch { /* parsed stays null */ }
     } else {
       try {
-        const { text: aiText, sources: gemSources } = await askGeminiWithSearch(
+        const gemCompResult = await askGeminiWithSearch(
           aiPrompt,
           "Eres un investigador competitivo. Verifica todo con Google. Responde SIEMPRE con JSON estricto, sin texto fuera del JSON. Si un dato no existe, omite el campo.",
         );
-        sources = gemSources;
-        parsed = safeParseJson(aiText);
+        sources = gemCompResult.sources;
+        parsed = safeParseJson(gemCompResult.text);
+        if (gemCompResult.usage) {
+          void recordApiUsage({
+            provider: "gemini",
+            operation: "competitors/report",
+            model: gemCompResult.usage.model,
+            projectId: projectIdNum,
+            inputUnits: gemCompResult.usage.inputTokens,
+            outputUnits: gemCompResult.usage.outputTokens,
+            unitsLabel: "tokens",
+            costUsd: gemCompResult.usage.costUsd,
+            success: true,
+          });
+        }
       } catch (gemErr) {
         logger.warn({ err: String(gemErr) }, "Comparative report: Gemini threw, falling back to Claude");
       }

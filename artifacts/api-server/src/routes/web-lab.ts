@@ -4,6 +4,7 @@ import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { scrapeWebsite, validateUrlWithDnsCheck } from "../lib/web-scraper.js";
 import { runPageSpeedAudit } from "../lib/pagespeed.js";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
+import { recordApiUsage } from "../lib/api-usage.js";
 import { saveToVault } from "../lib/vault.js";
 import { getReportShell, type ReportTemplate } from "./exports.js";
 import { db, projectsTable, projectFilesTable } from "@workspace/db";
@@ -453,6 +454,22 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
           "SEO SERP analyst. Search Google and return REAL ranking data for this website. Report specific page URLs and keyword rankings found."
         ),
       ]);
+
+      for (const r of [brandResult, igResult, competitorResult, sectorResult, encyclopediaResult, reviewsResult, serpResult]) {
+        if (r.status === "fulfilled" && r.value.usage) {
+          void recordApiUsage({
+            provider: "gemini",
+            operation: "web-lab/brand-research",
+            model: r.value.usage.model,
+            projectId: pid || undefined,
+            inputUnits: r.value.usage.inputTokens,
+            outputUnits: r.value.usage.outputTokens,
+            unitsLabel: "tokens",
+            costUsd: r.value.usage.costUsd,
+            success: true,
+          });
+        }
+      }
 
       const parseSafe = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>): Record<string, unknown> | null => {
         if (r.status !== "fulfilled") return null;
