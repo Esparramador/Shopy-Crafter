@@ -2036,7 +2036,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   touch-action: pan-y;
 }
 .fp-section {
-  min-height: auto;
+  min-height: calc(100dvh - 64px);
   position: relative;
   overflow: hidden;
   display: flex;

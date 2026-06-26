@@ -561,6 +561,74 @@ export default function Landing() {
     return () => obs.disconnect();
   }, [content]);
 
+  // ── WHEEL / KEYBOARD / TOUCH scroll entre secciones ──────────────────────
+  useEffect(() => {
+    if (!content) return;
+
+    const THROTTLE = 700; // ms entre saltos de sección
+    let lastNav = 0;
+
+    // Comprueba si el elemento o algún ancestro es scrollable (excluyendo window/body)
+    const isInsideScrollable = (el: EventTarget | null): boolean => {
+      let node = el as HTMLElement | null;
+      while (node && node !== document.body) {
+        const st = window.getComputedStyle(node);
+        const oy = st.overflowY;
+        if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight + 2) return true;
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    const navigate = (delta: 1 | -1) => {
+      const now = Date.now();
+      if (now - lastNav < THROTTLE) return;
+      lastNav = now;
+      const next = Math.max(0, Math.min(currentRef.current + delta, FP_SECTION_IDS.length - 1));
+      if (next === currentRef.current) return;
+      goToSection(next);
+      setHashRobust(FP_SECTION_IDS[next]);
+    };
+
+    // Wheel
+    const onWheel = (e: WheelEvent) => {
+      if (isInsideScrollable(e.target)) return;
+      if (Math.abs(e.deltaY) < 30) return; // ignorar trackpad fino
+      e.preventDefault();
+      navigate(e.deltaY > 0 ? 1 : -1);
+    };
+
+    // Teclado
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); navigate(1); }
+      if (e.key === "ArrowUp"   || e.key === "PageUp")                    { e.preventDefault(); navigate(-1); }
+    };
+
+    // Touch swipe
+    let touchStartY = 0;
+    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
+    const onTouchEnd   = (e: TouchEvent) => {
+      if (isInsideScrollable(e.target)) return;
+      const dy = touchStartY - e.changedTouches[0].clientY;
+      if (Math.abs(dy) < 50) return; // swipe mínimo de 50px
+      navigate(dy > 0 ? 1 : -1);
+    };
+
+    window.addEventListener("wheel",      onWheel,      { passive: false });
+    window.addEventListener("keydown",    onKey);
+    window.addEventListener("touchstart", onTouchStart, { passive: true  });
+    window.addEventListener("touchend",   onTouchEnd,   { passive: true  });
+
+    return () => {
+      window.removeEventListener("wheel",      onWheel);
+      window.removeEventListener("keydown",    onKey);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend",   onTouchEnd);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, goToSection, setHashRobust]);
+
   useEffect(() => {
     if (!content) return;
     const hash = window.location.hash;
