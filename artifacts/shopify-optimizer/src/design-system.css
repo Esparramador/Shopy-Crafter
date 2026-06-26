@@ -375,6 +375,7 @@ body::after {
   position: relative;
 }
 .module-tabs::-webkit-scrollbar { display: none; }
+.cat-pill-bar::-webkit-scrollbar { display: none; }
 .module-tab {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 14px;

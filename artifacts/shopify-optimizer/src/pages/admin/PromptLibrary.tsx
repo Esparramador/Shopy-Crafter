@@ -925,12 +925,14 @@ export default function PromptLibrary() {
         </div>
       )}
 
-      {/* ── CATEGORY EFFECT GRID ── */}
-      <div style={{ marginBottom: 24 }}>
-        <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--t3)", marginBottom: 12 }}>
-          Efectos y Categorías
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+      {/* ── CATEGORY PILL BAR ── */}
+      <div style={{ marginBottom: 20 }}>
+        <div className="cat-pill-bar" style={{
+          display: "flex", alignItems: "center", gap: 6,
+          overflowX: "auto", paddingBottom: 6,
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+        }}>
           {EFFECT_CATEGORIES.map(cat => {
             const isActive = activeCategory === cat.key;
             const libInfo = libIndex.find(l => l.key === cat.key);
@@ -938,35 +940,43 @@ export default function PromptLibrary() {
               <button
                 key={cat.key}
                 onClick={() => handleCategorySelect(cat.key)}
+                title={cat.desc}
                 style={{
-                  padding: "14px 12px", borderRadius: 12, cursor: "pointer",
-                  background: isActive ? `${cat.color}12` : "var(--ink2)",
-                  border: isActive ? `1px solid ${cat.color}50` : "1px solid var(--bdr)",
-                  textAlign: "left", transition: "all 0.15s",
-                  boxShadow: isActive ? `0 0 0 1px ${cat.color}20` : "none",
+                  flexShrink: 0,
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "6px 12px", borderRadius: 20, cursor: "pointer",
+                  background: isActive ? `${cat.color}18` : "var(--ink2)",
+                  border: isActive ? `1px solid ${cat.color}60` : "1px solid var(--bdr)",
+                  color: isActive ? cat.color : "var(--t3)",
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: 12, whiteSpace: "nowrap",
+                  transition: "all 0.15s",
+                  boxShadow: isActive ? `0 0 8px ${cat.color}20` : "none",
                 }}
-                onMouseOver={e => { if (!isActive) { e.currentTarget.style.borderColor = `${cat.color}30`; e.currentTarget.style.background = `${cat.color}06`; } }}
-                onMouseOut={e => { if (!isActive) { e.currentTarget.style.borderColor = "var(--bdr)"; e.currentTarget.style.background = "var(--ink2)"; } }}
+                onMouseOver={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.borderColor = `${cat.color}40`; (e.currentTarget as HTMLButtonElement).style.color = "var(--t)"; } }}
+                onMouseOut={e => { if (!isActive) { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--bdr)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--t3)"; } }}
               >
-                <div style={{ fontSize: 22, marginBottom: 8 }}>{cat.icon}</div>
-                <p style={{ fontSize: 12, fontWeight: 700, color: isActive ? cat.color : "var(--t)", marginBottom: 3 }}>
-                  {cat.label}
-                </p>
-                <p style={{ fontSize: 10, color: "var(--t4)", lineHeight: 1.4, marginBottom: 6 }}>
-                  {cat.desc}
-                </p>
+                <span style={{ fontSize: 14 }}>{cat.icon}</span>
+                <span>{cat.label}</span>
                 {libInfo && (
                   <span style={{
-                    fontSize: 9, padding: "1px 6px", borderRadius: 10,
-                    background: `${cat.color}15`, color: cat.color, fontWeight: 700,
+                    fontSize: 9, padding: "1px 5px", borderRadius: 8,
+                    background: isActive ? `${cat.color}25` : "rgba(255,255,255,0.06)",
+                    color: isActive ? cat.color : "var(--t4)",
+                    fontWeight: 700,
                   }}>
-                    {libInfo.count} templates
+                    {libInfo.count}
                   </span>
                 )}
               </button>
             );
           })}
         </div>
+        {activeCategory && (
+          <p style={{ fontSize: 11, color: "var(--t4)", marginTop: 8, lineHeight: 1.4 }}>
+            {EFFECT_CATEGORIES.find(c => c.key === activeCategory)?.desc}
+          </p>
+        )}
       </div>
 
       {/* ── RESULTS HEADER ── */}
