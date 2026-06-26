@@ -175,7 +175,7 @@ export default function ExplodedViewStudio() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 text-zinc-100 overflow-hidden">
+    <div className="flex flex-col bg-zinc-950 text-zinc-100">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center"><Layers size={18} className="text-white" /></div>

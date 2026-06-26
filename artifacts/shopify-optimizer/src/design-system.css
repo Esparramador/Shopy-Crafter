@@ -904,7 +904,11 @@ code {
   /* Module tabs scroll on tablet */
 
   /* Main content reduced padding */
-  .main-content { padding: 16px; }
+  .main-content {
+    padding: 16px;
+    overflow-x: hidden;
+    touch-action: pan-y;
+  }
 }
 
 /* ── RESPONSIVE MOBILE (≤ 600px) ───────────────────────────────────────────── */
@@ -943,15 +947,17 @@ code {
     padding: 12px;
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y: auto;
     min-height: 0;
+    touch-action: pan-y;
   }
   .grid-2 { grid-template-columns: 1fr !important; }
 
   .main-area {
     min-width: 0;
-    overflow-x: hidden;
+    overflow: hidden;
     flex: 1;
     min-height: 0;
     display: flex;
