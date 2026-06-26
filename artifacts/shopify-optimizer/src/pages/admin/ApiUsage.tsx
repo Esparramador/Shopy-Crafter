@@ -7,6 +7,8 @@ import {
   DollarSign, Zap, Activity, BarChart2, Download, Mail, CheckCircle, AlertCircle,
 } from "lucide-react";
 
+import { getModelShortName } from "../../lib/model-aliases";
+
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const PROVIDERS = ["all", "gemini", "claude", "replicate", "runway", "elevenlabs", "openai", "pagespeed", "shopify", "other"] as const;
@@ -481,8 +483,8 @@ export default function ApiUsage() {
                           {row.provider}
                         </span>
                       </td>
-                      <td style={{ padding: "9px 10px", color: "var(--t3,#888)", fontFamily: "monospace", fontSize: 11 }}>
-                        {row.model ?? "—"}
+                      <td style={{ padding: "9px 10px", color: "var(--t3,#888)", fontSize: 11 }} title={row.model ?? undefined}>
+                        {getModelShortName(row.model)}
                       </td>
                       <td style={{ padding: "9px 10px", color: "var(--t,#ccc)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.operation}>
                         {row.operation}
