@@ -5,7 +5,7 @@ import {
 import {
   TrendingUp, TrendingDown, Minus, RefreshCw, ChevronLeft, ChevronRight,
   DollarSign, Zap, Activity, BarChart2, Download, Mail, CheckCircle, AlertCircle,
-  Bell, BellOff, Save,
+  Bell, BellOff, Save, MessageSquare, X,
 } from "lucide-react";
 
 import { getModelShortName } from "../../lib/model-aliases";
@@ -72,6 +72,41 @@ interface LogRow {
   costEur: number;
   success: number;
   createdAt: string;
+}
+
+interface ChatSession {
+  sessionId: string;
+  provider: string;
+  model: string | null;
+  projectId: number | null;
+  projectName: string | null;
+  messages: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  costEur: number;
+  firstAt: string;
+  lastAt: string;
+}
+
+interface ChatSessionDetail {
+  id: string;
+  model: string | null;
+  provider: string;
+  inputUnits: number;
+  outputUnits: number;
+  costUsd: number;
+  costEur: number;
+  metadata: string | null;
+  createdAt: string;
+}
+
+interface ChatSessionsData {
+  sessions: ChatSession[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 }
 
 interface LogsData {
@@ -165,6 +200,37 @@ export default function ApiUsage() {
   const [alertEnabled,      setAlertEnabled]      = useState(true);
   const [savingAlert,       setSavingAlert]       = useState(false);
 
+  const [chatSessions,      setChatSessions]      = useState<ChatSessionsData | null>(null);
+  const [chatSessionsPage,  setChatSessionsPage]  = useState(1);
+  const [chatSessionsLoad,  setChatSessionsLoad]  = useState(false);
+  const [expandedSession,   setExpandedSession]   = useState<string | null>(null);
+  const [sessionDetail,     setSessionDetail]     = useState<ChatSessionDetail[] | null>(null);
+  const [sessionDetailLoad, setSessionDetailLoad] = useState(false);
+
+  const loadChatSessions = useCallback(async (p: number) => {
+    setChatSessionsLoad(true);
+    try {
+      const qs = new URLSearchParams({ from, to, page: String(p) }).toString();
+      const r = await fetch(`${API_BASE}/api/api-usage/chat-sessions?${qs}`, { credentials: "include" });
+      if (r.ok) setChatSessions(await r.json());
+    } finally {
+      setChatSessionsLoad(false);
+    }
+  }, [from, to]);
+
+  const loadSessionDetail = useCallback(async (sid: string) => {
+    if (expandedSession === sid) { setExpandedSession(null); setSessionDetail(null); return; }
+    setExpandedSession(sid);
+    setSessionDetail(null);
+    setSessionDetailLoad(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/api-usage/chat-session/${encodeURIComponent(sid)}`, { credentials: "include" });
+      if (r.ok) { const d = await r.json(); setSessionDetail(d.rows ?? []); }
+    } finally {
+      setSessionDetailLoad(false);
+    }
+  }, [expandedSession]);
+
   const loadAlertSettings = useCallback(async () => {
     try {
       const r = await fetch(`${API_BASE}/api/api-usage/alert-settings`, { credentials: "include" });
@@ -202,10 +268,12 @@ export default function ApiUsage() {
 
   useEffect(() => {
     setPage(1);
+    setChatSessionsPage(1);
     loadStats();
     loadLogs(1);
+    loadChatSessions(1);
     loadAlertSettings();
-  }, [loadStats, loadLogs, loadAlertSettings]);
+  }, [loadStats, loadLogs, loadChatSessions, loadAlertSettings]);
 
   function handlePageChange(np: number) {
     setPage(np);
@@ -634,6 +702,193 @@ export default function ApiUsage() {
               <span>${alertSettings.thresholdUsd.toFixed(2)}</span>
             </div>
           </div>
+        )}
+      </Card>
+
+      {/* Chat Sessions History */}
+      <Card style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <MessageSquare size={16} style={{ color: "var(--gold,#f59e0b)" }} />
+            <div style={{ fontWeight: 600, color: "var(--t,#fff)", fontSize: 14 }}>
+              Historial de Conversaciones del Chatbot
+              {chatSessions && <span style={{ marginLeft: 8, fontSize: 12, color: "var(--t3,#666)", fontWeight: 400 }}>({fmtNum(chatSessions.total)} sesiones)</span>}
+            </div>
+          </div>
+          <button
+            onClick={() => loadChatSessions(chatSessionsPage)}
+            disabled={chatSessionsLoad}
+            style={{ background: "none", border: "1px solid var(--border,rgba(255,255,255,0.12))", borderRadius: 7, padding: "5px 10px", color: "var(--t3,#888)", cursor: "pointer", fontSize: 12 }}
+          >
+            <RefreshCw size={12} style={{ animation: chatSessionsLoad ? "spin 0.6s linear infinite" : "none" }} />
+          </button>
+        </div>
+
+        {chatSessionsLoad ? (
+          <div style={{ textAlign: "center", padding: "30px 0", color: "var(--t3,#666)", fontSize: 13 }}>Cargando...</div>
+        ) : !chatSessions || chatSessions.sessions.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "30px 0", color: "var(--t3,#666)", fontSize: 13 }}>
+            <MessageSquare size={28} style={{ opacity: 0.2, display: "block", margin: "0 auto 8px" }} />
+            Sin conversaciones registradas en el período. Las próximas respuestas del chatbot admin quedarán guardadas aquí.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {chatSessions.sessions.map((sess) => {
+                const isExpanded = expandedSession === sess.sessionId;
+                const dur = sess.firstAt && sess.lastAt
+                  ? Math.round((new Date(sess.lastAt).getTime() - new Date(sess.firstAt).getTime()) / 60000)
+                  : 0;
+                return (
+                  <div key={sess.sessionId}>
+                    <div
+                      onClick={() => loadSessionDetail(sess.sessionId)}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto auto auto auto auto",
+                        gap: 10, alignItems: "center",
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        background: isExpanded ? "rgba(200,168,75,0.07)" : "transparent",
+                        border: `1px solid ${isExpanded ? "rgba(200,168,75,0.2)" : "rgba(255,255,255,0.04)"}`,
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                      onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                      onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                          <span style={{
+                            display: "inline-flex", alignItems: "center",
+                            background: `${PROVIDER_COLORS[sess.provider] ?? "#888"}22`,
+                            color: PROVIDER_COLORS[sess.provider] ?? "#888",
+                            borderRadius: 4, padding: "1px 6px", fontSize: 10, fontWeight: 700,
+                          }}>{sess.provider}</span>
+                          {sess.projectName && (
+                            <span style={{ fontSize: 11, color: "var(--t3,#777)" }}>{sess.projectName}</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 10, color: "var(--t3,#555)", fontFamily: "monospace" }}>
+                          {sess.sessionId.slice(0, 16)}…
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--t,#fff)" }}>{fmtNum(sess.messages)}</div>
+                        <div style={{ fontSize: 9, color: "var(--t3,#555)", textTransform: "uppercase" }}>msgs</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t3,#888)", fontFamily: "monospace" }}>
+                          {fmtNum(Number(sess.inputTokens) + Number(sess.outputTokens))}
+                        </div>
+                        <div style={{ fontSize: 9, color: "var(--t3,#555)", textTransform: "uppercase" }}>tokens</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold,#f59e0b)", fontFamily: "monospace" }}>
+                          {fmt(sess.costUsd, 4)}
+                        </div>
+                        <div style={{ fontSize: 9, color: "var(--t3,#555)", textTransform: "uppercase" }}>coste</div>
+                      </div>
+                      <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: 11, color: "var(--t3,#777)" }}>
+                          {new Date(sess.lastAt).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                        {dur > 0 && <div style={{ fontSize: 9, color: "var(--t3,#555)" }}>{dur} min</div>}
+                      </div>
+                      <div style={{ color: "var(--t3,#666)", fontSize: 12 }}>
+                        {isExpanded ? <X size={12} /> : <span style={{ opacity: 0.5 }}>▶</span>}
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div style={{
+                        marginLeft: 12, marginBottom: 4,
+                        borderLeft: "2px solid rgba(200,168,75,0.2)",
+                        paddingLeft: 12,
+                      }}>
+                        {sessionDetailLoad ? (
+                          <div style={{ padding: "12px 0", color: "var(--t3,#666)", fontSize: 12 }}>Cargando detalle...</div>
+                        ) : sessionDetail && sessionDetail.length === 0 ? (
+                          <div style={{ padding: "12px 0", color: "var(--t3,#666)", fontSize: 12 }}>Sin detalle disponible</div>
+                        ) : sessionDetail ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "6px 0" }}>
+                            {sessionDetail.map((row, i) => {
+                              let querySnippet = "";
+                              try { querySnippet = JSON.parse(row.metadata ?? "{}").querySnippet ?? ""; } catch {}
+                              return (
+                                <div key={row.id} style={{
+                                  display: "grid", gridTemplateColumns: "auto 1fr auto auto auto",
+                                  gap: 10, alignItems: "center",
+                                  padding: "7px 10px",
+                                  background: "rgba(255,255,255,0.02)", borderRadius: 6,
+                                  border: "1px solid rgba(255,255,255,0.04)",
+                                }}>
+                                  <div style={{ fontSize: 10, color: "var(--t3,#555)", fontWeight: 700, minWidth: 20, textAlign: "center" }}>
+                                    #{i + 1}
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    {querySnippet && (
+                                      <div style={{ fontSize: 11, color: "var(--t3,#888)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {querySnippet}
+                                      </div>
+                                    )}
+                                    <div style={{ fontSize: 10, color: "var(--t3,#555)" }}>
+                                      {getModelShortName(row.model)}
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--t3,#777)", whiteSpace: "nowrap" }}>
+                                    {fmtNum(row.inputUnits)}/{fmtNum(row.outputUnits)} tok
+                                  </div>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--gold,#f59e0b)", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                                    {fmt(row.costUsd, 5)}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "var(--t3,#555)", whiteSpace: "nowrap" }}>
+                                    {new Date(row.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <div style={{
+                              display: "flex", justifyContent: "flex-end", gap: 16,
+                              padding: "6px 10px 2px",
+                              borderTop: "1px solid rgba(255,255,255,0.04)",
+                              fontSize: 11, color: "var(--t3,#666)",
+                            }}>
+                              <span>Total: <strong style={{ color: "var(--gold,#f59e0b)" }}>{fmt(sess.costUsd, 4)}</strong></span>
+                              <span>{fmtNum(Number(sess.inputTokens) + Number(sess.outputTokens))} tokens totales</span>
+                              <span>{fmtEur(sess.costEur, 4)}</span>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {chatSessions.totalPages > 1 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
+                <button
+                  onClick={() => { setChatSessionsPage(p => { const np = p - 1; loadChatSessions(np); return np; }); }}
+                  disabled={chatSessionsPage <= 1}
+                  style={{ background: "none", border: "1px solid var(--border,rgba(255,255,255,0.1))", borderRadius: 6, padding: "5px 10px", color: chatSessionsPage <= 1 ? "var(--t3,#555)" : "var(--t,#fff)", cursor: chatSessionsPage <= 1 ? "not-allowed" : "pointer" }}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span style={{ fontSize: 12, color: "var(--t3,#666)" }}>
+                  Pág. {chatSessionsPage} / {chatSessions.totalPages}
+                </span>
+                <button
+                  onClick={() => { setChatSessionsPage(p => { const np = p + 1; loadChatSessions(np); return np; }); }}
+                  disabled={chatSessionsPage >= chatSessions.totalPages}
+                  style={{ background: "none", border: "1px solid var(--border,rgba(255,255,255,0.1))", borderRadius: 6, padding: "5px 10px", color: chatSessionsPage >= chatSessions.totalPages ? "var(--t3,#555)" : "var(--t,#fff)", cursor: chatSessionsPage >= chatSessions.totalPages ? "not-allowed" : "pointer" }}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </Card>
 

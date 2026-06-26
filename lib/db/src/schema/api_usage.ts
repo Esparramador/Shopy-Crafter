@@ -22,6 +22,7 @@ export const apiUsageLogTable = pgTable(
     success: integer("success").default(1),
     errorMessage: text("error_message"),
     metadata: text("metadata"),
+    sessionId: text("session_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({

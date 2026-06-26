@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
+import { recordApiUsage } from "../lib/api-usage.js";
 import { randomBytes } from "crypto";
 import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable, charactersTable, projectFilesTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
@@ -473,7 +474,7 @@ router.post("/shopybrain/learn", requireAdmin, async (req, res): Promise<void> =
 router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
-    const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute, engineMode } = req.body;
+    const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute, engineMode, chatSessionId } = req.body;
     const validEngines = ["auto", "claude", "gemini", "brain_only", "grok"] as const;
     type EngineMode = typeof validEngines[number];
     const engine: EngineMode = validEngines.includes(engineMode) ? engineMode : "auto";
@@ -1559,7 +1560,35 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
       const cleanAnswer = answer.replace(/:::ACTION:::[\s\S]*?:::END_ACTION:::/g, "").trim();
   
       learnFromConversation(query, cleanAnswer, niche, detectedAction?.action);
-  
+
+      if (searchUsage) {
+        const providerMap: Record<string, "claude" | "gemini" | "grok"> = {
+          "gemini": "gemini",
+          "gemini+search": "gemini",
+          "auto→gemini+search": "gemini",
+          "grok": "grok",
+          "grok-3": "grok",
+          "grok-3-mini": "grok",
+        };
+        const resolvedProvider = Object.keys(providerMap).find(k => engineUsed.includes(k))
+          ? providerMap[Object.keys(providerMap).find(k => engineUsed.includes(k))!]
+          : "claude";
+        const resolvedProjectId = req.body.activeProjectId ? parseInt(req.body.activeProjectId) || null : null;
+        recordApiUsage({
+          provider: resolvedProvider,
+          operation: "chat",
+          model: searchUsage.model,
+          projectId: resolvedProjectId,
+          inputUnits: searchUsage.inputTokens,
+          outputUnits: searchUsage.outputTokens,
+          unitsLabel: "tokens",
+          costUsd: searchUsage.costUsd,
+          success: true,
+          sessionId: typeof chatSessionId === "string" && chatSessionId ? chatSessionId : null,
+          metadata: { engine: engineUsed, querySnippet: String(query ?? "").slice(0, 200) },
+        }).catch(() => {});
+      }
+
       res.json({
         answer: cleanAnswer,
         source: engineUsed,

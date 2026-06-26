@@ -1182,6 +1182,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
+  const chatSessionIdRef = useRef<string>(uuid());
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
 
@@ -2402,7 +2403,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               const fallbackRes = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
                 method: "POST", credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode }),
+                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current }),
               });
               if (fallbackRes.ok) {
                 const fd = await fallbackRes.json();
@@ -2431,7 +2432,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const res = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode }),
+          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current }),
         });
         if (res.ok) {
           const d = await res.json();

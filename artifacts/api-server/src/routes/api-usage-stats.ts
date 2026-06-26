@@ -263,6 +263,95 @@ router.get("/api-usage/export", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/api-usage/chat-sessions", async (req, res): Promise<void> => {
+  try {
+    const { from, to, projectId, page } = req.query as Record<string, string>;
+    const PAGE_SIZE = 30;
+    const pageNum = Math.max(1, parseInt(page ?? "1", 10));
+    const offset  = (pageNum - 1) * PAGE_SIZE;
+
+    const now = new Date();
+    const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+    const rangeFrom = from ? new Date(from) : defaultFrom;
+    const rangeTo   = to   ? new Date(to)   : now;
+
+    const conditions = [
+      gte(apiUsageLogTable.createdAt, rangeFrom),
+      lte(apiUsageLogTable.createdAt, rangeTo),
+      eq(apiUsageLogTable.operation, "chat"),
+    ];
+    if (projectId) {
+      conditions.push(eq(apiUsageLogTable.projectId, parseInt(projectId, 10)));
+    }
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(distinct coalesce(${apiUsageLogTable.sessionId}, ${apiUsageLogTable.id}))` })
+      .from(apiUsageLogTable)
+      .where(and(...conditions));
+
+    const sessions = await db
+      .select({
+        sessionId:   sql<string>`coalesce(${apiUsageLogTable.sessionId}, ${apiUsageLogTable.id})`.as("session_id"),
+        provider:    sql<string>`max(${apiUsageLogTable.provider})`.as("provider"),
+        model:       sql<string>`max(${apiUsageLogTable.model})`.as("model"),
+        projectId:   sql<number>`max(${apiUsageLogTable.projectId})`.as("project_id"),
+        projectName: sql<string>`max(${projectsTable.name})`.as("project_name"),
+        messages:    sql<number>`count(*)`.as("messages"),
+        inputTokens: sql<number>`coalesce(sum(${apiUsageLogTable.inputUnits}),0)`.as("input_tokens"),
+        outputTokens:sql<number>`coalesce(sum(${apiUsageLogTable.outputUnits}),0)`.as("output_tokens"),
+        costUsd:     sql<number>`coalesce(sum(${apiUsageLogTable.costUsd}),0)`.as("cost_usd"),
+        costEur:     sql<number>`coalesce(sum(${apiUsageLogTable.costEur}),0)`.as("cost_eur"),
+        firstAt:     sql<string>`min(${apiUsageLogTable.createdAt})`.as("first_at"),
+        lastAt:      sql<string>`max(${apiUsageLogTable.createdAt})`.as("last_at"),
+      })
+      .from(apiUsageLogTable)
+      .leftJoin(projectsTable, eq(apiUsageLogTable.projectId, projectsTable.id))
+      .where(and(...conditions))
+      .groupBy(sql`coalesce(${apiUsageLogTable.sessionId}, ${apiUsageLogTable.id})`)
+      .orderBy(desc(sql`max(${apiUsageLogTable.createdAt})`))
+      .limit(PAGE_SIZE)
+      .offset(offset);
+
+    res.json({
+      sessions,
+      page: pageNum,
+      pageSize: PAGE_SIZE,
+      total: Number(total),
+      totalPages: Math.ceil(Number(total) / PAGE_SIZE),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
+router.get("/api-usage/chat-session/:sessionId", async (req, res): Promise<void> => {
+  try {
+    const { sessionId } = req.params;
+    const rows = await db
+      .select({
+        id:          apiUsageLogTable.id,
+        model:       apiUsageLogTable.model,
+        provider:    apiUsageLogTable.provider,
+        inputUnits:  apiUsageLogTable.inputUnits,
+        outputUnits: apiUsageLogTable.outputUnits,
+        costUsd:     apiUsageLogTable.costUsd,
+        costEur:     apiUsageLogTable.costEur,
+        metadata:    apiUsageLogTable.metadata,
+        createdAt:   apiUsageLogTable.createdAt,
+      })
+      .from(apiUsageLogTable)
+      .where(and(
+        eq(apiUsageLogTable.sessionId, sessionId),
+        eq(apiUsageLogTable.operation, "chat"),
+      ))
+      .orderBy(apiUsageLogTable.createdAt);
+
+    res.json({ rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
 router.post("/api-usage/send-email", async (req, res): Promise<void> => {
   try {
     if (!isGmailAvailable()) {

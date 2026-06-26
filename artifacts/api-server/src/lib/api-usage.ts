@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { db } from "@workspace/db";
 import { apiUsageLogTable } from "@workspace/db/schema";
 import { logger } from "./logger.js";
+import { sql } from "drizzle-orm";
 
 const USD_TO_EUR = 0.92;
 
@@ -14,6 +15,7 @@ export type ApiProvider =
   | "pagespeed"
   | "shopify"
   | "openai"
+  | "grok"
   | "other";
 
 export interface RecordApiUsageInput {
@@ -29,7 +31,26 @@ export interface RecordApiUsageInput {
   success?: boolean;
   errorMessage?: string | null;
   metadata?: Record<string, unknown> | null;
+  sessionId?: string | null;
 }
+
+let _migrationDone = false;
+
+async function ensureSessionIdColumn(): Promise<void> {
+  if (_migrationDone) return;
+  try {
+    await db.execute(sql`
+      ALTER TABLE api_usage_log
+      ADD COLUMN IF NOT EXISTS session_id TEXT
+    `);
+    _migrationDone = true;
+  } catch (err) {
+    logger.warn({ err: String(err) }, "ensureSessionIdColumn: migration warn (may already exist)");
+    _migrationDone = true;
+  }
+}
+
+ensureSessionIdColumn().catch(() => {});
 
 /**
  * Inserta una fila en api_usage_log. Fire-and-forget: nunca debe lanzar
@@ -55,6 +76,7 @@ export async function recordApiUsage(input: RecordApiUsageInput): Promise<void> 
       success: input.success === false ? 0 : 1,
       errorMessage: input.errorMessage ?? null,
       metadata: input.metadata ? JSON.stringify(input.metadata).slice(0, 4000) : null,
+      sessionId: input.sessionId ?? null,
     });
   } catch (err) {
     logger.warn({ err: String(err), provider: input.provider, op: input.operation }, "recordApiUsage: insert failed");
