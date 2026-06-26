@@ -92,7 +92,9 @@ export default function YouTubeStudio() {
   const [generatingVoice, setGeneratingVoice] = useState(false);
   const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
   const [cloningVoice, setCloningVoice] = useState(false);
-  const [clonedVoices, setClonedVoices] = useState<Array<{voice_id: string; name: string}>>([]);
+  const [clonedVoices, setClonedVoices] = useState<Array<{voice_id: string; name: string}>>([
+    { voice_id: "8m4O8qoFLrKBzbmsuL5T", name: "Sevillano" },
+  ]);
   const [voiceCloneFile, setVoiceCloneFile] = useState<File | null>(null);
   const [voiceCloneName, setVoiceCloneName] = useState("");
   const [showVoiceCloner, setShowVoiceCloner] = useState(false);
@@ -109,6 +111,12 @@ export default function YouTubeStudio() {
   const thumbRef = useRef<HTMLInputElement>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [thumbFile, setThumbFile] = useState<File | null>(null);
+
+  // Carga voces clonadas al montar — para que "Sevillano" aparezca de inmediato
+  useEffect(() => {
+    loadClonedVoices();
+    setStudioVoiceId("8m4O8qoFLrKBzbmsuL5T"); // Sevillano por defecto
+  }, []);
 
   useEffect(() => {
     loadChannel();
@@ -287,7 +295,17 @@ export default function YouTubeStudio() {
   async function loadClonedVoices() {
     try {
       const r = await fetch(`${BASE}/api/voice/cloned`, { credentials: "include" });
-      if (r.ok) { const d = await r.json(); setClonedVoices(d.voices || []); }
+      if (r.ok) {
+        const d = await r.json();
+        const apiVoices: Array<{voice_id: string; name: string}> = d.voices || [];
+        // Fusionar: garantizar que las voces conocidas siempre aparecen
+        const known = [{ voice_id: "8m4O8qoFLrKBzbmsuL5T", name: "Sevillano" }];
+        const merged = [...known];
+        for (const v of apiVoices) {
+          if (!merged.find(m => m.voice_id === v.voice_id)) merged.push(v);
+        }
+        setClonedVoices(merged);
+      }
     } catch {}
   }
 
