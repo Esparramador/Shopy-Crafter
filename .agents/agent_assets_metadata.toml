@@ -551,3 +551,9 @@ id = "R7wYgmQv6X-5NmNoN7V31"
 uri = "file://attached_assets/e2e-test/final_qr_xai.png"
 type = "image"
 title = "✅ QR code (760×760 — endpoint /cards/8/qr.png HTTP 200)"
+
+[[outputs]]
+id = "pyT5wOB0b1Lp237xFSm6O"
+uri = "file://ultimo_frame_landing.jpg"
+type = "image"
+title = "Último frame — vídeo de fondo landing"
