@@ -2746,7 +2746,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                             const icon = isGemini ? "🔬" : isClaude ? "🧠" : "💡";
                             const shortName = getModelShortName(msg.model);
                             return (
-                              <span style={{ fontSize: 8, color, background: bg, border: `1px solid ${color}`, borderRadius: 4, padding: "1px 5px", fontWeight: 600, letterSpacing: "0.3px", whiteSpace: "nowrap" }}>
+                              <span title={msg.model} style={{ fontSize: 8, color, background: bg, border: `1px solid ${color}`, borderRadius: 4, padding: "1px 5px", fontWeight: 600, letterSpacing: "0.3px", whiteSpace: "nowrap", cursor: "help" }}>
                                 {icon} {shortName}
                               </span>
                             );
