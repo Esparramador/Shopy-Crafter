@@ -382,7 +382,7 @@ router.get("/api-usage/chat-summary", async (req, res): Promise<void> => {
     const inputTok    = Number(totals?.inputTokens ?? 0);
     const outputTok   = Number(totals?.outputTokens ?? 0);
     const totalTokens = inputTok + outputTok;
-    const avgTokens   = messages > 0 ? Math.round(totalTokens / messages) : 0;
+    const avgTokens   = sessions > 0 ? Math.round(totalTokens / sessions) : 0;
     const avgCostEur  = sessions > 0 ? costEur / sessions : 0;
 
     res.json({ sessions, messages, costUsd, costEur, totalTokens, avgTokens, avgCostEur });

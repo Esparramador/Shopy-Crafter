@@ -460,7 +460,7 @@ export default function Home() {
           </div>
 
           {/* Chatbot cost summary card */}
-          <Link href="/admin/api-usage">
+          <Link href="/admin/api-usage#chat-sessions">
             <div className="glass-card card-hover" style={{
               padding: "16px", cursor: "pointer",
               background: "linear-gradient(135deg, rgba(45,212,159,0.07) 0%, rgba(0,0,0,0) 100%)",

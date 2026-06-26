@@ -706,7 +706,7 @@ export default function ApiUsage() {
       </Card>
 
       {/* Chat Sessions History */}
-      <Card style={{ marginBottom: 28 }}>
+      <Card id="chat-sessions" style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <MessageSquare size={16} style={{ color: "var(--gold,#f59e0b)" }} />
