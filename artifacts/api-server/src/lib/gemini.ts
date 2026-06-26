@@ -555,7 +555,7 @@ export async function askGeminiWithSearch(
   prompt: string,
   systemInstruction?: string,
   urlsToRead?: string[],
-): Promise<{ text: string; sources: string[]; queries: string[] }> {
+): Promise<{ text: string; sources: string[]; queries: string[]; usage?: { inputTokens: number; outputTokens: number; costUsd: number; model: string } }> {
   const EMPTY = { text: "", sources: [] as string[], queries: [] as string[] };
 
   if (isGeminiSearchBlocked()) {
@@ -621,11 +621,14 @@ export async function askGeminiWithSearch(
 
       const sources = (groundingChunks ?? []).map(c => c.web?.uri ?? "").filter(Boolean);
 
+      let callUsage: { inputTokens: number; outputTokens: number; costUsd: number; model: string } | undefined;
       try {
         const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-        const usage = (response as any).usageMetadata ?? {};
-        const inTok = Number(usage.promptTokenCount) || 0;
-        const outTok = Number(usage.candidatesTokenCount) || 0;
+        const usageMeta = (response as any).usageMetadata ?? {};
+        const inTok = Number(usageMeta.promptTokenCount) || 0;
+        const outTok = Number(usageMeta.candidatesTokenCount) || 0;
+        const cost = calcGeminiCost(geminiFast(), inTok, outTok);
+        callUsage = { inputTokens: inTok, outputTokens: outTok, costUsd: cost, model: geminiFast() };
         void recordApiUsage({
           provider: "gemini",
           operation: "askGeminiWithSearch",
@@ -633,14 +636,14 @@ export async function askGeminiWithSearch(
           inputUnits: inTok,
           outputUnits: outTok,
           unitsLabel: "tokens",
-          costUsd: calcGeminiCost(geminiFast(), inTok, outTok),
+          costUsd: cost,
           metadata: { sources: sources.length, queries: (searchQueries ?? []).length, client: label },
         });
       } catch {}
 
       _searchCircuitOpen = 0;
       logger.info({ label, sources: sources.length }, "[askGeminiWithSearch] Success");
-      return { text: response.text ?? "", sources, queries: searchQueries ?? [] };
+      return { text: response.text ?? "", sources, queries: searchQueries ?? [], usage: callUsage };
     } catch (err) {
       if (isPermissionDenied(err)) {
         logger.warn({ label }, `[askGeminiWithSearch] 403 on ${label} — trying next client`);

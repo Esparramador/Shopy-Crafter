@@ -1490,6 +1490,7 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           "Eres Shopy Crafter, asistente experto de eCommerce Shopify. Responde SIEMPRE en español. Sé directo y accionable."
         );
         answer = geminiRes.text || "Gemini no pudo generar una respuesta. Prueba con otro motor.";
+        if (geminiRes.usage) searchUsage = geminiRes.usage;
         engineUsed = engine === "auto" ? "auto→gemini+search" : "gemini+search";
       } else if (engine === "grok") {
         // Grok (xAI): razonamiento rápido, análisis en tiempo real, perspectiva alternativa
