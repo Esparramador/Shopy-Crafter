@@ -4,15 +4,17 @@ import {
   projectsTable, eventsTable, revenueSnapshotsTable,
   inventoryTrackingTable, competitorsTable, competitorSnapshotsTable, competitorAlertsTable,
   omnicoreMemoriesTable, omnicoreStudySessionsTable, omnicoreKnowledgeDomainsTable,
-  omnicoreInsightsTable, omnicoreCrossConnectionsTable,
+  omnicoreInsightsTable, omnicoreCrossConnectionsTable, platformSettingsTable,
 } from "@workspace/db";
-import { desc, eq, gte, sql, and } from "drizzle-orm";
+import { desc, eq, gte, sql, and, inArray } from "drizzle-orm";
 import { refreshToken, rotateToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
 import { askClaudeWithBrain, buildShopyBrainContext, type BrainUseCase } from "./claude.js";
 import { askGeminiWithSearch } from "./gemini.js";
 import { logger } from "./logger.js";
 import { randomBytes } from "crypto";
+import { sendEmail, isGmailAvailable } from "./gmail.js";
+import { apiUsageLogTable } from "@workspace/db/schema";
 
 let geminiOnly = false;
 
@@ -1023,6 +1025,137 @@ Return ONLY valid JSON:
   }
 }
 
+// ─── AI COST ALERT CHECK ─────────────────────────────────────────────────────
+export async function runAiCostAlertCheck() {
+  log("ai-cost-alert", "🔔 Checking monthly AI spend vs alert threshold");
+  try {
+    const settingKeys = [
+      "ai_cost_alert_threshold_usd",
+      "ai_cost_alert_email",
+      "ai_cost_alert_enabled",
+      "ai_cost_alert_last_sent",
+    ];
+    const rows = await db.select().from(platformSettingsTable)
+      .where(inArray(platformSettingsTable.key, settingKeys));
+
+    const s: Record<string, string> = {};
+    for (const r of rows) s[r.key] = r.value;
+
+    const thresholdUsd = parseFloat(s["ai_cost_alert_threshold_usd"] ?? "0") || 0;
+    const alertEmail   = s["ai_cost_alert_email"] ?? "craftershopy@gmail.com";
+    const enabled      = s["ai_cost_alert_enabled"] !== "false";
+
+    if (!enabled || thresholdUsd <= 0) {
+      log("ai-cost-alert", `⏭️ Skipped — enabled=${enabled}, threshold=$${thresholdUsd}`);
+      return;
+    }
+
+    // Avoid sending more than once per day
+    const lastSent = s["ai_cost_alert_last_sent"] ?? null;
+    const today    = new Date().toISOString().slice(0, 10);
+    if (lastSent === today) {
+      log("ai-cost-alert", "⏭️ Already sent alert today");
+      return;
+    }
+
+    // Monthly totals
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [totals] = await db
+      .select({
+        costUsd: sql<number>`coalesce(sum(${apiUsageLogTable.costUsd}),0)`,
+        calls:   sql<number>`count(*)`,
+      })
+      .from(apiUsageLogTable)
+      .where(gte(apiUsageLogTable.createdAt, monthStart));
+
+    const spentUsd   = Number(totals.costUsd ?? 0);
+    const pctUsed    = thresholdUsd > 0 ? (spentUsd / thresholdUsd) * 100 : 0;
+
+    if (spentUsd < thresholdUsd) {
+      log("ai-cost-alert", `✅ Within budget — $${spentUsd.toFixed(4)} / $${thresholdUsd} (${pctUsed.toFixed(1)}%)`);
+      return;
+    }
+
+    if (!isGmailAvailable()) {
+      log("ai-cost-alert", "⚠️ Gmail not available — cannot send alert");
+      return;
+    }
+
+    // Most expensive provider this month
+    const byProvider = await db
+      .select({
+        provider: apiUsageLogTable.provider,
+        costUsd:  sql<number>`coalesce(sum(${apiUsageLogTable.costUsd}),0)`,
+      })
+      .from(apiUsageLogTable)
+      .where(gte(apiUsageLogTable.createdAt, monthStart))
+      .groupBy(apiUsageLogTable.provider)
+      .orderBy(desc(sql`sum(${apiUsageLogTable.costUsd})`))
+      .limit(5);
+
+    const topProvider = byProvider[0];
+    const monthLabel  = now.toLocaleString("es-ES", { month: "long", year: "numeric" });
+    const subject     = `🚨 Alerta de presupuesto IA — ${monthLabel} superado ($${spentUsd.toFixed(2)})`;
+
+    const providerRows = byProvider.map(p =>
+      `<tr><td style="padding:7px 12px;color:#e8e0cc;">${p.provider}</td><td style="padding:7px 12px;color:#c8a84b;font-weight:700;text-align:right;">$${Number(p.costUsd).toFixed(4)}</td></tr>`
+    ).join("");
+
+    const htmlBody = `
+<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;background:#0f0f1a;color:#e8e0cc;padding:28px;border-radius:14px;">
+  <div style="border-bottom:2px solid rgba(239,68,68,0.4);padding-bottom:16px;margin-bottom:22px;">
+    <h1 style="margin:0;font-size:22px;color:#ef4444;">🚨 Alerta: Presupuesto IA Superado</h1>
+    <p style="margin:6px 0 0;font-size:13px;color:#888;">${monthLabel}</p>
+  </div>
+
+  <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:24px;">
+    <div style="flex:1;min-width:140px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:16px 20px;">
+      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Gasto Actual</div>
+      <div style="font-size:26px;font-weight:700;color:#ef4444;">$${spentUsd.toFixed(4)}</div>
+    </div>
+    <div style="flex:1;min-width:140px;background:rgba(200,168,75,0.06);border:1px solid rgba(200,168,75,0.2);border-radius:10px;padding:16px 20px;">
+      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Umbral Configurado</div>
+      <div style="font-size:26px;font-weight:700;color:#c8a84b;">$${thresholdUsd.toFixed(2)}</div>
+    </div>
+    <div style="flex:1;min-width:140px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);border-radius:10px;padding:16px 20px;">
+      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">% del Umbral</div>
+      <div style="font-size:26px;font-weight:700;color:#ef4444;">${pctUsed.toFixed(1)}%</div>
+    </div>
+  </div>
+
+  ${topProvider ? `<p style="font-size:13px;color:#ccc;margin-bottom:12px;">Motor más caro: <strong style="color:#c8a84b;">${topProvider.provider}</strong> — $${Number(topProvider.costUsd).toFixed(4)}</p>` : ""}
+
+  <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:22px;">
+    <thead>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+        <th style="padding:7px 12px;color:#888;font-weight:600;text-align:left;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;">Motor</th>
+        <th style="padding:7px 12px;color:#888;font-weight:600;text-align:right;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;">Coste USD</th>
+      </tr>
+    </thead>
+    <tbody>${providerRows}</tbody>
+  </table>
+
+  <p style="font-size:12px;color:#666;margin:0;">Accede al panel <strong style="color:#c8a84b;">Costes IA</strong> para más detalles.</p>
+  <p style="font-size:11px;color:#444;margin:16px 0 0;border-top:1px solid rgba(255,255,255,0.06);padding-top:12px;">Powered by Shopy Crafter · craftershopy@gmail.com</p>
+</div>`;
+
+    const sent = await sendEmail(alertEmail, subject, htmlBody);
+    if (sent) {
+      // Mark today as sent
+      await db.insert(platformSettingsTable)
+        .values({ key: "ai_cost_alert_last_sent", value: today, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: platformSettingsTable.key, set: { value: today, updatedAt: new Date() } });
+      log("ai-cost-alert", `✉️ Alert sent to ${alertEmail} — $${spentUsd.toFixed(4)} / $${thresholdUsd} (${pctUsed.toFixed(1)}%)`);
+    } else {
+      log("ai-cost-alert", "❌ Failed to send alert email");
+    }
+  } catch (err) {
+    logger.error({ err }, "AI cost alert check failed");
+  }
+}
+
 // ─── REGISTRO DE TODOS LOS CRON JOBS ─────────────────────────────────────────
 export async function runAdaptiveStudy() {
   log("adaptive-study", "🧠 Starting adaptive study session at 5:30am...");
@@ -1198,8 +1331,12 @@ export function registerCronJobs() {
   // También ejecutar al arrancar para renovar tokens caducados tras reinicio
   setTimeout(() => { runTokenRefresh().catch(e => logger.error(e)); }, 10_000);
 
+  // ── ALERTA DE PRESUPUESTO IA ──────────────────────────────────────────────
+  // 8am diario — Compara gasto mensual vs umbral y envía email si lo supera
+  cron.schedule("0 8 * * *", () => { runAiCostAlertCheck().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
+
   log("scheduler", [
-    "✅ 13 jobs registrados:",
+    "✅ 14 jobs registrados:",
     "  🔑 Tokens Shopify    → cada 20h (renovación con 4h margen)",
     "  ⚡ Micro-learning    → cada 3h  (2 dominios × 3 insights)",
     "  🧠 Consolidación     → cada 6h  (insights → memorias)",
@@ -1210,6 +1347,7 @@ export function registerCronJobs() {
     "  🧪 Adaptive study    → 5:30am  (refuerzo memorias + gaps)",
     "  🔍 Competidores      → 6am     (price scans)",
     "  📦 Inventario        → 7am     (sync + alertas stock)",
+    "  🔔 Alerta presupuesto → 8am    (coste IA vs umbral mensual)",
     "  🚀 Mega-synthesis    → Dom 0am (síntesis estratégica semanal)",
     "  🔄 Retroanálisis     → Dom 3am (re-evaluar insights antiguos)",
     "  📊 Auto-evaluación   → 1º/mes  (informe mensual de rendimiento)",

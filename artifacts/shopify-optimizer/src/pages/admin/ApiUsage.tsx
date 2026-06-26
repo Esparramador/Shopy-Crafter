@@ -5,6 +5,7 @@ import {
 import {
   TrendingUp, TrendingDown, Minus, RefreshCw, ChevronLeft, ChevronRight,
   DollarSign, Zap, Activity, BarChart2, Download, Mail, CheckCircle, AlertCircle,
+  Bell, BellOff, Save,
 } from "lucide-react";
 
 import { getModelShortName } from "../../lib/model-aliases";
@@ -138,6 +139,13 @@ function buildChartData(daily: StatsData["daily"], provider: Provider) {
     .map(([day, vals]) => ({ day: day.slice(5), ...Object.fromEntries(providers.map(p => [p, +(vals[p] ?? 0).toFixed(6)])) }));
 }
 
+interface AlertSettings {
+  thresholdUsd: number;
+  alertEmail:   string;
+  enabled:      boolean;
+  lastSent:     string | null;
+}
+
 export default function ApiUsage() {
   const [from,     setFrom]     = useState(monthStart());
   const [to,       setTo]       = useState(today());
@@ -150,6 +158,25 @@ export default function ApiUsage() {
   const [exporting,   setExporting]   = useState(false);
   const [sending,     setSending]     = useState(false);
   const [toast,       setToast]       = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+
+  const [alertSettings,     setAlertSettings]     = useState<AlertSettings | null>(null);
+  const [alertThreshold,    setAlertThreshold]    = useState("");
+  const [alertEmail,        setAlertEmail]        = useState("");
+  const [alertEnabled,      setAlertEnabled]      = useState(true);
+  const [savingAlert,       setSavingAlert]       = useState(false);
+
+  const loadAlertSettings = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/api-usage/alert-settings`, { credentials: "include" });
+      if (r.ok) {
+        const data: AlertSettings = await r.json();
+        setAlertSettings(data);
+        setAlertThreshold(data.thresholdUsd > 0 ? String(data.thresholdUsd) : "");
+        setAlertEmail(data.alertEmail);
+        setAlertEnabled(data.enabled);
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const loadStats = useCallback(async () => {
     setLoading(true);
@@ -177,11 +204,35 @@ export default function ApiUsage() {
     setPage(1);
     loadStats();
     loadLogs(1);
-  }, [loadStats, loadLogs]);
+    loadAlertSettings();
+  }, [loadStats, loadLogs, loadAlertSettings]);
 
   function handlePageChange(np: number) {
     setPage(np);
     loadLogs(np);
+  }
+
+  async function handleSaveAlert() {
+    setSavingAlert(true);
+    setToast(null);
+    try {
+      const thresholdVal = parseFloat(alertThreshold) || 0;
+      const r = await fetch(`${API_BASE}/api/api-usage/alert-settings`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thresholdUsd: thresholdVal, alertEmail, enabled: alertEnabled }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error ?? `Error ${r.status}`);
+      await loadAlertSettings();
+      setToast({ type: "ok", msg: "✅ Configuración de alerta guardada" });
+    } catch (err) {
+      setToast({ type: "err", msg: `❌ ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setSavingAlert(false);
+      setTimeout(() => setToast(null), 5000);
+    }
   }
 
   async function handleExport() {
@@ -435,6 +486,156 @@ export default function ApiUsage() {
           </div>
         </Card>
       )}
+
+      {/* Budget Alert Panel */}
+      <Card style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: "50%",
+              background: alertEnabled ? "rgba(239,68,68,0.12)" : "rgba(100,100,100,0.1)",
+              border: `1px solid ${alertEnabled ? "rgba(239,68,68,0.3)" : "rgba(100,100,100,0.2)"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: alertEnabled ? "#ef4444" : "#666",
+            }}>
+              {alertEnabled ? <Bell size={15} /> : <BellOff size={15} />}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: "var(--t,#fff)", fontSize: 14 }}>Alerta de Presupuesto Mensual</div>
+              <div style={{ fontSize: 11, color: "var(--t3,#666)", marginTop: 2 }}>
+                Email automático cuando el gasto IA supera el umbral · revisión diaria 8am
+              </div>
+            </div>
+          </div>
+          {alertSettings && stats && alertSettings.thresholdUsd > 0 && (() => {
+            const spent = stats.totals.current.costUsd;
+            const pct   = (spent / alertSettings.thresholdUsd) * 100;
+            const over  = spent >= alertSettings.thresholdUsd;
+            return (
+              <div style={{
+                background: over ? "rgba(239,68,68,0.08)" : "rgba(45,212,159,0.06)",
+                border: `1px solid ${over ? "rgba(239,68,68,0.25)" : "rgba(45,212,159,0.2)"}`,
+                borderRadius: 8, padding: "8px 14px", textAlign: "center",
+              }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: over ? "#ef4444" : "#2dd49f" }}>
+                  {pct.toFixed(1)}%
+                </div>
+                <div style={{ fontSize: 10, color: "var(--t3,#666)", marginTop: 1 }}>
+                  {over ? "⚠️ UMBRAL SUPERADO" : "del umbral usado"}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 12, alignItems: "end" }}>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3,#666)", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>
+              Umbral mensual (USD)
+            </label>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--gold,#f59e0b)", fontSize: 14, fontWeight: 700 }}>$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={alertThreshold}
+                onChange={e => setAlertThreshold(e.target.value)}
+                placeholder="ej. 10.00"
+                style={{
+                  width: "100%", boxSizing: "border-box",
+                  background: "var(--ink,#0f0f1a)", border: "1px solid var(--border,rgba(255,255,255,0.1))",
+                  borderRadius: 8, padding: "9px 10px 9px 26px", color: "var(--t,#fff)", fontSize: 14,
+                  fontWeight: 600,
+                }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3,#666)", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>
+              Email de destino
+            </label>
+            <input
+              type="email"
+              value={alertEmail}
+              onChange={e => setAlertEmail(e.target.value)}
+              placeholder="admin@ejemplo.com"
+              style={{
+                width: "100%", boxSizing: "border-box",
+                background: "var(--ink,#0f0f1a)", border: "1px solid var(--border,rgba(255,255,255,0.1))",
+                borderRadius: 8, padding: "9px 12px", color: "var(--t,#fff)", fontSize: 13,
+              }}
+            />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 2 }}>
+            <button
+              onClick={() => setAlertEnabled(v => !v)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: alertEnabled ? "rgba(45,212,159,0.08)" : "rgba(100,100,100,0.08)",
+                border: `1px solid ${alertEnabled ? "rgba(45,212,159,0.28)" : "rgba(100,100,100,0.2)"}`,
+                borderRadius: 8, padding: "9px 14px",
+                color: alertEnabled ? "#2dd49f" : "#888",
+                cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
+                transition: "all 0.2s",
+              }}
+            >
+              {alertEnabled ? <Bell size={13} /> : <BellOff size={13} />}
+              {alertEnabled ? "Activa" : "Inactiva"}
+            </button>
+          </div>
+
+          <div style={{ paddingBottom: 2 }}>
+            <button
+              onClick={handleSaveAlert}
+              disabled={savingAlert}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: savingAlert ? "rgba(200,168,75,0.06)" : "rgba(200,168,75,0.12)",
+                border: "1px solid rgba(200,168,75,0.35)",
+                borderRadius: 8, padding: "9px 16px",
+                color: savingAlert ? "rgba(200,168,75,0.5)" : "var(--gold,#f59e0b)",
+                cursor: savingAlert ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600,
+                whiteSpace: "nowrap", transition: "all 0.2s",
+              }}
+            >
+              <Save size={13} style={{ animation: savingAlert ? "spin 0.6s linear infinite" : "none" }} />
+              {savingAlert ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        </div>
+
+        {alertSettings?.lastSent && (
+          <div style={{ marginTop: 12, fontSize: 11, color: "var(--t3,#555)" }}>
+            Última alerta enviada: <span style={{ color: "var(--t3,#777)" }}>{alertSettings.lastSent}</span>
+          </div>
+        )}
+
+        {alertSettings && alertSettings.thresholdUsd > 0 && stats && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+              <div style={{
+                height: "100%", borderRadius: 3, transition: "width 0.5s ease",
+                width: `${Math.min(100, (stats.totals.current.costUsd / alertSettings.thresholdUsd) * 100)}%`,
+                background: stats.totals.current.costUsd >= alertSettings.thresholdUsd
+                  ? "linear-gradient(90deg,#ef4444,#dc2626)"
+                  : stats.totals.current.costUsd >= alertSettings.thresholdUsd * 0.8
+                    ? "linear-gradient(90deg,#f59e0b,#d97706)"
+                    : "linear-gradient(90deg,#2dd49f,#10b981)",
+              }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 10, color: "var(--t3,#555)" }}>
+              <span>$0</span>
+              <span style={{ color: stats.totals.current.costUsd >= alertSettings.thresholdUsd ? "#ef4444" : "var(--t3,#555)" }}>
+                ${fmt(stats.totals.current.costUsd, 4)} / ${alertSettings.thresholdUsd.toFixed(2)}
+              </span>
+              <span>${alertSettings.thresholdUsd.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Logs table */}
       <Card>

@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { db, projectsTable } from "@workspace/db";
+import { db, projectsTable, platformSettingsTable } from "@workspace/db";
 import { apiUsageLogTable } from "@workspace/db/schema";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
 import { sendEmailWithAttachment, isGmailAvailable } from "../lib/gmail.js";
 
 const router = Router();
@@ -377,6 +377,51 @@ router.post("/api-usage/send-email", async (req, res): Promise<void> => {
     }
 
     res.json({ ok: true, recipient, rows: rows.length, filename });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
+
+// ─── ALERT SETTINGS ──────────────────────────────────────────────────────────
+
+router.get("/api-usage/alert-settings", async (_req, res): Promise<void> => {
+  try {
+    const keys = ["ai_cost_alert_threshold_usd", "ai_cost_alert_email", "ai_cost_alert_enabled", "ai_cost_alert_last_sent"];
+    const rows = await db.select().from(platformSettingsTable)
+      .where(inArray(platformSettingsTable.key, keys));
+
+    const settings: Record<string, string> = {};
+    for (const r of rows) settings[r.key] = r.value;
+
+    res.json({
+      thresholdUsd:  parseFloat(settings["ai_cost_alert_threshold_usd"] ?? "0") || 0,
+      alertEmail:    settings["ai_cost_alert_email"] ?? "craftershopy@gmail.com",
+      enabled:       settings["ai_cost_alert_enabled"] !== "false",
+      lastSent:      settings["ai_cost_alert_last_sent"] ?? null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Error interno" });
+  }
+});
+
+router.put("/api-usage/alert-settings", async (req, res): Promise<void> => {
+  try {
+    const { thresholdUsd, alertEmail, enabled } = req.body as {
+      thresholdUsd?: number; alertEmail?: string; enabled?: boolean;
+    };
+
+    const upsert = async (key: string, value: string) => {
+      await db.insert(platformSettingsTable)
+        .values({ key, value, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: platformSettingsTable.key, set: { value, updatedAt: new Date() } });
+    };
+
+    if (thresholdUsd !== undefined) await upsert("ai_cost_alert_threshold_usd", String(Math.max(0, Number(thresholdUsd))));
+    if (alertEmail !== undefined)   await upsert("ai_cost_alert_email",           alertEmail.trim());
+    if (enabled !== undefined)      await upsert("ai_cost_alert_enabled",         String(enabled));
+
+    res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err?.message ?? "Error interno" });
   }
