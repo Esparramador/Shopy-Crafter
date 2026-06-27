@@ -16,6 +16,10 @@ import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { execSync, spawn } from "child_process";
+import fs from "fs";
+import path from "path";
+import os from "os";
 
 const router = Router();
 
@@ -458,6 +462,292 @@ router.delete("/youtube/channel", requireAdmin, async (req: Request, res: Respon
     await db.execute(sql`DELETE FROM youtube_tokens WHERE user_id = ${userId}`);
     return res.json({ success: true });
   } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODELO IA PIPELINE — download reference clip → ElevenLabs dubbing → face-swap
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const uploadModel = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const ELEVEN_KEY = () => process.env.ELEVENLABS_API_KEY || "";
+const REPLICATE_TOKEN = () => process.env.REPLICATE_API_TOKEN || "";
+
+// Content type → auto search query map
+const CONTENT_TYPE_QUERIES: Record<string, string> = {
+  monologo:    "monólogo humorístico español escenario",
+  ugc:         "ugc creator product review español",
+  podcast:     "podcast conversación español primer plano",
+  educativo:   "explicación educativa cámara directa español",
+  publicitario:"presentación producto publicitario español",
+  entrevista:  "entrevista periodística español",
+  testimonio:  "testimonio cliente satisfecho español",
+  tutorial:    "tutorial paso a paso español",
+};
+
+// ── GET /youtube/modelo/suggest-query — returns best YT search for content type
+router.get("/youtube/modelo/suggest-query", requireAdmin, (req: Request, res: Response) => {
+  const tipo = String(req.query.tipo || "monologo");
+  const q = CONTENT_TYPE_QUERIES[tipo] || CONTENT_TYPE_QUERIES.monologo;
+  return res.json({ query: q, tipo });
+});
+
+// ── POST /youtube/modelo/extract-clip — download YT video + trim best segment
+router.post("/youtube/modelo/extract-clip", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { videoId, startSec = 10, durationSec = 35 } = req.body;
+    if (!videoId) return res.status(400).json({ error: "videoId requerido" });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "modelo-"));
+    const rawPath  = path.join(tmpDir, "raw.mp4");
+    const clipPath = path.join(tmpDir, "clip.mp4");
+
+    const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const ytdlp = process.env.YTDLP_PATH || "yt-dlp";
+
+    // Download best quality video+audio up to 1080p
+    execSync(
+      `${ytdlp} -f "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best" ` +
+      `--merge-output-format mp4 -o "${rawPath}" "${ytUrl}"`,
+      { timeout: 120_000, stdio: "pipe" }
+    );
+
+    if (!fs.existsSync(rawPath)) return res.status(500).json({ error: "No se pudo descargar el vídeo" });
+
+    // Trim the requested segment
+    execSync(
+      `ffmpeg -y -ss ${startSec} -i "${rawPath}" -t ${durationSec} ` +
+      `-c:v libx264 -preset fast -crf 22 -c:a aac -movflags +faststart "${clipPath}"`,
+      { timeout: 60_000, stdio: "pipe" }
+    );
+
+    const clipData = fs.readFileSync(clipPath);
+    const b64 = clipData.toString("base64");
+    const sizeKb = Math.round(clipData.length / 1024);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    return res.json({
+      success: true,
+      videoId,
+      startSec,
+      durationSec,
+      sizeKb,
+      clipBase64: b64,
+      mimeType: "video/mp4",
+    });
+  } catch (err: any) {
+    logger.error("extract-clip:", err.message);
+    return res.status(500).json({ error: err.message?.slice(0, 300) || "Error descargando clip" });
+  }
+});
+
+// ── POST /youtube/modelo/dub — ElevenLabs dubbing on a video clip
+// Body: { clipBase64, voiceId, script, targetLang?, sourceVideoId? }
+router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { clipBase64, voiceId, script, targetLang = "es", sourceVideoId } = req.body;
+    if (!clipBase64 && !sourceVideoId) return res.status(400).json({ error: "clipBase64 o sourceVideoId requerido" });
+    if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
+
+    const key = ELEVEN_KEY();
+    if (!key) return res.status(500).json({ error: "ELEVENLABS_API_KEY no configurada" });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dub-"));
+    const inPath  = path.join(tmpDir, "input.mp4");
+    const outPath = path.join(tmpDir, "dubbed.mp4");
+
+    // Write clip to disk
+    const buf = Buffer.from(clipBase64, "base64");
+    fs.writeFileSync(inPath, buf);
+
+    // Build multipart form
+    const FormData = (await import("form-data")).default;
+    const form = new FormData();
+    form.append("file", fs.createReadStream(inPath), { filename: "clip.mp4", contentType: "video/mp4" });
+    form.append("target_lang", targetLang);
+    form.append("mode", "automatic");
+    form.append("voice_id", voiceId);
+    if (script) form.append("script", script);
+
+    const dubRes = await fetch("https://api.elevenlabs.io/v1/dubbing", {
+      method: "POST",
+      headers: { "xi-api-key": key, ...form.getHeaders() },
+      body: form as any,
+    });
+
+    const dubData = await dubRes.json() as any;
+    if (!dubRes.ok) return res.status(dubRes.status).json({ error: dubData?.detail?.message || JSON.stringify(dubData) });
+
+    const dubbingId = dubData.dubbing_id;
+    if (!dubbingId) return res.status(500).json({ error: "ElevenLabs no devolvió dubbing_id" });
+
+    // Poll until done (max 3 min)
+    let status = "in_progress";
+    let attempts = 0;
+    while (status === "in_progress" && attempts < 36) {
+      await new Promise(r => setTimeout(r, 5000));
+      const statusRes = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}`, {
+        headers: { "xi-api-key": key },
+      });
+      const statusData = await statusRes.json() as any;
+      status = statusData.status;
+      attempts++;
+    }
+
+    if (status !== "dubbed") {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      return res.status(500).json({ error: `Dubbing no completado. Estado: ${status}` });
+    }
+
+    // Download dubbed video
+    const dlRes = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}/audio/${targetLang}`, {
+      headers: { "xi-api-key": key },
+    });
+    if (!dlRes.ok) return res.status(500).json({ error: "Error descargando audio doblado" });
+
+    const dubbed = Buffer.from(await dlRes.arrayBuffer());
+    fs.writeFileSync(outPath, dubbed);
+
+    const b64out = fs.readFileSync(outPath).toString("base64");
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    return res.json({ success: true, dubbingId, status, dubbedBase64: b64out, mimeType: "video/mp4" });
+  } catch (err: any) {
+    logger.error("dub:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /youtube/modelo/face-swap — Replicate face swap (photo → video)
+router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
+  { name: "facePhoto", maxCount: 1 },
+]), async (req: Request, res: Response) => {
+  try {
+    const { videoBase64 } = req.body;
+    const files = req.files as Record<string, Express.Multer.File[]>;
+    const faceFile = files?.facePhoto?.[0];
+
+    if (!videoBase64) return res.status(400).json({ error: "videoBase64 requerido" });
+    if (!faceFile)    return res.status(400).json({ error: "facePhoto requerido" });
+
+    const token = REPLICATE_TOKEN();
+    if (!token) return res.status(500).json({ error: "REPLICATE_API_TOKEN no configurada" });
+
+    // Upload face image to Replicate Files API
+    const faceUpload = await fetch("https://api.replicate.com/v1/files", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": faceFile.mimetype },
+      body: faceFile.buffer,
+    });
+    const faceData = await faceUpload.json() as any;
+    const faceUrl = faceData.urls?.get || faceData.url;
+    if (!faceUrl) return res.status(500).json({ error: "No se pudo subir la foto" });
+
+    // Upload video to Replicate Files API
+    const vidBuf = Buffer.from(videoBase64, "base64");
+    const vidUpload = await fetch("https://api.replicate.com/v1/files", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "video/mp4" },
+      body: vidBuf,
+    });
+    const vidData = await vidUpload.json() as any;
+    const vidUrl = vidData.urls?.get || vidData.url;
+    if (!vidUrl) return res.status(500).json({ error: "No se pudo subir el vídeo" });
+
+    // Run face-swap model (akhaliq/facefusion or deepinsight/insightface)
+    const predRes = await fetch("https://api.replicate.com/v1/models/yan-ops/face-swap/predictions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=60" },
+      body: JSON.stringify({ input: { target_video: vidUrl, source_image: faceUrl } }),
+    });
+    let pred = await predRes.json() as any;
+
+    // Poll if not done
+    let pollAttempts = 0;
+    while (pred.status && !["succeeded", "failed", "canceled"].includes(pred.status) && pollAttempts < 60) {
+      await new Promise(r => setTimeout(r, 5000));
+      const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      pred = await pollRes.json() as any;
+      pollAttempts++;
+    }
+
+    if (pred.status !== "succeeded") {
+      return res.status(500).json({ error: pred.error || "Face-swap falló", status: pred.status });
+    }
+
+    return res.json({ success: true, outputUrl: pred.output, predictionId: pred.id });
+  } catch (err: any) {
+    logger.error("face-swap:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /youtube/modelo/voices — list available ElevenLabs voices
+router.get("/youtube/modelo/voices", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const key = ELEVEN_KEY();
+    if (!key) return res.json({ voices: [] });
+    const r = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": key } });
+    const d = await r.json() as any;
+    const voices = (d.voices || []).map((v: any) => ({
+      voice_id: v.voice_id,
+      name: v.name,
+      category: v.category,
+      preview_url: v.preview_url,
+    }));
+    return res.json({ voices });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /youtube/modelo/generate-reference — generate AI reference video with Kling
+// Used when no YouTube reference is provided
+router.post("/youtube/modelo/generate-reference", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { contentType = "monologo", prompt, durationSec = 5 } = req.body;
+    const token = REPLICATE_TOKEN();
+    if (!token) return res.status(500).json({ error: "REPLICATE_API_TOKEN no configurada" });
+
+    const defaultPrompts: Record<string, string> = {
+      monologo:    "A charismatic Spanish comedian on a comedy club stage, warm spotlight, gesturing with hands, expressive face, talking directly to camera, dark background with audience silhouettes, cinematic",
+      ugc:         "A friendly person holding a product and talking to camera, natural home setting, good lighting, authentic and enthusiastic, close-up shot",
+      podcast:     "Two people having a conversation at a podcast table with microphones, professional studio lighting, talking animatedly",
+      educativo:   "A teacher explaining something enthusiastically to camera, whiteboard background, pointing and gesturing, professional setting",
+      publicitario:"A confident presenter showing a product on camera, clean white background, professional lighting, smiling",
+    };
+
+    const finalPrompt = prompt || defaultPrompts[contentType] || defaultPrompts.monologo;
+
+    const predRes = await fetch("https://api.replicate.com/v1/models/kwaivgi/kling-v2.1-standard/predictions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=60" },
+      body: JSON.stringify({ input: { prompt: finalPrompt, duration: durationSec, aspect_ratio: "16:9" } }),
+    });
+    let pred = await predRes.json() as any;
+
+    // Poll up to 3 min
+    let attempts = 0;
+    while (pred.status && !["succeeded", "failed", "canceled"].includes(pred.status) && attempts < 36) {
+      await new Promise(r => setTimeout(r, 5000));
+      const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      pred = await pollRes.json() as any;
+      attempts++;
+    }
+
+    if (pred.status !== "succeeded") {
+      return res.status(500).json({ error: pred.error || "Generación falló", status: pred.status });
+    }
+
+    return res.json({ success: true, videoUrl: pred.output, predictionId: pred.id, prompt: finalPrompt });
+  } catch (err: any) {
+    logger.error("generate-reference:", err.message);
     return res.status(500).json({ error: err.message });
   }
 });

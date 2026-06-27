@@ -1071,6 +1071,7 @@ const SLASH_SKILLS: SlashSkill[] = [
   { cmd: "/whatsapp-agent", icon: "💬", label: "Agente WhatsApp",        desc: "Flujos automáticos de WhatsApp Business para ventas y soporte", engine: "claude", prompt: "Diseña un sistema completo de agente conversacional para WhatsApp Business de mi tienda: 1) Flujo de bienvenida (primer mensaje y menú principal), 2) Flujo de catálogo (mostrar productos con fotos y precios), 3) Flujo de pedido (tomar datos del cliente, confirmar pedido), 4) Flujo de soporte (FAQ automática + escalado a humano), 5) Flujo de recuperación de carrito (mensaje a las 2h + 24h). Para cada flujo incluye el mensaje exacto que envía el bot, las opciones de menú numeradas y el árbol de decisiones completo. Usa lenguaje natural, cálido y en español. Incluye plantillas listas para WhatsApp Business API." },
   { cmd: "/youtube",     icon: "▶️", label: "Buscar en YouTube",          desc: "Busca un vídeo o canción en YouTube y obtén el link directo",          engine: "gemini", prompt: "Busca en YouTube el vídeo o canción que pida el usuario. Incluye siempre el link de YouTube en formato https://www.youtube.com/results?search_query= con la búsqueda codificada para que el usuario pueda acceder con un click. Si el usuario especifica un artista o canción concreta, construye la URL de búsqueda con esos términos exactos. Ejemplo: para 'Bohemian Rhapsody Queen' → https://www.youtube.com/results?search_query=Bohemian+Rhapsody+Queen" },
   { cmd: "/viral",       icon: "🎭", label: "Viral Comedy Studio",         desc: "Tendencias políticas del día + genera guiones satíricos para YouTube", engine: "claude", prompt: "Actúa como director del Viral Comedy Studio de Shopy Crafter. El usuario quiere crear contenido satírico político viral. Primero analiza qué quiere: ¿buscar tendencias del día? ¿generar un guión satírico de una noticia concreta? ¿ver el historial de vídeos creados? Guíale al YouTube Studio → pestaña 'Tendencias' para ver las noticias del día o a la pestaña 'Satírico IA' para generar el guión. Explica que puede: 1) Ver tendencias políticas virales, 2) Seleccionar una noticia, 3) Generar guión satírico con IA, 4) Generar vídeo IA con ese prompt visual, 5) Publicar automáticamente en YouTube. Pregúntale sobre qué noticia o tema quiere satirizar hoy." },
+  { cmd: "/modelo",      icon: "🎭", label: "Modelo IA — vídeo con personaje real", desc: "Pipeline completo: referencia YouTube → ElevenLabs Dubbing → face-swap con tu foto", engine: "claude", prompt: "Actúa como director del pipeline Modelo IA de Shopy Crafter. El usuario quiere crear un vídeo con un personaje/modelo real hablando. Explica el flujo completo: 1) Busca en YouTube un vídeo de referencia con los gestos y movimientos del tipo de contenido (monólogo, UGC, podcast, publicidad, educativo, entrevista, testimonio, tutorial), 2) Extrae el fragmento más adecuado (puedes sugerir el segundo de inicio y duración), 3) ElevenLabs Dubbing sustituye la voz con la voz clonada elegida — el modelo de referencia gesticula con la voz del personaje, 4) Opcionalmente face-swap con Replicate pone la cara del modelo real encima. El Sevillano es el personaje principal: voz clonada en ElevenLabs (voice_id: 8m4O8qoFLrKBzbmsuL5T), foto del modelo guardada. Para acceder: Admin → YouTube Studio → pestaña 'Modelo IA 🎭'. Pregunta: ¿qué tipo de contenido quiere crear y tiene guión?" },
   { cmd: "/tendencias",  icon: "📰", label: "Tendencias virales hoy",      desc: "Noticias políticas del día con potencial satírico (Gemini Search)",    engine: "gemini", prompt: "Busca con Gemini Search las noticias políticas más virales, polémicas e impactantes de hoy en España. Para cada noticia indica: titular, protagonistas, por qué es viral, potencial satírico del 1 al 10, y el mejor ángulo cómico para satirizarla. Dame al menos 6 noticias distintas ordenadas por potencial de viralidad. Incluye también si hay tendencias de formato de vídeo político que estén funcionando en YouTube o TikTok España ahora mismo.", isResearch: true },
   { cmd: "/vtuber",      icon: "🎭", label: "Avatar VTuber",             desc: "Crea un VTuber IA con personalidad, guión y estrategia de contenido",  engine: "claude", prompt: "Crea un avatar VTuber completo para representar mi marca en redes sociales y streaming: 1) PERSONAJE: nombre, historia de origen, personalidad (3 rasgos principales), edad virtual, apariencia física (descripción detallada para generar con IA), 2) VOZ: tono, velocidad, muletillas y frases características, 3) CONTENIDO: 10 ideas de vídeos para TikTok/YouTube con guión del primer minuto (el hook), 4) ESTRATEGIA: horario de publicación óptimo, hashtags por plataforma y colaboraciones con otros VTubers del nicho, 5) MONETIZACIÓN: cómo integrar el VTuber con mi tienda Shopify para vender productos de forma entretenida. Adapta todo al tono y nicho de mi marca." },
 
@@ -1111,6 +1112,39 @@ const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la pla
 • Para acceder: Admin → YouTube Studio → pestaña "Tendencias" o "Satírico IA"
 • Comandos slash disponibles: /viral (guía completa), /tendencias (noticias del día con Gemini)
 
+═══ MODELO IA PIPELINE (YouTube Studio → pestaña "Modelo IA 🎭") ═══
+Sistema para crear vídeos con personajes/modelos reales hablando — NO animaciones, sino personas reales que gesticulan y hablan con lip sync perfecto.
+
+PIPELINE COMPLETO (3 pasos):
+1. REFERENCIA DE MOVIMIENTOS — dos modos:
+   • Buscar en YouTube: busca un vídeo de referencia del tipo de contenido deseado (monologuista, presentador, youtuber, actor). La IA sugiere automáticamente la query según el tipo. El usuario selecciona el vídeo y el fragmento (segundo de inicio + duración). yt-dlp descarga el clip y ffmpeg lo recorta.
+   • Generar con IA: si no hay referencia disponible, Kling v2.1 genera un vídeo de referencia con un prompt adaptado al tipo de contenido.
+
+2. ELEVENLABS DUBBING — ElevenLabs sustituye el audio del vídeo de referencia con la voz clonada elegida, manteniendo el lip sync automático. Esto da: los gestos y movimientos del referente + la voz del personaje del cliente. Funciona con cualquier voz de ElevenLabs — clonadas o estándar.
+
+3. FACE-SWAP (opcional) — Replicate sustituye la cara del referente con la foto del modelo real del cliente. Resultado: la cara del personaje del cliente, con los gestos del referente, con la voz clonada.
+
+PERSONAJE SEVILLANO (el modelo principal configurado):
+• Nombre: El Sevillano / El Monologuista
+• Foto: guardada en /images/sevillano-model.png — chico joven, pelo rizado largo oscuro, barba, sonrisa natural, estilo andaluz
+• Voz clonada en ElevenLabs: voice_id = 8m4O8qoFLrKBzbmsuL5T
+• Especialidad: monólogos de humor costumbrista andaluz, turistas en playas, costumbres sevillanas
+• Guión del primer monólogo: "¡Buenas noches Sevilla! Oye, que los turistas en la playa de Torremolinos son como los pulpos..." (41 segundos)
+
+TIPOS DE CONTENIDO SOPORTADOS (con query de referencia auto-sugerida):
+• 🎤 Monólogo — comediante en escenario con spotlight, gestos expresivos
+• 📱 UGC (User Generated Content) — creator sosteniendo producto, tono auténtico
+• 🎙️ Podcast — conversación en mesa con micros
+• 📚 Educativo — profesor explicando a cámara
+• 📣 Publicitario — presentador mostrando producto
+• 🎬 Entrevista — periodista/entrevistado cara a cara
+• ⭐ Testimonio — cliente satisfecho hablando a cámara
+• 🛠️ Tutorial — demostración paso a paso
+
+TIEMPOS ESTIMADOS: Extracción clip ~30s · ElevenLabs Dubbing ~2-3 min · Face-swap ~1 min
+PARA ACCEDER: Admin → YouTube Studio → pestaña "Modelo IA 🎭"
+COMANDO SLASH: /modelo (guía completa del pipeline)
+
 ═══ CLASIFICACIÓN DE INTENCIÓN (aplica en cada mensaje) ═══
 Detecta mentalmente qué quiere el usuario antes de responder:
 • PREGUNTA INFO — responde de forma concisa y pregunta si necesita profundizar
@@ -1130,7 +1164,7 @@ Detecta mentalmente qué quiere el usuario antes de responder:
 • Si el usuario lleva mucho tiempo en la misma duda, ofrece escalar: "¿Quieres que lo revisemos juntos con el equipo?"
 
 ═══ CONOCIMIENTO DE SKILLS (/comandos) ═══
-Los usuarios pueden usar /comandos para tareas específicas. Cuando detectes que un usuario quiere hacer algo que tiene /comando correspondiente, sugiérelo naturalmente. Skills disponibles: /audit, /seo, /cro, /products, /competitors, /analytics, /legal, /email, /klaviyo, /content, /social, /brand, /reviews, /returns, /research, /supply, /forecast, /ads, /images, /video, /describe, /newsletter, /cards, /launch, /persona, /antihall, /faq-builder, /whatsapp-agent, /vtuber, /imagen-gemini, /codigo-gemini
+Los usuarios pueden usar /comandos para tareas específicas. Cuando detectes que un usuario quiere hacer algo que tiene /comando correspondiente, sugiérelo naturalmente. Skills disponibles: /audit, /seo, /cro, /products, /competitors, /analytics, /legal, /email, /klaviyo, /content, /social, /brand, /reviews, /returns, /research, /supply, /forecast, /ads, /images, /video, /describe, /newsletter, /cards, /launch, /persona, /antihall, /faq-builder, /whatsapp-agent, /vtuber, /imagen-gemini, /codigo-gemini, /viral, /tendencias, /modelo
 
 Skills de Gemini nativo:
 • /imagen-gemini — genera una imagen con el modelo de imagen de Gemini (escribe la descripción tras el comando)

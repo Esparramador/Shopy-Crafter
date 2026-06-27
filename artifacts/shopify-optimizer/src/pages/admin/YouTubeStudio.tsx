@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Youtube, Upload, Trash2, ExternalLink, Search, CheckCircle, AlertCircle, RefreshCw, Link2, Users, Video, Eye, ThumbsUp, MessageSquare, X, TrendingUp, Mic, Copy, Play, Zap, ChevronDown, ChevronUp } from "lucide-react";
+import { Youtube, Upload, Trash2, ExternalLink, Search, CheckCircle, AlertCircle, RefreshCw, Link2, Users, Video, Eye, ThumbsUp, MessageSquare, X, TrendingUp, Mic, Copy, Play, Zap, ChevronDown, ChevronUp, UserSquare, Clapperboard, Download } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -51,7 +51,7 @@ export default function YouTubeStudio() {
   const [videos, setVideos] = useState<YtVideo[]>([]);
   const [loadingChannel, setLoadingChannel] = useState(true);
   const [loadingVideos, setLoadingVideos] = useState(false);
-  const [tab, setTab] = useState<"upload" | "videos" | "search" | "trends" | "satirico">("upload");
+  const [tab, setTab] = useState<"upload" | "videos" | "search" | "trends" | "satirico" | "modelo">("upload");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<{ watchUrl: string; title: string } | null>(null);
@@ -103,6 +103,34 @@ export default function YouTubeStudio() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarFileRef = useRef<HTMLInputElement>(null);
+
+  // ── Modelo IA tab state ───────────────────────────────────────────────────
+  const [modeloContentType, setModeloContentType] = useState("monologo");
+  const [modeloScript, setModeloScript] = useState("");
+  const [modeloVoiceId, setModeloVoiceId] = useState("8m4O8qoFLrKBzbmsuL5T");
+  const [modeloVoices, setModeloVoices] = useState<Array<{voice_id:string;name:string;category?:string}>>([
+    { voice_id: "8m4O8qoFLrKBzbmsuL5T", name: "Sevillano (clonada)", category: "cloned" },
+  ]);
+  const [modeloFaceFile, setModeloFaceFile] = useState<File | null>(null);
+  const [modeloFacePreview, setModeloFacePreview] = useState<string | null>(null);
+  const modeloFaceRef = useRef<HTMLInputElement>(null);
+  // Reference source
+  const [modeloRefMode, setModeloRefMode] = useState<"search" | "generate">("search");
+  const [modeloRefQuery, setModeloRefQuery] = useState("");
+  const [modeloRefResults, setModeloRefResults] = useState<SearchResult[]>([]);
+  const [modeloRefSearching, setModeloRefSearching] = useState(false);
+  const [modeloSelectedVideo, setModeloSelectedVideo] = useState<SearchResult | null>(null);
+  const [modeloStartSec, setModeloStartSec] = useState(10);
+  const [modeloDurSec, setModeloDurSec] = useState(30);
+  // Pipeline state
+  const [modeloStep, setModeloStep] = useState<"idle"|"extracting"|"dubbing"|"faceswap"|"done"|"error">("idle");
+  const [modeloLog, setModeloLog] = useState<string[]>([]);
+  const [modeloClipB64, setModeloClipB64] = useState<string | null>(null);
+  const [modeloDubbedB64, setModeloDubbedB64] = useState<string | null>(null);
+  const [modeloFinalUrl, setModeloFinalUrl] = useState<string | null>(null);
+  const [modeloError, setModeloError] = useState<string | null>(null);
+  const [modeloGenPrompt, setModeloGenPrompt] = useState("");
+  const [modeloLoadingVoices, setModeloLoadingVoices] = useState(false);
 
   const [form, setForm] = useState({
     title: "", description: "", tags: "", privacy: "public", categoryId: "22",
@@ -159,6 +187,157 @@ export default function YouTubeStudio() {
   }
 
   useEffect(() => { if (tab === "videos" && channel.connected) loadVideos(); }, [tab, channel.connected]);
+
+  // ── Modelo IA — pre-load Sevillano photo on mount ────────────────────────
+  useEffect(() => {
+    // Auto-load the saved Sevillano model photo
+    fetch(`${BASE}/images/sevillano-model.png`)
+      .then(r => { if (!r.ok) return; return r.blob(); })
+      .then(blob => {
+        if (!blob) return;
+        const file = new File([blob], "sevillano-model.png", { type: "image/png" });
+        setModeloFaceFile(file);
+        setModeloFacePreview(`${BASE}/images/sevillano-model.png`);
+      }).catch(() => {});
+  }, []);
+
+  // ── Modelo IA — load voices on tab open ──────────────────────────────────
+  useEffect(() => {
+    if (tab !== "modelo") return;
+    setModeloLoadingVoices(true);
+    fetch(`${BASE}/api/youtube/modelo/voices`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.voices?.length) setModeloVoices(d.voices);
+      }).catch(() => {})
+      .finally(() => setModeloLoadingVoices(false));
+    // Auto-suggest query for current content type
+    fetch(`${BASE}/api/youtube/modelo/suggest-query?tipo=${modeloContentType}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.query) setModeloRefQuery(d.query); }).catch(() => {});
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab !== "modelo") return;
+    fetch(`${BASE}/api/youtube/modelo/suggest-query?tipo=${modeloContentType}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.query) setModeloRefQuery(d.query); }).catch(() => {});
+  }, [modeloContentType]);
+
+  async function modeloSearchRef() {
+    if (!modeloRefQuery.trim()) return;
+    setModeloRefSearching(true);
+    setModeloRefResults([]);
+    try {
+      const r = await fetch(`${BASE}/api/youtube/search?q=${encodeURIComponent(modeloRefQuery)}&max=6`, { credentials: "include" });
+      const d = await r.json();
+      setModeloRefResults(d.results || []);
+    } catch {}
+    setModeloRefSearching(false);
+  }
+
+  function modeloAddLog(msg: string) {
+    setModeloLog(prev => [...prev, `${new Date().toLocaleTimeString()} — ${msg}`]);
+  }
+
+  async function modeloRunPipeline() {
+    if (!modeloScript.trim()) { setModeloError("Escribe el guión primero"); return; }
+    if (!modeloVoiceId) { setModeloError("Selecciona una voz"); return; }
+    if (modeloRefMode === "search" && !modeloSelectedVideo) { setModeloError("Selecciona un vídeo de referencia"); return; }
+
+    setModeloStep("extracting");
+    setModeloError(null);
+    setModeloLog([]);
+    setModeloClipB64(null);
+    setModeloDubbedB64(null);
+    setModeloFinalUrl(null);
+
+    try {
+      // STEP 1: extract clip or generate reference
+      let clipB64: string | null = null;
+
+      if (modeloRefMode === "search" && modeloSelectedVideo) {
+        modeloAddLog(`📥 Descargando clip de "${modeloSelectedVideo.title}" (${modeloStartSec}s → +${modeloDurSec}s)…`);
+        const r = await fetch(`${BASE}/api/youtube/modelo/extract-clip`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ videoId: modeloSelectedVideo.videoId, startSec: modeloStartSec, durationSec: modeloDurSec }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Error descargando clip");
+        clipB64 = d.clipBase64;
+        modeloAddLog(`✅ Clip extraído (${d.sizeKb} KB, ${d.durationSec}s)`);
+      } else {
+        modeloAddLog(`🤖 Generando referencia IA (${modeloContentType}) con Kling…`);
+        const r = await fetch(`${BASE}/api/youtube/modelo/generate-reference`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentType: modeloContentType, prompt: modeloGenPrompt }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Error generando referencia");
+        // Download video URL to base64
+        const vidRes = await fetch(d.videoUrl);
+        const vidBuf = await vidRes.arrayBuffer();
+        clipB64 = btoa(String.fromCharCode(...new Uint8Array(vidBuf)));
+        modeloAddLog(`✅ Referencia IA generada`);
+      }
+
+      setModeloClipB64(clipB64);
+      setModeloStep("dubbing");
+
+      // STEP 2: ElevenLabs dubbing
+      modeloAddLog(`🎙️ Enviando a ElevenLabs Dubbing con voz ${modeloVoices.find(v => v.voice_id === modeloVoiceId)?.name || modeloVoiceId}…`);
+      const dubR = await fetch(`${BASE}/api/youtube/modelo/dub`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipBase64: clipB64, voiceId: modeloVoiceId, script: modeloScript }),
+      });
+      const dubD = await dubR.json();
+      if (!dubR.ok) throw new Error(dubD.error || "Error en dubbing");
+      modeloAddLog(`✅ Dubbing completado (id: ${dubD.dubbingId})`);
+
+      // STEP 3: face-swap (optional)
+      if (modeloFaceFile) {
+        setModeloStep("faceswap");
+        modeloAddLog(`🔄 Aplicando face-swap con tu foto…`);
+        const fd = new FormData();
+        fd.append("videoBase64", dubD.dubbedBase64);
+        fd.append("facePhoto", modeloFaceFile);
+        const fsR = await fetch(`${BASE}/api/youtube/modelo/face-swap`, {
+          method: "POST", credentials: "include", body: fd,
+        });
+        const fsD = await fsR.json();
+        if (!fsR.ok) throw new Error(fsD.error || "Error en face-swap");
+        setModeloFinalUrl(Array.isArray(fsD.outputUrl) ? fsD.outputUrl[0] : fsD.outputUrl);
+        modeloAddLog(`✅ Face-swap completado`);
+      } else {
+        // No face-swap: use dubbed video directly
+        setModeloDubbedB64(dubD.dubbedBase64);
+        modeloAddLog(`ℹ️ Sin face-swap — usando vídeo doblado directamente`);
+      }
+
+      setModeloStep("done");
+      modeloAddLog(`🎬 ¡Pipeline completado!`);
+    } catch (err: any) {
+      setModeloStep("error");
+      setModeloError(err.message);
+      modeloAddLog(`❌ Error: ${err.message}`);
+    }
+  }
+
+  function modeloDownload() {
+    if (modeloFinalUrl) {
+      window.open(modeloFinalUrl, "_blank");
+      return;
+    }
+    if (modeloDubbedB64) {
+      const a = document.createElement("a");
+      a.href = `data:video/mp4;base64,${modeloDubbedB64}`;
+      a.download = "modelo_ia.mp4";
+      a.click();
+    }
+  }
 
   async function connectYouTube() {
     try {
@@ -487,6 +666,7 @@ export default function YouTubeStudio() {
           { id: "search",   label: "Buscar",           icon: <Search size={13} /> },
           { id: "trends",   label: "Tendencias 🔥",   icon: <TrendingUp size={13} /> },
           { id: "satirico", label: "Creador IA 🎬",   icon: <Mic size={13} /> },
+          { id: "modelo",   label: "Modelo IA 🎭",   icon: <UserSquare size={13} /> },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)}
             style={{ flex: 1, minWidth: 100, padding: "8px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, transition: "all .15s",
@@ -1696,6 +1876,257 @@ export default function YouTubeStudio() {
           )}
         </div>
       ); })()}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          TAB: MODELO IA
+          Pipeline: buscar/generar referencia → ElevenLabs Dubbing → face-swap
+      ══════════════════════════════════════════════════════════════════ */}
+      {tab === "modelo" && (() => {
+        const S = { label: { fontSize: 11, color: "var(--t3)", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 5, display: "block" } };
+        const CONTENT_TYPES = [
+          { id: "monologo",    label: "🎤 Monólogo" },
+          { id: "ugc",         label: "📱 UGC" },
+          { id: "podcast",     label: "🎙️ Podcast" },
+          { id: "educativo",   label: "📚 Educativo" },
+          { id: "publicitario",label: "📣 Publicitario" },
+          { id: "entrevista",  label: "🎬 Entrevista" },
+          { id: "testimonio",  label: "⭐ Testimonio" },
+          { id: "tutorial",    label: "🛠️ Tutorial" },
+        ];
+        const isRunning = ["extracting","dubbing","faceswap"].includes(modeloStep);
+        const isDone = modeloStep === "done";
+
+        return (
+          <div>
+            {/* Header */}
+            <div style={{ background: "linear-gradient(135deg,rgba(251,191,36,0.08),rgba(16,185,129,0.05))", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--gold)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                <Clapperboard size={16} /> Modelo IA — Pipeline de vídeo con personaje real
+              </div>
+              <div style={{ fontSize: 12, color: "var(--t3)", lineHeight: 1.6 }}>
+                Busca un vídeo de referencia en YouTube (gestos, ritmo, escenario) → ElevenLabs redubla con tu voz clonada → face-swap opcional con tu foto.<br />
+                Funciona para <strong>monólogos, UGC, podcasts, publicidad, tutoriales</strong> — cualquier formato que necesite un modelo hablando.
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+
+              {/* LEFT COLUMN */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                {/* 1. Content type */}
+                <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
+                  <span style={S.label}>1. Tipo de contenido</span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {CONTENT_TYPES.map(ct => (
+                      <button key={ct.id} onClick={() => setModeloContentType(ct.id)}
+                        style={{ padding: "5px 11px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                          background: modeloContentType === ct.id ? "var(--gold)" : "var(--ink3)",
+                          color: modeloContentType === ct.id ? "#000" : "var(--t3)" }}>
+                        {ct.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Script */}
+                <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
+                  <span style={S.label}>2. Guión / script</span>
+                  <textarea value={modeloScript} onChange={e => setModeloScript(e.target.value)}
+                    placeholder={"Escribe el guión que dirá el modelo.\nEjemplo: ¡Buenas noches Sevilla! Oye, que los turistas en la playa de Torremolinos son como los pulpos…"}
+                    rows={6}
+                    style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "var(--t)", resize: "vertical", lineHeight: 1.6 }} />
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>{modeloScript.length} caracteres · ~{Math.round(modeloScript.length / 14)} segundos de audio</div>
+                </div>
+
+                {/* 3. Voice */}
+                <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
+                  <span style={S.label}>3. Voz {modeloLoadingVoices && <RefreshCw size={10} className="spin" style={{ display: "inline", marginLeft: 4 }} />}</span>
+                  <select value={modeloVoiceId} onChange={e => setModeloVoiceId(e.target.value)}
+                    style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "var(--t)" }}>
+                    {modeloVoices.map(v => (
+                      <option key={v.voice_id} value={v.voice_id}>
+                        {v.name}{v.category === "cloned" ? " ★" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>★ = voz clonada · ElevenLabs substituirá la voz del vídeo de referencia</div>
+                </div>
+
+                {/* 4. Face photo (optional) */}
+                <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
+                  <span style={S.label}>4. Foto del modelo (opcional — face-swap)</span>
+                  <input type="file" accept="image/*" ref={modeloFaceRef} style={{ display: "none" }}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      setModeloFaceFile(f);
+                      const reader = new FileReader();
+                      reader.onload = ev => setModeloFacePreview(ev.target?.result as string);
+                      reader.readAsDataURL(f);
+                    }} />
+                  <div onClick={() => modeloFaceRef.current?.click()}
+                    style={{ border: `2px dashed ${modeloFaceFile ? "var(--jade)" : "var(--ink4)"}`, borderRadius: 8, padding: 14, cursor: "pointer", textAlign: "center",
+                      background: modeloFaceFile ? "rgba(16,185,129,0.05)" : "var(--ink3)", display: "flex", alignItems: "center", gap: 10 }}>
+                    {modeloFacePreview
+                      ? <img src={modeloFacePreview} style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover" }} />
+                      : <UserSquare size={32} style={{ opacity: 0.25 }} />}
+                    <div style={{ textAlign: "left" }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: modeloFaceFile ? "var(--jade)" : "var(--t)" }}>
+                        {modeloFaceFile ? modeloFaceFile.name : "Adjunta tu foto aquí"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--t3)" }}>
+                        {modeloFaceFile ? "Replicate sustituirá la cara del modelo" : "JPG/PNG · tu cara se implantará en el vídeo"}
+                      </div>
+                    </div>
+                    {modeloFaceFile && (
+                      <button onClick={e => { e.stopPropagation(); setModeloFaceFile(null); setModeloFacePreview(null); }}
+                        style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--t3)" }}>
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                {/* 5. Reference source */}
+                <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
+                  <span style={S.label}>5. Vídeo de referencia (gestos y movimientos)</span>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                    {(["search","generate"] as const).map(m => (
+                      <button key={m} onClick={() => setModeloRefMode(m)}
+                        style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                          background: modeloRefMode === m ? "var(--gold)" : "var(--ink3)",
+                          color: modeloRefMode === m ? "#000" : "var(--t3)" }}>
+                        {m === "search" ? "🔍 Buscar en YouTube" : "🤖 Generar con IA"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {modeloRefMode === "search" ? (
+                    <>
+                      <form onSubmit={e => { e.preventDefault(); modeloSearchRef(); }} style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                        <input value={modeloRefQuery} onChange={e => setModeloRefQuery(e.target.value)}
+                          placeholder="Busca un monologuista, actor, presenter…"
+                          style={{ flex: 1, background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "var(--t)" }} />
+                        <button type="submit" disabled={modeloRefSearching}
+                          style={{ padding: "7px 12px", background: "var(--gold)", color: "#000", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12 }}>
+                          {modeloRefSearching ? <RefreshCw size={12} className="spin" /> : <Search size={12} />}
+                        </button>
+                      </form>
+
+                      {modeloRefResults.map(r => (
+                        <div key={r.videoId} onClick={() => setModeloSelectedVideo(r)}
+                          style={{ display: "flex", gap: 8, padding: 8, borderRadius: 8, cursor: "pointer", marginBottom: 4, border: `1px solid ${modeloSelectedVideo?.videoId === r.videoId ? "var(--gold)" : "transparent"}`,
+                            background: modeloSelectedVideo?.videoId === r.videoId ? "rgba(251,191,36,0.08)" : "var(--ink3)" }}>
+                          {r.thumbnail && <img src={r.thumbnail} style={{ width: 72, height: 50, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: modeloSelectedVideo?.videoId === r.videoId ? "var(--gold)" : "var(--t)", lineClamp: 2, overflow: "hidden" }}>{r.title}</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)" }}>{r.channelTitle}</div>
+                          </div>
+                          {modeloSelectedVideo?.videoId === r.videoId && <CheckCircle size={14} style={{ marginLeft: "auto", flexShrink: 0, color: "var(--gold)" }} />}
+                        </div>
+                      ))}
+
+                      {modeloSelectedVideo && (
+                        <div style={{ marginTop: 10, padding: 10, background: "rgba(251,191,36,0.06)", borderRadius: 8, border: "1px solid rgba(251,191,36,0.2)" }}>
+                          <div style={{ fontSize: 11, color: "var(--gold)", fontWeight: 600, marginBottom: 6 }}>⏱ Segmento a extraer</div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <div style={{ flex: 1 }}>
+                              <label style={{ fontSize: 10, color: "var(--t3)" }}>Inicio (seg)</label>
+                              <input type="number" value={modeloStartSec} onChange={e => setModeloStartSec(Number(e.target.value))} min={0}
+                                style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 6, padding: "5px 8px", fontSize: 12, color: "var(--t)" }} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <label style={{ fontSize: 10, color: "var(--t3)" }}>Duración (seg)</label>
+                              <input type="number" value={modeloDurSec} onChange={e => setModeloDurSec(Number(e.target.value))} min={5} max={120}
+                                style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 6, padding: "5px 8px", fontSize: 12, color: "var(--t)" }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div>
+                      <textarea value={modeloGenPrompt} onChange={e => setModeloGenPrompt(e.target.value)}
+                        placeholder={`Prompt para Kling (se auto-rellena según tipo).\nEj: A charismatic Spanish comedian on a comedy club stage, gesturing with hands…`}
+                        rows={4}
+                        style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "var(--t)", resize: "vertical" }} />
+                      <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>Se generará un vídeo de ~5s con Kling v2.1 que usarás como referencia de movimientos</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pipeline status / log */}
+                {(modeloStep !== "idle" || modeloLog.length > 0) && (
+                  <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: "var(--t)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                      <Clapperboard size={13} />
+                      {modeloStep === "extracting" && <><RefreshCw size={12} className="spin" /> Descargando referencia…</>}
+                      {modeloStep === "dubbing"    && <><RefreshCw size={12} className="spin" /> ElevenLabs doblando vídeo… (puede tardar 2-3 min)</>}
+                      {modeloStep === "faceswap"   && <><RefreshCw size={12} className="spin" /> Aplicando face-swap…</>}
+                      {modeloStep === "done"       && <><CheckCircle size={12} style={{ color: "var(--jade)" }} /> ¡Pipeline completado!</>}
+                      {modeloStep === "error"      && <><AlertCircle size={12} style={{ color: "#ef4444" }} /> Error</>}
+                    </div>
+                    <div style={{ fontFamily: "monospace", fontSize: 10, color: "var(--t3)", maxHeight: 120, overflowY: "auto", lineHeight: 1.8 }}>
+                      {modeloLog.map((l, i) => <div key={i}>{l}</div>)}
+                    </div>
+                    {modeloError && (
+                      <div style={{ marginTop: 8, padding: "8px 10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, fontSize: 11, color: "#fca5a5" }}>
+                        {modeloError}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Result */}
+                {isDone && (modeloFinalUrl || modeloDubbedB64) && (
+                  <div style={{ background: "rgba(16,185,129,0.06)", border: "1px solid var(--jade)", borderRadius: 12, padding: 14 }}>
+                    <div style={{ fontWeight: 700, color: "var(--jade)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle size={14} /> Vídeo listo
+                    </div>
+                    {modeloFinalUrl && (
+                      <video src={modeloFinalUrl} controls style={{ width: "100%", borderRadius: 8, marginBottom: 10 }} />
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={modeloDownload}
+                        style={{ flex: 1, padding: "9px 14px", background: "linear-gradient(135deg,var(--gold),#f59e0b)", color: "#000", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                        <Download size={13} /> Descargar MP4
+                      </button>
+                      {channel.connected && (
+                        <button onClick={() => setTab("upload")}
+                          style={{ flex: 1, padding: "9px 14px", background: "transparent", color: "var(--jade)", border: "1px solid var(--jade)", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                          <Youtube size={13} /> Subir a YouTube
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RUN BUTTON */}
+            <div style={{ marginTop: 16 }}>
+              {modeloError && <div style={{ marginBottom: 10, fontSize: 12, color: "#f87171", padding: "8px 12px", background: "rgba(239,68,68,0.08)", borderRadius: 8 }}>{modeloError}</div>}
+              <button onClick={modeloRunPipeline} disabled={isRunning}
+                style={{ width: "100%", padding: "14px 20px", background: isRunning ? "var(--ink3)" : "linear-gradient(135deg,var(--gold),#f59e0b)", color: isRunning ? "var(--t3)" : "#000",
+                  border: "none", borderRadius: 10, fontWeight: 800, cursor: isRunning ? "not-allowed" : "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                {isRunning
+                  ? <><RefreshCw size={16} className="spin" />
+                    {modeloStep === "extracting" ? "Descargando referencia…" : modeloStep === "dubbing" ? "Doblando con ElevenLabs…" : "Aplicando face-swap…"}
+                    </>
+                  : <><Clapperboard size={16} /> Generar vídeo con modelo</>}
+              </button>
+              <div style={{ marginTop: 8, fontSize: 11, color: "var(--t3)", textAlign: "center" }}>
+                Paso 1: Extrae referencia (~30s) · Paso 2: ElevenLabs Dubbing (~2-3 min) · Paso 3: Face-swap opcional (~1 min)
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
