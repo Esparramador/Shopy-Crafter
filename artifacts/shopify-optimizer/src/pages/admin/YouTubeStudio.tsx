@@ -248,8 +248,7 @@ export default function YouTubeStudio() {
   async function modeloRunPipeline() {
     if (!modeloScript.trim()) { setModeloError("Escribe el guión primero"); return; }
     if (!modeloVoiceId) { setModeloError("Selecciona una voz"); return; }
-    if (modeloRefMode === "search" && !modeloSelectedVideo) { setModeloError("Selecciona un vídeo de referencia"); return; }
-    if (modeloRefMode === "local" && !modeloLocalB64) { setModeloError("Sube un vídeo de referencia primero"); return; }
+    if (modeloRefMode === "local" && !modeloLocalB64) { setModeloError("Sube el vídeo de referencia (Leo Harlem, etc.) primero"); return; }
 
     setModeloStep("extracting");
     setModeloError(null);
@@ -259,80 +258,70 @@ export default function YouTubeStudio() {
     setModeloFinalUrl(null);
     setModeloSavedUrl(null);
 
+    const voiceName = modeloVoices.find(v => v.voice_id === modeloVoiceId)?.name || "Sevillano";
+
     try {
-      // STEP 1: obtener clip de referencia
-      let clipB64: string | null = null;
+      // ── PIPELINE A: Generar desde cero — 3 clips Seedance I2V en paralelo ──
+      if (modeloRefMode === "generate" || modeloRefMode === "search") {
+        modeloAddLog(`🎬 Generando vídeo monologuista en escenario real…`);
+        modeloAddLog(`   → Lanzando 3 clips Seedance I2V en PARALELO (foto Sevillano + prompts stand-up)`);
+        modeloAddLog(`   → Voz "${voiceName}" con acento andaluz máximo (stability=0.12, style=0.72, speed=0.87)`);
+        setModeloStep("dubbing");
 
+        const r = await fetch(`${BASE}/api/youtube/modelo/comedian-gen`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ script: modeloScript, voiceId: modeloVoiceId }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Error generando vídeo comedian");
+
+        modeloAddLog(`✅ ${d.clipsGenerated} clips generados y concatenados (${d.audioDuration?.toFixed(1)}s)`);
+        modeloAddLog(`💾 Guardado permanentemente: ${d.savedAs}`);
+        if (d.publicUrl) setModeloSavedUrl(`${BASE}${d.publicUrl}`);
+
+        setModeloStep("done");
+        modeloAddLog(`🎤 Pipeline completado — monólogo en escenario real con voz Sevillana`);
+        return;
+      }
+
+      // ── PIPELINE B: Vídeo de referencia (Leo Harlem) → TTS Sevillano + face-swap ──
       if (modeloRefMode === "local" && modeloLocalB64) {
-        clipB64 = modeloLocalB64;
-        modeloAddLog(`📁 Usando vídeo local como referencia (${modeloLocalFile ? (modeloLocalFile.size/1024/1024).toFixed(1) : "?"}MB)…`);
-      } else if (modeloRefMode === "search" && modeloSelectedVideo) {
-        modeloAddLog(`📥 Descargando clip de "${modeloSelectedVideo.title}" (${modeloStartSec}s → +${modeloDurSec}s)…`);
-        const r = await fetch(`${BASE}/api/youtube/modelo/extract-clip`, {
+        modeloAddLog(`📁 Vídeo referencia: ${modeloLocalFile?.name} (${((modeloLocalFile?.size||0)/1024/1024).toFixed(1)}MB)`);
+        modeloAddLog(`🎙️ PASO 1: Generando voz Sevillano con acento andaluz…`);
+        modeloAddLog(`   → eleven_turbo_v2_5, stability=0.12 (máxima naturalidad), style=0.72 (stand-up), speed=0.87`);
+        modeloAddLog(`🔀 PASO 2: Reemplazando audio del vídeo de referencia con voz Sevillano`);
+        modeloAddLog(`   → Leo Harlem en escenario + voz del Sevillano sincronizada exactamente`);
+        setModeloStep("dubbing");
+
+        // Llamar al pipeline de referencia con face-swap automático
+        const r = await fetch(`${BASE}/api/youtube/modelo/reference-pipeline`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ videoId: modeloSelectedVideo.videoId, startSec: modeloStartSec, durationSec: modeloDurSec }),
+          body: JSON.stringify({
+            referenceVideoB64: modeloLocalB64,
+            voiceId: modeloVoiceId,
+            script: modeloScript,
+            doFaceSwap: true,
+          }),
         });
         const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "YouTube bloqueó la descarga — usa '📁 Subir vídeo' en su lugar");
-        clipB64 = d.clipBase64;
-        modeloAddLog(`✅ Clip extraído (${d.sizeKb} KB, ${d.durationSec}s)`);
-      } else {
-        modeloAddLog(`🤖 Generando referencia IA (${modeloContentType}) con Kling…`);
-        const r = await fetch(`${BASE}/api/youtube/modelo/generate-reference`, {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contentType: modeloContentType, prompt: modeloGenPrompt }),
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "Error generando referencia");
-        const vidRes = await fetch(d.videoUrl);
-        const vidBuf = await vidRes.arrayBuffer();
-        clipB64 = btoa(String.fromCharCode(...new Uint8Array(vidBuf)));
-        modeloAddLog(`✅ Referencia IA generada`);
+        if (!r.ok) throw new Error(d.error || "Error en pipeline de referencia");
+
+        if (d.faceSwapApplied) {
+          modeloAddLog(`🎭 PASO 3 (face-swap): cara del Sevillano implantada fotograma a fotograma`);
+          modeloAddLog(`   → ${d.audioDuration?.toFixed(1)}s a 4fps procesados con Replicate codeplugtech/face-swap`);
+          setModeloStep("faceswap");
+        }
+
+        modeloAddLog(`✅ Pipeline completado (${d.audioDuration?.toFixed(1)}s, face-swap=${d.faceSwapApplied})`);
+        modeloAddLog(`💾 Guardado permanentemente: ${d.savedAs}`);
+        if (d.publicUrl) setModeloSavedUrl(`${BASE}${d.publicUrl}`);
+
+        setModeloStep("done");
+        modeloAddLog(`🎤 Leo Harlem en escenario + cara Sevillano + voz Sevillano ✅`);
+        return;
       }
-
-      setModeloClipB64(clipB64);
-      setModeloStep("dubbing");
-
-      // STEP 2: ElevenLabs dubbing — sustituye la voz y sincroniza labios
-      const voiceName = modeloVoices.find(v => v.voice_id === modeloVoiceId)?.name || modeloVoiceId;
-      modeloAddLog(`🎙️ ElevenLabs Dubbing con voz "${voiceName}" + lip-sync automático…`);
-      const dubR = await fetch(`${BASE}/api/youtube/modelo/dub`, {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipBase64: clipB64, voiceId: modeloVoiceId, script: modeloScript }),
-      });
-      const dubD = await dubR.json();
-      if (!dubR.ok) throw new Error(dubD.error || "Error en dubbing");
-      modeloAddLog(`✅ Dubbing completado — vídeo guardado permanentemente (${dubD.savedAs || "dubbed.mp4"})`);
-      if (dubD.publicUrl) setModeloSavedUrl(`${BASE}${dubD.publicUrl}`);
-
-      // STEP 3: face-swap con ElevenLabs (foto del modelo + lip-sync) — opcional
-      if (modeloFaceFile) {
-        setModeloStep("faceswap");
-        modeloAddLog(`🎭 Face-swap con ElevenLabs (foto del Sevillano + lip-sync)…`);
-        const fd = new FormData();
-        fd.append("videoBase64", dubD.dubbedBase64);
-        fd.append("facePhoto", modeloFaceFile);
-        fd.append("voiceId", modeloVoiceId);
-        if (modeloScript) fd.append("script", modeloScript);
-        const fsR = await fetch(`${BASE}/api/youtube/modelo/face-swap`, {
-          method: "POST", credentials: "include", body: fd,
-        });
-        const fsD = await fsR.json();
-        if (!fsR.ok) throw new Error(fsD.error || "Error en face-swap");
-        const finalUrl = Array.isArray(fsD.outputUrl) ? fsD.outputUrl[0] : fsD.outputUrl;
-        setModeloFinalUrl(finalUrl);
-        if (fsD.publicUrl) setModeloSavedUrl(`${BASE}${fsD.publicUrl}`);
-        modeloAddLog(`✅ Face-swap completado con ${fsD.provider === "elevenlabs" ? "ElevenLabs" : "Replicate"} — guardado: ${fsD.savedAs || "faceswap.mp4"}`);
-      } else {
-        setModeloDubbedB64(dubD.dubbedBase64);
-        modeloAddLog(`ℹ️ Sin face-swap — vídeo doblado listo y guardado`);
-      }
-
-      setModeloStep("done");
-      modeloAddLog(`🎬 ¡Pipeline completado! Vídeo guardado permanentemente en el servidor.`);
     } catch (err: any) {
       setModeloStep("error");
       setModeloError(err.message);
@@ -1921,13 +1910,23 @@ export default function YouTubeStudio() {
         return (
           <div>
             {/* Header */}
-            <div style={{ background: "linear-gradient(135deg,rgba(251,191,36,0.08),rgba(16,185,129,0.05))", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: "14px 18px", marginBottom: 20 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--gold)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                <Clapperboard size={16} /> Modelo IA — Pipeline de vídeo con personaje real
+            <div style={{ background: "linear-gradient(135deg,rgba(251,191,36,0.08),rgba(16,185,129,0.05))", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--gold)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <Clapperboard size={16} /> Modelo IA — Monologuista en escenario real
               </div>
-              <div style={{ fontSize: 12, color: "var(--t3)", lineHeight: 1.6 }}>
-                Busca un vídeo de referencia en YouTube (gestos, ritmo, escenario) → ElevenLabs redubla con tu voz clonada → face-swap opcional con tu foto.<br />
-                Funciona para <strong>monólogos, UGC, podcasts, publicidad, tutoriales</strong> — cualquier formato que necesite un modelo hablando.
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontWeight: 700, color: "var(--gold)", fontSize: 12, marginBottom: 4 }}>🎬 Pipeline A — Generar desde cero</div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
+                    Tu foto → 3 clips Seedance I2V en <strong>paralelo</strong> (escenario comedia, spotlight) → concatena → voz Sevillano TTS. <em>Sin vídeo de referencia.</em>
+                  </div>
+                </div>
+                <div style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontWeight: 700, color: "var(--jade)", fontSize: 12, marginBottom: 4 }}>🎭 Pipeline B — Vídeo referencia (Leo Harlem)</div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
+                    Sube un vídeo de Leo Harlem → <strong>reemplaza audio</strong> con voz Sevillano → <strong>face-swap</strong> fotograma a fotograma (cara Sevillano sobre Leo Harlem).
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2018,25 +2017,38 @@ export default function YouTubeStudio() {
                 <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
                   <span style={S.label}>5. Vídeo de referencia (gestos y movimientos)</span>
                   <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                    {(["search","local","generate"] as const).map(m => (
-                      <button key={m} onClick={() => setModeloRefMode(m)}
-                        style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                          background: modeloRefMode === m ? "var(--gold)" : "var(--ink3)",
-                          color: modeloRefMode === m ? "#000" : "var(--t3)" }}>
-                        {m === "search" ? "🔍 YouTube" : m === "local" ? "📁 Subir vídeo" : "🤖 Generar IA"}
-                      </button>
-                    ))}
+                    <button onClick={() => setModeloRefMode("generate")}
+                      style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "2px solid", cursor: "pointer", fontSize: 11, fontWeight: 700,
+                        borderColor: modeloRefMode === "generate" || modeloRefMode === "search" ? "var(--gold)" : "transparent",
+                        background: modeloRefMode === "generate" || modeloRefMode === "search" ? "rgba(251,191,36,0.12)" : "var(--ink3)",
+                        color: modeloRefMode === "generate" || modeloRefMode === "search" ? "var(--gold)" : "var(--t3)" }}>
+                      🎬 Generar desde cero
+                    </button>
+                    <button onClick={() => setModeloRefMode("local")}
+                      style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "2px solid", cursor: "pointer", fontSize: 11, fontWeight: 700,
+                        borderColor: modeloRefMode === "local" ? "var(--jade)" : "transparent",
+                        background: modeloRefMode === "local" ? "rgba(16,185,129,0.12)" : "var(--ink3)",
+                        color: modeloRefMode === "local" ? "var(--jade)" : "var(--t3)" }}>
+                      🎭 Vídeo referencia
+                    </button>
                   </div>
 
-                  {/* Info: YouTube bot detection notice */}
-                  {modeloRefMode === "search" && (
-                    <div style={{ marginBottom: 8, padding: "6px 10px", background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, fontSize: 10, color: "var(--t3)" }}>
-                      ⚠️ YouTube bloquea descargas desde servidores. Si falla, usa <strong style={{ color: "var(--gold)" }}>📁 Subir vídeo</strong> — descarga tú mismo el clip de Leo Harlem y súbelo aquí.
+                  {/* Info: Pipeline A */}
+                  {(modeloRefMode === "generate" || modeloRefMode === "search") && (
+                    <div style={{ marginBottom: 8, padding: "8px 12px", background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
+                      <strong style={{ color: "var(--gold)" }}>🎬 Pipeline A:</strong> Foto Sevillano → 3 clips Seedance I2V en PARALELO (escenario comedia, spotlight, micrófono) → concatena → voz Sevillano TTS.<br />
+                      <span style={{ fontSize: 10, opacity: 0.8 }}>~4-7 min · No necesita vídeo de referencia</span>
                     </div>
                   )}
 
                   {modeloRefMode === "local" && (
                     <div>
+                      <div style={{ marginBottom: 8, padding: "8px 12px", background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 8, fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
+                        <strong style={{ color: "var(--jade)" }}>🎭 Pipeline B:</strong> Sube un clip de Leo Harlem / David el Guapo / cualquier monologuista → el servidor reemplaza el audio con la voz Sevillano → face-swap cara del Sevillano fotograma a fotograma.<br />
+                        <span style={{ fontSize: 10, opacity: 0.8 }}>~5-10 min según duración · Descarga el clip de YouTube con </span>
+                        <a href="https://cobalt.tools" target="_blank" style={{ color: "var(--jade)", fontSize: 10 }}>cobalt.tools</a>
+                        <span style={{ fontSize: 10, opacity: 0.8 }}> o y2mate y súbelo aquí</span>
+                      </div>
                       <input ref={modeloLocalRef} type="file" accept="video/*" style={{ display: "none" }}
                         onChange={e => {
                           const f = e.target.files?.[0];
@@ -2047,22 +2059,19 @@ export default function YouTubeStudio() {
                           reader.readAsDataURL(f);
                         }} />
                       <div onClick={() => modeloLocalRef.current?.click()}
-                        style={{ border: `2px dashed ${modeloLocalFile ? "var(--jade)" : "var(--ink4)"}`, borderRadius: 8, padding: 20, cursor: "pointer", textAlign: "center",
+                        style={{ border: `2px dashed ${modeloLocalFile ? "var(--jade)" : "rgba(16,185,129,0.3)"}`, borderRadius: 8, padding: 20, cursor: "pointer", textAlign: "center",
                           background: modeloLocalFile ? "rgba(16,185,129,0.05)" : "var(--ink3)" }}>
                         {modeloLocalFile ? (
                           <div>
                             <div style={{ fontSize: 24, marginBottom: 4 }}>🎬</div>
                             <div style={{ fontSize: 12, fontWeight: 700, color: "var(--jade)" }}>{modeloLocalFile.name}</div>
-                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{(modeloLocalFile.size / 1024 / 1024).toFixed(1)} MB · listo para dubbing</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{(modeloLocalFile.size / 1024 / 1024).toFixed(1)} MB · listo para reemplazar audio + face-swap</div>
                           </div>
                         ) : (
                           <div>
-                            <div style={{ fontSize: 28, marginBottom: 6 }}>📁</div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t)" }}>Sube tu vídeo de referencia</div>
-                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 4 }}>MP4 · máx 50MB · clip de Leo Harlem, youtuber, actor…</div>
-                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 6, lineHeight: 1.6 }}>
-                              💡 Descarga el clip con <a href="https://www.y2mate.com" target="_blank" style={{ color: "var(--gold)" }}>y2mate.com</a> o similar, luego súbelo aquí
-                            </div>
+                            <div style={{ fontSize: 28, marginBottom: 6 }}>🎭</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t)" }}>Sube vídeo de Leo Harlem / monologuista</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 4 }}>MP4 · máx 100MB · el servidor pone la voz Sevillano y su cara</div>
                           </div>
                         )}
                       </div>
@@ -2181,16 +2190,27 @@ export default function YouTubeStudio() {
             <div style={{ marginTop: 16 }}>
               {modeloError && <div style={{ marginBottom: 10, fontSize: 12, color: "#f87171", padding: "8px 12px", background: "rgba(239,68,68,0.08)", borderRadius: 8 }}>{modeloError}</div>}
               <button onClick={modeloRunPipeline} disabled={isRunning}
-                style={{ width: "100%", padding: "14px 20px", background: isRunning ? "var(--ink3)" : "linear-gradient(135deg,var(--gold),#f59e0b)", color: isRunning ? "var(--t3)" : "#000",
+                style={{ width: "100%", padding: "14px 20px",
+                  background: isRunning ? "var(--ink3)" : modeloRefMode === "local"
+                    ? "linear-gradient(135deg,#059669,#10b981)"
+                    : "linear-gradient(135deg,var(--gold),#f59e0b)",
+                  color: isRunning ? "var(--t3)" : "#000",
                   border: "none", borderRadius: 10, fontWeight: 800, cursor: isRunning ? "not-allowed" : "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {isRunning
                   ? <><RefreshCw size={16} className="spin" />
-                    {modeloStep === "extracting" ? "Descargando referencia…" : modeloStep === "dubbing" ? "Doblando con ElevenLabs…" : "Aplicando face-swap…"}
+                    {modeloStep === "extracting" ? "Iniciando pipeline…"
+                     : modeloStep === "dubbing" ? (modeloRefMode === "local" ? "Reemplazando audio + preparando face-swap…" : "Generando clips en paralelo…")
+                     : modeloStep === "faceswap" ? "Face-swap fotograma a fotograma (cara Sevillano)…"
+                     : "Procesando…"}
                     </>
-                  : <><Clapperboard size={16} /> Generar vídeo con modelo</>}
+                  : modeloRefMode === "local"
+                    ? <><span style={{ fontSize: 16 }}>🎭</span> Pipeline B — Subir vídeo + Voz + Face Swap</>
+                    : <><span style={{ fontSize: 16 }}>🎬</span> Pipeline A — Generar monólogo en escenario</>}
               </button>
               <div style={{ marginTop: 8, fontSize: 11, color: "var(--t3)", textAlign: "center" }}>
-                Paso 1: Extrae referencia (~30s) · Paso 2: ElevenLabs Dubbing (~2-3 min) · Paso 3: Face-swap opcional (~1 min)
+                {modeloRefMode === "local"
+                  ? "Paso 1: TTS Sevillano · Paso 2: Reemplazar audio Leo Harlem · Paso 3: Face-swap fotograma (~5-10 min)"
+                  : "3 clips Seedance I2V en paralelo (escenario comedia) → concatenar → voz Sevillano TTS (~4-7 min)"}
               </div>
             </div>
           </div>

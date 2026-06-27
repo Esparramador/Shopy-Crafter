@@ -762,6 +762,317 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
   }
 });
 
+// ── POST /youtube/modelo/comedian-gen — Genera vídeo monologuista en escenario REAL
+// 3 clips Seedance I2V en PARALELO (foto Sevillano + prompts stand-up en escenario)
+// → concatena clips → merge con voz Sevillano TTS (acento andaluz máximo)
+// Body: { script, voiceId }
+router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { script, voiceId } = req.body;
+    if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
+    if (!script?.trim()) return res.status(400).json({ error: "script requerido" });
+
+    const key = ELEVEN_KEY();
+    if (!key) return res.status(500).json({ error: "ELEVENLABS_API_KEY no configurada" });
+    const replicateToken = REPLICATE_TOKEN();
+    if (!replicateToken) return res.status(500).json({ error: "REPLICATE_API_TOKEN no configurado" });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "comedian-"));
+    const audioPath = path.join(tmpDir, "tts.mp3");
+
+    // ── PASO 1: TTS con acento andaluz máximo ──
+    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: { "xi-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: script,
+        model_id: "eleven_turbo_v2_5",
+        voice_settings: {
+          stability: 0.12,
+          similarity_boost: 0.95,
+          style: 0.72,
+          use_speaker_boost: true,
+          speed: 0.87,
+        },
+      }),
+    });
+    if (!ttsRes.ok) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      return res.status(ttsRes.status).json({ error: `TTS falló: ${await ttsRes.text()}` });
+    }
+    fs.writeFileSync(audioPath, Buffer.from(await ttsRes.arrayBuffer()));
+
+    // ── PASO 2: Duración exacta ──
+    const ffprobeBin = ffmpegBin.replace("ffmpeg", "ffprobe");
+    let exactDuration = "30";
+    try {
+      exactDuration = execSync(
+        `"${ffprobeBin}" -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`,
+        { stdio: ["pipe", "pipe", "pipe"] }
+      ).toString().trim();
+    } catch { /* fallback */ }
+    logger.info(`comedian-gen: TTS duration=${exactDuration}s`);
+
+    // ── PASO 3: Lanzar 3 clips Seedance I2V en PARALELO ──
+    const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
+    const photoUrl = devDomain ? `https://${devDomain}/images/sevillano-model.png` : "";
+
+    const comedyPrompts = [
+      "Spanish stand-up comedian performing energetically on a dark comedy club stage, warm amber spotlight from above, microphone stand visible, animated expressive hand gestures telling a joke, dark audience silhouette in background, cinematic stage lighting, authentic performance",
+      "Stand-up comedian on comedy club stage laughing and pointing at audience, dramatic golden spotlight from above, energetic body language, microphone in hand, professional Spanish comedy show",
+      "Stand-up comedian on stage finishing punchline, exaggerated facial expressions, triumph arms raised, warm spotlight from above, authentic Spanish comedy club atmosphere, audience in background",
+    ];
+
+    logger.info("comedian-gen: launching 3 Seedance I2V clips in parallel...");
+    const seedancePreds = await Promise.all(comedyPrompts.map(async (prompt, i) => {
+      const r = await fetch("https://api.replicate.com/v1/models/bytedance/seedance-1-lite/predictions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: { image: photoUrl || undefined, prompt, duration: 10, resolution: "720p", aspect_ratio: "9:16" },
+        }),
+      });
+      const d = await r.json() as any;
+      logger.info(`comedian-gen: Seedance clip ${i + 1} launched: id=${d.id}`);
+      return { id: d.id, index: i, url: null as string | null };
+    }));
+
+    // ── PASO 4: Polling paralelo de los 3 clips ──
+    const results = [...seedancePreds];
+    const pending = new Set(results.map((_, i) => i));
+    let attempts = 0;
+    while (pending.size > 0 && attempts < 50) {
+      await new Promise(r => setTimeout(r, 8000));
+      await Promise.all([...pending].map(async (i) => {
+        const p = results[i];
+        if (!p.id) { pending.delete(i); return; }
+        const d = await fetch(`https://api.replicate.com/v1/predictions/${p.id}`, {
+          headers: { Authorization: `Bearer ${replicateToken}` },
+        }).then(r => r.json()) as any;
+        if (d.status === "succeeded" && d.output) {
+          results[i].url = Array.isArray(d.output) ? d.output[0] : d.output;
+          pending.delete(i);
+          logger.info(`comedian-gen: clip ${i + 1} ready → ${results[i].url}`);
+        } else if (["failed","canceled"].includes(d.status)) {
+          pending.delete(i);
+          logger.warn(`comedian-gen: clip ${i + 1} failed: ${d.error}`);
+        }
+      }));
+      attempts++;
+    }
+
+    const successClips = results.filter(c => c.url);
+    if (successClips.length === 0) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      return res.status(500).json({ error: "Ningún clip Seedance generó vídeo. Comprueba el token de Replicate y la foto pública." });
+    }
+
+    // ── PASO 5: Descargar clips + concatenar ──
+    const clipPaths: string[] = [];
+    for (const c of successClips) {
+      const dlRes = await fetch(c.url!);
+      if (dlRes.ok) {
+        const p = path.join(tmpDir, `clip${c.index}.mp4`);
+        fs.writeFileSync(p, Buffer.from(await dlRes.arrayBuffer()));
+        clipPaths.push(p);
+      }
+    }
+
+    const outPath = path.join(tmpDir, "comedian.mp4");
+    const singleDur = 10;
+    const totalClipDur = clipPaths.length * singleDur;
+    const loopsNeeded = Math.ceil(parseFloat(exactDuration) / totalClipDur) + 1;
+    const listFile = path.join(tmpDir, "concat.txt");
+    const lines: string[] = [];
+    for (let l = 0; l < loopsNeeded; l++) for (const p of clipPaths) lines.push(`file '${p.replace(/'/g,"'\\''")}' `);
+    fs.writeFileSync(listFile, lines.join("\n"));
+    const concatPath = path.join(tmpDir, "concat.mp4");
+    execSync(`"${ffmpegBin}" -y -f concat -safe 0 -i "${listFile}" -c copy "${concatPath}"`, { timeout: 180_000, stdio: "pipe" });
+    execSync(
+      `"${ffmpegBin}" -y -i "${concatPath}" -i "${audioPath}" ` +
+      `-map 0:v:0 -map 1:a:0 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k ` +
+      `-t ${exactDuration} -movflags +faststart "${outPath}"`,
+      { timeout: 120_000, stdio: "pipe" }
+    );
+
+    // ── PASO 6: Guardar permanentemente ──
+    const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
+    const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
+    const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir :
+                         fs.existsSync(path.dirname(altSaveDir)) ? altSaveDir :
+                         path.join(os.tmpdir(), "modelo-saved");
+    fs.mkdirSync(permanentDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const savedFilename = `comedian_${timestamp}.mp4`;
+    const permanentPath = path.join(permanentDir, savedFilename);
+    fs.copyFileSync(outPath, permanentPath);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    const publicUrl = permanentPath.includes("shopify-optimizer") ? `/media/sevillano/${savedFilename}` : null;
+    logger.info(`comedian-gen: saved permanently as ${savedFilename} (${successClips.length} clips, ${exactDuration}s)`);
+
+    return res.json({ success: true, savedAs: savedFilename, publicUrl, audioDuration: parseFloat(exactDuration), clipsGenerated: successClips.length });
+  } catch (err: any) {
+    logger.error("comedian-gen:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /youtube/modelo/reference-pipeline — Vídeo referencia + TTS Sevillano + face-swap fotograma
+// Pipeline completo: vídeo Leo Harlem subido → audio Sevillano TTS → face-swap frame a frame
+// Body: { referenceVideoB64, voiceId, script, doFaceSwap?: boolean }
+router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { referenceVideoB64, voiceId, script, doFaceSwap = true } = req.body;
+    if (!referenceVideoB64) return res.status(400).json({ error: "referenceVideoB64 requerido — sube el vídeo de referencia" });
+    if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
+    if (!script?.trim()) return res.status(400).json({ error: "script requerido" });
+
+    const key = ELEVEN_KEY();
+    if (!key) return res.status(500).json({ error: "ELEVENLABS_API_KEY no configurada" });
+    const replicateToken = REPLICATE_TOKEN();
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "refpipe-"));
+    const audioPath = path.join(tmpDir, "tts.mp3");
+    const refVideoPath = path.join(tmpDir, "reference.mp4");
+    const mergedPath = path.join(tmpDir, "merged.mp4");
+    const outPath = path.join(tmpDir, "final.mp4");
+
+    // ── PASO 1: TTS Sevillano con acento andaluz ──
+    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: { "xi-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: script,
+        model_id: "eleven_turbo_v2_5",
+        voice_settings: { stability: 0.12, similarity_boost: 0.95, style: 0.72, use_speaker_boost: true, speed: 0.87 },
+      }),
+    });
+    if (!ttsRes.ok) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      return res.status(ttsRes.status).json({ error: `TTS falló: ${await ttsRes.text()}` });
+    }
+    fs.writeFileSync(audioPath, Buffer.from(await ttsRes.arrayBuffer()));
+
+    // ── PASO 2: Duración exacta ──
+    const ffprobeBin = ffmpegBin.replace("ffmpeg", "ffprobe");
+    let exactDuration = "30";
+    try {
+      exactDuration = execSync(
+        `"${ffprobeBin}" -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`,
+        { stdio: ["pipe", "pipe", "pipe"] }
+      ).toString().trim();
+    } catch { /* fallback */ }
+    logger.info(`reference-pipeline: TTS duration=${exactDuration}s, doFaceSwap=${doFaceSwap}`);
+
+    // ── PASO 3: Guardar vídeo de referencia ──
+    fs.writeFileSync(refVideoPath, Buffer.from(referenceVideoB64, "base64"));
+
+    // ── PASO 4: Reemplazar audio del vídeo de referencia con TTS (loop si necesario) ──
+    execSync(
+      `"${ffmpegBin}" -y -stream_loop 5 -i "${refVideoPath}" -i "${audioPath}" ` +
+      `-map 0:v:0 -map 1:a:0 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k ` +
+      `-t ${exactDuration} -movflags +faststart "${mergedPath}"`,
+      { timeout: 120_000, stdio: "pipe" }
+    );
+
+    // ── PASO 5: Face-swap fotograma a fotograma (codeplugtech/face-swap via Replicate) ──
+    let faceSwapApplied = false;
+    if (doFaceSwap && replicateToken) {
+      const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
+      const facePhotoUrl = devDomain ? `https://${devDomain}/images/sevillano-model.png` : "";
+      const FACE_SWAP_VERSION = "278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34";
+
+      const framesDir = path.join(tmpDir, "frames");
+      const swappedDir = path.join(tmpDir, "swapped");
+      fs.mkdirSync(framesDir, { recursive: true });
+      fs.mkdirSync(swappedDir, { recursive: true });
+
+      // Extraer fotogramas a 4fps (manejable: ~120 frames para 30s)
+      execSync(
+        `"${ffmpegBin}" -y -i "${mergedPath}" -vf fps=4 "${framesDir}/frame_%05d.jpg"`,
+        { timeout: 60_000, stdio: "pipe" }
+      );
+      const frameFiles = fs.readdirSync(framesDir).filter(f => f.endsWith(".jpg")).sort();
+      logger.info(`reference-pipeline: face-swapping ${frameFiles.length} frames @ 4fps...`);
+
+      // Procesar en batches de 12 en paralelo
+      const BATCH_SIZE = 12;
+      for (let i = 0; i < frameFiles.length; i += BATCH_SIZE) {
+        const batch = frameFiles.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (fname) => {
+          const framePath = path.join(framesDir, fname);
+          const swappedPath = path.join(swappedDir, fname);
+          try {
+            const frameB64 = fs.readFileSync(framePath).toString("base64");
+            let pred = await fetch("https://api.replicate.com/v1/predictions", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                version: FACE_SWAP_VERSION,
+                input: { swap_image: facePhotoUrl, input_image: `data:image/jpeg;base64,${frameB64}` },
+              }),
+            }).then(r => r.json()) as any;
+
+            let att = 0;
+            while (!["succeeded","failed","canceled"].includes(pred.status) && att < 18) {
+              await new Promise(r => setTimeout(r, 2500));
+              pred = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
+                headers: { Authorization: `Bearer ${replicateToken}` },
+              }).then(r => r.json()) as any;
+              att++;
+            }
+            if (pred.status === "succeeded" && pred.output) {
+              const dlRes = await fetch(Array.isArray(pred.output) ? pred.output[0] : pred.output);
+              if (dlRes.ok) { fs.writeFileSync(swappedPath, Buffer.from(await dlRes.arrayBuffer())); return; }
+            }
+          } catch { /* fallback */ }
+          try { fs.copyFileSync(framePath, swappedPath); } catch {}
+        }));
+        logger.info(`reference-pipeline: face-swap batch ${Math.floor(i/BATCH_SIZE)+1}/${Math.ceil(frameFiles.length/BATCH_SIZE)} done`);
+      }
+
+      // Reconstruir vídeo a 4fps y merge con audio TTS
+      const faceswappedPath = path.join(tmpDir, "faceswapped.mp4");
+      execSync(
+        `"${ffmpegBin}" -y -framerate 4 -i "${swappedDir}/frame_%05d.jpg" ` +
+        `-c:v libx264 -preset fast -crf 22 -movflags +faststart "${faceswappedPath}"`,
+        { timeout: 120_000, stdio: "pipe" }
+      );
+      execSync(
+        `"${ffmpegBin}" -y -i "${faceswappedPath}" -i "${audioPath}" ` +
+        `-map 0:v:0 -map 1:a:0 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k ` +
+        `-t ${exactDuration} -movflags +faststart "${outPath}"`,
+        { timeout: 120_000, stdio: "pipe" }
+      );
+      faceSwapApplied = true;
+    }
+
+    if (!fs.existsSync(outPath)) fs.copyFileSync(mergedPath, outPath);
+
+    // ── PASO 6: Guardar permanentemente ──
+    const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
+    const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
+    const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir :
+                         fs.existsSync(path.dirname(altSaveDir)) ? altSaveDir :
+                         path.join(os.tmpdir(), "modelo-saved");
+    fs.mkdirSync(permanentDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const savedFilename = `reference_pipeline_${timestamp}.mp4`;
+    const permanentPath = path.join(permanentDir, savedFilename);
+    fs.copyFileSync(outPath, permanentPath);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    const publicUrl = permanentPath.includes("shopify-optimizer") ? `/media/sevillano/${savedFilename}` : null;
+    logger.info(`reference-pipeline: saved ${savedFilename} (faceSwap=${faceSwapApplied}, duration=${exactDuration}s)`);
+
+    return res.json({ success: true, savedAs: savedFilename, publicUrl, audioDuration: parseFloat(exactDuration), faceSwapApplied });
+  } catch (err: any) {
+    logger.error("reference-pipeline:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /youtube/modelo/face-swap — ElevenLabs dubbing with face reference (lip-sync + face)
 // Falls back to Replicate if ElevenLabs fails
 router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
