@@ -10,7 +10,8 @@ const router = Router();
 // Express must be configured with express.raw() or rawBody middleware upstream.
 
 function verifyShopifyHmac(secret: string, rawBody: Buffer, hmacHeader: string): boolean {
-  if (!secret) return true;
+  // SECURITY: fail-closed — reject ALL requests if secret is not configured
+  if (!secret) return false;
   const digest = createHmac("sha256", secret).update(rawBody).digest("base64");
   try {
     const a = Buffer.from(digest), b = Buffer.from(hmacHeader);
@@ -19,7 +20,8 @@ function verifyShopifyHmac(secret: string, rawBody: Buffer, hmacHeader: string):
 }
 
 function verifyWooCommerceHmac(secret: string, rawBody: Buffer, sigHeader: string): boolean {
-  if (!secret) return true;
+  // SECURITY: fail-closed — reject ALL requests if secret is not configured
+  if (!secret) return false;
   const digest = createHmac("sha256", secret).update(rawBody).digest("base64");
   try {
     const a = Buffer.from(digest), b = Buffer.from(sigHeader);
@@ -28,7 +30,8 @@ function verifyWooCommerceHmac(secret: string, rawBody: Buffer, sigHeader: strin
 }
 
 function verifyStripeSignature(secret: string, rawBody: Buffer, sigHeader: string): boolean {
-  if (!secret) return true;
+  // SECURITY: fail-closed — reject ALL requests if secret is not configured
+  if (!secret) return false;
   try {
     const parts = sigHeader.split(",");
     const ts = parts.find(p => p.startsWith("t="))?.split("=")[1];
