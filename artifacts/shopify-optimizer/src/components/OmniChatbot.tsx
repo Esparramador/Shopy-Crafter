@@ -2125,6 +2125,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       let action: ChatAction | undefined;
       let streamUsage: MsgUsage | undefined;
       let streamSources: string[] | undefined;
+      let wasStreamed = false; // true when gemini-stream SSE already revealed text incrementally
 
       // ── CASE 0: Grabación y multi-tarea secuencial ─────────────────────────
       const lowerContent = content.toLowerCase();
@@ -2645,6 +2646,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   }
                 }
                 if (streamBuffer && !streamFailed) {
+                  wasStreamed = true;
                   assistantContent = streamBuffer;
                   // Detectar y ejecutar acciones Shopify incrustadas (:::ACTION:::...:::END_ACTION:::)
                   const streamActionRegex = /:::ACTION:::([\s\S]*?):::END_ACTION:::/g;
@@ -2806,6 +2808,29 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           assistantContent = `❌ **Error ${res.status}** en el servidor.${errDetail ? `\n\n_${errDetail}_` : ""}\n\nPuedes intentarlo de nuevo o usar un mensaje más corto. Si persiste, recarga la página.`;
         }
         } // fin motores no-Gemini
+      }
+
+      // ── Typewriter reveal for non-streaming responses ────────────────────
+      // When text arrived all at once (JSON endpoint), animate it word by word
+      // before the final setMessages so the user sees it build fluidly.
+      if (!wasStreamed && assistantContent.length > 60) {
+        const tokens = assistantContent.split(/(\s+)/);
+        // Scale delay so total animation ≤ 3.5s regardless of response length
+        const delay = Math.max(6, Math.min(28, 3500 / Math.max(tokens.length, 1)));
+        if (delay >= 8) {
+          let revealed = "";
+          for (let i = 0; i < tokens.length; i++) {
+            revealed += tokens[i];
+            // Update every 2 tokens (word + its trailing space) to batch renders
+            if (i % 2 === 0) {
+              const snap = revealed;
+              setMessages(m => m.map(msg =>
+                msg.id === thinkingId ? { ...msg, content: snap + " ▋" } : msg
+              ));
+              await new Promise<void>(r => setTimeout(r, delay));
+            }
+          }
+        }
       }
 
       const finalUsage = streamUsage;
