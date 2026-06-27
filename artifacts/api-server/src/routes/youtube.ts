@@ -23,6 +23,27 @@ import os from "os";
 
 const router = Router();
 
+// ─── OAuth State Store (in-memory, TTL 10 min) ───────────────────────────────
+// Needed because Google's redirect arrives without a valid session cookie in
+// production (SameSite cookie limitations on cross-site top-level navigations).
+interface OAuthState { userId: string; expires: number; }
+const oauthStateMap = new Map<string, OAuthState>();
+
+function createOAuthState(userId: string): string {
+  const state = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  oauthStateMap.set(state, { userId, expires: Date.now() + 10 * 60 * 1000 });
+  // Prune expired states
+  for (const [k, v] of oauthStateMap) if (v.expires < Date.now()) oauthStateMap.delete(k);
+  return state;
+}
+
+function consumeOAuthState(state: string): string | null {
+  const entry = oauthStateMap.get(state);
+  oauthStateMap.delete(state);
+  if (!entry || entry.expires < Date.now()) return null;
+  return entry.userId;
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 256 * 1024 * 1024 }, // 256 MB
@@ -190,6 +211,8 @@ router.get("/youtube/oauth/url", requireAdmin, (req: Request, res: Response) => 
       error: "YOUTUBE_CLIENT_ID no configurado. Crea credenciales OAuth en Google Cloud Console.",
     });
   }
+  const userId = (req.session as any)?.userId || "admin";
+  const state = createOAuthState(userId);
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: OAUTH.redirectUri(),
@@ -201,14 +224,27 @@ router.get("/youtube/oauth/url", requireAdmin, (req: Request, res: Response) => 
     ].join(" "),
     access_type: "offline",
     prompt: "consent",
+    state,
   });
   return res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
 });
 
 // ─── ADMIN: OAuth Callback ────────────────────────────────────────────────────
-router.get("/youtube/oauth/callback", requireAdmin, async (req: Request, res: Response) => {
+// NO requireAdmin here — Google's redirect comes without a valid session cookie
+// in production (SameSite=Lax). We verify identity via the `state` token instead.
+router.get("/youtube/oauth/callback", async (req: Request, res: Response) => {
   const code = String(req.query.code || "");
+  const stateParam = String(req.query.state || "");
+
   if (!code) return res.status(400).send("Sin código de autorización");
+
+  // Verify state token — prevents CSRF and identifies the user
+  const userId = consumeOAuthState(stateParam) || (req.session as any)?.userId || null;
+  if (!userId) {
+    logger.warn("YouTube OAuth callback: state token inválido o expirado");
+    const APP_URL = process.env.APP_URL || "";
+    return res.redirect(`${APP_URL}/admin/youtube-studio?error=state_expired`);
+  }
 
   try {
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -227,7 +263,6 @@ router.get("/youtube/oauth/callback", requireAdmin, async (req: Request, res: Re
       return res.status(400).send(`Error al obtener tokens: ${err}`);
     }
     const tokens = await tokenRes.json();
-    const userId = (req.user as any)?.id || "admin";
     const expiresAt = new Date(Date.now() + (tokens.expires_in - 60) * 1000);
 
     await db.execute(sql`
@@ -822,27 +857,108 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, r
     const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
     const photoUrl = customPhotoUrl || (devDomain ? `https://${devDomain}/images/sevillano-model.png` : "");
 
-    // Prompts adaptativos según el estilo seleccionado
+    // Prompts adaptativos con timeline de secciones (formato 0-Xs: descripción)
+    // Cada prompt describe 15s de vídeo divididos en segmentos de efecto/movimiento
     const STYLE_PROMPTS: Record<string, string[]> = {
       monologo: [
-        "Spanish stand-up comedian performing energetically on a dark comedy club stage, warm amber spotlight from above, microphone stand visible, animated expressive hand gestures telling a joke, dark audience silhouette in background, cinematic stage lighting, authentic live performance",
-        "Stand-up comedian on comedy club stage laughing and pointing at audience, dramatic golden spotlight from above, energetic body language, microphone in hand, professional Spanish comedy show, theater atmosphere",
-        "Stand-up comedian on stage delivering punchline, exaggerated facial expressions, triumph gesture arms raised, warm spotlight from above, authentic Spanish comedy club atmosphere, blurred audience in background",
+        // Clip 1 — Entrada energética + monólogo
+        "0-1.5s: Spanish comedian walks into amber spotlight on dark comedy club stage, big grin toward camera; " +
+        "1.5-3s: leans toward microphone stand with expressive eyes, hands open wide; " +
+        "3-5s: animated storytelling gestures, eyebrows raised, audience silhouettes visible in background; " +
+        "5-7s: throws head back laughing, points at crowd, dramatic golden light from above; " +
+        "7-9s: slow zoom-in on expressive face delivering punchline, cinematic shallow depth of field; " +
+        "9-10s: triumphant arms-wide pose, crowd laughter shadow in background, warm stage glow",
+
+        // Clip 2 — Desarrollo del chiste
+        "0-1.5s: comedian mid-story on comedy club stage, finger raised making a point, spotlight overhead; " +
+        "1.5-3s: squints conspiratorially at camera, leans in with a whisper gesture, dark atmosphere; " +
+        "3-5s: sudden burst of energy, claps hands together, audience shadow reacts; " +
+        "5-7s: walking side to side on stage, talking with both hands, amber rim lighting; " +
+        "7-8.5s: stops dead centre, pauses for effect, dramatic silence pose under spotlight; " +
+        "8.5-10s: explosive punchline delivery, arms fly out, huge smile, stage lights flare",
+
+        // Clip 3 — Remate y cierre
+        "0-2s: comedian laughing hard on stage, microphone at mouth, warm golden spotlight, audience in dark; " +
+        "2-4s: wipes tear of laughter, catches breath, audience silhouettes visible clapping; " +
+        "4-6s: energetic final joke gestures, full body movement, theatrical comedy club lighting; " +
+        "6-8s: slow dramatic zoom-out revealing full stage and spotlit comedian from distance; " +
+        "8-9.5s: comedian bows slightly, raises hand to audience, satisfied expression; " +
+        "9.5-10s: freeze on triumphant smile under single bright spotlight, fade to dark",
       ],
       ugc: [
-        "Person speaking directly to camera in casual home environment, natural daylight, speaking naturally and authentically, UGC style, slightly handheld feel, modern apartment background",
-        "Casual creator speaking to camera, bright natural light from window, relaxed body language, expressive face, authentic user generated content style, lifestyle background",
-        "Person talking to smartphone camera, candid authentic expression, natural indoor lighting, casual clothing, genuine reaction and story telling style, close medium shot",
+        // Clip 1 — Intro a cámara
+        "0-1.5s: person walks into frame in cozy modern apartment, looks directly at camera with natural smile; " +
+        "1.5-3s: leans forward slightly, eyebrows raised, speaking casually, soft window daylight; " +
+        "3-5s: gestures with both hands explaining something, candid authentic energy, UGC handheld feel; " +
+        "5-7s: surprised reaction, covers mouth, big eyes, natural expressive face; " +
+        "7-8.5s: laughs genuinely, shakes head in disbelief, warm lifestyle background; " +
+        "8.5-10s: looks into camera with knowing grin, points forward, casual close medium shot",
+
+        // Clip 2 — Desarrollo relatable
+        "0-2s: casual creator at kitchen counter speaking to phone camera, natural morning light from window; " +
+        "2-4s: walks toward camera while talking, relaxed body language, authentic clothing; " +
+        "4-6s: pauses to think, taps chin, then snaps fingers with idea face, lifestyle home setting; " +
+        "6-7.5s: leans back laughing candidly, covers face, genuine unscripted reaction; " +
+        "7.5-9s: leans into camera conspiratorially, whisper face, eyes wide; " +
+        "9-10s: final direct-to-camera confident statement, slight nod, natural fade",
+
+        // Clip 3 — CTA / cierre orgánico
+        "0-1.5s: person on sofa speaking comfortably to camera, natural bokeh background, cozy lighting; " +
+        "1.5-3.5s: raises index finger making key point, eyebrows animated, genuine expression; " +
+        "3.5-5.5s: glances away recalling something, then looks back laughing, head shake; " +
+        "5.5-7.5s: leans forward with big energy, hands gesturing fast, authentic UGC vibe; " +
+        "7.5-9s: slows down, speaks directly to camera for emphasis, warm eye contact; " +
+        "9-10s: smiles confidently, slight lean back, comfortable close-up finish",
       ],
       podcast: [
-        "Person speaking in modern podcast studio, professional microphone in foreground, dynamic lighting, engaged expression, podcast host style, broadcast quality setup",
-        "Podcast host at recording desk, condenser microphone, acoustic panels in background, confident gestures while speaking, professional media production environment",
-        "Close medium shot of podcast speaker, quality microphone, expressive speaking gestures, cozy studio atmosphere, warm desk lamp, professional audio setup",
+        // Clip 1 — Apertura del podcast
+        "0-2s: podcast host enters frame at recording desk, condenser microphone in foreground, settles in; " +
+        "2-4s: adjusts headphones, glances at notes, looks up at camera with engaged expression; " +
+        "4-6s: leans toward mic, speaking with measured authority, acoustic panels background; " +
+        "6-7.5s: tilts head listening, raises eyebrow, thoughtful pause for effect; " +
+        "7.5-9s: gestures with one hand making point, professional warm desk lamp lighting; " +
+        "9-10s: leans back slightly, satisfied expression, podcast studio ambience",
+
+        // Clip 2 — Momento de insight
+        "0-1.5s: podcast host mid-conversation, animated expression, hand flat on desk for emphasis; " +
+        "1.5-3.5s: picks up pen to gesture, leans forward, quality microphone prominent in shot; " +
+        "3.5-5.5s: counts points on fingers, deliberate speech rhythm, broadcast quality setup; " +
+        "5.5-7s: sits back, crosses arms briefly, then opens up with spread hands; " +
+        "7-8.5s: direct camera eye contact during key statement, slight forward lean; " +
+        "8.5-10s: breaks into genuine laugh at own point, relaxes, warm studio mood",
+
+        // Clip 3 — Cierre impactante
+        "0-2s: medium close-up of podcast host speaking passionately, dynamic studio lighting; " +
+        "2-4s: raises both hands for major point, expressive face, condenser mic in frame; " +
+        "4-6s: voice drops lower (visible in expression), serious compelling moment, soft focus background; " +
+        "6-7.5s: quick smile breaks through, points at camera for emphasis; " +
+        "7.5-9s: leans back satisfied, professional sign-off energy, glances at notes then camera; " +
+        "9-10s: confident closing nod, recording light visible, outro atmosphere",
       ],
       standUp: [
-        "Stand-up comedian on large theater stage, dramatic theatrical spotlight, performing to packed audience, energetic comedic gestures, big stage production, powerful performance moment",
-        "Comedian performing on spotlit stage, audience laughter reaction visible in background, theatrical comedy show, confident stage presence, boom microphone stand",
-        "Stand-up comedian mid-performance on well-lit stage, expressive face and body language, comedy theater venue, warm stage lights, audience silhouettes applauding",
+        // Clip 1 — Gran escenario, entrada
+        "0-2s: stand-up comedian strides into center-stage spotlight, large theater, crowd silhouette; " +
+        "2-4s: grabs microphone, scans audience left to right with wide grin, dramatic theatrical light; " +
+        "4-6s: big opening gesture arms wide, introducing bit with confident showman energy; " +
+        "6-8s: paces across stage, hands animated, audience engagement clear from body language; " +
+        "8-9s: stops centre stage, builds tension with long pause, spotlight tightens; " +
+        "9-10s: explosive opening punchline, crowd laughter wave, comedian beams",
+
+        // Clip 2 — Escalada cómica
+        "0-1.5s: comedian close-up delivering fast punchlines, rapid hand gestures, spotlit face; " +
+        "1.5-3s: steps back dramatically, then rushes forward, theatrical performance energy; " +
+        "3-5s: mimics a character voice (visible in exaggerated face), crowd silhouette reacting; " +
+        "5-6.5s: comedian laughs at own bit, recovers, professional crowd-work moment; " +
+        "6.5-8s: points into crowd, big smile, theater light catching the gesture; " +
+        "8-10s: builds to set-piece climax, arms wide, projection voice energy visible",
+
+        // Clip 3 — Gran remate teatral
+        "0-2s: wide shot of comedian on large stage, spotlight, packed theater atmosphere; " +
+        "2-4s: zoom slowly toward comedian mid-punchline, dramatic lighting, comedic peak; " +
+        "4-6s: crowd laugh reaction visible in background silhouettes, comedian savors moment; " +
+        "6-7.5s: triumphant gesture arms raised, spinning slowly on stage, theater applause energy; " +
+        "7.5-9s: microphone hold to audience for echo effect, showman style, stage flare; " +
+        "9-10s: comedian bows, looks up with huge smile, single bright curtain call spotlight",
       ],
     };
     const comedyPrompts = STYLE_PROMPTS[style] || STYLE_PROMPTS.monologo;
