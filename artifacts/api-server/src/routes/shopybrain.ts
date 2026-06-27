@@ -19,6 +19,7 @@ import { buildCoverPage } from "../lib/report-cover.js";
 import { analyzeImageForFusion } from "../lib/fusion-studio.js";
 import { processUploadedFile } from "../lib/file-processor.js";
 import { generateLeveledReport } from "../lib/report-levels.js";
+import { withPlatform, getProjectPlatformType } from "../lib/platform-helper.js";
 import {
   getSessionProjectId,
   fetchImageWithSizeLimit,
@@ -689,7 +690,26 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - create_business_card: Crear tarjeta de presentación profesional con IA (Card Studio). Pipeline 5 capas: fondo IA/CSS, logo overlay, texto vectorial, QR vCard, composición Sharp 300DPI. Exporta PNG + PDF. Params: {projectId, name (nombre de la tarjeta), fullName?, jobTitle?, companyName?, tagline?, email?, phone?, website?, socialHandle?, address?, templateId? ("black-gold"|"white-clean"|"jade-dark"|"minimal-light"|"neon-cyber"|"wood-craft"|"marble-luxury"|"deep-space"), layout? ("centered"|"left"|"grid"), backgroundModel? ("recraft-v3"|"gpt-image-1"|"imagen-4"|"flux-dev"), qrUrl?, generateCard? (default true)}
   - list_business_cards: Listar tarjetas de presentación de un proyecto. Params: {projectId}
   - generate_business_card_image: Regenerar imagen de una tarjeta existente con IA. Params: {projectId, cardId, backgroundModel?}
-  
+
+  ── 🛒 ACCIONES MULTI-PLATAFORMA (WooCommerce · PrestaShop · Shopify) ──
+  Estas acciones funcionan en CUALQUIER tienda conectada independientemente de la plataforma. El sistema detecta automáticamente si es Shopify, WooCommerce o PrestaShop y ejecuta la acción correcta.
+  - platform_store_status: Estado de la tienda (cualquier plataforma). Params: {projectId}
+  - platform_list_products: Listar productos (cualquier plataforma). Params: {projectId, status? ("active"|"draft"|"archived"), limit? (max 100)}
+  - platform_get_product: Obtener un producto por ID (cualquier plataforma). Params: {projectId, platformProductId}
+  - platform_create_product: Crear producto (cualquier plataforma — WooCommerce, PrestaShop, Shopify). Params: {projectId, title, price?, bodyHtml?, status? ("active"|"draft"), tags?, sku?, compareAtPrice?, variants? (array)}
+  - platform_edit_product: Editar producto existente (cualquier plataforma). Params: {projectId, platformProductId, title?, price?, bodyHtml?, status?, tags?, sku?, compareAtPrice?}
+  - platform_delete_product: Eliminar producto (cualquier plataforma). Params: {projectId, platformProductId}
+  - platform_get_orders: Obtener pedidos (cualquier plataforma). Params: {projectId, limit? (default 20), page?}
+  - platform_update_stock: Actualizar stock de un producto/variante (cualquier plataforma). Params: {projectId, platformProductId, quantity, variantId?}
+  - platform_update_seo: Actualizar SEO de un producto (cualquier plataforma). Params: {projectId, platformProductId, metaTitle?, metaDescription?, focusKeyword?}
+
+  ── 💳 STRIPE — Gestión de cuentas conectadas ──
+  - stripe_list_accounts: Listar cuentas Stripe conectadas (clientes). Sin params adicionales.
+  - stripe_account_overview: Resumen completo de una cuenta Stripe (balance, ingresos, clientes, suscripciones). Params: {accountId}
+  - stripe_list_transactions: Listar transacciones de una cuenta Stripe. Params: {accountId, limit? (default 20)}
+  - stripe_list_customers: Listar clientes de una cuenta Stripe. Params: {accountId, limit? (default 20)}
+  - stripe_list_subscriptions: Listar suscripciones activas de una cuenta Stripe. Params: {accountId}
+
   ── 🎨 FUSION STUDIO PRO (14 módulos de creación visual IA) ──
   FusionStudioPro es el estudio creativo completo en /projects/:id/fusion-studio-pro con 14 pestañas:
   • Quick Image: Generación rápida con cualquier modelo (gpt-image-1, recraft-v3, flux-dev, imagen-4, nano-banana, seedream-4)
@@ -11596,6 +11616,206 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const statsRes = await fetch(`http://localhost:${calPort4}/api/calendar/stats`, { headers: { cookie: req.headers.cookie || "" } });
           const statsData = await statsRes.json() as any;
           result = { message: `📊 **Estadísticas de Calendario CRM:**\n• Próximas citas: ${statsData.upcoming}\n• Completadas: ${statsData.completed}\n• Pendientes: ${statsData.pending}\n• Total facturado: ${parseFloat(statsData.total_revenue || 0).toFixed(2)}€\n• Duración media: ${statsData.avg_duration ? Math.round(statsData.avg_duration) + "min" : "N/D"}`, stats: statsData };
+          break;
+        }
+
+        // ── MULTI-PLATFORM ACTIONS (WooCommerce · PrestaShop · Shopify) ──────────
+
+        case "platform_store_status": {
+          const projectId = params?.projectId;
+          if (!projectId) { result = { error: "projectId requerido" }; break; }
+          const platformType = await getProjectPlatformType(parseInt(projectId));
+          const r2 = await withPlatform(parseInt(projectId), "products", async (connector) => {
+            const test = await connector.testConnection();
+            return { ...test, platformType };
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = { ...r2.data, message: `✅ Tienda ${r2.data.storeName || "conectada"} (${r2.data.platformInfo || platformType}) · ${r2.data.productCount ?? "?"} productos · Token: ${r2.data.tokenValid ? "válido" : "expirado"}` };
+          break;
+        }
+
+        case "platform_list_products": {
+          const projectId = params?.projectId;
+          if (!projectId) { result = { error: "projectId requerido" }; break; }
+          const limit = Math.min(params?.limit ?? 20, 100);
+          const status = params?.status as string | undefined;
+          const r2 = await withPlatform(parseInt(projectId), "products", async (connector) => {
+            return connector.getProducts({ status, limit });
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = { products: r2.data, total: r2.data.length, message: `${r2.data.length} productos encontrados` };
+          break;
+        }
+
+        case "platform_get_product": {
+          const projectId = params?.projectId;
+          const pid = params?.platformProductId;
+          if (!projectId || !pid) { result = { error: "projectId y platformProductId requeridos" }; break; }
+          const r2 = await withPlatform(parseInt(projectId), "products", async (connector) => {
+            return connector.getProduct(pid);
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = { product: r2.data, message: `Producto: ${r2.data.title} · ${r2.data.price}€` };
+          break;
+        }
+
+        case "platform_create_product": {
+          const projectId = params?.projectId;
+          if (!projectId) { result = { error: "projectId requerido" }; break; }
+          const title = params?.title;
+          if (!title) { result = { error: "title requerido" }; break; }
+          const confirmed = await requireConfirmation(req, `crear producto "${title}" en la tienda`);
+          if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas crear el producto "${title}"?` }; break; }
+          const productData = {
+            title,
+            price: params?.price ? String(params.price) : "0.00",
+            bodyHtml: params?.bodyHtml ?? "",
+            status: (params?.status ?? "draft") as "active" | "draft" | "archived",
+            tags: params?.tags ?? "",
+            variants: params?.variants ?? undefined,
+          };
+          const r2 = await withPlatform(parseInt(projectId), "product_create", async (connector) => {
+            return connector.createProduct(productData);
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = { product: r2.data, message: `✅ Producto creado: "${r2.data.title}" (ID: ${r2.data.platformId})` };
+          break;
+        }
+
+        case "platform_edit_product": {
+          const projectId = params?.projectId;
+          const pid = params?.platformProductId;
+          if (!projectId || !pid) { result = { error: "projectId y platformProductId requeridos" }; break; }
+          const updateData: Record<string, unknown> = {};
+          if (params?.title !== undefined) updateData.title = params.title;
+          if (params?.price !== undefined) updateData.price = String(params.price);
+          if (params?.bodyHtml !== undefined) updateData.bodyHtml = params.bodyHtml;
+          if (params?.status !== undefined) updateData.status = params.status;
+          if (params?.tags !== undefined) updateData.tags = params.tags;
+          if (params?.compareAtPrice !== undefined) updateData.compareAtPrice = String(params.compareAtPrice);
+          const r2 = await withPlatform(parseInt(projectId), "product_update", async (connector) => {
+            return connector.updateProduct(pid, updateData);
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = { product: r2.data, message: `✅ Producto actualizado: "${r2.data.title}"` };
+          break;
+        }
+
+        case "platform_delete_product": {
+          const projectId = params?.projectId;
+          const pid = params?.platformProductId;
+          if (!projectId || !pid) { result = { error: "projectId y platformProductId requeridos" }; break; }
+          const confirmed = await requireConfirmation(req, `eliminar producto ID ${pid}`);
+          if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas ELIMINAR el producto ${pid}? Esta acción es irreversible.` }; break; }
+          const r2 = await withPlatform(parseInt(projectId), "product_delete", async (connector) => {
+            await connector.deleteProduct(pid);
+            return { deleted: true };
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = { message: `🗑️ Producto ${pid} eliminado correctamente` };
+          break;
+        }
+
+        case "platform_get_orders": {
+          const projectId = params?.projectId;
+          if (!projectId) { result = { error: "projectId requerido" }; break; }
+          const limit = Math.min(params?.limit ?? 20, 100);
+          const page = params?.page ?? 1;
+          const r2 = await withPlatform(parseInt(projectId), "orders", async (connector) => {
+            return connector.getOrders({ limit, page });
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = {
+            orders: r2.data,
+            total: r2.data.length,
+            message: `${r2.data.length} pedidos · Total: ${r2.data.reduce((s, o) => s + parseFloat(o.total || "0"), 0).toFixed(2)}${r2.data[0]?.currency ?? "€"}`,
+          };
+          break;
+        }
+
+        case "platform_update_stock": {
+          const projectId = params?.projectId;
+          const pid = params?.platformProductId;
+          const quantity = params?.quantity;
+          if (!projectId || !pid || quantity === undefined) { result = { error: "projectId, platformProductId y quantity requeridos" }; break; }
+          const confirmed = await requireConfirmation(req, `actualizar stock del producto ${pid} a ${quantity} unidades`);
+          if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas actualizar el stock a ${quantity} unidades?` }; break; }
+          const r2 = await withPlatform(parseInt(projectId), "inventory", async (connector) => {
+            return connector.updateInventory(pid, parseInt(quantity), params?.variantId);
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = { message: `✅ Stock actualizado a ${quantity} unidades`, ...r2.data };
+          break;
+        }
+
+        case "platform_update_seo": {
+          const projectId = params?.projectId;
+          const pid = params?.platformProductId;
+          if (!projectId || !pid) { result = { error: "projectId y platformProductId requeridos" }; break; }
+          const seoData = { metaTitle: params?.metaTitle, metaDescription: params?.metaDescription, focusKeyword: params?.focusKeyword };
+          const r2 = await withPlatform(parseInt(projectId), "seo_write", async (connector) => {
+            return connector.updateSeo(pid, seoData);
+          });
+          if (!r2.ok) { result = { error: r2.error }; break; }
+          result = { seo: r2.data, message: `✅ SEO actualizado para producto ${pid}` };
+          break;
+        }
+
+        // ── STRIPE ACTIONS ──────────────────────────────────────────────────────
+
+        case "stripe_list_accounts": {
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts`, { headers: { cookie: req.headers.cookie || "" } });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error listando cuentas Stripe" }; break; }
+          const accounts = (data2.accounts || []) as Array<{ accountId: string; email?: string; businessName?: string; connected: boolean }>;
+          result = { accounts, total: accounts.length, message: `${accounts.length} cuenta(s) Stripe conectada(s):\n${accounts.map((a: any) => `• ${a.businessName || a.email || a.accountId} (${a.accountId})`).join("\n")}` };
+          break;
+        }
+
+        case "stripe_account_overview": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/overview`, { headers: { cookie: req.headers.cookie || "" } });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error obteniendo cuenta Stripe" }; break; }
+          result = { ...data2, message: `💳 Stripe ${accountId}: Balance disponible ${data2.balance?.available?.[0]?.amount ? (data2.balance.available[0].amount / 100).toFixed(2) + data2.balance.available[0].currency.toUpperCase() : "N/D"} · ${data2.customerCount ?? "?"} clientes · ${data2.subscriptionCount ?? "?"} suscripciones activas` };
+          break;
+        }
+
+        case "stripe_list_transactions": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const limit2 = Math.min(params?.limit ?? 20, 100);
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/transactions?limit=${limit2}`, { headers: { cookie: req.headers.cookie || "" } });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error listando transacciones" }; break; }
+          result = { transactions: data2.transactions || [], total: (data2.transactions || []).length, message: `${(data2.transactions || []).length} transacciones Stripe` };
+          break;
+        }
+
+        case "stripe_list_customers": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const limit2 = Math.min(params?.limit ?? 20, 100);
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/customers?limit=${limit2}`, { headers: { cookie: req.headers.cookie || "" } });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error listando clientes Stripe" }; break; }
+          result = { customers: data2.customers || [], total: (data2.customers || []).length, message: `${(data2.customers || []).length} clientes en Stripe` };
+          break;
+        }
+
+        case "stripe_list_subscriptions": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/subscriptions`, { headers: { cookie: req.headers.cookie || "" } });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error listando suscripciones Stripe" }; break; }
+          result = { subscriptions: data2.subscriptions || [], total: (data2.subscriptions || []).length, message: `${(data2.subscriptions || []).length} suscripciones activas en Stripe` };
           break;
         }
 
