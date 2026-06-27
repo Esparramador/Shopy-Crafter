@@ -566,74 +566,87 @@ router.post("/youtube/modelo/extract-clip", requireAdmin, async (req: Request, r
   }
 });
 
-// ── POST /youtube/modelo/dub — ElevenLabs dubbing on a video clip
-// Body: { clipBase64, voiceId, script, targetLang?, sourceVideoId? }
+// ── POST /youtube/modelo/dub — Smart pipeline: TTS → ffprobe duration → ffmpeg exact sync
+// Body: { clipBase64?, voiceId, script, targetLang?, facePhotoBase64?, sourceVideoId? }
+// Strategy: generate TTS audio first, measure exact duration, build video with -t matching audio.
+// This guarantees audio ↔ video are perfectly aligned (no ElevenLabs timing drift).
 router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { clipBase64, voiceId, script, targetLang = "es", sourceVideoId } = req.body;
-    if (!clipBase64 && !sourceVideoId) return res.status(400).json({ error: "clipBase64 o sourceVideoId requerido" });
+    const { clipBase64, voiceId, script, targetLang = "es", facePhotoBase64, sourceVideoId } = req.body;
     if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
+    if (!script?.trim()) return res.status(400).json({ error: "script requerido para generar TTS" });
 
     const key = ELEVEN_KEY();
     if (!key) return res.status(500).json({ error: "ELEVENLABS_API_KEY no configurada" });
 
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dub-"));
-    const inPath  = path.join(tmpDir, "input.mp4");
-    const outPath = path.join(tmpDir, "dubbed.mp4");
+    const audioPath = path.join(tmpDir, "tts.mp3");
+    const outPath   = path.join(tmpDir, "dubbed.mp4");
 
-    // Write clip to disk
-    const buf = Buffer.from(clipBase64, "base64");
-    fs.writeFileSync(inPath, buf);
-
-    // Build multipart form
-    const FormData = (await import("form-data")).default;
-    const form = new FormData();
-    form.append("file", fs.createReadStream(inPath), { filename: "clip.mp4", contentType: "video/mp4" });
-    form.append("target_lang", targetLang);
-    form.append("mode", "automatic");
-    form.append("voice_id", voiceId);
-    if (script) form.append("script", script);
-
-    const dubRes = await fetch("https://api.elevenlabs.io/v1/dubbing", {
+    // ── PASO 1: TTS con ElevenLabs — generamos el audio en la voz clonada ──
+    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: "POST",
-      headers: { "xi-api-key": key, ...form.getHeaders() },
-      body: form as any,
+      headers: { "xi-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: script,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: { stability: 0.5, similarity_boost: 0.85, style: 0.6, use_speaker_boost: true },
+      }),
     });
-
-    const dubData = await dubRes.json() as any;
-    if (!dubRes.ok) return res.status(dubRes.status).json({ error: dubData?.detail?.message || JSON.stringify(dubData) });
-
-    const dubbingId = dubData.dubbing_id;
-    if (!dubbingId) return res.status(500).json({ error: "ElevenLabs no devolvió dubbing_id" });
-
-    // Poll until done (max 3 min)
-    let status = "in_progress";
-    let attempts = 0;
-    while (status === "in_progress" && attempts < 36) {
-      await new Promise(r => setTimeout(r, 5000));
-      const statusRes = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}`, {
-        headers: { "xi-api-key": key },
-      });
-      const statusData = await statusRes.json() as any;
-      status = statusData.status;
-      attempts++;
-    }
-
-    if (status !== "dubbed") {
+    if (!ttsRes.ok) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
-      return res.status(500).json({ error: `Dubbing no completado. Estado: ${status}` });
+      return res.status(ttsRes.status).json({ error: `TTS falló: ${await ttsRes.text()}` });
+    }
+    fs.writeFileSync(audioPath, Buffer.from(await ttsRes.arrayBuffer()));
+
+    // ── PASO 2: Medir duración exacta del audio con ffprobe ──
+    const ffprobeBin = ffmpegBin.replace("ffmpeg", "ffprobe");
+    let exactDuration = "30";
+    try {
+      exactDuration = execSync(
+        `"${ffprobeBin}" -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`,
+        { stdio: ["pipe", "pipe", "pipe"] }
+      ).toString().trim();
+    } catch { /* fallback 30s */ }
+    logger.info(`TTS duration: ${exactDuration}s`);
+
+    // ── PASO 3: Construir vídeo con foto + TTS audio usando -t exacto ──
+    // Efecto Ken Burns suave para que no sea una foto estática
+    const fps = 25;
+    const totalFrames = Math.ceil(parseFloat(exactDuration) * fps);
+    const photoPath = path.join(process.cwd(), "..", "shopify-optimizer", "public", "images", "sevillano-model.png");
+    const altPhotoPath = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "images", "sevillano-model.png");
+    const photoSrc = fs.existsSync(photoPath) ? photoPath : altPhotoPath;
+
+    // If caller provided a video clip, use it as base; otherwise use the Sevillano photo
+    let videoInput = "";
+    if (clipBase64) {
+      const clipTmp = path.join(tmpDir, "clip.mp4");
+      fs.writeFileSync(clipTmp, Buffer.from(clipBase64, "base64"));
+      // Replace audio of existing clip with TTS, keeping exact duration
+      execSync(
+        `"${ffmpegBin}" -y -i "${clipTmp}" -i "${audioPath}" ` +
+        `-c:v copy -c:a aac -b:a 192k -map 0:v:0 -map 1:a:0 ` +
+        `-t ${exactDuration} -movflags +faststart "${outPath}"`,
+        { timeout: 90_000, stdio: "pipe" }
+      );
+    } else {
+      // Photo-based: loop photo + Ken Burns zoom, exact duration
+      if (!fs.existsSync(photoSrc)) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        return res.status(500).json({ error: "No se encontró foto de referencia (sevillano-model.png)" });
+      }
+      execSync(
+        `"${ffmpegBin}" -y -loop 1 -framerate ${fps} -i "${photoSrc}" -i "${audioPath}" ` +
+        `-filter_complex "[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,` +
+        `zoompan=z='min(1+on/${totalFrames}*0.05,1.05)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:fps=${fps}:s=720x1280,format=yuv420p[vout]" ` +
+        `-map "[vout]" -map "1:a" -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k ` +
+        `-t ${exactDuration} -movflags +faststart "${outPath}"`,
+        { timeout: 120_000, stdio: "pipe" }
+      );
     }
 
-    // Download dubbed video from ElevenLabs
-    const dlRes = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}/audio/${targetLang}`, {
-      headers: { "xi-api-key": key },
-    });
-    if (!dlRes.ok) return res.status(500).json({ error: "Error descargando audio doblado" });
-
-    const dubbed = Buffer.from(await dlRes.arrayBuffer());
-    fs.writeFileSync(outPath, dubbed);
-
-    // ── Guardar permanentemente en el proyecto (evita pérdida si ElevenLabs borra el archivo) ──
+    // ── PASO 4: Guardar permanentemente (TTS+vídeo ya sincronizados) ──
     const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
     const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
     const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir :
@@ -644,17 +657,25 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
     const savedFilename = `dubbed_${timestamp}.mp4`;
     const permanentPath = path.join(permanentDir, savedFilename);
     fs.copyFileSync(outPath, permanentPath);
-    logger.info(`Dubbed video saved permanently: ${permanentPath}`);
+    logger.info(`Dubbed video saved permanently: ${permanentPath} (duration: ${exactDuration}s)`);
 
     const b64out = fs.readFileSync(outPath).toString("base64");
     fs.rmSync(tmpDir, { recursive: true, force: true });
 
-    // Public URL if saved in shopify-optimizer/public
     const publicUrl = permanentPath.includes("shopify-optimizer")
       ? `/media/sevillano/${savedFilename}`
       : null;
 
-    return res.json({ success: true, dubbingId, status, dubbedBase64: b64out, mimeType: "video/mp4", savedAs: savedFilename, publicUrl });
+    return res.json({
+      success: true,
+      dubbingId: `tts-ffmpeg-${timestamp}`,
+      status: "dubbed",
+      dubbedBase64: b64out,
+      mimeType: "video/mp4",
+      savedAs: savedFilename,
+      publicUrl,
+      audioDuration: parseFloat(exactDuration),
+    });
   } catch (err: any) {
     logger.error("dub:", err.message);
     return res.status(500).json({ error: err.message });

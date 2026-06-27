@@ -569,3 +569,9 @@ id = "dcLJpt6TXLTNFy5QVoV39"
 uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_definitivo_2026-06-27T00-36-14.mp4"
 type = "video"
 title = "Sevillano — Monólogo Shopy Crafter (DEFINITIVO)"
+
+[[outputs]]
+id = "Gqybn7Aa0ce2TaY-HCoV2"
+uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_definitivo_sync_2026-06-27T00-37-35.mp4"
+type = "video"
+title = "Sevillano — Monólogo DEFINITIVO (audio+vídeo sincronizados al ms)"
