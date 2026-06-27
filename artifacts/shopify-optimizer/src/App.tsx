@@ -165,8 +165,13 @@ function LoadingScreen() {
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const [location] = useLocation();
   if (loading) return <LoadingScreen />;
-  if (!user) return <Redirect to="/" />;
+  if (!user) {
+    // Save intended destination so Login can redirect back after auth
+    try { localStorage.setItem("sc_last_route", location); } catch {}
+    return <Redirect to="/login" />;
+  }
   if (user.role !== "admin") return <Redirect to="/client" />;
   return <>{children}</>;
 }
@@ -186,6 +191,10 @@ function ExportCenterRoute() {
 }
 
 function HomeRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (user?.role === "admin") return <Redirect to="/home" />;
+  if (user?.role === "client") return <Redirect to="/client" />;
   return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
 }
 
@@ -225,8 +234,24 @@ function PageErrorBoundary({ children }: { children: React.ReactNode }) {
   return <ErrorBoundary fallbackRoute="/home">{children}</ErrorBoundary>;
 }
 
+function useMediaPermissions() {
+  const { user } = useAuth();
+  useEffect(() => {
+    if (!user || user.role !== "admin") return;
+    // Request mic + camera once so browser has permissions ready for YouTube Studio, voice input, etc.
+    if (!navigator.mediaDevices?.getUserMedia) return;
+    const key = "sc_media_perms_asked";
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then(stream => { stream.getTracks().forEach(t => t.stop()); })
+      .catch(() => {});
+  }, [user]);
+}
+
 function AdminWrapper({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  useMediaPermissions();
   return (
     <>
       <PageErrorBoundary>{children}</PageErrorBoundary>

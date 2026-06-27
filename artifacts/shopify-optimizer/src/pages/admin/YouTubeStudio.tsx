@@ -731,6 +731,27 @@ export default function YouTubeStudio() {
         </div>
       )}
 
+      {/* API Keys Status Banner */}
+      {(tab === "modelo" || tab === "satirico") && modeloVoices.length <= 1 && (
+        <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <AlertCircle size={16} style={{ color: "#f59e0b", flexShrink: 0, marginTop: 1 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b", marginBottom: 4 }}>APIs de voz no configuradas</div>
+            <div style={{ fontSize: 12, color: "var(--t3)", lineHeight: 1.6 }}>
+              Para usar <strong>Modelo IA</strong> y <strong>Creador IA</strong> necesitas añadir en Replit Secrets:
+              <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                <code style={{ background: "var(--ink3)", padding: "2px 8px", borderRadius: 6, fontSize: 11, color: "var(--gold)" }}>ELEVENLABS_API_KEY</code>
+                <span style={{ fontSize: 11, color: "var(--t3)", alignSelf: "center" }}>→ síntesis y clonado de voz (eleven.io)</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                <code style={{ background: "var(--ink3)", padding: "2px 8px", borderRadius: 6, fontSize: 11, color: "var(--t2)" }}>YOUTUBE_API_KEY</code>
+                <span style={{ fontSize: 11, color: "var(--t3)", alignSelf: "center" }}>→ búsqueda de vídeos sin OAuth (opcional)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={{ display: "flex", gap: 4, background: "var(--ink2)", borderRadius: 10, padding: 4, marginBottom: 20, flexWrap: "wrap" }}>
         {[
