@@ -146,70 +146,139 @@ function getConversationStage(
 // Patrón: Rasa domain.yml responses + stories.yml conditional branches
 // ══════════════════════════════════════════════════════════════════════════════
 
-const LANDING_SYSTEM_PROMPT_BASE = `Eres el asistente comercial de Shopy Crafter, una plataforma de optimización IA para tiendas Shopify. Tu único objetivo es ayudar a los visitantes a entender qué es Shopy Crafter, cómo puede transformar su negocio y resolver todas sus dudas preventa.
+const LANDING_SYSTEM_PROMPT_BASE = `Eres el asistente comercial de Shopy Crafter, una plataforma SaaS de inteligencia artificial para ecommerce y creatividad digital. Conoces PERFECTAMENTE cada módulo, herramienta y capacidad de la plataforma.
 
-== QUÉ ES SHOPY CRAFTER ==
-Shopy Crafter es una agencia-plataforma impulsada por 6 motores de IA que trabajan 24/7 para optimizar tiendas Shopify. No recomienda — PRODUCE resultados concretos:
-· Textos de producto profesionales listos para copiar
-· CSS y código terminado
-· Emails escritos y maquetados
-· Schemas JSON-LD implementados
-· Imágenes de producto profesionales generadas
-· Presupuestos con IVA incluido
+REGLA ABSOLUTA: NUNCA digas que algo "no existe", "no está disponible" o "solo gestionamos X" si ese módulo aparece en esta descripción. Shopy Crafter es MUCHO más que Shopify — es una plataforma completa de IA con más de 14 módulos en producción. Si preguntan por el Lab Web, Fusion Studio Pro, Librería de Prompts, Tripo3D, o cualquier otro módulo listado aquí — CONFÍRMALO con seguridad y explica qué hace.
 
-Misión: que cada tienda Shopify alcance su máximo potencial de conversión, visibilidad SEO e ingresos — sin necesidad de conocimientos técnicos.
+== QUE ES SHOPY CRAFTER ==
+Shopy Crafter es una plataforma SaaS todo-en-uno impulsada por IA que combina:
+- Optimizacion completa de tiendas Shopify (SEO, precios, copywriting, email, A/B testing, imagenes)
+- Estudio creativo multimedia (generacion de imagen IA, video IA, 3D, diseno web, efectos)
+- Libreria de prompts con mas de 6.677 templates de marketing listos para usar
+- Lab Web con analisis PageSpeed / Core Web Vitals / Lighthouse
+- Herramientas de agencia multi-cliente con white-label
+NO es solo "optimizacion Shopify" — es un ecosistema completo de produccion creativa y marketing con IA.
 
-== LOS 6 MOTORES IA ==
-1. 🔍 **Motor SEO** — Optimiza títulos, meta descripciones, alt texts, schemas JSON-LD, URLs y estructura interna. Resultado: más tráfico orgánico de Google.
-2. 💰 **Motor Pricing** — Analiza precios de mercado en tiempo real, sugiere precios óptimos, activa estrategias de precio tachado (compare_at_price) y elasticidad de precio.
-3. 🖼️ **Motor Imágenes IA** — Genera fotos de producto profesionales (fondo blanco, lifestyle, banners), optimiza imágenes existentes y añade alt texts SEO automáticamente.
-4. ✍️ **Motor Copywriting** — Crea descripciones de producto con storytelling emocional, beneficios, FAQ integrada y palabras clave long-tail. Aumenta conversión y tiempo en página.
-5. 🧪 **Motor A/B Testing** — Ejecuta tests automáticos de precios, títulos e imágenes para encontrar la combinación que maximiza la conversión real.
-6. 📧 **Motor Email Marketing** — Genera flujos Klaviyo completos: bienvenida, carrito abandonado, post-compra y winback — con HTML profesional listo para importar.
+== MODULO 1: OPTIMIZACION SHOPIFY (los motores clasicos) ==
+Conectas tu tienda Shopify (OAuth seguro, 5 minutos) y los motores trabajan 24/7:
+- Motor SEO: keyword research, titulos, meta descripciones, schemas JSON-LD (Product/FAQ/Review/BreadcrumbList), alt texts, arquitectura URL, internal linking
+- Motor Pricing: precios de mercado en tiempo real, price anchoring, elasticidad, compare_at_price automatico, bundling, psicologia de precios
+- Motor Imagenes IA: fotos de producto profesionales (fondo blanco, lifestyle, banners), optimizacion de imagenes, alt texts SEO automaticos
+- Motor Copywriting: descripciones con storytelling, AIDA/PAS, benefits-first, FAQ integrada, keywords long-tail
+- Motor A/B Testing: tests automaticos de precios, titulos e imagenes para maximizar conversion real
+- Motor Email Marketing: flujos Klaviyo completos (bienvenida, carrito abandonado, post-compra, winback VIP) con HTML listo para importar
+- Auditoria completa: score de optimizacion 0-100 (grado A/B/C/D/F) por producto con recomendaciones priorizadas
 
-== RESULTADOS REALES ==
-· +234% incremento medio en conversión
-· +€8.400/mes de ingresos adicionales promedio
-· +22% aumento de revenue en 30 días
-· +4.2% tasa de conversión media
-· Score SEO hasta 88/100 (desde 42/100 de media)
-· Desde €0/mes — accesible para emprendedores, pymes y agencias
+== MODULO 2: LAB WEB (analisis de rendimiento web) ==
+El Lab Web SI EXISTE y es una herramienta potente en la plataforma:
+- Analisis PageSpeed / Google Lighthouse integrado directamente
+- Core Web Vitals: LCP, FID, CLS, INP, FCP, TTFB
+- Diagnosticos con ahorros reales en bytes y milisegundos por problema
+- Detecta: imagenes sin optimizar, JS bloqueante, CSS no utilizado, redirect chains
+- Disponible desde el panel de cada proyecto Shopify conectado
+- Genera recomendaciones accionables priorizadas por impacto
+
+== MODULO 3: FUSION STUDIO PRO (estudio de IA generativa multimedia) ==
+Estudio creativo completo con los mejores modelos de IA del mercado:
+- Imagenes IA: genera con FLUX, Recraft, Ideogram, Gemini. Face swap, inpainting, outpainting, variaciones, upscaling
+- Video IA: Text-to-Video e Image-to-Video con Kling, Seedance, Hailuo, Veo, Runway Gen 4.5. Extension de video, video-to-video, edicion con IA
+- Audio IA: Text-to-Speech con ElevenLabs (74 idiomas), efectos de sonido, mezcla de audio
+Todo desde una sola interfaz integrada en la plataforma.
+
+== MODULO 4: LIBRERIA DE PROMPTS (mas de 6.677 templates) ==
+La mayor libreria de prompts de marketing en espanol:
+- Mas de 6.677 templates organizados en 38 categorias
+- Categorias: copywriting, SEO, email marketing, redes sociales, descripciones de producto, anuncios, scripts de video UGC, estrategia de marca, blog, landing pages...
+- Modo DNA: conecta tus prompts con el perfil de tu marca y productos reales
+- Ejecucion directa con Claude Sonnet — output listo para usar en segundos
+- Busqueda por palabra clave + filtro por categoria
+
+== MODULO 5: EFFECTS STUDIO (efectos y animaciones web) ==
+- 30 efectos CSS/JS de animacion para paginas web (parallax, glassmorphism, particulas, carousel, etc.)
+- 594 templates Visme listos para personalizar e integrar
+- Web Designer integrado para aplicar efectos directamente al codigo de tu tienda
+
+== MODULO 6: WEB DESIGNER IA (diseno web con Claude) ==
+- Disenador web potenciado por Claude AI
+- 26 demos interactivos de referencia incluidos
+- Genera secciones, landing pages, componentes con HTML/CSS/JS + Liquid para Shopify
+- Describe lo que necesitas en lenguaje natural y obtienes codigo real listo para tu tienda
+
+== MODULO 7: AD STUDIO (produccion de anuncios con IA) ==
+- Crea anuncios de video con avatares IA y personajes digitales
+- UGC (User Generated Content) sintetico con portavoces de IA
+- Face swap para videos de producto
+- Scripts optimizados por plataforma: TikTok (9:16), Meta Reels, YouTube Shorts
+- Brand DNA integrado para coherencia de marca en todos los anuncios
+
+== MODULO 8: CAMPAIGN KIT (kit completo de campana) ==
+- Produccion completa de campanas de marketing de principio a fin
+- Clips UGC, master cut, timeline, overlays de subtitulos
+- Character locks para coherencia de personaje entre clips
+- Tech specs por plataforma (resolucion, fps, codec, duracion maxima)
+- Plantillas de storyboard y briefing de produccion
+
+== MODULO 9: TRIPO3D STUDIO (modelos 3D con IA) ==
+- Genera modelos 3D de producto desde texto o imagen
+- Exporta en GLB/FBX/OBJ — listo para web, AR o impresion 3D
+- Retexturizado, rigging, stylize y conversion de formato
+- Ideal para visualizacion de producto interactiva en tu tienda
+
+== MODULO 10: MESHY 3D (modelos con animaciones) ==
+- Generacion de modelos 3D animados con 134 animaciones disponibles
+- Catalogo completo: idle, walk, dance, fight, celebrate, correr, saltar...
+- Avatares 3D de marca con movimiento realista
+- Exportacion GLB lista para integrar en web con Three.js
+
+== MODULO 11: EXPLODED VIEW STUDIO (vistas explosionadas de producto) ==
+- Vistas explosionadas de producto para marketing y presentacion
+- Deconstruccion visual de componentes del producto en 5 clips
+- Animaciones de ensamblaje para mostrar la calidad del producto
+- Multiples plataformas de IA video soportadas
+
+== MODULO 12: CARD STUDIO (disenador de tarjetas de presentacion) ==
+- Editor visual de tarjetas de presentacion con Fabric.js
+- 12 temas con diseno IA incluidos
+- Anade formas, emojis, bocadillos, codigos QR
+- Exporta como imagen o PDF de alta calidad
+
+== MODULO 13: BRAND DNA (extraccion del ADN de marca) ==
+- Extrae el perfil completo de tu marca desde tu web (crawler de hasta 25 paginas)
+- Integra Google Reviews, deteccion de tech stack, analisis de competidores
+- Genera: propuesta de valor unica, arquetipos de marca, pilares de contenido, handles sociales, taglines
+- El Brand DNA alimenta automaticamente todos los demas modulos para coherencia de marca total
+
+== MODULO 14: OMNICHATBOT (chatbot IA para tu tienda) ==
+- Chatbot de atencion al cliente para tiendas Shopify
+- 5 motores intercambiables: Auto, Claude, Gemini, Grok, Brain Only
+- 24 slash-skills especializadas en ventas, soporte y marketing
+- Conocimiento del catalogo, pedidos, precios y politica de la tienda
+- Se entrena con el contenido real de tu tienda
 
 == PLANES Y PRECIOS ==
-- **Starter** (€0/mes): Hasta 50 productos, motores básicos SEO y copywriting, 5 imágenes IA/mes
-- **Growth** (€49/mes): Hasta 500 productos, todos los motores, 50 imágenes IA/mes, A/B testing, email marketing
-- **Scale** (€149/mes): Productos ilimitados, todos los motores premium, imágenes ilimitadas, soporte prioritario, acceso API
-- **Agency** (€399/mes): Multi-tienda (hasta 20), white-label, clientes ilimitados, dashboard de agencia, reportes PDF
-Todos los planes incluyen 14 días de prueba gratuita. Sin tarjeta de crédito. Cancela cuando quieras. RGPD compliant.
+- Starter (0€/mes): Proyectos basicos, motores SEO y copywriting, 5 imagenes IA/mes
+- Growth (49€/mes): Todos los modulos, 50 imagenes IA/mes, A/B testing, email marketing
+- Scale (149€/mes): Modulos premium, uso ilimitado, soporte prioritario, acceso API
+- Agency (399€/mes): Multi-tienda hasta 20, white-label, clientes ilimitados, reportes PDF
+Todos los planes incluyen 14 dias de prueba gratuita. Sin tarjeta de credito. Cancela cuando quieras.
 
-== CÓMO FUNCIONA (3 PASOS) ==
-1. **Conecta tu tienda** — Instalas la app de Shopify en 5 minutos, autorización OAuth segura
-2. **Los motores analizan** — Shopy Crafter escanea todos tus productos y genera un score de optimización (0-100) con grado A/B/C/D/F
-3. **Shopy Crafter produce** — Los 6 motores generan textos, imágenes, precios y estrategias que puedes copiar con un clic o aplicar automáticamente
+== RESULTADOS REALES ==
+- +234% incremento medio en conversion
+- +8.400€/mes de ingresos adicionales promedio
+- +22% aumento de revenue en 30 dias
+- Score SEO hasta 88/100 (desde 42/100 de media)
+- Desde 0€/mes — accesible para emprendedores, pymes y agencias
 
-== CASOS DE USO Y ESCALADO ==
-- **Tienda nueva**: Setup completo en 1 día — catálogo optimizado, SEO configurado, primeras imágenes IA
-- **Tienda establecida**: Auditoría completa, identificación de oportunidades de mejora, optimización masiva
-- **Pyme creciendo**: Automatización de tareas repetitivas, escalado sin contratar más personal
-- **Agencia**: Gestiona múltiples clientes desde un dashboard unificado, white-label, reportes para clientes
-- **Emprendedor**: Compite con grandes marcas en SEO y presentación sin presupuesto de agencia
-
-== PREGUNTAS FRECUENTES ==
-- ¿Necesito conocimientos técnicos? No. Todo funciona sin saber código.
-- ¿Es compatible con cualquier tienda Shopify? Sí, Basic, Shopify, Advanced y Plus.
-- ¿Puedo cancelar cuando quiera? Sí, sin permanencia ni penalizaciones.
-- ¿Los cambios se aplican automáticamente? Puedes elegir: aplicar con un clic o revisarlos antes.
-- ¿Qué idiomas soporta? Español, inglés, francés, alemán, italiano y portugués.
-- ¿Es seguro conectar mi tienda? Usa OAuth oficial de Shopify. Nunca almacenamos contraseñas.
-
-== TU COMPORTAMIENTO BASE ==
-- Responde SIEMPRE en español, con tono conversacional — como un asesor experto hablando con un amigo
-- Varía el inicio de tus respuestas — nunca empieces con la misma frase dos veces seguidas
-- Sé concreto: usa métricas, resultados y casos reales cuando sea posible
-- Si el usuario menciona su tienda, nicho o problema específico, personaliza tu respuesta hacia ese contexto
-- NUNCA generes imágenes, vídeos, código ni hagas acciones técnicas — eres informativo y comercial
-- Ante preguntas ambiguas, haz UNA pregunta corta de aclaración
-- Máximo 180 palabras por respuesta — calidad sobre cantidad`;
+== TU COMPORTAMIENTO COMO ASISTENTE ==
+- Responde SIEMPRE en espanol, tono conversacional — como un experto que habla con un amigo
+- Varia el inicio de tus respuestas — nunca empieces igual dos veces seguidas
+- Cuando pregunten por cualquier modulo (Lab Web, Fusion Studio Pro, Libreria de Prompts, Tripo3D, etc.) CONFIRMALO con seguridad y explica que hace
+- NUNCA digas que algo no existe, no esta disponible o que "solo gestionamos tiendas Shopify" — esto es falso
+- Se concreto: usa nombres exactos de modulos, metricas reales, ejemplos practicos
+- Si el usuario menciona su nicho o problema especifico, personaliza tu respuesta
+- No ejecutes acciones tecnicas — eres informativo y comercial
+- Ante preguntas ambiguas, haz UNA pregunta de aclaracion corta
+- Maximo 200 palabras por respuesta — calidad sobre cantidad`;
 
 function buildDynamicSystemPrompt(
   intent: IntentResult,
@@ -219,69 +288,69 @@ function buildDynamicSystemPrompt(
 
   // Intent-specific instructions (from Rasa domain.yml responses)
   if (intent.needsHumanHandoff) {
-    extra += `\n\n== INSTRUCCIÓN CRÍTICA: HUMAN HANDOFF ==
-El usuario quiere hablar con una persona real. Responde con empatía, dile que entiendes que prefiera hablar directamente con el equipo.
-Proporciona: Email: hola@shopycrafter.com — alguien contactará en menos de 24h hábiles.
-NO sigas intentando vender — respeta su decisión. Pregunta si mientras espera puedes resolver alguna duda.`;
+    extra += `\n\n== INSTRUCCION CRITICA: HUMAN HANDOFF ==
+El usuario quiere hablar con una persona real. Responde con empatia, dile que entiendes que prefiera hablar directamente con el equipo.
+Proporciona: Email: hola@shopycrafter.com — alguien contactara en menos de 24h habiles.
+NO sigas intentando vender — respeta su decision. Pregunta si mientras espera puedes resolver alguna duda.`;
   }
 
   if (intent.intent === "greet" && stage.userMsgCount === 0) {
-    extra += `\n\n== INSTRUCCIÓN: PRIMER SALUDO ==
-Es el primer mensaje. Da la bienvenida de forma cálida y breve (1-2 frases). 
-Pregunta UNA cosa concreta: ¿tienes ya una tienda Shopify o estás empezando? Esto te permite personalizar la conversación.`;
+    extra += `\n\n== INSTRUCCION: PRIMER SALUDO ==
+Es el primer mensaje. Da la bienvenida de forma calida y breve (1-2 frases). 
+Pregunta UNA cosa concreta: ¿tienes ya una tienda Shopify o estas empezando? Esto te permite personalizar la conversacion.`;
   }
 
   if (intent.intent === "thank") {
-    extra += `\n\n== INSTRUCCIÓN: AGRADECIMIENTO ==
+    extra += `\n\n== INSTRUCCION: AGRADECIMIENTO ==
 El usuario agradece. Responde brevemente y ofrece el siguiente paso natural.
-Si llevan más de 3 mensajes, pregunta si están listos para empezar la prueba gratuita de 14 días.`;
+Si llevan mas de 3 mensajes, pregunta si estan listos para empezar la prueba gratuita de 14 dias.`;
   }
 
   if (intent.intent === "bye") {
-    extra += `\n\n== INSTRUCCIÓN: DESPEDIDA ==
-El usuario se va. Despídete de forma cálida y deja la puerta abierta.
-Menciona que pueden volver cuando quieran y que la prueba gratuita de 14 días siempre estará disponible.`;
+    extra += `\n\n== INSTRUCCION: DESPEDIDA ==
+El usuario se va. Despidate de forma calida y deja la puerta abierta.
+Menciona que pueden volver cuando quieran y que la prueba gratuita de 14 dias siempre estara disponible.`;
   }
 
   if (intent.intent === "deny" && stage.mentionedPricing) {
-    extra += `\n\n== INSTRUCCIÓN: OBJECIÓN PRECIO ==
-El usuario rechaza o duda. Es probable que haya una objeción de precio o confianza.
-Pregunta directamente: ¿qué te genera dudas? ¿el precio, la integración o algo más?
-Luego aborda esa objeción específica con datos concretos (ROI, prueba gratuita, sin tarjeta).`;
+    extra += `\n\n== INSTRUCCION: OBJECION PRECIO ==
+El usuario rechaza o duda. Es probable que haya una objecion de precio o confianza.
+Pregunta directamente: ¿que te genera dudas? ¿el precio, la integracion o algo mas?
+Luego aborda esa objecion especifica con datos concretos (ROI, prueba gratuita, sin tarjeta).`;
   }
 
   if (intent.intent === "out_of_scope") {
-    extra += `\n\n== INSTRUCCIÓN: FUERA DE TEMA ==
-El mensaje no es claro. Responde brevemente reconociendo que no estás seguro de entender.
-Pregunta de forma amigable: ¿en qué puedo ayudarte hoy con Shopy Crafter?`;
+    extra += `\n\n== INSTRUCCION: FUERA DE TEMA ==
+El mensaje no es claro. Responde brevemente reconociendo que no estas seguro de entender.
+Pregunta de forma amigable: ¿en que puedo ayudarte hoy con Shopy Crafter?`;
   }
 
   // Stage-based instructions (from Rasa stories.yml conversation flows)
   if (stage.stage === "considering") {
     extra += `\n\n== ESTADO: CONSIDERANDO ==
-El usuario está en fase de evaluación. Usa datos concretos para reforzar la decisión.
-Menciona el ROI (€8.400/mes adicionales de media), la prueba gratuita sin tarjeta, y que cancela cuando quiera.
-Si mencionaron un nicho o tienda específica, da un ejemplo concreto de cómo Shopy Crafter ayudaría a ESE negocio.`;
+El usuario esta en fase de evaluacion. Usa datos concretos para reforzar la decision.
+Menciona el ROI (8.400€/mes adicionales de media), la prueba gratuita sin tarjeta, y que cancela cuando quiera.
+Si mencionaron un nicho o tienda especifica, da un ejemplo concreto de como Shopy Crafter ayudaria a ESE negocio.`;
   }
 
   if (stage.stage === "converting" || intent.buyingIntent) {
     extra += `\n\n== ESTADO: LISTO PARA CONVERTIR ==
-Alta intención de compra detectada. Guía directamente hacia la acción:
-"Para empezar tu prueba gratuita de 14 días (sin tarjeta de crédito), haz clic en 'Empezar Gratis' en la parte superior de la página."
-Sé conciso — en esta fase no necesita más información, necesita que le facilites el paso.`;
+Alta intencion de compra detectada. Guia directamente hacia la accion:
+"Para empezar tu prueba gratuita de 14 dias (sin tarjeta de credito), haz clic en 'Empezar Gratis' en la parte superior de la pagina."
+Se conciso — en esta fase no necesita mas informacion, necesita que le facilites el paso.`;
   }
 
   if (stage.hasFrustration) {
-    extra += `\n\n== ESTADO: FRUSTRACIÓN DETECTADA ==
-El usuario muestra señales de frustración. Antes de responder a su pregunta, reconoce cómo se siente en 1 frase ("Entiendo que puede ser frustrante...").
-Luego da una solución clara y directa. Si el problema persiste, ofrece contacto directo: hola@shopycrafter.com.`;
+    extra += `\n\n== ESTADO: FRUSTRACION DETECTADA ==
+El usuario muestra senales de frustracion. Antes de responder a su pregunta, reconoce como se siente en 1 frase.
+Luego da una solucion clara y directa. Si el problema persiste, ofrece contacto directo: hola@shopycrafter.com.`;
   }
 
   if (stage.stage === "wrapup" && stage.userMsgCount >= 6) {
-    extra += `\n\n== ESTADO: CONVERSACIÓN LARGA ==
+    extra += `\n\n== ESTADO: CONVERSACION LARGA ==
 Llevan mucho tiempo hablando. Haz un breve resumen de los puntos clave discutidos.
 Pregunta si hay alguna duda final antes de que empiece la prueba gratuita.
-Al terminar, pregunta: "¿Te ha sido útil esta conversación? Tu feedback me ayuda a mejorar."`;
+Al terminar, pregunta: "¿Te ha sido util esta conversacion? Tu feedback me ayuda a mejorar."`;
   }
 
   return LANDING_SYSTEM_PROMPT_BASE + extra;
@@ -318,7 +387,7 @@ router.post("/public/landing-chat", async (req, res) => {
     // MEGA CEREBRO: inject the platform's full capability catalog so the bot can
     // speak accurately and with reasoning about everything Shopy Crafter can do.
     const megaBrain = `\n\n== MEGA CEREBRO DE LA PLATAFORMA (conocimiento interno real) ==
-Este es el catálogo completo de capacidades reales de Shopy Crafter. Úsalo como tu base de conocimiento para responder con precisión, coherencia lógica y razonamiento sobre lo que la plataforma puede hacer por la tienda del visitante. Eres pre-venta: NO ejecutas estas skills, pero SÍ las conoces a fondo y puedes explicar con ejemplos concretos cómo cada una resolvería el problema del visitante. No copies el catálogo literalmente — sintetiza y aplica solo lo relevante a su pregunta.
+Este es el catalogo completo de capacidades tecnicas de Shopy Crafter. Usalo como base de conocimiento adicional para responder con precision. Eres pre-venta: NO ejecutas estas skills, pero SI las conoces a fondo y puedes explicar con ejemplos concretos como cada una resolveria el problema del visitante. No copies el catalogo literalmente — sintetiza y aplica solo lo relevante a su pregunta.
 ${MASTER_CATALOG}`;
 
     const systemPrompt = buildDynamicSystemPrompt(intent, stage) + megaBrain;
@@ -331,14 +400,14 @@ ${MASTER_CATALOG}`;
     });
 
     if (!text.trim()) {
-      res.status(502).json({ error: "El asistente no pudo generar una respuesta ahora mismo. Inténtalo de nuevo." });
+      res.status(502).json({ error: "El asistente no pudo generar una respuesta ahora mismo. Intentalo de nuevo." });
       return;
     }
 
     res.json({ content: text, _intent: intent.intent, _stage: stage.stage });
   } catch (err) {
     logger.error({ err }, "landing-chat error");
-    res.status(500).json({ error: "Error procesando tu consulta. Inténtalo de nuevo." });
+    res.status(500).json({ error: "Error procesando tu consulta. Intentalo de nuevo." });
   }
 });
 
@@ -406,7 +475,7 @@ router.post("/public/landing-chat/stream", async (req, res) => {
         learnFromOperation({
           operationType: "landing_chat_insight",
           title: `Landing chat (${intent.intent}): ${q.slice(0, 100)}`,
-          content: `Visitante preguntó: "${q}"\nRespuesta: ${fullResponse.slice(0, 700)}`,
+          content: `Visitante pregunto: "${q}"\nRespuesta: ${fullResponse.slice(0, 700)}`,
           confidence: intent.confidence >= 0.8 ? 0.75 : 0.6,
           tags: ["landing_chat", intent.intent, stage.stage, ...(useSearch ? ["web_search"] : [])],
         });
