@@ -4,7 +4,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { db, projectsTable, projectFilesTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
-import { requireAdmin } from "../lib/auth.js";
+import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { saveToVault } from "../lib/vault.js";
@@ -450,7 +450,7 @@ router.post("/fs-pro/prompt/enhance", requireAdmin, async (req, res) => {
 
 // ─── PROMPT LIBRARY (biblioteca persistente de plantillas reutilizables) ──
 // GET /api/fs-pro/prompt-library?useCase=...  → lista (auto-seed si vacía)
-router.get("/fs-pro/prompt-library", requireAdmin, async (req, res) => {
+router.get("/fs-pro/prompt-library", requireAuth, async (req, res) => {
   try {
     await ensureSeedsExist();
     await ensureCinematicAdTemplatesExist();
@@ -501,7 +501,7 @@ router.get("/fs-pro/prompt-library", requireAdmin, async (req, res) => {
 });
 
 // POST /api/fs-pro/prompt-library  → crear plantilla custom del usuario
-router.post("/fs-pro/prompt-library", requireAdmin, async (req, res) => {
+router.post("/fs-pro/prompt-library", requireAuth, async (req, res) => {
   try {
     const { name, description, useCase, niche, systemPrompt, userTemplate, variables } = req.body as Record<string, any>;
     if (!name || typeof name !== "string" || name.trim().length < 3) {
@@ -534,7 +534,7 @@ router.post("/fs-pro/prompt-library", requireAdmin, async (req, res) => {
 });
 
 // DELETE /api/fs-pro/prompt-library/:id  → solo plantillas user-* (no seeds)
-router.delete("/fs-pro/prompt-library/:id", requireAdmin, async (req, res) => {
+router.delete("/fs-pro/prompt-library/:id", requireAuth, async (req, res) => {
   try {
     const id = String(req.params.id);
     if (id.startsWith("seed:")) {
@@ -548,7 +548,7 @@ router.delete("/fs-pro/prompt-library/:id", requireAdmin, async (req, res) => {
 });
 
 // POST /api/fs-pro/prompt-library/:id/use  → incrementa contador de uso
-router.post("/fs-pro/prompt-library/:id/use", requireAdmin, async (req, res) => {
+router.post("/fs-pro/prompt-library/:id/use", requireAuth, async (req, res) => {
   try {
     const id = String(req.params.id);
     await _dbForLibrary.update(omnicorePromptLibraryTable)
@@ -613,7 +613,7 @@ export function resetMasterLib() { _masterLib = null; }
 
 // GET /api/fs-pro/prompt-library-master?library=KEY&search=TEXT&limit=20&offset=0
 // Without params (or indexOnly=1) → returns the library index with counts only
-router.get("/fs-pro/prompt-library-master", requireAdmin, async (req, res): Promise<void> => {
+router.get("/fs-pro/prompt-library-master", requireAuth, async (req, res): Promise<void> => {
   try {
     const { library: libKey, search, limit = "20", offset = "0", indexOnly } = req.query as Record<string, string>;
     const master = getMasterLib();

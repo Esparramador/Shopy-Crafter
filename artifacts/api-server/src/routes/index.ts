@@ -121,6 +121,12 @@ router.use(webhookGatewayRouter);
 router.use(stripeConnectRouter);
 router.use(stripeMasterRouter);
 
+// fs-pro and visme: every route has its own per-route auth (requireAdmin or requireAuth)
+// so they must be mounted BEFORE the global requireAdmin gate below.
+router.use(fsProRouter);
+router.use(vismeRouter);
+router.use(promptExecRouter);
+
 router.use(requireAdmin, meshyRouter);
 router.use(requireAdmin, stitchRouter);
 
@@ -167,16 +173,13 @@ router.use(webLabRouter);
 router.use(fusionStudioRouter);
 router.use(brandKitRouter);
 router.use(adStudioRouter);
-router.use(fsProRouter);
 router.use(productAdsRouter);
 router.use(charactersRouter);
 router.use(cardsRouter);
 router.use(reportTemplatesRouter);
 router.use(brandDnaRouter);
 router.use(tripo3dRouter);
-router.use(vismeRouter);
 router.use(webDesignerRouter);
-router.use(promptExecRouter);
 router.use(amrRouter);
 router.use(skillsRouter);
 router.use(designSystemsRouter);

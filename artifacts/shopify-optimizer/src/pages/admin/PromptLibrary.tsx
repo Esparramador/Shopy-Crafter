@@ -667,6 +667,7 @@ export default function PromptLibrary() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [items, setItems] = useState<MasterItem[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -682,13 +683,19 @@ export default function PromptLibrary() {
 
   const loadItems = useCallback(async (key: string, q: string, off: number, append = false) => {
     setLoading(true);
+    if (!append) setFetchError(null);
     try {
       const params = new URLSearchParams({ limit: String(LIMIT), offset: String(off) });
       if (key) params.set("library", key);
       if (q.trim()) params.set("search", q.trim());
       if (!key && !q.trim()) params.set("all", "1");
       const r = await fetch(`${API_BASE}/api/fs-pro/prompt-library-master?${params}`, { credentials: "include" });
-      if (!r.ok) throw new Error("failed");
+      if (!r.ok) {
+        const msg = r.status === 401 ? "Sesión expirada. Recarga la página." : r.status === 403 ? "Sin acceso. Inicia sesión como admin o usuario registrado." : `Error ${r.status} al cargar la librería.`;
+        setFetchError(msg);
+        if (!append) setItems([]);
+        return;
+      }
       const data = await r.json();
       const list: MasterItem[] = Array.isArray(data) ? data : (data.items ?? []);
       const total: number = data.total ?? list.length;
@@ -696,6 +703,7 @@ export default function PromptLibrary() {
       setHasMore(off + list.length < total);
       setItems(prev => append ? [...prev, ...list] : list);
     } catch {
+      setFetchError("Error de red. Verifica tu conexión e inténtalo de nuevo.");
       if (!append) setItems([]);
     } finally {
       setLoading(false);
@@ -1004,6 +1012,21 @@ export default function PromptLibrary() {
           </button>
         )}
       </div>
+
+      {/* ── Error banner ── */}
+      {fetchError && (
+        <div style={{ marginBottom: 16, padding: "14px 18px", borderRadius: 12, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.25)", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 2 }}>Error al cargar la librería</p>
+            <p style={{ fontSize: 12, color: "rgba(248,113,113,.75)" }}>{fetchError}</p>
+          </div>
+          <button onClick={() => { setFetchError(null); loadItems(activeCategory, search, 0); }}
+            style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(239,68,68,.3)", background: "rgba(239,68,68,.1)", color: "#f87171", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* ── ITEMS GRID ── */}
       {loading && items.length === 0 ? (

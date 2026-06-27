@@ -98,6 +98,7 @@ export default function EffectsStudio() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [libIndex, setLibIndex] = useState<Array<{ key: string; count: number }>>([]);
   const [items, setItems] = useState<AnyItem[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -180,17 +181,29 @@ export default function EffectsStudio() {
   // ── Load items per source ───────────────────────────────────────────────────
   const loadPrompts = useCallback(async (cat: string, q: string, off: number, append = false) => {
     setLoading(true);
+    setFetchError(null);
     try {
       const p = new URLSearchParams({ limit: String(LIMIT), offset: String(off) });
       if (cat) p.set("library", cat);
       if (q.trim()) p.set("search", q.trim());
-      const d = await fetch(`${API}/fs-pro/prompt-library-master?${p}`, { credentials: "include" }).then(r => r.json());
+      const r = await fetch(`${API}/fs-pro/prompt-library-master?${p}`, { credentials: "include" });
+      if (!r.ok) {
+        const msg = r.status === 401 ? "Sesión expirada. Recarga la página." : r.status === 403 ? "Sin acceso. Inicia sesión." : `Error ${r.status} al cargar prompts.`;
+        setFetchError(msg);
+        if (!append) setItems([]);
+        setLoading(false);
+        return;
+      }
+      const d = await r.json();
       const list: MasterItem[] = (Array.isArray(d) ? d : (d.items ?? [])).map((x: any) => ({ ...x, source: "prompts" as const }));
       const total = d.total ?? list.length;
       setTotalCount(total);
       setHasMore(off + list.length < total);
       setItems(prev => append ? [...prev, ...list] : list);
-    } catch { if (!append) setItems([]); }
+    } catch (e: any) {
+      setFetchError("Error de red al cargar prompts. Revisa tu conexión.");
+      if (!append) setItems([]);
+    }
     setLoading(false);
   }, []);
 
@@ -230,7 +243,7 @@ export default function EffectsStudio() {
   function switchSource(s: Source) {
     setSource(s); setCategory(""); setSearchInput(""); setSearch(""); setSelected(null);
     setSnippetDetail(null); setAdaptedPrompt(""); setGeneratedOutput(""); setItems([]);
-    setOffset(0); setVismePage(1);
+    setOffset(0); setVismePage(1); setFetchError(null);
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -447,7 +460,7 @@ export default function EffectsStudio() {
   });
 
   const totalTemplates = libIndex.reduce((s, l) => s + l.count, 0) || 6132;
-  const showCategoryGrid = source === "prompts" && items.length === 0 && !loading && !search;
+  const showCategoryGrid = source === "prompts" && items.length === 0 && !loading && !search && !fetchError;
   const currentCats = source === "effects"
     ? (stats?.snippetCategories ?? [])
     : source === "visme"
@@ -743,6 +756,21 @@ export default function EffectsStudio() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ── Error banner ── */}
+          {fetchError && (
+            <div style={{ margin: "12px 0", padding: "14px 18px", borderRadius: 12, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.25)", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 18 }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: "#f87171", marginBottom: 2 }}>Error al cargar prompts</p>
+                <p style={{ fontSize: 11, color: "rgba(248,113,113,.75)" }}>{fetchError}</p>
+              </div>
+              <button onClick={() => { setFetchError(null); void loadPrompts(category, search, 0); }}
+                style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid rgba(239,68,68,.3)", background: "rgba(239,68,68,.1)", color: "#f87171", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                Reintentar
+              </button>
             </div>
           )}
 

@@ -4,7 +4,7 @@ import { recordApiUsage } from "../lib/api-usage.js";
 import { randomBytes } from "crypto";
 import { db, omnicoreMemoriesTable, omnicoreNicheProfilesTable, omnicorePromptLibraryTable, omnicoreKnowledgeDomainsTable, omnicoreInsightsTable, omnicoreStudySessionsTable, omnicoreCrossConnectionsTable, projectsTable, seoDataTable, productsTable, charactersTable, projectFilesTable } from "@workspace/db";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
-import { requireAdmin } from "../lib/auth.js";
+import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
 import { buildMasterSkillsBlock } from "../lib/master-skills-injector.js";
@@ -1929,7 +1929,7 @@ router.post("/shopybrain/niche-profiles", requireAdmin, async (req, res): Promis
   }
 });
 
-router.get("/shopybrain/prompt-library", requireAdmin, async (_req, res): Promise<void> => {
+router.get("/shopybrain/prompt-library", requireAuth, async (_req, res): Promise<void> => {
   try {
     const prompts = await db.select().from(omnicorePromptLibraryTable)
       .orderBy(desc(omnicorePromptLibraryTable.useCount));
@@ -1939,7 +1939,7 @@ router.get("/shopybrain/prompt-library", requireAdmin, async (_req, res): Promis
   }
 });
 
-router.post("/shopybrain/prompt-library", requireAdmin, async (req, res): Promise<void> => {
+router.post("/shopybrain/prompt-library", requireAuth, async (req, res): Promise<void> => {
   try {
     const { name, description, niche, useCase, promptTemplate, variables } = req.body;
     if (!name || !promptTemplate) {
