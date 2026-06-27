@@ -186,7 +186,8 @@ export function ClientChatbot() {
     const timer = setTimeout(() => ctrl.abort(), 30000);
 
     try {
-      const isForward = FORWARD_WORDS.test(t) && filesToSend.length > 0;
+      const hasFiles = filesToSend.length > 0;
+      const isForward = FORWARD_WORDS.test(t) && hasFiles;
       const isListFiles = LIST_FILES_WORDS.test(t) && !t.includes("producto");
       const isListProducts = LIST_PRODUCTS_WORDS.test(t) && t.includes("producto");
 
@@ -195,43 +196,78 @@ export function ClientChatbot() {
         return;
       }
 
-      const res = await fetch(`${API}/client/ai-chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          message: t,
-          history: msgs.filter(m => m.role !== "system").slice(-10).map(m => ({ role: m.role, content: m.content })),
-          attachedFiles: filesToSend,
-          forwardToAdmin: isForward,
-          intentHints: {
-            listFiles: isListFiles,
-            listProducts: isListProducts,
-            forward: isForward,
-          },
-        }),
-      });
+      if (isForward || hasFiles) {
+        // ── JSON path: forward to admin, includes file context ──────────
+        const res = await fetch(`${API}/client/ai-chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            message: t,
+            history: msgs.filter(m => m.role !== "system").slice(-8).map(m => ({ role: m.role, content: m.content })),
+            attachedFiles: filesToSend,
+            forwardToAdmin: isForward,
+            intentHints: { listFiles: false, listProducts: isListProducts, forward: isForward },
+          }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          addMsg({ role: "assistant", content: d.error ?? `Error ${res.status}. Inténtalo de nuevo.`, ts: Date.now() });
+          return;
+        }
+        const reply = d.reply ?? "No pude procesar tu consulta.";
+        addMsg({ role: "assistant", content: reply, vaultFiles: d.vaultFiles, forwarded: d.forwarded, ts: Date.now() });
+        speak(reply);
+        if (d.forwarded) addMsg({ role: "system", content: "✅ Mensaje enviado al equipo de Shopy Crafter. Te responderán pronto.", ts: Date.now() });
+      } else {
+        // ── SSE STREAMING path: general chat + deep research ────────────
+        const botTs = Date.now();
+        setMsgs(prev => [...prev, { role: "assistant" as const, content: "", ts: botTs }]);
 
-      const d = await res.json();
-      if (!res.ok) {
-        addMsg({ role: "assistant", content: d.error ?? `Error ${res.status}. Inténtalo de nuevo.`, ts: Date.now() });
-        return;
-      }
+        const res = await fetch(`${API}/client/ai-chat/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            message: t,
+            history: msgs.filter(m => m.role !== "system").slice(-8).map(m => ({ role: m.role, content: m.content })),
+          }),
+        });
 
-      const reply = d.reply ?? "No pude procesar tu consulta.";
-      const botMsg: ChatMsg = {
-        role: "assistant",
-        content: reply,
-        vaultFiles: d.vaultFiles,
-        forwarded: d.forwarded,
-        ts: Date.now(),
-      };
-      addMsg(botMsg);
-      speak(reply);
+        if (!res.ok || !res.body) {
+          setMsgs(prev => prev.map(m => m.ts === botTs ? { ...m, content: `Error ${res.status}. Inténtalo de nuevo.` } : m));
+          return;
+        }
 
-      if (d.forwarded) {
-        addMsg({ role: "system", content: "✅ Mensaje enviado al equipo de Shopy Crafter. Te responderán pronto.", ts: Date.now() });
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        let acc = "";
+
+        outer: while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const parts = buf.split("\n\n");
+          buf = parts.pop() ?? "";
+          for (const part of parts) {
+            if (!part.startsWith("data: ")) continue;
+            try {
+              const d = JSON.parse(part.slice(6));
+              if (d.error) { acc = acc || "No pude procesar tu consulta. Inténtalo de nuevo."; break outer; }
+              if (d.text) {
+                acc += d.text;
+                setMsgs(prev => prev.map(m => m.ts === botTs ? { ...m, content: acc } : m));
+              }
+              if (d.done) break outer;
+            } catch {}
+          }
+        }
+
+        if (!acc) setMsgs(prev => prev.map(m => m.ts === botTs ? { ...m, content: "No pude generar una respuesta. Inténtalo de nuevo." } : m));
+        speak(acc);
       }
     } catch (e: any) {
       if (e?.name !== "AbortError") {

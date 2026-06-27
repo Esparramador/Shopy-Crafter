@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { askGeminiChat } from "../lib/gemini.js";
+import { askGeminiChat, askGeminiStream } from "../lib/gemini.js";
 import { MASTER_CATALOG } from "../lib/master-skills-injector.js";
 import { logger } from "../lib/logger.js";
+import { learnFromOperation } from "../lib/claude.js";
 
 const router = Router();
 
@@ -338,6 +339,79 @@ ${MASTER_CATALOG}`;
   } catch (err) {
     logger.error({ err }, "landing-chat error");
     res.status(500).json({ error: "Error procesando tu consulta. Inténtalo de nuevo." });
+  }
+});
+
+// ─── SEARCH DETECTION ──────────────────────────────────────────────────────
+const NEEDS_SEARCH_RE = /busca(r)?\s|google|internet|noticias?|tendencias?|competidore?s?|investigar|research|precio.{1,20}mercado|qué.{1,15}dicen|actualidad|últimas?\s+(noticias?|tendencias?)|mercado\s+actual|mi\s+(empresa|marca|tienda)\s+en/i;
+
+// ─── STREAMING ROUTE ───────────────────────────────────────────────────────
+router.post("/public/landing-chat/stream", async (req, res) => {
+  const { messages } = req.body as {
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+  };
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    res.status(400).json({ error: "messages requerido" }); return;
+  }
+
+  const sanitized = messages
+    .filter(m => m.role === "user" || m.role === "assistant")
+    .map(m => ({ role: m.role, content: String(m.content).slice(0, 1200) }))
+    .slice(-14);
+
+  const lastUserMsg = [...sanitized].reverse().find(m => m.role === "user");
+  const intent = lastUserMsg
+    ? classifyIntent(lastUserMsg.content, sanitized.slice(0, -1))
+    : { intent: "general", entities: {}, confidence: 0.5, needsHumanHandoff: false, buyingIntent: false };
+
+  const stage = getConversationStage(sanitized.slice(0, -1));
+
+  const megaBrain = `\n\n== MEGA CEREBRO DE LA PLATAFORMA ==\n${MASTER_CATALOG}`;
+  const systemPrompt = buildDynamicSystemPrompt(intent, stage) + megaBrain;
+
+  const useSearch = NEEDS_SEARCH_RE.test(lastUserMsg?.content ?? "");
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  let fullResponse = "";
+  try {
+    const gen = askGeminiStream(sanitized, systemPrompt, { useSearch, thinkingBudget: 0 });
+    for await (const chunk of gen) {
+      if (res.destroyed) break;
+      if (chunk.text) fullResponse += chunk.text;
+      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      (res as any).flush?.();
+      if (chunk.done) break;
+    }
+  } catch (err) {
+    logger.error({ err }, "landing-chat/stream error");
+    if (!res.headersSent) { res.status(500).json({ error: String(err) }); return; }
+    res.write(`data: ${JSON.stringify({ error: String(err), done: true })}\n\n`);
+  }
+
+  if (!res.destroyed) res.end();
+
+  // Async learning — save conversation knowledge to ShopyBrain
+  if (fullResponse.length > 80 && lastUserMsg) {
+    setImmediate(() => {
+      try {
+        const q = lastUserMsg.content;
+        const isValuable = q.length > 20 && intent.intent !== "greet" && intent.intent !== "bye" && intent.intent !== "out_of_scope";
+        if (!isValuable) return;
+        learnFromOperation({
+          operationType: "landing_chat_insight",
+          title: `Landing chat (${intent.intent}): ${q.slice(0, 100)}`,
+          content: `Visitante preguntó: "${q}"\nRespuesta: ${fullResponse.slice(0, 700)}`,
+          confidence: intent.confidence >= 0.8 ? 0.75 : 0.6,
+          tags: ["landing_chat", intent.intent, stage.stage, ...(useSearch ? ["web_search"] : [])],
+        });
+      } catch {}
+    });
   }
 });
 

@@ -64,9 +64,10 @@ export default function LandingChatbot() {
     if (!content || loading) return;
 
     const userMsg: Message = { id: uuid(), role: "user", content };
-    const thinkingMsg: Message = { id: uuid(), role: "assistant", content: "…" };
+    const botId = uuid();
+    const botMsg: Message = { id: botId, role: "assistant", content: "" };
 
-    setMessages(m => [...m, userMsg, thinkingMsg]);
+    setMessages(m => [...m, userMsg, botMsg]);
     setInput("");
     setShowSuggestions(false);
     setLoading(true);
@@ -76,16 +77,56 @@ export default function LandingChatbot() {
       .map(m => ({ role: m.role, content: m.content }));
 
     try {
-      const res = await fetch(`${API}/api/public/landing-chat`, {
+      const res = await fetch(`${API}/api/public/landing-chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history }),
       });
-      const data = await res.json();
-      const reply = data.content || data.error || "Ha ocurrido un error. Inténtalo de nuevo.";
-      setMessages(m => m.map(msg => msg.id === thinkingMsg.id ? { ...msg, content: reply } : msg));
+
+      if (!res.ok || !res.body) throw new Error("stream_failed");
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let acc = "";
+
+      outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          if (!part.startsWith("data: ")) continue;
+          try {
+            const d = JSON.parse(part.slice(6));
+            if (d.error) { acc = acc || "Ha ocurrido un error. Inténtalo de nuevo."; break outer; }
+            if (d.text) {
+              acc += d.text;
+              setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: acc } : msg));
+            }
+            if (d.done) break outer;
+          } catch {}
+        }
+      }
+
+      if (!acc) {
+        setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: "No pude generar una respuesta. Inténtalo de nuevo." } : msg));
+      }
     } catch {
-      setMessages(m => m.map(msg => msg.id === thinkingMsg.id ? { ...msg, content: "Error de conexión. Inténtalo de nuevo." } : msg));
+      // Fallback: try JSON endpoint
+      try {
+        const history2 = [...messages, userMsg].filter(m => m.id !== "welcome").map(m => ({ role: m.role, content: m.content }));
+        const r2 = await fetch(`${API}/api/public/landing-chat`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: history2 }),
+        });
+        const data = await r2.json();
+        const reply = data.content || data.error || "Error de conexión. Inténtalo de nuevo.";
+        setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: reply } : msg));
+      } catch {
+        setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: "Error de conexión. Inténtalo de nuevo." } : msg));
+      }
     } finally {
       setLoading(false);
     }

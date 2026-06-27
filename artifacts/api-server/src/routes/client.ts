@@ -6,7 +6,7 @@ import { requireAuth } from "../lib/auth.js";
 import { msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
-import { askClaude } from "../lib/claude.js";
+import { askClaude, learnFromOperation } from "../lib/claude.js";
 import { askGeminiChat } from "../lib/gemini.js";
 import { sendPushToAdmins, sendPushToClientByProject } from "../lib/push-helper.js";
 
@@ -730,6 +730,105 @@ router.get("/platform-data", async (req, res): Promise<void> => {
   } catch (err: any) {
     logger.error({ err: err.message }, "GET /client/platform-data error");
     res.status(500).json({ error: "Error al cargar datos de plataforma" });
+  }
+});
+
+// ─── AI CHAT STREAMING (SSE) ─────────────────────────────────────────────────
+const CLIENT_SEARCH_RE = /busca(r)?\s|google|internet|noticias?|tendencias?|competidore?s?|investigar|research|precio.{1,20}mercado|qué.{1,15}dicen|actualidad|mi\s+(empresa|marca|tienda)\s+en|últimas?\s+(noticias?|tendencias?)/i;
+
+router.post("/ai-chat/stream", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    const pid = parseInt(projectId);
+
+    const { message = "", history = [] } = req.body as {
+      message?: string;
+      history?: Array<{ role: string; content: string }>;
+    };
+    const msg = (message ?? "").trim();
+    if (!msg) { res.status(400).json({ error: "Message required" }); return; }
+
+    const [products, recentActivity] = await Promise.all([
+      db.select({ id: productsTable.id, title: productsTable.title, price: productsTable.price, auditScore: productsTable.auditScore, auditGrade: productsTable.auditGrade })
+        .from(productsTable).where(eq(productsTable.projectId, pid)).limit(20),
+      db.select({ action: auditLogTable.action, details: auditLogTable.details })
+        .from(auditLogTable).where(eq(auditLogTable.projectId, projectId)).orderBy(desc(auditLogTable.createdAt)).limit(6),
+    ]);
+
+    const scored = products.filter(p => p.auditScore !== null);
+    const avgScore = scored.length ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length) : null;
+    const storeHealth = avgScore === null ? "sin datos" : avgScore >= 75 ? "buena" : avgScore >= 55 ? "media" : "crítica";
+    const useSearch = CLIENT_SEARCH_RE.test(msg);
+
+    const systemPrompt = `Eres el asistente IA personal de Shopy Crafter para este cliente. Responde SIEMPRE en español. Eres directo, cálido y orientado a resultados. Tienes acceso a Google Search para obtener información real y actualizada cuando el cliente lo necesite.
+
+CAPACIDADES:
+• Analizar catálogo, scores SEO y actividad de la tienda
+• Sugerir estrategias de monetización basadas en datos reales
+• Buscar información de Internet: empresa del cliente, mercado, competidores, tendencias, noticias
+• Responder cualquier pregunta con datos verídicos y actuales
+• Proporcionar deep research sobre cualquier tema relevante
+
+DATOS DE LA TIENDA:
+Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score: ${avgScore}/100` : ""}
+Catálogo: ${products.length} productos — ${scored.length} auditados
+
+${products.length > 0 ? `PRODUCTOS:\n${products.slice(0, 10).map(p => {
+  const flag = !p.auditScore ? "⬜" : p.auditScore < 50 ? "🔴" : p.auditScore < 70 ? "🟡" : "🟢";
+  return `${flag} ${p.title}: €${p.price ?? "?"} (${p.auditScore ?? "?"}pts ${p.auditGrade ?? "?"})`;
+}).join("\n")}` : ""}
+
+${recentActivity.length > 0 ? `ACTIVIDAD:\n${recentActivity.map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
+
+${useSearch ? `MODO DEEP RESEARCH ACTIVADO: El cliente pide información de Internet. Usa Google Search para datos reales y actualizados. Presenta los hallazgos de forma clara, estructurada y con fuentes cuando las tengas.` : ""}
+
+REGLAS: Máx 220 palabras. Termina con UNA acción concreta. Para monetización, sugiere 3 ideas específicas a su nicho. Varía el inicio. Sé un experto real, no genérico.`;
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+
+    const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [
+      ...history.slice(-8)
+        .filter(m => m.content)
+        .map(m => ({ role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant", content: m.content })),
+      { role: "user" as const, content: msg },
+    ];
+
+    const { askGeminiStream } = await import("../lib/gemini.js");
+    const gen = askGeminiStream(chatMessages, systemPrompt, { useSearch, thinkingBudget: 0 });
+
+    let fullResponse = "";
+    for await (const chunk of gen) {
+      if (res.destroyed) break;
+      if (chunk.text) fullResponse += chunk.text;
+      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      (res as any).flush?.();
+      if (chunk.done) break;
+    }
+    if (!res.destroyed) res.end();
+
+    if (fullResponse.length > 80) {
+      setImmediate(() => {
+        try {
+          learnFromOperation({
+            operationType: "client_chat_insight",
+            title: `Cliente (proy:${projectId}): ${msg.slice(0, 100)}`,
+            content: `Proyecto ${projectId} — El cliente preguntó: "${msg}". La IA respondió: ${fullResponse.slice(0, 600)}`,
+            confidence: 0.7,
+            tags: ["client_chat", `project_${projectId}`, ...(useSearch ? ["web_search", "deep_research"] : [])],
+            sourceProjectId: isNaN(pid) ? undefined : pid,
+          });
+        } catch {}
+      });
+    }
+  } catch (err) {
+    logger.error({ err }, "client ai-chat/stream error");
+    if (!res.headersSent) res.status(500).json({ error: String(err) });
+    else { res.write(`data: ${JSON.stringify({ error: String(err), done: true })}\n\n`); res.end(); }
   }
 });
 
