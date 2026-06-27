@@ -88,6 +88,8 @@ export default function AdminCalendar() {
   const [connected, setConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [oauthRedirectUri, setOauthRedirectUri] = useState<string | null>(null);
+  const [showUriHelper, setShowUriHelper] = useState(false);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [view, setView] = useState<"month" | "list">("month");
@@ -157,8 +159,9 @@ export default function AdminCalendar() {
   async function connectGoogle() {
     try {
       const r = await fetch(`${API}/calendar/oauth/url`, { credentials: "include" });
-      const { url, error: err } = await r.json();
+      const { url, redirectUri, error: err } = await r.json();
       if (err) { setError(err); return; }
+      if (redirectUri) setOauthRedirectUri(redirectUri);
       window.open(url, "_blank", "width=500,height=600");
     } catch (e: any) { setError(e.message); }
   }
@@ -290,6 +293,45 @@ export default function AdminCalendar() {
             </button>
           </div>
         </div>
+
+        {/* ── OAuth redirect_uri_mismatch helper ─────────────────────────── */}
+        {!connected && (
+          <div style={{ marginTop: 12 }}>
+            <button
+              onClick={() => setShowUriHelper(v => !v)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", fontSize: 12, display: "flex", alignItems: "center", gap: 6, padding: 0 }}
+            >
+              <AlertCircle size={13} style={{ color: "#f59e0b" }} />
+              ¿Te sale "redirect_uri_mismatch" al conectar? Haz clic aquí
+              <span style={{ fontSize: 10 }}>{showUriHelper ? "▲" : "▼"}</span>
+            </button>
+            {showUriHelper && (
+              <div style={{ marginTop: 10, padding: "14px 16px", background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10, fontSize: 13 }}>
+                <p style={{ margin: "0 0 8px", fontWeight: 700, color: "#f59e0b" }}>🔧 Cómo solucionar el error 400 redirect_uri_mismatch</p>
+                <ol style={{ margin: "0 0 10px", paddingLeft: 18, color: "var(--t2)", lineHeight: 1.9 }}>
+                  <li>Ve a <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" style={{ color: "var(--gold)" }}>Google Cloud Console → Credenciales</a></li>
+                  <li>Abre tu OAuth 2.0 Client ID (el mismo que usas para YouTube)</li>
+                  <li>En <strong>"URIs de redireccionamiento autorizados"</strong> añade esta URL exacta:</li>
+                </ol>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", fontFamily: "monospace", fontSize: 12, wordBreak: "break-all", color: "var(--jade)" }}>
+                  <span style={{ flex: 1 }}>
+                    {oauthRedirectUri || `${window.location.origin}/api/calendar/oauth/callback`}
+                  </span>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(oauthRedirectUri || `${window.location.origin}/api/calendar/oauth/callback`)}
+                    style={{ background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", color: "var(--t2)", fontSize: 11, whiteSpace: "nowrap" }}
+                  >
+                    📋 Copiar
+                  </button>
+                </div>
+                <p style={{ margin: "10px 0 0", color: "var(--t3)", fontSize: 12 }}>
+                  4. Guarda los cambios en Google Console y vuelve a intentar <strong>Conectar Google Calendar</strong>.<br />
+                  La cuenta que se conectará es <strong>craftershopy@gmail.com</strong>.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Stats bar */}
         {stats && (

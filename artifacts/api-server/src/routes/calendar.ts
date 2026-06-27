@@ -173,14 +173,16 @@ router.get("/calendar/oauth/url", (_req: Request, res: Response): void => {
     res.status(500).json({ error: "YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET no configurados." });
     return;
   }
+  const redirectUri = getRedirectUri();
   const oauth2Client = makeOAuth2Client();
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: CALENDAR_SCOPES,
     prompt: "consent",
     state: "shopycrafter_calendar",
+    login_hint: "craftershopy@gmail.com",
   });
-  res.json({ url });
+  res.json({ url, redirectUri });
 });
 
 // ─── OAUTH CALLBACK ──────────────────────────────────────────────────────────
