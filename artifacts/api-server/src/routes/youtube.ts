@@ -566,31 +566,34 @@ router.post("/youtube/modelo/extract-clip", requireAdmin, async (req: Request, r
   }
 });
 
-// ── POST /youtube/modelo/dub — Smart pipeline: TTS → ffprobe duration → ffmpeg exact sync
-// Body: { clipBase64?, voiceId, script, targetLang?, facePhotoBase64?, sourceVideoId? }
-// Strategy: generate TTS audio first, measure exact duration, build video with -t matching audio.
-// This guarantees audio ↔ video are perfectly aligned (no ElevenLabs timing drift).
+// ── POST /youtube/modelo/dub — Full AI pipeline: TTS → SadTalker lip-sync (or Seedance I2V) → exact sync
+// Body: { clipBase64?, voiceId, script, targetLang?, mode?: "sadtalker"|"seedance"|"merge" }
+// Pipeline:
+//   mode=sadtalker (default): foto + TTS audio → SadTalker → real lip-sync talking head
+//   mode=seedance: foto → Seedance I2V animated → loop → merge TTS audio exact sync
+//   mode=merge: clipBase64 provided → replace audio with TTS, exact sync
 router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { clipBase64, voiceId, script, targetLang = "es", facePhotoBase64, sourceVideoId } = req.body;
+    const { clipBase64, voiceId, script, targetLang = "es", mode = "sadtalker" } = req.body;
     if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
     if (!script?.trim()) return res.status(400).json({ error: "script requerido para generar TTS" });
 
     const key = ELEVEN_KEY();
     if (!key) return res.status(500).json({ error: "ELEVENLABS_API_KEY no configurada" });
+    const replicateToken = REPLICATE_TOKEN();
 
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dub-"));
     const audioPath = path.join(tmpDir, "tts.mp3");
     const outPath   = path.join(tmpDir, "dubbed.mp4");
 
-    // ── PASO 1: TTS con ElevenLabs — generamos el audio en la voz clonada ──
+    // ── PASO 1: TTS naturalizado con ElevenLabs ──
     const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: { "xi-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
         text: script,
-        model_id: "eleven_multilingual_v2",
-        voice_settings: { stability: 0.5, similarity_boost: 0.85, style: 0.6, use_speaker_boost: true },
+        model_id: "eleven_turbo_v2_5",
+        voice_settings: { stability: 0.3, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true, speed: 0.95 },
       }),
     });
     if (!ttsRes.ok) {
@@ -599,7 +602,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
     }
     fs.writeFileSync(audioPath, Buffer.from(await ttsRes.arrayBuffer()));
 
-    // ── PASO 2: Medir duración exacta del audio con ffprobe ──
+    // ── PASO 2: Duración exacta del audio ──
     const ffprobeBin = ffmpegBin.replace("ffmpeg", "ffprobe");
     let exactDuration = "30";
     try {
@@ -607,41 +610,118 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
         `"${ffprobeBin}" -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`,
         { stdio: ["pipe", "pipe", "pipe"] }
       ).toString().trim();
-    } catch { /* fallback 30s */ }
-    logger.info(`TTS duration: ${exactDuration}s`);
+    } catch { /* fallback */ }
+    logger.info(`TTS duration: ${exactDuration}s, mode: ${mode}`);
 
-    // ── PASO 3: Construir vídeo con foto + TTS audio usando -t exacto ──
-    // Efecto Ken Burns suave para que no sea una foto estática
-    const fps = 25;
-    const totalFrames = Math.ceil(parseFloat(exactDuration) * fps);
+    // Paths to locate sevillano photo
     const photoPath = path.join(process.cwd(), "..", "shopify-optimizer", "public", "images", "sevillano-model.png");
     const altPhotoPath = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "images", "sevillano-model.png");
     const photoSrc = fs.existsSync(photoPath) ? photoPath : altPhotoPath;
+    const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
+    const basePublicUrl = devDomain ? `https://${devDomain}` : "";
 
-    // If caller provided a video clip, use it as base; otherwise use the Sevillano photo
-    let videoInput = "";
-    if (clipBase64) {
+    // ── PASO 3A: SadTalker — foto + audio → lip-sync real (modo por defecto) ──
+    if ((mode === "sadtalker" || mode === "auto") && !clipBase64 && replicateToken && basePublicUrl) {
+      try {
+        // Save TTS audio to public for URL access
+        const pubAudioDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
+        const altPubDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
+        const pubDir = fs.existsSync(pubAudioDir) ? pubAudioDir : altPubDir;
+        fs.mkdirSync(pubDir, { recursive: true });
+        const ttsFilename = `tts_${Date.now()}.mp3`;
+        fs.copyFileSync(audioPath, path.join(pubDir, ttsFilename));
+
+        const photoUrl = `${basePublicUrl}/images/sevillano-model.png`;
+        const audioUrl = `${basePublicUrl}/media/sevillano/${ttsFilename}`;
+
+        // SadTalker version
+        const SADTALKER_VERSION = "85c698db7c0a66d5011435d0191db323034e1da04b912a6d365833141b6a285b";
+        const predRes = await fetch("https://api.replicate.com/v1/predictions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            version: SADTALKER_VERSION,
+            input: { source_image: photoUrl, driven_audio: audioUrl, preprocess: "full", still_mode: false, use_enhancer: true, pose_style: 0, exp_scale: 1.0, size: 256 },
+          }),
+        });
+        let pred = await predRes.json() as any;
+        if (pred.id) {
+          // Poll up to 5 min
+          let attempts = 0;
+          while (!["succeeded","failed","canceled"].includes(pred.status) && attempts < 40) {
+            await new Promise(r => setTimeout(r, 8000));
+            const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } });
+            pred = await pollRes.json() as any;
+            attempts++;
+          }
+          if (pred.status === "succeeded" && pred.output) {
+            const videoUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
+            const dlRes = await fetch(videoUrl);
+            if (dlRes.ok) {
+              fs.writeFileSync(outPath, Buffer.from(await dlRes.arrayBuffer()));
+              logger.info(`SadTalker succeeded: ${videoUrl}`);
+              // Clean up temp TTS public file
+              try { fs.unlinkSync(path.join(pubDir, ttsFilename)); } catch {}
+              // Fall through to PASO 4
+            }
+          }
+        }
+        if (!fs.existsSync(outPath)) throw new Error("SadTalker no generó vídeo");
+      } catch (stErr: any) {
+        logger.warn("SadTalker failed, falling back to Seedance/ffmpeg:", stErr.message);
+      }
+    }
+
+    // ── PASO 3B: Seedance I2V → loop → merge TTS (fallback animado) ──
+    if (!fs.existsSync(outPath) && !clipBase64 && replicateToken && basePublicUrl) {
+      try {
+        const photoUrl = `${basePublicUrl}/images/sevillano-model.png`;
+        const seedRes = await fetch("https://api.replicate.com/v1/models/bytedance/seedance-1-lite/predictions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ input: { image: photoUrl, prompt: "Man speaking expressively to camera, natural head and hand movements, realistic talking, warm studio lighting", duration: 10, resolution: "720p", aspect_ratio: "9:16" } }),
+        });
+        let seed = await seedRes.json() as any;
+        let sat = 0;
+        while (!["succeeded","failed","canceled"].includes(seed.status) && sat < 20) {
+          await new Promise(r => setTimeout(r, 8000));
+          const sp = await fetch(`https://api.replicate.com/v1/predictions/${seed.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } });
+          seed = await sp.json() as any; sat++;
+        }
+        if (seed.status === "succeeded" && seed.output) {
+          const seedUrl = Array.isArray(seed.output) ? seed.output[0] : seed.output;
+          const sdl = await fetch(seedUrl);
+          if (sdl.ok) {
+            const seedPath = path.join(tmpDir, "seed.mp4");
+            fs.writeFileSync(seedPath, Buffer.from(await sdl.arrayBuffer()));
+            execSync(`"${ffmpegBin}" -y -stream_loop 3 -i "${seedPath}" -i "${audioPath}" -map 0:v:0 -map 1:a:0 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k -t ${exactDuration} -movflags +faststart "${outPath}"`, { timeout: 120_000, stdio: "pipe" });
+          }
+        }
+      } catch (seedErr: any) {
+        logger.warn("Seedance failed, falling back to ffmpeg photo:", seedErr.message);
+      }
+    }
+
+    // ── PASO 3C: clipBase64 proporcionado — reemplazar audio con TTS (exact sync) ──
+    if (!fs.existsSync(outPath) && clipBase64) {
       const clipTmp = path.join(tmpDir, "clip.mp4");
       fs.writeFileSync(clipTmp, Buffer.from(clipBase64, "base64"));
-      // Replace audio of existing clip with TTS, keeping exact duration
-      execSync(
-        `"${ffmpegBin}" -y -i "${clipTmp}" -i "${audioPath}" ` +
-        `-c:v copy -c:a aac -b:a 192k -map 0:v:0 -map 1:a:0 ` +
-        `-t ${exactDuration} -movflags +faststart "${outPath}"`,
-        { timeout: 90_000, stdio: "pipe" }
-      );
-    } else {
-      // Photo-based: loop photo + Ken Burns zoom, exact duration
+      execSync(`"${ffmpegBin}" -y -i "${clipTmp}" -i "${audioPath}" -c:v copy -c:a aac -b:a 192k -map 0:v:0 -map 1:a:0 -t ${exactDuration} -movflags +faststart "${outPath}"`, { timeout: 90_000, stdio: "pipe" });
+    }
+
+    // ── PASO 3D: Último fallback — foto estática Ken Burns + audio ──
+    if (!fs.existsSync(outPath)) {
+      const fps = 25;
+      const totalFrames = Math.ceil(parseFloat(exactDuration) * fps);
       if (!fs.existsSync(photoSrc)) {
         fs.rmSync(tmpDir, { recursive: true, force: true });
-        return res.status(500).json({ error: "No se encontró foto de referencia (sevillano-model.png)" });
+        return res.status(500).json({ error: "No se encontró foto de referencia" });
       }
       execSync(
         `"${ffmpegBin}" -y -loop 1 -framerate ${fps} -i "${photoSrc}" -i "${audioPath}" ` +
         `-filter_complex "[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,` +
         `zoompan=z='min(1+on/${totalFrames}*0.05,1.05)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:fps=${fps}:s=720x1280,format=yuv420p[vout]" ` +
-        `-map "[vout]" -map "1:a" -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k ` +
-        `-t ${exactDuration} -movflags +faststart "${outPath}"`,
+        `-map "[vout]" -map "1:a" -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k -t ${exactDuration} -movflags +faststart "${outPath}"`,
         { timeout: 120_000, stdio: "pipe" }
       );
     }

@@ -575,3 +575,15 @@ id = "Gqybn7Aa0ce2TaY-HCoV2"
 uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_definitivo_sync_2026-06-27T00-37-35.mp4"
 type = "video"
 title = "Sevillano — Monólogo DEFINITIVO (audio+vídeo sincronizados al ms)"
+
+[[outputs]]
+id = "j3mq2QFmqcXG9kJNM6BAm"
+uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_animado_2026-06-27T00-46-54.mp4"
+type = "video"
+title = "Sevillano — Vídeo Animado Real (Seedance I2V + Voz Clonada naturalizada)"
+
+[[outputs]]
+id = "sFeNeChYPaNkeHmHzjljq"
+uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_lipsync_2026-06-27T00-52-31.mp4"
+type = "video"
+title = "Sevillano — LIP-SYNC REAL (SadTalker + Voz Naturalizada ElevenLabs)"
