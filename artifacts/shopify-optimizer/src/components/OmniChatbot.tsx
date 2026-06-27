@@ -227,30 +227,76 @@ function formatInlineText(content: string, segIdx: number): React.ReactNode[] {
   });
 }
 
+// VIDEO_MD_RE matches [VIDEO:label](https://...)
+const VIDEO_MD_RE = /\[VIDEO:([^\]]*)\]\((https?:\/\/[^)]{4,})\)/g;
+
+// VIDEO card component
+function VideoCard({ src, label }: { src: string; label: string }) {
+  return (
+    <div style={{ margin: "10px 0" }}>
+      <video
+        controls
+        src={src}
+        style={{ maxWidth: "100%", maxHeight: 360, borderRadius: 8, border: "1px solid var(--ink3)", display: "block", background: "#000" }}
+      />
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        <a
+          href={src}
+          download
+          target="_blank"
+          rel="noreferrer"
+          style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "1px solid var(--ink3)", background: "var(--ink2)", color: "var(--t)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}
+        >
+          ⬇ Descargar vídeo
+        </a>
+        <a
+          href={src}
+          target="_blank"
+          rel="noreferrer"
+          style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "1px solid var(--ink3)", background: "var(--ink2)", color: "var(--t)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none" }}
+        >
+          ⛶ Pantalla completa
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // IMAGE_MD_RE matches ![alt](data:... or https://...)
 const IMAGE_MD_RE = /!\[([^\]]*)\]\(((?:data:|https?:\/\/)[^)]{4,})\)/g;
 
 function formatMessage(content: string): React.ReactNode {
+  // Build a combined token list for both VIDEO and IMAGE patterns
+  type Token = { index: number; length: number; node: React.ReactNode };
+  const tokens: Token[] = [];
+
+  VIDEO_MD_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = VIDEO_MD_RE.exec(content)) !== null) {
+    tokens.push({ index: m.index, length: m[0].length, node: <VideoCard key={`vid-${m.index}`} src={m[2]} label={m[1] || "Vídeo IA"} /> });
+  }
+  IMAGE_MD_RE.lastIndex = 0;
+  while ((m = IMAGE_MD_RE.exec(content)) !== null) {
+    tokens.push({ index: m.index, length: m[0].length, node: <GeminiImageCard key={`img-${m.index}`} src={m[2]} alt={m[1] || "Imagen generada"} /> });
+  }
+
+  if (tokens.length === 0) return formatInlineText(content, 0);
+
+  tokens.sort((a, b) => a.index - b.index);
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   let segIdx = 0;
-  let match: RegExpExecArray | null;
-
-  IMAGE_MD_RE.lastIndex = 0;
-  while ((match = IMAGE_MD_RE.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(...formatInlineText(content.slice(lastIndex, match.index), segIdx++));
+  for (const tok of tokens) {
+    if (tok.index > lastIndex) {
+      nodes.push(...formatInlineText(content.slice(lastIndex, tok.index), segIdx++));
     }
-    nodes.push(<GeminiImageCard key={`img-${segIdx}`} src={match[2]} alt={match[1] || "Imagen generada"} />);
-    segIdx++;
-    lastIndex = match.index + match[0].length;
+    nodes.push(tok.node);
+    lastIndex = tok.index + tok.length;
   }
-
   if (lastIndex < content.length) {
     nodes.push(...formatInlineText(content.slice(lastIndex), segIdx));
   }
-
-  return nodes.length > 0 ? nodes : formatInlineText(content, 0);
+  return nodes;
 }
 
 function createSpeechRecognition(): any | null {
@@ -1523,7 +1569,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   // Acciones de generación de vídeo (montage/long_ad/brand_ad/cinematic-multishot) pueden
   // tardar 5–20 min (8 escenas × 60-120s cada Replicate + voz + música + concat ffmpeg).
   // Subimos el timeout a 25 min para esas acciones; resto sigue en 3 min.
-  const HEAVY_VIDEO_ACTIONS = new Set(["create_brand_ad", "create_long_ad", "create_montage_video", "create_cinematic_multishot"]);
+  const HEAVY_VIDEO_ACTIONS = new Set(["create_brand_ad", "create_long_ad", "create_montage_video", "create_cinematic_multishot", "generate_video"]);
   const executeShopifyAction = async (action: string, params: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
     try {
       const actionController = new AbortController();
@@ -1986,6 +2032,38 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         }
         return msg;
       }
+
+      case "generate_video": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.message || r.error}`;
+        const url = r.videoUrl || r.url || "";
+        let msg = `🎬 **Vídeo generado** con ${r.model || "IA"}\n`;
+        if (r.durationSec) msg += `⏱️ ${r.durationSec}s`;
+        if (r.aspect) msg += ` · ${r.aspect}`;
+        msg += "\n";
+        if (url) {
+          msg += `[VIDEO:Vídeo IA](${url})\n`;
+          msg += `📥 [Descargar vídeo](${url})\n`;
+        }
+        if (r.vaultId) msg += `💾 Guardado en Vault #${r.vaultId}`;
+        return msg.trim();
+      }
+
+      case "platform_store_status":
+      case "platform_list_products":
+      case "platform_get_product":
+      case "platform_create_product":
+      case "platform_edit_product":
+      case "platform_delete_product":
+      case "platform_get_orders":
+      case "platform_update_stock":
+      case "platform_update_seo":
+      case "stripe_list_accounts":
+      case "stripe_account_overview":
+      case "stripe_list_transactions":
+      case "stripe_list_customers":
+      case "stripe_list_subscriptions":
+        return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
 
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";

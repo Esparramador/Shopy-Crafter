@@ -737,6 +737,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - persist_cinematic_script: Guardar un script cinematográfico (objeto con scenes[]) como template reutilizable. Devuelve {scriptId} para reutilizar como savedPromptId en futuros anuncios. Params: {projectId, script (objeto con scenes[]), brand?, productName?, niche?, audience?, language?, totalDurationSec?, aspect?, videoModel?, imageModel?, style?, customBrief?}.
   - build_product_dna: Extraer un dossier hiper-detallado del producto (materiales, capas, paleta, hardware, branding visible) usando visión IA. Útil antes de generar un anuncio largo. Params: {projectId, productId}
   - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. EXIGE un productId Shopify (para anuncios de MARCA sin producto Shopify usa create_brand_ad). Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6, hasta 240), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), savedPromptId? (id devuelto por persist_cinematic_script para REUSAR un script ya guardado en lugar de generar uno nuevo), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"kling-3.0-omni"|"runway-seedance2"|"runway-gen4.5"|"seedance-pro"|"veo-4"|"veo-3.1")}
+  - generate_video: Generar un vídeo corto con IA a partir de un prompt de texto (T2V) o una imagen de referencia (I2V). Modelos disponibles: grok-imagine-video (xAI Grok, rápido y barato, 720p), grok-video-1 (xAI flagship junio 2026, máxima calidad), kling-3.0-turbo (cinematic, audio nativo, 1080p), kling-3.0-master (máxima calidad Kling), wan-2.5-t2v (open-source barato), wan-2.7 (open-source última gen), hailuo-2.3 (MiniMax 1080p), seedance-1-lite (Replicate). Si el usuario pide Grok usa grok-imagine-video por defecto. Params: {projectId, prompt (descripción del vídeo en inglés, sé específico y cinematográfico), model? (default grok-imagine-video), duration? (segundos 5-10, default 5), aspect? (9:16|16:9|1:1, default 9:16), imageUrl? (URL de imagen para I2V — si no hay, se usa T2V)}
   - create_brand_ad: Crear un anuncio de MARCA (sin producto Shopify específico) — ideal para campañas de branding, drops o equivalente al script v3 cascada en una sola llamada: imagen de referencia → N escenas → voz off → música → concat con crossfade. Equivalente al runner offline pero invocable desde el chat. La imagen de referencia debe estar PREVIAMENTE en el vault del proyecto (usa absorb-image antes para subirla y obtén el vault id). Devuelve {vaultId} del vídeo final + {scriptVaultId} reusable. Params: {projectId, brand (nombre de la marca), productName (concepto del anuncio, ej "drop primavera 2026"), referenceImageVaultId (id en vault de la imagen base — obligatorio), scenesCount? (2-24, default 6), totalDurationSec? (6-240, default scenesCount*8), aspect? ("9:16"|"16:9"|"1:1", default 9:16), language? ("es"|"en", default es), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"kling-3.0-omni"|"seedance-pro"|"runway-seedance2"|"runway-gen4.5", default kling-3.0-turbo), style? ("cinematic"|"ugc"|"editorial"|"luxury"|"tech"|"energetic"), customBrief? (notas extra para el guion), narrationEnabled? (default true), narrationVoiceId? (default ES Bella 21m00Tcm4TlvDq8ikWAM), musicEnabled? (default true), musicPrompt? (descripción para Stable Audio via Replicate — ej: "ambient electronic 120 BPM para anuncio de tecnología")}
   - get_ai_models: Devuelve la matriz activa de modelos AI (claude/gemini × fast/smart/genius/vision) indicando si la fuente es db/env/default + catálogo de modelos conocidos. Sin params.
   - set_ai_model: Cambia EN VIVO el modelo de un provider+tier (ej: usar Opus 4.1 para "genius"). Pasa model=null para borrar el override. Params: {provider:"claude"|"gemini", tier:"fast"|"smart"|"genius"|"vision", model:string|null}
@@ -796,6 +797,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Precio óptimo / mejor precio → calculate_optimal_price; Estimar costos / COGS → estimate_cogs
   - Simular precio / qué pasa si → price_simulator; Forecast / proyección financiera → financial_forecast
   - Dashboard financiero / márgenes → financial_dashboard
+  - Crear vídeo / generar vídeo / hacer vídeo / vídeo de producto / vídeo IA / quiero un vídeo / video con Grok / grok video / video con kling / video con runway / un vídeo de / video corto / clip de vídeo / generar clip → generate_video. Params: {projectId, prompt (descripción cinematográfica en inglés), model? (grok-imagine-video|grok-video-1|kling-3.0-turbo|kling-3.0-master|wan-2.5-t2v|wan-2.7|hailuo-2.3|seedance-1-lite, default grok-imagine-video), duration? (5-10s, default 5), aspect? (9:16|16:9|1:1), imageUrl? (para I2V)}
   - Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Virtual try-on / OOTD / vestir modelo / poner ropa a modelo / probador virtual / fotos con modelo / photoshoot con persona / outfit en modelo → virtual_tryon; Imágenes todos / bulk images → bulk_generate_images
   - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
   - Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history; Informe ventas y stock / report ventas stock / cuantos se han vendido / ventas por variante talla color → sales_report
@@ -11616,6 +11618,47 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const statsRes = await fetch(`http://localhost:${calPort4}/api/calendar/stats`, { headers: { cookie: req.headers.cookie || "" } });
           const statsData = await statsRes.json() as any;
           result = { message: `📊 **Estadísticas de Calendario CRM:**\n• Próximas citas: ${statsData.upcoming}\n• Completadas: ${statsData.completed}\n• Pendientes: ${statsData.pending}\n• Total facturado: ${parseFloat(statsData.total_revenue || 0).toFixed(2)}€\n• Duración media: ${statsData.avg_duration ? Math.round(statsData.avg_duration) + "min" : "N/D"}`, stats: statsData };
+          break;
+        }
+
+        // ── GENERATE VIDEO (T2V / I2V — any model via FusionStudioPro) ──────────
+
+        case "generate_video": {
+          const projectId = params?.projectId;
+          const prompt = params?.prompt;
+          if (!projectId) { result = { error: "projectId requerido para generar vídeo" }; break; }
+          if (!prompt) { result = { error: "prompt requerido — describe el vídeo que quieres crear" }; break; }
+          const vidModel = params?.model ?? "grok-imagine-video";
+          const vidDuration = Math.min(Math.max(Number(params?.duration ?? 5), 5), 10);
+          const vidAspect = params?.aspect ?? "9:16";
+          const vidImageUrl = params?.imageUrl ?? "";
+          const port = process.env.PORT || 8080;
+          const vidRes = await fetch(`http://localhost:${port}/api/fusion-studio/generate-video`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+            body: JSON.stringify({
+              projectId: parseInt(projectId),
+              promptText: prompt,
+              model: vidModel,
+              duration: vidDuration,
+              ratio: vidAspect,
+              imageUrl: vidImageUrl,
+            }),
+          });
+          const vidData = await vidRes.json() as any;
+          if (!vidRes.ok || vidData.error) {
+            result = { error: true, message: `❌ Error generando vídeo: ${vidData.error || vidRes.statusText}` };
+            break;
+          }
+          const vidUrl = vidData.videoUrl || vidData.url || "";
+          result = {
+            videoUrl: vidUrl,
+            vaultId: vidData.vaultId,
+            model: vidData.model || vidModel,
+            durationSec: vidData.durationSec || vidDuration,
+            aspect: vidAspect,
+            message: `🎬 **Vídeo generado** con ${vidData.model || vidModel}\n⏱️ ${vidData.durationSec || vidDuration}s · ${vidAspect}${vidUrl ? `\n📥 [Descargar vídeo](${vidUrl})\n[VIDEO:Vídeo IA](${vidUrl})` : ""}${vidData.vaultId ? `\n💾 Guardado en Vault #${vidData.vaultId}` : ""}`,
+          };
           break;
         }
 
