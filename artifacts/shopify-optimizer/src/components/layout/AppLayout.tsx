@@ -59,6 +59,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "YouTube Studio", icon: "▶️", href: "/admin/youtube-studio" },
   { label: "Calendario CRM", icon: "📅", href: "/admin/calendar" },
   { label: "Meshy Character Lab", icon: "🧊", href: "/admin/meshy-studio" },
+  { label: "Tripo3D Studio", icon: "🧊✨", href: "/tripo3d" },
   { label: "MCP Manager", icon: "🔌", href: "/admin/mcp-manager" },
 
   { label: "── STUDIO IA ──", icon: "", href: "#", divider: true },
@@ -71,6 +72,17 @@ const DEFAULT_SHOPYBRAIN_NAV = [
 ];
 
 const DEFAULT_ADMIN_NAV = [
+  { label: "Home / Inicio", icon: "🏠", href: "/home" },
+  { label: "── MÓDULOS ──", icon: "", href: "#", divider: true },
+  { label: "Auditoría Web", icon: "📊", href: "/audit" },
+  { label: "Rediseño IA", icon: "✏️", href: "/redesign" },
+  { label: "Imágenes IA", icon: "🖼", href: "/images" },
+  { label: "Consistencia", icon: "🎨", href: "/consistency" },
+  { label: "A/B Testing", icon: "📈", href: "/ab-testing" },
+  { label: "Pricing Engine", icon: "💰", href: "/pricing" },
+  { label: "SEO Engine", icon: "🔍", href: "/seo" },
+  { label: "Repositorio", icon: "🗄️", href: "/vault" },
+  { label: "── CRM & ADMIN ──", icon: "", href: "#", divider: true },
   { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
   { label: "Mensajes Clientes", icon: "💬", href: "/admin/messages" },
   { label: "Productos Global", icon: "📦", href: "/admin/products" },
