@@ -57,6 +57,7 @@ const BrainSync = lazy(() => import("@/pages/admin/BrainSync"));
 const AdStudio = lazy(() => import("@/pages/projects/AdStudio"));
 const AvatarStudio = lazy(() => import("@/pages/admin/AvatarStudio"));
 const YouTubeStudio = lazy(() => import("@/pages/admin/YouTubeStudio"));
+const AdminCalendar = lazy(() => import("@/pages/admin/AdminCalendar"));
 const PromptLibrary = lazy(() => import("@/pages/admin/PromptLibrary"));
 
 const SobreNosotros = lazy(() => import("@/pages/public/SobreNosotros"));
@@ -617,6 +618,9 @@ function Router() {
         </Route>
         <Route path="/admin/youtube-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><YouTubeStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/calendar">
+          <RequireAdmin><AdminWrapper><AppLayout><S><AdminCalendar /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/tienda">
           <RequireAdmin><AdminWrapper><AppLayout><S><TiendaAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>

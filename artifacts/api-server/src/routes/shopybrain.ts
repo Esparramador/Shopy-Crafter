@@ -11494,6 +11494,63 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           break;
         }
 
+        // ─── CALENDAR ─────────────────────────────────────────────────────────
+        case "list_upcoming_appointments": {
+          const calPort = process.env.PORT || 8080;
+          const calRes = await fetch(`http://localhost:${calPort}/api/calendar/events`, { headers: { cookie: req.headers.cookie || "" } });
+          const calData = await calRes.json() as any;
+          const upcoming = (calData.appointments || []).filter((a: any) => new Date(a.meeting_date) >= new Date() && a.status !== "cancelled")
+            .sort((a: any, b: any) => new Date(a.meeting_date).getTime() - new Date(b.meeting_date).getTime())
+            .slice(0, 10);
+          if (!upcoming.length) { result = { message: "No hay citas próximas en el calendario." }; break; }
+          const lines = upcoming.map((a: any) => {
+            const d = new Date(a.meeting_date);
+            const dateStr = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+            const timeStr = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+            return `📅 **${a.client_name}**${a.company ? ` (${a.company})` : ""} — ${dateStr} a las ${timeStr} · ${a.duration_minutes}min · ${a.status}`;
+          });
+          result = { message: `Próximas ${upcoming.length} citas:\n\n${lines.join("\n")}` };
+          break;
+        }
+
+        case "check_calendar_availability": {
+          const calPort2 = process.env.PORT || 8080;
+          const { date: checkDate, duration: checkDur = 60 } = params || {};
+          if (!checkDate) { result = { message: "Indica una fecha (YYYY-MM-DD) para comprobar disponibilidad." }; break; }
+          const slotsRes = await fetch(`http://localhost:${calPort2}/api/calendar/slots?date=${checkDate}&duration=${checkDur}`, { headers: { cookie: req.headers.cookie || "" } });
+          const slotsData = await slotsRes.json() as any;
+          const availableSlots = (slotsData.slots || []).filter((s: any) => s.available);
+          if (!availableSlots.length) { result = { message: `No hay huecos disponibles el ${checkDate} para una reunión de ${checkDur}min.` }; break; }
+          const slotLabels = availableSlots.map((s: any) => s.label).join(", ");
+          result = { message: `El ${checkDate} hay ${availableSlots.length} huecos disponibles (${checkDur}min): **${slotLabels}**\n\n¿Quieres que cree una cita? Dime el nombre del cliente y la hora.` };
+          break;
+        }
+
+        case "create_appointment": {
+          const calPort3 = process.env.PORT || 8080;
+          const { client_name: calName, company: calCompany, email: calEmail, phone: calPhone, meeting_date: calDate, meeting_time: calTime = "10:00", duration_minutes: calDur = 60, description: calDesc } = params || {};
+          if (!calName || !calDate) { result = { message: "Necesito al menos el nombre del cliente y la fecha (YYYY-MM-DD). ¿Puedes darme esos datos?" }; break; }
+          const meetingDateISO = new Date(`${calDate}T${calTime}:00`).toISOString();
+          const createRes = await fetch(`http://localhost:${calPort3}/api/calendar/events`, {
+            method: "POST", headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+            body: JSON.stringify({ client_name: calName, company: calCompany, email: calEmail, phone: calPhone, meeting_date: meetingDateISO, duration_minutes: calDur, description: calDesc }),
+          });
+          const createData = await createRes.json() as any;
+          if (!createRes.ok) { result = { error: createData.error || "Error creando cita" }; break; }
+          const calAppt = createData.appointment;
+          const calD = new Date(calAppt.meeting_date);
+          result = { message: `✅ **Cita creada** con ${calAppt.client_name}${calAppt.company ? ` (${calAppt.company})` : ""}\n📅 ${calD.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })} a las ${calD.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}\n⏱️ ${calAppt.duration_minutes}min\n${createData.syncedToGoogle ? "📅 Sincronizada con Google Calendar ✓" : "⚠️ Sin sincronizar con Google Calendar (conecta tu cuenta)"}`, appointment: calAppt };
+          break;
+        }
+
+        case "get_calendar_stats": {
+          const calPort4 = process.env.PORT || 8080;
+          const statsRes = await fetch(`http://localhost:${calPort4}/api/calendar/stats`, { headers: { cookie: req.headers.cookie || "" } });
+          const statsData = await statsRes.json() as any;
+          result = { message: `📊 **Estadísticas de Calendario CRM:**\n• Próximas citas: ${statsData.upcoming}\n• Completadas: ${statsData.completed}\n• Pendientes: ${statsData.pending}\n• Total facturado: ${parseFloat(statsData.total_revenue || 0).toFixed(2)}€\n• Duración media: ${statsData.avg_duration ? Math.round(statsData.avg_duration) + "min" : "N/D"}`, stats: statsData };
+          break;
+        }
+
         default:
           res.status(400).json({ error: `Acción desconocida: ${action}` });
           return;

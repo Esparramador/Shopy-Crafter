@@ -74,6 +74,7 @@ import hyperframesRouter from "./hyperframes.js";
 import studioRouter from "./studio.js";
 import apiUsageStatsRouter from "./api-usage-stats.js";
 import youtubeRouter from "./youtube.js";
+import calendarRouter from "./calendar.js";
 import viralRouter from "./viral.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
@@ -184,6 +185,7 @@ router.use(hyperframesRouter);
 router.use(studioRouter);
 router.use(apiUsageStatsRouter);
 router.use(youtubeRouter);
+router.use(calendarRouter);
 router.use(viralRouter);
 
 export default router;
