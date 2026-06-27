@@ -1215,7 +1215,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [selectedFlow, setSelectedFlow] = useState<KlaviyoWorkflowResult["plan"]["flows"][0] | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [quickActions, setQuickActions] = useState<QuickAction[]>(FALLBACK_QUICK_ACTIONS);
-  const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only" | "grok">("auto");
+  const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only" | "grok" | "gpt">("auto");
+  const [claudeModel, setClaudeModel] = useState<"claude-haiku-3-5" | "claude-sonnet-4-6" | "claude-opus-4-8">("claude-sonnet-4-6");
+  const [gptModel, setGptModel] = useState<"gpt-4.1-nano" | "gpt-4.1-mini" | "gpt-4.1" | "gpt-4o">("gpt-4.1-mini");
   const [deepThinkMode, setDeepThinkMode] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
@@ -2107,7 +2109,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       attachmentName: hasAttach ? attachName : undefined,
     };
     const thinkingId = uuid();
-    const engineLabels: Record<string, string> = { auto: "gemini+claude+brain", claude: "claude", gemini: "gemini+search", brain_only: "brain", grok: "grok-3" };
+    const engineLabels: Record<string, string> = { auto: "gemini+claude+brain", claude: claudeModel, gemini: "gemini+search", brain_only: "brain", grok: "grok-3", gpt: gptModel };
     setMessages(m => [...m, userMsg, { id: thinkingId, role: "assistant" as const, content: "🧠 Analizando tu solicitud...", timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain" }]);
     setInput(""); setAttachFile(null); setAttachFiles([]); setAttachUrl(""); setShowAttach(false);
     setLoading(true);
@@ -2680,7 +2682,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               const fallbackRes = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
                 method: "POST", credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current }),
+                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: engineMode === "claude" ? claudeModel : undefined, gptModel: engineMode === "gpt" ? gptModel : undefined }),
               });
               if (fallbackRes.ok) {
                 const fd = await fallbackRes.json();
@@ -2709,7 +2711,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const res = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current }),
+          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: engineMode === "claude" ? claudeModel : undefined, gptModel: engineMode === "gpt" ? gptModel : undefined }),
         });
         if (res.ok) {
           const d = await res.json();
@@ -2871,7 +2873,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, location]);
+  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, claudeModel, gptModel, location]);
 
   useEffect(() => {
     if (!isListening && pendingTranscriptRef.current) {
@@ -3504,6 +3506,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                     { key: "claude",     icon: "🧠", label: "Claude", title: "Claude (Anthropic) — escritura profunda, código, análisis estratégico, informes largos" },
                     { key: "gemini",     icon: "🔬", label: "Gemini", title: "Gemini (Google) — streaming en tiempo real + búsqueda web, /imagen-gemini y /codigo-gemini" },
                     { key: "grok",       icon: "🤖", label: "Grok",   title: "Grok (xAI) — razonamiento rápido, perspectiva alternativa, análisis directo" },
+                    { key: "gpt",        icon: "🟢", label: "GPT",    title: "GPT (OpenAI) — gran rendimiento en código, análisis y escritura; elige modelo en el sub-selector" },
                     { key: "brain_only", icon: "💾", label: "Brain",  title: "Solo memoria ShopyBrain — responde desde el conocimiento acumulado de tu tienda" },
                   ] as const).map(({ key, icon, label, title }) => (
                     <button key={key} onClick={() => setEngineMode(key)} title={title}
@@ -3533,6 +3536,49 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       }}>
                       🧩 {deepThinkMode ? "Think ON" : "Deep Think"}
                     </button>
+                  )}
+                  {/* Sub-selector de modelo Claude — visible solo con motor Claude */}
+                  {engineMode === "claude" && (
+                    <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "center" }}>
+                      {([
+                        { key: "claude-haiku-3-5",  label: "Haiku",  title: "Claude Haiku 3.5 — rapidísimo y económico • $0.25/M in, $1.25/M out" },
+                        { key: "claude-sonnet-4-6", label: "Sonnet", title: "Claude Sonnet 4.6 — equilibrado, inteligente • $3/M in, $15/M out" },
+                        { key: "claude-opus-4-8",   label: "Opus",   title: "Claude Opus 4.8 — máxima inteligencia, más lento • $15/M in, $75/M out" },
+                      ] as const).map(({ key, label, title }) => (
+                        <button key={key} onClick={() => setClaudeModel(key)} title={title}
+                          style={{
+                            fontSize: 9, padding: "3px 7px", borderRadius: 3, cursor: "pointer",
+                            border: claudeModel === key ? "1px solid #c878ff" : "1px solid rgba(200,120,255,0.25)",
+                            background: claudeModel === key ? "rgba(200,120,255,0.12)" : "transparent",
+                            color: claudeModel === key ? "#c878ff" : "var(--t4)",
+                            display: "flex", alignItems: "center", gap: 2, transition: "all 0.2s",
+                          }}>
+                          🧠 {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Sub-selector de modelo GPT — visible solo con motor GPT */}
+                  {engineMode === "gpt" && (
+                    <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "center" }}>
+                      {([
+                        { key: "gpt-4.1-nano", label: "Nano", title: "GPT-4.1 Nano — ultrarápido y baratísimo • $0.10/M in, $0.40/M out" },
+                        { key: "gpt-4.1-mini", label: "Mini", title: "GPT-4.1 Mini — rápido y económico • $0.40/M in, $1.60/M out" },
+                        { key: "gpt-4.1",      label: "4.1",  title: "GPT-4.1 — alto rendimiento • $2/M in, $8/M out" },
+                        { key: "gpt-4o",       label: "4o",   title: "GPT-4o — multimodal, visión + texto • $2.50/M in, $10/M out" },
+                      ] as const).map(({ key, label, title }) => (
+                        <button key={key} onClick={() => setGptModel(key)} title={title}
+                          style={{
+                            fontSize: 9, padding: "3px 7px", borderRadius: 3, cursor: "pointer",
+                            border: gptModel === key ? "1px solid #10a37f" : "1px solid rgba(16,163,127,0.25)",
+                            background: gptModel === key ? "rgba(16,163,127,0.12)" : "transparent",
+                            color: gptModel === key ? "#10a37f" : "var(--t4)",
+                            display: "flex", alignItems: "center", gap: 2, transition: "all 0.2s",
+                          }}>
+                          🟢 {label}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

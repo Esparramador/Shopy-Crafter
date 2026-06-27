@@ -474,8 +474,8 @@ router.post("/shopybrain/learn", requireAdmin, async (req, res): Promise<void> =
 router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
-    const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute, engineMode, chatSessionId } = req.body;
-    const validEngines = ["auto", "claude", "gemini", "brain_only", "grok"] as const;
+    const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute, engineMode, chatSessionId, claudeModel: reqClaudeModel, gptModel: reqGptModel } = req.body;
+    const validEngines = ["auto", "claude", "gemini", "brain_only", "grok", "gpt"] as const;
     type EngineMode = typeof validEngines[number];
     const engine: EngineMode = validEngines.includes(engineMode) ? engineMode : "auto";
     if (!query) {
@@ -1531,17 +1531,65 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           const costUsd = (inTok / 1_000_000) * grokPrice.input + (outTok / 1_000_000) * grokPrice.output;
           searchUsage = { inputTokens: inTok, outputTokens: outTok, costUsd, model: grokModel };
         }
+      } else if (engine === "gpt") {
+        // GPT (OpenAI): razonamiento avanzado, código, escritura, multimodal
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (!openaiKey) throw new Error("OPENAI_API_KEY no configurada — contacta al administrador");
+        const VALID_GPT_MODELS = ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "o1-mini", "o3-mini"] as const;
+        const gptModelId = typeof reqGptModel === "string" && (VALID_GPT_MODELS as readonly string[]).includes(reqGptModel) ? reqGptModel : "gpt-4.1-mini";
+        const gptRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${openaiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: gptModelId,
+            messages: [
+              { role: "system", content: sysPrompt },
+              { role: "user", content: userContent },
+            ],
+            max_tokens: 16384,
+            temperature: 0.7,
+          }),
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (!gptRes.ok) {
+          const errText = await gptRes.text().catch(() => "");
+          throw new Error(`OpenAI API error (${gptRes.status}): ${errText.slice(0, 300)}`);
+        }
+        const gptData = await gptRes.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+        answer = gptData.choices?.[0]?.message?.content || "GPT no pudo generar una respuesta. Prueba con otro motor.";
+        engineUsed = gptModelId;
+        if (gptData.usage) {
+          const inTok = gptData.usage.prompt_tokens ?? 0;
+          const outTok = gptData.usage.completion_tokens ?? 0;
+          const GPT_PRICING: Record<string, { input: number; output: number }> = {
+            "gpt-4.1-nano":  { input: 0.10,  output: 0.40  },
+            "gpt-4.1-mini":  { input: 0.40,  output: 1.60  },
+            "gpt-4.1":       { input: 2.00,  output: 8.00  },
+            "gpt-4o":        { input: 2.50,  output: 10.00 },
+            "gpt-4o-mini":   { input: 0.15,  output: 0.60  },
+            "o1-mini":       { input: 1.10,  output: 4.40  },
+            "o3-mini":       { input: 1.10,  output: 4.40  },
+          };
+          const priceKey = Object.keys(GPT_PRICING).find(k => gptModelId.includes(k)) ?? "gpt-4.1-mini";
+          const gptPrice = GPT_PRICING[priceKey];
+          const costUsd = (inTok / 1_000_000) * gptPrice.input + (outTok / 1_000_000) * gptPrice.output;
+          searchUsage = { inputTokens: inTok, outputTokens: outTok, costUsd, model: gptModelId };
+        }
       } else {
         // Claude: escritura profunda, guiones, código, JSON estructurado, razonamiento complejo
+        const VALID_CLAUDE_MODELS = ["claude-haiku-3-5", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-opus-4", "claude-opus-4-8"] as const;
+        const claudeModelOverride = typeof reqClaudeModel === "string" && (VALID_CLAUDE_MODELS as readonly string[]).includes(reqClaudeModel) ? reqClaudeModel : undefined;
         const claudeResult = await askClaudeWithUsage(
           resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
           [{ role: "user", content: userContent }],
           sysPrompt,
           32000,
+          300_000,
+          claudeModelOverride ? { model: claudeModelOverride } : undefined,
         );
         answer = claudeResult.text;
         searchUsage = claudeResult.usage;
-        engineUsed = engine === "claude" ? "claude" : engine === "auto" ? "auto→claude+omnicore" : "claude+omnicore";
+        engineUsed = engine === "claude" ? (claudeModelOverride ?? "claude") : engine === "auto" ? "auto→claude+omnicore" : "claude+omnicore";
       }
 
       let detectedAction: { action: string; params: Record<string, unknown> } | null = null;
