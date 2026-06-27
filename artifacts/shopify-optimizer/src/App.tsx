@@ -1,5 +1,6 @@
 import { useRef, useEffect, lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
+import { useNotifications, useCalendarReminders } from "@/hooks/useNotifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -252,6 +253,8 @@ function useMediaPermissions() {
 function AdminWrapper({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   useMediaPermissions();
+  useNotifications();
+  useCalendarReminders();
   return (
     <>
       <PageErrorBoundary>{children}</PageErrorBoundary>

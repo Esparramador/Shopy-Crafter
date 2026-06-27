@@ -7,6 +7,7 @@ import { msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { askClaude } from "../lib/claude.js";
+import { askGeminiChat } from "../lib/gemini.js";
 import { sendPushToAdmins, sendPushToClientByProject } from "../lib/push-helper.js";
 
 const router = Router();
@@ -486,71 +487,155 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
     const pid = parseInt(projectId);
 
-    const { message, history = [] } = req.body as { message: string; history?: Array<{ role: string; content: string }> };
-    if (!message?.trim()) { res.status(400).json({ error: "Message required" }); return; }
+    const {
+      message = "",
+      history = [],
+      attachedFiles = [],
+      forwardToAdmin = false,
+      intentHints = {},
+    } = req.body as {
+      message?: string;
+      history?: Array<{ role: string; content: string }>;
+      attachedFiles?: Array<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }>;
+      forwardToAdmin?: boolean;
+      intentHints?: { listFiles?: boolean; listProducts?: boolean; forward?: boolean };
+    };
 
-    const products = await db.select({
-      id: productsTable.id, title: productsTable.title,
-      price: productsTable.price, auditScore: productsTable.auditScore, auditGrade: productsTable.auditGrade,
-    }).from(productsTable).where(eq(productsTable.projectId, pid)).limit(20);
+    const msg = message?.trim() ?? "";
+    const hasFiles = attachedFiles.length > 0;
+    if (!msg && !hasFiles) { res.status(400).json({ error: "Message or files required" }); return; }
 
-    const recentActivity = await db.select({
-      action: auditLogTable.action, details: auditLogTable.details, createdAt: auditLogTable.createdAt,
-    }).from(auditLogTable).where(eq(auditLogTable.projectId, projectId)).orderBy(desc(auditLogTable.createdAt)).limit(10);
+    // ── Intent detection ────────────────────────────────────────────
+    const msgLower = msg.toLowerCase();
+    const isForward = forwardToAdmin || intentHints.forward ||
+      (/\b(manda|envía|envíale|pasa|comparte|dile|mándalo|mándale|reenvía)\b/.test(msgLower) &&
+       /\b(joan|shopy|agencia|equipo|admin|vosotros|os)\b/.test(msgLower));
+
+    const [products, recentActivity] = await Promise.all([
+      db.select({
+        id: productsTable.id, title: productsTable.title,
+        price: productsTable.price, auditScore: productsTable.auditScore, auditGrade: productsTable.auditGrade,
+      }).from(productsTable).where(eq(productsTable.projectId, pid)).limit(25),
+      db.select({
+        action: auditLogTable.action, details: auditLogTable.details, createdAt: auditLogTable.createdAt,
+      }).from(auditLogTable).where(eq(auditLogTable.projectId, projectId)).orderBy(desc(auditLogTable.createdAt)).limit(10),
+    ]);
 
     const scored = products.filter(p => p.auditScore !== null);
     const avgScore = scored.length ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length) : null;
-
     const avgGrade = avgScore !== null ? (avgScore >= 80 ? "A" : avgScore >= 65 ? "B" : avgScore >= 50 ? "C" : "D") : null;
-
-    // Detectar situación crítica de la tienda para contexto proactivo
     const lowScoreProducts = scored.filter(p => (p.auditScore ?? 0) < 50);
     const highScoreProducts = scored.filter(p => (p.auditScore ?? 0) >= 80);
     const unaudi = products.length - scored.length;
-    const storeHealth = avgScore === null ? "sin datos"
-      : avgScore >= 75 ? "buena" : avgScore >= 55 ? "media" : "crítica";
+    const storeHealth = avgScore === null ? "sin datos" : avgScore >= 75 ? "buena" : avgScore >= 55 ? "media" : "crítica";
 
-    const systemPrompt = `Eres el asistente personal de Shopy Crafter para este cliente. Tu objetivo: ayudarle a entender su tienda, resolver dudas y guiarle siempre hacia la acción de mayor impacto basada en sus datos reales.
+    // ── Vault files (for list_files intent or as context) ───────────
+    let vaultFiles: any[] | undefined;
+    if (intentHints.listFiles) {
+      try {
+        const files = await db.select({
+          id: projectFilesTable.id,
+          title: projectFilesTable.title,
+          fileType: projectFilesTable.fileType,
+          category: projectFilesTable.category,
+          description: projectFilesTable.description,
+          createdAt: projectFilesTable.createdAt,
+          objectPath: projectFilesTable.objectPath,
+          hasContent: projectFilesTable.content,
+        }).from(projectFilesTable)
+          .where(eq(projectFilesTable.projectId, pid))
+          .orderBy(desc(projectFilesTable.createdAt));
+
+        vaultFiles = files.map(f => ({
+          id: f.id,
+          title: f.title,
+          fileType: f.fileType,
+          category: f.category,
+          description: f.description,
+          createdAt: f.createdAt,
+          downloadUrl: (f.objectPath || f.hasContent)
+            ? `/api/projects/${pid}/vault/${f.id}/download`
+            : null,
+        })).filter(f => f.downloadUrl);
+      } catch {}
+    }
+
+    // ── Forward to admin ─────────────────────────────────────────────
+    let forwarded = false;
+    let forwardedId: string | undefined;
+    if (isForward && (msg || hasFiles)) {
+      try {
+        const senderName = (req.session as any).name ?? "Cliente";
+        const id = randomBytes(16).toString("hex");
+        const filesJson = hasFiles ? JSON.stringify(attachedFiles) : null;
+        await db.execute(sql`
+          INSERT INTO messages (id, project_id, from_role, from_name, content, files_json)
+          VALUES (${id}, ${projectId}, 'client', ${senderName},
+            ${msg || `📎 ${attachedFiles.length} archivo(s) adjunto(s)`},
+            ${filesJson}::jsonb)
+        `);
+        const preview = msg.length > 80 ? msg.slice(0, 77) + "…" : msg || `📎 ${attachedFiles.length} archivo(s)`;
+        sendPushToAdmins(`💬 ${senderName} te envía: ${preview}`, `Nuevo mensaje con ${hasFiles ? `${attachedFiles.length} archivo(s)` : "texto"}`, "/admin/messages").catch(() => {});
+        forwarded = true;
+        forwardedId = id;
+      } catch (err: any) {
+        logger.error({ err: err.message }, "client ai-chat: forward to admin failed");
+      }
+    }
+
+    // ── Build system prompt ──────────────────────────────────────────
+    const filesContext = hasFiles
+      ? `\n\nARCHIVOS QUE HA ENVIADO EL CLIENTE:\n${attachedFiles.map(f => `· ${f.fileName} (${f.fileType}, ${Math.round(f.fileSize / 1024)}KB)`).join("\n")}`
+      : "";
+
+    const systemPrompt = `Eres el asistente personal IA de Shopy Crafter — ultra-profesional, empático y orientado a resultados. Hablas siempre en español.
+
+CAPACIDADES TUYAS:
+• Listar y proporcionar archivos generados para el cliente (imágenes, vídeos, documentos)
+• Analizar catálogo, scores SEO y actividad de la tienda
+• Sugerir estrategias de monetización y productos nuevos
+• Reenviar archivos/mensajes al equipo de Shopy Crafter (Joan)
+• Responder preguntas con búsqueda en internet si es necesario
+• Responder por voz si el cliente lo activa
 
 ══ DATOS REALES DE LA TIENDA ══
-Estado de salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` (score medio ${avgScore}/100, grado ${avgGrade})` : ""}
-Catálogo: ${products.length} productos totales — ${scored.length} auditados, ${unaudi} sin auditar
-${lowScoreProducts.length > 0 ? `⚠️ CRÍTICO: ${lowScoreProducts.length} producto(s) con score <50 pts (acción urgente)` : ""}
-${highScoreProducts.length > 0 ? `✅ ${highScoreProducts.length} producto(s) con score ≥80 pts (bien optimizados)` : ""}
-Motores IA disponibles: Auditoría, Rediseño, Imágenes IA, A/B Testing, SEO, Precios, Email Marketing
+Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score medio: ${avgScore}/100 (${avgGrade})` : ""}
+Catálogo: ${products.length} productos — ${scored.length} auditados, ${unaudi} sin auditar
+${lowScoreProducts.length > 0 ? `🔴 URGENTE: ${lowScoreProducts.length} producto(s) con score <50` : ""}
+${highScoreProducts.length > 0 ? `🟢 ${highScoreProducts.length} bien optimizados (≥80 pts)` : ""}
+Motores IA: Auditoría · Imágenes IA · A/B Testing · SEO · Email · Precios · Rediseño
 
-${products.length > 0 ? `MUESTRA DE PRODUCTOS (ordenados por relevancia):
-${products.slice(0, 10).map(p => {
-  const grade = p.auditGrade ?? "?";
-  const flag = !p.auditScore ? "⬜ sin auditar" : (p.auditScore < 50 ? "🔴 urgente" : p.auditScore < 70 ? "🟡 mejorar" : "🟢 ok");
-  return `· ${p.title}: €${p.price ?? "?"} — ${p.auditScore ?? "?"}pts (${grade}) ${flag}`;
+${products.length > 0 ? `PRODUCTOS:\n${products.slice(0, 12).map(p => {
+  const flag = !p.auditScore ? "⬜" : p.auditScore < 50 ? "🔴" : p.auditScore < 70 ? "🟡" : "🟢";
+  return `${flag} ${p.title}: €${p.price ?? "?"} — ${p.auditScore ?? "?"}pts (${p.auditGrade ?? "?"})`;
 }).join("\n")}` : ""}
 
-${recentActivity.length > 0 ? `ACTIVIDAD RECIENTE:
-${recentActivity.slice(0, 5).map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
+${recentActivity.length > 0 ? `ACTIVIDAD:\n${recentActivity.slice(0, 5).map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
+${filesContext}
 
-══ INTENCIÓN DEL USUARIO — detecta y responde apropiadamente ══
-• Pregunta sobre score/calidad → explica con el dato exacto y qué mejorar primero
-• Pregunta "qué debo hacer" → prioriza por impacto: empieza con los 🔴 urgentes
-• Pregunta sobre un producto específico → busca en la muestra y da feedback detallado
-• Pide comparar → compara con los datos reales disponibles
-• Frustración / "no funciona" → empatía primero, solución directa, escalar si persiste
-• Pregunta fuera de alcance → di qué no puedes hacer, ofrece alternativa dentro de Shopy Crafter
+REGLAS:
+• Respuesta máx 220 palabras. Nunca inventes métricas.
+• Termina siempre con UNA acción concreta que el cliente puede hacer ahora.
+• Si el cliente pregunta cómo monetizar → sugiere 3 ideas concretas basadas en su nicho/productos.
+• Si el cliente pregunta qué crear → sugiere productos específicos para su catálogo.
+• Sé directo, cálido, y profesional. Varía el inicio de cada respuesta.`;
 
-══ REGLAS DE COMUNICACIÓN ══
-• Varía el inicio de cada respuesta — no empieces siempre igual
-• Usa los datos REALES que tienes — nunca inventes métricas
-• Si no tienes datos suficientes, dilo y sugiere cómo obtenerlos (p.ej., "ejecuta la auditoría primero")
-• Termina SIEMPRE con una acción concreta y específica que el cliente puede hacer ahora mismo en la plataforma
-• Máximo 200 palabras. Responde siempre en español.`;
-
-    const messages: Array<{ role: "user" | "assistant"; content: string }> = [
-      ...history.slice(-6).map(m => ({ role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant", content: m.content })),
-      { role: "user", content: message },
+    const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [
+      ...history.slice(-8)
+        .filter(m => m.content)
+        .map(m => ({ role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant", content: m.content })),
+      { role: "user", content: msg || `[Cliente adjuntó ${attachedFiles.length} archivo(s)]` },
     ];
 
-    const reply = await askClaude(isNaN(pid) ? 0 : pid, messages, systemPrompt, 300, 12000);
-    res.json({ reply });
+    let reply: string;
+    try {
+      reply = await askGeminiChat(chatMessages, systemPrompt, { maxOutputTokens: 600 });
+      if (!reply) throw new Error("empty");
+    } catch {
+      reply = await askClaude(isNaN(pid) ? 0 : pid, chatMessages, systemPrompt, 400, 12000);
+    }
+
+    res.json({ reply, vaultFiles, forwarded, forwardedId });
   } catch (err: any) {
     logger.error({ err: err.message }, "client ai-chat error");
     res.status(500).json({ error: "Error al procesar tu consulta. Por favor inténtalo de nuevo." });

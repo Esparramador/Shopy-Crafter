@@ -5,6 +5,7 @@ import { useCms } from "@/contexts/CmsContext";
 import { LogOut, Menu, X } from "lucide-react";
 import { ClientChatbot } from "./ClientChatbot";
 import { useClientPreview } from "./ClientPreviewContext";
+import { useNotifications } from "@/hooks/useNotifications";
 
 const _BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -30,6 +31,7 @@ interface ClientCmsPanel {
 
 export function ClientLayout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  useNotifications();
   const [location, navigate] = useLocation();
   const { content: cmsContent } = useCms();
   const cp: ClientCmsPanel = (cmsContent?.clientPanel as ClientCmsPanel) ?? {};
