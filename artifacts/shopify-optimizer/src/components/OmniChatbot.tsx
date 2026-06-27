@@ -1320,6 +1320,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
+  const geminiAudioRef = useRef<HTMLAudioElement | null>(null);
   const chatSessionIdRef = useRef<string>(uuid());
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
@@ -1433,8 +1434,17 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   }, [isListening]);
 
   const speakText = useCallback((text: string) => {
-    if (!voiceEnabled || typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    if (!voiceEnabled) return;
+
+    // Detener audio anterior
+    if (geminiAudioRef.current) {
+      geminiAudioRef.current.pause();
+      geminiAudioRef.current.src = "";
+      geminiAudioRef.current = null;
+    }
+    window.speechSynthesis?.cancel();
+
+    // Limpiar markdown del texto
     const cleaned = text
       .replace(/\*\*([^*]+)\*\*/g, "$1")
       .replace(/\*([^*]+)\*/g, "$1")
@@ -1446,55 +1456,67 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       .replace(/[-•·]\s+/g, ". ")
       .replace(/\n{2,}/g, ". ")
       .replace(/\n/g, " ")
-      .slice(0, 700);
+      .slice(0, 600);
     if (!cleaned.trim()) return;
-    const utter = new SpeechSynthesisUtterance(cleaned);
-    utter.lang = "es-ES";
-    utter.rate = 0.88;
-    utter.pitch = 1.0;
-    utter.volume = 1.0;
-    const trySpeak = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        const best =
-          voices.find(v => v.lang === "es-ES" && v.name.includes("Google español de España")) ||
-          voices.find(v => v.lang === "es-ES" && v.name.includes("Conchita")) ||
-          voices.find(v => v.lang === "es-ES" && v.name.includes("Monica")) ||
-          voices.find(v => v.lang === "es-ES" && v.name.includes("Sabina")) ||
-          voices.find(v => v.lang === "es-ES" && (v.name.includes("Google") || v.name.includes("Microsoft"))) ||
-          voices.find(v => v.lang === "es-ES") ||
-          voices.find(v => v.lang.startsWith("es") && !v.lang.includes("MX") && !v.lang.includes("US")) ||
-          voices.find(v => v.lang.startsWith("es"));
-        if (best) utter.voice = best;
-      }
-      utter.onend = () => {
-        if (voiceEnabled) {
-          setTimeout(() => {
-            const rec = recognitionRef.current || createSpeechRecognition();
-            if (rec) {
-              recognitionRef.current = rec;
-              rec.onresult = (e: any) => {
-                const t = Array.from(e.results as any[]).map((r: any) => r[0].transcript).join("");
-                setInput(t);
-                if (e.results[e.results.length - 1].isFinal) {
-                  setIsListening(false);
-                  pendingTranscriptRef.current = t;
-                }
-              };
-              rec.onerror = () => setIsListening(false);
-              rec.onend = () => setIsListening(false);
-              try { rec.start(); setIsListening(true); } catch { setIsListening(false); }
+
+    // Reiniciar micrófono al terminar de hablar (modo conversación)
+    const onSpeechEnd = () => {
+      if (!voiceEnabled) return;
+      setTimeout(() => {
+        const rec = recognitionRef.current || createSpeechRecognition();
+        if (rec) {
+          recognitionRef.current = rec;
+          rec.onresult = (e: any) => {
+            const t = Array.from(e.results as any[]).map((r: any) => r[0].transcript).join("");
+            setInput(t);
+            if (e.results[e.results.length - 1].isFinal) {
+              setIsListening(false);
+              pendingTranscriptRef.current = t;
             }
-          }, 400);
+          };
+          rec.onerror = () => setIsListening(false);
+          rec.onend = () => setIsListening(false);
+          try { rec.start(); setIsListening(true); } catch { setIsListening(false); }
         }
-      };
-      window.speechSynthesis.speak(utter);
+      }, 400);
     };
-    if (window.speechSynthesis.getVoices().length === 0) {
-      window.speechSynthesis.onvoiceschanged = trySpeak;
-    } else {
-      trySpeak();
-    }
+
+    // Llamar al endpoint Gemini TTS (voz humanizada, sin delay robótico)
+    fetch(`${API}/api/voice/gemini-tts`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: cleaned, voice: "Aoede" }),
+    })
+      .then(r => {
+        if (!r.ok) throw new Error(`Gemini TTS ${r.status}`);
+        return r.blob();
+      })
+      .then(blob => {
+        if (!voiceEnabled) return;
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        geminiAudioRef.current = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          geminiAudioRef.current = null;
+          onSpeechEnd();
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          geminiAudioRef.current = null;
+          onSpeechEnd();
+        };
+        audio.play().catch(() => {
+          URL.revokeObjectURL(url);
+          geminiAudioRef.current = null;
+          onSpeechEnd();
+        });
+      })
+      .catch(() => {
+        // Fallback silencioso — no romper el chat
+        onSpeechEnd();
+      });
   }, [voiceEnabled]);
 
   // ─── Execute Shopify action via backend ────────────────────────────────────
@@ -3082,7 +3104,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 {minimized ? <Maximize2 size={isMobile ? 18 : 14} /> : <Minimize2 size={isMobile ? 18 : 14} />}
               </button>
               <button
-                onClick={() => { setVoiceEnabled(v => !v); if (voiceEnabled) window.speechSynthesis?.cancel(); }}
+                onClick={() => { setVoiceEnabled(v => !v); if (voiceEnabled) { window.speechSynthesis?.cancel(); if (geminiAudioRef.current) { geminiAudioRef.current.pause(); geminiAudioRef.current.src = ""; geminiAudioRef.current = null; } } }}
                 title={voiceEnabled ? "Desactivar voz — conversación fluída activa" : "Activar conversación por voz"}
                 aria-label={voiceEnabled ? "Desactivar voz" : "Activar voz"}
                 style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: voiceEnabled ? "rgba(45,212,159,0.18)" : "var(--ink2)", color: voiceEnabled ? "var(--jade)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s, color 0.2s" }}

@@ -386,4 +386,88 @@ router.delete("/voice/clone/:voiceId", requireAdmin, async (req, res): Promise<v
   }
 });
 
+// ─── Gemini TTS (Live, humanizada, sin delay) ────────────────────────────────
+function pcm16ToWav(pcmData: Buffer, sampleRate = 24000, channels = 1): Buffer {
+  const bitDepth = 16;
+  const byteRate = sampleRate * channels * (bitDepth / 8);
+  const blockAlign = channels * (bitDepth / 8);
+  const dataSize = pcmData.length;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);           // PCM
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitDepth, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(dataSize, 40);
+  return Buffer.concat([header, pcmData]);
+}
+
+const GEMINI_TTS_VOICES = ["Aoede", "Kore", "Charon", "Fenrir", "Puck", "Orbit", "Zephyr", "Leda"] as const;
+
+router.post("/voice/gemini-tts", async (req, res): Promise<void> => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) { res.status(401).json({ error: "No autenticado" }); return; }
+
+    const { text, voice = "Aoede" } = req.body ?? {};
+    if (!text || typeof text !== "string" || text.trim().length === 0) {
+      res.status(400).json({ error: "text requerido" }); return;
+    }
+    if (text.length > 700) {
+      res.status(413).json({ error: "text excede 700 caracteres" }); return;
+    }
+    const cleaned = text.trim().slice(0, 700);
+
+    const quota = checkTtsQuota(String(userId) + ":gemini", cleaned.length);
+    if (!quota.ok) {
+      res.setHeader("Retry-After", String(quota.retryAfter));
+      res.status(429).json({ error: quota.reason }); return;
+    }
+
+    const safeVoice = (GEMINI_TTS_VOICES as readonly string[]).includes(voice) ? voice : "Aoede";
+    const geminiKey = process.env.GEMINI_API_KEY ?? process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+    if (!geminiKey) { res.status(503).json({ error: "Gemini no configurado" }); return; }
+
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+
+    const response = await (ai.models as any).generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: cleaned }] }],
+      config: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: safeVoice } },
+        },
+      },
+    });
+
+    const part = response?.candidates?.[0]?.content?.parts?.[0];
+    if (!part?.inlineData?.data) {
+      res.status(502).json({ error: "Gemini TTS no devolvió audio" }); return;
+    }
+
+    const mimeType: string = part.inlineData.mimeType || "audio/L16;rate=24000";
+    const pcmBuffer = Buffer.from(part.inlineData.data as string, "base64");
+    const rateMatch = mimeType.match(/rate=(\d+)/);
+    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+
+    const wavBuffer = pcm16ToWav(pcmBuffer, sampleRate);
+    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Content-Length", String(wavBuffer.length));
+    res.setHeader("Cache-Control", "no-cache");
+    res.send(wavBuffer);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "gemini-tts failed");
+    if (!res.headersSent) res.status(500).json({ error: "Error generando voz con Gemini Live" });
+  }
+});
+
 export default router;
