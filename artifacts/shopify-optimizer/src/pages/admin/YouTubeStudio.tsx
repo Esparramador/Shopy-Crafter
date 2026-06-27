@@ -731,8 +731,8 @@ export default function YouTubeStudio() {
         </div>
       )}
 
-      {/* API Keys Status Banner */}
-      {(tab === "modelo" || tab === "satirico") && modeloVoices.length <= 1 && (
+      {/* API Keys Status Banner — Modelo IA only, after voices loaded, only if ElevenLabs returned none */}
+      {tab === "modelo" && !modeloLoadingVoices && modeloVoices.length <= 1 && (
         <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 12, alignItems: "flex-start" }}>
           <AlertCircle size={16} style={{ color: "#f59e0b", flexShrink: 0, marginTop: 1 }} />
           <div style={{ flex: 1 }}>
