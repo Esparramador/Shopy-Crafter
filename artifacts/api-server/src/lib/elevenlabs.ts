@@ -398,3 +398,370 @@ export async function listClonedVoices(): Promise<ClonedVoice[]> {
       preview_url: v.preview_url ?? "",
     }));
 }
+
+// ─── SPEECH-TO-TEXT (Transcripción) ───────────────────────────────────────────
+
+export interface TranscribeResult {
+  text: string;
+  language_code?: string;
+  language_probability?: number;
+  words?: Array<{ text: string; start: number; end: number; type: string; speaker_id?: string }>;
+}
+
+/**
+ * Transcribe an audio/video file to text using ElevenLabs Speech-to-Text API.
+ * POST /v1/speech-to-text
+ * Supported: mp3, mp4, wav, m4a, ogg, flac, webm (max 1GB, max 4.5h)
+ */
+export async function transcribeAudio(
+  audioBuffer: Buffer,
+  filename: string,
+  mimeType: string,
+  options?: {
+    language_code?: string;
+    diarize?: boolean;
+    timestamps_granularity?: "word" | "character" | "none";
+  },
+): Promise<TranscribeResult> {
+  const apiKey = getApiKey();
+
+  const form = new FormData();
+  const blob = new Blob([audioBuffer], { type: mimeType || "audio/mpeg" });
+  form.append("file", blob, filename);
+  form.append("model_id", "scribe_v1");
+  if (options?.language_code) form.append("language_code", options.language_code);
+  if (options?.diarize !== undefined) form.append("diarize", String(options.diarize));
+  if (options?.timestamps_granularity) form.append("timestamps_granularity", options.timestamps_granularity);
+
+  const res = await fetch(`${ELEVEN_BASE}/speech-to-text`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey },
+    body: form,
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs STT ${res.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const data = await res.json() as any;
+  return {
+    text: data.text ?? "",
+    language_code: data.language_code,
+    language_probability: data.language_probability,
+    words: data.words,
+  };
+}
+
+// ─── AUDIO ISOLATION (Separar voz del ruido) ─────────────────────────────────
+
+/**
+ * Isolate voice from background noise using ElevenLabs Audio Isolation.
+ * POST /v1/audio-isolation
+ * Returns: Buffer with the isolated voice audio (mp3)
+ */
+export async function isolateAudio(
+  audioBuffer: Buffer,
+  filename: string,
+  mimeType: string,
+): Promise<Buffer> {
+  const apiKey = getApiKey();
+
+  const form = new FormData();
+  const blob = new Blob([audioBuffer], { type: mimeType || "audio/mpeg" });
+  form.append("audio", blob, filename);
+
+  const res = await fetch(`${ELEVEN_BASE}/audio-isolation`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey },
+    body: form,
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs Audio Isolation ${res.status}: ${errText.slice(0, 300)}`);
+  }
+
+  return Buffer.from(await res.arrayBuffer());
+}
+
+// ─── CONVAI — Agentes Conversacionales con Voz ───────────────────────────────
+
+export interface ConvAIAgent {
+  agent_id: string;
+  name: string;
+  created_at_unix_secs?: number;
+  conversation_config?: Record<string, unknown>;
+}
+
+export interface ConvAIAgentConfig {
+  name: string;
+  conversation_config?: {
+    agent?: {
+      prompt?: { prompt: string };
+      first_message?: string;
+      language?: string;
+    };
+    tts?: { voice_id?: string; model_id?: string };
+  };
+  platform_settings?: Record<string, unknown>;
+}
+
+/**
+ * List all ConvAI agents in the account.
+ */
+export async function listConvAIAgents(): Promise<ConvAIAgent[]> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/convai/agents`, {
+    headers: { "xi-api-key": apiKey },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs ConvAI list ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json() as any;
+  return (data.agents ?? []) as ConvAIAgent[];
+}
+
+/**
+ * Create a new ConvAI agent.
+ */
+export async function createConvAIAgent(config: ConvAIAgentConfig): Promise<ConvAIAgent> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/convai/agents/create`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs ConvAI create ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  return await res.json() as ConvAIAgent;
+}
+
+/**
+ * Get a ConvAI agent by ID.
+ */
+export async function getConvAIAgent(agentId: string): Promise<ConvAIAgent> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/convai/agents/${encodeURIComponent(agentId)}`, {
+    headers: { "xi-api-key": apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs ConvAI get ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  return await res.json() as ConvAIAgent;
+}
+
+/**
+ * Delete a ConvAI agent by ID.
+ */
+export async function deleteConvAIAgent(agentId: string): Promise<void> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/convai/agents/${encodeURIComponent(agentId)}`, {
+    method: "DELETE",
+    headers: { "xi-api-key": apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs ConvAI delete ${res.status}: ${errText.slice(0, 200)}`);
+  }
+}
+
+/**
+ * Get a signed URL to start a ConvAI conversation (for the web widget).
+ */
+export async function getConvAISignedUrl(agentId: string): Promise<string> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/convai/conversation/get_signed_url?agent_id=${encodeURIComponent(agentId)}`, {
+    headers: { "xi-api-key": apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs ConvAI signed URL ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json() as any;
+  return data.signed_url as string;
+}
+
+/**
+ * List recent ConvAI conversations.
+ */
+export async function listConvAIConversations(agentId?: string): Promise<any[]> {
+  const apiKey = getApiKey();
+  const url = agentId
+    ? `${ELEVEN_BASE}/convai/conversations?agent_id=${encodeURIComponent(agentId)}`
+    : `${ELEVEN_BASE}/convai/conversations`;
+  const res = await fetch(url, {
+    headers: { "xi-api-key": apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs ConvAI conversations ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json() as any;
+  return data.conversations ?? [];
+}
+
+// ─── PRONUNCIATION DICTIONARIES ───────────────────────────────────────────────
+
+export interface PronunciationRule {
+  type: "alias" | "phoneme";
+  string_to_replace: string;
+  alias?: string;
+  phoneme?: string;
+  alphabet?: "ipa" | "cmu-arpabet";
+}
+
+export interface PronunciationDictionary {
+  id: string;
+  name: string;
+  description?: string;
+  version_id: string;
+  created_at_unix?: number;
+  rules?: PronunciationRule[];
+}
+
+/**
+ * List all pronunciation dictionaries in the account.
+ */
+export async function listPronunciationDictionaries(): Promise<PronunciationDictionary[]> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/pronunciation-dictionaries`, {
+    headers: { "xi-api-key": apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs PronDict list ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json() as any;
+  return (data.pronunciation_dictionaries ?? []) as PronunciationDictionary[];
+}
+
+/**
+ * Create a new pronunciation dictionary with initial rules.
+ */
+export async function createPronunciationDictionary(
+  name: string,
+  rules: PronunciationRule[],
+  description?: string,
+): Promise<PronunciationDictionary> {
+  const apiKey = getApiKey();
+
+  const form = new FormData();
+  form.append("name", name);
+  if (description) form.append("description", description);
+
+  const pls = buildPlsFromRules(name, rules);
+  const blob = new Blob([pls], { type: "application/xml" });
+  form.append("file", blob, `${name.replace(/\s+/g, "_")}.pls`);
+
+  const res = await fetch(`${ELEVEN_BASE}/pronunciation-dictionaries/add-from-file`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey },
+    body: form,
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs PronDict create ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  const data = await res.json() as any;
+  return {
+    id: data.id,
+    name: data.name ?? name,
+    description: data.description,
+    version_id: data.version_id ?? "",
+    created_at_unix: data.created_at_unix,
+  };
+}
+
+/**
+ * Add rules to an existing pronunciation dictionary.
+ */
+export async function addRulesToPronunciationDictionary(
+  dictionaryId: string,
+  rules: PronunciationRule[],
+): Promise<{ version_id: string }> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/pronunciation-dictionaries/${encodeURIComponent(dictionaryId)}/add-rules`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ rules }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs PronDict add-rules ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  const data = await res.json() as any;
+  return { version_id: data.version_id ?? "" };
+}
+
+/**
+ * Remove rules from a pronunciation dictionary.
+ */
+export async function removeRulesFromPronunciationDictionary(
+  dictionaryId: string,
+  ruleStrings: string[],
+): Promise<{ version_id: string }> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/pronunciation-dictionaries/${encodeURIComponent(dictionaryId)}/remove-rules`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ rule_strings: ruleStrings }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs PronDict remove-rules ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  const data = await res.json() as any;
+  return { version_id: data.version_id ?? "" };
+}
+
+/**
+ * Delete a pronunciation dictionary by ID.
+ */
+export async function deletePronunciationDictionary(dictionaryId: string): Promise<void> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/pronunciation-dictionaries/${encodeURIComponent(dictionaryId)}`, {
+    method: "DELETE",
+    headers: { "xi-api-key": apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs PronDict delete ${res.status}: ${errText.slice(0, 200)}`);
+  }
+}
+
+function buildPlsFromRules(name: string, rules: PronunciationRule[]): string {
+  const entries = rules.map(r => {
+    if (r.type === "alias") {
+      return `  <lexeme><grapheme>${escapeXml(r.string_to_replace)}</grapheme><alias>${escapeXml(r.alias ?? "")}</alias></lexeme>`;
+    }
+    const alphabet = r.alphabet ?? "ipa";
+    return `  <lexeme><grapheme>${escapeXml(r.string_to_replace)}</grapheme><phoneme alphabet="${alphabet}">${escapeXml(r.phoneme ?? "")}</phoneme></lexeme>`;
+  }).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<lexicon version="1.0" xmlns="http://www.w3.org/2005/01/pronunciation-lexicon" alphabet="ipa" xml:lang="es">
+  <info><desc>${escapeXml(name)}</desc></info>
+${entries}
+</lexicon>`;
+}
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}

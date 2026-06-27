@@ -3,7 +3,14 @@ import { db, projectsTable, productsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
-import { synthesizeSpeech, listVoices, listAllVoices, cloneVoice, deleteClonedVoice, listClonedVoices, type ElevenModel, type ElevenOutputFormat } from "../lib/elevenlabs.js";
+import {
+  synthesizeSpeech, listVoices, listAllVoices, cloneVoice, deleteClonedVoice, listClonedVoices,
+  transcribeAudio, isolateAudio,
+  listConvAIAgents, createConvAIAgent, getConvAIAgent, deleteConvAIAgent, getConvAISignedUrl, listConvAIConversations,
+  listPronunciationDictionaries, createPronunciationDictionary, addRulesToPronunciationDictionary,
+  removeRulesFromPronunciationDictionary, deletePronunciationDictionary,
+  type ElevenModel, type ElevenOutputFormat, type ConvAIAgentConfig, type PronunciationRule,
+} from "../lib/elevenlabs.js";
 import multer from "multer";
 
 const cloneUpload = multer({
@@ -14,6 +21,18 @@ const cloneUpload = multer({
       cb(null, true);
     } else {
       cb(new Error("Solo se admiten archivos de audio (mp3, wav, m4a, ogg, flac)"));
+    }
+  },
+});
+
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (/^(audio|video)\//i.test(file.mimetype) || /\.(mp3|wav|m4a|ogg|flac|aac|webm|mp4|mov|mkv)$/i.test(file.originalname)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se admiten archivos de audio o vídeo"));
     }
   },
 });
@@ -383,6 +402,194 @@ router.delete("/voice/clone/:voiceId", requireAdmin, async (req, res): Promise<v
   } catch (err: any) {
     logger.error({ err: err?.message }, "voice/clone delete failed");
     res.status(500).json({ error: err?.message || "Error eliminando voz" });
+  }
+});
+
+// ─── SPEECH-TO-TEXT (Transcripción) ─────────────────────────────────────────
+router.post("/voice/transcribe",
+  requireAdmin,
+  (req, res, next) => audioUpload.single("file")(req, res, (err) => {
+    if (err) { res.status(400).json({ error: err.message }); return; }
+    next();
+  }),
+  async (req: any, res): Promise<void> => {
+    try {
+      const file: Express.Multer.File | undefined = req.file;
+      if (!file) { res.status(400).json({ error: "Archivo de audio requerido (campo: file)" }); return; }
+      const { language_code, diarize, timestamps_granularity } = req.body ?? {};
+      const result = await transcribeAudio(
+        file.buffer,
+        file.originalname || "audio.mp3",
+        file.mimetype || "audio/mpeg",
+        {
+          language_code: typeof language_code === "string" && language_code.trim() ? language_code.trim() : undefined,
+          diarize: diarize === "true" || diarize === true,
+          timestamps_granularity: (timestamps_granularity as any) || "word",
+        },
+      );
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "voice/transcribe failed");
+      if (!res.headersSent) res.status(500).json({ error: err?.message || "Error transcribiendo audio" });
+    }
+  },
+);
+
+// ─── AUDIO ISOLATION ─────────────────────────────────────────────────────────
+router.post("/voice/audio-isolation",
+  requireAdmin,
+  (req, res, next) => audioUpload.single("audio")(req, res, (err) => {
+    if (err) { res.status(400).json({ error: err.message }); return; }
+    next();
+  }),
+  async (req: any, res): Promise<void> => {
+    try {
+      const file: Express.Multer.File | undefined = req.file;
+      if (!file) { res.status(400).json({ error: "Archivo de audio requerido (campo: audio)" }); return; }
+      const isolated = await isolateAudio(file.buffer, file.originalname || "audio.mp3", file.mimetype || "audio/mpeg");
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Length", String(isolated.length));
+      res.setHeader("Content-Disposition", `attachment; filename="isolated_${file.originalname || "audio.mp3"}"`);
+      res.send(isolated);
+    } catch (err: any) {
+      logger.error({ err: err?.message }, "voice/audio-isolation failed");
+      if (!res.headersSent) res.status(500).json({ error: err?.message || "Error aislando audio" });
+    }
+  },
+);
+
+// ─── CONVAI AGENTS ────────────────────────────────────────────────────────────
+router.get("/voice/convai/agents", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const agents = await listConvAIAgents();
+    res.json({ agents });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/agents list failed");
+    res.status(500).json({ error: err?.message || "Error listando agentes ConvAI" });
+  }
+});
+
+router.post("/voice/convai/agents", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { name, prompt, first_message, language = "es", voice_id } = req.body ?? {};
+    if (!name || typeof name !== "string" || name.trim().length < 2) {
+      res.status(400).json({ error: "name requerido (mín. 2 caracteres)" }); return;
+    }
+    const config: ConvAIAgentConfig = {
+      name: name.trim(),
+      conversation_config: {
+        agent: {
+          prompt: prompt ? { prompt: String(prompt) } : undefined,
+          first_message: first_message ? String(first_message) : "Hola, ¿en qué puedo ayudarte?",
+          language: language || "es",
+        },
+        tts: voice_id ? { voice_id: String(voice_id) } : undefined,
+      },
+    };
+    const agent = await createConvAIAgent(config);
+    logger.info({ agentId: agent.agent_id, name }, "ConvAI agent created");
+    res.json({ success: true, agent });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/agents create failed");
+    res.status(500).json({ error: err?.message || "Error creando agente ConvAI" });
+  }
+});
+
+router.get("/voice/convai/agents/:agentId", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const agent = await getConvAIAgent(req.params.agentId);
+    res.json({ agent });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error obteniendo agente" });
+  }
+});
+
+router.delete("/voice/convai/agents/:agentId", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    await deleteConvAIAgent(req.params.agentId);
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/agents delete failed");
+    res.status(500).json({ error: err?.message || "Error eliminando agente" });
+  }
+});
+
+router.get("/voice/convai/signed-url", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { agentId } = req.query;
+    if (!agentId || typeof agentId !== "string") { res.status(400).json({ error: "agentId requerido" }); return; }
+    const signed_url = await getConvAISignedUrl(agentId);
+    res.json({ signed_url });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error obteniendo URL firmada" });
+  }
+});
+
+router.get("/voice/convai/conversations", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { agentId } = req.query;
+    const conversations = await listConvAIConversations(typeof agentId === "string" ? agentId : undefined);
+    res.json({ conversations });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error listando conversaciones" });
+  }
+});
+
+// ─── PRONUNCIATION DICTIONARIES ───────────────────────────────────────────────
+router.get("/voice/pronunciation-dicts", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const dicts = await listPronunciationDictionaries();
+    res.json({ dictionaries: dicts });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error listando diccionarios" });
+  }
+});
+
+router.post("/voice/pronunciation-dicts", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { name, description, rules } = req.body ?? {};
+    if (!name || typeof name !== "string" || name.trim().length < 2) {
+      res.status(400).json({ error: "name requerido" }); return;
+    }
+    if (!Array.isArray(rules) || rules.length === 0) {
+      res.status(400).json({ error: "rules requerido (array de reglas)" }); return;
+    }
+    const dict = await createPronunciationDictionary(name.trim(), rules as PronunciationRule[], description?.trim());
+    res.json({ success: true, dictionary: dict });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "pronunciation-dicts create failed");
+    res.status(500).json({ error: err?.message || "Error creando diccionario" });
+  }
+});
+
+router.post("/voice/pronunciation-dicts/:id/add-rules", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { rules } = req.body ?? {};
+    if (!Array.isArray(rules) || rules.length === 0) { res.status(400).json({ error: "rules requerido" }); return; }
+    const result = await addRulesToPronunciationDictionary(req.params.id, rules as PronunciationRule[]);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error añadiendo reglas" });
+  }
+});
+
+router.post("/voice/pronunciation-dicts/:id/remove-rules", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { rule_strings } = req.body ?? {};
+    if (!Array.isArray(rule_strings) || rule_strings.length === 0) { res.status(400).json({ error: "rule_strings requerido" }); return; }
+    const result = await removeRulesFromPronunciationDictionary(req.params.id, rule_strings as string[]);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error eliminando reglas" });
+  }
+});
+
+router.delete("/voice/pronunciation-dicts/:id", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    await deletePronunciationDictionary(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Error eliminando diccionario" });
   }
 });
 

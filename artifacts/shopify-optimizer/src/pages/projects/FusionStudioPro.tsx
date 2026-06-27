@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRoute } from "wouter";
-import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare, Zap, RefreshCw, Copy } from "lucide-react";
+import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare, Zap, RefreshCw, Copy, FileText, Scissors, Bot, BookOpen, Plus, Trash2, UploadCloud, PlayCircle } from "lucide-react";
 import { LiveOperation } from "@/components/LiveOperation";
 import VideoStudio from "./VideoStudio";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "compose" | "protools" | "promptlab" | "cinematic-templates" | "downloads";
+type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "audiotools" | "compose" | "protools" | "promptlab" | "cinematic-templates" | "downloads";
 
 type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai";
 type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
@@ -180,7 +180,8 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "multishot",  label: "Multi-shot",      icon: <Film size={15} />,     desc: "Anuncios cinematográficos por escenas (Seedance / Kling / Veo / Runway)" },
   { id: "uploadconcat", label: "Video Studio", icon: <Film size={15} />,      desc: "Editor de vídeo profesional multi-pista: timeline, AI clips, narración, música, texto, efectos y exportación" },
   { id: "avatars",    label: "Avatares",        icon: <UserSquare size={15} />, desc: "Talking heads y product avatars por nicho" },
-  { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,      desc: "TTS, voice clone, SFX, música original" },
+  { id: "audio",      label: "Voz & Música",    icon: <Mic size={15} />,       desc: "TTS, voice clone, SFX, música original" },
+  { id: "audiotools", label: "Audio AI Tools",  icon: <FileText size={15} />, desc: "Transcripción, aislamiento de voz, agentes ConvAI y diccionarios de pronunciación" },
   { id: "compose",    label: "Componer",        icon: <Palette size={15} />,  desc: "Mezcla video + voz + música + texto en MP4" },
   { id: "protools",   label: "Pro tools",       icon: <Mic size={15} />,      desc: "Lip-sync, subtítulos auto, motion transfer" },
   { id: "promptlab",  label: "Prompt Lab",      icon: <Zap size={15} />,      desc: "Construye prompts profesionales: imagen, vídeo, podcast, testimonial, Reels, unboxing, narrativa de marca" },
@@ -287,6 +288,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         {tab === "uploadconcat" && <VideoStudio projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Video exportado y guardado en bóveda ✓", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "avatars"    && <AvatarsTab   caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Avatar listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "audio"      && <AudioTab    caps={caps} projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Audio listo", true); }} onError={(m) => showToast(m, false)} onInfo={(m) => showToast(m, true)} />}
+        {tab === "audiotools" && <AudioToolsTab projectId={projectId} onInfo={(m) => showToast(m, true)} onError={(m) => showToast(m, false)} />}
         {tab === "compose"    && <ComposeTab projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Compose listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "protools"   && <ProToolsTab caps={caps} projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "promptlab"  && <PromptLabTab onInfo={(m) => showToast(m, true)} onError={(m) => showToast(m, false)} />}
@@ -1567,6 +1569,438 @@ function AudioTab({ caps, projectId, onSuccess, onError, onInfo }: { caps: Capab
           className="w-full"
         />
       </div>
+    </div>
+  );
+}
+
+// ─── TAB: AUDIO AI TOOLS ─────────────────────────────────────────────────────
+// Sub-tabs: Transcripción · Aislamiento de voz · ConvAI Agents · Diccionarios
+type AudioSubTab = "transcribe" | "isolate" | "convai" | "pron";
+
+function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: string) => void; onError: (m: string) => void }) {
+  const [sub, setSub] = useState<AudioSubTab>("transcribe");
+
+  // ── Transcripción ──
+  const [tFile, setTFile] = useState<File | null>(null);
+  const [tLang, setTLang] = useState("es");
+  const [tDiarize, setTDiarize] = useState(false);
+  const [tBusy, setTBusy] = useState(false);
+  const [tResult, setTResult] = useState<{ text: string; language_code?: string; words?: any[] } | null>(null);
+
+  async function runTranscribe() {
+    if (!tFile) { onError("Selecciona un archivo de audio o vídeo"); return; }
+    setTBusy(true); setTResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", tFile);
+      fd.append("language_code", tLang);
+      fd.append("diarize", String(tDiarize));
+      fd.append("timestamps_granularity", "word");
+      const r = await fetch(`${API_BASE}/api/voice/transcribe`, { method: "POST", body: fd, credentials: "include" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error transcribiendo");
+      setTResult(j);
+      onInfo("Transcripción completada");
+    } catch (e: any) { onError(e.message); }
+    finally { setTBusy(false); }
+  }
+
+  // ── Aislamiento de voz ──
+  const [iFile, setIFile] = useState<File | null>(null);
+  const [iBusy, setIBusy] = useState(false);
+  const [iUrl, setIUrl] = useState<string | null>(null);
+
+  async function runIsolate() {
+    if (!iFile) { onError("Selecciona un archivo de audio"); return; }
+    setIBusy(true); setIUrl(null);
+    try {
+      const fd = new FormData();
+      fd.append("audio", iFile);
+      const r = await fetch(`${API_BASE}/api/voice/audio-isolation`, { method: "POST", body: fd, credentials: "include" });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || "Error aislando audio"); }
+      const blob = await r.blob();
+      setIUrl(URL.createObjectURL(blob));
+      onInfo("Audio aislado correctamente");
+    } catch (e: any) { onError(e.message); }
+    finally { setIBusy(false); }
+  }
+
+  // ── ConvAI Agents ──
+  const [agents, setAgents] = useState<any[]>([]);
+  const [agentsBusy, setAgentsBusy] = useState(false);
+  const [newAgent, setNewAgent] = useState({ name: "", prompt: "", first_message: "", language: "es" });
+  const [convaiLoaded, setConvaiLoaded] = useState(false);
+
+  async function loadAgents() {
+    setAgentsBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/convai/agents`, { credentials: "include" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error cargando agentes");
+      setAgents(j.agents ?? []);
+      setConvaiLoaded(true);
+    } catch (e: any) { onError(e.message); }
+    finally { setAgentsBusy(false); }
+  }
+
+  async function createAgent() {
+    if (!newAgent.name.trim()) { onError("Nombre del agente requerido"); return; }
+    setAgentsBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/convai/agents`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newAgent),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error creando agente");
+      onInfo(`Agente "${newAgent.name}" creado`);
+      setNewAgent({ name: "", prompt: "", first_message: "", language: "es" });
+      loadAgents();
+    } catch (e: any) { onError(e.message); }
+    finally { setAgentsBusy(false); }
+  }
+
+  async function deleteAgent(id: string) {
+    setAgentsBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/convai/agents/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || "Error eliminando"); }
+      onInfo("Agente eliminado");
+      setAgents(prev => prev.filter(a => a.agent_id !== id));
+    } catch (e: any) { onError(e.message); }
+    finally { setAgentsBusy(false); }
+  }
+
+  useEffect(() => { if (sub === "convai" && !convaiLoaded) loadAgents(); }, [sub]);
+
+  // ── Diccionarios de Pronunciación ──
+  const [dicts, setDicts] = useState<any[]>([]);
+  const [dictsBusy, setDictsBusy] = useState(false);
+  const [dictsLoaded, setDictsLoaded] = useState(false);
+  const [newDict, setNewDict] = useState({ name: "", description: "" });
+  const [newRules, setNewRules] = useState([{ type: "alias" as const, string_to_replace: "", alias: "" }]);
+
+  async function loadDicts() {
+    setDictsBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/pronunciation-dicts`, { credentials: "include" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error cargando diccionarios");
+      setDicts(j.dictionaries ?? []);
+      setDictsLoaded(true);
+    } catch (e: any) { onError(e.message); }
+    finally { setDictsBusy(false); }
+  }
+
+  async function createDict() {
+    if (!newDict.name.trim()) { onError("Nombre del diccionario requerido"); return; }
+    const validRules = newRules.filter(r => r.string_to_replace.trim() && (r.alias?.trim()));
+    if (!validRules.length) { onError("Al menos una regla con palabra y alias requerida"); return; }
+    setDictsBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/pronunciation-dicts`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newDict.name.trim(), description: newDict.description.trim(), rules: validRules }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error creando diccionario");
+      onInfo(`Diccionario "${newDict.name}" creado`);
+      setNewDict({ name: "", description: "" });
+      setNewRules([{ type: "alias", string_to_replace: "", alias: "" }]);
+      loadDicts();
+    } catch (e: any) { onError(e.message); }
+    finally { setDictsBusy(false); }
+  }
+
+  async function deleteDict(id: string) {
+    setDictsBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/pronunciation-dicts/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || "Error eliminando"); }
+      onInfo("Diccionario eliminado");
+      setDicts(prev => prev.filter(d => d.id !== id));
+    } catch (e: any) { onError(e.message); }
+    finally { setDictsBusy(false); }
+  }
+
+  useEffect(() => { if (sub === "pron" && !dictsLoaded) loadDicts(); }, [sub]);
+
+  const SUB_TABS: { id: AudioSubTab; label: string; icon: React.ReactNode }[] = [
+    { id: "transcribe", label: "Transcripción", icon: <FileText size={13} /> },
+    { id: "isolate",    label: "Aislar voz",    icon: <Scissors size={13} /> },
+    { id: "convai",     label: "ConvAI Agents", icon: <Bot size={13} /> },
+    { id: "pron",       label: "Pronunciación", icon: <BookOpen size={13} /> },
+  ];
+
+  const inp: React.CSSProperties = {
+    width: "100%", padding: "8px 10px", borderRadius: 6,
+    border: "1px solid rgba(200,168,75,0.25)", background: "rgba(255,255,255,0.04)",
+    color: "var(--t1)", fontSize: 13, outline: "none",
+  };
+  const label: React.CSSProperties = { fontSize: 12, color: "var(--t2)", marginBottom: 4, display: "block" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Sub-tab bar */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {SUB_TABS.map(t => (
+          <button key={t.id} onClick={() => setSub(t.id)} style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "6px 14px",
+            borderRadius: 20, fontSize: 12, cursor: "pointer", transition: "all 0.15s",
+            background: sub === t.id ? "rgba(200,168,75,0.18)" : "rgba(255,255,255,0.04)",
+            border: sub === t.id ? "1px solid rgba(200,168,75,0.45)" : "1px solid rgba(255,255,255,0.08)",
+            color: sub === t.id ? "var(--gold)" : "var(--t2)",
+          }}>{t.icon}{t.label}</button>
+        ))}
+      </div>
+
+      {/* ── TRANSCRIPCIÓN ── */}
+      {sub === "transcribe" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ padding: 14, background: "rgba(200,168,75,0.06)", borderRadius: 8, border: "1px solid rgba(200,168,75,0.15)", fontSize: 12, color: "var(--t2)" }}>
+            <strong style={{ color: "var(--gold)" }}>ElevenLabs Scribe v1</strong> — Transcribe audio y vídeo a texto con timestamps por palabra. Admite mp3, wav, m4a, ogg, flac, webm, mp4 (máx. 100 MB).
+          </div>
+          <div>
+            <span style={label}>Archivo de audio / vídeo</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", border: "2px dashed rgba(200,168,75,0.3)", borderRadius: 8, cursor: "pointer", color: "var(--t2)", fontSize: 13 }}>
+              <UploadCloud size={16} style={{ color: "var(--gold)" }} />
+              {tFile ? tFile.name : "Arrastra o haz clic para seleccionar"}
+              <input type="file" accept="audio/*,video/*" style={{ display: "none" }} onChange={e => setTFile(e.target.files?.[0] ?? null)} />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <span style={label}>Idioma</span>
+              <select value={tLang} onChange={e => setTLang(e.target.value)} style={{ ...inp }}>
+                <option value="es">Español</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Português</option>
+                <option value="zh">中文</option>
+                <option value="ja">日本語</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: 0, gap: 6 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--t2)", cursor: "pointer" }}>
+                <input type="checkbox" checked={tDiarize} onChange={e => setTDiarize(e.target.checked)} />
+                Identificar hablantes
+              </label>
+            </div>
+          </div>
+          <button onClick={runTranscribe} disabled={!tFile || tBusy} className="btn btn-gold" style={{ alignSelf: "flex-start" }}>
+            {tBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+            {tBusy ? "Transcribiendo…" : "Transcribir"}
+          </button>
+          {tResult && (
+            <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 8, border: "1px solid rgba(200,168,75,0.2)", padding: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: "var(--gold)" }}>
+                  <CheckCircle2 size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                  Transcripción completada {tResult.language_code ? `(${tResult.language_code})` : ""}
+                </span>
+                <button onClick={() => navigator.clipboard.writeText(tResult.text)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t2)" }}>
+                  <Copy size={13} />
+                </button>
+              </div>
+              <p style={{ fontSize: 13, color: "var(--t1)", margin: 0, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{tResult.text}</p>
+              {tResult.words && tResult.words.length > 0 && (
+                <details style={{ marginTop: 10 }}>
+                  <summary style={{ fontSize: 11, color: "var(--t3)", cursor: "pointer" }}>Ver timestamps ({tResult.words.length} palabras)</summary>
+                  <div style={{ maxHeight: 160, overflowY: "auto", marginTop: 6, fontSize: 11, color: "var(--t2)" }}>
+                    {tResult.words.slice(0, 50).map((w: any, i: number) => (
+                      <span key={i} style={{ marginRight: 8 }}>[{w.start?.toFixed(1)}s] {w.text}</span>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── AISLAR VOZ ── */}
+      {sub === "isolate" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ padding: 14, background: "rgba(200,168,75,0.06)", borderRadius: 8, border: "1px solid rgba(200,168,75,0.15)", fontSize: 12, color: "var(--t2)" }}>
+            <strong style={{ color: "var(--gold)" }}>Audio Isolation</strong> — Separa la voz de la música y el ruido de fondo. Perfecto para limpiar voiceovers antes de hacer face-swap o doblaje.
+          </div>
+          <div>
+            <span style={label}>Archivo de audio</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", border: "2px dashed rgba(200,168,75,0.3)", borderRadius: 8, cursor: "pointer", color: "var(--t2)", fontSize: 13 }}>
+              <Scissors size={16} style={{ color: "var(--gold)" }} />
+              {iFile ? iFile.name : "Arrastra o haz clic para seleccionar (mp3, wav, m4a, ogg)"}
+              <input type="file" accept="audio/*" style={{ display: "none" }} onChange={e => setIFile(e.target.files?.[0] ?? null)} />
+            </label>
+          </div>
+          <button onClick={runIsolate} disabled={!iFile || iBusy} className="btn btn-gold" style={{ alignSelf: "flex-start" }}>
+            {iBusy ? <Loader2 size={14} className="animate-spin" /> : <Scissors size={14} />}
+            {iBusy ? "Aislando voz…" : "Aislar voz"}
+          </button>
+          {iUrl && (
+            <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 8, border: "1px solid rgba(200,168,75,0.2)", padding: 14 }}>
+              <p style={{ fontSize: 12, color: "var(--gold)", marginBottom: 10 }}>
+                <CheckCircle2 size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                Voz aislada lista
+              </p>
+              <audio controls src={iUrl} style={{ width: "100%", borderRadius: 6 }} />
+              <a href={iUrl} download={`isolated_${iFile?.name || "audio.mp3"}`} className="btn" style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 14px" }}>
+                <Download size={13} /> Descargar
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── CONVAI AGENTS ── */}
+      {sub === "convai" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ padding: 14, background: "rgba(200,168,75,0.06)", borderRadius: 8, border: "1px solid rgba(200,168,75,0.15)", fontSize: 12, color: "var(--t2)" }}>
+            <strong style={{ color: "var(--gold)" }}>ConvAI Agents</strong> — Crea agentes conversacionales con voz en tiempo real. Cada agente tiene su propia personalidad, prompt y voz. Ideal para chatbots de atención al cliente de tus tiendas Shopify.
+          </div>
+
+          {/* Crear agente */}
+          <div style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 14, border: "1px solid rgba(255,255,255,0.07)" }}>
+            <p style={{ fontSize: 12, color: "var(--gold)", marginBottom: 12, fontWeight: 600 }}>+ Nuevo agente</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <span style={label}>Nombre del agente *</span>
+                <input value={newAgent.name} onChange={e => setNewAgent(p => ({ ...p, name: e.target.value }))} placeholder="Ej: Asistente Tienda Zara" style={inp} />
+              </div>
+              <div>
+                <span style={label}>Prompt del sistema</span>
+                <textarea value={newAgent.prompt} onChange={e => setNewAgent(p => ({ ...p, prompt: e.target.value }))}
+                  placeholder="Eres un asistente de atención al cliente amable y profesional de [nombre de tienda]. Ayudas con pedidos, productos y devoluciones en español."
+                  rows={3} style={{ ...inp, resize: "vertical" }} />
+              </div>
+              <div>
+                <span style={label}>Mensaje inicial</span>
+                <input value={newAgent.first_message} onChange={e => setNewAgent(p => ({ ...p, first_message: e.target.value }))}
+                  placeholder="Hola, ¿en qué puedo ayudarte hoy?" style={inp} />
+              </div>
+              <div>
+                <span style={label}>Idioma</span>
+                <select value={newAgent.language} onChange={e => setNewAgent(p => ({ ...p, language: e.target.value }))} style={inp}>
+                  <option value="es">Español</option>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                  <option value="de">Deutsch</option>
+                  <option value="pt">Português</option>
+                </select>
+              </div>
+              <button onClick={createAgent} disabled={agentsBusy || !newAgent.name.trim()} className="btn btn-gold" style={{ alignSelf: "flex-start" }}>
+                {agentsBusy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                Crear agente
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de agentes */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <p style={{ fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>Agentes activos ({agents.length})</p>
+              <button onClick={loadAgents} disabled={agentsBusy} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)" }}>
+                <RefreshCw size={13} className={agentsBusy ? "animate-spin" : ""} />
+              </button>
+            </div>
+            {agents.length === 0 && !agentsBusy && (
+              <p style={{ fontSize: 12, color: "var(--t3)", padding: "12px 0" }}>No hay agentes creados aún.</p>
+            )}
+            {agents.map(a => (
+              <div key={a.agent_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 6, border: "1px solid rgba(255,255,255,0.07)", marginBottom: 6 }}>
+                <div>
+                  <p style={{ fontSize: 13, color: "var(--t1)", margin: 0 }}><Bot size={12} style={{ marginRight: 6, verticalAlign: "middle", color: "var(--gold)" }} />{a.name}</p>
+                  <p style={{ fontSize: 11, color: "var(--t3)", margin: "2px 0 0" }}>ID: {a.agent_id}</p>
+                </div>
+                <button onClick={() => deleteAgent(a.agent_id)} disabled={agentsBusy} style={{ background: "none", border: "none", cursor: "pointer", color: "#e05252" }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── DICCIONARIOS DE PRONUNCIACIÓN ── */}
+      {sub === "pron" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ padding: 14, background: "rgba(200,168,75,0.06)", borderRadius: 8, border: "1px solid rgba(200,168,75,0.15)", fontSize: 12, color: "var(--t2)" }}>
+            <strong style={{ color: "var(--gold)" }}>Diccionarios de Pronunciación</strong> — Corrige cómo el TTS pronuncia nombres de marca, productos o términos técnicos. Ej: "Nike" → "Naiki", "Zara" → "Zará".
+          </div>
+
+          {/* Crear diccionario */}
+          <div style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 14, border: "1px solid rgba(255,255,255,0.07)" }}>
+            <p style={{ fontSize: 12, color: "var(--gold)", marginBottom: 12, fontWeight: 600 }}>+ Nuevo diccionario</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <span style={label}>Nombre *</span>
+                  <input value={newDict.name} onChange={e => setNewDict(p => ({ ...p, name: e.target.value }))} placeholder="Ej: Marcas de moda" style={inp} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <span style={label}>Descripción</span>
+                  <input value={newDict.description} onChange={e => setNewDict(p => ({ ...p, description: e.target.value }))} placeholder="Correcciones para TTS" style={inp} />
+                </div>
+              </div>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={label}>Reglas de pronunciación</span>
+                  <button onClick={() => setNewRules(p => [...p, { type: "alias", string_to_replace: "", alias: "" }])}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gold)", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Plus size={12} /> Añadir regla
+                  </button>
+                </div>
+                {newRules.map((rule, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6, alignItems: "center" }}>
+                    <input value={rule.string_to_replace} onChange={e => setNewRules(p => p.map((r, j) => j === i ? { ...r, string_to_replace: e.target.value } : r))}
+                      placeholder="Palabra original" style={{ ...inp, flex: 1 }} />
+                    <span style={{ color: "var(--t3)", fontSize: 14 }}>→</span>
+                    <input value={rule.alias || ""} onChange={e => setNewRules(p => p.map((r, j) => j === i ? { ...r, alias: e.target.value } : r))}
+                      placeholder="Pronunciar como" style={{ ...inp, flex: 1 }} />
+                    {newRules.length > 1 && (
+                      <button onClick={() => setNewRules(p => p.filter((_, j) => j !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#e05252" }}>
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button onClick={createDict} disabled={dictsBusy || !newDict.name.trim()} className="btn btn-gold" style={{ alignSelf: "flex-start" }}>
+                {dictsBusy ? <Loader2 size={13} className="animate-spin" /> : <BookOpen size={13} />}
+                Crear diccionario
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de diccionarios */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <p style={{ fontSize: 12, color: "var(--t2)", fontWeight: 600 }}>Diccionarios ({dicts.length})</p>
+              <button onClick={loadDicts} disabled={dictsBusy} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)" }}>
+                <RefreshCw size={13} className={dictsBusy ? "animate-spin" : ""} />
+              </button>
+            </div>
+            {dicts.length === 0 && !dictsBusy && (
+              <p style={{ fontSize: 12, color: "var(--t3)", padding: "12px 0" }}>No hay diccionarios creados aún.</p>
+            )}
+            {dicts.map(d => (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 6, border: "1px solid rgba(255,255,255,0.07)", marginBottom: 6 }}>
+                <div>
+                  <p style={{ fontSize: 13, color: "var(--t1)", margin: 0 }}><BookOpen size={12} style={{ marginRight: 6, verticalAlign: "middle", color: "var(--gold)" }} />{d.name}</p>
+                  {d.description && <p style={{ fontSize: 11, color: "var(--t3)", margin: "2px 0 0" }}>{d.description}</p>}
+                  <p style={{ fontSize: 10, color: "var(--t3)", margin: "2px 0 0", fontFamily: "monospace" }}>ID: {d.id} · v{d.version_id}</p>
+                </div>
+                <button onClick={() => deleteDict(d.id)} disabled={dictsBusy} style={{ background: "none", border: "none", cursor: "pointer", color: "#e05252" }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
