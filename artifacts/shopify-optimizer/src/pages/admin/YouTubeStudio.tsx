@@ -134,6 +134,16 @@ export default function YouTubeStudio() {
   const [modeloError, setModeloError] = useState<string | null>(null);
   const [modeloGenPrompt, setModeloGenPrompt] = useState("");
   const [modeloLoadingVoices, setModeloLoadingVoices] = useState(false);
+  // Pipeline A — style
+  const [modeloStyle, setModeloStyle] = useState<"monologo"|"ugc"|"podcast"|"standUp">("monologo");
+  // Pipeline B — audio mode
+  const [modeloAudioMode, setModeloAudioMode] = useState<"tts"|"sts">("tts");
+  // Voice settings (adjustable per voice)
+  const [modeloVoiceStab, setModeloVoiceStab] = useState(0.12);
+  const [modeloVoiceStyleVal, setModeloVoiceStyleVal] = useState(0.72);
+  const [modeloVoiceSpeed, setModeloVoiceSpeed] = useState(0.87);
+  const [modeloVoiceSim, setModeloVoiceSim] = useState(0.95);
+  const [modeloShowVoiceSettings, setModeloShowVoiceSettings] = useState(false);
 
   const [form, setForm] = useState({
     title: "", description: "", tags: "", privacy: "public", categoryId: "22",
@@ -245,10 +255,19 @@ export default function YouTubeStudio() {
 
   const [modeloSavedUrl, setModeloSavedUrl] = useState<string | null>(null);
 
+  // Construye el objeto voiceSettings para enviar al backend
+  function buildVoiceSettings() {
+    return { stability: modeloVoiceStab, similarity_boost: modeloVoiceSim, style_val: modeloVoiceStyleVal, speed: modeloVoiceSpeed };
+  }
+
   async function modeloRunPipeline() {
-    if (!modeloScript.trim()) { setModeloError("Escribe el guión primero"); return; }
     if (!modeloVoiceId) { setModeloError("Selecciona una voz"); return; }
-    if (modeloRefMode === "local" && !modeloLocalB64) { setModeloError("Sube el vídeo de referencia (Leo Harlem, etc.) primero"); return; }
+    const isGenerate = modeloRefMode === "generate" || modeloRefMode === "search";
+    const isLocal = modeloRefMode === "local";
+
+    if (isGenerate && !modeloScript.trim()) { setModeloError("Escribe el guión primero para generar el vídeo"); return; }
+    if (isLocal && !modeloLocalB64) { setModeloError("Sube el vídeo de referencia primero"); return; }
+    if (isLocal && modeloAudioMode === "tts" && !modeloScript.trim()) { setModeloError("En modo TTS escribe el guión (texto que dirá la voz). En modo STS no hace falta."); return; }
 
     setModeloStep("extracting");
     setModeloError(null);
@@ -258,43 +277,87 @@ export default function YouTubeStudio() {
     setModeloFinalUrl(null);
     setModeloSavedUrl(null);
 
-    const voiceName = modeloVoices.find(v => v.voice_id === modeloVoiceId)?.name || "Sevillano";
+    const voiceName = modeloVoices.find(v => v.voice_id === modeloVoiceId)?.name || "Voz elegida";
+    const vs = buildVoiceSettings();
 
     try {
-      // ── PIPELINE A: Generar desde cero — 3 clips Seedance I2V en paralelo ──
-      if (modeloRefMode === "generate" || modeloRefMode === "search") {
-        modeloAddLog(`🎬 Generando vídeo monologuista en escenario real…`);
-        modeloAddLog(`   → Lanzando 3 clips Seedance I2V en PARALELO (foto Sevillano + prompts stand-up)`);
-        modeloAddLog(`   → Voz "${voiceName}" con acento andaluz máximo (stability=0.12, style=0.72, speed=0.87)`);
+      // ─────────────────────────────────────────────────────────────────────
+      // PIPELINE A — Generar desde cero (3 clips Seedance I2V en paralelo)
+      // ─────────────────────────────────────────────────────────────────────
+      if (isGenerate) {
+        const styleLabel: Record<string, string> = { monologo:"Monólogo", ugc:"UGC", podcast:"Podcast", standUp:"Stand-Up" };
+        modeloAddLog(`🎬 Pipeline A — Generando "${styleLabel[modeloStyle] || modeloStyle}" con "${voiceName}"…`);
+        modeloAddLog(`   → 3 clips Seedance I2V lanzados en PARALELO (10s c/u, escenario adaptado al estilo)`);
+        modeloAddLog(`   → Voz: stability=${vs.stability}, style=${vs.style_val}, speed=${vs.speed}`);
         setModeloStep("dubbing");
 
         const r = await fetch(`${BASE}/api/youtube/modelo/comedian-gen`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ script: modeloScript, voiceId: modeloVoiceId }),
+          body: JSON.stringify({
+            script: modeloScript,
+            voiceId: modeloVoiceId,
+            style: modeloStyle,
+            voiceSettings: vs,
+          }),
         });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "Error generando vídeo comedian");
+        const d = await r.json() as any;
+        if (!r.ok) throw new Error(d.error || "Error generando vídeo");
 
-        modeloAddLog(`✅ ${d.clipsGenerated} clips generados y concatenados (${d.audioDuration?.toFixed(1)}s)`);
+        modeloAddLog(`✅ ${d.clipsGenerated} clips generados y concatenados`);
+        modeloAddLog(`🎵 Audio: ${d.audioDuration?.toFixed(1)}s con voz "${voiceName}"`);
         modeloAddLog(`💾 Guardado permanentemente: ${d.savedAs}`);
         if (d.publicUrl) setModeloSavedUrl(`${BASE}${d.publicUrl}`);
-
         setModeloStep("done");
-        modeloAddLog(`🎤 Pipeline completado — monólogo en escenario real con voz Sevillana`);
+        modeloAddLog(`🎤 ¡Pipeline A completado! Vídeo "${styleLabel[modeloStyle]}" con voz "${voiceName}" listo.`);
         return;
       }
 
-      // ── PIPELINE B: Vídeo de referencia (Leo Harlem) → TTS Sevillano + face-swap ──
-      if (modeloRefMode === "local" && modeloLocalB64) {
+      // ─────────────────────────────────────────────────────────────────────
+      // PIPELINE B — Vídeo de referencia + voz clonada (TTS o STS)
+      // ─────────────────────────────────────────────────────────────────────
+      if (isLocal) {
         modeloAddLog(`📁 Vídeo referencia: ${modeloLocalFile?.name} (${((modeloLocalFile?.size||0)/1024/1024).toFixed(1)}MB)`);
-        modeloAddLog(`🎙️ PASO 1: Generando voz Sevillano con acento andaluz…`);
-        modeloAddLog(`   → eleven_turbo_v2_5, stability=0.12 (máxima naturalidad), style=0.72 (stand-up), speed=0.87`);
-        modeloAddLog(`🔀 PASO 2: Reemplazando audio del vídeo de referencia con voz Sevillano`);
-        modeloAddLog(`   → Leo Harlem en escenario + voz del Sevillano sincronizada exactamente`);
+
+        // ── MODO STS: Dubbing REAL — ElevenLabs analiza el audio original y lo convierte ──
+        if (modeloAudioMode === "sts") {
+          modeloAddLog(`🎙️ Modo: STS Dubbing REAL (ElevenLabs Speech-to-Speech)`);
+          modeloAddLog(`   → Extrae audio del vídeo → ElevenLabs clona la voz preservando timing/ritmo`);
+          modeloAddLog(`   → NO necesita guión — usa el patrón vocal del hablante original`);
+          modeloAddLog(`   → Voz elegida: "${voiceName}" (stability=${vs.stability}, style=${vs.style_val})`);
+          setModeloStep("dubbing");
+
+          const r = await fetch(`${BASE}/api/youtube/modelo/speech-to-speech`, {
+            method: "POST", credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              referenceVideoB64: modeloLocalB64,
+              voiceId: modeloVoiceId,
+              doFaceSwap: !!modeloFaceFile,
+              voiceSettings: vs,
+            }),
+          });
+          const d = await r.json() as any;
+          if (!r.ok) throw new Error(d.error || "Error en STS dubbing");
+
+          if (d.faceSwapApplied) {
+            modeloAddLog(`🎭 Face-swap aplicado — cara del modelo implantada fotograma a fotograma`);
+            setModeloStep("faceswap");
+          }
+          modeloAddLog(`✅ STS Dubbing completado (${d.videoDuration?.toFixed(1)}s)`);
+          modeloAddLog(`💾 Guardado permanentemente: ${d.savedAs}`);
+          if (d.publicUrl) setModeloSavedUrl(`${BASE}${d.publicUrl}`);
+          setModeloStep("done");
+          modeloAddLog(`🎤 ¡STS Pipeline completado! Vídeo con voz "${voiceName}" lista.`);
+          return;
+        }
+
+        // ── MODO TTS: Genera TTS del guión → reemplaza audio del vídeo referencia ──
+        modeloAddLog(`🎙️ Modo: TTS — Sintetizando guión con voz "${voiceName}"…`);
+        modeloAddLog(`   → stability=${vs.stability}, style=${vs.style_val}, speed=${vs.speed}`);
+        modeloAddLog(`🔀 Reemplazando audio de "${modeloLocalFile?.name}" con la voz sintetizada`);
         setModeloStep("dubbing");
 
-        // Llamar al pipeline de referencia con face-swap automático
         const r = await fetch(`${BASE}/api/youtube/modelo/reference-pipeline`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -302,24 +365,23 @@ export default function YouTubeStudio() {
             referenceVideoB64: modeloLocalB64,
             voiceId: modeloVoiceId,
             script: modeloScript,
-            doFaceSwap: true,
+            doFaceSwap: !!modeloFaceFile,
+            audioMode: "tts",
+            voiceSettings: vs,
           }),
         });
-        const d = await r.json();
+        const d = await r.json() as any;
         if (!r.ok) throw new Error(d.error || "Error en pipeline de referencia");
 
         if (d.faceSwapApplied) {
-          modeloAddLog(`🎭 PASO 3 (face-swap): cara del Sevillano implantada fotograma a fotograma`);
-          modeloAddLog(`   → ${d.audioDuration?.toFixed(1)}s a 4fps procesados con Replicate codeplugtech/face-swap`);
+          modeloAddLog(`🎭 Face-swap: cara del modelo implantada fotograma a fotograma (4fps)`);
           setModeloStep("faceswap");
         }
-
-        modeloAddLog(`✅ Pipeline completado (${d.audioDuration?.toFixed(1)}s, face-swap=${d.faceSwapApplied})`);
+        modeloAddLog(`✅ Pipeline TTS completado (${d.audioDuration?.toFixed(1)}s, face-swap=${d.faceSwapApplied})`);
         modeloAddLog(`💾 Guardado permanentemente: ${d.savedAs}`);
         if (d.publicUrl) setModeloSavedUrl(`${BASE}${d.publicUrl}`);
-
         setModeloStep("done");
-        modeloAddLog(`🎤 Leo Harlem en escenario + cara Sevillano + voz Sevillano ✅`);
+        modeloAddLog(`🎤 ¡Vídeo referencia con voz "${voiceName}" completado!`);
         return;
       }
     } catch (err: any) {
@@ -1950,9 +2012,32 @@ export default function YouTubeStudio() {
                   </div>
                 </div>
 
-                {/* 2. Script */}
+                {/* 2. Script + Style (Pipeline A: style selector visible) */}
+                {(modeloRefMode === "generate" || modeloRefMode === "search") && (
+                  <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
+                    <span style={S.label}>2. Estilo de vídeo (Pipeline A)</span>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      {([
+                        { id: "monologo", label: "🎤 Monólogo", desc: "Club de comedia, spotlight, micrófono" },
+                        { id: "standUp",  label: "🎭 Stand-Up",  desc: "Teatro, escenario grande, público" },
+                        { id: "ugc",      label: "📱 UGC",       desc: "Casual, cámara directa, casa/exterior" },
+                        { id: "podcast",  label: "🎙️ Podcast",  desc: "Estudio podcast, micrófono pro" },
+                      ] as Array<{id:string;label:string;desc:string}>).map(st => (
+                        <button key={st.id} onClick={() => setModeloStyle(st.id as any)}
+                          style={{ padding: "8px 10px", borderRadius: 8, border: "2px solid",
+                            borderColor: modeloStyle === st.id ? "var(--gold)" : "transparent",
+                            background: modeloStyle === st.id ? "rgba(251,191,36,0.1)" : "var(--ink3)",
+                            cursor: "pointer", textAlign: "left" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: modeloStyle === st.id ? "var(--gold)" : "var(--t)" }}>{st.label}</div>
+                          <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{st.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
-                  <span style={S.label}>2. Guión / script</span>
+                  <span style={S.label}>{(modeloRefMode === "generate" || modeloRefMode === "search") ? "3. Guión / script" : "2. Guión / script"} {modeloRefMode === "local" && modeloAudioMode === "sts" && <span style={{ fontSize: 10, color: "var(--jade)", fontWeight: 700 }}> — opcional en modo STS</span>}</span>
                   <textarea value={modeloScript} onChange={e => setModeloScript(e.target.value)}
                     placeholder={"Escribe el guión que dirá el modelo.\nEjemplo: ¡Buenas noches Sevilla! Oye, que los turistas en la playa de Torremolinos son como los pulpos…"}
                     rows={6}
@@ -1962,16 +2047,67 @@ export default function YouTubeStudio() {
 
                 {/* 3. Voice */}
                 <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
-                  <span style={S.label}>3. Voz {modeloLoadingVoices && <RefreshCw size={10} className="spin" style={{ display: "inline", marginLeft: 4 }} />}</span>
-                  <select value={modeloVoiceId} onChange={e => setModeloVoiceId(e.target.value)}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={S.label}>3. Voz {modeloLoadingVoices && <RefreshCw size={10} className="spin" style={{ display: "inline", marginLeft: 4 }} />}</span>
+                    <button onClick={() => setModeloShowVoiceSettings(v => !v)}
+                      style={{ background: "none", border: "1px solid var(--ink4)", borderRadius: 6, padding: "2px 8px", fontSize: 10, color: modeloShowVoiceSettings ? "var(--gold)" : "var(--t3)", cursor: "pointer" }}>
+                      {modeloShowVoiceSettings ? "▲ Ajustes" : "⚙ Ajustes"}
+                    </button>
+                  </div>
+                  <select value={modeloVoiceId} onChange={e => {
+                    setModeloVoiceId(e.target.value);
+                    // Si es la voz Sevillano, usar ajustes de acento andaluz máximo
+                    if (e.target.value === "8m4O8qoFLrKBzbmsuL5T") {
+                      setModeloVoiceStab(0.12); setModeloVoiceStyleVal(0.72); setModeloVoiceSpeed(0.87); setModeloVoiceSim(0.95);
+                    } else {
+                      setModeloVoiceStab(0.5); setModeloVoiceStyleVal(0.5); setModeloVoiceSpeed(1.0); setModeloVoiceSim(0.85);
+                    }
+                  }}
                     style={{ width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "var(--t)" }}>
                     {modeloVoices.map(v => (
                       <option key={v.voice_id} value={v.voice_id}>
-                        {v.name}{v.category === "cloned" ? " ★" : ""}
+                        {v.name}{v.category === "cloned" ? " ★ (clonada)" : ""}
                       </option>
                     ))}
                   </select>
-                  <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>★ = voz clonada · ElevenLabs substituirá la voz del vídeo de referencia</div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>
+                    ★ = voz clonada · {modeloVoiceId === "8m4O8qoFLrKBzbmsuL5T" ? <span style={{ color: "var(--gold)" }}>Sevillano — acento andaluz máximo activo</span> : "Selecciona cualquier voz ElevenLabs"}
+                  </div>
+                  {modeloShowVoiceSettings && (
+                    <div style={{ marginTop: 10, padding: "10px 12px", background: "var(--ink3)", borderRadius: 8, border: "1px solid var(--ink4)" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--t2)", marginBottom: 8 }}>⚙ Ajustes de voz (ElevenLabs)</div>
+                      {([
+                        { label: "Stability", hint: "↓ = más expresivo/natural", val: modeloVoiceStab, set: setModeloVoiceStab, min: 0, max: 1, step: 0.01 },
+                        { label: "Style exaggeration", hint: "↑ = más dramatismo / acento", val: modeloVoiceStyleVal, set: setModeloVoiceStyleVal, min: 0, max: 1, step: 0.01 },
+                        { label: "Speed", hint: "< 1 = más lento y natural", val: modeloVoiceSpeed, set: setModeloVoiceSpeed, min: 0.7, max: 1.3, step: 0.01 },
+                        { label: "Similarity boost", hint: "↑ = más parecido a la muestra", val: modeloVoiceSim, set: setModeloVoiceSim, min: 0, max: 1, step: 0.01 },
+                      ] as Array<{label:string;hint:string;val:number;set:(v:number)=>void;min:number;max:number;step:number}>).map(s => (
+                        <div key={s.label} style={{ marginBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--t3)", marginBottom: 2 }}>
+                            <span>{s.label} <span style={{ opacity: 0.6 }}>— {s.hint}</span></span>
+                            <span style={{ color: "var(--gold)", fontWeight: 700 }}>{s.val.toFixed(2)}</span>
+                          </div>
+                          <input type="range" min={s.min} max={s.max} step={s.step} value={s.val}
+                            onChange={e => s.set(parseFloat(e.target.value))}
+                            style={{ width: "100%", accentColor: "var(--gold)" }} />
+                        </div>
+                      ))}
+                      <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                        <button onClick={() => { setModeloVoiceStab(0.12); setModeloVoiceStyleVal(0.72); setModeloVoiceSpeed(0.87); setModeloVoiceSim(0.95); }}
+                          style={{ flex: 1, padding: "4px 0", background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 6, fontSize: 10, color: "var(--gold)", cursor: "pointer" }}>
+                          🌶 Sevillano (andaluz)
+                        </button>
+                        <button onClick={() => { setModeloVoiceStab(0.5); setModeloVoiceStyleVal(0.5); setModeloVoiceSpeed(1.0); setModeloVoiceSim(0.85); }}
+                          style={{ flex: 1, padding: "4px 0", background: "var(--ink4)", border: "1px solid var(--ink4)", borderRadius: 6, fontSize: 10, color: "var(--t3)", cursor: "pointer" }}>
+                          ⚖ Neutro (estándar)
+                        </button>
+                        <button onClick={() => { setModeloVoiceStab(0.3); setModeloVoiceStyleVal(0.8); setModeloVoiceSpeed(0.92); setModeloVoiceSim(0.9); }}
+                          style={{ flex: 1, padding: "4px 0", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 6, fontSize: 10, color: "var(--jade)", cursor: "pointer" }}>
+                          🎭 Stand-up
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 4. Face photo (optional) */}
@@ -2043,11 +2179,37 @@ export default function YouTubeStudio() {
 
                   {modeloRefMode === "local" && (
                     <div>
-                      <div style={{ marginBottom: 8, padding: "8px 12px", background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 8, fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
-                        <strong style={{ color: "var(--jade)" }}>🎭 Pipeline B:</strong> Sube un clip de Leo Harlem / David el Guapo / cualquier monologuista → el servidor reemplaza el audio con la voz Sevillano → face-swap cara del Sevillano fotograma a fotograma.<br />
-                        <span style={{ fontSize: 10, opacity: 0.8 }}>~5-10 min según duración · Descarga el clip de YouTube con </span>
-                        <a href="https://cobalt.tools" target="_blank" style={{ color: "var(--jade)", fontSize: 10 }}>cobalt.tools</a>
-                        <span style={{ fontSize: 10, opacity: 0.8 }}> o y2mate y súbelo aquí</span>
+                      {/* Audio mode selector — TTS vs STS */}
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--t2)", marginBottom: 6 }}>🎵 Modo de audio</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                          <button onClick={() => setModeloAudioMode("tts")}
+                            style={{ padding: "8px 10px", borderRadius: 8, border: "2px solid",
+                              borderColor: modeloAudioMode === "tts" ? "var(--gold)" : "transparent",
+                              background: modeloAudioMode === "tts" ? "rgba(251,191,36,0.1)" : "var(--ink3)",
+                              cursor: "pointer", textAlign: "left" }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: modeloAudioMode === "tts" ? "var(--gold)" : "var(--t)" }}>🎙️ TTS — Guión</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2, lineHeight: 1.4 }}>Sintetiza el guión escrito. Vídeo referencia solo para los gestos/movimientos.</div>
+                          </button>
+                          <button onClick={() => setModeloAudioMode("sts")}
+                            style={{ padding: "8px 10px", borderRadius: 8, border: "2px solid",
+                              borderColor: modeloAudioMode === "sts" ? "var(--jade)" : "transparent",
+                              background: modeloAudioMode === "sts" ? "rgba(16,185,129,0.1)" : "var(--ink3)",
+                              cursor: "pointer", textAlign: "left" }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: modeloAudioMode === "sts" ? "var(--jade)" : "var(--t)" }}>✨ STS — Dubbing Real</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2, lineHeight: 1.4 }}>ElevenLabs clona la voz preservando el timing/ritmo exacto del hablante. Sin guión.</div>
+                          </button>
+                        </div>
+                        {modeloAudioMode === "sts" && (
+                          <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 7, fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
+                            <strong style={{ color: "var(--jade)" }}>STS (Speech-to-Speech):</strong> ElevenLabs extrae el audio del vídeo (Leo Harlem hablando) y lo convierte a la voz elegida <strong>manteniendo exactamente el timing, ritmo y cadencia</strong> del hablante original. El resultado suena como si el modelo hubiera dicho exactamente lo mismo que Leo Harlem.
+                          </div>
+                        )}
+                        {modeloAudioMode === "tts" && (
+                          <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 7, fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
+                            <strong style={{ color: "var(--gold)" }}>TTS:</strong> Se genera la voz del modelo a partir del guión escrito, y se reemplaza el audio del vídeo de referencia con este audio. El vídeo dura lo que dure el guión.
+                          </div>
+                        )}
                       </div>
                       <input ref={modeloLocalRef} type="file" accept="video/*" style={{ display: "none" }}
                         onChange={e => {
@@ -2189,29 +2351,40 @@ export default function YouTubeStudio() {
             {/* RUN BUTTON */}
             <div style={{ marginTop: 16 }}>
               {modeloError && <div style={{ marginBottom: 10, fontSize: 12, color: "#f87171", padding: "8px 12px", background: "rgba(239,68,68,0.08)", borderRadius: 8 }}>{modeloError}</div>}
-              <button onClick={modeloRunPipeline} disabled={isRunning}
-                style={{ width: "100%", padding: "14px 20px",
-                  background: isRunning ? "var(--ink3)" : modeloRefMode === "local"
-                    ? "linear-gradient(135deg,#059669,#10b981)"
-                    : "linear-gradient(135deg,var(--gold),#f59e0b)",
-                  color: isRunning ? "var(--t3)" : "#000",
-                  border: "none", borderRadius: 10, fontWeight: 800, cursor: isRunning ? "not-allowed" : "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                {isRunning
-                  ? <><RefreshCw size={16} className="spin" />
-                    {modeloStep === "extracting" ? "Iniciando pipeline…"
-                     : modeloStep === "dubbing" ? (modeloRefMode === "local" ? "Reemplazando audio + preparando face-swap…" : "Generando clips en paralelo…")
-                     : modeloStep === "faceswap" ? "Face-swap fotograma a fotograma (cara Sevillano)…"
-                     : "Procesando…"}
-                    </>
-                  : modeloRefMode === "local"
-                    ? <><span style={{ fontSize: 16 }}>🎭</span> Pipeline B — Subir vídeo + Voz + Face Swap</>
-                    : <><span style={{ fontSize: 16 }}>🎬</span> Pipeline A — Generar monólogo en escenario</>}
-              </button>
-              <div style={{ marginTop: 8, fontSize: 11, color: "var(--t3)", textAlign: "center" }}>
-                {modeloRefMode === "local"
-                  ? "Paso 1: TTS Sevillano · Paso 2: Reemplazar audio Leo Harlem · Paso 3: Face-swap fotograma (~5-10 min)"
-                  : "3 clips Seedance I2V en paralelo (escenario comedia) → concatenar → voz Sevillano TTS (~4-7 min)"}
-              </div>
+              {(() => {
+                const isLocalMode = modeloRefMode === "local";
+                const isSTS = isLocalMode && modeloAudioMode === "sts";
+                const styleLabel: Record<string, string> = { monologo:"🎤 Monólogo", ugc:"📱 UGC", podcast:"🎙️ Podcast", standUp:"🎭 Stand-Up" };
+                const bg = isRunning ? "var(--ink3)"
+                  : isSTS ? "linear-gradient(135deg,#059669,#10b981)"
+                  : isLocalMode ? "linear-gradient(135deg,#7c3aed,#a78bfa)"
+                  : "linear-gradient(135deg,var(--gold),#f59e0b)";
+                const runLabel = isSTS
+                  ? <><span>✨</span> Pipeline B STS — Dubbing REAL con ElevenLabs</>
+                  : isLocalMode
+                    ? <><span>🎙️</span> Pipeline B TTS — Sintetizar guión + reemplazar audio</>
+                    : <><span>🎬</span> Pipeline A — {styleLabel[modeloStyle] || "Generar"} desde cero</>;
+                const hint = isSTS
+                  ? `STS: ElevenLabs extrae audio del vídeo → clona voz preservando timing (${modeloLocalFile ? `${((modeloLocalFile.size||0)/1024/1024).toFixed(1)}MB` : "sube vídeo"})`
+                  : isLocalMode
+                    ? "TTS: Sintetiza guión → reemplaza audio del vídeo referencia → face-swap opcional (~5-10 min)"
+                    : `3 clips Seedance I2V en paralelo → concatenar → voz TTS (~4-7 min)`;
+                const stepLabel = modeloStep === "extracting" ? "Iniciando pipeline…"
+                  : modeloStep === "dubbing" ? (isSTS ? "ElevenLabs STS clonando voz (preserva timing)…" : isLocalMode ? "Sintetizando TTS + reemplazando audio…" : "Generando 3 clips Seedance en paralelo…")
+                  : modeloStep === "faceswap" ? "Face-swap fotograma a fotograma (Replicate)…"
+                  : "Procesando…";
+                return (
+                  <>
+                    <button onClick={modeloRunPipeline} disabled={isRunning}
+                      style={{ width: "100%", padding: "14px 20px", background: bg, color: isRunning ? "var(--t3)" : "#000",
+                        border: "none", borderRadius: 10, fontWeight: 800, cursor: isRunning ? "not-allowed" : "pointer", fontSize: 13,
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      {isRunning ? <><RefreshCw size={16} className="spin" />{stepLabel}</> : runLabel}
+                    </button>
+                    <div style={{ marginTop: 8, fontSize: 11, color: "var(--t3)", textAlign: "center" }}>{hint}</div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         );

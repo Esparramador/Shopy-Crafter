@@ -763,12 +763,14 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
 });
 
 // ── POST /youtube/modelo/comedian-gen — Genera vídeo monologuista en escenario REAL
-// 3 clips Seedance I2V en PARALELO (foto Sevillano + prompts stand-up en escenario)
-// → concatena clips → merge con voz Sevillano TTS (acento andaluz máximo)
-// Body: { script, voiceId }
+// 3 clips Seedance I2V en PARALELO (foto del modelo + prompts adaptativos por estilo)
+// → concatena clips → merge con TTS de la voz elegida
+// Body: { script, voiceId, style?, voiceSettings?, photoUrl? }
+// style: "monologo"|"ugc"|"podcast"|"standUp" — default "monologo"
+// voiceSettings: { stability, style_val, speed, similarity_boost } — default Sevillano settings
 router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { script, voiceId } = req.body;
+    const { script, voiceId, style = "monologo", voiceSettings, photoUrl: customPhotoUrl } = req.body;
     if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
     if (!script?.trim()) return res.status(400).json({ error: "script requerido" });
 
@@ -780,20 +782,23 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, r
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "comedian-"));
     const audioPath = path.join(tmpDir, "tts.mp3");
 
-    // ── PASO 1: TTS con acento andaluz máximo ──
+    // ── Configuración de voz — usa voiceSettings del frontend o defaults ──
+    const vs = {
+      stability:        voiceSettings?.stability        ?? 0.12,
+      similarity_boost: voiceSettings?.similarity_boost ?? 0.95,
+      style:            voiceSettings?.style_val        ?? 0.72,
+      use_speaker_boost: true,
+      speed:            voiceSettings?.speed            ?? 0.87,
+    };
+
+    // ── PASO 1: TTS con la voz y ajustes elegidos ──
     const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: { "xi-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
         text: script,
         model_id: "eleven_turbo_v2_5",
-        voice_settings: {
-          stability: 0.12,
-          similarity_boost: 0.95,
-          style: 0.72,
-          use_speaker_boost: true,
-          speed: 0.87,
-        },
+        voice_settings: vs,
       }),
     });
     if (!ttsRes.ok) {
@@ -815,13 +820,32 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, r
 
     // ── PASO 3: Lanzar 3 clips Seedance I2V en PARALELO ──
     const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
-    const photoUrl = devDomain ? `https://${devDomain}/images/sevillano-model.png` : "";
+    const photoUrl = customPhotoUrl || (devDomain ? `https://${devDomain}/images/sevillano-model.png` : "");
 
-    const comedyPrompts = [
-      "Spanish stand-up comedian performing energetically on a dark comedy club stage, warm amber spotlight from above, microphone stand visible, animated expressive hand gestures telling a joke, dark audience silhouette in background, cinematic stage lighting, authentic performance",
-      "Stand-up comedian on comedy club stage laughing and pointing at audience, dramatic golden spotlight from above, energetic body language, microphone in hand, professional Spanish comedy show",
-      "Stand-up comedian on stage finishing punchline, exaggerated facial expressions, triumph arms raised, warm spotlight from above, authentic Spanish comedy club atmosphere, audience in background",
-    ];
+    // Prompts adaptativos según el estilo seleccionado
+    const STYLE_PROMPTS: Record<string, string[]> = {
+      monologo: [
+        "Spanish stand-up comedian performing energetically on a dark comedy club stage, warm amber spotlight from above, microphone stand visible, animated expressive hand gestures telling a joke, dark audience silhouette in background, cinematic stage lighting, authentic live performance",
+        "Stand-up comedian on comedy club stage laughing and pointing at audience, dramatic golden spotlight from above, energetic body language, microphone in hand, professional Spanish comedy show, theater atmosphere",
+        "Stand-up comedian on stage delivering punchline, exaggerated facial expressions, triumph gesture arms raised, warm spotlight from above, authentic Spanish comedy club atmosphere, blurred audience in background",
+      ],
+      ugc: [
+        "Person speaking directly to camera in casual home environment, natural daylight, speaking naturally and authentically, UGC style, slightly handheld feel, modern apartment background",
+        "Casual creator speaking to camera, bright natural light from window, relaxed body language, expressive face, authentic user generated content style, lifestyle background",
+        "Person talking to smartphone camera, candid authentic expression, natural indoor lighting, casual clothing, genuine reaction and story telling style, close medium shot",
+      ],
+      podcast: [
+        "Person speaking in modern podcast studio, professional microphone in foreground, dynamic lighting, engaged expression, podcast host style, broadcast quality setup",
+        "Podcast host at recording desk, condenser microphone, acoustic panels in background, confident gestures while speaking, professional media production environment",
+        "Close medium shot of podcast speaker, quality microphone, expressive speaking gestures, cozy studio atmosphere, warm desk lamp, professional audio setup",
+      ],
+      standUp: [
+        "Stand-up comedian on large theater stage, dramatic theatrical spotlight, performing to packed audience, energetic comedic gestures, big stage production, powerful performance moment",
+        "Comedian performing on spotlit stage, audience laughter reaction visible in background, theatrical comedy show, confident stage presence, boom microphone stand",
+        "Stand-up comedian mid-performance on well-lit stage, expressive face and body language, comedy theater venue, warm stage lights, audience silhouettes applauding",
+      ],
+    };
+    const comedyPrompts = STYLE_PROMPTS[style] || STYLE_PROMPTS.monologo;
 
     logger.info("comedian-gen: launching 3 Seedance I2V clips in parallel...");
     const seedancePreds = await Promise.all(comedyPrompts.map(async (prompt, i) => {
@@ -918,57 +942,107 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, r
   }
 });
 
-// ── POST /youtube/modelo/reference-pipeline — Vídeo referencia + TTS Sevillano + face-swap fotograma
-// Pipeline completo: vídeo Leo Harlem subido → audio Sevillano TTS → face-swap frame a frame
-// Body: { referenceVideoB64, voiceId, script, doFaceSwap?: boolean }
+// ── POST /youtube/modelo/reference-pipeline — Vídeo referencia + audio IA + face-swap fotograma
+// Body: { referenceVideoB64, voiceId, script, doFaceSwap?, audioMode?, voiceSettings? }
+// audioMode: "tts" (default, genera TTS del script) | "sts" (ElevenLabs Speech-to-Speech del audio del vídeo)
+// voiceSettings: { stability, similarity_boost, style_val, speed }
 router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { referenceVideoB64, voiceId, script, doFaceSwap = true } = req.body;
+    const { referenceVideoB64, voiceId, script, doFaceSwap = true, audioMode = "tts", voiceSettings } = req.body;
     if (!referenceVideoB64) return res.status(400).json({ error: "referenceVideoB64 requerido — sube el vídeo de referencia" });
     if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
-    if (!script?.trim()) return res.status(400).json({ error: "script requerido" });
+    if (audioMode === "tts" && !script?.trim()) return res.status(400).json({ error: "script requerido en modo TTS" });
 
     const key = ELEVEN_KEY();
     if (!key) return res.status(500).json({ error: "ELEVENLABS_API_KEY no configurada" });
     const replicateToken = REPLICATE_TOKEN();
 
+    const ffprobeBin = ffmpegBin.replace("ffmpeg", "ffprobe");
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "refpipe-"));
-    const audioPath = path.join(tmpDir, "tts.mp3");
+    const audioPath = path.join(tmpDir, "audio.mp3");
     const refVideoPath = path.join(tmpDir, "reference.mp4");
     const mergedPath = path.join(tmpDir, "merged.mp4");
     const outPath = path.join(tmpDir, "final.mp4");
 
-    // ── PASO 1: TTS Sevillano con acento andaluz ──
-    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: "POST",
-      headers: { "xi-api-key": key, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: script,
-        model_id: "eleven_turbo_v2_5",
-        voice_settings: { stability: 0.12, similarity_boost: 0.95, style: 0.72, use_speaker_boost: true, speed: 0.87 },
-      }),
-    });
-    if (!ttsRes.ok) {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-      return res.status(ttsRes.status).json({ error: `TTS falló: ${await ttsRes.text()}` });
-    }
-    fs.writeFileSync(audioPath, Buffer.from(await ttsRes.arrayBuffer()));
-
-    // ── PASO 2: Duración exacta ──
-    const ffprobeBin = ffmpegBin.replace("ffmpeg", "ffprobe");
-    let exactDuration = "30";
-    try {
-      exactDuration = execSync(
-        `"${ffprobeBin}" -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`,
-        { stdio: ["pipe", "pipe", "pipe"] }
-      ).toString().trim();
-    } catch { /* fallback */ }
-    logger.info(`reference-pipeline: TTS duration=${exactDuration}s, doFaceSwap=${doFaceSwap}`);
-
-    // ── PASO 3: Guardar vídeo de referencia ──
+    // Guardar vídeo de referencia primero (necesario para ambos modos)
     fs.writeFileSync(refVideoPath, Buffer.from(referenceVideoB64, "base64"));
 
-    // ── PASO 4: Reemplazar audio del vídeo de referencia con TTS (loop si necesario) ──
+    // Obtener duración del vídeo de referencia
+    let videoDuration = "30";
+    try {
+      videoDuration = execSync(
+        `"${ffprobeBin}" -v error -show_entries format=duration -of csv=p=0 "${refVideoPath}"`,
+        { stdio: ["pipe", "pipe", "pipe"] }
+      ).toString().trim();
+    } catch {}
+
+    // Configuración de voz
+    const vs = {
+      stability:        voiceSettings?.stability        ?? 0.12,
+      similarity_boost: voiceSettings?.similarity_boost ?? 0.95,
+      style:            voiceSettings?.style_val        ?? 0.72,
+      use_speaker_boost: true,
+      speed:            voiceSettings?.speed            ?? 0.87,
+    };
+
+    let exactDuration = videoDuration; // para STS, la duración es la del vídeo
+    let audioMode_used = audioMode;
+
+    if (audioMode === "sts") {
+      // ── MODO STS: Extrae audio del vídeo → ElevenLabs Speech-to-Speech → mantiene timing original ──
+      logger.info(`reference-pipeline: STS mode — extracting audio from ${videoDuration}s reference video...`);
+      const extractedAudioPath = path.join(tmpDir, "original_audio.mp3");
+      execSync(
+        `"${ffmpegBin}" -y -i "${refVideoPath}" -vn -acodec libmp3lame -q:a 2 "${extractedAudioPath}"`,
+        { timeout: 60_000, stdio: "pipe" }
+      );
+
+      logger.info(`reference-pipeline: STS — calling ElevenLabs speech-to-speech voiceId=${voiceId}...`);
+      const audioBuffer = fs.readFileSync(extractedAudioPath);
+      const formData = new FormData();
+      formData.append("audio", new Blob([audioBuffer], { type: "audio/mpeg" }), "audio.mp3");
+      formData.append("model_id", "eleven_multilingual_sts_v2");
+      formData.append("voice_settings", JSON.stringify(vs));
+
+      const stsRes = await fetch(`https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}`, {
+        method: "POST",
+        headers: { "xi-api-key": key },
+        body: formData,
+      });
+      if (!stsRes.ok) {
+        const errText = await stsRes.text();
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        return res.status(stsRes.status).json({ error: `ElevenLabs STS falló: ${errText}` });
+      }
+      fs.writeFileSync(audioPath, Buffer.from(await stsRes.arrayBuffer()));
+      logger.info(`reference-pipeline: STS audio generated (${videoDuration}s)`);
+      audioMode_used = "sts";
+    } else {
+      // ── MODO TTS: Genera audio desde el script ──
+      logger.info(`reference-pipeline: TTS mode — generating audio from script...`);
+      const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: "POST",
+        headers: { "xi-api-key": key, "Content-Type": "application/json" },
+        body: JSON.stringify({ text: script, model_id: "eleven_turbo_v2_5", voice_settings: vs }),
+      });
+      if (!ttsRes.ok) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        return res.status(ttsRes.status).json({ error: `TTS falló: ${await ttsRes.text()}` });
+      }
+      fs.writeFileSync(audioPath, Buffer.from(await ttsRes.arrayBuffer()));
+      // Para TTS, la duración exacta es la del audio generado
+      try {
+        exactDuration = execSync(
+          `"${ffprobeBin}" -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`,
+          { stdio: ["pipe", "pipe", "pipe"] }
+        ).toString().trim();
+      } catch {}
+      audioMode_used = "tts";
+    }
+
+    logger.info(`reference-pipeline: audioMode=${audioMode_used}, exactDuration=${exactDuration}s, doFaceSwap=${doFaceSwap}`);
+
+    // ── PASO 3: Reemplazar audio del vídeo de referencia (loop si TTS es más largo) ──
     execSync(
       `"${ffmpegBin}" -y -stream_loop 5 -i "${refVideoPath}" -i "${audioPath}" ` +
       `-map 0:v:0 -map 1:a:0 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k ` +
@@ -1069,6 +1143,152 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req: Requ
     return res.json({ success: true, savedAs: savedFilename, publicUrl, audioDuration: parseFloat(exactDuration), faceSwapApplied });
   } catch (err: any) {
     logger.error("reference-pipeline:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /youtube/modelo/speech-to-speech — Dubbing REAL con ElevenLabs STS
+// Extrae el audio del vídeo de referencia → ElevenLabs Speech-to-Speech clona la voz manteniendo el timing
+// → reimplanta el audio en el vídeo → opcionalmente face-swap fotograma a fotograma
+// Body: { referenceVideoB64, voiceId, doFaceSwap?, voiceSettings? }
+router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { referenceVideoB64, voiceId, doFaceSwap = false, voiceSettings } = req.body;
+    if (!referenceVideoB64) return res.status(400).json({ error: "referenceVideoB64 requerido" });
+    if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
+
+    const key = ELEVEN_KEY();
+    if (!key) return res.status(500).json({ error: "ELEVENLABS_API_KEY no configurada" });
+
+    const ffprobeBin = ffmpegBin.replace("ffmpeg", "ffprobe");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sts-"));
+    const refVideoPath = path.join(tmpDir, "reference.mp4");
+    const extractedAudioPath = path.join(tmpDir, "original_audio.mp3");
+    const stsAudioPath = path.join(tmpDir, "sts_audio.mp3");
+    const outPath = path.join(tmpDir, "dubbed.mp4");
+
+    // Guardar vídeo de referencia
+    fs.writeFileSync(refVideoPath, Buffer.from(referenceVideoB64, "base64"));
+
+    // Obtener duración real del vídeo
+    let videoDuration = "30";
+    try {
+      videoDuration = execSync(
+        `"${ffprobeBin}" -v error -show_entries format=duration -of csv=p=0 "${refVideoPath}"`,
+        { stdio: ["pipe", "pipe", "pipe"] }
+      ).toString().trim();
+    } catch {}
+    logger.info(`speech-to-speech: video duration=${videoDuration}s`);
+
+    // PASO 1: Extraer audio del vídeo de referencia (voz del hablante original — Leo Harlem, etc.)
+    execSync(
+      `"${ffmpegBin}" -y -i "${refVideoPath}" -vn -acodec libmp3lame -q:a 2 "${extractedAudioPath}"`,
+      { timeout: 60_000, stdio: "pipe" }
+    );
+    logger.info("speech-to-speech: audio extracted, sending to ElevenLabs STS...");
+
+    // PASO 2: ElevenLabs Speech-to-Speech — CLONA la voz del hablante preservando timing/ritmo/cadencia
+    const vs = {
+      stability:        voiceSettings?.stability        ?? 0.12,
+      similarity_boost: voiceSettings?.similarity_boost ?? 0.95,
+      style:            voiceSettings?.style_val        ?? 0.72,
+      use_speaker_boost: true,
+    };
+    const audioBuffer = fs.readFileSync(extractedAudioPath);
+    const stsFormData = new FormData();
+    stsFormData.append("audio", new Blob([audioBuffer], { type: "audio/mpeg" }), "audio.mp3");
+    stsFormData.append("model_id", "eleven_multilingual_sts_v2");
+    stsFormData.append("voice_settings", JSON.stringify(vs));
+
+    const stsRes = await fetch(`https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: { "xi-api-key": key },
+      body: stsFormData,
+    });
+    if (!stsRes.ok) {
+      const errText = await stsRes.text();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      return res.status(stsRes.status).json({ error: `ElevenLabs STS falló: ${errText}` });
+    }
+    fs.writeFileSync(stsAudioPath, Buffer.from(await stsRes.arrayBuffer()));
+    logger.info("speech-to-speech: STS audio received, merging with video...");
+
+    // PASO 3: Reemplazar audio en el vídeo manteniendo duración exacta del vídeo original
+    execSync(
+      `"${ffmpegBin}" -y -i "${refVideoPath}" -i "${stsAudioPath}" ` +
+      `-map 0:v:0 -map 1:a:0 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k ` +
+      `-t ${videoDuration} -movflags +faststart "${outPath}"`,
+      { timeout: 120_000, stdio: "pipe" }
+    );
+
+    // PASO 4 (opcional): Face-swap fotograma a fotograma
+    let faceSwapApplied = false;
+    const replicateToken = REPLICATE_TOKEN();
+    if (doFaceSwap && replicateToken) {
+      const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
+      const facePhotoUrl = devDomain ? `https://${devDomain}/images/sevillano-model.png` : "";
+      const FACE_SWAP_VERSION = "278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34";
+      const framesDir = path.join(tmpDir, "frames");
+      const swappedDir = path.join(tmpDir, "swapped");
+      fs.mkdirSync(framesDir, { recursive: true });
+      fs.mkdirSync(swappedDir, { recursive: true });
+      execSync(`"${ffmpegBin}" -y -i "${outPath}" -vf fps=4 "${framesDir}/frame_%05d.jpg"`, { timeout: 60_000, stdio: "pipe" });
+      const frameFiles = fs.readdirSync(framesDir).filter(f => f.endsWith(".jpg")).sort();
+      logger.info(`speech-to-speech: face-swapping ${frameFiles.length} frames @ 4fps...`);
+      const BATCH_SIZE = 12;
+      for (let i = 0; i < frameFiles.length; i += BATCH_SIZE) {
+        const batch = frameFiles.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (fname) => {
+          const framePath = path.join(framesDir, fname);
+          const swappedPath = path.join(swappedDir, fname);
+          try {
+            const frameB64 = fs.readFileSync(framePath).toString("base64");
+            let pred = await fetch("https://api.replicate.com/v1/predictions", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ version: FACE_SWAP_VERSION, input: { swap_image: facePhotoUrl, input_image: `data:image/jpeg;base64,${frameB64}` } }),
+            }).then(r => r.json()) as any;
+            let att = 0;
+            while (!["succeeded","failed","canceled"].includes(pred.status) && att < 18) {
+              await new Promise(r => setTimeout(r, 2500));
+              pred = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } }).then(r => r.json()) as any;
+              att++;
+            }
+            if (pred.status === "succeeded" && pred.output) {
+              const dlRes = await fetch(Array.isArray(pred.output) ? pred.output[0] : pred.output);
+              if (dlRes.ok) { fs.writeFileSync(swappedPath, Buffer.from(await dlRes.arrayBuffer())); return; }
+            }
+          } catch {}
+          try { fs.copyFileSync(framePath, swappedPath); } catch {}
+        }));
+        logger.info(`speech-to-speech: face-swap batch ${Math.floor(i/BATCH_SIZE)+1}/${Math.ceil(frameFiles.length/BATCH_SIZE)} done`);
+      }
+      const faceswappedPath = path.join(tmpDir, "faceswapped.mp4");
+      execSync(
+        `"${ffmpegBin}" -y -framerate 4 -i "${swappedDir}/frame_%05d.jpg" -i "${stsAudioPath}" ` +
+        `-map 0:v:0 -map 1:a:0 -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k -t ${videoDuration} -movflags +faststart "${faceswappedPath}"`,
+        { timeout: 120_000, stdio: "pipe" }
+      );
+      fs.copyFileSync(faceswappedPath, outPath);
+      faceSwapApplied = true;
+    }
+
+    // Guardar permanentemente
+    const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
+    const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
+    const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir : fs.existsSync(path.dirname(altSaveDir)) ? altSaveDir : path.join(os.tmpdir(), "modelo-saved");
+    fs.mkdirSync(permanentDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const savedFilename = `sts_dubbed_${timestamp}.mp4`;
+    const permanentPath = path.join(permanentDir, savedFilename);
+    fs.copyFileSync(outPath, permanentPath);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    const publicUrl = permanentPath.includes("shopify-optimizer") ? `/media/sevillano/${savedFilename}` : null;
+    logger.info(`speech-to-speech: saved ${savedFilename} (${videoDuration}s, faceSwap=${faceSwapApplied})`);
+    return res.json({ success: true, savedAs: savedFilename, publicUrl, videoDuration: parseFloat(videoDuration), faceSwapApplied, stsUsed: true });
+  } catch (err: any) {
+    logger.error("speech-to-speech:", err.message);
     return res.status(500).json({ error: err.message });
   }
 });

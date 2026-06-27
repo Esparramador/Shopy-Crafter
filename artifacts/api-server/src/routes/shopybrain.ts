@@ -11460,6 +11460,40 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           break;
         }
 
+        // ── YouTube Studio — Modelo IA actions ────────────────────────────────
+        case "generate_comedian_video": {
+          const { script: ysScript, voiceId: ysVoiceId, style: ysStyle, voiceSettings: ysVs } = params || {};
+          if (!ysScript) { res.json({ error: "script requerido para generar vídeo" }); return; }
+          const port = process.env.PORT || 3000;
+          const ytR = await fetch(`http://localhost:${port}/api/youtube/modelo/comedian-gen`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Cookie": req.headers.cookie || "" },
+            body: JSON.stringify({ script: ysScript, voiceId: ysVoiceId || "8m4O8qoFLrKBzbmsuL5T", style: ysStyle || "monologo", voiceSettings: ysVs }),
+          });
+          const ytD = await ytR.json() as any;
+          result = ytD.error
+            ? { error: true, message: `❌ Error generando vídeo comedian: ${ytD.error}` }
+            : { success: true, savedAs: ytD.savedAs, publicUrl: ytD.publicUrl, audioDuration: ytD.audioDuration, clipsGenerated: ytD.clipsGenerated, message: `🎬 Vídeo monologuista generado: ${ytD.clipsGenerated} clips Seedance I2V, ${ytD.audioDuration?.toFixed(1)}s, guardado: ${ytD.savedAs}` };
+          break;
+        }
+
+        case "list_modelo_voices": {
+          const port = process.env.PORT || 3000;
+          const vR = await fetch(`http://localhost:${port}/api/youtube/modelo/voices`, {
+            headers: { "Cookie": req.headers.cookie || "" },
+          });
+          const vD = await vR.json() as any;
+          result = { voices: vD.voices, message: `🎙️ ${vD.voices?.length || 0} voces disponibles en ElevenLabs:\n${(vD.voices || []).map((v: any) => `• ${v.name}${v.category === "cloned" ? " ★" : ""} (${v.voice_id})`).join("\n")}` };
+          break;
+        }
+
+        case "speech_to_speech_dub": {
+          const { referenceVideoUrl: stsUrl, voiceId: stsVoiceId, doFaceSwap: stsFaceSwap } = params || {};
+          if (!stsUrl) { res.json({ error: "referenceVideoUrl requerido" }); return; }
+          result = { message: `⚠️ El dubbing STS requiere que el vídeo de referencia sea subido desde la UI de YouTube Studio → tab 'Modelo IA' → Pipeline B → 🎙️ Dubbing Real STS.\n\nVoiceId a usar: ${stsVoiceId || "8m4O8qoFLrKBzbmsuL5T"}, Face-swap: ${stsFaceSwap ? "sí" : "no"}` };
+          break;
+        }
+
         default:
           res.status(400).json({ error: `Acción desconocida: ${action}` });
           return;
