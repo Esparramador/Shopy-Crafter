@@ -123,6 +123,28 @@ async function fetchChannelInfo(accessToken: string) {
   };
 }
 
+// ─── HELPER: YouTube search via OAuth token (preferred) or API key ────────────
+async function ytSearch(q: string, maxResults: number, oauthToken?: string | null): Promise<{items: any[]} | null> {
+  const qs = `part=snippet&q=${encodeURIComponent(q)}&type=video&maxResults=${maxResults}&relevanceLanguage=es&videoDuration=medium`;
+
+  // Prefer OAuth token (user's own credentials — no need to enable YouTube Data API separately)
+  if (oauthToken) {
+    const r = await fetch(`https://www.googleapis.com/youtube/v3/search?${qs}`, {
+      headers: { Authorization: `Bearer ${oauthToken}` },
+    });
+    if (r.ok) return r.json();
+    logger.warn("YouTube OAuth search failed:", await r.text().catch(() => "?"));
+  }
+
+  // Fallback: API key
+  const apiKey = YT_API_KEY();
+  if (!apiKey) return null;
+  const r2 = await fetch(`https://www.googleapis.com/youtube/v3/search?${qs}&key=${apiKey}`);
+  if (r2.ok) return r2.json();
+  logger.warn("YouTube API key search failed:", await r2.text().catch(() => "?"));
+  return null;
+}
+
 // ─── PUBLIC: YouTube Search ───────────────────────────────────────────────────
 router.get("/youtube/search", async (req: Request, res: Response) => {
   try {
@@ -130,27 +152,18 @@ router.get("/youtube/search", async (req: Request, res: Response) => {
     const maxResults = Math.min(Number(req.query.max) || 5, 10);
     if (!q) return res.status(400).json({ error: "Query requerida" });
 
-    const apiKey = YT_API_KEY();
-    if (!apiKey) {
-      return res.json({
-        results: [],
-        fallbackUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
-        message: "YOUTUBE_API_KEY no configurada — abre YouTube directamente",
-      });
-    }
+    // Try to get OAuth token from admin session (avoids needing YouTube Data API key enabled)
+    let oauthToken: string | null = null;
+    try { oauthToken = await getValidToken("admin"); } catch {}
 
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&maxResults=${maxResults}&key=${apiKey}&relevanceLanguage=es`;
-    const ytRes = await fetch(url);
-    if (!ytRes.ok) {
-      const err = await ytRes.text();
-      logger.warn("YouTube search error:", err);
+    const data = await ytSearch(q, maxResults, oauthToken);
+    if (!data) {
       return res.json({
         results: [],
         fallbackUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
-        message: "Error en búsqueda — abre YouTube directamente",
+        message: "YouTube API no disponible — abre YouTube directamente",
       });
     }
-    const data = await ytRes.json();
     const results = (data.items || []).map((item: any) => ({
       videoId: item.id?.videoId,
       title: item.snippet?.title,
@@ -470,7 +483,7 @@ router.delete("/youtube/channel", requireAdmin, async (req: Request, res: Respon
 // MODELO IA PIPELINE — download reference clip → ElevenLabs dubbing → face-swap
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const uploadModel = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const uploadModel = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024, fieldSize: 50 * 1024 * 1024 } });
 const ELEVEN_KEY = () => process.env.ELEVENLABS_API_KEY || "";
 const REPLICATE_TOKEN = () => process.env.REPLICATE_API_TOKEN || "";
 
@@ -504,11 +517,21 @@ router.post("/youtube/modelo/extract-clip", requireAdmin, async (req: Request, r
     const clipPath = path.join(tmpDir, "clip.mp4");
 
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const ytdlp = process.env.YTDLP_PATH || "yt-dlp";
+    // Find yt-dlp — env var, common replit path, or system PATH
+    const ytdlp = process.env.YTDLP_PATH ||
+      ["/home/runner/workspace/.pythonlibs/bin/yt-dlp",
+       "/home/runner/.pythonlibs/bin/yt-dlp",
+       "/usr/local/bin/yt-dlp"].find(p => { try { return require("fs").existsSync(p); } catch { return false; } }) ||
+      "yt-dlp";
+    // Find ffmpeg — env var, nix store, or system PATH
+    const ffmpegBin = process.env.FFMPEG_PATH ||
+      ["/nix/store/k28ypnisbhajg3x1kv5hy7h2vjbajkvy-replit-runtime-path/bin/ffmpeg",
+       "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"].find(p => { try { return require("fs").existsSync(p); } catch { return false; } }) ||
+      "ffmpeg";
 
-    // Download best quality video+audio up to 1080p
+    // Download best quality video+audio up to 720p
     execSync(
-      `${ytdlp} -f "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best" ` +
+      `"${ytdlp}" -f "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best" ` +
       `--merge-output-format mp4 -o "${rawPath}" "${ytUrl}"`,
       { timeout: 120_000, stdio: "pipe" }
     );
@@ -517,7 +540,7 @@ router.post("/youtube/modelo/extract-clip", requireAdmin, async (req: Request, r
 
     // Trim the requested segment
     execSync(
-      `ffmpeg -y -ss ${startSec} -i "${rawPath}" -t ${durationSec} ` +
+      `"${ffmpegBin}" -y -ss ${startSec} -i "${rawPath}" -t ${durationSec} ` +
       `-c:v libx264 -preset fast -crf 22 -c:a aac -movflags +faststart "${clipPath}"`,
       { timeout: 60_000, stdio: "pipe" }
     );
@@ -601,7 +624,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
       return res.status(500).json({ error: `Dubbing no completado. Estado: ${status}` });
     }
 
-    // Download dubbed video
+    // Download dubbed video from ElevenLabs
     const dlRes = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId}/audio/${targetLang}`, {
       headers: { "xi-api-key": key },
     });
@@ -610,28 +633,106 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
     const dubbed = Buffer.from(await dlRes.arrayBuffer());
     fs.writeFileSync(outPath, dubbed);
 
+    // ── Guardar permanentemente en el proyecto (evita pérdida si ElevenLabs borra el archivo) ──
+    const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
+    const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
+    const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir :
+                         fs.existsSync(path.dirname(altSaveDir)) ? altSaveDir :
+                         path.join(os.tmpdir(), "modelo-saved");
+    fs.mkdirSync(permanentDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const savedFilename = `dubbed_${timestamp}.mp4`;
+    const permanentPath = path.join(permanentDir, savedFilename);
+    fs.copyFileSync(outPath, permanentPath);
+    logger.info(`Dubbed video saved permanently: ${permanentPath}`);
+
     const b64out = fs.readFileSync(outPath).toString("base64");
     fs.rmSync(tmpDir, { recursive: true, force: true });
 
-    return res.json({ success: true, dubbingId, status, dubbedBase64: b64out, mimeType: "video/mp4" });
+    // Public URL if saved in shopify-optimizer/public
+    const publicUrl = permanentPath.includes("shopify-optimizer")
+      ? `/media/sevillano/${savedFilename}`
+      : null;
+
+    return res.json({ success: true, dubbingId, status, dubbedBase64: b64out, mimeType: "video/mp4", savedAs: savedFilename, publicUrl });
   } catch (err: any) {
     logger.error("dub:", err.message);
     return res.status(500).json({ error: err.message });
   }
 });
 
-// ── POST /youtube/modelo/face-swap — Replicate face swap (photo → video)
+// ── POST /youtube/modelo/face-swap — ElevenLabs dubbing with face reference (lip-sync + face)
+// Falls back to Replicate if ElevenLabs fails
 router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
   { name: "facePhoto", maxCount: 1 },
 ]), async (req: Request, res: Response) => {
   try {
-    const { videoBase64 } = req.body;
+    const { videoBase64, voiceId, script, targetLang = "es" } = req.body;
     const files = req.files as Record<string, Express.Multer.File[]>;
     const faceFile = files?.facePhoto?.[0];
 
     if (!videoBase64) return res.status(400).json({ error: "videoBase64 requerido" });
     if (!faceFile)    return res.status(400).json({ error: "facePhoto requerido" });
 
+    const key = ELEVEN_KEY();
+    if (key && voiceId) {
+      // ── Usar ElevenLabs Dubbing con reference_face_image para lip-sync + face ──
+      try {
+        const tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "faceswap-el-"));
+        const inVid = path.join(tmpDir2, "input.mp4");
+        fs.writeFileSync(inVid, Buffer.from(videoBase64, "base64"));
+
+        const FormData2 = (await import("form-data")).default;
+        const form2 = new FormData2();
+        form2.append("file", fs.createReadStream(inVid), { filename: "input.mp4", contentType: "video/mp4" });
+        form2.append("target_lang", targetLang);
+        form2.append("mode", "automatic");
+        form2.append("voice_id", voiceId);
+        if (script) form2.append("script", script);
+        form2.append("reference_face_image", faceFile.buffer, { filename: faceFile.originalname, contentType: faceFile.mimetype });
+
+        const dubRes = await fetch("https://api.elevenlabs.io/v1/dubbing", {
+          method: "POST",
+          headers: { "xi-api-key": key, ...form2.getHeaders() },
+          body: form2 as any,
+        });
+        const dubData = await dubRes.json() as any;
+
+        if (dubRes.ok && dubData.dubbing_id) {
+          const dubbingId2 = dubData.dubbing_id;
+          // Poll
+          let st2 = "in_progress"; let att2 = 0;
+          while (st2 === "in_progress" && att2 < 36) {
+            await new Promise(r => setTimeout(r, 5000));
+            const sr = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId2}`, { headers: { "xi-api-key": key } });
+            st2 = (await sr.json() as any).status; att2++;
+          }
+          if (st2 === "dubbed") {
+            const dlR = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId2}/audio/${targetLang}`, { headers: { "xi-api-key": key } });
+            if (dlR.ok) {
+              const outBuf = Buffer.from(await dlR.arrayBuffer());
+              // Save permanently
+              const saveDir3 = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
+              const altDir3 = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
+              const permDir3 = fs.existsSync(path.dirname(saveDir3)) ? saveDir3 : altDir3;
+              fs.mkdirSync(permDir3, { recursive: true });
+              const ts3 = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+              const fname3 = `faceswap_el_${ts3}.mp4`;
+              fs.writeFileSync(path.join(permDir3, fname3), outBuf);
+              fs.rmSync(tmpDir2, { recursive: true, force: true });
+              logger.info(`ElevenLabs face-swap saved: ${fname3}`);
+              return res.json({ success: true, dubbingId: dubbingId2, provider: "elevenlabs", savedAs: fname3, publicUrl: `/media/sevillano/${fname3}`, outputUrl: `/media/sevillano/${fname3}` });
+            }
+          }
+        }
+        fs.rmSync(tmpDir2, { recursive: true, force: true });
+        logger.warn("ElevenLabs face-swap failed, falling back to Replicate");
+      } catch (elErr: any) {
+        logger.warn("ElevenLabs face-swap error, falling back to Replicate:", elErr.message);
+      }
+    }
+
+    // ── Fallback: Replicate face-swap ──
     const token = REPLICATE_TOKEN();
     if (!token) return res.status(500).json({ error: "REPLICATE_API_TOKEN no configurada" });
 
@@ -679,7 +780,25 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
       return res.status(500).json({ error: pred.error || "Face-swap falló", status: pred.status });
     }
 
-    return res.json({ success: true, outputUrl: pred.output, predictionId: pred.id });
+    // Save Replicate result permanently
+    const outputUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
+    try {
+      const dlFace = await fetch(outputUrl);
+      if (dlFace.ok) {
+        const faceBuf = Buffer.from(await dlFace.arrayBuffer());
+        const saveDir4 = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
+        const altDir4 = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
+        const permDir4 = fs.existsSync(path.dirname(saveDir4)) ? saveDir4 : altDir4;
+        fs.mkdirSync(permDir4, { recursive: true });
+        const ts4 = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const fname4 = `faceswap_rep_${ts4}.mp4`;
+        fs.writeFileSync(path.join(permDir4, fname4), faceBuf);
+        logger.info(`Replicate face-swap saved: ${fname4}`);
+        return res.json({ success: true, outputUrl: `/media/sevillano/${fname4}`, publicUrl: `/media/sevillano/${fname4}`, predictionId: pred.id, provider: "replicate", savedAs: fname4 });
+      }
+    } catch {}
+
+    return res.json({ success: true, outputUrl, predictionId: pred.id, provider: "replicate" });
   } catch (err: any) {
     logger.error("face-swap:", err.message);
     return res.status(500).json({ error: err.message });

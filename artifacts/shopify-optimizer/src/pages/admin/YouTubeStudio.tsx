@@ -115,7 +115,10 @@ export default function YouTubeStudio() {
   const [modeloFacePreview, setModeloFacePreview] = useState<string | null>(null);
   const modeloFaceRef = useRef<HTMLInputElement>(null);
   // Reference source
-  const [modeloRefMode, setModeloRefMode] = useState<"search" | "generate">("search");
+  const [modeloRefMode, setModeloRefMode] = useState<"search" | "generate" | "local">("search");
+  const [modeloLocalFile, setModeloLocalFile] = useState<File | null>(null);
+  const [modeloLocalB64, setModeloLocalB64] = useState<string | null>(null);
+  const modeloLocalRef = useRef<HTMLInputElement>(null);
   const [modeloRefQuery, setModeloRefQuery] = useState("");
   const [modeloRefResults, setModeloRefResults] = useState<SearchResult[]>([]);
   const [modeloRefSearching, setModeloRefSearching] = useState(false);
@@ -240,10 +243,13 @@ export default function YouTubeStudio() {
     setModeloLog(prev => [...prev, `${new Date().toLocaleTimeString()} — ${msg}`]);
   }
 
+  const [modeloSavedUrl, setModeloSavedUrl] = useState<string | null>(null);
+
   async function modeloRunPipeline() {
     if (!modeloScript.trim()) { setModeloError("Escribe el guión primero"); return; }
     if (!modeloVoiceId) { setModeloError("Selecciona una voz"); return; }
     if (modeloRefMode === "search" && !modeloSelectedVideo) { setModeloError("Selecciona un vídeo de referencia"); return; }
+    if (modeloRefMode === "local" && !modeloLocalB64) { setModeloError("Sube un vídeo de referencia primero"); return; }
 
     setModeloStep("extracting");
     setModeloError(null);
@@ -251,12 +257,16 @@ export default function YouTubeStudio() {
     setModeloClipB64(null);
     setModeloDubbedB64(null);
     setModeloFinalUrl(null);
+    setModeloSavedUrl(null);
 
     try {
-      // STEP 1: extract clip or generate reference
+      // STEP 1: obtener clip de referencia
       let clipB64: string | null = null;
 
-      if (modeloRefMode === "search" && modeloSelectedVideo) {
+      if (modeloRefMode === "local" && modeloLocalB64) {
+        clipB64 = modeloLocalB64;
+        modeloAddLog(`📁 Usando vídeo local como referencia (${modeloLocalFile ? (modeloLocalFile.size/1024/1024).toFixed(1) : "?"}MB)…`);
+      } else if (modeloRefMode === "search" && modeloSelectedVideo) {
         modeloAddLog(`📥 Descargando clip de "${modeloSelectedVideo.title}" (${modeloStartSec}s → +${modeloDurSec}s)…`);
         const r = await fetch(`${BASE}/api/youtube/modelo/extract-clip`, {
           method: "POST", credentials: "include",
@@ -264,7 +274,7 @@ export default function YouTubeStudio() {
           body: JSON.stringify({ videoId: modeloSelectedVideo.videoId, startSec: modeloStartSec, durationSec: modeloDurSec }),
         });
         const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "Error descargando clip");
+        if (!r.ok) throw new Error(d.error || "YouTube bloqueó la descarga — usa '📁 Subir vídeo' en su lugar");
         clipB64 = d.clipBase64;
         modeloAddLog(`✅ Clip extraído (${d.sizeKb} KB, ${d.durationSec}s)`);
       } else {
@@ -276,7 +286,6 @@ export default function YouTubeStudio() {
         });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || "Error generando referencia");
-        // Download video URL to base64
         const vidRes = await fetch(d.videoUrl);
         const vidBuf = await vidRes.arrayBuffer();
         clipB64 = btoa(String.fromCharCode(...new Uint8Array(vidBuf)));
@@ -286,8 +295,9 @@ export default function YouTubeStudio() {
       setModeloClipB64(clipB64);
       setModeloStep("dubbing");
 
-      // STEP 2: ElevenLabs dubbing
-      modeloAddLog(`🎙️ Enviando a ElevenLabs Dubbing con voz ${modeloVoices.find(v => v.voice_id === modeloVoiceId)?.name || modeloVoiceId}…`);
+      // STEP 2: ElevenLabs dubbing — sustituye la voz y sincroniza labios
+      const voiceName = modeloVoices.find(v => v.voice_id === modeloVoiceId)?.name || modeloVoiceId;
+      modeloAddLog(`🎙️ ElevenLabs Dubbing con voz "${voiceName}" + lip-sync automático…`);
       const dubR = await fetch(`${BASE}/api/youtube/modelo/dub`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -295,30 +305,34 @@ export default function YouTubeStudio() {
       });
       const dubD = await dubR.json();
       if (!dubR.ok) throw new Error(dubD.error || "Error en dubbing");
-      modeloAddLog(`✅ Dubbing completado (id: ${dubD.dubbingId})`);
+      modeloAddLog(`✅ Dubbing completado — vídeo guardado permanentemente (${dubD.savedAs || "dubbed.mp4"})`);
+      if (dubD.publicUrl) setModeloSavedUrl(`${BASE}${dubD.publicUrl}`);
 
-      // STEP 3: face-swap (optional)
+      // STEP 3: face-swap con ElevenLabs (foto del modelo + lip-sync) — opcional
       if (modeloFaceFile) {
         setModeloStep("faceswap");
-        modeloAddLog(`🔄 Aplicando face-swap con tu foto…`);
+        modeloAddLog(`🎭 Face-swap con ElevenLabs (foto del Sevillano + lip-sync)…`);
         const fd = new FormData();
         fd.append("videoBase64", dubD.dubbedBase64);
         fd.append("facePhoto", modeloFaceFile);
+        fd.append("voiceId", modeloVoiceId);
+        if (modeloScript) fd.append("script", modeloScript);
         const fsR = await fetch(`${BASE}/api/youtube/modelo/face-swap`, {
           method: "POST", credentials: "include", body: fd,
         });
         const fsD = await fsR.json();
         if (!fsR.ok) throw new Error(fsD.error || "Error en face-swap");
-        setModeloFinalUrl(Array.isArray(fsD.outputUrl) ? fsD.outputUrl[0] : fsD.outputUrl);
-        modeloAddLog(`✅ Face-swap completado`);
+        const finalUrl = Array.isArray(fsD.outputUrl) ? fsD.outputUrl[0] : fsD.outputUrl;
+        setModeloFinalUrl(finalUrl);
+        if (fsD.publicUrl) setModeloSavedUrl(`${BASE}${fsD.publicUrl}`);
+        modeloAddLog(`✅ Face-swap completado con ${fsD.provider === "elevenlabs" ? "ElevenLabs" : "Replicate"} — guardado: ${fsD.savedAs || "faceswap.mp4"}`);
       } else {
-        // No face-swap: use dubbed video directly
         setModeloDubbedB64(dubD.dubbedBase64);
-        modeloAddLog(`ℹ️ Sin face-swap — usando vídeo doblado directamente`);
+        modeloAddLog(`ℹ️ Sin face-swap — vídeo doblado listo y guardado`);
       }
 
       setModeloStep("done");
-      modeloAddLog(`🎬 ¡Pipeline completado!`);
+      modeloAddLog(`🎬 ¡Pipeline completado! Vídeo guardado permanentemente en el servidor.`);
     } catch (err: any) {
       setModeloStep("error");
       setModeloError(err.message);
@@ -327,6 +341,14 @@ export default function YouTubeStudio() {
   }
 
   function modeloDownload() {
+    // Prefer saved public URL (permanent)
+    if (modeloSavedUrl) {
+      const a = document.createElement("a");
+      a.href = modeloSavedUrl;
+      a.download = "sevillano_modelo_ia.mp4";
+      a.click();
+      return;
+    }
     if (modeloFinalUrl) {
       window.open(modeloFinalUrl, "_blank");
       return;
@@ -334,7 +356,7 @@ export default function YouTubeStudio() {
     if (modeloDubbedB64) {
       const a = document.createElement("a");
       a.href = `data:video/mp4;base64,${modeloDubbedB64}`;
-      a.download = "modelo_ia.mp4";
+      a.download = "sevillano_modelo_ia.mp4";
       a.click();
     }
   }
@@ -1996,15 +2018,62 @@ export default function YouTubeStudio() {
                 <div style={{ background: "var(--ink2)", borderRadius: 10, padding: 14 }}>
                   <span style={S.label}>5. Vídeo de referencia (gestos y movimientos)</span>
                   <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                    {(["search","generate"] as const).map(m => (
+                    {(["search","local","generate"] as const).map(m => (
                       <button key={m} onClick={() => setModeloRefMode(m)}
-                        style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                        style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
                           background: modeloRefMode === m ? "var(--gold)" : "var(--ink3)",
                           color: modeloRefMode === m ? "#000" : "var(--t3)" }}>
-                        {m === "search" ? "🔍 Buscar en YouTube" : "🤖 Generar con IA"}
+                        {m === "search" ? "🔍 YouTube" : m === "local" ? "📁 Subir vídeo" : "🤖 Generar IA"}
                       </button>
                     ))}
                   </div>
+
+                  {/* Info: YouTube bot detection notice */}
+                  {modeloRefMode === "search" && (
+                    <div style={{ marginBottom: 8, padding: "6px 10px", background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, fontSize: 10, color: "var(--t3)" }}>
+                      ⚠️ YouTube bloquea descargas desde servidores. Si falla, usa <strong style={{ color: "var(--gold)" }}>📁 Subir vídeo</strong> — descarga tú mismo el clip de Leo Harlem y súbelo aquí.
+                    </div>
+                  )}
+
+                  {modeloRefMode === "local" && (
+                    <div>
+                      <input ref={modeloLocalRef} type="file" accept="video/*" style={{ display: "none" }}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setModeloLocalFile(f);
+                          const reader = new FileReader();
+                          reader.onload = ev => setModeloLocalB64((ev.target?.result as string).split(",")[1]);
+                          reader.readAsDataURL(f);
+                        }} />
+                      <div onClick={() => modeloLocalRef.current?.click()}
+                        style={{ border: `2px dashed ${modeloLocalFile ? "var(--jade)" : "var(--ink4)"}`, borderRadius: 8, padding: 20, cursor: "pointer", textAlign: "center",
+                          background: modeloLocalFile ? "rgba(16,185,129,0.05)" : "var(--ink3)" }}>
+                        {modeloLocalFile ? (
+                          <div>
+                            <div style={{ fontSize: 24, marginBottom: 4 }}>🎬</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--jade)" }}>{modeloLocalFile.name}</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>{(modeloLocalFile.size / 1024 / 1024).toFixed(1)} MB · listo para dubbing</div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontSize: 28, marginBottom: 6 }}>📁</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t)" }}>Sube tu vídeo de referencia</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 4 }}>MP4 · máx 50MB · clip de Leo Harlem, youtuber, actor…</div>
+                            <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 6, lineHeight: 1.6 }}>
+                              💡 Descarga el clip con <a href="https://www.y2mate.com" target="_blank" style={{ color: "var(--gold)" }}>y2mate.com</a> o similar, luego súbelo aquí
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {modeloLocalFile && (
+                        <button onClick={() => { setModeloLocalFile(null); setModeloLocalB64(null); }}
+                          style={{ marginTop: 6, background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "#f87171", cursor: "pointer" }}>
+                          🗑 Quitar vídeo
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {modeloRefMode === "search" ? (
                     <>
