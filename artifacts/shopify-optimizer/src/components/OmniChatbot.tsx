@@ -2058,12 +2058,155 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       case "platform_get_orders":
       case "platform_update_stock":
       case "platform_update_seo":
-      case "stripe_list_accounts":
-      case "stripe_account_overview":
-      case "stripe_list_transactions":
-      case "stripe_list_customers":
-      case "stripe_list_subscriptions":
-        return result.message ? `✅ ${result.message}` : "✅ Acción completada.";
+        return (result as any).message ? `✅ ${(result as any).message}` : "✅ Acción completada.";
+
+      case "stripe_list_accounts": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const accs = r.accounts || [];
+        if (!accs.length) return "💳 No hay cuentas Stripe conectadas. Ve a **Admin → Stripe Manager** para conectar una.";
+        let msg = `💳 **${accs.length} cuenta(s) Stripe conectada(s):**\n`;
+        for (const a of accs) msg += `• ${a.displayName || a.display_name || a.businessName || a.accountId || a.account_id} — ${a.email || "sin email"} (${a.accountId || a.account_id})\n`;
+        return msg.trim();
+      }
+      case "stripe_account_overview": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const bal = r.balance || {};
+        const m = r.metrics || {};
+        const fmt = (n: number) => n != null ? `€${(n/100).toFixed(2)}` : "—";
+        let msg = `💳 **Cuenta Stripe — Overview**\n`;
+        msg += `💰 Saldo disponible: **${fmt(bal.available)}** · Pendiente: ${fmt(bal.pending)}\n`;
+        msg += `📊 Volumen 30d: **${fmt(m.grossVolume)}** bruto · ${fmt(m.netVolume)} neto\n`;
+        msg += `✅ ${m.successCount ?? "?"} pagos exitosos · ❌ ${m.failedCount ?? "?"} fallidos\n`;
+        if (r.recentCharges?.length) {
+          msg += `\n🧾 **Últimos cobros:**\n`;
+          for (const c of (r.recentCharges || []).slice(0,5)) msg += `• ${fmt(c.amount)} — ${c.status} — ${c.description || c.id}\n`;
+        }
+        return msg.trim();
+      }
+      case "stripe_list_transactions": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const txs = r.transactions || r.data || [];
+        let msg = `💰 **${txs.length} transacción(es) Stripe:**\n`;
+        for (const t of txs.slice(0,15)) msg += `• ${t.amount != null ? `€${(t.amount/100).toFixed(2)}` : "—"} — ${t.status} — ${t.description || t.id}${t.customerEmail ? ` (${t.customerEmail})` : ""}\n`;
+        return msg.trim() || "Sin transacciones";
+      }
+      case "stripe_list_customers": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const custs = r.customers || r.data || [];
+        let msg = `👥 **${custs.length} cliente(s) en Stripe:**\n`;
+        for (const c of custs.slice(0,15)) msg += `• ${c.name || "Sin nombre"} — ${c.email || "sin email"} (${c.id})\n`;
+        return msg.trim() || "Sin clientes";
+      }
+      case "stripe_list_subscriptions": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const subs = r.subscriptions || r.data || [];
+        let msg = `🔄 **${subs.length} suscripción(es) Stripe:**\n`;
+        for (const s of subs.slice(0,15)) {
+          const item = s.items?.[0];
+          msg += `• ${s.id} — ${s.status}${item ? ` — €${((item.amount||0)/100).toFixed(2)}/${item.interval}` : ""}${s.cancelAtPeriodEnd ? " · 🔴 cancela al renovar" : ""}\n`;
+        }
+        return msg.trim() || "Sin suscripciones";
+      }
+      case "stripe_list_products": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const prods = r.products || [];
+        if (!prods.length) return "📦 No hay productos en el catálogo Stripe. Puedes crear uno con `stripe_create_product`.";
+        let msg = `📦 **${prods.length} producto(s) en catálogo Stripe:**\n`;
+        for (const p of prods.slice(0,15)) {
+          const prices = (p.prices || []).map((pr: any) => pr.amount ? `€${(pr.amount/100).toFixed(2)}${pr.interval ? `/${pr.interval}` : ""}` : "sin precio").join(", ");
+          msg += `• **${p.name}** — ${prices || "sin precio"} — ${p.active ? "✅ activo" : "⛔ archivado"}\n`;
+        }
+        return msg.trim();
+      }
+      case "stripe_list_invoices": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const invs = r.invoices || [];
+        let msg = `🧾 **${invs.length} factura(s) Stripe:**\n`;
+        for (const inv of invs.slice(0,15)) {
+          const statusIcon = inv.status === "paid" ? "✅" : inv.status === "open" ? "📬" : inv.status === "void" ? "🚫" : "📋";
+          msg += `• ${statusIcon} ${inv.number || inv.id} — ${inv.customerEmail || inv.customer} — €${((inv.amountDue||0)/100).toFixed(2)} — ${inv.status}`;
+          if (inv.hostedUrl) msg += ` — [Ver factura](${inv.hostedUrl})`;
+          msg += "\n";
+        }
+        return msg.trim() || "Sin facturas";
+      }
+      case "stripe_list_payouts": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const pays = r.payouts || [];
+        let msg = `🏦 **${pays.length} payout(s) Stripe:**\n`;
+        for (const p of pays.slice(0,15)) {
+          const statusIcon = p.status === "paid" ? "✅" : p.status === "pending" ? "⏳" : p.status === "failed" ? "❌" : "📋";
+          const arrival = p.arrivalDate ? new Date(p.arrivalDate * 1000).toLocaleDateString("es-ES") : "—";
+          msg += `• ${statusIcon} €${((p.amount||0)/100).toFixed(2)} — llegada: ${arrival} — ${p.type}\n`;
+        }
+        return msg.trim() || "Sin payouts";
+      }
+      case "stripe_create_product": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const p = r.product || {};
+        const pr = r.price;
+        let msg = `📦 **Producto creado en Stripe:**\n`;
+        msg += `• **${p.name}** (${p.id})\n`;
+        if (pr) msg += `• Precio: €${((pr.unit_amount||0)/100).toFixed(2)} ${pr.currency?.toUpperCase()}${pr.recurring?.interval ? `/${pr.recurring.interval}` : ""}\n`;
+        msg += `• Estado: ${p.active ? "✅ activo" : "archivado"}`;
+        return msg;
+      }
+      case "stripe_create_charge": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const pi = r.paymentIntent || {};
+        let msg = `💳 **PaymentIntent creado:**\n`;
+        msg += `• ID: \`${pi.id}\`\n`;
+        msg += `• Importe: €${((pi.amount||0)/100).toFixed(2)} ${(pi.currency||"").toUpperCase()}\n`;
+        msg += `• Estado: ${pi.status}\n`;
+        if (pi.clientSecret) msg += `• ClientSecret disponible para completar el pago en el frontend`;
+        return msg;
+      }
+      case "stripe_create_customer": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const c = r.customer || {};
+        return `👤 **Cliente creado en Stripe:**\n• **${c.name || "Sin nombre"}** — ${c.email}\n• ID: \`${c.id}\``;
+      }
+      case "stripe_create_invoice": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const inv = r.invoice || {};
+        let msg = `🧾 **Factura creada:**\n`;
+        msg += `• Número: ${inv.number || inv.id}\n`;
+        msg += `• Estado: ${inv.status}\n`;
+        msg += `• Total: €${((inv.amountDue||0)/100).toFixed(2)}\n`;
+        if (inv.hostedUrl) msg += `• [🔗 Ver factura online](${inv.hostedUrl})\n`;
+        msg += `\nUsa \`stripe_send_invoice\` con invoiceId: \`${inv.id}\` para enviarla al cliente.`;
+        return msg;
+      }
+      case "stripe_send_invoice": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        let msg = `📬 **Factura enviada al cliente**\n• Estado: ${r.status}\n`;
+        if (r.hostedUrl) msg += `• [🔗 Ver factura online](${r.hostedUrl})`;
+        return msg;
+      }
+      case "stripe_create_refund": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        const ref = r.refund || {};
+        return `↩️ **Reembolso creado:**\n• ID: \`${ref.id}\`\n• Importe: €${((ref.amount||0)/100).toFixed(2)}\n• Estado: ${ref.status}`;
+      }
+      case "stripe_cancel_subscription": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        return `🔴 **Suscripción cancelada**\n• Estado: ${r.status}\n• ${r.message || "Cancelación procesada correctamente"}`;
+      }
 
       default:
         return result.message ? `✅ ${result.message}` : "✅ Acción completada.";

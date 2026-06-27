@@ -703,12 +703,25 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - platform_update_stock: Actualizar stock de un producto/variante (cualquier plataforma). Params: {projectId, platformProductId, quantity, variantId?}
   - platform_update_seo: Actualizar SEO de un producto (cualquier plataforma). Params: {projectId, platformProductId, metaTitle?, metaDescription?, focusKeyword?}
 
-  ── 💳 STRIPE — Gestión de cuentas conectadas ──
-  - stripe_list_accounts: Listar cuentas Stripe conectadas (clientes). Sin params adicionales.
-  - stripe_account_overview: Resumen completo de una cuenta Stripe (balance, ingresos, clientes, suscripciones). Params: {accountId}
-  - stripe_list_transactions: Listar transacciones de una cuenta Stripe. Params: {accountId, limit? (default 20)}
-  - stripe_list_customers: Listar clientes de una cuenta Stripe. Params: {accountId, limit? (default 20)}
-  - stripe_list_subscriptions: Listar suscripciones activas de una cuenta Stripe. Params: {accountId}
+  ── 💳 STRIPE — Gestión completa (como Shopify pero con lógica Stripe) ──
+  LECTURA:
+  - stripe_list_accounts: Listar cuentas Stripe conectadas (clientes). Sin params.
+  - stripe_account_overview: Resumen completo de una cuenta Stripe (balance, ingresos, métricas). Params: {accountId}
+  - stripe_list_transactions: Listar charges/transacciones de una cuenta. Params: {accountId, limit?}
+  - stripe_list_customers: Listar clientes de una cuenta Stripe. Params: {accountId, limit?}
+  - stripe_list_subscriptions: Listar suscripciones de una cuenta. Params: {accountId}
+  - stripe_list_products: Listar productos y precios del catálogo Stripe. Params: {accountId, limit?}
+  - stripe_list_invoices: Listar facturas de una cuenta. Params: {accountId, limit?, status?}
+  - stripe_list_payouts: Listar payouts/transferencias bancarias. Params: {accountId, limit?}
+  CREACIÓN:
+  - stripe_create_product: Crear producto + precio en Stripe (como crear producto en Shopify). Params: {accountId, name, description?, price (en euros), currency?, interval? (month/year para suscripción), images?}
+  - stripe_create_charge: Crear cobro/PaymentIntent en Stripe. Params: {accountId, amount (en céntimos), currency?, customerId?, description?, receiptEmail?}
+  - stripe_create_customer: Crear cliente en Stripe. Params: {accountId, email, name?, phone?, description?}
+  - stripe_create_invoice: Crear factura para un cliente. Params: {accountId, customerId, description?, daysUntilDue?, lineItems? [{amount, description, currency?}]}
+  ACCIONES:
+  - stripe_send_invoice: Enviar factura al cliente. Params: {accountId, invoiceId}
+  - stripe_create_refund: Reembolsar un cobro. Params: {accountId, chargeId? o paymentIntentId?, amount? (parcial en céntimos), reason?}
+  - stripe_cancel_subscription: Cancelar suscripción. Params: {accountId, subscriptionId, immediately? (bool, default false=al final del período)}
 
   ── 🎨 FUSION STUDIO PRO (14 módulos de creación visual IA) ──
   FusionStudioPro es el estudio creativo completo en /projects/:id/fusion-studio-pro con 14 pestañas:
@@ -11858,7 +11871,159 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/subscriptions`, { headers: { cookie: req.headers.cookie || "" } });
           const data2 = await r2.json() as any;
           if (!r2.ok) { result = { error: data2.error || "Error listando suscripciones Stripe" }; break; }
-          result = { subscriptions: data2.subscriptions || [], total: (data2.subscriptions || []).length, message: `${(data2.subscriptions || []).length} suscripciones activas en Stripe` };
+          const subs2 = data2.data || data2.subscriptions || [];
+          result = { subscriptions: subs2, total: subs2.length, message: `${subs2.length} suscripciones en Stripe` };
+          break;
+        }
+
+        case "stripe_list_products": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const limit2 = Math.min(params?.limit ?? 25, 100);
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/products?limit=${limit2}`, { headers: { cookie: req.headers.cookie || "" } });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error listando productos Stripe" }; break; }
+          const prods = data2.data || [];
+          result = { products: prods, total: prods.length, message: `${prods.length} producto(s) en catálogo Stripe:\n${prods.map((p: any) => `• ${p.name} — ${p.prices?.map((pr: any) => pr.amount ? `€${(pr.amount/100).toFixed(2)}${pr.interval ? `/${pr.interval}` : ""}` : "sin precio").join(", ") || "sin precio"}`).join("\n")}` };
+          break;
+        }
+
+        case "stripe_list_invoices": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const limit2 = Math.min(params?.limit ?? 25, 100);
+          const statusQ = params?.status ? `&status=${params.status}` : "";
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/invoices?limit=${limit2}${statusQ}`, { headers: { cookie: req.headers.cookie || "" } });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error listando facturas" }; break; }
+          const invs = data2.data || [];
+          result = { invoices: invs, total: invs.length, message: `${invs.length} factura(s) Stripe:\n${invs.slice(0,10).map((inv: any) => `• ${inv.number ?? inv.id} — ${inv.customerEmail ?? inv.customer} — €${((inv.amountDue||0)/100).toFixed(2)} — ${inv.status}`).join("\n")}` };
+          break;
+        }
+
+        case "stripe_list_payouts": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const limit2 = Math.min(params?.limit ?? 25, 100);
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/payouts?limit=${limit2}`, { headers: { cookie: req.headers.cookie || "" } });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error listando payouts" }; break; }
+          const pays = data2.data || [];
+          result = { payouts: pays, total: pays.length, message: `${pays.length} payout(s):\n${pays.slice(0,10).map((p: any) => `• €${((p.amount||0)/100).toFixed(2)} — ${p.status} — llegada: ${p.arrivalDate ? new Date(p.arrivalDate*1000).toLocaleDateString("es-ES") : "—"}`).join("\n")}` };
+          break;
+        }
+
+        case "stripe_create_product": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          if (!params?.name) { result = { error: "name requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/products`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+            body: JSON.stringify({ name: params.name, description: params.description, price: params.price, currency: params.currency, interval: params.interval }),
+          });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error creando producto" }; break; }
+          result = { product: data2.product, price: data2.price, message: data2.message || `Producto "${params.name}" creado en Stripe` };
+          break;
+        }
+
+        case "stripe_create_charge": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          if (!params?.amount) { result = { error: "amount requerido (en céntimos, ej. 4900 = €49)" }; break; }
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/charges`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+            body: JSON.stringify({ amount: params.amount, currency: params.currency, customerId: params.customerId, description: params.description, receiptEmail: params.receiptEmail }),
+          });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error creando cobro" }; break; }
+          result = { paymentIntent: data2.paymentIntent, message: data2.message || `Cobro creado: ${data2.paymentIntent?.id}` };
+          break;
+        }
+
+        case "stripe_create_customer": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          if (!params?.email) { result = { error: "email requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/customers`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+            body: JSON.stringify({ email: params.email, name: params.name, phone: params.phone, description: params.description }),
+          });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error creando cliente" }; break; }
+          result = { customer: data2.customer, message: data2.message || `Cliente ${params.email} creado` };
+          break;
+        }
+
+        case "stripe_create_invoice": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          if (!params?.customerId) { result = { error: "customerId requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/invoices`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+            body: JSON.stringify({ customerId: params.customerId, description: params.description, daysUntilDue: params.daysUntilDue, lineItems: params.lineItems }),
+          });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error creando factura" }; break; }
+          result = { invoice: data2.invoice, message: data2.message || `Factura creada: ${data2.invoice?.id}` };
+          break;
+        }
+
+        case "stripe_send_invoice": {
+          const accountId = params?.accountId;
+          const invoiceId = params?.invoiceId;
+          if (!accountId || !invoiceId) { result = { error: "accountId e invoiceId requeridos" }; break; }
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/invoices/${invoiceId}/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+          });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error enviando factura" }; break; }
+          result = { ok: true, status: data2.status, hostedUrl: data2.hostedUrl, message: data2.message || "Factura enviada al cliente" };
+          break;
+        }
+
+        case "stripe_create_refund": {
+          const accountId = params?.accountId;
+          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          if (!params?.chargeId && !params?.paymentIntentId) { result = { error: "chargeId o paymentIntentId requerido" }; break; }
+          const port = process.env.PORT || 8080;
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/refunds`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+            body: JSON.stringify({ chargeId: params.chargeId, paymentIntentId: params.paymentIntentId, amount: params.amount, reason: params.reason }),
+          });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error creando reembolso" }; break; }
+          result = { refund: data2.refund, message: data2.message || `Reembolso creado: ${data2.refund?.id}` };
+          break;
+        }
+
+        case "stripe_cancel_subscription": {
+          const accountId = params?.accountId;
+          const subscriptionId = params?.subscriptionId;
+          if (!accountId || !subscriptionId) { result = { error: "accountId y subscriptionId requeridos" }; break; }
+          const port = process.env.PORT || 8080;
+          const immediately = params?.immediately === true || params?.immediately === "true";
+          const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/subscriptions/${subscriptionId}?immediately=${immediately}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+          });
+          const data2 = await r2.json() as any;
+          if (!r2.ok) { result = { error: data2.error || "Error cancelando suscripción" }; break; }
+          result = { ok: true, status: data2.status, message: data2.message || "Suscripción cancelada" };
           break;
         }
 

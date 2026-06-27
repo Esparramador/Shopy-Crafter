@@ -26,7 +26,7 @@ function fmtDatetime(ts: number) {
   return new Date(ts * 1000).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-type Tab = "overview" | "transactions" | "customers" | "subscriptions" | "draft-order";
+type Tab = "overview" | "transactions" | "customers" | "subscriptions" | "products" | "invoices" | "payouts" | "charges" | "draft-order";
 
 interface StripeAccount {
   id: number;
@@ -127,6 +127,9 @@ export default function StripeManager() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [oauthConfig, setOauthConfig] = useState<{ configured: boolean; mode: string } | null>(null);
@@ -135,6 +138,15 @@ export default function StripeManager() {
   const [draftLoading, setDraftLoading] = useState(false);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+
+  // Forms for new tabs
+  const [chargeForm, setChargeForm] = useState({ amount: "", currency: "eur", description: "", customerId: "", receiptEmail: "" });
+  const [refundForm, setRefundForm] = useState({ paymentIntentId: "", amount: "", reason: "requested_by_customer" });
+  const [productForm, setProductForm] = useState({ name: "", description: "", price: "", currency: "eur", interval: "" });
+  const [customerForm, setCustomerForm] = useState({ email: "", name: "", phone: "", description: "" });
+  const [invoiceForm, setInvoiceForm] = useState({ customerId: "", description: "", daysUntilDue: "30", lineItemDesc: "", lineItemAmount: "" });
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionResult, setActionResult] = useState<any>(null);
 
   // Check OAuth config
   useEffect(() => {
@@ -192,6 +204,27 @@ export default function StripeManager() {
         .then(d => setSubscriptions(d.data ?? []))
         .catch(() => setErr("Error cargando suscripciones"))
         .finally(() => setLoading(false));
+    } else if (tab === "products") {
+      setLoading(true);
+      apiFetch(`/stripe/accounts/${id}/products?limit=50`)
+        .then(r => r.json())
+        .then(d => setProducts(d.data ?? []))
+        .catch(() => setErr("Error cargando productos"))
+        .finally(() => setLoading(false));
+    } else if (tab === "invoices") {
+      setLoading(true);
+      apiFetch(`/stripe/accounts/${id}/invoices?limit=25`)
+        .then(r => r.json())
+        .then(d => setInvoices(d.data ?? []))
+        .catch(() => setErr("Error cargando facturas"))
+        .finally(() => setLoading(false));
+    } else if (tab === "payouts") {
+      setLoading(true);
+      apiFetch(`/stripe/accounts/${id}/payouts?limit=25`)
+        .then(r => r.json())
+        .then(d => setPayouts(d.data ?? []))
+        .catch(() => setErr("Error cargando payouts"))
+        .finally(() => setLoading(false));
     }
   }, [selectedAccount, tab]);
 
@@ -217,6 +250,29 @@ export default function StripeManager() {
       setErr(e.message);
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function doAction(path: string, method: string, body?: any) {
+    if (!selectedAccount) return;
+    setActionLoading(true);
+    setActionResult(null);
+    setErr("");
+    try {
+      const r = await apiFetch(path, { method, body: body ? JSON.stringify(body) : undefined });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error en la operación");
+      setActionResult(d);
+      setMsg(d.message || "✓ Operación completada");
+      setTimeout(() => setMsg(""), 4000);
+      // Reload current tab data
+      if (tab === "products") apiFetch(`/stripe/accounts/${selectedAccount.account_id}/products?limit=50`).then(r2 => r2.json()).then(d2 => setProducts(d2.data ?? [])).catch(() => {});
+      if (tab === "invoices") apiFetch(`/stripe/accounts/${selectedAccount.account_id}/invoices?limit=25`).then(r2 => r2.json()).then(d2 => setInvoices(d2.data ?? [])).catch(() => {});
+      if (tab === "customers") apiFetch(`/stripe/accounts/${selectedAccount.account_id}/customers?limit=25`).then(r2 => r2.json()).then(d2 => setCustomers(d2.data ?? [])).catch(() => {});
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -440,10 +496,10 @@ export default function StripeManager() {
               </div>
 
               {/* Tabs */}
-              <div style={S.tabs}>
-                {(["overview", "transactions", "customers", "subscriptions"] as const).map(t => (
-                  <button key={t} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }} onClick={() => setTab(t)}>
-                    {{ overview: "📊 Overview", transactions: "💰 Transacciones", customers: "👥 Clientes", subscriptions: "🔄 Suscripciones" }[t]}
+              <div style={{ ...S.tabs, flexWrap: "wrap" as const }}>
+                {(["overview", "transactions", "customers", "subscriptions", "products", "invoices", "payouts", "charges"] as const).map(t => (
+                  <button key={t} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }} onClick={() => { setTab(t); setActionResult(null); }}>
+                    {{ overview: "📊 Overview", transactions: "💰 Cobros", customers: "👥 Clientes", subscriptions: "🔄 Suscripciones", products: "📦 Productos", invoices: "🧾 Facturas", payouts: "🏦 Payouts", charges: "⚡ Acciones" }[t]}
                   </button>
                 ))}
               </div>
@@ -593,39 +649,254 @@ export default function StripeManager() {
                   {subscriptions.length === 0 && <div style={S.emptyState}>Sin suscripciones</div>}
                   {subscriptions.length > 0 && (
                     <table style={S.table}>
-                      <thead>
-                        <tr>
-                          <th style={S.th}>ID</th>
-                          <th style={S.th}>Cliente</th>
-                          <th style={S.th}>Estado</th>
-                          <th style={S.th}>Plan</th>
-                          <th style={S.th}>Importe</th>
-                          <th style={S.th}>Próxima renovación</th>
-                          <th style={S.th}>Alta</th>
-                        </tr>
-                      </thead>
+                      <thead><tr>
+                        <th style={S.th}>ID</th><th style={S.th}>Cliente</th><th style={S.th}>Estado</th>
+                        <th style={S.th}>Importe</th><th style={S.th}>Próxima renovación</th><th style={S.th}>Acción</th>
+                      </tr></thead>
                       <tbody>
                         {subscriptions.map(s => (
                           <tr key={s.id}>
-                            <td style={{ ...S.td, fontFamily: "monospace", fontSize: 11, color: "rgba(240,237,230,0.5)" }}>{s.id.slice(-8)}</td>
+                            <td style={{ ...S.td, fontFamily: "monospace", fontSize: 11, color: "rgba(240,237,230,0.5)" }}>{s.id.slice(-12)}</td>
                             <td style={S.td}>{s.customer ?? "—"}</td>
                             <td style={S.td}>{statusBadge(s.status)}</td>
-                            <td style={{ ...S.td, fontSize: 12 }}>
-                              {s.items?.[0]?.interval ?? "—"}
-                            </td>
-                            <td style={{ ...S.td, fontWeight: 600 }}>
-                              {s.items?.[0] ? fmtMoney(s.items[0].amount ?? 0, s.items[0].currency ?? "eur") : "—"}
-                            </td>
+                            <td style={{ ...S.td, fontWeight: 600 }}>{s.items?.[0] ? fmtMoney(s.items[0].amount ?? 0, s.items[0].currency ?? "eur") : "—"}</td>
                             <td style={{ ...S.td, color: "rgba(240,237,230,0.55)", fontSize: 12 }}>
                               {s.currentPeriodEnd ? fmtDate(s.currentPeriodEnd) : "—"}
                               {s.cancelAtPeriodEnd && <span style={{ color: "#fb923c", marginLeft: 6 }}>⚠ Cancela</span>}
                             </td>
-                            <td style={{ ...S.td, color: "rgba(240,237,230,0.55)", fontSize: 12 }}>{fmtDate(s.created)}</td>
+                            <td style={S.td}>
+                              {s.status === "active" && !s.cancelAtPeriodEnd && (
+                                <button style={{ ...S.btn, ...S.btnDanger, ...S.btnSm }} onClick={() => {
+                                  if (confirm("¿Cancelar suscripción al final del período?"))
+                                    doAction(`/stripe/accounts/${selectedAccount!.account_id}/subscriptions/${s.id}`, "DELETE");
+                                }}>Cancelar</button>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   )}
+                </div>
+              )}
+
+              {/* Products — catálogo de precios/productos Stripe */}
+              {!loading && tab === "products" && (
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                    <div style={S.card}>
+                      <h4 style={{ margin: "0 0 14px", fontSize: 14 }}>➕ Nuevo Producto</h4>
+                      <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+                        <div><label style={S.label}>Nombre del producto *</label><input style={S.input} placeholder="Plan Pro · Consultoría SEO..." value={productForm.name} onChange={e => setProductForm(f => ({ ...f, name: e.target.value }))} /></div>
+                        <div><label style={S.label}>Descripción</label><input style={S.input} placeholder="Descripción breve" value={productForm.description} onChange={e => setProductForm(f => ({ ...f, description: e.target.value }))} /></div>
+                        <div style={S.grid2}>
+                          <div><label style={S.label}>Precio (€)</label><input style={S.input} type="number" min="0" step="0.01" placeholder="49.00" value={productForm.price} onChange={e => setProductForm(f => ({ ...f, price: e.target.value }))} /></div>
+                          <div><label style={S.label}>Facturación</label>
+                            <select style={{ ...S.select, width: "100%" }} value={productForm.interval} onChange={e => setProductForm(f => ({ ...f, interval: e.target.value }))}>
+                              <option value="">Pago único</option><option value="month">Mensual</option><option value="year">Anual</option><option value="week">Semanal</option>
+                            </select>
+                          </div>
+                        </div>
+                        <button style={{ ...S.btn, ...S.btnGold }} disabled={actionLoading || !productForm.name} onClick={() => {
+                          doAction(`/stripe/accounts/${selectedAccount!.account_id}/products`, "POST", { name: productForm.name, description: productForm.description, price: parseFloat(productForm.price) || undefined, currency: "eur", interval: productForm.interval || undefined });
+                          setProductForm({ name: "", description: "", price: "", currency: "eur", interval: "" });
+                        }}>
+                          {actionLoading ? "⏳ Creando..." : "📦 Crear producto en Stripe"}
+                        </button>
+                      </div>
+                    </div>
+                    <div style={S.card}>
+                      <h4 style={{ margin: "0 0 14px", fontSize: 14 }}>👤 Nuevo Cliente</h4>
+                      <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+                        <div><label style={S.label}>Email *</label><input style={S.input} type="email" placeholder="cliente@empresa.com" value={customerForm.email} onChange={e => setCustomerForm(f => ({ ...f, email: e.target.value }))} /></div>
+                        <div><label style={S.label}>Nombre</label><input style={S.input} placeholder="Nombre del cliente" value={customerForm.name} onChange={e => setCustomerForm(f => ({ ...f, name: e.target.value }))} /></div>
+                        <div><label style={S.label}>Teléfono</label><input style={S.input} placeholder="+34 600..." value={customerForm.phone} onChange={e => setCustomerForm(f => ({ ...f, phone: e.target.value }))} /></div>
+                        <button style={{ ...S.btn, ...S.btnGold }} disabled={actionLoading || !customerForm.email} onClick={() => {
+                          doAction(`/stripe/accounts/${selectedAccount!.account_id}/customers`, "POST", customerForm);
+                          setCustomerForm({ email: "", name: "", phone: "", description: "" });
+                        }}>
+                          {actionLoading ? "⏳ Creando..." : "👤 Crear cliente en Stripe"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={S.card}>
+                    <h4 style={{ margin: "0 0 16px", fontSize: 14 }}>📦 Catálogo de Productos ({products.length})</h4>
+                    {products.length === 0 && <div style={S.emptyState}>Sin productos. Crea uno arriba.</div>}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+                      {products.map(p => (
+                        <div key={p.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 14 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{p.name}</div>
+                          {p.description && <div style={{ fontSize: 11, color: "rgba(240,237,230,0.5)", marginBottom: 8 }}>{p.description}</div>}
+                          {(p.prices || []).map((pr: any) => (
+                            <div key={pr.id} style={{ fontSize: 12, color: "#c8a84b", fontWeight: 600 }}>
+                              {pr.amount ? fmtMoney(pr.amount, pr.currency) : "—"}{pr.interval ? `/${pr.interval}` : ""}
+                            </div>
+                          ))}
+                          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                            <span style={{ ...S.badge, background: p.active ? "rgba(45,212,159,0.1)" : "rgba(239,68,68,0.1)", color: p.active ? "#2dd49f" : "#f87171", fontSize: 10 }}>{p.active ? "✓ Activo" : "⛔ Archivado"}</span>
+                            {p.active && <button style={{ ...S.btn, ...S.btnDanger, ...S.btnSm, marginLeft: "auto" }} onClick={() => { if (confirm("¿Archivar producto?")) doAction(`/stripe/accounts/${selectedAccount!.account_id}/products/${p.id}`, "DELETE"); }}>Archivar</button>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Invoices — facturas */}
+              {!loading && tab === "invoices" && (
+                <div>
+                  <div style={{ ...S.card, marginBottom: 16 }}>
+                    <h4 style={{ margin: "0 0 14px", fontSize: 14 }}>🧾 Nueva Factura</h4>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div><label style={S.label}>Customer ID de Stripe *</label><input style={S.input} placeholder="cus_XXXXXXXXX" value={invoiceForm.customerId} onChange={e => setInvoiceForm(f => ({ ...f, customerId: e.target.value }))} /></div>
+                      <div><label style={S.label}>Días hasta vencimiento</label><input style={S.input} type="number" min="1" value={invoiceForm.daysUntilDue} onChange={e => setInvoiceForm(f => ({ ...f, daysUntilDue: e.target.value }))} /></div>
+                      <div><label style={S.label}>Descripción de línea</label><input style={S.input} placeholder="Servicio de consultoría..." value={invoiceForm.lineItemDesc} onChange={e => setInvoiceForm(f => ({ ...f, lineItemDesc: e.target.value }))} /></div>
+                      <div><label style={S.label}>Importe (€)</label><input style={S.input} type="number" min="0" step="0.01" placeholder="150.00" value={invoiceForm.lineItemAmount} onChange={e => setInvoiceForm(f => ({ ...f, lineItemAmount: e.target.value }))} /></div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={S.label}>Descripción de factura</label><input style={S.input} placeholder="Factura Junio 2026" value={invoiceForm.description} onChange={e => setInvoiceForm(f => ({ ...f, description: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                      <button style={{ ...S.btn, ...S.btnGold }} disabled={actionLoading || !invoiceForm.customerId} onClick={() => {
+                        const lineItems = invoiceForm.lineItemDesc && invoiceForm.lineItemAmount ? [{ description: invoiceForm.lineItemDesc, amount: parseFloat(invoiceForm.lineItemAmount), currency: "eur" }] : undefined;
+                        doAction(`/stripe/accounts/${selectedAccount!.account_id}/invoices`, "POST", { customerId: invoiceForm.customerId, description: invoiceForm.description, daysUntilDue: parseInt(invoiceForm.daysUntilDue), lineItems });
+                        setInvoiceForm({ customerId: "", description: "", daysUntilDue: "30", lineItemDesc: "", lineItemAmount: "" });
+                      }}>
+                        {actionLoading ? "⏳ Creando..." : "🧾 Crear factura"}
+                      </button>
+                    </div>
+                    {actionResult?.invoice && (
+                      <div style={S.successBanner}>
+                        ✓ Factura creada: <strong>{actionResult.invoice.number || actionResult.invoice.id}</strong> — Estado: {actionResult.invoice.status}
+                        {actionResult.invoice.hostedUrl && <> — <a href={actionResult.invoice.hostedUrl} target="_blank" rel="noreferrer" style={{ color: "#2dd49f" }}>Ver online</a></>}
+                        <br /><button style={{ ...S.btn, ...S.btnGold, ...S.btnSm, marginTop: 8 }} onClick={() => doAction(`/stripe/accounts/${selectedAccount!.account_id}/invoices/${actionResult.invoice.id}/send`, "POST")}>📬 Enviar al cliente</button>
+                      </div>
+                    )}
+                  </div>
+                  <div style={S.card}>
+                    <h4 style={{ margin: "0 0 16px", fontSize: 14 }}>🧾 Facturas ({invoices.length})</h4>
+                    {invoices.length === 0 && <div style={S.emptyState}>Sin facturas aún</div>}
+                    {invoices.length > 0 && (
+                      <table style={S.table}>
+                        <thead><tr>
+                          <th style={S.th}>Número</th><th style={S.th}>Cliente</th><th style={S.th}>Importe</th>
+                          <th style={S.th}>Estado</th><th style={S.th}>Vence</th><th style={S.th}>Acciones</th>
+                        </tr></thead>
+                        <tbody>
+                          {invoices.map(inv => (
+                            <tr key={inv.id}>
+                              <td style={{ ...S.td, fontFamily: "monospace", fontSize: 12 }}>{inv.number || inv.id.slice(-10)}</td>
+                              <td style={{ ...S.td, fontSize: 12 }}>{inv.customerEmail || inv.customerName || inv.customer || "—"}</td>
+                              <td style={{ ...S.td, fontWeight: 600 }}>{fmtMoney(inv.amountDue ?? 0, inv.currency ?? "eur")}</td>
+                              <td style={S.td}>{statusBadge(inv.status ?? "draft")}</td>
+                              <td style={{ ...S.td, fontSize: 11, color: "rgba(240,237,230,0.5)" }}>{inv.dueDate ? fmtDate(inv.dueDate) : "—"}</td>
+                              <td style={S.td}>
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  {inv.hostedUrl && <a href={inv.hostedUrl} target="_blank" rel="noreferrer" style={{ ...S.btn, ...S.btnGhost, ...S.btnSm, textDecoration: "none" }}>Ver</a>}
+                                  {(inv.status === "draft" || inv.status === "open") && <button style={{ ...S.btn, ...S.btnGold, ...S.btnSm }} onClick={() => doAction(`/stripe/accounts/${selectedAccount!.account_id}/invoices/${inv.id}/send`, "POST")}>📬 Enviar</button>}
+                                  {inv.pdfUrl && <a href={inv.pdfUrl} target="_blank" rel="noreferrer" style={{ ...S.btn, ...S.btnGhost, ...S.btnSm, textDecoration: "none" }}>PDF</a>}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Payouts — transferencias bancarias */}
+              {!loading && tab === "payouts" && (
+                <div style={S.card}>
+                  <h4 style={{ margin: "0 0 16px", fontSize: 14 }}>🏦 Payouts — Transferencias bancarias ({payouts.length})</h4>
+                  <p style={{ fontSize: 12, color: "rgba(240,237,230,0.5)", marginBottom: 16 }}>Los payouts son transferencias automáticas de Stripe a la cuenta bancaria vinculada.</p>
+                  {payouts.length === 0 && <div style={S.emptyState}>Sin payouts aún</div>}
+                  {payouts.length > 0 && (
+                    <table style={S.table}>
+                      <thead><tr>
+                        <th style={S.th}>ID</th><th style={S.th}>Importe</th><th style={S.th}>Estado</th>
+                        <th style={S.th}>Método</th><th style={S.th}>Llegada</th><th style={S.th}>Descripción</th>
+                      </tr></thead>
+                      <tbody>
+                        {payouts.map(p => (
+                          <tr key={p.id}>
+                            <td style={{ ...S.td, fontFamily: "monospace", fontSize: 11, color: "rgba(240,237,230,0.5)" }}>{p.id.slice(-10)}</td>
+                            <td style={{ ...S.td, fontWeight: 600, color: p.status === "paid" ? "#2dd49f" : "inherit" }}>{fmtMoney(p.amount ?? 0, p.currency ?? "eur")}</td>
+                            <td style={S.td}>{statusBadge(p.status ?? "pending")}</td>
+                            <td style={{ ...S.td, fontSize: 12 }}>{p.method} · {p.type}</td>
+                            <td style={{ ...S.td, fontSize: 12 }}>{p.arrivalDate ? fmtDate(p.arrivalDate) : "—"}</td>
+                            <td style={{ ...S.td, fontSize: 12, color: "rgba(240,237,230,0.55)" }}>{p.description || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {/* Charges — crear cobros, reembolsos, clientes */}
+              {!loading && tab === "charges" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  {/* Create PaymentIntent */}
+                  <div style={S.card}>
+                    <h4 style={{ margin: "0 0 14px", fontSize: 14 }}>⚡ Crear Cobro (PaymentIntent)</h4>
+                    <p style={{ fontSize: 12, color: "rgba(240,237,230,0.5)", marginBottom: 14 }}>Crea un PaymentIntent. El cliente lo completa en el frontend con su método de pago.</p>
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+                      <div style={S.grid2}>
+                        <div><label style={S.label}>Importe (€) *</label><input style={S.input} type="number" min="0.01" step="0.01" placeholder="99.00" value={chargeForm.amount} onChange={e => setChargeForm(f => ({ ...f, amount: e.target.value }))} /></div>
+                        <div><label style={S.label}>Moneda</label>
+                          <select style={{ ...S.select, width: "100%" }} value={chargeForm.currency} onChange={e => setChargeForm(f => ({ ...f, currency: e.target.value }))}>
+                            <option value="eur">EUR</option><option value="usd">USD</option><option value="gbp">GBP</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div><label style={S.label}>Descripción</label><input style={S.input} placeholder="Servicio de marketing..." value={chargeForm.description} onChange={e => setChargeForm(f => ({ ...f, description: e.target.value }))} /></div>
+                      <div><label style={S.label}>Customer ID (opcional)</label><input style={S.input} placeholder="cus_XXXXXXXXX" value={chargeForm.customerId} onChange={e => setChargeForm(f => ({ ...f, customerId: e.target.value }))} /></div>
+                      <div><label style={S.label}>Email recibo (opcional)</label><input style={S.input} type="email" placeholder="cliente@email.com" value={chargeForm.receiptEmail} onChange={e => setChargeForm(f => ({ ...f, receiptEmail: e.target.value }))} /></div>
+                      <button style={{ ...S.btn, ...S.btnGold }} disabled={actionLoading || !chargeForm.amount} onClick={() => {
+                        const amtCents = Math.round(parseFloat(chargeForm.amount) * 100);
+                        doAction(`/stripe/accounts/${selectedAccount!.account_id}/charges`, "POST", { amount: amtCents, currency: chargeForm.currency, description: chargeForm.description, customerId: chargeForm.customerId || undefined, receiptEmail: chargeForm.receiptEmail || undefined });
+                        setChargeForm({ amount: "", currency: "eur", description: "", customerId: "", receiptEmail: "" });
+                      }}>{actionLoading ? "⏳ Creando..." : "⚡ Crear PaymentIntent"}</button>
+                      {actionResult?.paymentIntent && (
+                        <div style={S.successBanner}>
+                          ✓ <strong>{actionResult.paymentIntent.id}</strong><br />
+                          Estado: {actionResult.paymentIntent.status} · {fmtMoney(actionResult.paymentIntent.amount, actionResult.paymentIntent.currency)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Refund */}
+                  <div style={S.card}>
+                    <h4 style={{ margin: "0 0 14px", fontSize: 14 }}>↩️ Crear Reembolso</h4>
+                    <p style={{ fontSize: 12, color: "rgba(240,237,230,0.5)", marginBottom: 14 }}>Reembolsa un cobro existente total o parcialmente.</p>
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+                      <div><label style={S.label}>PaymentIntent ID *</label><input style={S.input} placeholder="pi_XXXXX o ch_XXXXX" value={refundForm.paymentIntentId} onChange={e => setRefundForm(f => ({ ...f, paymentIntentId: e.target.value }))} /></div>
+                      <div><label style={S.label}>Importe a reembolsar (€, vacío = total)</label><input style={S.input} type="number" min="0.01" step="0.01" placeholder="Dejar vacío para reembolso total" value={refundForm.amount} onChange={e => setRefundForm(f => ({ ...f, amount: e.target.value }))} /></div>
+                      <div><label style={S.label}>Motivo</label>
+                        <select style={{ ...S.select, width: "100%" }} value={refundForm.reason} onChange={e => setRefundForm(f => ({ ...f, reason: e.target.value }))}>
+                          <option value="requested_by_customer">Solicitado por cliente</option>
+                          <option value="duplicate">Pago duplicado</option>
+                          <option value="fraudulent">Fraudulento</option>
+                        </select>
+                      </div>
+                      <button style={{ ...S.btn, ...S.btnDanger }} disabled={actionLoading || !refundForm.paymentIntentId} onClick={() => {
+                        const amtCents = refundForm.amount ? Math.round(parseFloat(refundForm.amount) * 100) : undefined;
+                        const isCharge = refundForm.paymentIntentId.startsWith("ch_");
+                        doAction(`/stripe/accounts/${selectedAccount!.account_id}/refunds`, "POST", { [isCharge ? "chargeId" : "paymentIntentId"]: refundForm.paymentIntentId, amount: amtCents, reason: refundForm.reason });
+                        setRefundForm({ paymentIntentId: "", amount: "", reason: "requested_by_customer" });
+                      }}>{actionLoading ? "⏳ Procesando..." : "↩️ Emitir reembolso"}</button>
+                      {actionResult?.refund && (
+                        <div style={S.successBanner}>
+                          ✓ Reembolso <strong>{actionResult.refund.id}</strong> — {fmtMoney(actionResult.refund.amount, actionResult.refund.currency)} — {actionResult.refund.status}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </>
