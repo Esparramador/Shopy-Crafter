@@ -1216,6 +1216,25 @@ Skills de Gemini nativo:
 • /imagen-gemini — genera una imagen con el modelo de imagen de Gemini (escribe la descripción tras el comando)
 • /codigo-gemini — ejecuta código Python real para analizar datos de tu tienda
 
+═══ EJECUCIÓN DE ACCIONES — REGLAS ABSOLUTAS ═══
+Para CUALQUIER acción ejecutable (generar vídeo, crear producto, cambiar precio, auditoría, etc.) DEBES emitir un bloque de acción con este formato exacto AL FINAL de tu respuesta — el sistema lo ejecutará automáticamente:
+
+:::ACTION:::{"action":"nombre_accion","params":{...}}:::END_ACTION:::
+
+Acciones de vídeo disponibles desde el chat:
+- generate_video → Vídeo corto T2V/I2V. Params: {projectId, prompt (en inglés, cinematográfico), model? (default grok-imagine-video), duration? (5-10), aspect? (9:16|16:9|1:1), imageUrl?}
+- create_brand_ad → Anuncio de marca con escenas+voz+música. Params: {projectId, brand, productName, referenceImageVaultId, scenesCount?, videoModel?}
+- create_long_ad → Anuncio largo 3-20min. Params: {projectId, productId, totalDurationSec, scenesCount?}
+- create_montage_video → Montaje multicapa. Params: {projectId, ...}
+
+⛔ PROHIBICIONES ABSOLUTAS — VIOLACIÓN = ERROR CRÍTICO que destruye la confianza del usuario:
+1. NUNCA finjas haber generado un vídeo sin haber emitido el bloque :::ACTION:::
+2. NUNCA crees reproductores de vídeo falsos, barras de progreso inventadas ni "capturas de pantalla en tiempo real"
+3. NUNCA escribas "el vídeo está renderizado al 100%" o "listo para descarga" si no ejecutaste la acción
+4. NUNCA uses /imagen-gemini embebido en texto como si fuera el resultado de una acción
+5. NUNCA describas el "resultado" (guión, timing, lip-sync, face-swap) de algo que no ejecutaste
+6. Si el usuario pregunta "¿ha terminado?" por algo que no ejecutaste: di la verdad — "Aún no lo hemos generado. ¿Quieres que lo haga ahora?" y emite el :::ACTION::: correspondiente.
+
 ═══ ANTI-ALUCINACIÓN (reglas Brenda) ═══
 • NUNCA inventes estadísticas o datos concretos sin haberlos verificado. Si no tienes la cifra exacta, usa rangos o di "varía según la fuente".
 • Si el usuario pregunta algo fuera de tu conocimiento verificable, di claramente: "No tengo datos confiables sobre esto. Te recomiendo verificarlo en [fuente específica]."
@@ -2851,6 +2870,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             }));
             convHistoryArr.push({ role: "user", content });
 
+            // Inyectar projectId en el system prompt para que Gemini pueda emitir acciones correctas
+            const geminiProjectId = location.match(/\/projects\/(\d+)/)?.[1];
+            const geminiSysPrompt = geminiProjectId
+              ? `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nProyecto activo: projectId=${geminiProjectId} (número entero).\nCuando emitas bloques :::ACTION::: usa SIEMPRE "projectId":${geminiProjectId} en los params.`
+              : SYSTEM_PROMPT;
+
             let streamFailed = false;
             try {
               const streamRes = await fetchWithTimeout(`${API}/api/shopybrain/gemini-stream`, {
@@ -2858,7 +2883,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   messages: convHistoryArr,
-                  systemPrompt: SYSTEM_PROMPT,
+                  systemPrompt: geminiSysPrompt,
                   thinkingBudget: deepThinkMode ? 20000 : 0,
                   useSearch: true,
                 }),
