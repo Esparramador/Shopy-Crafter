@@ -1527,15 +1527,15 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }, 400);
     };
 
-    // Llamar al endpoint Gemini TTS (voz humanizada, sin delay robótico)
-    fetch(`${API}/api/voice/gemini-tts`, {
+    // ElevenLabs TTS — Voz clonada de El Sevillano (voice_id: 8m4O8qoFLrKBzbmsuL5T)
+    fetch(`${API}/api/voice/tts`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: cleaned, voice: "Aoede" }),
+      body: JSON.stringify({ text: cleaned, voiceId: "8m4O8qoFLrKBzbmsuL5T", modelId: "eleven_multilingual_v2", languageCode: "es" }),
     })
       .then(r => {
-        if (!r.ok) throw new Error(`Gemini TTS ${r.status}`);
+        if (!r.ok) throw new Error(`ElevenLabs TTS ${r.status}`);
         return r.blob();
       })
       .then(blob => {
@@ -2913,8 +2913,35 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   }
                   if (streamActions.length > 0) {
                     assistantContent = assistantContent.replace(/:::ACTION:::[\s\S]*?:::END_ACTION:::/g, "").trim();
+                    const VIDEO_LABELS_MAP: Record<string, string> = {
+                      generate_video: "🎬 Generando vídeo con IA",
+                      create_brand_ad: "📢 Produciendo anuncio de marca",
+                      create_long_ad: "🎥 Produciendo anuncio largo",
+                      create_montage_video: "🎞️ Montando vídeo",
+                      create_cinematic_multishot: "🎬 Renderizando escenas",
+                    };
+                    const SPINNERS = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
                     for (const act of streamActions) {
+                      const isHeavyVid = HEAVY_VIDEO_ACTIONS.has(act.action);
+                      let progInterval: ReturnType<typeof setInterval> | null = null;
+                      if (isHeavyVid) {
+                        const progLabel = VIDEO_LABELS_MAP[act.action] || "🎬 Generando vídeo";
+                        let spinIdx = 0;
+                        const progStart = Date.now();
+                        const baseSnap = assistantContent;
+                        progInterval = setInterval(() => {
+                          const elapsed = Math.floor((Date.now() - progStart) / 1000);
+                          const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
+                          const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+                          const spin = SPINNERS[spinIdx % SPINNERS.length]; spinIdx++;
+                          const dots = ".".repeat((spinIdx % 3) + 1);
+                          setMessages(prev => prev.map(msg => msg.id === thinkingId
+                            ? { ...msg, content: `${baseSnap}\n\n${spin} **${progLabel}${dots}**\n⏱️ **${timeStr}** transcurrido · Estimado: 1-4 min\n📊 Procesando frames · Aplicando IA generativa · Guardando en Vault` }
+                            : msg));
+                        }, 1000);
+                      }
                       const actionResult = await executeShopifyAction(act.action, act.params);
+                      if (progInterval) { clearInterval(progInterval); progInterval = null; }
                       if (actionResult) {
                         assistantContent += "\n\n" + formatActionResult(act.action, actionResult);
                         action = { type: "shopify-action", label: "Ver resultado", data: actionResult };
@@ -3007,29 +3034,61 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             financial_forecast: "📊 **Generando forecast financiero...**\n\n**Paso 1** — Analizando datos históricos\n**Paso 2** — Calculando escenarios\n**Paso 3** — Proyectando revenue a 6 meses\n\n_⏱️ 15-30 segundos..._",
             agency_proposal: "📋 **Generando propuesta comercial...**\n\n**Paso 1** — Analizando tienda del cliente\n**Paso 2** — Calculando servicios necesarios\n**Paso 3** — Creando propuesta profesional\n\n_⏱️ 20-40 segundos..._",
             bulk_generate_images: "🎨 **Generando imágenes IA en lote...**\n\n**Paso 1** — Preparando prompts por producto\n**Paso 2** — Flux genera imágenes profesionales\n\n_⏱️ ~3 segundos por imagen..._",
+            generate_video: "🎬 **Iniciando generación de vídeo con IA...**\n\n**Paso 1** — Construyendo prompt cinematográfico\n**Paso 2** — Enviando a modelo de vídeo IA\n**Paso 3** — Renderizando frames (GPU cloud)\n**Paso 4** — Guardando en tu Vault automáticamente\n\n_⏱️ Estimado: 1-4 minutos dependiendo del modelo y duración_",
+            create_brand_ad: "📢 **Produciendo anuncio de marca completo...**\n\n**Paso 1** — Generando guión cinematográfico\n**Paso 2** — Generando escenas de vídeo en paralelo\n**Paso 3** — TTS + sincronización de voz\n**Paso 4** — Música + mezcla de audio\n**Paso 5** — Concat final con crossfade · Guardando en Vault\n\n_⏱️ Estimado: 5-20 minutos (normal para producción de vídeo IA)_",
+            create_long_ad: "🎥 **Produciendo anuncio largo (60-1800s)...**\n\n**Paso 1** — Director IA genera guión completo\n**Paso 2** — Generando escenas en paralelo\n**Paso 3** — Montaje + voz + música\n\n_⏱️ Estimado: 10-30 minutos para anuncios largos_",
+            create_montage_video: "🎞️ **Montando vídeo con múltiples escenas...**\n\n**Paso 1** — Preparando clips de referencia\n**Paso 2** — Face-swap + TTS + sincronización\n**Paso 3** — Concat final · Guardando en Vault\n\n_⏱️ Estimado: 3-10 minutos_",
           };
 
           const allActions = d.detectedActions ?? (d.detectedAction ? [d.detectedAction] : []);
 
           if (allActions.length > 0) {
             const firstAction = allActions[0].action;
+            const progMsgId = uuid();
             if (longActions[firstAction]) {
               setMessages(m => [...m, {
-                id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
+                id: progMsgId, role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
                 content: allActions.length > 1
                   ? `⚡ **Ejecutando ${allActions.length} acciones en secuencia...**\n\n${longActions[firstAction]}`
                   : longActions[firstAction],
               }]);
             } else if (allActions.length > 1) {
               setMessages(m => [...m, {
-                id: uuid(), role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
+                id: progMsgId, role: "assistant", timestamp: new Date(), model: "gemini+claude+brain",
                 content: `⚡ **Ejecutando ${allActions.length} acciones en secuencia...**`,
               }]);
             }
 
+            const SPINNERS2 = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
+            const VIDEO_LABELS2: Record<string, string> = {
+              generate_video: "🎬 Generando vídeo",
+              create_brand_ad: "📢 Produciendo anuncio",
+              create_long_ad: "🎥 Produciendo anuncio largo",
+              create_montage_video: "🎞️ Montando vídeo",
+              create_cinematic_multishot: "🎬 Renderizando escenas",
+            };
+
             const results: string[] = [];
             for (const act of allActions) {
+              const isHeavyVid2 = HEAVY_VIDEO_ACTIONS.has(act.action);
+              let progInterval2: ReturnType<typeof setInterval> | null = null;
+              if (isHeavyVid2) {
+                const progLabel2 = VIDEO_LABELS2[act.action] || "🎬 Generando vídeo";
+                let spinIdx2 = 0;
+                const progStart2 = Date.now();
+                progInterval2 = setInterval(() => {
+                  const elapsed = Math.floor((Date.now() - progStart2) / 1000);
+                  const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
+                  const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+                  const spin = SPINNERS2[spinIdx2 % SPINNERS2.length]; spinIdx2++;
+                  const dots = ".".repeat((spinIdx2 % 3) + 1);
+                  setMessages(prev => prev.map(msg => msg.id === progMsgId
+                    ? { ...msg, content: `${spin} **${progLabel2}${dots}**\n⏱️ **${timeStr}** transcurrido · Estimado: 1-4 min\n📊 Procesando frames · Aplicando IA generativa · Guardando en Vault automáticamente` }
+                    : msg));
+                }, 1000);
+              }
               const actionResult = await executeShopifyAction(act.action, act.params);
+              if (progInterval2) { clearInterval(progInterval2); progInterval2 = null; }
               if (actionResult) {
                 const formatted = formatActionResult(act.action, actionResult);
                 results.push(formatted);
