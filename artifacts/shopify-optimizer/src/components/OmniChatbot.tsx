@@ -1509,22 +1509,73 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     }
     window.speechSynthesis?.cancel();
 
-    // Limpiar markdown del texto — sin límite de longitud
-    const cleaned = text
-      .replace(/\*\*([^*]+)\*\*/g, "$1")
-      .replace(/\*([^*]+)\*/g, "$1")
-      .replace(/#{1,6}\s+/g, "")
-      .replace(/!\[.*?\]\(.*?\)/g, "imagen. ")
-      .replace(/\[VIDEO:[^\]]*\]\([^)]*\)/g, "vídeo generado. ")
-      .replace(/\[([^\]]+)\]\(.*?\)/g, "$1")
-      .replace(/`{1,3}[^`]*`{1,3}/g, "")
-      .replace(/>\s*/g, "")
-      .replace(/[-•·]\s+/g, ". ")
-      .replace(/:{1,}\s*/g, ": ")
-      .replace(/\n{2,}/g, ". ")
-      .replace(/\n/g, " ")
-      .replace(/\s{2,}/g, " ")
-      .trim();
+    // ── LIMPIADOR TTS ─────────────────────────────────────────────────────────
+    // Transforma texto con markdown/JSON/emojis en texto limpio natural para voz.
+    const cleanForTTS = (raw: string): string => {
+      let t = raw;
+      // 1. Eliminar bloques de acción :::ACTION:::...:::END_ACTION::: completos
+      t = t.replace(/:{3}ACTION:{3}[\s\S]*?:{3}END_ACTION:{3}/g, "");
+      t = t.replace(/:{3}\w+:{3}/g, "");
+      // 2. Eliminar bloques de código con triple backtick (JSON, código, etc.)
+      t = t.replace(/```[\s\S]*?```/g, "");
+      // 3. Eliminar backtick inline
+      t = t.replace(/`[^`]*`/g, "");
+      // 4. Vídeos e imágenes → descripción corta
+      t = t.replace(/\[VIDEO:[^\]]*\]\([^)]*\)/g, "vídeo generado.");
+      t = t.replace(/!\[([^\]]*)\]\([^)]*\)/g, (_, alt) => alt ? alt + "." : "imagen.");
+      // 5. Links markdown → solo el texto visible
+      t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+      // 6. URLs sueltas → eliminar
+      t = t.replace(/https?:\/\/[^\s)>,"]+/g, "");
+      // 7. Tablas markdown → eliminar separadores, mantener contenido
+      t = t.replace(/^\s*\|[-:|\s]+\|\s*$/gm, "");          // líneas de separación |---|
+      t = t.replace(/\|([^|]+)/g, "$1. ");                   // celdas → texto + pausa
+      // 8. Encabezados → quitar # y añadir pausa
+      t = t.replace(/#{1,6}\s+(.+)/g, "$1. ");
+      // 9. Negrita e itálica → texto limpio
+      t = t.replace(/\*\*\*([^*]+)\*\*\*/g, "$1");
+      t = t.replace(/\*\*([^*]+)\*\*/g, "$1");
+      t = t.replace(/\*([^*]+)\*/g, "$1");
+      t = t.replace(/__([^_]+)__/g, "$1");
+      t = t.replace(/_([^_]+)_/g, "$1");
+      // 10. Tachado ~~texto~~
+      t = t.replace(/~~([^~]+)~~/g, "$1");
+      // 11. Blockquotes
+      t = t.replace(/^>\s*/gm, "");
+      // 12. Listas con número → pausa natural
+      t = t.replace(/^\s*\d+[.)]\s+/gm, "");
+      // 13. Listas con viñetas → pausa
+      t = t.replace(/^\s*[-•·*]\s+/gm, "");
+      // 14. Emojis → eliminar completamente (evita leer "emoji de cara con lágrimas")
+      t = t.replace(/[\u{1F000}-\u{1FFFF}]/gu, "");
+      t = t.replace(/[\u{2600}-\u{27BF}]/gu, "");
+      t = t.replace(/[\u{FE00}-\u{FEFF}]/gu, "");
+      t = t.replace(/[\u{1F900}-\u{1F9FF}]/gu, "");
+      t = t.replace(/[\u{2300}-\u{23FF}]/gu, "");
+      // 15. Símbolos sueltos que no deben leerse
+      t = t.replace(/[|~^=<>{}\[\]\\]/g, " ");
+      t = t.replace(/[#@$%]/g, " ");
+      // 16. Separadores repetidos (----, ====, ...)
+      t = t.replace(/[-=_*]{3,}/g, ".");
+      // 17. Paréntesis de acotaciones de guión → leer como indicación o eliminar
+      t = t.replace(/\((?:pausa|silencio|risas|aplausos|risa|efecto)[^)]*\)/gi, "...");
+      t = t.replace(/\[(?:PAUSA|RISAS|APLAUSOS|EFECTO|MÚSICA)[^\]]*\]/gi, "...");
+      // 18. Nombres de personaje en guiones (PERSONAJE:) → leer sin los dos puntos extra
+      t = t.replace(/^([A-ZÁÉÍÓÚ\s]{2,20}):\s*/gm, "$1. ");
+      // 19. Múltiples puntos seguidos → una pausa
+      t = t.replace(/\.{3,}/g, "...");
+      t = t.replace(/\.\s*\.\s*\./g, "...");
+      // 20. Normalizar saltos de línea → pausas
+      t = t.replace(/\n{2,}/g, ". ");
+      t = t.replace(/\n/g, " ");
+      // 21. Múltiples espacios
+      t = t.replace(/\s{2,}/g, " ");
+      // 22. Puntuación repetida
+      t = t.replace(/([.!?])\s*([.!?])+/g, "$1");
+      return t.trim();
+    };
+
+    const cleaned = cleanForTTS(text);
     if (!cleaned) return;
 
     // Reiniciar micrófono al terminar de hablar (modo conversación)
