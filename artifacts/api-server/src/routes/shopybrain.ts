@@ -887,6 +887,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   • INFORMES/EXPORTS: Generar informes completos (SEO, financiero, catálogo, competidores, inventario, brand brief, IA)
   • FLUJOS EMAIL CRUD: Crear, listar, eliminar flujos de email marketing (además de generar con IA)
   - USA projectId del contexto si hay proyecto activo. El projectId SIEMPRE es un número entero (ej: 2), NUNCA un string largo ni un CUID.
+  - Si NO hay proyecto activo (el usuario está en una sección global sin tienda Shopify), usa projectId=0 en los params de la acción. El sistema creará automáticamente una carpeta "Shopy Crafter" donde se guardará todo lo que generes, analices o audites.
   - Si no necesitas acción, responde normalmente sin :::ACTION:::
   - SIGUE la conversación: comprende el contexto previo y lo que el usuario ya pidió. No repitas ni ignores instrucciones anteriores.
 
@@ -2258,11 +2259,42 @@ function buildEnrichedLearningContent(action: string, params: Record<string, unk
 
 router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promise<void> => {
   enableLongRunning(res);
-  const { action, params } = req.body;
+  let { action, params } = req.body;
   if (!action) { res.status(400).json({ error: "action requerida" }); return; }
   
   const SENSITIVE_KEYS = new Set(["password", "token", "secret", "accessToken", "clientSecret", "inviteToken", "apiKey"]);
-  
+
+  // ── Auto-crear proyecto "Shopy Crafter" cuando no hay projectId ──────────────
+  const missingProjectId = !params?.projectId || params.projectId === 0 || params.projectId === "0" || params.projectId === "";
+  if (missingProjectId) {
+    try {
+      // Buscar proyecto por defecto existente
+      const [existing] = await db.select({ id: projectsTable.id, name: projectsTable.name })
+        .from(projectsTable)
+        .where(eq(projectsTable.shopDomain, "shopycrafter.internal"))
+        .limit(1);
+      if (existing) {
+        params = { ...(params ?? {}), projectId: String(existing.id) };
+        logger.info({ resolvedId: existing.id }, "[execute-action] No projectId — using default 'Shopy Crafter' project");
+      } else {
+        // Crear proyecto por defecto
+        const [created] = await db.insert(projectsTable).values({
+          name: "Shopy Crafter",
+          platformType: "universal" as const,
+          shopDomain: "shopycrafter.internal",
+          clientId: "",
+          clientSecret: "",
+          plan: "admin" as const,
+          planRenewsAt: new Date(Date.now() + 365 * 24 * 3600 * 1000),
+        }).returning();
+        params = { ...(params ?? {}), projectId: String(created.id) };
+        logger.info({ createdId: created.id }, "[execute-action] No projectId — created default 'Shopy Crafter' project");
+      }
+    } catch (autoCreateErr) {
+      logger.warn({ err: autoCreateErr }, "[execute-action] Could not auto-create default project");
+    }
+  }
+
     if (params?.projectId && isNaN(parseInt(String(params.projectId)))) {
       const allProjects = await db.select({ id: projectsTable.id, shopDomain: projectsTable.shopDomain }).from(projectsTable).limit(10);
       if (allProjects.length === 1) {

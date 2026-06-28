@@ -2874,7 +2874,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
             const geminiProjectId = location.match(/\/projects\/(\d+)/)?.[1];
             const geminiSysPrompt = geminiProjectId
               ? `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nProyecto activo: projectId=${geminiProjectId} (número entero).\nCuando emitas bloques :::ACTION::: usa SIEMPRE "projectId":${geminiProjectId} en los params.`
-              : SYSTEM_PROMPT;
+              : `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nNo hay proyecto Shopify activo en esta sesión. Si el usuario pide generar vídeos, imágenes, auditorías, informes o cualquier acción que requiera projectId, usa projectId=0 en los params — el sistema creará automáticamente una carpeta "Shopy Crafter" donde se guardará todo lo generado.`;
 
             let streamFailed = false;
             try {
