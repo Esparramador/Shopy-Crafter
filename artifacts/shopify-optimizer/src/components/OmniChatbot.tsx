@@ -1581,7 +1581,19 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: chunk, voiceId: "8m4O8qoFLrKBzbmsuL5T", modelId: "eleven_multilingual_v2", languageCode: "es" }),
+        body: JSON.stringify({
+        text: chunk,
+        voiceId: "8m4O8qoFLrKBzbmsuL5T",
+        modelId: "eleven_turbo_v2_5",
+        languageCode: "es",
+        voiceSettings: {
+          stability: 0.12,
+          similarity_boost: 0.95,
+          style: 0.72,
+          use_speaker_boost: true,
+          speed: 0.92,
+        },
+      }),
       })
         .then(r => r.ok ? r.blob() : null)
         .then(blob => blob ? URL.createObjectURL(blob) : null)
