@@ -587,3 +587,39 @@ id = "sFeNeChYPaNkeHmHzjljq"
 uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_lipsync_2026-06-27T00-52-31.mp4"
 type = "video"
 title = "Sevillano — LIP-SYNC REAL (SadTalker + Voz Naturalizada ElevenLabs)"
+
+[[outputs]]
+id = "aTctCXb319OdhKXn-ogvv"
+uri = "file://tmp_vault_exports/video_1405_seedance.mp4"
+type = "video"
+title = "🎬 Vídeo IA — Seedance Pro (Hombre Balinés) · 17.6 MB"
+
+[[outputs]]
+id = "P4KbgJC-Mfl51bs__4xTz"
+uri = "file://tmp_vault_exports/img_1399_multiangle.png"
+type = "image"
+title = "🖼️ Multi-ángulo — Relojería de Lujo"
+
+[[outputs]]
+id = "q9fvQxAvopDGwqbG2eUdp"
+uri = "file://tmp_vault_exports/img_1400_hero.png"
+type = "image"
+title = "🖼️ Hero — Relojería de Lujo"
+
+[[outputs]]
+id = "LkRip4mkm56dV_Ss8Xkyc"
+uri = "file://tmp_vault_exports/img_1401_lifestyle.png"
+type = "image"
+title = "🖼️ Lifestyle — Relojería de Lujo"
+
+[[outputs]]
+id = "MvnXJC0WhwfeRge6j7TYx"
+uri = "file://tmp_vault_exports/img_1402_model_fashion.png"
+type = "image"
+title = "🖼️ Model Fashion — Relojería de Lujo"
+
+[[outputs]]
+id = "Uzdb8_xyEriBz5a7xdxMO"
+uri = "file://tmp_vault_exports/img_1403_ugc.webp"
+type = "image"
+title = "🖼️ UGC — Relojería de Lujo"
