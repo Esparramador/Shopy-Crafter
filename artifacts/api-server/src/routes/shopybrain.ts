@@ -10990,82 +10990,91 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         // BROWSER RESEARCH — Investigación web + informe profesional
         // ══════════════════════════════════════════════════════════════════
         case "browser_research": {
-          const { browserResearchTopic } = await import("../lib/browser-agent.js");
           const topic: string = params?.topic || params?.query || "investigación general";
           const projectId = params?.projectId ? Number(params.projectId) : (req.session as any)?.projectId;
           const reportTitle: string = params?.reportTitle || `Investigación: ${topic}`;
-          const reportStyle: string = params?.style || "professional"; // professional | fun | technical
+          const reportStyle: string = params?.style || "professional";
 
           // Construir queries de búsqueda inteligentes
-          const queries: string[] = params?.queries || [topic];
+          const queries: string[] = params?.queries?.length ? params.queries : [topic];
           if (queries.length === 1) {
-            queries.push(`${topic} guía completa`);
-            queries.push(`${topic} tutorial paso a paso`);
+            queries.push(`${topic} guía completa 2025 2026`);
+            queries.push(`${topic} análisis expertos últimas noticias`);
           }
 
           try {
-            // 1. Investigación web real
-            const research = await browserResearchTopic({
-              queries: queries.slice(0, 3),
-              resultsPerQuery: 3,
-              maxCharsPerPage: 5000,
-              takeScreenshot: false,
+            // ── MOTOR DE BÚSQUEDA: Gemini Google Search Grounding ──────────────
+            // Reemplaza Puppeteer (bloqueado por Google) con la API nativa de búsqueda.
+            const { askGeminiWithSearch } = await import("../lib/gemini.js");
+
+            const geminiSystemPrompt = reportStyle === "fun"
+              ? `Eres un investigador experto y redactor creativo. Busca información REAL y ACTUAL sobre el tema. Recopila el máximo de datos específicos, ejemplos, chistes, anécdotas o contenido relevante que encuentres. Devuelve los hallazgos en texto estructurado detallado en español.`
+              : `Eres un investigador y analista experto. Busca información REAL, ACTUAL y VERIFICADA sobre el tema. Incluye datos concretos, estadísticas, ejemplos reales, expertos citados, tendencias actuales. Devuelve los hallazgos en texto estructurado detallado en español.`;
+
+            // Lanzar 3 búsquedas en paralelo — una por query
+            const searchResults = await Promise.allSettled(
+              queries.slice(0, 3).map(q =>
+                askGeminiWithSearch(
+                  `Investiga exhaustivamente sobre: "${q}". Proporciona información detallada, actualizada y verificada. Incluye datos concretos, ejemplos, estadísticas y fuentes relevantes.`,
+                  geminiSystemPrompt,
+                )
+              )
+            );
+
+            // Recopilar texto y fuentes de todas las búsquedas exitosas
+            const allSources: string[] = [];
+            const allSearchQueries: string[] = [];
+            const rawParts: string[] = [];
+
+            searchResults.forEach((r, i) => {
+              if (r.status === "fulfilled" && r.value.text.length > 50) {
+                rawParts.push(`### Búsqueda ${i + 1}: "${queries[i]}"\n\n${r.value.text}`);
+                allSources.push(...r.value.sources);
+                allSearchQueries.push(...r.value.queries);
+              }
             });
 
-            // 2. Preparar contexto de investigación para Claude
-            const rawContent = research.allPages
-              .filter((p: { text: string }) => p.text.length > 100)
-              .map((p: { url: string; title: string; text: string }, i: number) => `### Fuente ${i + 1}: ${p.title}\n🔗 ${p.url}\n\n${p.text}`)
-              .join("\n\n---\n\n")
-              .slice(0, 40000);
+            const rawContent = rawParts.join("\n\n---\n\n").slice(0, 50000);
+            const uniqueSources = [...new Set(allSources)].filter(Boolean);
 
-            if (!rawContent && research.error) {
-              result = { error: true, message: `❌ Error de investigación web: ${research.error}` };
+            if (!rawContent) {
+              result = { error: true, message: `❌ No se encontró información sobre "${topic}". Intenta con un tema más específico.` };
               break;
             }
 
-            // 3. Claude sintetiza y genera el contenido del informe
+            // ── SÍNTESIS: Claude convierte investigación en informe HTML ──────
             const synthesisPrompt = reportStyle === "fun"
-              ? `Eres un experto en síntesis de información y redacción creativa. 
-                 Con el siguiente contenido investigado sobre "${topic}", genera un RECOPILATORIO completo, 
-                 entretenido y bien estructurado. Si son chistes, preséntalo como "Los X mejores chistes de ${topic}" 
-                 con numeración clara. Si es otro tipo de contenido, adapta el tono.
-                 
-                 Formato de salida: HTML limpio con <h2>, <p>, <ol>/<ul>, <blockquote> para los chistes/fragmentos.
-                 Incluye introducción, secciones temáticas, y conclusión.`
-              : `Eres un analista experto con 20 años de experiencia. 
-                 Con el siguiente contenido investigado sobre "${topic}", redacta un INFORME PROFESIONAL COMPLETO.
-                 
-                 El informe debe incluir:
-                 1. Resumen ejecutivo (3-4 párrafos)
-                 2. Introducción y contexto
-                 3. Análisis detallado (mínimo 5 secciones temáticas con H2/H3)
-                 4. Puntos clave destacados
-                 5. Proceso paso a paso (si aplica)
-                 6. Recursos y herramientas recomendadas
-                 7. Conclusiones y recomendaciones
-                 8. Fuentes consultadas
-                 
-                 Tono: profesional, preciso, completo. Mínimo 1500 palabras.
-                 Formato: HTML con <h2>, <h3>, <p>, <ul>, <ol>, <strong>, <em>, <blockquote>.
-                 NO incluyas DOCTYPE, html, head, body — solo el contenido interior.`;
+              ? `Eres un experto en redacción creativa y entretenimiento.
+                 Con la siguiente información investigada sobre "${topic}", genera un RECOPILATORIO completo y entretenido.
+                 Si son chistes o humor: preséntalo numerado "1. ..." "2. ..." con cada elemento en su propio párrafo claro.
+                 Si es otro contenido: adapta el tono divertido con secciones temáticas.
+                 IMPORTANTE: Usa TODO el contenido investigado real. No inventes datos que no estén en la investigación.
+                 Formato: HTML limpio con <h2>, <p>, <ol>/<ul>, <blockquote>. Solo el cuerpo interior, sin DOCTYPE ni <html>.`
+              : `Eres un analista experto con 20 años de experiencia.
+                 Con la siguiente información REAL investigada sobre "${topic}", redacta un INFORME PROFESIONAL COMPLETO.
+                 OBLIGATORIO:
+                 - Usa los datos reales encontrados, cita fuentes específicas donde los hayas
+                 - Mínimo 1500 palabras con contenido real, no genérico
+                 - Incluye: Resumen ejecutivo, Contexto actual, Análisis por secciones (5+), Datos y estadísticas reales, Conclusiones
+                 - Formato: HTML con <h2>, <h3>, <p>, <ul>, <ol>, <strong>, <blockquote>
+                 - Solo el cuerpo interior, sin DOCTYPE ni <html>`;
 
             const { askClaude: ask } = await import("../lib/claude.js");
             const synthesizedHtml = await ask(
               0,
-              [{ role: "user" as const, content: rawContent || `Genera un informe completo sobre: ${topic}` }],
+              [{ role: "user" as const, content: rawContent }],
               synthesisPrompt,
-              5000,
+              6000,
               undefined,
               { tier: "smart" as any },
             );
 
-            // 4. Construir HTML profesional completo
+            // ── HTML COMPLETO ─────────────────────────────────────────────────
             const { buildCoverPage } = await import("../lib/report-cover.js");
             const reportDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
-            const sourcesHtml = research.allPages
-              .filter((p: { text: string }) => p.text.length > 50)
-              .map((p: { url: string; title: string }) => `<li><a href="${p.url}" target="_blank" style="color:#c4a55a;">${p.title || p.url}</a></li>`)
+            const sourcesHtml = uniqueSources
+              .slice(0, 20)
+              .map(url => `<li><a href="${url}" target="_blank" style="color:#c4a55a;">${url}</a></li>`)
               .join("\n");
 
             const fullHtml = `<!DOCTYPE html>
@@ -11092,7 +11101,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
     .meta-item{font-size:12px;color:#8a8070}.meta-item span{color:#c4a55a;font-weight:600}
     .sources{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:24px;margin-top:3rem}
     .sources h2{color:#9a9080;font-size:1rem;border-bottom-color:rgba(154,144,128,0.3)}
-    .sources ul{color:#7a7068;font-size:13px}
+    .sources ul{color:#7a7068;font-size:13px;list-style:none;margin-left:0}
+    .sources li{word-break:break-all;margin-bottom:0.7rem}
     .footer-brand{text-align:center;padding:3rem 0 1rem;color:#4a4038;font-size:12px;border-top:1px solid rgba(255,255,255,0.05);margin-top:3rem}
     @media print{body{background:#fff;color:#000}.report-body{padding:20px}h1,h2,h3{color:#000}blockquote{border-left-color:#000;background:#f5f5f5}}
   </style>
@@ -11102,24 +11112,24 @@ ${buildCoverPage({ reportTitle, reportSubtitle: `Investigación generada por IA 
 <div class="report-body">
   <div class="meta-bar">
     <div class="meta-item">📅 Fecha: <span>${reportDate}</span></div>
-    <div class="meta-item">🔍 Fuentes: <span>${research.allPages.filter((p: { text: string }) => p.text.length > 50).length} páginas</span></div>
+    <div class="meta-item">🔍 Fuentes: <span>${uniqueSources.length} fuentes web reales</span></div>
     <div class="meta-item">📊 Queries: <span>${queries.slice(0, 3).join(" | ")}</span></div>
-    <div class="meta-item">🤖 IA: <span>Claude Genius + Chromium Browser</span></div>
+    <div class="meta-item">🤖 IA: <span>Gemini Search + Claude Genius</span></div>
   </div>
   
   ${synthesizedHtml}
   
-  ${sourcesHtml ? `<div class="sources"><h2>📚 Fuentes Consultadas</h2><ul>${sourcesHtml}</ul></div>` : ""}
+  ${sourcesHtml ? `<div class="sources"><h2>📚 Fuentes Consultadas (${uniqueSources.length})</h2><ul>${sourcesHtml}</ul></div>` : ""}
   
   <div class="footer-brand">
     Generado por Shopy Crafter Intelligence Engine · ${reportDate}<br>
-    Este informe fue creado mediante investigación web real con navegador Chromium + síntesis con IA.
+    Investigación real con Google Search Grounding (Gemini) + síntesis con Claude AI.
   </div>
 </div>
 </body>
 </html>`;
 
-            // 5. Guardar en Vault si hay projectId
+            // ── GUARDAR EN VAULT ──────────────────────────────────────────────
             let vaultId: number | null = null;
             let vaultUrl: string | undefined;
             if (projectId) {
@@ -11138,16 +11148,13 @@ ${buildCoverPage({ reportTitle, reportSubtitle: `Investigación generada por IA 
               success: true,
               topic,
               reportTitle,
-              sourcesCount: research.allPages.filter((p: { text: string }) => p.text.length > 50).length,
+              sourcesCount: uniqueSources.length,
+              queriesUsed: [...new Set(allSearchQueries)].slice(0, 6),
               vaultId,
               vaultUrl,
               htmlPreview: synthesizedHtml.slice(0, 500) + "...",
-              screenshots: research.screenshots.map((s: { label: string; base64: string }) => ({
-                label: s.label,
-                dataUrl: `data:image/jpeg;base64,${s.base64}`,
-              })),
               message: vaultId
-                ? `📊 **Informe de investigación generado y guardado**\n\n📋 **${reportTitle}**\n🔍 ${research.allPages.filter((p: { text: string }) => p.text.length > 50).length} fuentes web consultadas\n📁 Queries: ${queries.slice(0, 3).join(" | ")}\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver informe: ${vaultUrl}\n📥 Descargar PDF: ${vaultUrl}?format=pdf`
+                ? `📊 **Informe de investigación generado y guardado**\n\n📋 **${reportTitle}**\n🔍 ${uniqueSources.length} fuentes web reales consultadas\n📁 Queries: ${queries.slice(0, 3).join(" | ")}\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver informe: ${vaultUrl}\n📥 Descargar PDF: ${vaultUrl}?format=pdf`
                 : `📊 **Informe de investigación generado**\n\n${synthesizedHtml.replace(/<[^>]+>/g, " ").slice(0, 800)}`,
             };
           } catch (err) {
