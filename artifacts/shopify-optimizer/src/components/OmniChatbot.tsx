@@ -2005,6 +2005,17 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         return msg;
       }
 
+      case "upload_file": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.error}`;
+        if (!r.hasContent) return r.message || r.analysis || "📎 Indica qué archivo quieres subir.";
+        let msg = `📄 **Archivo procesado:** ${r.fileName || "archivo"}\n`;
+        if (r.fileType && r.fileType !== "desconocido") msg += `🗂️ Tipo: ${r.fileType}\n`;
+        if (r.contentLength) msg += `📏 Tamaño: ${r.contentLength.toLocaleString()} caracteres\n`;
+        msg += `\n${r.analysis || r.message || ""}`;
+        return msg;
+      }
+
       case "browser_research": {
         const r = result as any;
         if (r.error) return `❌ ${r.message}`;

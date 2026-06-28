@@ -852,6 +852,16 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Subir archivo / procesar archivo / analizar archivo / importar archivo / CSV / PDF / Excel → upload_file (procesa archivo subido). Params: {fileContext? (descripción del archivo)}
   - Investigar en internet / buscar información sobre / informe sobre / recopila información de / dime todo sobre / investiga / ¿qué es / cómo funciona / cómo se hace / tutorial / guía completa / análisis de / recopilatorio de / cuéntame sobre / busca y resume / genera informe de investigación / chistes de / recopilatorio de chistes / humor / memes de / cómo diseñar / cómo crear desde 0 → browser_research. Params: {topic (tema a investigar), queries? (array de búsquedas específicas), reportTitle? (título del informe), style? ("professional"|"fun" — "fun" para chistes/entretenimiento), projectId?}. Investigación REAL en Google: visita múltiples páginas y sintetiza con IA. SIEMPRE guarda en Vault si hay projectId. EJEMPLOS: {topic:"chistes de humor negro",style:"fun"} / {topic:"diseñar Plim Plim en Blender desde 0",style:"professional",projectId:X} / {topic:"estrategias marketing para Shopify"}
   - Brand Book / Brand DNA / manual de marca / identidad visual / guía de estilo completa / DNA de marca / generar brand book / como google ai studio / identidad corporativa / dossier de marca / manual de identidad → generate_brand_book. Params: {brandName?, industry?, notes? (información adicional sobre la marca), projectId?}. Genera un brand book completo de 10+ secciones: misión/visión, valores, arquetipo, tono de voz, paleta de colores, tipografía, logo, audiencia, pilares de contenido, redes sociales, mensajes clave, posicionamiento. HTML profesional descargable guardado en Vault. EJEMPLOS: {brandName:"Nike",industry:"deportes"} / {brandName:"Mi Tienda",projectId:X,notes:"vendemos ropa sostenible para mujer"} 
+  - Ver productos Stripe / listar productos Stripe / catálogo Stripe / catálogo de precios Stripe / qué productos tengo en Stripe / servicios de Stripe → stripe_list_products. Params: {accountId}
+  - Ver facturas Stripe / listar facturas / facturas pendientes / facturas de cliente / facturas emitidas → stripe_list_invoices. Params: {accountId, limit?, status?}
+  - Ver payouts / transferencias Stripe / transferencias bancarias / cuándo me paga Stripe / mis pagos pendientes Stripe → stripe_list_payouts. Params: {accountId, limit?}
+  - Crear producto Stripe / añadir producto Stripe / nuevo servicio Stripe / crear plan de pago / nuevo producto en catálogo Stripe → stripe_create_product. Params: {accountId, name, description?, price, currency?, interval?}
+  - Cobrar / crear cobro / PaymentIntent / cargo Stripe / iniciar pago / cobrarle a un cliente → stripe_create_charge. Params: {accountId, amount, currency?, customerId?, description?, receiptEmail?}
+  - Crear cliente Stripe / añadir cliente a Stripe / nuevo cliente en Stripe → stripe_create_customer. Params: {accountId, email, name?, phone?}
+  - Crear factura Stripe / nueva factura / emitir factura al cliente / facturar a cliente → stripe_create_invoice. Params: {accountId, customerId, description?, daysUntilDue?, lineItems?}
+  - Enviar factura / mandar factura al cliente / enviar email de factura → stripe_send_invoice. Params: {accountId, invoiceId}
+  - Reembolsar / devolver pago / refund Stripe / reembolso / devolver dinero → stripe_create_refund. Params: {accountId, chargeId?, paymentIntentId?, amount?, reason?}
+  - Cancelar suscripción / dar de baja suscripción Stripe / anular suscripción / baja de plan Stripe → stripe_cancel_subscription. Params: {accountId, subscriptionId, immediately?}
   - Abrir web / navegar a / ir a / abre / visita / accede a / abre YouTube / pon canción / busca en Google / busca en YouTube / busca en internet / scraping / extrae info de web / analiza página / ¿qué dice esta web? / busca información online → browser_action (controla navegador real Chromium, navega, hace clic, escribe, hace capturas, extrae texto). Params: {goal (descripción en lenguaje natural de qué hacer), steps? (array de pasos explícitos si se quiere control preciso), url? (URL directa si es "abrir esta URL"), scrapeUrl? (URL para scraping)}. PASOS DISPONIBLES: navigate(url), type(selector,text), click(selector), click_text(text), press(key), wait(ms), screenshot(label?), get_url, get_text(selector?), scroll(direction,amount), search(engine:"google"|"youtube"|"bing", query), evaluate(script). RECETAS AUTOMÁTICAS: si el goal menciona "youtube" → busca en YouTube y abre el primer vídeo; si menciona "google" o "buscar" → búsqueda Google con capturas; si es una URL → abre y toma captura; cualquier otra cosa → búsqueda Google. EJEMPLOS: {goal:"Abre YouTube y pon canción de Omar Montes"} / {goal:"Busca en Google precio del oro hoy"} / {goal:"Navega a amazon.es y busca auriculares"} / {goal:"Extrae los precios de esta web", scrapeUrl:"https://ejemplo.com"}
   
   SERVICIOS COMPLETOS DE SHOPY CRAFTER (explica al usuario TODO lo que podemos hacer):
@@ -10877,6 +10887,54 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             scriptId: savedId,
             message: `📝 Script cinematográfico guardado (id ${savedId}). Reutilízalo en create_long_ad pasando savedPromptId="${savedId}".`,
           };
+          break;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // UPLOAD FILE — Procesar archivo subido por el usuario
+        // ══════════════════════════════════════════════════════════════════
+        case "upload_file": {
+          const fileContext: string = params?.fileContext || "";
+          const fileContent: string = (req.body as any)?.fileContent || (req.body as any)?.fileData || "";
+          const fileName: string = (req.body as any)?.fileName || params?.fileName || "archivo";
+          const fileType: string = (req.body as any)?.fileType || params?.fileType || "desconocido";
+
+          if (!fileContent && !fileContext) {
+            result = {
+              error: false,
+              message: "📎 Para procesar un archivo, adjúntalo al chat usando el botón de clip o indica qué archivo quieres subir.\n\n**Formatos soportados:** CSV, Excel (.xlsx), PDF, JSON, imágenes (PNG/JPG), TXT.\n\n¿Qué tipo de archivo quieres analizar?"
+            };
+            break;
+          }
+
+          try {
+            const { askClaude } = await import("../lib/claude.js");
+            let analysisPrompt = "";
+
+            if (fileContent) {
+              // Tenemos contenido real del archivo
+              const preview = fileContent.length > 8000 ? fileContent.slice(0, 8000) + "\n\n[... contenido truncado]" : fileContent;
+              analysisPrompt = `Analiza el siguiente contenido de archivo "${fileName}" (tipo: ${fileType}):\n\n${preview}\n\n${fileContext ? `Contexto adicional del usuario: ${fileContext}` : ""}\n\nProporciona:\n1. Resumen de lo que contiene el archivo\n2. Estructura detectada (columnas, campos, secciones)\n3. Datos clave o insights relevantes\n4. Acciones recomendadas basadas en el contenido\n5. Si es CSV/Excel: estadísticas básicas (filas, columnas, valores únicos)`;
+            } else {
+              // Solo contexto textual, el usuario describe el archivo
+              analysisPrompt = `El usuario quiere subir/procesar un archivo con la siguiente descripción: "${fileContext}"\n\nOrientale sobre:\n1. Cómo puede subir el archivo al chat\n2. Qué puede hacer el sistema con ese tipo de archivo\n3. Qué información puede extraer automáticamente`;
+            }
+
+            const analysis = await askClaude(analysisPrompt, { maxTokens: 2000 });
+
+            result = {
+              fileName,
+              fileType,
+              hasContent: !!fileContent,
+              contentLength: fileContent.length,
+              analysis,
+              message: fileContent
+                ? `📄 **${fileName}** procesado (${fileContent.length} caracteres)\n\n${analysis}`
+                : analysis
+            };
+          } catch (e: any) {
+            result = { error: e.message || "Error procesando el archivo" };
+          }
           break;
         }
 
