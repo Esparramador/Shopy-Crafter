@@ -1461,7 +1461,9 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
             : "";
           projectContextInfo = `\n[CONTEXTO: Solo hay un proyecto registrado: ID=${p.id}, nombre="${p.name}", dominio="${p.shopDomain}".${tokenWarning} USA projectId=${p.id} en TODAS las acciones.]`;
         } else if (allProjects.length > 0) {
-          projectContextInfo = `\n[PROYECTOS DISPONIBLES: ${allProjects.map(p => `ID=${p.id} "${p.name}" (${p.shopDomain})`).join(", ")}. Usa el projectId numérico correspondiente en las acciones.]`;
+          projectContextInfo = `\n[PROYECTOS DISPONIBLES: ${allProjects.map(p => `ID=${p.id} "${p.name}" (${p.shopDomain})`).join(", ")}. Usa el projectId numérico correspondiente en las acciones. Si el usuario no especificó proyecto, usa projectId=0 y el sistema creará automáticamente una carpeta "Shopy Crafter" donde se guardará todo.]`;
+        } else {
+          projectContextInfo = `\n[SIN PROYECTO ACTIVO: Para cualquier acción que requiera projectId (generar vídeos, imágenes, informes, auditorías, tarjetas, presupuestos), usa projectId=0. El sistema creará automáticamente una carpeta "Shopy Crafter" donde se guardará todo sin que el usuario tenga que hacer nada.]`;
         }
       }
       const userContent = (conversationHistory ? `Conversación previa:\n${conversationHistory}\n\nUsuario: ${query}` : query) + projectContextInfo;
@@ -6527,6 +6529,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             const sizeMB = ((concatData.sizeBytes || 0) / 1024 / 1024).toFixed(2);
             result = {
               vaultId: concatData.vaultId,
+              projectId: Number(projectId),
+              videoUrl: `/api/projects/${Number(projectId)}/vault/${concatData.vaultId}/download`,
               clipsCount: concatData.clipsCount,
               sizeBytes: concatData.sizeBytes,
               message: `🎬✅ **Vídeo montaje creado**\n\n` +
@@ -10609,6 +10613,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             const sizeMB = (adResult.finalVideo.length / 1024 / 1024).toFixed(2);
             result = {
               ok: true, vaultId: finalVaultId, scriptVaultId,
+              projectId,
+              videoUrl: `/api/projects/${projectId}/vault/${finalVaultId}/download`,
               durationSec: adResult.durationSec,
               scenesCount: adResult.script.scenes.length,
               sizeBytes: adResult.finalVideo.length,

@@ -227,8 +227,8 @@ function formatInlineText(content: string, segIdx: number): React.ReactNode[] {
   });
 }
 
-// VIDEO_MD_RE matches [VIDEO:label](https://...)
-const VIDEO_MD_RE = /\[VIDEO:([^\]]*)\]\((https?:\/\/[^)]{4,})\)/g;
+// VIDEO_MD_RE matches [VIDEO:label](https://...) OR [VIDEO:label](/api/...)
+const VIDEO_MD_RE = /\[VIDEO:([^\]]*)\]\(((?:https?:\/\/|\/api\/)[^)]{4,})\)/g;
 
 // VIDEO card component
 function VideoCard({ src, label }: { src: string; label: string }) {
@@ -2061,6 +2061,56 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           msg += `📥 Descargar PDF: ${r.vaultUrl}?format=pdf`;
         }
         return msg;
+      }
+
+      case "create_brand_ad": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.message || r.error}`;
+        const url = r.videoUrl || (r.vaultId && r.projectId ? `/api/projects/${r.projectId}/vault/${r.vaultId}/download` : "");
+        let msg = `🎬✅ **Anuncio de marca generado**\n`;
+        if (r.durationSec) msg += `⏱️ ${r.durationSec}s`;
+        if (r.scenesCount) msg += ` · ${r.scenesCount} escenas`;
+        msg += "\n";
+        if (url) {
+          msg += `[VIDEO:Anuncio de marca](${url})\n`;
+          msg += `📥 [Descargar vídeo](${url})\n`;
+        }
+        if (r.vaultId) msg += `💾 Vault #${r.vaultId}`;
+        if (r.scriptVaultId) msg += ` · 📜 Script reutilizable Vault #${r.scriptVaultId}`;
+        return msg.trim();
+      }
+
+      case "create_long_ad": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.message || r.error}`;
+        const url = r.videoUrl || (r.vaultId && r.projectId ? `/api/projects/${r.projectId}/vault/${r.vaultId}/download` : "");
+        let msg = `🎬✅ **Anuncio largo generado**\n`;
+        if (r.durationSec) msg += `⏱️ ${r.durationSec}s`;
+        if (r.scenesCount) msg += ` · ${r.scenesCount} escenas`;
+        if (r.compositionMode) msg += ` · modo ${r.compositionMode}`;
+        msg += "\n";
+        if (url) {
+          msg += `[VIDEO:Anuncio largo](${url})\n`;
+          msg += `📥 [Descargar vídeo](${url})\n`;
+        }
+        if (r.vaultId) msg += `💾 Vault #${r.vaultId}`;
+        return msg.trim();
+      }
+
+      case "create_montage_video": {
+        const r = result as any;
+        if (r.error) return `❌ ${r.message || r.error}`;
+        const url = r.videoUrl || (r.vaultId && r.projectId ? `/api/projects/${r.projectId}/vault/${r.vaultId}/download` : "");
+        let msg = `🎞️✅ **Vídeo montaje creado**\n`;
+        if (r.clipsCount) msg += `🎞️ ${r.clipsCount} clips`;
+        if (r.sizeBytes) msg += ` · ${(r.sizeBytes / 1024 / 1024).toFixed(1)} MB`;
+        msg += "\n";
+        if (url) {
+          msg += `[VIDEO:Montaje](${url})\n`;
+          msg += `📥 [Descargar vídeo](${url})\n`;
+        }
+        if (r.vaultId) msg += `💾 Vault #${r.vaultId}`;
+        return msg.trim();
       }
 
       case "generate_video": {
