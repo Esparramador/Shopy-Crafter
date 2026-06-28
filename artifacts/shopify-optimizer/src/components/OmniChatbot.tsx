@@ -1509,20 +1509,23 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     }
     window.speechSynthesis?.cancel();
 
-    // Limpiar markdown del texto
+    // Limpiar markdown del texto — sin límite de longitud
     const cleaned = text
       .replace(/\*\*([^*]+)\*\*/g, "$1")
       .replace(/\*([^*]+)\*/g, "$1")
       .replace(/#{1,6}\s+/g, "")
-      .replace(/!\[.*?\]\(.*?\)/g, "")
+      .replace(/!\[.*?\]\(.*?\)/g, "imagen. ")
+      .replace(/\[VIDEO:[^\]]*\]\([^)]*\)/g, "vídeo generado. ")
       .replace(/\[([^\]]+)\]\(.*?\)/g, "$1")
       .replace(/`{1,3}[^`]*`{1,3}/g, "")
       .replace(/>\s*/g, "")
       .replace(/[-•·]\s+/g, ". ")
+      .replace(/:{1,}\s*/g, ": ")
       .replace(/\n{2,}/g, ". ")
       .replace(/\n/g, " ")
-      .slice(0, 600);
-    if (!cleaned.trim()) return;
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (!cleaned) return;
 
     // Reiniciar micrófono al terminar de hablar (modo conversación)
     const onSpeechEnd = () => {
@@ -1546,42 +1549,93 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       }, 400);
     };
 
-    // ElevenLabs TTS — Voz clonada de El Sevillano (voice_id: 8m4O8qoFLrKBzbmsuL5T)
-    fetch(`${API}/api/voice/tts`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: cleaned, voiceId: "8m4O8qoFLrKBzbmsuL5T", modelId: "eleven_multilingual_v2", languageCode: "es" }),
-    })
-      .then(r => {
-        if (!r.ok) throw new Error(`ElevenLabs TTS ${r.status}`);
-        return r.blob();
+    // ── CHUNKED TTS PIPELINE ──────────────────────────────────────────────────
+    // Divide el texto en frases, arranca reproduciendo el chunk 1 al momento
+    // mientras descarga el chunk 2 en paralelo. Sin cortes, sin delay inicial.
+    const splitIntoChunks = (t: string, maxLen = 220): string[] => {
+      const sentences = t.match(/[^.!?。]+[.!?。]?/g) || [t];
+      const chunks: string[] = [];
+      let current = "";
+      for (const s of sentences) {
+        const trimmed = s.trim();
+        if (!trimmed) continue;
+        if ((current + " " + trimmed).trim().length > maxLen && current) {
+          chunks.push(current.trim());
+          current = trimmed;
+        } else {
+          current = current ? current + " " + trimmed : trimmed;
+        }
+      }
+      if (current.trim()) chunks.push(current.trim());
+      return chunks.filter(c => c.length > 1);
+    };
+
+    const chunks = splitIntoChunks(cleaned);
+    if (!chunks.length) return;
+
+    let cancelled = false;
+    const audioUrls: string[] = [];
+
+    const fetchChunk = (chunk: string): Promise<string | null> =>
+      fetch(`${API}/api/voice/tts`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: chunk, voiceId: "8m4O8qoFLrKBzbmsuL5T", modelId: "eleven_multilingual_v2", languageCode: "es" }),
       })
-      .then(blob => {
-        if (!voiceEnabled) return;
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        geminiAudioRef.current = audio;
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          geminiAudioRef.current = null;
-          onSpeechEnd();
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          geminiAudioRef.current = null;
-          onSpeechEnd();
-        };
-        audio.play().catch(() => {
-          URL.revokeObjectURL(url);
-          geminiAudioRef.current = null;
-          onSpeechEnd();
-        });
-      })
-      .catch(() => {
-        // Fallback silencioso — no romper el chat
-        onSpeechEnd();
+        .then(r => r.ok ? r.blob() : null)
+        .then(blob => blob ? URL.createObjectURL(blob) : null)
+        .catch(() => null);
+
+    // Pre-fetch chunk 2 while chunk 1 plays
+    const prefetched: Map<number, Promise<string | null>> = new Map();
+    const prefetch = (idx: number) => {
+      if (idx < chunks.length && !prefetched.has(idx)) {
+        prefetched.set(idx, fetchChunk(chunks[idx]));
+      }
+    };
+
+    const playChunk = async (idx: number) => {
+      if (cancelled || idx >= chunks.length) {
+        if (!cancelled) onSpeechEnd();
+        return;
+      }
+      // Prefetch next chunk immediately
+      prefetch(idx + 1);
+
+      const urlPromise = prefetched.get(idx) ?? fetchChunk(chunks[idx]);
+      const url = await urlPromise;
+      if (cancelled || !url) {
+        if (!cancelled) playChunk(idx + 1);
+        return;
+      }
+      audioUrls.push(url);
+      const audio = new Audio(url);
+      geminiAudioRef.current = audio;
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        geminiAudioRef.current = null;
+        playChunk(idx + 1);
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        geminiAudioRef.current = null;
+        playChunk(idx + 1);
+      };
+      audio.play().catch(() => {
+        URL.revokeObjectURL(url);
+        geminiAudioRef.current = null;
+        playChunk(idx + 1);
       });
+    };
+
+    // Start: prefetch chunk 0 + chunk 1 simultaneously, play 0 immediately
+    prefetch(0);
+    prefetch(1);
+    prefetched.get(0)!.then(() => { if (!cancelled) playChunk(0); });
+
+    // Cleanup ref so external pause works
+    geminiAudioRef.current = { pause: () => { cancelled = true; audioUrls.forEach(u => URL.revokeObjectURL(u)); }, src: "", } as any;
   }, [voiceEnabled]);
 
   // ─── Execute Shopify action via backend ────────────────────────────────────
