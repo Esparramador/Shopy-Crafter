@@ -812,6 +812,8 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Simular precio / qué pasa si → price_simulator; Forecast / proyección financiera → financial_forecast
   - Dashboard financiero / márgenes → financial_dashboard
   - Crear vídeo / generar vídeo / hacer vídeo / vídeo de producto / vídeo IA / quiero un vídeo / video con Grok / grok video / video con kling / video con runway / un vídeo de / video corto / clip de vídeo / generar clip → generate_video. Params: {projectId, prompt (descripción cinematográfica en inglés), model? (grok-imagine-video|grok-video-1|kling-3.0-turbo|kling-3.0-master|wan-2.5-t2v|wan-2.7|hailuo-2.3|seedance-1-lite, default grok-imagine-video), duration? (5-10s, default 5), aspect? (9:16|16:9|1:1), imageUrl? (para I2V)}
+  - Listar vídeos / mis vídeos / qué vídeos tengo / vídeos del proyecto / ver vídeos de la bóveda / vídeos guardados / clips guardados / clips en vault / qué clips hay → list_vault_videos. Muestra todos los vídeos guardados en la bóveda del proyecto con su vaultId, título y tamaño. Params: {projectId}
+  - Montar vídeo / concatenar vídeos / unir clips / juntar vídeos / montaje / pegar vídeos / crear montaje / combinar clips / merge clips / unir mis clips → create_montage_video. FLUJO: si el usuario no da vaultIds, ejecuta PRIMERO list_vault_videos para mostrarle sus clips y que elija. Luego concat. Params: {projectId, clipVaultIds (array de vault IDs de vídeo, mín 2 máx 32), transitionPreset? (hard_cut|cross_dissolve|fade_to_black|white_flash|dissolve_grain|hand_swipe_l|hand_swipe_r|slide_up|slide_down|zoom_punch|iris_open|iris_close|smoke_blur|glitch_pixel|splash_circle|diagonal_tl|cover_left|reveal_right — default cross_dissolve), voiceVaultId? (vault ID del audio de voz), musicVaultId? (vault ID de música de fondo), voiceVolume? (0-2, default 1.0), musicVolume? (0-2, default 0.18)}
   - Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Virtual try-on / OOTD / vestir modelo / poner ropa a modelo / probador virtual / fotos con modelo / photoshoot con persona / outfit en modelo → virtual_tryon; Imágenes todos / bulk images → bulk_generate_images
   - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
   - Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history; Informe ventas y stock / report ventas stock / cuantos se han vendido / ventas por variante talla color → sales_report
@@ -6545,6 +6547,54 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             };
           } catch (err) {
             result = { error: true, message: `❌ Error creando montaje: ${err instanceof Error ? err.message : String(err)}` };
+          }
+          break;
+        }
+
+        case "list_vault_videos": {
+          const projectId = params?.projectId;
+          if (!projectId || isNaN(Number(projectId))) {
+            result = { error: true, message: "❌ Falta projectId válido" }; break;
+          }
+          try {
+            const rows = await db
+              .select({
+                id: projectFilesTable.id,
+                title: projectFilesTable.title,
+                mimeType: projectFilesTable.mimeType,
+              })
+              .from(projectFilesTable)
+              .where(
+                and(
+                  eq(projectFilesTable.projectId, Number(projectId)),
+                )
+              );
+            const videos = rows.filter(r =>
+              r.mimeType && (r.mimeType.startsWith("video/") || r.mimeType === "application/octet-stream")
+            );
+            if (videos.length === 0) {
+              result = {
+                videos: [],
+                message: `📭 No hay vídeos en la bóveda del proyecto ${projectId} todavía.\n\n` +
+                  `Para añadir vídeos:\n` +
+                  `1️⃣ Ve a **Fusion Studio Pro → Video Studio** (exporta un montaje)\n` +
+                  `2️⃣ O pídeme **generar un vídeo IA** con generate_video\n` +
+                  `3️⃣ O **sube tus propios clips** desde Video Studio (botón "+")`,
+              };
+            } else {
+              const list = videos.map(v =>
+                `• **${v.title || `Clip sin título`}** — Vault ID: \`${v.id}\` (${v.mimeType || "video"})`
+              ).join("\n");
+              result = {
+                videos,
+                count: videos.length,
+                message: `🎬 **${videos.length} vídeo(s) en la bóveda** del proyecto ${projectId}:\n\n${list}\n\n` +
+                  `💡 Para concatenarlos dime: *"Monta los clips con IDs X, Y, Z"*\n` +
+                  `📥 Descarga: \`/api/projects/${projectId}/vault/<vaultId>/download\``,
+              };
+            }
+          } catch (err) {
+            result = { error: true, message: `❌ Error listando vídeos: ${err instanceof Error ? err.message : String(err)}` };
           }
           break;
         }
