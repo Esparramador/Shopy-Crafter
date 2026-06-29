@@ -1266,7 +1266,7 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
             </div>
 
             {/* Track area */}
-            <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
+            <div style={{ flex:1, display:"flex", overflowX:"hidden", overflowY:"auto" }}>
               {/* Track labels */}
               <div style={{ width:LABEL_WIDTH, flexShrink:0, borderRight:`1px solid ${C.border}`, background:"#080810" }}>
                 <div style={{ height:RULER_HEIGHT, borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", padding:"0 8px" }}>
@@ -1297,7 +1297,7 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
               </div>
 
               {/* Timeline scrollable */}
-              <div ref={timelineScrollRef} style={{ flex:1, overflowX:"auto", overflowY:"hidden", position:"relative" }} onClick={handleTimelineClick}>
+              <div ref={timelineScrollRef} style={{ flex:1, overflowX:"auto", overflowY:"visible", position:"relative" }} onClick={handleTimelineClick}>
                 <div style={{ width:Math.max(900, totalDuration*scale+250), position:"relative" }}>
                   <TimelineRuler totalSec={totalDuration} scale={scale}/>
                   {tracks.map(track=>(
