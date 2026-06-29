@@ -185,7 +185,7 @@ const C = {
 };
 
 const S: Record<string, React.CSSProperties> = {
-  root:         { display:"flex", flexDirection:"column", height:"calc(100vh - 118px)", minHeight:640, background:C.bg0, color:C.text, fontFamily:"inherit", borderRadius:12, overflow:"hidden", border:`1px solid ${C.border}` },
+  root:         { display:"flex", flexDirection:"column", background:C.bg0, color:C.text, fontFamily:"inherit", overflow:"hidden", border:`1px solid ${C.border}` },
   topBar:       { display:"flex", alignItems:"center", gap:6, padding:"0 10px", height:46, background:C.bg3, borderBottom:`1px solid ${C.border}`, flexShrink:0, userSelect:"none" },
   body:         { display:"flex", flex:1, overflow:"hidden", minHeight:0 },
   leftPanel:    { width:220, flexShrink:0, background:C.bg2, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden" },
@@ -662,10 +662,13 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
   const [showGrid, setShowGrid]     = useState(false);
   const [sfxLoaded, setSfxLoaded]   = useState(false);
 
+  const [fullScreen, setFullScreen] = useState(false);
+
   const videoRef          = useRef<HTMLVideoElement>(null);
   const playIntervalRef   = useRef<ReturnType<typeof setInterval>|null>(null);
   const timelineScrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef      = useRef<HTMLInputElement>(null);
+  const uploadTrackRef    = useRef<string>("video1");
 
   // ── Derived
   const selectedClip = useMemo(()=>clips.find(c=>c.id===selectedId)||null, [clips, selectedId]);
@@ -711,6 +714,8 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
       if (e.code==="KeyJ") setCurrentSec(0);
       if (e.code==="ArrowLeft") setCurrentSec(s=>Math.max(0,s-1));
       if (e.code==="ArrowRight") setCurrentSec(s=>Math.min(totalDuration,s+1));
+      if (e.code==="Escape") setFullScreen(false);
+      if (e.code==="KeyF"&&e.ctrlKey) { e.preventDefault(); setFullScreen(fs=>!fs); }
     };
     window.addEventListener("keydown",onKey);
     return ()=>window.removeEventListener("keydown",onKey);
@@ -819,8 +824,11 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
               <label style={{ ...S.btnGold, justifyContent:"center", cursor:"pointer", marginBottom:6, display:"flex", width:"100%", boxSizing:"border-box" }}>
                 <Upload size={12}/> Subir video/imagen/audio
                 <input ref={fileInputRef} type="file" multiple accept="video/*,audio/*,image/*" style={{ display:"none" }}
-                  onChange={e=>addMediaFiles(e.target.files)}/>
+                  onChange={e=>{ addMediaFiles(e.target.files, uploadTrackRef.current); e.target.value=""; }}/>
               </label>
+              <div style={{ fontSize:9, color:C.textFaint, textAlign:"center", marginBottom:4 }}>
+                Selecciona varios archivos a la vez (Ctrl/Cmd+click)
+              </div>
               <div style={{ fontSize:9, color:C.textFaint, textAlign:"center" }}>
                 Arrastra archivos a las pistas
               </div>
@@ -1109,9 +1117,18 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
     </div>
   );
 
+  const openTrackUpload = (trackId: string) => {
+    uploadTrackRef.current = trackId;
+    fileInputRef.current?.click();
+  };
+
   // ─── RENDER ───────────────────────────────────────────────────────────────
+  const rootStyle: React.CSSProperties = fullScreen
+    ? { ...S.root, position:"fixed", inset:0, zIndex:500, borderRadius:0, height:"100dvh" }
+    : { ...S.root, height:"calc(100dvh - 118px)", minHeight:560, borderRadius:12 };
+
   return (
-    <div style={S.root}>
+    <div style={rootStyle}>
 
       {/* ── TOP BAR ── */}
       <div style={S.topBar}>
@@ -1163,6 +1180,12 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
         </button>
         <button onClick={()=>setShowExport(true)} style={S.btnGold}>
           <Download size={13}/> Exportar MP4
+        </button>
+        <button
+          onClick={()=>setFullScreen(fs=>!fs)}
+          style={{ ...S.btnIcon, color:fullScreen?C.gold:C.textDim, border:`1px solid ${fullScreen?C.gold:C.border2}`, borderRadius:4, padding:"3px 7px" }}
+          title={fullScreen?"Salir de pantalla completa (Esc)":"Pantalla completa"}>
+          <Maximize2 size={14}/>
         </button>
       </div>
 
@@ -1250,15 +1273,23 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
                   <span style={{ fontSize:8.5, color:C.textFaint }}>Pistas</span>
                 </div>
                 {tracks.map(track=>(
-                  <div key={track.id} style={{ height:TRACK_HEIGHT, borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", padding:"0 6px", gap:4 }}>
+                  <div key={track.id} style={{ height:TRACK_HEIGHT, borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", padding:"0 4px", gap:2 }}>
                     <div style={{ width:3, height:28, borderRadius:2, background:track.color, flexShrink:0 }}/>
-                    <span style={{ fontSize:8.5, color:"#8080a0", fontWeight:600, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{track.label}</span>
+                    <span style={{ fontSize:8, color:"#8080a0", fontWeight:600, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginLeft:3 }}>{track.label}</span>
+                    {(track.type==="video"||track.type==="image"||track.type==="audio") && !trackLocked[track.id] && (
+                      <button
+                        onClick={e=>{ e.stopPropagation(); openTrackUpload(track.id); }}
+                        title={`Añadir archivo a ${track.label}`}
+                        style={{ ...S.btnIcon, color:C.teal, padding:"1px 3px", fontSize:9, fontWeight:700, flexShrink:0 }}>
+                        <Plus size={10}/>
+                      </button>
+                    )}
                     <button onClick={()=>setTrackMuted(m=>({...m,[track.id]:!m[track.id]}))}
-                      style={{ ...S.btnIcon, color:trackMuted[track.id]?"#e06060":C.textFaint, padding:2 }}>
+                      style={{ ...S.btnIcon, color:trackMuted[track.id]?"#e06060":C.textFaint, padding:2, flexShrink:0 }}>
                       {trackMuted[track.id]?<VolumeX size={9}/>:<Volume2 size={9}/>}
                     </button>
                     <button onClick={()=>setTrackLocked(l=>({...l,[track.id]:!l[track.id]}))}
-                      style={{ ...S.btnIcon, color:trackLocked[track.id]?C.gold:C.textFaint, padding:2 }}>
+                      style={{ ...S.btnIcon, color:trackLocked[track.id]?C.gold:C.textFaint, padding:2, flexShrink:0 }}>
                       {trackLocked[track.id]?<Lock size={9}/>:<Unlock size={9}/>}
                     </button>
                   </div>

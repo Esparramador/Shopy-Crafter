@@ -982,13 +982,13 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
   };
 
   const modelSupportsT2V = !I2V_ONLY_MODELS.has(model);
-  const isXaiMode = false;
+  const isXaiMode = mode === "extend" || mode === "edit-video";
 
   const xaiHealthStatus = health?.["xai"]?.status;
   const xaiDown = xaiHealthStatus === "out_of_credits" || xaiHealthStatus === "down" || xaiHealthStatus === "missing_key";
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 16 }}>
       <div>
         <Section title="Modo de generación">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
