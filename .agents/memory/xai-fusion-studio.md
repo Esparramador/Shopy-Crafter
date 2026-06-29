@@ -36,3 +36,23 @@ Fixed in (2026-06-26): `fusion-studio-pro.ts`, `provider-health.ts`, `card-studi
 - `"t2v"` / `"i2v"` → standard generate-video route (Replicate/Runway/etc.)
 - `"extend"` → xAI `/fs-pro/extend-video` — requires public video URL (2-15s MP4)
 - `"edit-video"` → xAI `/fs-pro/edit-video` — requires public video URL (max 8.7s MP4)
+
+## ⚡ VIDEO EXTENSION — Extender desde el último frame
+**Grok puede extender un vídeo ya generado partiendo de su último fotograma.**
+
+Endpoint: `POST https://api.x.ai/v1/videos/extensions`
+```json
+{
+  "model": "grok-imagine-video",
+  "prompt": "descripción de lo que ocurre a continuación",
+  "duration": 5,
+  "video": { "url": "https://url-del-video-generado.mp4" }
+}
+```
+- Returns `{request_id}` → poll with `GET /v1/videos/{request_id}`
+- `duration`: 2–10 seconds per extension
+- Input video: must be a public HTTPS URL (not data-URI, not localhost)
+- **Use case para Muscle Factory**: extender V1 o V2 con una escena de cierre adicional sin regenerar todo desde cero
+- **Rate limit**: mismo 1 req/s que generación normal — hacer secuencial
+
+**Why this matters:** Permite iterar el final de un anuncio ya generado (ej. añadir un CTA épico de 5s al final) sin consumir un nuevo slot de 15s completo. Mucho más eficiente para refinamiento.
