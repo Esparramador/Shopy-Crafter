@@ -2497,6 +2497,32 @@ export async function extractAudioMp3(videoBuffer: Buffer): Promise<Buffer> {
   }
 }
 
+/**
+ * stripAudio — quita la pista de audio de un vídeo MP4, devolviendo el vídeo silenciado.
+ */
+export async function stripAudio(videoBuffer: Buffer): Promise<Buffer> {
+  const tmp = await makeTmpDir("strip");
+  const inPath = path.join(tmp, "in.mp4");
+  const outPath = path.join(tmp, "out.mp4");
+  await fs.writeFile(inPath, videoBuffer);
+  const ffmpeg: any = await loadFfmpeg();
+  try {
+    return await new Promise<Buffer>((resolve, reject) => {
+      ffmpeg(inPath)
+        .noAudio()
+        .videoCodec("copy")
+        .outputOptions(["-movflags +faststart"])
+        .on("end", async () => {
+          try { resolve(await fs.readFile(outPath)); } catch (e) { reject(e); }
+        })
+        .on("error", (e: Error) => reject(new Error(`FFmpeg strip-audio: ${e.message}`)))
+        .save(outPath);
+    });
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CAPABILITY 20: IMAGE VARIATIONS & EDITING (Flux / SDXL)
 // ═══════════════════════════════════════════════════════════════════════════
