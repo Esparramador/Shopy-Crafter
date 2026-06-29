@@ -628,10 +628,16 @@ title = "🖼️ UGC — Relojería de Lujo"
 id = "JEY9Nc98_kbQJl-hBJWTv"
 uri = "file://artifacts/shopify-optimizer/public/muscle-factory-warriors-iso-ad-FULL.mp4"
 type = "video"
-title = "Warriors ISO — FULL 32s (V1 Forest Fruits + V2 Pineapple Coconut + Title Card)"
+title = "Warriors ISO — FULL 32s — Harry (Forest Fruits) + Adam (Piña Coco) + Title Card"
 
 [[outputs]]
 id = "UEE1Gev8rm5SrKbyybapo"
 uri = "file://artifacts/shopify-optimizer/public/muscle-factory-warriors-iso-ad.mp4"
 type = "video"
 title = "Warriors ISO — V2 Pineapple Coconut + Title Card (17s)"
+
+[[outputs]]
+id = "fKyC4YZ8f24udbWxdS0Qa"
+uri = "file://artifacts/shopify-optimizer/public/muscle-factory-v2-pinacocо-adam.mp4"
+type = "video"
+title = "Warriors ISO — V2 Piña Coco 17s — voz Adam (solo ese sabor)"
