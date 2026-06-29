@@ -87,7 +87,7 @@ const btnBack: React.CSSProperties = {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean }) {
+export function VismeFormHero({ isActive = false }: { isActive?: boolean }) {
 
   // Form
   const [step,     setStep]    = useState(0);
@@ -104,7 +104,18 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef  = useRef<HTMLDivElement>(null);
 
-  // IntersectionObserver — play when visible, pause when hidden
+  // isActive prop — play/pause based on whether the landing section is active
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (isActive) {
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, [isActive]);
+
+  // IntersectionObserver — fallback: play when visible, pause when hidden
   useEffect(() => {
     const obs = new IntersectionObserver(
       ([entry]) => {
@@ -112,7 +123,7 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
         if (!v) return;
         entry.isIntersecting ? v.play().catch(() => {}) : v.pause();
       },
-      { threshold: 0.15 }
+      { threshold: 0.10 }
     );
     if (rootRef.current) obs.observe(rootRef.current);
     return () => obs.disconnect();
@@ -418,7 +429,8 @@ export function VismeFormHero({ isActive: _ia = false }: { isActive?: boolean })
           poster={POSTER_SRC}
           muted
           playsInline
-          preload="none"
+          loop
+          preload="metadata"
         />
 
         {/* ── Gradient overlay ──────────────────────────────────────────────── */}

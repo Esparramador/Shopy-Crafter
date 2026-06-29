@@ -600,8 +600,13 @@ export default function Landing() {
       if (!isFullpageMode()) return;
       if (isInsideScrollable(e.target)) return;
       if (Math.abs(e.deltaY) < 30) return; // ignorar trackpad fino
+      const delta = e.deltaY > 0 ? 1 : -1;
+      const next = Math.max(0, Math.min(currentRef.current + delta, FP_SECTION_IDS.length - 1));
+      // En el límite (primera/última sección) dejamos el scroll nativo para
+      // que el usuario pueda llegar al footer sin que el fullpage lo bloquee.
+      if (next === currentRef.current) return;
       e.preventDefault();
-      navigate(e.deltaY > 0 ? 1 : -1);
+      navigate(delta);
     };
 
     // Teclado — solo en desktop

@@ -331,14 +331,16 @@ const CSS = `
   border: 1px solid rgba(200,168,75,.12);
 }
 
-/* ─── TABLET ─── */
+/* ─── TABLET / MOBILE ─── */
 @media (max-width: 900px) {
   .ctc-layout { flex-direction: column; }
+  /* En vertical: primero el formulario, luego las info cards debajo */
   .ctc-panel {
+    order: -1;
     width: 100%; min-height: auto;
     padding: 72px 20px 32px; justify-content: flex-start; overflow-y: visible;
   }
-  .ctc-left { align-items: center; justify-content: center; padding: 8px 16px 48px; }
+  .ctc-left { order: 1; align-items: center; justify-content: center; padding: 8px 16px 48px; }
   .ctc-card { flex: 1 1 120px; max-width: 160px; padding: 16px 10px 14px; }
   .ctc-card-icon { font-size: 20px; margin-bottom: 6px; }
   .ctc-card-label { font-size: 8px; }
