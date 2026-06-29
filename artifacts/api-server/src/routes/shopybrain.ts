@@ -814,6 +814,13 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Crear vídeo / generar vídeo / hacer vídeo / vídeo de producto / vídeo IA / quiero un vídeo / video con Grok / grok video / video con kling / video con runway / un vídeo de / video corto / clip de vídeo / generar clip → generate_video. Params: {projectId, prompt (descripción cinematográfica en inglés), model? (grok-imagine-video|grok-video-1|kling-3.0-turbo|kling-3.0-master|wan-2.5-t2v|wan-2.7|hailuo-2.3|seedance-1-lite, default grok-imagine-video), duration? (5-10s, default 5), aspect? (9:16|16:9|1:1), imageUrl? (para I2V)}
   - Listar vídeos / mis vídeos / qué vídeos tengo / vídeos del proyecto / ver vídeos de la bóveda / vídeos guardados / clips guardados / clips en vault / qué clips hay → list_vault_videos. Muestra todos los vídeos guardados en la bóveda del proyecto con su vaultId, título y tamaño. Params: {projectId}
   - Montar vídeo / concatenar vídeos / unir clips / juntar vídeos / montaje / pegar vídeos / crear montaje / combinar clips / merge clips / unir mis clips → create_montage_video. FLUJO: si el usuario no da vaultIds, ejecuta PRIMERO list_vault_videos para mostrarle sus clips y que elija. Luego concat. Params: {projectId, clipVaultIds (array de vault IDs de vídeo, mín 2 máx 32), transitionPreset? (hard_cut|cross_dissolve|fade_to_black|white_flash|dissolve_grain|hand_swipe_l|hand_swipe_r|slide_up|slide_down|zoom_punch|iris_open|iris_close|smoke_blur|glitch_pixel|splash_circle|diagonal_tl|cover_left|reveal_right — default cross_dissolve), voiceVaultId? (vault ID del audio de voz), musicVaultId? (vault ID de música de fondo), voiceVolume? (0-2, default 1.0), musicVolume? (0-2, default 0.18)}
+  - Recortar clip / trim vídeo / cortar vídeo / quiero el trozo del segundo X al Y / recorta desde / recorta hasta / fragmento del vídeo → trim_video. Params: {projectId, vaultId, startSec (segundo inicio, ej 3), endSec? (segundo fin, ej 9 — si no se da, va hasta el final), title?}
+  - Recortar y unir / trim y concat / coger fragmentos de varios vídeos y unirlos / del vídeo X quiero del segundo A al B y del vídeo Y del segundo C al D / montaje inteligente de fragmentos → trim_concat. Recorta N fragmentos de vault IDs distintos y los une en orden con transición + voz IA opcional. Params: {projectId, segments: [{vaultId, startSec, endSec}], script? (texto narración IA — la IA ajusta la voz exactamente a la duración del montaje), voiceId? (ElevenLabs voice ID, default Rachel ES), musicVaultId?, transitionPreset? (default cross_dissolve), title?}
+  - Extraer audio / sacar audio / quitar audio como archivo / aislar audio / exportar audio / audio del vídeo / mp3 del clip → extract_audio. Devuelve el audio como MP3 en vault. Params: {projectId, vaultId, title?}
+  - Quitar audio / silenciar vídeo / mute / sin audio / eliminar sonido / video mudo / strip audio → strip_audio. Quita la pista de audio del clip, generando un nuevo clip sin sonido. Acepta 1 o varios clips. Params: {projectId, vaultIds (array), title?}
+  - Añadir voz al vídeo / narrar vídeo / poner voz en off / generar narración / TTS sincronizado / voz que dure lo mismo que el vídeo / voz coordinada / producir voz para el vídeo → add_voice_to_video. Genera TTS y lo ajusta EXACTAMENTE a la duración del vídeo (ni más ni menos). Params: {projectId, vaultId, script (texto que leerá la IA — usa esto para narrar el contenido del vídeo), voiceId? (ElevenLabs ID, default Rachel ES 21m00Tcm4TlvDq8ikWAM), musicVaultId? (ID de música de fondo opcional), musicVolume? (0-2, default 0.18), title?}
+  - Añadir texto / poner texto / superponer texto / grabar texto / quemar texto / texto sobre vídeo / subtítulos automáticos / subtítulos IA / transcribir y subtitular / caption TikTok / watermark / marca de agua / intro / outro → burn_text_video. Quema texto, subtítulos o caption sobre un clip existente. Params: {projectId, vaultId, mode ("text"|"subtitles"|"auto-subtitles"|"watermark"|"tiktok-caption"|"intro"|"outro"), text? (texto a quemar — requerido para modes: text/watermark/tiktok-caption/intro/outro), srt? (SRT manual si mode=subtitles), style? ({fontSize?:number, color?:"FFFFFF", position?:"top"|"center"|"bottom", fontName?, margin?}), startSec?, endSec?, title?}. FLUJO: si mode=auto-subtitles, transcribe el audio del vídeo con Whisper y quema los subtítulos automáticamente. Si el usuario no especifica mode, pregunta qué tipo de texto quiere.
+  - Face swap vídeo / cambiar cara / clonar cara en vídeo / poner mi cara / face swap real → face_swap_video. Params: {projectId, videoVaultId, faceImageVaultId? (vault ID de la imagen con la cara), faceImageUrl? (URL pública de la imagen — alternativa a vaultId), title?}
   - Generar imágenes / fotos producto → generate_product_images; Imágenes DESDE REFERENCIA / foto de mi producto / mejorar fotos / generar fotos desde imagen / con foto real / con imagen de muestra → generate_images_from_reference; Virtual try-on / OOTD / vestir modelo / poner ropa a modelo / probador virtual / fotos con modelo / photoshoot con persona / outfit en modelo → virtual_tryon; Imágenes todos / bulk images → bulk_generate_images
   - Email marketing / flujo email / email automation → generate_email_flow; Email / newsletter / campaña → generate_email
   - Inventario / sincronizar stock → inventory_sync; Alertas stock / stock bajo → inventory_alerts; Informe inventario / report stock / estado del inventario / analisis de stock → inventory_deep_report; Sincronizar pedidos / importar ventas / sync orders → inventory_sync_orders; Analytics ventas / que se vende / top productos / top clientes / ventas por color talla → inventory_sales_analytics; Historial cliente / que ha comprado / preferencias cliente → inventory_customer_history; Informe ventas y stock / report ventas stock / cuantos se han vendido / ventas por variante talla color → sales_report
@@ -6596,6 +6603,196 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           } catch (err) {
             result = { error: true, message: `❌ Error listando vídeos: ${err instanceof Error ? err.message : String(err)}` };
           }
+          break;
+        }
+
+        case "trim_video": {
+          const { projectId, vaultId, startSec, endSec, title } = params || {};
+          if (!projectId || !vaultId || startSec == null) {
+            result = { error: true, message: "❌ Necesito: projectId, vaultId, startSec (y opcionalmente endSec)" }; break;
+          }
+          try {
+            const internalPort = process.env.PORT || 8080;
+            const r = await fetch(`http://localhost:${internalPort}/api/fs-pro/trim`, {
+              method: "POST", headers: { "Content-Type": "application/json", Cookie: (req.headers.cookie as string) || "" },
+              body: JSON.stringify({ projectId: Number(projectId), vaultId: Number(vaultId), startSec: Number(startSec), endSec: endSec != null ? Number(endSec) : undefined, title }),
+              signal: AbortSignal.timeout(3 * 60_000),
+            });
+            const d = await r.json() as any;
+            if (!r.ok || !d.success) { result = { error: true, message: `❌ Error recortando: ${d.error || `HTTP ${r.status}`}` }; break; }
+            result = {
+              vaultId: d.vaultId, projectId: Number(projectId),
+              videoUrl: `/api/projects/${Number(projectId)}/vault/${d.vaultId}/download`,
+              message: `✂️✅ **Clip recortado**\n\n` +
+                `⏱️ Rango: ${startSec}s → ${endSec != null ? `${endSec}s` : "final"}\n` +
+                `📦 Vault ID: \`${d.vaultId}\`\n💾 ${((d.sizeBytes||0)/1024/1024).toFixed(2)} MB\n\n` +
+                `🔗 Descarga: \`/api/projects/${Number(projectId)}/vault/${d.vaultId}/download\``,
+            };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "trim_concat": {
+          const { projectId, segments, script, voiceId, musicVaultId, transitionPreset, title } = params || {};
+          if (!projectId || !Array.isArray(segments) || segments.length < 1) {
+            result = { error: true, message: "❌ Necesito projectId y segments:[{vaultId,startSec,endSec}] (mín 1 segmento)" }; break;
+          }
+          try {
+            const internalPort = process.env.PORT || 8080;
+            const r = await fetch(`http://localhost:${internalPort}/api/fs-pro/trim-concat`, {
+              method: "POST", headers: { "Content-Type": "application/json", Cookie: (req.headers.cookie as string) || "" },
+              body: JSON.stringify({ projectId: Number(projectId), segments, script, voiceId, musicVaultId, transitionPreset, title }),
+              signal: AbortSignal.timeout(8 * 60_000),
+            });
+            const d = await r.json() as any;
+            if (!r.ok || !d.success) { result = { error: true, message: `❌ Error en montaje: ${d.error || `HTTP ${r.status}`}` }; break; }
+            const segs = segments.map((s: any) => `  • Vault ${s.vaultId}: ${s.startSec}s → ${s.endSec}s`).join("\n");
+            result = {
+              vaultId: d.vaultId, projectId: Number(projectId),
+              videoUrl: `/api/projects/${Number(projectId)}/vault/${d.vaultId}/download`,
+              message: `🎬✅ **Montaje inteligente creado**\n\n` +
+                `📋 Fragmentos:\n${segs}\n` +
+                `⏱️ Duración total: ${d.totalSec?.toFixed(1)}s\n` +
+                `${script ? `🎙️ Narración IA: sincronizada exactamente\n` : ""}` +
+                `📦 Vault ID: \`${d.vaultId}\`\n💾 ${((d.sizeBytes||0)/1024/1024).toFixed(2)} MB\n\n` +
+                `🔗 \`/api/projects/${Number(projectId)}/vault/${d.vaultId}/download\``,
+            };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "extract_audio": {
+          const { projectId, vaultId, title } = params || {};
+          if (!projectId || !vaultId) { result = { error: true, message: "❌ Necesito projectId y vaultId" }; break; }
+          try {
+            const internalPort = process.env.PORT || 8080;
+            const r = await fetch(`http://localhost:${internalPort}/api/fs-pro/extract-audio`, {
+              method: "POST", headers: { "Content-Type": "application/json", Cookie: (req.headers.cookie as string) || "" },
+              body: JSON.stringify({ projectId: Number(projectId), vaultId: Number(vaultId), title }),
+              signal: AbortSignal.timeout(3 * 60_000),
+            });
+            const d = await r.json() as any;
+            if (!r.ok || !d.success) { result = { error: true, message: `❌ Error extrayendo audio: ${d.error || `HTTP ${r.status}`}` }; break; }
+            result = {
+              vaultId: d.vaultId, projectId: Number(projectId),
+              audioUrl: `/api/projects/${Number(projectId)}/vault/${d.vaultId}/download`,
+              message: `🎵✅ **Audio extraído como MP3**\n\n` +
+                `📦 Vault ID: \`${d.vaultId}\`\n💾 ${((d.sizeBytes||0)/1024/1024).toFixed(2)} MB\n\n` +
+                `🔗 \`/api/projects/${Number(projectId)}/vault/${d.vaultId}/download\`\n\n` +
+                `💡 Puedes usar este audio en create_montage_video como voiceVaultId o musicVaultId`,
+            };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "strip_audio": {
+          const { projectId, vaultIds, title } = params || {};
+          const ids = Array.isArray(vaultIds) ? vaultIds : (vaultIds ? [vaultIds] : []);
+          if (!projectId || ids.length === 0) { result = { error: true, message: "❌ Necesito projectId y vaultIds (array de IDs)" }; break; }
+          try {
+            const internalPort = process.env.PORT || 8080;
+            const r = await fetch(`http://localhost:${internalPort}/api/fs-pro/strip-audio`, {
+              method: "POST", headers: { "Content-Type": "application/json", Cookie: (req.headers.cookie as string) || "" },
+              body: JSON.stringify({ projectId: Number(projectId), vaultIds: ids.map(Number), title }),
+              signal: AbortSignal.timeout(3 * 60_000),
+            });
+            const d = await r.json() as any;
+            if (!r.ok || !d.success) { result = { error: true, message: `❌ Error: ${d.error || `HTTP ${r.status}`}` }; break; }
+            const list = (d.results||[]).map((x: any) => `  • Vault ${x.vaultId} → nuevo Vault \`${x.newVaultId}\``).join("\n");
+            result = {
+              results: d.results, projectId: Number(projectId),
+              message: `🔇✅ **Audio eliminado de ${d.count} clip(s)**\n\n${list}\n\n💡 Los clips originales siguen intactos en la bóveda.`,
+            };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "add_voice_to_video": {
+          const { projectId, vaultId, script, voiceId, musicVaultId, musicVolume, title } = params || {};
+          if (!projectId || !vaultId || !script?.trim()) {
+            result = { error: true, message: "❌ Necesito projectId, vaultId y script (texto de la narración)" }; break;
+          }
+          try {
+            const internalPort = process.env.PORT || 8080;
+            const r = await fetch(`http://localhost:${internalPort}/api/fs-pro/add-voice`, {
+              method: "POST", headers: { "Content-Type": "application/json", Cookie: (req.headers.cookie as string) || "" },
+              body: JSON.stringify({ projectId: Number(projectId), vaultId: Number(vaultId), script, voiceId, musicVaultId, musicVolume, title }),
+              signal: AbortSignal.timeout(5 * 60_000),
+            });
+            const d = await r.json() as any;
+            if (!r.ok || !d.success) { result = { error: true, message: `❌ Error: ${d.error || `HTTP ${r.status}`}` }; break; }
+            result = {
+              vaultId: d.vaultId, projectId: Number(projectId),
+              videoUrl: `/api/projects/${Number(projectId)}/vault/${d.vaultId}/download`,
+              message: `🎙️✅ **Voz sincronizada al vídeo**\n\n` +
+                `📝 Script: "${String(script).slice(0, 80)}..."\n` +
+                `🎵 Música: ${musicVaultId ? `vault ${musicVaultId}` : "sin música"}\n` +
+                `📦 Vault ID: \`${d.vaultId}\`\n💾 ${((d.sizeBytes||0)/1024/1024).toFixed(2)} MB\n\n` +
+                `🔗 \`/api/projects/${Number(projectId)}/vault/${d.vaultId}/download\``,
+            };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "burn_text_video": {
+          const { projectId, vaultId, mode, text, srt, style, startSec, endSec, title } = params || {};
+          if (!projectId || !vaultId || !mode) {
+            result = { error: true, message: "❌ Necesito projectId, vaultId y mode (text|subtitles|auto-subtitles|watermark|tiktok-caption|intro|outro)" }; break;
+          }
+          if (mode === "auto-subtitles") {
+            // No extra params needed — inform user
+          } else if (mode === "subtitles" && !srt) {
+            result = { error: true, message: "❌ mode=subtitles requiere el parámetro srt (texto en formato SRT)" }; break;
+          } else if (["text","watermark","tiktok-caption","intro","outro"].includes(mode) && !text) {
+            result = { error: true, message: `❌ mode=${mode} requiere el parámetro text (el texto a mostrar)` }; break;
+          }
+          try {
+            const internalPort = process.env.PORT || 8080;
+            const r = await fetch(`http://localhost:${internalPort}/api/fs-pro/burn-text`, {
+              method: "POST", headers: { "Content-Type": "application/json", Cookie: (req.headers.cookie as string) || "" },
+              body: JSON.stringify({ projectId: Number(projectId), vaultId: Number(vaultId), mode, text, srt, style, startSec, endSec, title }),
+              signal: AbortSignal.timeout(5 * 60_000),
+            });
+            const d = await r.json() as any;
+            if (!r.ok || !d.success) { result = { error: true, message: `❌ Error: ${d.error || `HTTP ${r.status}`}` }; break; }
+            const modeLabels: Record<string,string> = {
+              "text":"Texto superpuesto","subtitles":"Subtítulos quemados","auto-subtitles":"Subtítulos automáticos IA",
+              "watermark":"Marca de agua","tiktok-caption":"Caption TikTok","intro":"Intro","outro":"Outro",
+            };
+            result = {
+              vaultId: d.vaultId, projectId: Number(projectId),
+              videoUrl: `/api/projects/${Number(projectId)}/vault/${d.vaultId}/download`,
+              message: `📝✅ **${modeLabels[mode] || mode} aplicado**\n\n` +
+                `${text ? `✏️ Texto: "${text.slice(0,60)}${text.length>60?"...":""}"\n` : ""}` +
+                `📦 Vault ID: \`${d.vaultId}\`\n💾 ${((d.sizeBytes||0)/1024/1024).toFixed(2)} MB\n\n` +
+                `🔗 \`/api/projects/${Number(projectId)}/vault/${d.vaultId}/download\``,
+            };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "face_swap_video": {
+          const { projectId, videoVaultId, faceImageVaultId, faceImageUrl, title } = params || {};
+          if (!projectId || !videoVaultId || (!faceImageVaultId && !faceImageUrl)) {
+            result = { error: true, message: "❌ Necesito: projectId, videoVaultId y (faceImageVaultId o faceImageUrl con la cara a aplicar)" }; break;
+          }
+          try {
+            const internalPort = process.env.PORT || 8080;
+            const r = await fetch(`http://localhost:${internalPort}/api/fs-pro/face-swap-video`, {
+              method: "POST", headers: { "Content-Type": "application/json", Cookie: (req.headers.cookie as string) || "" },
+              body: JSON.stringify({ projectId: Number(projectId), videoVaultId: Number(videoVaultId), faceImageVaultId: faceImageVaultId ? Number(faceImageVaultId) : undefined, faceImageUrl, title }),
+              signal: AbortSignal.timeout(8 * 60_000),
+            });
+            const d = await r.json() as any;
+            if (!r.ok || !d.success) { result = { error: true, message: `❌ Error en face swap: ${d.error || `HTTP ${r.status}`}` }; break; }
+            result = {
+              vaultId: d.vaultId, projectId: Number(projectId),
+              videoUrl: `/api/projects/${Number(projectId)}/vault/${d.vaultId}/download`,
+              message: `👤✅ **Face Swap aplicado al vídeo**\n\n` +
+                `📦 Vault ID: \`${d.vaultId}\`\n💾 ${((d.sizeBytes||0)/1024/1024).toFixed(2)} MB\n\n` +
+                `🔗 \`/api/projects/${Number(projectId)}/vault/${d.vaultId}/download\``,
+            };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
           break;
         }
 

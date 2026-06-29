@@ -1473,7 +1473,7 @@ export interface ConcatOptions {
  * falls back to the system `ffmpeg`/`ffprobe` resolved via PATH (which is
  * always available in the Replit Nix runtime).
  */
-async function loadFfmpeg(): Promise<any> {
+export async function loadFfmpeg(): Promise<any> {
   let ffmpeg: any;
   try {
     ffmpeg = (await import("fluent-ffmpeg")).default;

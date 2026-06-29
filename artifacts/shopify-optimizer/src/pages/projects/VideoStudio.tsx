@@ -49,6 +49,26 @@ interface FormatPreset {
 interface SFXEntry { id: string; name: string; prompt: string; category: string; duration: number; url?: string }
 interface TemplateEntry { id: string; label: string; desc: string; icon: string; tracks: Partial<Track>[]; duration: number }
 
+// ─── Overlay types (canvas overlay system T003) ───────────────────────────────
+type OverlayKind = "text" | "emoji" | "image";
+interface CanvasOverlay {
+  id: string;
+  kind: OverlayKind;
+  // Position & size — percent of preview (0–100)
+  x: number; y: number; w: number; h: number;
+  // Text
+  text?: string; fontSize?: number; color?: string; bgColor?: string;
+  bold?: boolean; italic?: boolean; shadow?: boolean;
+  // Emoji
+  emoji?: string;
+  // Image sticker
+  imageUrl?: string;
+  // Timing
+  startSec: number; endSec: number;
+  // Rotation
+  rotate?: number;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PX_PER_SEC  = 60;
 const TRACK_HEIGHT = 50;
@@ -638,6 +658,179 @@ function ExportModal({ clips, format, projectId, totalDuration, onClose, onSucce
   );
 }
 
+// ─── TrimPanel — recorte rápido en inspector ──────────────────────────────────
+function TrimPanel({ clip, updateClip }: { clip: ClipItem; updateClip: (id:string, u:Partial<ClipItem>)=>void }) {
+  const [start, setStart] = useState(clip.trimStart ?? 0);
+  const [end,   setEnd]   = useState(clip.trimEnd   ?? 1);
+  const apply = () => {
+    const dur = clip.durationSec;
+    updateClip(clip.id, { trimStart: start, trimEnd: end, durationSec: (end - start) * dur });
+  };
+  return (
+    <div style={{ fontSize:10 }}>
+      <div style={{ color:"#aaa", marginBottom:6 }}>
+        Ajusta el rango de reproducción (0–1 = inicio–fin del clip)
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+        <label style={{ color:"#aaa" }}>Inicio: {(start * clip.durationSec).toFixed(1)}s</label>
+        <input type="range" min={0} max={0.99} step={0.01} value={start}
+          onChange={e=>setStart(parseFloat(e.target.value))} style={{ accentColor:"#c8a84b", width:"100%" }}/>
+        <label style={{ color:"#aaa" }}>Fin: {(end * clip.durationSec).toFixed(1)}s</label>
+        <input type="range" min={0.01} max={1} step={0.01} value={end}
+          onChange={e=>setEnd(parseFloat(e.target.value))} style={{ accentColor:"#c8a84b", width:"100%" }}/>
+        <div style={{ fontSize:9, color:"#888" }}>
+          Duración recortada: {((end - start) * clip.durationSec).toFixed(1)}s
+        </div>
+        <button onClick={apply} style={{ background:"#1a3a2a", border:"1px solid #2d6a4f", color:"#5db88a", borderRadius:4, padding:"4px 10px", cursor:"pointer", fontSize:10 }}>
+          ✂️ Aplicar recorte
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── VoicePanel — añadir narración IA sincronizada ───────────────────────────
+function VoicePanel({ clip, projectId, onError, onSuccess }: {
+  clip: ClipItem; projectId: number;
+  onError: (m:string)=>void; onSuccess: (vaultId:number)=>void;
+}) {
+  const [script, setScript] = useState("");
+  const [voiceId, setVoiceId] = useState("21m00Tcm4TlvDq8ikWAM");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const VOICES = [
+    { id:"21m00Tcm4TlvDq8ikWAM", label:"Rachel (ES)" },
+    { id:"EXAVITQu4vr4xnSDxMaL", label:"Bella (ES)" },
+    { id:"AZnzlk1XvdvUeBnXmlld", label:"Domi (ES)" },
+    { id:"D38z5RcWu1voky8WS1ja", label:"Fin (EN)" },
+    { id:"ThT5KcBeYPX3keUQqHPh", label:"Dorothy (EN)" },
+  ];
+
+  const go = async () => {
+    if (!script.trim()) { onError("Escribe el texto de la narración"); return; }
+    const vaultId = clip.aiUrl ? null : null; // We need vaultId from clip
+    // Extract vault ID from aiUrl if it looks like /vault/123/download
+    const match = (clip.aiUrl||"").match(/\/vault\/(\d+)\//);
+    if (!match) { onError("El clip necesita estar guardado en la bóveda primero"); return; }
+    setBusy(true); setDone(false);
+    try {
+      const r = await fetch(`${API_BASE}/api/fs-pro/add-voice`, {
+        method:"POST", credentials:"include", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ projectId, vaultId: parseInt(match[1]), script, voiceId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error||"Error");
+      setDone(true);
+      onSuccess(d.vaultId);
+    } catch(e:any) { onError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ fontSize:10 }}>
+      <textarea value={script} onChange={e=>setScript(e.target.value)} rows={3}
+        placeholder="Texto de la narración que sincronizará exactamente con la duración del vídeo…"
+        style={{ width:"100%", background:"#111", border:"1px solid #333", color:"#fff", borderRadius:4, padding:6, fontSize:10, resize:"vertical", boxSizing:"border-box" }}/>
+      <select value={voiceId} onChange={e=>setVoiceId(e.target.value)}
+        style={{ width:"100%", background:"#111", border:"1px solid #333", color:"#fff", borderRadius:4, padding:5, marginTop:5, fontSize:10 }}>
+        {VOICES.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}
+      </select>
+      <button onClick={go} disabled={busy} style={{ marginTop:6, width:"100%", background:"#1a3a2a", border:"1px solid #2d6a4f", color:done?"#5db88a":"#c8a84b", borderRadius:4, padding:"5px 0", cursor:"pointer", fontSize:10 }}>
+        {busy ? <>{<Loader2 size={10}/>} Generando…</> : done ? "✅ Narración añadida" : "🎙️ Generar narración sincronizada"}
+      </button>
+    </div>
+  );
+}
+
+// ─── BurnTextPanel — quemar texto/subtítulos/caption ─────────────────────────
+function BurnTextPanel({ clip, projectId, onError, onSuccess }: {
+  clip: ClipItem; projectId: number;
+  onError: (m:string)=>void; onSuccess: (vaultId:number)=>void;
+}) {
+  const [mode, setMode] = useState<"text"|"auto-subtitles"|"watermark"|"tiktok-caption"|"intro"|"outro">("text");
+  const [text, setText] = useState("");
+  const [fontSize, setFontSize] = useState(48);
+  const [color, setColor] = useState("#FFFFFF");
+  const [position, setPosition] = useState<"top"|"center"|"bottom">("bottom");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const MODES: {key:typeof mode; label:string}[] = [
+    {key:"text",          label:"📝 Texto libre"},
+    {key:"auto-subtitles",label:"🤖 Subtítulos auto (IA)"},
+    {key:"tiktok-caption",label:"🎵 Caption TikTok"},
+    {key:"watermark",     label:"💧 Marca de agua"},
+    {key:"intro",         label:"▶️ Intro"},
+    {key:"outro",         label:"⏹ Outro"},
+  ];
+
+  const go = async () => {
+    const match = (clip.aiUrl||"").match(/\/vault\/(\d+)\//);
+    if (!match) { onError("El clip necesita estar guardado en la bóveda primero"); return; }
+    if (mode!=="auto-subtitles" && !text.trim()) { onError("Escribe el texto"); return; }
+    setBusy(true); setDone(false);
+    try {
+      const r = await fetch(`${API_BASE}/api/fs-pro/burn-text`, {
+        method:"POST", credentials:"include", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ projectId, vaultId: parseInt(match[1]), mode, text: text||undefined,
+          style: { fontSize, color: color.replace("#",""), position } }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error||"Error");
+      setDone(true);
+      onSuccess(d.vaultId);
+    } catch(e:any) { onError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ fontSize:10 }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:3, marginBottom:7 }}>
+        {MODES.map(m=>(
+          <button key={m.key} onClick={()=>setMode(m.key)}
+            style={{ background:mode===m.key?"#2a2a00":"#111", border:`1px solid ${mode===m.key?"#c8a84b":"#333"}`,
+              color:mode===m.key?"#c8a84b":"#888", borderRadius:4, padding:"3px 6px", cursor:"pointer", fontSize:9 }}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {mode!=="auto-subtitles" && (
+        <textarea value={text} onChange={e=>setText(e.target.value)} rows={2}
+          placeholder="Texto a quemar en el vídeo…"
+          style={{ width:"100%", background:"#111", border:"1px solid #333", color:"#fff", borderRadius:4, padding:6, fontSize:10, resize:"vertical", boxSizing:"border-box", marginBottom:5 }}/>
+      )}
+      {mode==="auto-subtitles" && (
+        <div style={{ color:"#888", fontSize:9, marginBottom:5 }}>
+          🤖 Whisper transcribirá el audio y generará subtítulos automáticamente
+        </div>
+      )}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:5, marginBottom:5 }}>
+        <div>
+          <div style={{ color:"#888", marginBottom:2 }}>Tamaño</div>
+          <input type="number" value={fontSize} min={12} max={120} onChange={e=>setFontSize(parseInt(e.target.value))}
+            style={{ width:"100%", background:"#111", border:"1px solid #333", color:"#fff", borderRadius:4, padding:"3px 6px", fontSize:10 }}/>
+        </div>
+        <div>
+          <div style={{ color:"#888", marginBottom:2 }}>Color</div>
+          <input type="color" value={color} onChange={e=>setColor(e.target.value)}
+            style={{ width:"100%", background:"#111", border:"1px solid #333", borderRadius:4, padding:2, height:26, cursor:"pointer" }}/>
+        </div>
+      </div>
+      <select value={position} onChange={e=>setPosition(e.target.value as any)}
+        style={{ width:"100%", background:"#111", border:"1px solid #333", color:"#fff", borderRadius:4, padding:5, marginBottom:5, fontSize:10 }}>
+        <option value="top">Superior</option>
+        <option value="center">Centro</option>
+        <option value="bottom">Inferior</option>
+      </select>
+      <button onClick={go} disabled={busy} style={{ width:"100%", background:"#1a3a2a", border:"1px solid #2d6a4f",
+        color:done?"#5db88a":"#c8a84b", borderRadius:4, padding:"5px 0", cursor:"pointer", fontSize:10 }}>
+        {busy ? "Procesando…" : done ? "✅ Texto quemado" : "🔥 Quemar en vídeo"}
+      </button>
+    </div>
+  );
+}
+
 // ─── Main VideoStudio ─────────────────────────────────────────────────────────
 export default function VideoStudio({ projectId, onSuccess, onError }: {
   projectId: number;
@@ -661,8 +854,16 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
   const [previewFit, setPreviewFit] = useState<"fill"|"fit">("fit");
   const [showGrid, setShowGrid]     = useState(false);
   const [sfxLoaded, setSfxLoaded]   = useState(false);
-
   const [fullScreen, setFullScreen] = useState(false);
+
+  // ── Canvas overlay system (T003) ──────────────────────────────────────────
+  const [overlays, setOverlays]           = useState<CanvasOverlay[]>([]);
+  const [selectedOverlayId, setSelOvId]   = useState<string|null>(null);
+  const [overlayMode, setOverlayMode]     = useState<"select"|"add-text"|"add-emoji"|"add-image">("select");
+  const [showOverlayPanel, setShowOvPanel]= useState(false);
+  const [dragOvId, setDragOvId]           = useState<string|null>(null);
+  const [dragStart, setDragStart]         = useState<{mx:number;my:number;ox:number;oy:number}|null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const videoRef          = useRef<HTMLVideoElement>(null);
   const playIntervalRef   = useRef<ReturnType<typeof setInterval>|null>(null);
@@ -1091,16 +1292,35 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
               )}
 
               {selectedClip.type==="video" && (
-                <SSection title="🤖 IA sobre este clip" defaultOpen>
-                  <button onClick={()=>setAiMode("v2v")} style={{ ...S.btn, width:"100%", justifyContent:"center", marginBottom:4, fontSize:10 }}>
+                <SSection title="🤖 IA — Edición inteligente" defaultOpen>
+                  <button onClick={()=>setAiMode("v2v")} style={{ ...S.btn, width:"100%", justifyContent:"center", marginBottom:3, fontSize:10 }}>
                     <Wand2 size={11}/> Transformar estilo (V2V)
                   </button>
-                  <button onClick={()=>setAiMode("face-swap")} style={{ ...S.btn, width:"100%", justifyContent:"center", fontSize:10 }}>
+                  <button onClick={()=>setAiMode("face-swap")} style={{ ...S.btn, width:"100%", justifyContent:"center", marginBottom:3, fontSize:10 }}>
                     <Sparkles size={11}/> Face Swap
+                  </button>
+                  <button onClick={()=>setAiMode("extend")} style={{ ...S.btn, width:"100%", justifyContent:"center", marginBottom:3, fontSize:10 }}>
+                    <Film size={11}/> Extender vídeo
                   </button>
                 </SSection>
               )}
-
+              {selectedClip.type==="video" && (
+                <SSection title="✂️ Recorte rápido" defaultOpen={false}>
+                  <TrimPanel clip={selectedClip} updateClip={updateClip}/>
+                </SSection>
+              )}
+              {selectedClip.type==="video" && (
+                <SSection title="🎙️ Añadir narración IA" defaultOpen={false}>
+                  <VoicePanel clip={selectedClip} projectId={projectId} onError={onError}
+                    onSuccess={(newVaultId)=>{ onSuccess({ vaultId:newVaultId, type:"video", label:`${selectedClip.name} [con voz]`, mimeType:"video/mp4" }); }}/>
+                </SSection>
+              )}
+              {selectedClip.type==="video" && (
+                <SSection title="📝 Texto / Subtítulos / Caption" defaultOpen={false}>
+                  <BurnTextPanel clip={selectedClip} projectId={projectId} onError={onError}
+                    onSuccess={(newVaultId)=>{ onSuccess({ vaultId:newVaultId, type:"video", label:`${selectedClip.name} [texto]`, mimeType:"video/mp4" }); }}/>
+                </SSection>
+              )}
               {(selectedClip.type==="image") && (
                 <SSection title="🤖 IA sobre esta imagen" defaultOpen>
                   {([["outpaint","Expandir canvas"],["inpaint","Inpainting"],["variations","Generar variaciones"],["face-swap","Face Swap"]] as [AIMode,string][]).map(([m,lbl])=>(
@@ -1202,12 +1422,48 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
               <div style={{ position:"absolute", inset:0, backgroundImage:"linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px)", backgroundSize:"40px 40px", pointerEvents:"none", zIndex:10 }}/>
             )}
 
+            {/* Overlay toolbar (Canva-style) */}
+            <div style={{ position:"absolute", top:8, left:"50%", transform:"translateX(-50%)", zIndex:50,
+              display:"flex", gap:4, background:"rgba(10,10,20,0.85)", borderRadius:8, padding:"4px 8px",
+              border:"1px solid rgba(200,168,75,0.3)", boxShadow:"0 2px 12px rgba(0,0,0,0.6)", backdropFilter:"blur(6px)" }}>
+              <button title="Seleccionar overlay" onClick={()=>setOverlayMode("select")}
+                style={{ ...S.btnIcon, background:overlayMode==="select"?"#2a2a00":"transparent", color:overlayMode==="select"?C.gold:C.textDim, borderRadius:4, padding:"3px 7px" }}>
+                <Layers size={12}/>
+              </button>
+              <button title="Añadir texto" onClick={()=>{
+                const ov:CanvasOverlay={id:uid(),kind:"text",x:20,y:40,w:60,h:12,text:"Texto",fontSize:36,color:"#ffffff",bgColor:"transparent",bold:false,italic:false,shadow:true,startSec:currentSec,endSec:Math.min(totalDuration,currentSec+5),rotate:0};
+                setOverlays(prev=>[...prev,ov]); setSelOvId(ov.id); setOverlayMode("select"); setShowOvPanel(true);
+              }} style={{ ...S.btnIcon, background:overlayMode==="add-text"?"#2a2a00":"transparent", color:C.textDim, borderRadius:4, padding:"3px 7px" }}>
+                <Type size={12}/>
+              </button>
+              <button title="Añadir emoji" onClick={()=>{
+                const EMOJIS=["🔥","⭐","💥","✨","🎯","💰","🛒","🎉","💎","🚀","❤️","👋"];
+                const e=EMOJIS[Math.floor(Math.random()*EMOJIS.length)];
+                const ov:CanvasOverlay={id:uid(),kind:"emoji",x:40,y:40,w:15,h:15,emoji:e,startSec:currentSec,endSec:Math.min(totalDuration,currentSec+5)};
+                setOverlays(prev=>[...prev,ov]); setSelOvId(ov.id); setOverlayMode("select"); setShowOvPanel(true);
+              }} style={{ ...S.btnIcon, color:C.textDim, borderRadius:4, padding:"3px 7px" }}>
+                <span style={{fontSize:12}}>😀</span>
+              </button>
+              <button title="Eliminar overlay seleccionado" onClick={()=>{
+                if (selectedOverlayId) { setOverlays(prev=>prev.filter(o=>o.id!==selectedOverlayId)); setSelOvId(null); }
+              }} disabled={!selectedOverlayId}
+                style={{ ...S.btnIcon, color:selectedOverlayId?"#e06060":C.textFaint, borderRadius:4, padding:"3px 7px", opacity:selectedOverlayId?1:0.4 }}>
+                <Trash2 size={12}/>
+              </button>
+              <div style={{width:1,background:C.border2,margin:"0 2px"}}/>
+              <button title={showOverlayPanel?"Ocultar panel":"Panel de overlays"} onClick={()=>setShowOvPanel(p=>!p)}
+                style={{ ...S.btnIcon, color:showOverlayPanel?C.gold:C.textDim, borderRadius:4, padding:"3px 7px" }}>
+                <Settings size={12}/>
+              </button>
+            </div>
+
             {/* Canvas placeholder / video */}
-            <div style={{
+            <div ref={previewRef} style={{
               position:"relative", aspectRatio:
                 format.aspect==="9:16"?"9/16":format.aspect==="16:9"?"16/9":format.aspect==="1:1"?"1/1":"4/5",
               maxHeight:"100%", maxWidth:"100%", background:"#000",
               boxShadow:"0 0 40px rgba(0,0,0,0.8)", borderRadius:4, overflow:"hidden",
+              cursor: overlayMode==="select" ? "default" : "crosshair",
             }}>
               {videoClipsInOrder.length>0
                 ? <video ref={videoRef} style={{ width:"100%", height:"100%", objectFit:previewFit==="fit"?"contain":"cover" }}/>
@@ -1223,7 +1479,7 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
                 )
               }
 
-              {/* Text overlay preview */}
+              {/* Timeline text clips preview */}
               {clips.filter(c=>c.type==="text"&&c.textProps&&currentSec>=c.startSec&&currentSec<c.startSec+c.durationSec).map(c=>{
                 const tp = c.textProps!;
                 const topPos = tp.position==="top"?"8%" : tp.position==="center"?"50%" : undefined;
@@ -1231,23 +1487,233 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
                 const xform  = tp.position==="center"?"translate(-50%,-50%)":"translateX(-50%)";
                 return (
                   <div key={c.id} style={{
-                    position:"absolute",
-                    top:topPos, bottom:botPos,
-                    left:"50%", transform:xform,
-                    fontWeight:tp.bold?"700":"400",
-                    fontStyle:tp.italic?"italic":"normal",
+                    position:"absolute", top:topPos, bottom:botPos, left:"50%", transform:xform,
+                    fontWeight:tp.bold?"700":"400", fontStyle:tp.italic?"italic":"normal",
                     fontSize:`clamp(14px,${tp.fontSize/5}vw,${tp.fontSize}px)`,
                     color:tp.color, background:tp.bgColor, padding:"4px 12px",
                     borderRadius:4, textAlign:"center", whiteSpace:"pre-wrap",
-                    textShadow:tp.shadow?"1px 2px 6px rgba(0,0,0,0.8)":"none",
-                    zIndex:20,
+                    textShadow:tp.shadow?"1px 2px 6px rgba(0,0,0,0.8)":"none", zIndex:20, pointerEvents:"none",
                   }}>{tp.content}</div>
+                );
+              })}
+
+              {/* ── CANVAS OVERLAYS (T003) ── */}
+              {overlays.filter(o=>currentSec>=o.startSec&&currentSec<=o.endSec).map(ov=>{
+                const isSelected = ov.id===selectedOverlayId;
+                return (
+                  <div key={ov.id}
+                    onMouseDown={e=>{
+                      e.stopPropagation();
+                      setSelOvId(ov.id);
+                      setOverlayMode("select");
+                      const rect = previewRef.current?.getBoundingClientRect();
+                      if (rect) setDragStart({ mx:e.clientX, my:e.clientY, ox:ov.x, oy:ov.y });
+                      setDragOvId(ov.id);
+                    }}
+                    onMouseMove={e=>{
+                      if (dragOvId!==ov.id||!dragStart) return;
+                      const rect = previewRef.current?.getBoundingClientRect();
+                      if (!rect) return;
+                      const dx = ((e.clientX-dragStart.mx)/rect.width)*100;
+                      const dy = ((e.clientY-dragStart.my)/rect.height)*100;
+                      setOverlays(prev=>prev.map(o=>o.id===ov.id?{...o,x:Math.max(0,Math.min(100-o.w,dragStart.ox+dx)),y:Math.max(0,Math.min(100-o.h,dragStart.oy+dy))}:o));
+                    }}
+                    onMouseUp={()=>{ setDragOvId(null); setDragStart(null); }}
+                    style={{
+                      position:"absolute",
+                      left:`${ov.x}%`, top:`${ov.y}%`,
+                      width:`${ov.w}%`, height:`${ov.h}%`,
+                      transform:`rotate(${ov.rotate||0}deg)`,
+                      cursor:"move", userSelect:"none",
+                      border: isSelected ? "2px dashed #c8a84b" : "2px solid transparent",
+                      borderRadius:4,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      zIndex:30,
+                    }}>
+                    {ov.kind==="text" && (
+                      <div style={{
+                        fontSize:`clamp(10px,${(ov.fontSize||36)/10}vw,${ov.fontSize||36}px)`,
+                        color: ov.color||"#fff",
+                        background: ov.bgColor||"transparent",
+                        fontWeight: ov.bold?"700":"400",
+                        fontStyle: ov.italic?"italic":"normal",
+                        textShadow: ov.shadow?"1px 2px 6px rgba(0,0,0,0.8)":"none",
+                        padding:"2px 6px", borderRadius:3, whiteSpace:"pre-wrap", textAlign:"center", lineHeight:1.2,
+                        pointerEvents:"none", width:"100%",
+                      }}>{ov.text}</div>
+                    )}
+                    {ov.kind==="emoji" && (
+                      <span style={{ fontSize:`clamp(16px,${ov.w/2}vw,96px)`, lineHeight:1, pointerEvents:"none", userSelect:"none" }}>{ov.emoji}</span>
+                    )}
+                    {ov.kind==="image" && ov.imageUrl && (
+                      <img src={ov.imageUrl} alt="" style={{ width:"100%", height:"100%", objectFit:"contain", pointerEvents:"none" }}/>
+                    )}
+                    {isSelected && (
+                      <div style={{ position:"absolute", top:-18, right:0, display:"flex", gap:3, background:"rgba(10,10,20,0.9)", borderRadius:4, padding:"2px 4px" }}>
+                        <button onClick={e=>{e.stopPropagation();setOverlays(prev=>prev.filter(o=>o.id!==ov.id));setSelOvId(null);}}
+                          style={{background:"none",border:"none",color:"#e06060",cursor:"pointer",fontSize:10,padding:"1px 4px"}}>✕</button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
 
+            {/* ── OVERLAY INSPECTOR PANEL (Canva-style) ── */}
+            {showOverlayPanel && (
+              <div style={{
+                position:"absolute", right:8, top:52, bottom:8, width:200, zIndex:60,
+                background:"rgba(10,10,22,0.95)", border:`1px solid ${C.border}`, borderRadius:8,
+                overflowY:"auto", padding:10, backdropFilter:"blur(8px)",
+                boxShadow:"0 4px 24px rgba(0,0,0,0.7)",
+              }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                  <span style={{ fontSize:10, fontWeight:700, color:C.gold }}>🎨 Overlays</span>
+                  <button onClick={()=>setShowOvPanel(false)} style={{ background:"none", border:"none", color:C.textDim, cursor:"pointer", fontSize:14 }}>×</button>
+                </div>
+
+                {/* Overlay list */}
+                <div style={{ marginBottom:8 }}>
+                  {overlays.length===0
+                    ? <div style={{ fontSize:9, color:C.textFaint, textAlign:"center" }}>Sin overlays. Usa la barra de arriba para añadir texto o emojis.</div>
+                    : overlays.map(ov=>(
+                      <div key={ov.id} onClick={()=>setSelOvId(ov.id)}
+                        style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 6px", borderRadius:4, marginBottom:2, cursor:"pointer",
+                          background:ov.id===selectedOverlayId?"#1a1a00":"#111", border:`1px solid ${ov.id===selectedOverlayId?C.gold:C.border2}` }}>
+                        <span style={{fontSize:13}}>{ov.kind==="emoji"?ov.emoji:ov.kind==="text"?"T":"🖼"}</span>
+                        <span style={{fontSize:9,color:C.text,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ov.text||ov.emoji||"Imagen"}</span>
+                        <span style={{fontSize:8,color:C.textFaint}}>{ov.startSec.toFixed(0)}s–{ov.endSec.toFixed(0)}s</span>
+                      </div>
+                    ))
+                  }
+                </div>
+
+                {/* Selected overlay controls */}
+                {selectedOverlayId && (()=>{
+                  const ov = overlays.find(o=>o.id===selectedOverlayId);
+                  if (!ov) return null;
+                  const upd = (u:Partial<CanvasOverlay>)=>setOverlays(prev=>prev.map(o=>o.id===ov.id?{...o,...u}:o));
+                  return (
+                    <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:8 }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:C.gold, marginBottom:6 }}>
+                        {ov.kind==="text"?"✏️ Editar texto":ov.kind==="emoji"?"😀 Emoji":"🖼 Imagen"}
+                      </div>
+                      {ov.kind==="text" && <>
+                        <textarea value={ov.text||""} rows={2} onChange={e=>upd({text:e.target.value})}
+                          style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,color:"#fff",borderRadius:4,padding:5,fontSize:10,resize:"vertical",boxSizing:"border-box",marginBottom:5}}/>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:5}}>
+                          <div>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>Tamaño</div>
+                            <input type="number" value={ov.fontSize||36} min={8} max={200} onChange={e=>upd({fontSize:parseInt(e.target.value)})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,color:"#fff",borderRadius:4,padding:"3px 5px",fontSize:10}}/>
+                          </div>
+                          <div>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>Color</div>
+                            <input type="color" value={ov.color||"#ffffff"} onChange={e=>upd({color:e.target.value})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,borderRadius:4,padding:2,height:26,cursor:"pointer"}}/>
+                          </div>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:5}}>
+                          <div>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>Fondo</div>
+                            <input type="color" value={ov.bgColor==="transparent"?"#000000":ov.bgColor||"#000000"} onChange={e=>upd({bgColor:e.target.value})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,borderRadius:4,padding:2,height:26,cursor:"pointer"}}/>
+                          </div>
+                          <div>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>Rotación</div>
+                            <input type="number" value={ov.rotate||0} min={-180} max={180} onChange={e=>upd({rotate:parseInt(e.target.value)})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,color:"#fff",borderRadius:4,padding:"3px 5px",fontSize:10}}/>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:4,marginBottom:5}}>
+                          <button onClick={()=>upd({bold:!ov.bold})} style={{flex:1,...S.btn,justifyContent:"center",fontWeight:700,fontSize:10,color:ov.bold?C.gold:C.textDim,borderColor:ov.bold?C.gold:C.border2}}>B</button>
+                          <button onClick={()=>upd({italic:!ov.italic})} style={{flex:1,...S.btn,justifyContent:"center",fontStyle:"italic",fontSize:10,color:ov.italic?C.gold:C.textDim,borderColor:ov.italic?C.gold:C.border2}}>I</button>
+                          <button onClick={()=>upd({shadow:!ov.shadow})} style={{flex:1,...S.btn,justifyContent:"center",fontSize:10,color:ov.shadow?C.gold:C.textDim,borderColor:ov.shadow?C.gold:C.border2}}>🌑</button>
+                        </div>
+                        <div style={{marginBottom:5}}>
+                          <div style={{fontSize:8,color:"#888",marginBottom:3}}>Fondo transparente</div>
+                          <button onClick={()=>upd({bgColor:"transparent"})} style={{...S.btn,width:"100%",justifyContent:"center",fontSize:9}}>Sin fondo</button>
+                        </div>
+                      </>}
+                      {ov.kind==="emoji" && (
+                        <div>
+                          <div style={{fontSize:8,color:"#888",marginBottom:4}}>Elige emoji</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:5}}>
+                            {["🔥","⭐","💥","✨","🎯","💰","🛒","🎉","💎","🚀","❤️","👋","🙌","💯","🏆","🎁","🛍️","📱","🌟","⚡","🎶","🍀"].map(em=>(
+                              <button key={em} onClick={()=>upd({emoji:em})}
+                                style={{background:ov.emoji===em?"#2a2a00":"#111",border:`1px solid ${ov.emoji===em?C.gold:C.border2}`,borderRadius:4,padding:"3px 5px",cursor:"pointer",fontSize:16}}>
+                                {em}
+                              </button>
+                            ))}
+                          </div>
+                          <div style={{marginBottom:5}}>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>Rotación</div>
+                            <input type="number" value={ov.rotate||0} min={-180} max={180} onChange={e=>upd({rotate:parseInt(e.target.value)})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,color:"#fff",borderRadius:4,padding:"3px 5px",fontSize:10}}/>
+                          </div>
+                        </div>
+                      )}
+                      {/* Timing controls (shared) */}
+                      <div style={{borderTop:`1px solid ${C.border}`,paddingTop:6,marginTop:4}}>
+                        <div style={{fontSize:8,color:"#888",marginBottom:4}}>⏱ Temporización</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:4}}>
+                          <div>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>Inicio (s)</div>
+                            <input type="number" value={ov.startSec} min={0} max={totalDuration} step={0.5} onChange={e=>upd({startSec:parseFloat(e.target.value)})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,color:"#fff",borderRadius:4,padding:"3px 5px",fontSize:10}}/>
+                          </div>
+                          <div>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>Fin (s)</div>
+                            <input type="number" value={ov.endSec} min={0} max={totalDuration} step={0.5} onChange={e=>upd({endSec:parseFloat(e.target.value)})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,color:"#fff",borderRadius:4,padding:"3px 5px",fontSize:10}}/>
+                          </div>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                          <div>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>X (%)</div>
+                            <input type="number" value={Math.round(ov.x)} min={0} max={100} onChange={e=>upd({x:parseInt(e.target.value)})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,color:"#fff",borderRadius:4,padding:"3px 5px",fontSize:10}}/>
+                          </div>
+                          <div>
+                            <div style={{fontSize:8,color:"#888",marginBottom:2}}>Y (%)</div>
+                            <input type="number" value={Math.round(ov.y)} min={0} max={100} onChange={e=>upd({y:parseInt(e.target.value)})}
+                              style={{width:"100%",background:"#111",border:`1px solid ${C.border2}`,color:"#fff",borderRadius:4,padding:"3px 5px",fontSize:10}}/>
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={()=>{setOverlays(prev=>prev.filter(o=>o.id!==ov.id));setSelOvId(null);}}
+                        style={{...S.btnDanger,width:"100%",justifyContent:"center",marginTop:8,fontSize:9}}>
+                        <Trash2 size={10}/> Eliminar overlay
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* Add overlay buttons */}
+                <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:8, marginTop:4 }}>
+                  <div style={{ fontSize:9, color:C.textDim, marginBottom:5 }}>+ Añadir nuevo</div>
+                  <button onClick={()=>{
+                    const ov:CanvasOverlay={id:uid(),kind:"text",x:20,y:40,w:60,h:12,text:"Nuevo texto",fontSize:36,color:"#ffffff",bgColor:"transparent",bold:false,italic:false,shadow:true,startSec:currentSec,endSec:Math.min(totalDuration,currentSec+5)};
+                    setOverlays(prev=>[...prev,ov]); setSelOvId(ov.id);
+                  }} style={{...S.btn,width:"100%",justifyContent:"center",marginBottom:4,fontSize:9}}>
+                    <Type size={10}/> Texto
+                  </button>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
+                    {["🔥","⭐","💥","✨","🎯","💰","🛒","🎉"].map(em=>(
+                      <button key={em} onClick={()=>{
+                        const ov:CanvasOverlay={id:uid(),kind:"emoji",x:35+Math.random()*30,y:30+Math.random()*30,w:12,h:12,emoji:em,startSec:currentSec,endSec:Math.min(totalDuration,currentSec+5)};
+                        setOverlays(prev=>[...prev,ov]); setSelOvId(ov.id);
+                      }} style={{background:"#111",border:`1px solid ${C.border2}`,borderRadius:4,padding:"3px 6px",cursor:"pointer",fontSize:15}}>
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Scrubber time tooltip */}
-            <div style={{ position:"absolute", bottom:8, right:12, fontSize:10, color:C.textDim, background:C.bg3, padding:"2px 8px", borderRadius:4 }}>
+            <div style={{ position:"absolute", bottom:8, right:12, fontSize:10, color:C.textDim, background:C.bg3, padding:"2px 8px", borderRadius:4, zIndex:5 }}>
               ⌨ Espacio=play · ←→=seek · Del=eliminar
             </div>
           </div>
