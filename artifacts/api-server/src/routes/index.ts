@@ -76,6 +76,7 @@ import apiUsageStatsRouter from "./api-usage-stats.js";
 import youtubeRouter from "./youtube.js";
 import calendarRouter from "./calendar.js";
 import viralRouter from "./viral.js";
+import muscleFactoryRouter from "./muscle-factory.js";
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
 const router: IRouter = Router();
@@ -190,5 +191,6 @@ router.use(apiUsageStatsRouter);
 router.use(youtubeRouter);
 router.use(calendarRouter);
 router.use(viralRouter);
+router.use(muscleFactoryRouter);
 
 export default router;

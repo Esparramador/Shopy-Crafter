@@ -89,6 +89,7 @@ const Suppliers = lazy(() => import("@/pages/projects/Suppliers"));
 const WebLab = lazy(() => import("@/pages/projects/WebLab"));
 const FusionStudio = lazy(() => import("@/pages/projects/FusionStudio"));
 const FusionStudioPro = lazy(() => import("@/pages/projects/FusionStudioPro"));
+const MuscleFactoryAd = lazy(() => import("@/pages/projects/MuscleFactoryAd"));
 const CardStudio = lazy(() => import("@/pages/projects/CardStudio"));
 const CampaignKit = lazy(() => import("@/pages/projects/CampaignKit"));
 const ExplodedViewStudio = lazy(() => import("@/pages/projects/ExplodedViewStudio"));
@@ -532,6 +533,9 @@ function Router() {
         </Route>
         <Route path="/projects/:id/fusion-studio-pro">
           <RequireAdmin><AdminWrapper><AppLayout><S><FusionStudioPro /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/muscle-factory-ad">
+          <RequireAdmin><AdminWrapper><AppLayout><S><MuscleFactoryAd /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/ad-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><AdStudio /></S></AppLayout></AdminWrapper></RequireAdmin>

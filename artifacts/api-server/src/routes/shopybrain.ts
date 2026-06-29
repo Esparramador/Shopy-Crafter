@@ -750,6 +750,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - persist_cinematic_script: Guardar un script cinematográfico (objeto con scenes[]) como template reutilizable. Devuelve {scriptId} para reutilizar como savedPromptId en futuros anuncios. Params: {projectId, script (objeto con scenes[]), brand?, productName?, niche?, audience?, language?, totalDurationSec?, aspect?, videoModel?, imageModel?, style?, customBrief?}.
   - build_product_dna: Extraer un dossier hiper-detallado del producto (materiales, capas, paleta, hardware, branding visible) usando visión IA. Útil antes de generar un anuncio largo. Params: {projectId, productId}
   - create_long_ad: Crear un anuncio LARGO (60-1800s, 3-20 min) tipo trailer/explainer/discurso con director cinematográfico inteligente, arco narrativo, Product DNA y opcionalmente Character Lock. EXIGE un productId Shopify (para anuncios de MARCA sin producto Shopify usa create_brand_ad). Devuelve URL del vídeo final. Params: {projectId, productId, totalDurationSec (60-1800), scenesCount? (auto si no se da, ~totalDurationSec/6, hasta 240), compositionMode? ("narrative" | "explainer-locked" | "composite-pro"), characterId? (id de personaje bloqueado), savedPromptId? (id devuelto por persist_cinematic_script para REUSAR un script ya guardado en lugar de generar uno nuevo), aspect? ("9:16" | "16:9" | "1:1"), language? ("es"|"en"), ctaText?, customNotes?, addMusic? (default true), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"kling-3.0-omni"|"runway-seedance2"|"runway-gen4.5"|"seedance-pro"|"veo-4"|"veo-3.1")}
+  - generate_muscle_factory_ad: Generar el anuncio 30s de Muscle Factory Warriors ISO (Forest Fruits + Pineapple Coconut) con Grok xAI — 6 clips I2V/T2V paralelos + TTS narración + ffmpeg concat + title card. Params: {projectId}
   - generate_video: Generar un vídeo corto con IA a partir de un prompt de texto (T2V) o una imagen de referencia (I2V). Modelos disponibles: grok-imagine-video (xAI Grok, rápido y barato, 720p), grok-video-1 (xAI flagship junio 2026, máxima calidad), kling-3.0-turbo (cinematic, audio nativo, 1080p), kling-3.0-master (máxima calidad Kling), wan-2.5-t2v (open-source barato), wan-2.7 (open-source última gen), hailuo-2.3 (MiniMax 1080p), seedance-1-lite (Replicate). Si el usuario pide Grok usa grok-imagine-video por defecto. Params: {projectId, prompt (descripción del vídeo en inglés, sé específico y cinematográfico), model? (default grok-imagine-video), duration? (segundos 5-10, default 5), aspect? (9:16|16:9|1:1, default 9:16), imageUrl? (URL de imagen para I2V — si no hay, se usa T2V)}
   - create_brand_ad: Crear un anuncio de MARCA (sin producto Shopify específico) — ideal para campañas de branding, drops o equivalente al script v3 cascada en una sola llamada: imagen de referencia → N escenas → voz off → música → concat con crossfade. Equivalente al runner offline pero invocable desde el chat. La imagen de referencia debe estar PREVIAMENTE en el vault del proyecto (usa absorb-image antes para subirla y obtén el vault id). Devuelve {vaultId} del vídeo final + {scriptVaultId} reusable. Params: {projectId, brand (nombre de la marca), productName (concepto del anuncio, ej "drop primavera 2026"), referenceImageVaultId (id en vault de la imagen base — obligatorio), scenesCount? (2-24, default 6), totalDurationSec? (6-240, default scenesCount*8), aspect? ("9:16"|"16:9"|"1:1", default 9:16), language? ("es"|"en", default es), videoModel? ("kling-3.0-turbo"|"kling-3.0-master"|"kling-3.0-omni"|"seedance-pro"|"runway-seedance2"|"runway-gen4.5", default kling-3.0-turbo), style? ("cinematic"|"ugc"|"editorial"|"luxury"|"tech"|"energetic"), customBrief? (notas extra para el guion), narrationEnabled? (default true), narrationVoiceId? (default ES Bella 21m00Tcm4TlvDq8ikWAM), musicEnabled? (default true), musicPrompt? (descripción para Stable Audio via Replicate — ej: "ambient electronic 120 BPM para anuncio de tecnología")}
   - get_ai_models: Devuelve la matriz activa de modelos AI (claude/gemini × fast/smart/genius/vision) indicando si la fuente es db/env/default + catálogo de modelos conocidos. Sin params.
@@ -11785,6 +11786,46 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             aspect: vidAspect,
             message: `🎬 **Vídeo generado** con ${vidData.model || vidModel}\n⏱️ ${vidData.durationSec || vidDuration}s · ${vidAspect}${vidUrl ? `\n📥 [Descargar vídeo](${vidUrl})\n[VIDEO:Vídeo IA](${vidUrl})` : ""}${vidData.vaultId ? `\n💾 Guardado en Vault #${vidData.vaultId}` : ""}`,
           };
+          break;
+        }
+
+        case "generate_muscle_factory_ad": {
+          const projectId = params?.projectId ?? (req.session as any)?.projectId;
+          const port = process.env.PORT || 8080;
+          send(`⚙️ Iniciando pipeline Muscle Factory (30s, 6 clips Grok I2V/T2V en paralelo)...`);
+          let adResult: any = null;
+          await new Promise<void>((resolve) => {
+            fetch(`http://localhost:${port}/api/muscle-factory/generate-ad`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
+              body: JSON.stringify({ projectId }),
+            }).then(async (adRes) => {
+              const reader = adRes.body?.getReader();
+              if (!reader) { resolve(); return; }
+              const dec = new TextDecoder();
+              let buf = "";
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split("\n\n");
+                buf = lines.pop() || "";
+                for (const chunk of lines) {
+                  const dataLine = chunk.split("\n").find(l => l.startsWith("data:"));
+                  if (!dataLine) continue;
+                  try {
+                    const evt = JSON.parse(dataLine.slice(5).trim());
+                    if (evt.message) send(`🎬 ${evt.message}`);
+                    if (evt.success) adResult = evt;
+                  } catch { /* ignore */ }
+                }
+              }
+              resolve();
+            }).catch(err => { send(`❌ Error pipeline: ${err.message}`); resolve(); });
+          });
+          result = adResult
+            ? { ...adResult, message: adResult.message || `✅ Anuncio Muscle Factory 30s listo en Vault #${adResult.vaultId}` }
+            : { error: true, message: "❌ El pipeline no completó correctamente" };
           break;
         }
 
