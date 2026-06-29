@@ -443,6 +443,17 @@ export default function Contacto() {
     return () => v.removeEventListener("timeupdate", onTime);
   }, []);
 
+  /* ── video ended → freeze on last frame (seek back 0.05s) ── */
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onEnded = () => {
+      try { v.currentTime = Math.max(0, v.duration - 0.05); } catch {}
+    };
+    v.addEventListener("ended", onEnded);
+    return () => v.removeEventListener("ended", onEnded);
+  }, []);
+
   /* ── launch typewriter when form appears ── */
   useEffect(() => {
     if (!formReady || demoActive || demoDone) return;
