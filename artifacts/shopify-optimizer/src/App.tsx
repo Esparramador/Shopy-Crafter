@@ -715,11 +715,31 @@ function PublicChatbotSlot() {
   );
 }
 
+const PUBLIC_PATHS = [
+  "/",
+  "/landing",
+  "/sobre-nosotros",
+  "/casos-de-exito",
+  "/programa-de-afiliados",
+  "/faq",
+  "/blog",
+  "/changelog",
+  "/privacidad",
+  "/terminos",
+  "/cookies",
+  "/contacto",
+  "/p/",
+];
+
 function AdminOmniChatbotSlot() {
   const { user, loading } = useAuth();
   const [location] = useLocation();
   if (loading || user?.role !== "admin") return null;
-  if (location.startsWith("/client") || location === "/" || location === "" || location.startsWith("/landing")) return null;
+  const isPublic =
+    location === "/" ||
+    location === "" ||
+    PUBLIC_PATHS.slice(1).some(p => location.startsWith(p));
+  if (isPublic || location.startsWith("/client")) return null;
   return (
     <Suspense fallback={null}>
       <OmniChatbot />

@@ -67,6 +67,11 @@ const CSS = `
   object-fit: cover; object-position: left center;
   z-index: 0;
   pointer-events: none;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 .ctc-overlay {
   position: fixed; inset: 0; z-index: 1;
@@ -356,6 +361,27 @@ const CSS = `
   .ctc-build-orb { width: 48px; height: 48px; font-size: 18px; margin-bottom: 14px; }
   .ctc-card { padding: 12px 8px 10px; }
   .ctc-card-icon { font-size: 16px; margin-bottom: 4px; }
+  /* ── Landscape video fix: show character head (top-left) ── */
+  .ctc-video {
+    object-position: left top;
+  }
+  /* ── Landscape overlay: lighter at top-left so head is visible ── */
+  .ctc-overlay {
+    background:
+      linear-gradient(90deg,
+        transparent 0%,
+        transparent 30%,
+        rgba(5,3,12,.55) 50%,
+        rgba(5,3,12,.95) 68%,
+        rgba(5,3,12,.99) 100%
+      ),
+      linear-gradient(180deg,
+        rgba(5,3,12,.15) 0%,
+        transparent 20%,
+        transparent 72%,
+        rgba(5,3,12,.55) 100%
+      );
+  }
 }
 @media (max-width: 480px) {
   .ctc-panel { padding: 56px 14px 24px; }
