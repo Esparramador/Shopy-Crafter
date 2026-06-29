@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams } from "wouter";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -35,16 +35,26 @@ const VIDEO_2_TIMELINE = [
 
 const TITLE_CARD = { time: "15 – 17s", icon: "🏷️", desc: "Title card ffmpeg: imagen real de los botes + MUSCLE FACTORY + musclefactorybcn.com" };
 
+const FULL_VIDEO_URL  = "/muscle-factory-warriors-iso-ad-FULL.mp4";
+const SHORT_VIDEO_URL = "/muscle-factory-warriors-iso-ad.mp4";
+
 export default function MuscleFactoryAd() {
   const { id }     = useParams<{ id: string }>();
   const projectId  = parseInt(id || "0");
 
-  const [running, setRunning]   = useState(false);
-  const [log, setLog]           = useState<string[]>([]);
-  const [result, setResult]     = useState<PipelineEvent | null>(null);
-  const [progress, setProgress] = useState(0);
-  const abortRef                = useRef<AbortController | null>(null);
-  const logEndRef               = useRef<HTMLDivElement>(null);
+  const [running, setRunning]     = useState(false);
+  const [log, setLog]             = useState<string[]>([]);
+  const [result, setResult]       = useState<PipelineEvent | null>(null);
+  const [progress, setProgress]   = useState(0);
+  const [hasFullVideo, setHasFull]= useState(false);
+  const abortRef                  = useRef<AbortController | null>(null);
+  const logEndRef                 = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch(FULL_VIDEO_URL, { method: "HEAD" })
+      .then(r => { if (r.ok) setHasFull(true); })
+      .catch(() => {});
+  }, []);
 
   function addLog(msg: string) {
     setLog(prev => [...prev, msg]);
@@ -132,6 +142,71 @@ export default function MuscleFactoryAd() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 pt-6 space-y-6">
+
+        {/* ── VÍDEO YA GENERADO ── */}
+        {hasFullVideo && (
+          <div className="bg-gradient-to-br from-yellow-900/30 to-red-900/20 border-2 border-yellow-500/50 rounded-2xl overflow-hidden shadow-2xl shadow-yellow-900/30">
+            <div className="px-5 py-3 bg-yellow-500/10 border-b border-yellow-500/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🏆</span>
+                <span className="font-bold text-yellow-300 text-sm">¡ANUNCIO WARRIORS ISO GENERADO! · 32s · 720p 9:16 · con narración</span>
+              </div>
+              <span className="text-xs text-green-400 bg-green-500/10 border border-green-500/30 rounded-full px-2 py-0.5 font-bold">✅ LISTO</span>
+            </div>
+            <div className="flex flex-col md:flex-row">
+              {/* Video player */}
+              <div className="flex-shrink-0 md:w-64 bg-black flex items-center justify-center p-2">
+                <video
+                  src={FULL_VIDEO_URL}
+                  controls
+                  playsInline
+                  className="rounded-xl max-h-[480px] w-full object-contain"
+                  style={{ aspectRatio: "9/16" }}
+                />
+              </div>
+              {/* Info + descarga */}
+              <div className="flex-1 p-5 flex flex-col justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-2">Warriors ISO — Muscle Factory</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+                    {[
+                      ["📐 Resolución", "720×1280 · 9:16"],
+                      ["⏱️ Duración", "~32 segundos"],
+                      ["🎬 Técnica", "2×15s Timeline I2V"],
+                      ["🎙️ Audio", "TTS El Sevillano"],
+                      ["📦 Tamaño", "16.7 MB"],
+                      ["🤖 Motor", "xAI Grok Imagine"],
+                    ].map(([label, val]) => (
+                      <div key={label} className="bg-zinc-800/60 rounded-lg px-3 py-2">
+                        <div className="text-zinc-500 text-xs">{label}</div>
+                        <div className="text-white text-xs font-semibold mt-0.5">{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs text-zinc-400 bg-zinc-900/60 rounded-lg p-3">
+                    <strong className="text-zinc-300">Segmentos:</strong> V1 Forest Fruits (0–15s) + V2 Pineapple Coconut (15–30s) + Title Card Muscle Factory (30–32s)
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href={FULL_VIDEO_URL}
+                    download="muscle-factory-warriors-iso-32s.mp4"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-400 hover:to-red-500 text-black font-bold text-center text-sm transition-all shadow-lg"
+                  >
+                    ⬇️ Descargar vídeo FULL 32s (16.7 MB)
+                  </a>
+                  <a
+                    href={SHORT_VIDEO_URL}
+                    download="muscle-factory-warriors-iso-v2-17s.mp4"
+                    className="w-full py-3 rounded-xl bg-zinc-700 hover:bg-zinc-600 font-medium text-center text-sm transition-all"
+                  >
+                    ⬇️ Descargar solo V2 + Title (17s · 9.6 MB)
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Técnica Timeline Prompting ── */}
         <div className="bg-gradient-to-r from-blue-950/40 to-indigo-950/30 border border-blue-700/30 rounded-2xl p-5">
