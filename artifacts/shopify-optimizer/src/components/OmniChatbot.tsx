@@ -1386,6 +1386,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition> | null>(null);
   const geminiAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceCancelRef = useRef<boolean>(false);
   const chatSessionIdRef = useRef<string>(uuid());
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
@@ -1502,6 +1503,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     if (!voiceEnabled) return;
 
     // Detener audio anterior
+    // Cancelar cualquier cadena de audio en curso inmediatamente
+    voiceCancelRef.current = true;
     if (geminiAudioRef.current) {
       geminiAudioRef.current.pause();
       geminiAudioRef.current.src = "";
@@ -1624,7 +1627,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     const chunks = splitIntoChunks(cleaned);
     if (!chunks.length) return;
 
-    let cancelled = false;
+    // Resetear el flag de cancelación para esta nueva cadena de audio
+    voiceCancelRef.current = false;
     const audioUrls: string[] = [];
 
     const fetchChunk = (chunk: string): Promise<string | null> =>
@@ -1659,8 +1663,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     };
 
     const playChunk = async (idx: number) => {
-      if (cancelled || idx >= chunks.length) {
-        if (!cancelled) onSpeechEnd();
+      if (voiceCancelRef.current || idx >= chunks.length) {
+        if (!voiceCancelRef.current) onSpeechEnd();
         return;
       }
       // Prefetch next chunk immediately
@@ -1668,8 +1672,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
       const urlPromise = prefetched.get(idx) ?? fetchChunk(chunks[idx]);
       const url = await urlPromise;
-      if (cancelled || !url) {
-        if (!cancelled) playChunk(idx + 1);
+      if (voiceCancelRef.current || !url) {
+        if (!voiceCancelRef.current) playChunk(idx + 1);
         return;
       }
       audioUrls.push(url);
@@ -1678,27 +1682,24 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       audio.onended = () => {
         URL.revokeObjectURL(url);
         geminiAudioRef.current = null;
-        playChunk(idx + 1);
+        if (!voiceCancelRef.current) playChunk(idx + 1);
       };
       audio.onerror = () => {
         URL.revokeObjectURL(url);
         geminiAudioRef.current = null;
-        playChunk(idx + 1);
+        if (!voiceCancelRef.current) playChunk(idx + 1);
       };
       audio.play().catch(() => {
         URL.revokeObjectURL(url);
         geminiAudioRef.current = null;
-        playChunk(idx + 1);
+        if (!voiceCancelRef.current) playChunk(idx + 1);
       });
     };
 
     // Start: prefetch chunk 0 + chunk 1 simultaneously, play 0 immediately
     prefetch(0);
     prefetch(1);
-    prefetched.get(0)!.then(() => { if (!cancelled) playChunk(0); });
-
-    // Cleanup ref so external pause works
-    geminiAudioRef.current = { pause: () => { cancelled = true; audioUrls.forEach(u => URL.revokeObjectURL(u)); }, src: "", } as any;
+    prefetched.get(0)!.then(() => { if (!voiceCancelRef.current) playChunk(0); });
   }, [voiceEnabled]);
 
   // ─── Execute Shopify action via backend ────────────────────────────────────
@@ -3587,7 +3588,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                 {minimized ? <Maximize2 size={isMobile ? 18 : 14} /> : <Minimize2 size={isMobile ? 18 : 14} />}
               </button>
               <button
-                onClick={() => { setVoiceEnabled(v => !v); if (voiceEnabled) { window.speechSynthesis?.cancel(); if (geminiAudioRef.current) { geminiAudioRef.current.pause(); geminiAudioRef.current.src = ""; geminiAudioRef.current = null; } } }}
+                onClick={() => { setVoiceEnabled(v => !v); if (voiceEnabled) { voiceCancelRef.current = true; window.speechSynthesis?.cancel(); if (geminiAudioRef.current) { geminiAudioRef.current.pause(); geminiAudioRef.current.src = ""; geminiAudioRef.current = null; } } }}
                 title={voiceEnabled ? "Desactivar voz — conversación fluída activa" : "Activar conversación por voz"}
                 aria-label={voiceEnabled ? "Desactivar voz" : "Activar voz"}
                 style={{ width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", background: voiceEnabled ? "rgba(45,212,159,0.18)" : "var(--ink2)", color: voiceEnabled ? "var(--jade)" : "var(--t3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s, color 0.2s" }}
