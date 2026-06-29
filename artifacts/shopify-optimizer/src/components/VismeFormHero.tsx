@@ -429,7 +429,6 @@ export function VismeFormHero({ isActive = false }: { isActive?: boolean }) {
           poster={POSTER_SRC}
           muted
           playsInline
-          loop
           preload="metadata"
         />
 
