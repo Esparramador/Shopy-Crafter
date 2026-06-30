@@ -861,6 +861,8 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Informe por niveles / informe nivel 2 / generar nivel 3 / report nivel / informe profesional / informe enterprise → run_leveled_report (genera informe con sistema de 5 niveles). Params: {projectId, type (tipo de informe), level (1-5), template?}
   - Subir archivo / procesar archivo / analizar archivo / importar archivo / CSV / PDF / Excel → upload_file (procesa archivo subido). Params: {fileContext? (descripción del archivo)}
   - Investigar en internet / buscar información sobre / informe sobre / recopila información de / dime todo sobre / investiga / ¿qué es / cómo funciona / cómo se hace / tutorial / guía completa / análisis de / recopilatorio de / cuéntame sobre / busca y resume / genera informe de investigación / chistes de / recopilatorio de chistes / humor / memes de / cómo diseñar / cómo crear desde 0 → browser_research. Params: {topic (tema a investigar), queries? (array de búsquedas específicas), reportTitle? (título del informe), style? ("professional"|"fun" — "fun" para chistes/entretenimiento), projectId?}. Investigación REAL en Google: visita múltiples páginas y sintetiza con IA. SIEMPRE guarda en Vault si hay projectId. EJEMPLOS: {topic:"chistes de humor negro",style:"fun"} / {topic:"diseñar Plim Plim en Blender desde 0",style:"professional",projectId:X} / {topic:"estrategias marketing para Shopify"}
+  - Skill de ciberseguridad / análisis de seguridad / cómo [atacar|defender|detectar|analizar] / técnica de seguridad / hardening web / blindar [web|servidor|API|aplicación] / auditoría de seguridad / OWASP / MITRE ATT&CK / CVE / pentest / red team / vulnerability / threat hunting / forensics / malware analysis / phishing / SIEM / SOC / cloud security / zero trust / compliance / CMMC / ISO27001 / PCI-DSS / incident response / qué es [término de seguridad] / cómo funciona [ataque] / cómo detectar / cómo prevenir → security_skill. Recupera el contenido completo de la skill y actúa como experto en ciberseguridad. Params: {skillId (nombre de la skill, ej: "analyzing-malware-behavior-with-cuckoo-sandbox"), query? (pregunta específica)}. Si no sabes el ID exacto, usa security_skill_search primero.
+  - Buscar skill de seguridad / qué skills de seguridad hay / listar skills de [dominio] / repositorio de seguridad / skills de malware / red team skills / cloud security skills → security_skill_search. Params: {query (término), domain? (ej: "red-teaming","malware-analysis","cloud-security","threat-hunting")}
   - Brand Book / Brand DNA / manual de marca / identidad visual / guía de estilo completa / DNA de marca / generar brand book / como google ai studio / identidad corporativa / dossier de marca / manual de identidad → generate_brand_book. Params: {brandName?, industry?, notes? (información adicional sobre la marca), projectId?}. Genera un brand book completo de 10+ secciones: misión/visión, valores, arquetipo, tono de voz, paleta de colores, tipografía, logo, audiencia, pilares de contenido, redes sociales, mensajes clave, posicionamiento. HTML profesional descargable guardado en Vault. EJEMPLOS: {brandName:"Nike",industry:"deportes"} / {brandName:"Mi Tienda",projectId:X,notes:"vendemos ropa sostenible para mujer"} 
   - Ver productos Stripe / listar productos Stripe / catálogo Stripe / catálogo de precios Stripe / qué productos tengo en Stripe / servicios de Stripe → stripe_list_products. Params: {accountId}
   - Ver facturas Stripe / listar facturas / facturas pendientes / facturas de cliente / facturas emitidas → stripe_list_invoices. Params: {accountId, limit?, status?}
@@ -12425,6 +12427,36 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const data2 = await r2.json() as any;
           if (!r2.ok) { result = { error: data2.error || "Error cancelando suscripción" }; break; }
           result = { ok: true, status: data2.status, message: data2.message || "Suscripción cancelada" };
+          break;
+        }
+
+        case "security_skill": {
+          const { skillId, query: secQuery } = params as { skillId?: string; query?: string };
+          if (!skillId) { result = { error: "skillId requerido. Usa security_skill_search para encontrar el ID exacto." }; break; }
+          const { getSkillContent, getCybersecCatalog, searchCybersecSkills } = await import("../lib/cybersec-knowledge.js");
+          const content = getSkillContent(skillId);
+          if (!content) {
+            const suggestions = searchCybersecSkills(skillId, 6);
+            result = { error: `Skill "${skillId}" no encontrada.`, suggestions: suggestions.map(s => ({ id: s.id, description: s.description, subdomain: s.subdomain })) };
+            break;
+          }
+          const meta = getCybersecCatalog().find((s: any) => s.id === skillId);
+          result = { skillId, name: meta?.name || skillId, description: meta?.description, subdomain: meta?.subdomain, tags: meta?.tags, mitre_attack: meta?.mitre_attack, overview: meta?.overview, when_to_use: meta?.when_to_use, content, queryContext: secQuery };
+          break;
+        }
+
+        case "security_skill_search": {
+          const { query: secQ, domain: secDomain } = params as { query?: string; domain?: string };
+          const { searchCybersecSkills, getCybersecCatalog, getCybersecDomains } = await import("../lib/cybersec-knowledge.js");
+          let secResults = secQ ? searchCybersecSkills(secQ, 20) : getCybersecCatalog();
+          if (secDomain) secResults = secResults.filter((s: any) => s.subdomain === secDomain);
+          const domains = getCybersecDomains();
+          result = {
+            total: secResults.length,
+            skills: secResults.slice(0, 15).map((s: any) => ({ id: s.id, name: s.name, description: s.description, subdomain: s.subdomain, tags: s.tags?.slice(0, 4), mitre_attack: s.mitre_attack?.slice(0, 3), when_to_use: s.when_to_use })),
+            domains: domains.slice(0, 15),
+            hint: "Usa security_skill con el id exacto para obtener la guía técnica completa.",
+          };
           break;
         }
 

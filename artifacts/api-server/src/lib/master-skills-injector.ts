@@ -14,6 +14,7 @@
 //
 // buildMasterSkillsBlock(query) → catálogo compacto siempre-on + deep injection
 // ═══════════════════════════════════════════════════════════════════════════
+import { buildCybersecKnowledgeBlock } from "./cybersec-knowledge.js";
 
 import {
   SEO_OPTIMIZER_PROMPT,
@@ -530,7 +531,9 @@ export function buildMasterSkillsBlock(query: string): string {
       + SEO_OPTIMIZER_PROMPT + "\n\n" + EXPERT_MARKETING_KNOWLEDGE;
   }
 
-  return PLATFORM_SKILLS_MASTER_CATALOG + deepBlock;
+  const cybersecBlock = buildCybersecKnowledgeBlock();
+
+  return PLATFORM_SKILLS_MASTER_CATALOG + deepBlock + cybersecBlock;
 }
 
 // ─── Exportaciones de acceso directo ─────────────────────────────────────────

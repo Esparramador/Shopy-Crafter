@@ -61,6 +61,7 @@ const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Meshy Character Lab", icon: "🧊", href: "/admin/meshy-studio" },
   { label: "Tripo3D Studio", icon: "🧊✨", href: "/tripo3d" },
   { label: "MCP Manager", icon: "🔌", href: "/admin/mcp-manager" },
+  { label: "Security Lab", icon: "🔐", href: "/admin/security-lab" },
 
   { label: "── STUDIO IA ──", icon: "", href: "#", divider: true },
   { label: "AMR Studio", icon: "🤖", href: "/admin/amr-studio" },

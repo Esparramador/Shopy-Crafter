@@ -123,15 +123,23 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
 buildAll()
   .then(async () => {
     // Copy static data files (JSON libraries, etc.) to dist/data/
-    const srcData = path.resolve(artifactDir, "src/lib/data");
     const distData = path.resolve(artifactDir, "dist/data");
+    await mkdir(distData, { recursive: true });
+
+    // 1. src/lib/data — existing effects/visme templates
     try {
-      await mkdir(distData, { recursive: true });
-      await cp(srcData, distData, { recursive: true });
+      await cp(path.resolve(artifactDir, "src/lib/data"), distData, { recursive: true });
       console.log("✓ Static data files copied to dist/data/");
     } catch (e) {
-      // data dir may not exist
-      if (e.code !== "ENOENT") console.warn("Warning: could not copy data files:", e.message);
+      if (e.code !== "ENOENT") console.warn("Warning: could not copy lib/data files:", e.message);
+    }
+
+    // 2. src/data — cybersec catalog + 817 skill folders
+    try {
+      await cp(path.resolve(artifactDir, "src/data"), distData, { recursive: true });
+      console.log("✓ Cybersec data copied to dist/data/");
+    } catch (e) {
+      if (e.code !== "ENOENT") console.warn("Warning: could not copy src/data files:", e.message);
     }
   })
   .catch((err) => {

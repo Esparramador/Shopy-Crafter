@@ -95,6 +95,7 @@ const CampaignKit = lazy(() => import("@/pages/projects/CampaignKit"));
 const ExplodedViewStudio = lazy(() => import("@/pages/projects/ExplodedViewStudio"));
 const Tripo3DStudio = lazy(() => import("@/pages/projects/Tripo3DStudio"));
 const MeshyStudio = lazy(() => import("@/pages/projects/MeshyStudio"));
+const SecurityLab = lazy(() => import("@/pages/admin/SecurityLab"));
 const WebDesigner = lazy(() => import("@/pages/admin/WebDesigner"));
 const EffectsStudio = lazy(() => import("@/pages/admin/EffectsStudio"));
 const MCPManager = lazy(() => import("@/pages/admin/MCPManager"));
@@ -423,6 +424,9 @@ function Router() {
         </Route>
         <Route path="/admin/meshy-studio">
           <RequireAdmin><AdminWrapper><AppLayout><S><MeshyStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/security-lab">
+          <RequireAdmin><AdminWrapper><AppLayout><S><SecurityLab /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/prompt-library">
           <RequireAdmin><AdminWrapper><AppLayout><S><PromptLibrary /></S></AppLayout></AdminWrapper></RequireAdmin>

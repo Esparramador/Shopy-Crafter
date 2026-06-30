@@ -71,6 +71,7 @@ import skillsRouter from "./skills.js";
 import designSystemsRouter from "./design-systems.js";
 import pluginsRouter from "./plugins.js";
 import hyperframesRouter from "./hyperframes.js";
+import cybersecRouter from "./cybersec.js";
 import studioRouter from "./studio.js";
 import apiUsageStatsRouter from "./api-usage-stats.js";
 import youtubeRouter from "./youtube.js";
@@ -191,5 +192,6 @@ router.use(apiUsageStatsRouter);
 router.use(youtubeRouter);
 router.use(calendarRouter);
 router.use(viralRouter);
+router.use(cybersecRouter);
 
 export default router;
