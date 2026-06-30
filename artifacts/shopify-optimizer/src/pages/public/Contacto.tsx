@@ -358,24 +358,27 @@ const CSS = `
   .ctc-build-orb { width: 48px; height: 48px; font-size: 18px; margin-bottom: 14px; }
   .ctc-card { padding: 12px 8px 10px; }
   .ctc-card-icon { font-size: 16px; margin-bottom: 4px; }
-  /* ── Landscape video fix: show character head (top-left) ── */
+  /* ── Landscape: vídeo y overlay empiezan BAJO el nav (≈56px)
+       para que la cabeza de Alec no quede tapada por la barra de nav ── */
   .ctc-video {
+    top: 56px;
+    height: calc(100dvh - 56px);
     object-position: left top;
   }
-  /* ── Landscape overlay: lighter at top-left so head is visible ── */
   .ctc-overlay {
+    top: 56px;
+    height: calc(100dvh - 56px);
     background:
       linear-gradient(90deg,
         transparent 0%,
-        transparent 30%,
-        rgba(5,3,12,.55) 50%,
-        rgba(5,3,12,.95) 68%,
+        transparent 32%,
+        rgba(5,3,12,.50) 50%,
+        rgba(5,3,12,.94) 67%,
         rgba(5,3,12,.99) 100%
       ),
       linear-gradient(180deg,
-        rgba(5,3,12,.15) 0%,
-        transparent 20%,
-        transparent 72%,
+        transparent 0%,
+        transparent 68%,
         rgba(5,3,12,.55) 100%
       );
   }
