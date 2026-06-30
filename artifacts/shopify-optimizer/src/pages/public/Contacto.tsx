@@ -141,19 +141,14 @@ const CSS = `
 .ctc-card-value:hover { text-decoration: underline; }
 
 /* ─── RIGHT FORM PANEL ─── */
+/* Sin overflow-y:auto — la página scroll entera (el vídeo es position:fixed,
+   no afecta al layout). Así el footer es alcanzable sin bounce ni trampa. */
 .ctc-panel {
   width: min(44%, 520px);
   min-height: 100dvh;
-  overflow-y: auto;
-  overscroll-behavior-y: auto;
   padding: 56px 36px 56px 24px;
   display: flex; flex-direction: column; justify-content: center;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(200,168,75,.18) transparent;
 }
-.ctc-panel::-webkit-scrollbar { width: 4px; }
-.ctc-panel::-webkit-scrollbar-track { background: transparent; }
-.ctc-panel::-webkit-scrollbar-thumb { background: rgba(200,168,75,.18); border-radius: 99px; }
 
 /* ─── BUILD ANIMATION ─── */
 .ctc-building {
