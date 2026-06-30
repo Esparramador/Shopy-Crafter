@@ -31,4 +31,6 @@ export * from "./express_rate_limits";
 export * from "./api_usage";
 export * from "./characters";
 export * from "./business_cards";
+export * from "./youtube";
+export * from "./security_scans";
 //# sourceMappingURL=index.d.ts.map

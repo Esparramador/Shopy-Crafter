@@ -863,6 +863,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Investigar en internet / buscar información sobre / informe sobre / recopila información de / dime todo sobre / investiga / ¿qué es / cómo funciona / cómo se hace / tutorial / guía completa / análisis de / recopilatorio de / cuéntame sobre / busca y resume / genera informe de investigación / chistes de / recopilatorio de chistes / humor / memes de / cómo diseñar / cómo crear desde 0 → browser_research. Params: {topic (tema a investigar), queries? (array de búsquedas específicas), reportTitle? (título del informe), style? ("professional"|"fun" — "fun" para chistes/entretenimiento), projectId?}. Investigación REAL en Google: visita múltiples páginas y sintetiza con IA. SIEMPRE guarda en Vault si hay projectId. EJEMPLOS: {topic:"chistes de humor negro",style:"fun"} / {topic:"diseñar Plim Plim en Blender desde 0",style:"professional",projectId:X} / {topic:"estrategias marketing para Shopify"}
   - Skill de ciberseguridad / análisis de seguridad / cómo [atacar|defender|detectar|analizar] / técnica de seguridad / hardening web / blindar [web|servidor|API|aplicación] / auditoría de seguridad / OWASP / MITRE ATT&CK / CVE / pentest / red team / vulnerability / threat hunting / forensics / malware analysis / phishing / SIEM / SOC / cloud security / zero trust / compliance / CMMC / ISO27001 / PCI-DSS / incident response / qué es [término de seguridad] / cómo funciona [ataque] / cómo detectar / cómo prevenir → security_skill. Recupera el contenido completo de la skill y actúa como experto en ciberseguridad. Params: {skillId (nombre de la skill, ej: "analyzing-malware-behavior-with-cuckoo-sandbox"), query? (pregunta específica)}. Si no sabes el ID exacto, usa security_skill_search primero.
   - Buscar skill de seguridad / qué skills de seguridad hay / listar skills de [dominio] / repositorio de seguridad / skills de malware / red team skills / cloud security skills → security_skill_search. Params: {query (término), domain? (ej: "red-teaming","malware-analysis","cloud-security","threat-hunting")}
+  - Escanear vulnerabilidades / escanear la página/sitio/web / analizar seguridad de mi tienda / probar capacidades y funciones de seguridad / testear la web / blindar mi sitio / aplicar psicología inversa para encontrar fallos / pentest pasivo / auditoría de vulnerabilidades → security_scan_website. Ejecuta un escaneo PASIVO real (headers de seguridad, TLS/HTTPS, cookies, CORS, archivos sensibles expuestos, fingerprinting, contenido mixto, librerías obsoletas, secretos filtrados) contra la URL del proyecto (o la que indique el usuario), mapea cada hallazgo al catálogo de 817 skills de ciberseguridad (MITRE ATT&CK/NIST CSF), y devuelve para CADA hallazgo: cómo lo explotaría un atacante (perspectiva inversa) + pasos exactos de blindaje. Params: {projectId, url? (si se quiere escanear una URL distinta a la del proyecto)}. Después de ejecutar, narra los hallazgos priorizados por severidad, explica el "modo atacante" de cada uno (psicología inversa) y propone el plan de blindaje concreto.
   - Brand Book / Brand DNA / manual de marca / identidad visual / guía de estilo completa / DNA de marca / generar brand book / como google ai studio / identidad corporativa / dossier de marca / manual de identidad → generate_brand_book. Params: {brandName?, industry?, notes? (información adicional sobre la marca), projectId?}. Genera un brand book completo de 10+ secciones: misión/visión, valores, arquetipo, tono de voz, paleta de colores, tipografía, logo, audiencia, pilares de contenido, redes sociales, mensajes clave, posicionamiento. HTML profesional descargable guardado en Vault. EJEMPLOS: {brandName:"Nike",industry:"deportes"} / {brandName:"Mi Tienda",projectId:X,notes:"vendemos ropa sostenible para mujer"} 
   - Ver productos Stripe / listar productos Stripe / catálogo Stripe / catálogo de precios Stripe / qué productos tengo en Stripe / servicios de Stripe → stripe_list_products. Params: {accountId}
   - Ver facturas Stripe / listar facturas / facturas pendientes / facturas de cliente / facturas emitidas → stripe_list_invoices. Params: {accountId, limit?, status?}
@@ -12456,6 +12457,60 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             skills: secResults.slice(0, 15).map((s: any) => ({ id: s.id, name: s.name, description: s.description, subdomain: s.subdomain, tags: s.tags?.slice(0, 4), mitre_attack: s.mitre_attack?.slice(0, 3), when_to_use: s.when_to_use })),
             domains: domains.slice(0, 15),
             hint: "Usa security_skill con el id exacto para obtener la guía técnica completa.",
+          };
+          break;
+        }
+
+        case "security_scan_website": {
+          const projectId = parseInt(String(params?.projectId), 10);
+          const [secProject] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+          if (!secProject) { result = { error: "Proyecto no encontrado" }; break; }
+
+          const rawSecUrl = (params?.url as string | undefined) || secProject.shopDomain;
+          const secUrl = rawSecUrl.startsWith("http") ? rawSecUrl : `https://${rawSecUrl}`;
+
+          const { validateAuditUrl } = await import("../lib/web-scraper.js");
+          const secUrlError = validateAuditUrl(secUrl);
+          if (secUrlError) { result = { error: secUrlError }; break; }
+
+          const { runSecurityScan } = await import("../lib/security-scanner.js");
+          const scanResult = await runSecurityScan(secUrl);
+
+          let savedScanId: number | null = null;
+          try {
+            const { securityScansTable } = await import("@workspace/db");
+            const [savedScan] = await db.insert(securityScansTable).values({
+              projectId,
+              url: scanResult.url,
+              score: scanResult.score,
+              findings: scanResult.findings,
+              techStack: scanResult.techStack,
+              summary: `Score ${scanResult.score}/100 — ${scanResult.countsBySeverity.critical} críticos, ${scanResult.countsBySeverity.high} altos, ${scanResult.countsBySeverity.medium} medios, ${scanResult.countsBySeverity.low} bajos`,
+            }).returning();
+            savedScanId = savedScan.id;
+          } catch (e) {
+            logger.warn({ err: e }, "[security_scan_website] no se pudo persistir el escaneo");
+          }
+
+          result = {
+            scanId: savedScanId,
+            url: scanResult.url,
+            score: scanResult.score,
+            countsBySeverity: scanResult.countsBySeverity,
+            techStack: scanResult.techStack,
+            findings: scanResult.findings.map(f => ({
+              severity: f.severity,
+              category: f.category,
+              title: f.title,
+              description: f.description,
+              evidence: f.evidence,
+              attackerPerspective: f.attackerPerspective,
+              hardeningSteps: f.hardeningSteps,
+              mitreAttack: f.mitreAttack,
+              nistCsf: f.nistCsf,
+              relatedSkills: f.relatedSkills,
+            })),
+            instructions: "Narra estos hallazgos al usuario priorizados por severidad (critical > high > medium > low > info). Para cada uno explica brevemente 'cómo lo explotaría un atacante' (attackerPerspective) y luego el plan de blindaje (hardeningSteps). Cierra con un resumen ejecutivo y el score general.",
           };
           break;
         }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Shield, Search, ChevronRight, Tag, Lock, Target, BookOpen, X, ExternalLink, AlertTriangle, Loader2, Grid3X3, List } from "lucide-react";
+import { Shield, Search, ChevronRight, Tag, Lock, Target, BookOpen, X, ExternalLink, AlertTriangle, Loader2, Grid3X3, List, ScanLine, Globe, ChevronDown, ChevronUp, Swords, ShieldCheck, History, RotateCw } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -15,6 +15,316 @@ interface SkillMeta {
   when_to_use: string[];
 }
 interface Domain { name: string; count: number; }
+
+interface ProjectLite { id: number; name: string; shopDomain: string; }
+
+type Severity = "critical" | "high" | "medium" | "low" | "info";
+
+interface ScanFinding {
+  id: string;
+  category: string;
+  severity: Severity;
+  title: string;
+  description: string;
+  evidence?: string;
+  attackerPerspective: string;
+  hardeningSteps: string[];
+  mitreAttack: string[];
+  nistCsf: string[];
+  relatedSkills: { id: string; name: string }[];
+}
+
+interface ScanResult {
+  id?: number;
+  url: string;
+  scannedAt: string;
+  techStack: any;
+  findings: ScanFinding[];
+  score: number;
+  countsBySeverity: Record<Severity, number>;
+}
+
+interface ScanHistoryItem { id: number; url: string; score: number; summary: string; scannedAt: string; }
+
+const SEVERITY_COLORS: Record<Severity, string> = {
+  critical: "#e0405a", high: "#e2664f", medium: "#c8a84b", low: "#4fa3e2", info: "#7070a0",
+};
+const SEVERITY_LABELS: Record<Severity, string> = {
+  critical: "Crítico", high: "Alto", medium: "Medio", low: "Bajo", info: "Info",
+};
+const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
+
+function scoreColor(score: number) {
+  if (score >= 80) return "#5db88a";
+  if (score >= 50) return "#c8a84b";
+  return "#e0405a";
+}
+
+// ─── Score gauge ──────────────────────────────────────────────────────────────
+function ScoreGauge({ score }: { score: number }) {
+  const c = scoreColor(score);
+  const r = 42, circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - score / 100);
+  return (
+    <div style={{ position: "relative", width: 110, height: 110, flexShrink: 0 }}>
+      <svg width={110} height={110} viewBox="0 0 110 110">
+        <circle cx={55} cy={55} r={r} fill="none" stroke="#1e1e2e" strokeWidth={9} />
+        <circle cx={55} cy={55} r={r} fill="none" stroke={c} strokeWidth={9} strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          transform="rotate(-90 55 55)" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: 26, fontWeight: 800, color: c }}>{score}</div>
+        <div style={{ fontSize: 9, color: "#7070a0", letterSpacing: 0.5 }}>/ 100</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Finding card ─────────────────────────────────────────────────────────────
+function FindingCard({ finding }: { finding: ScanFinding }) {
+  const [open, setOpen] = useState(false);
+  const c = SEVERITY_COLORS[finding.severity];
+  return (
+    <div style={{ background: "#0d0d18", border: `1px solid ${open ? c + "55" : "#1e1e2e"}`, borderRadius: 10, overflow: "hidden", transition: "border-color 0.15s" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer" }}>
+        <span style={{ fontSize: 9, padding: "3px 8px", borderRadius: 12, background: `${c}22`, color: c, fontWeight: 700, letterSpacing: 0.3, flexShrink: 0, textTransform: "uppercase" }}>
+          {SEVERITY_LABELS[finding.severity]}
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#e8e8f0" }}>{finding.title}</div>
+          <div style={{ fontSize: 10, color: "#7070a0", marginTop: 1 }}>{finding.category}</div>
+        </div>
+        {open ? <ChevronUp size={14} color="#7070a0" /> : <ChevronDown size={14} color="#7070a0" />}
+      </div>
+      {open && (
+        <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 11.5, color: "#c0c0d8", lineHeight: 1.6 }}>{finding.description}</div>
+          {finding.evidence && (
+            <div style={{ fontSize: 10.5, color: "#5db88a", background: "#09091a", border: "1px solid #1e1e2e", borderRadius: 6, padding: "6px 10px", fontFamily: "monospace", overflowX: "auto" }}>
+              {finding.evidence}
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, background: "#1a0a08", border: "1px solid rgba(226,102,79,0.25)", borderRadius: 8, padding: "10px 12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, fontWeight: 700, color: "#e2664f" }}>
+              <Swords size={12} /> Perspectiva del atacante
+            </div>
+            <div style={{ fontSize: 11.5, color: "#d0a8a0", lineHeight: 1.6 }}>{finding.attackerPerspective}</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, background: "#0a1a0a", border: "1px solid rgba(93,184,138,0.25)", borderRadius: 8, padding: "10px 12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, fontWeight: 700, color: "#5db88a" }}>
+              <ShieldCheck size={12} /> Plan de blindaje
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 3 }}>
+              {finding.hardeningSteps.map((s, i) => (
+                <li key={i} style={{ fontSize: 11.5, color: "#a8d0b8", lineHeight: 1.5 }}>{s}</li>
+              ))}
+            </ul>
+          </div>
+          {(finding.mitreAttack?.length > 0 || finding.nistCsf?.length > 0) && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {finding.mitreAttack?.map(m => (
+                <span key={m} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 12, background: "#1a0a08", color: "#e06060", border: "1px solid rgba(220,80,80,0.25)", fontWeight: 600 }}>⚔️ {m}</span>
+              ))}
+              {finding.nistCsf?.map(n => (
+                <span key={n} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 12, background: "#0a1a0a", color: "#5db88a", border: "1px solid rgba(93,184,138,0.25)", fontWeight: 600 }}>🛡 {n}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Scanner panel ────────────────────────────────────────────────────────────
+function ScannerPanel() {
+  const [projects, setProjects] = useState<ProjectLite[]>([]);
+  const [projectId, setProjectId] = useState<string>("");
+  const [url, setUrl] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<ScanResult | null>(null);
+  const [history, setHistory] = useState<ScanHistoryItem[]>([]);
+  const [severityFilter, setSeverityFilter] = useState<Severity | "">("");
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/admin/projects-list`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => {
+        const list = Array.isArray(d) ? d : [];
+        setProjects(list);
+        if (list.length > 0) {
+          setProjectId(String(list[0].id));
+          setUrl(list[0].shopDomain || "");
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const loadHistory = useCallback((pid: string) => {
+    if (!pid) { setHistory([]); return; }
+    fetch(`${API_BASE}/api/projects/${pid}/security-scan/history`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setHistory(Array.isArray(d) ? d : []))
+      .catch(() => setHistory([]));
+  }, []);
+
+  useEffect(() => { loadHistory(projectId); }, [projectId, loadHistory]);
+
+  const handleProjectChange = (pid: string) => {
+    setProjectId(pid);
+    const p = projects.find(p => String(p.id) === pid);
+    if (p) setUrl(p.shopDomain || "");
+  };
+
+  const runScan = async () => {
+    if (!projectId) { setError("Selecciona un proyecto primero"); return; }
+    if (!url.trim()) { setError("Indica una URL a escanear"); return; }
+    setScanning(true); setError(""); setResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/security-scan/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error ejecutando el escaneo");
+      setResult(data);
+      loadHistory(projectId);
+    } catch (e: any) {
+      setError(e.message || "Error desconocido");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const loadHistoryScan = async (id: number) => {
+    setScanning(true); setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/security-scan/${id}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error cargando escaneo");
+      setResult(data);
+    } catch (e: any) {
+      setError(e.message || "Error desconocido");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const filteredFindings = (result?.findings || [])
+    .filter(f => !severityFilter || f.severity === severityFilter)
+    .slice()
+    .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "16px 20px", overflowY: "auto", flex: 1 }}>
+      {/* Controls */}
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", background: "#0d0d18", border: "1px solid #1e1e2e", borderRadius: 10, padding: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 9, color: "#7070a0", textTransform: "uppercase", letterSpacing: 0.5 }}>Proyecto</label>
+          <select value={projectId} onChange={e => handleProjectChange(e.target.value)}
+            style={{ background: "#13131f", border: "1px solid #252535", borderRadius: 8, color: "#e8e8f0", fontSize: 12, padding: "8px 10px", minWidth: 180, outline: "none" }}>
+            {projects.length === 0 && <option value="">Sin proyectos</option>}
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 240 }}>
+          <label style={{ fontSize: 9, color: "#7070a0", textTransform: "uppercase", letterSpacing: 0.5 }}>URL a escanear</label>
+          <div style={{ position: "relative" }}>
+            <Globe size={13} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#7070a0" }} />
+            <input value={url} onChange={e => setUrl(e.target.value)} placeholder="midominio.com"
+              style={{ width: "100%", paddingLeft: 28, paddingRight: 8, paddingTop: 8, paddingBottom: 8, background: "#13131f", border: "1px solid #252535", borderRadius: 8, color: "#e8e8f0", fontSize: 12, boxSizing: "border-box", outline: "none" }} />
+          </div>
+        </div>
+        <button onClick={runScan} disabled={scanning}
+          style={{ display: "flex", alignItems: "center", gap: 7, background: scanning ? "#252535" : "#c8a84b", border: "none", borderRadius: 8, color: scanning ? "#7070a0" : "#08080f", fontWeight: 700, fontSize: 12, padding: "9px 16px", cursor: scanning ? "not-allowed" : "pointer" }}>
+          {scanning ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <ScanLine size={14} />}
+          {scanning ? "Escaneando…" : "Escanear sitio"}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#1a0a08", border: "1px solid rgba(220,80,80,0.3)", borderRadius: 8, color: "#e06060", fontSize: 12 }}>
+          <AlertTriangle size={14} /> {error}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        {/* Result column */}
+        <div style={{ flex: 2, minWidth: 320, display: "flex", flexDirection: "column", gap: 14 }}>
+          {result ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 18, background: "#0d0d18", border: "1px solid #1e1e2e", borderRadius: 10, padding: 16 }}>
+                <ScoreGauge score={result.score} />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 12, color: "#7070a0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{result.url}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {SEVERITY_ORDER.map(sev => (
+                      <button key={sev} onClick={() => setSeverityFilter(f => f === sev ? "" : sev)}
+                        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, padding: "4px 9px", borderRadius: 12, background: severityFilter === sev ? `${SEVERITY_COLORS[sev]}33` : `${SEVERITY_COLORS[sev]}18`, color: SEVERITY_COLORS[sev], border: `1px solid ${SEVERITY_COLORS[sev]}${severityFilter === sev ? "88" : "33"}`, fontWeight: 700, cursor: "pointer" }}>
+                        {SEVERITY_LABELS[sev]} · {result.countsBySeverity[sev] ?? 0}
+                      </button>
+                    ))}
+                  </div>
+                  {result.techStack && (
+                    <div style={{ fontSize: 10, color: "#404060" }}>
+                      Stack detectado: {[result.techStack.cms, result.techStack.framework, result.techStack.ecommerce].filter(Boolean).join(" · ") || "no identificado"}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {filteredFindings.length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 0", gap: 8 }}>
+                  <ShieldCheck size={28} color="#5db88a" />
+                  <div style={{ color: "#7070a0", fontSize: 12 }}>Sin hallazgos en esta categoría</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {filteredFindings.map(f => <FindingCard key={f.id} finding={f} />)}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 10, background: "#0d0d18", border: "1px solid #1e1e2e", borderRadius: 10 }}>
+              <ScanLine size={32} color="#252535" />
+              <div style={{ color: "#404060", fontSize: 13 }}>Selecciona un proyecto e indica la URL para lanzar un escaneo de seguridad pasivo</div>
+            </div>
+          )}
+        </div>
+
+        {/* History column */}
+        <div style={{ flex: 1, minWidth: 240, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, color: "#7070a0", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <History size={12} /> Historial
+          </div>
+          {history.length === 0 ? (
+            <div style={{ fontSize: 11, color: "#404060", padding: "10px 0" }}>Sin escaneos previos para este proyecto.</div>
+          ) : (
+            history.map(h => (
+              <div key={h.id} onClick={() => loadHistoryScan(h.id)}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "#0d0d18", border: "1px solid #1e1e2e", borderRadius: 8, cursor: "pointer" }}
+                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = scoreColor(h.score) + "55"}
+                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = "#1e1e2e"}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", border: `2px solid ${scoreColor(h.score)}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: scoreColor(h.score), flexShrink: 0 }}>
+                  {h.score}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: "#e8e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.url}</div>
+                  <div style={{ fontSize: 9.5, color: "#404060" }}>{new Date(h.scannedAt).toLocaleString("es-ES")}</div>
+                </div>
+                <RotateCw size={11} color="#404060" />
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Color per subdomain ─────────────────────────────────────────────────────
 const DOMAIN_COLORS: Record<string, string> = {
@@ -181,6 +491,7 @@ export default function SecurityLab() {
   const [view, setView]             = useState<"grid" | "list">("grid");
   const [drawerSkillId, setDrawer]  = useState<string | null>(null);
   const [page, setPage]             = useState(0);
+  const [tab, setTab]               = useState<"catalog" | "scanner">("scanner");
   const PAGE = 60;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -219,25 +530,42 @@ export default function SecurityLab() {
           </div>
         </div>
 
+        {/* Tab toggle */}
+        <div style={{ display: "flex", gap: 2, background: "#13131f", padding: 3, borderRadius: 7, border: "1px solid #1e1e2e" }}>
+          <button onClick={() => setTab("scanner")} style={{ display: "flex", alignItems: "center", gap: 6, background: tab === "scanner" ? "#c8a84b" : "none", border: "none", borderRadius: 5, color: tab === "scanner" ? "#08080f" : "#7070a0", cursor: "pointer", padding: "5px 12px", fontSize: 11.5, fontWeight: 700 }}>
+            <ScanLine size={13} /> Escáner
+          </button>
+          <button onClick={() => setTab("catalog")} style={{ display: "flex", alignItems: "center", gap: 6, background: tab === "catalog" ? "#c8a84b" : "none", border: "none", borderRadius: 5, color: tab === "catalog" ? "#08080f" : "#7070a0", cursor: "pointer", padding: "5px 12px", fontSize: 11.5, fontWeight: 700 }}>
+            <BookOpen size={13} /> Catálogo
+          </button>
+        </div>
+
         <div style={{ flex: 1 }} />
 
-        {/* Search */}
-        <div style={{ position: "relative", width: 280 }}>
-          <Search size={13} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#7070a0" }} />
-          <input value={search} onChange={e => handleSearch(e.target.value)} placeholder="Buscar skills, técnicas, herramientas…"
-            style={{ width: "100%", paddingLeft: 28, paddingRight: 8, paddingTop: 7, paddingBottom: 7, background: "#13131f", border: "1px solid #252535", borderRadius: 8, color: "#e8e8f0", fontSize: 12, boxSizing: "border-box", outline: "none" }} />
-        </div>
+        {tab === "catalog" && (
+          <>
+            {/* Search */}
+            <div style={{ position: "relative", width: 280 }}>
+              <Search size={13} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#7070a0" }} />
+              <input value={search} onChange={e => handleSearch(e.target.value)} placeholder="Buscar skills, técnicas, herramientas…"
+                style={{ width: "100%", paddingLeft: 28, paddingRight: 8, paddingTop: 7, paddingBottom: 7, background: "#13131f", border: "1px solid #252535", borderRadius: 8, color: "#e8e8f0", fontSize: 12, boxSizing: "border-box", outline: "none" }} />
+            </div>
 
-        {/* View toggle */}
-        <div style={{ display: "flex", gap: 2, background: "#13131f", padding: 3, borderRadius: 7, border: "1px solid #1e1e2e" }}>
-          {(["grid", "list"] as const).map(v => (
-            <button key={v} onClick={() => setView(v)} style={{ background: view === v ? "#c8a84b" : "none", border: "none", borderRadius: 5, color: view === v ? "#08080f" : "#7070a0", cursor: "pointer", padding: "4px 8px", display: "flex", alignItems: "center" }}>
-              {v === "grid" ? <Grid3X3 size={13} /> : <List size={13} />}
-            </button>
-          ))}
-        </div>
+            {/* View toggle */}
+            <div style={{ display: "flex", gap: 2, background: "#13131f", padding: 3, borderRadius: 7, border: "1px solid #1e1e2e" }}>
+              {(["grid", "list"] as const).map(v => (
+                <button key={v} onClick={() => setView(v)} style={{ background: view === v ? "#c8a84b" : "none", border: "none", borderRadius: 5, color: view === v ? "#08080f" : "#7070a0", cursor: "pointer", padding: "4px 8px", display: "flex", alignItems: "center" }}>
+                  {v === "grid" ? <Grid3X3 size={13} /> : <List size={13} />}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
+      {tab === "scanner" ? (
+        <ScannerPanel />
+      ) : (
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* ── Left sidebar: domains ── */}
         <div style={{ width: 200, flexShrink: 0, background: "#0a0a14", borderRight: "1px solid #1e1e2e", overflowY: "auto", padding: "10px 0" }}>
@@ -321,6 +649,7 @@ export default function SecurityLab() {
           )}
         </div>
       </div>
+      )}
 
       {/* ── Skill detail drawer ── */}
       {drawerSkillId && <SkillDrawer skillId={drawerSkillId} onClose={() => setDrawer(null)} />}

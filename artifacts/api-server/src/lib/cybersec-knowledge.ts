@@ -45,22 +45,47 @@ export function getSkillContent(skillId: string): string | null {
   return readFileSync(skillPath, "utf-8");
 }
 
+/** Catalog data is generated from heterogeneous sources — some fields that are
+ * typed as string[] arrive as a single string (or empty string) instead. Normalize
+ * defensively so consumers never have to special-case the shape. */
+function toStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string" && x.length > 0);
+  if (typeof v === "string" && v.length > 0) return [v];
+  return [];
+}
+
+const STOPWORDS = new Set(["a", "de", "el", "la", "los", "las", "en", "y", "con", "para", "the", "of", "and", "or", "to", "in", "on", "attack"]);
+
 export function searchCybersecSkills(query: string, limit = 15): CybersecSkillMeta[] {
   const catalog = getCybersecCatalog();
-  const q = query.toLowerCase().replace(/-/g, " ");
+  const q = query.toLowerCase().replace(/-/g, " ").trim();
+  const words = q.split(/\s+/).filter(w => w.length > 2 && !STOPWORDS.has(w));
+  const terms = words.length > 0 ? words : [q];
+
   return catalog
     .map(s => {
       let score = 0;
-      const name = s.name.replace(/-/g, " ").toLowerCase();
+      const name = (s.name || "").replace(/-/g, " ").toLowerCase();
+      const description = (s.description || "").toLowerCase();
+      const overview = (s.overview || "").toLowerCase();
+      const subdomain = (s.subdomain || "").toLowerCase();
+      const tags = toStringArray(s.tags);
+      const mitreList = toStringArray(s.mitre_attack);
+
       if (name === q) score += 30;
       else if (name.startsWith(q)) score += 20;
       else if (name.includes(q)) score += 12;
-      if (s.description.toLowerCase().includes(q)) score += 6;
-      if (s.overview?.toLowerCase().includes(q)) score += 4;
-      if (s.subdomain?.toLowerCase().includes(q)) score += 8;
-      if (s.tags?.some(t => t.toLowerCase().includes(q))) score += 5;
-      if (s.mitre_attack?.some(m => m.toLowerCase().includes(q))) score += 7;
-      return { ...s, _score: score };
+
+      for (const w of terms) {
+        if (name.includes(w)) score += 6;
+        if (description.includes(w)) score += 3;
+        if (overview.includes(w)) score += 2;
+        if (subdomain.includes(w)) score += 4;
+        if (tags.some(t => t.toLowerCase().includes(w))) score += 3;
+        if (mitreList.some(m => m.toLowerCase().includes(w))) score += 4;
+      }
+
+      return { ...s, tags, mitre_attack: mitreList, nist_csf: toStringArray(s.nist_csf), _score: score };
     })
     .filter(s => (s as any)._score > 0)
     .sort((a, b) => ((b as any)._score) - ((a as any)._score))
