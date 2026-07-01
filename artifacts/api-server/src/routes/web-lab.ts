@@ -13,6 +13,7 @@ import { logger } from "../lib/logger.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { setupZipStream } from "../lib/zip-stream.js";
 import archiver from "archiver";
+import { searchCybersecSkills } from "../lib/cybersec-knowledge.js";
 
 const router = Router();
 
@@ -3263,6 +3264,9 @@ interface AuditFinding {
   fix: string;
   fixCode?: string;       // snippet de corrección
   cvss?: number;          // puntuación CVSS aproximada
+  mitreAttack?: string[]; // técnicas MITRE ATT&CK relacionadas (vía catálogo de 817 skills)
+  nistCsf?: string[];     // controles NIST CSF relacionados
+  relatedSkills?: Array<{ id: string; name: string }>; // skills del catálogo cybersec relacionadas
 }
 
 function findLineNumber(content: string, index: number): number {
@@ -3279,6 +3283,27 @@ function maskEvidence(raw: string, maxLen = 60): string {
   return mid.length < raw.length ? mid : raw.slice(0, maxLen) + "…";
 }
 
+/** Enriquece un hallazgo del auditor regex con MITRE ATT&CK / NIST CSF / skills
+ * relacionadas del catálogo de 817 skills de ciberseguridad, para que "Analizar
+ * Seguridad" en Lab Web se apoye en el mismo conocimiento experto que el Security Lab. */
+function enrichWithSkills(f: AuditFinding): AuditFinding {
+  try {
+    const searchTerm = `${f.category} ${f.type} ${f.title}`;
+    const matches = searchCybersecSkills(searchTerm, 3);
+    const mitreAttack = Array.from(new Set(matches.flatMap(m => m.mitre_attack || [])));
+    const nistCsf = Array.from(new Set(matches.flatMap(m => m.nist_csf || [])));
+    return {
+      ...f,
+      mitreAttack,
+      nistCsf,
+      relatedSkills: matches.map(m => ({ id: m.id, name: m.name })),
+    };
+  } catch (e) {
+    logger.warn({ err: e }, "[web-lab security-audit] skill enrichment failed");
+    return f;
+  }
+}
+
 function runFullSecurityAudit(content: string, url?: string): AuditFinding[] {
   const findings: AuditFinding[] = [];
   const seen = new Set<string>();
@@ -3287,7 +3312,7 @@ function runFullSecurityAudit(content: string, url?: string): AuditFinding[] {
     const dedup = `${f.category}:${f.type}:${f.evidence.slice(0, 20)}`;
     if (seen.has(dedup)) return;
     seen.add(dedup);
-    findings.push(f);
+    findings.push(enrichWithSkills(f));
   }
 
   const lines = content.split("\n");
@@ -3463,7 +3488,7 @@ function runFullSecurityAudit(content: string, url?: string): AuditFinding[] {
   }
 
   // ─── CATEGORÍA 4: BUGS DE CÓDIGO CRÍTICOS ──────────────────────────────────
-  const CODE_BUG_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; fix: string }> = [
+  const CODE_BUG_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; fix: string; fixCode?: string }> = [
     {
       re: /\bcatch\s*\([^)]*\)\s*\{\s*\}/g,
       type: "Error silenciado (catch vacío)", sev: "high", cvss: 7.2,
@@ -3524,12 +3549,13 @@ function runFullSecurityAudit(content: string, url?: string): AuditFinding[] {
       lineNumber: lineOf(idx),
       attackScenario: p.scenario,
       fix: p.fix,
+      fixCode: p.fixCode,
       cvss: p.cvss,
     });
   }
 
   // ─── CATEGORÍA 5: EXPOSICIÓN DE BD / INFRAESTRUCTURA ───────────────────────
-  const INFRA_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; dbImpact?: string; fix: string }> = [
+  const INFRA_PATTERNS: Array<{ re: RegExp; type: string; sev: AuditSeverity; cvss: number; scenario: string; dbImpact?: string; fix: string; fixCode?: string }> = [
     {
       re: /(?:mongodb(?:\+srv)?|postgres(?:ql)?|mysql|redis|mssql|mariadb):\/\/[^\s"'`]{10,}/gi,
       type: "URL de BD expuesta (sin credenciales visibles)", sev: "high", cvss: 8.1,
@@ -3578,6 +3604,7 @@ function runFullSecurityAudit(content: string, url?: string): AuditFinding[] {
         attackScenario: p.scenario,
         dbImpact: p.dbImpact,
         fix: p.fix,
+        fixCode: p.fixCode,
         cvss: p.cvss,
       });
     }
@@ -3769,6 +3796,11 @@ ${findings.map(f => `<div class="finding ${f.severity}">
   ${f.dbImpact ? `<div style="background:#1a0000;border-radius:6px;padding:10px;font-size:12px;color:#f87171;margin:8px 0">🗄️ ${escapeHtml(f.dbImpact)}</div>` : ""}
   <div class="fix">💡 ${escapeHtml(f.fix)}</div>
   ${f.fixCode ? `<pre>${escapeHtml(f.fixCode)}</pre>` : ""}
+  ${(f.mitreAttack?.length || f.nistCsf?.length || f.relatedSkills?.length) ? `<div style="margin-top:8px;font-size:11px;color:#9a9080">
+    ${f.mitreAttack?.length ? `<div>🎯 MITRE ATT&CK: ${f.mitreAttack.map(t => escapeHtml(t)).join(", ")}</div>` : ""}
+    ${f.nistCsf?.length ? `<div>📋 NIST CSF: ${f.nistCsf.map(t => escapeHtml(t)).join(", ")}</div>` : ""}
+    ${f.relatedSkills?.length ? `<div>🧠 Skills relacionadas: ${f.relatedSkills.map(s => escapeHtml(s.name)).join(", ")}</div>` : ""}
+  </div>` : ""}
 </div>`).join("")}
 </body></html>`;
         vaultId = await saveToVault({

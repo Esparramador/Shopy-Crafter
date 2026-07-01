@@ -112,6 +112,9 @@ interface AuditFinding {
   fix: string;
   fixCode?: string;
   cvss?: number;
+  mitreAttack?: string[];
+  nistCsf?: string[];
+  relatedSkills?: Array<{ id: string; name: string }>;
 }
 interface SecurityAuditResult {
   findings: AuditFinding[];
@@ -2300,6 +2303,28 @@ ${body}
                                   <pre style={{ background: "#0d1117", borderRadius: 8, padding: "10px 14px", fontSize: 11, color: "#86efac", fontFamily: "monospace", margin: 0, overflow: "auto", lineHeight: 1.6 }}>{f.fixCode}</pre>
                                 </div>
                               )}
+
+                              {/* Contexto experto: MITRE ATT&CK / NIST CSF / skills relacionadas (catálogo cybersec) */}
+                              {(f.mitreAttack?.length || f.nistCsf?.length || f.relatedSkills?.length) ? (
+                                <div style={{ marginTop: 10, background: "#0d0d14", border: "1px solid #333", borderRadius: 8, padding: "10px 14px" }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: "#93c5fd", textTransform: "uppercase", letterSpacing: "0.5px" }}>🧠 Contexto experto (catálogo de 817 skills)</span>
+                                  {f.mitreAttack && f.mitreAttack.length > 0 && (
+                                    <p style={{ fontSize: 11, color: "#bfdbfe", margin: "6px 0 0", lineHeight: 1.6 }}>
+                                      🎯 <b>MITRE ATT&CK:</b> {f.mitreAttack.join(", ")}
+                                    </p>
+                                  )}
+                                  {f.nistCsf && f.nistCsf.length > 0 && (
+                                    <p style={{ fontSize: 11, color: "#bfdbfe", margin: "4px 0 0", lineHeight: 1.6 }}>
+                                      📋 <b>NIST CSF:</b> {f.nistCsf.join(", ")}
+                                    </p>
+                                  )}
+                                  {f.relatedSkills && f.relatedSkills.length > 0 && (
+                                    <p style={{ fontSize: 11, color: "#bfdbfe", margin: "4px 0 0", lineHeight: 1.6 }}>
+                                      🔗 <b>Skills relacionadas:</b> {f.relatedSkills.map(s => s.name).join(", ")}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : null}
                             </div>
                           )}
                         </div>
