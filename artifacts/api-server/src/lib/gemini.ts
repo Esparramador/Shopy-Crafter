@@ -17,6 +17,7 @@ import { logger } from "./logger.js";
 
 let _ai: GoogleGenAI | null = null;
 let _aiDirect: GoogleGenAI | null = null;
+let _aiProxy: GoogleGenAI | null = null;
 
 function getGeminiClient(): GoogleGenAI {
   if (!_ai) {
@@ -52,6 +53,53 @@ function getGeminiDirectClient(): GoogleGenAI | null {
     if (savedGoogleKey) process.env.GOOGLE_API_KEY = savedGoogleKey;
   }
   return _aiDirect;
+}
+
+// ─── Replit AI Integrations proxy client ───────────────────────────────────────
+// Billed to Replit credits, separate scope/permissions from the direct
+// GEMINI_API_KEY (which can hit personal GCP billing/dunning blocks). Used as
+// the primary fallback for text generation before ever giving up to Claude —
+// "more permissions" than the direct key when the direct project is blocked.
+function getGeminiProxyClient(): GoogleGenAI | null {
+  const proxyKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+  const proxyUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+  if (!proxyKey || !proxyUrl) return null;
+  if (!_aiProxy) {
+    _aiProxy = new GoogleGenAI({ apiKey: proxyKey, httpOptions: { apiVersion: "", baseUrl: proxyUrl } });
+  }
+  return _aiProxy;
+}
+
+// Only these models are served through the Replit AI Integrations Gemini proxy.
+// When routing a generation call through the proxy, map whatever model the
+// direct path was going to use (which may be a newer/unsupported alias like
+// "gemini-3.5-flash") onto the closest proxy-supported equivalent.
+const PROXY_SUPPORTED_MODELS = new Set([
+  "gemini-3.1-pro-preview",
+  "gemini-3-flash-preview",
+  "gemini-3-pro-image-preview",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-image",
+]);
+
+function mapModelForProxy(model: string, isProxy: boolean): string {
+  if (!isProxy || PROXY_SUPPORTED_MODELS.has(model)) return model;
+  if (/pro/i.test(model)) return "gemini-3.1-pro-preview";
+  return "gemini-3-flash-preview";
+}
+
+// Picks which client a generation call (chat/json/stream — NOT search
+// grounding, which stays on the direct client) should use right now. Prefers
+// the direct key unless its circuit breaker is open, in which case it
+// switches to the Replit AI Integrations proxy (if configured) so the bot
+// keeps answering with real Gemini instead of degrading straight to Claude.
+function getGenerationClient(): { client: GoogleGenAI; isProxy: boolean } {
+  const proxy = getGeminiProxyClient();
+  if (isGeminiGenerationBlocked() && proxy) {
+    return { client: proxy, isProxy: true };
+  }
+  return { client: getGeminiClient(), isProxy: false };
 }
 
 export function isGeminiAvailable(): boolean {
@@ -265,16 +313,10 @@ export async function askGeminiChat(
     return askClaudeWithBrain(0, claudeMsgs, systemInstruction ?? "Eres un asistente útil.", "general");
   };
 
-  if (isGeminiGenerationBlocked()) {
-    logger.warn("[askGeminiChat] Circuit breaker open — falling back to Claude");
-    try { return await claudeFallback(); }
-    catch (err) { logger.error({ err: String(err) }, "[askGeminiChat] Claude fallback also failed"); return ""; }
-  }
+  const { client: ai, isProxy } = getGenerationClient();
+  const model = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), isProxy);
 
   try {
-    const ai    = getGeminiClient();
-    const model = useProModel ? geminiPro() : geminiFast();
-
     const response = await withTimeout(
       ai.models.generateContent({
         model,
@@ -286,7 +328,7 @@ export async function askGeminiChat(
         },
       }),
       GEMINI_CALL_TIMEOUT_MS,
-      `askGeminiChat(${model})`,
+      `askGeminiChat(${model}${isProxy ? ",proxy" : ""})`,
     );
 
     const candidate = response.candidates?.[0];
@@ -318,8 +360,34 @@ export async function askGeminiChat(
     try { return await claudeFallback(); } catch { return ""; }
   } catch (err) {
     if (isPermissionDenied(err)) {
-      tripGenerationCircuit();
-      logger.warn("[askGeminiChat] 403 detected — falling back to Claude");
+      if (!isProxy) {
+        tripGenerationCircuit();
+        const proxy = getGeminiProxyClient();
+        if (proxy) {
+          logger.warn("[askGeminiChat] 403 on direct key — retrying via Replit AI Integrations proxy");
+          try {
+            const proxyModel = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), true);
+            const response = await withTimeout(
+              proxy.models.generateContent({
+                model: proxyModel,
+                contents,
+                config: {
+                  ...(systemInstruction ? { systemInstruction } : {}),
+                  maxOutputTokens,
+                  ...(thinkingBudget != null ? { thinkingConfig: { thinkingBudget } } : {}),
+                },
+              }),
+              GEMINI_CALL_TIMEOUT_MS,
+              `askGeminiChat(${proxyModel},proxy-retry)`,
+            );
+            const text = response.text ?? "";
+            if (text.trim()) return text;
+          } catch (proxyErr) {
+            logger.error({ err: String(proxyErr) }, "[askGeminiChat] Proxy retry also failed — falling back to Claude");
+          }
+        }
+      }
+      logger.warn("[askGeminiChat] Gemini unavailable — falling back to Claude");
       try { return await claudeFallback(); } catch { return ""; }
     }
     throw err;
@@ -328,21 +396,10 @@ export async function askGeminiChat(
 
 // ─── JSON-structured generation ───────────────────────────────────────────────
 async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: string, useProModel = false): Promise<T> {
-  if (isGeminiGenerationBlocked()) {
-    logger.warn("[askGeminiJson] Circuit breaker open — falling back to Claude");
-    try {
-      const { askClaudeJson } = await import("./claude.js");
-      return await askClaudeJson<T>(0, prompt, systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.");
-    } catch (claudeErr) {
-      logger.error({ err: String(claudeErr) }, "[askGeminiJson] Claude fallback also failed");
-      return {} as T;
-    }
-  }
+  const { client: ai, isProxy } = getGenerationClient();
+  const model = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), isProxy);
 
   try {
-    const ai    = getGeminiClient();
-    const model = useProModel ? geminiPro() : geminiFast();
-
     const response = await withTimeout(
       ai.models.generateContent({
         model,
@@ -355,7 +412,7 @@ async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: st
         },
       }),
       GEMINI_CALL_TIMEOUT_MS,
-      `askGeminiJson(${model})`
+      `askGeminiJson(${model}${isProxy ? ",proxy" : ""})`
     );
 
     const jsonCandidate = response.candidates?.[0];
@@ -393,8 +450,40 @@ async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: st
     }
   } catch (err) {
     if (isPermissionDenied(err)) {
-      tripGenerationCircuit();
-      logger.warn("[askGeminiJson] 403 detected — falling back to Claude");
+      if (!isProxy) {
+        tripGenerationCircuit();
+        const proxy = getGeminiProxyClient();
+        if (proxy) {
+          logger.warn("[askGeminiJson] 403 on direct key — retrying via Replit AI Integrations proxy");
+          try {
+            const proxyModel = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), true);
+            const response = await withTimeout(
+              proxy.models.generateContent({
+                model: proxyModel,
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                config: {
+                  systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.",
+                  responseMimeType: "application/json",
+                  maxOutputTokens: 65_536,
+                  ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
+                },
+              }),
+              GEMINI_CALL_TIMEOUT_MS,
+              `askGeminiJson(${proxyModel},proxy-retry)`,
+            );
+            const text = response.text ?? "{}";
+            try {
+              return JSON.parse(text) as T;
+            } catch {
+              const match = text.match(/```json\s*([\s\S]*?)```/);
+              return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
+            }
+          } catch (proxyErr) {
+            logger.error({ err: String(proxyErr) }, "[askGeminiJson] Proxy retry also failed — falling back to Claude");
+          }
+        }
+      }
+      logger.warn("[askGeminiJson] Gemini unavailable — falling back to Claude");
       try {
         const { askClaudeJson } = await import("./claude.js");
         return await askClaudeJson<T>(0, prompt, systemInstruction ?? "You are a precise business intelligence analyst.");
@@ -1098,21 +1187,42 @@ export async function* askGeminiStream(
     yield { done: true };
   };
 
-  if (isGeminiGenerationBlocked()) {
-    logger.warn("[askGeminiStream] Circuit breaker open — falling back to Claude");
-    yield* claudeStreamFallback();
-    return;
-  }
-
-  const ai = getGeminiClient();
-  const model = useProModel ? geminiPro() : geminiFast();
+  const { client: ai, isProxy } = getGenerationClient();
+  const model = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), isProxy);
 
   const config: Record<string, unknown> = { maxOutputTokens: 65_536 };
   if (systemInstruction) config.systemInstruction = systemInstruction;
   if (thinkingBudget > 0) config.thinkingConfig = { thinkingBudget };
-  if (useSearch) {
+  if (useSearch && !isProxy) {
+    // Google Search grounding is not guaranteed via the AI Integrations proxy;
+    // only attach it on the direct client.
     config.tools = [{ googleSearch: { dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.0 } } }];
   }
+
+  // Retries the same streamed request via the Replit AI Integrations proxy
+  // instead of jumping straight to Claude when the direct key gets a 403.
+  const proxyStreamRetry = async function* (): AsyncGenerator<{ text?: string; done?: boolean; sources?: string[]; error?: string; usage?: GeminiStreamUsage }> {
+    const proxy = getGeminiProxyClient();
+    if (!proxy) { yield* claudeStreamFallback(); return; }
+    logger.warn("[askGeminiStream] 403 on direct key — retrying via Replit AI Integrations proxy");
+    const proxyModel = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), true);
+    const proxyConfig: Record<string, unknown> = { maxOutputTokens: 65_536 };
+    if (systemInstruction) proxyConfig.systemInstruction = systemInstruction;
+    if (thinkingBudget > 0) proxyConfig.thinkingConfig = { thinkingBudget };
+    try {
+      const stream = await proxy.models.generateContentStream({ model: proxyModel, contents, config: proxyConfig });
+      let got = false;
+      for await (const chunk of stream) {
+        const text = chunk.text;
+        if (text) { got = true; yield { text }; }
+      }
+      yield { done: true };
+      if (!got) logger.warn("[askGeminiStream] Proxy retry returned empty stream");
+    } catch (proxyErr) {
+      logger.error({ err: String(proxyErr) }, "[askGeminiStream] Proxy retry also failed — falling back to Claude");
+      yield* claudeStreamFallback();
+    }
+  };
 
   try {
     const stream = await ai.models.generateContentStream({ model, contents, config });
@@ -1163,8 +1273,12 @@ export async function* askGeminiStream(
   } catch (err) {
     logger.error({ err: String(err) }, "[askGeminiStream] Error");
     if (isPermissionDenied(err)) {
-      tripGenerationCircuit();
-      logger.warn("[askGeminiStream] 403 detected — falling back to Claude");
+      if (!isProxy) {
+        tripGenerationCircuit();
+        yield* proxyStreamRetry();
+        return;
+      }
+      logger.warn("[askGeminiStream] 403 on proxy too — falling back to Claude");
       yield* claudeStreamFallback();
       return;
     }
