@@ -641,3 +641,9 @@ id = "fKyC4YZ8f24udbWxdS0Qa"
 uri = "file://artifacts/shopify-optimizer/public/muscle-factory-v2-pinacocо-adam.mp4"
 type = "video"
 title = "Warriors ISO — V2 Piña Coco 17s — voz Adam (solo ese sabor)"
+
+[[outputs]]
+id = "8GEPvYkFKwx3vesSYNjBi"
+uri = "file://exports/skills_ciberseguridad_shopy_crafter.xlsx"
+type = "table"
+title = "Catálogo de 817 Skills de Ciberseguridad — Verificado"
