@@ -647,3 +647,9 @@ id = "8GEPvYkFKwx3vesSYNjBi"
 uri = "file://exports/skills_ciberseguridad_shopy_crafter.xlsx"
 type = "table"
 title = "Catálogo de 817 Skills de Ciberseguridad — Verificado"
+
+[[outputs]]
+id = "uIRKgVRCMwv0MRakqFsUJ"
+uri = "file://exports/skills_completo_shopy_crafter.xlsx"
+type = "table"
+title = "Inventario Completo: Skills de Ciberseguridad + Biblioteca Maestra de Prompts"
