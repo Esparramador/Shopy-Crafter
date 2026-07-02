@@ -863,6 +863,9 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Investigar en internet / buscar información sobre / informe sobre / recopila información de / dime todo sobre / investiga / ¿qué es / cómo funciona / cómo se hace / tutorial / guía completa / análisis de / recopilatorio de / cuéntame sobre / busca y resume / genera informe de investigación / chistes de / recopilatorio de chistes / humor / memes de / cómo diseñar / cómo crear desde 0 → browser_research. Params: {topic (tema a investigar), queries? (array de búsquedas específicas), reportTitle? (título del informe), style? ("professional"|"fun" — "fun" para chistes/entretenimiento), projectId?}. Investigación REAL en Google: visita múltiples páginas y sintetiza con IA. SIEMPRE guarda en Vault si hay projectId. EJEMPLOS: {topic:"chistes de humor negro",style:"fun"} / {topic:"diseñar Plim Plim en Blender desde 0",style:"professional",projectId:X} / {topic:"estrategias marketing para Shopify"}
   - Skill de ciberseguridad / análisis de seguridad / cómo [atacar|defender|detectar|analizar] / técnica de seguridad / hardening web / blindar [web|servidor|API|aplicación] / auditoría de seguridad / OWASP / MITRE ATT&CK / CVE / pentest / red team / vulnerability / threat hunting / forensics / malware analysis / phishing / SIEM / SOC / cloud security / zero trust / compliance / CMMC / ISO27001 / PCI-DSS / incident response / qué es [término de seguridad] / cómo funciona [ataque] / cómo detectar / cómo prevenir → security_skill. Recupera el contenido completo de la skill y actúa como experto en ciberseguridad. Params: {skillId (nombre de la skill, ej: "analyzing-malware-behavior-with-cuckoo-sandbox"), query? (pregunta específica)}. Si no sabes el ID exacto, usa security_skill_search primero.
   - Buscar skill de seguridad / qué skills de seguridad hay / listar skills de [dominio] / repositorio de seguridad / skills de malware / red team skills / cloud security skills → security_skill_search. Params: {query (término), domain? (ej: "red-teaming","malware-analysis","cloud-security","threat-hunting")}
+  - Pide EJECUTAR una skill de agencia (81 skills reales instaladas: crear un documento Word/docx, generar un Excel/xlsx, hacer una presentación PowerPoint/pptx, crear una factura/invoice, hacer un currículum/resume, generar un infográfico, crear copy/copywriting, generar contenido de redes sociales, crear un contrato/legal, plan de negocio, análisis competitivo, meal planner, PDF, etc.) / "usa la skill de..." / "ejecuta la skill..." → agent_skill. Recupera las instrucciones REALES de la skill y actúa según ellas al pie de la letra (no solo describir, EJECUTAR: generar el contenido/documento pedido). Params: {skillId (nombre exacto de la skill, ej: "docx","invoice-generator","copywriting","excel-generator"), query? (lo que pide el usuario)}. Si no conoces el ID exacto, usa agent_skill_search primero. Si el resultado es un documento de oficina, SIEMPRE sigue con generate_office_document para producir el archivo real.
+  - Buscar skill de agencia / qué skills tienes / qué puedes hacer / listar skills disponibles / catálogo de skills / skills de documentos / skills de marketing → agent_skill_search. Params: {query? (término), category? ("document"|"media"|"marketing"|"business")}
+  - Generar/crear/descargar un archivo Word/.docx, Excel/.xlsx o PowerPoint/.pptx REAL (currículum, factura, informe, contrato, propuesta, plan de negocio, hoja de cálculo, presentación) → generate_office_document. SIEMPRE úsalo tras agent_skill cuando la skill ejecutada produce un documento de oficina, para generar el ARCHIVO REAL descargable (no solo texto en el chat). Params: {projectId, format ("docx"|"xlsx"|"pptx"), title, subtitle?, sections: [{heading?, paragraphs?: string[], bullets?: string[], table?: {headers: string[], rows: string[][]}}]}. El archivo se guarda en el Vault del proyecto listo para descargar.
   - Escanear vulnerabilidades / escanear la página/sitio/web / analizar seguridad de mi tienda / probar capacidades y funciones de seguridad / testear la web / blindar mi sitio / aplicar psicología inversa para encontrar fallos / pentest pasivo / auditoría de vulnerabilidades → security_scan_website. Ejecuta un escaneo PASIVO real (headers de seguridad, TLS/HTTPS, cookies, CORS, archivos sensibles expuestos, fingerprinting, contenido mixto, librerías obsoletas, secretos filtrados) contra la URL del proyecto (o la que indique el usuario), mapea cada hallazgo al catálogo de 817 skills de ciberseguridad (MITRE ATT&CK/NIST CSF), y devuelve para CADA hallazgo: cómo lo explotaría un atacante (perspectiva inversa) + pasos exactos de blindaje. Params: {projectId, url? (si se quiere escanear una URL distinta a la del proyecto)}. Después de ejecutar, narra los hallazgos priorizados por severidad, explica el "modo atacante" de cada uno (psicología inversa) y propone el plan de blindaje concreto.
   - Brand Book / Brand DNA / manual de marca / identidad visual / guía de estilo completa / DNA de marca / generar brand book / como google ai studio / identidad corporativa / dossier de marca / manual de identidad → generate_brand_book. Params: {brandName?, industry?, notes? (información adicional sobre la marca), projectId?}. Genera un brand book completo de 10+ secciones: misión/visión, valores, arquetipo, tono de voz, paleta de colores, tipografía, logo, audiencia, pilares de contenido, redes sociales, mensajes clave, posicionamiento. HTML profesional descargable guardado en Vault. EJEMPLOS: {brandName:"Nike",industry:"deportes"} / {brandName:"Mi Tienda",projectId:X,notes:"vendemos ropa sostenible para mujer"} 
   - Ver productos Stripe / listar productos Stripe / catálogo Stripe / catálogo de precios Stripe / qué productos tengo en Stripe / servicios de Stripe → stripe_list_products. Params: {accountId}
@@ -1331,6 +1334,15 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
           expertKnowledgeBlock = EXPERT_SEO_KNOWLEDGE + EXPERT_MARKETING_KNOWLEDGE;
         } catch { /* silencioso */ }
       }
+
+      // ── AGENT SKILLS INJECTOR — catálogo de las 81 skills reales de agencia ──
+      // A diferencia del chatbot público (que SOLO conoce), esta plataforma autenticada
+      // puede EJECUTARLAS de verdad vía las acciones agent_skill / agent_skill_search /
+      // generate_office_document (documentos Word/Excel/PowerPoint reales al Vault).
+      try {
+        const { buildAgentSkillsKnowledgeBlock } = await import("../lib/agent-skills-knowledge.js");
+        expertKnowledgeBlock += buildAgentSkillsKnowledgeBlock();
+      } catch { /* silencioso */ }
   
       const sysPrompt = (customSystemPrompt ?? `Eres Shopy Crafter, el CEREBRO CENTRAL de la agencia. NO eres un asistente — eres el COO/CTO/CMO/CFO virtual de la agencia. Tu dueño es Sadia, la única persona que usa esta plataforma. Tú eres su socio de negocio 24/7.
   
@@ -1416,7 +1428,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   REGLA CRÍTICA — TOKEN SHOPIFY:
   Cuando el [CONTEXTO] indique "Token Shopify: CADUCADO" o "Token Shopify: SIN_TOKEN":
   - NO intentes ejecutar acciones que llamen a la API de Shopify: create_product, list_products, list_all_products, scan_store, store_status, optimize_product, optimize_all_products, redesign_product, bulk_redesign, list_themes, audit_theme, edit_theme_file, edit_theme_css, edit_theme_settings, create_theme_section, generate_all_metas, fix_all_alt_texts, generate_schemas, seo_full_audit, list_collections, create_collection, auto_collections, list_pages, create_page, design_all_pages, get_orders, change_price, set_product_status, delete_product, update_product_price, bulk_update_prices, update_stock, bulk_update_stock, sync_catalog_prices, price_audit, list_products_with_prices, add_variant, edit_variant, delete_variant, remove_from_collection, inventory_sync, inventory_sync_orders, regenerate_token, copyright_audit, setup_full_store, keyword_intelligence (si requiere productos de la tienda), blog_strategy (si requiere productos), generate_blog_post (si requiere productos).
-  - SÍ puedes ejecutar estas acciones que NO requieren token Shopify: generate_ai_report, generate_platform_report, recall_knowledge, brain_status, brain_stats, brain_sync, brain_export, analyze_external_store, generate_budget, update_cms, update_cms_batch, read_cms, reset_cms, list_users, create_user, invite_client, deactivate_user, activate_user, reset_user_password, list_messages, send_message, list_approvals, create_approval, audit_log, list_automations, run_automation, generate_email_flow, list_email_flows, generate_brand_css, generate_brand_kit, generate_brand_guide, financial_forecast, financial_dashboard, agency_proposal, search_suppliers, generate_budget, create_business_card, list_business_cards, analyze_web_design, run_universal_generator, run_leveled_report, inspect_code, fix_code, list_source_files, analyze_component, modify_ui, learn_from_url, learn_from_content, generate_competitive_pricing (con URL), scan_competitor, discover_competitors, analyze_competitor_product.
+  - SÍ puedes ejecutar estas acciones que NO requieren token Shopify: generate_ai_report, generate_platform_report, recall_knowledge, brain_status, brain_stats, brain_sync, brain_export, analyze_external_store, generate_budget, update_cms, update_cms_batch, read_cms, reset_cms, list_users, create_user, invite_client, deactivate_user, activate_user, reset_user_password, list_messages, send_message, list_approvals, create_approval, audit_log, list_automations, run_automation, generate_email_flow, list_email_flows, generate_brand_css, generate_brand_kit, generate_brand_guide, financial_forecast, financial_dashboard, agency_proposal, search_suppliers, generate_budget, create_business_card, list_business_cards, analyze_web_design, run_universal_generator, run_leveled_report, inspect_code, fix_code, list_source_files, analyze_component, modify_ui, learn_from_url, learn_from_content, generate_competitive_pricing (con URL), scan_competitor, discover_competitors, analyze_competitor_product, agent_skill, agent_skill_search, generate_office_document.
   - Si el usuario pide un informe o análisis y el token está caducado: responde con lo que puedes hacer con los datos disponibles (generate_ai_report, recall_knowledge) y explica brevemente que para sincronizar datos de la tienda necesita renovar el token en Configuración → Integración Shopify. NO repitas el error de token en cada respuesta.
   - Si el usuario pregunta sobre informes YA GENERADOS (guardados en el Vault): usa recall_knowledge para buscarlos. Los informes generados se almacenan en la base de datos y NO necesitan token.
 
@@ -12458,6 +12470,84 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             domains: domains.slice(0, 15),
             hint: "Usa security_skill con el id exacto para obtener la guía técnica completa.",
           };
+          break;
+        }
+
+        case "agent_skill": {
+          const { skillId: agSkillId, query: agQuery } = params as { skillId?: string; query?: string };
+          if (!agSkillId) { result = { error: "skillId requerido. Usa agent_skill_search para encontrar el ID exacto." }; break; }
+          const { getAgentSkillContent, getAgentSkillsCatalog, searchAgentSkills } = await import("../lib/agent-skills-knowledge.js");
+          const agContent = getAgentSkillContent(agSkillId);
+          if (!agContent) {
+            const agSuggestions = searchAgentSkills(agSkillId, 6);
+            result = { error: `Skill "${agSkillId}" no encontrada.`, suggestions: agSuggestions.map(s => ({ id: s.id, description: s.description, category: s.category })) };
+            break;
+          }
+          const agMeta = getAgentSkillsCatalog().find((s) => s.id === agSkillId);
+          result = {
+            skillId: agSkillId,
+            name: agMeta?.name || agSkillId,
+            description: agMeta?.description,
+            category: agMeta?.category,
+            content: agContent,
+            queryContext: agQuery,
+            instruction: "Sigue estas instrucciones REALES al pie de la letra para completar la tarea del usuario. Si la skill produce un documento de oficina (Word/Excel/PowerPoint), usa a continuación la acción generate_office_document para generar el archivo real.",
+          };
+          break;
+        }
+
+        case "agent_skill_search": {
+          const { query: agQ, category: agCategory } = params as { query?: string; category?: string };
+          const { searchAgentSkills, getAgentSkillsCatalog, getAgentSkillCategories } = await import("../lib/agent-skills-knowledge.js");
+          let agResults = agQ ? searchAgentSkills(agQ, 20) : getAgentSkillsCatalog().filter(s => s.category !== "meta");
+          if (agCategory) agResults = agResults.filter((s) => s.category === agCategory);
+          const agCategories = getAgentSkillCategories();
+          result = {
+            total: agResults.length,
+            skills: agResults.slice(0, 15).map((s) => ({ id: s.id, name: s.name, description: s.description, category: s.category })),
+            categories: agCategories,
+            hint: "Usa agent_skill con el id exacto para obtener la guía completa y ejecutarla.",
+          };
+          break;
+        }
+
+        case "generate_office_document": {
+          const {
+            projectId: goProjectIdRaw, format: goFormat, title: goTitle, subtitle: goSubtitle, sections: goSections,
+          } = params as { projectId?: number | string; format?: string; title?: string; subtitle?: string; sections?: any[] };
+          const goProjectId = goProjectIdRaw ? parseInt(String(goProjectIdRaw), 10) : null;
+          if (!goProjectId) { result = { error: "projectId requerido" }; break; }
+          if (!goTitle || !Array.isArray(goSections) || goSections.length === 0) {
+            result = { error: "title y sections (array de {heading, paragraphs?, bullets?, table?}) son requeridos" };
+            break;
+          }
+          const goFmt = (["docx", "xlsx", "pptx"].includes(String(goFormat)) ? goFormat : "docx") as "docx" | "xlsx" | "pptx";
+          try {
+            const { generateOfficeDocument } = await import("../lib/office-document-generator.js");
+            const { buffer: goBuf, mimeType: goMime, extension: goExt } = await generateOfficeDocument(goFmt, {
+              title: goTitle, subtitle: goSubtitle, sections: goSections,
+            });
+            const goVaultId = await saveToVault({
+              projectId: goProjectId,
+              fileType: `agent_skill_${goFmt}`,
+              category: "agent_skills",
+              title: goTitle,
+              description: `Documento ${goFmt.toUpperCase()} generado por skill de agencia`,
+              mimeType: goMime,
+              fileSizeBytes: goBuf.length,
+              content: goBuf.toString("base64"),
+              generatedBy: "agent_skill:generate_office_document",
+            });
+            result = {
+              ok: true,
+              vaultId: goVaultId,
+              format: goExt,
+              sizeBytes: goBuf.length,
+              message: `✅ Documento .${goExt} generado y guardado en el Vault del proyecto (${(goBuf.length / 1024).toFixed(1)} KB). Puedes descargarlo desde la sección Vault.`,
+            };
+          } catch (goErr: any) {
+            result = { error: true, message: `❌ Error generando documento: ${goErr?.message || goErr}` };
+          }
           break;
         }
 
