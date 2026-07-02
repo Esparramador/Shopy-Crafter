@@ -1082,6 +1082,28 @@ export async function* askGeminiStream(
 
   if (contents.length === 0) { yield { done: true }; return; }
 
+  const claudeStreamFallback = async function* (): AsyncGenerator<{ text?: string; done?: boolean }> {
+    try {
+      const { askClaudeWithBrain } = await import("./claude.js");
+      const claudeMsgs = messages
+        .filter(m => m.content)
+        .map(m => ({ role: m.role, content: m.content }));
+      const claudeText = await askClaudeWithBrain(0, claudeMsgs, systemInstruction ?? "Eres un asistente útil.", "general");
+      if (claudeText && claudeText.trim()) {
+        yield { text: claudeText };
+      }
+    } catch (fallbackErr) {
+      logger.error({ err: String(fallbackErr) }, "[askGeminiStream] Claude fallback also failed");
+    }
+    yield { done: true };
+  };
+
+  if (isGeminiGenerationBlocked()) {
+    logger.warn("[askGeminiStream] Circuit breaker open — falling back to Claude");
+    yield* claudeStreamFallback();
+    return;
+  }
+
   const ai = getGeminiClient();
   const model = useProModel ? geminiPro() : geminiFast();
 
@@ -1140,6 +1162,12 @@ export async function* askGeminiStream(
     yield { done: true, sources: [...new Set(allSources)], ...(usage ? { usage } : {}) };
   } catch (err) {
     logger.error({ err: String(err) }, "[askGeminiStream] Error");
+    if (isPermissionDenied(err)) {
+      tripGenerationCircuit();
+      logger.warn("[askGeminiStream] 403 detected — falling back to Claude");
+      yield* claudeStreamFallback();
+      return;
+    }
     yield { error: String(err) };
     yield { done: true };
   }

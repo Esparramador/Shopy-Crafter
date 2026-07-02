@@ -89,6 +89,7 @@ export default function LandingChatbot() {
       const dec = new TextDecoder();
       let buf = "";
       let acc = "";
+      let streamErrored = false;
 
       outer: while (true) {
         const { done, value } = await reader.read();
@@ -100,7 +101,7 @@ export default function LandingChatbot() {
           if (!part.startsWith("data: ")) continue;
           try {
             const d = JSON.parse(part.slice(6));
-            if (d.error) { acc = acc || "Ha ocurrido un error. Inténtalo de nuevo."; break outer; }
+            if (d.error) { streamErrored = true; break outer; }
             if (d.text) {
               acc += d.text;
               setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: acc } : msg));
@@ -108,6 +109,12 @@ export default function LandingChatbot() {
             if (d.done) break outer;
           } catch {}
         }
+      }
+
+      if (streamErrored && !acc) {
+        // No partial content was shown yet — retry via the non-streaming endpoint
+        // (which has its own Claude fallback), instead of leaving a blank bubble.
+        throw new Error("stream_error");
       }
 
       if (!acc) {
@@ -138,11 +145,12 @@ export default function LandingChatbot() {
 
   const panelStyle: React.CSSProperties = {
     position: "fixed",
-    bottom: 96,
-    right: 24,
+    bottom: "max(88px, env(safe-area-inset-bottom, 0px) + 88px)",
+    right: "max(12px, env(safe-area-inset-right, 0px) + 12px)",
     width: 360,
-    maxWidth: "calc(100vw - 48px)",
-    maxHeight: "min(560px, calc(100vh - 140px))",
+    maxWidth: "calc(100vw - 24px)",
+    maxHeight: "min(560px, calc(100dvh - 112px))",
+    minHeight: 0,
     display: "flex",
     flexDirection: "column",
     background: "linear-gradient(160deg, #111010 0%, #0d0d0d 100%)",
@@ -160,7 +168,14 @@ export default function LandingChatbot() {
 
   return (
     <>
-      <div style={panelStyle}>
+      <div
+        style={panelStyle}
+        className="lc-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden={!open}
+        aria-label="Asesor virtual Shopy Crafter"
+      >
         <div style={{
           padding: "14px 16px 12px",
           background: "linear-gradient(135deg, rgba(200,168,75,0.12) 0%, rgba(200,168,75,0.04) 100%)",
@@ -170,7 +185,7 @@ export default function LandingChatbot() {
           gap: 10,
           flexShrink: 0,
         }}>
-          <div style={{
+          <div aria-hidden="true" style={{
             width: 36, height: 36, borderRadius: "50%",
             background: "linear-gradient(135deg, #c8a84b, #8b6f35)",
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -181,11 +196,11 @@ export default function LandingChatbot() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#f0e8cc", letterSpacing: "0.01em" }}>Asesor Shopy Crafter</div>
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 1 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#2dd49f", flexShrink: 0, boxShadow: "0 0 6px rgba(45,212,159,0.6)" }} />
+              <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: "#2dd49f", flexShrink: 0, boxShadow: "0 0 6px rgba(45,212,159,0.6)" }} />
               <span style={{ fontSize: 10, color: "rgba(240,232,204,0.6)" }}>Disponible ahora · responde al instante</span>
             </div>
           </div>
-          <button onClick={() => setOpen(false)} style={{
+          <button onClick={() => setOpen(false)} aria-label="Minimizar chat" style={{
             width: 28, height: 28, borderRadius: "50%", border: "none",
             background: "rgba(255,255,255,0.06)", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -194,20 +209,25 @@ export default function LandingChatbot() {
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLButtonElement).style.color = "#f0e8cc"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(240,232,204,0.5)"; }}
           >
-            <ChevronDown size={14} />
+            <ChevronDown size={14} aria-hidden="true" />
           </button>
         </div>
 
-        <div style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "14px 14px 6px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          scrollbarWidth: "thin",
-          scrollbarColor: "rgba(200,168,75,0.2) transparent",
-        }}>
+        <div
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions text"
+          className="lc-scroll"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "14px 14px 6px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            scrollbarWidth: "thin",
+            scrollbarColor: "rgba(200,168,75,0.2) transparent",
+          }}>
           {messages.map(msg => (
             <div key={msg.id} style={{
               display: "flex",
@@ -216,7 +236,7 @@ export default function LandingChatbot() {
               alignItems: "flex-end",
             }}>
               {msg.role === "assistant" && (
-                <div style={{
+                <div aria-hidden="true" style={{
                   width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
                   background: "linear-gradient(135deg, #c8a84b, #8b6f35)",
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -303,6 +323,7 @@ export default function LandingChatbot() {
           }}>
             <textarea
               ref={inputRef}
+              aria-label="Escribe tu pregunta para el asesor virtual"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
@@ -458,6 +479,27 @@ export default function LandingChatbot() {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.3); opacity: 0.7; }
         }
+
+        /* Foldables unfolded in landscape (e.g. Z Fold 7 ~ 1812x2176 CSS px
+           reported as a short, very wide viewport) and other short-height
+           screens: the header/tab chrome eats vertical space, so shrink
+           margins and let the panel use as much height as is actually
+           available instead of clipping. */
+        @media (max-height: 500px) {
+          .lc-panel {
+            bottom: 8px !important;
+            top: 8px !important;
+            max-height: calc(100dvh - 16px) !important;
+          }
+        }
+        @media (max-width: 420px) {
+          .lc-panel {
+            right: 8px !important;
+            width: calc(100vw - 16px) !important;
+          }
+        }
+        .lc-scroll::-webkit-scrollbar { width: 6px; }
+        .lc-scroll::-webkit-scrollbar-thumb { background: rgba(200,168,75,0.2); border-radius: 3px; }
       `}</style>
     </>
   );
