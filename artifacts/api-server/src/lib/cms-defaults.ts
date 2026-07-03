@@ -856,7 +856,7 @@ export const DEFAULT_CMS_CONTENT = {
       { title: "Recursos", links: [
         { label: "Blog", href: "/blog" },
         { label: "Changelog", href: "/changelog" },
-        { label: "FAQ", href: "/faq" },
+        { label: "Preguntas Frecuentes", href: "/preguntas-frecuentes" },
         { label: "Documentación", href: "" },
       ] },
       { title: "Legal", links: [

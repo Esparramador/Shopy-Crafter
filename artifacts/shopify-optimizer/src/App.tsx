@@ -329,6 +329,7 @@ function Router() {
         <Route path="/casos-de-exito/:slug">{() => <S><CasoDeExitoDetailPage /></S>}</Route>
         <Route path="/programa-de-afiliados">{() => <S><ProgramaAfiliados /></S>}</Route>
         <Route path="/faq">{() => <S><FAQPage /></S>}</Route>
+        <Route path="/preguntas-frecuentes">{() => <S><FAQPage /></S>}</Route>
         <Route path="/blog">{() => <S><BlogPage /></S>}</Route>
         <Route path="/blog/:slug">{() => <S><BlogPostPage /></S>}</Route>
         <Route path="/changelog">{() => <S><ChangelogPage /></S>}</Route>
@@ -715,6 +716,7 @@ function PublicChatbotSlot() {
     location.startsWith("/casos-de-exito") ||
     location.startsWith("/programa-de-afiliados") ||
     location.startsWith("/faq") ||
+    location.startsWith("/preguntas-frecuentes") ||
     location.startsWith("/blog") ||
     location.startsWith("/changelog") ||
     location.startsWith("/privacidad") ||
@@ -736,6 +738,7 @@ const PUBLIC_PATHS = [
   "/casos-de-exito",
   "/programa-de-afiliados",
   "/faq",
+  "/preguntas-frecuentes",
   "/blog",
   "/changelog",
   "/privacidad",

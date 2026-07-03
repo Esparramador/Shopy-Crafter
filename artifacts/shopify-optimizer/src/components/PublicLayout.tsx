@@ -76,17 +76,19 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                 <div style={{ fontSize: 12, fontWeight: 700, color: "var(--t3, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>{col.title}</div>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
                   {col.links.map((l, li) => {
-                    const href = (l.href || "").trim();
+                    const rawHref = (l.href || "").trim();
+                    const href = rawHref === "/faq" ? "/preguntas-frecuentes" : rawHref;
+                    const label = rawHref === "/faq" ? "Preguntas Frecuentes" : l.label;
                     if (href.startsWith("/") && !href.startsWith("//")) {
-                      return <li key={li}><Link href={href} style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{l.label}</Link></li>;
+                      return <li key={li}><Link href={href} style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{label}</Link></li>;
                     }
                     if (href.startsWith("http")) {
-                      return <li key={li}><a href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{l.label}</a></li>;
+                      return <li key={li}><a href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{label}</a></li>;
                     }
                     if (href.startsWith("mailto:") || href.startsWith("tel:")) {
-                      return <li key={li}><a href={href} style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{l.label}</a></li>;
+                      return <li key={li}><a href={href} style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{label}</a></li>;
                     }
-                    return <li key={li}><span style={{ fontSize: 13, color: "var(--t4, #555)", cursor: "default" }}>{l.label}</span></li>;
+                    return <li key={li}><span style={{ fontSize: 13, color: "var(--t4, #555)", cursor: "default" }}>{label}</span></li>;
                   })}
                 </ul>
               </div>
