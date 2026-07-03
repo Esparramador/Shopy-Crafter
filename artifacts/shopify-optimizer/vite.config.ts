@@ -175,8 +175,8 @@ export default defineConfig({
     hmr:          { clientPort: 443 },
     fs:           { strict: true, deny: ["**/.*"] },
     proxy: {
-      "/api":     { target: "http://localhost:8080", changeOrigin: true, secure: false },
-      "/shopify": { target: "http://localhost:8080", changeOrigin: true, secure: false },
+      "/api":              { target: "http://localhost:8080", changeOrigin: true, secure: false },
+      "^/shopify(/|\\?|$)": { target: "http://localhost:8080", changeOrigin: true, secure: false },
     },
   },
 

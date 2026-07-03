@@ -74,6 +74,7 @@ const PrivacidadPage = lazy(() => import("@/pages/public/Privacidad"));
 const TerminosPage = lazy(() => import("@/pages/public/Terminos"));
 const CookiesPage = lazy(() => import("@/pages/public/Cookies"));
 const ContactoPage = lazy(() => import("@/pages/public/Contacto"));
+const ComparisonPage = lazy(() => import("@/pages/public/ComparisonPage"));
 
 const AuditPage = lazy(() => import("@/pages/projects/Audit"));
 const RedesignPage = lazy(() => import("@/pages/projects/Redesign"));
@@ -336,6 +337,15 @@ function Router() {
         <Route path="/terminos">{() => <S><TerminosPage /></S>}</Route>
         <Route path="/cookies">{() => <S><CookiesPage /></S>}</Route>
         <Route path="/contacto">{() => <S><ContactoPage /></S>}</Route>
+
+        {/* SEO comparison pages */}
+        <Route path="/shopify-vs-woocommerce">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/shopify-vs-prestashop">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/migrar-woocommerce-shopify">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/migrar-prestashop-shopify">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/shopify-stripe-pagos">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/agencia-shopify-ia">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/ecommerce-ia-automatizacion">{() => <S><ComparisonPage /></S>}</Route>
 
         {/* Root — redirects by role */}
         <Route path="/">
