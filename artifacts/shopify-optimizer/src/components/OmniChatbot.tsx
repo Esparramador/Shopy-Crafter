@@ -1119,6 +1119,7 @@ const SLASH_SKILLS: SlashSkill[] = [
   { cmd: "/viral",       icon: "🎭", label: "Viral Comedy Studio",         desc: "Tendencias políticas del día + genera guiones satíricos para YouTube", engine: "claude", prompt: "Actúa como director del Viral Comedy Studio de Shopy Crafter. El usuario quiere crear contenido satírico político viral. Primero analiza qué quiere: ¿buscar tendencias del día? ¿generar un guión satírico de una noticia concreta? ¿ver el historial de vídeos creados? Guíale al YouTube Studio → pestaña 'Tendencias' para ver las noticias del día o a la pestaña 'Satírico IA' para generar el guión. Explica que puede: 1) Ver tendencias políticas virales, 2) Seleccionar una noticia, 3) Generar guión satírico con IA, 4) Generar vídeo IA con ese prompt visual, 5) Publicar automáticamente en YouTube. Pregúntale sobre qué noticia o tema quiere satirizar hoy." },
   { cmd: "/modelo",      icon: "🎭", label: "Modelo IA — vídeo con personaje real", desc: "Pipeline completo: referencia YouTube → ElevenLabs Dubbing → face-swap con tu foto", engine: "claude", prompt: "Actúa como director del pipeline Modelo IA de Shopy Crafter. El usuario quiere crear un vídeo con un personaje/modelo real hablando. Explica el flujo completo: 1) Busca en YouTube un vídeo de referencia con los gestos y movimientos del tipo de contenido (monólogo, UGC, podcast, publicidad, educativo, entrevista, testimonio, tutorial), 2) Extrae el fragmento más adecuado (puedes sugerir el segundo de inicio y duración), 3) ElevenLabs Dubbing sustituye la voz con la voz clonada elegida — el modelo de referencia gesticula con la voz del personaje, 4) Opcionalmente face-swap con Replicate pone la cara del modelo real encima. El Sevillano es el personaje principal: voz clonada en ElevenLabs (voice_id: 8m4O8qoFLrKBzbmsuL5T), foto del modelo guardada. Para acceder: Admin → YouTube Studio → pestaña 'Modelo IA 🎭'. Pregunta: ¿qué tipo de contenido quiere crear y tiene guión?" },
   { cmd: "/tendencias",  icon: "📰", label: "Tendencias virales hoy",      desc: "Noticias políticas del día con potencial satírico (Gemini Search)",    engine: "gemini", prompt: "Busca con Gemini Search las noticias políticas más virales, polémicas e impactantes de hoy en España. Para cada noticia indica: titular, protagonistas, por qué es viral, potencial satírico del 1 al 10, y el mejor ángulo cómico para satirizarla. Dame al menos 6 noticias distintas ordenadas por potencial de viralidad. Incluye también si hay tendencias de formato de vídeo político que estén funcionando en YouTube o TikTok España ahora mismo.", isResearch: true },
+  { cmd: "/director",    icon: "🎬", label: "Director IA — pipeline completo", desc: "Orquesta storyboard + personaje + prompts de vídeo en un plan de producción completo", engine: "claude", prompt: `Actúa como Director Creativo IA de Shopy Crafter — el orquestador cognitivo principal para producción de vídeo. El usuario puede pedirte cualquier tipo de vídeo (anuncio, cortometraje, UGC, TikTok, drama, terror, comedia, producto). Sigue este flujo SIEMPRE:\n\n1. GÉNERO Y BRIEF — Detecta el género y expande el concepto del usuario en un brief cinematográfico: estilo visual (iluminación, paleta, grano de película), tono emocional y ritmo narrativo.\n\n2. STORYBOARD DE 5 CORTES — Genera un storyboard operativo con 5 planos exactos. Para cada plano: número, objetivo narrativo, descripción de acción, ángulo de cámara (24mm/50mm/85mm), duración en segundos.\n\n3. CHARACTER LOCK — Define el personaje principal si hay uno: descripción física detallada (cabello, ropa, expresión), género, edad estimada y nota de consistencia visual para FacePass (mantener outfit y rostro idénticos en todos los planos).\n\n4. PROMPTS DE PRODUCCIÓN — Para cada plano del storyboard genera:\n   • PROMPT POSITIVO: en inglés, estructura Camera + Action + Environment + Style + Lighting. Incluye micro-detalles ambientales (sparks burst, reflections rippling on wet pavement, golden particles drifting upward).\n   • TIMESTAMPS: "ACTION 0-5s: [acción], ACTION 5-10s: [acción]"\n   • NEGATIVE PROMPT: selecciona el bloque según el género — Realismo/Anatomía, Alta Acción, o Drama Cinemático.\n\n5. PIPELINE DE EJECUCIÓN — Guía al usuario exactamente a dónde ir:\n   • Imágenes de personaje/storyboard → Fusion Studio Pro → Tab Generar imagen\n   • Animación de planos → Fusion Studio Pro → Tab Vídeo → modo Storyboard → Vídeo\n   • Pipeline automático completo → Fusion Studio Pro → Tab Multi-Shot\n   • Publicación → YouTube Studio\n\nPregunta primero: ¿Qué tipo de vídeo quieres crear y cuál es el concepto o producto?` },
   { cmd: "/vtuber",      icon: "🎭", label: "Avatar VTuber",             desc: "Crea un VTuber IA con personalidad, guión y estrategia de contenido",  engine: "claude", prompt: "Crea un avatar VTuber completo para representar mi marca en redes sociales y streaming: 1) PERSONAJE: nombre, historia de origen, personalidad (3 rasgos principales), edad virtual, apariencia física (descripción detallada para generar con IA), 2) VOZ: tono, velocidad, muletillas y frases características, 3) CONTENIDO: 10 ideas de vídeos para TikTok/YouTube con guión del primer minuto (el hook), 4) ESTRATEGIA: horario de publicación óptimo, hashtags por plataforma y colaboraciones con otros VTubers del nicho, 5) MONETIZACIÓN: cómo integrar el VTuber con mi tienda Shopify para vender productos de forma entretenida. Adapta todo al tono y nicho de mi marca." },
 
   // ── GEMINI NATIVO ─────────────────────────────────────────────────────────
@@ -1156,7 +1157,7 @@ const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la pla
 • Puedes generar el vídeo IA con el visual prompt y publicarlo automáticamente en YouTube
 • Cada búsqueda de tendencia, guión generado y vídeo publicado queda registrado en el historial
 • Para acceder: Admin → YouTube Studio → pestaña "Tendencias" o "Satírico IA"
-• Comandos slash disponibles: /viral (guía completa), /tendencias (noticias del día con Gemini)
+• Comandos slash disponibles: /viral (guía completa), /tendencias (noticias del día con Gemini), /director (producción cinematográfica autónoma completa)
 
 ═══ MODELO IA PIPELINE (YouTube Studio → pestaña "Modelo IA 🎭") ═══
 Sistema para crear vídeos con personajes/modelos reales hablando — NO animaciones, sino personas reales que gesticulan y hablan con lip sync perfecto.
@@ -1191,6 +1192,27 @@ TIEMPOS ESTIMADOS: Extracción clip ~30s · ElevenLabs Dubbing ~2-3 min · Face-
 PARA ACCEDER: Admin → YouTube Studio → pestaña "Modelo IA 🎭"
 COMANDO SLASH: /modelo (guía completa del pipeline)
 
+═══ DIRECTOR IA (Fusion Studio Pro — producción cinematográfica autónoma) ═══
+Cuando el usuario pida crear un vídeo de cualquier tipo (anuncio, cortometraje, UGC, TikTok, terror, comedia, producto), actúa como Director Creativo:
+1. BRIEF CINEMÁTICO — Expande el concepto: estilo visual (iluminación, paleta, grano de película), tono emocional
+2. STORYBOARD 5 CORTES — Plano, objetivo narrativo, ángulo de cámara (24mm/50mm/85mm), duración en segundos
+3. CHARACTER LOCK — Si hay personaje: descripción física detallada para FacePass (rostro + outfit idénticos en todos los planos)
+4. PROMPTS DE PRODUCCIÓN — Para cada plano: prompt positivo (Camera+Action+Environment+Style+Lighting+micro-detalles ambientales) + negative prompt del escenario correcto
+5. PIPELINE DE EJECUCIÓN — Guía exacta: Fusion Studio Pro → Tab Generar imagen (character sheets/storyboard grid), Tab Vídeo → modo Storyboard → Vídeo (animación de paneles), Tab Multi-Shot (pipeline automático completo)
+
+NEGATIVE PROMPT PRESETS disponibles en el Tab Vídeo de Fusion Studio Pro:
+• 🧍 Realismo/Anatomía — para sujetos fotorrealistas: bloquea CGI, miembros extra, distorsiones
+• ⚡ Alta Acción/Danza — permite cortes rápidos bloqueando deformidad estructural
+• 🎬 Drama Cinemático — estabiliza narrativa seria: bloquea cambios de ropa, cara inconsistente
+
+PLANTILLAS DE CHARACTER DESIGN SHEET en Tab Generar imagen de Fusion Studio Pro:
+• 👤 Character Turnaround — 1 hero pose + 3 vistas (frente/espalda/perfil) + 3 poses de acción + 2 siluetas
+• 📋 Storyboard 6 paneles — grid 3x2 con captions de lente y número de panel
+• 📋 Storyboard 20 paneles — grid 5x4 profesional con caption naranja
+• 🎭 Influencer Sheet — hoja fotorrealista de IA influencer
+
+COMANDO: /director — lanza el pipeline Director completo
+
 ═══ CLASIFICACIÓN DE INTENCIÓN (aplica en cada mensaje) ═══
 Detecta mentalmente qué quiere el usuario antes de responder:
 • PREGUNTA INFO — responde de forma concisa y pregunta si necesita profundizar
@@ -1210,7 +1232,7 @@ Detecta mentalmente qué quiere el usuario antes de responder:
 • Si el usuario lleva mucho tiempo en la misma duda, ofrece escalar: "¿Quieres que lo revisemos juntos con el equipo?"
 
 ═══ CONOCIMIENTO DE SKILLS (/comandos) ═══
-Los usuarios pueden usar /comandos para tareas específicas. Cuando detectes que un usuario quiere hacer algo que tiene /comando correspondiente, sugiérelo naturalmente. Skills disponibles: /audit, /seo, /cro, /products, /competitors, /analytics, /legal, /email, /klaviyo, /content, /social, /brand, /reviews, /returns, /research, /supply, /forecast, /ads, /images, /video, /describe, /newsletter, /cards, /launch, /persona, /antihall, /faq-builder, /whatsapp-agent, /vtuber, /imagen-gemini, /codigo-gemini, /viral, /tendencias, /modelo
+Los usuarios pueden usar /comandos para tareas específicas. Cuando detectes que un usuario quiere hacer algo que tiene /comando correspondiente, sugiérelo naturalmente. Skills disponibles: /audit, /seo, /cro, /products, /competitors, /analytics, /legal, /email, /klaviyo, /content, /social, /brand, /reviews, /returns, /research, /supply, /forecast, /ads, /images, /video, /describe, /newsletter, /cards, /launch, /persona, /antihall, /faq-builder, /whatsapp-agent, /vtuber, /imagen-gemini, /codigo-gemini, /viral, /tendencias, /modelo, /director
 
 Skills de Gemini nativo:
 • /imagen-gemini — genera una imagen con el modelo de imagen de Gemini (escribe la descripción tras el comando)

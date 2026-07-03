@@ -431,6 +431,36 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
             )}
           </div>
         </Section>
+        <Section title="Plantillas de prompt (Character Design Sheet / Storyboard)">
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+            {[
+              {
+                label: "👤 Character Turnaround",
+                prompt: "Goal: Create a polished character design sheet. Canvas: Wide horizontal character design board, 16:9, lots of white space and small handwritten annotation labels. Layout: exactly 1 large central hero pose, exactly 3 turnaround views (Front, Back, Profile), exactly 3 action pose studies, exactly 2 black silhouette studies. Constraints: Do not add extra poses, watermarks, or unrelated props. Style: ultra-detailed, cinematic character design, masterpiece, 8k. Character: ",
+              },
+              {
+                label: "📋 Storyboard 6 paneles",
+                prompt: "Main layout: Use exactly 6 storyboard panels arranged in a 3-column by 2-row grid. Each panel has a narrow caption strip along its top edge with a panel number from P01 to P06, lens/camera note, and action title. Style: production storyboard, clean line art, cinematic composition, professional presentation. Constraints: Do not add extra panels, no watermarks. Scene: ",
+              },
+              {
+                label: "📋 Storyboard 20 paneles",
+                prompt: "Main layout: Use exactly 20 storyboard panels arranged in a 5-column by 4-row grid. Each panel has a narrow caption strip along its top edge with an orange panel number from P01 to P20, lens/camera note, and action title. Style: production animation storyboard, clean line art, masterpiece, ultra detailed, 8k. ASPECT RATIO: 16:9. Constraints: Do not add extra panels. Scene: ",
+              },
+              {
+                label: "🎭 Influencer Sheet",
+                prompt: "Goal: Create a photorealistic AI influencer character sheet. Canvas: 16:9 horizontal board. Layout: exactly 1 full-body front pose (hero), exactly 2 expression close-ups (smile, neutral), exactly 2 outfit variants, exactly 1 side profile. Style: hyper-realistic, editorial photography, soft studio lighting, 8k. No watermarks. Character: ",
+              },
+            ].map(t => (
+              <button
+                key={t.label}
+                onClick={() => setPrompt(t.prompt)}
+                style={{ ...pillButton(false), fontSize: 10 }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 9, color: "var(--t3)", margin: "2px 0 0" }}>Haz click para pre-cargar la plantilla y completa al final con la descripción de tu personaje o escena.</p>
+        </Section>
         <Section title="Negative prompt (opcional)">
           <textarea value={negativePrompt} onChange={e => setNegativePrompt(e.target.value)} placeholder="blurry, low-quality, watermark, text, logo..." style={{ ...inputStyle, minHeight: 60 }} />
         </Section>
@@ -883,13 +913,35 @@ function EnhanceTab({ caps, projectId, onSuccess, onError }: { caps: Capabilitie
 // Modelos que NO soportan text-to-video puro → exigen imagen origen.
 const I2V_ONLY_MODELS = new Set(["runway-gen4-turbo", "runway-gen4.5", "runway-gen3-alpha", "wan-2.5", "wan-2.5-fast"]);
 
-type VideoMode = "t2v" | "i2v" | "v2v" | "extend" | "edit-video";
+type VideoMode = "t2v" | "i2v" | "storyboard-video" | "v2v" | "extend" | "edit-video";
+
+const RENOISE_NEG_PRESETS: { label: string; key: string; value: string }[] = [
+  {
+    key: "anatomy",
+    label: "🧍 Realismo / Anatomía",
+    value: "Cartoon, anime, CGI-looking textures, fake skin, extra limbs, distorted faces, exaggerated fantasy armor, unrealistic physics, low quality, blurry faces, overexposed lighting, comedic tone, childish style, bad anatomy, unrealistic body proportions, supernatural effects, glowing eyes, energy auras, magic.",
+  },
+  {
+    key: "action",
+    label: "⚡ Alta Acción / Danza",
+    value: "horror, dark tone, realistic style, grotesque face, body deformation, extra limbs, broken hands, scary expressions, dull colors, muddy palette, slow motion, empty background, overly realistic physics, unreadable face, low energy, depressing mood.",
+  },
+  {
+    key: "cinema",
+    label: "🎬 Drama Cinemático",
+    value: "no dialogue, no subtitles, no text, no watermark, no logo, no extra characters, no inconsistent face, no changing outfit, no distorted hands, no overexposed glow, no fast chaotic cuts, no modern sci-fi armor, no comedic style.",
+  },
+];
+
+const STORYBOARD_VIDEO_WRAPPER = `Use the storyboard sheet as the exact sequential visual keyframe reference for the video. Treat every panel as an independent cinematic shot, not as a single image. Follow the storyboard shot by shot. No text, no label, no watermark, no logo. `;
 
 function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }: { caps: Capabilities | null; health: HealthMap | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onCreditError?: () => void }) {
   const [mode, setMode] = useState<VideoMode>("i2v");
   const [model, setModel] = useState("seedance-fast");
   const [xaiModel, setXaiModel] = useState<string>("grok-imagine-video");
   const [prompt, setPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
+  const [negPreset, setNegPreset] = useState<string>("");
   const [duration, setDuration] = useState(5);
   const [extendDuration, setExtendDuration] = useState(6);
   const [aspect, setAspect] = useState("9:16");
@@ -913,9 +965,19 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
     if (mode === "t2v" && I2V_ONLY_MODELS.has(model)) setMode("i2v");
   }, [model, mode]);
 
+  // Al entrar en storyboard-video, pre-inyectar el wrapper crítico de Renoise en el prompt
+  useEffect(() => {
+    if (mode === "storyboard-video" && !prompt.startsWith(STORYBOARD_VIDEO_WRAPPER)) {
+      setPrompt(STORYBOARD_VIDEO_WRAPPER + prompt);
+    }
+    // Al salir del modo, no borramos el prompt por si el usuario lo editó ya
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
   const run = async () => {
     if (!prompt.trim() && mode !== "extend" && mode !== "edit-video") { onError("Prompt requerido"); return; }
     if (mode === "i2v" && !file && !sourceUrl) { onError("Imagen origen requerida en modo Imagen → Vídeo"); return; }
+    if (mode === "storyboard-video" && !file && !sourceUrl) { onError("Imagen del storyboard requerida en modo Storyboard → Vídeo"); return; }
     if (mode === "v2v" && !file) { onError("Video origen requerido para V2V"); return; }
     if ((mode === "extend" || mode === "edit-video") && !videoUrl.trim()) {
       onError("URL del vídeo origen requerida"); return;
@@ -961,7 +1023,8 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
       fd.append("model", model); fd.append("prompt", prompt);
       fd.append("duration", String(duration)); fd.append("aspect", aspect);
       if (cameraPreset) fd.append("cameraPreset", cameraPreset);
-      if (mode === "i2v") {
+      if (negativePrompt.trim()) fd.append("negativePrompt", negativePrompt.trim());
+      if (mode === "i2v" || mode === "storyboard-video") {
         if (file) fd.append("image", file);
         if (sourceUrl) fd.append("sourceImageUrl", sourceUrl);
       }
@@ -1028,11 +1091,26 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
               <div style={{ fontSize: 11, fontWeight: 700 }}>✏️ Editar IA</div>
               <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Transformar</div>
             </button>
+            <button
+              onClick={() => setMode("storyboard-video")}
+              style={{ ...cardButton(mode === "storyboard-video"), padding: "10px 8px", border: mode === "storyboard-video" ? "1px solid var(--gold)" : undefined }}>
+              <div style={{ fontSize: 11, fontWeight: 700 }}>📋 Storyboard</div>
+              <div style={{ fontSize: 9, color: "var(--t3)", marginTop: 2 }}>Panel → Vídeo</div>
+            </button>
           </div>
           {mode === "t2v" && (
             <p style={{ fontSize: 10, color: "var(--t3)", margin: "8px 0 0", lineHeight: 1.4 }}>
               Modo Texto → Vídeo: el modelo genera el clip a partir del prompt sin imagen origen. Disponible en Veo, Kling, Seedance y Hailuo.
             </p>
+          )}
+          {mode === "storyboard-video" && (
+            <div style={{ margin: "8px 0 0", padding: "8px 10px", borderRadius: 6, background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.2)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", marginBottom: 4 }}>📋 Modo Storyboard → Vídeo</div>
+              <p style={{ fontSize: 10, color: "var(--t3)", margin: 0, lineHeight: 1.5 }}>
+                Convierte una hoja de storyboard en un clip. El modelo tratará <strong>cada panel como un plano cinemático independiente</strong>, no como imagen unificada — crítico para evitar que el modelo intente animar los bordes negros del grid.<br />
+                Sube la imagen del storyboard abajo y añade la descripción de tu escena en el prompt.
+              </p>
+            </div>
           )}
           {mode === "extend" && (
             <p style={{ fontSize: 10, color: "var(--t3)", margin: "8px 0 0", lineHeight: 1.4 }}>
@@ -1183,8 +1261,8 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
                 </div>
               </div>
             </Section>
-            {mode === "i2v" && (
-              <Section title="Imagen origen (requerida)">
+            {(mode === "i2v" || mode === "storyboard-video") && (
+              <Section title={mode === "storyboard-video" ? "Imagen del storyboard (requerida)" : "Imagen origen (requerida)"}>
                 <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} />
                 <p style={{ fontSize: 10, color: "var(--t3)", margin: "6px 0" }}>O URL pública:</p>
                 <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://..." style={inputStyle} />
@@ -1215,11 +1293,40 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
           </>
         )}
 
+        {!isXaiMode && (
+          <Section title="Negative Prompt (presets Renoise)">
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+              <button
+                onClick={() => { setNegPreset(""); setNegativePrompt(""); }}
+                style={pillButton(negPreset === "")}>Ninguno</button>
+              {RENOISE_NEG_PRESETS.map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => { setNegPreset(p.key); setNegativePrompt(p.value); }}
+                  style={pillButton(negPreset === p.key)}>{p.label}</button>
+              ))}
+            </div>
+            <textarea
+              value={negativePrompt}
+              onChange={e => { setNegativePrompt(e.target.value); setNegPreset("custom"); }}
+              placeholder="Opcional — keywords de exclusión para restringir el espacio latente…"
+              style={{ ...inputStyle, minHeight: 54, fontSize: 10 }}
+            />
+            {negPreset && negPreset !== "custom" && (
+              <p style={{ fontSize: 9, color: "var(--t3)", margin: "4px 0 0", lineHeight: 1.4 }}>
+                {RENOISE_NEG_PRESETS.find(p => p.key === negPreset)?.key === "anatomy" && "Previene texturas CGI, miembros extra y distorsiones faciales en sujetos fotorrealistas."}
+                {RENOISE_NEG_PRESETS.find(p => p.key === negPreset)?.key === "action" && "Permite cortes rápidos sin deformidad estructural — ideal para música y danza."}
+                {RENOISE_NEG_PRESETS.find(p => p.key === negPreset)?.key === "cinema" && "Estabiliza narrativa seria: bloquea cambios de ropa, cara inconsistente y texto superpuesto."}
+              </p>
+            )}
+          </Section>
+        )}
+
         <button onClick={run} disabled={busy} className="btn btn-gold" style={{ width: "100%", justifyContent: "center", padding: "12px 20px" }}>
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />}
           {busy
-            ? (mode === "extend" ? "Extendiendo vídeo..." : mode === "edit-video" ? "Editando vídeo..." : "Generando video...")
-            : (mode === "extend" ? "Extender vídeo (xAI, 2-4 min)" : mode === "edit-video" ? "Editar vídeo (xAI, 2-4 min)" : "Generar video (1-3 min)")}
+            ? (mode === "extend" ? "Extendiendo vídeo..." : mode === "edit-video" ? "Editando vídeo..." : mode === "storyboard-video" ? "Animando storyboard..." : "Generando video...")
+            : (mode === "extend" ? "Extender vídeo (xAI, 2-4 min)" : mode === "edit-video" ? "Editar vídeo (xAI, 2-4 min)" : mode === "storyboard-video" ? "Storyboard → Vídeo (1-3 min)" : "Generar video (1-3 min)")}
         </button>
         <LiveOperation
           active={busy}
