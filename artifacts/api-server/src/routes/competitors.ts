@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, projectsTable, productsTable } from "@workspace/db";
+import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, projectsTable, productsTable, clientKnowledgeTable } from "@workspace/db";
 import { eq, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
@@ -680,6 +680,312 @@ DEVUELVE SOLO un JSON válido:
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="competidores-${projectIdNum}-${Date.now()}.html"`);
     res.send(html);
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ─── POST /competitors/auto-analyze ──────────────────────────────────────────
+// ONE-CLICK: discovers new competitors via Google Search (3 randomised angles)
+// + scrapes + analyses each in parallel + extracts feature gaps.
+// Never repeats the same search — angles are randomised on every call.
+router.post("/competitors/auto-analyze", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const { projectId } = req.body;
+    if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
+    const pid = parseInt(projectId, 10);
+
+    // ── 1. Load all context in parallel ──────────────────────────────────────
+    const [project, products, existingCompetitors, knowledgeRows] = await Promise.all([
+      db.select().from(projectsTable).where(eq(projectsTable.id, pid)).limit(1).then(r => r[0]),
+      db.select({ title: productsTable.title, price: productsTable.price })
+        .from(productsTable).where(eq(productsTable.projectId, pid)).limit(25),
+      db.select().from(competitorsTable).where(eq(competitorsTable.projectId, String(pid))),
+      db.select({ category: clientKnowledgeTable.category, content: clientKnowledgeTable.content })
+        .from(clientKnowledgeTable)
+        .where(eq(clientKnowledgeTable.projectId, String(pid)))
+        .limit(15)
+        .catch(() => [] as { category: string; content: string }[]),
+    ]);
+
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const niche = project.storeNiche || "e-commerce general";
+    const storeName = project.name || "tienda";
+    const existingUrls = existingCompetitors.map(c => {
+      try { return new URL(c.url).hostname.toLowerCase(); } catch { return c.url?.toLowerCase(); }
+    }).filter(Boolean) as string[];
+
+    const productList = products.slice(0, 8).map(p => `${p.title}${p.price ? ` (${p.price}€)` : ""}`).join(", ");
+
+    // Build enriched context from client_knowledge
+    const knowledgeCtx = (knowledgeRows as { category: string; content: string }[])
+      .map(r => `[${r.category}] ${r.content}`)
+      .join("\n")
+      .slice(0, 1200);
+
+    // ── 2. Randomised search angles — different every call ────────────────────
+    const ANGLE_POOL = [
+      "mejores tiendas 2025 más vendidas",
+      "top marcas líderes del mercado",
+      "alternativas populares tendencias",
+      "nuevas tiendas online emergentes",
+      "mejor valorados por clientes reales",
+      "precio asequible buena calidad",
+      "marcas premium exclusivas",
+      "tiendas online más visitadas",
+      "competidores principales cuota de mercado",
+      "marcas internacionales que venden en España",
+    ];
+    const angles = ANGLE_POOL.sort(() => Math.random() - 0.5).slice(0, 3);
+
+    const buildDiscoveryPrompt = (angle: string) =>
+      `Busca tiendas online REALES usando el ángulo: "${angle}" para el sector "${niche}".
+
+Tienda cliente: "${storeName}" — vende: ${productList || "productos de " + niche}
+${knowledgeCtx ? `Contexto adicional del cliente:\n${knowledgeCtx}\n` : ""}
+Fecha de hoy: ${new Date().toISOString().split("T")[0]}
+
+REGLAS:
+• Encuentra 5-7 tiendas REALES que compitan en este sector y nicho
+• URLs verificables y reales (nada de ejemplo.com ni urls inventadas)
+• Varía el tipo: directos, indirectos, marketplaces, marcas grandes
+• EXCLUIR estos dominios ya registrados: ${existingUrls.slice(0, 8).join(", ") || "ninguno"}
+• Incluye qué servicios o features tienen (suscripción, app, personalización, envío gratis, etc.)
+• Busca en España, Europa y globalmente si el nicho lo requiere
+
+Responde SOLO JSON válido:
+{
+  "competitors": [
+    {
+      "name": "Nombre de la tienda",
+      "url": "https://...",
+      "type": "direct|indirect|substitute",
+      "reason": "Por qué compiten directamente",
+      "features": ["feature1", "feature2", "feature3"],
+      "priceLevel": "low|mid|premium",
+      "threatLevel": "low|medium|high"
+    }
+  ]
+}`;
+
+    // ── 3. Run 3 discovery searches in parallel ───────────────────────────────
+    const searchResults = await Promise.allSettled(
+      angles.map(angle =>
+        (isGeminiSearchBlocked()
+          ? askClaudeWithBrain(pid, [{ role: "user", content: buildDiscoveryPrompt(angle) }],
+              `${SHOPIFY_EXPERT_SYSTEM} Eres analista de inteligencia competitiva. Responde SOLO JSON válido. Nicho: ${niche}.`,
+              "competitors", niche)
+          : askGeminiWithSearch(buildDiscoveryPrompt(angle),
+              `Analista de inteligencia competitiva ecommerce. Busca en Google tiendas REALES. Responde SOLO JSON válido.`)
+              .then(r => r.text ?? "")
+        ).catch(() => "")
+      )
+    );
+
+    // ── 4. Parse + deduplicate ────────────────────────────────────────────────
+    const seenHostnames = new Set(existingUrls);
+    const allDiscovered: Array<{
+      name: string; url: string; type: string; reason: string;
+      features: string[]; priceLevel: string; threatLevel: string;
+    }> = [];
+
+    for (const result of searchResults) {
+      if (result.status !== "fulfilled" || !result.value) continue;
+      const raw = typeof result.value === "string" ? result.value : "";
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) continue;
+      try {
+        const parsed = JSON.parse(match[0]);
+        for (const c of (parsed.competitors ?? [])) {
+          if (!c.url || !isSafePublicUrl(c.url)) continue;
+          let hostname: string;
+          try { hostname = new URL(c.url).hostname.toLowerCase(); } catch { continue; }
+          if (seenHostnames.has(hostname)) continue;
+          // Skip own domain
+          if (project.shopDomain && hostname.includes(project.shopDomain.toLowerCase().replace(/^https?:\/\//, ""))) continue;
+          seenHostnames.add(hostname);
+          allDiscovered.push({
+            name: c.name ?? hostname,
+            url: c.url,
+            type: c.type ?? "direct",
+            reason: c.reason ?? "",
+            features: Array.isArray(c.features) ? c.features : [],
+            priceLevel: c.priceLevel ?? "mid",
+            threatLevel: c.threatLevel ?? "medium",
+          });
+        }
+      } catch {}
+    }
+
+    // Take up to 6 new competitors to analyse
+    const toAnalyze = allDiscovered.slice(0, 6);
+
+    // ── 5. Parallel: scrape + AI-analyse each competitor ─────────────────────
+    const analyzeOne = async (comp: typeof toAnalyze[0]) => {
+      // a) Scrape website
+      let htmlContent = "";
+      try {
+        const resp = await fetch(comp.url, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopifyAI-Monitor/1.0; +https://shopycrafter.com)" },
+          signal: AbortSignal.timeout(12_000),
+        });
+        const raw = await resp.text();
+        htmlContent = raw
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .slice(0, 12_000);
+      } catch { /* scrape failed — AI uses search */ }
+
+      // b) Gemini analysis with search
+      const analysisPrompt = `Analiza este competidor para la tienda "${storeName}" (sector: ${niche}).
+
+Competidor: ${comp.name} — ${comp.url}
+${htmlContent ? `Contenido scrapeado (usa esto + Google Search para completar):\n${htmlContent.slice(0, 6000)}` : "No se pudo scrapear. Usa Google Search para buscar info real sobre esta tienda."}
+
+NUESTRA TIENDA vende: ${productList || niche}
+
+ANALIZA y responde SOLO JSON:
+{
+  "productsFound": 0,
+  "priceMin": null,
+  "priceMax": null,
+  "featuresTheyHave": ["suscripción mensual", "app móvil", "envío gratis > €X", "personalización", "pack regalo", "reseñas verificadas", "chat en vivo", "programa de fidelidad", "devoluciones gratis"],
+  "strengths": ["fortaleza1", "fortaleza2"],
+  "weaknesses": ["debilidad1", "debilidad2"],
+  "opportunities": ["oportunidad para nosotros1", "oportunidad2"],
+  "threatLevel": "low|medium|high",
+  "insights": [
+    {"severity":"high|medium|low","type":"price_drop|new_product|promotion|stock|feature_gap","title":"...","description":"...","action":"..."}
+  ]
+}`;
+
+      let analysis: any = null;
+      try {
+        const r = isGeminiSearchBlocked()
+          ? await askClaudeWithBrain(pid, [{ role: "user", content: analysisPrompt }],
+              `${SHOPIFY_EXPERT_SYSTEM} Analista de inteligencia competitiva. Responde SOLO JSON válido.`,
+              "competitors", niche)
+          : await askGeminiWithSearch(analysisPrompt, `Analista de inteligencia competitiva ecommerce. Busca en Google info real. Responde SOLO JSON válido.`).then(r => r.text ?? "");
+
+        const raw = typeof r === "string" ? r : "";
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (match) { try { analysis = JSON.parse(match[0]); } catch {} }
+      } catch {}
+
+      return { ...comp, analysis };
+    };
+
+    const analyzed = await Promise.allSettled(toAnalyze.map(analyzeOne));
+    const results = analyzed
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+      .map(r => r.value)
+      .filter(r => r.analysis !== null);
+
+    // ── 6. Save to DB: competitors + snapshots + alerts ───────────────────────
+    const saved: any[] = [];
+    for (const item of results) {
+      try {
+        const [comp] = await db.insert(competitorsTable).values({
+          id: randomUUID(),
+          projectId: String(pid),
+          name: item.name,
+          url: item.url,
+          type: item.type || "direct",
+        }).returning();
+
+        await db.insert(competitorSnapshotsTable).values({
+          id: randomUUID(),
+          competitorId: comp.id,
+          productsFound: item.analysis?.productsFound ?? 0,
+          priceMin: item.analysis?.priceMin ?? null,
+          priceMax: item.analysis?.priceMax ?? null,
+          priceMedian: null,
+          newProducts: JSON.stringify([]),
+          outOfStock: JSON.stringify([]),
+          promotionsDetected: JSON.stringify([]),
+          rawData: JSON.stringify(item.analysis),
+        });
+
+        await db.update(competitorsTable).set({ lastScanned: new Date() }).where(eq(competitorsTable.id, comp.id));
+
+        for (const insight of (item.analysis?.insights ?? [])) {
+          await db.insert(competitorAlertsTable).values({
+            id: randomUUID(),
+            projectId: String(pid),
+            competitorId: comp.id,
+            alertType: insight.type ?? "general",
+            severity: insight.severity ?? "low",
+            title: insight.title ?? "",
+            description: insight.description ?? "",
+            actionSuggestion: insight.action ?? "",
+          });
+        }
+
+        saved.push({
+          ...comp,
+          reason: item.reason,
+          priceLevel: item.priceLevel,
+          threatLevel: item.analysis?.threatLevel ?? item.threatLevel,
+          features: item.features,
+          analysis: item.analysis,
+        });
+      } catch {}
+    }
+
+    // ── 7. Feature gap aggregation ────────────────────────────────────────────
+    const featureCount: Record<string, number> = {};
+    for (const item of results) {
+      for (const f of (item.analysis?.featuresTheyHave ?? [])) {
+        const key = String(f).toLowerCase().trim();
+        featureCount[key] = (featureCount[key] || 0) + 1;
+      }
+    }
+    const gaps = Object.entries(featureCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([feature, count]) => ({
+        feature,
+        competitorsWithIt: count,
+        totalAnalyzed: results.length,
+        priority: count >= results.length * 0.6 ? "high" : count >= results.length * 0.3 ? "medium" : "low",
+      }));
+
+    // ── 8. Learn + save ───────────────────────────────────────────────────────
+    learnFromOperation({
+      operationType: "competitor_auto_analyze",
+      title: `Auto-análisis competidores: ${storeName} (${niche})`,
+      content: `Analizados ${saved.length} competidores para "${storeName}" (${niche}). Ángulos: ${angles.join(" | ")}. Gaps: ${gaps.slice(0, 5).map(g => g.feature).join(", ")}`,
+      niche,
+      sourceProjectId: pid,
+    });
+
+    saveToVault({
+      projectId: pid,
+      fileType: "analysis",
+      category: "competitor_scan",
+      title: `Auto-análisis competidores: ${storeName}`,
+      description: `${saved.length} competidores analizados, ${gaps.length} feature gaps detectados`,
+      mimeType: "application/json",
+      fileSizeBytes: Buffer.from(JSON.stringify({ saved, gaps })).length,
+      generatedBy: "competitor_auto_analyze",
+      content: JSON.stringify({ saved, gaps, angles, sector: niche }, null, 2),
+      metadata: { analyzed: saved.length, gaps: gaps.length },
+    }).catch(() => {});
+
+    res.json({
+      ok: true,
+      analyzed: saved,
+      gaps,
+      angles,
+      totalDiscovered: allDiscovered.length,
+      sector: niche,
+      storeName,
+    });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
