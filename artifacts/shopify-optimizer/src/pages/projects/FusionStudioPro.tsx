@@ -451,6 +451,27 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
                 prompt: "Goal: Create a photorealistic AI influencer character sheet. Canvas: 16:9 horizontal board. Layout: exactly 1 full-body front pose (hero), exactly 2 expression close-ups (smile, neutral), exactly 2 outfit variants, exactly 1 side profile. Style: hyper-realistic, editorial photography, soft studio lighting, 8k. No watermarks. Character: ",
               },
               {
+                label: "⌚ Watch Character Sheet",
+                prompt: `Technical luxury watch character design sheet, wide horizontal board 16:9, cream off-white background, fine serif typography labels.
+Layout — CENTER: 1 large hero shot of Rolex Datejust 41 two-tone Rolesor, 3/4 view, dramatic studio lighting, champagne diamond dial, 18k yellow gold fluted bezel.
+LEFT COLUMN: 3 component close-ups — (1) fluted 18k gold bezel extreme macro, 72 ridges catching studio light; (2) Five-link Jubilee bracelet showing polished gold + brushed steel; (3) Oyster crown with Rolex crown logo in relief.
+RIGHT COLUMN: 3 component close-ups — (1) champagne sunray dial macro with 10 diamond indices; (2) Calibre 3235 movement exposed from caseback — rotor, blue Parachrom hairspring, Chronergy escapement; (3) Oystersteel 904L case profile showing polished lugs + brushed flanks.
+BOTTOM ROW: 5 views — dial face, case side profile, caseback (Oyster screwback), bezel top-down showing 72 ridges, Jubilee clasp open showing Easylink system.
+ANNOTATIONS: fine thin serif labels — "72-ridge 18k fluted bezel", "Chromalight indices", "Calibre 3235 — 28,800 vph — 31 rubies", "Oystersteel 904L", "Jubilee Ref 62613", "2.5x Cyclops sapphire crystal", "Oysterclasp + Easylink".
+Style: luxury editorial technical illustration, 8K precision, photorealistic. No watermarks. Watch model: Rolex Datejust 41 Ref 126333`,
+              },
+              {
+                label: "⌚ Watch Storyboard 6P",
+                prompt: `Production storyboard for Rolex Datejust 41 explode view video. Exactly 6 panels in 3-column × 2-row grid. Each panel has caption strip with panel number, camera note, timestamp, and action title. Style: luxury cinematic storyboard, clean detailed illustration, black marker on cream paper aesthetic.
+P01 [100mm macro / 45° iso / 00:00-02s / HERO ASSEMBLED]: Rolex Datejust 41 fully assembled rotating on matte black pedestal. Champagne diamond dial, gold fluted bezel.
+P02 [Extreme macro / 200mm / 02-04s / BEZEL REVEAL]: 18k gold fluted bezel extreme close-up — 72 ridges, alternating light/shadow, each facet visible.
+P03 [45° iso / Slow-mo 0.3x / 04-08s / DISASSEMBLY BEGINS]: Fluted bezel lifts, sapphire crystal rises, three gold hands separate radially. Case body remains center anchor.
+P04 [90° overhead / 08-13s / FULL EXPLODE]: All components floating in perfect formation — dial, bezel, crystal, hands, bracelet links cascading. Oysterclasp unfolded.
+P05 [Tight 3/4 / movement visible / 13-18s / CALIBRE 3235]: Caseback open, movement exposed — blue Parachrom hairspring, tungsten rotor, Chronergy escapement, 31 ruby jewels.
+P06 [Hero / 100mm / 18-25s / REASSEMBLY + CTA]: All components magnetically snap back. Watch assembled, 3/4 rotation. Rolex crown logo sharp. Fade to black.
+No extra panels, no watermarks.`,
+              },
+              {
                 label: "💥 Explode View (auriculares)",
                 prompt: "Cinematic exploded view of wireless earbuds on a clean white studio background. Silicone tips, internal speaker drivers, battery casing, and PCB board float apart vertically and outward, perfectly separated in 3D space. Engineering manual aesthetic, ultra-detailed components, soft rim lighting, 8k. No text, no watermarks. Brand: ",
               },
@@ -959,6 +980,137 @@ const RENOISE_NEG_PRESETS: { label: string; key: string; value: string }[] = [
 
 const STORYBOARD_VIDEO_WRAPPER = `Use the storyboard sheet as the exact sequential visual keyframe reference for the video. Treat every panel as an independent cinematic shot, not as a single image. Follow the storyboard shot by shot. No text, no label, no watermark, no logo. `;
 
+// ─── WATCH EXPLODE SEQUENCE ─────────────────────────────────────────────────
+// Duraciones verificadas: Grok=15s+extend, Runway Gen-4.5=15s+I2V, Seedance=10s(4slots), Flow=10s, Kling=8s, Hailuo=5s
+const WATCH_EXPLODE_CLIPS: {
+  id: string;
+  clip: string;
+  engine: string;
+  engineKey: string;
+  maxDuration: number;
+  chainMethod: string;
+  chainMethodNote: string;
+  prompt: string;
+  tip: string;
+}[] = [
+  {
+    id: "clip1",
+    clip: "CLIP 1 / 3",
+    engine: "Seedance 2.0",
+    engineKey: "seedance-1-pro",
+    maxDuration: 10,
+    chainMethod: "T2V (texto → vídeo)",
+    chainMethodNote: "No necesita imagen origen. Guarda el ÚLTIMO FRAME para el Clip 2.",
+    tip: "⏱ 10s · 4 timestamps · Modo T2V → guarda último frame para Clip 2",
+    prompt: `CAMERA: Static locked-off 45° isometric, 100mm macro equivalent. Zero camera movement. STYLE: Luxury watch product film, photorealistic, ARRI Alexa Mini LF, matte black background, soft diffused studio boxes, warm specular on 18k yellow gold.
+[0-1.5s] Rolex Datejust 41 two-tone Rolesor fully assembled, rotating slowly 360° on matte black pedestal. Champagne sunray diamond dial, 18k yellow gold fluted bezel (72 ridges) catching studio specular highlights. Jubilee bracelet two-tone links glinting.
+[1.5-3.5s] Watch stops rotating, faces dial directly to lens. EXTREME CLOSE-UP. 72 fluted gold ridges create alternating specular highlights and deep shadows. 10 brilliant-cut diamond hour indices catch prismatic light. Applied Rolex crown logo at 12 o'clock razor sharp.
+[3.5-6s] DISASSEMBLY BEGINS — SLOW MOTION 0.3x. The 18k yellow gold fluted bezel lifts vertically away from case. Flat sapphire crystal rises above dial. Three gold hands (hour baton / minute baton / slim seconds) separate radially outward simultaneously, each rotating to reveal Chromalight blue luminescent fill.
+[6-8s] Champagne sunray dial detaches and floats upward, revealing empty case interior. Oystersteel 904L case body (41mm, polished lugs) remains as anchor center. 18k gold Oyster screw-down crown slides out to the right. Case back unseals and descends below. All components simultaneously rotating to show all surfaces.`,
+  },
+  {
+    id: "clip2",
+    clip: "CLIP 2 / 3",
+    engine: "Grok Aurora 1.5",
+    engineKey: "grok-imagine-video-1.5",
+    maxDuration: 15,
+    chainMethod: "I2V (imagen → vídeo)",
+    chainMethodNote: "Usa el ÚLTIMO FRAME del Clip 1 como imagen origen (@Image1). Modo I2V.",
+    tip: "⏱ 15s · I2V desde último frame Clip 1 · Puede extenderse +2-10s adicionales",
+    prompt: `@Image1 Continuing from previous frame — all exterior watch components now in full 3D exploded formation floating in matte black space. SLOW MOTION. Studio boxes warm specular on gold.
+[0-4s] Five-link Jubilee bracelet (Ref 62613) links cascade apart sequentially from Oysterclasp clasp toward case — each link group separates revealing 3 polished 18k gold center links + 2 brushed Oystersteel outer links. Butterfly Oysterclasp unfolds showing Easylink 5mm extension mechanism in detail. Each bracelet link rotates 360° showing both polished gold and brushed steel surfaces.
+[4s transition] Smash cut to overhead 90° top view.
+[4-9s] ALL EXTERIOR COMPONENTS in perfect exploded formation from above: fluted bezel, sapphire crystal, champagne diamond dial (sunray lines visible from above), 3 gold hands, Oystersteel case body, gold crown, caseback, all 22 Jubilee bracelet link groups arranged in arc. Every component slowly rotating. Prismatic diamond light refractions visible. Camera orbits slowly 45° around the formation.
+[9-15s] Camera tilts to 3/4 view revealing inside of case — CALIBRE 3235 MOVEMENT exposed from below through open caseback. Tungsten perpetual rotor (semi-circular oscillating weight) sweeps slowly. Blue Parachrom hairspring (8 coils, oxidized niobium-zirconium) oscillates at 4Hz. Chronergy escape wheel (nickel-phosphorus) advances rhythmically. 31 ruby jewels glow in their gold settings. Perlage decoration on main plate visible. Côtes de Genève stripes on barrel bridge. EXTREME MACRO detail.`,
+  },
+  {
+    id: "clip3",
+    clip: "CLIP 3 / 3",
+    engine: "Runway Gen-4.5",
+    engineKey: "runway-gen4.5",
+    maxDuration: 15,
+    chainMethod: "I2V (imagen → vídeo)",
+    chainMethodNote: "Usa el ÚLTIMO FRAME del Clip 2 como imagen origen. Modo I2V. Runway Gen-4.5 (15s máx).",
+    tip: "⏱ 15s · I2V desde último frame Clip 2 · 4K nativo · Audio nativo activado",
+    prompt: `Continuing from previous frame — Calibre 3235 movement fully exposed in exploded view.
+[0-5s] EXTREME MACRO orbit around floating Calibre 3235 components: GLUCYDUR beryllium-bronze balance wheel oscillating, blue Parachrom hairspring (8 spiral coils) flexing rhythmically, Chronergy escape wheel advancing tooth by tooth, pallet fork lever clicking with two ruby stones, mainspring barrel (open showing coiled NIVAFLEX spring), barrel bridge (Côtes de Genève stripes), main plate (perlage decoration), 31 ruby jewels highlighted in gold polished settings. All 201 components in technical floating formation. Slow camera dolly through the movement components.
+[5-8s] 18k gold Oyster crown with Rolex five-point crown logo engraving orbits into foreground extreme macro. Logo crisp and sharp. Then caseback with Oyster engraving rises into frame. SFX: single precise watch tick at 7s.
+[8-13s] REVERSE ASSEMBLY — magnetic attraction. All components begin converging inward simultaneously: caseback seals first (rising from below), movement drops into case, Jubilee bracelet links reconnect sequentially (cascade in reverse, link by link snapping together with satisfying click sounds), champagne dial descends onto case, hands return to 10:10:31 position, sapphire crystal seals, fluted 18k bezel locks onto case with audible snap. SLOW MOTION → REAL SPEED transition at 11s.
+[13-15s] Fully assembled Rolex Datejust 41 in hero 3/4 position, slow 30° rotation. Rolex crown logo at 12 o'clock razor sharp in foreground. Diamond indices catching light. FADE TO MATTE BLACK. Text on screen: elegant thin white serif — "DATEJUST 41 · CALIBRE 3235".`,
+  },
+];
+
+function WatchExplodeSequenceBuilder({ setPrompt, setMode }: { setPrompt: (p: string) => void; setMode: (m: VideoMode) => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [copied, setCopied] = React.useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(id);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  };
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ width: "100%", background: "linear-gradient(135deg, rgba(180,140,60,0.15), rgba(251,191,36,0.08))", border: "1px solid rgba(251,191,36,0.35)", borderRadius: 8, padding: "10px 14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--gold)" }}>
+        <span style={{ fontSize: 11, fontWeight: 700 }}>⌚ Rolex Explode View — Secuencia 3 Clips (40s total)</span>
+        <span style={{ fontSize: 10 }}>{open ? "▲ Cerrar" : "▼ Ver secuencia"}</span>
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ padding: "8px 10px", background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 6, fontSize: 9, color: "var(--t3)", lineHeight: 1.6 }}>
+            <strong style={{ color: "var(--gold)" }}>📐 Duraciones verificadas:</strong> Grok Aurora=15s+extend · Runway Gen-4.5=15s+I2V · Seedance=10s(4slots) · Google Flow=10s · Kling=8s · Hailuo=5s<br />
+            <strong style={{ color: "var(--gold)" }}>🔗 Encadenamiento:</strong> Genera Clip 1 → descarga último frame → súbelo como imagen origen en Clip 2 (modo I2V) → repite para Clip 3. Cada clip comienza exactamente donde terminó el anterior.
+          </div>
+          {WATCH_EXPLODE_CLIPS.map((clip) => (
+            <div key={clip.id} style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ background: "rgba(30,30,30,0.8)", padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: "var(--gold)" }}>{clip.clip}</span>
+                  <span style={{ fontSize: 9, color: "var(--t3)", marginLeft: 8 }}>Motor: <strong style={{ color: "#e0d4b4" }}>{clip.engine}</strong></span>
+                  <span style={{ fontSize: 9, color: "#4ade80", marginLeft: 8 }}>⏱ {clip.maxDuration}s máx</span>
+                </div>
+                <span style={{ fontSize: 9, color: "#94a3b8", background: "rgba(255,255,255,0.07)", padding: "2px 7px", borderRadius: 4 }}>{clip.chainMethod}</span>
+              </div>
+              <div style={{ padding: "8px 12px", background: "rgba(15,15,15,0.5)" }}>
+                <div style={{ fontSize: 9, color: "#60a5fa", marginBottom: 6, lineHeight: 1.5, padding: "4px 8px", background: "rgba(96,165,250,0.08)", borderRadius: 4, border: "1px solid rgba(96,165,250,0.15)" }}>
+                  🔗 <strong>Encadenamiento:</strong> {clip.chainMethodNote}
+                </div>
+                <div style={{ fontSize: 9, color: "var(--t3)", fontFamily: "monospace", background: "rgba(0,0,0,0.4)", borderRadius: 6, padding: "8px 10px", maxHeight: 120, overflowY: "auto", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                  {clip.prompt.slice(0, 400)}{clip.prompt.length > 400 ? "…" : ""}
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <button
+                    onClick={() => { setPrompt(clip.prompt); setMode(clip.id === "clip1" ? "t2v" : "i2v"); }}
+                    style={{ flex: 1, fontSize: 9, padding: "6px 8px", background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.4)", borderRadius: 5, cursor: "pointer", color: "var(--gold)", fontWeight: 700 }}>
+                    ⚡ Cargar en VideoTab
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(clip.prompt, clip.id)}
+                    style={{ fontSize: 9, padding: "6px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 5, cursor: "pointer", color: "var(--t3)" }}>
+                    {copied === clip.id ? "✓ Copiado" : "📋 Copiar"}
+                  </button>
+                </div>
+                <p style={{ fontSize: 9, color: "var(--t3)", margin: "6px 0 0", fontStyle: "italic" }}>{clip.tip}</p>
+              </div>
+            </div>
+          ))}
+          <div style={{ padding: "8px 10px", background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.2)", borderRadius: 6, fontSize: 9, color: "#86efac", lineHeight: 1.6 }}>
+            <strong>💡 Workflow completo:</strong><br />
+            1. Clip 1 → Seedance 2.0 (T2V, 10s) → descarga último frame<br />
+            2. Clip 2 → Grok Aurora (I2V, 15s) → sube último frame de Clip 1 como imagen origen<br />
+            3. Clip 3 → Runway Gen-4.5 (I2V, 15s) → sube último frame de Clip 2<br />
+            4. Exporta los 3 clips (10s+15s+15s=40s) y únelos en DaVinci/Premiere con cortes en el último frame de cada clip
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }: { caps: Capabilities | null; health: HealthMap | null; projectId: number; onSuccess: (it: VaultItem) => void; onError: (m: string) => void; onCreditError?: () => void }) {
   const [mode, setMode] = useState<VideoMode>("i2v");
   const [model, setModel] = useState("seedance-fast");
@@ -1281,6 +1433,12 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
                 </button>
               </div>
             )}
+          </Section>
+        )}
+
+        {!isXaiMode && (
+          <Section title="⌚ Secuencia Explode View — Multi-Clip Encadenado">
+            <WatchExplodeSequenceBuilder setPrompt={setPrompt} setMode={setMode} />
           </Section>
         )}
 
