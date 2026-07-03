@@ -10,7 +10,7 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export type PlatformType = "shopify" | "woocommerce" | "prestashop" | "wordpress" | "universal";
+export type PlatformType = "shopify" | "woocommerce" | "prestashop" | "wordpress" | "universal" | "stripe";
 
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),

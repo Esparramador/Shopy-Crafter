@@ -646,6 +646,7 @@ export declare const insertAbTestSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodString>;
     projectId: z.ZodInt;
     shopifyProductId: z.ZodString;
+    confidence: z.ZodOptional<z.ZodNumber>;
     imageType: z.ZodString;
     productTitle: z.ZodString;
     testType: z.ZodOptional<z.ZodString>;
@@ -663,7 +664,6 @@ export declare const insertAbTestSchema: z.ZodObject<{
     variantBConversions: z.ZodOptional<z.ZodInt>;
     variantARevenue: z.ZodOptional<z.ZodNumber>;
     variantBRevenue: z.ZodOptional<z.ZodNumber>;
-    confidence: z.ZodOptional<z.ZodNumber>;
     winner: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     targetMetric: z.ZodOptional<z.ZodString>;
     minimumSampleSize: z.ZodOptional<z.ZodInt>;

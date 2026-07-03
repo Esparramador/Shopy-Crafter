@@ -5,6 +5,7 @@ import { ShopifyConnector } from "./shopify";
 import { PrestaShopConnector } from "./prestashop";
 import { WooCommerceConnector } from "./woocommerce";
 import { UniversalAuditConnector } from "./universal";
+import { StripeConnector } from "./stripe";
 
 export function getConnector(project: Project): IPlatformConnector {
   const platformType = (project as Project & { platformType?: string }).platformType ?? "shopify";
@@ -22,6 +23,9 @@ export function getConnector(project: Project): IPlatformConnector {
     case "woocommerce":
       return new WooCommerceConnector(project);
 
+    case "stripe":
+      return new StripeConnector(project);
+
     case "wordpress":
       throw new PlatformNotSupportedError("wordpress");
 
@@ -33,6 +37,7 @@ export function getConnector(project: Project): IPlatformConnector {
 export { ShopifyConnector } from "./shopify";
 export { PrestaShopConnector } from "./prestashop";
 export { WooCommerceConnector } from "./woocommerce";
+export { StripeConnector } from "./stripe";
 export { UniversalAuditConnector } from "./universal";
 export { PlatformNotSupportedError, FeatureNotSupportedError } from "./types";
 export type {

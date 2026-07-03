@@ -264,13 +264,13 @@ export declare const charactersTable: import("drizzle-orm/pg-core").PgTableWithC
 export declare const insertCharacterSchema: z.ZodObject<{
     name: z.ZodString;
     projectId: z.ZodInt;
-    metadata: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     gender: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     ageRange: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     identityDescription: z.ZodString;
     voiceId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     voiceGender: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     voiceLanguage: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    metadata: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     refVaultFileId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     refMimeType: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     styleNotes: z.ZodOptional<z.ZodNullable<z.ZodString>>;

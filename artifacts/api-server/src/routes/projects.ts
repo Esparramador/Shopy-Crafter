@@ -267,7 +267,7 @@ router.post("/projects", async (req, res): Promise<void> => {
       replicateApiToken, anthropicApiKey, plan, platformType: rawPlatformType,
     } = req.body;
   
-    const validPlatforms: PlatformType[] = ["shopify", "woocommerce", "prestashop", "wordpress", "universal"];
+    const validPlatforms: PlatformType[] = ["shopify", "woocommerce", "prestashop", "wordpress", "universal", "stripe"];
     const platformType: PlatformType = validPlatforms.includes(rawPlatformType) ? rawPlatformType : "shopify";
   
     const isShopify = platformType === "shopify";
@@ -763,7 +763,7 @@ router.post("/projects/test-connection-presave", async (req, res): Promise<void>
       return;
     }
   
-    const validPlatforms = ["shopify", "woocommerce", "prestashop"];
+    const validPlatforms = ["shopify", "woocommerce", "prestashop", "stripe"];
     if (!validPlatforms.includes(platformType)) {
       res.status(400).json({ connected: false, error: "Plataforma no válida", errorCode: "INVALID_PLATFORM" });
       return;
@@ -775,7 +775,8 @@ router.post("/projects/test-connection-presave", async (req, res): Promise<void>
         res.status(400).json({ connected: false, error: "El dominio debe ser un dominio .myshopify.com válido", errorCode: "STORE_NOT_FOUND" });
         return;
       }
-    } else {
+    } else if (platformType !== "stripe") {
+      // Stripe uses a business name (not a URL) — skip URL validation for it
       try {
         const storeUrl = new URL(shopDomain.startsWith("http") ? shopDomain : `https://${shopDomain}`);
         const hostname = storeUrl.hostname.toLowerCase();

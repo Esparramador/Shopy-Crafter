@@ -33,4 +33,5 @@ export * from "./characters";
 export * from "./business_cards";
 export * from "./youtube";
 export * from "./security_scans";
+export * from "./client_knowledge";
 //# sourceMappingURL=index.d.ts.map

@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-export type PlatformType = "shopify" | "woocommerce" | "prestashop" | "wordpress" | "universal";
+export type PlatformType = "shopify" | "woocommerce" | "prestashop" | "wordpress" | "universal" | "stripe";
 export declare const projectsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "projects";
     schema: undefined;

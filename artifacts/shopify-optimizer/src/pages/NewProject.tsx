@@ -9,7 +9,7 @@ import { useCmsSection } from "@/contexts/CmsContext";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type PlatformType = "shopify" | "woocommerce" | "prestashop" | "universal";
+type PlatformType = "shopify" | "woocommerce" | "prestashop" | "universal" | "stripe";
 
 const PLATFORM_OPTIONS: Array<{
   key: PlatformType;
@@ -21,6 +21,7 @@ const PLATFORM_OPTIONS: Array<{
   { key: "shopify", label: "Shopify", icon: ShoppingBag, color: "#95bf47", description: "Tienda Shopify con API Admin" },
   { key: "woocommerce", label: "WooCommerce", icon: Globe, color: "#7f54b3", description: "WordPress + WooCommerce" },
   { key: "prestashop", label: "PrestaShop", icon: Store, color: "#df0067", description: "Panel PrestaShop con Webservice" },
+  { key: "stripe", label: "Stripe", icon: Store, color: "#635bff", description: "Pagos Stripe con API Key" },
   { key: "universal", label: "Auditoría Universal", icon: Globe, color: "#5b9bd5", description: "Analiza cualquier web con IA" },
 ];
 
@@ -77,6 +78,7 @@ export default function NewProject() {
   const isUniversal = platform === "universal";
   const isWoo = platform === "woocommerce";
   const isShopify = platform === "shopify";
+  const isStripe = platform === "stripe";
 
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
@@ -150,7 +152,7 @@ export default function NewProject() {
       if (isShopify || isWoo) {
         body.clientId = formData.clientId;
         body.clientSecret = formData.clientSecret;
-      } else if (isPrestaShop) {
+      } else if (isPrestaShop || isStripe) {
         body.clientId = "";
         body.clientSecret = formData.clientSecret;
       } else {
@@ -186,6 +188,8 @@ export default function NewProject() {
     ? formData.shopDomain && formData.clientSecret && formData.clientSecret.length === 32
     : isUniversal
     ? !!formData.shopDomain
+    : isStripe
+    ? formData.shopDomain && formData.clientSecret && formData.clientSecret.startsWith("sk_")
     : formData.shopDomain && formData.clientId && formData.clientSecret;
 
   const canTestConnection = !isUniversal && isValid;
@@ -197,12 +201,16 @@ export default function NewProject() {
     ? "URL de tu tienda PrestaShop *"
     : isUniversal
     ? "URL del sitio web *"
+    : isStripe
+    ? "Nombre del negocio o URL *"
     : t("shopDomain", "Dominio Shopify *");
 
   const domainPlaceholder = isWoo
     ? "https://mitienda.com"
     : isUniversal
     ? "https://www.ejemplo.com"
+    : isStripe
+    ? "Mi Negocio o https://minegocio.com"
     : isShopify
     ? "mi-tienda.myshopify.com"
     : "mitienda.com";
@@ -339,7 +347,51 @@ export default function NewProject() {
             <>
               <div style={{ borderTop: "1px solid var(--bdr)", margin: "20px 0" }} />
 
-              {isPrestaShop ? (
+              {isStripe ? (
+                <>
+                  <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                    Credenciales — Stripe Dashboard → Desarrolladores → Claves de API
+                  </p>
+                  <div style={{ marginBottom: 0 }}>
+                    <div className="form-group">
+                      <label className="form-label">Secret Key de Stripe *</label>
+                      <input
+                        required
+                        type="password"
+                        className="form-input"
+                        style={{ fontFamily: "var(--fm)" }}
+                        value={formData.clientSecret}
+                        onChange={handleChange("clientSecret")}
+                        placeholder="sk_live_••••••••••••••••••••••••••••••••"
+                        autoComplete="new-password"
+                      />
+                      {formData.clientSecret && !formData.clientSecret.startsWith("sk_") && (
+                        <span style={{ fontSize: 11, color: "#dc3c3c", marginTop: 4, display: "block" }}>
+                          Debe empezar por sk_live_ (producción) o sk_test_ (pruebas)
+                        </span>
+                      )}
+                      {formData.clientSecret && formData.clientSecret.startsWith("sk_") && (
+                        <span style={{ fontSize: 11, color: "#3db87a", marginTop: 4, display: "block" }}>
+                          ✓ Formato de clave correcto
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: "rgba(99,91,255,0.06)", border: "1px solid rgba(99,91,255,0.2)" }}>
+                    <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "#635bff", marginBottom: 6 }}>
+                      Cómo obtener tu Secret Key de Stripe:
+                    </p>
+                    <ol style={{ fontSize: 11, color: "var(--t2)", margin: 0, paddingLeft: 16, lineHeight: 1.6 }}>
+                      <li>Accede a <strong>dashboard.stripe.com</strong></li>
+                      <li>Ve a <strong>Desarrolladores → Claves de API</strong></li>
+                      <li>Copia la <strong>Secret key</strong> (empieza por sk_live_...)</li>
+                    </ol>
+                  </div>
+                  <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 10 }}>
+                    🔒 Clave cifrada con AES-256. Stripe no requiere OAuth — conexión directa con la API key.
+                  </p>
+                </>
+              ) : isPrestaShop ? (
                 <>
                   <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
                     Credenciales — Parámetros Avanzados → Webservice → Añadir clave

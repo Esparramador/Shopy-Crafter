@@ -496,12 +496,12 @@ export declare const insertProductSchema: z.ZodObject<{
     projectId: z.ZodInt;
     shopifyProductId: z.ZodString;
     title: z.ZodString;
+    tags: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     handle: z.ZodString;
     bodyHtml: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     vendor: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     productType: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     publishedAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    tags: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     price: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     compareAtPrice: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     imageCount: z.ZodOptional<z.ZodInt>;
