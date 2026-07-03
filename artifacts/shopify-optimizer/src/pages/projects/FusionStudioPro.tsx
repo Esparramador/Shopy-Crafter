@@ -950,6 +950,9 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
   const [videoUrl, setVideoUrl] = useState("");
   const [cameraPreset, setCameraPreset] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [showTsBuilder, setShowTsBuilder] = useState(false);
+  const [tsSlots, setTsSlots] = useState(["", "", "", ""]);
+  const [tsCameraSetup, setTsCameraSetup] = useState("");
 
   const modelCfg = caps?.videoGeneration.find(m => m.key === model);
   const currentProvider = (mode === "extend" || mode === "edit-video") ? "xai" as ProviderId : modelCfg?.provider;
@@ -1199,6 +1202,63 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
             )}
           </div>
         </Section>
+
+        {!isXaiMode && (
+          <Section title="🎬 Timestamp Narration Builder (Seedance 2.0)">
+            <button
+              onClick={() => setShowTsBuilder(v => !v)}
+              style={{ ...pillButton(showTsBuilder), marginBottom: showTsBuilder ? 10 : 0, width: "100%", justifyContent: "center" }}>
+              {showTsBuilder ? "▲ Ocultar Builder" : "▼ Construir prompt por timestamps [0-1.5s] [1.5-3.5s]…"}
+            </button>
+            {showTsBuilder && (
+              <div>
+                <div style={{ fontSize: 9, color: "var(--t3)", marginBottom: 8, lineHeight: 1.5, padding: "6px 8px", background: "rgba(251,191,36,0.06)", borderRadius: 6, border: "1px solid rgba(251,191,36,0.15)" }}>
+                  <strong style={{ color: "var(--gold)" }}>Sintaxis Seedance 2.0</strong> — El modelo trata cada corchete como un corte editorial duro.<br />
+                  Refs: <code style={{ fontSize: 9 }}>@Image1</code>–<code style={{ fontSize: 9 }}>@Image9</code> · SFX: <code style={{ fontSize: 9 }}>SFX: thunder at 2s</code> · Cámara global ↓ (fuera de timestamps)
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3 }}>📷 Global Setup (cámara + estilo — se pone ANTES de los timestamps):</label>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+                    {["CAMERA: Dolly push-in, 50mm prime. STYLE: Cinematic, golden hour.", "CAMERA: 360 orbit, 14mm wide-angle. STYLE: Cyberpunk neon glow.", "CAMERA: Slow dolly out, 35mm anamorphic. STYLE: Film grain, ARRI Alexa Mini LF.", "CAMERA: Low-angle tracking. STYLE: High-key commercial, clean white."].map(p => (
+                      <button key={p} onClick={() => setTsCameraSetup(p)} style={{ ...pillButton(tsCameraSetup === p), fontSize: 9, padding: "3px 7px" }}>{p.split(".")[0].replace("CAMERA: ", "")}</button>
+                    ))}
+                  </div>
+                  <input value={tsCameraSetup} onChange={e => setTsCameraSetup(e.target.value)} placeholder="CAMERA: Dolly push-in, 50mm prime. STYLE: Cinematic, golden hour." style={{ ...inputStyle, fontSize: 10 }} />
+                </div>
+                {[
+                  { label: "[0–1.5s]", hint: "Plano de apertura / establecimiento" },
+                  { label: "[1.5–3.5s]", hint: "Acción principal / punto de giro" },
+                  { label: "[3.5–6s]", hint: "Desarrollo / close-up / detalle" },
+                  { label: "[6–8s]", hint: "Cierre / CTA / QUICK CUT" },
+                ].map((slot, i) => (
+                  <div key={i} style={{ marginBottom: 8 }}>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", display: "block", marginBottom: 3 }}>
+                      {slot.label} <span style={{ fontWeight: 400, color: "var(--t3)" }}>— {slot.hint}</span>
+                    </label>
+                    <textarea
+                      value={tsSlots[i]}
+                      onChange={e => { const n = [...tsSlots]; n[i] = e.target.value; setTsSlots(n); }}
+                      placeholder={`Describe la acción de este plano… ej: "Character from @Image1 walks through rain. SFX: thunder at ${i === 0 ? "0.5" : i === 1 ? "2" : i === 2 ? "4.5" : "7"}s"`}
+                      style={{ ...inputStyle, minHeight: 44, fontSize: 10 }}
+                    />
+                  </div>
+                ))}
+                <button
+                  onClick={() => {
+                    const parts: string[] = [];
+                    if (tsCameraSetup.trim()) parts.push(tsCameraSetup.trim());
+                    const labels = ["[0-1.5s]", "[1.5-3.5s]", "[3.5-6s]", "[6-8s]"];
+                    tsSlots.forEach((s, i) => { if (s.trim()) parts.push(`${labels[i]} ${s.trim()}`); });
+                    if (parts.length) setPrompt(parts.join("\n"));
+                  }}
+                  className="btn btn-gold"
+                  style={{ width: "100%", justifyContent: "center", fontSize: 11, padding: "9px 16px", marginTop: 4 }}>
+                  ⚡ Ensamblar en Prompt
+                </button>
+              </div>
+            )}
+          </Section>
+        )}
 
         {isXaiMode ? (
           <>
