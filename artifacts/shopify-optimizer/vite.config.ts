@@ -34,6 +34,22 @@ export default defineConfig({
     react(),
     tailwindcss(),
     {
+      // Non-blocking CSS: converts the main Vite-injected <link rel="stylesheet">
+      // into a preload + onload swap pattern so it no longer blocks FCP.
+      // A <noscript> fallback ensures non-JS environments still get styles.
+      name: "async-css-inject",
+      transformIndexHtml(html: string) {
+        // Only apply during production build
+        if (!isBuild) return html;
+        return html.replace(
+          /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/g,
+          (_match: string, href: string) =>
+            `<link rel="preload" as="style" href="${href}" onload="this.onload=null;this.rel='stylesheet'">` +
+            `<noscript><link rel="stylesheet" href="${href}"></noscript>`
+        );
+      },
+    },
+    {
       // Cache-Control para la build de producción servida con `vite preview`.
       // Los assets con hash de contenido (/assets/*.js|css|fuentes) son inmutables;
       // medios (vídeos/imágenes) reciben max-age largo; el HTML nunca se cachea
@@ -156,6 +172,18 @@ export default defineConfig({
           // JSZip — zip file generation
           if (id.includes("node_modules/jszip")) {
             return "vendor-jszip";
+          }
+          // Recharts — charts (admin dashboard only)
+          if (id.includes("node_modules/recharts") || id.includes("node_modules/victory-")) {
+            return "vendor-recharts";
+          }
+          // Zod + react-hook-form — form validation (admin forms only)
+          if (id.includes("node_modules/zod") || id.includes("node_modules/@hookform") || id.includes("node_modules/react-hook-form")) {
+            return "vendor-forms";
+          }
+          // date-fns — date utilities (admin pages only)
+          if (id.includes("node_modules/date-fns")) {
+            return "vendor-date";
           }
           // All other node_modules
           if (id.includes("node_modules/")) {

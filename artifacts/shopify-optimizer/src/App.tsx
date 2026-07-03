@@ -196,9 +196,11 @@ function ExportCenterRoute() {
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
-  if (loading) return <PageLoader />;
-  if (user?.role === "admin") return <Redirect to="/home" />;
-  if (user?.role === "client") return <Redirect to="/client" />;
+  // Never block the landing page on the auth API call.
+  // Auth typically takes 1-3 s on mobile — blocking it causes 14 s FCP.
+  // Instead: render Landing immediately; once auth resolves redirect if needed.
+  if (!loading && user?.role === "admin") return <Redirect to="/home" />;
+  if (!loading && user?.role === "client") return <Redirect to="/client" />;
   return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
 }
 

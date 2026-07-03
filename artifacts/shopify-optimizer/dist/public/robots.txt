@@ -6,6 +6,7 @@ Allow: /sobre-nosotros
 Allow: /casos-de-exito
 Allow: /programa-de-afiliados
 Allow: /faq
+Allow: /preguntas-frecuentes
 Allow: /blog
 Allow: /changelog
 Allow: /privacidad
