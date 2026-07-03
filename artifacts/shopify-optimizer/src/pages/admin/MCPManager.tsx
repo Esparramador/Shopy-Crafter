@@ -252,13 +252,35 @@ export default function MCPManager() {
   const [installStatus, setInstallStatus] = useState<Record<string, boolean>>({});
   const [installing, setInstalling] = useState<string | null>(null);
   const [installResults, setInstallResults] = useState<Record<string, { ok: boolean; error?: string }>>({});
+  const [pinging, setPinging] = useState(false);
+  const [pingResult, setPingResult] = useState<{ ok: boolean; checked: number; msg: string } | null>(null);
+  const [lastPing, setLastPing] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadStatus() {
     fetch(`${API_BASE}/api/admin/mcp/status`, { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (d?.status) setInstallStatus(d.status); })
       .catch(() => {});
-  }, []);
+  }
+
+  useEffect(() => { loadStatus(); }, []);
+
+  async function reconnectAll() {
+    setPinging(true);
+    setPingResult(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/admin/mcp/status`, { credentials: "include" });
+      const d = await r.json();
+      if (d?.status) setInstallStatus(d.status);
+      const total = MCP_SERVERS.length;
+      const ok = MCP_SERVERS.filter(s => d?.status?.[s.npmPackage ?? s.id] !== false).length;
+      setPingResult({ ok: ok === total, checked: total, msg: `${ok}/${total} servidores verificados` });
+      setLastPing(new Date().toLocaleTimeString("es-ES"));
+    } catch (e: any) {
+      setPingResult({ ok: false, checked: 0, msg: `Error de conexión: ${e?.message || "red"}` });
+    }
+    setPinging(false);
+  }
 
   async function installServer(npmPackage: string) {
     setInstalling(npmPackage);
@@ -298,17 +320,49 @@ export default function MCPManager() {
     <div style={{ padding: "24px 24px 40px", maxWidth: 1100, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
           <Server size={22} style={{ color: "var(--gold)" }} />
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--t1)", margin: 0 }}>MCP Manager</h1>
           <span style={{
             padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
             background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)"
           }}>6 servidores activos</span>
+          <button
+            onClick={reconnectAll}
+            disabled={pinging}
+            style={{
+              marginLeft: "auto", display: "flex", alignItems: "center", gap: 6,
+              padding: "7px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: pinging ? "wait" : "pointer",
+              background: pingResult?.ok ? "rgba(74,222,128,0.12)" : pinging ? "rgba(200,168,75,0.08)" : "rgba(200,168,75,0.12)",
+              border: pingResult?.ok ? "1px solid rgba(74,222,128,0.3)" : "1px solid rgba(200,168,75,0.3)",
+              color: pingResult?.ok ? "#4ade80" : "var(--gold)",
+            }}
+          >
+            {pinging
+              ? <><Loader2 size={13} style={{ animation: "spin 0.6s linear infinite" }} /> Verificando...</>
+              : pingResult?.ok
+              ? <><CheckCircle2 size={13} /> Todos conectados</>
+              : <><RefreshCw size={13} /> Reconectar / Verificar</>
+            }
+          </button>
         </div>
-        <p style={{ color: "var(--t3)", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
-          Model Context Protocol — herramientas de IA conectadas al agente. Gestiona, configura e instala nuevos MCP servers.
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <p style={{ color: "var(--t3)", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+            Model Context Protocol — herramientas de IA conectadas al agente. Gestiona, configura e instala nuevos MCP servers.
+          </p>
+          {pingResult && (
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 20, fontSize: 11,
+              background: pingResult.ok ? "rgba(74,222,128,0.08)" : "rgba(248,113,113,0.08)",
+              border: `1px solid ${pingResult.ok ? "rgba(74,222,128,0.25)" : "rgba(248,113,113,0.25)"}`,
+              color: pingResult.ok ? "#4ade80" : "#f87171",
+            }}>
+              {pingResult.ok ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+              {pingResult.msg}
+              {lastPing && <span style={{ color: "var(--t4)" }}>· {lastPing}</span>}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats */}

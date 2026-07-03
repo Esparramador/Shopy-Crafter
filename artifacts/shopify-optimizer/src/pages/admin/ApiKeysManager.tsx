@@ -62,13 +62,34 @@ export default function ApiKeysManager() {
   const [editValue, setEditValue] = useState("");
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({ ai: true, media: true, audio: true, design: true, social: true, payments: true, other: true });
+  const [billingProvider, setBillingProvider] = useState<"shopify" | "stripe">("shopify");
+  const [savingBilling, setSavingBilling] = useState(false);
 
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3500);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetch(`${API}/api/admin/billing-config`, { credentials: "include" })
+      .then(r => r.json()).then(d => { if (d.provider) setBillingProvider(d.provider); }).catch(() => {});
+  }, []);
+
+  async function saveBillingProvider(p: "shopify" | "stripe") {
+    setSavingBilling(true);
+    setBillingProvider(p);
+    try {
+      const r = await fetch(`${API}/api/admin/billing-config`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: p }),
+      });
+      if (r.ok) showToast(`✅ Método de cobro actualizado: ${p === "shopify" ? "Shopify Billing" : "Stripe"}`, true);
+      else showToast("Error guardando configuración de cobro", false);
+    } catch { showToast("Error de red", false); }
+    setSavingBilling(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -352,6 +373,71 @@ export default function ApiKeysManager() {
           );
         })
       )}
+
+      {/* ── Billing Provider Config ─────────────────────────────────────────── */}
+      <div style={{ marginTop: 32, background: "var(--ink2)", borderRadius: 14, border: "1px solid var(--ink3)", overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--ink3)", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>💳</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--t)" }}>Configuración de Cobro a Clientes</div>
+            <div style={{ fontSize: 12, color: "var(--t3)", marginTop: 2 }}>Elige cómo cobrar las suscripciones y servicios a tus clientes</div>
+          </div>
+        </div>
+        <div style={{ padding: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+            {([
+              {
+                id: "shopify" as const,
+                icon: "🛍️",
+                title: "Shopify Billing",
+                desc: "Usa la API de facturación nativa de Shopify. Cargos recurrentes, planes de aplicación, períodos de prueba integrados. Ideal si tus clientes ya tienen tienda Shopify.",
+                pros: ["✅ Integración nativa con Shopify", "✅ Gestión automática de planes", "✅ Facturación en dashboards de Shopify"],
+                color: "#96bf48",
+              },
+              {
+                id: "stripe" as const,
+                icon: "💳",
+                title: "Stripe",
+                desc: "Pagos directos via Stripe. Soporta tarjetas, SEPA, transferencias. Funciona con clientes Shopify y no-Shopify. Máxima flexibilidad.",
+                pros: ["✅ Funciona con cualquier cliente", "✅ Múltiples métodos de pago", "✅ Panel Stripe completo"],
+                color: "#635bff",
+              },
+            ] as const).map(opt => {
+              const active = billingProvider === opt.id;
+              return (
+                <div key={opt.id}
+                  onClick={() => !savingBilling && saveBillingProvider(opt.id)}
+                  style={{
+                    padding: 16, borderRadius: 12, cursor: savingBilling ? "wait" : "pointer",
+                    border: active ? `2px solid ${opt.color}` : "2px solid var(--ink3)",
+                    background: active ? `color-mix(in srgb, ${opt.color} 8%, transparent)` : "var(--ink3)",
+                    transition: "all .2s", position: "relative",
+                  }}
+                >
+                  {active && (
+                    <div style={{ position: "absolute", top: 10, right: 12, fontSize: 10, fontWeight: 800, color: opt.color, padding: "2px 8px", borderRadius: 20, background: `color-mix(in srgb, ${opt.color} 15%, transparent)` }}>
+                      ACTIVO
+                    </div>
+                  )}
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>{opt.icon}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: active ? opt.color : "var(--t)", marginBottom: 6 }}>{opt.title}</div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 10, lineHeight: 1.5 }}>{opt.desc}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {opt.pros.map((p, i) => (
+                      <div key={i} style={{ fontSize: 10, color: active ? opt.color : "var(--t3)" }}>{p}</div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--t3)", padding: "10px 14px", borderRadius: 8, background: "var(--ink3)", display: "flex", alignItems: "center", gap: 8 }}>
+            <Shield size={14} />
+            El método elegido se aplica a los nuevos clientes. Los clientes existentes mantienen su método de facturación actual hasta que renuevan.
+            {savingBilling && <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite", marginLeft: "auto" }} />}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

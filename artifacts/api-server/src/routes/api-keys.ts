@@ -220,6 +220,36 @@ router.put("/admin/api-keys/:id/toggle", requireAdmin, async (req: Request, res:
   }
 });
 
+// ── GET /api/admin/billing-config ────────────────────────────────────────────
+router.get("/admin/billing-config", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS platform_settings_kv (
+        key VARCHAR(120) PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = 'billing_provider'`);
+    const provider = (rows.rows[0] as any)?.value || "shopify";
+    res.json({ provider });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST /api/admin/billing-config ───────────────────────────────────────────
+router.post("/admin/billing-config", requireAdmin, async (req: Request, res: Response) => {
+  const { provider } = req.body;
+  if (!["shopify", "stripe"].includes(provider)) return res.status(400).json({ error: "provider must be shopify or stripe" }) as any;
+  try {
+    await db.execute(sql`
+      INSERT INTO platform_settings_kv (key, value, updated_at)
+      VALUES ('billing_provider', ${provider}, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = ${provider}, updated_at = NOW()
+    `);
+    res.json({ success: true, provider });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 // ── GET /api/admin/api-keys/startup-inject ──────────────────────────────────
 // Called at startup to inject DB keys into process.env
 export async function injectDbApiKeys() {

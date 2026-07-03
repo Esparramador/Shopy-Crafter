@@ -627,7 +627,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
       headers: { "xi-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
         text: script,
-        model_id: "eleven_turbo_v2_5",
+        model_id: "eleven_v3",
         voice_settings: { stability: 0.3, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true, speed: 0.95 },
       }),
     });
@@ -832,7 +832,7 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, r
       headers: { "xi-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
         text: script,
-        model_id: "eleven_turbo_v2_5",
+        model_id: "eleven_v3",
         voice_settings: vs,
       }),
     });
@@ -1139,7 +1139,7 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req: Requ
       const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: "POST",
         headers: { "xi-api-key": key, "Content-Type": "application/json" },
-        body: JSON.stringify({ text: script, model_id: "eleven_turbo_v2_5", voice_settings: vs }),
+        body: JSON.stringify({ text: script, model_id: "eleven_v3", voice_settings: vs }),
       });
       if (!ttsRes.ok) {
         fs.rmSync(tmpDir, { recursive: true, force: true });

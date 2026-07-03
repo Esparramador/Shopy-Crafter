@@ -644,6 +644,8 @@ export default function YouTubeStudio() {
     // Timer visible para que el usuario sepa que está generando (puede tardar 2-5 min)
     const timerRef = { id: 0 };
     timerRef.id = window.setInterval(() => setVideoGenSeconds(s => s + 1), 1000);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 min max
     try {
       fetch(`${BASE}/api/viral/log`, {
         method: "POST", credentials: "include",
@@ -656,7 +658,7 @@ export default function YouTubeStudio() {
       fd.append("prompt", scriptResult.visualPrompt);
       fd.append("duration", "5");
       fd.append("aspect", "9:16");
-      const r = await fetch(`${BASE}/api/fs-pro/generate-video`, { method: "POST", credentials: "include", body: fd });
+      const r = await fetch(`${BASE}/api/fs-pro/generate-video`, { method: "POST", credentials: "include", body: fd, signal: controller.signal });
       if (!r.ok) {
         let errMsg = "Error generando vídeo";
         try { const d = await r.json(); errMsg = d.error || errMsg; } catch {}
@@ -664,7 +666,14 @@ export default function YouTubeStudio() {
       }
       const d = await r.json();
       setVideoResult(d);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      if (e.name === "AbortError") {
+        setError("⏱ Tiempo máximo de generación superado (10 min). El vídeo puede seguir procesándose en el servidor — revisa el Vault en unos minutos.");
+      } else {
+        setError(e.message);
+      }
+    }
+    clearTimeout(timeoutId);
     clearInterval(timerRef.id);
     setGeneratingVideo(false);
   }

@@ -101,13 +101,39 @@ export default function FusionStudio() {
     return () => window.removeEventListener("resize", handler);
   }, []);
 
+  // Auto-load project info and vault images when projectId is set
+  useEffect(() => {
+    if (!projectId) return;
+    fetch(`${API_BASE}/api/projects/${projectId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        if (data.shopUrl && !brandUrl) setBrandUrl(`https://${data.shopUrl}`);
+        if (data.name && !companyName) setCompanyName(data.name);
+        if (data.storeNiche && !niche) setNiche(data.storeNiche);
+      })
+      .catch(() => {});
+    fetch(`${API_BASE}/api/projects/${projectId}/vault?page=1&limit=30`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.files) return;
+        const imgs = data.files
+          .filter((f: any) => /\.(jpe?g|png|webp|gif|avif)/i.test(f.name))
+          .map((f: any) => ({ id: f.id, name: f.name, previewUrl: `${API_BASE}/api/projects/${projectId}/vault/${f.id}/preview` }));
+        setVaultImages(imgs);
+      })
+      .catch(() => {});
+  }, [projectId]);
+
   const [brandUrl, setBrandUrl] = useState("");
   const [instagram, setInstagram] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [niche, setNiche] = useState("");
   const [brandStyle, setBrandStyle] = useState("");
-  const [brandColors, setBrandColors] = useState(["#000000", "#ffffff", "#c8a84b"]);
+  const [brandColors, setBrandColors] = useState(["#1a1a2e", "#f5f5f0", "#c8a84b"]);
   const [brandDna, setBrandDna] = useState<any>(null);
+  const [vaultImages, setVaultImages] = useState<Array<{id:number;name:string;previewUrl:string}>>([]);
+  const [selectedVaultImage, setSelectedVaultImage] = useState<string | null>(null);
   const [isFetchingBrand, setIsFetchingBrand] = useState(false);
   const [brandError, setBrandError] = useState("");
 
@@ -346,6 +372,9 @@ export default function FusionStudio() {
         raw: dna,
       };
       setBrandDna(merged);
+      if (dna.brandInfo?.colors?.length) {
+        setBrandColors(dna.brandInfo.colors.slice(0, 5));
+      }
       setPhase("product");
     } catch (err: any) {
       setBrandError(err.message || "Error investigando marca");
@@ -1163,6 +1192,39 @@ export default function FusionStudio() {
                 {generationWarning && (
                   <div style={{ padding: "12px 16px", borderRadius: 8, background: "#c8a84b12", border: "1px solid #c8a84b33", marginBottom: 16, fontSize: 12, color: "#f0d68a" }}>
                     {generationWarning}
+                  </div>
+                )}
+
+                {/* ── Vault images horizontal scroll strip ── */}
+                {vaultImages.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#c8a84b99", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>
+                      📁 Imágenes del Proyecto · {vaultImages.length} archivos
+                    </div>
+                    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, scrollSnapType: "x mandatory" }}>
+                      {vaultImages.map(img => (
+                        <div key={img.id}
+                          onClick={() => setSelectedVaultImage(selectedVaultImage === img.previewUrl ? null : img.previewUrl)}
+                          style={{
+                            flexShrink: 0, width: 80, height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", scrollSnapAlign: "start",
+                            border: selectedVaultImage === img.previewUrl ? "2px solid #c8a84b" : "2px solid transparent",
+                            transition: "border-color .15s", position: "relative",
+                          }}
+                          title={img.name}
+                        >
+                          <img src={img.previewUrl} alt={img.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
+                          {selectedVaultImage === img.previewUrl && (
+                            <div style={{ position: "absolute", inset: 0, background: "rgba(200,168,75,0.25)", display: "grid", placeItems: "center", fontSize: 18 }}>✓</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {selectedVaultImage && (
+                      <div style={{ fontSize: 10, color: "#c8a84b", marginTop: 4 }}>
+                        ✓ Imagen seleccionada como referencia para nueva sesión
+                        <button onClick={() => setSelectedVaultImage(null)} style={{ marginLeft: 8, background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 10 }}>✕</button>
+                      </div>
+                    )}
                   </div>
                 )}
 

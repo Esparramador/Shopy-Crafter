@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Palette, Download, Copy, Check, Search, Loader2, AlertCircle, X, Eye, Sparkles } from "lucide-react";
+import { Palette, Download, Copy, Check, Search, Loader2, AlertCircle, X, Eye, Sparkles, FileText, LayoutTemplate } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -330,6 +330,263 @@ export default function DesignSystems() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ── Plantillas de Portada / Informe ──────────────────────────────────── */}
+      <div style={{ marginTop: 36, background: "var(--s1)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
+          <LayoutTemplate size={18} style={{ color: "#a78bfa" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--t1)" }}>Plantillas de Portada e Informe</div>
+            <div style={{ fontSize: 12, color: "var(--t3)", marginTop: 1 }}>Portadas, contraportadas e índices dinámicos — sin texto hardcodeado. Se adaptan a la marca seleccionada.</div>
+          </div>
+        </div>
+        <div style={{ padding: 20 }}>
+          <ReportTemplateBuilder selectedSystem={selected} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportTemplateBuilder({ selectedSystem }: { selectedSystem: DesignSystem | null }) {
+  const [fields, setFields] = useState({
+    titulo: "", subtitulo: "", empresa: "", fecha: new Date().toLocaleDateString("es-ES", { year: "numeric", month: "long" }),
+    autor: "", version: "1.0", confidencial: false,
+  });
+  const [activeTemplate, setActiveTemplate] = useState<"portada" | "contraportada" | "indice">("portada");
+  const [downloading, setDownloading] = useState(false);
+
+  const primary = selectedSystem?.primaryColor || "#c8a84b";
+  const secondary = selectedSystem?.secondaryColor || "#1e293b";
+  const accent = selectedSystem?.accentColor || "#f5f5f7";
+  const brand = selectedSystem?.brand || fields.empresa || "Tu Marca";
+
+  function downloadHtml() {
+    setDownloading(true);
+    const html = generateHtml();
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${activeTemplate}-${(fields.titulo || brand).replace(/\s+/g, "-").toLowerCase()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setTimeout(() => setDownloading(false), 1000);
+  }
+
+  function generateHtml(): string {
+    const titulo = fields.titulo || "Informe Estratégico";
+    const subtitulo = fields.subtitulo || "Análisis y Recomendaciones";
+    const empresa = fields.empresa || brand;
+    const fecha = fields.fecha;
+    const autor = fields.autor;
+    const version = fields.version;
+
+    if (activeTemplate === "portada") {
+      return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; width:210mm; height:297mm; background:${secondary}; color:${accent}; display:flex; flex-direction:column; }
+  .bar { height:6px; background:${primary}; }
+  .main { flex:1; padding:60px 56px 40px; display:flex; flex-direction:column; justify-content:space-between; }
+  .brand { font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:${primary}; font-weight:600; margin-bottom:60px; }
+  .title-block { flex:1; display:flex; flex-direction:column; justify-content:center; }
+  h1 { font-size:48px; font-weight:900; line-height:1.1; letter-spacing:-0.03em; margin-bottom:18px; }
+  .subtitle { font-size:20px; font-weight:300; opacity:0.7; }
+  .accent-line { width:64px; height:4px; background:${primary}; margin:28px 0; border-radius:2px; }
+  .meta { display:flex; justify-content:space-between; align-items:flex-end; padding-top:40px; border-top:1px solid rgba(255,255,255,0.12); }
+  .meta-left { font-size:13px; opacity:0.5; line-height:1.8; }
+  .meta-right { font-size:12px; text-align:right; opacity:0.45; }
+  .confidencial { display:inline-block; border:1px solid ${primary}; color:${primary}; font-size:10px; letter-spacing:0.1em; padding:4px 10px; border-radius:2px; margin-top:8px; }
+</style></head>
+<body>
+  <div class="bar"></div>
+  <div class="main">
+    <div class="brand">${empresa}</div>
+    <div class="title-block">
+      <h1>${titulo}</h1>
+      <div class="accent-line"></div>
+      <p class="subtitle">${subtitulo}</p>
+    </div>
+    <div class="meta">
+      <div class="meta-left">${fecha ? `<span>${fecha}</span><br>` : ""}${autor ? `<span>${autor}</span><br>` : ""}${version ? `<span>v${version}</span>` : ""}</div>
+      <div class="meta-right">${fields.confidencial ? '<span class="confidencial">CONFIDENCIAL</span>' : ""}</div>
+    </div>
+  </div>
+</body></html>`;
+    }
+
+    if (activeTemplate === "contraportada") {
+      return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; width:210mm; height:297mm; background:${primary}; color:${secondary}; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:60px; }
+  h2 { font-size:32px; font-weight:700; line-height:1.2; margin-bottom:16px; }
+  p { font-size:15px; font-weight:300; opacity:0.75; max-width:420px; line-height:1.6; }
+  .divider { width:50px; height:3px; background:${secondary}; opacity:0.4; margin:28px auto; border-radius:2px; }
+  .brand { font-size:12px; letter-spacing:0.15em; text-transform:uppercase; font-weight:700; opacity:0.6; margin-top:40px; }
+  .year { font-size:11px; opacity:0.4; margin-top:8px; }
+</style></head>
+<body>
+  <h2>${titulo}</h2>
+  <div class="divider"></div>
+  <p>${subtitulo}</p>
+  <div class="brand">${empresa}</div>
+  <div class="year">${fecha}${version ? ` · v${version}` : ""}</div>
+</body></html>`;
+    }
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; width:210mm; min-height:297mm; background:#fff; color:#111; padding:56px; }
+  .header { border-bottom:3px solid ${primary}; padding-bottom:16px; margin-bottom:32px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .header h1 { font-size:28px; font-weight:700; color:${primary}; }
+  .header .brand { font-size:11px; color:#888; letter-spacing:0.08em; text-transform:uppercase; }
+  .section { margin-bottom:14px; display:flex; gap:16px; align-items:baseline; padding:10px 0; border-bottom:1px solid #f0f0f0; }
+  .num { font-size:13px; font-weight:700; color:${primary}; min-width:28px; }
+  .entry { font-size:14px; color:#222; flex:1; }
+  .page { font-size:13px; color:#999; min-width:30px; text-align:right; }
+  .sub { margin-left:28px; font-size:12px; color:#666; padding:4px 0; }
+</style></head>
+<body>
+  <div class="header">
+    <h1>Índice de Contenidos</h1>
+    <span class="brand">${empresa} · ${fecha}</span>
+  </div>
+  ${[
+    { n: "01", t: "Resumen Ejecutivo", p: "3" },
+    { n: "02", t: "Análisis de Situación", p: "7" },
+    { n: "03", t: "Estrategia y Objetivos", p: "14" },
+    { n: "04", t: "Plan de Acción", p: "22" },
+    { n: "05", t: "KPIs y Métricas", p: "31" },
+    { n: "06", t: "Conclusiones", p: "38" },
+  ].map(s => `<div class="section"><span class="num">${s.n}</span><span class="entry">${s.t}</span><span class="page">${s.p}</span></div>`).join("\n  ")}
+</body></html>`;
+  }
+
+  return (
+    <div>
+      {/* Template tabs */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {([
+          { id: "portada" as const, label: "Portada", icon: "📄" },
+          { id: "contraportada" as const, label: "Contraportada", icon: "🔙" },
+          { id: "indice" as const, label: "Índice", icon: "📋" },
+        ]).map(t => (
+          <button key={t.id} onClick={() => setActiveTemplate(t.id)} style={{
+            padding: "7px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            border: activeTemplate === t.id ? "2px solid #a78bfa" : "1px solid var(--border)",
+            background: activeTemplate === t.id ? "rgba(167,139,250,0.12)" : "var(--s2)",
+            color: activeTemplate === t.id ? "#a78bfa" : "var(--t3)",
+          }}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20, alignItems: "start" }}>
+        {/* Fields */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {[
+            { key: "titulo", label: "Título principal", placeholder: "Informe Estratégico Q3 2026" },
+            { key: "subtitulo", label: "Subtítulo / descripción", placeholder: "Análisis y Recomendaciones" },
+            { key: "empresa", label: "Empresa / Marca", placeholder: selectedSystem?.brand || "Tu Empresa" },
+            { key: "autor", label: "Autor / Equipo", placeholder: "Equipo de Consultoría" },
+            { key: "fecha", label: "Fecha / Período", placeholder: "Julio 2026" },
+            { key: "version", label: "Versión", placeholder: "1.0" },
+          ].map(f => (
+            <div key={f.key}>
+              <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 4, fontWeight: 600 }}>{f.label}</div>
+              <input
+                value={(fields as any)[f.key]}
+                onChange={e => setFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                placeholder={f.placeholder}
+                style={{ width: "100%", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", color: "var(--t1)", fontSize: 13, boxSizing: "border-box" }}
+              />
+            </div>
+          ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+            <input type="checkbox" id="confidencial" checked={fields.confidencial} onChange={e => setFields(prev => ({ ...prev, confidencial: e.target.checked }))} style={{ cursor: "pointer" }} />
+            <label htmlFor="confidencial" style={{ fontSize: 13, color: "var(--t2)", cursor: "pointer" }}>Marcar como Confidencial</label>
+          </div>
+        </div>
+
+        {/* Preview + actions */}
+        <div>
+          <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Vista previa</div>
+          <div style={{
+            width: "100%", aspectRatio: "0.707", borderRadius: 10, overflow: "hidden",
+            border: "1px solid var(--border)", background: activeTemplate === "contraportada" ? primary : activeTemplate === "portada" ? secondary : "#fff",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: activeTemplate === "indice" ? "flex-start" : "center",
+            padding: 20, gap: 8, boxSizing: "border-box",
+          }}>
+            {activeTemplate === "portada" && (
+              <>
+                <div style={{ width: "100%", height: 3, background: primary, borderRadius: 1, marginBottom: 8 }} />
+                <div style={{ fontSize: 8, color: primary, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 700, alignSelf: "flex-start" }}>{fields.empresa || brand}</div>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", width: "100%" }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: accent, lineHeight: 1.1, letterSpacing: "-0.03em" }}>{fields.titulo || "Título del informe"}</div>
+                  <div style={{ width: 20, height: 2, background: primary, margin: "8px 0", borderRadius: 1 }} />
+                  <div style={{ fontSize: 9, color: accent, opacity: 0.6 }}>{fields.subtitulo || "Subtítulo"}</div>
+                </div>
+                <div style={{ width: "100%", borderTop: "1px solid rgba(255,255,255,0.12)", paddingTop: 8, fontSize: 8, color: accent, opacity: 0.4 }}>
+                  {fields.fecha} {fields.autor && `· ${fields.autor}`} {fields.version && `· v${fields.version}`}
+                </div>
+              </>
+            )}
+            {activeTemplate === "contraportada" && (
+              <>
+                <div style={{ fontSize: 14, fontWeight: 700, color: secondary, textAlign: "center" }}>{fields.titulo || "Título"}</div>
+                <div style={{ width: 20, height: 2, background: secondary, opacity: 0.4, borderRadius: 1 }} />
+                <div style={{ fontSize: 8, color: secondary, opacity: 0.7, textAlign: "center" }}>{fields.subtitulo}</div>
+                <div style={{ fontSize: 7, color: secondary, opacity: 0.5, marginTop: 8, letterSpacing: "0.1em", textTransform: "uppercase" }}>{fields.empresa || brand}</div>
+              </>
+            )}
+            {activeTemplate === "indice" && (
+              <div style={{ width: "100%", padding: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: primary, borderBottom: `2px solid ${primary}`, paddingBottom: 4, marginBottom: 8 }}>Índice de Contenidos</div>
+                {["01 · Resumen Ejecutivo", "02 · Análisis", "03 · Estrategia", "04 · Plan de Acción", "05 · KPIs", "06 · Conclusiones"].map((s, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 7, color: "#333", padding: "3px 0", borderBottom: "1px solid #f0f0f0" }}>
+                    <span>{s}</span><span style={{ color: "#999" }}>{3 + i * 7}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            {selectedSystem && (
+              <div style={{ fontSize: 11, color: "var(--t3)", padding: "6px 10px", background: "var(--s2)", borderRadius: 6, textAlign: "center" }}>
+                🎨 Colores de <strong style={{ color: "var(--t1)" }}>{selectedSystem.brand}</strong> aplicados
+              </div>
+            )}
+            <button
+              onClick={downloadHtml}
+              disabled={downloading}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 0", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", background: "#a78bfa", color: "#fff", border: "none" }}
+            >
+              {downloading ? <Loader2 size={14} style={{ animation: "spin 0.6s linear infinite" }} /> : <Download size={14} />}
+              Descargar HTML
+            </button>
+            <button
+              onClick={() => {
+                const html = generateHtml();
+                const w = window.open("", "_blank");
+                if (w) { w.document.write(html); w.document.close(); }
+              }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "var(--s2)", color: "var(--t2)", border: "1px solid var(--border)" }}
+            >
+              <Eye size={13} /> Vista previa completa
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

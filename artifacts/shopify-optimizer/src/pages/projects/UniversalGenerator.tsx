@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Loader2, Download, ExternalLink, Search, Brain, CheckCircle, FolderOpen, Sparkles, RotateCcw } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -202,9 +200,9 @@ export default function UniversalGenerator() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
             <Sparkles size={28} />
             <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>Generador Universal</h1>
-            <Badge variant="secondary" style={{ background: "rgba(99,102,241,0.3)", color: "white", fontSize: 13 }}>
+            <span style={{ padding: "3px 12px", borderRadius: 20, fontSize: 13, fontWeight: 700, background: "rgba(99,102,241,0.3)", color: "white" }}>
               {totalTypes} herramientas
-            </Badge>
+            </span>
           </div>
           <p style={{ opacity: 0.7, fontSize: 14, maxWidth: 700 }}>
             Genera, descarga y guarda cualquier tipo de contenido profesional. Informes, CSS de marca, SEO, análisis de competencia, presupuestos, y mucho más. Todo impulsado por IA y adaptado a tu marca.
@@ -320,19 +318,17 @@ export default function UniversalGenerator() {
         <span style={{ fontSize: 11, color: "#818cf8", whiteSpace: "nowrap" }}>Para analizar cualquier tienda</span>
       </div>
       {showHistory && history.length > 0 && (
-        <Card style={{ marginBottom: 20 }}>
-          <CardHeader>
-            <CardTitle style={{ fontSize: 16 }}>
-              <FolderOpen size={16} style={{ display: "inline", marginRight: 6 }} />
-              Historial de generaciones ({history.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div style={{ marginBottom: 20, background: "var(--ink2,#0f172a)", border: "1px solid var(--ink3,#1e293b)", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--ink3,#1e293b)", fontSize: 16, fontWeight: 700, color: "var(--t1)", display: "flex", alignItems: "center", gap: 6 }}>
+            <FolderOpen size={16} />
+            Historial de generaciones ({history.length})
+          </div>
+          <div style={{ padding: 12 }}>
             <div style={{ maxHeight: 300, overflowY: "auto" }}>
               {history.map(h => (
                 <div key={h.id} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "8px 12px", borderBottom: "1px solid #f1f5f9", fontSize: 13
+                  padding: "8px 12px", borderBottom: "1px solid var(--ink3,#1e293b)", fontSize: 13
                 }}>
                   <div>
                     <strong>{h.title}</strong>
@@ -353,8 +349,8 @@ export default function UniversalGenerator() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
       {filteredCategories.map(([catId, cat]) => {
         const visibleTypes = cat.types.filter(matchesSearch);
@@ -364,7 +360,7 @@ export default function UniversalGenerator() {
           <div key={catId} style={{ marginBottom: 28 }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 22 }}>{cat.icon}</span> {cat.label}
-              <Badge variant="outline" style={{ fontSize: 11 }}>{visibleTypes.length}</Badge>
+              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700, background: "var(--ink3,#1e293b)", color: "var(--t3,#64748b)", border: "1px solid var(--ink4,#334155)" }}>{visibleTypes.length}</span>
             </h2>
             <div style={{
               display: "grid",
@@ -376,36 +372,33 @@ export default function UniversalGenerator() {
                 const isGenerating = generating === genType.id;
 
                 return (
-                  <Card key={genType.id} style={{
-                    border: result?.success ? "1px solid #86efac" : "1px solid #e2e8f0",
-                    background: result?.success ? "#f0fdf4" : "white",
-                    transition: "all 0.2s",
+                  <div key={genType.id} style={{
+                    border: result?.success ? "1px solid rgba(74,222,128,0.4)" : "1px solid var(--ink3,#1e293b)",
+                    background: result?.success ? "rgba(74,222,128,0.05)" : "var(--ink2,#0f172a)",
+                    borderRadius: 12, transition: "all 0.2s", padding: 16,
                   }}>
-                    <CardContent style={{ padding: 16 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 24 }}>{genType.icon}</span>
                           <div>
-                            <h3
-                              style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}
-                              className="text-[#0c81f5]">{genType.label}</h3>
-                            <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+                            <h3 style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3, color: "#60a5fa", margin: 0 }}>{genType.label}</h3>
+                            <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
                               {genType.outputFormats.map(f => (
-                                <Badge key={f} variant="outline" className="text-[#077bf0]" style={{ fontSize: 9, padding: "0 4px", textTransform: "uppercase" }}>
+                                <span key={f} style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, textTransform: "uppercase", fontWeight: 700, background: "rgba(96,165,250,0.12)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.25)" }}>
                                   {f}
-                                </Badge>
+                                </span>
                               ))}
                               {genType.acceptsUrl && (
-                                <Badge variant="outline" style={{ fontSize: 9, padding: "0 4px", background: "#ede9fe", color: "#7c3aed" }}>
+                                <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, fontWeight: 700, background: "rgba(139,92,246,0.12)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.25)" }}>
                                   URL
-                                </Badge>
+                                </span>
                               )}
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12, lineHeight: 1.5 }}>
+                      <p style={{ fontSize: 12, color: "var(--t3,#64748b)", marginBottom: 12, lineHeight: 1.5 }}>
                         {genType.description}
                       </p>
 
@@ -457,12 +450,12 @@ export default function UniversalGenerator() {
 
                       {result?.success && (
                         <div style={{
-                          background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 8,
+                          background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 8,
                           padding: "8px 12px", marginBottom: 10, fontSize: 12
                         }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                            <CheckCircle size={14} color="#10b981" />
-                            <strong style={{ color: "#065f46" }}>Generado</strong>
+                            <CheckCircle size={14} color="#4ade80" />
+                            <strong style={{ color: "#4ade80" }}>Generado</strong>
                             {result.brainLearned && (
                               <span style={{ display: "flex", alignItems: "center", gap: 2, color: "#7c3aed", fontSize: 10 }}>
                                 <Brain size={10} /> Aprendido
@@ -474,7 +467,7 @@ export default function UniversalGenerator() {
                               </span>
                             )}
                           </div>
-                          <p style={{ color: "#047857", fontSize: 11 }}>{result.message}</p>
+                          <p style={{ color: "#4ade80", fontSize: 11 }}>{result.message}</p>
                           {result.downloadUrl && !result.redirect && (
                             <Button
                               size="sm"
@@ -514,8 +507,7 @@ export default function UniversalGenerator() {
                           )}
                         </Button>
                       </div>
-                    </CardContent>
-                  </Card>
+                  </div>
                 );
               })}
             </div>
