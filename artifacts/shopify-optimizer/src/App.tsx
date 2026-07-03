@@ -111,6 +111,8 @@ const TiendaAdmin = lazy(() => import("@/pages/admin/TiendaAdmin"));
 const StripeManager = lazy(() => import("@/pages/admin/StripeManager"));
 const StripeMasterHub = lazy(() => import("@/pages/admin/StripeMasterHub"));
 const ApiUsage = lazy(() => import("@/pages/admin/ApiUsage"));
+const ApiKeysManager = lazy(() => import("@/pages/admin/ApiKeysManager"));
+const AgencyBilling = lazy(() => import("@/pages/admin/AgencyBilling"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
@@ -681,6 +683,12 @@ function Router() {
         </Route>
         <Route path="/admin/stripe-master">
           <RequireAdmin><AdminWrapper><AppLayout><S><StripeMasterHub /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/api-keys">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ApiKeysManager /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/agency-billing">
+          <RequireAdmin><AdminWrapper><AppLayout><S><AgencyBilling /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         {/* Client routes — ClientPreviewProvider lives inside RequireClient */}

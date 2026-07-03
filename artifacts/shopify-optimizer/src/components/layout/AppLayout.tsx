@@ -96,6 +96,8 @@ const DEFAULT_ADMIN_NAV = [
   { label: "── GOD MODE ──", icon: "", href: "#", divider: true },
   { label: "Stripe Manager", icon: "💳", href: "/admin/stripe" },
   { label: "Stripe Master Hub", icon: "👑", href: "/admin/stripe-master" },
+  { label: "API Keys Manager", icon: "🔑", href: "/admin/api-keys" },
+  { label: "Facturación de Agencia", icon: "📄", href: "/admin/agency-billing" },
   { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },
   { label: "Gemini Research", icon: "🔬", href: "/admin/gemini-intel" },
   { label: "M7 Inventario", icon: "🗄", href: "/admin/inventory" },

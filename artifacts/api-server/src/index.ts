@@ -14,6 +14,7 @@ import {
   runInventorySync,
 } from "./lib/scheduler.js";
 import { ensureAllKnowledgeDomains } from "./routes/shopybrain.js";
+import { injectDbApiKeys } from "./routes/api-keys.js";
 import { db, usersTable, projectsTable, productsTable, omnicoreMemoriesTable, seoDataTable } from "@workspace/db";
 import { eq, sql, isNull, or, and } from "drizzle-orm";
 import { shopifyRequestPaged, shopifyGraphQL } from "./lib/shopify.js";
@@ -346,6 +347,9 @@ const server = app.listen(port, (err?: Error) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Inject DB-stored API keys into process.env (non-blocking)
+  injectDbApiKeys().catch(() => {});
 
   db.execute(sql`
     CREATE TABLE IF NOT EXISTS rate_limits (

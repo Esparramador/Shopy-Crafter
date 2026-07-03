@@ -79,6 +79,7 @@ import youtubeRouter from "./youtube.js";
 import calendarRouter from "./calendar.js";
 import viralRouter from "./viral.js";
 import chatGroupsRouter from "./chat-groups.js";
+import apiKeysRouter from "./api-keys.js";
 
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
@@ -197,5 +198,6 @@ router.use(youtubeRouter);
 router.use(calendarRouter);
 router.use(viralRouter);
 router.use(cybersecRouter);
+router.use(apiKeysRouter);
 
 export default router;
