@@ -450,6 +450,22 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
                 label: "🎭 Influencer Sheet",
                 prompt: "Goal: Create a photorealistic AI influencer character sheet. Canvas: 16:9 horizontal board. Layout: exactly 1 full-body front pose (hero), exactly 2 expression close-ups (smile, neutral), exactly 2 outfit variants, exactly 1 side profile. Style: hyper-realistic, editorial photography, soft studio lighting, 8k. No watermarks. Character: ",
               },
+              {
+                label: "💥 Explode View (auriculares)",
+                prompt: "Cinematic exploded view of wireless earbuds on a clean white studio background. Silicone tips, internal speaker drivers, battery casing, and PCB board float apart vertically and outward, perfectly separated in 3D space. Engineering manual aesthetic, ultra-detailed components, soft rim lighting, 8k. No text, no watermarks. Brand: ",
+              },
+              {
+                label: "💥 Explode View (sneakers)",
+                prompt: "Hyper-realistic teardown of a performance running shoe on matte black background. Outsole, foam midsole, carbon fiber plate, insole, and knit upper separate in clean horizontal layers, showing internal construction. Technical engineering style, studio lighting, ultra-detailed, 8k. No text, no watermarks. Model: ",
+              },
+              {
+                label: "💥 Explode View (tech/phone)",
+                prompt: "Cinematic exploded view animation still of a flagship smartphone on deep black background. Glass back panel, aluminum chassis, camera module lenses, battery, PCB, and screws drift outward symmetrically with glowing blue technical callout lines. Sci-fi holographic aesthetic, ultra-detailed, 8k. No text, no watermarks. Product: ",
+              },
+              {
+                label: "🔩 Assembled (reverso)",
+                prompt: "Product assembly shot. All individual components converge inward and snap together in perfect mechanical order — satisfying assembly sequence final frame. Clean white studio background, soft directional lighting, hyper-realistic, 8k. No text, no watermarks. Product: ",
+              },
             ].map(t => (
               <button
                 key={t.label}
@@ -459,7 +475,7 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
               </button>
             ))}
           </div>
-          <p style={{ fontSize: 9, color: "var(--t3)", margin: "2px 0 0" }}>Haz click para pre-cargar la plantilla y completa al final con la descripción de tu personaje o escena.</p>
+          <p style={{ fontSize: 9, color: "var(--t3)", margin: "2px 0 0" }}>Character sheets / storyboard → completa al final la descripción. Explode View → completa con el nombre del producto.</p>
         </Section>
         <Section title="Negative prompt (opcional)">
           <textarea value={negativePrompt} onChange={e => setNegativePrompt(e.target.value)} placeholder="blurry, low-quality, watermark, text, logo..." style={{ ...inputStyle, minHeight: 60 }} />
@@ -1213,8 +1229,8 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
             {showTsBuilder && (
               <div>
                 <div style={{ fontSize: 9, color: "var(--t3)", marginBottom: 8, lineHeight: 1.5, padding: "6px 8px", background: "rgba(251,191,36,0.06)", borderRadius: 6, border: "1px solid rgba(251,191,36,0.15)" }}>
-                  <strong style={{ color: "var(--gold)" }}>Sintaxis Seedance 2.0</strong> — El modelo trata cada corchete como un corte editorial duro.<br />
-                  Refs: <code style={{ fontSize: 9 }}>@Image1</code>–<code style={{ fontSize: 9 }}>@Image9</code> · SFX: <code style={{ fontSize: 9 }}>SFX: thunder at 2s</code> · Cámara global ↓ (fuera de timestamps)
+                  <strong style={{ color: "var(--gold)" }}>Sintaxis por modelo</strong> — Seedance 2.0: <code style={{ fontSize: 9 }}>[0-1.5s] acción</code> · Grok Aurora: <code style={{ fontSize: 9 }}>[0-4s] acción · [4s transition] Smash cut</code><br />
+                  Refs: <code style={{ fontSize: 9 }}>@Image1</code>–<code style={{ fontSize: 9 }}>@Image9</code> (Seedance/Grok) · SFX: <code style={{ fontSize: 9 }}>SFX: thunder at 2s</code> · Cámara global ↓ (fuera de timestamps) · Grok: no soporta negative prompts, usar lenguaje afirmativo
                 </div>
                 <div style={{ marginBottom: 8 }}>
                   <label style={{ fontSize: 10, color: "var(--t3)", display: "block", marginBottom: 3 }}>📷 Global Setup (cámara + estilo — se pone ANTES de los timestamps):</label>

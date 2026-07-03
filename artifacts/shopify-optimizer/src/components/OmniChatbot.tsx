@@ -1207,14 +1207,38 @@ Cuando el usuario pida crear un vídeo de cualquier tipo (anuncio, cortometraje,
 5. NEGATIVE PRESET — Elegir preset según escena: Realismo/Anatomía, Alta Acción/Danza, o Drama Cinemático
 6. PIPELINE DE EJECUCIÓN — Tab Generar imagen → character sheet → Tab Vídeo → Timestamp Builder → Ensamblar → Generar
 
-SINTAXIS TIMESTAMP NARRATION SEEDANCE 2.0 (incluir SIEMPRE al dar prompts de vídeo):
-• Global Setup (FUERA de timestamps): CAMERA: movimiento, lente. STYLE: estética. [Camera systems: ARRI Alexa Mini LF, Sony Venice]
-• Formato slot: [Xs-Ys] acción del plano
-• Referencias: @Image1–@Image9 para personajes/fondos subidos
-• SFX: SFX: nombre_sonido at Xs
-• Diálogo: Character softly whispers "frase" (antes de comillas: emoción)
-• Max 4 slots para clips de 10-15s — más saturan al modelo
-• Seedance 2.5 (Junio 2026): soporte hasta 30 segundos coherentes
+SINTAXIS TIMESTAMP NARRATION POR MODELO:
+
+Seedance 2.0 (mejor timestamp control):
+  CAMERA: Dolly push-in, 50mm prime. STYLE: Cinematic, ARRI Alexa Mini LF.
+  [0-1.5s] Acción slot 1. @Image1 para personaje.
+  [1.5-3.5s] Acción principal. SFX: thunder at 2s.
+  [3.5-6s] Detalle. Rack focus.
+  [6-8s] Cierre. QUICK CUT.
+  → Max 4 slots. Global Setup FUERA de timestamps. Seedance 2.5: hasta 30s.
+
+Grok Aurora (grok-imagine-video-1.5) — #1 Image-to-Video Arena:
+  [0-4s] Descripción + Audio: ticking sound.
+  [4s transition] Smash cut / Fade
+  [4-10s] Nueva acción. Voice-over: "Frase aquí."
+  → NO soporta negative prompts → usar lenguaje afirmativo (crystal clear focus).
+  → Hasta 7 @imageN referencias. Lip-sync + SFX nativos. ~17s generación.
+  → Explode view I2V: "disassemble into individual components, floating parts in 3D space"
+
+Runway Gen-4.5 (mejor para hero shots y explode views de producto):
+  → NO tiene timestamp text syntax → usa Clip Chaining + Director Mode
+  → Motion Brush: pinta hasta 5 zonas con dirección X/Y/Z independiente
+  → Para explode view: pintar componentes → asignar direcciones opuestas
+  → "components slowly float apart, parts drift outward symmetrically"
+
+Replicate API (Seedance 2.0):
+  prompt: "At 0:00 acción. At 0:05 nueva acción.", duration: -1, audio: True
+
+ElevenLabs + Video workflow:
+  1. eleven_v3 genera voz (74 idiomas) o SFX: POST /v1/sound-generation {"text":"thunder", "duration_seconds":3}
+  2. Video generado sin audio en Replicate/Seedance
+  3. FFmpeg merge: ffmpeg -i video.mp4 -i audio.mp3 -c:v copy output.mp4
+  4. Para lip-sync: POST /v1/dubbing {file: video.mp4, target_lang: "es"}
 
 NEGATIVE PROMPT PRESETS en Tab Vídeo de Fusion Studio Pro:
 • 🧍 Realismo/Anatomía — bloquea CGI, miembros extra, distorsiones faciales
