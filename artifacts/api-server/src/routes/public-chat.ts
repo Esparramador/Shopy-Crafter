@@ -3,6 +3,7 @@ import { askGeminiChat, askGeminiStream } from "../lib/gemini.js";
 import { MASTER_CATALOG } from "../lib/master-skills-injector.js";
 import { logger } from "../lib/logger.js";
 import { learnFromOperation } from "../lib/claude.js";
+import { buildModulesBlock, buildPricingBlock } from "../lib/platform-knowledge.js";
 
 const router = Router();
 
@@ -159,109 +160,9 @@ Shopy Crafter es una plataforma SaaS todo-en-uno impulsada por IA que combina:
 - Herramientas de agencia multi-cliente con white-label
 NO es solo "optimizacion Shopify" — es un ecosistema completo de produccion creativa y marketing con IA.
 
-== MODULO 1: OPTIMIZACION SHOPIFY (los motores clasicos) ==
-Conectas tu tienda Shopify (OAuth seguro, 5 minutos) y los motores trabajan 24/7:
-- Motor SEO: keyword research, titulos, meta descripciones, schemas JSON-LD (Product/FAQ/Review/BreadcrumbList), alt texts, arquitectura URL, internal linking
-- Motor Pricing: precios de mercado en tiempo real, price anchoring, elasticidad, compare_at_price automatico, bundling, psicologia de precios
-- Motor Imagenes IA: fotos de producto profesionales (fondo blanco, lifestyle, banners), optimizacion de imagenes, alt texts SEO automaticos
-- Motor Copywriting: descripciones con storytelling, AIDA/PAS, benefits-first, FAQ integrada, keywords long-tail
-- Motor A/B Testing: tests automaticos de precios, titulos e imagenes para maximizar conversion real
-- Motor Email Marketing: flujos Klaviyo completos (bienvenida, carrito abandonado, post-compra, winback VIP) con HTML listo para importar
-- Auditoria completa: score de optimizacion 0-100 (grado A/B/C/D/F) por producto con recomendaciones priorizadas
+${buildModulesBlock()}
 
-== MODULO 2: LAB WEB (analisis de rendimiento web) ==
-El Lab Web SI EXISTE y es una herramienta potente en la plataforma:
-- Analisis PageSpeed / Google Lighthouse integrado directamente
-- Core Web Vitals: LCP, FID, CLS, INP, FCP, TTFB
-- Diagnosticos con ahorros reales en bytes y milisegundos por problema
-- Detecta: imagenes sin optimizar, JS bloqueante, CSS no utilizado, redirect chains
-- Disponible desde el panel de cada proyecto Shopify conectado
-- Genera recomendaciones accionables priorizadas por impacto
-
-== MODULO 3: FUSION STUDIO PRO (estudio de IA generativa multimedia) ==
-Estudio creativo completo con los mejores modelos de IA del mercado:
-- Imagenes IA: genera con FLUX, Recraft, Ideogram, Gemini. Face swap, inpainting, outpainting, variaciones, upscaling
-- Video IA: Text-to-Video e Image-to-Video con Kling, Seedance, Hailuo, Veo, Runway Gen 4.5. Extension de video, video-to-video, edicion con IA
-- Audio IA: Text-to-Speech con ElevenLabs (74 idiomas), efectos de sonido, mezcla de audio
-Todo desde una sola interfaz integrada en la plataforma.
-
-== MODULO 4: LIBRERIA DE PROMPTS (mas de 6.677 templates) ==
-La mayor libreria de prompts de marketing en espanol:
-- Mas de 6.677 templates organizados en 38 categorias
-- Categorias: copywriting, SEO, email marketing, redes sociales, descripciones de producto, anuncios, scripts de video UGC, estrategia de marca, blog, landing pages...
-- Modo DNA: conecta tus prompts con el perfil de tu marca y productos reales
-- Ejecucion directa con Claude Sonnet — output listo para usar en segundos
-- Busqueda por palabra clave + filtro por categoria
-
-== MODULO 5: EFFECTS STUDIO (efectos y animaciones web) ==
-- 30 efectos CSS/JS de animacion para paginas web (parallax, glassmorphism, particulas, carousel, etc.)
-- 594 templates Visme listos para personalizar e integrar
-- Web Designer integrado para aplicar efectos directamente al codigo de tu tienda
-
-== MODULO 6: WEB DESIGNER IA (diseno web con Claude) ==
-- Disenador web potenciado por Claude AI
-- 26 demos interactivos de referencia incluidos
-- Genera secciones, landing pages, componentes con HTML/CSS/JS + Liquid para Shopify
-- Describe lo que necesitas en lenguaje natural y obtienes codigo real listo para tu tienda
-
-== MODULO 7: AD STUDIO (produccion de anuncios con IA) ==
-- Crea anuncios de video con avatares IA y personajes digitales
-- UGC (User Generated Content) sintetico con portavoces de IA
-- Face swap para videos de producto
-- Scripts optimizados por plataforma: TikTok (9:16), Meta Reels, YouTube Shorts
-- Brand DNA integrado para coherencia de marca en todos los anuncios
-
-== MODULO 8: CAMPAIGN KIT (kit completo de campana) ==
-- Produccion completa de campanas de marketing de principio a fin
-- Clips UGC, master cut, timeline, overlays de subtitulos
-- Character locks para coherencia de personaje entre clips
-- Tech specs por plataforma (resolucion, fps, codec, duracion maxima)
-- Plantillas de storyboard y briefing de produccion
-
-== MODULO 9: TRIPO3D STUDIO (modelos 3D con IA) ==
-- Genera modelos 3D de producto desde texto o imagen
-- Exporta en GLB/FBX/OBJ — listo para web, AR o impresion 3D
-- Retexturizado, rigging, stylize y conversion de formato
-- Ideal para visualizacion de producto interactiva en tu tienda
-
-== MODULO 10: MESHY 3D (modelos con animaciones) ==
-- Generacion de modelos 3D animados con 134 animaciones disponibles
-- Catalogo completo: idle, walk, dance, fight, celebrate, correr, saltar...
-- Avatares 3D de marca con movimiento realista
-- Exportacion GLB lista para integrar en web con Three.js
-
-== MODULO 11: EXPLODED VIEW STUDIO (vistas explosionadas de producto) ==
-- Vistas explosionadas de producto para marketing y presentacion
-- Deconstruccion visual de componentes del producto en 5 clips
-- Animaciones de ensamblaje para mostrar la calidad del producto
-- Multiples plataformas de IA video soportadas
-
-== MODULO 12: CARD STUDIO (disenador de tarjetas de presentacion) ==
-- Editor visual de tarjetas de presentacion con Fabric.js
-- 12 temas con diseno IA incluidos
-- Anade formas, emojis, bocadillos, codigos QR
-- Exporta como imagen o PDF de alta calidad
-
-== MODULO 13: BRAND DNA (extraccion del ADN de marca) ==
-- Extrae el perfil completo de tu marca desde tu web (crawler de hasta 25 paginas)
-- Integra Google Reviews, deteccion de tech stack, analisis de competidores
-- Genera: propuesta de valor unica, arquetipos de marca, pilares de contenido, handles sociales, taglines
-- El Brand DNA alimenta automaticamente todos los demas modulos para coherencia de marca total
-
-== MODULO 14: OMNICHATBOT (chatbot IA para tu tienda) ==
-- Chatbot de atencion al cliente para tiendas Shopify
-- 5 motores intercambiables: Auto, Claude, Gemini, Grok, Brain Only
-- 24 slash-skills especializadas en ventas, soporte y marketing
-- Conocimiento del catalogo, pedidos, precios y politica de la tienda
-- Se entrena con el contenido real de tu tienda
-
-== PLANES Y PRECIOS (NO hay plan gratuito permanente; todos son de pago) ==
-- Emprendedor (19€/mes): 5 productos/mes, 10 imagenes IA/mes, auditoria de tienda Shopify, chatbot IA de atencion, SEO basico automatico, soporte por email
-- Starter (49€/mes): 15 productos/mes, 45 imagenes IA/mes, todos los modulos de IA, SEO tecnico automatico, pricing dinamico con IA, soporte prioritario
-- Growth (149€/mes) — el mas popular: 60 productos/mes, 300 imagenes IA/mes, todos los modulos, A/B testing (hasta 10 activos), informes Pro mensuales, analisis de competidores en vivo, API access + webhooks, soporte prioritario 12h
-- Enterprise (399€/mes): 200 productos/mes, 1.200 imagenes IA/mes, A/B testing ilimitado, informes ejecutivos semanales, white-label y multi-tienda, account manager dedicado, API privada, soporte 24/7
-- A medida (precio personalizado): productos y tiendas ilimitadas, imagenes IA ilimitadas, integracion personalizada, SLA contractual, onboarding dedicado — para hablar con ventas
-Todos los planes de pago incluyen 14 dias de prueba gratuita (no requiere tarjeta de credito para probar, pero el servicio en si no es gratuito). Cancela cuando quieras.
+${buildPricingBlock()}
 
 == RESULTADOS REALES ==
 - +234% incremento medio en conversion

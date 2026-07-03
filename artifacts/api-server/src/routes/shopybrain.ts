@@ -8,6 +8,7 @@ import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { loadExistingEntityKnowledge } from "./entity-research.js";
 import { APP_GUIDE_KNOWLEDGE, getPageContextForRoute, detectGuideRequest } from "../lib/app-guide.js";
 import { buildMasterSkillsBlock } from "../lib/master-skills-injector.js";
+import { buildPricingBlock } from "../lib/platform-knowledge.js";
 import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { learnFromOperation, askClaude, askClaudeWithUsage, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
@@ -1011,12 +1012,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   TARIFA COMPLETA DE PRECIOS — CATÁLOGO 57 PRODUCTOS
   ═══════════════════════════════════════════════════
   
-  ▸ PLANES SHOPY CRAFTER — SIN PERMANENCIA, CANCELA CUANDO QUIERAS (NO hay plan gratuito permanente):
-  • Emprendedor — €19/mes: 5 productos/mes, 10 imágenes IA/mes, auditoría de tienda Shopify, chatbot IA de atención, SEO básico automático, soporte email
-  • Starter — €49/mes: 15 productos/mes, 45 imágenes IA/mes, todos los módulos de IA, SEO técnico automático, pricing dinámico con IA, soporte prioritario
-  • Growth — €149/mes (MÁS POPULAR): 60 productos/mes, 300 imágenes IA/mes, todos los módulos, A/B testing (hasta 10 activos), informes Pro mensuales, análisis de competidores en vivo, API access + webhooks, soporte prioritario 12h
-  • Enterprise — €399/mes: 200 productos/mes, 1.200 imágenes IA/mes, A/B testing ilimitado, informes ejecutivos semanales, white-label y multi-tienda, account manager dedicado, API privada, soporte 24/7
-  • A medida — precio personalizado: productos y tiendas ilimitadas, imágenes IA ilimitadas, integración personalizada, SLA contractual, onboarding dedicado
+  ${buildPricingBlock()}
   
   FLEXIBILIDAD DE PAGO:
   • Todos los planes SIN PERMANENCIA — cancela cuando quieras
@@ -1024,7 +1020,6 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   • Para emprendedores y pymes: pago fraccionado disponible (consultar)
   • Servicios one-shot: se pueden contratar SIN suscripción
   • Descuentos por volumen automáticos en productos y servicios
-  • Todos los planes incluyen 14 días de prueba gratuita (sin tarjeta de crédito requerida para probar)
   
   ▸ PACKS DE CRÉDITOS IA (Comic Crafter):
   • Pack Ilustrador 110 Créditos — desde €9.99: Generación básica cómics y arte digital
