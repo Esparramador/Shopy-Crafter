@@ -591,11 +591,27 @@ export interface AiVideoTool {
 }
 
 export const AI_VIDEO_TOOLS: AiVideoTool[] = [
-  { rank: 1, name: "Kling AI 1.6", bestFor: "Character consistency + motion", notes: "Best for maintaining Crafter across clips" },
-  { rank: 2, name: "Runway Gen-3 Alpha", bestFor: "Prompt adherence + cinematic", notes: "Most faithful to detailed prompts" },
-  { rank: 3, name: "Luma Dream Machine", bestFor: "3D/robotic elements", notes: "Ideal for Blueprint video robotic arms" },
-  { rank: 4, name: "Pika Labs 2.1", bestFor: "Fastest iteration", notes: "Best for rapid draft previews" },
+  { rank: 1, name: "Grok Aurora 1.5 (xAI)", bestFor: "UGC character — timestamp [0-4s] + 7 @imageN refs + audio nativo + lip-sync automático", notes: "#1 Image-to-Video Arena. Timestamp: [0-4s] acción. [4s transition] Smash cut. [4-10s] acción. Voice-over: 'frase'" },
+  { rank: 2, name: "Seedance 2.0 (ByteDance)", bestFor: "Timestamp narration [0-1.5s] + 9 refs omni-modal + explode view I2V", notes: "Mejor para control narrativo preciso. API Replicate: duration=-1, audio=True, subject_reference=URL" },
+  { rank: 3, name: "Kling 3.0 Omni (Kuaishou)", bestFor: "Character ID cross-shot + Multi-shot 6 escenas + 4K nativo", notes: "@character1 para personaje consistente en toda la campaña" },
+  { rank: 4, name: "Runway Gen-4.5", bestFor: "Explode views + Motion Brush 5 zonas X/Y/Z + física realista", notes: "NO timestamp syntax. 'components slowly float apart' + pintar zonas con Motion Brush" },
+  { rank: 5, name: "Google Flow (Veo 3)", bestFor: "First/Last Frame — ensamblado→explotado automático", notes: "MEJOR para explode views: start=ensamblado, end=explotado, IA calcula trayecto" },
+  { rank: 6, name: "ElevenLabs eleven_v3", bestFor: "Voz personaje UGC (74 idiomas) + SFX + Dubbing lip-sync", notes: "Instant Voice Clone (5 muestras). SFX: POST /v1/sound-generation. Dubbing: POST /v1/dubbing" },
 ];
+
+// CHARACTER UGC — DNA Blueprint (incluir en TODOS los prompts para consistencia):
+// [CHARACTER LOCK] Maria, 28, Mediterranean features, long dark wavy hair, brown eyes,
+// beauty mark on left cheek, oversized white tee, minimal jewelry.
+// Hyper-realistic, natural skin texture, editorial photography.
+//
+// TÉCNICA CROSS-SHOT: último frame clip A = primer frame clip B (First/Last Frame chaining)
+// Grok: @image1–@image7 · Kling: @character1 · Runway: Character Reference toggle + Fixed Seed
+//
+// EXPLODE VIEW PROMPTS VERIFICADOS:
+// Auriculares: "Cinematic exploded view, silicone tips, drivers, battery float apart vertically, clean white studio, 8K"
+// Zapatillas:  "Teardown running shoe, outsole/midsole/carbon plate/upper in layers, technical engineering, 8K"
+// Tech/Phone:  "Exploded view smartphone, glass back/camera/PCB/battery drift outward, blue callout lines, 8K"
+// Assembled:   "Parts converge and snap together, satisfying mechanical click motion, white studio, 8K"
 
 // ─────────────────────────────────────────────────────────────────────────
 // 10. STORYBOARD STRUCTURE — 10-slide deck flow

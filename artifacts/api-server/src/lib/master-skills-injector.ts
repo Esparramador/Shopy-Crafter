@@ -174,8 +174,25 @@ CODE: liquid-custom-section, shopify-app-snippet, storefront-api-query
 • Global State DNA: ${GLOBAL_STATE_TEMPLATES.length} templates (camera+lighting+physics lock cross-clip)
 • Prompt Sequences: ${PROMPT_SEQUENCES.length} secuencias de 5 clips (deconstrucción + ensamblaje)
 • Product Presets: ${PRODUCT_PRESETS.map(p => p.displayName).join(", ")}
-• Post-Production: ${POST_PRODUCTION_PIPELINE.length} pasos de pipeline
-• Quality Rules: ${QUALITY_RULES.length} reglas de calidad
+• Post-Production: ${POST_PRODUCTION_PIPELINE.length} pasos de pipeline · Quality Rules: ${QUALITY_RULES.length} reglas
+• TOP MODELOS EXPLODE VIEW (2026): Google Flow Veo 3 (FLF rating:98) → Seedance 2.0 (rating:95) → Kling 3.0 (rating:92) → Runway Gen-4.5 (rating:90) → Grok Aurora 1.5 (rating:88)
+• TÉCNICA FLF: imagen ensamblada (start) + imagen explotada (end) → Google Flow calcula trayecto de cada pieza
+• TIMESTAMP NARRATION: Seedance [0-1.5s]slot1.[1.5-3.5s]slot2 / Grok [0-4s]acción.[4s transition]Smash cut.[4-10s]nueva
+
+🤖 AI VIDEO TOOLS RANKING 2026 (actualizado Jul 2026):
+1. Grok Aurora 1.5 — #1 I2V Arena, timestamp narración, 7 @imageN refs, audio nativo, ~17s gen
+2. Seedance 2.0   — timestamp [0-1.5s] slots, 9 omni refs, explode view I2V, Replicate API
+3. Kling 3.0 Omni — @character1 ID, multi-shot 6 escenas, 4K, Element Binding
+4. Runway Gen-4.5 — Motion Brush 5 zonas X/Y/Z, física realista, NO timestamp syntax
+5. Google Flow    — MEJOR First/Last Frame para explode views de producto
+6. ElevenLabs eleven_v3 — TTS 74 idiomas, SFX API, Dubbing lip-sync, Instant Voice Clone
+   Workflow: eleven_v3 audio + video sin audio → zsxkib/mmaudio SFX → ffmpeg merge
+
+🎭 CHARACTER UGC — DNA Blueprint & Consistency:
+• DNA Lock: [CHARACTER NAME, edad, rasgos, ropa, estilo] incluir en TODOS los prompts
+• Cross-shot: último frame clip A = primer frame clip B (First/Last Frame chaining)
+• Por modelo: Grok @image1-7 · Kling @character1 · Runway Character Reference toggle + Fixed Seed
+• Multi-Angle Ref Sheet: 4 ángulos (frente/perfil/3-4/espalda) → imagen compuesta → referencia para Runway/Luma
 
 🎨 SHOPIFY EXPERT KNOWLEDGE BLOCKS (5 bloques expertos):
 • THEME_ARCHITECTURE_KNOWLEDGE — Liquid syntax, secciones, snippets, schemas JSON, CSS custom
@@ -421,13 +438,13 @@ function detectIntents(query: string): IntentFlags {
     supplier:      /proveedor|supplier|fabricante|manufacturer|dropshipping|sourcing|alibaba|mayorista|wholesale|\bmoq\b|lead.*time/.test(q),
     theme:         /edit.*css|theme.*css|tema.*shopify|diseño.*tienda|sección.*shopify|custom.*section|shopify.*css|header.*shopify|footer.*shopify/.test(q),
     advertising:   /anuncio|publicidad|\bads\b|\bugc\b|tiktok.*ad|meta.*ad|campaña.*video|\breel\b|short.*video|micro.*clip|ad.*creativ|brand.*dna.*frame|plataforma.*prompt/.test(q),
-    videoProduction: /producción.*video|video.*campaign|campaña.*video|master.*cut|timeline.*video|character.*lock|subtitle.*track|deliverable.*video/.test(q),
-    cinematic:     /cinemat|optical.*tech|dolly.*zoom|rack.*focus|cinematograph|shot.*size|presenter.*style|plano.*detalle|plano.*general|encuadr|continuity.*token|action.*token|preset.*cine/.test(q),
+    videoProduction: /producción.*video|video.*campaign|campaña.*video|master.*cut|timeline.*video|character.*lock|subtitle.*track|deliverable.*video|timestamp.*narration|timestamp.*escena|narración.*timestamp/.test(q),
+    cinematic:     /cinemat|optical.*tech|dolly.*zoom|rack.*focus|cinematograph|shot.*size|presenter.*style|plano.*detalle|plano.*general|encuadr|continuity.*token|action.*token|preset.*cine|grok.*aurora|grok.*video|aurora.*timestamp|seedance.*timestamp|timestamp.*slot/.test(q),
     cogsDeep:      /metodología.*cogs|cogs.*metodolog|coste.*oculto|hidden.*cost|tco.*total|cost.*ownership|escenario.*proveedor|excel.*cogs|cogs.*excel|golden.*rule.*cogs|regla.*oro.*cogs/.test(q),
     plugins:       /plugin|app.*shopify|shopify.*app|klaviyo|judge\.me|okendo|hotjar|gorgias|recharge|bold.*upsell|smile\.io|aftership|triple.*whale|recomienda.*app/.test(q),
-    explodedView:  /exploded.*view|vista.*explot|deconstrucción.*producto|producto.*desmontado|assembly.*video|magnetic.*assembly|components.*float|global.*state.*dna|prompt.*sequence.*5|exploded/.test(q),
+    explodedView:  /exploded.*view|vista.*explot|deconstrucción.*producto|producto.*desmontado|assembly.*video|magnetic.*assembly|components.*float|global.*state.*dna|prompt.*sequence.*5|exploded|desensambla|ensambla|teardown|disassemble|assembled|producto.*explo|explo.*producto|auriculares.*explo|sneaker.*explo|phone.*explo/.test(q),
     skillsLibrary: /qué.*skills|skill.*disponible|listame.*skills|generar.*con.*skill|usar.*skill|skill.*library|all.*skills|todas.*skills/.test(q),
-    campaignProduction: /campaign.*production|producción.*campaña|character.*lock|ugc.*clip|micro.clip.*method|master.*cut.*timeline|storyboard.*slide|subtitle.*track/.test(q),
+    campaignProduction: /campaign.*production|producción.*campaña|character.*lock|ugc.*clip|micro.clip.*method|master.*cut.*timeline|storyboard.*slide|subtitle.*track|elevenlabs.*workflow|eleven.*v3|voice.*clone|ugc.*character|character.*ugc|dna.*blueprint/.test(q),
   };
 }
 

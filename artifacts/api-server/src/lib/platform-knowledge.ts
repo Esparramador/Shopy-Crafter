@@ -165,12 +165,14 @@ export const PLATFORM_MODULES: PlatformModule[] = [
   {
     id: "fusion-studio-pro",
     name: "FUSION STUDIO PRO (estudio de IA generativa multimedia)",
-    description: "Estudio creativo completo con los mejores modelos de IA del mercado:",
+    description: "Estudio creativo completo con los mejores modelos de IA del mercado (actualizado Jul 2026):",
     bullets: [
-      "Imágenes IA: genera con FLUX, Recraft, Ideogram, Gemini. Face swap, inpainting, outpainting, variaciones, upscaling",
-      "Video IA: Text-to-Video e Image-to-Video con Kling, Seedance, Hailuo, Veo, Runway Gen 4.5. Extensión de video, video-to-video, edición con IA",
-      "Audio IA: Text-to-Speech con ElevenLabs (74 idiomas), efectos de sonido, mezcla de audio",
-      "Todo desde una sola interfaz integrada en la plataforma",
+      "Imágenes IA: FLUX, Recraft V4, Ideogram V3, Imagen 4, Gemini. Face swap, inpainting, outpainting, variaciones, upscaling 4K",
+      "Video IA: Grok Aurora 1.5 (#1 I2V Arena, timestamp narration [0-4s], 7 refs, audio nativo), Seedance 2.0 (timestamp [0-1.5s] slots, 9 omni-refs), Kling 3.0 Omni (4K, multi-shot 6 escenas), Runway Gen-4.5 (Motion Brush explode views), Hailuo, Veo 3.1. Extensión, video-to-video, edición con IA",
+      "Timestamp Scene Builder: construye narración timestamp a timestamp para Seedance ([0-1.5s][1.5-3.5s][3.5-6s][6-8s]) y Grok Aurora ([0-4s][4s transition][4-10s])",
+      "Explode View Studio: desensambla/ensambla productos en video — auriculares, zapatillas, smartphones, tech. Templates listos: 💥 Explode View + 🔩 Assembled",
+      "Character UGC: DNA Blueprint cross-shot consistency con @imageN refs (Grok), @character1 (Kling), Character Reference (Runway)",
+      "Audio IA: ElevenLabs eleven_v3 TTS (74 idiomas), Instant Voice Clone, SFX generation, Dubbing lip-sync. Workflow: audio + video → ffmpeg merge",
     ],
   },
   {
@@ -254,13 +256,16 @@ export const PLATFORM_MODULES: PlatformModule[] = [
   },
   {
     id: "exploded-view",
-    name: "EXPLODED VIEW STUDIO (vistas explosionadas de producto)",
-    description: "",
+    name: "EXPLODED VIEW STUDIO (vistas explosionadas de producto — Jul 2026)",
+    description: "Crea videos de despiece y ensamblaje de producto con IA — perfecto para marketing técnico y hero shots:",
     bullets: [
-      "Vistas explosionadas de producto para marketing y presentación",
-      "Deconstrucción visual de componentes del producto en 5 clips",
-      "Animaciones de ensamblaje para mostrar la calidad del producto",
-      "Múltiples plataformas de IA video soportadas",
+      "Deconstrucción en 5 clips: componentes flotan hacia afuera con física precisa — auriculares, zapatillas, smartphone, tech",
+      "Ensamblaje reverso (Assembled): partes convergen y encajan con satisfying click motion",
+      "MEJORES MODELOS: Google Flow Veo 3 (First/Last Frame — imagen ensamblada+explotada → IA calcula trayecto) · Seedance 2.0 I2V · Kling 3.0 Element Binding · Runway Gen-4.5 Motion Brush",
+      "Runway Motion Brush: pinta hasta 5 zonas independientes con dirección X/Y/Z para forzar explosión controlada",
+      "Prompts verificados: auriculares (drivers/battery/PCB float) · sneakers (outsole/midsole/carbon plate layers) · smartphone (callout lines holográficas)",
+      "Global State DNA: camera+lighting+physics lock cross-clip para consistencia entre los 5 clips de la secuencia",
+      "Post-producción: ffmpeg concatenación + zsxkib/mmaudio para SFX reactivos al movimiento de las piezas",
     ],
   },
   {

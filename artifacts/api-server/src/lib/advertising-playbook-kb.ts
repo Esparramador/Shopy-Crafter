@@ -469,12 +469,20 @@ export interface AiVideoTool {
 }
 
 export const AI_VIDEO_TOOLS: AiVideoTool[] = [
-  { rank: 1, name: "Kling AI 2.1", bestFor: "Best character consistency + motion", characterConsistency: 95, cinematicQuality: 90, speedSec: 45 },
-  { rank: 2, name: "Runway Gen-3 Alpha", bestFor: "Best prompt adherence + cinematic quality", characterConsistency: 85, cinematicQuality: 95, speedSec: 60 },
-  { rank: 3, name: "Luma Dream Machine", bestFor: "Best 3D/complex scenes", characterConsistency: 80, cinematicQuality: 88, speedSec: 50 },
-  { rank: 4, name: "Seedance 2.0", bestFor: "Best motion quality + physics", characterConsistency: 88, cinematicQuality: 92, speedSec: 55 },
-  { rank: 5, name: "Pika Labs 2.1", bestFor: "Fastest iteration speed", characterConsistency: 75, cinematicQuality: 82, speedSec: 20 },
+  { rank: 1, name: "Grok Aurora 1.5 (xAI)", bestFor: "#1 Image-to-Video Arena — timestamp narration + audio nativo", characterConsistency: 90, cinematicQuality: 93, speedSec: 17 },
+  { rank: 2, name: "Seedance 2.0 (ByteDance)", bestFor: "Timestamp narration [0-1.5s] + 9 refs multi-modal + explode view I2V", characterConsistency: 88, cinematicQuality: 92, speedSec: 55 },
+  { rank: 3, name: "Kling 3.0 Omni (Kuaishou)", bestFor: "Multi-shot 6 escenas + Character ID + 4K nativo", characterConsistency: 95, cinematicQuality: 90, speedSec: 45 },
+  { rank: 4, name: "Runway Gen-4.5", bestFor: "Explode views + Motion Brush 5 zonas + física realista", characterConsistency: 85, cinematicQuality: 96, speedSec: 60 },
+  { rank: 5, name: "Google Flow (Veo 3)", bestFor: "First/Last Frame interpolation — mejor para explode views de producto", characterConsistency: 82, cinematicQuality: 95, speedSec: 50 },
+  { rank: 6, name: "Wan 2.7 Fast (Replicate)", bestFor: "Open source, 1080p, $0.05/s — mejor precio/calidad", characterConsistency: 80, cinematicQuality: 88, speedSec: 30 },
+  { rank: 7, name: "ElevenLabs eleven_v3", bestFor: "Audio UGC: TTS 74 idiomas + SFX generation + Dubbing lip-sync", characterConsistency: 99, cinematicQuality: 0, speedSec: 5 },
 ];
+
+// TIMESTAMP NARRATION SYNTAX (2026 verificado):
+// Seedance 2.0:  CAMERA: setup. STYLE: setup. [0-1.5s] slot1. [1.5-3.5s] slot2. [3.5-6s] slot3. [6-8s] slot4.
+// Grok Aurora:   [0-4s] desc + Audio: sfx. [4s transition] Smash cut. [4-10s] nueva acción. Voice-over: "frase".
+// Runway Gen-4.5: NO timestamp syntax → Clip Chaining + Motion Brush (5 zonas X/Y/Z).
+// ElevenLabs workflow: eleven_v3 audio → video sin audio → zsxkib/mmaudio SFX → ffmpeg merge.
 
 // ───────────────────────────────────────────────────────────────────────────
 // COMPOSE HELPERS — Pure transformation functions (no AI calls)
