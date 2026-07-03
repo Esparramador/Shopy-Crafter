@@ -46,6 +46,8 @@ export const projectsTable = pgTable("projects", {
   clientContactName: text("client_contact_name"),
   clientContactEmail: text("client_contact_email"),
   clientContactPhone: text("client_contact_phone"),
+  instagramHandle: text("instagram_handle"),
+  projectDescription: text("project_description"),
   status: text("status").notNull().default("active").$type<"active" | "paused" | "churned" | "prospect">(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

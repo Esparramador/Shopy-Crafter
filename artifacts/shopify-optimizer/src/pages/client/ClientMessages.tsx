@@ -3,7 +3,7 @@ import { ClientLayout } from "./ClientLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
 import { useClientPreview } from "./ClientPreviewContext";
-import { Send, Loader2, Paperclip, X, Download, Package, Search, ExternalLink } from "lucide-react";
+import { Send, Loader2, Paperclip, X, Download, Package, Search, ExternalLink, Video } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -394,24 +394,48 @@ export default function ClientMessages() {
           display: "flex", flexDirection: "column", minWidth: 0,
         }}>
           {/* Chat header */}
-          <div style={{
-            padding: "12px 16px", borderBottom: "1px solid var(--bdr)",
-            display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
-          }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 10,
-              background: "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 14, fontWeight: 800, color: "#0a0a14", flexShrink: 0,
-            }}>A</div>
-            <div>
-              <p style={{ fontSize: 13, fontWeight: 700 }}>{t("agencyName", "Tu Agencia")}</p>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div className="status-pulse" style={{ width: 5, height: 5, background: "var(--jade)", flexShrink: 0 }} />
-                <p style={{ fontSize: 11, color: "var(--t3)" }}>{t("agencyStatus", "En línea · Respuesta en <24h")}</p>
-              </div>
-            </div>
-          </div>
+          {(() => {
+            const callMsg = [...messages].reverse().find(m => m.fromRole === "admin" && m.content?.includes("📹 Videollamada iniciada"));
+            const callUrl = callMsg?.content?.match(/https:\/\/meet\.jit\.si\/[^\s]+/)?.[0];
+            return (
+              <>
+                <div style={{
+                  padding: "12px 16px", borderBottom: "1px solid var(--bdr)",
+                  display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+                }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 10,
+                    background: "linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 14, fontWeight: 800, color: "#0a0a14", flexShrink: 0,
+                  }}>A</div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700 }}>{t("agencyName", "Tu Agencia")}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <div className="status-pulse" style={{ width: 5, height: 5, background: "var(--jade)", flexShrink: 0 }} />
+                      <p style={{ fontSize: 11, color: "var(--t3)" }}>{t("agencyStatus", "En línea · Respuesta en <24h")}</p>
+                    </div>
+                  </div>
+                  {callUrl && (
+                    <a href={callUrl} target="_blank" rel="noopener noreferrer"
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: "1px solid rgba(45,212,159,0.4)", background: "rgba(45,212,159,0.08)", color: "var(--jade)", fontSize: 12, fontWeight: 700, textDecoration: "none", animation: "pulse 2s infinite" }}>
+                      <Video size={14} /> Unirse
+                    </a>
+                  )}
+                </div>
+                {callUrl && (
+                  <div style={{ padding: "8px 16px", borderBottom: "1px solid rgba(45,212,159,0.2)", background: "rgba(45,212,159,0.05)", display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--jade)", animation: "pulse 1.5s infinite", flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "var(--jade)", fontWeight: 600, flex: 1 }}>Tu agencia ha iniciado una videollamada</span>
+                    <a href={callUrl} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: "var(--jade)", textDecoration: "underline" }}>
+                      Abrir llamada →
+                    </a>
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px" }}>

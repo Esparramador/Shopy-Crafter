@@ -54,6 +54,8 @@ export default function NewProject() {
     targetAudience: "",
     storeMarkets: "",
     plan: "starter",
+    instagramHandle: "",
+    projectDescription: "",
   });
   const { t } = useCmsSection("labels.newProject");
   const { t: tGuide } = useCmsSection("labels.connectionGuides");
@@ -147,6 +149,8 @@ export default function NewProject() {
         storeMarkets: formData.storeMarkets || undefined,
         plan: formData.plan,
         platformType: platform,
+        instagramHandle: formData.instagramHandle || undefined,
+        projectDescription: formData.projectDescription || undefined,
       };
 
       if (isShopify || isWoo) {
@@ -342,6 +346,37 @@ export default function NewProject() {
               )}
             </div>
           </div>
+
+          {isUniversal && (
+            <>
+              <div style={{ borderTop: "1px solid var(--bdr)", margin: "20px 0" }} />
+              <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+                Información del cliente (opcional)
+              </p>
+              <div className="grid-2" style={{ marginBottom: 0 }}>
+                <div className="form-group">
+                  <label className="form-label">Instagram del cliente</label>
+                  <input
+                    className="form-input"
+                    value={formData.instagramHandle}
+                    onChange={e => setFormData(prev => ({ ...prev, instagramHandle: e.target.value }))}
+                    placeholder="@handle o URL completa"
+                  />
+                </div>
+                <div className="form-group" style={{ gridColumn: "1 / -1" }}>
+                  <label className="form-label">Descripción del encargo</label>
+                  <textarea
+                    className="form-input"
+                    value={formData.projectDescription}
+                    onChange={e => setFormData(prev => ({ ...prev, projectDescription: e.target.value }))}
+                    placeholder="Describe qué necesita el cliente: campañas, auditoría, branding, redes sociales..."
+                    rows={3}
+                    style={{ resize: "vertical", fontFamily: "inherit" }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           {!isUniversal && (
             <>

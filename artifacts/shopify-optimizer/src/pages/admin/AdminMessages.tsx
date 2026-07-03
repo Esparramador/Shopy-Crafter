@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "../../components/layout/AppLayout";
-import { Send, Loader2, MessageSquare, Search, Paperclip, X, Download } from "lucide-react";
+import { Send, Loader2, MessageSquare, Search, Paperclip, X, Download, Video, VideoOff, Users } from "lucide-react";
 
 function renderMsgContent(content: string, isAdmin: boolean, onProductNav?: (handle: string) => void) {
   const parts = content.split(/(\[Producto: [^\]]+\]\([^)]+\)|\[Producto: [^\]]+\])/g);
@@ -140,6 +140,8 @@ export default function AdminMessages() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [search, setSearch] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [jitsiActive, setJitsiActive] = useState(false);
+  const [jitsiRoom, setJitsiRoom] = useState("");
 
   const handleProductNav = useCallback((handle: string) => {
     if (selected) {
@@ -240,6 +242,22 @@ export default function AdminMessages() {
     p.shopDomain?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const startVideoCall = useCallback(async () => {
+    if (!selected) return;
+    const token = Math.random().toString(36).slice(2, 8);
+    const room = `ShopyCrafter-${selected.id}-${token}`;
+    const url = `https://meet.jit.si/${room}`;
+    setJitsiRoom(room);
+    setJitsiActive(true);
+    await fetch(`${API}/admin/projects/${selected.id}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ content: `📹 Videollamada iniciada — únete aquí: ${url}` }),
+    }).catch(() => {});
+    loadMsgs(String(selected.id));
+  }, [selected, loadMsgs]);
+
   return (
     <AppLayout>
       <div style={{ display: "flex", height: "calc(100vh - 6rem)", gap: 0, background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }}>
@@ -307,14 +325,37 @@ export default function AdminMessages() {
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,rgba(201,169,97,0.2),rgba(201,169,97,0.08))", border: "1px solid rgba(201,169,97,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "var(--gold)", flexShrink: 0 }}>
                   {(selected.name ?? "?")[0]?.toUpperCase()}
                 </div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 14, fontWeight: 700, color: "var(--t1)", margin: 0 }}>{selected.name ?? "Tienda sin nombre"}</p>
                   <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                     <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--jade)", animation: "pulse 2s infinite" }} />
                     <p style={{ fontSize: 11, color: "var(--t3)", margin: 0 }}>{selected.shopDomain || "Sin dominio"} · Actualiza cada 5s</p>
                   </div>
                 </div>
+                <button
+                  onClick={jitsiActive ? () => { setJitsiActive(false); setJitsiRoom(""); } : startVideoCall}
+                  title={jitsiActive ? "Finalizar videollamada" : "Iniciar videollamada"}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: `1px solid ${jitsiActive ? "rgba(220,60,60,0.4)" : "rgba(45,212,159,0.35)"}`, background: jitsiActive ? "rgba(220,60,60,0.08)" : "rgba(45,212,159,0.07)", color: jitsiActive ? "#e84558" : "var(--jade)", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}>
+                  {jitsiActive ? <VideoOff size={14} /> : <Video size={14} />}
+                  {jitsiActive ? "Finalizar" : "Videollamada"}
+                </button>
               </div>
+
+              {/* Jitsi embed */}
+              {jitsiActive && jitsiRoom && (
+                <div style={{ height: 380, flexShrink: 0, borderBottom: "1px solid var(--bdr)", position: "relative", background: "#000" }}>
+                  <iframe
+                    src={`https://meet.jit.si/${jitsiRoom}#config.startWithAudioMuted=false&config.disableDeepLinking=true&config.prejoinPageEnabled=false&userInfo.displayName=Admin%20ShopyCrafter`}
+                    style={{ width: "100%", height: "100%", border: "none" }}
+                    allow="camera; microphone; display-capture; fullscreen"
+                    title="Videollamada"
+                  />
+                  <a href={`https://meet.jit.si/${jitsiRoom}`} target="_blank" rel="noopener noreferrer"
+                    style={{ position: "absolute", bottom: 10, right: 10, padding: "5px 10px", background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 7, fontSize: 11, color: "#fff", textDecoration: "none" }}>
+                    Abrir en nueva pestaña ↗
+                  </a>
+                </div>
+              )}
 
               {/* Messages */}
               <div style={{ flex: 1, overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 10 }}>

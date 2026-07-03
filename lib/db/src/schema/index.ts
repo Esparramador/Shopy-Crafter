@@ -28,6 +28,7 @@ export * from "./email_flows";
 export * from "./audit_results";
 export * from "./report_templates";
 export * from "./express_rate_limits";
+export * from "./chat_groups";
 export * from "./api_usage";
 export * from "./characters";
 export * from "./business_cards";

@@ -1638,7 +1638,7 @@ router.post("/vault/global/save", requireAuth, async (req, res): Promise<void> =
   
     const htmlBuffer = Buffer.from(htmlReport, "utf-8");
     const safeName = title.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, "").replace(/\s+/g, "_").slice(0, 80);
-    const safeEntity = (entityName || "external").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 40);
+    const safeEntity = (entityName || "Shopy Crafter").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 40);
     const objectPath = projectId
       ? `projects/${projectId}/${fileType}/${safeName}_${Date.now()}.html`
       : `global/${safeEntity}/${fileType}/${safeName}_${Date.now()}.html`;

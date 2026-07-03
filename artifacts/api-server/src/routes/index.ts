@@ -78,6 +78,7 @@ import apiUsageStatsRouter from "./api-usage-stats.js";
 import youtubeRouter from "./youtube.js";
 import calendarRouter from "./calendar.js";
 import viralRouter from "./viral.js";
+import chatGroupsRouter from "./chat-groups.js";
 
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
@@ -123,6 +124,7 @@ router.use(tiendaRouter);
 router.use(webhookGatewayRouter);
 router.use(stripeConnectRouter);
 router.use(stripeMasterRouter);
+router.use(chatGroupsRouter);
 
 // fs-pro and visme: every route has its own per-route auth (requireAdmin or requireAuth)
 // so they must be mounted BEFORE the global requireAdmin gate below.

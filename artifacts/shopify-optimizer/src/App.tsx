@@ -49,6 +49,7 @@ const GlobalVault = lazy(() => import("@/pages/admin/GlobalVault"));
 const UniversalSearch = lazy(() => import("@/pages/admin/UniversalSearch"));
 const AdminSettings = lazy(() => import("@/pages/admin/AdminSettings"));
 const AdminMessages = lazy(() => import("@/pages/admin/AdminMessages"));
+const GroupChat = lazy(() => import("@/pages/admin/GroupChat"));
 const AdminProducts = lazy(() => import("@/pages/admin/AdminProducts"));
 const AdminABTests = lazy(() => import("@/pages/admin/AdminABTests"));
 const AdminAutomations = lazy(() => import("@/pages/admin/AdminAutomations"));
@@ -383,6 +384,9 @@ function Router() {
         </Route>
         <Route path="/admin/messages">
           <RequireAdmin><AdminWrapper><S><AdminMessages /></S></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/group-chat">
+          <RequireAdmin><AdminWrapper><S><GroupChat /></S></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/cms">
           <RequireAdmin><S><CMSEditor /></S></RequireAdmin>

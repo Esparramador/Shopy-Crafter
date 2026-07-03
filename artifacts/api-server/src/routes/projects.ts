@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { db } from "@workspace/db";
 import { projectsTable, platformSettingsTable } from "@workspace/db";
 import type { PlatformType } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { refreshToken, validateToken, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { recordAudit } from "../lib/audit.helper.js";
@@ -12,6 +12,14 @@ import { learnFromOperation } from "../lib/claude";
 import { cached, invalidateCache } from "../lib/cache.js";
 
 const router = Router();
+
+// ── Startup migration: add new columns if not present ────────────────────────
+(async () => {
+  try {
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS instagram_handle TEXT`);
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_description TEXT`);
+  } catch { /* non-fatal */ }
+})();
 
 function handleRouteError(res: any, err: any): void {
   if (err instanceof ShopifyAuthError) {
@@ -265,6 +273,7 @@ router.post("/projects", async (req, res): Promise<void> => {
       name, shopDomain, clientId, clientSecret,
       storeNiche, brandTone, targetAudience, storeMarkets,
       replicateApiToken, anthropicApiKey, plan, platformType: rawPlatformType,
+      instagramHandle, projectDescription,
     } = req.body;
   
     const validPlatforms: PlatformType[] = ["shopify", "woocommerce", "prestashop", "wordpress", "universal", "stripe"];
@@ -344,6 +353,8 @@ router.post("/projects", async (req, res): Promise<void> => {
       brandTone: brandTone ?? null,
       targetAudience: targetAudience ?? null,
       storeMarkets: storeMarkets ?? null,
+      instagramHandle: instagramHandle ?? null,
+      projectDescription: projectDescription ?? null,
       replicateApiToken: replicateApiToken ? encrypt(replicateApiToken) : null,
       anthropicApiKey: anthropicApiKey ? encrypt(anthropicApiKey) : null,
       plan: finalPlan as "admin" | "starter" | "agency_pro" | "enterprise" | "trial",
