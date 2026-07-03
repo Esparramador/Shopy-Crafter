@@ -910,6 +910,171 @@ router.post("/api/tripo3d/text-to-model-advanced", async (req: Request, res: Res
   }
 });
 
+/* POST /api/tripo3d/segment — segmentar modelo 3D en partes semánticas
+   Tripo3D divide el modelo en componentes (cuerpo, ruedas, cabello, ropa…) */
+router.post("/api/tripo3d/segment", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
+  const { original_model_task_id } = req.body ?? {};
+  if (!original_model_task_id) {
+    res.status(400).json({ error: "original_model_task_id requerido" }); return;
+  }
+  try {
+    const taskId = await tripoCreateTask({
+      type: "segment_model",
+      original_model_task_id,
+    });
+    res.write(`data: ${JSON.stringify({ event: "started", task_id: taskId })}\n\n`);
+    for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
+      const data = await tripoFetch(`/task/${taskId}`);
+      const status: string = data.status;
+      const progress: number = data.progress ?? 0;
+      res.write(`data: ${JSON.stringify({ event: "progress", task_id: taskId, progress, status })}\n\n`);
+      if (status === "success") {
+        res.write(`data: ${JSON.stringify({ event: "done", task_id: taskId, output: data.output, segments: data.output?.segments ?? [] })}\n\n`);
+        res.end(); return;
+      }
+      if (status === "failed" || status === "cancelled") {
+        res.write(`data: ${JSON.stringify({ event: "error", task_id: taskId, error: `Segment ${status}` })}\n\n`);
+        res.end(); return;
+      }
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    res.write(`data: ${JSON.stringify({ event: "timeout", task_id: taskId })}\n\n`);
+    res.end();
+  } catch (e: any) {
+    logger.error({ err: e }, "tripo3d segment error");
+    res.write(`data: ${JSON.stringify({ event: "error", error: e.message })}\n\n`);
+    res.end();
+  }
+});
+
+/* POST /api/tripo3d/image-to-multiview
+   Dado un archivo imagen, genera 4 renders angulares (front/left/back/right)
+   usando visión IA (Gemini) para describir el objeto, luego xAI Aurora para renderizar */
+router.post(
+  "/api/tripo3d/image-to-multiview",
+  upload.single("image"),
+  async (req: Request, res: Response): Promise<any> => {
+    if (!req.file) return res.status(400).json({ error: "Imagen requerida" });
+    const xaiKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!xaiKey) return res.status(503).json({ error: "XAI_API_KEY no configurada" });
+
+    try {
+      // 1. Describe the object in the image via Gemini vision (or basic fallback)
+      let objectDescription = "the object in the image";
+      if (geminiKey) {
+        const base64 = req.file.buffer.toString("base64");
+        const mime = req.file.mimetype || "image/jpeg";
+        const gemRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: "Describe this 3D object in 1-2 sentences for product photography. Focus on the object type, material, color, and style. Be concise and specific. Use English only." },
+                  { inline_data: { mime_type: mime, data: base64 } },
+                ],
+              }],
+              generationConfig: { temperature: 0.3, maxOutputTokens: 120 },
+            }),
+          }
+        );
+        if (gemRes.ok) {
+          const gd = await gemRes.json();
+          const desc = gd.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (desc) objectDescription = desc.trim();
+        }
+      }
+
+      // 2. Generate 4 angles using xAI Aurora
+      const angles = [
+        { key: "front", desc: "front view, facing camera directly" },
+        { key: "left",  desc: "left side view, 90 degrees" },
+        { key: "back",  desc: "back view, rear" },
+        { key: "right", desc: "right side view, 90 degrees" },
+      ];
+
+      const generate = async (angleDesc: string): Promise<string> => {
+        const fullPrompt = `${angleDesc} of ${objectDescription}, product photography, clean white background, studio lighting, centered, high quality 3D render`;
+        const r = await fetch("https://api.x.ai/v1/images/generations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${xaiKey}` },
+          body: JSON.stringify({ model: "aurora", prompt: fullPrompt, n: 1 }),
+        });
+        if (!r.ok) throw new Error(`xAI ${r.status}: ${(await r.text()).slice(0, 120)}`);
+        const d = await r.json();
+        const item = d.data?.[0];
+        if (!item) throw new Error("No image from xAI");
+        if (item.url)      return item.url;
+        if (item.b64_json) return `data:image/jpeg;base64,${item.b64_json}`;
+        throw new Error("Unknown xAI response format");
+      };
+
+      const results = await Promise.allSettled(angles.map(a => generate(a.desc)));
+      const views: Record<string, string> = {};
+      angles.forEach((a, i) => {
+        const r = results[i];
+        if (r.status === "fulfilled") views[a.key] = r.value;
+      });
+
+      if (!views.front) {
+        const err = (results.find(r => r.status === "rejected") as PromiseRejectedResult)?.reason;
+        return res.status(500).json({ error: (err as Error)?.message ?? "Error generating views" });
+      }
+      return res.json({ views, description: objectDescription });
+    } catch (e: any) {
+      logger.error({ err: e }, "tripo3d image-to-multiview error");
+      return res.status(500).json({ error: e.message });
+    }
+  }
+);
+
+/* POST /api/tripo3d/text-to-texture — aplicar textura basada en texto a modelo existente */
+router.post("/api/tripo3d/text-to-texture", async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  enableLongRunning(res);
+  const { original_model_task_id, prompt, texture_quality = "standard" } = req.body ?? {};
+  if (!original_model_task_id || !prompt) {
+    res.status(400).json({ error: "original_model_task_id y prompt requeridos" }); return;
+  }
+  try {
+    const taskId = await tripoCreateTask({
+      type: "text_to_texture",
+      original_model_task_id,
+      prompt,
+      texture_quality,
+    });
+    res.write(`data: ${JSON.stringify({ event: "started", task_id: taskId })}\n\n`);
+    for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
+      const data = await tripoFetch(`/task/${taskId}`);
+      const status: string = data.status;
+      const progress: number = data.progress ?? 0;
+      res.write(`data: ${JSON.stringify({ event: "progress", task_id: taskId, progress, status })}\n\n`);
+      if (status === "success") {
+        res.write(`data: ${JSON.stringify({ event: "done", task_id: taskId, output: data.output })}\n\n`);
+        res.end(); return;
+      }
+      if (status === "failed" || status === "cancelled") {
+        res.write(`data: ${JSON.stringify({ event: "error", task_id: taskId, error: `Text-to-texture ${status}` })}\n\n`);
+        res.end(); return;
+      }
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    res.write(`data: ${JSON.stringify({ event: "timeout", task_id: taskId })}\n\n`);
+    res.end();
+  } catch (e: any) {
+    logger.error({ err: e }, "tripo3d text-to-texture error");
+    res.write(`data: ${JSON.stringify({ event: "error", error: e.message })}\n\n`);
+    res.end();
+  }
+});
+
 /* POST /api/tripo3d/generate-views — text prompt → 4 angle images via xAI Aurora */
 router.post("/api/tripo3d/generate-views", async (req: Request, res: Response): Promise<any> => {
   const { prompt } = req.body ?? {};
