@@ -2056,6 +2056,16 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
       cameraPreset: typeof cameraPreset === "string" ? cameraPreset : undefined,
     });
 
+    // Validar que el buffer no esté vacío — indica fallo silencioso del proveedor
+    if (!out || out.length < 1024) {
+      throw new Error(
+        `El proveedor devolvió un archivo vacío (${out?.length ?? 0} bytes). ` +
+        `El modelo "${model}" puede no estar disponible aún en la API, ` +
+        `o la URL del vídeo generado expiró antes de descargarse. ` +
+        `Prueba con otro modelo (ej: kling-3.0-master o seedance-1-pro).`
+      );
+    }
+
     const vaultId = await saveToVaultSmart({
       projectId: projectId || 0, fileType: "fs-pro-video", category: "fusion-studio-pro",
       title: `FS Pro Video: ${prompt.slice(0, 60)}`,

@@ -30,16 +30,27 @@ const router = Router();
 
 // ─── GET /viral/engines — qué motores tienen su API key configurada ──────────
 router.get("/viral/engines", requireAdmin, (_req: Request, res: Response) => {
-  const grokKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
+  const grokKey   = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
+  // Claude funciona vía Replit AI Integrations proxy (AI_INTEGRATIONS_ANTHROPIC_*)
+  // O también vía ANTHROPIC_API_KEY directa — cualquiera de las dos cuenta
+  const claudeKey = process.env.ANTHROPIC_API_KEY
+    || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY
+    || process.env.AI_INTEGRATIONS_BASE_URL; // proxy configurado = claude disponible
+  const geminiKey = process.env.GEMINI_API_KEY
+    || process.env.GOOGLE_API_KEY
+    || process.env.AI_INTEGRATIONS_GEMINI_API_KEY
+    || process.env.AI_INTEGRATIONS_GOOGLE_API_KEY;
   res.json({
     grok:   !!grokKey,
-    claude: !!process.env.ANTHROPIC_API_KEY,
-    gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+    claude: !!claudeKey,
+    gemini: !!geminiKey,
     _debug: {
-      XAI_API_KEY:    !!process.env.XAI_API_KEY,
-      GROK_API_KEY:   !!process.env.GROK_API_KEY,
-      ANTHROPIC:      !!process.env.ANTHROPIC_API_KEY,
-      GEMINI:         !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+      XAI_API_KEY:       !!process.env.XAI_API_KEY,
+      GROK_API_KEY:      !!process.env.GROK_API_KEY,
+      ANTHROPIC_DIRECT:  !!process.env.ANTHROPIC_API_KEY,
+      ANTHROPIC_PROXY:   !!process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+      GEMINI:            !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+      GEMINI_PROXY:      !!process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
     },
   });
 });

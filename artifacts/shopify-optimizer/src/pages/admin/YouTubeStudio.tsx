@@ -73,11 +73,12 @@ export default function YouTubeStudio() {
   const [generatingScript, setGeneratingScript] = useState(false);
   const [scriptResult, setScriptResult] = useState<any | null>(null);
   const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [videoGenSeconds, setVideoGenSeconds] = useState(0);
   const [videoResult, setVideoResult] = useState<{ vaultId: number; sizeBytes: number } | null>(null);
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const [satiricoProjectId, setSatiricoProjectId] = useState<string>("");
   const [satiricoProjects, setSatiricoProjects] = useState<{ id: number; storeName: string }[]>([]);
-  const [satiricoModel, setSatiricoModel] = useState("grok-video-1");
+  const [satiricoModel, setSatiricoModel] = useState("grok-imagine-video");
   const [scriptEngine, setScriptEngine] = useState<"grok" | "claude" | "gemini">("grok");
   const [videoFormat, setVideoFormat] = useState("product-demo");
   const [comedyPromptId, setComedyPromptId] = useState<string | null>(null);
@@ -639,13 +640,16 @@ export default function YouTubeStudio() {
   async function generateViralVideo() {
     if (!scriptResult?.visualPrompt) return;
     if (!satiricoProjectId) return setError("Introduce un Project ID para generar el vídeo");
-    setGeneratingVideo(true); setVideoResult(null); setError(null);
+    setGeneratingVideo(true); setVideoResult(null); setError(null); setVideoGenSeconds(0);
+    // Timer visible para que el usuario sepa que está generando (puede tardar 2-5 min)
+    const timerRef = { id: 0 };
+    timerRef.id = window.setInterval(() => setVideoGenSeconds(s => s + 1), 1000);
     try {
-      await fetch(`${BASE}/api/viral/log`, {
+      fetch(`${BASE}/api/viral/log`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "video_generated", data: { title: scriptResult.title, model: satiricoModel } }),
-      });
+      }).catch(() => {});
       const fd = new FormData();
       fd.append("projectId", satiricoProjectId);
       fd.append("model", satiricoModel);
@@ -653,10 +657,15 @@ export default function YouTubeStudio() {
       fd.append("duration", "5");
       fd.append("aspect", "9:16");
       const r = await fetch(`${BASE}/api/fs-pro/generate-video`, { method: "POST", credentials: "include", body: fd });
-      if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+      if (!r.ok) {
+        let errMsg = "Error generando vídeo";
+        try { const d = await r.json(); errMsg = d.error || errMsg; } catch {}
+        throw new Error(errMsg);
+      }
       const d = await r.json();
       setVideoResult(d);
     } catch (e: any) { setError(e.message); }
+    clearInterval(timerRef.id);
     setGeneratingVideo(false);
   }
 
@@ -1930,9 +1939,16 @@ export default function YouTubeStudio() {
                     </select>
                   </div>
                   <button onClick={generateViralVideo} disabled={generatingVideo}
-                    style={{ padding: "8px 16px", background: generatingVideo ? "var(--ink3)" : "var(--jade)", color: generatingVideo ? "var(--t3)" : "#000", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: generatingVideo ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                    {generatingVideo ? <RefreshCw size={14} className="spin" /> : <Play size={14} />}
-                    {generatingVideo ? "Generando…" : "Generar Vídeo"}
+                    style={{ padding: "8px 16px", background: generatingVideo ? "var(--ink3)" : "var(--jade)", color: generatingVideo ? "var(--t3)" : "#000", border: "none", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: generatingVideo ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexDirection: "column", lineHeight: 1.3 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {generatingVideo ? <RefreshCw size={14} className="spin" /> : <Play size={14} />}
+                      {generatingVideo ? "Generando…" : "Generar Vídeo"}
+                    </span>
+                    {generatingVideo && videoGenSeconds > 0 && (
+                      <span style={{ fontSize: 10, opacity: 0.7 }}>
+                        {Math.floor(videoGenSeconds / 60)}:{String(videoGenSeconds % 60).padStart(2, "0")} · puede tardar 2-5 min
+                      </span>
+                    )}
                   </button>
                 </div>
 

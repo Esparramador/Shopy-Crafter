@@ -105,20 +105,40 @@ function getXaiKey(): string {
   return k;
 }
 
-async function pollXaiVideo(requestId: string, apiKey: string, timeoutMs = 6 * 60_000): Promise<string> {
+async function pollXaiVideo(requestId: string, apiKey: string, timeoutMs = 7 * 60_000): Promise<string> {
+  if (!requestId) throw new Error("xAI video: request_id vacío — el modelo puede no existir en la API o la clave es inválida");
   const deadline = Date.now() + timeoutMs;
+  let attempt = 0;
   while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, 6_000));
-    const res = await fetch(`https://api.x.ai/v1/videos/${requestId}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!res.ok) continue;
-    const data = await res.json() as { status: string; video?: { url: string } };
-    if (data.status === "done" && data.video?.url) return data.video.url;
-    if (data.status === "expired") throw new Error("xAI video request expirado");
-    if (data.status === "failed") throw new Error("xAI video generation falló");
+    await new Promise(r => setTimeout(r, 8_000));
+    attempt++;
+    let res: Response;
+    try {
+      res = await fetch(`https://api.x.ai/v1/videos/${requestId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+    } catch (netErr: any) {
+      logger.warn({ attempt, netErr: netErr?.message }, "xAI video poll: network error, reintentando");
+      continue;
+    }
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      logger.warn({ attempt, status: res.status, requestId, errBody: errBody.slice(0, 200) }, "xAI video poll: HTTP no-ok, reintentando");
+      if (res.status === 404) throw new Error(`xAI video 404: requestId=${requestId} — el modelo "${requestId}" puede no existir en la API xAI`);
+      continue;
+    }
+    const data = await res.json() as { status: string; video?: { url: string }; generations?: Array<{ url: string }> };
+    // Soporte para ambas estructuras de respuesta de xAI
+    const videoUrl = data.video?.url ?? data.generations?.[0]?.url;
+    if (data.status === "done" || data.status === "succeeded") {
+      if (videoUrl) return videoUrl;
+      logger.warn({ attempt, data }, "xAI video: status=done pero sin URL de vídeo");
+    }
+    if (data.status === "expired") throw new Error("xAI video request expirado (>15 min en cola)");
+    if (data.status === "failed") throw new Error(`xAI video falló. Modelo: ${requestId}`);
+    logger.info({ attempt, status: data.status, requestId }, "xAI video: generando…");
   }
-  throw new Error("xAI video timeout (>6 min)");
+  throw new Error(`xAI video timeout (>${Math.round(timeoutMs / 60000)} min). El modelo puede estar sobrecargado.`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
