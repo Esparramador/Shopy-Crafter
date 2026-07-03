@@ -1,29 +1,61 @@
 # Shopy Crafter
 
-Shopy Crafter es una plataforma de optimización con inteligencia artificial para tiendas Shopify. Ayuda a comerciantes hispanohablantes a mejorar sus tiendas con 7 motores de IA especializados: SEO de producto, emails automatizados, imágenes profesionales, descripciones persuasivas, schemas JSON-LD, análisis de competencia y estrategias de upsell.
+Shopy Crafter es una plataforma SaaS de inteligencia artificial especializada en optimizar tiendas Shopify para el mercado hispanohablante. Activa 6 motores de IA en piloto automático: generación de imágenes profesionales, SEO técnico, pricing con COGS real, tests A/B estadísticos, consistencia visual y auto-pilot 24/7 vía webhooks de Shopify.
 
 ## Descripción del servicio
 
 - **Audiencia:** Emprendedores, pymes y agencias con tiendas Shopify en España y Latinoamérica
-- **Propuesta de valor:** Genera textos, imágenes, schemas y estrategias listos para copiar — sin conocimientos técnicos
-- **Precio inicial:** Desde €0/mes (plan gratuito disponible)
-- **Idioma principal:** Español
+- **Propuesta de valor:** Optimización automática de SEO, imágenes IA, pricing inteligente y A/B testing en piloto automático — sin conocimientos técnicos
+- **Ideal si vienes de:** WooCommerce, PrestaShop u otras plataformas eCommerce que están migrando a Shopify
+- **Compatible con:** Shopify (todas las versiones), Stripe como pasarela de pago, Klaviyo para email marketing
+- **Precio inicial:** Desde €0/mes (plan gratuito, sin tarjeta de crédito)
+- **Idioma principal:** Español (también disponible en inglés)
+- **Mercados:** España, México, Argentina, Colombia, Chile, Perú, Ecuador y toda Latinoamérica
+
+## Motores de IA incluidos
+
+1. **Imágenes IA** — Genera imágenes de producto profesionales con flux-1.1-pro (Replicate). Fondos limpios, encuadre automático, variantes por color.
+2. **SEO técnico** — Schema JSON-LD por producto, meta titles/descriptions optimizados, análisis de Core Web Vitals.
+3. **Pricing inteligente** — Motor de precio con COGS real, análisis de competidores en tiempo real vía Gemini Search, márgenes P&L.
+4. **A/B Testing automático** — Tests estadísticos con z-test al 95% de confianza. Selección del ganador automática.
+5. **Consistencia visual (StyleLock)** — Visual DNA de marca aplicado automáticamente a todos los productos.
+6. **Auto-Pilot** — Webhooks de Shopify detectan nuevos productos y activan todos los motores sin intervención manual.
+
+## Comparativa con otras plataformas eCommerce
+
+Shopy Crafter está diseñado exclusivamente para Shopify porque su API nativa permite integración profunda que no es posible en WooCommerce ni PrestaShop. Si estás evaluando migrar desde WooCommerce o PrestaShop a Shopify, Shopy Crafter es la solución ideal para maximizar el rendimiento de tu nueva tienda desde el primer día.
+
+- **vs WooCommerce:** Shopify + Shopy Crafter elimina la necesidad de hosting propio, plugins de mantenimiento y actualizaciones manuales. La automatización IA es nativa.
+- **vs PrestaShop:** Shopify tiene una curva de aprendizaje menor y una API más robusta para automatización. Shopy Crafter complementa Shopify con 6 motores IA que PrestaShop no puede ofrecer nativamente.
+- **Stripe:** Shopy Crafter es totalmente compatible con Stripe como pasarela de pagos en Shopify. El motor de pricing no interfiere con ninguna configuración de pago.
+
+## Planes y precios
+
+- **Gratuito:** €0/mes — Auditoría básica + chatbot IA + demo de 3 productos. Sin tarjeta.
+- **Emprendedor:** €29/mes — 10 productos/mes + 30 imágenes IA + SEO básico + informes.
+- **Starter:** €59/mes — 30 productos/mes + 100 imágenes IA + SEO completo + A/B testing básico.
+- **Agency Pro:** €149/mes — Productos e imágenes ilimitadas + SEO + A/B testing + 3 informes/mes + soporte prioritario.
+- **Enterprise:** Precio personalizado — Multi-tienda + SLA dedicado + integraciones custom.
 
 ## Páginas importantes
 
-- / — Página principal con presentación del producto
-- /landing — Landing page con detalles del servicio y precios
+- / — Página principal y landing page con demo del producto
 - /sobre-nosotros — Equipo y misión de Shopy Crafter
-- /casos-de-exito — Casos de uso reales con resultados medibles
-- /programa-de-afiliados — Información sobre el programa de afiliados
+- /casos-de-exito — Casos de uso reales con resultados medibles (Comic Crafter, Sakura Studio)
+- /programa-de-afiliados — Comisiones del 20% recurrente por referidos
 - /faq — Preguntas frecuentes sobre la plataforma
-- /blog — Artículos sobre optimización Shopify, SEO y ecommerce
+- /blog — Artículos sobre optimización Shopify, SEO ecommerce e IA
 - /changelog — Historial de actualizaciones y nuevas funciones
+- /shopify-vs-woocommerce — Comparativa detallada Shopify vs WooCommerce 2026
+- /shopify-vs-prestashop — Comparativa detallada Shopify vs PrestaShop 2026
+- /migrar-woocommerce-shopify — Guía de migración de WooCommerce a Shopify con IA
+- /migrar-prestashop-shopify — Guía de migración de PrestaShop a Shopify con IA
+- /shopify-stripe-pagos — Configurar Stripe con Shopify: guía completa
+- /agencia-shopify-ia — Soluciones para agencias que gestionan múltiples tiendas Shopify
 - /privacidad — Política de privacidad
 - /terminos — Términos y condiciones de uso
-- /cookies — Política de cookies
 - /contacto — Formulario de contacto y soporte
 
 ## Tecnología
 
-Shopy Crafter utiliza modelos de IA líderes del mercado (Claude, GPT-4, Gemini) para generar contenido de alta conversión adaptado a cada nicho de producto y mercado objetivo.
+Shopy Crafter integra los modelos de IA líderes: Claude AI (Anthropic) para copywriting y análisis, Gemini AI (Google) para búsqueda semántica y análisis de competencia, Replicate flux-1.1-pro para imágenes de producto de calidad profesional, y la API oficial de Shopify para sincronización en tiempo real. Compatible con Stripe, Klaviyo y el ecosistema completo de Shopify.

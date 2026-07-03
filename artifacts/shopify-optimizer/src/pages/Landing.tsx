@@ -778,9 +778,9 @@ export default function Landing() {
         }}
       />
       <PageMeta
-        title="Shopy Crafter — Optimización IA para tiendas Shopify"
-        description="6 motores de IA para optimizar imágenes, SEO, pricing y conversión en tu tienda Shopify. Piloto automático 24/7. Setup completo en 48h."
-        canonical="https://shopycrafter.com/landing"
+        title="Shopy Crafter — IA para Shopify: SEO, imágenes, pricing y conversión automática"
+        description="Optimiza tu tienda Shopify con 6 motores de IA: SEO técnico, imágenes profesionales, pricing inteligente y tests A/B en piloto automático 24/7. La alternativa inteligente si vienes de WooCommerce o PrestaShop. Setup en 48h."
+        canonical="https://shopycrafter.com/"
       />
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">
@@ -1593,6 +1593,54 @@ export default function Landing() {
               )}
             </div>
 
+          </div>
+        </section>
+
+        {/* ── SEO FAQ BLOCK (always visible, outside snap-scroll for Google) ── */}
+        <section className="fp-seo-faq" aria-label="Preguntas frecuentes sobre Shopy Crafter">
+          <div className="fp-seo-faq-inner">
+            <h2 className="fp-seo-faq-title">Preguntas frecuentes</h2>
+            <div className="fp-seo-faq-grid">
+              {[
+                {
+                  q: "¿Qué es Shopy Crafter y para qué sirve?",
+                  a: "Shopy Crafter es una plataforma SaaS de inteligencia artificial para tiendas Shopify. Activa 6 motores de IA en piloto automático: generación de imágenes de producto profesionales, SEO técnico, pricing con COGS real, tests A/B con 95% de confianza estadística, consistencia visual (StyleLock) y auto-pilot 24/7 vía webhooks de Shopify.",
+                },
+                {
+                  q: "¿Funciona con WooCommerce o PrestaShop?",
+                  a: "Shopy Crafter está diseñado exclusivamente para Shopify, aprovechando su API oficial al máximo. Si tienes una tienda en WooCommerce o PrestaShop y estás valorando migrar a Shopify, Shopy Crafter es la solución ideal para que tu nueva tienda esté optimizada desde el primer día: imágenes IA, SEO técnico, precios inteligentes y tests A/B activados automáticamente.",
+                },
+                {
+                  q: "¿Es compatible con Stripe como pasarela de pagos?",
+                  a: "Sí, Shopy Crafter es totalmente compatible con Stripe en Shopify. El motor de pricing analiza márgenes con COGS real y propone precios optimizados para maximizar la conversión, sin interferir con tu configuración de Stripe ni ninguna otra pasarela de pagos.",
+                },
+                {
+                  q: "¿Por qué Shopify frente a WooCommerce o PrestaShop?",
+                  a: "Shopify tiene una API nativa robusta que permite automatización profunda con IA. A diferencia de WooCommerce (hosting propio, mantenimiento de plugins constante) o PrestaShop (mayor curva técnica), Shopify permite integrar plataformas como Shopy Crafter para poner en piloto automático el SEO, imágenes, pricing y A/B testing sin conocimientos técnicos.",
+                },
+                {
+                  q: "¿Cuánto mejora la conversión con Shopy Crafter?",
+                  a: "Nuestros clientes reportan un incremento medio del +67% en conversión en los primeros 90 días. Esto se consigue combinando imágenes profesionales generadas con IA (flux-1.1-pro), SEO técnico automatizado con Schema JSON-LD y tests A/B estadísticos al 95% de confianza.",
+                },
+                {
+                  q: "¿Cuánto cuesta optimizar una tienda Shopify con IA?",
+                  a: "Shopy Crafter tiene planes desde €0/mes (plan gratuito sin tarjeta de crédito), €29/mes para emprendedores y €149/mes para agencias con catálogos ilimitados. El coste de generación de imágenes IA es de aproximadamente €0,25 por producto optimizado.",
+                },
+                {
+                  q: "¿Sirve para agencias que gestionan varias tiendas Shopify?",
+                  a: "Sí. El plan Agency Pro está diseñado para agencias digitales que gestionan múltiples tiendas Shopify simultáneamente: catálogos ilimitados, imágenes IA en masa, SEO técnico centralizado, tests A/B y 3 informes mensuales de rendimiento.",
+                },
+                {
+                  q: "¿Qué tecnologías de IA usa Shopy Crafter?",
+                  a: "Shopy Crafter integra Claude AI (Anthropic) para copywriting y análisis, Gemini AI (Google) para búsqueda semántica y análisis de competencia en tiempo real, Replicate flux-1.1-pro para imágenes de producto profesionales, y la API oficial de Shopify para sincronización continua del catálogo.",
+                },
+              ].map(({ q, a }, i) => (
+                <details key={i} className="fp-seo-faq-item">
+                  <summary className="fp-seo-faq-q">{q}</summary>
+                  <p className="fp-seo-faq-a">{a}</p>
+                </details>
+              ))}
+            </div>
           </div>
         </section>
 
