@@ -8,6 +8,7 @@ import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { askClaude, learnFromOperation } from "../lib/claude.js";
 import { askGeminiChat } from "../lib/gemini.js";
+import { buildClientPlatformContext } from "../lib/platform-knowledge.js";
 import { sendPushToAdmins, sendPushToClientByProject } from "../lib/push-helper.js";
 
 const router = Router();
@@ -603,8 +604,6 @@ Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score medio: ${avg
 Catálogo: ${products.length} productos — ${scored.length} auditados, ${unaudi} sin auditar
 ${lowScoreProducts.length > 0 ? `🔴 URGENTE: ${lowScoreProducts.length} producto(s) con score <50` : ""}
 ${highScoreProducts.length > 0 ? `🟢 ${highScoreProducts.length} bien optimizados (≥80 pts)` : ""}
-Motores IA: Auditoría · Imágenes IA · A/B Testing · SEO · Email · Precios · Rediseño
-
 ${products.length > 0 ? `PRODUCTOS:\n${products.slice(0, 12).map(p => {
   const flag = !p.auditScore ? "⬜" : p.auditScore < 50 ? "🔴" : p.auditScore < 70 ? "🟡" : "🟢";
   return `${flag} ${p.title}: €${p.price ?? "?"} — ${p.auditScore ?? "?"}pts (${p.auditGrade ?? "?"})`;
@@ -612,6 +611,8 @@ ${products.length > 0 ? `PRODUCTOS:\n${products.slice(0, 12).map(p => {
 
 ${recentActivity.length > 0 ? `ACTIVIDAD:\n${recentActivity.slice(0, 5).map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
 ${filesContext}
+
+${buildClientPlatformContext()}
 
 REGLAS:
 • Respuesta máx 220 palabras. Nunca inventes métricas.
@@ -782,6 +783,8 @@ ${products.length > 0 ? `PRODUCTOS:\n${products.slice(0, 10).map(p => {
 ${recentActivity.length > 0 ? `ACTIVIDAD:\n${recentActivity.map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
 
 ${useSearch ? `MODO DEEP RESEARCH ACTIVADO: El cliente pide información de Internet. Usa Google Search para datos reales y actualizados. Presenta los hallazgos de forma clara, estructurada y con fuentes cuando las tengas.` : ""}
+
+${buildClientPlatformContext()}
 
 REGLAS: Máx 220 palabras. Termina con UNA acción concreta. Para monetización, sugiere 3 ideas específicas a su nicho. Varía el inicio. Sé un experto real, no genérico.`;
 

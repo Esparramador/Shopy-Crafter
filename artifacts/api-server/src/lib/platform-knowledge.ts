@@ -341,3 +341,19 @@ export function buildModulesBlock(): string {
 export function buildFullPlatformContext(): string {
   return `${buildModulesBlock()}\n\n${buildPricingBlock()}`;
 }
+
+/**
+ * Compact version for the client-panel chatbot.
+ * Lists module names + key capabilities in one line each, and current plans.
+ * Keeps the system prompt short since it already contains live store data.
+ */
+export function buildClientPlatformContext(): string {
+  const moduleLines = PLATFORM_MODULES.map(
+    m => `• ${m.name}: ${m.bullets[0]}${m.bullets.length > 1 ? ` (+${m.bullets.length - 1} más)` : ""}`,
+  ).join("\n");
+
+  return `== MÓDULOS DISPONIBLES EN SHOPY CRAFTER (para recomendar al cliente) ==
+${moduleLines}
+
+${buildPricingBlock()}`;
+}
