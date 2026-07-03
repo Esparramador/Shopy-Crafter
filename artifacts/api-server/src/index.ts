@@ -356,6 +356,10 @@ const server = app.listen(port, (err?: Error) => {
     )
   `).catch((err) => logger.error({ err }, "Failed to create rate_limits table"));
 
+  import("./lib/client-advisor.js")
+    .then((m) => m.ensureClientKnowledgeTable())
+    .catch((err) => logger.warn({ err }, "client_knowledge table warning"));
+
   deduplicateProducts()
     .then(() => ensureAdminUser())
     .then(() => migrateTokenEncryption())

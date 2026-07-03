@@ -9,6 +9,15 @@ import { logger } from "../lib/logger.js";
 import { askClaude, learnFromOperation } from "../lib/claude.js";
 import { askGeminiChat } from "../lib/gemini.js";
 import { buildClientPlatformContext } from "../lib/platform-knowledge.js";
+import {
+  loadClientProfile,
+  extractAndLearnFromChat,
+  teachClientAdvisor,
+  deleteClientKnowledge,
+  KNOWLEDGE_CATEGORIES,
+} from "../lib/client-advisor.js";
+import { db as _db, clientKnowledgeTable } from "@workspace/db";
+import { eq as _eq, desc as _desc } from "drizzle-orm";
 import { sendPushToAdmins, sendPushToClientByProject } from "../lib/push-helper.js";
 
 const router = Router();
@@ -584,22 +593,31 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
       }
     }
 
+    // ── Load accumulated client profile ─────────────────────────────
+    const [filesContext, clientProfile] = await Promise.all([
+      Promise.resolve(hasFiles
+        ? `\n\nARCHIVOS QUE HA ENVIADO EL CLIENTE:\n${attachedFiles.map(f => `· ${f.fileName} (${f.fileType}, ${Math.round(f.fileSize / 1024)}KB)`).join("\n")}`
+        : ""),
+      loadClientProfile(pid),
+    ]);
+
     // ── Build system prompt ──────────────────────────────────────────
-    const filesContext = hasFiles
-      ? `\n\nARCHIVOS QUE HA ENVIADO EL CLIENTE:\n${attachedFiles.map(f => `· ${f.fileName} (${f.fileType}, ${Math.round(f.fileSize / 1024)}KB)`).join("\n")}`
-      : "";
+    const systemPrompt = `Eres el asesor personal de negocio IA del cliente en Shopy Crafter. Conoces su empresa en profundidad y actúas como un socio estratégico de confianza — no como un chatbot genérico. Hablas siempre en español.
 
-    const systemPrompt = `Eres el asistente personal IA de Shopy Crafter — ultra-profesional, empático y orientado a resultados. Hablas siempre en español.
+MISIÓN PRINCIPAL:
+• Ser el asesor más informado sobre el negocio del cliente: su sector, competidores, objetivos, retos y oportunidades
+• Aprender y recordar todo lo que el cliente te comparte — cada dato que te dan lo incorporas a tu conocimiento de su empresa
+• Detectar oportunidades que el cliente no está aprovechando basándote en lo que sabes de su sector
+• Dar consejos hiperpersonalizados basados en su perfil real, no respuestas genéricas
 
-CAPACIDADES TUYAS:
-• Listar y proporcionar archivos generados para el cliente (imágenes, vídeos, documentos)
-• Analizar catálogo, scores SEO y actividad de la tienda
-• Sugerir estrategias de monetización y productos nuevos
+CAPACIDADES:
+• Analizar catálogo, scores SEO y actividad de la tienda con datos reales
+• Incorporar información nueva del cliente: datos de empresa, sector, competidores, objetivos, archivos
+• Sugerir estrategias de monetización y productos específicos para su nicho
+• Comparar con empresas similares del mismo sector y detectar brechas competitivas
 • Reenviar archivos/mensajes al equipo de Shopy Crafter (Joan)
-• Responder preguntas con búsqueda en internet si es necesario
-• Responder por voz si el cliente lo activa
 
-══ DATOS REALES DE LA TIENDA ══
+${clientProfile ? clientProfile + "\n" : ""}══ DATOS REALES DE LA TIENDA ══
 Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score medio: ${avgScore}/100 (${avgGrade})` : ""}
 Catálogo: ${products.length} productos — ${scored.length} auditados, ${unaudi} sin auditar
 ${lowScoreProducts.length > 0 ? `🔴 URGENTE: ${lowScoreProducts.length} producto(s) con score <50` : ""}
@@ -617,9 +635,9 @@ ${buildClientPlatformContext()}
 REGLAS:
 • Respuesta máx 220 palabras. Nunca inventes métricas.
 • Termina siempre con UNA acción concreta que el cliente puede hacer ahora.
-• Si el cliente pregunta cómo monetizar → sugiere 3 ideas concretas basadas en su nicho/productos.
-• Si el cliente pregunta qué crear → sugiere productos específicos para su catálogo.
-• Sé directo, cálido, y profesional. Varía el inicio de cada respuesta.`;
+• Si el cliente comparte datos de su empresa → acúsalo recibo ("Anoto que…") y úsalos en tu respuesta.
+• Si detectas que el cliente NO usa una capacidad clave para su sector → señálalo proactivamente.
+• Sé directo, cálido, estratégico. Varía el inicio de cada respuesta.`;
 
     const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [
       ...history.slice(-8)
@@ -634,6 +652,16 @@ REGLAS:
       if (!reply) throw new Error("empty");
     } catch {
       reply = await askClaude(isNaN(pid) ? 0 : pid, chatMessages, systemPrompt, 400, 12000);
+    }
+
+    // ── Learn from this conversation (fire-and-forget) ───────────────
+    if (msg) {
+      extractAndLearnFromChat({
+        projectId: pid,
+        niche: (project as any)?.niche ?? null,
+        userMessage: msg,
+        aiReply: reply,
+      });
     }
 
     res.json({ reply, vaultFiles, forwarded, forwardedId });
@@ -750,11 +778,12 @@ router.post("/ai-chat/stream", async (req, res): Promise<void> => {
     const msg = (message ?? "").trim();
     if (!msg) { res.status(400).json({ error: "Message required" }); return; }
 
-    const [products, recentActivity] = await Promise.all([
+    const [products, recentActivity, clientProfileStream] = await Promise.all([
       db.select({ id: productsTable.id, title: productsTable.title, price: productsTable.price, auditScore: productsTable.auditScore, auditGrade: productsTable.auditGrade })
         .from(productsTable).where(eq(productsTable.projectId, pid)).limit(20),
       db.select({ action: auditLogTable.action, details: auditLogTable.details })
         .from(auditLogTable).where(eq(auditLogTable.projectId, projectId)).orderBy(desc(auditLogTable.createdAt)).limit(6),
+      loadClientProfile(pid),
     ]);
 
     const scored = products.filter(p => p.auditScore !== null);
@@ -762,16 +791,15 @@ router.post("/ai-chat/stream", async (req, res): Promise<void> => {
     const storeHealth = avgScore === null ? "sin datos" : avgScore >= 75 ? "buena" : avgScore >= 55 ? "media" : "crítica";
     const useSearch = CLIENT_SEARCH_RE.test(msg);
 
-    const systemPrompt = `Eres el asistente IA personal de Shopy Crafter para este cliente. Responde SIEMPRE en español. Eres directo, cálido y orientado a resultados. Tienes acceso a Google Search para obtener información real y actualizada cuando el cliente lo necesite.
+    const systemPrompt = `Eres el asesor personal de negocio IA del cliente en Shopy Crafter. Conoces su empresa en profundidad y actúas como socio estratégico de confianza. Hablas siempre en español. Tienes acceso a Google Search cuando el cliente lo necesite.
 
-CAPACIDADES:
-• Analizar catálogo, scores SEO y actividad de la tienda
-• Sugerir estrategias de monetización basadas en datos reales
-• Buscar información de Internet: empresa del cliente, mercado, competidores, tendencias, noticias
-• Responder cualquier pregunta con datos verídicos y actuales
-• Proporcionar deep research sobre cualquier tema relevante
+MISIÓN PRINCIPAL:
+• Ser el asesor más informado sobre el negocio del cliente: sector, competidores, objetivos, retos y oportunidades
+• Aprender y recordar todo lo que el cliente comparte — cada dato que dan lo incorporas a tu conocimiento
+• Detectar oportunidades que el cliente no está aprovechando, basándote en su sector
+• Dar consejos hiperpersonalizados, no genéricos
 
-DATOS DE LA TIENDA:
+${clientProfileStream ? clientProfileStream + "\n" : ""}DATOS DE LA TIENDA:
 Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score: ${avgScore}/100` : ""}
 Catálogo: ${products.length} productos — ${scored.length} auditados
 
@@ -782,11 +810,11 @@ ${products.length > 0 ? `PRODUCTOS:\n${products.slice(0, 10).map(p => {
 
 ${recentActivity.length > 0 ? `ACTIVIDAD:\n${recentActivity.map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
 
-${useSearch ? `MODO DEEP RESEARCH ACTIVADO: El cliente pide información de Internet. Usa Google Search para datos reales y actualizados. Presenta los hallazgos de forma clara, estructurada y con fuentes cuando las tengas.` : ""}
+${useSearch ? `MODO DEEP RESEARCH ACTIVADO: Usa Google Search para datos reales y actualizados. Presenta hallazgos con fuentes cuando las tengas.` : ""}
 
 ${buildClientPlatformContext()}
 
-REGLAS: Máx 220 palabras. Termina con UNA acción concreta. Para monetización, sugiere 3 ideas específicas a su nicho. Varía el inicio. Sé un experto real, no genérico.`;
+REGLAS: Máx 220 palabras. Termina con UNA acción concreta. Si el cliente comparte datos de su empresa → acúsalo recibo y úsalos. Varía el inicio.`;
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -827,11 +855,99 @@ REGLAS: Máx 220 palabras. Termina con UNA acción concreta. Para monetización,
           });
         } catch {}
       });
+      // ── Advisor learning from stream conversation ─────────────────
+      extractAndLearnFromChat({
+        projectId: pid,
+        niche: null,
+        userMessage: msg,
+        aiReply: fullResponse,
+      });
     }
   } catch (err) {
     logger.error({ err }, "client ai-chat/stream error");
     if (!res.headersSent) res.status(500).json({ error: String(err) });
     else { res.write(`data: ${JSON.stringify({ error: String(err), done: true })}\n\n`); res.end(); }
+  }
+});
+
+// ─── GET /api/client/profile ──────────────────────────────────────────────────
+// Returns the full accumulated knowledge profile for this client project.
+router.get("/profile", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+
+    const rows = await _db
+      .select()
+      .from(clientKnowledgeTable)
+      .where(_eq(clientKnowledgeTable.projectId, String(projectId)))
+      .orderBy(_desc(clientKnowledgeTable.updatedAt))
+      .limit(100);
+
+    const categories = Object.entries(KNOWLEDGE_CATEGORIES).map(([key, label]) => ({
+      key,
+      label,
+      entries: rows.filter(r => r.category === key).map(r => ({
+        id: r.id,
+        title: r.title,
+        content: r.content,
+        source: r.source,
+        confidence: r.confidence,
+        createdAt: r.createdAt,
+      })),
+    })).filter(c => c.entries.length > 0);
+
+    res.json({ total: rows.length, categories });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/client/teach ───────────────────────────────────────────────────
+// Client explicitly teaches the advisor about their business.
+// Body: { category, title, content, niche? }
+router.post("/teach", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+
+    const { category = "free_knowledge", title, content, niche } = req.body as {
+      category?: string;
+      title: string;
+      content: string;
+      niche?: string;
+    };
+
+    if (!title?.trim() || !content?.trim()) {
+      res.status(400).json({ error: "title y content son obligatorios" });
+      return;
+    }
+
+    const result = await teachClientAdvisor({
+      projectId,
+      category,
+      title: title.trim(),
+      content: content.trim(),
+      niche: niche ?? null,
+      source: "teach",
+    });
+
+    res.json({ ok: true, id: result.id, message: "Conocimiento guardado y absorbido en ShopyBrain" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── DELETE /api/client/knowledge/:id ────────────────────────────────────────
+// Remove a specific knowledge entry.
+router.delete("/knowledge/:id", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    await deleteClientKnowledge(req.params.id, projectId);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
