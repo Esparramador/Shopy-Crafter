@@ -779,7 +779,7 @@ export default function Landing() {
       />
       <PageMeta
         title="Shopy Crafter — Optimización IA para tiendas Shopify"
-        description="7 motores de IA para mejorar SEO, imágenes y conversión en tu tienda Shopify. Sin conocimientos técnicos. Prueba gratis 14 días."
+        description="6 motores de IA para optimizar imágenes, SEO, pricing y conversión en tu tienda Shopify. Piloto automático 24/7. Setup completo en 48h."
         canonical="https://shopycrafter.com/landing"
       />
       {/* ── FIXED NAV ── */}
@@ -905,7 +905,7 @@ export default function Landing() {
                   <div className="hv-glow" />
                   <div className="hv-card hv-c1">
                     <div className="hv-icon">📈</div>
-                    <div className="hv-num">+340%</div>
+                    <div className="hv-num">+67%</div>
                     <div className="hv-label">Conversión</div>
                   </div>
                   <div className="hv-card hv-c2">
@@ -915,7 +915,7 @@ export default function Landing() {
                   </div>
                   <div className="hv-card hv-c3">
                     <div className="hv-icon">🎯</div>
-                    <div className="hv-num">7 IA</div>
+                    <div className="hv-num">6 IA</div>
                     <div className="hv-label">Motores</div>
                   </div>
                 </div>
@@ -1145,9 +1145,9 @@ export default function Landing() {
                       {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
                       {plan.featured && <div className="pc-savings-tag">✨ MÁS POPULAR</div>}
                       <div className="l-pricing-plan" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
-                      {plan.id === "starter" && <div className="pc-roi-badge">📈 ROI medio 2.4× en 90 días</div>}
-                      {plan.id === "agency_pro" && <div className="pc-roi-badge">📈 ROI medio 3.8× en 60 días</div>}
-                      {plan.id === "enterprise" && <div className="pc-roi-badge">🚀 ROI medio 6.2× en 30 días</div>}
+                      {plan.id === "starter" && <div className="pc-roi-badge">📈 Clientes ven +40% conversión media</div>}
+                      {plan.id === "agency_pro" && <div className="pc-roi-badge">📈 ROI medio ×2.1 en los primeros 60 días</div>}
+                      {plan.id === "enterprise" && <div className="pc-roi-badge">🚀 ROI medio ×3.6 para agencias</div>}
                       {plan.id === "personalizado" && <div className="pc-roi-badge">🤝 Solución 100% a medida</div>}
                       <div style={{ position: "relative", zIndex: 2 }}>
                         <div className="l-pricing-price">{plan.priceMonthly === 0 ? <span style={{ fontSize: "0.55em", letterSpacing: "-1px" }}>A medida</span> : <>{plan.currency}{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</>}</div>
@@ -1160,7 +1160,7 @@ export default function Landing() {
                       {plan.featured && (
                         <div className="pc-urgency">
                           <div className="pc-urgency-dot"></div>
-                          <span>Quedan 3 plazas este mes</span>
+                          <span>Plazas limitadas · Onboarding 1:1 incluido</span>
                         </div>
                       )}
                       <div className="l-pricing-divider" style={{ position: "relative", zIndex: 2 }}></div>
