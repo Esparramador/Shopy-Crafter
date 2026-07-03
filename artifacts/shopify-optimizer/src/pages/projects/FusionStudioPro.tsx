@@ -466,6 +466,14 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
                 label: "🔩 Assembled (reverso)",
                 prompt: "Product assembly shot. All individual components converge inward and snap together in perfect mechanical order — satisfying assembly sequence final frame. Clean white studio background, soft directional lighting, hyper-realistic, 8k. No text, no watermarks. Product: ",
               },
+              {
+                label: "⌚ Reloj Lujo Explode",
+                prompt: "Cinematic exploded view of a luxury mechanical watch, individual components floating symmetrically in precise 3D space on matte black background. Separated components visible: fluted 18k gold bezel (72 ridges, mirror-polished facets), flat sapphire crystal with cyclops magnifier lens, champagne sunray brushed dial with brilliant-cut diamond hour indices in gold bezels, applied gold crown logo at 12, gold baton hands (Chromalight luminescent fill), Oystersteel 904L case body (41mm, polished lugs), screw-down 18k gold crown with logo engraving, five-link Jubilee bracelet links separating in cascade (polished gold center links + brushed steel outer links), Oysterclasp butterfly clasp open, mechanical movement exposed showing oscillating rotor, blue Parachrom hairspring coils, Chronergy escapement wheel, 31 ruby jewels. Soft diffused studio boxes, warm specular on 18k gold, prismatic light from diamond indices. Ultra-sharp 8K macro photography. Brand: ",
+              },
+              {
+                label: "⌚ Mecanismo Calibre",
+                prompt: "Ultra-close-up technical exploded view of a Swiss mechanical watch movement floating on dark background. Components separated in precise formation: main plate with perlage decoration, barrel bridge with Côtes de Genève stripes, mainspring barrel (open showing coiled spring), center wheel, third wheel, Chronergy escape wheel (nickel-phosphorus), pallet fork lever with two ruby pallet stones, GLUCYDUR beryllium-bronze balance wheel, blue Parachrom hairspring (8 spiral coils), Paraflex shock absorbers, tungsten perpetual rotor (semi-circular oscillating weight), 31 ruby jewels highlighted in gold settings, white date disc with star wheel jumper. All 201 components organized in technical isometric layout. Studio lighting, ultra-sharp 8K macro. Movement caliber: ",
+              },
             ].map(t => (
               <button
                 key={t.label}
