@@ -1040,6 +1040,269 @@ const WATCH_EXPLODE_CLIPS: {
   },
 ];
 
+// ─── Generic Explode View Sequence Generator (SSE, 35 s, Grok Aurora) ────────
+function ExplodeViewSequenceGenerator({ projectId }: { projectId: number }) {
+  const [open, setOpen] = React.useState(false);
+  const [objectName, setObjectName] = React.useState("Rolex Datejust 41");
+  const [objectDescription, setObjectDescription] = React.useState("Swiss luxury automatic watch. Oystersteel 904L case 41mm, sapphire crystal, Calibre 3235 movement with 201 parts and 31 jewels, 70h power reserve, 18k gold fluted bezel with 72 grooves, Jubilee bracelet Ref 62613.");
+  const [materials, setMaterials] = React.useState("Oystersteel 904L, 18k yellow gold, sapphire crystal, rhodium-plated gold");
+  const [components, setComponents] = React.useState("Oystersteel case, sapphire crystal, dial with date window, Calibre 3235 movement, rotor, mainspring, 31 jewels, 18k fluted bezel, Jubilee bracelet, Oysterlock clasp");
+  const [style, setStyle] = React.useState("ultra-luxury cinematic, black studio background, dramatic volumetric lighting, macro lens, 4K");
+  const [aspect, setAspect] = React.useState("9:16");
+  const [running, setRunning] = React.useState(false);
+  const [steps, setSteps] = React.useState<Array<{ step: string; message: string; pct: number }>>([]);
+  const [prompts, setPrompts] = React.useState<{ clip1: string; clip2: string; clip3: string } | null>(null);
+  const [vaultId, setVaultId] = React.useState<number | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const esRef = React.useRef<EventSource | null>(null);
+
+  const currentPct = steps.length ? steps[steps.length - 1].pct : 0;
+
+  const start = () => {
+    if (running) return;
+    setRunning(true);
+    setSteps([]);
+    setPrompts(null);
+    setVaultId(null);
+    setError(null);
+
+    fetch(`${API_BASE}/api/fs-pro/explode-view-sequence`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, objectName, objectDescription, materials, components, style, aspect }),
+    }).then(async (res) => {
+      if (!res.body) { setError("Sin respuesta del servidor"); setRunning(false); return; }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      const parse = (chunk: string) => {
+        buf += chunk;
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          const lines = part.split("\n");
+          let event = "message";
+          let data = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) event = line.slice(7).trim();
+            else if (line.startsWith("data: ")) data = line.slice(6);
+          }
+          if (!data) continue;
+          try {
+            const payload = JSON.parse(data);
+            if (event === "progress") setSteps(s => [...s, payload]);
+            else if (event === "prompts") setPrompts(payload);
+            else if (event === "done") { setVaultId(payload.vaultId); setRunning(false); }
+            else if (event === "error") { setError(payload.message); setRunning(false); }
+          } catch { /* ignore parse errors */ }
+        }
+      };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parse(dec.decode(value, { stream: true }));
+      }
+      setRunning(false);
+    }).catch(e => { setError(e?.message || "Error de red"); setRunning(false); });
+  };
+
+  const stop = () => {
+    esRef.current?.close();
+    setRunning(false);
+  };
+
+  const stepIcons: Record<string, string> = {
+    prompts: "✍️", clip1: "🎬", clip1_done: "✅", frame1: "🖼️",
+    clip2: "🎬", clip2_done: "✅", frame2: "🖼️",
+    clip3: "🎬", clip3_done: "✅", concat: "🔗", save: "💾",
+  };
+
+  const inputStyle2: React.CSSProperties = {
+    width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 6, padding: "7px 10px", fontSize: 11, color: "var(--ink)", outline: "none",
+    boxSizing: "border-box",
+  };
+  const labelStyle: React.CSSProperties = { fontSize: 10, color: "var(--t3)", marginBottom: 3, display: "block", fontWeight: 600 };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%",
+          background: running
+            ? "linear-gradient(135deg, rgba(59,130,246,0.2), rgba(99,102,241,0.12))"
+            : "linear-gradient(135deg, rgba(59,130,246,0.12), rgba(99,102,241,0.08))",
+          border: `1px solid ${running ? "rgba(99,102,241,0.6)" : "rgba(99,102,241,0.35)"}`,
+          borderRadius: 8, padding: "10px 14px", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          color: "#818cf8",
+        }}>
+        <span style={{ fontSize: 11, fontWeight: 700 }}>
+          {running ? "⏳" : "🚀"} Explode View Generator — 35 s con Grok Aurora
+          {running && ` (${currentPct}%)`}
+        </span>
+        <span style={{ fontSize: 10 }}>{open ? "▲ Cerrar" : "▼ Configurar"}</span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8, padding: "12px 10px", background: "rgba(10,10,20,0.6)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8 }}>
+
+          <div style={{ fontSize: 10, color: "#818cf8", padding: "6px 10px", background: "rgba(99,102,241,0.08)", borderRadius: 6, lineHeight: 1.6, border: "1px solid rgba(99,102,241,0.15)" }}>
+            <strong>Pipeline 100% Grok Aurora:</strong> Claude genera prompts adaptativos → <strong>Clip 1</strong> Grok T2V 15s → último frame → <strong>Clip 2</strong> Grok I2V 10s → último frame → <strong>Clip 3</strong> Grok I2V 10s → ffmpeg concat = <strong>35s</strong>. Tiempo estimado: 12-18 min.
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <label style={labelStyle}>Nombre del objeto *</label>
+              <input value={objectName} onChange={e => setObjectName(e.target.value)} placeholder="Rolex Datejust 41" style={inputStyle2} disabled={running} />
+            </div>
+            <div>
+              <label style={labelStyle}>Estilo visual</label>
+              <select value={style} onChange={e => setStyle(e.target.value)} style={{ ...inputStyle2, height: 32 }} disabled={running}>
+                <option value="ultra-luxury cinematic, black studio background, dramatic volumetric lighting, macro lens, 4K">Ultra Luxury</option>
+                <option value="minimalist tech, white studio, clean lines, product photography, soft shadows">Tech Minimal</option>
+                <option value="dark moody, cinematic, teal and orange color grade, dramatic shadows">Dark Cinematic</option>
+                <option value="futuristic, neon accents, holographic overlay, sci-fi aesthetic">Futuristic</option>
+                <option value="editorial luxury, warm gold tones, premium lifestyle">Editorial Gold</option>
+                <option value="industrial engineering, blueprint aesthetic, technical precision">Industrial Tech</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Descripción detallada del objeto *</label>
+            <textarea
+              value={objectDescription}
+              onChange={e => setObjectDescription(e.target.value)}
+              placeholder="Swiss luxury automatic watch, 41mm case..."
+              rows={3}
+              style={{ ...inputStyle2, resize: "vertical", lineHeight: 1.5 }}
+              disabled={running}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Materiales (separados por coma)</label>
+            <input value={materials} onChange={e => setMaterials(e.target.value)} placeholder="Oystersteel 904L, 18k yellow gold, sapphire crystal" style={inputStyle2} disabled={running} />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Componentes clave (separados por coma)</label>
+            <textarea
+              value={components}
+              onChange={e => setComponents(e.target.value)}
+              placeholder="Case, crystal, dial, movement, bezel, bracelet, clasp..."
+              rows={2}
+              style={{ ...inputStyle2, resize: "vertical", lineHeight: 1.5 }}
+              disabled={running}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <label style={labelStyle}>Aspect Ratio</label>
+              <select value={aspect} onChange={e => setAspect(e.target.value)} style={{ ...inputStyle2, height: 32 }} disabled={running}>
+                <option value="9:16">9:16 (Vertical — Reels/TikTok)</option>
+                <option value="16:9">16:9 (Horizontal — YouTube)</option>
+                <option value="1:1">1:1 (Cuadrado)</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button
+                onClick={running ? stop : start}
+                disabled={!objectName.trim() || !objectDescription.trim()}
+                style={{
+                  width: "100%", padding: "8px 14px", borderRadius: 7, fontSize: 11, fontWeight: 800,
+                  cursor: (!objectName.trim() || !objectDescription.trim()) ? "not-allowed" : "pointer",
+                  background: running
+                    ? "linear-gradient(135deg, #ef4444, #dc2626)"
+                    : "linear-gradient(135deg, #4f46e5, #6366f1)",
+                  border: "none", color: "#fff",
+                  opacity: (!objectName.trim() || !objectDescription.trim()) ? 0.5 : 1,
+                }}>
+                {running ? "⏹ Detener" : "🚀 Generar 35s con Grok"}
+              </button>
+            </div>
+          </div>
+
+          {/* Progress tracker */}
+          {(running || steps.length > 0) && (
+            <div style={{ marginTop: 4 }}>
+              <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden", marginBottom: 8 }}>
+                <div style={{
+                  height: "100%", borderRadius: 2,
+                  background: "linear-gradient(90deg, #4f46e5, #818cf8)",
+                  width: `${currentPct}%`,
+                  transition: "width 0.5s ease",
+                }} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 160, overflowY: "auto" }}>
+                {steps.map((s, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 10, color: i === steps.length - 1 ? "#e2e8f0" : "var(--t3)" }}>
+                    <span>{stepIcons[s.step] || "•"}</span>
+                    <span style={{ flex: 1 }}>{s.message}</span>
+                    <span style={{ color: "#4f46e5", fontWeight: 700 }}>{s.pct}%</span>
+                  </div>
+                ))}
+                {running && <div style={{ fontSize: 10, color: "#818cf8", animation: "pulse 1.5s infinite" }}>⏳ Procesando…</div>}
+              </div>
+            </div>
+          )}
+
+          {/* Generated prompts preview */}
+          {prompts && (
+            <div style={{ background: "rgba(0,0,0,0.4)", borderRadius: 6, padding: "8px 10px", border: "1px solid rgba(99,102,241,0.15)" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#818cf8", marginBottom: 6 }}>📝 Prompts generados por IA</div>
+              {(["clip1", "clip2", "clip3"] as const).map((k, i) => (
+                <div key={k} style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 9, color: "#4ade80", fontWeight: 600, marginBottom: 2 }}>
+                    {i === 0 ? "Clip 1 — Ensamblado + Inicio despiece (15s)" : i === 1 ? "Clip 2 — Despiece completo + flotando (10s)" : "Clip 3 — Detalle + Reensamblaje + Cierre (10s)"}
+                  </div>
+                  <div style={{ fontSize: 9, color: "var(--t3)", fontFamily: "monospace", lineHeight: 1.5, background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "4px 8px", maxHeight: 60, overflowY: "auto" }}>
+                    {prompts[k]}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div style={{ padding: "8px 10px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, fontSize: 10, color: "#fca5a5" }}>
+              ❌ {error}
+            </div>
+          )}
+
+          {/* Result */}
+          {vaultId && !running && (
+            <div style={{ padding: "10px 12px", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80", marginBottom: 8 }}>🎬 ¡Vídeo de 35s generado con Grok Aurora!</div>
+              <video
+                src={`${API_BASE}/api/vault/${vaultId}/file`}
+                controls
+                style={{ width: "100%", borderRadius: 6, maxHeight: 300, background: "#000" }}
+              />
+              <a
+                href={`${API_BASE}/api/vault/${vaultId}/file`}
+                download={`explode-view-${objectName.replace(/\s+/g, "-")}.mp4`}
+                style={{
+                  display: "block", marginTop: 8, padding: "8px 12px", textAlign: "center",
+                  background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.4)",
+                  borderRadius: 6, fontSize: 11, color: "#4ade80", fontWeight: 700, textDecoration: "none",
+                }}>
+                ⬇️ Descargar MP4 (35 s)
+              </a>
+            </div>
+          )}
+
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WatchExplodeSequenceBuilder({ setPrompt, setMode }: { setPrompt: (p: string) => void; setMode: (m: VideoMode) => void }) {
   const [open, setOpen] = React.useState(false);
   const [copied, setCopied] = React.useState<string | null>(null);
@@ -1436,8 +1699,12 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
           </Section>
         )}
 
+        <Section title="🚀 Explode View Generator — 35 s con Grok Aurora (automático)">
+          <ExplodeViewSequenceGenerator projectId={projectId} />
+        </Section>
+
         {!isXaiMode && (
-          <Section title="⌚ Secuencia Explode View — Multi-Clip Encadenado">
+          <Section title="⌚ Secuencia Explode View — Prompts Manuales Multi-Clip">
             <WatchExplodeSequenceBuilder setPrompt={setPrompt} setMode={setMode} />
           </Section>
         )}

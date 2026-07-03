@@ -21,7 +21,8 @@ import {
   cloneVoice, deleteCloneVoice, generateTTS, generateSFX, generateMusic, generateMusicLong,
   generateVideoFromImage, extendXaiVideo, editXaiVideo,
   composeAd, concatVideos, packAssetsAsZip,
-  fetchToBuffer,
+  fetchToBuffer, extractVideoFrames,
+  loadFfmpeg, makeTmpDir,
   CAMERA_PRESETS, TRANSITION_PRESETS,
   lipSyncVideoToAudio, transcribeAudioToSrt, burnSubtitlesIntoVideo,
   transferMotionToImage,
@@ -4131,6 +4132,184 @@ router.post("/fs-pro/trim-concat", requireAdmin, async (req, res) => {
   } catch (err: any) {
     logger.error({ err }, "fs-pro trim-concat failed");
     res.status(500).json({ error: err?.message || "Error en trim-concat" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER: extract last frame from a video buffer using ffmpeg
+// ═══════════════════════════════════════════════════════════════════════════
+async function extractLastFrameLocal(videoBuf: Buffer, sizePx = 1280): Promise<Buffer> {
+  const { frames, durationSec } = await extractVideoFrames(videoBuf, 1, 64);
+  const fsp = await import("fs/promises");
+  const pathMod = await import("path");
+  const tmp = await makeTmpDir("lf");
+  const inPath = pathMod.join(tmp, "in.mp4");
+  const outPath = pathMod.join(tmp, "last.jpg");
+  await fsp.writeFile(inPath, videoBuf);
+  const ffmpeg = await loadFfmpeg();
+  const seekSec = Math.max(0, durationSec - 0.5);
+  await new Promise<void>((resolve, reject) => {
+    ffmpeg(inPath)
+      .seekInput(seekSec)
+      .frames(1)
+      .size(`${sizePx}x?`)
+      .outputOptions(["-q:v 2"])
+      .on("end", () => resolve())
+      .on("error", (e: Error) => reject(e))
+      .save(outPath);
+  });
+  const result = await fsp.readFile(outPath);
+  fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUTE: POST /api/fs-pro/explode-view-sequence
+// Generic 35-second "explode view" ad video generator (adaptable to any object).
+// Pipeline: Claude prompts → Grok T2V 15s → frame → Grok I2V 10s → frame → Grok I2V 10s → ffmpeg concat → vault
+// ═══════════════════════════════════════════════════════════════════════════
+router.post("/fs-pro/explode-view-sequence", requireAdmin, async (req: Request, res: Response) => {
+  enableLongRunning(req, res, 30 * 60_000); // 30 min max
+
+  // SSE setup
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  const send = (event: string, data: object) => {
+    try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch { /* client disconnected */ }
+  };
+
+  const {
+    projectId,
+    objectName,
+    objectDescription,
+    materials,
+    components,
+    style,
+    aspect,
+  } = req.body as {
+    projectId: string | number;
+    objectName: string;
+    objectDescription: string;
+    materials?: string;
+    components?: string;
+    style?: string;
+    aspect?: string;
+  };
+
+  if (!objectName || !objectDescription) {
+    send("error", { message: "objectName y objectDescription son requeridos" });
+    return res.end();
+  }
+
+  const videoAspect = aspect || "9:16";
+  const videoStyle  = style  || "luxury cinematic, dark background, dramatic lighting";
+
+  try {
+    // ── Step 1: Generate 3 prompts dynamically with Claude ───────────────
+    send("progress", { step: "prompts", message: "Generando guion cinematográfico con IA...", pct: 3 });
+
+    const systemPrompt = `You are a world-class luxury ad director specialising in "explode view" product advertising videos.
+Generate EXACTLY 3 tightly-written English video prompts for Grok Aurora 1.5 (720p, cinematic).
+The video shows the product assembled, then explodes into its parts, then reassembles.
+
+RULES:
+- NO text, no logos, no watermarks in any clip
+- Use the exact style: ${videoStyle}
+- Aspect ratio: ${videoAspect}
+- Clip 1 (15 s, T2V): Product in assembled hero pose → slow-motion disassembly BEGINS from the exterior shell, parts drift apart gently, macro lens, studio lighting
+- Clip 2 (10 s, I2V continuing from last frame of Clip 1): Full explode VIEW — all internal components suspended in space, perfect symmetry, each part lit individually, depth of field, floating in dark void
+- Clip 3 (10 s, I2V continuing from last frame of Clip 2): Hero internal component close-up → magnetic snap reassembly in reverse, parts fly back perfectly, final assembled product gleaming, beauty shot
+- ADAPT every word of the prompts to the specific object, its real materials and real components below
+- Be precise, technical, poetic — make each frame feel like an Apple or Rolex commercial
+
+Respond ONLY with valid JSON — no markdown, no commentary:
+{"clip1":"...","clip2":"...","clip3":"..."}`;
+
+    const userMsg = `Object: ${objectName}
+Description: ${objectDescription}
+Materials: ${materials || "not specified"}
+Key components: ${components || "not specified"}`;
+
+    const promptsRaw = await askClaude(userMsg, { systemPrompt, maxTokens: 2000 });
+    const jsonMatch = promptsRaw.match(/\{[\s\S]*\}/);
+    const prompts = safeJsonParse<{ clip1: string; clip2: string; clip3: string }>(
+      jsonMatch ? jsonMatch[0] : promptsRaw,
+      { clip1: "", clip2: "", clip3: "" },
+    );
+    if (!prompts.clip1 || !prompts.clip2 || !prompts.clip3) {
+      throw new Error("Claude no pudo generar los 3 prompts — intenta de nuevo");
+    }
+    send("prompts", { clip1: prompts.clip1, clip2: prompts.clip2, clip3: prompts.clip3 });
+
+    // ── Step 2: Clip 1 — Grok T2V 15 s ─────────────────────────────────
+    send("progress", { step: "clip1", message: `Generando Clip 1 con Grok Aurora (15 s, T2V)… puede tardar 4-6 min`, pct: 8 });
+    const buf1 = await generateVideoFromImage(
+      "grok-imagine-video-1.5",
+      null, "image/jpeg",
+      prompts.clip1,
+      { duration: 15, aspect: videoAspect },
+    );
+    send("progress", { step: "clip1_done", message: "✓ Clip 1 listo (15 s)", pct: 40 });
+
+    // ── Step 3: Extract last frame from Clip 1 ───────────────────────────
+    send("progress", { step: "frame1", message: "Extrayendo último frame del Clip 1…", pct: 41 });
+    const frame1 = await extractLastFrameLocal(buf1);
+
+    // ── Step 4: Clip 2 — Grok I2V 10 s ──────────────────────────────────
+    send("progress", { step: "clip2", message: "Generando Clip 2 con Grok Aurora (10 s, I2V)… puede tardar 3-5 min", pct: 44 });
+    const buf2 = await generateVideoFromImage(
+      "grok-imagine-video-1.5",
+      frame1, "image/jpeg",
+      prompts.clip2,
+      { duration: 10, aspect: videoAspect },
+    );
+    send("progress", { step: "clip2_done", message: "✓ Clip 2 listo (10 s)", pct: 65 });
+
+    // ── Step 5: Extract last frame from Clip 2 ───────────────────────────
+    send("progress", { step: "frame2", message: "Extrayendo último frame del Clip 2…", pct: 66 });
+    const frame2 = await extractLastFrameLocal(buf2);
+
+    // ── Step 6: Clip 3 — Grok I2V 10 s ──────────────────────────────────
+    send("progress", { step: "clip3", message: "Generando Clip 3 con Grok Aurora (10 s, I2V)… puede tardar 3-5 min", pct: 70 });
+    const buf3 = await generateVideoFromImage(
+      "grok-imagine-video-1.5",
+      frame2, "image/jpeg",
+      prompts.clip3,
+      { duration: 10, aspect: videoAspect },
+    );
+    send("progress", { step: "clip3_done", message: "✓ Clip 3 listo (10 s)", pct: 85 });
+
+    // ── Step 7: ffmpeg concat → 35 s ─────────────────────────────────────
+    send("progress", { step: "concat", message: "Concatenando con ffmpeg (15 s + 10 s + 10 s = 35 s)…", pct: 88 });
+    const finalBuf = await concatVideos({
+      videoBuffers: [buf1, buf2, buf3],
+      transitionPreset: "cross_dissolve",
+      crossfadeSec: 0.5,
+    });
+
+    // ── Step 8: Save to vault ─────────────────────────────────────────────
+    send("progress", { step: "save", message: "Guardando vídeo final en Vault…", pct: 95 });
+    const vaultId = await saveToVaultSmart({
+      buffer: finalBuf,
+      projectId: parseInt(String(projectId)),
+      fileType: "fs-pro-explode-sequence",
+      category: "fusion-studio-pro",
+      mimeType: "video/mp4",
+      title: `Explode View: ${objectName} (35 s)`,
+      generatedBy: "fs-pro:grok-explode-sequence",
+    });
+
+    send("done", { vaultId, totalSec: 35, clips: 3, objectName });
+    return res.end();
+
+  } catch (err: any) {
+    logger.error({ err }, "explode-view-sequence failed");
+    send("error", { message: err?.message || "Error desconocido generando la secuencia" });
+    return res.end();
   }
 });
 
