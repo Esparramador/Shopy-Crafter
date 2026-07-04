@@ -762,6 +762,46 @@ ${entries}
 </lexicon>`;
 }
 
+// ── Sound Effects (SFX) ──────────────────────────────────────────────────────
+export interface SoundEffectResult {
+  audio: Buffer;
+  contentType: string;
+  durationSeconds?: number;
+}
+
+export async function generateSoundEffect(
+  text: string,
+  durationSeconds?: number,
+  promptInfluence?: number
+): Promise<SoundEffectResult> {
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) throw new Error("ELEVENLABS_API_KEY not set");
+  if (!text?.trim()) throw new Error("El texto del efecto de sonido no puede estar vacío");
+
+  const body: Record<string, unknown> = { text: text.slice(0, 450) };
+  if (durationSeconds && durationSeconds >= 0.5 && durationSeconds <= 22) {
+    body.duration_seconds = durationSeconds;
+  }
+  if (promptInfluence !== undefined) {
+    body.prompt_influence = Math.max(0, Math.min(1, promptInfluence));
+  }
+
+  const res = await fetch(`${ELEVEN_BASE}/sound-generation`, {
+    method: "POST",
+    headers: { "xi-api-key": key, "Content-Type": "application/json", "Accept": "audio/mpeg" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs SFX ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return { audio: buffer, contentType: "audio/mpeg", durationSeconds };
+}
+
 function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }

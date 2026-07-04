@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Check, Copy, AlertTriangle, RefreshCcw, Plus, Trash2, Pencil, X } from "lucide-react";
+import { CreditCard, Check, Copy, AlertTriangle, RefreshCcw, Plus, Trash2, Pencil, X, Settings, Users } from "lucide-react";
 import { apiGet, apiPost, apiPut, apiDelete, ApiError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -72,7 +72,7 @@ export default function Billing() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const [activeTab, setActiveTab] = useState<"subscription" | "affiliate" | "invoices" | "planes">("subscription");
+  const [activeTab, setActiveTab] = useState<"subscription" | "affiliate" | "invoices" | "planes" | "config">("subscription");
   const [copied, setCopied] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ type: "success" | "manual" | "redirect"; message: string; contactEmail?: string; checkoutUrl?: string } | null>(null);
 
@@ -188,6 +188,7 @@ export default function Billing() {
           { id: "affiliate" as const, label: "Afiliados" },
           { id: "invoices" as const, label: "Facturas" },
           ...(isAdmin ? [{ id: "planes" as const, label: "✦ Planes" }] : []),
+          ...(isAdmin ? [{ id: "config" as const, label: "⚙️ Cobro" }] : []),
         ]).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
             padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer",
@@ -359,6 +360,10 @@ export default function Billing() {
           onRefresh={() => qc.invalidateQueries({ queryKey: billingKeys.plans })}
         />
       )}
+
+      {activeTab === "config" && isAdmin && (
+        <PaymentSettingsTab />
+      )}
     </div>
   );
 }
@@ -485,6 +490,149 @@ function InvoicesTab(props: { loading: boolean; error: string | null; invoices: 
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Payment Settings Tab (Admin only) ─────────────────────────────────────
+function PaymentSettingsTab() {
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [assignPlanId, setAssignPlanId] = useState("");
+  const [assignUserId, setAssignUserId] = useState("");
+  const [assignMsg, setAssignMsg] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
+
+  const paySettings = useQuery({
+    queryKey: ["billing", "payment-settings"],
+    queryFn: () => apiGet<{ method: string }>("/api/billing/admin/payment-settings"),
+  });
+
+  const allPlans = useQuery({
+    queryKey: ["billing", "admin-plans-all"],
+    queryFn: () => apiGet<Array<{ id: string; name: string; userId: string | null; userEmail: string | null; paymentMethod: string }>>("/api/billing/admin/plans-all"),
+  });
+
+  const savePayMethod = async (method: string) => {
+    setSaving(true);
+    try {
+      await apiPut("/api/billing/admin/payment-settings", { method });
+      qc.invalidateQueries({ queryKey: ["billing", "payment-settings"] });
+    } catch (e: any) { alert(e.message ?? "Error"); }
+    finally { setSaving(false); }
+  };
+
+  const handleAssign = async () => {
+    if (!assignPlanId || !assignUserId) { setAssignError("Plan ID y User ID son requeridos"); return; }
+    setAssignError(null); setAssignMsg(null);
+    try {
+      const r = await apiPost<{ message: string }>("/api/billing/admin/assign-user-plan", {
+        planId: assignPlanId, userId: assignUserId,
+      });
+      setAssignMsg(r.message ?? "Asignado");
+      qc.invalidateQueries({ queryKey: ["billing", "admin-plans-all"] });
+      setAssignPlanId(""); setAssignUserId("");
+    } catch (e: any) { setAssignError(e.message ?? "Error"); }
+  };
+
+  const currentMethod = paySettings.data?.method ?? "stripe";
+  const METHODS = [
+    { id: "stripe", label: "💳 Stripe", desc: "Pagos recurrentes con tarjeta — requiere STRIPE_SECRET_KEY" },
+    { id: "shopify", label: "🛍 Shopify Billing", desc: "Cargos de app a través de Shopify — requiere SHOPIFY_CLIENT_ID" },
+    { id: "manual", label: "✉️ Manual", desc: "El cliente contacta por email — sin integración automática" },
+  ];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Payment method selector */}
+      <div className="glass-card" style={{ padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <Settings size={16} style={{ color: "var(--gold)" }} />
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>Método de cobro global</h3>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 16 }}>
+          Define cómo se procesan los pagos cuando un usuario solicita un upgrade de plan.
+        </p>
+        {paySettings.isLoading ? (
+          <div className="skeleton" style={{ height: 120, borderRadius: 8 }} />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {METHODS.map(m => (
+              <label key={m.id} style={{
+                display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px",
+                background: currentMethod === m.id ? "rgba(200,168,75,0.08)" : "var(--ink2)",
+                border: `1px solid ${currentMethod === m.id ? "rgba(200,168,75,0.4)" : "var(--ink3)"}`,
+                borderRadius: 8, cursor: "pointer", transition: "all 0.15s",
+              }}>
+                <input
+                  type="radio" name="payMethod" value={m.id}
+                  checked={currentMethod === m.id}
+                  onChange={() => savePayMethod(m.id)}
+                  disabled={saving}
+                  style={{ marginTop: 2, accentColor: "var(--gold)" }}
+                />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--t)", marginBottom: 2 }}>{m.label}</div>
+                  <div style={{ fontSize: 11, color: "var(--t3)" }}>{m.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+        {saving && <p style={{ fontSize: 11, color: "var(--gold)", marginTop: 8 }}>Guardando...</p>}
+      </div>
+
+      {/* Assign plan to specific user */}
+      <div className="glass-card" style={{ padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <Users size={16} style={{ color: "var(--gold)" }} />
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>Asignar plan privado a usuario</h3>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--t3)", marginBottom: 16 }}>
+          Restringe un plan de la landing para que solo sea visible a un usuario específico (útil para precios personalizados).
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>ID del plan</label>
+            <input
+              value={assignPlanId} onChange={e => setAssignPlanId(e.target.value)}
+              placeholder="ej: personalizado"
+              style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 6, padding: "7px 10px", color: "var(--t)", fontSize: 12, boxSizing: "border-box" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>User ID del cliente</label>
+            <input
+              value={assignUserId} onChange={e => setAssignUserId(e.target.value)}
+              placeholder="ID del usuario"
+              style={{ width: "100%", background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 6, padding: "7px 10px", color: "var(--t)", fontSize: 12, boxSizing: "border-box" }}
+            />
+          </div>
+          <button onClick={handleAssign} className="btn-primary" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+            Asignar
+          </button>
+        </div>
+        {assignError && <p style={{ fontSize: 11, color: "var(--crim)", marginTop: 8 }}>⚠️ {assignError}</p>}
+        {assignMsg && <p style={{ fontSize: 11, color: "var(--jade)", marginTop: 8 }}>✅ {assignMsg}</p>}
+
+        {/* Plans with user assignments */}
+        {!allPlans.isLoading && (allPlans.data ?? []).filter(p => p.userId).length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <p style={{ fontSize: 11, color: "var(--t3)", fontWeight: 600, marginBottom: 8 }}>PLANES CON USUARIO ASIGNADO</p>
+            {allPlans.data!.filter(p => p.userId).map(p => (
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--ink3)", fontSize: 12 }}>
+                <div>
+                  <span style={{ color: "var(--t)", fontWeight: 600 }}>{p.name}</span>
+                  <span style={{ color: "var(--t4)", marginLeft: 8 }}>({p.id})</span>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--gold)" }}>
+                  {p.userEmail ?? p.userId}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

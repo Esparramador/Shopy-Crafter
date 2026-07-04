@@ -5,7 +5,7 @@ import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import {
   synthesizeSpeech, listVoices, listAllVoices, cloneVoice, deleteClonedVoice, listClonedVoices,
-  transcribeAudio, isolateAudio,
+  transcribeAudio, isolateAudio, generateSoundEffect,
   listConvAIAgents, createConvAIAgent, getConvAIAgent, deleteConvAIAgent, getConvAISignedUrl, listConvAIConversations,
   listPronunciationDictionaries, createPronunciationDictionary, addRulesToPronunciationDictionary,
   removeRulesFromPronunciationDictionary, deletePronunciationDictionary,
@@ -674,6 +674,31 @@ router.post("/voice/gemini-tts", async (req, res): Promise<void> => {
   } catch (err: any) {
     logger.error({ err: err?.message }, "gemini-tts failed");
     if (!res.headersSent) res.status(500).json({ error: "Error generando voz con Gemini Live" });
+  }
+});
+
+// ============================================================
+// SOUND EFFECTS (ElevenLabs SFX)
+// ============================================================
+router.post("/voice/sfx", async (req, res): Promise<void> => {
+  try {
+    const { text, durationSeconds, promptInfluence } = req.body as {
+      text: string;
+      durationSeconds?: number;
+      promptInfluence?: number;
+    };
+    if (!text?.trim()) {
+      res.status(400).json({ error: "El campo 'text' es requerido" });
+      return;
+    }
+    const result = await generateSoundEffect(text, durationSeconds, promptInfluence);
+    res.setHeader("Content-Type", result.contentType);
+    res.setHeader("Content-Disposition", 'attachment; filename="sfx.mp3"');
+    res.setHeader("Cache-Control", "no-cache");
+    res.send(result.audio);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "sfx generation failed");
+    res.status(500).json({ error: err?.message ?? "Error generando efecto de sonido" });
   }
 });
 

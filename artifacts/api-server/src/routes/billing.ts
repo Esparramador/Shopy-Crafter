@@ -103,6 +103,19 @@ async function ensureBillingPlansTable(): Promise<void> {
       )
     `);
     await db.execute(sql`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS shopify_checkout_url TEXT`);
+    await db.execute(sql`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS user_id TEXT`);
+    await db.execute(sql`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'stripe'`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      INSERT INTO app_settings (key, value) VALUES ('payment_method', 'stripe')
+      ON CONFLICT (key) DO NOTHING
+    `);
   } catch (err) {
     logger.warn({ err }, "billing_plans table setup warning");
   }
@@ -265,11 +278,20 @@ function rowToPlan(row: any) {
   };
 }
 
-router.get("/billing/plans", async (_req, res): Promise<void> => {
+router.get("/billing/plans", async (req, res): Promise<void> => {
   try {
-    const result = await db.execute(sql`
-      SELECT * FROM billing_plans WHERE visible = TRUE ORDER BY sort_order ASC, created_at ASC
-    `);
+    const userId = (req.session as any).userId as string | undefined;
+    const result = userId
+      ? await db.execute(sql`
+          SELECT * FROM billing_plans
+          WHERE visible = TRUE AND (user_id IS NULL OR user_id = ${userId})
+          ORDER BY sort_order ASC, created_at ASC
+        `)
+      : await db.execute(sql`
+          SELECT * FROM billing_plans
+          WHERE visible = TRUE AND user_id IS NULL
+          ORDER BY sort_order ASC, created_at ASC
+        `);
     res.json(result.rows.map(rowToPlan));
   } catch {
     res.json([]);
@@ -280,15 +302,16 @@ router.post("/billing/plans", requireAdmin, async (req, res): Promise<void> => {
   try {
     const { id, name, price, priceAnnual, currency = "€", period = "/mes", featured = false,
       badge = null, features = [], ctaLabel = "Contactar →", ctaStyle = "ghost",
-      ctaHref = "/contacto", storesLimit = 1, imagesIncluded = 10 } = req.body as Record<string, any>;
+      ctaHref = "/contacto", storesLimit = 1, imagesIncluded = 10,
+      userId = null, paymentMethod = "stripe" } = req.body as Record<string, any>;
     if (!id || !name || price == null) { res.status(400).json({ error: "id, name y price son requeridos" }); return; }
     const maxRes = await db.execute(sql`SELECT COALESCE(MAX(sort_order), -1)::int AS m FROM billing_plans`);
     const nextOrder = Number((maxRes.rows[0] as any)?.m ?? -1) + 1;
     await db.execute(sql`
-      INSERT INTO billing_plans (id,name,price,price_annual,currency,period,featured,badge,features,cta_label,cta_style,cta_href,stores_limit,images_included,period_days,visible,sort_order)
-      VALUES (${id},${name},${Number(price)},${Number(priceAnnual ?? price * 10)},${currency},${period},${!!featured},${badge ?? null},${JSON.stringify(features)},${ctaLabel},${ctaStyle},${ctaHref},${Number(storesLimit)},${Number(imagesIncluded)},30,TRUE,${nextOrder})
+      INSERT INTO billing_plans (id,name,price,price_annual,currency,period,featured,badge,features,cta_label,cta_style,cta_href,stores_limit,images_included,period_days,visible,sort_order,user_id,payment_method)
+      VALUES (${id},${name},${Number(price)},${Number(priceAnnual ?? price * 10)},${currency},${period},${!!featured},${badge ?? null},${JSON.stringify(features)},${ctaLabel},${ctaStyle},${ctaHref},${Number(storesLimit)},${Number(imagesIncluded)},30,TRUE,${nextOrder},${userId ?? null},${paymentMethod})
     `);
-    logger.info({ id, name }, "✅ billing_plan created");
+    logger.info({ id, name, userId }, "✅ billing_plan created");
     res.json({ ok: true, id });
   } catch (err: any) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
@@ -570,6 +593,69 @@ router.post("/billing/admin/upgrade-user", requireAdmin, async (req, res): Promi
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
+  }
+});
+
+// ── Admin: payment method global settings ─────────────────────────────────
+router.get("/billing/admin/payment-settings", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const result = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'payment_method'`);
+    const method = (result.rows[0] as any)?.value ?? "stripe";
+    res.json({ method });
+  } catch {
+    res.json({ method: "stripe" });
+  }
+});
+
+router.put("/billing/admin/payment-settings", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { method } = req.body as { method: string };
+    const valid = ["stripe", "shopify", "manual"];
+    if (!valid.includes(method)) { res.status(400).json({ error: "Método inválido. Use: stripe, shopify, manual" }); return; }
+    await db.execute(sql`
+      INSERT INTO app_settings (key, value, updated_at) VALUES ('payment_method', ${method}, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+    `);
+    logger.info({ method }, "💳 Payment method updated");
+    res.json({ ok: true, method });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+// ── Admin: all plans (including user-specific) ─────────────────────────────
+router.get("/billing/admin/plans-all", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const result = await db.execute(sql`
+      SELECT bp.*, u.email AS user_email, u.name AS user_name
+      FROM billing_plans bp
+      LEFT JOIN users u ON bp.user_id = u.id
+      WHERE bp.visible = TRUE
+      ORDER BY bp.sort_order ASC, bp.created_at ASC
+    `);
+    res.json(result.rows.map(r => ({
+      ...rowToPlan(r),
+      userId: (r as any).user_id ?? null,
+      userEmail: (r as any).user_email ?? null,
+      userName: (r as any).user_name ?? null,
+      paymentMethod: (r as any).payment_method ?? "stripe",
+    })));
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+// ── Admin: assign a custom plan to a specific user ─────────────────────────
+router.post("/billing/admin/assign-user-plan", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { planId, userId, reason } = req.body as { planId: string; userId: string; reason?: string };
+    if (!planId || !userId) { res.status(400).json({ error: "planId y userId son requeridos" }); return; }
+    // Update the billing plan to restrict it to this user
+    await db.execute(sql`UPDATE billing_plans SET user_id = ${userId} WHERE id = ${planId}`);
+    logger.info({ planId, userId, reason }, "👑 Plan asignado a usuario específico");
+    res.json({ ok: true, message: `Plan "${planId}" asignado a usuario ${userId}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
   }
 });
 

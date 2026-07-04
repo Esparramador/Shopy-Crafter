@@ -1596,7 +1596,10 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── FOOTER (standalone block — always visible for users & SEO) ── */}
+        </div>{/* /fp-wrapper */}
+      </div>{/* /fp-container */}
+
+        {/* ── FOOTER — fuera del fp-wrapper para que no se vea afectado por transforms ── */}
         <footer className="fp-footer fp-footer-standalone">
               <div className="fp-footer-inner">
                 <div className="fp-footer-brand">
@@ -1673,9 +1676,6 @@ export default function Landing() {
                 <div className="l-footer-badges">{content.footer.badges.map((b, i) => <span key={i} className="l-footer-badge">{b}</span>)}</div>
               </div>
             </footer>
-
-        </div>{/* /fp-wrapper */}
-      </div>{/* /fp-container */}
 
     </div>
   );
