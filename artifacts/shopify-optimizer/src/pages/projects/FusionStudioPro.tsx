@@ -6,7 +6,7 @@ import VideoStudio from "./VideoStudio";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "audiotools" | "compose" | "protools" | "promptlab" | "cinematic-templates" | "downloads";
+type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "audiotools" | "compose" | "protools" | "promptlab" | "cinematic-templates" | "openart" | "downloads";
 
 type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai";
 type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
@@ -186,6 +186,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; desc: string 
   { id: "protools",   label: "Pro tools",       icon: <Mic size={15} />,      desc: "Lip-sync, subtítulos auto, motion transfer" },
   { id: "promptlab",  label: "Prompt Lab",      icon: <Zap size={15} />,      desc: "Construye prompts profesionales: imagen, vídeo, podcast, testimonial, Reels, unboxing, narrativa de marca" },
   { id: "cinematic-templates", label: "Cinematic Templates", icon: <Film size={15} />, desc: "Plantillas masterpiece: Anatomía / Deconstrucción / Construcción / Exploded View / Apple-Porsche" },
+  { id: "openart",    label: "🎨 OpenArt Engine", icon: <Sparkles size={15} />, desc: "Motor de prompts OpenArt: 40+ estilos, fórmula maestra, libro de prompts, 100+ plantillas, enhancer IA" },
   { id: "downloads",  label: "Descargas",       icon: <Download size={15} />, desc: "Exportar todos los assets en ZIP" },
 ];
 
@@ -293,6 +294,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         {tab === "protools"   && <ProToolsTab caps={caps} projectId={projectId} sessionItems={sessionItems} onSuccess={(it) => { addItem(it); showToast("Listo", true); }} onError={(m) => showToast(m, false)} />}
         {tab === "promptlab"  && <PromptLabTab onInfo={(m) => showToast(m, true)} onError={(m) => showToast(m, false)} />}
         {tab === "cinematic-templates" && <CinematicTemplatesTab projectId={projectId} onSuccess={(it) => { addItem(it); showToast("Anuncio cinematográfico generado y guardado en Vault", true); }} onInfo={(m) => showToast(m, true)} onError={(m) => showToast(m, false)} onCreditError={() => refreshHealth(true)} />}
+        {tab === "openart"    && <OpenArtEngineTab onInfo={(m) => showToast(m, true)} onError={(m) => showToast(m, false)} />}
         {tab === "downloads"  && <DownloadsTab projectId={projectId} sessionItems={sessionItems} onError={(m) => showToast(m, false)} />}
       </div>
     </div>
@@ -2709,6 +2711,616 @@ function ComposeTab({ projectId, sessionItems, onSuccess, onError }: { projectId
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── TAB: OPENART ENGINE ──────────────────────────────────────────────────
+interface OAStyle { id: string; name: string; category: string; emoji: string; description: string; promptSuffix: string; negativePrompt: string; recommendedModel: string; examplePrompt: string; tags: string[] }
+interface OATemplate { id: string; name: string; category: string; prompt: string; variables: string[]; tags: string[] }
+interface OABookChapter { id: string; title: string; icon: string; content: string }
+
+type OASubTab = "styles" | "builder" | "enhancer" | "templates" | "book" | "analyzer";
+
+function OpenArtEngineTab({ onInfo, onError }: { onInfo: (m: string) => void; onError: (m: string) => void }) {
+  const [sub, setSub] = useState<OASubTab>("styles");
+  const [styles, setStyles] = useState<OAStyle[]>([]);
+  const [templates, setTemplates] = useState<OATemplate[]>([]);
+  const [chapters, setChapters] = useState<OABookChapter[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Style selector state
+  const [selectedStyle, setSelectedStyle] = useState<OAStyle | null>(null);
+  const [catFilter, setCatFilter] = useState("all");
+  const [searchQ, setSearchQ] = useState("");
+
+  // Builder state
+  const [bSubject, setBSubject] = useState("");
+  const [bComposition, setBComposition] = useState("professional composition, rule of thirds");
+  const [bLighting, setBLighting] = useState("professional studio lighting");
+  const [bMood, setBMood] = useState("high quality professional");
+  const [bQuality, setBQuality] = useState<"standard"|"premium"|"ultra">("premium");
+  const [builtPrompt, setBuiltPrompt] = useState<{full:string;negative:string;stylePreset?:{name:string}} | null>(null);
+  const [building, setBuilding] = useState(false);
+
+  // Enhancer state
+  const [enhInput, setEnhInput] = useState("");
+  const [enhMode, setEnhMode] = useState<"enhance"|"rewrite"|"translate"|"variations"|"negative">("enhance");
+  const [enhResult, setEnhResult] = useState("");
+  const [enhancing, setEnhancing] = useState(false);
+
+  // Analyzer state
+  const [analyzeInput, setAnalyzeInput] = useState("");
+  const [analyzeResult, setAnalyzeResult] = useState<any>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // Template state
+  const [tmplSearch, setTmplSearch] = useState("");
+  const [tmplCat, setTmplCat] = useState("all");
+  const [selectedTmpl, setSelectedTmpl] = useState<OATemplate | null>(null);
+  const [tmplVars, setTmplVars] = useState<Record<string,string>>({});
+  const [tmplResult, setTmplResult] = useState("");
+
+  // Book state
+  const [bookChapter, setBookChapter] = useState<OABookChapter | null>(null);
+
+  const card: React.CSSProperties = { background: "var(--ink)", border: "1px solid var(--bdr)", borderRadius: 10, padding: 14 };
+  const inp: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "7px 10px", fontSize: 11, color: "var(--ink)", outline: "none", boxSizing: "border-box" };
+  const btn = (active = false, accent = false): React.CSSProperties => ({
+    padding: "7px 14px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "none",
+    background: accent ? "linear-gradient(135deg,#c8a84b,#f0d68a)" : active ? "rgba(200,168,75,0.18)" : "rgba(255,255,255,0.06)",
+    color: accent ? "#000" : active ? "var(--gold)" : "var(--t2)",
+  });
+  const gold: React.CSSProperties = { color: "var(--gold)" };
+  const label: React.CSSProperties = { fontSize: 10, color: "var(--t3)", marginBottom: 3, display: "block", fontWeight: 600 };
+
+  const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text).then(() => onInfo("✅ Copiado al portapapeles")); };
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API_BASE}/api/openart/styles`, { credentials: "include" }).then(r => r.json()),
+      fetch(`${API_BASE}/api/openart/templates`, { credentials: "include" }).then(r => r.json()),
+      fetch(`${API_BASE}/api/openart/prompt-book`, { credentials: "include" }).then(r => r.json()),
+    ]).then(([s, t, b]) => {
+      setStyles(s.styles || []);
+      setTemplates(t.templates || []);
+      setChapters(b.chapters || []);
+    }).catch(e => onError(e.message)).finally(() => setLoading(false));
+  }, []);
+
+  const filteredStyles = styles.filter(s => {
+    const matchCat = catFilter === "all" || s.category === catFilter;
+    const matchQ = !searchQ || s.name.toLowerCase().includes(searchQ.toLowerCase()) || s.tags.some(t => t.includes(searchQ.toLowerCase()));
+    return matchCat && matchQ;
+  });
+  const categories = ["all", ...Array.from(new Set(styles.map(s => s.category)))];
+
+  const filteredTemplates = templates.filter(t => {
+    const matchCat = tmplCat === "all" || t.category === tmplCat;
+    const matchQ = !tmplSearch || t.name.toLowerCase().includes(tmplSearch.toLowerCase()) || t.tags.some(x => x.includes(tmplSearch.toLowerCase()));
+    return matchCat && matchQ;
+  });
+  const tmplCategories = ["all", ...Array.from(new Set(templates.map(t => t.category)))];
+
+  const buildPrompt = async () => {
+    if (!bSubject.trim()) { onError("Escribe un sujeto"); return; }
+    setBuilding(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/openart/build-prompt`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: bSubject, styleId: selectedStyle?.id, composition: bComposition, lighting: bLighting, mood: bMood, qualityTier: bQuality }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      setBuiltPrompt(d.prompt);
+    } catch (e: any) { onError(e.message); }
+    setBuilding(false);
+  };
+
+  const enhancePrompt = async () => {
+    if (!enhInput.trim()) { onError("Escribe un prompt"); return; }
+    setEnhancing(true); setEnhResult("");
+    try {
+      const r = await fetch(`${API_BASE}/api/openart/enhance-prompt`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: enhInput, styleId: selectedStyle?.id, mode: enhMode }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      setEnhResult(d.enhanced || "");
+    } catch (e: any) { onError(e.message); }
+    setEnhancing(false);
+  };
+
+  const analyzePrompt = async () => {
+    if (!analyzeInput.trim()) { onError("Escribe un prompt"); return; }
+    setAnalyzing(true); setAnalyzeResult(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/openart/analyze-prompt`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: analyzeInput }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      setAnalyzeResult(d);
+    } catch (e: any) { onError(e.message); }
+    setAnalyzing(false);
+  };
+
+  const fillTemplate = async () => {
+    if (!selectedTmpl) return;
+    try {
+      const r = await fetch(`${API_BASE}/api/openart/template-fill`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: selectedTmpl.id, variables: tmplVars, styleId: selectedStyle?.id }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      setTmplResult(d.prompt);
+    } catch (e: any) { onError(e.message); }
+  };
+
+  const SUBTABS: Array<{id: OASubTab; label: string; icon: string}> = [
+    { id: "styles",   label: "Estilos",    icon: "🎨" },
+    { id: "builder",  label: "Constructor", icon: "🧪" },
+    { id: "enhancer", label: "Enhancer IA", icon: "⚡" },
+    { id: "templates",label: "Plantillas",  icon: "📋" },
+    { id: "book",     label: "Libro",       icon: "📖" },
+    { id: "analyzer", label: "Analizador",  icon: "🔬" },
+  ];
+
+  return (
+    <div style={{ padding: "0 0 32px" }}>
+      {/* Hero Header */}
+      <div style={{ background: "linear-gradient(135deg, rgba(200,168,75,0.12), rgba(120,80,200,0.08))", border: "1px solid rgba(200,168,75,0.25)", borderRadius: 12, padding: "18px 20px", marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontSize: 36 }}>🎨</div>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "var(--gold)" }}>OpenArt Engine</div>
+            <div style={{ fontSize: 11, color: "var(--t2)", marginTop: 2 }}>
+              Motor de prompts de nivel profesional · {styles.length} estilos · {templates.length} plantillas · Fórmula maestra · Enhancer IA · Libro de prompts
+            </div>
+          </div>
+          {selectedStyle && (
+            <div style={{ marginLeft: "auto", background: "rgba(200,168,75,0.15)", border: "1px solid rgba(200,168,75,0.4)", borderRadius: 8, padding: "6px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>{selectedStyle.emoji}</span>
+              <div>
+                <div style={{ fontSize: 10, color: "var(--t3)" }}>Estilo activo</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)" }}>{selectedStyle.name}</div>
+              </div>
+              <button onClick={() => setSelectedStyle(null)} style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer", fontSize: 14 }}>×</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
+        {SUBTABS.map(s => (
+          <button key={s.id} onClick={() => setSub(s.id)} style={{
+            ...btn(sub === s.id),
+            padding: "8px 14px", fontSize: 12,
+            border: sub === s.id ? "1px solid rgba(200,168,75,0.5)" : "1px solid rgba(255,255,255,0.08)",
+          }}>
+            {s.icon} {s.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div style={{ textAlign: "center", padding: 40, color: "var(--t3)" }}>⏳ Cargando motor OpenArt…</div>}
+
+      {/* ── STYLES ─────────────────────────────────────────────────────────── */}
+      {!loading && sub === "styles" && (
+        <div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Buscar estilo…" style={{ ...inp, flex: 1, minWidth: 160 }} />
+            <select value={catFilter} onChange={e => setCatFilter(e.target.value)} style={{ ...inp, width: "auto" }}>
+              {categories.map(c => <option key={c} value={c}>{c === "all" ? "Todas las categorías" : c}</option>)}
+            </select>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--t3)", marginBottom: 12 }}>
+            {filteredStyles.length} estilos · Haz clic para seleccionar el estilo activo (se usará en Builder, Enhancer y Plantillas)
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+            {filteredStyles.map(s => (
+              <div key={s.id} onClick={() => { setSelectedStyle(s === selectedStyle ? null : s); onInfo(`✅ Estilo "${s.name}" ${s === selectedStyle ? "deseleccionado" : "activado"}`); }}
+                style={{ ...card, cursor: "pointer", transition: "all 0.15s", border: selectedStyle?.id === s.id ? "1px solid rgba(200,168,75,0.6)" : "1px solid var(--bdr)", background: selectedStyle?.id === s.id ? "linear-gradient(135deg, rgba(200,168,75,0.12), rgba(200,168,75,0.04))" : "var(--ink)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 22 }}>{s.emoji}</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: selectedStyle?.id === s.id ? "var(--gold)" : "var(--t1)" }}>{s.name}</div>
+                    <div style={{ fontSize: 9, color: "var(--t3)", background: "rgba(255,255,255,0.06)", padding: "1px 6px", borderRadius: 10, display: "inline-block", marginTop: 2 }}>{s.category}</div>
+                  </div>
+                  {selectedStyle?.id === s.id && <span style={{ marginLeft: "auto", color: "var(--gold)", fontSize: 14 }}>✓</span>}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--t2)", lineHeight: 1.4, marginBottom: 8 }}>{s.description}</div>
+                <div style={{ fontSize: 9, color: "var(--t3)", fontStyle: "italic", lineHeight: 1.3, borderTop: "1px solid var(--bdr)", paddingTop: 6 }}>
+                  Modelo: <span style={{ color: "var(--gold)", fontStyle: "normal" }}>{s.recommendedModel}</span>
+                </div>
+                <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+                  {s.tags.slice(0, 3).map(t => (
+                    <span key={t} style={{ fontSize: 8, background: "rgba(200,168,75,0.1)", color: "var(--gold)", padding: "1px 5px", borderRadius: 8 }}>#{t}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── BUILDER ────────────────────────────────────────────────────────── */}
+      {!loading && sub === "builder" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <div style={{ ...card, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)", marginBottom: 12 }}>🧪 Constructor de Prompts — Fórmula OpenArt</div>
+              <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 14, lineHeight: 1.4 }}>
+                <strong style={gold}>Fórmula:</strong> Sujeto → Estilo → Composición → Iluminación → Ánimo → Calidad
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <span style={label}>SUJETO * — ¿Qué aparece en la imagen?</span>
+                <textarea value={bSubject} onChange={e => setBSubject(e.target.value)} placeholder="Luxury Swiss watch with diamond bezel on black marble surface" style={{ ...inp, minHeight: 60 }} />
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <span style={label}>ESTILO — {selectedStyle ? `✓ ${selectedStyle.name}` : "Selecciona en pestaña Estilos"}</span>
+                {selectedStyle ? (
+                  <div style={{ background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.3)", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "var(--t2)", lineHeight: 1.4 }}>
+                    {selectedStyle.emoji} {selectedStyle.name} · {selectedStyle.description}
+                  </div>
+                ) : (
+                  <button onClick={() => setSub("styles")} style={{ ...btn(false, false), width: "100%", textAlign: "left" }}>
+                    🎨 Ir a Estilos para seleccionar →
+                  </button>
+                )}
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <span style={label}>COMPOSICIÓN</span>
+                <select value={bComposition} onChange={e => setBComposition(e.target.value)} style={{ ...inp }}>
+                  {["professional composition, rule of thirds","centered symmetrical composition","bird's eye view overhead shot","dramatic Dutch angle","close-up macro shot","wide establishing shot","leading lines composition","over-the-shoulder perspective"].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <span style={label}>ILUMINACIÓN</span>
+                <select value={bLighting} onChange={e => setBLighting(e.target.value)} style={{ ...inp }}>
+                  {["professional studio lighting","golden hour warm sunlight","dramatic side Rembrandt lighting","soft box diffused light","rim backlighting silhouette","neon colored lights","cinematic volumetric rays","candlelight warm glow","harsh high-noon sun","blue hour twilight"].map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <span style={label}>ESTADO DE ÁNIMO</span>
+                <select value={bMood} onChange={e => setBMood(e.target.value)} style={{ ...inp }}>
+                  {["high quality professional","luxurious and refined","mysterious and atmospheric","epic and powerful","cheerful and energetic","romantic and tender","dark and threatening","serene and peaceful","dreamy and ethereal","raw and authentic"].map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <span style={label}>TIER DE CALIDAD</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {(["standard","premium","ultra"] as const).map(q => (
+                    <button key={q} onClick={() => setBQuality(q)} style={{ ...btn(bQuality === q), flex: 1, textTransform: "capitalize" }}>{q}</button>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={buildPrompt} disabled={building || !bSubject.trim()} style={{ ...btn(false, true), width: "100%", opacity: building ? 0.6 : 1 }}>
+                {building ? "🧪 Construyendo…" : "🧪 Construir Prompt"}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            {builtPrompt ? (
+              <div style={card}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)", marginBottom: 12 }}>✅ Prompt Construido</div>
+                {builtPrompt.stylePreset && (
+                  <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 8 }}>
+                    Estilo aplicado: <span style={gold}>{builtPrompt.stylePreset.name}</span>
+                  </div>
+                )}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", marginBottom: 6 }}>✅ PROMPT PRINCIPAL:</div>
+                  <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 6, padding: 10, fontSize: 10, color: "var(--t1)", lineHeight: 1.5, fontFamily: "monospace" }}>
+                    {builtPrompt.full}
+                  </div>
+                  <button onClick={() => copyToClipboard(builtPrompt.full)} style={{ ...btn(false, true), marginTop: 8, fontSize: 10 }}>📋 Copiar Prompt</button>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", marginBottom: 6 }}>🚫 NEGATIVE PROMPT:</div>
+                  <div style={{ background: "rgba(239,68,68,0.06)", borderRadius: 6, padding: 10, fontSize: 10, color: "var(--t2)", lineHeight: 1.5, fontFamily: "monospace" }}>
+                    {builtPrompt.negative}
+                  </div>
+                  <button onClick={() => copyToClipboard(builtPrompt.negative)} style={{ ...btn(), marginTop: 8, fontSize: 10 }}>📋 Copiar Negative</button>
+                </div>
+                <div style={{ marginTop: 14, padding: "10px", background: "rgba(200,168,75,0.07)", borderRadius: 8, fontSize: 10, color: "var(--t3)" }}>
+                  💡 <strong style={gold}>Pro tip:</strong> Pega este prompt en la pestaña Generar imagen para ver el resultado
+                </div>
+              </div>
+            ) : (
+              <div style={{ ...card, textAlign: "center", padding: 40 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🧪</div>
+                <div style={{ color: "var(--t3)", fontSize: 12 }}>Rellena los campos y pulsa "Construir Prompt"</div>
+                <div style={{ color: "var(--t3)", fontSize: 10, marginTop: 8, lineHeight: 1.4 }}>
+                  El constructor aplica automáticamente la fórmula maestra OpenArt con el estilo seleccionado
+                </div>
+              </div>
+            )}
+
+            {/* Quick Formula Reference */}
+            <div style={{ ...card, marginTop: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", marginBottom: 8 }}>📐 Fórmula Rápida OpenArt</div>
+              {[
+                ["🎯 Sujeto", "Qué aparece: objeto, persona, escena, concepto"],
+                ["🎨 Estilo", "Arte fotorrealista, anime, 3D, pintura, etc."],
+                ["📐 Composición", "Cómo está encuadrado: regla de tercios, macro, etc."],
+                ["💡 Iluminación", "Golden hour, studio, Rembrandt, rim light, etc."],
+                ["🌡️ Ánimo", "Lujoso, misterioso, épico, romántico, etc."],
+                ["⭐ Calidad", "8K, masterpiece, ultra-detailed, etc."],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: "flex", gap: 8, marginBottom: 5, fontSize: 10 }}>
+                  <span style={{ color: "var(--gold)", fontWeight: 700, minWidth: 100 }}>{k}</span>
+                  <span style={{ color: "var(--t3)" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ENHANCER ───────────────────────────────────────────────────────── */}
+      {!loading && sub === "enhancer" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={card}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)", marginBottom: 12 }}>⚡ Enhancer de Prompts IA</div>
+            <div style={{ marginBottom: 12 }}>
+              <span style={label}>TU PROMPT ORIGINAL</span>
+              <textarea value={enhInput} onChange={e => setEnhInput(e.target.value)} placeholder="Escribe tu prompt aquí, aunque sea sencillo o en español…" style={{ ...inp, minHeight: 100 }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <span style={label}>MODO DE MEJORA</span>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {([
+                  ["enhance","⚡ Mejorar"],
+                  ["rewrite","✍️ Reescribir"],
+                  ["translate","🌐 Traducir"],
+                  ["variations","🎲 Variaciones (x3)"],
+                  ["negative","🚫 Negative Prompt"],
+                ] as const).map(([id, lbl]) => (
+                  <button key={id} onClick={() => setEnhMode(id as any)} style={{ ...btn(enhMode === id), fontSize: 10 }}>{lbl}</button>
+                ))}
+              </div>
+            </div>
+            {selectedStyle && (
+              <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 12, background: "rgba(200,168,75,0.08)", padding: "6px 10px", borderRadius: 6 }}>
+                🎨 Estilo activo: <strong style={gold}>{selectedStyle.name}</strong> — se aplicará automáticamente
+              </div>
+            )}
+            <button onClick={enhancePrompt} disabled={enhancing || !enhInput.trim()} style={{ ...btn(false, true), width: "100%", opacity: enhancing ? 0.6 : 1 }}>
+              {enhancing ? "⚡ Mejorando con IA…" : "⚡ Mejorar Prompt"}
+            </button>
+            <div style={{ marginTop: 14, fontSize: 10, color: "var(--t3)", lineHeight: 1.4 }}>
+              <strong style={gold}>Modos explicados:</strong><br />
+              ⚡ <strong>Mejorar</strong> — Amplía y enriquece el prompt original<br />
+              ✍️ <strong>Reescribir</strong> — Reformula con fórmula OpenArt completa<br />
+              🌐 <strong>Traducir</strong> — Convierte al inglés técnico perfecto<br />
+              🎲 <strong>Variaciones</strong> — 3 versiones alternativas creativas<br />
+              🚫 <strong>Negative</strong> — Genera el negative prompt óptimo
+            </div>
+          </div>
+          <div style={card}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)", marginBottom: 12 }}>✨ Resultado</div>
+            {enhancing && <div style={{ textAlign: "center", padding: 40, color: "var(--t3)" }}>⚡ Mejorando con Claude…</div>}
+            {enhResult ? (
+              <>
+                <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 12, fontSize: 11, color: "var(--t1)", lineHeight: 1.6, fontFamily: "monospace", whiteSpace: "pre-wrap", marginBottom: 10 }}>
+                  {enhResult}
+                </div>
+                <button onClick={() => copyToClipboard(enhResult)} style={{ ...btn(false, true), width: "100%" }}>📋 Copiar Resultado</button>
+              </>
+            ) : !enhancing && (
+              <div style={{ textAlign: "center", padding: 40, color: "var(--t3)", fontSize: 11 }}>
+                El prompt mejorado aparecerá aquí
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TEMPLATES ──────────────────────────────────────────────────────── */}
+      {!loading && sub === "templates" && (
+        <div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            <input value={tmplSearch} onChange={e => setTmplSearch(e.target.value)} placeholder="Buscar plantilla…" style={{ ...inp, flex: 1, minWidth: 160 }} />
+            <select value={tmplCat} onChange={e => setTmplCat(e.target.value)} style={{ ...inp, width: "auto" }}>
+              {tmplCategories.map(c => <option key={c} value={c}>{c === "all" ? "Todas" : c}</option>)}
+            </select>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            {/* Template list */}
+            <div style={{ maxHeight: 600, overflowY: "auto" }}>
+              {filteredTemplates.map(t => (
+                <div key={t.id} onClick={() => { setSelectedTmpl(t); setTmplVars({}); setTmplResult(""); }}
+                  style={{ ...card, marginBottom: 8, cursor: "pointer", border: selectedTmpl?.id === t.id ? "1px solid rgba(200,168,75,0.6)" : "1px solid var(--bdr)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: selectedTmpl?.id === t.id ? "var(--gold)" : "var(--t1)" }}>{t.name}</div>
+                    <span style={{ fontSize: 9, background: "rgba(200,168,75,0.12)", color: "var(--gold)", padding: "1px 6px", borderRadius: 8 }}>{t.category}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 4, lineHeight: 1.3 }}>{t.prompt.slice(0, 80)}…</div>
+                  {t.variables.length > 0 && (
+                    <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                      {t.variables.map(v => <span key={v} style={{ fontSize: 8, background: "rgba(100,200,100,0.1)", color: "#4ade80", padding: "1px 5px", borderRadius: 8 }}>{v}</span>)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Fill template */}
+            <div>
+              {selectedTmpl ? (
+                <div style={card}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)", marginBottom: 10 }}>{selectedTmpl.name}</div>
+                  <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 12, fontFamily: "monospace", background: "rgba(255,255,255,0.04)", padding: 8, borderRadius: 6, lineHeight: 1.5 }}>
+                    {selectedTmpl.prompt}
+                  </div>
+                  {selectedTmpl.variables.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", marginBottom: 8 }}>Rellena las variables:</div>
+                      {selectedTmpl.variables.map(v => (
+                        <div key={v} style={{ marginBottom: 8 }}>
+                          <span style={label}>{v.toUpperCase()}</span>
+                          <input value={tmplVars[v] || ""} onChange={e => setTmplVars(prev => ({ ...prev, [v]: e.target.value }))}
+                            placeholder={`Escribe ${v}…`} style={inp} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button onClick={fillTemplate} style={{ ...btn(false, true), width: "100%" }}>📋 Generar Prompt</button>
+                  {tmplResult && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 6, padding: 10, fontSize: 10, color: "var(--t1)", lineHeight: 1.5, fontFamily: "monospace" }}>
+                        {tmplResult}
+                      </div>
+                      <button onClick={() => copyToClipboard(tmplResult)} style={{ ...btn(false, true), marginTop: 8, width: "100%" }}>📋 Copiar</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ ...card, textAlign: "center", padding: 40 }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                  <div style={{ color: "var(--t3)", fontSize: 12 }}>Selecciona una plantilla a la izquierda</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PROMPT BOOK ────────────────────────────────────────────────────── */}
+      {!loading && sub === "book" && (
+        <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gold)", marginBottom: 10 }}>📖 Capítulos</div>
+            {chapters.map(ch => (
+              <div key={ch.id} onClick={() => setBookChapter(ch)}
+                style={{ ...card, marginBottom: 8, cursor: "pointer", border: bookChapter?.id === ch.id ? "1px solid rgba(200,168,75,0.6)" : "1px solid var(--bdr)" }}>
+                <div style={{ fontSize: 18, marginBottom: 4 }}>{ch.icon}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: bookChapter?.id === ch.id ? "var(--gold)" : "var(--t1)" }}>{ch.title}</div>
+              </div>
+            ))}
+          </div>
+          <div style={card}>
+            {bookChapter ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <span style={{ fontSize: 28 }}>{bookChapter.icon}</span>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)" }}>{bookChapter.title}</div>
+                </div>
+                <div style={{ fontSize: 12, color: "var(--t1)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}
+                  dangerouslySetInnerHTML={{ __html: bookChapter.content
+                    .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--gold)">$1</strong>')
+                    .replace(/`([^`]+)`/g, '<code style="background:rgba(200,168,75,0.1);padding:1px 5px;border-radius:3px;font-size:10px;color:var(--gold)">$1</code>')
+                    .replace(/\n/g, '<br />')
+                  }} />
+              </>
+            ) : (
+              <div style={{ textAlign: "center", padding: 60 }}>
+                <div style={{ fontSize: 50, marginBottom: 16 }}>📖</div>
+                <div style={{ fontSize: 14, color: "var(--gold)", fontWeight: 700, marginBottom: 8 }}>Libro de Prompts OpenArt</div>
+                <div style={{ fontSize: 12, color: "var(--t3)" }}>Selecciona un capítulo para aprender técnicas profesionales de prompt engineering</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── ANALYZER ───────────────────────────────────────────────────────── */}
+      {!loading && sub === "analyzer" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={card}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold)", marginBottom: 12 }}>🔬 Analizador de Prompts IA</div>
+            <div style={{ marginBottom: 12 }}>
+              <span style={label}>PROMPT A ANALIZAR</span>
+              <textarea value={analyzeInput} onChange={e => setAnalyzeInput(e.target.value)} placeholder="Pega cualquier prompt para que la IA lo analice y te dé feedback…" style={{ ...inp, minHeight: 120 }} />
+            </div>
+            <button onClick={analyzePrompt} disabled={analyzing || !analyzeInput.trim()} style={{ ...btn(false, true), width: "100%", opacity: analyzing ? 0.6 : 1 }}>
+              {analyzing ? "🔬 Analizando…" : "🔬 Analizar Prompt"}
+            </button>
+            <div style={{ marginTop: 12, fontSize: 10, color: "var(--t3)", lineHeight: 1.4 }}>
+              El analizador evalúa: score de calidad, bloques detectados (sujeto/estilo/iluminación/ánimo), fortalezas, debilidades y sugerencias de mejora.
+            </div>
+          </div>
+          <div>
+            {analyzing && <div style={{ ...card, textAlign: "center", padding: 40, color: "var(--t3)" }}>🔬 Analizando con IA…</div>}
+            {analyzeResult && (
+              <div style={card}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                  <div style={{ width: 64, height: 64, borderRadius: "50%", background: `conic-gradient(var(--gold) ${analyzeResult.score * 3.6}deg, rgba(255,255,255,0.1) 0)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 50, height: 50, borderRadius: "50%", background: "var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: analyzeResult.score >= 80 ? "#4ade80" : analyzeResult.score >= 60 ? "var(--gold)" : "#f87171" }}>{analyzeResult.score}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "var(--gold)" }}>Score: {analyzeResult.score}/100</div>
+                    <div style={{ fontSize: 10, color: "var(--t3)" }}>{analyzeResult.score >= 80 ? "🟢 Prompt excelente" : analyzeResult.score >= 60 ? "🟡 Prompt mejorable" : "🔴 Prompt débil"}</div>
+                  </div>
+                </div>
+                {/* Detected blocks */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gold)", marginBottom: 6 }}>Bloques detectados:</div>
+                  {[["Sujeto", analyzeResult.subject], ["Estilo", analyzeResult.style], ["Iluminación", analyzeResult.lighting], ["Ánimo", analyzeResult.mood]].map(([k, v]) => (
+                    <div key={k} style={{ display: "flex", gap: 8, marginBottom: 4, fontSize: 10 }}>
+                      <span style={{ color: "var(--t3)", minWidth: 70 }}>{k}:</span>
+                      <span style={{ color: v ? "#4ade80" : "#f87171" }}>{v || "❌ No detectado"}</span>
+                    </div>
+                  ))}
+                </div>
+                {analyzeResult.strengths?.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#4ade80", marginBottom: 4 }}>✅ Fortalezas:</div>
+                    {analyzeResult.strengths.map((s: string) => <div key={s} style={{ fontSize: 10, color: "var(--t2)", marginBottom: 3 }}>• {s}</div>)}
+                  </div>
+                )}
+                {analyzeResult.weaknesses?.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>⚠️ Debilidades:</div>
+                    {analyzeResult.weaknesses.map((s: string) => <div key={s} style={{ fontSize: 10, color: "var(--t2)", marginBottom: 3 }}>• {s}</div>)}
+                  </div>
+                )}
+                {analyzeResult.suggestions?.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "var(--gold)", marginBottom: 4 }}>💡 Sugerencias:</div>
+                    {analyzeResult.suggestions.map((s: string) => <div key={s} style={{ fontSize: 10, color: "var(--t2)", marginBottom: 3 }}>• {s}</div>)}
+                  </div>
+                )}
+                {analyzeResult.missingBlocks?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#fb923c", marginBottom: 4 }}>🔸 Bloques faltantes:</div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {analyzeResult.missingBlocks.map((b: string) => (
+                        <span key={b} style={{ fontSize: 9, background: "rgba(251,146,60,0.12)", color: "#fb923c", padding: "2px 7px", borderRadius: 10 }}>{b}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {!analyzeResult && !analyzing && (
+              <div style={{ ...card, textAlign: "center", padding: 40 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🔬</div>
+                <div style={{ color: "var(--t3)", fontSize: 12 }}>El análisis detallado de tu prompt aparecerá aquí</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
