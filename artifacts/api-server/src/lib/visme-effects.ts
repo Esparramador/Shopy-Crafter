@@ -1533,6 +1533,136 @@ body{cursor:none;}`,
 .fx-holo-sub{font-family:__FONT__,sans-serif;font-size:.8rem;color:rgba(255,255,255,.6);margin:0;}`,
     js: `(function(){var card=document.getElementById('fx-holo');if(!card)return;var inner=card.querySelector('.fx-holo-inner');card.addEventListener('mousemove',function(e){var r=card.getBoundingClientRect();var x=((e.clientX-r.left)/r.width-.5)*28;var y=((e.clientY-r.top)/r.height-.5)*(-28);inner.style.transform='rotateY('+x+'deg) rotateX('+y+'deg)';});card.addEventListener('mouseleave',function(){inner.style.transform='rotateY(0) rotateX(0)';});})();`,
   },
+  {
+    id: "gsap_parallax_mountains",
+    name: "Parallax GSAP Montañas",
+    category: "parallax_effects",
+    description: "Paisaje multicapa con parallax al scroll — SVG montañas + cielo + estrellas (GSAP ScrollTrigger)",
+    libs: ["https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js", "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"],
+    html: `<div class="fx-pmount" id="fx-pmount">
+  <div class="fx-pm-layer fx-pm-stars"></div>
+  <div class="fx-pm-layer fx-pm-moon"></div>
+  <div class="fx-pm-layer fx-pm-mtn3"></div>
+  <div class="fx-pm-layer fx-pm-mtn2"></div>
+  <div class="fx-pm-layer fx-pm-mtn1"></div>
+  <div class="fx-pm-content">
+    <h1>__HEADLINE__</h1>
+    <p>__TAGLINE__</p>
+    <a class="fx-pm-btn" href="#">__CTA__</a>
+  </div>
+  <div class="fx-pm-scroll-hint">↓ Scroll</div>
+</div>
+<div style="height:200vh;background:var(--fx-pm-bg,#0a0a1a);"></div>`,
+    css: `:root{--fx-pm-sky:#0a0a2e;--fx-pm-mtn1:__PRIMARY__;--fx-pm-mtn2:__SECONDARY__;--fx-pm-mtn3:#1a1a3a;}
+.fx-pmount{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--fx-pm-sky);display:flex;align-items:center;justify-content:center;}
+.fx-pm-layer{position:absolute;inset:0;background-size:cover;background-position:bottom center;background-repeat:no-repeat;}
+.fx-pm-stars{background:radial-gradient(circle at 20% 20%,rgba(255,255,255,.8) 1px,transparent 1px),radial-gradient(circle at 80% 10%,rgba(255,255,255,.6) 1px,transparent 1px),radial-gradient(circle at 50% 40%,rgba(255,255,255,.5) 1px,transparent 1px),radial-gradient(circle at 30% 60%,rgba(255,255,255,.4) 1px,transparent 1px),radial-gradient(circle at 70% 30%,rgba(255,255,255,.7) 1px,transparent 1px),radial-gradient(circle at 10% 80%,rgba(255,255,255,.3) 1px,transparent 1px),radial-gradient(circle at 90% 70%,rgba(255,255,255,.5) 1px,transparent 1px),radial-gradient(circle at 45% 15%,rgba(255,255,255,.6) 1px,transparent 1px);background-size:200px 200px,150px 150px,300px 300px,250px 250px,180px 180px,220px 220px,170px 170px,280px 280px;}
+.fx-pm-moon{background:radial-gradient(circle at 15% 18%,rgba(255,240,200,.9) 28px,transparent 30px);}
+.fx-pm-mtn3{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%231a1a3a' d='M0,320L80,280L160,240L280,160L360,200L480,120L600,180L720,100L840,160L960,120L1080,200L1200,160L1320,220L1440,180L1440,320Z'/%3E%3C/svg%3E") bottom/cover no-repeat;opacity:.9;}
+.fx-pm-mtn2{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%232a4a6a' d='M0,320L60,290L140,260L240,180L340,220L460,140L560,200L680,120L800,180L920,140L1040,200L1160,160L1280,220L1440,200L1440,320Z'/%3E%3C/svg%3E") bottom/cover no-repeat;}
+.fx-pm-mtn1{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%230d2137' d='M0,320L40,300L120,270L220,220L320,260L440,190L540,250L660,180L780,250L900,200L1020,260L1140,220L1260,270L1440,240L1440,320Z'/%3E%3C/svg%3E") bottom/cover no-repeat;}
+.fx-pm-content{position:relative;z-index:10;text-align:center;padding:32px;}
+.fx-pm-content h1{font-family:__FONT__,sans-serif;font-size:clamp(2.2rem,6vw,5rem);color:#fff;margin-bottom:12px;text-shadow:0 0 40px rgba(100,150,255,.5);}
+.fx-pm-content p{color:rgba(200,220,255,.75);font-size:1.1rem;margin-bottom:28px;}
+.fx-pm-btn{display:inline-block;padding:14px 36px;background:__PRIMARY__;color:#fff;border-radius:100px;text-decoration:none;font-weight:700;font-family:__FONT__,sans-serif;box-shadow:0 0 20px __PRIMARY__88;}
+.fx-pm-scroll-hint{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);color:rgba(200,220,255,.5);font-size:.85rem;animation:fx-pm-bounce 1.5s ease-in-out infinite;}
+@keyframes fx-pm-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}`,
+    js: `(function(){if(!window.gsap||!window.ScrollTrigger){console.warn('GSAP/ScrollTrigger needed');return;}gsap.registerPlugin(ScrollTrigger);var el=document.getElementById('fx-pmount');if(!el)return;var layers=['.fx-pm-stars','.fx-pm-moon','.fx-pm-mtn3','.fx-pm-mtn2','.fx-pm-mtn1'];var speeds=[0.3,0.5,0.6,0.8,1.0];layers.forEach(function(sel,i){var node=el.querySelector(sel);if(!node)return;gsap.to(node,{yPercent:-(speeds[i]*60),ease:'none',scrollTrigger:{trigger:el,start:'top top',end:'bottom top',scrub:true}});});gsap.from(el.querySelector('.fx-pm-content'),{opacity:0,y:30,duration:1,delay:.3});})();`,
+  },
+  {
+    id: "travel_card_opening",
+    name: "Tarjeta de Viaje Interactiva",
+    category: "cards_banners",
+    description: "Tarjeta de destino que se despliega al hacer click mostrando detalles — CSS + JS",
+    libs: [],
+    html: `<div class="fx-tcard-wrap">
+  <div class="fx-tcard" id="fx-tcard">
+    <div class="fx-tc-front">
+      <div class="fx-tc-img"></div>
+      <div class="fx-tc-badge">✈️ Destino</div>
+      <div class="fx-tc-title">__NAME__</div>
+      <div class="fx-tc-sub">__TAGLINE__</div>
+    </div>
+    <div class="fx-tc-back">
+      <div class="fx-tc-detail-header">
+        <span class="fx-tc-flag">🌍</span>
+        <div>
+          <div class="fx-tc-dname">__NAME__</div>
+          <div class="fx-tc-dsub">Información del destino</div>
+        </div>
+      </div>
+      <div class="fx-tc-items">
+        <div class="fx-tc-item"><span>📅</span><div><b>Mejor época</b><p>Junio – Septiembre</p></div></div>
+        <div class="fx-tc-item"><span>💰</span><div><b>Precio desde</b><p>__PRICE__ / persona</p></div></div>
+        <div class="fx-tc-item"><span>⏱️</span><div><b>Duración</b><p>7 – 14 días</p></div></div>
+        <div class="fx-tc-item"><span>⭐</span><div><b>Valoración</b><p>4.9 / 5.0</p></div></div>
+      </div>
+      <a class="fx-tc-cta" href="#">__CTA__</a>
+    </div>
+  </div>
+</div>`,
+    css: `.fx-tcard-wrap{perspective:1200px;display:flex;justify-content:center;padding:24px;}
+.fx-tcard{width:300px;height:420px;position:relative;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.4,0,.2,1);cursor:pointer;}
+.fx-tcard.fx-tc-open{transform:rotateY(180deg);}
+.fx-tc-front,.fx-tc-back{position:absolute;inset:0;border-radius:20px;backface-visibility:hidden;overflow:hidden;}
+.fx-tc-front{background:linear-gradient(160deg,__PRIMARY__,__SECONDARY__);display:flex;flex-direction:column;justify-content:flex-end;padding:24px;}
+.fx-tc-img{position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,.6));background-image:url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80');background-size:cover;background-position:center;border-radius:20px;}
+.fx-tc-badge{position:absolute;top:16px;left:16px;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);color:#fff;font-size:.75rem;font-weight:700;padding:4px 12px;border-radius:100px;border:1px solid rgba(255,255,255,.3);}
+.fx-tc-title{position:relative;font-family:__FONT__,sans-serif;font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:4px;text-shadow:0 2px 8px rgba(0,0,0,.5);}
+.fx-tc-sub{position:relative;color:rgba(255,255,255,.75);font-size:.85rem;}
+.fx-tc-back{background:var(--surface,#1a1a2e);transform:rotateY(180deg);display:flex;flex-direction:column;padding:20px;border:1px solid rgba(255,255,255,.08);}
+.fx-tc-detail-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);}
+.fx-tc-flag{font-size:2rem;}
+.fx-tc-dname{font-family:__FONT__,sans-serif;font-weight:700;color:#fff;font-size:1.1rem;}
+.fx-tc-dsub{color:rgba(255,255,255,.4);font-size:.75rem;}
+.fx-tc-items{display:flex;flex-direction:column;gap:12px;flex:1;}
+.fx-tc-item{display:flex;align-items:center;gap:12px;}
+.fx-tc-item>span{font-size:1.3rem;width:28px;text-align:center;}
+.fx-tc-item b{display:block;color:#fff;font-size:.8rem;font-family:__FONT__,sans-serif;}
+.fx-tc-item p{margin:0;color:rgba(255,255,255,.5);font-size:.75rem;}
+.fx-tc-cta{display:block;background:__PRIMARY__;color:#fff;text-align:center;padding:13px;border-radius:12px;text-decoration:none;font-weight:700;font-family:__FONT__,sans-serif;font-size:.9rem;margin-top:16px;box-shadow:0 4px 16px __PRIMARY__66;}`,
+    js: `(function(){var card=document.getElementById('fx-tcard');if(!card)return;card.addEventListener('click',function(){card.classList.toggle('fx-tc-open');});})();`,
+  },
+  {
+    id: "nine_dot_navigation",
+    name: "Navegación 9 Puntos",
+    category: "navigation_menus",
+    description: "Menú de apps expandible con 9 iconos tipo grid — CSS transitions puro",
+    libs: [],
+    html: `<div class="fx-9dot-wrap">
+  <button class="fx-9dot-trigger" id="fx-9dot-btn" aria-label="Menu" aria-expanded="false">
+    <span class="fx-9dot-icon">
+      <span></span><span></span><span></span>
+      <span></span><span></span><span></span>
+      <span></span><span></span><span></span>
+    </span>
+  </button>
+  <div class="fx-9dot-grid" id="fx-9dot-grid">
+    <a class="fx-9dot-item" href="#"><span>🏠</span><small>Inicio</small></a>
+    <a class="fx-9dot-item" href="#"><span>📊</span><small>Analytics</small></a>
+    <a class="fx-9dot-item" href="#"><span>🛒</span><small>Tienda</small></a>
+    <a class="fx-9dot-item" href="#"><span>📧</span><small>Email</small></a>
+    <a class="fx-9dot-item" href="#"><span>🎨</span><small>Diseño</small></a>
+    <a class="fx-9dot-item" href="#"><span>📱</span><small>Social</small></a>
+    <a class="fx-9dot-item" href="#"><span>🔍</span><small>SEO</small></a>
+    <a class="fx-9dot-item" href="#"><span>⚙️</span><small>Config</small></a>
+    <a class="fx-9dot-item" href="#"><span>👤</span><small>Perfil</small></a>
+  </div>
+</div>`,
+    css: `.fx-9dot-wrap{position:relative;display:inline-block;}
+.fx-9dot-trigger{width:44px;height:44px;border-radius:50%;background:var(--surface,#1e1e2e);border:1px solid rgba(255,255,255,.12);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.fx-9dot-trigger:hover,.fx-9dot-trigger[aria-expanded=true]{background:__PRIMARY__22;border-color:__PRIMARY__;}
+.fx-9dot-icon{display:grid;grid-template-columns:repeat(3,6px);grid-template-rows:repeat(3,6px);gap:3px;}
+.fx-9dot-icon span{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.6);transition:background .2s,transform .3s;}
+.fx-9dot-trigger[aria-expanded=true] .fx-9dot-icon span{background:__PRIMARY__;transform:scale(1.2);}
+.fx-9dot-grid{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%) scale(.85);transform-origin:top center;background:var(--surface,#1e1e2e);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:12px;display:grid;grid-template-columns:repeat(3,72px);gap:4px;box-shadow:0 16px 40px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:100;}
+.fx-9dot-grid.fx-9dot-open{opacity:1;pointer-events:auto;transform:translateX(-50%) scale(1);}
+.fx-9dot-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px 6px;border-radius:10px;text-decoration:none;transition:background .15s,transform .15s;color:inherit;}
+.fx-9dot-item:hover{background:__PRIMARY__18;transform:scale(1.06);}
+.fx-9dot-item span{font-size:1.4rem;line-height:1;}
+.fx-9dot-item small{font-family:__FONT__,sans-serif;font-size:.65rem;color:rgba(255,255,255,.55);white-space:nowrap;}`,
+    js: `(function(){var btn=document.getElementById('fx-9dot-btn');var grid=document.getElementById('fx-9dot-grid');if(!btn||!grid)return;btn.addEventListener('click',function(e){e.stopPropagation();var open=grid.classList.toggle('fx-9dot-open');btn.setAttribute('aria-expanded',String(open));});document.addEventListener('click',function(){grid.classList.remove('fx-9dot-open');btn.setAttribute('aria-expanded','false');});})();`,
+  },
 ];
 
 // ── Visme templates (loaded lazily) ──────────────────────────────────────────
