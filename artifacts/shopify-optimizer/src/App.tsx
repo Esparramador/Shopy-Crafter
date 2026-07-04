@@ -25,6 +25,8 @@ const HelpConnections = lazy(() => import("@/pages/HelpConnections"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const AdminClients = lazy(() => import("@/pages/AdminClients"));
 
+const RolexAd = lazy(() => import("@/video/RolexAd"));
+
 const CMSEditor = lazy(() => import("@/pages/admin/CMSEditor"));
 const Intelligence = lazy(() => import("@/pages/admin/Intelligence"));
 const GeminiIntelligence = lazy(() => import("@/pages/admin/GeminiIntelligence"));
@@ -327,6 +329,8 @@ function Router() {
 
         {/* Landing */}
         <Route path="/landing">{() => <S><Landing /></S>}</Route>
+
+        <Route path="/admin/rolex-ad">{() => <S><RolexAd /></S>}</Route>
 
         {/* Public pages */}
         <Route path="/sobre-nosotros">{() => <S><SobreNosotros /></S>}</Route>
