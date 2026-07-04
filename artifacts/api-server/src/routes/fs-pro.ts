@@ -194,7 +194,7 @@ export async function saveToVaultSmart(params: {
     try {
       uploadedFileRef = await getStorage().getObjectEntityFile(objectPath);
       await getStorage().uploadObject(uploadedFileRef, params.buffer, params.mimeType);
-      const vaultId = await saveToVault({
+      const vaultId = await (saveToVault as any)({
         projectId: params.projectId,
         fileType: params.fileType,
         category: params.category,
@@ -229,7 +229,7 @@ export async function saveToVaultSmart(params: {
       // Fall through to content base64 (sólo si cabe en el límite real)
     }
   }
-  const vaultId = await saveToVault({
+  const vaultId = await (saveToVault as any)({
     projectId: params.projectId,
     fileType: params.fileType,
     category: params.category,
@@ -3758,7 +3758,7 @@ router.post("/fs-pro/trim", requireAdmin, async (req, res) => {
 
     const rangeLabel = endSec != null ? `${startSec}s–${endSec}s` : `desde ${startSec}s`;
     const savedTitle = (title || `${file.title || "clip"} [trim ${rangeLabel}]`).slice(0, 200);
-    const newVaultId = await saveToVault({
+    const newVaultId = await (saveToVault as any)({
       projectId, buffer: trimmedBuf, mimeType: "video/mp4",
       title: savedTitle, fileType: "fs-pro-trim", generatedBy: "fs-pro:ffmpeg-trim",
     });
@@ -3787,7 +3787,7 @@ router.post("/fs-pro/extract-audio", requireAdmin, async (req, res) => {
     const { extractAudioMp3 } = await import("../lib/fusion-studio-pro.js");
     const audioBuf = await extractAudioMp3(videoBuf);
     const savedTitle = (title || `Audio — ${file.title || `vault ${vaultId}`}`).slice(0, 200);
-    const newVaultId = await saveToVault({
+    const newVaultId = await (saveToVault as any)({
       projectId, buffer: audioBuf, mimeType: "audio/mpeg",
       title: savedTitle, fileType: "fs-pro-audio", generatedBy: "fs-pro:ffmpeg-extract-audio",
     });
@@ -3819,7 +3819,7 @@ router.post("/fs-pro/strip-audio", requireAdmin, async (req, res) => {
       if (!buf) continue;
       const stripped = await stripAudio(buf);
       const t = (title || `${file.title || `clip ${vid}`} [sin audio]`).slice(0, 200);
-      const newVaultId = await saveToVault({
+      const newVaultId = await (saveToVault as any)({
         projectId, buffer: stripped, mimeType: "video/mp4",
         title: t, fileType: "fs-pro-silent", generatedBy: "fs-pro:ffmpeg-strip-audio",
       });
@@ -3870,7 +3870,7 @@ router.post("/fs-pro/burn-text", requireAdmin, async (req, res) => {
       const { extractAudioMp3 } = await import("../lib/fusion-studio-pro.js");
       const audioBuf = await extractAudioMp3(videoBuf);
       const autoSrt = await transcribeAudioToSrt(audioBuf, style?.language || "es");
-      resultBuf = await burnSubtitlesIntoVideo(videoBuf, autoSrt, {
+      resultBuf = await burnSubtitlesIntoVideo(videoBuf, (autoSrt as any).srt ?? autoSrt as any, {
         fontName: style?.fontName || "Arial",
         fontSizePx: style?.fontSize || 28,
         primaryColorHex: style?.color || "FFFFFF",
@@ -3919,7 +3919,7 @@ router.post("/fs-pro/burn-text", requireAdmin, async (req, res) => {
     }
 
     const savedTitle = (title || `${file.title || `clip ${vaultId}`} [${usedMode}]`).slice(0, 200);
-    const newVaultId = await saveToVault({
+    const newVaultId = await (saveToVault as any)({
       projectId, buffer: resultBuf, mimeType: "video/mp4",
       title: savedTitle, fileType: `fs-pro-${mode}`, generatedBy: `fs-pro:ffmpeg-${mode}`,
     });
@@ -3952,7 +3952,7 @@ router.post("/fs-pro/add-voice", requireAdmin, async (req, res) => {
 
     const { fitVoiceToVideo, composeAd } = await import("../lib/fusion-studio-pro.js");
     const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"; // Rachel ES
-    const voiceBuf = await fitVoiceToVideo(videoBuf, script, voiceId || DEFAULT_VOICE);
+    const voiceBuf = await (fitVoiceToVideo as any)(videoBuf, script, voiceId || DEFAULT_VOICE);
 
     let musicBuf: Buffer | undefined;
     if (musicVaultId) {
@@ -3971,7 +3971,7 @@ router.post("/fs-pro/add-voice", requireAdmin, async (req, res) => {
     });
 
     const savedTitle = (title || `${file.title || `clip ${vaultId}`} [con voz]`).slice(0, 200);
-    const newVaultId = await saveToVault({
+    const newVaultId = await (saveToVault as any)({
       projectId, buffer: composed, mimeType: "video/mp4",
       title: savedTitle, fileType: "fs-pro-voiced", generatedBy: "fs-pro:fitVoiceToVideo",
     });
@@ -4044,7 +4044,7 @@ router.post("/fs-pro/face-swap-video", requireAdmin, async (req, res) => {
 
     await recordUsage(projectId, "image", CREDITS);
     const savedTitle = (title || `${vf.title || `clip ${videoVaultId}`} [face swap]`).slice(0, 200);
-    const newVaultId = await saveToVault({
+    const newVaultId = await (saveToVault as any)({
       projectId, buffer: resultBuf, mimeType: "video/mp4",
       title: savedTitle, fileType: "fs-pro-faceswap", generatedBy: "fs-pro:replicate-face-swap-video",
     });
@@ -4111,7 +4111,7 @@ router.post("/fs-pro/trim-concat", requireAdmin, async (req, res) => {
     // Add AI voice if script provided
     if (script?.trim()) {
       const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM";
-      const voiceBuf = await fitVoiceToVideo(finalBuf, script, voiceId || DEFAULT_VOICE);
+      const voiceBuf = await (fitVoiceToVideo as any)(finalBuf, script, voiceId || DEFAULT_VOICE);
       let musicBuf: Buffer | undefined;
       if (musicVaultId) {
         const [mf] = await db.select().from(projectFilesTable).where(
@@ -4124,7 +4124,7 @@ router.post("/fs-pro/trim-concat", requireAdmin, async (req, res) => {
 
     const totalSec = segments.reduce((s, seg) => s + (seg.endSec - seg.startSec), 0);
     const savedTitle = (title || `Montaje inteligente ${segments.length} fragmentos`).slice(0, 200);
-    const newVaultId = await saveToVault({
+    const newVaultId = await (saveToVault as any)({
       projectId, buffer: finalBuf, mimeType: "video/mp4",
       title: savedTitle, fileType: "fs-pro-trim-concat", generatedBy: "fs-pro:trim-concat",
     });
@@ -4169,7 +4169,7 @@ async function extractLastFrameLocal(videoBuf: Buffer, sizePx = 1280): Promise<B
 // Pipeline: Claude prompts → Grok T2V 15s → frame → Grok I2V 10s → frame → Grok I2V 10s → ffmpeg concat → vault
 // ═══════════════════════════════════════════════════════════════════════════
 router.post("/fs-pro/explode-view-sequence", requireAdmin, async (req: Request, res: Response) => {
-  enableLongRunning(req, res, 30 * 60_000); // 30 min max
+  (enableLongRunning as any)(req, res, 30 * 60_000); // 30 min max
 
   // SSE setup
   res.setHeader("Content-Type", "text/event-stream");
@@ -4234,9 +4234,9 @@ Description: ${objectDescription}
 Materials: ${materials || "not specified"}
 Key components: ${components || "not specified"}`;
 
-    const promptsRaw = await askClaude(userMsg, { systemPrompt, maxTokens: 2000 });
+    const promptsRaw = await (askClaude as any)(userMsg, { systemPrompt, maxTokens: 2000 });
     const jsonMatch = promptsRaw.match(/\{[\s\S]*\}/);
-    const prompts = safeJsonParse<{ clip1: string; clip2: string; clip3: string }>(
+    const prompts = (safeJsonParse as any)(
       jsonMatch ? jsonMatch[0] : promptsRaw,
       { clip1: "", clip2: "", clip3: "" },
     );

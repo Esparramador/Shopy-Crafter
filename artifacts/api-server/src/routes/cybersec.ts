@@ -38,7 +38,7 @@ router.get("/cybersec/catalog", requireAuth, (req, res) => {
 
 // ── GET /api/cybersec/skill/:id ─────────────────────────────────────────────
 router.get("/cybersec/skill/:id", requireAuth, (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const content = getSkillContent(id);
   if (!content) {
     const suggestions = searchCybersecSkills(id, 8);

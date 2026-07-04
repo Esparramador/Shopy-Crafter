@@ -137,7 +137,7 @@ router.post("/admin/api-keys", requireAdmin, async (req: Request, res: Response)
 
 // ── POST /api/admin/api-keys/:id/test ────────────────────────────────────────
 router.post("/admin/api-keys/:id/test", requireAdmin, async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   try {
     const rows = await db.execute(sql`SELECT * FROM platform_api_keys WHERE id = ${id}`);
     const key = rows.rows[0] as any;
@@ -200,7 +200,7 @@ router.post("/admin/api-keys/:id/test", requireAdmin, async (req: Request, res: 
 
 // ── DELETE /api/admin/api-keys/:id ───────────────────────────────────────────
 router.delete("/admin/api-keys/:id", requireAdmin, async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   try {
     await db.execute(sql`DELETE FROM platform_api_keys WHERE id = ${id}`);
     res.json({ success: true });
@@ -211,7 +211,7 @@ router.delete("/admin/api-keys/:id", requireAdmin, async (req: Request, res: Res
 
 // ── PUT /api/admin/api-keys/:id/toggle ───────────────────────────────────────
 router.put("/admin/api-keys/:id/toggle", requireAdmin, async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   try {
     await db.execute(sql`UPDATE platform_api_keys SET is_active = NOT is_active, updated_at = NOW() WHERE id = ${id}`);
     res.json({ success: true });

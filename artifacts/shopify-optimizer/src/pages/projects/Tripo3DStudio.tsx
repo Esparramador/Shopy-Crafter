@@ -23,6 +23,8 @@ import {
 
 const API = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
+declare global { namespace JSX { interface IntrinsicElements { "model-viewer": any } } }
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = "text" | "image" | "multiview" | "batch" | "process" | "segment" | "animate" | "stylize" | "gallery";
 type GenStatus = "idle" | "uploading" | "running" | "done" | "error";
@@ -192,6 +194,7 @@ function ModelViewer({ url, previewImg, compact = false }: { url?: string; previ
       </div>
       <div style={{ padding: 12 }}>
         {mode === "3d" && url
+          // @ts-ignore — model-viewer is a custom HTML element
           ? <model-viewer src={url} auto-rotate camera-controls style={{ width: "100%", height: compact ? 220 : 280, borderRadius: 10, background: "var(--ink3)" } as any} />
           : previewImg ? <img src={previewImg} alt="render" style={{ width: "100%", maxHeight: compact ? 220 : 280, objectFit: "contain", borderRadius: 10 }} /> : null
         }

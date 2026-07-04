@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Copy, Check, ExternalLink, ShoppingBag, Globe, Store, Info } from "lucide-react";
 import { useCmsSection } from "@/contexts/CmsContext";
 
-type PlatformType = "shopify" | "woocommerce" | "prestashop" | "universal";
+type PlatformType = "shopify" | "woocommerce" | "prestashop" | "universal" | "stripe";
 
 interface StepData {
   title: string;
@@ -371,6 +371,7 @@ const PLATFORM_CONFIG: Record<PlatformType, { label: string; color: string; icon
   woocommerce: { label: "WooCommerce", color: "#7f54b3", icon: Globe, getSteps: getWooCommerceSteps },
   prestashop: { label: "PrestaShop", color: "#df0067", icon: Store, getSteps: getPrestaShopSteps },
   universal: { label: "Auditoría Universal", color: "#888", icon: Globe, getSteps: getUniversalSteps },
+  stripe: { label: "Stripe", color: "#635bff", icon: Globe, getSteps: getUniversalSteps },
 };
 
 interface ConnectionGuideProps {

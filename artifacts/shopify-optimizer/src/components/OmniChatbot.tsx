@@ -3220,7 +3220,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               const fallbackRes = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
                 method: "POST", credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: engineMode === "claude" ? claudeModel : undefined, gptModel: engineMode === "gpt" ? gptModel : undefined }),
+                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: (engineMode as string) === "claude" ? claudeModel : undefined, gptModel: (engineMode as string) === "gpt" ? gptModel : undefined }),
               });
               if (fallbackRes.ok) {
                 const fd = await fallbackRes.json();
@@ -3249,7 +3249,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const res = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: engineMode === "claude" ? claudeModel : undefined, gptModel: engineMode === "gpt" ? gptModel : undefined }),
+          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: (engineMode as string) === "claude" ? claudeModel : undefined, gptModel: (engineMode as string) === "gpt" ? gptModel : undefined }),
         });
         if (res.ok) {
           const d = await res.json();

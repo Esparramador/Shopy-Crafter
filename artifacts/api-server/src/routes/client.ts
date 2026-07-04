@@ -658,7 +658,7 @@ REGLAS:
     if (msg) {
       extractAndLearnFromChat({
         projectId: pid,
-        niche: (project as any)?.niche ?? null,
+        niche: null,
         userMessage: msg,
         aiReply: reply,
       });

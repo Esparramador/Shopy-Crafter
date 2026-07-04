@@ -30,6 +30,14 @@ args = "API Server"
 task = "workflow.run"
 args = "web"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck-api"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck-frontend"
+
 [[workflows.workflow]]
 name = "API Server"
 author = "agent"
@@ -51,6 +59,28 @@ args = "pnpm --filter @workspace/shopify-optimizer run dev"
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow]]
+name = "typecheck-api"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd artifacts/api-server && npx tsc --noEmit 2>&1 | tail -60"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "typecheck-frontend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd artifacts/shopify-optimizer && npx tsc --noEmit 2>&1 | tail -60"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [agent]
 stack = "PNPM_WORKSPACE"

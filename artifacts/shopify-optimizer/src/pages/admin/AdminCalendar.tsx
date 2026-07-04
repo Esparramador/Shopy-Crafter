@@ -71,7 +71,7 @@ function getDaysInMonth(year: number, month: number) { return new Date(year, mon
 function getFirstDayOfWeek(year: number, month: number) { return (new Date(year, month, 1).getDay() + 6) % 7; }
 
 // ─── Inline styles ────────────────────────────────────────────────────────────
-const S: Record<string, React.CSSProperties> = {
+const S = {
   page: { padding: "0 0 40px 0", minHeight: "100vh", background: "var(--ink)", color: "var(--t)" },
   card: { background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 12, padding: 16 },
   label: { fontSize: 11, fontWeight: 700, color: "var(--t2)", textTransform: "uppercase" as const, letterSpacing: 1, display: "block", marginBottom: 6 },

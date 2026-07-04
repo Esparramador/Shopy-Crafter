@@ -23,6 +23,17 @@ import os from "os";
 
 const router = Router();
 
+const ffmpegBin: string = process.env.FFMPEG_PATH ||
+  ["/nix/store/k28ypnisbhajg3x1kv5hy7h2vjbajkvy-replit-runtime-path/bin/ffmpeg",
+   "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"].find(p => { try { return fs.existsSync(p); } catch { return false; } }) ||
+  "ffmpeg";
+
+const ytdlpBin: string = process.env.YTDLP_PATH ||
+  ["/home/runner/workspace/.pythonlibs/bin/yt-dlp",
+   "/home/runner/.pythonlibs/bin/yt-dlp",
+   "/usr/local/bin/yt-dlp"].find(p => { try { return fs.existsSync(p); } catch { return false; } }) ||
+  "yt-dlp";
+
 // ─── OAuth State Store (in-memory, TTL 10 min) ───────────────────────────────
 // Needed because Google's redirect arrives without a valid session cookie in
 // production (SameSite cookie limitations on cross-site top-level navigations).
@@ -154,7 +165,7 @@ async function ytSearch(q: string, maxResults: number, oauthToken?: string | nul
       headers: { Authorization: `Bearer ${oauthToken}` },
     });
     if (r.ok) return r.json();
-    logger.warn("YouTube OAuth search failed:", await r.text().catch(() => "?"));
+    logger.warn({ detail: await r.text().catch(() => "?") }, "YouTube OAuth search failed");
   }
 
   // Fallback: API key
@@ -162,12 +173,12 @@ async function ytSearch(q: string, maxResults: number, oauthToken?: string | nul
   if (!apiKey) return null;
   const r2 = await fetch(`https://www.googleapis.com/youtube/v3/search?${qs}&key=${apiKey}`);
   if (r2.ok) return r2.json();
-  logger.warn("YouTube API key search failed:", await r2.text().catch(() => "?"));
+  logger.warn({ detail: await r2.text().catch(() => "?") }, "YouTube API key search failed");
   return null;
 }
 
 // ─── PUBLIC: YouTube Search ───────────────────────────────────────────────────
-router.get("/youtube/search", async (req: Request, res: Response) => {
+router.get("/youtube/search", async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
     const maxResults = Math.min(Number(req.query.max) || 5, 10);
@@ -196,7 +207,7 @@ router.get("/youtube/search", async (req: Request, res: Response) => {
       embedUrl: `https://www.youtube.com/embed/${item.id?.videoId}`,
     }));
 
-    return res.json({ results, query: q, total: data.pageInfo?.totalResults });
+    return res.json({ results, query: q, total: (data as any).pageInfo?.totalResults });
   } catch (err: any) {
     logger.error("YouTube search:", err);
     return res.status(500).json({ error: err.message });
@@ -204,7 +215,7 @@ router.get("/youtube/search", async (req: Request, res: Response) => {
 });
 
 // ─── ADMIN: OAuth URL ─────────────────────────────────────────────────────────
-router.get("/youtube/oauth/url", requireAdmin, (req: Request, res: Response) => {
+router.get("/youtube/oauth/url", requireAdmin, (req, res) => {
   const clientId = OAUTH.clientId();
   if (!clientId) {
     return res.status(400).json({
@@ -232,7 +243,7 @@ router.get("/youtube/oauth/url", requireAdmin, (req: Request, res: Response) => 
 // ─── ADMIN: OAuth Callback ────────────────────────────────────────────────────
 // NO requireAdmin here — Google's redirect comes without a valid session cookie
 // in production (SameSite=Lax). We verify identity via the `state` token instead.
-router.get("/youtube/oauth/callback", async (req: Request, res: Response) => {
+router.get("/youtube/oauth/callback", async (req, res) => {
   const code = String(req.query.code || "");
   const stateParam = String(req.query.state || "");
 
@@ -298,9 +309,9 @@ router.get("/youtube/oauth/callback", async (req: Request, res: Response) => {
 });
 
 // ─── ADMIN: Channel Info ──────────────────────────────────────────────────────
-router.get("/youtube/channel", requireAdmin, async (req: Request, res: Response) => {
+router.get("/youtube/channel", requireAdmin, async (req, res) => {
   try {
-    const userId = (req.user as any)?.id || "admin";
+    const userId = ((req as any).user)?.id || "admin";
     const rows = await db.execute<{
       channel_id: string | null; channel_name: string | null;
       channel_thumbnail: string | null; channel_url: string | null;
@@ -326,9 +337,9 @@ router.get("/youtube/channel", requireAdmin, async (req: Request, res: Response)
 });
 
 // ─── ADMIN: List Channel Videos ──────────────────────────────────────────────
-router.get("/youtube/videos", requireAdmin, async (req: Request, res: Response) => {
+router.get("/youtube/videos", requireAdmin, async (req, res) => {
   try {
-    const userId = (req.user as any)?.id || "admin";
+    const userId = ((req as any).user)?.id || "admin";
     const token = await getValidToken(userId);
     if (!token) return res.json({ connected: false, videos: [] });
 
@@ -381,9 +392,9 @@ router.post(
     { name: "video", maxCount: 1 },
     { name: "thumbnail", maxCount: 1 },
   ]),
-  async (req: Request, res: Response) => {
+  async (req, res) => {
     try {
-      const userId = (req.user as any)?.id || "admin";
+      const userId = ((req as any).user)?.id || "admin";
       const token = await getValidToken(userId);
       if (!token) {
         return res.status(401).json({ error: "Canal de YouTube no conectado. Conecta tu canal primero." });
@@ -438,7 +449,7 @@ router.post(
 
       if (!uploadRes.ok) {
         const err = await uploadRes.text();
-        logger.error("YouTube upload error:", err);
+        logger.error({ err }, "YouTube upload error");
         return res.status(400).json({ error: `Error al subir vídeo: ${err}` });
       }
 
@@ -455,12 +466,12 @@ router.post(
                 Authorization: `Bearer ${token}`,
                 "Content-Type": files.thumbnail[0].mimetype,
               },
-              body: files.thumbnail[0].buffer,
+              body: files.thumbnail[0].buffer as unknown as BodyInit,
             }
           );
-          if (!thumbRes.ok) logger.warn("Thumbnail upload failed:", await thumbRes.text());
+          if (!thumbRes.ok) logger.warn("Thumbnail upload failed");
         } catch (thumbErr) {
-          logger.warn("Thumbnail error:", thumbErr);
+          logger.warn({ err: thumbErr }, "Thumbnail error");
         }
       }
 
@@ -484,9 +495,9 @@ router.post(
 );
 
 // ─── ADMIN: Delete Video ──────────────────────────────────────────────────────
-router.delete("/youtube/videos/:videoId", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/youtube/videos/:videoId", requireAdmin, async (req, res) => {
   try {
-    const userId = (req.user as any)?.id || "admin";
+    const userId = ((req as any).user)?.id || "admin";
     const token = await getValidToken(userId);
     if (!token) return res.status(401).json({ error: "Canal no conectado" });
 
@@ -504,9 +515,9 @@ router.delete("/youtube/videos/:videoId", requireAdmin, async (req: Request, res
 });
 
 // ─── ADMIN: Disconnect Channel ────────────────────────────────────────────────
-router.delete("/youtube/channel", requireAdmin, async (req: Request, res: Response) => {
+router.delete("/youtube/channel", requireAdmin, async (req, res) => {
   try {
-    const userId = (req.user as any)?.id || "admin";
+    const userId = ((req as any).user)?.id || "admin";
     await db.execute(sql`DELETE FROM youtube_tokens WHERE user_id = ${userId}`);
     return res.json({ success: true });
   } catch (err: any) {
@@ -535,14 +546,14 @@ const CONTENT_TYPE_QUERIES: Record<string, string> = {
 };
 
 // ── GET /youtube/modelo/suggest-query — returns best YT search for content type
-router.get("/youtube/modelo/suggest-query", requireAdmin, (req: Request, res: Response) => {
+router.get("/youtube/modelo/suggest-query", requireAdmin, (req, res) => {
   const tipo = String(req.query.tipo || "monologo");
   const q = CONTENT_TYPE_QUERIES[tipo] || CONTENT_TYPE_QUERIES.monologo;
   return res.json({ query: q, tipo });
 });
 
 // ── POST /youtube/modelo/extract-clip — download YT video + trim best segment
-router.post("/youtube/modelo/extract-clip", requireAdmin, async (req: Request, res: Response) => {
+router.post("/youtube/modelo/extract-clip", requireAdmin, async (req, res) => {
   try {
     const { videoId, startSec = 10, durationSec = 35 } = req.body;
     if (!videoId) return res.status(400).json({ error: "videoId requerido" });
@@ -552,21 +563,11 @@ router.post("/youtube/modelo/extract-clip", requireAdmin, async (req: Request, r
     const clipPath = path.join(tmpDir, "clip.mp4");
 
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    // Find yt-dlp — env var, common replit path, or system PATH
-    const ytdlp = process.env.YTDLP_PATH ||
-      ["/home/runner/workspace/.pythonlibs/bin/yt-dlp",
-       "/home/runner/.pythonlibs/bin/yt-dlp",
-       "/usr/local/bin/yt-dlp"].find(p => { try { return require("fs").existsSync(p); } catch { return false; } }) ||
-      "yt-dlp";
-    // Find ffmpeg — env var, nix store, or system PATH
-    const ffmpegBin = process.env.FFMPEG_PATH ||
-      ["/nix/store/k28ypnisbhajg3x1kv5hy7h2vjbajkvy-replit-runtime-path/bin/ffmpeg",
-       "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"].find(p => { try { return require("fs").existsSync(p); } catch { return false; } }) ||
-      "ffmpeg";
+    // ffmpegBin and ytdlpBin are module-level constants (hoisted above router)
 
     // Download best quality video+audio up to 720p
     execSync(
-      `"${ytdlp}" -f "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best" ` +
+      `"${ytdlpBin}" -f "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best" ` +
       `--merge-output-format mp4 -o "${rawPath}" "${ytUrl}"`,
       { timeout: 120_000, stdio: "pipe" }
     );
@@ -607,7 +608,7 @@ router.post("/youtube/modelo/extract-clip", requireAdmin, async (req: Request, r
 //   mode=sadtalker (default): foto + TTS audio → SadTalker → real lip-sync talking head
 //   mode=seedance: foto → Seedance I2V animated → loop → merge TTS audio exact sync
 //   mode=merge: clipBase64 provided → replace audio with TTS, exact sync
-router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Response) => {
+router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
   try {
     const { clipBase64, voiceId, script, targetLang = "es", mode = "sadtalker" } = req.body;
     if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
@@ -803,7 +804,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req: Request, res: Respo
 // Body: { script, voiceId, style?, voiceSettings?, photoUrl? }
 // style: "monologo"|"ugc"|"podcast"|"standUp" — default "monologo"
 // voiceSettings: { stability, style_val, speed, similarity_boost } — default Sevillano settings
-router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, res: Response) => {
+router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req, res) => {
   try {
     const { script, voiceId, style = "monologo", voiceSettings, photoUrl: customPhotoUrl } = req.body;
     if (!voiceId) return res.status(400).json({ error: "voiceId requerido" });
@@ -1062,7 +1063,7 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req: Request, r
 // Body: { referenceVideoB64, voiceId, script, doFaceSwap?, audioMode?, voiceSettings? }
 // audioMode: "tts" (default, genera TTS del script) | "sts" (ElevenLabs Speech-to-Speech del audio del vídeo)
 // voiceSettings: { stability, similarity_boost, style_val, speed }
-router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req: Request, res: Response) => {
+router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req, res) => {
   try {
     const { referenceVideoB64, voiceId, script, doFaceSwap = true, audioMode = "tts", voiceSettings } = req.body;
     if (!referenceVideoB64) return res.status(400).json({ error: "referenceVideoB64 requerido — sube el vídeo de referencia" });
@@ -1267,7 +1268,7 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req: Requ
 // Extrae el audio del vídeo de referencia → ElevenLabs Speech-to-Speech clona la voz manteniendo el timing
 // → reimplanta el audio en el vídeo → opcionalmente face-swap fotograma a fotograma
 // Body: { referenceVideoB64, voiceId, doFaceSwap?, voiceSettings? }
-router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req: Request, res: Response) => {
+router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req, res) => {
   try {
     const { referenceVideoB64, voiceId, doFaceSwap = false, voiceSettings } = req.body;
     if (!referenceVideoB64) return res.status(400).json({ error: "referenceVideoB64 requerido" });
@@ -1413,7 +1414,7 @@ router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req: Reques
 // Falls back to Replicate if ElevenLabs fails
 router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
   { name: "facePhoto", maxCount: 1 },
-]), async (req: Request, res: Response) => {
+]), async (req, res) => {
   try {
     const { videoBase64, voiceId, script, targetLang = "es" } = req.body;
     const files = req.files as Record<string, Express.Multer.File[]>;
@@ -1430,6 +1431,7 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
         const inVid = path.join(tmpDir2, "input.mp4");
         fs.writeFileSync(inVid, Buffer.from(videoBase64, "base64"));
 
+        // @ts-ignore — form-data no tiene @types
         const FormData2 = (await import("form-data")).default;
         const form2 = new FormData2();
         form2.append("file", fs.createReadStream(inVid), { filename: "input.mp4", contentType: "video/mp4" });
@@ -1488,7 +1490,7 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
     const faceUpload = await fetch("https://api.replicate.com/v1/files", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": faceFile.mimetype },
-      body: faceFile.buffer,
+      body: faceFile.buffer as unknown as BodyInit,
     });
     const faceData = await faceUpload.json() as any;
     const faceUrl = faceData.urls?.get || faceData.url;
@@ -1554,7 +1556,7 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
 });
 
 // ── GET /youtube/modelo/voices — list available ElevenLabs voices
-router.get("/youtube/modelo/voices", requireAdmin, async (req: Request, res: Response) => {
+router.get("/youtube/modelo/voices", requireAdmin, async (req, res) => {
   try {
     const key = ELEVEN_KEY();
     if (!key) return res.json({ voices: [] });
@@ -1574,7 +1576,7 @@ router.get("/youtube/modelo/voices", requireAdmin, async (req: Request, res: Res
 
 // ── POST /youtube/modelo/generate-reference — generate AI reference video with Kling
 // Used when no YouTube reference is provided
-router.post("/youtube/modelo/generate-reference", requireAdmin, async (req: Request, res: Response) => {
+router.post("/youtube/modelo/generate-reference", requireAdmin, async (req, res) => {
   try {
     const { contentType = "monologo", prompt, durationSec = 5 } = req.body;
     const token = REPLICATE_TOKEN();

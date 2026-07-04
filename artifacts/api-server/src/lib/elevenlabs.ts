@@ -341,7 +341,7 @@ export async function cloneVoice(
   if (description) form.append("description", description.trim());
 
   for (const af of audioFiles) {
-    const blob = new Blob([af.buffer], { type: af.mimeType || "audio/mpeg" });
+    const blob = new Blob([af.buffer as unknown as ArrayBuffer], { type: af.mimeType || "audio/mpeg" });
     form.append("files", blob, af.filename);
   }
 
@@ -426,7 +426,7 @@ export async function transcribeAudio(
   const apiKey = getApiKey();
 
   const form = new FormData();
-  const blob = new Blob([audioBuffer], { type: mimeType || "audio/mpeg" });
+  const blob = new Blob([audioBuffer as unknown as ArrayBuffer], { type: mimeType || "audio/mpeg" });
   form.append("file", blob, filename);
   form.append("model_id", "scribe_v1");
   if (options?.language_code) form.append("language_code", options.language_code);
@@ -469,7 +469,7 @@ export async function isolateAudio(
   const apiKey = getApiKey();
 
   const form = new FormData();
-  const blob = new Blob([audioBuffer], { type: mimeType || "audio/mpeg" });
+  const blob = new Blob([audioBuffer as unknown as ArrayBuffer], { type: mimeType || "audio/mpeg" });
   form.append("audio", blob, filename);
 
   const res = await fetch(`${ELEVEN_BASE}/audio-isolation`, {

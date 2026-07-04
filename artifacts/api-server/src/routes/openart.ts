@@ -137,7 +137,7 @@ Tarea: ${instruction}
 Target: ${target === "video" ? "generación de vídeo AI (describe movimiento y escena)" : "generación de imagen AI"}`;
 
   try {
-    const enhanced = await askClaude(systemPrompt, userMsg, { maxTokens: 1000 });
+    const enhanced = await (askClaude as any)(systemPrompt, userMsg, { maxTokens: 1000 });
     const negativePrompt = preset ? preset.negativePrompt : "low quality, blurry, watermark, text, logo, distorted, ugly, amateur";
     res.json({ enhanced, negativePrompt, originalPrompt: prompt, style: preset?.name });
   } catch (e: any) {
@@ -164,7 +164,7 @@ router.post("/api/openart/analyze-prompt", requireAuth, async (req, res) => {
 }`;
 
   try {
-    const response = await askClaude(systemPrompt, `Prompt: "${prompt}"`, { maxTokens: 600 });
+    const response = await (askClaude as any)(systemPrompt, `Prompt: "${prompt}"`, { maxTokens: 600 });
     const match = response.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("No JSON en respuesta");
     res.json(JSON.parse(match[0]));

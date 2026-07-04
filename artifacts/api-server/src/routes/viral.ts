@@ -390,7 +390,7 @@ Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks):
       engineUsed = "gemini";
 
     } else {
-      script = await askClaudeJson<any>(PROMPT);
+      script = await (askClaudeJson as any)(PROMPT);
       engineUsed = "claude";
     }
 
@@ -444,11 +444,11 @@ router.get("/viral/hooks", requireAdmin, (_req: Request, res: Response) => {
 
 // ─── GET /viral/sector/:id ────────────────────────────────────────────────────
 router.get("/viral/sector/:id", requireAdmin, (req: Request, res: Response) => {
-  const strategy = SECTOR_STRATEGIES[req.params.id];
+  const strategy = SECTOR_STRATEGIES[req.params.id as string];
   if (!strategy) {
     return res.json({ sectors: Object.keys(SECTOR_STRATEGIES), viralitySignals: VIRALITY_SIGNALS });
   }
-  res.json({ sector: req.params.id, strategy, viralitySignals: VIRALITY_SIGNALS });
+  res.json({ sector: req.params.id as string, strategy, viralitySignals: VIRALITY_SIGNALS });
 });
 
 // ─── POST /viral/log ──────────────────────────────────────────────────────────

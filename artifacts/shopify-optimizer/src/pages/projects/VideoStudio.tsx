@@ -345,7 +345,7 @@ function TimelineClip({ clip, scale, selected, onSelect, onDelete, onDragEnd }: 
 }
 
 // ─── AI Panel Modal ───────────────────────────────────────────────────────────
-type AIMode = "t2v" | "i2v" | "v2v" | "voice" | "music" | "face-swap" | "inpaint" | "outpaint" | "variations" | "audio-mix";
+type AIMode = "t2v" | "i2v" | "v2v" | "voice" | "music" | "face-swap" | "inpaint" | "outpaint" | "variations" | "audio-mix" | "extend";
 
 function AIGenerateModal({ mode, projectId, onClose, onClipReady, onError }: {
   mode: AIMode; projectId: number; onClose: () => void;
@@ -367,6 +367,7 @@ function AIGenerateModal({ mode, projectId, onClose, onClipReady, onError }: {
     "voice":"🎙️ Narración TTS", "music":"🎵 Música IA", "face-swap":"👤 Face Swap",
     "inpaint":"🖌️ Inpainting", "outpaint":"↔️ Outpainting", "variations":"✨ Variaciones Imagen",
     "audio-mix":"🎚️ Mezclar Audio",
+    "extend":"↔️ Extender Video",
   };
 
   const doGenerate = async () => {

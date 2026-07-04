@@ -106,8 +106,8 @@ export default function AgencyBilling() {
     const item: LineItem = {
       id: Math.random().toString(36).slice(2),
       description: svc.description, category: svc.category,
-      hours: "hours" in svc ? svc.hours : 0,
-      rate: svc.rate, quantity: "quantity" in svc ? svc.quantity : 1,
+      hours: "hours" in svc ? Number((svc as any).hours ?? 0) : 0,
+      rate: svc.rate, quantity: "quantity" in svc ? Number((svc as any).quantity ?? 1) : 1,
       unit: svc.unit, subtotal: 0,
     };
     item.subtotal = calcSubtotal(item);

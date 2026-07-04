@@ -301,7 +301,7 @@ router.post("/calendar/events", async (req: Request, res: Response): Promise<voi
 // ─── UPDATE APPOINTMENT ───────────────────────────────────────────────────────
 router.put("/calendar/events/:id", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params["id"]!);
+    const id = parseInt(String(req.params["id"]));
     const {
       client_name, company, email, phone,
       meeting_date, duration_minutes, description,
@@ -340,7 +340,7 @@ router.put("/calendar/events/:id", async (req: Request, res: Response): Promise<
 // ─── DELETE APPOINTMENT ───────────────────────────────────────────────────────
 router.delete("/calendar/events/:id", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params["id"]!);
+    const id = parseInt(String(req.params["id"]));
     const rows = await db.execute(sql`SELECT google_event_id FROM calendar_appointments WHERE id = ${id}`);
     const googleEventId = (rows.rows[0] as any)?.google_event_id;
 
@@ -363,7 +363,7 @@ router.delete("/calendar/events/:id", async (req: Request, res: Response): Promi
 // ─── COMPLETE MEETING (post-reunión) ─────────────────────────────────────────
 router.post("/calendar/events/:id/complete", async (req: Request, res: Response): Promise<void> => {
   try {
-    const id = parseInt(req.params["id"]!);
+    const id = parseInt(String(req.params["id"]));
     const {
       arrival_time,
       services_rendered = [],

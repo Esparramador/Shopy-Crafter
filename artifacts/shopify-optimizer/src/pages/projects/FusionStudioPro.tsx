@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRoute } from "wouter";
 import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare, Zap, RefreshCw, Copy, FileText, Scissors, Bot, BookOpen, Plus, Trash2, UploadCloud, PlayCircle } from "lucide-react";
 import { LiveOperation } from "@/components/LiveOperation";

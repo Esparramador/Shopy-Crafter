@@ -392,7 +392,7 @@ router.post("/voice/clone",
 // ─── DELETE /voice/clone/:voiceId ────────────────────────────────────────────
 router.delete("/voice/clone/:voiceId", requireAdmin, async (req, res): Promise<void> => {
   try {
-    const { voiceId } = req.params;
+    const voiceId = req.params.voiceId as string;
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(voiceId)) {
       res.status(400).json({ error: "voiceId inválido" });
       return;
@@ -497,7 +497,7 @@ router.post("/voice/convai/agents", requireAdmin, async (req, res): Promise<void
 
 router.get("/voice/convai/agents/:agentId", requireAdmin, async (req, res): Promise<void> => {
   try {
-    const agent = await getConvAIAgent(req.params.agentId);
+    const agent = await getConvAIAgent(req.params.agentId as string);
     res.json({ agent });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error obteniendo agente" });
@@ -506,7 +506,7 @@ router.get("/voice/convai/agents/:agentId", requireAdmin, async (req, res): Prom
 
 router.delete("/voice/convai/agents/:agentId", requireAdmin, async (req, res): Promise<void> => {
   try {
-    await deleteConvAIAgent(req.params.agentId);
+    await deleteConvAIAgent(req.params.agentId as string);
     res.json({ success: true });
   } catch (err: any) {
     logger.error({ err: err?.message }, "convai/agents delete failed");
@@ -566,7 +566,7 @@ router.post("/voice/pronunciation-dicts/:id/add-rules", requireAdmin, async (req
   try {
     const { rules } = req.body ?? {};
     if (!Array.isArray(rules) || rules.length === 0) { res.status(400).json({ error: "rules requerido" }); return; }
-    const result = await addRulesToPronunciationDictionary(req.params.id, rules as PronunciationRule[]);
+    const result = await addRulesToPronunciationDictionary(req.params.id as string, rules as PronunciationRule[]);
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error añadiendo reglas" });
@@ -577,7 +577,7 @@ router.post("/voice/pronunciation-dicts/:id/remove-rules", requireAdmin, async (
   try {
     const { rule_strings } = req.body ?? {};
     if (!Array.isArray(rule_strings) || rule_strings.length === 0) { res.status(400).json({ error: "rule_strings requerido" }); return; }
-    const result = await removeRulesFromPronunciationDictionary(req.params.id, rule_strings as string[]);
+    const result = await removeRulesFromPronunciationDictionary(req.params.id as string, rule_strings as string[]);
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error eliminando reglas" });
@@ -586,7 +586,7 @@ router.post("/voice/pronunciation-dicts/:id/remove-rules", requireAdmin, async (
 
 router.delete("/voice/pronunciation-dicts/:id", requireAdmin, async (req, res): Promise<void> => {
   try {
-    await deletePronunciationDictionary(req.params.id);
+    await deletePronunciationDictionary(req.params.id as string);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error eliminando diccionario" });

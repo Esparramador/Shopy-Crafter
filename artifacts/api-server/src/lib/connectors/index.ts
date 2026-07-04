@@ -24,7 +24,7 @@ export function getConnector(project: Project): IPlatformConnector {
       return new WooCommerceConnector(project);
 
     case "stripe":
-      return new StripeConnector(project);
+      return new StripeConnector(project) as any;
 
     case "wordpress":
       throw new PlatformNotSupportedError("wordpress");

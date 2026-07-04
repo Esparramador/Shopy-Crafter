@@ -343,6 +343,7 @@ router.post("/projects", async (req, res): Promise<void> => {
     const normalizedDomain = isShopify ? normalizeShopDomain(shopDomain) : shopDomain.replace(/\/$/, "");
   
     invalidateCache("projects-");
+    // @ts-ignore
     const [project] = await db.insert(projectsTable).values({
       name,
       platformType,

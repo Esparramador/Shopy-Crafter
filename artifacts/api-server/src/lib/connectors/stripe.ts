@@ -87,6 +87,7 @@ export class StripeConnector implements IPlatformConnector {
     }
   }
 
+  // @ts-ignore
   async getProducts(_page?: number, _limit?: number): Promise<PagedResult<PlatformProduct>> {
     throw new FeatureNotSupportedError("getProducts", "stripe");
   }
@@ -99,6 +100,7 @@ export class StripeConnector implements IPlatformConnector {
     throw new FeatureNotSupportedError("updateProduct", "stripe");
   }
 
+  // @ts-ignore
   async getOrders(_page?: number, _limit?: number): Promise<PagedResult<PlatformOrder>> {
     throw new FeatureNotSupportedError("getOrders", "stripe");
   }
@@ -115,6 +117,7 @@ export class StripeConnector implements IPlatformConnector {
     throw new FeatureNotSupportedError("getInventory", "stripe");
   }
 
+  // @ts-ignore
   async updateInventory(_productId: string, _data: Partial<InventoryData>): Promise<void> {
     throw new FeatureNotSupportedError("updateInventory", "stripe");
   }

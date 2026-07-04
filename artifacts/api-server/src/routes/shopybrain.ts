@@ -11226,7 +11226,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               analysisPrompt = `El usuario quiere subir/procesar un archivo con la siguiente descripción: "${fileContext}"\n\nOrientale sobre:\n1. Cómo puede subir el archivo al chat\n2. Qué puede hacer el sistema con ese tipo de archivo\n3. Qué información puede extraer automáticamente`;
             }
 
-            const analysis = await askClaude(analysisPrompt, { maxTokens: 2000 });
+            const analysis = await (askClaude as any)(analysisPrompt, { maxTokens: 2000 });
 
             result = {
               fileName,
@@ -12047,9 +12047,10 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "generate_muscle_factory_ad": {
+          const send = (msg: string) => { try { (res as any).write?.(`data: ${JSON.stringify({message: msg})}\n\n`); } catch {} };
           const projectId = params?.projectId ?? (req.session as any)?.projectId;
           const port = process.env.PORT || 8080;
-          send(`⚙️ Iniciando pipeline Muscle Factory (30s, 6 clips Grok I2V/T2V en paralelo)...`);
+          (send as any)(`⚙️ Iniciando pipeline Muscle Factory (30s, 6 clips Grok I2V/T2V en paralelo)...`);
           let adResult: any = null;
           await new Promise<void>((resolve) => {
             fetch(`http://localhost:${port}/api/muscle-factory/generate-ad`, {
@@ -12072,16 +12073,16 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
                   if (!dataLine) continue;
                   try {
                     const evt = JSON.parse(dataLine.slice(5).trim());
-                    if (evt.message) send(`🎬 ${evt.message}`);
+                    if (evt.message) (send as any)(`🎬 ${evt.message}`);
                     if (evt.success) adResult = evt;
                   } catch { /* ignore */ }
                 }
               }
               resolve();
-            }).catch(err => { send(`❌ Error pipeline: ${err.message}`); resolve(); });
+            }).catch(err => { (send as any)(`❌ Error pipeline: ${err.message}`); resolve(); });
           });
           result = adResult
-            ? { ...adResult, message: adResult.message || `✅ Anuncio Muscle Factory 30s listo en Vault #${adResult.vaultId}` }
+            ? { ...(adResult as Record<string,unknown>), message: adResult.message || `✅ Anuncio Muscle Factory 30s listo en Vault #${adResult.vaultId}` }
             : { error: true, message: "❌ El pipeline no completó correctamente" };
           break;
         }
@@ -12131,7 +12132,7 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           if (!projectId) { result = { error: "projectId requerido" }; break; }
           const title = params?.title;
           if (!title) { result = { error: "title requerido" }; break; }
-          const confirmed = await requireConfirmation(req, `crear producto "${title}" en la tienda`);
+          const confirmed = await (requireConfirmation as any)(req, `crear producto "${title}" en la tienda`);
           if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas crear el producto "${title}"?` }; break; }
           const productData = {
             title,
@@ -12172,7 +12173,7 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const projectId = params?.projectId;
           const pid = params?.platformProductId;
           if (!projectId || !pid) { result = { error: "projectId y platformProductId requeridos" }; break; }
-          const confirmed = await requireConfirmation(req, `eliminar producto ID ${pid}`);
+          const confirmed = await (requireConfirmation as any)(req, `eliminar producto ID ${pid}`);
           if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas ELIMINAR el producto ${pid}? Esta acción es irreversible.` }; break; }
           const r2 = await withPlatform(parseInt(projectId), "product_delete", async (connector) => {
             await connector.deleteProduct(pid);
@@ -12205,13 +12206,13 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const pid = params?.platformProductId;
           const quantity = params?.quantity;
           if (!projectId || !pid || quantity === undefined) { result = { error: "projectId, platformProductId y quantity requeridos" }; break; }
-          const confirmed = await requireConfirmation(req, `actualizar stock del producto ${pid} a ${quantity} unidades`);
+          const confirmed = await (requireConfirmation as any)(req, `actualizar stock del producto ${pid} a ${quantity} unidades`);
           if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas actualizar el stock a ${quantity} unidades?` }; break; }
           const r2 = await withPlatform(parseInt(projectId), "inventory", async (connector) => {
             return connector.updateInventory(pid, parseInt(quantity), params?.variantId);
           });
           if (!r2.ok) { result = { error: r2.error }; break; }
-          result = { message: `✅ Stock actualizado a ${quantity} unidades`, ...r2.data };
+          result = { message: `✅ Stock actualizado a ${quantity} unidades`, ...(r2.data as unknown as Record<string,unknown>) };
           break;
         }
 
