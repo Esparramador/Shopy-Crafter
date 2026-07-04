@@ -1335,8 +1335,15 @@ export function registerCronJobs() {
   // 8am diario — Compara gasto mensual vs umbral y envía email si lo supera
   cron.schedule("0 8 * * *", () => { runAiCostAlertCheck().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
 
+  // 4:30am diario — AI Model Intelligence: investiga nuevos modelos en todos los proveedores
+  cron.schedule("30 4 * * *", () => {
+    import("./ai-model-intelligence.js")
+      .then(({ runAiModelResearch }) => runAiModelResearch())
+      .catch(e => logger.error({ job: "ai-model-research" }, String(e)));
+  }, { timezone: "Europe/Madrid" });
+
   log("scheduler", [
-    "✅ 14 jobs registrados:",
+    "✅ 15 jobs registrados:",
     "  🔑 Tokens Shopify    → cada 20h (renovación con 4h margen)",
     "  ⚡ Micro-learning    → cada 3h  (2 dominios × 3 insights)",
     "  🧠 Consolidación     → cada 6h  (insights → memorias)",
@@ -1348,6 +1355,7 @@ export function registerCronJobs() {
     "  🔍 Competidores      → 6am     (price scans)",
     "  📦 Inventario        → 7am     (sync + alertas stock)",
     "  🔔 Alerta presupuesto → 8am    (coste IA vs umbral mensual)",
+    "  🤖 AI Model Research → 4:30am (investiga + actualiza catálogo modelos)",
     "  🚀 Mega-synthesis    → Dom 0am (síntesis estratégica semanal)",
     "  🔄 Retroanálisis     → Dom 3am (re-evaluar insights antiguos)",
     "  📊 Auto-evaluación   → 1º/mes  (informe mensual de rendimiento)",

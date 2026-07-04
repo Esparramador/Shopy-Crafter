@@ -81,6 +81,8 @@ import calendarRouter from "./calendar.js";
 import viralRouter from "./viral.js";
 import chatGroupsRouter from "./chat-groups.js";
 import apiKeysRouter from "./api-keys.js";
+import freepikRouter from "./freepik.js";
+import aiCatalogRouter from "./ai-catalog.js";
 
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
@@ -201,5 +203,7 @@ router.use(calendarRouter);
 router.use(viralRouter);
 router.use(cybersecRouter);
 router.use(apiKeysRouter);
+router.use(freepikRouter);
+router.use(aiCatalogRouter);
 
 export default router;

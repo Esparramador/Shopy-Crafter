@@ -836,6 +836,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Aprobaciones / pendientes → list_approvals; Crear aprobación / solicitar aprobación → create_approval
   - Audit log / registro de auditoría / historial de acciones → audit_log
   - Automatizaciones / cron jobs / tareas programadas → list_automations; Ejecutar automatización / ejecutar job / run job → run_automation
+  - Catálogo de modelos IA / ver modelos / qué modelos hay / estadísticas modelos → ai_catalog_stats; Listar modelos por categoría / proveedor / budget → ai_catalog_list {category?,provider?,budget?,search?}; Investigar nuevos modelos / actualizar catálogo / buscar modelos nuevos → ai_catalog_research; Mejor modelo para una tarea / routing inteligente / qué modelo usar para X → ai_model_route {task, budget?}
   - Flujos de email / email flows / listar flujos → list_email_flows; Crear flujo email (CRUD) → create_email_flow; Eliminar flujo → delete_email_flow
   - Email restock / email proveedor / restock → send_restock_email; Órdenes restock / pedidos restock → restock_orders
   - Editar colección / cambiar descripción colección / actualizar colección → edit_collection; Eliminar colección / borrar colección → delete_collection
@@ -1439,7 +1440,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   REGLA CRÍTICA — TOKEN SHOPIFY:
   Cuando el [CONTEXTO] indique "Token Shopify: CADUCADO" o "Token Shopify: SIN_TOKEN":
   - NO intentes ejecutar acciones que llamen a la API de Shopify: create_product, list_products, list_all_products, scan_store, store_status, optimize_product, optimize_all_products, redesign_product, bulk_redesign, list_themes, audit_theme, edit_theme_file, edit_theme_css, edit_theme_settings, create_theme_section, generate_all_metas, fix_all_alt_texts, generate_schemas, seo_full_audit, list_collections, create_collection, auto_collections, list_pages, create_page, design_all_pages, get_orders, change_price, set_product_status, delete_product, update_product_price, bulk_update_prices, update_stock, bulk_update_stock, sync_catalog_prices, price_audit, list_products_with_prices, add_variant, edit_variant, delete_variant, remove_from_collection, inventory_sync, inventory_sync_orders, regenerate_token, copyright_audit, setup_full_store, keyword_intelligence (si requiere productos de la tienda), blog_strategy (si requiere productos), generate_blog_post (si requiere productos).
-  - SÍ puedes ejecutar estas acciones que NO requieren token Shopify: generate_ai_report, generate_platform_report, recall_knowledge, brain_status, brain_stats, brain_sync, brain_export, analyze_external_store, generate_budget, update_cms, update_cms_batch, read_cms, reset_cms, list_users, create_user, invite_client, deactivate_user, activate_user, reset_user_password, list_messages, send_message, list_approvals, create_approval, audit_log, list_automations, run_automation, generate_email_flow, list_email_flows, generate_brand_css, generate_brand_kit, generate_brand_guide, financial_forecast, financial_dashboard, agency_proposal, search_suppliers, generate_budget, create_business_card, list_business_cards, analyze_web_design, run_universal_generator, run_leveled_report, inspect_code, fix_code, list_source_files, analyze_component, modify_ui, learn_from_url, learn_from_content, generate_competitive_pricing (con URL), scan_competitor, discover_competitors, analyze_competitor_product, agent_skill, agent_skill_search, generate_office_document.
+  - SÍ puedes ejecutar estas acciones que NO requieren token Shopify: generate_ai_report, generate_platform_report, recall_knowledge, brain_status, brain_stats, brain_sync, brain_export, analyze_external_store, generate_budget, update_cms, update_cms_batch, read_cms, reset_cms, list_users, create_user, invite_client, deactivate_user, activate_user, reset_user_password, list_messages, send_message, list_approvals, create_approval, audit_log, list_automations, run_automation, generate_email_flow, list_email_flows, generate_brand_css, generate_brand_kit, generate_brand_guide, financial_forecast, financial_dashboard, agency_proposal, search_suppliers, generate_budget, create_business_card, list_business_cards, analyze_web_design, run_universal_generator, run_leveled_report, inspect_code, fix_code, list_source_files, analyze_component, modify_ui, learn_from_url, learn_from_content, generate_competitive_pricing (con URL), scan_competitor, discover_competitors, analyze_competitor_product, agent_skill, agent_skill_search, generate_office_document, ai_catalog_stats, ai_catalog_list, ai_catalog_research, ai_model_route.
   - Si el usuario pide un informe o análisis y el token está caducado: responde con lo que puedes hacer con los datos disponibles (generate_ai_report, recall_knowledge) y explica brevemente que para sincronizar datos de la tienda necesita renovar el token en Configuración → Integración Shopify. NO repitas el error de token en cada respuesta.
   - Si el usuario pregunta sobre informes YA GENERADOS (guardados en el Vault): usa recall_knowledge para buscarlos. Los informes generados se almacenan en la base de datos y NO necesitan token.
 
@@ -12614,6 +12615,55 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             })),
             instructions: "Narra estos hallazgos al usuario priorizados por severidad (critical > high > medium > low > info). Para cada uno explica brevemente 'cómo lo explotaría un atacante' (attackerPerspective) y luego el plan de blindaje (hardeningSteps). Cierra con un resumen ejecutivo y el score general.",
           };
+          break;
+        }
+
+        case "ai_catalog_stats": {
+          try {
+            const { getCatalogStats } = await import("../lib/ai-model-intelligence.js");
+            const stats = await getCatalogStats();
+            const byCategory = (stats.by_category as Array<{ category: string; cnt: string }>).map(r => `  • ${r.category}: ${r.cnt}`).join("\n");
+            const byProvider = (stats.by_provider as Array<{ provider: string; cnt: string }>).map(r => `  • ${r.provider}: ${r.cnt}`).join("\n");
+            result = { ...stats, message: `🤖 **Catálogo de Modelos IA**\n\n**Total activos:** ${stats.total}\n**Updates hoy:** ${stats.recent_updates}\n\n**Por categoría:**\n${byCategory}\n\n**Por proveedor:**\n${byProvider}` };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "ai_catalog_research": {
+          try {
+            const { runAiModelResearch } = await import("../lib/ai-model-intelligence.js");
+            runAiModelResearch()
+              .then(s => logger.info({ summary: s }, "AI Model Research completado"))
+              .catch(e => logger.error({ err: e }, "AI Model Research error"));
+            result = { success: true, message: "🔬 **Investigación de modelos IA iniciada** en segundo plano.\n\nEl sistema está consultando:\n• Replicate (kwaivgi, black-forest-labs, minimax, stability-ai...)\n• OpenAI, Gemini, ElevenLabs, xAI, Freepik\n• Gemini Search para anuncios de nuevos modelos\n\nConsulta el estado con `ai_catalog_stats` en ~2 minutos." };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "ai_model_route": {
+          const taskType = params?.task ?? params?.taskType;
+          const budget   = params?.budget ?? "balanced";
+          if (!taskType) { result = { error: true, message: "❌ Falta task (ej: product_photography, video_generation, text_to_speech)" }; break; }
+          try {
+            const { getBestModelForTask } = await import("../lib/ai-model-intelligence.js");
+            const recs = await getBestModelForTask(String(taskType), budget as "economy" | "balanced" | "quality");
+            if (!recs.length) { result = { error: true, message: `❌ No hay reglas de routing para task: ${taskType}` }; break; }
+            const lines = recs.map((r, i) => `${i === 0 ? "⭐" : "  "} **${r.display_name}** (${r.provider}) — ${r.cost_tier}${r.fallback ? ` · fallback: ${r.fallback}` : ""}`).join("\n");
+            result = { recommendations: recs, message: `🎯 **Mejor modelo para "${taskType}" · ${budget}:**\n\n${lines}\n\n_Usa el primero (⭐) para el resultado óptimo._` };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
+        case "ai_catalog_list": {
+          const category = params?.category;
+          const budget   = params?.budget;
+          const search   = params?.search ?? params?.query;
+          try {
+            const { getCatalogModels } = await import("../lib/ai-model-intelligence.js");
+            const models = await getCatalogModels({ category: category as string | undefined, budget: budget as "economy" | "balanced" | "quality" | undefined, search: search as string | undefined, limit: 30 });
+            const lines = models.map(m => `• **${m.display_name}** (${m.provider}) — Q:${m.quality_score} S:${m.speed_score} E:${m.economy_score} · $${Number(m.cost_per_unit).toFixed(4)}/${m.cost_unit}`).join("\n");
+            result = { models, total: models.length, message: `📋 **${models.length} modelos${category ? " · " + category : ""}${budget ? " · " + budget : ""}:**\n\n${lines || "(sin resultados)"}` };
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
           break;
         }
 
