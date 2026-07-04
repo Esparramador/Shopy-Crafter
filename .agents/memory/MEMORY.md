@@ -1,3 +1,4 @@
+- [Grok Aurora I2V pipeline](grok-i2v-pipeline.md) — I2V only (no T2V); aurora image not available; "done" = success; 22 min timeout; node -e has no XAI_API_KEY; recovery via disk check + stored request_id.
 - [Missing :root CSS vars (white screen)](missing-root-css-vars.md) — design-system.css :root block MUST have dark-mode vars (--ink,--t,--gold,etc.) + Tailwind HSL tokens; if empty, body shows white.
 - [Streaming AI helpers need own fallback](landing-chatbot-stream-fallback.md) — a working non-streaming fallback does NOT protect the sibling `*Stream` SSE path; each entry point must independently check circuit breaker + fall back.
 - [Duplicate legacy workflows race on same dist/](duplicate-workflow-race.md) — old top-level `API Server`/`web` workflows duplicate artifact-managed ones on the same package; running both races the build and crashes one with MODULE_NOT_FOUND.

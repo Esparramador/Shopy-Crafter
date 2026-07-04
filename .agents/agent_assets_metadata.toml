@@ -653,3 +653,9 @@ id = "uIRKgVRCMwv0MRakqFsUJ"
 uri = "file://exports/skills_completo_shopy_crafter.xlsx"
 type = "table"
 title = "Inventario Completo: 3 Catálogos de Skills (Ciberseguridad + Prompts + Agente)"
+
+[[outputs]]
+id = "1Dv3ywz_j6lSnQBS5ixBK"
+uri = "file://.local/video-output/rolex-datejust-twotone-explode-35s.mp4"
+type = "video"
+title = "Rolex Datejust Two-Tone — Explode View 35s (Grok Aurora)"
