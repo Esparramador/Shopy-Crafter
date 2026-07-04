@@ -939,6 +939,7 @@ export type VideoModel =
   | "wan-2.7"                // Wan 2.7 — última gen open-source, T2V+I2V+R2V, hasta 1080p y 15s
   | "kling-3.0-omni"         // Kling V3.0 Omni — multimodal: texto+imagen+refs+audio, máxima calidad
   | "hailuo-2.3"             // MiniMax Hailuo 2.3 — último Hailuo, 1080p T2V+I2V
+  | "hailuo-2.3-fast"        // MiniMax Hailuo 2.3 Fast — variante rápida, I2V 1080p
   | "grok-video-1"           // xAI Grok Video 1 — June 2026 flagship video, T2V/I2V
   | "grok-imagine-video"     // xAI Grok Imagine Video — T2V/I2V, hasta 15s, 720p ($0.07/s)
   | "grok-imagine-video-1.5" // xAI Grok Imagine Video 1.5 Preview — mayor calidad ($0.14/s 720p)
@@ -952,7 +953,11 @@ export type VideoModel =
   | "kling-v2.1-pro"        // Kling v2.1 Pro — T2V+I2V 1080p, mayor calidad, 5/10s
   | "kling-v2.5-turbo-pro"  // Kling v2.5 Turbo Pro — rápido, T2V+I2V, 1080p
   | "runway-aleph2"         // Runway Aleph 2.0 — Video-to-Video contextual editing
-  | "runway-happyhorse";    // Runway HappyHorse 1.0 — T2V/I2V nueva gen (jun 2026)
+  | "runway-happyhorse"     // Runway HappyHorse 1.0 — T2V/I2V nueva gen (jun 2026)
+  | "kling-v2.6"            // Kling v2.6 — T2V+I2V, audio+lip-sync nativos, 1080p
+  | "kling-v2.1-master"     // Kling v2.1 Master — T2V+I2V premium, 1080p, 5/10s
+  | "wan-2.7-videoedit"     // Wan 2.7 VideoEdit — edición con instrucciones naturales
+  | "seedance-2.0";         // Seedance 2.0 — T2V+I2V, audio nativo, 4-15s, 720p
 
 export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini" | "xai"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
   "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
@@ -995,6 +1000,7 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "wan-2.6":             { provider: "replicate", modelId: "wan-video/wan-2.7-i2v",           description: "Wan 2.7 — última gen open-source, T2V+I2V+R2V, hasta 1080p y 15s (wan-2.6 redirigido)", costPerSec: 0.05, quality: 8,  maxDuration: 15 },
   "wan-2.7":             { provider: "replicate", modelId: "wan-video/wan-2.7-i2v",           description: "Wan 2.7 — última gen open-source wan-video, T2V+I2V+R2V, hasta 1080p y 15s",  costPerSec: 0.05,  quality: 8,  maxDuration: 15 },
   "hailuo-2.3":          { provider: "replicate", modelId: "minimax/hailuo-2.3",              description: "MiniMax Hailuo 2.3 — última gen Hailuo, 1080p, T2V+I2V, mejora sobre hailuo-02", costPerSec: 0.06, quality: 8, maxDuration: 10 },
+  "hailuo-2.3-fast":     { provider: "replicate", modelId: "minimax/hailuo-2.3-fast",         description: "MiniMax Hailuo 2.3 Fast — variante rápida, I2V 1080p, latencia reducida",    costPerSec: 0.04, quality: 7, maxDuration: 10 },
   "grok-video-1":        { provider: "xai", modelId: "grok-video-1",           description: "xAI Grok Video 1 — June 2026 flagship video, T2V/I2V, cinematic quality", costPerSec: 0.15, quality: 10, maxDuration: 15 },
   "grok-imagine-video":    { provider: "xai", modelId: "grok-imagine-video",           description: "xAI Grok Imagine Video — T2V/I2V, hasta 15s, 720p ($0.07/s)", costPerSec: 0.07, quality: 9,  maxDuration: 15 },
   "grok-imagine-video-1.5":{ provider: "xai", modelId: "grok-imagine-video-1.5",         description: "xAI Grok Imagine Video 1.5 — I2V 1080p, máxima calidad xAI ($0.14/s)", costPerSec: 0.14, quality: 10, maxDuration: 15 },
@@ -1007,6 +1013,10 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "kling-v2.5-turbo-pro":  { provider: "replicate", modelId: "kwaivgi/kling-v2.5-turbo-pro",    description: "Kling v2.5 Turbo Pro — rápido, T2V+I2V, 1080p",                           costPerSec: 0.14, quality: 9,  maxDuration: 10 },
   "runway-aleph2":         { provider: "runway",                                                  description: "Runway Aleph 2.0 — Video-to-Video contextual editing (jun 2026)",          costPerSec: 0.09, quality: 9,  maxDuration: 15 },
   "runway-happyhorse":     { provider: "runway",                                                  description: "Runway HappyHorse 1.0 — T2V/I2V nueva gen (jun 2026)",                    costPerSec: 0.06, quality: 8,  maxDuration: 10 },
+  "kling-v2.6":            { provider: "replicate", modelId: "kwaivgi/kling-v2.6",              description: "Kling v2.6 — audio+lip-sync nativos (voz+SFX+BGM), T2V+I2V, 1080p",     costPerSec: 0.16, quality: 9,  maxDuration: 10 },
+  "kling-v2.1-master":     { provider: "replicate", modelId: "kwaivgi/kling-v2.1-master",       description: "Kling v2.1 Master — dynamics premium, T2V+I2V, 1080p, 5/10s",             costPerSec: 0.20, quality: 10, maxDuration: 10 },
+  "wan-2.7-videoedit":     { provider: "replicate", modelId: "wan-video/wan-2.7-videoedit",      description: "Wan 2.7 VideoEdit — edición V2V con instrucciones en lenguaje natural",   costPerSec: 0.07, quality: 9,  maxDuration: 15 },
+  "seedance-2.0":          { provider: "replicate", modelId: "bytedance/seedance-2.0",           description: "Seedance 2.0 — T2V+I2V, audio nativo, 4-15s, 720p, aspect adaptivo",     costPerSec: 0.06, quality: 9,  maxDuration: 15 },
 };
 
 // Modelos que soportan TEXT-TO-VIDEO puro (sin imagen origen).
@@ -1044,7 +1054,8 @@ const T2V_SUPPORTED: Record<string, boolean> = {
   "wan-2.6":                true,   // wan-2.7 soporta T2V
   "wan-2.7":                true,   // wan-2.7 soporta T2V+I2V+R2V
   "kling-3.0-omni":         true,   // Kling Omni soporta T2V+I2V multimodal
-  "hailuo-2.3":             true,   // Hailuo 2.3 soporta T2V+I2V
+  "hailuo-2.3":             true,
+  "hailuo-2.3-fast":        false,  // Hailuo 2.3 Fast — I2V only
   "grok-video-1":           true,
   "grok-imagine-video":     true,
   "grok-imagine-video-1.5": true,
@@ -1057,6 +1068,10 @@ const T2V_SUPPORTED: Record<string, boolean> = {
   "kling-v2.5-turbo-pro":   true,
   "runway-aleph2":          false,
   "runway-happyhorse":      true,
+  "kling-v2.6":             true,
+  "kling-v2.1-master":      true,
+  "wan-2.7-videoedit":      false,
+  "seedance-2.0":           true,
 };
 
 export function modelSupportsTextToVideo(model: VideoModel): boolean {
@@ -1243,11 +1258,11 @@ export async function generateVideoFromImage(
     };
     const ratio = ratioMap[opts.aspect || "9:16"] || (isGen3 ? "768:1280" : "720:1280");
     const runwayModel = isGen3 ? "gen3a_turbo"
-      : model === "runway-gen4.5" ? "gen4.5"
-      : model === "runway-gen4.5-turbo" ? "gen4.5-turbo"
+      : model === "runway-gen4.5" ? "gen4_5"
+      : model === "runway-gen4.5-turbo" ? "gen4_5_turbo"
       : model === "runway-seedance2" ? "seedance2"
       : model === "runway-seedance2-fast" ? "seedance2_fast"
-      : model === "runway-gen5" ? "gen4.5"
+      : model === "runway-gen5" ? "gen4_5"
       : model === "runway-aleph2" ? "aleph2"
       : model === "runway-happyhorse" ? "happyhorse_1_0"
       : "gen4_turbo";
@@ -2766,7 +2781,7 @@ export async function generateVideoFromVideo(
     const runwayBuf = await runwayGenerateVideo({
       promptImage: bufferToDataUri(frames[0], "image/jpeg"),
       promptText: prompt,
-      model: model.includes("4.5") ? "gen4.5" : "gen4_turbo",
+      model: model.includes("4.5") ? "gen4_5" : "gen4_turbo",
     });
     
     const finalBuf = await fetchToBuffer(runwayBuf.videoUrl);
@@ -2782,10 +2797,10 @@ export async function generateVideoFromVideo(
 export async function extendVideoWithRunway(
   videoUrl: string,
   duration: number,
-  model?: "gen4.5" | "gen4_turbo"
+  model?: "gen4_5" | "gen4_turbo"
 ): Promise<Buffer> {
   const apiKey = getRunwayKey();
-  const runwayModel = model || "gen4.5";
+  const runwayModel = model || "gen4_5";
   
   const res = await fetch("https://api.dev.runwayml.com/v1/video_extensions", {
     method: "POST",

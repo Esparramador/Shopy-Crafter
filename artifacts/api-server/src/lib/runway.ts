@@ -9,8 +9,8 @@ const MAX_PROMPT_LENGTH = 1000;
 export type RunwayModel =
   | "gen3a_turbo"
   | "gen4_turbo"
-  | "gen4.5"           // Jun-2026: nueva generación, mejor motion y detalle
-  | "gen4.5-turbo"     // Jun-2026: versión rápida de 4.5
+  | "gen4_5"           // Jun-2026: nueva generación, mejor motion y detalle (API ID oficial)
+  | "gen4_5_turbo"     // Jun-2026: versión rápida de 4.5
   | "seedance2"        // Seedance 2 vía Runway, calidad cinematográfica
   | "seedance2_fast"   // Seedance 2 Fast vía Runway, rápido
   | "gen4_aleph"       // Runway Gen-4 Aleph — Video-to-Video contextual editing
@@ -61,8 +61,8 @@ export interface RunwayVideoResult {
 const COST_PER_SECOND: Record<RunwayModel, number> = {
   gen3a_turbo:     0.03,
   gen4_turbo:      0.05,
-  "gen4.5":        0.07,
-  "gen4.5-turbo":  0.05,
+  "gen4_5":        0.07,
+  "gen4_5_turbo":  0.05,
   seedance2:       0.10,
   seedance2_fast:  0.06,
   gen4_aleph:      0.08,
@@ -73,8 +73,8 @@ const COST_PER_SECOND: Record<RunwayModel, number> = {
 const MODEL_SPECS: Record<RunwayModel, { maxDuration: number, maxResolution: string, supportsAudio: boolean }> = {
   "gen3a_turbo":    { maxDuration: 10, maxResolution: "1280x768",   supportsAudio: false },
   "gen4_turbo":     { maxDuration: 10, maxResolution: "1920x1080",  supportsAudio: true  },
-  "gen4.5":         { maxDuration: 15, maxResolution: "3840x2160",  supportsAudio: true  },
-  "gen4.5-turbo":   { maxDuration: 10, maxResolution: "1920x1080",  supportsAudio: true  },
+  "gen4_5":         { maxDuration: 15, maxResolution: "3840x2160",  supportsAudio: true  },
+  "gen4_5_turbo":   { maxDuration: 10, maxResolution: "1920x1080",  supportsAudio: true  },
   "seedance2":      { maxDuration: 10, maxResolution: "2048x2048",  supportsAudio: false },
   "seedance2_fast": { maxDuration: 10, maxResolution: "1024x1024",  supportsAudio: false },
   "gen4_aleph":     { maxDuration: 10, maxResolution: "1920x1080",  supportsAudio: false },
@@ -299,7 +299,7 @@ export async function generateVideoFromImage(
     throw new Error(`promptText excede ${MAX_PROMPT_LENGTH} caracteres`);
   }
 
-  const model: RunwayModel = req.model ?? "gen4.5-turbo";
+  const model: RunwayModel = req.model ?? "gen4_5_turbo";
   const duration: RunwayDuration = req.duration ?? 5;
   const ratio: RunwayRatio = req.ratio ?? "1920:1080";
 

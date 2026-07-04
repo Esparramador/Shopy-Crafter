@@ -299,7 +299,9 @@ const FREEPIK_ENGINE_ENDPOINT: Record<string, string> = {
   "kling-pro":       "/ai/video/kling-v3-pro",
   "kling-v3-std":    "/ai/video/kling-v3-std",
   "kling-v3-pro":    "/ai/video/kling-v3-pro",
-  "kling-v3-omni":   "/ai/video/kling-v3-omni",
+  "kling-v3-omni":     "/ai/video/kling-v3-omni-std",
+  "kling-v3-omni-pro": "/ai/video/kling-v3-omni-pro",
+  "kling-v3-omni-std": "/ai/video/kling-v3-omni-std",
   "hailuo-02":       "/ai/video/hailuo-video-02",
   "hailuo":          "/ai/video/hailuo-video-02",
 };

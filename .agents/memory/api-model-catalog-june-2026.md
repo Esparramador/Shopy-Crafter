@@ -1,76 +1,58 @@
 ---
-name: API Model Catalog June 2026
-description: All AI model identifiers verified live as of June 15, 2026 — Claude, Gemini, ElevenLabs, Runway, Replicate, Stability AI
+name: API Model Catalog Jul 2026
+description: Verified live model IDs for all AI providers — deep 20-search parallel research Jul 4 2026
 ---
 
-## Anthropic Claude (verified live)
-- Fast tier: `claude-haiku-4-5`
-- Smart tier default: `claude-sonnet-4-6` — set in `claude.ts` CLAUDE_MODEL, `config.ts` claude.model, `ai-models.ts` HARD_DEFAULTS
-- Genius/heavy tier: `claude-opus-4-8`
-- Fable (narrative): `claude-fable-5`
-- API version stays `anthropic-version: 2023-06-01` — unchanged
-- SDK `@anthropic-ai/sdk ^0.81.0` — newer versions blocked by pnpm minimumReleaseAge at time of update
+## Runway (api.dev.runwayml.com/v1, header 2024-11-06)
+- Gen4.5 API model ID: `gen4_5` (underscore) — NOT `gen4.5` (dot was wrong, causes 400)
+- Gen4.5-Turbo: `gen4_5_turbo`
+- Aleph 2.0: `aleph2` — V2V only (video-to-video edit), NOT T2V/I2V
+- HappyHorse 1.0: `happyhorse_1_0` — T2V+I2V
+- Gen4 Turbo: `gen4_turbo`; Gen3: `gen3a_turbo`
 
-## ElevenLabs TTS
-- New flagship: `eleven_v3` — 74 languages, most expressive. Default across ALL services.
-- Legacy allowed: `eleven_multilingual_v2`, `eleven_turbo_v2_5`, `eleven_flash_v2_5`
-- Updated in: `elevenlabs.ts`, `voice.ts` ALLOWED_TTS_MODELS, `fusion-studio-pro.ts`, `avatar-studio.ts`, `cinematic-multishot.ts`, `adstudio.ts`
+## Kling (Replicate, kwaivgi namespace)
+- `kwaivgi/kling-video-3.0` — T2V+I2V, 1080p, 15s
+- `kwaivgi/kling-video-3.0-omni` — multimodal (text+img+refs+audio)
+- `kwaivgi/kling-v2.1` / `kling-v2.1-pro` / `kling-v2.1-master`
+- `kwaivgi/kling-v2.5-turbo-pro`
+- `kwaivgi/kling-v2.6` — T2V+I2V, native audio+lip-sync (speech+SFX+BGM), NEW
 
-## Runway (verified live)
-- Gen4.5 now used as DEFAULT in `campaign-planner.ts` and `video-tryon.ts` (was gen4-turbo)
-- `runway-gen4-turbo` kept as valid VideoModel for backward compat but no longer recommended default
-- `FSP_MODEL_MAP` keys: `runway_gen45`, `runway_seedance2`, `runway_seedance2_fast`
-- Endpoint: `api.dev.runwayml.com/v1` (see runway-api-config.md)
+## Veo / Gemini
+- `veo-3.1-generate-preview` / `veo-3.1-fast-generate-preview` / `veo-3.1-lite-generate-preview`
+- Veo 3.0 SHUT DOWN Jun 30 2026; Veo 4 NOT released (Jul 2026)
+- Accepted aspect ratios: `16:9` and `9:16` ONLY
+- Supports: I2V, first+last frame, reference images
 
-## Replicate Image Models (all HTTP 200 confirmed or pattern-verified)
-- `recraft-ai/recraft-v4`, `black-forest-labs/flux-kontext-max`, `flux-kontext-dev`, `ideogram-ai/ideogram-v3-quality`
-- `google/imagen-5-ultra`, `google/imagen-5` — Imagen 5 family (pattern: same as imagen-4)
-- `stability-ai/stable-diffusion-3.5-large` — cfg=4.5, steps=28 input shape
-- `stability-ai/stable-diffusion-3.5-large-turbo` — cfg=1.0, steps=4 input shape
+## Wan (Replicate, wan-video namespace)
+- `wan-video/wan-2.7-t2v` / `wan-2.7-i2v` / `wan-2.7-r2v`
+- `wan-video/wan-2.7-videoedit` — V2V instruction-based editing (NEW)
 
-## Replicate Video Models (all confirmed June 16, 2026)
-- `kwaivgi/kling-v3-video` — Kling 3.0 standard (T2V+I2V, 15s, 1080p, audio nativo)
-- `kwaivgi/kling-v3-omni-video` — Kling 3.0 Omni (multimodal: text+image+refs+audio, style transfer)
-- `kwaivgi/kling-v3-motion-control` — Kling 3.0 motion control
-- ⚠️ `kwaivgi/kling-v3.0-master` and `kwaivgi/kling-v3.0-turbo` DO NOT EXIST — use kling-v3-omni-video / kling-v3-video
-- `wan-video/wan-2.7-t2v`, `wan-video/wan-2.7-i2v` — Wan 2.7 latest (T2V+I2V+R2V, 1080p, 15s)
-- ⚠️ `wan-video/wan-2.6-i2v` DOES NOT EXIST — no wan-2.6 namespace on Replicate; use wan-2.7
-- `bytedance/seedance-1-pro` — Seedance 1 Pro (cinema, multi-ref)
-- `bytedance/seedance-1-pro-fast` — Seedance 1 Pro Fast
-- `bytedance/seedance-1-lite` — Seedance 1 Lite (economy)
-- `minimax/hailuo-02`, `minimax/hailuo-02-fast` — Hailuo 02
-- `minimax/hailuo-2.3`, `minimax/hailuo-2.3-fast` — Hailuo 2.3 latest (1080p)
-- `minimax/video-01` — MiniMax base model (legacy)
+## Seedance (Replicate, bytedance namespace)
+- `bytedance/seedance-1-pro` / `seedance-1-lite`
+- `bytedance/seedance-2.0` — T2V+I2V, native audio, 4-15s, aspect: 16:9/9:16/4:3/3:4/1:1/21:9/adaptive (NEW)
 
-## Runway Models (native API)
-- ⚠️ Gen 5 NOT RELEASED as of June 16, 2026 — do NOT use "gen5" string
-- Video model strings for /image_to_video: `gen4.5` (gen4.5 since Feb 10 2026), `seedance2` (Seedance 2.0, May 28 2026), `seedance2_fast`, `gen4_turbo`, `gen3a_turbo`
-- Image gen: gen4_image ($0.08/img), gen4_image_turbo ($0.02/img) via /v1/image_generation
-- Seedance 2.0 on Runway: available Unlimited/Enterprise plans outside US only
+## MiniMax Hailuo (Replicate)
+- `minimax/hailuo-2.3` — T2V+I2V 1080p ACTIVE (recommended)
+- `minimax/hailuo-2.3-fast` — I2V 1080p, low latency (NEW)
+- `minimax/hailuo-02` / `hailuo-02-fast` — legacy (still accessible)
 
-## Google Gemini Video (Veo)
-- Veo 4 family: `veo-4.0-generate-preview`, `veo-4.0-fast-generate-preview` — 16:9+9:16, fixed 8s, native audio ($1.00/s and $0.55/s)
+## xAI Grok Video
+- `grok-imagine-video` — T2V+I2V+Reference+Edit+Extend, 720p
+- `grok-imagine-video-1.5` — T2V+I2V, 1080p (no Reference mode)
+- NO `-preview` suffix; endpoint: POST /v1/videos/generations
 
-## xAI Grok Models (verified June 16, 2026)
-- Text flagship: `grok-4.3` — all older aliases (grok-3, grok-4-0709, grok-4-fast-*) redirect here since May 15 2026
-- Image gen: `grok-2-image` or `grok-2-image-1212` (both valid; same Aurora-2 engine)
-- Video: `grok-imagine-video` (production model; T2V+I2V via POST /v1/videos/generations)
-- Video preview: `grok-imagine-video-1.5-preview` (higher quality; use with -preview suffix)
-- Polling: GET /v1/videos/{request_id} (field: request_id in create response)
+## Tripo3D
+- Full version strings required: `v3.1-20260211`, `P1-20260311`, `v2.5-20250123`
+- Default updated to `v3.1-20260211` (was shorthand `v2.5`)
 
-## Google Gemini (verified live via SDK models.list)
-- Fast tier: `gemini-3.5-flash` (new — confirmed in live models list)
-- Smart/genius/vision tier: `gemini-3.1-pro-preview` (confirmed live)
-- Nano-Banana v1: `gemini-3.1-flash-image` (updated from gemini-2.5-flash-image — also in images.ts, product-ads.ts, fusion-studio.ts tryon routes)
-- Nano-Banana v2: `gemini-3-pro-image` (stable, upgraded from -preview)
-- Also available: `gemini-3-pro-preview`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite`
-- SDK `@google/genai ^1.46.0`
-- config.ts: `GEMINI_MODEL=gemini-3.5-flash`, `GEMINI_PRO_MODEL=gemini-3.1-pro-preview`
+## Freepik Video Endpoints (POST + GET /{path}/{taskId})
+- /v1/ai/video/kling-v3-std, /v1/ai/video/kling-v3-pro
+- /v1/ai/video/kling-v3-omni-std, /v1/ai/video/kling-v3-omni-pro
+- /v1/ai/video/hailuo-video-02
 
-## Tripo 3D
-- No `TRIPO_API_KEY` or `TRIPO3D_API_KEY` found in env as of June 2026
-- Not integrated — needs API key to add
+## Meshy AI
+- `meshy-6` active; `meshy-5` active; `latest` → meshy-6; meshy-4 RETIRED
 
-**Why:** Verified before implementing — live API calls (especially `ai.models.list()`) confirmed all model IDs before use. No mocks.
+**Why:** `gen4_5` bug caused 400 errors on every Runway Gen4.5 request. Freepik omni split into -pro/-std variants. 5 new models discovered (kling-v2.6, kling-v2.1-master, wan-2.7-videoedit, seedance-2.0, hailuo-2.3-fast).
 
-**How to apply:** When adding new AI models, always call `ai.models.list()` via SDK before updating code. Check pnpm minimumReleaseAge before bumping SDK major versions.
+**How to apply:** Runway model IDs always use underscores. Replicate models: always verify exact namespace/slug. Tripo3D: always use full date-suffixed version string.

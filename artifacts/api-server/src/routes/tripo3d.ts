@@ -257,7 +257,7 @@ router.post("/api/tripo3d/text-to-model", async (req: Request, res: Response) =>
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
-  const { prompt, model_version = "v2.5", texture = true, pbr = true, face_limit, negative_prompt } = req.body ?? {};
+  const { prompt, model_version = "v3.1-20260211", texture = true, pbr = true, face_limit, negative_prompt } = req.body ?? {};
   if (!prompt) { res.status(400).json({ error: "prompt requerido" }); return; }
   try {
     const taskId = await tripoCreateTask({
@@ -311,7 +311,7 @@ router.post("/api/tripo3d/image-to-model", upload.single("image"), async (req: R
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
   if (!req.file) { res.status(400).json({ error: "image requerida" }); return; }
-  const { model_version = "v2.5", texture = true, pbr = true, face_limit } = req.body ?? {};
+  const { model_version = "v3.1-20260211", texture = true, pbr = true, face_limit } = req.body ?? {};
   try {
     const imageToken = await tripoUploadFile(req.file.buffer, req.file.mimetype, req.file.originalname);
     const taskId = await tripoCreateTask({
