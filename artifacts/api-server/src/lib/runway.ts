@@ -9,10 +9,13 @@ const MAX_PROMPT_LENGTH = 1000;
 export type RunwayModel =
   | "gen3a_turbo"
   | "gen4_turbo"
-  | "gen4.5"          // Jun-2026: nueva generación, mejor motion y detalle
-  | "gen4.5-turbo"    // Jun-2026: versión rápida de 4.5
-  | "seedance2"       // Seedance 2 vía Runway, calidad cinematográfica
-  | "seedance2_fast"; // Seedance 2 Fast vía Runway, rápido
+  | "gen4.5"           // Jun-2026: nueva generación, mejor motion y detalle
+  | "gen4.5-turbo"     // Jun-2026: versión rápida de 4.5
+  | "seedance2"        // Seedance 2 vía Runway, calidad cinematográfica
+  | "seedance2_fast"   // Seedance 2 Fast vía Runway, rápido
+  | "gen4_aleph"       // Runway Gen-4 Aleph — Video-to-Video contextual editing
+  | "aleph2"           // Runway Aleph 2.0 — V2V mejorado (jun 2026)
+  | "happyhorse_1_0";  // Runway HappyHorse 1.0 — T2V/I2V nueva gen (jun 2026)
 
 export type RunwayRatio =
   | "1280:768"
@@ -56,21 +59,27 @@ export interface RunwayVideoResult {
 }
 
 const COST_PER_SECOND: Record<RunwayModel, number> = {
-  gen3a_turbo:  0.03,      // Precio reducido por legacy
-  gen4_turbo:   0.05,
-  "gen4.5":     0.07,      // Premium 4.5
-  "gen4.5-turbo": 0.05,    // Fast 4.5
-  seedance2:    0.10,
-  seedance2_fast: 0.06,
+  gen3a_turbo:     0.03,
+  gen4_turbo:      0.05,
+  "gen4.5":        0.07,
+  "gen4.5-turbo":  0.05,
+  seedance2:       0.10,
+  seedance2_fast:  0.06,
+  gen4_aleph:      0.08,
+  aleph2:          0.09,
+  happyhorse_1_0:  0.06,
 };
 
 const MODEL_SPECS: Record<RunwayModel, { maxDuration: number, maxResolution: string, supportsAudio: boolean }> = {
-  "gen3a_turbo": { maxDuration: 10, maxResolution: "1280x768", supportsAudio: false },
-  "gen4_turbo":  { maxDuration: 10, maxResolution: "1920x1080", supportsAudio: true },
-  "gen4.5":      { maxDuration: 15, maxResolution: "3840x2160", supportsAudio: true },
-  "gen4.5-turbo": { maxDuration: 10, maxResolution: "1920x1080", supportsAudio: true },
-  "seedance2":   { maxDuration: 10, maxResolution: "2048x2048", supportsAudio: false },
-  "seedance2_fast": { maxDuration: 10, maxResolution: "1024x1024", supportsAudio: false },
+  "gen3a_turbo":    { maxDuration: 10, maxResolution: "1280x768",   supportsAudio: false },
+  "gen4_turbo":     { maxDuration: 10, maxResolution: "1920x1080",  supportsAudio: true  },
+  "gen4.5":         { maxDuration: 15, maxResolution: "3840x2160",  supportsAudio: true  },
+  "gen4.5-turbo":   { maxDuration: 10, maxResolution: "1920x1080",  supportsAudio: true  },
+  "seedance2":      { maxDuration: 10, maxResolution: "2048x2048",  supportsAudio: false },
+  "seedance2_fast": { maxDuration: 10, maxResolution: "1024x1024",  supportsAudio: false },
+  "gen4_aleph":     { maxDuration: 10, maxResolution: "1920x1080",  supportsAudio: false },
+  "aleph2":         { maxDuration: 15, maxResolution: "1920x1080",  supportsAudio: true  },
+  "happyhorse_1_0": { maxDuration: 10, maxResolution: "1920x1080",  supportsAudio: true  },
 };
 
 function getApiKey(): string {

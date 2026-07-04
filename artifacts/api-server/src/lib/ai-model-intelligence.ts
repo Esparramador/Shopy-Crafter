@@ -191,7 +191,7 @@ async function seedInitialCatalog(): Promise<void> {
         ${m.model_key}, ${m.provider}, ${m.provider_model_id ?? null}, ${m.category}, ${m.subcategory ?? null},
         ${m.display_name}, ${m.description ?? null}, ${m.cost_per_unit ?? 0}, ${m.cost_unit ?? "per_request"},
         ${m.quality_score ?? 5}, ${m.speed_score ?? 5}, ${m.economy_score ?? 5},
-        ${m.best_for ?? []}, ${JSON.stringify(m.capabilities ?? [])}, ${m.aspect_ratios ?? []}, ${m.max_resolution ?? null},
+        ${`{${(m.best_for ?? []).join(",")}}`}, ${JSON.stringify(m.capabilities ?? [])}, ${`{${(m.aspect_ratios ?? []).join(",")}}`}, ${m.max_resolution ?? null},
         false
       )
       ON CONFLICT (model_key) DO NOTHING

@@ -291,8 +291,27 @@ export async function freepikVirtualModel(opts: {
 
 // ─── GENERACIÓN DE VÍDEO (Freepik agrega Kling, Hailuo, etc.) ────────────────
 
+// Engine name → model-specific Freepik endpoint path (POST + poll GET /<path>/<taskId>)
+// Source: docs.freepik.com/api-reference/video — verified July 2026
+const FREEPIK_ENGINE_ENDPOINT: Record<string, string> = {
+  "kling-2":         "/ai/video/kling-v3-std",
+  "kling-1.5":       "/ai/video/kling-v3-std",
+  "kling-pro":       "/ai/video/kling-v3-pro",
+  "kling-v3-std":    "/ai/video/kling-v3-std",
+  "kling-v3-pro":    "/ai/video/kling-v3-pro",
+  "kling-v3-omni":   "/ai/video/kling-v3-omni",
+  "hailuo-02":       "/ai/video/hailuo-video-02",
+  "hailuo":          "/ai/video/hailuo-video-02",
+};
+
+// Track taskId → endpoint path for correct polling (model-specific poll URL)
+const _freepikTaskPollPath = new Map<string, string>();
+
 export async function generateFreepikVideoTask(opts: FreepikVideoOptions): Promise<string> {
   const key = getKey();
+
+  const specificPath = opts.engine ? FREEPIK_ENGINE_ENDPOINT[opts.engine] : undefined;
+  const apiPath = specificPath ?? (opts.image_url ? "/ai/image-to-video" : "/ai/text-to-video");
 
   const body: Record<string, unknown> = {
     prompt: opts.prompt,
@@ -302,11 +321,9 @@ export async function generateFreepikVideoTask(opts: FreepikVideoOptions): Promi
   if (opts.negative_prompt) body.negative_prompt = opts.negative_prompt;
   if (opts.image_url)       body.image_url  = opts.image_url;
   if (opts.image_tail_url)  body.image_tail_url = opts.image_tail_url;
-  if (opts.engine)          body.engine     = opts.engine;
+  if (opts.engine && !specificPath) body.engine = opts.engine;
 
-  const endpoint = opts.image_url ? `${BASE}/ai/image-to-video` : `${BASE}/ai/text-to-video`;
-
-  const res = await fetch(endpoint, {
+  const res = await fetch(`${BASE}${apiPath}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-freepik-api-key": key },
     body: JSON.stringify(body),
@@ -316,23 +333,30 @@ export async function generateFreepikVideoTask(opts: FreepikVideoOptions): Promi
 
   const data = await res.json() as { data: { task_id?: string; video_url?: string } };
   if (data.data.video_url) return data.data.video_url;
-  if (data.data.task_id)   return data.data.task_id;
+  if (data.data.task_id) {
+    _freepikTaskPollPath.set(data.data.task_id, apiPath);
+    return data.data.task_id;
+  }
   throw new Error("Freepik Video: respuesta inesperada");
 }
 
 export async function pollFreepikVideoTask(taskId: string, timeoutMs = 10 * 60_000): Promise<string> {
   const key = getKey();
   const start = Date.now();
+  const pollPath = _freepikTaskPollPath.get(taskId) ?? "/ai/video/kling-v3-std";
 
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, 5000));
     try {
-      const res = await fetch(`${BASE}/ai/video-tasks/${taskId}`, {
+      const res = await fetch(`${BASE}${pollPath}/${taskId}`, {
         headers: { "x-freepik-api-key": key },
       });
       if (!res.ok) continue;
       const data = await res.json() as FreepikVideoTask;
-      if (data.status === "completed" && data.video_url) return data.video_url;
+      if (data.status === "completed" && data.video_url) {
+        _freepikTaskPollPath.delete(taskId);
+        return data.video_url;
+      }
       if (data.status === "failed") throw new Error(`Freepik video task falló (${taskId}): ${data.error ?? "sin detalles"}`);
     } catch (err: unknown) {
       if (String((err as Error).message).includes("falló")) throw err;
