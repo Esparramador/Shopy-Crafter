@@ -107,6 +107,7 @@ const DEFAULT_ADMIN_NAV = [
   { label: "Plan 30-60-90", icon: "🗺", href: "/admin/roadmap" },
   { label: "APK Android", icon: "📱", href: "/admin/apk" },
   { label: "Tienda / Store", icon: "🛒", href: "/tienda" },
+  { label: "Catálogo IA AMIS", icon: "🧠", href: "/admin/ai-catalog" },
   { label: "Costes IA por sesión", icon: "💸", href: "/admin/api-usage" },
   { label: "System Health", icon: "🖥", href: "/admin/system" },
   { label: "Conexiones / Integraciones", icon: "🔗", href: "/help/connections" },

@@ -113,6 +113,7 @@ const TiendaAdmin = lazy(() => import("@/pages/admin/TiendaAdmin"));
 const StripeManager = lazy(() => import("@/pages/admin/StripeManager"));
 const StripeMasterHub = lazy(() => import("@/pages/admin/StripeMasterHub"));
 const ApiUsage = lazy(() => import("@/pages/admin/ApiUsage"));
+const AICatalog = lazy(() => import("@/pages/admin/AICatalog"));
 const ApiKeysManager = lazy(() => import("@/pages/admin/ApiKeysManager"));
 const AgencyBilling = lazy(() => import("@/pages/admin/AgencyBilling"));
 
@@ -429,6 +430,9 @@ function Router() {
         </Route>
         <Route path="/admin/system">
           <RequireAdmin><AdminWrapper><AppLayout><S><SystemHealth /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/ai-catalog">
+          <RequireAdmin><AdminWrapper><AppLayout><S><AICatalog /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/mcp-manager">
           <RequireAdmin><AdminWrapper><AppLayout><S><MCPManager /></S></AppLayout></AdminWrapper></RequireAdmin>

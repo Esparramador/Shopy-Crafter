@@ -8,7 +8,7 @@ const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "audiotools" | "compose" | "protools" | "promptlab" | "cinematic-templates" | "openart" | "downloads";
 
-type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai";
+type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai" | "freepik" | "openai";
 type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
 interface ProviderHealth { provider: ProviderId; status: ProviderStatus; hasKey: boolean; detail?: string; checkedAt: number }
 type HealthMap = Record<ProviderId, ProviderHealth>;
@@ -56,7 +56,7 @@ function useProviderHealth(): { health: HealthMap | null; loading: boolean; refr
 }
 
 const PROVIDER_LABEL: Record<ProviderId, string> = {
-  replicate: "Replicate", runway: "Runway", gemini: "Gemini", elevenlabs: "ElevenLabs", xai: "xAI (Grok)",
+  replicate: "Replicate", runway: "Runway", gemini: "Gemini", elevenlabs: "ElevenLabs", xai: "xAI (Grok)", freepik: "Freepik", openai: "OpenAI",
 };
 const STATUS_COLOR: Record<ProviderStatus, { bg: string; fg: string; border: string; emoji: string }> = {
   ok:              { bg: "rgba(45,212,159,0.15)", fg: "#2dd49f", border: "rgba(45,212,159,0.4)", emoji: "🟢" },
@@ -247,7 +247,7 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--t3, #6c6c7c)", textTransform: "uppercase", letterSpacing: 0.6, marginRight: 6 }}>
           Motores IA
         </span>
-        {(["replicate","runway","gemini","elevenlabs","xai"] as ProviderId[]).map(p => (
+        {(["replicate","runway","gemini","elevenlabs","xai","freepik","openai"] as ProviderId[]).map(p => (
           <ProviderBadge key={p} provider={p} health={health} />
         ))}
         <button onClick={() => refreshHealth(true)} disabled={healthLoading}

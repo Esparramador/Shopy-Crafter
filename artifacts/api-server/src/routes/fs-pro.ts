@@ -257,6 +257,7 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
         gemini:    ["16:9", "9:16"],
         replicate: ["9:16", "16:9", "1:1", "4:5", "4:3"],
         xai:       ["9:16", "16:9", "1:1", "3:4"],
+        freepik:   ["9:16", "16:9", "1:1", "3:4", "4:3"],
       };
       // Per-model overrides
       const modelAspectOverrides: Record<string, string[]> = {
@@ -289,6 +290,12 @@ router.get("/fs-pro/capabilities", requireAdmin, async (_req, res) => {
         "grok-video-1": ["9:16", "16:9", "1:1"],
         "grok-imagine-video": ["9:16", "16:9", "1:1"],
         "grok-imagine-video-1.5": ["9:16", "16:9", "1:1"],
+        "freepik-kling-2-t2v": ["16:9", "9:16", "1:1"],
+        "freepik-kling-2-i2v": ["16:9", "9:16", "1:1"],
+        "freepik-kling-1.5-t2v": ["16:9", "9:16", "1:1"],
+        "freepik-kling-1.5-i2v": ["16:9", "9:16", "1:1"],
+        "freepik-hailuo-02-t2v": ["16:9", "9:16", "1:1"],
+        "freepik-hailuo-02-i2v": ["16:9", "9:16", "1:1"],
       };
       const aspectRatios = modelAspectOverrides[k] ?? videoAspects[v.provider] ?? ["9:16", "16:9", "1:1"];
       return { key: k, label: prettyLabel(k), ...v, aspectRatios };
@@ -2050,12 +2057,29 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
     if (f) { buf = f.buffer; mime = f.mimetype; }
     else if (sourceImageUrl) { buf = await fetchToBuffer(sourceImageUrl); mime = "image/png"; }
 
-    const out = await generateVideoFromImage(model as VideoModel, buf, mime, prompt, {
-      duration: parseInt(duration || "5"),
-      aspect: aspect || "9:16",
-      replicateToken: getProjectReplicateToken(project),
-      cameraPreset: typeof cameraPreset === "string" ? cameraPreset : undefined,
-    });
+    const out = model.startsWith("freepik-")
+      ? await (async () => {
+          const { generateFreepikVideoTask, pollFreepikVideoTask } = await import("../lib/freepik.js");
+          const freepikEngine = model.includes("kling-2") ? "kling-2" : model.includes("kling-1.5") ? "kling-1.5" : "hailuo-02";
+          const taskIdOrUrl = await generateFreepikVideoTask({
+            prompt,
+            aspect_ratio: aspect as any || "9:16",
+            duration: parseInt(duration || "5") === 10 ? 10 : 5,
+            engine: freepikEngine,
+            image_url: sourceImageUrl,
+          });
+          let finalUrl = taskIdOrUrl;
+          if (!taskIdOrUrl.startsWith("http")) {
+            finalUrl = await pollFreepikVideoTask(taskIdOrUrl);
+          }
+          return await fetchToBuffer(finalUrl);
+        })()
+      : await generateVideoFromImage(model as VideoModel, buf, mime, prompt, {
+          duration: parseInt(duration || "5"),
+          aspect: aspect || "9:16",
+          replicateToken: getProjectReplicateToken(project),
+          cameraPreset: typeof cameraPreset === "string" ? cameraPreset : undefined,
+        });
 
     // Validar que el buffer no esté vacío — indica fallo silencioso del proveedor
     if (!out || out.length < 1024) {

@@ -179,12 +179,16 @@ export type ImageGenModel =
   | "recraft-v3-svg"            // Recraft v3 SVG — vectorial real (logos, iconos)
   | "ideogram-v3-balanced"      // Ideogram V3 Balanced — buen balance velocidad/calidad
   | "imagen-4-fast"             // Google Imagen 4 Fast (cheap, quick)
-  | "bytedance/seedream-3";     // ByteDance Seedream 3 — photoreal artístico
+  | "bytedance/seedream-3"     // ByteDance Seedream 3 — photoreal artístico
+  | "freepik-mystic"            // Freepik Mystic — high quality styling
+  | "freepik-flux-dev";         // Freepik Flux Dev — fast/high quality
 
 // ImageProvider explícito para health-check / fallback automático en frontend.
-export type ImageProvider = "replicate" | "gemini" | "runway" | "openai" | "xai";
+export type ImageProvider = "replicate" | "gemini" | "runway" | "openai" | "xai" | "freepik";
 
 export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; replicateId?: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }> = {
+  "freepik-mystic":         { provider: "freepik", description: "Freepik Mystic — Máxima calidad con controles de estilo avanzados", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
+  "freepik-flux-dev":       { provider: "freepik", description: "Freepik Flux Dev — Rápido, preciso y de alta calidad", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
   "flux-1.1-pro-ultra":     { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Top photoreal 4MP, mejor calidad fotográfica", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
   "flux-1.1-pro-ultra-raw": { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro-ultra", description: "Flux Ultra modo RAW — fotografía naturalista (sin look AI)", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2752x1536" },
   "flux-1.1-pro":           { provider: "replicate", replicateId: "black-forest-labs/flux-1.1-pro",       description: "Photoreal estándar, buen precio/calidad", costPerImage: 0.04, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"],         maxResolution: "1440x1440" },
@@ -326,6 +330,27 @@ export async function generateImage(
     const result = await generateImageWithReferences({ promptText: prompt, referenceImages: refs, ratio: ratio as any, model: runwayModel });
     const { buffer, mimeType } = await fetchRunwayImageBuffer(result.imageUrl);
     return { buffer, mimeType, model };
+  }
+
+  // ── Freepik models
+  if (model.startsWith("freepik-")) {
+    const { generateFreepikImage, isFreepikAvailable } = await import("./freepik.js");
+    if (!isFreepikAvailable()) throw new Error("Freepik API key not configured");
+    const freepikModel = model === "freepik-mystic" ? "freepik-mystic" : "flux-dev-fp8";
+    const results = await generateFreepikImage({
+      prompt,
+      negative_prompt: opts.negativePrompt,
+      aspect_ratio: aspect as any,
+      model: freepikModel,
+      seed: opts.seed,
+      num_images: 1,
+    });
+    if (!results.length) throw new Error("Freepik no devolvió imagen");
+    return {
+      buffer: Buffer.from(results[0].base64, "base64"),
+      mimeType: results[0].mimeType,
+      model
+    };
   }
 
   // ── Replicate models
