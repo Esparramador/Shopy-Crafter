@@ -660,7 +660,8 @@ export async function getCatalogModels(filters: {
   q += " ORDER BY quality_score DESC, speed_score DESC";
   if (filters.limit) { params.push(filters.limit); q += ` LIMIT $${params.length}`; }
 
-  const rows = await db.execute(sql.raw(q, params));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = await db.execute((sql as any).raw(q, params));
   return rows.rows as Record<string, unknown>[];
 }
 

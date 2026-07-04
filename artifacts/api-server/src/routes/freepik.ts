@@ -47,7 +47,7 @@ router.post("/freepik/generate", requireAdmin, async (req, res): Promise<void> =
       num_images: Number(num_images) || 1,
       width: width ? Number(width) : undefined,
       height: height ? Number(height) : undefined,
-      aspect_ratio: aspect_ratio as string | undefined,
+      aspect_ratio: aspect_ratio as "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "3:2" | "2:3" | "4:5" | "5:4" | "21:9" | undefined,
       model: model ? String(model) : undefined,
       style: style as string | undefined,
       color: color as string | undefined,
@@ -78,7 +78,7 @@ router.post("/freepik/generate", requireAdmin, async (req, res): Promise<void> =
         base64:  img.base64,
         mimeType: img.mimeType,
         seed:    img.seed,
-        vaultId: saved[i]?.id,
+        vaultId: saved[i],
       })),
     });
   } catch (err: unknown) {
@@ -99,7 +99,7 @@ router.post("/freepik/image-to-image", requireAdmin, async (req, res): Promise<v
       imageBase64: String(imageBase64),
       strength: strength != null ? Number(strength) : undefined,
       negative_prompt: negative_prompt ? String(negative_prompt) : undefined,
-      aspect_ratio: aspect_ratio as string | undefined,
+      aspect_ratio: aspect_ratio as "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | undefined,
       num_images: num_images ? Number(num_images) : 1,
       seed: seed != null ? Number(seed) : undefined,
     });
@@ -109,7 +109,7 @@ router.post("/freepik/image-to-image", requireAdmin, async (req, res): Promise<v
         return await saveToVault({ projectId: projectId ? Number(projectId) : 0, title: `${title ?? prompt} (${i + 1})`, fileType: "freepik-i2i", generatedBy: "freepik:image-to-image", content: img.base64, mimeType: img.mimeType, fileSizeBytes: Buffer.from(img.base64, "base64").length });
       } catch { return null; }
     }));
-    res.json({ success: true, images: results.map((img, i) => ({ base64: img.base64, mimeType: img.mimeType, vaultId: saved[i]?.id })) });
+    res.json({ success: true, images: results.map((img, i) => ({ base64: img.base64, mimeType: img.mimeType, vaultId: saved[i] })) });
   } catch (err: unknown) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -124,7 +124,7 @@ router.post("/freepik/upscale", requireAdmin, async (req, res): Promise<void> =>
 
     const upscaled = await upscaleFreepikImage(String(imageBase64), String(mimeType));
     const saved = await saveToVault({ projectId: projectId ? Number(projectId) : 0, title: String(title ?? "Upscaled 4×"), fileType: "freepik-upscale", generatedBy: "freepik:upscaler", content: upscaled, mimeType: String(mimeType), fileSizeBytes: Buffer.from(upscaled, "base64").length }).catch(() => null);
-    res.json({ success: true, base64: upscaled, mimeType: String(mimeType), vaultId: saved?.id });
+    res.json({ success: true, base64: upscaled, mimeType: String(mimeType), vaultId: saved });
   } catch (err: unknown) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -141,7 +141,7 @@ router.post("/freepik/recolor", requireAdmin, async (req, res): Promise<void> =>
     const saved = await Promise.all(results.map(async (img, i) =>
       saveToVault({ projectId: projectId ? Number(projectId) : 0, title: `${title ?? "Recolor"} (${i + 1})`, fileType: "freepik-recolor", generatedBy: "freepik:recolor", content: img.base64, mimeType: img.mimeType, fileSizeBytes: Buffer.from(img.base64, "base64").length }).catch(() => null)
     ));
-    res.json({ success: true, images: results.map((img, i) => ({ base64: img.base64, mimeType: img.mimeType, vaultId: saved[i]?.id })) });
+    res.json({ success: true, images: results.map((img, i) => ({ base64: img.base64, mimeType: img.mimeType, vaultId: saved[i] })) });
   } catch (err: unknown) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -156,7 +156,7 @@ router.post("/freepik/remove-background", requireAdmin, async (req, res): Promis
 
     const result = await removeFreepikBackground(String(imageBase64), String(mimeType));
     const saved = await saveToVault({ projectId: projectId ? Number(projectId) : 0, title: String(title ?? "Sin Fondo"), fileType: "freepik-bg-removal", generatedBy: "freepik:background-removal", content: result, mimeType: "image/png", fileSizeBytes: Buffer.from(result, "base64").length }).catch(() => null);
-    res.json({ success: true, base64: result, mimeType: "image/png", vaultId: saved?.id });
+    res.json({ success: true, base64: result, mimeType: "image/png", vaultId: saved });
   } catch (err: unknown) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -171,7 +171,7 @@ router.post("/freepik/expand", requireAdmin, async (req, res): Promise<void> => 
 
     const result = await expandFreepikImage({ imageBase64: String(imageBase64), prompt: prompt ? String(prompt) : undefined, width: Number(width), height: Number(height), top: top != null ? Number(top) : undefined, bottom: bottom != null ? Number(bottom) : undefined, left: left != null ? Number(left) : undefined, right: right != null ? Number(right) : undefined });
     const saved = await saveToVault({ projectId: projectId ? Number(projectId) : 0, title: String(title ?? "Imagen Expandida"), fileType: "freepik-expand", generatedBy: "freepik:expand", content: result, mimeType: "image/jpeg", fileSizeBytes: Buffer.from(result, "base64").length }).catch(() => null);
-    res.json({ success: true, base64: result, mimeType: "image/jpeg", vaultId: saved?.id });
+    res.json({ success: true, base64: result, mimeType: "image/jpeg", vaultId: saved });
   } catch (err: unknown) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -188,7 +188,7 @@ router.post("/freepik/virtual-model", requireAdmin, async (req, res): Promise<vo
     const saved = await Promise.all(results.map(async (img, i) =>
       saveToVault({ projectId: projectId ? Number(projectId) : 0, title: `${title ?? "Virtual Model"} (${i + 1})`, fileType: "freepik-virtual-model", generatedBy: "freepik:virtual-model", content: img.base64, mimeType: img.mimeType, fileSizeBytes: Buffer.from(img.base64, "base64").length }).catch(() => null)
     ));
-    res.json({ success: true, images: results.map((img, i) => ({ base64: img.base64, mimeType: img.mimeType, vaultId: saved[i]?.id })) });
+    res.json({ success: true, images: results.map((img, i) => ({ base64: img.base64, mimeType: img.mimeType, vaultId: saved[i] })) });
   } catch (err: unknown) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -233,7 +233,7 @@ router.post("/freepik/video", requireAdmin, async (req, res): Promise<void> => {
 router.get("/freepik/video-status/:taskId", requireAdmin, async (req, res): Promise<void> => {
   try {
     if (!isFreepikAvailable()) { res.status(503).json({ error: "FREEPIK_API_KEY no configurada" }); return; }
-    const videoUrl = await pollFreepikVideoTask(req.params.taskId, 30_000); // short poll
+    const videoUrl = await pollFreepikVideoTask(String(req.params.taskId), 30_000); // short poll
     res.json({ success: true, status: "completed", video_url: videoUrl });
   } catch (err: unknown) {
     if ((err as Error).message.includes("timeout")) {
