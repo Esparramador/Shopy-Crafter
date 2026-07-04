@@ -325,7 +325,7 @@ export function buildPricingBlock(): string {
   }
 
   lines.push(
-    "Todos los planes incluyen 14 días de prueba gratuita (no requiere tarjeta de crédito para probar, pero el servicio no es gratuito de forma permanente). Sin permanencia — cancela cuando quieras.",
+    "Sin permanencia — cancela cuando quieras. No hay prueba gratuita: los planes son de pago desde el primer día, pero puedes cancelar en cualquier momento sin penalización.",
   );
 
   return lines.join("\n");

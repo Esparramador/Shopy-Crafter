@@ -205,20 +205,20 @@ Pregunta UNA cosa concreta: ¿tienes ya una tienda Shopify o estas empezando? Es
   if (intent.intent === "thank") {
     extra += `\n\n== INSTRUCCION: AGRADECIMIENTO ==
 El usuario agradece. Responde brevemente y ofrece el siguiente paso natural.
-Si llevan mas de 3 mensajes, pregunta si estan listos para empezar la prueba gratuita de 14 dias.`;
+Si llevan mas de 3 mensajes, pregunta si estan listos para suscribirse y empezar hoy mismo.`;
   }
 
   if (intent.intent === "bye") {
     extra += `\n\n== INSTRUCCION: DESPEDIDA ==
 El usuario se va. Despidate de forma calida y deja la puerta abierta.
-Menciona que pueden volver cuando quieran y que la prueba gratuita de 14 dias siempre estara disponible.`;
+Menciona que pueden volver cuando quieran y que pueden suscribirse cuando quieran y cancelar en cualquier momento.`;
   }
 
   if (intent.intent === "deny" && stage.mentionedPricing) {
     extra += `\n\n== INSTRUCCION: OBJECION PRECIO ==
 El usuario rechaza o duda. Es probable que haya una objecion de precio o confianza.
 Pregunta directamente: ¿que te genera dudas? ¿el precio, la integracion o algo mas?
-Luego aborda esa objecion especifica con datos concretos (ROI, prueba gratuita, sin tarjeta).`;
+Luego aborda esa objecion especifica con datos concretos (ROI, planes flexibles, cancela cuando quieras).`;
   }
 
   if (intent.intent === "out_of_scope") {
@@ -231,14 +231,14 @@ Pregunta de forma amigable: ¿en que puedo ayudarte hoy con Shopy Crafter?`;
   if (stage.stage === "considering") {
     extra += `\n\n== ESTADO: CONSIDERANDO ==
 El usuario esta en fase de evaluacion. Usa datos concretos para reforzar la decision.
-Menciona el ROI (8.400€/mes adicionales de media), la prueba gratuita sin tarjeta, y que cancela cuando quiera.
+Menciona el ROI (8.400€/mes adicionales de media), que no hay permanencia y puede cancelar cuando quiera.
 Si mencionaron un nicho o tienda especifica, da un ejemplo concreto de como Shopy Crafter ayudaria a ESE negocio.`;
   }
 
   if (stage.stage === "converting" || intent.buyingIntent) {
     extra += `\n\n== ESTADO: LISTO PARA CONVERTIR ==
 Alta intencion de compra detectada. Guia directamente hacia la accion:
-"Para empezar tu prueba gratuita de 14 dias (sin tarjeta de credito), haz clic en 'Empezar Gratis' en la parte superior de la pagina."
+"Para suscribirte y empezar hoy mismo, haz clic en 'Empezar' en la parte superior de la pagina. Puedes cancelar cuando quieras."
 Se conciso — en esta fase no necesita mas informacion, necesita que le facilites el paso.`;
   }
 
@@ -251,7 +251,7 @@ Luego da una solucion clara y directa. Si el problema persiste, ofrece contacto 
   if (stage.stage === "wrapup" && stage.userMsgCount >= 6) {
     extra += `\n\n== ESTADO: CONVERSACION LARGA ==
 Llevan mucho tiempo hablando. Haz un breve resumen de los puntos clave discutidos.
-Pregunta si hay alguna duda final antes de que empiece la prueba gratuita.
+Pregunta si hay alguna duda final antes de que empiece.
 Al terminar, pregunta: "¿Te ha sido util esta conversacion? Tu feedback me ayuda a mejorar."`;
   }
 
