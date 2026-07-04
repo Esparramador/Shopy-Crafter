@@ -5,6 +5,9 @@ import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import Stripe from "stripe";
+
+const STRIPE_API_VERSION = "2025-01-27.acacia" as const;
 
 const router = Router();
 
@@ -404,8 +407,45 @@ router.post("/billing/upgrade", async (req, res): Promise<void> => {
       return;
     }
 
-    const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
     const APP_URL = process.env.APP_URL || `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+
+    // ── Stripe Checkout (when STRIPE_SECRET_KEY is configured) ───────────────
+    const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
+    if (STRIPE_SECRET) {
+      const stripe = new Stripe(STRIPE_SECRET, { apiVersion: STRIPE_API_VERSION });
+      const [user] = await db.select({ email: usersTable.email })
+        .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        payment_method_types: ["card"],
+        line_items: [{
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: `Shopy Crafter — ${plan.name}`,
+              description: plan.features.slice(0, 3).join(" · "),
+            },
+            unit_amount: Math.round(plan.price * 100),
+            recurring: { interval: "month" },
+          },
+          quantity: 1,
+        }],
+        success_url: `${APP_URL}/admin/billing?stripe=success&plan=${planId}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${APP_URL}/admin/billing?stripe=cancelled`,
+        metadata: { userId, planId },
+        ...(user?.email ? { customer_email: user.email } : {}),
+      });
+      logger.info({ userId, planId, sessionId: session.id }, "💳 Stripe Checkout session creada");
+      res.json({
+        requiresPayment: true,
+        confirmationUrl: session.url!,
+        plan,
+        message: `Redirigiendo a Stripe para confirmar el pago de ${plan.name} (€${plan.price}/mes)...`,
+      });
+      return;
+    }
+
+    const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
 
     if (SHOPIFY_CLIENT_ID) {
       const returnUrl = `${APP_URL}/api/billing/shopify/callback`;

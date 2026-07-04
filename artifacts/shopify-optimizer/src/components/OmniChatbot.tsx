@@ -7,7 +7,7 @@ import {
   Brain, X, Send, Loader2, Minimize2, Maximize2, Sparkles, ChevronDown,
   Link, Image, Video, Upload, Eye, Palette, Layers, Cpu, Globe,
   Instagram, Twitter, Facebook, Youtube, CheckCircle, ZapIcon, HelpCircle, Mic, MicOff,
-  Volume2, VolumeX
+  Volume2, VolumeX, Phone, PhoneOff
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -1349,6 +1349,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [gptModel, setGptModel] = useState<"gpt-4.1-nano" | "gpt-4.1-mini" | "gpt-4.1" | "gpt-4o">("gpt-4.1-mini");
   const [deepThinkMode, setDeepThinkMode] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceCallOpen, setVoiceCallOpen] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [attachFiles, setAttachFiles] = useState<File[]>([]);
@@ -4057,6 +4058,17 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                     }}>
                     {isListening ? <MicOff size={isMobile ? 18 : 15} /> : <Mic size={isMobile ? 18 : 15} />}
                   </button>
+                  <button
+                    onClick={() => setVoiceCallOpen(true)}
+                    aria-label="Llamada de voz con IA"
+                    title="Llamada de voz — habla directamente con el asistente IA en tiempo real"
+                    style={{
+                      width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", flexShrink: 0,
+                      background: "var(--ink2)", color: "var(--jade)",
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
+                    }}>
+                    <Phone size={isMobile ? 17 : 14} />
+                  </button>
                   <button onClick={() => sendMessage()} disabled={loading || (!input.trim() && !attachFile && !attachUrl)} aria-label="Enviar mensaje"
                     style={{
                       width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, minWidth: isMobile ? 44 : 36, borderRadius: 8, border: "none", flexShrink: 0,
@@ -4160,13 +4172,213 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       {/* Hidden file input */}
       <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,audio/*,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.ndjson,.xml,.html,.htm,.css,.scss,.sass,.less,.js,.mjs,.cjs,.ts,.tsx,.jsx,.vue,.svelte,.py,.rb,.php,.java,.kt,.c,.cpp,.h,.cs,.go,.rs,.swift,.dart,.yaml,.yml,.toml,.ini,.sql,.graphql,.sh,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.log" style={{ display: "none" }} onChange={handleFileSelect} />
 
+      {/* ── ConvAI Voice Call Modal ────────────────────────────────────────── */}
+      {voiceCallOpen && (
+        <VoiceCallModal onClose={() => setVoiceCallOpen(false)} API={API} />
+      )}
+
       <style>{`
         @keyframes pulseGold {
           0%, 100% { box-shadow: 0 4px 24px rgba(200,168,75,0.4), 0 0 0 0 rgba(200,168,75,0.3); }
           50% { box-shadow: 0 4px 32px rgba(200,168,75,0.7), 0 0 0 10px rgba(200,168,75,0.05); }
         }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes voicePulse {
+          0%, 100% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.15); opacity: 1; }
+        }
       `}</style>
     </>
+  );
+}
+
+// ── ConvAI Voice Call Modal ────────────────────────────────────────────────────
+function VoiceCallModal({ onClose, API }: { onClose: () => void; API: string }) {
+  const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "speaking" | "error">("idle");
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
+  const [transcript, setTranscript] = useState<Array<{ role: "user" | "agent"; text: string }>>([]);
+  const [errorMsg, setErrorMsg] = useState("");
+  const wsRef = useRef<WebSocket | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioQueueRef = useRef<AudioBuffer[]>([]);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const playingRef = useRef(false);
+
+  const playNextAudio = async () => {
+    if (playingRef.current || audioQueueRef.current.length === 0) return;
+    playingRef.current = true;
+    const buf = audioQueueRef.current.shift()!;
+    const ctx = audioCtxRef.current!;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.onended = () => { playingRef.current = false; setAgentSpeaking(false); playNextAudio(); };
+    setAgentSpeaking(true);
+    src.start();
+  };
+
+  const startCall = async () => {
+    setStatus("connecting"); setErrorMsg("");
+    try {
+      const resp = await fetch(`${API}/api/voice/convai/call-url`, { credentials: "include" });
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({})) as any;
+        throw new Error(e.error ?? "No se pudo obtener URL de llamada");
+      }
+      const { signed_url } = await resp.json() as { signed_url: string };
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtxRef.current = new AudioContext({ sampleRate: 16000 });
+      const ws = new WebSocket(signed_url);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setStatus("connected");
+        // Send init message
+        ws.send(JSON.stringify({ type: "conversation_initiation_client_data", conversation_config_override: {} }));
+        // Start recording and streaming audio
+        const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (e) => {
+          if (ws.readyState === WebSocket.OPEN && e.data.size > 0) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64 = (reader.result as string).split(",")[1];
+              if (base64) ws.send(JSON.stringify({ user_audio_chunk: base64 }));
+            };
+            reader.readAsDataURL(e.data);
+          }
+        };
+        recorder.start(250);
+      };
+
+      ws.onmessage = async (evt) => {
+        try {
+          const msg = JSON.parse(evt.data) as Record<string, any>;
+          if (msg.type === "audio" && msg.audio_event?.audio_base_64) {
+            const raw = atob(msg.audio_event.audio_base_64);
+            const bytes = new Uint8Array(raw.length).map((_, i) => raw.charCodeAt(i));
+            const decoded = await audioCtxRef.current!.decodeAudioData(bytes.buffer.slice(0));
+            audioQueueRef.current.push(decoded);
+            playNextAudio();
+          } else if (msg.type === "transcript" || msg.type === "user_transcript") {
+            const text = msg.transcript ?? msg.user_transcript ?? "";
+            if (text) setTranscript(p => [...p, { role: "user", text }]);
+          } else if (msg.type === "agent_response") {
+            const text = msg.agent_response ?? "";
+            if (text) setTranscript(p => [...p, { role: "agent", text }]);
+          }
+        } catch { /* ignore parse errors */ }
+      };
+
+      ws.onerror = () => { setStatus("error"); setErrorMsg("Error de conexión WebSocket"); };
+      ws.onclose = () => { if (status !== "error") setStatus("idle"); stream.getTracks().forEach(t => t.stop()); };
+    } catch (err: any) {
+      setStatus("error");
+      setErrorMsg(err.message ?? "Error iniciando llamada");
+    }
+  };
+
+  const endCall = () => {
+    wsRef.current?.close();
+    mediaRecorderRef.current?.stop();
+    audioCtxRef.current?.close();
+    audioQueueRef.current = [];
+    playingRef.current = false;
+    setStatus("idle");
+    setAgentSpeaking(false);
+  };
+
+  useEffect(() => { return () => endCall(); }, []);
+
+  const statusColor = { idle: "var(--jade)", connecting: "var(--gold)", connected: "var(--jade)", speaking: "#7c3aed", error: "var(--crim)" }[status];
+  const statusLabel = { idle: "Listo para llamar", connecting: "Conectando...", connected: "En llamada", speaking: "IA hablando", error: errorMsg }[status];
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+      background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
+    }} onClick={e => { if (e.target === e.currentTarget) { endCall(); onClose(); } }}>
+      <div style={{
+        background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 20, padding: 32, width: "min(420px, 92vw)",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
+      }}>
+        {/* Avatar */}
+        <div style={{
+          width: 96, height: 96, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold), #c878ff)",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40,
+          animation: (status === "connected" || status === "speaking") ? "voicePulse 1.5s ease-in-out infinite" : "none",
+          boxShadow: `0 0 0 0 ${statusColor}`,
+        }}>🤖</div>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>Asistente IA — Voz</div>
+          <div style={{ fontSize: 13, color: statusColor, fontWeight: 600 }}>{statusLabel}</div>
+        </div>
+
+        {/* Transcript */}
+        {transcript.length > 0 && (
+          <div style={{
+            width: "100%", maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
+            background: "var(--ink2)", borderRadius: 10, padding: "10px 12px",
+          }}>
+            {transcript.slice(-6).map((t, i) => (
+              <div key={i} style={{ display: "flex", gap: 6, justifyContent: t.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{
+                  background: t.role === "user" ? "rgba(200,168,75,0.15)" : "rgba(124,58,237,0.15)",
+                  border: `1px solid ${t.role === "user" ? "rgba(200,168,75,0.3)" : "rgba(124,58,237,0.3)"}`,
+                  borderRadius: 8, padding: "5px 10px", fontSize: 12, color: "var(--t)", maxWidth: "85%",
+                }}>
+                  <span style={{ fontSize: 10, color: "var(--t4)", display: "block", marginBottom: 2 }}>
+                    {t.role === "user" ? "Tú" : "IA"}
+                  </span>
+                  {t.text}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Controls */}
+        <div style={{ display: "flex", gap: 12 }}>
+          {status === "idle" ? (
+            <button onClick={startCall} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px",
+              background: "var(--jade)", color: "#000", borderRadius: 40, border: "none",
+              fontSize: 15, fontWeight: 700, cursor: "pointer",
+            }}>
+              <Phone size={18} /> Iniciar llamada
+            </button>
+          ) : status !== "error" ? (
+            <button onClick={endCall} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px",
+              background: "var(--crim)", color: "#fff", borderRadius: 40, border: "none",
+              fontSize: 15, fontWeight: 700, cursor: "pointer",
+              animation: "voicePulse 1.5s ease-in-out infinite",
+            }}>
+              <PhoneOff size={18} /> Colgar
+            </button>
+          ) : (
+            <button onClick={startCall} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "12px 24px",
+              background: "var(--gold)", color: "#000", borderRadius: 40, border: "none",
+              fontSize: 14, fontWeight: 700, cursor: "pointer",
+            }}>
+              Reintentar
+            </button>
+          )}
+          <button onClick={() => { endCall(); onClose(); }} style={{
+            padding: "12px 20px", background: "var(--ink2)", color: "var(--t3)",
+            borderRadius: 40, border: "1px solid var(--ink3)", fontSize: 14, cursor: "pointer",
+          }}>
+            Cerrar
+          </button>
+        </div>
+
+        <p style={{ fontSize: 11, color: "var(--t4)", textAlign: "center", maxWidth: 300 }}>
+          Requiere un agente ConvAI de ElevenLabs configurado. Admin → configura <code>ELEVEN_CONVAI_DEFAULT_AGENT_ID</code>.
+        </p>
+      </div>
+    </div>
   );
 }

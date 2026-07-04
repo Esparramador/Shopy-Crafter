@@ -331,6 +331,34 @@ router.post("/webhooks/stripe", async (req: Request, res: Response) => {
           logger.info({ projectId, amount, currency }, "✅ Stripe payment registrado via webhook");
         }
       }
+    } else if (eventType === "checkout.session.completed") {
+      // Platform SaaS billing — activate plan for user after Stripe Checkout
+      const { userId, planId } = (obj.metadata ?? {}) as { userId?: string; planId?: string };
+      if (userId && planId && !connectedAccountId) {
+        try {
+          const { subscriptionsTable: subTable } = await import("@workspace/db");
+          const periodEnd = new Date();
+          periodEnd.setDate(periodEnd.getDate() + 30);
+          const existing = await db.select({ id: subTable.userId }).from(subTable).where(eq(subTable.userId, userId)).limit(1);
+          const updates = {
+            plan: planId,
+            status: "active" as const,
+            currentPeriodEnd: periodEnd,
+            trialEndsAt: null,
+            cancelAtPeriodEnd: 0,
+            stripeCustomerId: obj.customer ?? null,
+            stripeSubscriptionId: obj.subscription ?? null,
+          };
+          if (existing.length > 0) {
+            await db.update(subTable).set(updates).where(eq(subTable.userId, userId));
+          } else {
+            await db.insert(subTable).values({ userId, ...updates, storesLimit: 1, imagesIncluded: 10 });
+          }
+          logger.info({ userId, planId, sessionId: obj.id }, "✅ Plan SaaS activado via Stripe Checkout");
+        } catch (activateErr) {
+          logger.error({ activateErr, userId, planId }, "❌ Error activando plan SaaS tras Stripe Checkout");
+        }
+      }
     } else if (eventType === "customer.subscription.deleted") {
       const customerId = obj.customer ?? "";
       logger.info({ customerId, connectedAccountId }, "Stripe suscripción cancelada");

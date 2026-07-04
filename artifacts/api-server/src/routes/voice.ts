@@ -514,6 +514,21 @@ router.delete("/voice/convai/agents/:agentId", requireAdmin, async (req, res): P
   }
 });
 
+// ── User-accessible ConvAI signed URL (for voice calls in chat) ──────────────
+router.get("/voice/convai/call-url", async (req, res): Promise<void> => {
+  const userId = (req.session as any)?.userId;
+  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  try {
+    const agentId = (req.query.agentId as string) || process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID || "";
+    if (!agentId) { res.status(400).json({ error: "agentId requerido. Crea un agente ConvAI en ElevenLabs y configura ELEVEN_CONVAI_DEFAULT_AGENT_ID." }); return; }
+    const signed_url = await getConvAISignedUrl(agentId);
+    res.json({ signed_url, agentId });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/call-url failed");
+    res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada" });
+  }
+});
+
 router.get("/voice/convai/signed-url", requireAdmin, async (req, res): Promise<void> => {
   try {
     const { agentId } = req.query;
