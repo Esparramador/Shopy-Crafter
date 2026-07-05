@@ -683,6 +683,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - generate_brand_css: Generar un archivo CSS personalizado adaptado al ADN de marca del cliente (colores, tipografías, botones, tarjetas, responsive). Params: {projectId}
   - generate_brand_kit: Generar el Brand Kit completo (CSS + Guía de marca + Tokens JSON + Sección Liquid + README). Params: {projectId}
   - generate_brand_guide: Generar la Guía de Identidad Visual de la marca (paleta colores, tipografías, componentes, estilo foto, tono de voz). Params: {projectId}
+  - generate_brand_story: Generar narrativa/storytelling de marca con IA. Params: {projectId, format ("manifesto"|"founder"|"product"|"email"|"social"|"press"), productId? (shopifyProductId), language? ("es"|"en"|"fr"|"it"|"pt"|"de")}. Formatos: manifesto=brand manifesto emocional, founder=historia del fundador, product=historia del producto, email=secuencia 3 emails bienvenida, social=pack 6 posts RRSS, press=nota de prensa. Combinar con generate_office_document para DOCX descargable.
   - run_universal_generator: Ejecutar el Generador Universal para crear cualquier tipo de contenido profesional. Params: {projectId, generatorType (seo-audit|seo-metas|seo-schemas|seo-alt-texts|seo-keywords|blog-strategy|blog-post|product-catalog|complete-report|financial-report|inventory-report|consistency-report|revenue-analysis|brand-css|brand-css-ai|brand-guide|brand-kit|brand-kit-premium|photo-brief|social-kit|competitor-scan|market-research|pricing-optimal|margin-waterfall|financial-forecast|product-redesign|email-templates|email-flow|social-posts|landing-design|agency-proposal|agency-budget|external-audit|data-csv|data-xlsx|data-json|data-zip), url? (para análisis externo)}
   - analyze_web_design: Analizar en profundidad el diseño de cualquier página web — extrae HTML+CSS reales, genera CSS/HTML mejorado copy-paste-ready, informe profesional descargable, y guarda todo en Vault. Params: {projectId, url, template? ("classic"|"elegance"|"prestige")}
   - generate_export: Generar un informe/export (HTML, CSV, PDF). Params: {projectId, reportType ("seo-audit"|"product-catalog"|"financial"|"brand-brief"|"ab-tests"|"images-gallery"|"competitors"|"consistency"|"inventory"|"redesigns"|"revenue"|"complete-report"|"csv/products")}
@@ -852,6 +853,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   - Generar CSS personalizado / descargar CSS de marca / CSS adaptado a mi marca / generar archivo CSS / quiero mi CSS / CSS descargable / custom brand CSS → generate_brand_css (NOTA: esto genera un ARCHIVO CSS descargable, NO edita el theme de Shopify — para editar theme usa edit_theme_css)
   - Brand kit / kit de marca / kit diseño / paquete marca completo / brand package / descargar kit de marca / quiero mi brand kit → generate_brand_kit
   - Guía de marca / manual de marca / identidad visual / brand guide / guía estilo / manual identidad / quiero mi guía de marca → generate_brand_guide
+  - Storytelling / narrativa de marca / historia de marca / brand story / brand manifesto / historia del fundador / historia del producto / nota de prensa / email storytelling / pack de posts storytelling / contenido narrativo / storyteller / escribe mi historia de marca / cuéntame la historia de la marca → generate_brand_story
   - Generador universal / herramienta de generación / generar contenido / crear informe / quiero un análisis / generar todo / usar generador → run_universal_generator (pide al usuario qué tipo de contenido quiere: SEO, CSS, informe, presupuesto, etc.)
   - Lab web / analizar diseño web / analizar esta web / extraer css de / auditar diseño de / mejorar diseño de / analiza el diseño / extrae el código de / lab de diseño / análisis de diseño web → analyze_web_design (pide la URL si no la proporcionó)
   - Fusion Studio / analizar imagen / descomponer imagen / crear producto desde imagen / imagen de producto → fusion_analyze (analiza imagen y extrae componentes). Params: {imageUrl, projectId?}
@@ -1440,7 +1442,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   REGLA CRÍTICA — TOKEN SHOPIFY:
   Cuando el [CONTEXTO] indique "Token Shopify: CADUCADO" o "Token Shopify: SIN_TOKEN":
   - NO intentes ejecutar acciones que llamen a la API de Shopify: create_product, list_products, list_all_products, scan_store, store_status, optimize_product, optimize_all_products, redesign_product, bulk_redesign, list_themes, audit_theme, edit_theme_file, edit_theme_css, edit_theme_settings, create_theme_section, generate_all_metas, fix_all_alt_texts, generate_schemas, seo_full_audit, list_collections, create_collection, auto_collections, list_pages, create_page, design_all_pages, get_orders, change_price, set_product_status, delete_product, update_product_price, bulk_update_prices, update_stock, bulk_update_stock, sync_catalog_prices, price_audit, list_products_with_prices, add_variant, edit_variant, delete_variant, remove_from_collection, inventory_sync, inventory_sync_orders, regenerate_token, copyright_audit, setup_full_store, keyword_intelligence (si requiere productos de la tienda), blog_strategy (si requiere productos), generate_blog_post (si requiere productos).
-  - SÍ puedes ejecutar estas acciones que NO requieren token Shopify: generate_ai_report, generate_platform_report, recall_knowledge, brain_status, brain_stats, brain_sync, brain_export, analyze_external_store, generate_budget, update_cms, update_cms_batch, read_cms, reset_cms, list_users, create_user, invite_client, deactivate_user, activate_user, reset_user_password, list_messages, send_message, list_approvals, create_approval, audit_log, list_automations, run_automation, generate_email_flow, list_email_flows, generate_brand_css, generate_brand_kit, generate_brand_guide, financial_forecast, financial_dashboard, agency_proposal, search_suppliers, generate_budget, create_business_card, list_business_cards, analyze_web_design, run_universal_generator, run_leveled_report, inspect_code, fix_code, list_source_files, analyze_component, modify_ui, learn_from_url, learn_from_content, generate_competitive_pricing (con URL), scan_competitor, discover_competitors, analyze_competitor_product, agent_skill, agent_skill_search, generate_office_document, ai_catalog_stats, ai_catalog_list, ai_catalog_research, ai_model_route.
+  - SÍ puedes ejecutar estas acciones que NO requieren token Shopify: generate_ai_report, generate_platform_report, recall_knowledge, brain_status, brain_stats, brain_sync, brain_export, analyze_external_store, generate_budget, update_cms, update_cms_batch, read_cms, reset_cms, list_users, create_user, invite_client, deactivate_user, activate_user, reset_user_password, list_messages, send_message, list_approvals, create_approval, audit_log, list_automations, run_automation, generate_email_flow, list_email_flows, generate_brand_css, generate_brand_kit, generate_brand_guide, generate_brand_story, financial_forecast, financial_dashboard, agency_proposal, search_suppliers, generate_budget, create_business_card, list_business_cards, analyze_web_design, run_universal_generator, run_leveled_report, inspect_code, fix_code, list_source_files, analyze_component, modify_ui, learn_from_url, learn_from_content, generate_competitive_pricing (con URL), scan_competitor, discover_competitors, analyze_competitor_product, agent_skill, agent_skill_search, generate_office_document, ai_catalog_stats, ai_catalog_list, ai_catalog_research, ai_model_route.
   - Si el usuario pide un informe o análisis y el token está caducado: responde con lo que puedes hacer con los datos disponibles (generate_ai_report, recall_knowledge) y explica brevemente que para sincronizar datos de la tienda necesita renovar el token en Configuración → Integración Shopify. NO repitas el error de token en cada respuesta.
   - Si el usuario pregunta sobre informes YA GENERADOS (guardados en el Vault): usa recall_knowledge para buscarlos. Los informes generados se almacenan en la base de datos y NO necesitan token.
 
@@ -6485,6 +6487,45 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           break;
         }
   
+        case "generate_brand_story": {
+          const projectId = params?.projectId;
+          const format = (params?.format as string) || "manifesto";
+          const productId = params?.productId as string | undefined;
+          const language = (params?.language as string) || "es";
+          if (!projectId || isNaN(Number(projectId))) { result = { error: true, message: "❌ Falta projectId válido" }; break; }
+          try {
+            const [proj] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(String(projectId))));
+            if (!proj) { result = { error: true, message: "❌ Proyecto no encontrado" }; break; }
+            let productContext = "";
+            if (productId) {
+              const [prod] = await db.select().from(productsTable)
+                .where(and(eq(productsTable.projectId, parseInt(String(projectId))), eq(productsTable.shopifyProductId, String(productId))));
+              if (prod) productContext = `\nPRODUCTO FOCAL: "${prod.title}" (${prod.productType || "general"})${prod.bodyHtml ? `\nDescripción: ${prod.bodyHtml.replace(/<[^>]+>/g, " ").slice(0, 400)}` : ""}`;
+            }
+            const brandContext = `MARCA: ${proj.name}\nNICHO: ${proj.storeNiche || "general"}\nTONO: ${proj.brandTone || "profesional"}\nAUDIENCIA: ${proj.targetAudience || "general"}${productContext}`;
+            const langLabel = language === "en" ? "inglés" : language === "fr" ? "francés" : language === "pt" ? "portugués" : language === "it" ? "italiano" : language === "de" ? "alemán" : "español";
+            const STORY_FORMATS: Record<string, { name: string; prompt: string }> = {
+              manifesto: { name: "Brand Manifesto", prompt: `Escribe un BRAND MANIFESTO poderoso y emocional (300-400 palabras). Estructura: apertura audaz (qué creemos), el problema que resuelven, nuestra visión, nuestra promesa, llamada a la comunidad. Tono: inspirador, auténtico, memorable. Sin clichés. En ${langLabel}.` },
+              founder: { name: "Historia del Fundador", prompt: `Escribe la HISTORIA DEL FUNDADOR (400-500 palabras) en formato narrativo de primera persona. Estructura: momento inicial (el problema que vivió en carne propia), el punto de inflexión, el proceso de creación, la visión de futuro. Tono: honesto, vulnerable, inspirador. En ${langLabel}.` },
+              product: { name: "Historia del Producto", prompt: `Escribe la HISTORIA DEL PRODUCTO (350-450 palabras). Estructura: origen de la idea, el proceso de creación/craftsmanship, los materiales/ingredientes/tecnología que lo hacen único, el impacto en el cliente. Tono: apasionado, educativo, sensorial. En ${langLabel}.` },
+              email: { name: "Email Storytelling", prompt: `Escribe una SECUENCIA DE 3 EMAILS de storytelling para bienvenida de nuevos clientes. Email 1: La historia de origen (por qué existimos). Email 2: Cómo hacemos lo que hacemos (proceso, valores, craftsmanship). Email 3: Tu primer paso con nosotros (CTA suave hacia compra). Cada email: asunto atractivo, 200-250 palabras, tono conversacional. En ${langLabel}.` },
+              social: { name: "Pack Contenido Social", prompt: `Crea un PACK DE 6 POSTS para redes sociales con storytelling de marca. 2x Instagram caption larga (historias), 2x Twitter/X thread (7 tweets c/u), 2x LinkedIn post (reflexión de negocio). Cada formato con hook, historia, CTA. Total: pack completo listo para usar. En ${langLabel}.` },
+              press: { name: "Nota de Prensa", prompt: `Escribe una NOTA DE PRENSA profesional (500-600 palabras) con estructura periodística: titular impactante, subtítulo, primer párrafo (quién/qué/cuándo/dónde/por qué), historia de la marca en 3 párrafos, cita del fundador, datos de contacto ficticios. Tono: objetivo, periodístico, informativo. En ${langLabel}.` },
+            };
+            const fmt = STORY_FORMATS[format] || STORY_FORMATS.manifesto;
+            const { askClaudeWithBrain: acwb } = await import("../lib/claude.js");
+            const storyContent = await acwb(parseInt(String(projectId)), [{ role: "user", content: `${brandContext}\n\n${fmt.prompt}` }], `Eres un copywriter de marca de élite especializado en storytelling auténtico. Tu trabajo es crear narrativas que conecten emocionalmente, no textos de marketing genéricos.`, "content", proj.storeNiche ?? undefined, 4000);
+            result = {
+              message: `✍️ **${fmt.name}** generado para **${proj.name}**\n\n---\n\n${storyContent}\n\n---\n\n💡 *Disponible como DOCX descargable — usa \`generate_office_document\` con el contenido anterior para crear el archivo.*`,
+              storyContent,
+              format,
+              brandName: proj.name,
+            };
+            await learnFromOperation(parseInt(String(projectId)), `Brand Story generado: ${fmt.name} en ${langLabel}`, "content_generation");
+          } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
+          break;
+        }
+
         case "run_universal_generator": {
           const projectId = params?.projectId;
           const generatorType = params?.generatorType;

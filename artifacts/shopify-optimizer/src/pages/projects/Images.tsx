@@ -43,6 +43,9 @@ const IMAGE_TYPES = [
   { id: "infografia", label: "Infografía SVG", icon: "📊", model: "Claude SVG", color: "teal" },
   { id: "infografia-premium", label: "Infografía Premium", icon: "💎", model: "Ideogram v3 (texto real)", color: "amber" },
   { id: "tryon", label: "Virtual Try-On", icon: "🧍", model: "Gemini Fusion", color: "rose" },
+  { id: "explode-foto", label: "Explode View Foto", icon: "💥", model: "Flux Kontext Max", color: "cyan" },
+  { id: "biografia-premium", label: "Biografía Premium", icon: "📖", model: "Ideogram v3 Quality", color: "violet" },
+  { id: "story-sheet", label: "Story Sheet Full", icon: "📋", model: "Ideogram v3 Quality", color: "fuchsia" },
 ];
 
 type JobEntry = { jobId: string; type: string };
@@ -898,6 +901,87 @@ export default function ImagesPage() {
       return;
     }
 
+    if (imageType === "explode-foto") {
+      setJobs((prev) => ({ ...prev, [key]: { jobId: "explode-foto", type: imageType } }));
+      (async () => {
+        try {
+          const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-explode-photo`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ aspectRatio: "1:1" }),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error((err as { error?: string }).error || `HTTP ${resp.status}`);
+          }
+          const data = await resp.json() as { dataUri?: string };
+          if (!data.dataUri) throw new Error("Respuesta sin imagen");
+          setCompletedImages((prev) => ({ ...prev, [key]: data.dataUri! }));
+          setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          toast({ title: "💥 Explode View Foto generada", description: "Imagen de producto desarmado lista." });
+        } catch (err) {
+          setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          toast({ title: "Error", description: (err as { message?: string })?.message || "Error generando explode foto", variant: "destructive" });
+        }
+      })();
+      return;
+    }
+
+    if (imageType === "biografia-premium") {
+      setJobs((prev) => ({ ...prev, [key]: { jobId: "biografia-premium", type: imageType } }));
+      (async () => {
+        try {
+          const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-biography-premium`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ aspectRatio: "4:5", language: premiumLanguage }),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error((err as { error?: string }).error || `HTTP ${resp.status}`);
+          }
+          const data = await resp.json() as { dataUri?: string };
+          if (!data.dataUri) throw new Error("Respuesta sin imagen");
+          setCompletedImages((prev) => ({ ...prev, [key]: data.dataUri! }));
+          setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          toast({ title: "📖 Biografía Premium generada", description: "Hoja de marca con historia lista." });
+        } catch (err) {
+          setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          toast({ title: "Error", description: (err as { message?: string })?.message || "Error generando biografía premium", variant: "destructive" });
+        }
+      })();
+      return;
+    }
+
+    if (imageType === "story-sheet") {
+      setJobs((prev) => ({ ...prev, [key]: { jobId: "story-sheet", type: imageType } }));
+      (async () => {
+        try {
+          const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-story-sheet`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ aspectRatio: "4:5", storyType: "product" }),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error((err as { error?: string }).error || `HTTP ${resp.status}`);
+          }
+          const data = await resp.json() as { dataUri?: string };
+          if (!data.dataUri) throw new Error("Respuesta sin imagen");
+          setCompletedImages((prev) => ({ ...prev, [key]: data.dataUri! }));
+          setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          toast({ title: "📋 Story Sheet generado", description: "Narrativa visual de marca lista." });
+        } catch (err) {
+          setJobs((prev) => { const next = { ...prev }; delete next[key]; return next; });
+          toast({ title: "Error", description: (err as { message?: string })?.message || "Error generando story sheet", variant: "destructive" });
+        }
+      })();
+      return;
+    }
+
     if (imageType === "infografia") {
       setJobs((prev) => ({ ...prev, [key]: { jobId: "infografia", type: imageType } }));
       generateInfographic.mutate(
@@ -1020,7 +1104,7 @@ export default function ImagesPage() {
     <div className="space-y-8 pb-12">
       {/* Job pollers for in-progress jobs */}
       {Object.entries(jobs)
-        .filter(([, e]) => e.jobId && e.jobId !== "infografia" && e.jobId !== "infografia-premium" && e.jobId !== "tryon")
+        .filter(([, e]) => e.jobId && e.jobId !== "infografia" && e.jobId !== "infografia-premium" && e.jobId !== "tryon" && e.jobId !== "explode-foto" && e.jobId !== "biografia-premium" && e.jobId !== "story-sheet")
         .map(([key, entry]) => (
           <JobPoller key={key} projectId={projectId} jobId={entry.jobId} onComplete={handleJobComplete(key)} />
         ))}
@@ -1043,7 +1127,7 @@ export default function ImagesPage() {
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Motor de Imágenes IA</h1>
           <p className="text-muted-foreground mt-1">
-            8 tipos de foto + Infografía SVG. Genera briefs, prompts Midjourney/DALL-E e imágenes reales con Replicate.
+            11 tipos de foto + Infografía SVG + Biografía + Story Sheet. Genera imágenes reales con Replicate y activos de marca premium.
           </p>
         </div>
         <div className="flex gap-3">
@@ -1307,6 +1391,12 @@ export default function ImagesPage() {
                                 ? "💎 Generar Premium (~$0.03)"
                                 : type.id === "tryon"
                                 ? "🧍 Configurar Try-On"
+                                : type.id === "explode-foto"
+                                ? "💥 Explode Foto (~$0.07)"
+                                : type.id === "biografia-premium"
+                                ? "📖 Biografía (~$0.06)"
+                                : type.id === "story-sheet"
+                                ? "📋 Story Sheet (~$0.06)"
                                 : selectedEngines[key]
                                 ? `Generar con ${engines.find((e) => e.model === selectedEngines[key])?.label ?? "motor"}`
                                 : "Generar (~$0.04)"}

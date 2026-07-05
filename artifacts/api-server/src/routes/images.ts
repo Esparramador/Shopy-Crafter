@@ -1471,6 +1471,269 @@ INSTRUCCIONES ESTRICTAS — REGLA DE ORO: NUNCA INVENTES DATOS DEL PRODUCTO.
   }
 });
 
+// ── Explode View Foto ─────────────────────────────────────────────────────────
+
+router.post("/projects/:projectId/products/:productId/images/generate-explode-photo", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const [product] = await db.select().from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+    if (!project || !product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+    const limitCheck = await checkProductionLimit(projectId, "image", 1);
+    if (!limitCheck.allowed) { res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true }); return; }
+    if (!project.replicateApiToken) { res.status(400).json({ error: "Replicate API token requerido en la configuración del proyecto" }); return; }
+
+    const productTitle = product.title || "Producto";
+    const productDescription = (product.bodyHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800);
+    const productType = product.productType || "";
+    const niche = project.storeNiche || "general";
+    const aspectRatio = (req.body?.aspectRatio as string) || "1:1";
+
+    const systemPrompt = `You are a world-class commercial art director specializing in product deconstruction photography and exploded view visuals for advertising and e-commerce.`;
+    const userPrompt = `Create a hyper-detailed image generation prompt for an EXPLODED VIEW PHOTO of this product:
+
+PRODUCT: "${productTitle}"
+CATEGORY: ${productType || "General"}
+NICHE: ${niche}
+${productDescription ? `DESCRIPTION: ${productDescription.slice(0, 400)}` : ""}
+
+Requirements:
+- Show the product with ALL its components PHYSICALLY SEPARATED and FLOATING in mid-air, each clearly visible
+- Use a clean, premium studio background (white, light gray, or dark elegant depending on product)
+- Perfect 3-point studio lighting, each component casting a subtle shadow
+- Components arranged in an elegant starburst or layered explosion pattern
+- Photorealistic render quality, 4K commercial photography
+- Each part showing its material texture clearly
+- The composition communicates quality and craftsmanship
+- Style: Apple product photography, Dyson engineering editorial, premium e-commerce
+
+Output ONLY the prompt in English (max 180 words). No explanations.`;
+
+    let imagePrompt = await askClaudeWithBrain(projectId, [{ role: "user", content: userPrompt }], systemPrompt, "images", niche);
+    imagePrompt = imagePrompt.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").trim();
+    if (imagePrompt.length < 30) imagePrompt = `Exploded view product photography of ${productTitle}. All components floating separated in mid-air, premium studio white background, 3-point lighting, 4K ultra sharp, each component visible with material textures, elegant starburst arrangement, Apple product photography quality`;
+
+    const Replicate = (await import("replicate")).default;
+    const { safeDecrypt } = await import("../lib/crypto.js");
+    const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+    const replicate = new Replicate({ auth: replicateToken });
+
+    const output = await withTimeout(
+      replicate.run("black-forest-labs/flux-kontext-max" as `${string}/${string}`, {
+        input: { prompt: imagePrompt, aspect_ratio: aspectRatio, output_format: "png", output_quality: 95 },
+      }),
+      REPLICATE_TIMEOUT_MS, "flux-kontext-max explode-photo"
+    );
+
+    const raw = Array.isArray(output) ? output[0] : output;
+    const imageUrl = typeof raw === "string" ? raw : (raw as any)?.url?.()?.href ?? String(raw);
+    if (!imageUrl || !imageUrl.startsWith("http")) throw new Error("Replicate returned invalid image URL");
+
+    const dl = await safeDownloadReplicateImage(imageUrl, { tag: "[explode-photo]", maxBytes: 15 * 1024 * 1024 });
+    const b64 = dl.buffer.toString("base64");
+    const dataUri = `data:${dl.mime};base64,${b64}`;
+
+    const vaultId = await saveToVault({
+      projectId,
+      category: "explode_photo",
+      content: b64,
+      mimeType: dl.mime,
+      fileSizeBytes: dl.buffer.length,
+      metadata: { productTitle, model: "flux-kontext-max", shopifyProductId },
+    });
+
+    await recordUsage(projectId, "image", 1);
+    await learnFromOperation(projectId, `Explode View Foto generada para "${productTitle}"`, "image_generation");
+
+    res.json({ dataUri, model: "flux-kontext-max", vaultId, promptUsed: imagePrompt });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "generate-explode-photo failed");
+    if (!res.headersSent) res.status(500).json({ error: err?.message || "Error generando explode view foto" });
+  }
+});
+
+// ── Biografía de Marca Premium ────────────────────────────────────────────────
+
+router.post("/projects/:projectId/products/:productId/images/generate-biography-premium", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const [product] = await db.select().from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+    if (!project || !product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+    const limitCheck = await checkProductionLimit(projectId, "image", 1);
+    if (!limitCheck.allowed) { res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true }); return; }
+    if (!project.replicateApiToken) { res.status(400).json({ error: "Replicate API token requerido" }); return; }
+
+    const productTitle = product.title || "Producto";
+    const vendor = product.vendor || project.name || "";
+    const productDescription = (product.bodyHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800);
+    const niche = project.storeNiche || "general";
+    const brandTone = project.brandTone || "professional premium";
+    const aspectRatio = (req.body?.aspectRatio as string) || "4:5";
+    const language = (req.body?.language as string) || "es";
+    const langLabel = language === "en" ? "English" : language === "fr" ? "French" : language === "it" ? "Italian" : language === "pt" ? "Portuguese" : language === "de" ? "German" : "Spanish";
+
+    const systemPrompt = `You are a luxury brand identity designer and brand storyteller. You create premium brand biography visuals — editorial quality pages that tell the brand's story through design and typography.`;
+    const userPrompt = `Create a detailed image generation prompt for a PREMIUM BRAND BIOGRAPHY visual:
+
+BRAND: "${vendor || productTitle}"
+PRODUCT: "${productTitle}"
+NICHE: ${niche}
+BRAND TONE: ${brandTone}
+LANGUAGE FOR TEXT ELEMENTS: ${langLabel}
+${productDescription ? `CONTEXT: ${productDescription.slice(0, 350)}` : ""}
+
+The visual should look like a high-end brand biography page featuring:
+- Elegant typography hierarchy with brand name, founding story, craftsmanship values
+- Premium layout with portrait-orientation editorial design
+- Timeline or achievement markers in a luxury editorial style
+- Quality seals, craft heritage icons, materials callouts
+- Colors matching brand tone: ${brandTone}
+- Style references: Rolex editorial, Louis Vuitton heritage, Hermès craftsmanship page
+- Rich layout with premium white space, breathing room
+- Text elements in ${langLabel}: brand name, tagline placeholder, "Est. XXXX", quality descriptors
+- Elegant serif and sans-serif typography pairing
+
+Output ONLY the image generation prompt in English for Ideogram (max 200 words, include specific typography/layout direction).`;
+
+    let imagePrompt = await askClaudeWithBrain(projectId, [{ role: "user", content: userPrompt }], systemPrompt, "images", niche);
+    imagePrompt = imagePrompt.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").trim();
+    if (imagePrompt.length < 30) imagePrompt = `Premium brand biography editorial page for ${vendor || productTitle}. Luxury typography, heritage aesthetic, founder story layout, quality craftsmanship seals, elegant color palette, generous white space, Vogue/Hermès editorial quality, portrait format`;
+
+    const Replicate = (await import("replicate")).default;
+    const { safeDecrypt } = await import("../lib/crypto.js");
+    const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+    const replicate = new Replicate({ auth: replicateToken });
+
+    const output = await withTimeout(
+      replicate.run("ideogram-ai/ideogram-v3-quality" as `${string}/${string}`, {
+        input: { prompt: imagePrompt, aspect_ratio: aspectRatio, magic_prompt_option: "Auto", style_type: "Design" },
+      }),
+      REPLICATE_TIMEOUT_MS, "ideogram-v3-quality biography-premium"
+    );
+
+    const raw = Array.isArray(output) ? output[0] : output;
+    const imageUrl = typeof raw === "string" ? raw : (raw as any)?.url?.()?.href ?? String(raw);
+    if (!imageUrl || !imageUrl.startsWith("http")) throw new Error("Replicate returned invalid image URL");
+
+    const dl = await safeDownloadReplicateImage(imageUrl, { tag: "[biography-premium]", maxBytes: 15 * 1024 * 1024 });
+    const b64 = dl.buffer.toString("base64");
+    const dataUri = `data:${dl.mime};base64,${b64}`;
+
+    const vaultId = await saveToVault({
+      projectId,
+      category: "biography_premium",
+      content: b64,
+      mimeType: dl.mime,
+      fileSizeBytes: dl.buffer.length,
+      metadata: { productTitle, vendor, model: "ideogram-v3-quality", shopifyProductId },
+    });
+
+    await recordUsage(projectId, "image", 1);
+    await learnFromOperation(projectId, `Biografía Premium generada para "${vendor || productTitle}"`, "image_generation");
+
+    res.json({ dataUri, model: "ideogram-v3-quality", vaultId, promptUsed: imagePrompt });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "generate-biography-premium failed");
+    if (!res.headersSent) res.status(500).json({ error: err?.message || "Error generando biografía premium" });
+  }
+});
+
+// ── Story Sheet Full ──────────────────────────────────────────────────────────
+
+router.post("/projects/:projectId/products/:productId/images/generate-story-sheet", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
+    const shopifyProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    const [product] = await db.select().from(productsTable)
+      .where(and(eq(productsTable.projectId, projectId), eq(productsTable.shopifyProductId, shopifyProductId)));
+    if (!project || !product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+    const limitCheck = await checkProductionLimit(projectId, "image", 1);
+    if (!limitCheck.allowed) { res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true }); return; }
+    if (!project.replicateApiToken) { res.status(400).json({ error: "Replicate API token requerido" }); return; }
+
+    const productTitle = product.title || "Producto";
+    const vendor = product.vendor || project.name || "";
+    const productDescription = (product.bodyHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800);
+    const niche = project.storeNiche || "general";
+    const brandTone = project.brandTone || "professional";
+    const aspectRatio = (req.body?.aspectRatio as string) || "4:5";
+    const storyType = (req.body?.storyType as string) || "product";
+
+    const systemPrompt = `You are a master brand strategist and visual storyteller who creates cinematic story sheets — premium visual narratives combining photography art direction, editorial copy, and layout to tell brand and product stories.`;
+    const userPrompt = `Create a detailed image generation prompt for a STORY SHEET visual:
+
+PRODUCT/BRAND: "${productTitle}"
+VENDOR: ${vendor || "Independent"}
+NICHE: ${niche}
+BRAND TONE: ${brandTone}
+STORY TYPE: ${storyType}
+${productDescription ? `CONTEXT: ${productDescription.slice(0, 350)}` : ""}
+
+The Story Sheet is a premium visual narrative layout:
+- Cinematic hero image area at top with product/lifestyle direction
+- Compelling headline and subheadline in editorial typography
+- 3-panel photo strip: origin/craft → product in action → emotional outcome/transformation
+- Pull quote from the brand story in elegant serif typography
+- 4-6 key product attributes as visual icon callouts
+- Brand signature area at bottom
+- Color palette derived from the product's natural aesthetic (${niche})
+- Style: Monocle magazine, Kinfolk, Wallpaper*, Apartamento editorial quality
+- Warm, storytelling-forward composition
+
+Output ONLY the image generation prompt in English for Ideogram (max 200 words, specific layout/typography direction).`;
+
+    let imagePrompt = await askClaudeWithBrain(projectId, [{ role: "user", content: userPrompt }], systemPrompt, "images", niche);
+    imagePrompt = imagePrompt.replace(/```[\s\S]*?```/g, "").replace(/```/g, "").replace(/^["']|["']$/g, "").trim();
+    if (imagePrompt.length < 30) imagePrompt = `Editorial story sheet layout for ${vendor || productTitle}. Cinematic hero image, editorial typography, 3-panel photo strip, pull quote, icon callouts, Monocle/Kinfolk magazine aesthetic, generous white space, luxury brand storytelling, portrait format`;
+
+    const Replicate = (await import("replicate")).default;
+    const { safeDecrypt } = await import("../lib/crypto.js");
+    const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+    const replicate = new Replicate({ auth: replicateToken });
+
+    const output = await withTimeout(
+      replicate.run("ideogram-ai/ideogram-v3-quality" as `${string}/${string}`, {
+        input: { prompt: imagePrompt, aspect_ratio: aspectRatio, magic_prompt_option: "Auto", style_type: "Design" },
+      }),
+      REPLICATE_TIMEOUT_MS, "ideogram-v3-quality story-sheet"
+    );
+
+    const raw = Array.isArray(output) ? output[0] : output;
+    const imageUrl = typeof raw === "string" ? raw : (raw as any)?.url?.()?.href ?? String(raw);
+    if (!imageUrl || !imageUrl.startsWith("http")) throw new Error("Replicate returned invalid image URL");
+
+    const dl = await safeDownloadReplicateImage(imageUrl, { tag: "[story-sheet]", maxBytes: 15 * 1024 * 1024 });
+    const b64 = dl.buffer.toString("base64");
+    const dataUri = `data:${dl.mime};base64,${b64}`;
+
+    const vaultId = await saveToVault({
+      projectId,
+      category: "story_sheet",
+      content: b64,
+      mimeType: dl.mime,
+      fileSizeBytes: dl.buffer.length,
+      metadata: { productTitle, vendor, model: "ideogram-v3-quality", storyType, shopifyProductId },
+    });
+
+    await recordUsage(projectId, "image", 1);
+    await learnFromOperation(projectId, `Story Sheet generado para "${vendor || productTitle}" (tipo: ${storyType})`, "image_generation");
+
+    res.json({ dataUri, model: "ideogram-v3-quality", vaultId, promptUsed: imagePrompt, storyType });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "generate-story-sheet failed");
+    if (!res.headersSent) res.status(500).json({ error: err?.message || "Error generando story sheet" });
+  }
+});
+
 // ── Virtual Try-On Quick (single-shot, uses nano-banana to fuse model+product) ─
 
 router.post(
