@@ -283,7 +283,11 @@ router.post("/projects", async (req, res): Promise<void> => {
     const isUniversal = platformType === "universal";
     const isPrestaShop = platformType === "prestashop";
   
-    if (!name || !shopDomain) {
+    if (!name) {
+      res.status(400).json({ error: "El nombre del proyecto es obligatorio" });
+      return;
+    }
+    if (!isUniversal && !shopDomain) {
       res.status(400).json({ error: "name y shopDomain (URL de la tienda) son obligatorios" });
       return;
     }
@@ -340,7 +344,7 @@ router.post("/projects", async (req, res): Promise<void> => {
     const validPlans = ["admin", "starter", "agency_pro", "enterprise", "trial"];
     const finalPlan = validPlans.includes(plan) ? plan : "starter";
   
-    const normalizedDomain = isShopify ? normalizeShopDomain(shopDomain) : shopDomain.replace(/\/$/, "");
+    const normalizedDomain = isShopify ? normalizeShopDomain(shopDomain) : (shopDomain || "").replace(/\/$/, "");
   
     invalidateCache("projects-");
     // @ts-ignore

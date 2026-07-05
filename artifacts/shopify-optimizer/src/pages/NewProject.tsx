@@ -141,8 +141,8 @@ export default function NewProject() {
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
-        name: formData.name || formData.shopDomain.split(".")[0].replace(/^https?:\/\//, ""),
-        shopDomain: formData.shopDomain,
+        name: formData.name || (formData.shopDomain ? formData.shopDomain.split(".")[0].replace(/^https?:\/\//, "") : ""),
+        shopDomain: formData.shopDomain || "",
         storeNiche: formData.storeNiche || undefined,
         brandTone: formData.brandTone || undefined,
         targetAudience: formData.targetAudience || undefined,
@@ -177,7 +177,7 @@ export default function NewProject() {
         return;
       }
       await queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
-      if (isUniversal) {
+      if (isUniversal && formData.shopDomain) {
         setLocation(`/projects/${data.id}/audit`);
       } else {
         setLocation(`/projects/${data.id}`);
@@ -191,7 +191,7 @@ export default function NewProject() {
   const isValid = isPrestaShop
     ? formData.shopDomain && formData.clientSecret && formData.clientSecret.length === 32
     : isUniversal
-    ? !!formData.shopDomain
+    ? formData.name.length >= 2
     : isStripe
     ? formData.shopDomain && formData.clientSecret && formData.clientSecret.startsWith("sk_")
     : formData.shopDomain && formData.clientId && formData.clientSecret;
@@ -204,7 +204,7 @@ export default function NewProject() {
     : isPrestaShop
     ? "URL de tu tienda PrestaShop *"
     : isUniversal
-    ? "URL del sitio web *"
+    ? "URL del sitio web (opcional)"
     : isStripe
     ? "Nombre del negocio o URL *"
     : t("shopDomain", "Dominio Shopify *");
@@ -307,7 +307,7 @@ export default function NewProject() {
           {isUniversal && (
             <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(91,155,213,0.06)", border: "1px solid rgba(91,155,213,0.2)", marginBottom: 18 }}>
               <p style={{ fontSize: 12, color: "#5b9bd5", lineHeight: 1.5 }}>
-                Solo necesitamos la URL de tu web. Analizaremos SEO, rendimiento, accesibilidad y te daremos recomendaciones profesionales con IA.
+                Solo necesitas el nombre. La URL es opcional — si la añades, podremos analizar SEO, rendimiento y accesibilidad. Puedes añadirla más adelante desde el panel del cliente.
               </p>
             </div>
           )}
@@ -330,7 +330,7 @@ export default function NewProject() {
             <div className="form-group">
               <label className="form-label">{domainLabel}</label>
               <input
-                required
+                required={!isUniversal}
                 className="form-input"
                 value={formData.shopDomain}
                 onChange={handleChange("shopDomain")}
@@ -682,7 +682,7 @@ export default function NewProject() {
           {!isValid && (
             <span style={{ fontSize: 12, color: "var(--t3)" }}>
               {isUniversal
-                ? "URL del sitio web requerida"
+                ? "Nombre del negocio requerido (mín. 2 caracteres)"
                 : isPrestaShop
                   ? formData.clientSecret.length !== 32 ? "Clave API: 32 caracteres requeridos" : ""
                   : isWoo
