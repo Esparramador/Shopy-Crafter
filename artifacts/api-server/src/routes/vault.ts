@@ -5,6 +5,8 @@ import { generationJobsTable } from "@workspace/db/schema";
 import { eq, and, desc, sql, isNull, isNotNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { canAccessProject } from "../lib/access.js";
+import { askGeminiWithUrls } from "../lib/gemini.js";
+import { askClaude } from "../lib/claude.js";
 import { ObjectStorageService } from "../lib/objectStorage.js";
 import { logger } from "../lib/logger.js";
 import { setupZipStream, isBinaryMime, isAlreadyCompressed, extForMime, sniffMimeFromMagic } from "../lib/zip-stream.js";
@@ -890,6 +892,146 @@ router.post("/projects/:projectId/vault/register", requireAuth, async (req, res)
   }
 });
 
+// ─── AUDITORÍA DE VÍDEO IA ────────────────────────────────────────────────────
+router.post("/projects/:projectId/vault/:fileId/audit-video", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const session = req.session as any;
+    const projectId = parseInt(String(req.params.projectId));
+    const fileId = parseInt(String(req.params.fileId));
+    if (!(await canAccessProject(session.role, session.clientId, projectId))) {
+      res.status(403).json({ error: "Sin acceso" }); return;
+    }
+
+    const [file] = await db.select().from(projectFilesTable)
+      .where(and(eq(projectFilesTable.id, fileId), eq(projectFilesTable.projectId, projectId))).limit(1);
+    if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+
+    const isVideo = file.mimeType?.startsWith("video/") ||
+      ["fs-pro-video", "fs-pro-video-upscaled", "ad-studio-video", "ad-final", "video"].includes(file.fileType ?? "");
+    if (!isVideo) { res.status(400).json({ error: "El archivo no es un vídeo" }); return; }
+
+    const videoUrl = file.originalUrl ?? null;
+    const title = file.title ?? "vídeo";
+    const meta = JSON.parse(file.metadata ?? "{}");
+
+    let analysis: string;
+    if (videoUrl && (videoUrl.startsWith("http://") || videoUrl.startsWith("https://"))) {
+      try {
+        const result = await askGeminiWithUrls(
+          `Eres un experto en marketing de vídeo para e-commerce y redes sociales.
+Analiza este vídeo titulado "${title}" y proporciona una auditoría detallada que incluya:
+
+## 1. Calidad Técnica
+- Resolución y nitidez visual
+- Fluidez y velocidad de fotogramas
+- Iluminación y color
+
+## 2. Contenido y Narrativa
+- Mensaje principal y claridad
+- Duración y ritmo
+- Gancho inicial (primeros 3 segundos)
+
+## 3. Efectividad para Marketing
+- Idoneidad para la plataforma (Instagram, TikTok, Ads)
+- Call-to-action (si hay)
+- Potencial de conversión
+
+## 4. Puntuación Global
+Puntuación del 1 al 10 con justificación.
+
+## 5. Recomendaciones
+Top 3 mejoras concretas y accionables.
+
+Sé específico, directo y útil. Responde en español.`,
+          [{ url: videoUrl, mimeType: file.mimeType ?? "video/mp4" }]
+        );
+        analysis = typeof result === "string" ? result : JSON.stringify(result);
+      } catch {
+        analysis = await askClaude(
+          `Eres un experto en marketing de vídeo. Analiza este vídeo para e-commerce:
+- Título: "${title}"
+- Tipo: ${file.fileType}
+- Generado por: ${file.generatedBy ?? "IA"}
+- Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "desconocido"}
+- Metadatos: ${JSON.stringify(meta).slice(0, 300)}
+
+Proporciona una auditoría completa con: calidad técnica estimada, efectividad para marketing, puntuación 1-10, y 3 recomendaciones concretas. Responde en español.`
+        );
+      }
+    } else {
+      analysis = await askClaude(
+        `Eres un experto en marketing de vídeo para e-commerce.
+Analiza este vídeo generado por IA basándote en sus metadatos:
+- Título: "${title}"
+- Tipo de archivo: ${file.fileType}
+- Generado por: ${file.generatedBy ?? "IA"}
+- Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "desconocido"}
+- Metadatos técnicos: ${JSON.stringify(meta).slice(0, 400)}
+
+Proporciona:
+## Análisis de Calidad (basado en metadatos)
+## Efectividad para Marketing
+## Puntuación Global (1-10)
+## 3 Recomendaciones de Mejora
+
+Responde en español, sé directo y práctico.`
+      );
+    }
+
+    res.json({ analysis, fileId, title });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ─── AUDITORÍA DE VÍDEO IA (global vault) ────────────────────────────────────
+router.post("/vault/global/:fileId/audit-video", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const session = req.session as any;
+    if (session.role !== "admin") { res.status(403).json({ error: "Solo admin" }); return; }
+    const fileId = parseInt(String(req.params.fileId));
+
+    const [file] = await db.select().from(projectFilesTable)
+      .where(eq(projectFilesTable.id, fileId)).limit(1);
+    if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+
+    const isVideo = file.mimeType?.startsWith("video/") ||
+      ["fs-pro-video", "fs-pro-video-upscaled", "ad-studio-video", "ad-final", "video"].includes(file.fileType ?? "");
+    if (!isVideo) { res.status(400).json({ error: "El archivo no es un vídeo" }); return; }
+
+    const videoUrl = file.originalUrl ?? null;
+    const title = file.title ?? "vídeo";
+    const meta = JSON.parse(file.metadata ?? "{}");
+    let analysis: string;
+
+    if (videoUrl && (videoUrl.startsWith("http://") || videoUrl.startsWith("https://"))) {
+      try {
+        const result = await askGeminiWithUrls(
+          `Experto en marketing de vídeo. Analiza este vídeo "${title}" para e-commerce:
+## 1. Calidad Técnica (resolución, fluidez, iluminación)
+## 2. Contenido y Narrativa (mensaje, duración, gancho inicial)
+## 3. Efectividad para Marketing (plataforma, CTA, conversión)
+## 4. Puntuación Global (1-10)
+## 5. Top 3 Recomendaciones
+Responde en español.`,
+          [{ url: videoUrl, mimeType: file.mimeType ?? "video/mp4" }]
+        );
+        analysis = typeof result === "string" ? result : JSON.stringify(result);
+      } catch {
+        analysis = await askClaude(`Auditoría de vídeo IA. Título: "${title}". Tipo: ${file.fileType}. Generado por: ${file.generatedBy ?? "IA"}. Metadatos: ${JSON.stringify(meta).slice(0, 300)}. Proporciona: calidad técnica, efectividad marketing, puntuación 1-10, 3 recomendaciones. Responde en español.`);
+      }
+    } else {
+      analysis = await askClaude(`Auditoría de vídeo IA. Título: "${title}". Tipo: ${file.fileType}. Generado por: ${file.generatedBy ?? "IA"}. Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "N/A"}. Metadatos: ${JSON.stringify(meta).slice(0, 300)}. Proporciona: calidad técnica estimada, efectividad marketing, puntuación 1-10, 3 recomendaciones. Responde en español.`);
+    }
+
+    res.json({ analysis, fileId, title });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
 // ─── ELIMINAR ARCHIVO (solo admin) ───────────────────────────────────────────
 router.delete("/projects/:projectId/vault/:fileId", requireAuth, async (req, res): Promise<void> => {
   try {
@@ -1502,6 +1644,7 @@ router.get("/vault/global/entities", requireAuth, async (req, res): Promise<void
       entityUrl: projectsTable.shopDomain,
       projectId: projectsTable.id,
       fileCount: sql<number>`count(${projectFilesTable.id})`,
+      latestDate: sql<string>`max(${projectFilesTable.createdAt})`,
     })
       .from(projectsTable)
       .leftJoin(projectFilesTable, eq(projectFilesTable.projectId, projectsTable.id))
@@ -1524,6 +1667,7 @@ router.get("/vault/global/entities", requireAuth, async (req, res): Promise<void
         projectId: e.projectId,
         fileCount: Number(e.fileCount),
         source: "project" as const,
+        latestDate: e.latestDate ?? null,
       })),
       ...externalEntities.map(e => ({
         name: e.entityName ?? "Sin nombre",
@@ -1533,7 +1677,12 @@ router.get("/vault/global/entities", requireAuth, async (req, res): Promise<void
         source: "external" as const,
         latestDate: e.latestDate,
       })),
-    ].sort((a, b) => b.fileCount - a.fileCount);
+    ].sort((a, b) => {
+      const dateA = (a as any).latestDate ?? "0";
+      const dateB = (b as any).latestDate ?? "0";
+      if (dateB !== dateA) return dateB > dateA ? 1 : -1;
+      return b.fileCount - a.fileCount;
+    });
   
     res.json({ entities, total: entities.length });
   } catch (err: any) {

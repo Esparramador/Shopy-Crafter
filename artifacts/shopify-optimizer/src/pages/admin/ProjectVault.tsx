@@ -7,27 +7,46 @@ import {
   Folder, Eye, ChevronRight, DollarSign, Palette, Wand2,
   SplitSquareHorizontal, ShieldCheck, FileSpreadsheet,
   CheckSquare, Square, XCircle, CheckCircle, FileDown,
-  BookOpen, ClipboardList,
+  BookOpen, ClipboardList, Film, Mic, Music, Box, Target,
+  Camera, Layers, Megaphone, Zap, MonitorPlay, Sparkles, Video,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const FILE_TYPE_CONFIG: Record<string, { label: string; icon: typeof Image; color: string }> = {
-  image:          { label: "Imágenes",            icon: Image,                 color: "#5b4eff" },
-  seo_report:     { label: "SEO",                 icon: Search,                color: "var(--jade)" },
-  seo_audit:      { label: "SEO",                 icon: Search,                color: "var(--jade)" },
-  redesign:       { label: "Rediseños",           icon: Wand2,                 color: "var(--gold)" },
-  ab_test:        { label: "Tests A/B",           icon: SplitSquareHorizontal, color: "#ff6b35" },
-  ab_testing:     { label: "Tests A/B",           icon: SplitSquareHorizontal, color: "#ff6b35" },
-  email:          { label: "Emails",              icon: Mail,                  color: "#e040fb" },
-  pricing_report: { label: "Financiero",          icon: DollarSign,            color: "#00bcd4" },
-  financial:      { label: "Financiero",          icon: DollarSign,            color: "#00bcd4" },
-  audit:          { label: "Auditorías",          icon: ShieldCheck,           color: "#ff9800" },
-  consistency:    { label: "Consistencia Visual",  icon: Palette,               color: "#9c27b0" },
-  bulk_export:    { label: "Exportaciones",       icon: FileSpreadsheet,       color: "#607d8b" },
-  product_card:   { label: "Productos",           icon: Package,               color: "var(--gold)" },
-  report:         { label: "Informes",            icon: ClipboardList,         color: "#26a69a" },
-  brain_action:   { label: "Acciones IA",         icon: BookOpen,              color: "#7c4dff" },
+  image:                   { label: "Imágenes",            icon: Image,                 color: "#5b4eff" },
+  seo_report:              { label: "SEO",                 icon: Search,                color: "var(--jade)" },
+  seo_audit:               { label: "SEO",                 icon: Search,                color: "var(--jade)" },
+  redesign:                { label: "Rediseños",           icon: Wand2,                 color: "var(--gold)" },
+  ab_test:                 { label: "Tests A/B",           icon: SplitSquareHorizontal, color: "#ff6b35" },
+  ab_testing:              { label: "Tests A/B",           icon: SplitSquareHorizontal, color: "#ff6b35" },
+  email:                   { label: "Emails",              icon: Mail,                  color: "#e040fb" },
+  pricing_report:          { label: "Financiero",          icon: DollarSign,            color: "#00bcd4" },
+  financial:               { label: "Financiero",          icon: DollarSign,            color: "#00bcd4" },
+  audit:                   { label: "Auditorías",          icon: ShieldCheck,           color: "#ff9800" },
+  consistency:             { label: "Consistencia Visual", icon: Palette,               color: "#9c27b0" },
+  bulk_export:             { label: "Exportaciones",       icon: FileSpreadsheet,       color: "#607d8b" },
+  product_card:            { label: "Productos",           icon: Package,               color: "var(--gold)" },
+  report:                  { label: "Informes",            icon: ClipboardList,         color: "#26a69a" },
+  brain_action:            { label: "Acciones IA",         icon: BookOpen,              color: "#7c4dff" },
+  complete_audit:          { label: "Auditorías",          icon: ShieldCheck,           color: "#ff9800" },
+  fs_pro_image:            { label: "Imagen IA",           icon: Sparkles,              color: "#5b4eff" },
+  "fs-pro-image":          { label: "Imagen IA",           icon: Sparkles,              color: "#5b4eff" },
+  "fs-pro-image-edit":     { label: "Imagen editada",      icon: Camera,                color: "#5b4eff" },
+  "fs-pro-bg-removed":     { label: "Fondo removido",      icon: Layers,                color: "#7c4dff" },
+  "fs-pro-bg-replaced":    { label: "Fondo reemplazado",   icon: Layers,                color: "#7c4dff" },
+  "fs-pro-upscaled":       { label: "Imagen mejorada",     icon: Zap,                   color: "#00bcd4" },
+  "fs-pro-video":          { label: "Vídeo IA",            icon: Film,                  color: "#e84558" },
+  "fs-pro-video-upscaled": { label: "Vídeo mejorado",      icon: MonitorPlay,           color: "#e84558" },
+  "fs-pro-tts":            { label: "Voz IA",              icon: Mic,                   color: "#9c27b0" },
+  "fs-pro-sfx":            { label: "Efectos de sonido",   icon: Zap,                   color: "#ff9800" },
+  "fs-pro-music":          { label: "Música IA",           icon: Music,                 color: "#9c27b0" },
+  "ad-studio-video":       { label: "Vídeo publicitario",  icon: Megaphone,             color: "#ff6b35" },
+  "ad-final":              { label: "Anuncio final",       icon: Target,                color: "#ff6b35" },
+  "ad-image":              { label: "Imagen publicitaria", icon: Camera,                color: "#ff6b35" },
+  "3d_model":              { label: "Modelo 3D",           icon: Box,                   color: "#00bcd4" },
+  video:                   { label: "Vídeo",               icon: Video,                 color: "#e84558" },
+  audio:                   { label: "Audio",               icon: Music,                 color: "#9c27b0" },
 };
 
 const FOLDER_CONFIG: Array<{
@@ -37,13 +56,17 @@ const FOLDER_CONFIG: Array<{
   color: string;
   matchTypes: string[];
 }> = [
+  { id: "videos",       label: "Vídeos",             icon: Film,                  color: "#e84558",     matchTypes: ["fs-pro-video", "fs-pro-video-upscaled", "ad-studio-video", "ad-final", "video"] },
+  { id: "images",       label: "Imágenes",           icon: Image,                 color: "#5b4eff",     matchTypes: ["image", "fs-pro-image", "fs_pro_image", "fs-pro-image-edit", "fs-pro-bg-removed", "fs-pro-bg-replaced", "fs-pro-upscaled", "ad-image"] },
+  { id: "audio",        label: "Audio & Voz",        icon: Music,                 color: "#9c27b0",     matchTypes: ["fs-pro-tts", "fs-pro-sfx", "fs-pro-music", "audio"] },
+  { id: "3d",           label: "Modelos 3D",         icon: Box,                   color: "#00bcd4",     matchTypes: ["3d_model"] },
+  { id: "publicidad",   label: "Publicidad",         icon: Megaphone,             color: "#ff6b35",     matchTypes: ["ad-final", "ad-image"] },
   { id: "reports",      label: "Informes Completos", icon: ClipboardList,         color: "#26a69a",     matchTypes: ["report", "complete_audit"] },
   { id: "brain",        label: "Acciones IA",        icon: BookOpen,              color: "#7c4dff",     matchTypes: ["brain_action"] },
-  { id: "images",       label: "Imágenes",           icon: Image,                 color: "#5b4eff",     matchTypes: ["image"] },
   { id: "audit",        label: "Auditorías",         icon: ShieldCheck,           color: "#ff9800",     matchTypes: ["audit"] },
   { id: "seo",          label: "Informes SEO",       icon: Search,                color: "var(--jade)", matchTypes: ["seo_report", "seo_audit"] },
   { id: "redesign",     label: "Rediseños",          icon: Wand2,                 color: "var(--gold)", matchTypes: ["redesign"] },
-  { id: "consistency",  label: "Consistencia Visual", icon: Palette,               color: "#9c27b0",     matchTypes: ["consistency"] },
+  { id: "consistency",  label: "Consistencia Visual", icon: Palette,              color: "#9c27b0",     matchTypes: ["consistency"] },
   { id: "abtesting",    label: "Tests A/B",          icon: SplitSquareHorizontal, color: "#ff6b35",     matchTypes: ["ab_test", "ab_testing"] },
   { id: "financial",    label: "Financiero",         icon: DollarSign,            color: "#00bcd4",     matchTypes: ["pricing_report", "financial"] },
   { id: "products",     label: "Productos",          icon: Package,               color: "var(--gold)", matchTypes: ["product_card"] },
@@ -89,6 +112,8 @@ export default function ProjectVault() {
   const [selectMode, setSelectMode] = useState(false);
   const [zippingSelected, setZippingSelected] = useState(false);
   const [zippingFolder, setZippingFolder] = useState<string | null>(null);
+  const [auditingVideo, setAuditingVideo] = useState<number | null>(null);
+  const [videoAuditResult, setVideoAuditResult] = useState<{ fileId: number; title: string; analysis: string } | null>(null);
 
   const pid = parseInt(projectId ?? "0");
 
@@ -127,6 +152,29 @@ export default function ProjectVault() {
   };
 
   useEffect(() => { if (pid) loadData(); }, [filterType, filterCategory]);
+
+  const isVideoFile = (file: VaultFile) =>
+    file.mimeType?.startsWith("video/") ||
+    ["fs-pro-video", "fs-pro-video-upscaled", "ad-studio-video", "ad-final", "video"].includes(file.fileType ?? "");
+
+  const handleAuditVideo = async (file: VaultFile) => {
+    setAuditingVideo(file.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${pid}/vault/${file.id}/audit-video`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setVideoAuditResult({ fileId: file.id, title: file.title, analysis: data.analysis });
+      } else {
+        alert(data.error ?? "Error en auditoría");
+      }
+    } catch {
+      alert("Error conectando con el servidor");
+    }
+    setAuditingVideo(null);
+  };
 
   const isReportFile = (file: VaultFile) => {
     const reportTypes = ["report", "complete_audit", "seo_report", "seo_audit", "brain_action", "audit"];
@@ -322,6 +370,7 @@ export default function ProjectVault() {
   const _visibleSelected = displayFiles.filter(f => selectedIds.has(f.id)).length;
 
   return (
+    <>
     <div className="page-inner">
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
         <button onClick={() => navigate("/admin")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t3)", display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
@@ -675,6 +724,17 @@ export default function ProjectVault() {
                             {downloading === file.id ? <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={12} />} Descargar
                           </button>
                         )}
+                        {isVideoFile(file) && (
+                          <button
+                            onClick={() => handleAuditVideo(file)}
+                            disabled={auditingVideo === file.id}
+                            title="Auditoría IA del vídeo"
+                            style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid rgba(232,69,88,0.3)", background: "rgba(232,69,88,0.08)", color: "#e84558", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}
+                          >
+                            {auditingVideo === file.id ? <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Film size={12} />}
+                            {auditingVideo === file.id ? "" : "Auditar"}
+                          </button>
+                        )}
                         <button onClick={() => deleteFile(file)} disabled={deleting === file.id} style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid rgba(255,75,75,0.2)", background: "rgba(255,75,75,0.06)", color: "#ff4b4b", cursor: "pointer", display: "flex", alignItems: "center" }}>
                           <Trash2 size={12} />
                         </button>
@@ -689,6 +749,39 @@ export default function ProjectVault() {
         );
       })()}
     </div>
+
+    {/* ── Video Audit Modal ── */}
+    {videoAuditResult && (
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }} onClick={() => setVideoAuditResult(null)}>
+        <div style={{
+          background: "#111118", border: "1px solid rgba(232,69,88,0.3)", borderRadius: 16,
+          padding: 28, maxWidth: 680, width: "100%", maxHeight: "80vh", overflowY: "auto",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+        }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(232,69,88,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Film size={18} color="#e84558" />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#f5f5f7" }}>Auditoría de Vídeo IA</div>
+              <div style={{ fontSize: 12, color: "#8b8b9e" }}>{videoAuditResult.title}</div>
+            </div>
+            <button onClick={() => setVideoAuditResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#8b8b9e", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ fontSize: 13, color: "#d0d0e0", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+            {videoAuditResult.analysis}
+          </div>
+          <button onClick={() => setVideoAuditResult(null)} style={{ marginTop: 20, width: "100%", padding: "10px 0", borderRadius: 8, border: "1px solid #1e1e2e", background: "#0d0d14", color: "#8b8b9e", cursor: "pointer", fontSize: 13 }}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -756,7 +849,7 @@ function FolderGrid({ files, onOpenFolder, onDownloadFolder, zippingFolder }: {
                 </div>
                 {latestFile && (
                   <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 8, opacity: 0.7 }}>
-                    Último: {new Date(latestFile.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+                    Último: {new Date(latestFile.createdAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 )}
               </button>

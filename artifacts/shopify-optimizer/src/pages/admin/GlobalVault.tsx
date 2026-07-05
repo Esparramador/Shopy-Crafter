@@ -184,6 +184,8 @@ export default function GlobalVault() {
   } | null>(null);
   const [recordingDemo, setRecordingDemo] = useState<string | null>(null);
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [auditingVideo, setAuditingVideo] = useState<number | null>(null);
+  const [videoAuditResult, setVideoAuditResult] = useState<{ fileId: number; title: string; analysis: string } | null>(null);
   const [loadedPreviews, setLoadedPreviews] = useState<Set<string>>(new Set());
 
   const handleRecord = useCallback(async (demoId: string, demoName: string) => {
@@ -207,6 +209,20 @@ export default function GlobalVault() {
       setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 10000);
     } catch { setRecordingDemo(null); }
   }, []);
+
+  const handleAuditVideo = async (file: VaultFile) => {
+    setAuditingVideo(file.id);
+    try {
+      const endpoint = file.projectId
+        ? `${API_BASE}/api/projects/${file.projectId}/vault/${file.id}/audit-video`
+        : `${API_BASE}/api/vault/global/${file.id}/audit-video`;
+      const res = await fetch(endpoint, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      if (res.ok) setVideoAuditResult({ fileId: file.id, title: file.title, analysis: data.analysis });
+      else alert(data.error ?? "Error en auditoría");
+    } catch { alert("Error conectando con el servidor"); }
+    setAuditingVideo(null);
+  };
 
   const handleCopyCaption = useCallback((id: string, text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -1413,7 +1429,7 @@ Hemos trabajado con más de 50 tiendas Shopify en España y Latinoamérica — e
                         </span>
                         {file.generatedBy && <span style={{ fontSize: 11, color: "#6b6b7e" }}>por {file.generatedBy}</span>}
                         {file.fileSizeBytes ? <span style={{ fontSize: 11, color: "#6b6b7e" }}>{fmtSize(file.fileSizeBytes)}</span> : null}
-                        <span style={{ fontSize: 11, color: "#6b6b7e" }}>{new Date(file.createdAt).toLocaleDateString("es-ES")}</span>
+                        <span style={{ fontSize: 11, color: "#6b6b7e" }}>{new Date(file.createdAt).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                     </div>
 
@@ -1436,6 +1452,14 @@ Hemos trabajado con más de 50 tiendas Shopify en España y Latinoamérica — e
                           <ExternalLink size={13} />
                         </a>
                       )}
+                      {isVideo && (
+                        <button onClick={() => handleAuditVideo(file)} disabled={auditingVideo === file.id}
+                          title="Auditoría IA del vídeo"
+                          style={{ background: "rgba(232,69,88,0.07)", border: "1px solid rgba(232,69,88,0.25)", borderRadius: 7, padding: "6px 9px", color: "#e84558", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                          {auditingVideo === file.id ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Film size={13} />}
+                          {auditingVideo === file.id ? "" : "Auditar"}
+                        </button>
+                      )}
                       <button onClick={() => handleDelete(file)} disabled={deleting === file.id}
                         style={{ background: "rgba(232,69,88,0.07)", border: "1px solid rgba(232,69,88,0.12)", borderRadius: 7, padding: "6px 9px", color: "#e84558", cursor: "pointer", display: "flex" }}>
                         {deleting === file.id ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Trash2 size={13} />}
@@ -1450,6 +1474,38 @@ Hemos trabajado con más de 50 tiendas Shopify en España y Latinoamérica — e
       )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+      {/* ── Video Audit Modal (Global Vault) ── */}
+      {videoAuditResult && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9999,
+          background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }} onClick={() => setVideoAuditResult(null)}>
+          <div style={{
+            background: "#111118", border: "1px solid rgba(232,69,88,0.3)", borderRadius: 16,
+            padding: 28, maxWidth: 680, width: "100%", maxHeight: "80vh", overflowY: "auto",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(232,69,88,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Film size={18} color="#e84558" />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#f5f5f7" }}>Auditoría de Vídeo IA</div>
+                <div style={{ fontSize: 12, color: "#8b8b9e" }}>{videoAuditResult.title}</div>
+              </div>
+              <button onClick={() => setVideoAuditResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#8b8b9e", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ fontSize: 13, color: "#d0d0e0", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+              {videoAuditResult.analysis}
+            </div>
+            <button onClick={() => setVideoAuditResult(null)} style={{ marginTop: 20, width: "100%", padding: "10px 0", borderRadius: 8, border: "1px solid #1e1e2e", background: "#0d0d14", color: "#8b8b9e", cursor: "pointer", fontSize: 13 }}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
