@@ -3,7 +3,7 @@
  * Renoise AI-style format: hero + 16-panel grid + waveform + do's/don'ts
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Film, Play, Mic, Zap, Copy, Check,
@@ -680,100 +680,320 @@ function Waveform() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   ANIMATED PREVIEW (tab 2)
+   ANIMATED PREVIEW — shot-by-shot player with real timing
 ───────────────────────────────────────────────────────────── */
 function AnimatedPreview({ shots, voScript }: { shots: Shot[]; voScript: typeof VO_SCRIPT }) {
-  const DURATIONS = shots.map(s => s.duration * 1000);
+  const DURATIONS = shots.map(s => s.duration * 1000); // ms per shot
+  const TOTAL_MS  = DURATIONS.reduce((a, b) => a + b, 0);
+
   const [currentShot, setCurrentShot] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const [playing,     setPlaying]     = useState(false);
+  const [paused,      setPaused]      = useState(false);
+  const [elapsed,     setElapsed]     = useState(0);   // ms within current shot
+  const [showThumb,   setShowThumb]   = useState(false);
+
+  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startRef   = useRef<number>(0);   // Date.now() when shot started
+  const pausedAt   = useRef<number>(0);   // elapsed ms when paused
+
   const ease = [0.22, 1, 0.36, 1] as const;
   const shot = shots[currentShot];
-  const vo = voScript.find(v => v.shot === shot.num);
+  const vo   = voScript.find(v => v.shot === shot.num);
+  const dur  = DURATIONS[currentShot];
+
+  // ── tick: updates elapsed every ~30ms ──────────────────────
+  const tick = useCallback(() => {
+    const now = Date.now();
+    const ms  = now - startRef.current;
+    setElapsed(ms);
+    if (ms >= dur) {
+      clearInterval(timerRef.current!);
+      timerRef.current = null;
+      setElapsed(0);
+      setCurrentShot(prev => {
+        if (prev < shots.length - 1) return prev + 1;
+        setPlaying(false); setPaused(false);
+        return 0;
+      });
+    }
+  }, [dur, shots.length]);
+
+  // ── start new shot ─────────────────────────────────────────
+  useEffect(() => {
+    if (!playing || paused) return;
+    startRef.current = Date.now() - (pausedAt.current || 0);
+    pausedAt.current = 0;
+    timerRef.current = setInterval(tick, 30);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [playing, paused, currentShot, tick]);
+
+  const handlePlay = () => {
+    setCurrentShot(0); setElapsed(0); setPaused(false);
+    pausedAt.current = 0;
+    setPlaying(true);
+  };
+
+  const handlePause = () => {
+    if (paused) {
+      setPaused(false);
+    } else {
+      pausedAt.current = elapsed;
+      clearInterval(timerRef.current!);
+      timerRef.current = null;
+      setPaused(true);
+    }
+  };
+
+  const jumpTo = (i: number) => {
+    clearInterval(timerRef.current!);
+    timerRef.current = null;
+    pausedAt.current = 0;
+    setElapsed(0);
+    setCurrentShot(i);
+    if (!playing) setPlaying(true);
+    setPaused(false);
+  };
+
+  const handlePrev = () => jumpTo(Math.max(0, currentShot - 1));
+  const handleNext = () => {
+    if (currentShot < shots.length - 1) jumpTo(currentShot + 1);
+    else { setPlaying(false); setPaused(false); }
+  };
+
+  // ── total timeline position ────────────────────────────────
+  const totalElapsed = DURATIONS.slice(0, currentShot).reduce((a, b) => a + b, 0) + elapsed;
+  const totalPct     = Math.min((totalElapsed / TOTAL_MS) * 100, 100);
 
   return (
-    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", background: "#000", overflow: "hidden", maxHeight: "calc(100vh - 200px)" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "7%", background: "#000", zIndex: 40 }} />
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "7%", background: "#000", zIndex: 40 }} />
+    <div style={{ background: "#000", userSelect: "none" }}>
 
-      {!playing ? (
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#0B1525" }}>
-          <Crown size={60} />
-          <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(1rem, 2vw, 1.6rem)", color: "#F0EDE8", marginTop: 20, letterSpacing: "0.2em" }}>
-            COSMOGRAPH DAYTONA
-          </p>
-          <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "0.7rem", color: "rgba(240,237,232,0.4)", letterSpacing: "0.3em", marginBottom: 32, textTransform: "uppercase" }}>
-            {shots.length} shots · 30 seconds · Platinum 950
-          </p>
-          <button onClick={() => { setCurrentShot(0); setPlaying(true); }} style={{
-            display: "flex", alignItems: "center", gap: 10, padding: "14px 32px",
-            background: "rgba(201,169,110,0.15)", color: "#C9A96E",
-            border: "1px solid rgba(201,169,110,0.4)", borderRadius: 12, cursor: "pointer",
-            fontSize: 13, fontWeight: 700, fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.1em",
-          }}>
-            <Play size={16} fill="#C9A96E" /> PLAY PREVIEW
-          </button>
-        </div>
-      ) : (
-        <AnimatePresence mode="wait">
-          <motion.div key={`shot-${currentShot}`} style={{ position: "absolute", inset: 0 }}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease }}
-            onAnimationComplete={() => {
-              const dur = DURATIONS[currentShot];
-              const t = setTimeout(() => {
-                if (currentShot < shots.length - 1) setCurrentShot(c => c + 1);
-                else setPlaying(false);
-              }, dur - 600);
-              return () => clearTimeout(t);
-            }}
+      {/* ── Cinematic frame ─────────────────────────────────── */}
+      <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", overflow: "hidden", background: "#000" }}>
+
+        {/* Cinema letterbox bars */}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "7%", background: "#000", zIndex: 40, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "7%", background: "#000", zIndex: 40, pointerEvents: "none" }} />
+
+        {/* ── Idle / title screen ───────────────────────────── */}
+        {!playing && (
+          <motion.div
+            style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "radial-gradient(ellipse at center, #0F1E30 0%, #050A0F 100%)" }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           >
-            {shot.image ? (
-              <motion.img src={shot.image} alt={shot.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: shot.objectPosition }}
-                initial={{ scale: 1.04 }} animate={{ scale: 1.0 }} transition={{ duration: DURATIONS[currentShot] / 1000, ease: "linear" }} />
-            ) : (
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, #0B1525 0%, #1A2A40 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ textAlign: "center" }}>
-                  <Crown size={60} />
-                  <motion.p style={{ margin: "16px 0 4px", fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(1rem, 4vw, 3rem)", fontWeight: 700, color: "#F0EDE8", letterSpacing: "0.35em" }}
-                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.8 }}>
-                    ROLEX
-                  </motion.p>
-                  <motion.p style={{ margin: 0, fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: "clamp(0.5rem, 1.5vw, 1rem)", color: "#C9A96E", letterSpacing: "0.25em" }}
-                    initial={{ clipPath: "inset(0 100% 0 0)" }} animate={{ clipPath: "inset(0 0% 0 0)" }} transition={{ delay: 1.2, duration: 1, ease }}>
-                    COSMOGRAPH DAYTONA
-                  </motion.p>
+            <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, duration: 0.7, ease }}>
+              <Crown size={56} />
+            </motion.div>
+            <motion.p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(1rem, 2.5vw, 2rem)", color: "#F0EDE8", margin: "18px 0 4px", letterSpacing: "0.25em", fontWeight: 300 }}
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.7 }}>
+              COSMOGRAPH DAYTONA
+            </motion.p>
+            <motion.p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "clamp(0.45rem, 0.85vw, 0.7rem)", color: "#C9A96E", letterSpacing: "0.35em", marginBottom: 36, opacity: 0.7 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 0.7 }} transition={{ delay: 0.8, duration: 0.6 }}>
+              {shots.length} SHOTS · {TOTAL_MS / 1000}s · PLATINUM 950
+            </motion.p>
+            <motion.button onClick={handlePlay}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 32px", background: "rgba(201,169,110,0.12)", color: "#C9A96E", border: "1px solid rgba(201,169,110,0.45)", borderRadius: 40, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.12em" }}
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1, duration: 0.5 }}
+              whileHover={{ background: "rgba(201,169,110,0.22)", borderColor: "rgba(201,169,110,0.75)" }}
+              whileTap={{ scale: 0.97 }}>
+              <Play size={15} fill="#C9A96E" /> PLAY PREVIEW
+            </motion.button>
+
+            {/* Shot strip preview */}
+            <div style={{ position: "absolute", bottom: "9%", left: "3%", right: "3%", display: "flex", gap: 3 }}>
+              {shots.map((s, i) => (
+                <div key={i} onClick={() => jumpTo(i)} style={{ flex: 1, aspectRatio: "16/9", borderRadius: 3, overflow: "hidden", cursor: "pointer", border: "1px solid rgba(201,169,110,0.15)", background: "#0A1420", transition: "border-color 0.2s" }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(201,169,110,0.6)")}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(201,169,110,0.15)")}>
+                  {s.image
+                    ? <img src={s.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: s.objectPosition }} />
+                    : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(0.3rem, 0.7vw, 0.55rem)", color: "#C9A96E", opacity: 0.5 }}>{String(s.num).padStart(2,"0")}</div>
+                  }
                 </div>
-              </div>
-            )}
-            {shot.image && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%)" }} />}
-            {vo?.line && (
-              <motion.div style={{ position: "absolute", bottom: "12%", left: 0, right: 0, textAlign: "center", padding: "0 10%" }}
-                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8, duration: 0.6 }}>
-                <p style={{ margin: 0, fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: "clamp(0.7rem, 1.8vw, 1.1rem)", color: "rgba(240,237,232,0.9)", textShadow: "0 2px 12px rgba(0,0,0,0.8)", lineHeight: 1.3 }}>
-                  {vo.line}
-                </p>
-              </motion.div>
-            )}
-            <div style={{ position: "absolute", top: "10%", left: "3%", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)", borderRadius: 4, padding: "3px 8px" }}>
-              <span style={{ fontSize: "clamp(0.45rem, 1vw, 0.6rem)", color: "rgba(240,237,232,0.6)", fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.1em" }}>
-                {String(shot.num).padStart(2,"0")}/{shots.length} · {shot.type} · {shot.duration}s
-              </span>
+              ))}
             </div>
           </motion.div>
-        </AnimatePresence>
-      )}
+        )}
 
+        {/* ── Active playback ──────────────────────────────────── */}
+        {playing && (
+          <AnimatePresence mode="wait">
+            <motion.div key={`shot-${currentShot}`} style={{ position: "absolute", inset: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.55, ease }}>
+
+              {/* Background: image or generated */}
+              {shot.image ? (
+                <motion.img src={shot.image} alt={shot.name}
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: shot.objectPosition }}
+                  initial={{ scale: 1.05 }} animate={{ scale: 1.0 }}
+                  transition={{ duration: dur / 1000, ease: "linear" }} />
+              ) : (
+                <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 40% 50%, #0D1E35 0%, #050A0F 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ textAlign: "center" }}>
+                    <Crown size={48} />
+                    <motion.p style={{ margin: "14px 0 4px", fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(1.2rem, 5vw, 3.5rem)", fontWeight: 300, color: "#F0EDE8", letterSpacing: "0.4em" }}
+                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.9 }}>
+                      ROLEX
+                    </motion.p>
+                    <motion.p style={{ margin: 0, fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: "clamp(0.4rem, 1.4vw, 0.85rem)", color: "#C9A96E", letterSpacing: "0.3em" }}
+                      initial={{ clipPath: "inset(0 100% 0 0)" }} animate={{ clipPath: "inset(0 0% 0 0)" }} transition={{ delay: 1, duration: 1.1, ease }}>
+                      COSMOGRAPH DAYTONA
+                    </motion.p>
+                  </div>
+                </div>
+              )}
+
+              {/* Cinematic gradient overlay */}
+              {shot.image && (
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 40%, transparent 70%)" }} />
+              )}
+
+              {/* VO subtitle */}
+              {vo?.line && (
+                <motion.div style={{ position: "absolute", bottom: "14%", left: 0, right: 0, textAlign: "center", padding: "0 12%", zIndex: 30 }}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.7 }}>
+                  <p style={{ margin: 0, fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: "clamp(0.65rem, 1.6vw, 1rem)", color: "rgba(240,237,232,0.92)", textShadow: "0 1px 14px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.6)", lineHeight: 1.4 }}>
+                    "{vo.line}"
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Shot badge top-left */}
+              <div style={{ position: "absolute", top: "10%", left: "3%", zIndex: 30, display: "flex", gap: 5, alignItems: "center" }}>
+                <div style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 4, padding: "3px 8px", border: "1px solid rgba(201,169,110,0.2)" }}>
+                  <span style={{ fontSize: "clamp(0.38rem, 0.7vw, 0.52rem)", color: "#C9A96E", fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.12em", fontWeight: 600 }}>
+                    {String(shot.num).padStart(2,"0")}/{shots.length}
+                  </span>
+                </div>
+                <div style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)", borderRadius: 4, padding: "3px 8px" }}>
+                  <span style={{ fontSize: "clamp(0.35rem, 0.65vw, 0.48rem)", color: "rgba(240,237,232,0.6)", fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.1em" }}>
+                    {shot.type} · {shot.duration}s
+                  </span>
+                </div>
+              </div>
+
+              {/* Shot name top-right */}
+              <motion.div style={{ position: "absolute", top: "10%", right: "3%", zIndex: 30 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4, duration: 0.6 }}>
+                <div style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)", borderRadius: 4, padding: "3px 8px", textAlign: "right" }}>
+                  <span style={{ fontSize: "clamp(0.35rem, 0.6vw, 0.45rem)", color: "rgba(240,237,232,0.5)", fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.08em" }}>
+                    {shot.name}
+                  </span>
+                </div>
+              </motion.div>
+
+              {/* Pause overlay on click */}
+              <div onClick={handlePause} style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "pointer" }}>
+                {paused && (
+                  <motion.div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }}
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(201,169,110,0.15)", border: "1.5px solid rgba(201,169,110,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Play size={20} fill="#C9A96E" style={{ marginLeft: 3 }} />
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* ── Controls bar ──────────────────────────────────────── */}
       {playing && (
-        <div style={{ position: "absolute", bottom: "7%", left: 0, right: 0, display: "flex", gap: 2, padding: "0 3%", zIndex: 50 }}>
-          {shots.map((_, i) => (
-            <div key={i} style={{ flex: 1, height: 2, background: "rgba(240,237,232,0.15)", borderRadius: 1, overflow: "hidden" }}>
-              <div style={{
-                height: "100%", background: "#C9A96E", borderRadius: 1,
-                width: i < currentShot ? "100%" : i === currentShot ? "50%" : "0%",
-                transition: i === currentShot ? `width ${DURATIONS[i]}ms linear` : "none",
-              }} />
+        <div style={{ background: "#080C12", padding: "10px 14px 8px", borderTop: "1px solid rgba(201,169,110,0.1)" }}>
+
+          {/* Progress bars — one per shot */}
+          <div style={{ display: "flex", gap: 2, marginBottom: 10 }}>
+            {shots.map((s, i) => {
+              const shotPct =
+                i < currentShot ? 100
+                : i === currentShot ? Math.min((elapsed / DURATIONS[i]) * 100, 100)
+                : 0;
+              return (
+                <div key={i} onClick={() => jumpTo(i)}
+                  style={{ flex: DURATIONS[i], height: 3, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden", cursor: "pointer", transition: "opacity 0.2s" }}
+                  onMouseEnter={e => (e.currentTarget.style.opacity = "0.7")}
+                  onMouseLeave={e => (e.currentTarget.style.opacity = "1")}>
+                  <div style={{
+                    height: "100%", background: "#C9A96E", borderRadius: 2,
+                    width: `${shotPct}%`,
+                    transition: i === currentShot && !paused ? `width ${30}ms linear` : "none",
+                  }} />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Controls row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* Prev */}
+            <button onClick={handlePrev} disabled={currentShot === 0}
+              style={{ background: "none", border: "none", cursor: currentShot === 0 ? "not-allowed" : "pointer", color: currentShot === 0 ? "rgba(201,169,110,0.25)" : "#C9A96E", padding: 4, display: "flex", alignItems: "center" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+            </button>
+
+            {/* Play/Pause */}
+            <button onClick={handlePause}
+              style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(201,169,110,0.12)", border: "1px solid rgba(201,169,110,0.4)", cursor: "pointer", color: "#C9A96E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {paused
+                ? <Play size={13} fill="#C9A96E" style={{ marginLeft: 2 }} />
+                : <svg width="13" height="13" viewBox="0 0 24 24" fill="#C9A96E"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              }
+            </button>
+
+            {/* Next */}
+            <button onClick={handleNext}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#C9A96E", padding: 4, display: "flex", alignItems: "center" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 6h-2v12h2zm-3.5 6L6 6v12z"/></svg>
+            </button>
+
+            {/* Restart */}
+            <button onClick={handlePlay}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(201,169,110,0.5)", padding: 4, display: "flex", alignItems: "center" }} title="Restart">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+            </button>
+
+            {/* Shot info */}
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 9, color: "rgba(240,237,232,0.45)", letterSpacing: "0.1em" }}>
+                SHOT {String(shot.num).padStart(2,"0")} · {shot.name.toUpperCase()} · {shot.type}
+              </span>
             </div>
-          ))}
+
+            {/* Total timer */}
+            <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 9, color: "rgba(201,169,110,0.7)", letterSpacing: "0.08em", minWidth: 64, textAlign: "right" }}>
+              {(totalElapsed / 1000).toFixed(1)}s / {TOTAL_MS / 1000}s
+            </div>
+
+            {/* Thumbnail toggle */}
+            <button onClick={() => setShowThumb(v => !v)}
+              style={{ background: showThumb ? "rgba(201,169,110,0.15)" : "none", border: showThumb ? "1px solid rgba(201,169,110,0.4)" : "1px solid transparent", borderRadius: 4, cursor: "pointer", color: showThumb ? "#C9A96E" : "rgba(201,169,110,0.4)", padding: "3px 7px", fontSize: 9, fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.1em" }}>
+              SHOTS
+            </button>
+          </div>
+
+          {/* ── Thumbnail strip ─────────────────────────────────── */}
+          {showThumb && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
+              style={{ display: "flex", gap: 4, marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", paddingBottom: 2 }}>
+              {shots.map((s, i) => (
+                <div key={i} onClick={() => jumpTo(i)}
+                  style={{ flexShrink: 0, width: 64, position: "relative", borderRadius: 4, overflow: "hidden", cursor: "pointer", border: i === currentShot ? "1.5px solid #C9A96E" : "1.5px solid transparent", aspectRatio: "16/9", background: "#0A1420", transition: "border-color 0.2s, transform 0.15s", transform: i === currentShot ? "scale(1.05)" : "scale(1)" }}>
+                  {s.image
+                    ? <img src={s.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: s.objectPosition }} />
+                    : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><Crown size={12} /></div>
+                  }
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "rgba(0,0,0,0.65)", textAlign: "center", padding: "1px 0" }}>
+                    <span style={{ fontSize: 7, color: i === currentShot ? "#C9A96E" : "rgba(240,237,232,0.5)", fontFamily: "'Montserrat', sans-serif" }}>{String(s.num).padStart(2,"0")}</span>
+                  </div>
+                  {i === currentShot && (
+                    <div style={{ position: "absolute", bottom: 0, left: 0, height: 2, background: "#C9A96E", width: `${Math.min((elapsed / DURATIONS[i]) * 100, 100)}%`, transition: "width 100ms linear" }} />
+                  )}
+                </div>
+              ))}
+            </motion.div>
+          )}
         </div>
       )}
     </div>
