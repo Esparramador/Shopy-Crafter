@@ -477,7 +477,7 @@ router.post("/shopybrain/search", requireAdmin, async (req, res): Promise<void> 
   enableLongRunning(res);
   try {
     const { query, niche, searchType, returnRaw, systemPrompt: customSystemPrompt, conversationHistory, currentRoute, engineMode, chatSessionId, claudeModel: reqClaudeModel, gptModel: reqGptModel } = req.body;
-    const validEngines = ["auto", "claude", "gemini", "brain_only", "grok", "gpt"] as const;
+    const validEngines = ["auto", "claude", "gemini", "brain_only", "grok", "gpt", "nvidia"] as const;
     type EngineMode = typeof validEngines[number];
     const engine: EngineMode = validEngines.includes(engineMode) ? engineMode : "auto";
     if (!query) {
@@ -1669,6 +1669,64 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           const gptPrice = GPT_PRICING[priceKey];
           const costUsd = (inTok / 1_000_000) * gptPrice.input + (outTok / 1_000_000) * gptPrice.output;
           searchUsage = { inputTokens: inTok, outputTokens: outTok, costUsd, model: gptModelId };
+        }
+      } else if (engine === "nvidia") {
+        // NVIDIA NIM — OpenAI-compatible endpoint, access to Llama, Mistral, Qwen, Phi, VILA, Nemotron
+        const nvidiaKey = process.env.NVIDIA_API_KEY;
+        if (!nvidiaKey) throw new Error("NVIDIA_API_KEY no configurada — añade tu API key de NVIDIA en los secretos del proyecto");
+        const reqNvidiaModel = (req.body as { nvidiaModel?: string }).nvidiaModel;
+        const VALID_NVIDIA_MODELS = [
+          "nvidia/llama-3.3-nemotron-super-49b-v1",
+          "meta/llama-3.3-70b-instruct",
+          "meta/llama-3.1-405b-instruct",
+          "microsoft/phi-4",
+          "qwen/qwen3-235b-a22b",
+          "mistralai/mistral-large-2-instruct",
+          "nvidia/mistral-nemo-minitron-8b-8k-instruct",
+          "google/gemma-3-27b-it",
+        ] as const;
+        const nvidiaModelId = typeof reqNvidiaModel === "string" && (VALID_NVIDIA_MODELS as readonly string[]).includes(reqNvidiaModel)
+          ? reqNvidiaModel
+          : "nvidia/llama-3.3-nemotron-super-49b-v1";
+        const nvidiaRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${nvidiaKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: nvidiaModelId,
+            messages: [
+              { role: "system", content: sysPrompt },
+              { role: "user", content: userContent },
+            ],
+            max_tokens: 16384,
+            temperature: 0.7,
+            stream: false,
+          }),
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (!nvidiaRes.ok) {
+          const errText = await nvidiaRes.text().catch(() => "");
+          throw new Error(`NVIDIA NIM API error (${nvidiaRes.status}): ${errText.slice(0, 300)}`);
+        }
+        const nvidiaData = await nvidiaRes.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+        answer = nvidiaData.choices?.[0]?.message?.content || "NVIDIA NIM no pudo generar una respuesta.";
+        engineUsed = nvidiaModelId.split("/")[1] ?? nvidiaModelId;
+        if (nvidiaData.usage) {
+          const inTok = nvidiaData.usage.prompt_tokens ?? 0;
+          const outTok = nvidiaData.usage.completion_tokens ?? 0;
+          // NVIDIA NIM pricing (per million tokens, approximate)
+          const NVIDIA_PRICING: Record<string, { input: number; output: number }> = {
+            "llama-3.3-nemotron-super-49b-v1": { input: 0.40, output: 1.20 },
+            "llama-3.3-70b-instruct":           { input: 0.35, output: 0.40 },
+            "llama-3.1-405b-instruct":           { input: 0.99, output: 2.99 },
+            "phi-4":                             { input: 0.15, output: 0.15 },
+            "qwen3-235b-a22b":                   { input: 0.60, output: 2.40 },
+            "mistral-large-2-instruct":          { input: 0.40, output: 1.20 },
+          };
+          const nvidiaShortName = nvidiaModelId.split("/")[1] ?? "";
+          const nvPriceKey = Object.keys(NVIDIA_PRICING).find(k => nvidiaShortName.includes(k)) ?? "llama-3.3-nemotron-super-49b-v1";
+          const nvPrice = NVIDIA_PRICING[nvPriceKey];
+          const costUsd = (inTok / 1_000_000) * nvPrice.input + (outTok / 1_000_000) * nvPrice.output;
+          searchUsage = { inputTokens: inTok, outputTokens: outTok, costUsd, model: engineUsed };
         }
       } else {
         // Claude: escritura profunda, guiones, código, JSON estructurado, razonamiento complejo

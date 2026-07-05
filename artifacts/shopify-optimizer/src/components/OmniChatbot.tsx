@@ -1128,6 +1128,14 @@ const SLASH_SKILLS: SlashSkill[] = [
 
   // ── GRABACIÓN DE PANTALLA ─────────────────────────────────────────────────
   { cmd: "/grabar", icon: "🔴", label: "Grabar pantalla", desc: "Inicia grabación de pantalla — el navegador pedirá permiso una vez", engine: "auto", prompt: "grábame trabajando" },
+
+  // ── NVIDIA NIM ────────────────────────────────────────────────────────────
+  { cmd: "/nvidia-analiza", icon: "🟩", label: "NVIDIA: Análisis deep", desc: "Análisis profundo con NVIDIA Nemotron 49B", engine: "nvidia", prompt: "Realiza un análisis profundo y detallado de mi tienda Shopify. Examina rendimiento, catálogo, estrategia de precios y oportunidades de crecimiento. Proporciona insights accionables con prioridad y métricas esperadas.", isResearch: false },
+  { cmd: "/nvidia-copy",    icon: "🟩", label: "NVIDIA: Copy publicitario", desc: "Genera copy de alto impacto para anuncios y landing pages", engine: "nvidia", prompt: "Crea copy publicitario de alto impacto para mi tienda Shopify: headlines, subheadlines, bullets de beneficio, CTAs y textos para anuncios Meta/Google. Optimiza para conversión.", isResearch: false },
+  { cmd: "/nvidia-seo",     icon: "🟩", label: "NVIDIA: Estrategia SEO", desc: "Estrategia SEO completa con palabras clave y estructura", engine: "nvidia", prompt: "Desarrolla una estrategia SEO completa para mi tienda Shopify: palabras clave long-tail, estructura de contenido, meta descriptions, títulos de productos optimizados y plan de contenido mensual.", isResearch: false },
+  { cmd: "/nvidia-email",   icon: "🟩", label: "NVIDIA: Secuencia email", desc: "Secuencia de emails de nurturing y recuperación de carrito", engine: "nvidia", prompt: "Crea una secuencia completa de email marketing: bienvenida (5 emails), abandono de carrito (3 emails), post-compra (4 emails) y reactivación (3 emails). Incluye asuntos, preview text y cuerpo completo.", isResearch: false },
+  { cmd: "/nvidia-producto", icon: "🟩", label: "NVIDIA: Descripción producto", desc: "Descripciones de producto persuasivas y SEO-optimizadas", engine: "nvidia", prompt: "Escribe descripciones persuasivas y optimizadas para SEO de los principales productos de mi tienda. Para cada uno: título H1, párrafo de apertura, bullets de beneficios, especificaciones técnicas, FAQ y meta description.", isResearch: false },
+  { cmd: "/nvidia-investiga", icon: "🟩", label: "NVIDIA: Investigar competencia", desc: "Investiga competidores y sugiere estrategias de diferenciación", engine: "nvidia", isResearch: true, prompt: "Investiga en profundidad esta marca o competidor: " },
 ];
 
 const SYSTEM_PROMPT = `Eres el asistente inteligente de Shopy Crafter — la plataforma profesional de automatización eCommerce para tiendas Shopify.
@@ -1344,9 +1352,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [selectedFlow, setSelectedFlow] = useState<KlaviyoWorkflowResult["plan"]["flows"][0] | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [quickActions, setQuickActions] = useState<QuickAction[]>(FALLBACK_QUICK_ACTIONS);
-  const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only" | "grok" | "gpt">("auto");
+  const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only" | "grok" | "gpt" | "nvidia">("auto");
   const [claudeModel, setClaudeModel] = useState<"claude-haiku-3-5" | "claude-sonnet-4-6" | "claude-opus-4-8">("claude-sonnet-4-6");
   const [gptModel, setGptModel] = useState<"gpt-4.1-nano" | "gpt-4.1-mini" | "gpt-4.1" | "gpt-4o">("gpt-4.1-mini");
+  const [nvidiaModel, setNvidiaModel] = useState<string>("nvidia/llama-3.3-nemotron-super-49b-v1");
+  const [slashPendingSkill, setSlashPendingSkill] = useState<SlashSkill | null>(null);
+  const [slashPendingInput, setSlashPendingInput] = useState("");
   const [deepThinkMode, setDeepThinkMode] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
@@ -3221,7 +3232,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               const fallbackRes = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
                 method: "POST", credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: (engineMode as string) === "claude" ? claudeModel : undefined, gptModel: (engineMode as string) === "gpt" ? gptModel : undefined }),
+                body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: (engineMode as string) === "claude" ? claudeModel : undefined, gptModel: (engineMode as string) === "gpt" ? gptModel : undefined, nvidiaModel: (engineMode as string) === "nvidia" ? nvidiaModel : undefined }),
               });
               if (fallbackRes.ok) {
                 const fd = await fallbackRes.json();
@@ -3250,7 +3261,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         const res = await fetchWithTimeout(`${API}/api/shopybrain/search`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: (engineMode as string) === "claude" ? claudeModel : undefined, gptModel: (engineMode as string) === "gpt" ? gptModel : undefined }),
+          body: JSON.stringify({ query: content, returnRaw: true, systemPrompt: SYSTEM_PROMPT, conversationHistory: convHistory, currentRoute: location, activeProjectId: projectIdFromUrl, engineMode, chatSessionId: chatSessionIdRef.current, claudeModel: (engineMode as string) === "claude" ? claudeModel : undefined, gptModel: (engineMode as string) === "gpt" ? gptModel : undefined, nvidiaModel: (engineMode as string) === "nvidia" ? nvidiaModel : undefined }),
         });
         if (res.ok) {
           const d = await res.json();
@@ -3527,12 +3538,25 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     setSlashMenuOpen(false);
     setSlashFilter("");
     setInput("");
-    if (skill.isResearch) {
-      const entity = prompt("¿Qué marca, empresa o persona quieres investigar?\n\nPuedes escribir: URL, nombre, @instagram, dominio...");
-      if (entity?.trim()) sendMessage(entity.trim());
+    if (skill.isResearch || skill.prompt.trim() === "" || skill.prompt.endsWith(" ")) {
+      // Show inline input instead of browser prompt()
+      setSlashPendingSkill(skill);
+      setSlashPendingInput("");
     } else {
       sendMessage(skill.prompt);
     }
+  };
+
+  const handleSlashPendingSubmit = () => {
+    if (!slashPendingSkill) return;
+    const val = slashPendingInput.trim();
+    if (!val) return;
+    const fullPrompt = slashPendingSkill.prompt.trim()
+      ? `${slashPendingSkill.prompt.trim()}\n\nContexto adicional: ${val}`
+      : val;
+    setSlashPendingSkill(null);
+    setSlashPendingInput("");
+    sendMessage(fullPrompt);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -3972,6 +3996,54 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   </div>
                 )}
 
+                {/* ── Pending skill inline input (replaces window.prompt) ── */}
+                {slashPendingSkill && (
+                  <div style={{
+                    marginBottom: 8, padding: "12px 14px",
+                    background: "rgba(76,175,80,0.08)", border: "1px solid rgba(76,175,80,0.35)",
+                    borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start",
+                  }}>
+                    <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.2 }}>{slashPendingSkill.icon}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#4caf50", letterSpacing: "0.05em", marginBottom: 4 }}>
+                        {slashPendingSkill.label}
+                        <span style={{ fontWeight: 400, color: "var(--t4)", marginLeft: 8 }}>{slashPendingSkill.desc}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input
+                          autoFocus
+                          value={slashPendingInput}
+                          onChange={e => setSlashPendingInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") { e.preventDefault(); handleSlashPendingSubmit(); }
+                            if (e.key === "Escape") { setSlashPendingSkill(null); setSlashPendingInput(""); }
+                          }}
+                          placeholder={
+                            slashPendingSkill.isResearch
+                              ? "URL, marca, @instagram, dominio o nombre a investigar..."
+                              : slashPendingSkill.prompt.endsWith(" ")
+                                ? "Describe qué quieres generar..."
+                                : "Añade contexto o detalles (opcional)..."
+                          }
+                          style={{
+                            flex: 1, padding: "7px 10px", background: "var(--ink2)", border: "1px solid rgba(76,175,80,0.4)",
+                            borderRadius: 7, color: "var(--t)", fontSize: 13, outline: "none", fontFamily: "inherit",
+                          }}
+                        />
+                        <button onClick={handleSlashPendingSubmit} disabled={!slashPendingInput.trim()} style={{
+                          padding: "7px 14px", background: slashPendingInput.trim() ? "#4caf50" : "var(--ink2)",
+                          border: "none", borderRadius: 7, cursor: slashPendingInput.trim() ? "pointer" : "not-allowed",
+                          color: "#fff", fontSize: 12, fontWeight: 700, transition: "background 0.2s",
+                        }}>▶ Ejecutar</button>
+                        <button onClick={() => { setSlashPendingSkill(null); setSlashPendingInput(""); }} style={{
+                          padding: "7px 10px", background: "transparent", border: "1px solid var(--ink3)",
+                          borderRadius: 7, cursor: "pointer", color: "var(--t4)", fontSize: 11,
+                        }}>✕</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Slash command skill picker */}
                 {slashMenuOpen && (() => {
                   const filtered = getFilteredSkills();
@@ -4089,6 +4161,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                     { key: "gemini",     icon: "🔬", label: "Gemini", title: "Gemini (Google) — streaming en tiempo real + búsqueda web, /imagen-gemini y /codigo-gemini" },
                     { key: "grok",       icon: "🤖", label: "Grok",   title: "Grok (xAI) — razonamiento rápido, perspectiva alternativa, análisis directo" },
                     { key: "gpt",        icon: "🟢", label: "GPT",    title: "GPT (OpenAI) — gran rendimiento en código, análisis y escritura; elige modelo en el sub-selector" },
+                    { key: "nvidia",     icon: "🟩", label: "NVIDIA", title: "NVIDIA NIM — Llama 3.3 Nemotron, Qwen3, Phi-4, Mistral Large vía NVIDIA Inference Microservices" },
                     { key: "brain_only", icon: "💾", label: "Brain",  title: "Solo memoria ShopyBrain — responde desde el conocimiento acumulado de tu tienda" },
                   ] as const).map(({ key, icon, label, title }) => (
                     <button key={key} onClick={() => setEngineMode(key)} title={title}
@@ -4158,6 +4231,29 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                             display: "flex", alignItems: "center", gap: 2, transition: "all 0.2s",
                           }}>
                           🟢 {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Sub-selector de modelo NVIDIA NIM — visible solo con motor NVIDIA */}
+                  {engineMode === "nvidia" && (
+                    <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "center" }}>
+                      {([
+                        { key: "nvidia/llama-3.3-nemotron-super-49b-v1", label: "Nemotron",  title: "NVIDIA Llama-3.3 Nemotron 49B — flagship NVIDIA, razonamiento avanzado" },
+                        { key: "meta/llama-3.3-70b-instruct",            label: "Llama 70B", title: "Meta Llama 3.3 70B — potente, instrucción general" },
+                        { key: "microsoft/phi-4",                        label: "Phi-4",     title: "Microsoft Phi-4 — pequeño pero capaz, económico" },
+                        { key: "qwen/qwen3-235b-a22b",                   label: "Qwen3",     title: "Qwen3 235B A22B — modelo enorme, multilingüe" },
+                        { key: "mistralai/mistral-large-2-instruct",     label: "Mistral",   title: "Mistral Large 2 — instrucción, código, análisis" },
+                      ]).map(({ key, label, title }) => (
+                        <button key={key} onClick={() => setNvidiaModel(key)} title={title}
+                          style={{
+                            fontSize: 9, padding: "3px 7px", borderRadius: 3, cursor: "pointer",
+                            border: nvidiaModel === key ? "1px solid #76b900" : "1px solid rgba(118,185,0,0.25)",
+                            background: nvidiaModel === key ? "rgba(118,185,0,0.12)" : "transparent",
+                            color: nvidiaModel === key ? "#76b900" : "var(--t4)",
+                            display: "flex", alignItems: "center", gap: 2, transition: "all 0.2s",
+                          }}>
+                          🟩 {label}
                         </button>
                       ))}
                     </div>
