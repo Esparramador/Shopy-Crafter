@@ -5,7 +5,7 @@
 // son gratuitos y devuelven 200 si la API key es válida y la cuenta está activa.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai" | "freepik" | "openai";
+export type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai" | "freepik" | "openai" | "nvidia";
 
 export type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
 
@@ -210,16 +210,38 @@ async function checkOpenai(): Promise<ProviderHealth> {
   }
 }
 
+async function checkNvidia(): Promise<ProviderHealth> {
+  const key = process.env.NVIDIA_API_KEY;
+  const checkedAt = Date.now();
+  if (!key) return { provider: "nvidia", status: "missing_key", hasKey: false, checkedAt };
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    const res = await fetch("https://integrate.api.nvidia.com/v1/models", {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (res.status === 401 || res.status === 403) return { provider: "nvidia", status: "missing_key", hasKey: true, detail: `auth ${res.status}`, checkedAt };
+    if (res.status === 402)                       return { provider: "nvidia", status: "out_of_credits", hasKey: true, detail: "402 sin saldo NIM", checkedAt };
+    if (res.status === 429)                       return { provider: "nvidia", status: "rate_limited", hasKey: true, detail: "429 rate limit", checkedAt };
+    if (!res.ok)                                  return { provider: "nvidia", status: "down", hasKey: true, detail: `HTTP ${res.status}`, checkedAt };
+    return { provider: "nvidia", status: "ok", hasKey: true, checkedAt };
+  } catch (e: any) {
+    return { provider: "nvidia", status: "down", hasKey: true, detail: e?.message || "fetch error", checkedAt };
+  }
+}
+
 // ── Cache 60s para evitar machacar las APIs en cada render del frontend.
 let _cache: { ts: number; data: Record<ProviderId, ProviderHealth> } | null = null;
 const CACHE_TTL_MS = 60_000;
 
 export async function getAllProvidersHealth(forceFresh = false): Promise<Record<ProviderId, ProviderHealth>> {
   if (!forceFresh && _cache && Date.now() - _cache.ts < CACHE_TTL_MS) return _cache.data;
-  const [replicate, runway, gemini, elevenlabs, xai, freepik, openai] = await Promise.all([
-    checkReplicate(), checkRunway(), checkGemini(), checkElevenLabs(), checkXai(), checkFreepik(), checkOpenai(),
+  const [replicate, runway, gemini, elevenlabs, xai, freepik, openai, nvidia] = await Promise.all([
+    checkReplicate(), checkRunway(), checkGemini(), checkElevenLabs(), checkXai(), checkFreepik(), checkOpenai(), checkNvidia(),
   ]);
-  const data: Record<ProviderId, ProviderHealth> = { replicate, runway, gemini, elevenlabs, xai, freepik, openai };
+  const data: Record<ProviderId, ProviderHealth> = { replicate, runway, gemini, elevenlabs, xai, freepik, openai, nvidia };
   _cache = { ts: Date.now(), data };
   return data;
 }

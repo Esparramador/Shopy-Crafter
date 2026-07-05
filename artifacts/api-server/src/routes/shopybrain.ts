@@ -1672,8 +1672,22 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
         }
       } else if (engine === "nvidia") {
         // NVIDIA NIM — OpenAI-compatible endpoint, access to Llama, Mistral, Qwen, Phi, VILA, Nemotron
+        // Fallback: si no hay key o la llamada falla → Claude (plataforma siempre funcional)
         const nvidiaKey = process.env.NVIDIA_API_KEY;
-        if (!nvidiaKey) throw new Error("NVIDIA_API_KEY no configurada — añade tu API key de NVIDIA en los secretos del proyecto");
+        if (!nvidiaKey) {
+          logger.warn("[shopybrain] NVIDIA_API_KEY ausente — fallback a Claude");
+          const claudeFallback = await askClaudeWithUsage(
+            resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
+            [{ role: "user", content: userContent }],
+            sysPrompt,
+            32000,
+            300_000,
+          );
+          answer = claudeFallback.text;
+          searchUsage = claudeFallback.usage;
+          engineUsed = "claude (nvidia-fallback: sin key)";
+          // Skip the rest of the nvidia block
+        } else {
         const reqNvidiaModel = (req.body as { nvidiaModel?: string }).nvidiaModel;
         const VALID_NVIDIA_MODELS = [
           // ── Flagship Nemotron ─────────────────────────────────────────
@@ -1748,59 +1762,68 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           }),
           signal: AbortSignal.timeout(120_000),
         });
-        if (!nvidiaRes.ok) {
-          const errText = await nvidiaRes.text().catch(() => "");
-          throw new Error(`NVIDIA NIM API error (${nvidiaRes.status}): ${errText.slice(0, 300)}`);
+        let nvidiaOk = false;
+        if (nvidiaRes.ok) {
+          const nvidiaData = await nvidiaRes.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+          answer = nvidiaData.choices?.[0]?.message?.content || "";
+          if (answer) {
+            nvidiaOk = true;
+            engineUsed = nvidiaModelId.split("/")[1] ?? nvidiaModelId;
+            if (nvidiaData.usage) {
+              const inTok = nvidiaData.usage.prompt_tokens ?? 0;
+              const outTok = nvidiaData.usage.completion_tokens ?? 0;
+              const NVIDIA_PRICING: Record<string, { input: number; output: number }> = {
+                "llama-3.3-nemotron-super-49b-v1":    { input: 0.40, output: 1.20 },
+                "llama-3.3-nemotron-super-49b-v1.5":  { input: 0.40, output: 1.20 },
+                "llama-3.1-nemotron-ultra-253b-v1":   { input: 1.00, output: 3.00 },
+                "nemotron-4-340b-instruct":            { input: 1.50, output: 4.50 },
+                "llama-3.1-nemotron-nano-8b-v1":      { input: 0.10, output: 0.10 },
+                "nvidia-nemotron-nano-9b-v2":          { input: 0.10, output: 0.10 },
+                "nemotron-3-super-120b-a12b":          { input: 0.60, output: 1.80 },
+                "nemotron-3-ultra-550b-a55b":          { input: 2.00, output: 6.00 },
+                "llama-4-maverick-17b-128e-instruct":  { input: 0.20, output: 0.60 },
+                "llama-3.3-70b-instruct":              { input: 0.35, output: 0.40 },
+                "llama-3.1-70b-instruct":              { input: 0.35, output: 0.40 },
+                "llama-3.1-405b-instruct":             { input: 0.99, output: 2.99 },
+                "deepseek-v4-pro":                     { input: 0.30, output: 0.90 },
+                "deepseek-v4-flash":                   { input: 0.10, output: 0.30 },
+                "mistral-large-3-675b-instruct-2512":  { input: 1.80, output: 5.40 },
+                "mistral-large-2-instruct":            { input: 0.40, output: 1.20 },
+                "mistral-medium-3.5-128b":             { input: 0.30, output: 0.90 },
+                "mistral-nemotron":                    { input: 0.45, output: 1.35 },
+                "qwen3.5-397b-a17b":                   { input: 0.80, output: 2.40 },
+                "qwen3.5-122b-a10b":                   { input: 0.40, output: 1.20 },
+                "palmyra-creative-122b":               { input: 0.60, output: 1.80 },
+                "palmyra-fin-70b-32k":                 { input: 0.50, output: 1.50 },
+                "palmyra-med-70b":                     { input: 0.50, output: 1.50 },
+                "minimax-m3":                          { input: 0.40, output: 1.20 },
+                "kimi-k2.6":                           { input: 0.50, output: 1.50 },
+                "phi-4-mini-instruct":                 { input: 0.10, output: 0.10 },
+              };
+              const nvidiaShortName = nvidiaModelId.split("/")[1] ?? "";
+              const nvPriceKey = Object.keys(NVIDIA_PRICING).find(k => nvidiaShortName.includes(k)) ?? "llama-3.3-nemotron-super-49b-v1";
+              const nvPrice = NVIDIA_PRICING[nvPriceKey] ?? { input: 0.40, output: 1.20 };
+              const costUsd = (inTok / 1_000_000) * nvPrice.input + (outTok / 1_000_000) * nvPrice.output;
+              searchUsage = { inputTokens: inTok, outputTokens: outTok, costUsd, model: engineUsed };
+            }
+          }
         }
-        const nvidiaData = await nvidiaRes.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
-        answer = nvidiaData.choices?.[0]?.message?.content || "NVIDIA NIM no pudo generar una respuesta.";
-        engineUsed = nvidiaModelId.split("/")[1] ?? nvidiaModelId;
-        if (nvidiaData.usage) {
-          const inTok = nvidiaData.usage.prompt_tokens ?? 0;
-          const outTok = nvidiaData.usage.completion_tokens ?? 0;
-          // NVIDIA NIM pricing (per million tokens, approximate)
-          const NVIDIA_PRICING: Record<string, { input: number; output: number }> = {
-            // Nemotron family
-            "llama-3.3-nemotron-super-49b-v1":    { input: 0.40, output: 1.20 },
-            "llama-3.3-nemotron-super-49b-v1.5":  { input: 0.40, output: 1.20 },
-            "llama-3.1-nemotron-ultra-253b-v1":   { input: 1.00, output: 3.00 },
-            "nemotron-4-340b-instruct":            { input: 1.50, output: 4.50 },
-            "llama-3.1-nemotron-nano-8b-v1":      { input: 0.10, output: 0.10 },
-            "nvidia-nemotron-nano-9b-v2":          { input: 0.10, output: 0.10 },
-            "nemotron-3-super-120b-a12b":          { input: 0.60, output: 1.80 },
-            "nemotron-3-ultra-550b-a55b":          { input: 2.00, output: 6.00 },
-            // Meta
-            "llama-4-maverick-17b-128e-instruct":  { input: 0.20, output: 0.60 },
-            "llama-3.3-70b-instruct":              { input: 0.35, output: 0.40 },
-            "llama-3.1-70b-instruct":              { input: 0.35, output: 0.40 },
-            "llama-3.1-405b-instruct":             { input: 0.99, output: 2.99 },
-            // DeepSeek
-            "deepseek-v4-pro":                     { input: 0.30, output: 0.90 },
-            "deepseek-v4-flash":                   { input: 0.10, output: 0.30 },
-            // Mistral
-            "mistral-large-3-675b-instruct-2512":  { input: 1.80, output: 5.40 },
-            "mistral-large-2-instruct":            { input: 0.40, output: 1.20 },
-            "mistral-medium-3.5-128b":             { input: 0.30, output: 0.90 },
-            "mistral-nemotron":                    { input: 0.45, output: 1.35 },
-            // Qwen
-            "qwen3.5-397b-a17b":                   { input: 0.80, output: 2.40 },
-            "qwen3.5-122b-a10b":                   { input: 0.40, output: 1.20 },
-            // Especializados Writer
-            "palmyra-creative-122b":               { input: 0.60, output: 1.80 },
-            "palmyra-fin-70b-32k":                 { input: 0.50, output: 1.50 },
-            "palmyra-med-70b":                     { input: 0.50, output: 1.50 },
-            // MiniMax
-            "minimax-m3":                          { input: 0.40, output: 1.20 },
-            "kimi-k2.6":                           { input: 0.50, output: 1.50 },
-            // Microsoft
-            "phi-4-mini-instruct":                 { input: 0.10, output: 0.10 },
-          };
-          const nvidiaShortName = nvidiaModelId.split("/")[1] ?? "";
-          const nvPriceKey = Object.keys(NVIDIA_PRICING).find(k => nvidiaShortName.includes(k)) ?? "llama-3.3-nemotron-super-49b-v1";
-          const nvPrice = NVIDIA_PRICING[nvPriceKey];
-          const costUsd = (inTok / 1_000_000) * nvPrice.input + (outTok / 1_000_000) * nvPrice.output;
-          searchUsage = { inputTokens: inTok, outputTokens: outTok, costUsd, model: engineUsed };
+        if (!nvidiaOk) {
+          // Fallback a Claude si NVIDIA falló o devolvió respuesta vacía
+          const errStatus = nvidiaRes.ok ? "respuesta vacía" : `HTTP ${nvidiaRes.status}`;
+          logger.warn({ errStatus }, "[shopybrain] NVIDIA NIM falló — fallback a Claude");
+          const claudeFallback = await askClaudeWithUsage(
+            resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
+            [{ role: "user", content: userContent }],
+            sysPrompt,
+            32000,
+            300_000,
+          );
+          answer = claudeFallback.text;
+          searchUsage = claudeFallback.usage;
+          engineUsed = `claude (nvidia-fallback: ${errStatus})`;
         }
+        } // close else (nvidiaKey exists)
       } else {
         // Claude: escritura profunda, guiones, código, JSON estructurado, razonamiento complejo
         const VALID_CLAUDE_MODELS = ["claude-haiku-3-5", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-opus-4", "claude-opus-4-8"] as const;

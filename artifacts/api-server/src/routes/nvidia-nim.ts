@@ -1,8 +1,22 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
+
+// ── Middleware: retorna 503 si NVIDIA_API_KEY no está configurada ──────────
+// Esto permite que todos los endpoints degraden gracefully en lugar de lanzar
+function requireNvidiaKey(_req: Request, res: Response, next: NextFunction): void {
+  if (!process.env.NVIDIA_API_KEY) {
+    res.status(503).json({
+      error: "NVIDIA_API_KEY no configurada",
+      detail: "Añade tu API key de NVIDIA NIM en los Secretos del proyecto para usar estos endpoints.",
+      fallback: "sin_clave",
+    });
+    return;
+  }
+  next();
+}
 
 // ═══════════════════════════════════════════════════════════════
 // NVIDIA NIM — CATÁLOGO COMPLETO DE 121 MODELOS (Jul 2026)
@@ -151,9 +165,8 @@ const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
 const NIM_BASE = "https://integrate.api.nvidia.com/v1";
 
 function nimKey(): string {
-  const k = process.env.NVIDIA_API_KEY;
-  if (!k) throw new Error("NVIDIA_API_KEY no configurada — añade la clave en Secretos del proyecto.");
-  return k;
+  // requireNvidiaKey middleware already blocked requests without key; this is safe
+  return process.env.NVIDIA_API_KEY ?? "";
 }
 
 // ── GET /api/nvidia/catalog ─────────────────────────────────────────────────
@@ -207,7 +220,7 @@ router.get("/api/nvidia/skills", requireAuth, async (_req, res) => {
 
 // ── POST /api/nvidia/chat ───────────────────────────────────────────────────
 // Chat con CUALQUIERA de los modelos de texto del catálogo
-router.post("/api/nvidia/chat", requireAuth, async (req, res) => {
+router.post("/api/nvidia/chat", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const {
@@ -251,7 +264,7 @@ router.post("/api/nvidia/chat", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/vision ─────────────────────────────────────────────────
 // Análisis de imagen con Llama Vision 90B, Phi-4 Multimodal, etc.
-router.post("/api/nvidia/vision", requireAuth, async (req, res) => {
+router.post("/api/nvidia/vision", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const {
@@ -298,7 +311,7 @@ router.post("/api/nvidia/vision", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/code ───────────────────────────────────────────────────
 // Generación de código con StarCoder2, Codestral, CodeLlama, etc.
-router.post("/api/nvidia/code", requireAuth, async (req, res) => {
+router.post("/api/nvidia/code", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const {
@@ -343,7 +356,7 @@ router.post("/api/nvidia/code", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/translate ──────────────────────────────────────────────
 // Traducción profesional con RIVA Translate 4B
-router.post("/api/nvidia/translate", requireAuth, async (req, res) => {
+router.post("/api/nvidia/translate", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const { text, sourceLang = "auto", targetLang = "es", model = "nvidia/riva-translate-4b-instruct" } =
@@ -383,7 +396,7 @@ router.post("/api/nvidia/translate", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/safety ─────────────────────────────────────────────────
 // Análisis de seguridad de contenido con Llama Guard 4, NemoGuard, GLiNER PII
-router.post("/api/nvidia/safety", requireAuth, async (req, res) => {
+router.post("/api/nvidia/safety", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const { content, checkType = "content", model = "meta/llama-guard-4-12b" } =
@@ -427,7 +440,7 @@ router.post("/api/nvidia/safety", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/creative ────────────────────────────────────────────────
 // Escritura creativa con Palmyra Creative 122B
-router.post("/api/nvidia/creative", requireAuth, async (req, res) => {
+router.post("/api/nvidia/creative", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const { prompt, tone = "professional", brandName, model = "writer/palmyra-creative-122b", maxTokens = 8192 } =
@@ -462,7 +475,7 @@ router.post("/api/nvidia/creative", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/finance ─────────────────────────────────────────────────
 // Análisis financiero con Palmyra Finance 70B
-router.post("/api/nvidia/finance", requireAuth, async (req, res) => {
+router.post("/api/nvidia/finance", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const { prompt, context, model = "writer/palmyra-fin-70b-32k", maxTokens = 8192 } =
@@ -498,7 +511,7 @@ router.post("/api/nvidia/finance", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/embed ───────────────────────────────────────────────────
 // Embeddings semánticos con BGE-M3, NV-Embed, etc.
-router.post("/api/nvidia/embed", requireAuth, async (req, res) => {
+router.post("/api/nvidia/embed", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const { texts, model = "baai/bge-m3", inputType = "query" } =
@@ -530,7 +543,7 @@ router.post("/api/nvidia/embed", requireAuth, async (req, res) => {
 });
 
 // ── POST /api/nvidia/generate-image ─────────────────────────────────────────
-router.post("/api/nvidia/generate-image", requireAuth, async (req, res) => {
+router.post("/api/nvidia/generate-image", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const {
@@ -591,7 +604,7 @@ router.post("/api/nvidia/generate-image", requireAuth, async (req, res) => {
 });
 
 // ── POST /api/nvidia/generate-video ─────────────────────────────────────────
-router.post("/api/nvidia/generate-video", requireAuth, async (req, res) => {
+router.post("/api/nvidia/generate-video", requireAuth, requireNvidiaKey, async (req, res) => {
   try {
     const key = nimKey();
     const { prompt, model = "nvidia/cosmos-predict2-2b", duration = 6, resolution = "1280x720", fps = 24, seed } =

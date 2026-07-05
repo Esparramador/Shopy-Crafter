@@ -176,6 +176,9 @@ export type ImageGenModel =
   | "gpt-image-1-mini"         // OpenAI gpt-image-1 mini — presupuesto, alta velocidad
   | "grok-imagine-image"        // xAI Grok Imagine — generación de imagen T2I ($0.02/img)
   | "grok-imagine-image-quality" // xAI Grok Imagine Quality — alta calidad ($0.05/img 1K, $0.07/img 2K)
+  | "nvidia-flux-schnell"       // NVIDIA FLUX.1 Schnell — ultra rápido, 4 pasos, gratis en NIM
+  | "nvidia-flux-dev"           // NVIDIA FLUX.1 Dev — alta calidad, 28 pasos, NVIDIA NIM
+  | "nvidia-sdxl"               // NVIDIA SDXL Turbo — Stable Diffusion XL acelerado en GPU NVIDIA
   | "recraft-v3-svg"            // Recraft v3 SVG — vectorial real (logos, iconos)
   | "ideogram-v3-balanced"      // Ideogram V3 Balanced — buen balance velocidad/calidad
   | "imagen-4-fast"             // Google Imagen 4 Fast (cheap, quick)
@@ -184,7 +187,7 @@ export type ImageGenModel =
   | "freepik-flux-dev";         // Freepik Flux Dev — fast/high quality
 
 // ImageProvider explícito para health-check / fallback automático en frontend.
-export type ImageProvider = "replicate" | "gemini" | "runway" | "openai" | "xai" | "freepik";
+export type ImageProvider = "replicate" | "gemini" | "runway" | "openai" | "xai" | "freepik" | "nvidia";
 
 export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; replicateId?: string; description: string; costPerImage: number; aspectRatios: string[]; maxResolution: string }> = {
   "freepik-mystic":         { provider: "freepik", description: "Freepik Mystic — Máxima calidad con controles de estilo avanzados", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
@@ -219,8 +222,11 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "gpt-image-2":            { provider: "openai", description: "OpenAI gpt-image-2 — flagship 2026, razonamiento integrado, máxima calidad fotorrealista", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3","21:9"], maxResolution: "1536x864 (flex)" },
   "gpt-image-1.5":          { provider: "openai", description: "OpenAI gpt-image-1.5 — 20% más barato que v1, calidad equivalente", costPerImage: 0.033, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1536x1024" },
   "gpt-image-1-mini":             { provider: "openai", description: "OpenAI gpt-image-1 mini — presupuesto, alta velocidad, ideal para volumen", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1024x1024" },
-  "grok-imagine-image":           { provider: "xai",   description: "xAI Grok Imagine — generación de imagen rápida y barata ($0.02/img)", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1K" },
-  "grok-imagine-image-quality":   { provider: "xai",   description: "xAI Grok Imagine Quality — alta calidad 1K/2K, mejor coherencia visual ($0.05/img)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "2K" },
+  "grok-imagine-image":           { provider: "xai",    description: "xAI Grok Imagine — generación de imagen rápida y barata ($0.02/img)", costPerImage: 0.02, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "1K" },
+  "grok-imagine-image-quality":   { provider: "xai",    description: "xAI Grok Imagine Quality — alta calidad 1K/2K, mejor coherencia visual ($0.05/img)", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","3:2","2:3"], maxResolution: "2K" },
+  "nvidia-flux-schnell":          { provider: "nvidia", description: "NVIDIA FLUX.1 Schnell — ultra rápido (4 pasos), ideal para iteración y volumen", costPerImage: 0.01, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
+  "nvidia-flux-dev":              { provider: "nvidia", description: "NVIDIA FLUX.1 Dev — alta calidad, 28 pasos, detalle fotorrealista en GPU NVIDIA", costPerImage: 0.025, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
+  "nvidia-sdxl":                  { provider: "nvidia", description: "NVIDIA SDXL Turbo — Stable Diffusion XL acelerado con TensorRT en GPU NVIDIA", costPerImage: 0.015, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1024x1024" },
 };
 
 // Modelos de edición de imagen mapeados a provider para el health-check.
@@ -303,6 +309,48 @@ export async function generateImage(
     if (!imgUrl) throw new Error("xAI Aurora: no se devolvió URL de imagen");
     const buffer = await fetchToBuffer(imgUrl);
     return { buffer, mimeType: "image/jpeg", model };
+  }
+
+  // ── NVIDIA NIM image generation (FLUX.1 Schnell, FLUX.1 Dev, SDXL Turbo)
+  // Fallback: si NVIDIA_API_KEY ausente o falla → flux-schnell vía Replicate
+  if (model === "nvidia-flux-schnell" || model === "nvidia-flux-dev" || model === "nvidia-sdxl") {
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    if (nvidiaKey) {
+      const nvidiaModelMap: Record<string, string> = {
+        "nvidia-flux-schnell": "black-forest-labs/flux-schnell",
+        "nvidia-flux-dev":     "black-forest-labs/flux-dev",
+        "nvidia-sdxl":         "stabilityai/stable-diffusion-xl-base-1.0",
+      };
+      const nvidiaImgModel = nvidiaModelMap[model] ?? "black-forest-labs/flux-schnell";
+      const nvidiaW = aspect === "16:9" ? 1280 : aspect === "9:16" ? 720 : aspect === "4:3" ? 1024 : 1024;
+      const nvidiaH = aspect === "16:9" ? 720 : aspect === "9:16" ? 1280 : aspect === "4:3" ? 768 : 1024;
+      try {
+        const nvidiaRes = await fetch("https://integrate.api.nvidia.com/v1/images/generations", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${nvidiaKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: nvidiaImgModel,
+            prompt,
+            n: 1,
+            width: nvidiaW,
+            height: nvidiaH,
+            response_format: "b64_json",
+          }),
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (nvidiaRes.ok) {
+          const nvidiaData = await nvidiaRes.json() as { data: Array<{ b64_json?: string; url?: string }> };
+          const b64 = nvidiaData.data?.[0]?.b64_json;
+          if (b64) return { buffer: Buffer.from(b64, "base64"), mimeType: "image/png", model };
+          const imgUrl = nvidiaData.data?.[0]?.url;
+          if (imgUrl) { const buf = await fetchToBuffer(imgUrl); return { buffer: buf, mimeType: "image/png", model }; }
+        }
+        // NVIDIA failed — fall through to Replicate fallback below
+      } catch { /* fall through to Replicate */ }
+    }
+    // Fallback: route to equivalent Replicate model
+    const replicateFallback = model === "nvidia-sdxl" ? "stable-diffusion-3.5-large" : "flux-schnell";
+    return generateImage(replicateFallback as ImageGenModel, prompt, opts);
   }
 
   // ── Nano Banana v1 / v2 (Gemini → Replicate fallback)
@@ -957,9 +1005,11 @@ export type VideoModel =
   | "kling-v2.6"            // Kling v2.6 — T2V+I2V, audio+lip-sync nativos, 1080p
   | "kling-v2.1-master"     // Kling v2.1 Master — T2V+I2V premium, 1080p, 5/10s
   | "wan-2.7-videoedit"     // Wan 2.7 VideoEdit — edición con instrucciones naturales
-  | "seedance-2.0";         // Seedance 2.0 — T2V+I2V, audio nativo, 4-15s, 720p
+  | "seedance-2.0"          // Seedance 2.0 — T2V+I2V, audio nativo, 4-15s, 720p
+  | "nvidia-cosmos-2b"      // NVIDIA Cosmos 2B — world-model T2V compact en NIM
+  | "nvidia-cosmos-14b";    // NVIDIA Cosmos 14B — world-model T2V máxima calidad NVIDIA
 
-export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini" | "xai"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
+export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini" | "xai" | "nvidia"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
   "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
   "runway-gen3-alpha":  { provider: "runway",                                                description: "Runway Gen-3 Alpha — legado, reemplazado por Gen-4.5 y Gen-5",    costPerSec: 0.03, quality: 6,  maxDuration: 10 },
   "runway-gen4.5":       { provider: "runway",                                                description: "Runway Gen 4.5 — última generación Jun-2026, 4K, audio nativo, hasta 15s", costPerSec: 0.07,  quality: 10, maxDuration: 15 },
@@ -1017,6 +1067,8 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "kling-v2.1-master":     { provider: "replicate", modelId: "kwaivgi/kling-v2.1-master",       description: "Kling v2.1 Master — dynamics premium, T2V+I2V, 1080p, 5/10s",             costPerSec: 0.20, quality: 10, maxDuration: 10 },
   "wan-2.7-videoedit":     { provider: "replicate", modelId: "wan-video/wan-2.7-videoedit",      description: "Wan 2.7 VideoEdit — edición V2V con instrucciones en lenguaje natural",   costPerSec: 0.07, quality: 9,  maxDuration: 15 },
   "seedance-2.0":          { provider: "replicate", modelId: "bytedance/seedance-2.0",           description: "Seedance 2.0 — T2V+I2V, audio nativo, 4-15s, 720p, aspect adaptivo",     costPerSec: 0.06, quality: 9,  maxDuration: 15 },
+  "nvidia-cosmos-2b":      { provider: "nvidia",    modelId: "nvidia/cosmos-2b",                 description: "NVIDIA Cosmos 2B — world-model T2V compacto, rápido en GPU NVIDIA NIM",  costPerSec: 0.04, quality: 7,  maxDuration: 10 },
+  "nvidia-cosmos-14b":     { provider: "nvidia",    modelId: "nvidia/cosmos-14b",                description: "NVIDIA Cosmos 14B — world-model T2V máxima calidad NVIDIA, 1080p",       costPerSec: 0.10, quality: 9,  maxDuration: 10 },
 };
 
 // Modelos que soportan TEXT-TO-VIDEO puro (sin imagen origen).
@@ -1072,6 +1124,8 @@ const T2V_SUPPORTED: Record<string, boolean> = {
   "kling-v2.1-master":      true,
   "wan-2.7-videoedit":      false,
   "seedance-2.0":           true,
+  "nvidia-cosmos-2b":       true,
+  "nvidia-cosmos-14b":      true,
 };
 
 export function modelSupportsTextToVideo(model: VideoModel): boolean {
@@ -1316,6 +1370,36 @@ export async function generateVideoFromImage(
     const { request_id } = await createRes.json() as { request_id: string };
     const videoUrl = await pollXaiVideo(request_id, key);
     return await fetchToBuffer(videoUrl);
+  }
+
+  // ── NVIDIA NIM video generation (Cosmos 2B / 14B)
+  // Fallback: si NVIDIA_API_KEY ausente o falla → seedance-fast vía Replicate
+  if (cfg.provider === "nvidia") {
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    if (nvidiaKey && cfg.modelId) {
+      try {
+        const nvidiaVidRes = await fetch("https://integrate.api.nvidia.com/v1/videos/generations", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${nvidiaKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: cfg.modelId,
+            prompt,
+            duration: Math.min(duration, cfg.maxDuration),
+            aspect_ratio: opts.aspect || "16:9",
+          }),
+          signal: AbortSignal.timeout(180_000),
+        });
+        if (nvidiaVidRes.ok) {
+          const nvidiaVidData = await nvidiaVidRes.json() as { data?: Array<{ url?: string; b64_json?: string }> };
+          const vidUrl = nvidiaVidData.data?.[0]?.url;
+          if (vidUrl) return fetchToBuffer(vidUrl);
+          const b64 = nvidiaVidData.data?.[0]?.b64_json;
+          if (b64) return Buffer.from(b64, "base64");
+        }
+      } catch { /* fall through to Replicate fallback */ }
+    }
+    // Fallback to seedance-fast via Replicate
+    return generateVideo("seedance-fast" as VideoModel, prompt, opts);
   }
 
   // Replicate (T2V o I2V según haya imagen)
