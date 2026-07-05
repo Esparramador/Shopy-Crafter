@@ -4,51 +4,140 @@ import { saveToVault } from "../lib/vault.js";
 
 const router = Router();
 
-// ── NVIDIA NIM TEXT MODELS (reference) ───────────────────────────────────────
-export const NVIDIA_TEXT_MODELS = [
-  { id: "nvidia/llama-3.3-nemotron-super-49b-v1", label: "Nemotron 49B",      tier: "flagship" },
-  { id: "meta/llama-3.3-70b-instruct",            label: "Llama 3.3 70B",    tier: "pro"      },
-  { id: "meta/llama-3.1-405b-instruct",           label: "Llama 3.1 405B",   tier: "max"      },
-  { id: "microsoft/phi-4",                        label: "Phi-4",            tier: "fast"     },
-  { id: "qwen/qwen3-235b-a22b",                   label: "Qwen3 235B",       tier: "max"      },
-  { id: "mistralai/mistral-large-2-instruct",     label: "Mistral Large 2",  tier: "pro"      },
-  { id: "nvidia/mistral-nemo-minitron-8b-8k-instruct", label: "NeMo 8B",     tier: "fast"     },
-  { id: "google/gemma-3-27b-it",                  label: "Gemma 3 27B",      tier: "pro"      },
-] as const;
+// ═══════════════════════════════════════════════════════════════
+// NVIDIA NIM — CATÁLOGO COMPLETO DE 121 MODELOS (Jul 2026)
+// Fuente: GET https://integrate.api.nvidia.com/v1/models
+// ═══════════════════════════════════════════════════════════════
 
-// ── NVIDIA NIM IMAGE MODELS ───────────────────────────────────────────────────
-export const NVIDIA_IMAGE_MODELS = [
-  {
-    id: "black-forest-labs/flux-schnell",
-    label: "FLUX Schnell",
-    description: "Más rápido • 4 pasos • Ideal para prototipos rápidos",
-    aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4"],
-    maxPromptLength: 512,
-  },
-  {
-    id: "black-forest-labs/flux-dev",
-    label: "FLUX Dev",
-    description: "Alta calidad • 20+ pasos • Mejor para producción",
-    aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4"],
-    maxPromptLength: 512,
-  },
-  {
-    id: "stabilityai/sdxl-turbo",
-    label: "SDXL Turbo",
-    description: "Realtime diffusion • 1 paso • Ultra rápido",
-    aspectRatios: ["1:1", "16:9"],
-    maxPromptLength: 256,
-  },
-  {
-    id: "stabilityai/stable-diffusion-3-5-large",
-    label: "SD 3.5 Large",
-    description: "Última generación SD • Tipografía precisa • Composición perfecta",
-    aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "21:9"],
-    maxPromptLength: 1024,
-  },
-] as const;
+export const NVIDIA_CATALOG = {
 
-type NvidiaImageModelId = typeof NVIDIA_IMAGE_MODELS[number]["id"];
+  // ── TEXTO / CHAT ─────────────────────────────────────────────
+  text: [
+    { id: "nvidia/llama-3.3-nemotron-super-49b-v1",      label: "Nemotron 49B Super",         tier: "flagship", specialty: "razonamiento,análisis",          tokens: 128000 },
+    { id: "nvidia/llama-3.3-nemotron-super-49b-v1.5",    label: "Nemotron 49B Super v1.5",    tier: "flagship", specialty: "razonamiento,análisis",          tokens: 128000 },
+    { id: "nvidia/llama-3.1-nemotron-ultra-253b-v1",     label: "Nemotron Ultra 253B",        tier: "max",      specialty: "razonamiento avanzado,AGI tasks", tokens: 128000 },
+    { id: "nvidia/nemotron-4-340b-instruct",             label: "Nemotron 4 340B",            tier: "max",      specialty: "síntesis,análisis complejo",      tokens: 4096   },
+    { id: "nvidia/llama-3.1-nemotron-nano-8b-v1",        label: "Nemotron Nano 8B",           tier: "fast",     specialty: "respuestas rápidas,clasificación", tokens: 128000 },
+    { id: "nvidia/nvidia-nemotron-nano-9b-v2",           label: "Nemotron Nano 9B v2",        tier: "fast",     specialty: "respuestas rápidas",             tokens: 128000 },
+    { id: "nvidia/nemotron-nano-12b-v2-vl",              label: "Nemotron Nano 12B VL",       tier: "fast",     specialty: "visión+texto",                   tokens: 128000 },
+    { id: "nvidia/nemotron-3-super-120b-a12b",           label: "Nemotron 3 Super 120B",      tier: "pro",      specialty: "MoE,eficiencia",                 tokens: 128000 },
+    { id: "nvidia/nemotron-3-ultra-550b-a55b",           label: "Nemotron 3 Ultra 550B",      tier: "max",      specialty: "MoE máxima calidad",             tokens: 128000 },
+    { id: "nvidia/nemotron-3-nano-30b-a3b",              label: "Nemotron 3 Nano 30B",        tier: "fast",     specialty: "MoE ligero",                     tokens: 128000 },
+    { id: "meta/llama-4-maverick-17b-128e-instruct",     label: "Llama 4 Maverick 17B",       tier: "pro",      specialty: "multimodal,chat",                tokens: 1048576 },
+    { id: "meta/llama-3.3-70b-instruct",                 label: "Llama 3.3 70B",              tier: "pro",      specialty: "chat,instrucciones",             tokens: 128000 },
+    { id: "meta/llama-3.1-70b-instruct",                 label: "Llama 3.1 70B",              tier: "pro",      specialty: "chat general",                   tokens: 128000 },
+    { id: "meta/llama-3.1-8b-instruct",                  label: "Llama 3.1 8B",               tier: "fast",     specialty: "chat rápido",                    tokens: 128000 },
+    { id: "deepseek-ai/deepseek-v4-pro",                 label: "DeepSeek V4 Pro",            tier: "flagship", specialty: "razonamiento,código,matemáticas", tokens: 131072 },
+    { id: "deepseek-ai/deepseek-v4-flash",               label: "DeepSeek V4 Flash",          tier: "fast",     specialty: "razonamiento rápido",            tokens: 131072 },
+    { id: "mistralai/mistral-large-3-675b-instruct-2512",label: "Mistral Large 3 675B",       tier: "max",      specialty: "multilingüe,instrucciones",      tokens: 131072 },
+    { id: "mistralai/mistral-large-2-instruct",          label: "Mistral Large 2",            tier: "pro",      specialty: "instrucciones,multilingüe",      tokens: 128000 },
+    { id: "mistralai/mistral-medium-3.5-128b",           label: "Mistral Medium 3.5 128B",    tier: "pro",      specialty: "equilibrado",                    tokens: 128000 },
+    { id: "mistralai/mistral-nemotron",                  label: "Mistral Nemotron",           tier: "flagship", specialty: "NVIDIA+Mistral híbrido",         tokens: 128000 },
+    { id: "mistralai/mistral-small-4-119b-2603",         label: "Mistral Small 4 119B",       tier: "pro",      specialty: "rápido+capaz",                   tokens: 128000 },
+    { id: "qwen/qwen3.5-397b-a17b",                      label: "Qwen 3.5 397B MoE",          tier: "max",      specialty: "razonamiento,código,matemáticas", tokens: 131072 },
+    { id: "qwen/qwen3.5-122b-a10b",                      label: "Qwen 3.5 122B MoE",          tier: "pro",      specialty: "equilibrado,MoE",                tokens: 131072 },
+    { id: "qwen/qwen3-next-80b-a3b-instruct",            label: "Qwen 3 Next 80B",            tier: "pro",      specialty: "instrucciones,código",           tokens: 131072 },
+    { id: "microsoft/phi-4-mini-instruct",               label: "Phi-4 Mini",                 tier: "fast",     specialty: "compacto,razonamiento",          tokens: 128000 },
+    { id: "microsoft/phi-3.5-moe-instruct",              label: "Phi-3.5 MoE",                tier: "pro",      specialty: "MoE Microsoft",                  tokens: 128000 },
+    { id: "google/gemma-4-31b-it",                       label: "Gemma 4 31B",                tier: "pro",      specialty: "Google,instrucciones",           tokens: 128000 },
+    { id: "google/gemma-3-12b-it",                       label: "Gemma 3 12B",                tier: "fast",     specialty: "Google ligero",                  tokens: 128000 },
+    { id: "google/gemma-3-4b-it",                        label: "Gemma 3 4B",                 tier: "fast",     specialty: "Google ultra ligero",            tokens: 128000 },
+    { id: "minimaxai/minimax-m3",                        label: "MiniMax M3",                 tier: "pro",      specialty: "multimodal,contexto largo",      tokens: 1000000 },
+    { id: "minimaxai/minimax-m2.7",                      label: "MiniMax M2.7",               tier: "pro",      specialty: "eficiencia,velocidad",           tokens: 1000000 },
+    { id: "moonshotai/kimi-k2.6",                        label: "Kimi K2.6",                  tier: "flagship", specialty: "agente,razonamiento largo",      tokens: 131072 },
+    { id: "bytedance/seed-oss-36b-instruct",             label: "ByteDance Seed 36B",         tier: "pro",      specialty: "instrucciones,eficiencia",       tokens: 32768  },
+    { id: "stepfun-ai/step-3.7-flash",                   label: "Step 3.7 Flash",             tier: "fast",     specialty: "respuesta rápida",               tokens: 32768  },
+    { id: "ai21labs/jamba-1.5-large-instruct",           label: "Jamba 1.5 Large",            tier: "pro",      specialty: "SSM+Transformer híbrido",        tokens: 256000 },
+    { id: "01-ai/yi-large",                              label: "Yi Large",                   tier: "pro",      specialty: "multilingüe,instrucciones",      tokens: 32768  },
+  ],
+
+  // ── CÓDIGO ───────────────────────────────────────────────────
+  code: [
+    { id: "bigcode/starcoder2-15b",                      label: "StarCoder2 15B",             specialty: "código,80+ lenguajes,fill-in-middle", tokens: 16384 },
+    { id: "mistralai/codestral-22b-instruct-v0.1",       label: "Codestral 22B",              specialty: "código,velocidad,Mistral",            tokens: 32768 },
+    { id: "deepseek-ai/deepseek-coder-6.7b-instruct",    label: "DeepSeek Coder 6.7B",        specialty: "código,instrucciones,eficiente",      tokens: 16384 },
+    { id: "meta/codellama-70b",                          label: "CodeLlama 70B",              specialty: "código,razonamiento,Meta",            tokens: 100000},
+    { id: "ibm/granite-34b-code-instruct",               label: "Granite 34B Code",           specialty: "código empresarial,IBM",              tokens: 8192  },
+    { id: "ibm/granite-8b-code-instruct",                label: "Granite 8B Code",            specialty: "código rápido,IBM",                  tokens: 4096  },
+    { id: "google/codegemma-1.1-7b",                     label: "CodeGemma 7B",               specialty: "código,Google,fill-in-middle",        tokens: 8192  },
+  ],
+
+  // ── VISIÓN / MULTIMODAL ──────────────────────────────────────
+  vision: [
+    { id: "meta/llama-3.2-90b-vision-instruct",          label: "Llama 3.2 Vision 90B",       specialty: "visión+texto,análisis imagen,OCR",    tokens: 128000 },
+    { id: "meta/llama-3.2-11b-vision-instruct",          label: "Llama 3.2 Vision 11B",       specialty: "visión rápida,análisis imagen",       tokens: 128000 },
+    { id: "microsoft/phi-4-multimodal-instruct",         label: "Phi-4 Multimodal",           specialty: "visión+audio+texto,Microsoft",        tokens: 128000 },
+    { id: "microsoft/phi-3-vision-128k-instruct",        label: "Phi-3 Vision 128K",          specialty: "visión+texto,contexto largo",         tokens: 128000 },
+    { id: "microsoft/kosmos-2",                          label: "Kosmos-2",                   specialty: "grounding,detección objetos,bbox",    tokens: 2048   },
+    { id: "nvidia/neva-22b",                             label: "NEVA 22B",                   specialty: "visión-lenguaje,NVIDIA",              tokens: 4096   },
+    { id: "nvidia/vila",                                 label: "VILA",                       specialty: "video+imagen análisis,NVIDIA",        tokens: 4096   },
+    { id: "adept/fuyu-8b",                               label: "Fuyu-8B",                    specialty: "UI analysis,diagramas,documentos",   tokens: 4096   },
+    { id: "google/diffusiongemma-26b-a4b-it",            label: "DiffusionGemma 26B",         specialty: "generación imagen+texto,Google",      tokens: 8192   },
+    { id: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",    label: "Nemotron Nano VL 8B",        specialty: "visión+texto ligero",                tokens: 128000 },
+  ],
+
+  // ── EMBEDDING / RETRIEVAL ────────────────────────────────────
+  embedding: [
+    { id: "baai/bge-m3",                                 label: "BGE-M3",                     specialty: "multilingüe,dense+sparse+colbert",    dims: 1024 },
+    { id: "nvidia/nv-embed-v1",                          label: "NV-Embed v1",                specialty: "alta calidad,MTEB top",              dims: 4096 },
+    { id: "nvidia/nv-embedqa-mistral-7b-v2",             label: "NV-EmbedQA Mistral v2",      specialty: "QA,búsqueda semántica",              dims: 4096 },
+    { id: "nvidia/nv-embedqa-e5-v5",                     label: "NV-EmbedQA E5 v5",           specialty: "QA,multilingüe",                     dims: 1024 },
+    { id: "nvidia/llama-nemotron-embed-1b-v2",           label: "Nemotron Embed 1B",          specialty: "ligero,rápido",                      dims: 2048 },
+    { id: "snowflake/arctic-embed-l",                    label: "Arctic Embed L",             specialty: "retrieval,Snowflake",                dims: 1024 },
+    { id: "nvidia/embed-qa-4",                           label: "NV Embed QA 4",              specialty: "QA optimizado",                      dims: 1024 },
+  ],
+
+  // ── SEGURIDAD / GUARDRAILS ───────────────────────────────────
+  safety: [
+    { id: "meta/llama-guard-4-12b",                      label: "Llama Guard 4 12B",          specialty: "detección contenido peligroso,Meta" },
+    { id: "nvidia/llama-3.1-nemoguard-8b-content-safety",label: "NemoGuard Content Safety",   specialty: "seguridad contenido,NVIDIA" },
+    { id: "nvidia/llama-3.1-nemoguard-8b-topic-control", label: "NemoGuard Topic Control",    specialty: "control temático,NVIDIA" },
+    { id: "nvidia/nemotron-3-content-safety",            label: "Nemotron Content Safety",    specialty: "clasificación seguridad" },
+    { id: "nvidia/nemotron-3.5-content-safety",          label: "Nemotron 3.5 Content Safety",specialty: "seguridad avanzada" },
+    { id: "nvidia/nemotron-content-safety-reasoning-4b", label: "Nemotron Safety Reasoning 4B",specialty: "razonamiento de seguridad" },
+    { id: "nvidia/gliner-pii",                           label: "GLiNER PII Detector",        specialty: "detección PII,privacidad,GDPR" },
+    { id: "nvidia/ai-synthetic-video-detector",          label: "AI Video Detector",          specialty: "deepfake,vídeo sintético,detección" },
+  ],
+
+  // ── TRADUCCIÓN ───────────────────────────────────────────────
+  translation: [
+    { id: "nvidia/riva-translate-4b-instruct",           label: "RIVA Translate 4B",          specialty: "traducción profesional,NVIDIA RIVA,50+ idiomas" },
+    { id: "nvidia/riva-translate-4b-instruct-v1.1",      label: "RIVA Translate 4B v1.1",     specialty: "traducción mejorada,calidad superior" },
+  ],
+
+  // ── ESPECIALIZADOS (Finanzas, Medicina, Creativo) ───────────
+  specialized: [
+    { id: "writer/palmyra-creative-122b",                label: "Palmyra Creative 122B",      specialty: "escritura creativa,storytelling,copywriting premium" },
+    { id: "writer/palmyra-fin-70b-32k",                  label: "Palmyra Finance 70B",        specialty: "análisis financiero,Wall Street,reportes" },
+    { id: "writer/palmyra-med-70b",                      label: "Palmyra Medical 70B",        specialty: "contenido médico,HIPAA-aware,clínico" },
+    { id: "nvidia/nemotron-4-340b-reward",               label: "Nemotron Reward 340B",       specialty: "ranking respuestas,RLHF,evaluación IA" },
+    { id: "nvidia/cosmos-reason2-8b",                    label: "Cosmos Reason2 8B",          specialty: "simulación física,razonamiento espacial" },
+    { id: "nvidia/llama3-chatqa-1.5-70b",                label: "ChatQA 1.5 70B",             specialty: "QA sobre documentos,conversacional,RAG" },
+    { id: "sarvamai/sarvam-m",                           label: "Sarvam-M",                   specialty: "idiomas indios,multilingüe regional" },
+    { id: "stockmark/stockmark-2-100b-instruct",         label: "Stockmark 2 100B",           specialty: "japonés,contenido financiero" },
+    { id: "abacusai/dracarys-llama-3.1-70b-instruct",   label: "Dracarys Llama 70B",         specialty: "seguimiento instrucciones,agentes" },
+    { id: "upstage/solar-10.7b-instruct",                label: "SOLAR 10.7B",                specialty: "eficiencia,instrucciones,coreano" },
+    { id: "zyphra/zamba2-7b-instruct",                   label: "Zamba2 7B",                  specialty: "SSM híbrido,memoria larga" },
+  ],
+
+  // ── IMAGEN ───────────────────────────────────────────────────
+  image: [
+    { id: "black-forest-labs/flux-schnell",              label: "FLUX.1 Schnell",             specialty: "ultra rápido,4 pasos,prototipado",   aspectRatios: ["1:1","16:9","9:16","4:3","3:4"] },
+    { id: "black-forest-labs/flux-dev",                  label: "FLUX.1 Dev",                 specialty: "alta calidad,producción,20+ pasos",  aspectRatios: ["1:1","16:9","9:16","4:3","3:4"] },
+    { id: "stabilityai/sdxl-turbo",                      label: "SDXL Turbo",                 specialty: "realtime,1 paso,ultra rápido",        aspectRatios: ["1:1","16:9"] },
+    { id: "stabilityai/stable-diffusion-3-5-large",      label: "SD 3.5 Large",               specialty: "última gen SD,tipografía,composición",aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"] },
+  ],
+
+  // ── VÍDEO ────────────────────────────────────────────────────
+  video: [
+    { id: "nvidia/cosmos-predict2-2b",                   label: "Cosmos Predict2 2B",         specialty: "T2V rápido,física real,4-10s" },
+    { id: "nvidia/cosmos-predict2-14b",                  label: "Cosmos Predict2 14B",        specialty: "T2V máxima calidad,física coherente,4-12s" },
+  ],
+} as const;
+
+// Helpers de acceso rápido
+export const NVIDIA_TEXT_MODELS = NVIDIA_CATALOG.text;
+export const NVIDIA_IMAGE_MODELS = NVIDIA_CATALOG.image;
 
 const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
   "1:1":  "1024x1024",
@@ -59,79 +148,418 @@ const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
   "21:9": "1536x640",
 };
 
-// ── GET /api/nvidia/models ────────────────────────────────────────────────────
-router.get("/api/nvidia/models", requireAuth, (_req, res) => {
-  res.json({
-    text: NVIDIA_TEXT_MODELS,
-    image: NVIDIA_IMAGE_MODELS,
-  });
+const NIM_BASE = "https://integrate.api.nvidia.com/v1";
+
+function nimKey(): string {
+  const k = process.env.NVIDIA_API_KEY;
+  if (!k) throw new Error("NVIDIA_API_KEY no configurada — añade la clave en Secretos del proyecto.");
+  return k;
+}
+
+// ── GET /api/nvidia/catalog ─────────────────────────────────────────────────
+// Catálogo completo de 121 modelos organizado por categoría
+router.get("/api/nvidia/catalog", requireAuth, (_req, res) => {
+  const summary = {
+    total: Object.values(NVIDIA_CATALOG).reduce((s, arr) => s + (arr as unknown[]).length, 0),
+    categories: {
+      text:        { count: NVIDIA_CATALOG.text.length,        description: "LLMs de chat y razonamiento general" },
+      code:        { count: NVIDIA_CATALOG.code.length,        description: "Modelos especializados en generación de código" },
+      vision:      { count: NVIDIA_CATALOG.vision.length,      description: "Análisis de imagen/vídeo y OCR" },
+      embedding:   { count: NVIDIA_CATALOG.embedding.length,   description: "Embeddings semánticos para RAG y búsqueda" },
+      safety:      { count: NVIDIA_CATALOG.safety.length,      description: "Guardas de seguridad, PII y deepfakes" },
+      translation: { count: NVIDIA_CATALOG.translation.length, description: "Traducción profesional en 50+ idiomas" },
+      specialized: { count: NVIDIA_CATALOG.specialized.length, description: "Finanzas, medicina, escritura creativa" },
+      image:       { count: NVIDIA_CATALOG.image.length,       description: "Generación de imágenes con difusión" },
+      video:       { count: NVIDIA_CATALOG.video.length,       description: "Video text-to-video con física real (Cosmos)" },
+    },
+    catalog: NVIDIA_CATALOG,
+  };
+  res.json(summary);
 });
 
-// ── POST /api/nvidia/generate-image ──────────────────────────────────────────
-router.post("/api/nvidia/generate-image", requireAuth, async (req, res) => {
+// ── GET /api/nvidia/models (retrocompatibilidad) ────────────────────────────
+router.get("/api/nvidia/models", requireAuth, (_req, res) => {
+  res.json({ text: NVIDIA_CATALOG.text, image: NVIDIA_CATALOG.image, video: NVIDIA_CATALOG.video });
+});
+
+// ── GET /api/nvidia/skills ───────────────────────────────────────────────────
+// Skills catalog con prompts, use-cases y endpoints por capacidad
+router.get("/api/nvidia/skills", requireAuth, async (_req, res) => {
   try {
-    const nvidiaKey = process.env.NVIDIA_API_KEY;
-    if (!nvidiaKey) {
-      res.status(503).json({ error: "NVIDIA_API_KEY no configurada. Añade la clave en Configuración → Secretos del proyecto." });
-      return;
+    const { readFile } = await import("fs/promises");
+    const { resolve, dirname } = await import("path");
+    const { fileURLToPath } = await import("url");
+    const __dir = dirname(fileURLToPath(import.meta.url));
+    // Try dist/data/nvidia-skills then src/data/nvidia-skills
+    const paths = [
+      resolve(__dir, "../../data/nvidia-skills/catalog.json"),
+      resolve(__dir, "../../../src/data/nvidia-skills/catalog.json"),
+    ];
+    let catalog: unknown[] = [];
+    for (const p of paths) {
+      try { catalog = JSON.parse(await readFile(p, "utf-8")); break; } catch { /* try next */ }
+    }
+    res.json({ count: catalog.length, skills: catalog });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error cargando skills" });
+  }
+});
+
+// ── POST /api/nvidia/chat ───────────────────────────────────────────────────
+// Chat con CUALQUIERA de los modelos de texto del catálogo
+router.post("/api/nvidia/chat", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
+    const {
+      prompt, systemPrompt, model = "nvidia/llama-3.3-nemotron-super-49b-v1",
+      maxTokens = 4096, temperature = 0.7, stream = false,
+    } = req.body as { prompt: string; systemPrompt?: string; model?: string; maxTokens?: number; temperature?: number; stream?: boolean };
+
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt requerido" }); return; }
+
+    const allTextIds = NVIDIA_CATALOG.text.map(m => m.id as string)
+      .concat(NVIDIA_CATALOG.code.map(m => m.id as string))
+      .concat(NVIDIA_CATALOG.specialized.map(m => m.id as string));
+    const modelId = allTextIds.includes(model) ? model : "nvidia/llama-3.3-nemotron-super-49b-v1";
+
+    const messages: Array<{role: string; content: string}> = [];
+    if (systemPrompt?.trim()) messages.push({ role: "system", content: systemPrompt.trim() });
+    messages.push({ role: "user", content: prompt.trim() });
+
+    const r = await fetch(`${NIM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: modelId, messages, max_tokens: Math.min(maxTokens, 32768), temperature, stream: false }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      res.status(r.status).json({ error: `NVIDIA NIM: ${txt.slice(0, 300)}` }); return;
     }
 
+    const d = await r.json() as { choices?: Array<{message?: {content?: string}}>, usage?: {prompt_tokens?: number; completion_tokens?: number} };
+    res.json({
+      content: d.choices?.[0]?.message?.content ?? "",
+      model: modelId,
+      usage: d.usage ?? null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
+  }
+});
+
+// ── POST /api/nvidia/vision ─────────────────────────────────────────────────
+// Análisis de imagen con Llama Vision 90B, Phi-4 Multimodal, etc.
+router.post("/api/nvidia/vision", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
     const {
-      prompt,
-      negativePrompt,
-      model: reqModel,
-      aspectRatio = "1:1",
-      n = 1,
-      seed,
-      cfg,
-      steps,
-      projectId,
-      saveVault = false,
-      title,
+      prompt, imageUrl, imageBase64, mimeType = "image/jpeg",
+      model = "meta/llama-3.2-90b-vision-instruct",
+      maxTokens = 2048,
     } = req.body as {
-      prompt: string;
-      negativePrompt?: string;
-      model?: string;
-      aspectRatio?: string;
-      n?: number;
-      seed?: number;
-      cfg?: number;
-      steps?: number;
-      projectId?: number;
-      saveVault?: boolean;
-      title?: string;
+      prompt: string; imageUrl?: string; imageBase64?: string; mimeType?: string;
+      model?: string; maxTokens?: number;
     };
 
-    if (!prompt?.trim()) {
-      res.status(400).json({ error: "El campo 'prompt' es obligatorio." });
-      return;
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt requerido" }); return; }
+    if (!imageUrl && !imageBase64) { res.status(400).json({ error: "imageUrl o imageBase64 requerido" }); return; }
+
+    const validVision = NVIDIA_CATALOG.vision.map(m => m.id as string);
+    const modelId = validVision.includes(model) ? model : "meta/llama-3.2-90b-vision-instruct";
+
+    const imageContent = imageBase64
+      ? { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } }
+      : { type: "image_url", image_url: { url: imageUrl } };
+
+    const r = await fetch(`${NIM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: "user", content: [imageContent, { type: "text", text: prompt.trim() }] }],
+        max_tokens: maxTokens,
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      res.status(r.status).json({ error: `NVIDIA Vision: ${txt.slice(0, 300)}` }); return;
     }
 
-    const validModelIds = NVIDIA_IMAGE_MODELS.map(m => m.id) as string[];
-    const modelId: NvidiaImageModelId = (typeof reqModel === "string" && validModelIds.includes(reqModel))
-      ? reqModel as NvidiaImageModelId
-      : "black-forest-labs/flux-schnell";
+    const d = await r.json() as { choices?: Array<{message?: {content?: string}}> };
+    res.json({ analysis: d.choices?.[0]?.message?.content ?? "", model: modelId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
+  }
+});
 
+// ── POST /api/nvidia/code ───────────────────────────────────────────────────
+// Generación de código con StarCoder2, Codestral, CodeLlama, etc.
+router.post("/api/nvidia/code", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
+    const {
+      prompt, language = "javascript", model = "bigcode/starcoder2-15b",
+      maxTokens = 4096, systemContext,
+    } = req.body as { prompt: string; language?: string; model?: string; maxTokens?: number; systemContext?: string };
+
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt requerido" }); return; }
+
+    const validCode = NVIDIA_CATALOG.code.map(m => m.id as string);
+    const modelId = validCode.includes(model) ? model : "bigcode/starcoder2-15b";
+
+    const sys = systemContext?.trim()
+      ?? `Eres un experto programador. Genera código ${language} limpio, eficiente y bien comentado. Responde solo con el código y una breve explicación.`;
+
+    const r = await fetch(`${NIM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelId,
+        messages: [
+          { role: "system", content: sys },
+          { role: "user",   content: prompt.trim() },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.2,
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      res.status(r.status).json({ error: `NVIDIA Code: ${txt.slice(0, 300)}` }); return;
+    }
+
+    const d = await r.json() as { choices?: Array<{message?: {content?: string}}>, usage?: unknown };
+    res.json({ code: d.choices?.[0]?.message?.content ?? "", model: modelId, language });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
+  }
+});
+
+// ── POST /api/nvidia/translate ──────────────────────────────────────────────
+// Traducción profesional con RIVA Translate 4B
+router.post("/api/nvidia/translate", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
+    const { text, sourceLang = "auto", targetLang = "es", model = "nvidia/riva-translate-4b-instruct" } =
+      req.body as { text: string; sourceLang?: string; targetLang?: string; model?: string };
+
+    if (!text?.trim()) { res.status(400).json({ error: "text requerido" }); return; }
+
+    const validModels = NVIDIA_CATALOG.translation.map(m => m.id as string);
+    const modelId = validModels.includes(model) ? model : "nvidia/riva-translate-4b-instruct";
+
+    const prompt = sourceLang === "auto"
+      ? `Translate the following text to ${targetLang}. Return only the translation:\n\n${text.trim()}`
+      : `Translate the following text from ${sourceLang} to ${targetLang}. Return only the translation:\n\n${text.trim()}`;
+
+    const r = await fetch(`${NIM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 4096, temperature: 0.1,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      res.status(r.status).json({ error: `NVIDIA Translate: ${txt.slice(0, 300)}` }); return;
+    }
+
+    const d = await r.json() as { choices?: Array<{message?: {content?: string}}> };
+    res.json({ translation: d.choices?.[0]?.message?.content ?? "", model: modelId, sourceLang, targetLang });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
+  }
+});
+
+// ── POST /api/nvidia/safety ─────────────────────────────────────────────────
+// Análisis de seguridad de contenido con Llama Guard 4, NemoGuard, GLiNER PII
+router.post("/api/nvidia/safety", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
+    const { content, checkType = "content", model = "meta/llama-guard-4-12b" } =
+      req.body as { content: string; checkType?: "content" | "pii" | "topic"; model?: string };
+
+    if (!content?.trim()) { res.status(400).json({ error: "content requerido" }); return; }
+
+    const validSafety = NVIDIA_CATALOG.safety.map(m => m.id as string);
+    const modelId = validSafety.includes(model) ? model : "meta/llama-guard-4-12b";
+
+    const prompt = checkType === "pii"
+      ? `Identify any PII (Personal Identifiable Information) in this text. List what you find:\n\n${content}`
+      : checkType === "topic"
+      ? `Is this content appropriate for a professional e-commerce context? Identify any policy violations:\n\n${content}`
+      : content;
+
+    const r = await fetch(`${NIM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 512, temperature: 0,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      res.status(r.status).json({ error: `NVIDIA Safety: ${txt.slice(0, 300)}` }); return;
+    }
+
+    const d = await r.json() as { choices?: Array<{message?: {content?: string}}> };
+    const result = d.choices?.[0]?.message?.content ?? "";
+    const safe = result.toLowerCase().includes("safe") && !result.toLowerCase().includes("unsafe");
+    res.json({ safe, verdict: result, model: modelId, checkType });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
+  }
+});
+
+// ── POST /api/nvidia/creative ────────────────────────────────────────────────
+// Escritura creativa con Palmyra Creative 122B
+router.post("/api/nvidia/creative", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
+    const { prompt, tone = "professional", brandName, model = "writer/palmyra-creative-122b", maxTokens = 8192 } =
+      req.body as { prompt: string; tone?: string; brandName?: string; model?: string; maxTokens?: number };
+
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt requerido" }); return; }
+
+    const sys = `Eres un copywriter de clase mundial especializado en e-commerce y marketing digital. Tono: ${tone}. ${brandName ? `Marca: ${brandName}.` : ""} Crea contenido original, persuasivo y diferenciado que conecte emocionalmente con el lector.`;
+
+    const r = await fetch(`${NIM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "system", content: sys }, { role: "user", content: prompt.trim() }],
+        max_tokens: maxTokens, temperature: 0.85,
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      res.status(r.status).json({ error: `NVIDIA Creative: ${txt.slice(0, 300)}` }); return;
+    }
+
+    const d = await r.json() as { choices?: Array<{message?: {content?: string}}> };
+    res.json({ content: d.choices?.[0]?.message?.content ?? "", model, tone });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
+  }
+});
+
+// ── POST /api/nvidia/finance ─────────────────────────────────────────────────
+// Análisis financiero con Palmyra Finance 70B
+router.post("/api/nvidia/finance", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
+    const { prompt, context, model = "writer/palmyra-fin-70b-32k", maxTokens = 8192 } =
+      req.body as { prompt: string; context?: string; model?: string; maxTokens?: number };
+
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt requerido" }); return; }
+
+    const sys = "Eres un analista financiero experto. Proporciona análisis rigurosos, métricas precisas y recomendaciones basadas en datos. Contexto: e-commerce y negocios digitales.";
+
+    const userMsg = context?.trim() ? `Contexto adicional:\n${context}\n\nConsulta:\n${prompt}` : prompt;
+
+    const r = await fetch(`${NIM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model, messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+        max_tokens: maxTokens, temperature: 0.3,
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      res.status(r.status).json({ error: `NVIDIA Finance: ${txt.slice(0, 300)}` }); return;
+    }
+
+    const d = await r.json() as { choices?: Array<{message?: {content?: string}}> };
+    res.json({ analysis: d.choices?.[0]?.message?.content ?? "", model });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
+  }
+});
+
+// ── POST /api/nvidia/embed ───────────────────────────────────────────────────
+// Embeddings semánticos con BGE-M3, NV-Embed, etc.
+router.post("/api/nvidia/embed", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
+    const { texts, model = "baai/bge-m3", inputType = "query" } =
+      req.body as { texts: string | string[]; model?: string; inputType?: string };
+
+    const inputArray = Array.isArray(texts) ? texts : [texts];
+    if (!inputArray.length || !inputArray[0]?.trim()) { res.status(400).json({ error: "texts requerido" }); return; }
+
+    const validEmbed = NVIDIA_CATALOG.embedding.map(m => m.id as string);
+    const modelId = validEmbed.includes(model) ? model : "baai/bge-m3";
+
+    const r = await fetch(`${NIM_BASE}/embeddings`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ input: inputArray.slice(0, 100), model: modelId, input_type: inputType, encoding_format: "float" }),
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      res.status(r.status).json({ error: `NVIDIA Embed: ${txt.slice(0, 300)}` }); return;
+    }
+
+    const d = await r.json() as { data?: Array<{embedding: number[]; index: number}>, usage?: unknown };
+    res.json({ embeddings: d.data?.map(e => e.embedding) ?? [], model: modelId, count: d.data?.length ?? 0 });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
+  }
+});
+
+// ── POST /api/nvidia/generate-image ─────────────────────────────────────────
+router.post("/api/nvidia/generate-image", requireAuth, async (req, res) => {
+  try {
+    const key = nimKey();
+    const {
+      prompt, negativePrompt, model: reqModel, aspectRatio = "1:1",
+      n = 1, seed, cfg, steps, projectId, saveVault = false, title,
+    } = req.body as {
+      prompt: string; negativePrompt?: string; model?: string; aspectRatio?: string;
+      n?: number; seed?: number; cfg?: number; steps?: number;
+      projectId?: number; saveVault?: boolean; title?: string;
+    };
+
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt requerido" }); return; }
+
+    const validIds = NVIDIA_CATALOG.image.map(m => m.id as string);
+    const modelId = (typeof reqModel === "string" && validIds.includes(reqModel)) ? reqModel : "black-forest-labs/flux-schnell";
     const size = ASPECT_RATIO_TO_SIZE[aspectRatio] ?? "1024x1024";
 
     const body: Record<string, unknown> = {
-      model: modelId,
-      prompt: prompt.trim(),
-      n: Math.min(Math.max(1, n), 4),
-      response_format: "b64_json",
-      size,
+      model: modelId, prompt: prompt.trim(),
+      n: Math.min(Math.max(1, n), 4), response_format: "b64_json", size,
     };
     if (negativePrompt?.trim()) body.negative_prompt = negativePrompt.trim();
     if (typeof seed === "number") body.seed = seed;
     if (typeof cfg === "number") body.guidance_scale = cfg;
     if (typeof steps === "number") body.num_inference_steps = steps;
 
-    const nvidiaRes = await fetch("https://integrate.api.nvidia.com/v1/images/generations", {
+    const nvidiaRes = await fetch(`${NIM_BASE}/images/generations`, {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${nvidiaKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(120_000),
     });
@@ -140,109 +568,50 @@ router.post("/api/nvidia/generate-image", requireAuth, async (req, res) => {
       const errText = await nvidiaRes.text().catch(() => "");
       const parsed = (() => { try { return JSON.parse(errText); } catch { return null; } })();
       const msg = parsed?.detail ?? parsed?.message ?? parsed?.error ?? errText.slice(0, 300);
-      res.status(nvidiaRes.status).json({ error: `NVIDIA NIM: ${msg}` });
-      return;
+      res.status(nvidiaRes.status).json({ error: `NVIDIA NIM: ${msg}` }); return;
     }
 
-    const data = await nvidiaRes.json() as {
-      data?: Array<{ b64_json?: string; url?: string; revised_prompt?: string }>;
-    };
+    const data = await nvidiaRes.json() as { data?: Array<{ b64_json?: string; url?: string; revised_prompt?: string }> };
+    const images = (data.data ?? []).map(item => ({ b64: item.b64_json ?? null, url: item.url ?? null, revisedPrompt: item.revised_prompt ?? null }));
 
-    const images = (data.data ?? []).map(item => ({
-      b64: item.b64_json ?? null,
-      url: item.url ?? null,
-      revisedPrompt: item.revised_prompt ?? null,
-    }));
-
-    // Optionally save first image to vault
     let vaultFile: { id: string; downloadUrl: string } | null = null;
     if (saveVault && projectId && images[0]?.b64) {
       try {
         const buf = Buffer.from(images[0].b64, "base64");
         const modelShort = modelId.split("/")[1] ?? modelId;
-        const vId = await saveToVault({
-          projectId,
-          content: images[0].b64,
-          mimeType: "image/png",
-          fileSizeBytes: buf.length,
-          title: title ?? `NVIDIA ${modelShort} — ${prompt.slice(0, 60)}`,
-          fileType: "nvidia-image",
-          metadata: { model: modelId, prompt, aspectRatio, size },
-        });
+        const vId = await saveToVault({ projectId, content: images[0].b64, mimeType: "image/png", fileSizeBytes: buf.length, title: title ?? `NVIDIA ${modelShort} — ${prompt.slice(0, 60)}`, fileType: "nvidia-image", metadata: { model: modelId, prompt, aspectRatio, size } });
         vaultFile = vId ? { id: String(vId), downloadUrl: "" } : null;
-      } catch (e) {
-        console.warn("nvidia-nim: vault save failed", e);
-      }
+      } catch { /* vault fail is non-fatal */ }
     }
 
-    res.json({
-      images,
-      model: modelId,
-      prompt,
-      size,
-      vault: vaultFile,
-    });
-
+    res.json({ images, model: modelId, prompt, size, vault: vaultFile });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error desconocido";
-    console.error("nvidia-nim generate-image error:", err);
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
   }
 });
 
-// ── POST /api/nvidia/generate-video — NVIDIA Cosmos T2V ──────────────────────
-// Cosmos is available via the AI Catalog Inference endpoint.
-// Currently accessed through the legacy NVCF gateway; expose as SSE progress.
+// ── POST /api/nvidia/generate-video ─────────────────────────────────────────
 router.post("/api/nvidia/generate-video", requireAuth, async (req, res) => {
   try {
-    const nvidiaKey = process.env.NVIDIA_API_KEY;
-    if (!nvidiaKey) {
-      res.status(503).json({ error: "NVIDIA_API_KEY no configurada." });
-      return;
-    }
+    const key = nimKey();
+    const { prompt, model = "nvidia/cosmos-predict2-2b", duration = 6, resolution = "1280x720", fps = 24, seed } =
+      req.body as { prompt: string; model?: string; duration?: number; resolution?: string; fps?: number; seed?: number };
 
-    const {
-      prompt,
-      model = "nvidia/cosmos-predict2-2b",
-      duration = 6,
-      resolution = "1280x720",
-      fps = 24,
-      seed,
-    } = req.body as {
-      prompt: string;
-      model?: string;
-      duration?: number;
-      resolution?: string;
-      fps?: number;
-      seed?: number;
-    };
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt requerido" }); return; }
 
-    if (!prompt?.trim()) {
-      res.status(400).json({ error: "El campo 'prompt' es obligatorio." });
-      return;
-    }
-
-    const VALID_COSMOS = [
-      "nvidia/cosmos-predict2-2b",
-      "nvidia/cosmos-predict2-14b",
-    ];
-    const cosmosModel = VALID_COSMOS.includes(model) ? model : "nvidia/cosmos-predict2-2b";
+    const validCosmos = NVIDIA_CATALOG.video.map(m => m.id as string);
+    const cosmosModel = validCosmos.includes(model) ? model : "nvidia/cosmos-predict2-2b";
 
     const cosmosBody: Record<string, unknown> = {
-      model: cosmosModel,
-      prompt: prompt.trim(),
+      model: cosmosModel, prompt: prompt.trim(),
       duration_seconds: Math.min(Math.max(2, duration), 12),
-      resolution,
-      fps: Math.min(Math.max(8, fps), 30),
+      resolution, fps: Math.min(Math.max(8, fps), 30),
     };
     if (typeof seed === "number") cosmosBody.seed = seed;
 
-    const cosmosRes = await fetch("https://integrate.api.nvidia.com/v1/videos/generations", {
+    const cosmosRes = await fetch(`${NIM_BASE}/videos/generations`, {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${nvidiaKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(cosmosBody),
       signal: AbortSignal.timeout(300_000),
     });
@@ -251,30 +620,13 @@ router.post("/api/nvidia/generate-video", requireAuth, async (req, res) => {
       const errText = await cosmosRes.text().catch(() => "");
       const parsed = (() => { try { return JSON.parse(errText); } catch { return null; } })();
       const msg = parsed?.detail ?? parsed?.message ?? parsed?.error ?? errText.slice(0, 300);
-      res.status(cosmosRes.status).json({ error: `NVIDIA Cosmos: ${msg}` });
-      return;
+      res.status(cosmosRes.status).json({ error: `NVIDIA Cosmos: ${msg}` }); return;
     }
 
-    const vData = await cosmosRes.json() as {
-      url?: string;
-      b64_json?: string;
-      task_id?: string;
-      status?: string;
-    };
-
-    res.json({
-      url: vData.url ?? null,
-      b64: vData.b64_json ?? null,
-      taskId: vData.task_id ?? null,
-      status: vData.status ?? "completed",
-      model: cosmosModel,
-      prompt,
-    });
-
+    const vData = await cosmosRes.json() as { url?: string; b64_json?: string; task_id?: string; status?: string };
+    res.json({ url: vData.url ?? null, b64: vData.b64_json ?? null, taskId: vData.task_id ?? null, status: vData.status ?? "completed", model: cosmosModel, prompt });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error desconocido";
-    console.error("nvidia-nim generate-video error:", err);
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error desconocido" });
   }
 });
 

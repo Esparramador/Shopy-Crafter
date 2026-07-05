@@ -1676,14 +1676,59 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
         if (!nvidiaKey) throw new Error("NVIDIA_API_KEY no configurada — añade tu API key de NVIDIA en los secretos del proyecto");
         const reqNvidiaModel = (req.body as { nvidiaModel?: string }).nvidiaModel;
         const VALID_NVIDIA_MODELS = [
+          // ── Flagship Nemotron ─────────────────────────────────────────
           "nvidia/llama-3.3-nemotron-super-49b-v1",
-          "meta/llama-3.3-70b-instruct",
-          "meta/llama-3.1-405b-instruct",
-          "microsoft/phi-4",
-          "qwen/qwen3-235b-a22b",
-          "mistralai/mistral-large-2-instruct",
+          "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+          "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+          "nvidia/nemotron-4-340b-instruct",
+          "nvidia/llama-3.1-nemotron-nano-8b-v1",
+          "nvidia/nvidia-nemotron-nano-9b-v2",
+          "nvidia/nemotron-3-super-120b-a12b",
+          "nvidia/nemotron-3-ultra-550b-a55b",
+          "nvidia/nemotron-3-nano-30b-a3b",
           "nvidia/mistral-nemo-minitron-8b-8k-instruct",
-          "google/gemma-3-27b-it",
+          "nvidia/nemotron-mini-4b-instruct",
+          // ── Meta Llama 4 / 3.x ───────────────────────────────────────
+          "meta/llama-4-maverick-17b-128e-instruct",
+          "meta/llama-3.3-70b-instruct",
+          "meta/llama-3.1-70b-instruct",
+          "meta/llama-3.1-8b-instruct",
+          "meta/llama-3.1-405b-instruct",
+          // ── DeepSeek ─────────────────────────────────────────────────
+          "deepseek-ai/deepseek-v4-pro",
+          "deepseek-ai/deepseek-v4-flash",
+          // ── Mistral ──────────────────────────────────────────────────
+          "mistralai/mistral-large-3-675b-instruct-2512",
+          "mistralai/mistral-large-2-instruct",
+          "mistralai/mistral-medium-3.5-128b",
+          "mistralai/mistral-nemotron",
+          "mistralai/mistral-small-4-119b-2603",
+          "mistralai/mixtral-8x22b-v0.1",
+          // ── Qwen ─────────────────────────────────────────────────────
+          "qwen/qwen3.5-397b-a17b",
+          "qwen/qwen3.5-122b-a10b",
+          "qwen/qwen3-next-80b-a3b-instruct",
+          // ── Microsoft ────────────────────────────────────────────────
+          "microsoft/phi-4-mini-instruct",
+          "microsoft/phi-3.5-moe-instruct",
+          // ── Google ───────────────────────────────────────────────────
+          "google/gemma-4-31b-it",
+          "google/gemma-3-12b-it",
+          "google/gemma-3-4b-it",
+          // ── MiniMax / Kimi / ByteDance ───────────────────────────────
+          "minimaxai/minimax-m3",
+          "minimaxai/minimax-m2.7",
+          "moonshotai/kimi-k2.6",
+          "bytedance/seed-oss-36b-instruct",
+          // ── Especializados ────────────────────────────────────────────
+          "writer/palmyra-creative-122b",
+          "writer/palmyra-fin-70b-32k",
+          "writer/palmyra-med-70b",
+          "nvidia/llama3-chatqa-1.5-70b",
+          "ai21labs/jamba-1.5-large-instruct",
+          "stepfun-ai/step-3.7-flash",
+          "stepfun-ai/step-3.5-flash",
+          "moonshotai/kimi-k2.6",
         ] as const;
         const nvidiaModelId = typeof reqNvidiaModel === "string" && (VALID_NVIDIA_MODELS as readonly string[]).includes(reqNvidiaModel)
           ? reqNvidiaModel
@@ -1715,12 +1760,40 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           const outTok = nvidiaData.usage.completion_tokens ?? 0;
           // NVIDIA NIM pricing (per million tokens, approximate)
           const NVIDIA_PRICING: Record<string, { input: number; output: number }> = {
-            "llama-3.3-nemotron-super-49b-v1": { input: 0.40, output: 1.20 },
-            "llama-3.3-70b-instruct":           { input: 0.35, output: 0.40 },
-            "llama-3.1-405b-instruct":           { input: 0.99, output: 2.99 },
-            "phi-4":                             { input: 0.15, output: 0.15 },
-            "qwen3-235b-a22b":                   { input: 0.60, output: 2.40 },
-            "mistral-large-2-instruct":          { input: 0.40, output: 1.20 },
+            // Nemotron family
+            "llama-3.3-nemotron-super-49b-v1":    { input: 0.40, output: 1.20 },
+            "llama-3.3-nemotron-super-49b-v1.5":  { input: 0.40, output: 1.20 },
+            "llama-3.1-nemotron-ultra-253b-v1":   { input: 1.00, output: 3.00 },
+            "nemotron-4-340b-instruct":            { input: 1.50, output: 4.50 },
+            "llama-3.1-nemotron-nano-8b-v1":      { input: 0.10, output: 0.10 },
+            "nvidia-nemotron-nano-9b-v2":          { input: 0.10, output: 0.10 },
+            "nemotron-3-super-120b-a12b":          { input: 0.60, output: 1.80 },
+            "nemotron-3-ultra-550b-a55b":          { input: 2.00, output: 6.00 },
+            // Meta
+            "llama-4-maverick-17b-128e-instruct":  { input: 0.20, output: 0.60 },
+            "llama-3.3-70b-instruct":              { input: 0.35, output: 0.40 },
+            "llama-3.1-70b-instruct":              { input: 0.35, output: 0.40 },
+            "llama-3.1-405b-instruct":             { input: 0.99, output: 2.99 },
+            // DeepSeek
+            "deepseek-v4-pro":                     { input: 0.30, output: 0.90 },
+            "deepseek-v4-flash":                   { input: 0.10, output: 0.30 },
+            // Mistral
+            "mistral-large-3-675b-instruct-2512":  { input: 1.80, output: 5.40 },
+            "mistral-large-2-instruct":            { input: 0.40, output: 1.20 },
+            "mistral-medium-3.5-128b":             { input: 0.30, output: 0.90 },
+            "mistral-nemotron":                    { input: 0.45, output: 1.35 },
+            // Qwen
+            "qwen3.5-397b-a17b":                   { input: 0.80, output: 2.40 },
+            "qwen3.5-122b-a10b":                   { input: 0.40, output: 1.20 },
+            // Especializados Writer
+            "palmyra-creative-122b":               { input: 0.60, output: 1.80 },
+            "palmyra-fin-70b-32k":                 { input: 0.50, output: 1.50 },
+            "palmyra-med-70b":                     { input: 0.50, output: 1.50 },
+            // MiniMax
+            "minimax-m3":                          { input: 0.40, output: 1.20 },
+            "kimi-k2.6":                           { input: 0.50, output: 1.50 },
+            // Microsoft
+            "phi-4-mini-instruct":                 { input: 0.10, output: 0.10 },
           };
           const nvidiaShortName = nvidiaModelId.split("/")[1] ?? "";
           const nvPriceKey = Object.keys(NVIDIA_PRICING).find(k => nvidiaShortName.includes(k)) ?? "llama-3.3-nemotron-super-49b-v1";

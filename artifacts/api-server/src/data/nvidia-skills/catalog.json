@@ -1,0 +1,264 @@
+[
+  {
+    "id": "nvidia-text-nemotron",
+    "name": "NVIDIA Nemotron — Razonamiento y Análisis",
+    "category": "texto",
+    "endpoint": "POST /api/nvidia/chat",
+    "models": ["nvidia/llama-3.3-nemotron-super-49b-v1", "nvidia/llama-3.1-nemotron-ultra-253b-v1", "nvidia/nemotron-4-340b-instruct"],
+    "tags": ["razonamiento", "análisis", "flagship", "ecommerce"],
+    "description": "Modelos Nemotron de NVIDIA para razonamiento profundo, análisis estratégico y generación de contenido de alta calidad. Ideal para análisis de tienda, estrategia de precios y optimización de catálogo.",
+    "useCases": [
+      "Análisis profundo de rendimiento de tienda Shopify",
+      "Estrategia de precios y posicionamiento",
+      "Evaluación de competencia y oportunidades de mercado",
+      "Generación de reportes ejecutivos de ecommerce",
+      "Optimización de catálogo y arquitectura de información"
+    ],
+    "prompt_template": "Eres un experto en ecommerce y estrategia digital con acceso a NVIDIA Nemotron. Analiza {{TOPIC}} para la tienda {{BRAND_NAME}} en el contexto {{CONTEXT}}. Proporciona insights accionables, métricas esperadas y un plan de implementación con prioridades.",
+    "variables": ["TOPIC", "BRAND_NAME", "CONTEXT"],
+    "pricing_per_million_tokens": { "input": 0.40, "output": 1.20 },
+    "max_tokens": 128000,
+    "slash_command": "/nvidia-analiza"
+  },
+  {
+    "id": "nvidia-image-flux",
+    "name": "NVIDIA FLUX — Generación de Imagen para Ecommerce",
+    "category": "imagen",
+    "endpoint": "POST /api/nvidia/generate-image",
+    "models": ["black-forest-labs/flux-schnell", "black-forest-labs/flux-dev", "stabilityai/sdxl-turbo", "stabilityai/stable-diffusion-3-5-large"],
+    "tags": ["imagen", "producto", "ecommerce", "marketing", "social-media"],
+    "description": "Generación de imágenes fotorrealistas para tiendas Shopify. FLUX.1 Dev para producción, FLUX.1 Schnell para prototipado rápido, SDXL Turbo para realtime, SD 3.5 Large para tipografía y composición avanzada.",
+    "useCases": [
+      "Fotos de producto hero en fondo blanco",
+      "Imágenes lifestyle de producto en contexto",
+      "Visuales para Instagram, TikTok y Stories (9:16)",
+      "Banners publicitarios para Meta Ads y Google Shopping",
+      "Imágenes de campaña estacional (temporada, rebajas)",
+      "Mockups de packaging y branding"
+    ],
+    "prompt_templates": {
+      "hero_product": "Professional product photography of {{PRODUCT}}, centered composition, pure white seamless background, soft studio lighting, photorealistic 8K, Shot on Phase One IQ4. Style: Apple product catalog.",
+      "lifestyle": "Lifestyle photography of {{PRODUCT}} in {{SETTING}}, natural golden hour lighting, shallow depth of field, bokeh background, authentic aspirational mood. Brand: {{BRAND}}.",
+      "social_reel": "Bold vertical social media visual for {{BRAND}}, {{PRODUCT}} as hero, vibrant {{BRAND_COLORS}} palette, dynamic composition, Gen-Z aesthetic, trending Instagram Reels style.",
+      "ads_banner": "High-converting e-commerce ad banner for {{PRODUCT}}, clean modern design, strong visual hierarchy, {{BRAND}} color scheme, conversion-optimized layout, professional copywriting space."
+    },
+    "aspect_ratios": { "product": "1:1", "banner": "16:9", "stories": "9:16", "portrait": "4:3" },
+    "slash_command": "/nvidia-imagen"
+  },
+  {
+    "id": "nvidia-video-cosmos",
+    "name": "NVIDIA Cosmos — Vídeo con Física Real",
+    "category": "video",
+    "endpoint": "POST /api/nvidia/generate-video",
+    "models": ["nvidia/cosmos-predict2-2b", "nvidia/cosmos-predict2-14b"],
+    "tags": ["video", "t2v", "fisica", "producto", "ecommerce"],
+    "description": "NVIDIA Cosmos aplica simulación física del mundo real (gravedad, fluidos, materiales, colisiones) para crear vídeos fotorrealistas de productos. Ideal para demos de producto, anuncios de vídeo y contenido social.",
+    "useCases": [
+      "Demo de producto con movimiento físico natural",
+      "Anuncio de vídeo para Meta/TikTok/YouTube Shorts",
+      "Animación de packaging y unboxing",
+      "Vídeo de presentación de tienda",
+      "Contenido de temporada con efectos físicos (agua, nieve, luz)"
+    ],
+    "prompt_templates": {
+      "product_demo": "Close-up of {{PRODUCT}}, smooth 360° rotation, professional studio lighting, white background, photorealistic materials, subtle ambient light, physical simulation of {{MATERIAL}}. 4K quality.",
+      "lifestyle_video": "Cinematic lifestyle scene: {{PRODUCT}} being used by {{PERSON_TYPE}} in {{SETTING}}, natural lighting, realistic physics, emotional storytelling, {{BRAND}} aesthetic.",
+      "social_ad": "Fast-paced dynamic product showcase of {{PRODUCT}}, bold transitions, vibrant {{BRAND_COLORS}}, trending TikTok aesthetic, satisfying physics interactions, 9:16 vertical."
+    },
+    "models_detail": {
+      "cosmos-predict2-2b": "Rápido, ideal para prototipos y contenido de redes sociales. 2-8 segundos.",
+      "cosmos-predict2-14b": "Máxima calidad, física ultrarealista. Ideal para anuncios TV y campañas premium. 4-12 segundos."
+    },
+    "slash_command": "/nvidia-cosmos"
+  },
+  {
+    "id": "nvidia-code-generation",
+    "name": "NVIDIA Code — Desarrollo para Shopify",
+    "category": "codigo",
+    "endpoint": "POST /api/nvidia/code",
+    "models": ["bigcode/starcoder2-15b", "mistralai/codestral-22b-instruct-v0.1", "meta/codellama-70b", "deepseek-ai/deepseek-coder-6.7b-instruct", "ibm/granite-34b-code-instruct"],
+    "tags": ["codigo", "shopify", "liquid", "javascript", "python", "apis"],
+    "description": "Generación y análisis de código para personalización de tiendas Shopify. StarCoder2 cubre 80+ lenguajes incluido Liquid. CodeLlama 70B para arquitectura compleja. Codestral para velocidad.",
+    "useCases": [
+      "Plantillas Liquid para Shopify (secciones, snippets, layout)",
+      "Scripts JavaScript para funcionalidades custom",
+      "Webhooks y API routes de Shopify",
+      "Automatizaciones y scripts de migración de datos",
+      "Integraciones con terceros (Klaviyo, Recharge, Yotpo)",
+      "Generación de metafields y custom data",
+      "Tests y debugging de código existente"
+    ],
+    "model_recommendations": {
+      "liquid_templates": "bigcode/starcoder2-15b",
+      "complex_architecture": "meta/codellama-70b",
+      "fast_snippets": "mistralai/codestral-22b-instruct-v0.1",
+      "python_scripts": "deepseek-ai/deepseek-coder-6.7b-instruct",
+      "enterprise_code": "ibm/granite-34b-code-instruct"
+    },
+    "slash_command": "/nvidia-codigo"
+  },
+  {
+    "id": "nvidia-vision-analysis",
+    "name": "NVIDIA Vision — Análisis Visual de Productos",
+    "category": "vision",
+    "endpoint": "POST /api/nvidia/vision",
+    "models": ["meta/llama-3.2-90b-vision-instruct", "meta/llama-3.2-11b-vision-instruct", "microsoft/phi-4-multimodal-instruct", "nvidia/neva-22b"],
+    "tags": ["vision", "imagen", "ocr", "producto", "competencia"],
+    "description": "Análisis visual de imágenes de producto, capturas de competidores, catálogos e infografías. Llama 3.2 Vision 90B para análisis profundo, Phi-4 Multimodal para análisis combinado imagen+audio+texto.",
+    "useCases": [
+      "Análisis de calidad de imágenes de producto para Shopify",
+      "OCR de documentos, facturas, listas de precios",
+      "Análisis visual de landing pages de competidores",
+      "Extracción de información de catálogos en PDF/imagen",
+      "Revisión de creatividades de anuncios existentes",
+      "Análisis de infografías de marketing",
+      "Detección de objetos y elementos en imágenes de producto"
+    ],
+    "slash_command": "/nvidia-vision"
+  },
+  {
+    "id": "nvidia-translation",
+    "name": "NVIDIA RIVA — Traducción Profesional Multilingüe",
+    "category": "traduccion",
+    "endpoint": "POST /api/nvidia/translate",
+    "models": ["nvidia/riva-translate-4b-instruct", "nvidia/riva-translate-4b-instruct-v1.1"],
+    "tags": ["traduccion", "multilingue", "internacional", "shopify"],
+    "description": "Traducción profesional de contenido de tienda Shopify con NVIDIA RIVA — motor de traducción de nivel empresarial entrenado por NVIDIA. Soporta 50+ idiomas con alta fidelidad semántica.",
+    "useCases": [
+      "Traducción de descripciones de producto a múltiples idiomas",
+      "Localización de copy de marketing y anuncios",
+      "Traducción de emails de marketing y automatizaciones",
+      "Localización de políticas de tienda (privacidad, devoluciones)",
+      "Traducción de FAQ y contenido de soporte",
+      "Adaptación de contenido a mercados internacionales (ES, EN, FR, DE, PT, IT, JA, ZH, KO, AR)"
+    ],
+    "supported_languages": ["es", "en", "fr", "de", "pt", "it", "ja", "zh", "ko", "ar", "nl", "pl", "ru", "tr", "hi", "vi", "th", "id", "sv", "da", "no", "fi"],
+    "slash_command": "/nvidia-traducir"
+  },
+  {
+    "id": "nvidia-creative-palmyra",
+    "name": "Palmyra Creative — Copywriting Premium",
+    "category": "creativo",
+    "endpoint": "POST /api/nvidia/creative",
+    "models": ["writer/palmyra-creative-122b"],
+    "tags": ["copywriting", "creatividad", "marketing", "storytelling", "conversion"],
+    "description": "Palmyra Creative 122B es el modelo de escritura creativa más especializado del catálogo NVIDIA — entrenado por Writer.com, líderes en IA para contenido empresarial. Produce copy de nivel agencia creativa premium.",
+    "useCases": [
+      "Copy de hero section para landing pages de producto",
+      "Storytelling de marca y manifiesto de empresa",
+      "Guiones de vídeo emocionales para ads y redes",
+      "Posts virales para Instagram, LinkedIn y TikTok",
+      "Email marketing de alta conversión (subject lines, body)",
+      "Titulares y copy para anuncios Meta y Google",
+      "Descripciones de colección con narrativa de marca",
+      "Newsletter con voz de marca consistente"
+    ],
+    "tones": ["elegante", "enérgico", "emocional", "premium", "amigable", "urgente", "inspiracional", "humorístico", "técnico", "minimalista"],
+    "slash_command": "/nvidia-creativo"
+  },
+  {
+    "id": "nvidia-finance-palmyra",
+    "name": "Palmyra Finance — Análisis Financiero Ecommerce",
+    "category": "finanzas",
+    "endpoint": "POST /api/nvidia/finance",
+    "models": ["writer/palmyra-fin-70b-32k"],
+    "tags": ["finanzas", "metricas", "rentabilidad", "pricing", "ecommerce"],
+    "description": "Palmyra Finance 70B es un modelo financiero de nivel Wall Street especializado en análisis cuantitativo. Adaptado para métricas de ecommerce: CAC, LTV, márgenes, pricing, proyecciones de revenue.",
+    "useCases": [
+      "Análisis de márgenes por producto y categoría",
+      "Optimización de estrategia de pricing (premium, penetración, dynamic)",
+      "Proyección de revenue y forecasting mensual/anual",
+      "Análisis de CAC (Coste de Adquisición) vs LTV (Lifetime Value)",
+      "Evaluación de rentabilidad de campañas de marketing",
+      "Análisis de estacionalidad y planificación de inventario",
+      "Benchmarking financiero vs competidores del sector",
+      "Modelo financiero para expansión a nuevos mercados"
+    ],
+    "metrics_covered": ["CAC", "LTV", "ROAS", "AOV", "conversion_rate", "margin_gross", "margin_net", "revenue_forecast", "churn_rate", "NPS"],
+    "slash_command": "/nvidia-finanzas"
+  },
+  {
+    "id": "nvidia-safety-guard",
+    "name": "NVIDIA Safety — Seguridad de Contenido y PII",
+    "category": "seguridad",
+    "endpoint": "POST /api/nvidia/safety",
+    "models": ["meta/llama-guard-4-12b", "nvidia/llama-3.1-nemoguard-8b-content-safety", "nvidia/gliner-pii", "nvidia/ai-synthetic-video-detector"],
+    "tags": ["seguridad", "pii", "gdpr", "contenido", "compliance"],
+    "description": "Suite de seguridad IA de NVIDIA para proteger tiendas Shopify: Llama Guard 4 para detección de contenido dañino, GLiNER PII para privacidad GDPR, NemoGuard para control de chatbot, AI Video Detector para deepfakes.",
+    "useCases": [
+      "Auditoría de contenido del chatbot de tienda (NemoGuard)",
+      "Detección de PII en descripciones de producto y emails (GLiNER)",
+      "Verificación de cumplimiento GDPR en textos de marketing",
+      "Revisión de contenido generado por IA antes de publicar",
+      "Detección de vídeos sintéticos o deepfakes de productos",
+      "Control de topics del chatbot (solo responde sobre la tienda)",
+      "Moderación de reseñas de clientes y UGC"
+    ],
+    "models_detail": {
+      "llama-guard-4-12b": "Detección de contenido dañino — violence, hate speech, adult content. Meta.",
+      "nemoguard-content-safety": "Safety empresarial para chatbots y asistentes. NVIDIA.",
+      "gliner-pii": "Detección de PII: nombres, emails, teléfonos, tarjetas, DNI, IBANs. NVIDIA.",
+      "ai-synthetic-video-detector": "Detecta si un vídeo fue generado por IA (deepfake). NVIDIA."
+    },
+    "slash_command": "/nvidia-seguridad"
+  },
+  {
+    "id": "nvidia-embedding-rag",
+    "name": "NVIDIA Embedding — RAG para Tienda Shopify",
+    "category": "embedding",
+    "endpoint": "POST /api/nvidia/embed",
+    "models": ["baai/bge-m3", "nvidia/nv-embed-v1", "nvidia/nv-embedqa-mistral-7b-v2", "snowflake/arctic-embed-l"],
+    "tags": ["embedding", "rag", "busqueda", "semantica", "multilingue"],
+    "description": "Embeddings semánticos de alta calidad para construir sistemas de búsqueda y RAG (Retrieval Augmented Generation) sobre el catálogo de tu tienda Shopify. BGE-M3 soporta dense + sparse + colbert simultáneamente.",
+    "useCases": [
+      "Búsqueda semántica sobre catálogo de productos",
+      "Chatbot con knowledge base de tu tienda (RAG)",
+      "Recomendación de productos similares",
+      "Búsqueda de soporte por similitud semántica",
+      "Deduplicación de productos en catálogo",
+      "Análisis de clustering de productos por categoría"
+    ],
+    "model_recommendations": {
+      "multilingue_general": "baai/bge-m3",
+      "maxima_calidad": "nvidia/nv-embed-v1",
+      "qa_search": "nvidia/nv-embedqa-mistral-7b-v2",
+      "retrieval_fast": "snowflake/arctic-embed-l"
+    }
+  },
+  {
+    "id": "nvidia-deepseek-reasoning",
+    "name": "DeepSeek V4 Pro — Razonamiento Avanzado via NVIDIA NIM",
+    "category": "texto",
+    "endpoint": "POST /api/nvidia/chat",
+    "models": ["deepseek-ai/deepseek-v4-pro", "deepseek-ai/deepseek-v4-flash"],
+    "tags": ["razonamiento", "matematicas", "estrategia", "codigo", "deepseek"],
+    "description": "DeepSeek V4 Pro disponible vía NVIDIA NIM — uno de los modelos de razonamiento más potentes del catálogo. Especialmente fuerte en matemáticas, lógica, código y análisis cuantitativo.",
+    "useCases": [
+      "Análisis cuantitativo complejo de métricas de ecommerce",
+      "Optimización matemática de precios y descuentos",
+      "Generación de código de alta complejidad para Shopify",
+      "Razonamiento multi-paso para estrategia de expansión",
+      "Análisis de cohortes y segmentación de clientes",
+      "Algoritmos de recomendación y personalización"
+    ],
+    "slash_command": "/nvidia-deepseek"
+  },
+  {
+    "id": "nvidia-kimi-long-context",
+    "name": "Kimi K2.6 — Análisis de Documentos Extensos (131K tokens)",
+    "category": "texto",
+    "endpoint": "POST /api/nvidia/chat",
+    "models": ["moonshotai/kimi-k2.6"],
+    "tags": ["contexto-largo", "documentos", "analisis", "catalogo"],
+    "description": "Kimi K2.6 de MoonShot AI vía NVIDIA NIM — contexto de 131K tokens para analizar documentos muy extensos. Ideal para procesar catálogos completos, historiales de pedidos, reportes analíticos o transcripciones largas.",
+    "useCases": [
+      "Análisis del catálogo completo de la tienda (miles de productos)",
+      "Procesamiento de historiales de pedidos para insights",
+      "Análisis de transcripciones largas de soporte al cliente",
+      "Revisión de reportes completos de Google Analytics/Shopify",
+      "Procesamiento de documentos legales y contratos de proveedor",
+      "Análisis de competencia con múltiples fuentes simultáneas"
+    ],
+    "slash_command": "/nvidia-kimi"
+  }
+]
