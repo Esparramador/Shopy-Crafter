@@ -658,4 +658,40 @@ title = "Inventario Completo: 3 Catálogos de Skills (Ciberseguridad + Prompts +
 id = "1Dv3ywz_j6lSnQBS5ixBK"
 uri = "file://.local/video-output/rolex-datejust-twotone-explode-35s.mp4"
 type = "video"
-title = "Rolex Datejust Two-Tone — Explode View 35s (Grok Aurora)"
+title = "Rolex Datejust Two-Tone — Explode View 35s"
+
+[[outputs]]
+id = "f6epwygkknrfbi10XCc3u"
+uri = "file://artifacts/shopify-optimizer/public/rolex-1-angle.png"
+type = "image"
+title = "Rolex — Ángulo"
+
+[[outputs]]
+id = "YFe5F8cScJaJwSVV8Xyt9"
+uri = "file://artifacts/shopify-optimizer/public/rolex-2-dial.png"
+type = "image"
+title = "Rolex — Esfera"
+
+[[outputs]]
+id = "Cc852K_QNcCj3qvapV6HV"
+uri = "file://artifacts/shopify-optimizer/public/rolex-3-crown.png"
+type = "image"
+title = "Rolex — Corona"
+
+[[outputs]]
+id = "LO3yo_aheYHKgHBwT-4Bq"
+uri = "file://artifacts/shopify-optimizer/public/rolex-4-front.png"
+type = "image"
+title = "Rolex — Frontal"
+
+[[outputs]]
+id = "z2cCKu5SLAqEOy5UyHX4M"
+uri = "file://artifacts/shopify-optimizer/public/rolex-5-flatlay.png"
+type = "image"
+title = "Rolex — Flatlay"
+
+[[outputs]]
+id = "pmJ82nlGrzmcXrRrZoKox"
+uri = "file://.local/research/rolex-datejust-41-explode-view-complete.md"
+type = "text"
+title = "Investigación Rolex Datejust 41 — Completa"
