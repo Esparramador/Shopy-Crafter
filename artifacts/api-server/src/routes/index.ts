@@ -83,6 +83,7 @@ import chatGroupsRouter from "./chat-groups.js";
 import apiKeysRouter from "./api-keys.js";
 import freepikRouter from "./freepik.js";
 import aiCatalogRouter from "./ai-catalog.js";
+import nvidiaNimRouter from "./nvidia-nim.js";
 
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
 
@@ -205,5 +206,6 @@ router.use(cybersecRouter);
 router.use(apiKeysRouter);
 router.use(freepikRouter);
 router.use(aiCatalogRouter);
+router.use(nvidiaNimRouter);
 
 export default router;

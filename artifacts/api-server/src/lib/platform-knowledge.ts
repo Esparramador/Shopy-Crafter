@@ -296,10 +296,24 @@ export const PLATFORM_MODULES: PlatformModule[] = [
     description: "",
     bullets: [
       "Chatbot de atención al cliente para tiendas Shopify",
-      "5 motores intercambiables: Auto, Claude, Gemini, Grok, Brain Only",
-      "24 slash-skills especializadas en ventas, soporte y marketing",
+      "6 motores intercambiables: Auto, Claude, Gemini, Grok, GPT-4o, NVIDIA NIM",
+      "24+ slash-skills especializadas en ventas, soporte y marketing",
       "Conocimiento del catálogo, pedidos, precios y política de la tienda",
       "Se entrena con el contenido real de tu tienda",
+    ],
+  },
+  {
+    id: "nvidia-nim",
+    name: "NVIDIA NIM (motor de IA acelerado por GPU — integrado Jul 2026)",
+    description: "Acceso a los modelos de IA más potentes del mundo vía NVIDIA AI Inference Microservices (NIM). Dos flujos principales:",
+    bullets: [
+      "TEXTO — 8 modelos LLM en un solo motor: Nemotron 49B (flagship, razonamiento avanzado), Llama 3.3 70B, Llama 3.1 405B (el LLM open-source más grande), Phi-4, Qwen3 235B, Mistral Large 2, Gemma 3 27B",
+      "IMAGEN — Generación con 4 modelos de difusión de vanguardia: FLUX.1 Schnell (ultra rápido, 4 pasos), FLUX.1 Dev (alta calidad, producción), SDXL Turbo (realtime 1 paso), Stable Diffusion 3.5 Large (tipografía precisa, últimas SD)",
+      "VÍDEO — NVIDIA Cosmos Predict: modelo de simulación del mundo físico. Text-to-Video fotorrealista con física coherente. Cosmos 2B y 14B disponibles",
+      "Aspecto ratio configurable: 1:1, 16:9, 9:16, 4:3, 21:9. Seed reproducible. Guardado automático en Vault",
+      "Slash commands dedicados: /nvidia-analiza, /nvidia-copy, /nvidia-seo, /nvidia-email, /nvidia-producto, /nvidia-investiga, /nvidia-imagen",
+      "Disponible en Fusion Studio Pro (tab Generar Imagen) como proveedor 'NVIDIA FLUX' junto a Replicate, GPT Image y Google Imagen",
+      "API compatible OpenAI — sin configuración extra para usuarios: la key NVIDIA está pre-integrada en la plataforma",
     ],
   },
 ];

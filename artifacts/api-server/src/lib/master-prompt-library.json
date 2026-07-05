@@ -121241,13 +121241,348 @@
           "api_endpoint": "/api/prompt-library/execute"
         }
       ]
+    },
+    "nvidia_nim": {
+      "name": "NVIDIA NIM — Generación de Imagen y Texto con GPU IA",
+      "description": "Prompts optimizados para NVIDIA NIM: FLUX.1, SDXL Turbo, SD 3.5 Large y LLMs Nemotron/Llama para e-commerce",
+      "category": "nvidia",
+      "tags": [
+        "nvidia",
+        "flux",
+        "sdxl",
+        "stable-diffusion",
+        "imagen",
+        "nemotron"
+      ],
+      "templates": [
+        {
+          "id": "nvidia_img_product_hero",
+          "name": "Hero Shot Producto — FLUX Dev",
+          "description": "Imagen hero profesional con fondo blanco tipo Apple/Shopify",
+          "category": "producto",
+          "tags": [
+            "hero",
+            "producto",
+            "fondo-blanco",
+            "shopify"
+          ],
+          "model_recommendation": "black-forest-labs/flux-dev",
+          "aspect_ratio": "1:1",
+          "prompt": "Professional product photography of {{PRODUCT_NAME}}, centered composition, pure white seamless background, soft studio lighting with subtle shadows, ultra-sharp focus, photorealistic 8K quality, clean minimalist commercial grade. Shot on Phase One IQ4, 80mm macro lens. Style: Apple product catalog.",
+          "negative_prompt": "blurry, watermark, text, cluttered background, harsh shadows, overexposed, distorted",
+          "variables": [
+            "PRODUCT_NAME"
+          ]
+        },
+        {
+          "id": "nvidia_img_lifestyle",
+          "name": "Lifestyle Contextual — Producto en Ambiente",
+          "description": "Foto lifestyle del producto en su contexto natural de uso",
+          "category": "lifestyle",
+          "tags": [
+            "lifestyle",
+            "ambiente",
+            "uso",
+            "contexto"
+          ],
+          "model_recommendation": "black-forest-labs/flux-dev",
+          "aspect_ratio": "16:9",
+          "prompt": "Lifestyle photography of {{PRODUCT_NAME}} in {{SETTING}}, natural golden hour lighting, shallow depth of field, bokeh background, authentic aspirational mood, human element in frame, warm color grading, cinematic rule of thirds. Magazine editorial quality. Brand: {{BRAND_NAME}}.",
+          "negative_prompt": "stock photo clichés, harsh flash, oversaturation, deformed hands",
+          "variables": [
+            "PRODUCT_NAME",
+            "SETTING",
+            "BRAND_NAME"
+          ]
+        },
+        {
+          "id": "nvidia_img_social_reel",
+          "name": "Frame Social Media Vertical 9:16",
+          "description": "Visual vertical para Instagram Reels, TikTok y Stories",
+          "category": "social-media",
+          "tags": [
+            "instagram",
+            "tiktok",
+            "stories",
+            "reels",
+            "vertical"
+          ],
+          "model_recommendation": "black-forest-labs/flux-schnell",
+          "aspect_ratio": "9:16",
+          "prompt": "Bold vertical social media visual for {{BRAND_NAME}}, {{PRODUCT_NAME}} as hero element, vibrant color palette {{BRAND_COLORS}}, dynamic diagonal composition, trending Gen-Z aesthetic, neon accents, product floating with shadow, clean typography space top and bottom. Format: Instagram Reels 9:16.",
+          "negative_prompt": "boring corporate, horizontal crop, low contrast, muddy colors",
+          "variables": [
+            "BRAND_NAME",
+            "PRODUCT_NAME",
+            "BRAND_COLORS"
+          ]
+        },
+        {
+          "id": "nvidia_img_banner_ecom",
+          "name": "Banner E-Commerce Horizontal",
+          "description": "Banner promocional horizontal para tienda online y campañas",
+          "category": "banner",
+          "tags": [
+            "banner",
+            "e-commerce",
+            "promocion"
+          ],
+          "model_recommendation": "stabilityai/stable-diffusion-3-5-large",
+          "aspect_ratio": "16:9",
+          "prompt": "E-commerce promotional banner for {{BRAND_NAME}} featuring {{PRODUCT_NAME}}, {{SEASONAL_THEME}} theme, product displayed left third, text space right two-thirds, complementary color scheme {{BRAND_COLORS}}, premium visual hierarchy, CTA area visible, photorealistic product render. Shopify hero banner quality.",
+          "negative_prompt": "text overlapping product, cluttered layout, low resolution, amateur design",
+          "variables": [
+            "BRAND_NAME",
+            "PRODUCT_NAME",
+            "SEASONAL_THEME",
+            "BRAND_COLORS"
+          ]
+        },
+        {
+          "id": "nvidia_img_flat_lay",
+          "name": "Flat Lay Editorial Overhead",
+          "description": "Fotografía cenital tipo editorial con accesorios complementarios",
+          "category": "editorial",
+          "tags": [
+            "flat-lay",
+            "editorial",
+            "cenital",
+            "overhead"
+          ],
+          "model_recommendation": "black-forest-labs/flux-dev",
+          "aspect_ratio": "1:1",
+          "prompt": "Elegant flat lay photography, overhead 90-degree angle, {{PRODUCT_NAME}} as center hero, curated complementary props ({{PROPS}}), cohesive color palette {{COLOR_PALETTE}}, clean negative space, natural soft diffused lighting, slight shadows for depth, luxury magazine quality. Instagram grid optimized.",
+          "negative_prompt": "random props, busy composition, harsh shadows, perspective distortion",
+          "variables": [
+            "PRODUCT_NAME",
+            "PROPS",
+            "COLOR_PALETTE"
+          ]
+        },
+        {
+          "id": "nvidia_img_texture_macro",
+          "name": "Macro Textura y Detalle de Material",
+          "description": "Foto macro del material, textura y calidad artesanal del producto",
+          "category": "detalle",
+          "tags": [
+            "macro",
+            "textura",
+            "material",
+            "detalle",
+            "calidad"
+          ],
+          "model_recommendation": "stabilityai/stable-diffusion-3-5-large",
+          "aspect_ratio": "1:1",
+          "prompt": "Extreme close-up macro photography of {{PRODUCT_NAME}} surface showing {{MATERIAL}} quality, ultra-shallow depth of field, pin-sharp texture focus, premium tactile visual, studio lighting emphasizing material grain and finish, photorealistic, conveys craftsmanship. Technical: 100mm macro f/2.8.",
+          "negative_prompt": "blurry, flat lighting, generic material, out of focus",
+          "variables": [
+            "PRODUCT_NAME",
+            "MATERIAL"
+          ]
+        },
+        {
+          "id": "nvidia_img_ghost_mannequin",
+          "name": "Ghost Mannequin — Ropa sin Maniquí",
+          "description": "Efecto fantasma para moda: ropa con volumen natural sin maniquí visible",
+          "category": "moda",
+          "tags": [
+            "ropa",
+            "moda",
+            "ghost-mannequin",
+            "fashion",
+            "e-commerce"
+          ],
+          "model_recommendation": "black-forest-labs/flux-dev",
+          "aspect_ratio": "3:4",
+          "prompt": "Ghost mannequin invisible mannequin product photography of {{GARMENT_DESCRIPTION}}, professional fashion e-commerce standard, garment maintains natural shape and volume, pure white background, soft even studio lighting, all seams and details visible, fabric texture clearly rendered, ASOS product photography quality.",
+          "negative_prompt": "visible mannequin, body parts showing, wrinkled fabric, uneven lighting",
+          "variables": [
+            "GARMENT_DESCRIPTION"
+          ]
+        },
+        {
+          "id": "nvidia_img_cosmetics_luxury",
+          "name": "Cosmética Luxury — Editorial Beauty",
+          "description": "Fotografía de lujo para cosmética, skincare y fragancias",
+          "category": "beauty",
+          "tags": [
+            "cosmética",
+            "beauty",
+            "lujo",
+            "perfume",
+            "skincare"
+          ],
+          "model_recommendation": "stabilityai/stable-diffusion-3-5-large",
+          "aspect_ratio": "4:3",
+          "prompt": "Ultra-luxury cosmetics product photography of {{PRODUCT_NAME}} by {{BRAND_NAME}}, editorial beauty magazine style, reflective dark marble surface with soft specular highlights, atmospheric studio fog, dramatic chiaroscuro lighting, packaging detail in sharp focus, bokeh background with color echoes. Reference: Chanel, Dior campaigns.",
+          "negative_prompt": "cheap looking, plastic surface, flat lighting, over-bright, generic commercial",
+          "variables": [
+            "PRODUCT_NAME",
+            "BRAND_NAME"
+          ]
+        },
+        {
+          "id": "nvidia_img_tech_cinematic",
+          "name": "Tech Hero — Cinematic Dark",
+          "description": "Shot cinematográfico dramático para electrónica y gadgets",
+          "category": "tech",
+          "tags": [
+            "electronica",
+            "tech",
+            "gadget",
+            "cinematico",
+            "dramatico"
+          ],
+          "model_recommendation": "black-forest-labs/flux-dev",
+          "aspect_ratio": "16:9",
+          "prompt": "Cinematic hero product photography of {{TECH_PRODUCT}} by {{BRAND_NAME}}, dark atmospheric background with volumetric light rays, product center stage with specular edge highlights, black glass reflection surface, cool blue and warm amber accent lights, lens flares, premium tech aesthetic, 8K cinematic. Reference: Apple Mac Pro launch photography.",
+          "negative_prompt": "bright white background, boring angle, flat lighting, cheap looking",
+          "variables": [
+            "TECH_PRODUCT",
+            "BRAND_NAME"
+          ]
+        },
+        {
+          "id": "nvidia_img_food_gourmet",
+          "name": "Food Photography Gourmet",
+          "description": "Fotografía gastronómica apetitosa para productos de alimentación",
+          "category": "food",
+          "tags": [
+            "food",
+            "comida",
+            "gastronomia",
+            "apetitoso",
+            "gourmet"
+          ],
+          "model_recommendation": "black-forest-labs/flux-dev",
+          "aspect_ratio": "4:3",
+          "prompt": "Appetizing gourmet food photography of {{FOOD_PRODUCT}}, professional food styling with garnishes, steam wisps if hot, shallow depth of field, warm natural side lighting, rustic wooden or marble surface, complementary props ({{PROPS}}), rich saturated natural colors. Michelin-star plating aesthetic. 85mm f/1.4.",
+          "negative_prompt": "unappetizing, overcooked look, cold flat lighting, artificial colors, messy plating",
+          "variables": [
+            "FOOD_PRODUCT",
+            "PROPS"
+          ]
+        },
+        {
+          "id": "nvidia_nim_analisis_nemotron",
+          "name": "Análisis Estratégico Completo — Nemotron 49B",
+          "description": "Análisis profundo de tienda/producto con estrategia accionable usando Nemotron",
+          "category": "texto-analisis",
+          "tags": [
+            "analisis",
+            "estrategia",
+            "nemotron",
+            "shopify"
+          ],
+          "model_recommendation": "nvidia/llama-3.3-nemotron-super-49b-v1",
+          "prompt": "Actúa como consultor senior de e-commerce con 15 años en Shopify.\n\nANALIZA: {{PRODUCT_NAME}}\nDescripción actual: {{CURRENT_DESCRIPTION}}\nPrecio: {{PRICE}} | Mercado: {{TARGET_MARKET}}\n\nEntrega 6 bloques:\n1. DIAGNÓSTICO DE POSICIONAMIENTO: brecha de oportunidad real\n2. PROPUESTA DE VALOR ÚNICA: 3 ángulos diferenciadores\n3. PRICING INTELLIGENCE: ¿precio competitivo? psicología aplicada\n4. COPY AUDIT: debilidades y qué falta para convertir\n5. SEO KEYWORD MAP: 10 keywords intención compra + 5 long-tail\n6. PLAN DE ACCIÓN: 5 quick wins ordenados por impacto/esfuerzo con KPIs",
+          "variables": [
+            "PRODUCT_NAME",
+            "CURRENT_DESCRIPTION",
+            "PRICE",
+            "TARGET_MARKET"
+          ]
+        },
+        {
+          "id": "nvidia_nim_copy_ads_llama",
+          "name": "Copy Omnicanal de Conversión — Llama 405B",
+          "description": "Copy de alta conversión para Meta, Google y TikTok con el LLM más grande",
+          "category": "texto-copy",
+          "tags": [
+            "copy",
+            "ads",
+            "meta",
+            "google",
+            "tiktok",
+            "llama"
+          ],
+          "model_recommendation": "meta/llama-3.1-405b-instruct",
+          "prompt": "Eres copywriter performance con track record 8-ROAS+.\n\nProducto: {{PRODUCT_NAME}} | Propuesta: {{VALUE_PROP}}\nAudiencia: {{AUDIENCE}} | Objeción: {{MAIN_OBJECTION}}\n\n## META ADS\nHeadline 1 (30): ... | H2 (30): ... | Primary Text (125): ...\nHook Video (0-3s): ...\n\n## GOOGLE SEARCH\nH1/H2/H3 (30c/u): ... | Description 1 (90): ... | Description 2 (90): ...\n\n## TIKTOK/REELS\nHook (0-3s): ... | Body (3-15s): ... | CTA (15-20s): ...\n\n## EMAIL SUBJECTS (5 opciones A/B)\n1...5\n\nUsa power words, urgencia real, prueba social implícita.",
+          "variables": [
+            "PRODUCT_NAME",
+            "VALUE_PROP",
+            "AUDIENCE",
+            "MAIN_OBJECTION"
+          ]
+        },
+        {
+          "id": "nvidia_nim_seo_qwen",
+          "name": "Estrategia SEO Shopify — Qwen3 235B",
+          "description": "SEO on-page + off-page completo para tienda Shopify con el mayor modelo Qwen",
+          "category": "texto-seo",
+          "tags": [
+            "seo",
+            "shopify",
+            "keywords",
+            "contenido",
+            "qwen"
+          ],
+          "model_recommendation": "qwen/qwen3-235b-a22b",
+          "prompt": "Eres head of SEO de agencia e-commerce especializada en Shopify.\n\nTienda: {{STORE_NAME}} | Nicho: {{NICHE}}\nProductos top: {{TOP_PRODUCTS}} | Competidores: {{COMPETITORS}}\n\n### 1. KEYWORD RESEARCH\n- 5 keywords pilares (alta competencia)\n- 15 de cola media (oportunidad)\n- 10 long-tail transaccionales\n\n### 2. ARQUITECTURA DE CONTENIDO\n- Estructura colecciones SEO\n- Jerarquía URLs + internal linking\n\n### 3. PLANTILLAS ON-PAGE (home / colección / producto)\n- title, meta, H1, schema JSON-LD\n\n### 4. CALENDAR 6 SEMANAS\n- Blog posts featured snippet potential\n\n### 5. LINK BUILDING QUICK WINS\n- 5 tácticas específicas para {{NICHE}}",
+          "variables": [
+            "STORE_NAME",
+            "NICHE",
+            "TOP_PRODUCTS",
+            "COMPETITORS"
+          ]
+        },
+        {
+          "id": "nvidia_img_cosmos_t2v",
+          "name": "Prompt Cosmos T2V — Vídeo Físico Realista",
+          "description": "Prompts optimizados para NVIDIA Cosmos Text-to-Video con física del mundo real",
+          "category": "video",
+          "tags": [
+            "cosmos",
+            "video",
+            "t2v",
+            "fisica",
+            "realista",
+            "nvidia"
+          ],
+          "model_recommendation": "nvidia/cosmos-predict2-2b",
+          "aspect_ratio": "16:9",
+          "prompt": "Photorealistic video scene: {{SCENE_DESCRIPTION}}. Physical world simulation with accurate gravity, fluid dynamics and material properties. Camera: {{CAMERA_MOVEMENT}} movement at {{FPS}}fps. Lighting: {{LIGHTING_SETUP}}. Subject: {{SUBJECT}} interacting with environment. Duration: {{DURATION}} seconds. No cuts. Cinematic quality, IMAX standard.",
+          "negative_prompt": "cartoon, animation, CGI artifacts, unrealistic physics, flickering",
+          "variables": [
+            "SCENE_DESCRIPTION",
+            "CAMERA_MOVEMENT",
+            "FPS",
+            "LIGHTING_SETUP",
+            "SUBJECT",
+            "DURATION"
+          ]
+        },
+        {
+          "id": "nvidia_img_sdxl_turbo_realtime",
+          "name": "SDXL Turbo — Prototipado Ultrarrápido",
+          "description": "Generación en 1 paso para explorar ideas rápidamente antes de producción",
+          "category": "prototipo",
+          "tags": [
+            "sdxl-turbo",
+            "rapido",
+            "prototipo",
+            "iteracion"
+          ],
+          "model_recommendation": "stabilityai/sdxl-turbo",
+          "aspect_ratio": "1:1",
+          "prompt": "{{STYLE}} product photo of {{PRODUCT_NAME}}, {{COMPOSITION}}, {{COLOR_MOOD}} mood, professional quality, e-commerce ready",
+          "negative_prompt": "blurry, low quality, amateur",
+          "variables": [
+            "STYLE",
+            "PRODUCT_NAME",
+            "COMPOSITION",
+            "COLOR_MOOD"
+          ]
+        }
+      ],
+      "count": 15
     }
   },
   "meta": {
-    "totalTemplates": 7714,
-    "totalLibraries": 53,
+    "totalTemplates": 6796,
+    "totalLibraries": 58,
     "version": "5.0.0",
-    "lastUpdated": "2026-06-19",
+    "lastUpdated": "2026-07-05",
     "sources": [
       "trail-of-bits/skills (CC-BY-SA-4.0)",
       "affaan-m/everything-claude-code (MIT)",
@@ -121256,7 +121591,8 @@
       "hesreallyhim/awesome-claude-code (Various)",
       "Google Stitch MCP",
       "Visme Templates",
-      "21st.dev Components"
+      "21st.dev Components",
+      "NVIDIA NIM AI Catalog"
     ]
   }
 }

@@ -943,38 +943,19 @@ Puntuación del 1 al 10 con justificación.
 Top 3 mejoras concretas y accionables.
 
 Sé específico, directo y útil. Responde en español.`,
-          [{ url: videoUrl, mimeType: file.mimeType ?? "video/mp4" }]
+          [videoUrl]
         );
-        analysis = typeof result === "string" ? result : JSON.stringify(result);
+        analysis = typeof result === "string" ? result : (result as { text?: string }).text ?? JSON.stringify(result);
       } catch {
         analysis = await askClaude(
-          `Eres un experto en marketing de vídeo. Analiza este vídeo para e-commerce:
-- Título: "${title}"
-- Tipo: ${file.fileType}
-- Generado por: ${file.generatedBy ?? "IA"}
-- Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "desconocido"}
-- Metadatos: ${JSON.stringify(meta).slice(0, 300)}
-
-Proporciona una auditoría completa con: calidad técnica estimada, efectividad para marketing, puntuación 1-10, y 3 recomendaciones concretas. Responde en español.`
+          0,
+          [{ role: "user" as const, content: `Eres un experto en marketing de vídeo. Analiza este vídeo para e-commerce:\n- Título: "${title}"\n- Tipo: ${file.fileType}\n- Generado por: ${file.generatedBy ?? "IA"}\n- Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "desconocido"}\n- Metadatos: ${JSON.stringify(meta).slice(0, 300)}\n\nProporciona una auditoría completa con: calidad técnica estimada, efectividad para marketing, puntuación 1-10, y 3 recomendaciones concretas. Responde en español.` }],
         );
       }
     } else {
       analysis = await askClaude(
-        `Eres un experto en marketing de vídeo para e-commerce.
-Analiza este vídeo generado por IA basándote en sus metadatos:
-- Título: "${title}"
-- Tipo de archivo: ${file.fileType}
-- Generado por: ${file.generatedBy ?? "IA"}
-- Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "desconocido"}
-- Metadatos técnicos: ${JSON.stringify(meta).slice(0, 400)}
-
-Proporciona:
-## Análisis de Calidad (basado en metadatos)
-## Efectividad para Marketing
-## Puntuación Global (1-10)
-## 3 Recomendaciones de Mejora
-
-Responde en español, sé directo y práctico.`
+        0,
+        [{ role: "user" as const, content: `Eres un experto en marketing de vídeo para e-commerce.\nAnaliza este vídeo generado por IA basándote en sus metadatos:\n- Título: "${title}"\n- Tipo de archivo: ${file.fileType}\n- Generado por: ${file.generatedBy ?? "IA"}\n- Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "desconocido"}\n- Metadatos técnicos: ${JSON.stringify(meta).slice(0, 400)}\n\nProporciona:\n## Análisis de Calidad (basado en metadatos)\n## Efectividad para Marketing\n## Puntuación Global (1-10)\n## 3 Recomendaciones de Mejora\n\nResponde en español, sé directo y práctico.` }],
       );
     }
 
@@ -1008,21 +989,15 @@ router.post("/vault/global/:fileId/audit-video", requireAuth, async (req, res): 
     if (videoUrl && (videoUrl.startsWith("http://") || videoUrl.startsWith("https://"))) {
       try {
         const result = await askGeminiWithUrls(
-          `Experto en marketing de vídeo. Analiza este vídeo "${title}" para e-commerce:
-## 1. Calidad Técnica (resolución, fluidez, iluminación)
-## 2. Contenido y Narrativa (mensaje, duración, gancho inicial)
-## 3. Efectividad para Marketing (plataforma, CTA, conversión)
-## 4. Puntuación Global (1-10)
-## 5. Top 3 Recomendaciones
-Responde en español.`,
-          [{ url: videoUrl, mimeType: file.mimeType ?? "video/mp4" }]
+          `Experto en marketing de vídeo. Analiza este vídeo "${title}" para e-commerce:\n## 1. Calidad Técnica (resolución, fluidez, iluminación)\n## 2. Contenido y Narrativa (mensaje, duración, gancho inicial)\n## 3. Efectividad para Marketing (plataforma, CTA, conversión)\n## 4. Puntuación Global (1-10)\n## 5. Top 3 Recomendaciones\nResponde en español.`,
+          [videoUrl]
         );
-        analysis = typeof result === "string" ? result : JSON.stringify(result);
+        analysis = typeof result === "string" ? result : (result as { text?: string }).text ?? JSON.stringify(result);
       } catch {
-        analysis = await askClaude(`Auditoría de vídeo IA. Título: "${title}". Tipo: ${file.fileType}. Generado por: ${file.generatedBy ?? "IA"}. Metadatos: ${JSON.stringify(meta).slice(0, 300)}. Proporciona: calidad técnica, efectividad marketing, puntuación 1-10, 3 recomendaciones. Responde en español.`);
+        analysis = await askClaude(0, [{ role: "user" as const, content: `Auditoría de vídeo IA. Título: "${title}". Tipo: ${file.fileType}. Generado por: ${file.generatedBy ?? "IA"}. Metadatos: ${JSON.stringify(meta).slice(0, 300)}. Proporciona: calidad técnica, efectividad marketing, puntuación 1-10, 3 recomendaciones. Responde en español.` }]);
       }
     } else {
-      analysis = await askClaude(`Auditoría de vídeo IA. Título: "${title}". Tipo: ${file.fileType}. Generado por: ${file.generatedBy ?? "IA"}. Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "N/A"}. Metadatos: ${JSON.stringify(meta).slice(0, 300)}. Proporciona: calidad técnica estimada, efectividad marketing, puntuación 1-10, 3 recomendaciones. Responde en español.`);
+      analysis = await askClaude(0, [{ role: "user" as const, content: `Auditoría de vídeo IA. Título: "${title}". Tipo: ${file.fileType}. Generado por: ${file.generatedBy ?? "IA"}. Tamaño: ${file.fileSizeBytes ? `${(file.fileSizeBytes / 1024 / 1024).toFixed(1)}MB` : "N/A"}. Metadatos: ${JSON.stringify(meta).slice(0, 300)}. Proporciona: calidad técnica estimada, efectividad marketing, puntuación 1-10, 3 recomendaciones. Responde en español.` }]);
     }
 
     res.json({ analysis, fileId, title });
