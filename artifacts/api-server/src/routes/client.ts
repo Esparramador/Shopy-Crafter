@@ -826,13 +826,12 @@ REGLAS:
       { role: "user", content: msg || `[Cliente adjuntó ${attachedFiles.length} archivo(s)]` },
     ];
 
-    const maxTokens = projectMode ? 2000 : 600;
     let reply: string;
     try {
-      reply = await askGeminiChat(chatMessages, systemPrompt, { maxOutputTokens: maxTokens });
+      reply = await askGeminiChat(chatMessages, systemPrompt, { maxOutputTokens: 8192 });
       if (!reply) throw new Error("empty");
     } catch {
-      reply = await askClaude(isNaN(pid) ? 0 : pid, chatMessages, systemPrompt, projectMode ? 1500 : 400, 12000);
+      reply = await askClaude(isNaN(pid) ? 0 : pid, chatMessages, systemPrompt, 8192, 32000);
     }
 
     // ── Learn from this conversation (fire-and-forget) ───────────────
@@ -843,6 +842,28 @@ REGLAS:
         userMessage: msg,
         aiReply: reply,
       });
+    }
+
+    // ── Detect long/report response and auto-save to Vault ──────────
+    // ~4 chars per token: 8000 chars ≈ 2000 tokens, 30000 chars ≈ 7500 tokens
+    const LONG_REPORT_THRESHOLD = 8000; // chars
+    const isLongReport = reply.length > LONG_REPORT_THRESHOLD;
+    let reportFileId: number | undefined;
+
+    if (isLongReport && !isNaN(pid)) {
+      try {
+        const reportTitle = msg.length > 80
+          ? msg.slice(0, 80) + "…"
+          : msg || "Informe IA";
+        const fullContent = `# ${reportTitle}\n\n_Generado: ${new Date().toLocaleString("es-ES")}_\n\n---\n\n${reply}`;
+        const result = await db.execute(sql`
+          INSERT INTO project_files (project_id, title, content, file_type, category, created_at)
+          VALUES (${pid}, ${reportTitle}, ${fullContent}, 'text', 'report', NOW())
+          RETURNING id
+        `);
+        const rows = (result as any).rows ?? (Array.isArray(result) ? result : []);
+        reportFileId = rows[0]?.id;
+      } catch { /* silencioso */ }
     }
 
     // ── Auto-save to notebook in Project Mode ────────────────────────
@@ -859,7 +880,17 @@ REGLAS:
       } catch { /* silencioso — no bloquear la respuesta */ }
     }
 
-    res.json({ reply, vaultFiles, forwarded, forwardedId, autoSaved, projectMode });
+    res.json({
+      reply,
+      vaultFiles,
+      forwarded,
+      forwardedId,
+      autoSaved,
+      projectMode,
+      longReport: isLongReport,
+      reportFileId,
+      replyLength: reply.length,
+    });
   } catch (err: any) {
     logger.error({ err: err.message }, "client ai-chat error");
     res.status(500).json({ error: "Error al procesar tu consulta. Por favor inténtalo de nuevo." });

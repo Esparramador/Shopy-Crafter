@@ -26,7 +26,12 @@ interface ChatMsg {
   vaultFiles?: VaultFile[];
   forwarded?: boolean;
   ts?: number;
+  longReport?: boolean;
+  reportFileId?: number;
 }
+
+// Inline threshold: show full if ≤ this, truncate + expand button if longer
+const INLINE_CHARS = 3000;
 
 const FORWARD_WORDS = /\b(manda|envía|envíale|pasa|comparte|dile|mándalo|mándale|reenvía)\b.*\b(joan|shopy\s*crafter|agencia|equipo|admin|vosotros|os)/i;
 const LIST_FILES_WORDS = /\b(lista|muéstrame|dame|descarga|descárgame|archivos?|fotos?|vídeos?|imágenes?|documentos?|generados?|mis archivos?|mis fotos?|mis vídeos?)\b/i;
@@ -82,6 +87,7 @@ export function ClientChatbot() {
   const [savedIdxs, setSavedIdxs]   = useState<Set<number>>(new Set());
   const [savingIdx, setSavingIdx]   = useState<number | null>(null);
   const [projectMode, setProjectMode] = useState(false);
+  const [expandedMsgs, setExpandedMsgs] = useState<Set<number>>(new Set());
 
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
@@ -225,8 +231,19 @@ export function ClientChatbot() {
         }
         const reply = d.reply ?? "No pude procesar tu consulta.";
         const newIdx = msgs.filter(m => m.role !== "system").length + 1;
-        addMsg({ role: "assistant", content: reply, vaultFiles: d.vaultFiles, forwarded: d.forwarded, ts: Date.now() });
+        addMsg({
+          role: "assistant",
+          content: reply,
+          vaultFiles: d.vaultFiles,
+          forwarded: d.forwarded,
+          longReport: d.longReport,
+          reportFileId: d.reportFileId,
+          ts: Date.now(),
+        });
         speak(reply);
+        if (d.longReport) {
+          addMsg({ role: "system", content: `📄 Informe largo (${Math.round((d.replyLength ?? reply.length) / 1000)}K caracteres) — guardado en el Vault automáticamente`, ts: Date.now() });
+        }
         if (d.autoSaved) {
           setSavedIdxs(prev => { const s = new Set(prev); s.add(newIdx); return s; });
           addMsg({ role: "system", content: "📋 Guardado automáticamente en el Cuaderno IA", ts: Date.now() });
@@ -499,13 +516,48 @@ export function ClientChatbot() {
                 )}
 
                 {/* Assistant message */}
-                {m.role === "assistant" && (
+                {m.role === "assistant" && (() => {
+                  const isLong = m.content.length > INLINE_CHARS;
+                  const isExpanded = expandedMsgs.has(i);
+                  const displayContent = isLong && !isExpanded
+                    ? m.content.slice(0, INLINE_CHARS) + "\n\n…"
+                    : m.content;
+                  return (
                   <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
-                    <div style={{ width: 24, height: 24, borderRadius: 8, background: "rgba(201,169,97,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0, marginTop: 1 }}>🤖</div>
+                    <div style={{ width: 24, height: 24, borderRadius: 8, background: projectMode ? "rgba(99,102,241,0.15)" : "rgba(201,169,97,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0, marginTop: 1 }}>{projectMode ? "🎯" : "🤖"}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Long report badge */}
+                      {m.longReport && (
+                        <div style={{ marginBottom: 4, display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px", borderRadius: 6, background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.25)", fontSize: 10, color: "#a5b4fc" }}>
+                          <span>📄</span>
+                          <span>Informe completo · {Math.round(m.content.length / 1000)}K chars · Guardado en Vault</span>
+                        </div>
+                      )}
                       <div style={{ maxWidth: "92%", padding: "9px 12px", lineHeight: 1.6, borderRadius: "14px 14px 14px 3px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 12.5, color: "#e5e5e5" }}>
-                        {renderContent(m.content)}
+                        {renderContent(displayContent)}
                       </div>
+                      {/* Expand / Collapse for long messages */}
+                      {isLong && (
+                        <button
+                          onClick={() => setExpandedMsgs(prev => {
+                            const s = new Set(prev);
+                            if (s.has(i)) s.delete(i); else s.add(i);
+                            return s;
+                          })}
+                          style={{ marginTop: 4, padding: "3px 9px", borderRadius: 7, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.08)", color: "#a5b4fc", fontSize: 10.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, transition: "all 0.15s" }}
+                        >
+                          {isExpanded ? "⊡ Colapsar informe" : `📄 Ver informe completo (${Math.round(m.content.length / 1000)}K chars)`}
+                        </button>
+                      )}
+                      {/* Copy full content button for long reports */}
+                      {m.longReport && isExpanded && (
+                        <button
+                          onClick={() => navigator.clipboard?.writeText(m.content).catch(() => {})}
+                          style={{ marginTop: 4, marginLeft: 6, padding: "3px 9px", borderRadius: 7, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)", fontSize: 10.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                        >
+                          📋 Copiar todo
+                        </button>
+                      )}
                       {m.content && m.content.length > 20 && (
                         <button
                           onClick={async () => {
@@ -522,7 +574,7 @@ export function ClientChatbot() {
                           }}
                           title="Guardar en Cuaderno de Investigación"
                           style={{
-                            marginTop: 4, padding: "3px 9px", borderRadius: 7,
+                            marginTop: 4, marginLeft: isLong ? 6 : 0, padding: "3px 9px", borderRadius: 7,
                             border: `1px solid ${savedIdxs.has(i) ? "rgba(42,122,75,0.3)" : "rgba(201,169,97,0.2)"}`,
                             background: savedIdxs.has(i) ? "rgba(42,122,75,0.08)" : "rgba(201,169,97,0.05)",
                             color: savedIdxs.has(i) ? "var(--jade,#2da568)" : "rgba(201,169,97,0.7)",
@@ -558,7 +610,8 @@ export function ClientChatbot() {
                       )}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             ))}
 
