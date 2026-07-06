@@ -34,7 +34,13 @@ const STRIPE_MODULE_NAV = [
 
 const WOO_MODULE_NAV = [
   { id: "woo-hub",        label: "WooCommerce Hub", icon: "🟣" },
-  { id: "audit",          label: "Auditoría Web",   icon: "📊" },
+  { id: "audit",          label: "Auditoría",       icon: "📊" },
+  { id: "redesign",       label: "Rediseño IA",     icon: "✏️" },
+  { id: "images",         label: "Imágenes IA",     icon: "🖼" },
+  { id: "consistency",    label: "Consistencia",    icon: "🎨" },
+  { id: "ab-testing",     label: "A/B Testing",     icon: "📈" },
+  { id: "pricing",        label: "Pricing Engine",  icon: "💰" },
+  { id: "seo",            label: "SEO Engine",      icon: "🔍" },
   { id: "vault",          label: "Repositorio",     icon: "🗄️" },
   { id: "fusion-studio",  label: "Studio Foto",     icon: "🧬" },
   { id: "ad-studio",      label: "Studio Anuncios", icon: "📺" },
@@ -42,7 +48,13 @@ const WOO_MODULE_NAV = [
 
 const PS_MODULE_NAV = [
   { id: "ps-hub",         label: "PrestaShop Hub",  icon: "🔴" },
-  { id: "audit",          label: "Auditoría Web",   icon: "📊" },
+  { id: "audit",          label: "Auditoría",       icon: "📊" },
+  { id: "redesign",       label: "Rediseño IA",     icon: "✏️" },
+  { id: "images",         label: "Imágenes IA",     icon: "🖼" },
+  { id: "consistency",    label: "Consistencia",    icon: "🎨" },
+  { id: "ab-testing",     label: "A/B Testing",     icon: "📈" },
+  { id: "pricing",        label: "Pricing Engine",  icon: "💰" },
+  { id: "seo",            label: "SEO Engine",      icon: "🔍" },
   { id: "vault",          label: "Repositorio",     icon: "🗄️" },
   { id: "fusion-studio",  label: "Studio Foto",     icon: "🧬" },
   { id: "ad-studio",      label: "Studio Anuncios", icon: "📺" },
