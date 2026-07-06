@@ -320,6 +320,37 @@ export function AppLayout({ children }: AppLayoutProps) {
     };
   }, [darkMode]);
 
+  // ── Platform accent injection ──────────────────────────────────────────────
+  const PLATFORM_COLORS: Record<string, string> = {
+    shopify:     "#95bf47",
+    woocommerce: "#96588a",
+    prestashop:  "#df0067",
+    universal:   "#5b9bd5",
+    stripe:      "#635bff",
+    tiendanube:  "#00a0e3",
+  };
+  const PLATFORM_ICONS: Record<string, string> = {
+    shopify:     "🟢",
+    woocommerce: "🟣",
+    prestashop:  "🔴",
+    universal:   "🌐",
+    stripe:      "💳",
+    tiendanube:  "☁️",
+  };
+  const activePlatform: string = (activeProject as any)?.platformType ?? "shopify";
+  const platformAccent = PLATFORM_COLORS[activePlatform] ?? "var(--gold)";
+  const platformIcon   = PLATFORM_ICONS[activePlatform] ?? "🟢";
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--platform-accent", platformAccent);
+    root.setAttribute("data-platform", activePlatform);
+    return () => {
+      root.style.setProperty("--platform-accent", "var(--gold)");
+      root.removeAttribute("data-platform");
+    };
+  }, [activePlatform, platformAccent]);
+
   const toggleDarkMode = () => setDarkMode(d => !d);
 
   return (
@@ -375,17 +406,26 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="skeleton" style={{ height: 36, marginBottom: 4, borderRadius: 8 }} />
             </>
           ) : (
-            projects?.map((project: { id: number; name: string; shopDomain?: string }) => {
+            projects?.map((project: { id: number; name: string; shopDomain?: string; [k: string]: any }) => {
               const isActive = activeProjectId === project.id;
+              const pType: string = project.platformType ?? "shopify";
+              const pColor = PLATFORM_COLORS[pType] ?? "#95bf47";
+              const pIcon  = PLATFORM_ICONS[pType] ?? "🟢";
               return (
                 <Link key={project.id} href={`/projects/${project.id}/audit`}>
-                  <div className={`client-pill${isActive ? " active" : ""}`} role="button" aria-current={isActive ? "page" : undefined}>
+                  <div
+                    className={`client-pill${isActive ? " active" : ""}`}
+                    role="button"
+                    aria-current={isActive ? "page" : undefined}
+                    style={isActive ? { borderLeft: `2px solid ${pColor}`, borderRadius: 8 } : {}}
+                  >
                     <div
                       className="client-dot"
-                      style={{ background: isActive ? "var(--gold)" : "var(--t4)" }}
+                      style={{ background: isActive ? pColor : "var(--t4)", boxShadow: isActive ? `0 0 6px ${pColor}80` : "none" }}
                     />
                     <div className="client-info">
                       <p className="client-name">
+                        <span style={{ marginRight: 4 }}>{pIcon}</span>
                         {project.name}
                         <span style={{ marginLeft: 5, fontSize: 9, fontWeight: 800, color: "var(--t4)", letterSpacing: "0.3px" }}>#{project.id}</span>
                       </p>
@@ -604,6 +644,16 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="topbar-breadcrumb">
             {activeProject ? (
               <>
+                <span
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700,
+                    background: `${platformAccent}18`, border: `1px solid ${platformAccent}40`,
+                    color: platformAccent, flexShrink: 0,
+                  }}
+                >
+                  {platformIcon} {activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)}
+                </span>
                 <span className="topbar-client">{activeProject.name}</span>
                 <span className="topbar-sep">/</span>
                 <span className="topbar-page">{pageLabel}</span>

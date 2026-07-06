@@ -3,6 +3,31 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";
 import { LogOut, Menu, X } from "lucide-react";
+
+const PLATFORM_COLORS: Record<string, string> = {
+  shopify:     "#95bf47",
+  woocommerce: "#96588a",
+  prestashop:  "#df0067",
+  universal:   "#5b9bd5",
+  stripe:      "#635bff",
+  tiendanube:  "#00a0e3",
+};
+const PLATFORM_ICONS: Record<string, string> = {
+  shopify:     "🟢",
+  woocommerce: "🟣",
+  prestashop:  "🔴",
+  universal:   "🌐",
+  stripe:      "💳",
+  tiendanube:  "☁️",
+};
+const PLATFORM_LABELS: Record<string, string> = {
+  shopify:     "Shopify",
+  woocommerce: "WooCommerce",
+  prestashop:  "PrestaShop",
+  universal:   "Auditoría Web",
+  stripe:      "Stripe",
+  tiendanube:  "Tienda Nube",
+};
 import { ClientChatbot } from "./ClientChatbot";
 import { useClientPreview } from "./ClientPreviewContext";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -45,7 +70,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   useEffect(() => { locationRef.current = location; }, [location]);
   const { previewPid, setPreviewPid } = useClientPreview();
   const [projects, setProjects] = useState<Array<{ id: number; name: string; shopDomain: string }>>([]);
-  const [clientProjectInfo, setClientProjectInfo] = useState<{ name: string | null; shopDomain: string | null } | null>(null);
+  const [clientProjectInfo, setClientProjectInfo] = useState<{ name: string | null; shopDomain: string | null; platformType?: string | null } | null>(null);
 
   useEffect(() => {
     if (user?.role !== "admin") return;
@@ -136,6 +161,22 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   const displayName = activeProject?.name ?? cp.sidebar?.defaultName ?? "Cliente";
   const displayDomain = activeProject?.shopDomain ?? cp.sidebar?.storePanel ?? "Panel de tienda";
 
+  // Platform theming
+  const clientPlatform: string = (clientProjectInfo?.platformType ?? (activeProject as any)?.platformType ?? "shopify");
+  const clientPlatformColor  = PLATFORM_COLORS[clientPlatform]  ?? "#95bf47";
+  const clientPlatformIcon   = PLATFORM_ICONS[clientPlatform]   ?? "🟢";
+  const clientPlatformLabel  = PLATFORM_LABELS[clientPlatform]  ?? "Shopify";
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--platform-accent", clientPlatformColor);
+    root.setAttribute("data-platform", clientPlatform);
+    return () => {
+      root.style.setProperty("--platform-accent", "var(--gold)");
+      root.removeAttribute("data-platform");
+    };
+  }, [clientPlatform, clientPlatformColor]);
+
   const initials = displayName
     ? displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
     : "CL";
@@ -161,12 +202,24 @@ export function ClientLayout({ children }: { children: ReactNode }) {
         {/* Client identity */}
         <div className="sidebar-clients">
           <span className="sidebar-label">{cp.sidebar?.yourStore ?? "Tu Tienda"}</span>
-          <div className="client-pill active">
-            <div className="client-dot" style={{ background: "var(--gold)" }} />
+          <div className="client-pill active" style={{ borderLeft: `2px solid ${clientPlatformColor}`, borderRadius: 8 }}>
+            <div className="client-dot" style={{ background: clientPlatformColor, boxShadow: `0 0 6px ${clientPlatformColor}80` }} />
             <div className="client-info">
-              <p className="client-name">{displayName}</p>
+              <p className="client-name">
+                <span style={{ marginRight: 4 }}>{clientPlatformIcon}</span>
+                {displayName}
+              </p>
               <p className="client-domain">{displayDomain}</p>
             </div>
+          </div>
+          {/* Platform badge */}
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "3px 9px", borderRadius: 20, marginTop: 4,
+            background: `${clientPlatformColor}18`,
+            border: `1px solid ${clientPlatformColor}40`,
+          }}>
+            <span style={{ fontSize: 10, color: clientPlatformColor, fontWeight: 700 }}>{clientPlatformLabel}</span>
           </div>
 
           {/* Agency status pill */}

@@ -12,6 +12,7 @@ interface StoreSummary {
   storeName: string;
   domain: string;
   niche: string;
+  platformType: string;
   revenue30: number;
   orders30: number;
   aov: number;
@@ -20,6 +21,23 @@ interface StoreSummary {
   sparkline: number[];
   loading: boolean;
 }
+
+const PLATFORM_COLORS_HOME: Record<string, string> = {
+  shopify:     "#95bf47",
+  woocommerce: "#96588a",
+  prestashop:  "#df0067",
+  universal:   "#5b9bd5",
+  stripe:      "#635bff",
+  tiendanube:  "#00a0e3",
+};
+const PLATFORM_ICONS_HOME: Record<string, string> = {
+  shopify:     "🟢",
+  woocommerce: "🟣",
+  prestashop:  "🔴",
+  universal:   "🌐",
+  stripe:      "💳",
+  tiendanube:  "☁️",
+};
 
 interface BrainStatus {
   totalMemories: number;
@@ -103,26 +121,31 @@ function KpiCard({ icon, label, value, sub, color = "var(--gold)", trend }: {
 
 function StoreRevenueRow({ store, rank }: { store: StoreSummary; rank: number }) {
   const [, navigate] = useLocation();
-  const colors = ["var(--gold)", "var(--jade)", "#8b5cf6", "#f59e0b", "#06b6d4"];
-  const color = colors[rank % colors.length];
+  const pColor = PLATFORM_COLORS_HOME[store.platformType] ?? "#95bf47";
+  const pIcon  = PLATFORM_ICONS_HOME[store.platformType] ?? "🟢";
   return (
     <div
       onClick={() => navigate(`/projects/${store.projectId}/audit`)}
       className="glass-card card-hover"
-      style={{ padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}
+      style={{
+        padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
+        borderLeft: `3px solid ${pColor}`,
+      }}
     >
       <div style={{
-        width: 36, height: 36, borderRadius: 10, background: `${color}18`,
+        width: 36, height: 36, borderRadius: 10, background: `${pColor}18`,
         display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0, fontSize: 15, color, fontWeight: 900,
-        border: `1px solid ${color}30`,
+        flexShrink: 0, fontSize: 18,
+        border: `1px solid ${pColor}30`,
       }}>
-        #{rank + 1}
+        {pIcon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{store.storeName}</p>
-          <span style={{ fontSize: 9, color: "var(--t4)", flexShrink: 0 }}>#{store.projectId}</span>
+          <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, background: `${pColor}20`, color: pColor, fontWeight: 700, flexShrink: 0 }}>
+            #{rank + 1}
+          </span>
         </div>
         <p style={{ fontSize: 11, color: "var(--t4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {store.domain || "—"}{store.niche ? ` · ${store.niche}` : ""}
@@ -143,7 +166,7 @@ function StoreRevenueRow({ store, rank }: { store: StoreSummary; rank: number })
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-        <Sparkline data={store.sparkline} color={color} />
+        <Sparkline data={store.sparkline} color={pColor} />
         {!store.loading && <TrendBadge value={store.trend} />}
       </div>
     </div>
@@ -200,7 +223,8 @@ export default function Home() {
     if (!projects || projects.length === 0) return;
     const initial: StoreSummary[] = projects.map((p: any) => ({
       projectId: p.id, storeName: p.name, domain: p.shopDomain ?? "",
-      niche: p.storeNiche ?? "", revenue30: 0, orders30: 0, aov: 0,
+      niche: p.storeNiche ?? "", platformType: p.platformType ?? "shopify",
+      revenue30: 0, orders30: 0, aov: 0,
       trend: 0, totalAttributed: 0, sparkline: [], loading: true,
     }));
     setStores(initial);

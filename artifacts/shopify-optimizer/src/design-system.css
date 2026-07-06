@@ -21,6 +21,7 @@
   --gold:  #c8a84b;
   --gold2: #d2b86b;
   --gold3: #e4d4a5;
+  --platform-accent: #c8a84b;
   --jade:  #2dd49f;
   --jade2: #5bddb4;
   --sky:   #4a9edd;
@@ -263,14 +264,14 @@ body::after {
 }
 .nav-item:hover { background: var(--ink3); color: var(--t); }
 .nav-item.active {
-  background: rgba(200,168,75,0.07);
-  color: var(--gold3);
+  background: color-mix(in srgb, var(--platform-accent) 10%, transparent);
+  color: var(--t);
   border-color: var(--bdr);
 }
 .nav-item.active::before {
   content: '';
   position: absolute; left: 0; top: 18%; bottom: 18%;
-  width: 2px; background: var(--gold);
+  width: 2px; background: var(--platform-accent);
   border-radius: 0 2px 2px 0;
 }
 .nav-icon { font-size: 13px; width: 16px; text-align: center; flex-shrink: 0; }
@@ -400,7 +401,7 @@ body::after {
   font-family: var(--fb);
 }
 .module-tab:hover { color: var(--t); }
-.module-tab.active { color: var(--gold2); border-bottom-color: var(--gold); }
+.module-tab.active { color: var(--platform-accent); border-bottom-color: var(--platform-accent); }
 
 /* ── BUTTONS ── */
 .btn {
