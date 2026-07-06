@@ -46,6 +46,10 @@ const DEMOS = [
   { id: "24", name: "Infinite Scroll Feed", category: "scroll", file: "24-infinite-scroll-feed.html" },
   { id: "25", name: "Hero Sections", category: "landing", file: "25-hero-sections.html" },
   { id: "26", name: "Bento Grids", category: "ui", file: "26-bento-grids.html" },
+  { id: "27", name: "Suburbia R3F Tricks + Physics", category: "3d", file: "27-suburbia-r3f-tricks.html" },
+  { id: "28", name: "Noova Bento Tilt + Animated Words", category: "effects", file: "28-noova-bento-tilt.html" },
+  { id: "29", name: "Medical Canvas 2D + Counters", category: "effects", file: "29-medical-canvas2d-counters.html" },
+  { id: "30", name: "Ferrari GLB Lerp + Snap Scroll", category: "3d", file: "30-ferrari-glb-lerp-snap.html" },
 ];
 
 router.get("/web-designer/templates", (_req: Request, res: Response) => {

@@ -420,6 +420,42 @@ const DEMOS=[
     tags:['BentoGrid','Dashboard','Portfolio','Pricing','Analytics'],
     lines:'~650',cats:['ui','landing','effects']
   },
+  {
+    num:'27',file:'27-suburbia-r3f-tricks.html',
+    title:'Suburbia R3F Tricks + Physics + Parallax',
+    desc:'R3F con 3 zonas click invisibles → GSAP timeline ollie/kickflip/frontside360. matter-js physics footer con chamfer+restitution+MouseConstraint. Parallax 2 capas (fg 2.5×) lerp rAF. SlideIn IntersectionObserver rootMargin:-150px. Basado en blesten/3d-landing-page.',
+    thumb:'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['R3F','Three.js','GSAP','matter-js','Physics','Parallax','Skateboard'],
+    lines:'~500',cats:['3d','effects','scroll']
+  },
+  {
+    num:'28',file:'28-noova-bento-tilt.html',
+    title:'Noova Bento Tilt + Animated Words + Video Hero',
+    desc:'Bento Grid con tilt 3D puro CSS perspective(700px) — cero GSAP. AnimatedTitle: palabras desde translate3d(0,-100px,-500px) rotateX(90deg) → ScrollTrigger stagger:0.02. Video clip-path polygon hero. Image mouse tilt GSAP transformPerspective:500. Stack: React 19 + GSAP 3.14.2.',
+    thumb:'https://images.unsplash.com/photo-1522542550221-31fd19575a2d?w=700&q=75',
+    badge:'hot',badgeLabel:'HOT',
+    tags:['BentoTilt','GSAP','ScrollTrigger','AnimatedWords','VideoHero','CSS3D'],
+    lines:'~520',cats:['effects','landing','3d','ui']
+  },
+  {
+    num:'29',file:'29-medical-canvas2d-counters.html',
+    title:'Medical Canvas 2D + Counters + Glassmorphism',
+    desc:'Canvas 2D sin WebGL: drawHeartbeat ECG, drawDNA hélice, drawMolecule red molecular, drawParticles. useCounter con easing cúbico 1-Math.pow(1-p,3). Hero glassmorphism con btn-3d + SVG flotantes CSS @keyframes. framer-motion ready. Basado en AmirBayat0/medical.',
+    thumb:'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=700&q=75',
+    badge:'new',badgeLabel:'NEW',
+    tags:['Canvas2D','ECG','DNA','Glassmorphism','Counters','CubicEasing','Medical'],
+    lines:'~480',cats:['effects','landing','ui']
+  },
+  {
+    num:'30',file:'30-ferrari-glb-lerp-snap.html',
+    title:'Ferrari GLB Lerp + Snap Scroll + Dual Canvas',
+    desc:'Three.js GLB con lerp speed=0.10 manual — sin GSAP. sectionAnimations[] con IntersectionObserver threshold:0.3. Snap scroll wheel+keyboard+touch debounce 1000ms. Progress dots dinámicos generados por JS. Loader letra por letra CSS stagger. Dual canvas wbgl/wbgl2. Basado en Meettomb/LaFerrari.',
+    thumb:'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=700&q=75',
+    badge:'3d',badgeLabel:'3D',
+    tags:['Three.js','Lerp','SnapScroll','DualCanvas','ProgressDots','Loader','Ferrari'],
+    lines:'~480',cats:['3d','scroll','effects']
+  },
 ];
 
 let activeFilter='all';

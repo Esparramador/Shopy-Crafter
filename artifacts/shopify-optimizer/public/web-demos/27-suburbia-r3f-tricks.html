@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crafter AI — Demo 27 · Suburbia R3F Tricks + Physics + Parallax</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<style>
+:root{--bg:#080a0f;--surface:#0f1117;--gold:#f59e0b;--cyan:#06b6d4;--violet:#8b5cf6;--text:#f0f4ff;--muted:rgba(240,244,255,.5);--border:rgba(255,255,255,.07)}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-snap-type:y mandatory}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+/* ── HERO ── */
+.hero{min-height:100svh;scroll-snap-align:start;display:grid;place-items:center;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 20%,rgba(99,102,241,.12) 0%,transparent 60%)}
+.tag{display:inline-block;padding:5px 14px;border-radius:50px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#818cf8;margin-bottom:24px}
+.hero h1{font-size:clamp(42px,7vw,100px);font-weight:900;line-height:1;letter-spacing:-.04em;text-align:center;margin-bottom:20px}
+.hero h1 em{font-style:italic;color:var(--gold)}
+.hero p{color:var(--muted);text-align:center;font-size:16px;line-height:1.7;max-width:540px;margin:0 auto 40px}
+
+/* ── 3D BOARD VIEWER ── */
+.board-section{scroll-snap-align:start;min-height:100svh;display:flex;align-items:center;padding:80px 5%}
+.board-wrap{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;max-width:1100px;margin:0 auto;width:100%}
+@media(max-width:800px){.board-wrap{grid-template-columns:1fr}}
+#board-canvas{width:100%;max-width:480px;height:400px;border-radius:16px;border:1px solid var(--border);background:radial-gradient(ellipse at center,#1a1a2e 0%,#0a0a15 100%);cursor:grab;display:block}
+#board-canvas:active{cursor:grabbing}
+.board-info h2{font-size:clamp(28px,4vw,52px);font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-bottom:16px}
+.board-info p{color:var(--muted);font-size:14px;line-height:1.7;margin-bottom:32px}
+.tricks-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.trick-btn{padding:12px 8px;border-radius:10px;border:1px solid rgba(99,102,241,.25);background:rgba(99,102,241,.06);color:var(--text);font-size:11px;font-weight:700;letter-spacing:.05em;cursor:pointer;transition:all .2s;text-align:center;text-transform:uppercase}
+.trick-btn:hover{background:rgba(99,102,241,.18);border-color:#818cf8;transform:translateY(-2px)}
+.trick-btn.active{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-color:transparent;color:#fff;box-shadow:0 4px 20px rgba(99,102,241,.4)}
+
+/* ── PHYSICS FOOTER DEMO ── */
+.physics-section{scroll-snap-align:start;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 5%}
+.physics-section h2{font-size:clamp(26px,4vw,48px);font-weight:800;text-align:center;margin-bottom:12px}
+.physics-section p{color:var(--muted);text-align:center;font-size:14px;margin-bottom:40px}
+#physics-canvas{width:100%;max-width:800px;height:360px;border-radius:16px;border:1px solid var(--border);cursor:crosshair;display:block;background:#0c0c18}
+.physics-hint{margin-top:14px;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+
+/* ── PARALLAX ── */
+.parallax-section{scroll-snap-align:start;min-height:100svh;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.parallax-bg{position:absolute;inset:-10% -5%;background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><defs><radialGradient id="g" cx="50%" cy="40%"><stop offset="0%" stop-color="%236366f1" stop-opacity=".3"/><stop offset="100%" stop-color="%230f172a" stop-opacity="0"/></radialGradient></defs><rect width="800" height="600" fill="%230a0a15"/><ellipse cx="400" cy="240" rx="400" ry="300" fill="url(%23g)"/></svg>') center/cover;transform-origin:center;transition:transform .1s linear;will-change:transform}
+.parallax-fg{position:absolute;inset:-20% -10%;display:flex;align-items:center;justify-content:center;transform-origin:center;will-change:transform}
+.parallax-fg svg{width:min(500px,80vw);opacity:.15;filter:blur(1px)}
+.parallax-content{position:relative;z-index:2;text-align:center;max-width:600px;padding:5%}
+.parallax-content h2{font-size:clamp(36px,6vw,80px);font-weight:900;letter-spacing:-.04em;line-height:.95;margin-bottom:24px}
+.parallax-content p{color:var(--muted);font-size:15px;line-height:1.7}
+
+/* ── SLIDE-IN CARDS ── */
+.slidein-section{scroll-snap-align:start;padding:100px 5%;background:var(--surface)}
+.slidein-section h2{font-size:clamp(24px,4vw,52px);font-weight:800;text-align:center;margin-bottom:56px}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;max-width:1100px;margin:0 auto}
+.slide-card{padding:36px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid var(--border);opacity:0;transform:translateY(60px);transition:opacity .6s ease,transform .6s ease}
+.slide-card.visible{opacity:1;transform:translateY(0)}
+.card-icon{font-size:36px;margin-bottom:20px}
+.card-title{font-size:16px;font-weight:700;margin-bottom:10px}
+.card-desc{color:var(--muted);font-size:13px;line-height:1.7}
+.code-tag{display:inline-block;padding:3px 8px;border-radius:4px;background:rgba(99,102,241,.15);color:#818cf8;font-family:monospace;font-size:10px;margin-top:12px}
+
+/* ── LABEL ── */
+.demo-label{position:fixed;top:20px;left:20px;z-index:999;padding:6px 14px;border-radius:50px;background:rgba(0,0,0,.7);border:1px solid var(--border);backdrop-filter:blur(10px);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* scroll dot nav */
+.dots-nav{position:fixed;right:24px;top:50%;transform:translateY(-50%);z-index:999;display:flex;flex-direction:column;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);cursor:pointer;transition:all .3s}
+.dot.active{background:var(--violet);transform:scale(1.4)}
+</style>
+</head>
+<body>
+
+<div class="demo-label">Demo 27 · Suburbia R3F Tricks</div>
+
+<nav class="dots-nav">
+  <div class="dot active" onclick="scrollToSection(0)"></div>
+  <div class="dot" onclick="scrollToSection(1)"></div>
+  <div class="dot" onclick="scrollToSection(2)"></div>
+  <div class="dot" onclick="scrollToSection(3)"></div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="s0">
+  <div class="hero-bg"></div>
+  <div style="position:relative;z-index:1;text-align:center;padding:5%">
+    <div class="tag">Patrón 6 — blesten/3d-landing-page</div>
+    <h1>Interactive 3D<br><em>Tricks</em> + Physics</h1>
+    <p>R3F invisible click zones, GSAP timeline kickflip/ollie/360, matter-js physics footer, dual-layer parallax lerp, SlideIn IntersectionObserver.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button onclick="scrollToSection(1)" style="padding:14px 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer">Ver 3D Tricks →</button>
+      <button onclick="scrollToSection(2)" style="padding:14px 28px;background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text);font-size:14px;cursor:pointer">Physics Demo</button>
+    </div>
+  </div>
+</section>
+
+<!-- 3D BOARD -->
+<section class="board-section" id="s1">
+  <div class="board-wrap">
+    <canvas id="board-canvas"></canvas>
+    <div class="board-info">
+      <span class="tag">R3F · Three.js · GSAP</span>
+      <h2>Producto 3D<br>Interactivo</h2>
+      <p>3 meshes invisibles detectan clicks → GSAP timeline ejecuta ollie, kickflip y frontside360 con físicas reales. Float idle con sine.inOut. Camera zoom responsive.</p>
+      <div class="tricks-grid">
+        <button class="trick-btn" onclick="doTrick('ollie',this)">🛹 Ollie</button>
+        <button class="trick-btn" onclick="doTrick('kickflip',this)">🔄 Kickflip</button>
+        <button class="trick-btn" onclick="doTrick('fs360',this)">🌀 FS360</button>
+      </div>
+      <div style="margin-top:20px;padding:14px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.15);border-radius:10px">
+        <code style="font-size:11px;color:#818cf8;font-family:monospace;line-height:1.6">
+          gsap.timeline()<br>
+          &nbsp;&nbsp;.to(rot,{x:-.6,dur:.26})<br>
+          &nbsp;&nbsp;.to(rot,{z:`+=π*2`,dur:.78},.3)<br>
+          &nbsp;&nbsp;.to(rot,{x:0,dur:.12})
+        </code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PHYSICS -->
+<section class="physics-section" id="s2">
+  <span class="tag">matter-js · chamfer · MouseConstraint</span>
+  <h2>Physics Footer</h2>
+  <p>Bodies.rectangle con chamfer radius:40, restitution:0.8, MouseConstraint para arrastrar. Haz clic en el canvas para lanzar objetos.</p>
+  <canvas id="physics-canvas"></canvas>
+  <p class="physics-hint">🖱 Haz clic para lanzar · Arrastra los elementos</p>
+</section>
+
+<!-- PARALLAX -->
+<section class="parallax-section" id="s3">
+  <div class="parallax-bg" id="pbg"></div>
+  <div class="parallax-fg" id="pfg">
+    <svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="80" fill="none" stroke="#6366f1" stroke-width=".5"/><circle cx="100" cy="100" r="60" fill="none" stroke="#8b5cf6" stroke-width=".5"/><circle cx="100" cy="100" r="40" fill="none" stroke="#06b6d4" stroke-width=".5"/><line x1="20" y1="100" x2="180" y2="100" stroke="#6366f1" stroke-width=".3"/><line x1="100" y1="20" x2="100" y2="180" stroke="#6366f1" stroke-width=".3"/></svg>
+  </div>
+  <div class="parallax-content">
+    <h2>Dual Layer<br>Parallax</h2>
+    <p>Foreground se mueve 2.5× más rápido que el background. Lerp 0.1 via requestAnimationFrame — sin GSAP, máximo rendimiento.</p>
+    <div style="margin-top:32px;padding:16px;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:12px;text-align:left">
+      <code style="font-size:11px;color:#06b6d4;font-family:monospace;white-space:pre-wrap">// lerp en rAF:
+fg.x += (target.x * 2.5 - fg.x) * 0.1
+bg.x += (target.x * 1.0 - bg.x) * 0.1</code>
+    </div>
+  </div>
+</section>
+
+<!-- SLIDE-IN CARDS -->
+<section class="slidein-section" id="s4" style="scroll-snap-align:start">
+  <h2>SlideIn con<br>IntersectionObserver</h2>
+  <div class="cards-grid" id="cards-grid">
+    <div class="slide-card">
+      <div class="card-icon">🛹</div>
+      <div class="card-title">R3F Interactive Tricks</div>
+      <div class="card-desc">3 invisible click meshes → GSAP timeline. Ollie: tiltX. Kickflip: rotZ+=π*2. FS360: rotY+=π*2</div>
+      <span class="code-tag">3d_effect_13</span>
+    </div>
+    <div class="slide-card" style="transition-delay:.1s">
+      <div class="card-icon">⚛️</div>
+      <div class="card-title">matter-js Physics Footer</div>
+      <div class="card-desc">Bodies con chamfer:{radius:40}, restitution:0.8, MouseConstraint para drag & drop real</div>
+      <span class="code-tag">3d_effect_14</span>
+    </div>
+    <div class="slide-card" style="transition-delay:.2s">
+      <div class="card-icon">🌊</div>
+      <div class="card-title">Parallax 2 Capas</div>
+      <div class="card-desc">fg * 2.5, bg * 1.0 — lerp 0.1 via rAF. Sin dependencias externas. Buttery smooth.</div>
+      <span class="code-tag">3d_effect_15</span>
+    </div>
+    <div class="slide-card" style="transition-delay:.3s">
+      <div class="card-icon">📐</div>
+      <div class="card-title">SlideIn Observer</div>
+      <div class="card-desc">rootMargin:'-150px' para activar tarde. CSS keyframe slide-in. Stagger con transition-delay.</div>
+      <span class="code-tag">3d_effect_16</span>
+    </div>
+  </div>
+</section>
+
+<script>
+// ── Scroll snap dots ──
+const sections = document.querySelectorAll('section[id^="s"]');
+const dots = document.querySelectorAll('.dot');
+function scrollToSection(i){sections[i]?.scrollIntoView({behavior:'smooth'})}
+const observer = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const i=Array.from(sections).indexOf(e.target);
+      dots.forEach((d,j)=>d.classList.toggle('active',i===j));
+    }
+  });
+},{threshold:.5});
+sections.forEach(s=>observer.observe(s));
+
+// ── THREE.JS Board 3D ──
+(()=>{
+  const canvas=document.getElementById('board-canvas');
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(canvas.clientWidth,canvas.clientHeight,false);
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(35,canvas.clientWidth/canvas.clientHeight,.1,100);
+  camera.position.set(0,0,5);
+
+  // Board geometry (skateboard shape)
+  const board=new THREE.Group();
+  const deckGeo=new THREE.BoxGeometry(1.8,.08,.6);
+  const deckMat=new THREE.MeshStandardMaterial({color:0x2d1b69,roughness:.4,metalness:.1});
+  const deck=new THREE.Mesh(deckGeo,deckMat);
+  board.add(deck);
+
+  // Wheels
+  const wheelGeo=new THREE.CylinderGeometry(.08,.08,.04,16);
+  const wheelMat=new THREE.MeshStandardMaterial({color:0xf59e0b,roughness:.3,metalness:.6});
+  [[-0.7,-0.07,.25],[0.7,-0.07,.25],[-0.7,-0.07,-.25],[0.7,-0.07,-.25]].forEach(([x,y,z])=>{
+    const w=new THREE.Mesh(wheelGeo,wheelMat);
+    w.position.set(x,y,z);
+    w.rotation.z=Math.PI/2;
+    board.add(w);
+  });
+
+  scene.add(board);
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0xffffff,.4));
+  const dl=new THREE.DirectionalLight(0x818cf8,1.5);
+  dl.position.set(2,4,3);
+  scene.add(dl);
+  const pl=new THREE.PointLight(0xf59e0b,.8,10);
+  pl.position.set(-2,1,2);
+  scene.add(pl);
+
+  // Float idle
+  let floatT=0;
+  function floatIdle(){
+    floatT+=.016;
+    if(!window._trickRunning){
+      board.position.y=Math.sin(floatT*.8)*.08;
+      board.rotation.y=Math.sin(floatT*.5)*.15;
+    }
+  }
+
+  // Drag
+  let isDragging=false,lastX=0,lastY=0;
+  canvas.addEventListener('mousedown',e=>{isDragging=true;lastX=e.clientX;lastY=e.clientY;});
+  window.addEventListener('mouseup',()=>isDragging=false);
+  window.addEventListener('mousemove',e=>{
+    if(!isDragging)return;
+    board.rotation.y+=(e.clientX-lastX)*.01;
+    board.rotation.x+=(e.clientY-lastY)*.005;
+    lastX=e.clientX;lastY=e.clientY;
+  });
+
+  function animate(){
+    requestAnimationFrame(animate);
+    floatIdle();
+    renderer.render(scene,camera);
+  }
+  animate();
+
+  // Resize
+  new ResizeObserver(()=>{
+    renderer.setSize(canvas.clientWidth,canvas.clientHeight,false);
+    camera.aspect=canvas.clientWidth/canvas.clientHeight;
+    camera.updateProjectionMatrix();
+  }).observe(canvas);
+
+  window._board=board;
+  window._renderer=renderer;
+})();
+
+// ── TRICKS ──
+let trickRunning=false;
+function doTrick(name,btn){
+  if(trickRunning)return;
+  trickRunning=true;window._trickRunning=true;
+  document.querySelectorAll('.trick-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const board=window._board;
+  if(!board)return;
+
+  const jump=()=>gsap.timeline()
+    .to(board.position,{y:.5,duration:.25,ease:'power2.out'})
+    .to(board.position,{y:0,duration:.35,ease:'power2.in'});
+
+  const tl=gsap.timeline({onComplete:()=>{
+    trickRunning=false;window._trickRunning=false;
+    btn.classList.remove('active');
+    gsap.to(board.rotation,{x:0,y:0,z:0,duration:.3});
+  }});
+
+  if(name==='ollie'){
+    jump();
+    tl.to(board.rotation,{x:-.4,duration:.2,ease:'none'})
+      .to(board.rotation,{x:.2,duration:.4,ease:'power2.in'})
+      .to(board.rotation,{x:0,duration:.15,ease:'none'});
+  } else if(name==='kickflip'){
+    jump();
+    tl.to(board.rotation,{x:-.5,duration:.22,ease:'none'})
+      .to(board.rotation,{x:.35,duration:.7,ease:'power2.in'})
+      .to(board.rotation,{z:`+=${Math.PI*2}`,duration:.7,ease:'none'},'.3')
+      .to(board.rotation,{x:0,duration:.12,ease:'none'});
+  } else {
+    jump();
+    tl.to(board.rotation,{x:-.4,duration:.2,ease:'none'})
+      .to(board.rotation,{y:`+=${Math.PI*2}`,duration:.9,ease:'none'},'.1')
+      .to(board.rotation,{x:0,duration:.15,ease:'none'});
+  }
+}
+
+// ── PHYSICS (canvas 2D simulation) ──
+(()=>{
+  const canvas=document.getElementById('physics-canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.clientWidth*devicePixelRatio;
+  canvas.height=canvas.clientHeight*devicePixelRatio;
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+  const W=canvas.clientWidth,H=canvas.clientHeight;
+
+  const bodies=[];
+  const GRAV=0.4,BOUNCE=0.7,FRICTION=0.98;
+  const COLORS=['#6366f1','#8b5cf6','#f59e0b','#06b6d4','#ec4899','#22c55e'];
+
+  function spawnBody(x,y){
+    const r=18+Math.random()*20;
+    bodies.push({x,y,vx:(Math.random()-.5)*8,vy:-5-Math.random()*6,r,color:COLORS[bodies.length%COLORS.length],label:['SKATE','FLIP','360','OLLIE','KICK','GRIND'][Math.floor(Math.random()*6)]});
+  }
+
+  // Initial bodies
+  for(let i=0;i<8;i++) spawnBody(60+i*(W/9),H*.4+Math.random()*40-80);
+
+  canvas.addEventListener('click',e=>{
+    const rect=canvas.getBoundingClientRect();
+    spawnBody(e.clientX-rect.left,(e.clientY-rect.top));
+  });
+
+  // Mouse drag
+  let drag=null,dragOff={x:0,y:0};
+  canvas.addEventListener('mousedown',e=>{
+    const rect=canvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+    drag=bodies.find(b=>Math.hypot(b.x-mx,b.y-my)<b.r+4)||null;
+    if(drag){dragOff={x:mx-drag.x,y:my-drag.y}; drag.vx=0;drag.vy=0;}
+  });
+  canvas.addEventListener('mousemove',e=>{
+    if(!drag)return;
+    const rect=canvas.getBoundingClientRect();
+    const nx=e.clientX-rect.left-dragOff.x,ny=e.clientY-rect.top-dragOff.y;
+    drag.vx=(nx-drag.x)*.4;drag.vy=(ny-drag.y)*.4;
+    drag.x=nx;drag.y=ny;
+  });
+  canvas.addEventListener('mouseup',()=>{drag=null;});
+
+  function update(){
+    for(const b of bodies){
+      if(b===drag)continue;
+      b.vy+=GRAV;
+      b.vx*=FRICTION;
+      b.x+=b.vx;b.y+=b.vy;
+      if(b.y+b.r>H){b.y=H-b.r;b.vy*=-BOUNCE;b.vx*=.9;}
+      if(b.y-b.r<0){b.y=b.r;b.vy*=-BOUNCE;}
+      if(b.x-b.r<0){b.x=b.r;b.vx*=-BOUNCE;}
+      if(b.x+b.r>W){b.x=W-b.r;b.vx*=-BOUNCE;}
+      // collisions
+      for(const o of bodies){
+        if(o===b)continue;
+        const dx=o.x-b.x,dy=o.y-b.y,dist=Math.hypot(dx,dy);
+        if(dist<b.r+o.r&&dist>0){
+          const nx=dx/dist,ny=dy/dist,overlap=(b.r+o.r-dist)*.5;
+          b.x-=nx*overlap;b.y-=ny*overlap;o.x+=nx*overlap;o.y+=ny*overlap;
+          const rv=(b.vx-o.vx)*nx+(b.vy-o.vy)*ny;
+          if(rv<0){b.vx-=rv*nx*BOUNCE;b.vy-=rv*ny*BOUNCE;o.vx+=rv*nx*BOUNCE;o.vy+=rv*ny*BOUNCE;}
+        }
+      }
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // floor
+    ctx.fillStyle='rgba(99,102,241,.08)';ctx.fillRect(0,H-2,W,2);
+    for(const b of bodies){
+      ctx.save();
+      ctx.beginPath();
+      // rounded rectangle
+      const rr=b.r*.35;
+      roundRect(ctx,b.x-b.r,b.y-b.r*.6,b.r*2,b.r*1.2,rr);
+      ctx.fillStyle=b.color+'22';
+      ctx.fill();
+      ctx.strokeStyle=b.color;ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle=b.color;ctx.font=`bold ${Math.max(8,b.r*.45)}px system-ui`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(b.label,b.x,b.y);
+      ctx.restore();
+    }
+  }
+
+  function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}
+
+  function loop(){requestAnimationFrame(loop);update();draw();}
+  loop();
+})();
+
+// ── PARALLAX ──
+(()=>{
+  let tx=0,ty=0,bgX=0,bgY=0,fgX=0,fgY=0;
+  const bg=document.getElementById('pbg');
+  const fg=document.getElementById('pfg');
+  document.addEventListener('mousemove',e=>{
+    tx=((e.clientX/window.innerWidth)-.5)*30;
+    ty=((e.clientY/window.innerHeight)-.5)*20;
+  });
+  function update(){
+    bgX+=(tx-bgX)*.05; bgY+=(ty-bgY)*.05;
+    fgX+=(tx*2.5-fgX)*.08; fgY+=(ty*2.5-fgY)*.08;
+    bg.style.transform=`translate(${bgX}px,${bgY}px)`;
+    fg.style.transform=`translate(${fgX}px,${fgY}px)`;
+    requestAnimationFrame(update);
+  }
+  update();
+})();
+
+// ── SLIDE-IN CARDS ──
+(()=>{
+  const cards=document.querySelectorAll('.slide-card');
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible');});
+  },{rootMargin:'-80px',threshold:.1});
+  cards.forEach(c=>obs.observe(c));
+})();
+</script>
+</body>
+</html>

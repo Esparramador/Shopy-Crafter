@@ -1727,16 +1727,17 @@ ${body}
             ✨ Crear desde cero
           </button>
           <button
-            onClick={() => navigate("/admin/web-designer")}
+            onClick={() => navigate("/web-designer")}
             title="Diseñador Web con IA — Google Stitch, Claude, Gemini para páginas completas"
             style={{
               padding: "12px 16px",
-              background: "transparent",
-              border: "1px solid var(--border, #333)",
+              background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))",
+              border: "1px solid rgba(139,92,246,0.4)",
               borderRadius: 10,
-              color: "var(--t2, #aaa)",
+              color: "#a78bfa",
               cursor: "pointer",
               fontSize: 13,
+              fontWeight: 600,
               whiteSpace: "nowrap",
             }}
           >

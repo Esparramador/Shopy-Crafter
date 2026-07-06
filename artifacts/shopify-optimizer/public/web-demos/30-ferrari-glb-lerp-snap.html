@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crafter AI — Demo 30 · Ferrari GLB Lerp + Snap Scroll + Dual Canvas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<style>
+:root{--bg:#0a0500;--red:#dc2626;--gold:#f59e0b;--orange:#f97316;--text:#fff8f0;--muted:rgba(255,248,240,.5);--border:rgba(255,255,255,.07)}
+*{margin:0;padding:0;box-sizing:border-box}
+html{overflow:hidden}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100svh;overflow:hidden}
+
+/* ── LOADER (3d_effect_27) ── */
+#loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;transition:opacity .5s ease}
+#loader.hidden{opacity:0;pointer-events:none}
+.loader-letters{display:flex;gap:6px;overflow:hidden}
+.loader-letters span{font-size:clamp(24px,5vw,52px);font-weight:900;letter-spacing:.1em;opacity:0;transform:translateY(40px);animation:letterIn .4s forwards ease}
+@keyframes letterIn{to{opacity:1;transform:translateY(0)}}
+.loader-line{width:180px;height:2px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
+.loader-progress{height:100%;background:linear-gradient(90deg,var(--red),var(--gold));width:0%;transition:width .1s linear}
+.loader-sub{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+
+/* ── BACKGROUND CANVAS ── */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* ── SECTIONS CONTAINER ── */
+#sections{position:fixed;inset:0;z-index:1;overflow:hidden}
+.slide{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding:0 6%;opacity:0;transform:translateY(100%);transition:transform .7s cubic-bezier(.16,1,.3,1),opacity .5s ease;pointer-events:none}
+.slide.active{opacity:1;transform:translateY(0);pointer-events:auto}
+.slide.prev{transform:translateY(-100%);opacity:0}
+
+/* Slide content */
+.slide-content{max-width:480px;width:100%}
+.slide-tag{display:inline-block;padding:5px 14px;border-radius:50px;border:1px solid;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:20px}
+.slide h2{font-size:clamp(28px,4.5vw,64px);font-weight:900;letter-spacing:-.04em;line-height:1;margin-bottom:16px}
+.slide p{color:var(--muted);font-size:14px;line-height:1.75;margin-bottom:28px}
+.slide-meta{display:flex;gap:20px;flex-wrap:wrap}
+.meta-item{display:flex;flex-direction:column;gap:2px}
+.meta-val{font-size:20px;font-weight:800;color:var(--gold)}
+.meta-key{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.slide-code{margin-top:24px;padding:14px;background:rgba(0,0,0,.5);border:1px solid var(--border);border-radius:10px}
+.slide-code code{font-size:10px;color:var(--gold);font-family:monospace;white-space:pre-wrap;line-height:1.6}
+
+/* ── 3D CANVAS (interactive) ── */
+#car-canvas{position:fixed;left:0;top:0;width:55%;height:100%;z-index:2;pointer-events:none}
+
+/* ── PROGRESS DOTS (3d_effect_26) ── */
+#progress-dots{position:fixed;right:28px;top:50%;transform:translateY(-50%);z-index:100;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+.pdot{display:flex;align-items:center;gap:8px;cursor:pointer}
+.pdot-circle{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);transition:all .3s;flex-shrink:0}
+.pdot-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.3);transition:all .3s;opacity:0;transform:translateX(8px)}
+.pdot.active .pdot-circle{background:var(--gold);transform:scale(1.5);box-shadow:0 0 8px rgba(245,158,11,.5)}
+.pdot.active .pdot-label{opacity:1;transform:translateX(0);color:var(--gold)}
+
+/* ── SECTION INDICATORS ── */
+.section-num{position:fixed;left:5%;bottom:40px;z-index:100;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+.section-num strong{font-size:28px;font-weight:900;color:var(--text);letter-spacing:-.03em;display:block}
+
+/* demo label */
+.demo-label{position:fixed;top:20px;left:20px;z-index:999;padding:6px 14px;border-radius:50px;background:rgba(0,0,0,.7);border:1px solid var(--border);backdrop-filter:blur(10px);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- LOADER (3d_effect_27) -->
+<div id="loader">
+  <div class="loader-letters">
+    <span style="animation-delay:.0s">F</span>
+    <span style="animation-delay:.08s">E</span>
+    <span style="animation-delay:.16s">R</span>
+    <span style="animation-delay:.24s">R</span>
+    <span style="animation-delay:.32s">A</span>
+    <span style="animation-delay:.40s">R</span>
+    <span style="animation-delay:.48s">I</span>
+  </div>
+  <div class="loader-line"><div class="loader-progress" id="lp"></div></div>
+  <div class="loader-sub">Loading Experience</div>
+</div>
+
+<div class="demo-label">Demo 30 · Ferrari GLB Lerp</div>
+
+<!-- Background canvas (wbgl) -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- Interactive 3D canvas (wbgl2) -->
+<canvas id="car-canvas"></canvas>
+
+<!-- Sections (snap scroll content) -->
+<div id="sections">
+  <!-- Slide 0 -->
+  <div class="slide active" data-idx="0">
+    <div class="slide-content">
+      <div class="slide-tag" style="color:var(--red);border-color:rgba(220,38,38,.3)">Patrón 9 — Meettomb/LaFerrari</div>
+      <h2>GLB Lerp<br><span style="color:var(--gold)">Sin GSAP</span></h2>
+      <p>Three.js GLB con lerp speed=0.10 manual en animate(). IntersectionObserver threshold:0.3 por secciones. Suave como mantequilla sin dependencias de animación.</p>
+      <div class="slide-meta">
+        <div class="meta-item"><span class="meta-val">0.10</span><span class="meta-key">Lerp Speed</span></div>
+        <div class="meta-item"><span class="meta-val">60fps</span><span class="meta-key">Rendimiento</span></div>
+        <div class="meta-item"><span class="meta-val">0 GSAP</span><span class="meta-key">Dependencias</span></div>
+      </div>
+      <div class="slide-code">
+        <code>// Lerp manual en animate():
+car.position.lerp(target, 0.10)
+car.rotation.x = MathUtils.lerp(
+  car.rotation.x, targetRot.x, 0.10
+)</code>
+      </div>
+    </div>
+  </div>
+  <!-- Slide 1 -->
+  <div class="slide" data-idx="1">
+    <div class="slide-content">
+      <div class="slide-tag" style="color:var(--orange);border-color:rgba(249,115,22,.3)">3d_effect_26</div>
+      <h2>Snap Scroll<br><span style="color:var(--orange)">Progress Dots</span></h2>
+      <p>Dots generados dinámicamente (JS, no hardcoded). Wheel + ArrowKey + Touch + Auto-snap. Debounce 1000ms para evitar scroll doble. scrollIntoView behavior:smooth.</p>
+      <div class="slide-meta">
+        <div class="meta-item"><span class="meta-val">1000ms</span><span class="meta-key">Debounce</span></div>
+        <div class="meta-item"><span class="meta-val">4 inputs</span><span class="meta-key">Wheel+Key+Touch+Auto</span></div>
+      </div>
+      <div class="slide-code">
+        <code>// Snap scroll con debounce:
+let scrolling = false
+wheel.addEventListener('wheel', e => {
+  if(scrolling) return
+  scrolling = true
+  goToSection(currentIdx + Math.sign(e.deltaY))
+  setTimeout(() => scrolling = false, 1000)
+})</code>
+      </div>
+    </div>
+  </div>
+  <!-- Slide 2 -->
+  <div class="slide" data-idx="2">
+    <div class="slide-content">
+      <div class="slide-tag" style="color:#a78bfa;border-color:rgba(167,139,250,.3)">3d_effect_27</div>
+      <h2>Letter Loader<br><span style="color:#a78bfa">CSS Stagger</span></h2>
+      <p>Preloader de página con letras animadas individualmente. CSS animation-delay escalonado. Limpio, elegante, cero JavaScript para la animación en sí.</p>
+      <div class="slide-code">
+        <code>// CSS stagger por letra:
+.letter:nth-child(1) { animation-delay: 0.00s }
+.letter:nth-child(2) { animation-delay: 0.08s }
+.letter:nth-child(3) { animation-delay: 0.16s }
+// ...
+@keyframes letterIn {
+  to { opacity:1; transform:translateY(0) }
+}</code>
+      </div>
+    </div>
+  </div>
+  <!-- Slide 3 -->
+  <div class="slide" data-idx="3">
+    <div class="slide-content">
+      <div class="slide-tag" style="color:var(--gold);border-color:rgba(245,158,11,.3)">3d_effect_28</div>
+      <h2>Dual Canvas<br><span style="color:var(--gold)">WebGL Toggle</span></h2>
+      <p>Dos canvas simultáneos: .wbgl (fondo scroll) y .wbgl2 (3D interactivo). IntersectionObserver alterna display:none/block según la sección activa.</p>
+      <div class="slide-meta">
+        <div class="meta-item"><span class="meta-val">2 Canvas</span><span class="meta-key">Simultáneos</span></div>
+        <div class="meta-item"><span class="meta-val">IO.0.3</span><span class="meta-key">Threshold</span></div>
+      </div>
+      <div class="slide-code">
+        <code>// Dual canvas toggle:
+const observer = new IntersectionObserver(
+  entries => {
+    canvas2.style.display = 
+      entries[0].isIntersecting ? 'block' : 'none'
+  },
+  { threshold: 0.3 }
+)
+observer.observe(section3DView)</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Progress dots (generated by JS like in Ferrari repo) -->
+<div id="progress-dots"></div>
+
+<div class="section-num">
+  <strong id="sec-num">01</strong>
+  Sección
+</div>
+
+<script>
+// ── LOADER ──
+const lp=document.getElementById('lp');
+let prog=0;
+const pInterval=setInterval(()=>{prog=Math.min(prog+2,90);lp.style.width=prog+'%';},30);
+window.addEventListener('load',()=>{
+  prog=100;lp.style.width='100%';clearInterval(pInterval);
+  setTimeout(()=>{document.getElementById('loader').classList.add('hidden');},600);
+});
+setTimeout(()=>{document.getElementById('loader').classList.add('hidden');},2000);
+
+// ── THREE.JS (interactive 3D canvas = wbgl2) ──
+(()=>{
+  const canvas=document.getElementById('car-canvas');
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(window.innerWidth*.55,window.innerHeight);
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(25,window.innerWidth*.55/window.innerHeight,.1,100);
+  camera.position.set(0,1.2,6);
+
+  // Build car (geometric representation since no GLB)
+  const car=new THREE.Group();
+  // Body
+  const bodyGeo=new THREE.BoxGeometry(3.2,.5,1.4);
+  const bodyMat=new THREE.MeshStandardMaterial({color:0xcc0000,roughness:.2,metalness:.8});
+  car.add(new THREE.Mesh(bodyGeo,bodyMat));
+  // Cabin
+  const cabinGeo=new THREE.BoxGeometry(1.6,.5,1.2);
+  const cabinMesh=new THREE.Mesh(cabinGeo,new THREE.MeshStandardMaterial({color:0x1a0000,roughness:.1,metalness:.9}));
+  cabinMesh.position.set(-.1,.45,0);
+  car.add(cabinMesh);
+  // Wheels
+  const wGeo=new THREE.CylinderGeometry(.32,.32,.15,24);
+  const wMat=new THREE.MeshStandardMaterial({color:0x111111,roughness:.8});
+  const rMat=new THREE.MeshStandardMaterial({color:0xd4a017,roughness:.2,metalness:.9});
+  [[1.1,-.25,.75],[1.1,-.25,-.75],[-1.1,-.25,.75],[-1.1,-.25,-.75]].forEach(([x,y,z])=>{
+    const w=new THREE.Mesh(wGeo,wMat);
+    w.position.set(x,y,z);w.rotation.x=Math.PI/2;car.add(w);
+    const rim=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.16,8),rMat);
+    rim.position.set(x,y,z);rim.rotation.x=Math.PI/2;car.add(rim);
+  });
+  scene.add(car);
+  car.position.set(0,0,0);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xfff5e0,.6));
+  const dl=new THREE.DirectionalLight(0xffd080,2);dl.position.set(3,4,2);scene.add(dl);
+  const pl=new THREE.PointLight(0xff2200,.8,8);pl.position.set(-2,1,2);scene.add(pl);
+
+  // Target (updated by section)
+  const target={pos:new THREE.Vector3(0,0,0),rot:new THREE.Euler(0,.3,0)};
+  window._carTarget=target;
+
+  function animate(){
+    requestAnimationFrame(animate);
+    car.position.lerp(target.pos,.10);
+    car.rotation.x=THREE.MathUtils.lerp(car.rotation.x,target.rot.x,.10);
+    car.rotation.y=THREE.MathUtils.lerp(car.rotation.y,target.rot.y,.10);
+    car.rotation.z=THREE.MathUtils.lerp(car.rotation.z,target.rot.z,.10);
+    renderer.render(scene,camera);
+  }
+  animate();
+  window.addEventListener('resize',()=>{
+    renderer.setSize(window.innerWidth*.55,window.innerHeight);
+    camera.aspect=window.innerWidth*.55/window.innerHeight;camera.updateProjectionMatrix();
+  });
+})();
+
+// ── BACKGROUND CANVAS (wbgl) ──
+(()=>{
+  const canvas=document.getElementById('bg-canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+  window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;});
+  const pts=[];
+  for(let i=0;i<40;i++) pts.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3});
+  function loop(){
+    ctx.fillStyle='rgba(10,5,0,.04)';ctx.fillRect(0,0,canvas.width,canvas.height);
+    pts.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>canvas.width)p.vx*=-1;if(p.y<0||p.y>canvas.height)p.vy*=-1;
+      ctx.fillStyle='rgba(245,158,11,.15)';ctx.beginPath();ctx.arc(p.x,p.y,1.5,0,Math.PI*2);ctx.fill();
+    });
+    pts.forEach((p,i)=>pts.forEach((q,j)=>{if(j<=i)return;const d=Math.hypot(p.x-q.x,p.y-q.y);if(d<100){ctx.strokeStyle=`rgba(220,38,38,${.15-d/667})`;ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke();}}));
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── SNAP SCROLL SYSTEM (3d_effect_26) ──
+const SECTIONS_DATA=[
+  {label:'GLB Lerp',pos:[0,0,0],rot:[0,.3,0]},
+  {label:'Snap Scroll',pos:[.5,.2,.3],rot:[0,-.4,.05]},
+  {label:'Loader',pos:[-.3,.1,-.2],rot:[.05,.6,0]},
+  {label:'Dual Canvas',pos:[0,-.1,.4],rot:[0,1.2,0]},
+];
+
+const slides=[...document.querySelectorAll('.slide')];
+let currentIdx=0,scrolling=false;
+
+// Generate progress dots dynamically (like Ferrari repo)
+const dotsContainer=document.getElementById('progress-dots');
+SECTIONS_DATA.forEach((s,i)=>{
+  const d=document.createElement('div');d.className='pdot'+(i===0?' active':'');d.dataset.i=i;
+  d.innerHTML=`<span class="pdot-label">${s.label}</span><div class="pdot-circle"></div>`;
+  d.addEventListener('click',()=>goTo(i));
+  dotsContainer.appendChild(d);
+});
+
+function updateDots(i){document.querySelectorAll('.pdot').forEach((d,j)=>d.classList.toggle('active',i===j));}
+
+function goTo(i){
+  if(i<0||i>=slides.length)return;
+  slides[currentIdx].className='slide prev';
+  currentIdx=i;
+  slides[currentIdx].className='slide active';
+  updateDots(currentIdx);
+  document.getElementById('sec-num').textContent=String(currentIdx+1).padStart(2,'0');
+  // Move 3D car target
+  if(window._carTarget){
+    const s=SECTIONS_DATA[currentIdx];
+    window._carTarget.pos.set(...s.pos);
+    window._carTarget.rot.set(...s.rot);
+  }
+}
+
+// Wheel
+window.addEventListener('wheel',e=>{
+  if(scrolling)return;scrolling=true;
+  goTo(currentIdx+(e.deltaY>0?1:-1));
+  setTimeout(()=>scrolling=false,1000);
+},{passive:true});
+
+// Keyboard
+window.addEventListener('keydown',e=>{
+  if(['ArrowDown','ArrowRight'].includes(e.key))goTo(currentIdx+1);
+  else if(['ArrowUp','ArrowLeft'].includes(e.key))goTo(currentIdx-1);
+});
+
+// Touch
+let touchY=0;
+window.addEventListener('touchstart',e=>{touchY=e.touches[0].clientY;},{passive:true});
+window.addEventListener('touchend',e=>{
+  if(scrolling)return;
+  const dy=touchY-e.changedTouches[0].clientY;
+  if(Math.abs(dy)<40)return;
+  scrolling=true;goTo(currentIdx+(dy>0?1:-1));
+  setTimeout(()=>scrolling=false,1000);
+},{passive:true});
+</script>
+</body>
+</html>

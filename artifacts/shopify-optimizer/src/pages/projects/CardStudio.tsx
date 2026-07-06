@@ -372,6 +372,32 @@ export default function CardStudio() {
     );
   }
 
+  if (!projectId) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: 24, textAlign: "center", padding: "40px 20px" }}>
+        <div style={{ width: 80, height: 80, borderRadius: 20, background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <CreditCard size={36} style={{ color: "var(--gold)", opacity: 0.7 }} />
+        </div>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Card Studio</h2>
+          <p style={{ color: "var(--t3)", fontSize: 14, maxWidth: 400, lineHeight: 1.7 }}>
+            Crea tarjetas de presentación profesionales a 300 DPI con IA generativa, QR inteligente y exportación directa. Para empezar, selecciona un cliente en el menú lateral.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <a href="/projects" style={{ padding: "12px 28px", background: "linear-gradient(135deg,#f59e0b,#e07b39)", border: "none", borderRadius: 10, color: "#000", fontWeight: 700, fontSize: 14, cursor: "pointer", textDecoration: "none" }}>
+            Seleccionar Cliente
+          </a>
+        </div>
+        <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap", justifyContent: "center" }}>
+          {["📐 300 DPI · 85×55mm","🤖 Auto-design IA","🔗 QR inteligente","🎨 Live preview CSS"].map(f => (
+            <span key={f} style={{ fontSize: 12, color: "var(--t4)", display: "flex", alignItems: "center", gap: 5 }}>{f}</span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const qrTypeLandingNeeded = selected && ["video", "image", "animation"].includes(selected.qrType || "vcard");
   const qrContentNeeded = selected && ["url", "video", "image"].includes(selected.qrType || "vcard");
 

@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Copy, Check, Zap, Filter, ChevronDown, BookOpen, Sparkles, Star, Clock, Hash, Play, X, ChevronRight, AlertCircle, Loader2, Brain, Code2 } from "lucide-react";
+import { useLocation } from "wouter";
+import { Search, Copy, Check, Zap, Filter, ChevronDown, BookOpen, Sparkles, Star, Clock, Hash, Play, X, ChevronRight, AlertCircle, Loader2, Brain, Code2, Globe } from "lucide-react";
+
+const WEB_DESIGNER_CATS = new Set([
+  "3d_web_effects", "stitch_bulk_v2", "cult_ui_effects", "stitch_effects",
+  "typegpu_advanced", "typegpu_effects",
+  "21st_dev_heroes_nav", "21st_dev_landing_hero", "21st_dev_auth_dash", "21st_dev_design_system",
+]);
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -71,6 +78,7 @@ const EFFECT_CATEGORIES = [
   { key: "card_studio_templates", label: "Card Studio", icon: "🃏", color: "#fdba74", desc: "6 templates de cards premium para portfolios y catálogos" },
 
   // ── GPU & 3D ──
+  { key: "3d_web_effects", label: "3D Web Effects (28)", icon: "🌐", color: "#38bdf8", desc: "28 templates 3D web premium — R3F tricks, matter-js physics, GLB lerp, Canvas 2D, Bento Tilt, parallax, snap scroll. Código real extraído de 8 repos GitHub" },
   { key: "typegpu_advanced", label: "TypeGPU Avanzado", icon: "⚛️", color: "#f472b6", desc: "78 shaders GPU, física avanzada y partículas WebGL — Three.js, WGSL" },
   { key: "typegpu_effects", label: "Efectos GPU", icon: "🌈", color: "#fb7185", desc: "61 efectos básicos GPU — gradientes animados, blur, distorsión de imagen" },
   { key: "tripo3d_animations", label: "Animaciones 3D (Tripo)", icon: "🧊", color: "#67e8f9", desc: "63 animaciones 3D para modelos — idle, walk, attack, dance, emotes" },
@@ -518,15 +526,19 @@ function EffectPreviewCard({
   onCopy,
   onExecute,
   dnaMode,
+  activeCategory,
 }: {
   item: MasterItem;
   onCopy: (text: string) => void;
   onExecute: (item: MasterItem) => void;
   dnaMode: boolean;
+  activeCategory: string;
 }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [, navigate] = useLocation();
   const engineColor = ENGINE_COLORS[item.engine?.toLowerCase() ?? ""] ?? ENGINE_COLORS.default;
+  const isWebCat = WEB_DESIGNER_CATS.has(activeCategory);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -540,6 +552,11 @@ function EffectPreviewCard({
   const handleExecute = (e: React.MouseEvent) => {
     e.stopPropagation();
     onExecute(item);
+  };
+
+  const handleOpenWebDesigner = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate("/web-designer");
   };
 
   const hasVars = /\{\{[A-Z_]+\}\}/.test(item.prompt ?? item.description ?? "");
@@ -625,6 +642,23 @@ function EffectPreviewCard({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+          {isWebCat && (
+            <button
+              onClick={handleOpenWebDesigner}
+              title="Abrir en Web Designer"
+              style={{
+                background: "rgba(56,189,248,0.1)",
+                border: "1px solid rgba(56,189,248,0.3)",
+                borderRadius: 7, padding: "6px 8px", cursor: "pointer",
+                color: "#38bdf8", transition: "all 0.15s",
+                display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700,
+              }}
+              onMouseOver={e => { e.currentTarget.style.background = "rgba(56,189,248,0.2)"; }}
+              onMouseOut={e => { e.currentTarget.style.background = "rgba(56,189,248,0.1)"; }}
+            >
+              <Globe size={12} />
+            </button>
+          )}
           {dnaMode && (
             <button
               onClick={handleExecute}
@@ -1053,6 +1087,7 @@ export default function PromptLibrary() {
                 onCopy={handleCopy}
                 onExecute={setExecutingItem}
                 dnaMode={dnaMode}
+                activeCategory={activeCategory}
               />
             ))}
           </div>

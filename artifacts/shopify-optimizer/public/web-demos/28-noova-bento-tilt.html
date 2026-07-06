@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crafter AI — Demo 28 · Noova Bento Tilt + Animated Words + Video Hero</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+:root{--bg:#05050a;--surface:#0c0c14;--gold:#f59e0b;--cyan:#06b6d4;--violet:#8b5cf6;--text:#f0f4ff;--muted:rgba(240,244,255,.48);--border:rgba(255,255,255,.07)}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-snap-type:y mandatory}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* ── VIDEO CLIP-PATH HERO ── */
+.hero{scroll-snap-align:start;min-height:100svh;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#video-frame{position:absolute;inset:0;clip-path:polygon(14% 0%,72% 0%,90% 90%,0% 100%);border-radius:0 0 40% 10%;z-index:1;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);overflow:hidden;transition:clip-path .3s ease}
+.video-bg-anim{position:absolute;inset:0;background:conic-gradient(from 270deg at 50% 50%,#6366f1,#8b5cf6,#ec4899,#06b6d4,#6366f1);animation:spinGrad 8s linear infinite;opacity:.3}
+@keyframes spinGrad{to{transform:rotate(360deg)}}
+.video-orb{position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.6) 0%,transparent 70%);top:20%;left:30%;filter:blur(40px);animation:orbFloat 4s ease-in-out infinite}
+@keyframes orbFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-20px)}}
+#mini-video{position:absolute;width:64px;height:64px;border-radius:50%;overflow:hidden;bottom:20%;right:15%;z-index:3;cursor:pointer;border:2px solid rgba(255,255,255,.3);transition:all .4s ease;background:linear-gradient(135deg,#f59e0b,#ec4899)}
+#mini-video:hover,#mini-video.expanded{width:min(420px,50vw);height:min(236px,30vh);border-radius:16px;border-radius:16px}
+.mini-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px}
+.hero-content{position:relative;z-index:4;text-align:center;max-width:800px;padding:5%}
+.hero-tag{display:inline-block;padding:5px 16px;border-radius:50px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);font-size:10px;font-weight:700;letter-spacing:.1em;color:#818cf8;text-transform:uppercase;margin-bottom:28px}
+.hero-content h1{font-size:clamp(36px,7vw,90px);font-weight:900;line-height:1;letter-spacing:-.04em;margin-bottom:24px}
+.hero-content h1 .word{display:inline-block;margin-right:.2em;transform:translate3d(0,-100px,-500px) rotateX(90deg);opacity:0}
+.hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:36px}
+.btn-p{padding:14px 30px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:transform .2s,opacity .2s}
+.btn-p:hover{opacity:.85;transform:translateY(-2px)}
+.btn-o{padding:14px 30px;background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:10px;color:var(--text);font-size:14px;cursor:pointer}
+
+/* ── ANIMATED TITLE SECTION ── */
+.title-section{scroll-snap-align:start;min-height:100svh;display:flex;align-items:center;padding:80px 5%;background:var(--surface)}
+.title-wrap{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+@media(max-width:800px){.title-wrap{grid-template-columns:1fr;gap:40px}}
+.animated-title-demo{overflow:hidden}
+.animated-title-demo h2{font-size:clamp(32px,5vw,64px);font-weight:900;letter-spacing:-.03em;line-height:1.05}
+.animated-word{display:inline-block;margin-right:.15em;transform:translate3d(0,-80px,-400px) rotateX(90deg);opacity:0}
+.title-info .tag{display:inline-block;padding:5px 14px;border-radius:50px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.25);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--cyan);text-transform:uppercase;margin-bottom:20px}
+.title-info h3{font-size:28px;font-weight:800;margin-bottom:12px}
+.title-info p{color:var(--muted);font-size:14px;line-height:1.7;margin-bottom:20px}
+.code-block{padding:16px;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:10px}
+.code-block code{font-size:11px;color:#06b6d4;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;line-height:1.6}
+
+/* ── BENTO TILT GRID ── */
+.bento-section{scroll-snap-align:start;min-height:100svh;padding:80px 5%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.bento-section h2{font-size:clamp(24px,4vw,52px);font-weight:800;text-align:center;margin-bottom:48px}
+.bento-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:auto auto;gap:16px;max-width:900px;width:100%}
+@media(max-width:700px){.bento-grid{grid-template-columns:1fr 1fr}}
+.bento-item{padding:32px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid var(--border);transition:border-color .3s;will-change:transform;cursor:default;position:relative;overflow:hidden}
+.bento-item::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(139,92,246,.08) 0%,transparent 60%);opacity:0;transition:opacity .3s}
+.bento-item:hover::before{opacity:1}
+.bento-item.big{grid-column:span 2}
+.bento-icon{font-size:32px;margin-bottom:16px}
+.bento-label{font-size:15px;font-weight:700;margin-bottom:8px}
+.bento-sub{color:var(--muted);font-size:12px;line-height:1.6}
+.tilt-hint{position:absolute;bottom:12px;right:12px;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);opacity:.5}
+
+/* ── STORY TILT IMAGE ── */
+.story-section{scroll-snap-align:start;min-height:100svh;display:flex;align-items:center;padding:80px 5%}
+.story-wrap{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+@media(max-width:700px){.story-wrap{grid-template-columns:1fr}}
+.story-img-wrap{perspective:800px}
+.story-img{width:100%;height:340px;border-radius:20px;background:linear-gradient(135deg,#1e1b4b,#312e81,#4c1d95);border:1px solid rgba(139,92,246,.3);display:flex;align-items:center;justify-content:center;font-size:80px;transition:transform .3s ease;will-change:transform;cursor:crosshair;transform-style:preserve-3d}
+.story-text h2{font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.1;margin-bottom:16px}
+.story-text p{color:var(--muted);font-size:14px;line-height:1.7;margin-bottom:24px}
+
+/* label */
+.demo-label{position:fixed;top:20px;left:20px;z-index:999;padding:6px 14px;border-radius:50px;background:rgba(0,0,0,.7);border:1px solid var(--border);backdrop-filter:blur(10px);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.dots-nav{position:fixed;right:24px;top:50%;transform:translateY(-50%);z-index:999;display:flex;flex-direction:column;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);cursor:pointer;transition:all .3s}
+.dot.active{background:var(--violet);transform:scale(1.4)}
+</style>
+</head>
+<body>
+<div class="demo-label">Demo 28 · Noova Bento Tilt</div>
+<nav class="dots-nav">
+  <div class="dot active" onclick="scrollTo(0,0)"></div>
+  <div class="dot" onclick="document.getElementById('s1').scrollIntoView({behavior:'smooth'})"></div>
+  <div class="dot" onclick="document.getElementById('s2').scrollIntoView({behavior:'smooth'})"></div>
+  <div class="dot" onclick="document.getElementById('s3').scrollIntoView({behavior:'smooth'})"></div>
+</nav>
+
+<!-- VIDEO HERO -->
+<section class="hero" id="s0">
+  <div id="video-frame">
+    <div class="video-bg-anim"></div>
+    <div class="video-orb"></div>
+  </div>
+  <div id="mini-video" onclick="this.classList.toggle('expanded')">
+    <div class="mini-inner">▶</div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-tag">Patrón 7 — Ankit-Sharma1011/game-website</div>
+    <h1>
+      <span class="word">Bento</span>
+      <span class="word">Tilt</span>
+      <span class="word">+</span>
+      <span class="word">Animated</span>
+      <span class="word">Words</span>
+    </h1>
+    <p style="color:var(--muted);font-size:15px;line-height:1.7;max-width:500px;margin:0 auto">GSAP 3.14.2 + React 19. Bento Grid con tilt CSS puro. AnimatedTitle con translate3d rotateX. Sin Three.js.</p>
+    <div class="hero-cta">
+      <button class="btn-p" onclick="document.getElementById('s1').scrollIntoView({behavior:'smooth'})">Ver Animated Words →</button>
+      <button class="btn-o" onclick="document.getElementById('s2').scrollIntoView({behavior:'smooth'})">Bento Grid</button>
+    </div>
+  </div>
+</section>
+
+<!-- ANIMATED TITLE -->
+<section class="title-section" id="s1">
+  <div class="title-wrap">
+    <div class="animated-title-demo">
+      <div class="animated-title-demo" style="perspective:700px;transform-style:preserve-3d">
+        <h2>
+          <span class="animated-word" data-i="0">Premium</span>
+          <span class="animated-word" data-i="1">3D</span>
+          <span class="animated-word" data-i="2">Word</span><br>
+          <span class="animated-word" data-i="3" style="color:var(--violet)">Animation</span>
+          <span class="animated-word" data-i="4">System</span>
+        </h2>
+        <p style="margin-top:20px;color:var(--muted);font-size:14px;line-height:1.6">
+          Each word starts at <code style="color:var(--gold)">translate3d(0,-100px,-500px) rotateX(90deg)</code> and animates to <code style="color:var(--gold)">translate3d(0,0,0) rotateX(0)</code> via GSAP ScrollTrigger stagger:0.02
+        </p>
+      </div>
+      <button onclick="replayWords()" style="margin-top:24px;padding:10px 22px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:8px;color:#a78bfa;cursor:pointer;font-size:12px;font-weight:700">↺ Replay Animation</button>
+    </div>
+    <div class="title-info">
+      <div class="tag">GSAP ScrollTrigger</div>
+      <h3>AnimatedTitle Component</h3>
+      <p>Cada palabra es un span con CSS inicial 3D extremo. GSAP anima a posición neutral con stagger 0.02s. El efecto es de "palabras cayendo desde el espacio".</p>
+      <div class="code-block">
+        <code>.animated-word {
+  transform: translate3d(0,-100px,-500px)
+             rotateX(90deg);
+  opacity: 0;
+}
+
+// GSAP ScrollTrigger:
+gsap.to('.animated-word', {
+  transform: 'translate3d(0,0,0) rotateX(0)',
+  opacity: 1,
+  stagger: 0.02,
+  duration: 0.6,
+  ease: 'power2.out',
+  scrollTrigger: { trigger: el }
+})</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BENTO GRID -->
+<section class="bento-section" id="s2">
+  <h2>Bento Grid<br><span style="color:var(--violet)">CSS Tilt</span> — Sin GSAP</h2>
+  <div class="bento-grid" id="bentoGrid">
+    <div class="bento-item big">
+      <div class="bento-icon">🎮</div>
+      <div class="bento-label">Interactive Tilt Grid</div>
+      <div class="bento-sub">perspective(700px) rotateX/Y calculado de posición del mouse relativa al elemento. scale3d(0.98) en hover. Solo React state — cero GSAP.</div>
+      <div class="tilt-hint">Mueve el mouse</div>
+    </div>
+    <div class="bento-item">
+      <div class="bento-icon">⚡</div>
+      <div class="bento-label">Zero Dependencies</div>
+      <div class="bento-sub">tiltX = (relY-0.5)*5, tiltY = (relX-0.5)*-5</div>
+    </div>
+    <div class="bento-item">
+      <div class="bento-icon">🎯</div>
+      <div class="bento-label">React 19 + Vite v8</div>
+      <div class="bento-sub">Tailwind v4, GSAP 3.14.2 — stack 2026</div>
+    </div>
+    <div class="bento-item">
+      <div class="bento-icon">🌊</div>
+      <div class="bento-label">Mouse Tilt Formula</div>
+      <div class="bento-sub">perspective(700px)<br>rotateX(${tiltX}deg) rotateY(${tiltY}deg)<br>scale3d(0.98,0.98,0.98)</div>
+    </div>
+    <div class="bento-item">
+      <div class="bento-icon">🎬</div>
+      <div class="bento-label">Story Image Tilt</div>
+      <div class="bento-sub">GSAP transformPerspective:500 duration:0.3 ease:power1.inOut</div>
+    </div>
+    <div class="bento-item">
+      <div class="bento-icon">📦</div>
+      <div class="bento-label">3d_effect_17-20</div>
+      <div class="bento-sub">4 templates listos: BentoTilt, AnimatedWords, VideoHero, MouseTilt</div>
+    </div>
+  </div>
+</section>
+
+<!-- STORY TILT -->
+<section class="story-section" id="s3">
+  <div class="story-wrap">
+    <div class="story-img-wrap">
+      <div class="story-img" id="storyImg">🎮</div>
+    </div>
+    <div class="story-text">
+      <span style="display:inline-block;padding:5px 14px;border-radius:50px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.25);font-size:10px;font-weight:700;letter-spacing:.1em;color:#fb923c;text-transform:uppercase;margin-bottom:20px">GSAP Image Tilt</span>
+      <h2>Mouse Tilt con<br>GSAP <span style="color:var(--violet)">transformPerspective</span></h2>
+      <p>Mueve el mouse sobre la imagen. GSAP anima rotateX, rotateY con transformPerspective:500, duration:0.3, ease:'power1.inOut'. Suave y responsivo.</p>
+      <div style="padding:16px;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:10px;margin-top:20px">
+        <code style="font-size:11px;color:#fb923c;font-family:monospace;white-space:pre-wrap">gsap.to(img, {
+  rotateX: tiltX,
+  rotateY: tiltY,
+  transformPerspective: 500,
+  duration: 0.3,
+  ease: 'power1.inOut'
+})</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+// ── VIDEO HERO: clip-path + words ──
+gsap.set('#video-frame',{clipPath:'polygon(14% 0%,72% 0%,90% 90%,0% 100%)',borderRadius:'0 0 40% 10%'});
+gsap.from('#video-frame',{clipPath:'polygon(0% 0%,100% 0%,100% 100%,0% 100%)',ease:'none',scrollTrigger:{trigger:'.hero',start:'top top',end:'bottom top',scrub:true}});
+
+// Hero words on load
+function animateWords(selector){
+  gsap.to(selector,{
+    transform:'translate3d(0,0,0) rotateX(0deg)',opacity:1,
+    stagger:.08,duration:.7,ease:'power3.out',delay:.3
+  });
+}
+animateWords('.hero .word');
+
+// ScrollTrigger animated words
+function replayWords(){
+  gsap.set('.animated-word',{transform:'translate3d(0,-100px,-500px) rotateX(90deg)',opacity:0});
+  setTimeout(()=>{
+    gsap.to('.animated-word',{
+      transform:'translate3d(0,0,0) rotateX(0deg)',opacity:1,
+      stagger:.06,duration:.6,ease:'power2.out'
+    });
+  },100);
+}
+gsap.to('.animated-word',{
+  transform:'translate3d(0,0,0) rotateX(0deg)',opacity:1,
+  stagger:.06,duration:.6,ease:'power2.out',
+  scrollTrigger:{trigger:'#s1',start:'top 70%',once:true}
+});
+
+// ── BENTO TILT ──
+document.querySelectorAll('.bento-item').forEach(item=>{
+  item.addEventListener('mousemove',e=>{
+    const {left,top,width,height}=item.getBoundingClientRect();
+    const relX=(e.clientX-left)/width;
+    const relY=(e.clientY-top)/height;
+    const tiltX=(relY-.5)*5;
+    const tiltY=(relX-.5)*-5;
+    item.style.transform=`perspective(700px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale3d(0.98,0.98,0.98)`;
+    item.style.setProperty('--mx',`${relX*100}%`);
+    item.style.setProperty('--my',`${relY*100}%`);
+  });
+  item.addEventListener('mouseleave',()=>{
+    item.style.transform='perspective(700px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)';
+  });
+});
+
+// ── STORY IMAGE TILT ──
+const storyImg=document.getElementById('storyImg');
+storyImg.parentElement.addEventListener('mousemove',e=>{
+  const {left,top,width,height}=storyImg.getBoundingClientRect();
+  const relX=(e.clientX-left)/width-.5;
+  const relY=(e.clientY-top)/height-.5;
+  gsap.to(storyImg,{
+    rotateX:relY*-20,rotateY:relX*20,
+    transformPerspective:500,duration:.3,ease:'power1.inOut'
+  });
+});
+storyImg.parentElement.addEventListener('mouseleave',()=>{
+  gsap.to(storyImg,{rotateX:0,rotateY:0,duration:.5,ease:'power2.out'});
+});
+
+// nav dots
+const secs=[...document.querySelectorAll('section[id^="s"]')];
+const dots=[...document.querySelectorAll('.dot')];
+new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting){const i=secs.indexOf(e.target);dots.forEach((d,j)=>d.classList.toggle('active',i===j));}});
+},{threshold:.5}).observe;
+secs.forEach((s,i)=>new IntersectionObserver(entries=>{
+  if(entries[0].isIntersecting)dots.forEach((d,j)=>d.classList.toggle('active',i===j));
+},{threshold:.5}).observe(s));
+</script>
+</body>
+</html>
