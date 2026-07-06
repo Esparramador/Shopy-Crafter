@@ -4317,24 +4317,37 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
   const [errorMsg, setErrorMsg] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const audioQueueRef = useRef<AudioBuffer[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const playingRef = useRef(false);
+  const endingRef = useRef(false); // guard against double-endCall
+
+  const safeCloseAudioCtx = () => {
+    const ctx = audioCtxRef.current;
+    if (ctx && ctx.state !== "closed") {
+      ctx.close().catch(() => {});
+    }
+    audioCtxRef.current = null;
+  };
 
   const playNextAudio = async () => {
-    if (playingRef.current || audioQueueRef.current.length === 0) return;
+    const ctx = audioCtxRef.current;
+    if (playingRef.current || audioQueueRef.current.length === 0 || !ctx || ctx.state === "closed") return;
     playingRef.current = true;
     const buf = audioQueueRef.current.shift()!;
-    const ctx = audioCtxRef.current!;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    src.onended = () => { playingRef.current = false; setAgentSpeaking(false); playNextAudio(); };
-    setAgentSpeaking(true);
-    src.start();
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.onended = () => { playingRef.current = false; setAgentSpeaking(false); playNextAudio(); };
+      setAgentSpeaking(true);
+      src.start();
+    } catch { playingRef.current = false; }
   };
 
   const startCall = async () => {
+    endingRef.current = false;
     setStatus("provisioning"); setErrorMsg("");
     try {
       const endpoint = mode === "client"
@@ -4349,15 +4362,21 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
       setStatus("connecting");
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioCtxRef.current = new AudioContext({ sampleRate: 16000 });
+      streamRef.current = stream;
+      // Resume or create AudioContext (browsers may suspend it until user gesture)
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+        safeCloseAudioCtx();
+      }
+      const ctx = new AudioContext({ sampleRate: 16000 });
+      audioCtxRef.current = ctx;
+      if (ctx.state === "suspended") await ctx.resume();
+
       const ws = new WebSocket(signed_url);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setStatus("connected");
-        // Send init message
         ws.send(JSON.stringify({ type: "conversation_initiation_client_data", conversation_config_override: {} }));
-        // Start recording and streaming audio
         const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
         mediaRecorderRef.current = recorder;
         recorder.ondataavailable = (e) => {
@@ -4377,11 +4396,17 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
         try {
           const msg = JSON.parse(evt.data) as Record<string, any>;
           if (msg.type === "audio" && msg.audio_event?.audio_base_64) {
+            const currentCtx = audioCtxRef.current;
+            if (!currentCtx || currentCtx.state === "closed") return;
             const raw = atob(msg.audio_event.audio_base_64);
             const bytes = new Uint8Array(raw.length).map((_, i) => raw.charCodeAt(i));
-            const decoded = await audioCtxRef.current!.decodeAudioData(bytes.buffer.slice(0));
-            audioQueueRef.current.push(decoded);
-            playNextAudio();
+            try {
+              const decoded = await currentCtx.decodeAudioData(bytes.buffer.slice(0));
+              if (audioCtxRef.current === currentCtx && currentCtx.state !== "closed") {
+                audioQueueRef.current.push(decoded);
+                playNextAudio();
+              }
+            } catch { /* decode error — skip chunk */ }
           } else if (msg.type === "transcript" || msg.type === "user_transcript") {
             const text = msg.transcript ?? msg.user_transcript ?? "";
             if (text) setTranscript(p => [...p, { role: "user", text }]);
@@ -4392,25 +4417,42 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
         } catch { /* ignore parse errors */ }
       };
 
-      ws.onerror = () => { setStatus("error"); setErrorMsg("Error de conexión WebSocket"); };
-      ws.onclose = () => { if (status !== "error") setStatus("idle"); stream.getTracks().forEach(t => t.stop()); };
+      ws.onerror = () => { if (!endingRef.current) { setStatus("error"); setErrorMsg("Error de conexión WebSocket"); } };
+      ws.onclose = () => {
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+        if (!endingRef.current) setStatus("idle");
+      };
     } catch (err: any) {
       setStatus("error");
       setErrorMsg(err.message ?? "Error iniciando llamada");
     }
   };
 
-  const endCall = () => {
-    wsRef.current?.close();
-    mediaRecorderRef.current?.stop();
-    audioCtxRef.current?.close();
+  const endCall = (opts?: { unmounting?: boolean }) => {
+    if (endingRef.current) return;
+    endingRef.current = true;
+    const ws = wsRef.current;
+    wsRef.current = null;
+    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+      ws.close();
+    }
+    if (mediaRecorderRef.current?.state !== "inactive") {
+      try { mediaRecorderRef.current?.stop(); } catch { /* ignore */ }
+    }
+    mediaRecorderRef.current = null;
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
     audioQueueRef.current = [];
     playingRef.current = false;
-    setStatus("idle");
-    setAgentSpeaking(false);
+    safeCloseAudioCtx();
+    if (!opts?.unmounting) {
+      setStatus("idle");
+      setAgentSpeaking(false);
+    }
   };
 
-  useEffect(() => { return () => endCall(); }, []);
+  useEffect(() => { return () => endCall({ unmounting: true }); }, []);
 
   const isClientMode = mode === "client";
   const statusColor: Record<string, string> = { idle: "var(--jade)", provisioning: "var(--gold)", connecting: "rgba(200,168,75,0.8)", connected: "var(--jade)", speaking: "#7c3aed", error: "var(--crim)" };
