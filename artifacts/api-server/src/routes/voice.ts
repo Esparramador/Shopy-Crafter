@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, projectsTable, productsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import {
@@ -458,6 +458,96 @@ router.post("/voice/audio-isolation",
   },
 );
 
+// ─── CONVAI AGENT AUTO-PROVISIONING ──────────────────────────────────────────
+// In-process cache (reset on restart; backed by DB for persistence)
+const _agentIdCache: Record<string, string> = {};
+
+const ADMIN_AGENT_PROMPT = `Eres ShopyBrain, el asistente de voz de Shopy Crafter para tiendas Shopify.
+Eres un experto en e-commerce, marketing digital, SEO, gestión de inventario, precios y estrategia de ventas.
+Ayuda con: análisis de ventas, informes de stock e inventario, estrategia de precios, SEO técnico, campañas publicitarias, y cualquier duda sobre la tienda.
+Habla en español de forma profesional y cercana. Sé conciso pero completo. No inventes datos — si necesitas datos reales dile al usuario que los consulte en el panel.`;
+
+const CLIENT_AGENT_PROMPT = `Eres el asistente de informes de voz de Shopy Crafter.
+PUEDES ayudar con: consultas sobre ventas, stock, inventario, y resolver dudas sobre la tienda y la plataforma.
+NO PUEDES crear contenido, imágenes, textos publicitarios, campañas ni ningún tipo de material creativo. Si te lo piden, explica amablemente que esa función requiere acceder al panel.
+Si el usuario quiere dejar un mensaje o contactar con el equipo, toma nota del mensaje y dile que el equipo lo atenderá pronto.
+Habla en español de forma profesional y amigable. Sé directo y útil.`;
+
+async function ensurePlatformSettingsKV(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS platform_settings_kv (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch { /* already exists */ }
+}
+
+async function getOrCreateConvAIAgent(type: "admin" | "client"): Promise<string> {
+  const cacheKey = `convai_${type}_agent_id`;
+
+  // 1. In-memory cache
+  if (_agentIdCache[cacheKey]) return _agentIdCache[cacheKey];
+
+  // 2. Env var (admin only legacy support)
+  if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
+    _agentIdCache[cacheKey] = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
+    return _agentIdCache[cacheKey];
+  }
+
+  // 3. DB-cached agent ID
+  try {
+    await ensurePlatformSettingsKV();
+    const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
+    const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
+    const cachedId: string | undefined = rowArr[0]?.value;
+    if (cachedId && cachedId.length > 4) {
+      _agentIdCache[cacheKey] = cachedId;
+      logger.info({ type, agentId: cachedId }, "ConvAI agent loaded from DB cache");
+      return cachedId;
+    }
+  } catch (e) {
+    logger.warn({ err: (e as Error)?.message }, "Could not query DB for ConvAI agent ID");
+  }
+
+  // 4. Auto-create a new agent via ElevenLabs API
+  logger.info({ type }, "Auto-creating ConvAI agent in ElevenLabs...");
+  const agentName = type === "admin" ? "ShopyBrain IA — Asistente" : "ShopyBrain IA — Informes";
+  const firstMessage = type === "admin"
+    ? "Hola, soy ShopyBrain. ¿En qué puedo ayudarte hoy con tu tienda Shopify?"
+    : "Hola, soy el asistente de informes de Shopy Crafter. Puedo consultar ventas, stock e inventario, o tomar nota de tu mensaje. ¿Qué necesitas?";
+
+  const agent = await createConvAIAgent({
+    name: agentName,
+    conversation_config: {
+      agent: {
+        prompt: { prompt: type === "admin" ? ADMIN_AGENT_PROMPT : CLIENT_AGENT_PROMPT },
+        first_message: firstMessage,
+        language: "es",
+      },
+    },
+  });
+
+  const newId = agent.agent_id;
+
+  // Save to DB for persistence across restarts
+  try {
+    await db.execute(sql`
+      INSERT INTO platform_settings_kv (key, value, updated_at)
+      VALUES (${cacheKey}, ${newId}, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+    `);
+  } catch (e) {
+    logger.warn({ err: (e as Error)?.message }, "Could not persist ConvAI agent ID to DB");
+  }
+
+  _agentIdCache[cacheKey] = newId;
+  logger.info({ type, agentId: newId }, "ConvAI agent auto-created");
+  return newId;
+}
+
 // ─── CONVAI AGENTS ────────────────────────────────────────────────────────────
 router.get("/voice/convai/agents", requireAdmin, async (_req, res): Promise<void> => {
   try {
@@ -514,17 +604,42 @@ router.delete("/voice/convai/agents/:agentId", requireAdmin, async (req, res): P
   }
 });
 
-// ── User-accessible ConvAI signed URL (for voice calls in chat) ──────────────
+// ── Admin/Full ConvAI voice call (auto-creates agent if needed) ───────────────
 router.get("/voice/convai/call-url", async (req, res): Promise<void> => {
   const userId = (req.session as any)?.userId;
   if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
   try {
-    const agentId = (req.query.agentId as string) || process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID || "";
-    if (!agentId) { res.status(400).json({ error: "agentId requerido. Crea un agente ConvAI en ElevenLabs y configura ELEVEN_CONVAI_DEFAULT_AGENT_ID." }); return; }
+    const agentId = (req.query.agentId as string) || await getOrCreateConvAIAgent("admin");
     const signed_url = await getConvAISignedUrl(agentId);
     res.json({ signed_url, agentId });
   } catch (err: any) {
     logger.error({ err: err?.message }, "convai/call-url failed");
+    res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada" });
+  }
+});
+
+// ── Public voice call (no auth) — for landing chatbot visitors ────────────────
+router.get("/voice/public-call-url", async (_req, res): Promise<void> => {
+  try {
+    const agentId = await getOrCreateConvAIAgent("client");
+    const signed_url = await getConvAISignedUrl(agentId);
+    res.json({ signed_url, agentId, mode: "public" });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "public-call-url failed");
+    res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada pública" });
+  }
+});
+
+// ── Client voice call — restricted mode (reports + Q&A, no content creation) ──
+router.get("/voice/client-call-url", async (req, res): Promise<void> => {
+  const userId = (req.session as any)?.userId;
+  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  try {
+    const agentId = await getOrCreateConvAIAgent("client");
+    const signed_url = await getConvAISignedUrl(agentId);
+    res.json({ signed_url, agentId, mode: "client" });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "client-call-url failed");
     res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada" });
   }
 });

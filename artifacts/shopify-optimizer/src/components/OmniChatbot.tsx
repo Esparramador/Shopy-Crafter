@@ -4291,7 +4291,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
       {/* ── ConvAI Voice Call Modal ────────────────────────────────────────── */}
       {voiceCallOpen && (
-        <VoiceCallModal onClose={() => setVoiceCallOpen(false)} API={API} />
+        <VoiceCallModal onClose={() => setVoiceCallOpen(false)} API={API} mode={user?.role === "admin" ? "admin" : "client"} />
       )}
 
       <style>{`
@@ -4310,8 +4310,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 }
 
 // ── ConvAI Voice Call Modal ────────────────────────────────────────────────────
-function VoiceCallModal({ onClose, API }: { onClose: () => void; API: string }) {
-  const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "speaking" | "error">("idle");
+function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void; API: string; mode?: "admin" | "client" }) {
+  const [status, setStatus] = useState<"idle" | "connecting" | "provisioning" | "connected" | "speaking" | "error">("idle");
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [transcript, setTranscript] = useState<Array<{ role: "user" | "agent"; text: string }>>([]);
   const [errorMsg, setErrorMsg] = useState("");
@@ -4335,14 +4335,18 @@ function VoiceCallModal({ onClose, API }: { onClose: () => void; API: string }) 
   };
 
   const startCall = async () => {
-    setStatus("connecting"); setErrorMsg("");
+    setStatus("provisioning"); setErrorMsg("");
     try {
-      const resp = await fetch(`${API}/api/voice/convai/call-url`, { credentials: "include" });
+      const endpoint = mode === "client"
+        ? `${API}/api/voice/client-call-url`
+        : `${API}/api/voice/convai/call-url`;
+      const resp = await fetch(endpoint, { credentials: "include" });
       if (!resp.ok) {
         const e = await resp.json().catch(() => ({})) as any;
         throw new Error(e.error ?? "No se pudo obtener URL de llamada");
       }
       const { signed_url } = await resp.json() as { signed_url: string };
+      setStatus("connecting");
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioCtxRef.current = new AudioContext({ sampleRate: 16000 });
@@ -4408,8 +4412,16 @@ function VoiceCallModal({ onClose, API }: { onClose: () => void; API: string }) 
 
   useEffect(() => { return () => endCall(); }, []);
 
-  const statusColor = { idle: "var(--jade)", connecting: "var(--gold)", connected: "var(--jade)", speaking: "#7c3aed", error: "var(--crim)" }[status];
-  const statusLabel = { idle: "Listo para llamar", connecting: "Conectando...", connected: "En llamada", speaking: "IA hablando", error: errorMsg }[status];
+  const isClientMode = mode === "client";
+  const statusColor: Record<string, string> = { idle: "var(--jade)", provisioning: "var(--gold)", connecting: "rgba(200,168,75,0.8)", connected: "var(--jade)", speaking: "#7c3aed", error: "var(--crim)" };
+  const statusLabel: Record<string, string> = {
+    idle: isClientMode ? "Consultar por voz" : "Listo para llamar",
+    provisioning: "Preparando asistente IA...",
+    connecting: "Conectando...",
+    connected: "En llamada",
+    speaking: "IA respondiendo",
+    error: errorMsg,
+  };
 
   return (
     <div style={{
@@ -4422,15 +4434,30 @@ function VoiceCallModal({ onClose, API }: { onClose: () => void; API: string }) 
       }}>
         {/* Avatar */}
         <div style={{
-          width: 96, height: 96, borderRadius: "50%", background: "linear-gradient(135deg, var(--gold), #c878ff)",
+          width: 96, height: 96, borderRadius: "50%",
+          background: isClientMode ? "linear-gradient(135deg,#38bdf8,#7c3aed)" : "linear-gradient(135deg, var(--gold), #c878ff)",
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40,
-          animation: (status === "connected" || status === "speaking") ? "voicePulse 1.5s ease-in-out infinite" : "none",
-          boxShadow: `0 0 0 0 ${statusColor}`,
-        }}>🤖</div>
+          animation: (status === "connected" || status === "speaking" || status === "provisioning") ? "voicePulse 1.5s ease-in-out infinite" : "none",
+          boxShadow: `0 0 0 0 ${statusColor[status] ?? "var(--jade)"}`,
+        }}>{isClientMode ? "📊" : "🤖"}</div>
 
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>Asistente IA — Voz</div>
-          <div style={{ fontSize: 13, color: statusColor, fontWeight: 600 }}>{statusLabel}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>
+            {isClientMode ? "Consultar Informes — Voz" : "Asistente IA — Voz"}
+          </div>
+          <div style={{ fontSize: 13, color: statusColor[status] ?? "var(--jade)", fontWeight: 600 }}>
+            {statusLabel[status]}
+          </div>
+          {status === "provisioning" && (
+            <div style={{ fontSize: 11, color: "var(--t4)", marginTop: 4 }}>
+              Configurando agente IA por primera vez...
+            </div>
+          )}
+          {isClientMode && status === "idle" && (
+            <div style={{ fontSize: 11, color: "var(--t4)", marginTop: 4, maxWidth: 260 }}>
+              Consulta ventas, stock e inventario por voz. No disponible para crear contenido.
+            </div>
+          )}
         </div>
 
         {/* Transcript */}
@@ -4461,12 +4488,21 @@ function VoiceCallModal({ onClose, API }: { onClose: () => void; API: string }) 
           {status === "idle" ? (
             <button onClick={startCall} style={{
               display: "flex", alignItems: "center", gap: 8, padding: "12px 28px",
-              background: "var(--jade)", color: "#000", borderRadius: 40, border: "none",
+              background: isClientMode ? "linear-gradient(135deg,#38bdf8,#7c3aed)" : "var(--jade)",
+              color: "#fff", borderRadius: 40, border: "none",
               fontSize: 15, fontWeight: 700, cursor: "pointer",
             }}>
-              <Phone size={18} /> Iniciar llamada
+              <Phone size={18} /> {isClientMode ? "Consultar por voz" : "Iniciar llamada"}
             </button>
-          ) : status !== "error" ? (
+          ) : status === "provisioning" || status === "connecting" ? (
+            <button disabled style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px",
+              background: "var(--ink3)", color: "var(--t3)", borderRadius: 40, border: "none",
+              fontSize: 15, fontWeight: 700, cursor: "not-allowed", opacity: 0.7,
+            }}>
+              <Loader2 size={18} className="animate-spin" /> {status === "provisioning" ? "Preparando..." : "Conectando..."}
+            </button>
+          ) : status === "connected" || status === "speaking" ? (
             <button onClick={endCall} style={{
               display: "flex", alignItems: "center", gap: 8, padding: "12px 28px",
               background: "var(--crim)", color: "#fff", borderRadius: 40, border: "none",
@@ -4493,7 +4529,9 @@ function VoiceCallModal({ onClose, API }: { onClose: () => void; API: string }) 
         </div>
 
         <p style={{ fontSize: 11, color: "var(--t4)", textAlign: "center", maxWidth: 300 }}>
-          Requiere un agente ConvAI de ElevenLabs configurado. Admin → configura <code>ELEVEN_CONVAI_DEFAULT_AGENT_ID</code>.
+          {isClientMode
+            ? "Asistente de voz para consultas de informes. Powered by ElevenLabs AI."
+            : "Asistente IA de voz con acceso completo a ShopyBrain. Powered by ElevenLabs ConvAI."}
         </p>
       </div>
     </div>
