@@ -123,6 +123,7 @@ const ClientMessages = lazy(() => import("@/pages/client/ClientMessages"));
 const ClientProducts = lazy(() => import("@/pages/client/ClientProducts"));
 const ClientReports = lazy(() => import("@/pages/client/ClientReports"));
 const ClientTienda = lazy(() => import("@/pages/client/ClientTienda"));
+const ClientNotebook = lazy(() => import("@/pages/client/ClientNotebook"));
 
 const VoiceButton = lazy(() => import("@/components/VoiceButton").then(m => ({ default: m.VoiceButton })));
 const CommandPalette = lazy(() => import("@/components/CommandPalette").then(m => ({ default: m.CommandPalette })));
@@ -717,6 +718,9 @@ function Router() {
         </Route>
         <Route path="/client/tienda">
           <RequireClient><S><ClientTienda /></S></RequireClient>
+        </Route>
+        <Route path="/client/notebook">
+          <RequireClient><S><ClientNotebook /></S></RequireClient>
         </Route>
 
         <Route>{() => <S><NotFound /></S>}</Route>

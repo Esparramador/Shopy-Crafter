@@ -11,12 +11,13 @@ const _BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 const DEFAULT_NAV_ITEMS = [
-  { href: "/client",           label: "Dashboard",    icon: "📊" },
-  { href: "/client/products",  label: "Productos",    icon: "📦" },
-  { href: "/client/approvals", label: "Aprobaciones", icon: "✅" },
-  { href: "/client/messages",  label: "Mensajes",     icon: "💬" },
-  { href: "/client/reports",   label: "Reportes",     icon: "📈" },
-  { href: "/client/tienda",    label: "Mis Planes",   icon: "🛒" },
+  { href: "/client",            label: "Dashboard",    icon: "📊" },
+  { href: "/client/products",   label: "Productos",    icon: "📦" },
+  { href: "/client/approvals",  label: "Aprobaciones", icon: "✅" },
+  { href: "/client/messages",   label: "Mensajes",     icon: "💬" },
+  { href: "/client/reports",    label: "Reportes",     icon: "📈" },
+  { href: "/client/tienda",     label: "Mis Planes",   icon: "🛒" },
+  { href: "/client/notebook",   label: "Cuaderno IA",  icon: "📋" },
 ];
 
 interface ClientCmsPanel {

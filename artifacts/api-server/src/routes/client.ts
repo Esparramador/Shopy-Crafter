@@ -452,6 +452,105 @@ router.get("/products", async (req, res): Promise<void> => {
   }
 });
 
+// ── NOTEBOOK ─────────────────────────────────────────────────────────────────
+router.get("/notebook", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    const pid = parseInt(projectId);
+    if (isNaN(pid)) { res.status(400).json({ error: "Invalid projectId" }); return; }
+    const rows = await db.execute(
+      sql`SELECT id, title, content, created_at FROM project_files
+          WHERE project_id = ${pid} AND category = 'notebook'
+          ORDER BY created_at DESC`
+    );
+    const items = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
+    res.json(items);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "client notebook GET error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/notebook", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    const pid = parseInt(projectId);
+    if (isNaN(pid)) { res.status(400).json({ error: "Invalid projectId" }); return; }
+    const { title, content } = req.body as { title?: string; content?: string };
+    if (!content?.trim()) { res.status(400).json({ error: "content required" }); return; }
+    const noteTitle = (title?.trim() || content.trim().split("\n")[0].slice(0, 80)) || "Nota sin título";
+    await db.execute(
+      sql`INSERT INTO project_files (project_id, title, content, file_type, category, created_at)
+          VALUES (${pid}, ${noteTitle}, ${content.trim()}, 'text', 'notebook', NOW())`
+    );
+    res.json({ ok: true });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "client notebook POST error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/notebook/compile", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    const pid = parseInt(projectId);
+    if (isNaN(pid)) { res.status(400).json({ error: "Invalid projectId" }); return; }
+    const rows = await db.execute(
+      sql`SELECT title, content, created_at FROM project_files
+          WHERE project_id = ${pid} AND category = 'notebook'
+          ORDER BY created_at ASC`
+    );
+    const items: Array<{ title: string; content: string; created_at: string }> =
+      (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
+    if (items.length === 0) { res.status(400).json({ error: "No hay notas en el cuaderno" }); return; }
+    const sep = "═".repeat(60);
+    const lines: string[] = [
+      "CUADERNO DE INVESTIGACIÓN — SHOPY CRAFTER",
+      `Compilado el ${new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}`,
+      `Total de notas: ${items.length}`,
+      sep,
+      "",
+    ];
+    items.forEach((n, i) => {
+      const d = new Date(n.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      lines.push(`[${i + 1}] ${n.title}`);
+      lines.push(`Guardado: ${d}`);
+      lines.push("─".repeat(40));
+      lines.push(n.content);
+      lines.push("");
+      lines.push(sep);
+      lines.push("");
+    });
+    const compiled = lines.join("\n");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="cuaderno-investigacion.txt"`);
+    res.send(compiled);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "client notebook compile error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/notebook/:id", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    const pid = parseInt(projectId);
+    const noteId = parseInt(req.params.id);
+    if (isNaN(pid) || isNaN(noteId)) { res.status(400).json({ error: "Invalid id" }); return; }
+    await db.execute(
+      sql`DELETE FROM project_files WHERE id = ${noteId} AND project_id = ${pid} AND category = 'notebook'`
+    );
+    res.json({ ok: true });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "client notebook DELETE error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/brand-dna", async (req, res): Promise<void> => {
   try {
     const projectId = getClientProjectId(req);

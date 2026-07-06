@@ -79,6 +79,8 @@ export function ClientChatbot() {
   const [uploading, setUploading]   = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [expanded, setExpanded]     = useState(false);
+  const [savedIdxs, setSavedIdxs]   = useState<Set<number>>(new Set());
+  const [savingIdx, setSavingIdx]   = useState<number | null>(null);
 
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
@@ -466,6 +468,34 @@ export function ClientChatbot() {
                       <div style={{ maxWidth: "92%", padding: "9px 12px", lineHeight: 1.6, borderRadius: "14px 14px 14px 3px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 12.5, color: "#e5e5e5" }}>
                         {renderContent(m.content)}
                       </div>
+                      {m.content && m.content.length > 20 && (
+                        <button
+                          onClick={async () => {
+                            if (savedIdxs.has(i) || savingIdx === i) return;
+                            setSavingIdx(i);
+                            try {
+                              await fetch(`${API}/client/notebook`, {
+                                method: "POST", credentials: "include",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ content: m.content }),
+                              });
+                              setSavedIdxs(prev => new Set([...prev, i]));
+                            } catch { /* silencioso */ } finally { setSavingIdx(null); }
+                          }}
+                          title="Guardar en Cuaderno de Investigación"
+                          style={{
+                            marginTop: 4, padding: "3px 9px", borderRadius: 7,
+                            border: `1px solid ${savedIdxs.has(i) ? "rgba(42,122,75,0.3)" : "rgba(201,169,97,0.2)"}`,
+                            background: savedIdxs.has(i) ? "rgba(42,122,75,0.08)" : "rgba(201,169,97,0.05)",
+                            color: savedIdxs.has(i) ? "var(--jade,#2da568)" : "rgba(201,169,97,0.7)",
+                            fontSize: 10.5, cursor: savedIdxs.has(i) ? "default" : "pointer",
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {savingIdx === i ? "⏳ Guardando…" : savedIdxs.has(i) ? "✓ Guardado en Cuaderno" : "💾 Guardar en Cuaderno"}
+                        </button>
+                      )}
                       {/* Vault files listing */}
                       {m.vaultFiles && m.vaultFiles.length > 0 && (
                         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
