@@ -114,6 +114,8 @@ const TiendaAdmin = lazy(() => import("@/pages/admin/TiendaAdmin"));
 const StripeManager = lazy(() => import("@/pages/admin/StripeManager"));
 const StripeMasterHub = lazy(() => import("@/pages/admin/StripeMasterHub"));
 const StripeProjectHub = lazy(() => import("@/pages/projects/StripeProjectHub"));
+const WooProjectHub = lazy(() => import("@/pages/projects/WooProjectHub"));
+const PrestaShopProjectHub = lazy(() => import("@/pages/projects/PrestaShopProjectHub"));
 const ApiUsage = lazy(() => import("@/pages/admin/ApiUsage"));
 const AICatalog = lazy(() => import("@/pages/admin/AICatalog"));
 const ApiKeysManager = lazy(() => import("@/pages/admin/ApiKeysManager"));
@@ -320,7 +322,12 @@ function SmartProjectRedirect({ id }: { id: string }) {
   const { data: projects } = useListProjects();
   if (!projects) return <PageLoader />;
   const project = projects.find((p: any) => p.id === parseInt(id, 10));
-  const dest = project?.platformType === "stripe" ? "stripe-hub" : "audit";
+  const pt = project?.platformType;
+  const dest =
+    pt === "stripe"      ? "stripe-hub" :
+    pt === "woocommerce" ? "woo-hub"    :
+    pt === "prestashop"  ? "ps-hub"     :
+    "audit";
   return <Redirect to={`/projects/${id}/${dest}`} />;
 }
 
@@ -597,6 +604,12 @@ function Router() {
         </Route>
         <Route path="/projects/:id/stripe-hub">
           <RequireAdmin><AdminWrapper><AppLayout><S><StripeProjectHub /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/woo-hub">
+          <RequireAdmin><AdminWrapper><AppLayout><S><WooProjectHub /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/ps-hub">
+          <RequireAdmin><AdminWrapper><AppLayout><S><PrestaShopProjectHub /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/web-designer">
           <RequireAdmin><AdminWrapper><AppLayout><S><WebDesigner /></S></AppLayout></AdminWrapper></RequireAdmin>

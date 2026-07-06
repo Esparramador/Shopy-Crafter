@@ -57,6 +57,8 @@ import reportTemplatesRouter from "./report-templates.js";
 import billingRouter from "./billing.js";
 import stripeConnectRouter from "./stripe-connect.js";
 import stripeMasterRouter from "./stripe-master.js";
+import wooProjectRouter from "./woo-project.js";
+import psProjectRouter from "./ps-project.js";
 import webhookGatewayRouter from "./webhook-gateway.js";
 import brandDnaRouter from "./brand-dna.js";
 import tripo3dRouter from "./tripo3d.js";
@@ -129,6 +131,8 @@ router.use(tiendaRouter);
 router.use(webhookGatewayRouter);
 router.use(stripeConnectRouter);
 router.use(stripeMasterRouter);
+router.use(wooProjectRouter);
+router.use(psProjectRouter);
 router.use(chatGroupsRouter);
 
 // fs-pro, visme, youtube: every route has its own per-route auth (requireAdmin or requireAuth)

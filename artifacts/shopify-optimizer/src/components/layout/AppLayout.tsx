@@ -32,6 +32,22 @@ const STRIPE_MODULE_NAV = [
   { id: "ad-studio",      label: "Studio Anuncios", icon: "📺" },
 ];
 
+const WOO_MODULE_NAV = [
+  { id: "woo-hub",        label: "WooCommerce Hub", icon: "🟣" },
+  { id: "audit",          label: "Auditoría Web",   icon: "📊" },
+  { id: "vault",          label: "Repositorio",     icon: "🗄️" },
+  { id: "fusion-studio",  label: "Studio Foto",     icon: "🧬" },
+  { id: "ad-studio",      label: "Studio Anuncios", icon: "📺" },
+];
+
+const PS_MODULE_NAV = [
+  { id: "ps-hub",         label: "PrestaShop Hub",  icon: "🔴" },
+  { id: "audit",          label: "Auditoría Web",   icon: "📊" },
+  { id: "vault",          label: "Repositorio",     icon: "🗄️" },
+  { id: "fusion-studio",  label: "Studio Foto",     icon: "🧬" },
+  { id: "ad-studio",      label: "Studio Anuncios", icon: "📺" },
+];
+
 const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Centro Shopy Crafter", icon: "🧠", href: "/admin/shopybrain" },
   { label: "Centro de Comando", icon: "⚡", href: "/admin/command-center" },
@@ -272,7 +288,11 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   // CMS es la fuente de verdad; merge garantiza que items nuevos del código aparezcan
   const activePlatformEarly: string = (activeProject as any)?.platformType ?? "shopify";
-  const baseModuleNav = activePlatformEarly === "stripe" ? STRIPE_MODULE_NAV : DEFAULT_MODULE_NAV;
+  const baseModuleNav =
+    activePlatformEarly === "stripe"      ? STRIPE_MODULE_NAV :
+    activePlatformEarly === "woocommerce" ? WOO_MODULE_NAV    :
+    activePlatformEarly === "prestashop"  ? PS_MODULE_NAV     :
+    DEFAULT_MODULE_NAV;
   const moduleNav    = mergeById(cmsNav?.modules ?? [], baseModuleNav);
   const shopybrainNav = mergeByHref(cmsNav?.shopybrain ?? [], DEFAULT_SHOPYBRAIN_NAV);
   const adminNav: any[] = mergeByHref(cmsNav?.admin ?? [], DEFAULT_ADMIN_NAV);
