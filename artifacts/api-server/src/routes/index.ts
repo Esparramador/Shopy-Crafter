@@ -135,13 +135,15 @@ router.use(wooProjectRouter);
 router.use(psProjectRouter);
 router.use(chatGroupsRouter);
 
-// fs-pro, visme, youtube: every route has its own per-route auth (requireAdmin or requireAuth)
+// fs-pro, visme, youtube, voice: every route has its own per-route auth (requireAdmin or requireAuth)
 // so they must be mounted BEFORE the global requireAdmin gate below.
 // YouTube callback is deliberately public (verified via state token, no session cookie from Google redirect).
+// voice has /voice/public-call-url (no auth) + /voice/client-call-url (requireAuth) + others (requireAdmin).
 router.use(fsProRouter);
 router.use(vismeRouter);
 router.use(promptExecRouter);
 router.use(youtubeRouter);
+router.use(voiceRouter);
 
 router.use(requireAdmin, meshyRouter);
 router.use(requireAdmin, stitchRouter);
@@ -163,7 +165,6 @@ router.use(competitorsRouter);
 router.use(suppliersRouter);
 router.use(emailsRouter);
 router.use(emailTemplatesRouter);
-router.use(voiceRouter);
 router.use(pushRouter);
 router.use(shopybrainRouter);
 router.use(agencyRouter);
