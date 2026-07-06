@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
-import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable, projectsTable } from "@workspace/db";
+import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable, projectsTable, brandDnaTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import { msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
@@ -449,6 +449,27 @@ router.get("/products", async (req, res): Promise<void> => {
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
+  }
+});
+
+router.get("/brand-dna", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
+    const pid = parseInt(projectId);
+    if (isNaN(pid)) { res.status(400).json({ error: "Invalid projectId" }); return; }
+    const rows = await db.execute(
+      sql`SELECT tone_of_voice, target_audience, brand_personality, sector, company_description,
+                 unique_value_proposition, taglines, brand_archetype, primary_colors,
+                 content_pillars, website_url, extraction_status, extracted_at
+          FROM brand_dna WHERE project_id = ${pid} ORDER BY extracted_at DESC LIMIT 1`
+    );
+    const row = (rows as any).rows?.[0] ?? (Array.isArray(rows) ? rows[0] : null);
+    if (!row) { res.json({ ok: true, brandDna: null }); return; }
+    res.json({ ok: true, brandDna: row });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "client brand-dna error");
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

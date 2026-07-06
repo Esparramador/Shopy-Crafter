@@ -18,6 +18,20 @@ interface DashData {
   projectName: string | null; shopDomain: string | null; platformType?: string | null;
 }
 interface VaultFile { id: string; title: string; category: string; fileType: string; createdAt: string; downloadUrl?: string; }
+interface BrandDnaData {
+  tone_of_voice?: string | null;
+  target_audience?: string | null;
+  brand_personality?: string | null;
+  sector?: string | null;
+  company_description?: string | null;
+  unique_value_proposition?: string | null;
+  taglines?: string[] | null;
+  brand_archetype?: string | null;
+  primary_colors?: string[] | null;
+  content_pillars?: string[] | null;
+  website_url?: string | null;
+  extraction_status?: string | null;
+}
 
 function useCountUp(target: number, duration = 1100) {
   const [n, setN] = useState(0);
@@ -84,6 +98,7 @@ export default function ClientDashboard() {
   function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
   const [data, setData] = useState<DashData | null>(null);
   const [vault, setVault] = useState<VaultFile[]>([]);
+  const [brandDna, setBrandDna] = useState<BrandDnaData | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"activity" | "engines" | "reports">("activity");
   const [greeting, setGreeting] = useState("Hola");
@@ -98,9 +113,11 @@ export default function ClientDashboard() {
     Promise.all([
       fetch(apid(`${API}/client/dashboard`), { credentials: "include" }).then(r => r.json()),
       fetch(apid(`${API}/client/vault-files`), { credentials: "include" }).then(r => r.json()).catch(() => []),
-    ]).then(([d, v]) => {
+      fetch(apid(`${API}/client/brand-dna`), { credentials: "include" }).then(r => r.json()).catch(() => ({ ok: false })),
+    ]).then(([d, v, bdna]) => {
       setData(d?.totalProducts !== undefined ? d : null);
       setVault(Array.isArray(v) ? v : []);
+      setBrandDna(bdna?.ok && bdna.brandDna ? bdna.brandDna : null);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [previewPid]);
@@ -253,6 +270,88 @@ export default function ClientDashboard() {
             </div>
           ))}
         </div>
+
+        {/* ═══ BRAND DNA CARD ═══ */}
+        {!loading && brandDna && (
+          <div style={{
+            background: "linear-gradient(135deg,rgba(201,169,97,0.06) 0%,rgba(42,122,75,0.04) 100%)",
+            border: "1px solid rgba(201,169,97,0.18)", borderRadius: 16,
+            padding: "18px 22px", marginBottom: 16,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(201,169,97,0.12)", border: "1px solid rgba(201,169,97,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>🧬</div>
+                <div>
+                  <p style={{ fontSize: 10, color: "var(--gold)", textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 700, margin: 0 }}>ADN de Tu Marca</p>
+                  {brandDna.sector && <p style={{ fontSize: 11, color: "var(--t3)", margin: 0, marginTop: 1 }}>{brandDna.sector}</p>}
+                </div>
+              </div>
+              {brandDna.brand_archetype && (
+                <span style={{ fontSize: 11, color: "var(--gold2)", background: "rgba(201,169,97,0.1)", border: "1px solid rgba(201,169,97,0.2)", padding: "4px 12px", borderRadius: 100, fontWeight: 600 }}>
+                  {brandDna.brand_archetype}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 10 }}>
+              {brandDna.tone_of_voice && (
+                <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "10px 13px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <p style={{ fontSize: 9.5, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0, marginBottom: 4 }}>Tono de Voz</p>
+                  <p style={{ fontSize: 12.5, color: "var(--t1)", margin: 0, lineHeight: 1.45 }}>{brandDna.tone_of_voice}</p>
+                </div>
+              )}
+              {brandDna.target_audience && (
+                <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "10px 13px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <p style={{ fontSize: 9.5, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0, marginBottom: 4 }}>Audiencia Objetivo</p>
+                  <p style={{ fontSize: 12.5, color: "var(--t1)", margin: 0, lineHeight: 1.45 }}>{brandDna.target_audience}</p>
+                </div>
+              )}
+              {brandDna.unique_value_proposition && (
+                <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "10px 13px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <p style={{ fontSize: 9.5, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0, marginBottom: 4 }}>Propuesta de Valor</p>
+                  <p style={{ fontSize: 12.5, color: "var(--t1)", margin: 0, lineHeight: 1.45 }}>{brandDna.unique_value_proposition}</p>
+                </div>
+              )}
+              {brandDna.brand_personality && (
+                <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "10px 13px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <p style={{ fontSize: 9.5, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0, marginBottom: 4 }}>Personalidad</p>
+                  <p style={{ fontSize: 12.5, color: "var(--t1)", margin: 0, lineHeight: 1.45 }}>{brandDna.brand_personality}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Colores + Taglines */}
+            {((brandDna.primary_colors?.length ?? 0) > 0 || (brandDna.taglines?.length ?? 0) > 0 || (brandDna.content_pillars?.length ?? 0) > 0) && (
+              <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {(brandDna.primary_colors?.length ?? 0) > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 10, color: "var(--t3)" }}>Colores:</span>
+                    {brandDna.primary_colors!.slice(0, 6).map((c, i) => (
+                      <div key={i} title={c} style={{ width: 18, height: 18, borderRadius: 5, background: c, border: "1px solid rgba(255,255,255,0.12)", flexShrink: 0 }} />
+                    ))}
+                  </div>
+                )}
+                {(brandDna.taglines?.length ?? 0) > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, color: "var(--t3)" }}>Taglines:</span>
+                    {brandDna.taglines!.slice(0, 2).map((t, i) => (
+                      <span key={i} style={{ fontSize: 11, color: "var(--t2)", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", padding: "3px 9px", borderRadius: 6, fontStyle: "italic" }}>"{t}"</span>
+                    ))}
+                  </div>
+                )}
+                {(brandDna.content_pillars?.length ?? 0) > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, color: "var(--t3)" }}>Pilares:</span>
+                    {brandDna.content_pillars!.slice(0, 4).map((p, i) => (
+                      <span key={i} style={{ fontSize: 10.5, color: "var(--jade)", background: "rgba(42,122,75,0.08)", border: "1px solid rgba(42,122,75,0.18)", padding: "2px 8px", borderRadius: 6 }}>{p}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ═══ CHARTS ROW ═══ */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
