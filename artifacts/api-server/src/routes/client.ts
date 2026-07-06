@@ -623,12 +623,14 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
       attachedFiles = [],
       forwardToAdmin = false,
       intentHints = {},
+      projectMode = false,
     } = req.body as {
       message?: string;
       history?: Array<{ role: string; content: string }>;
       attachedFiles?: Array<{ fileUrl: string; fileName: string; fileType: string; fileSize: number }>;
       forwardToAdmin?: boolean;
       intentHints?: { listFiles?: boolean; listProducts?: boolean; forward?: boolean };
+      projectMode?: boolean;
     };
 
     const msg = message?.trim() ?? "";
@@ -721,8 +723,66 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
       loadClientProfile(pid),
     ]);
 
+    // ── Project Mode: fetch Brand DNA ────────────────────────────────
+    let brandDnaContext = "";
+    if (projectMode && !isNaN(pid)) {
+      try {
+        const bdRows = await db.execute(
+          sql`SELECT tone_of_voice, target_audience, brand_personality, sector, company_description,
+                     unique_value_proposition, taglines, brand_archetype, primary_colors, content_pillars
+              FROM brand_dna WHERE project_id = ${pid} ORDER BY extracted_at DESC LIMIT 1`
+        );
+        const bd: any = (bdRows as any).rows?.[0] ?? (Array.isArray(bdRows) ? bdRows[0] : null);
+        if (bd) {
+          brandDnaContext = `
+══ ADN DE MARCA DEL CLIENTE (usar para personalizar TODO) ══
+Sector: ${bd.sector ?? "No especificado"}
+Descripción: ${bd.company_description ?? ""}
+Arqueotipo: ${bd.brand_archetype ?? ""}
+Tono de voz: ${bd.tone_of_voice ?? ""}
+Audiencia: ${bd.target_audience ?? ""}
+Propuesta de valor: ${bd.unique_value_proposition ?? ""}
+Personalidad: ${bd.brand_personality ?? ""}
+Colores primarios: ${(bd.primary_colors ?? []).join(", ")}
+Taglines: ${(bd.taglines ?? []).join(" · ")}
+Pilares de contenido: ${(bd.content_pillars ?? []).join(", ")}
+════════════════════════════════════════════════════════════`;
+        }
+      } catch { /* silencioso */ }
+    }
+
     // ── Build system prompt ──────────────────────────────────────────
-    const systemPrompt = `Eres el asesor personal de negocio IA del cliente en Shopy Crafter. Conoces su empresa en profundidad y actúas como un socio estratégico de confianza — no como un chatbot genérico. Hablas siempre en español.
+    const systemPrompt = projectMode ? `Eres el ARQUITECTO DE PROYECTOS IA de Shopy Crafter. Tu misión es ayudar al cliente a crear un brief completo y ejecutable — listo para pasarlo a cualquier IA (Claude, Gemini, ChatGPT, etc.) o agencia creativa. Hablas siempre en español.
+
+${brandDnaContext}
+
+${clientProfile ? clientProfile + "\n" : ""}
+TU MÉTODO ESTRUCTURADO (sigue este orden a lo largo de la conversación):
+1. DESCUBRIMIENTO — Pregunta qué quiere crear (app, web, brand book, e-commerce, APK, contenido, etc.) y para qué.
+2. AUDIENCIA & OBJETIVO — Profundiza en el público objetivo, el problema que resuelve y el objetivo de negocio.
+3. FUNCIONALIDADES CLAVE — Define las secciones, pantallas o funcionalidades más importantes.
+4. ESTÉTICA & DISEÑO — Conecta con los colores, tono y personalidad de la marca ya detectados en el ADN.
+5. TECH STACK / PLATAFORMA — Recomienda herramientas, plataformas o stack según el tipo de proyecto.
+6. MASTER BRIEF FINAL — Al final de la conversación, cuando el cliente lo pida o cuando tengas suficiente info, genera el brief completo con este formato:
+
+---
+# 🚀 MASTER BRIEF: [NOMBRE DEL PROYECTO]
+## Qué se va a crear
+## Audiencia objetivo
+## Objetivo de negocio
+## Funcionalidades / secciones clave
+## Identidad visual y tono
+## Stack recomendado
+## Prompt maestro para cualquier IA (listo para copiar y pegar)
+---
+
+REGLAS:
+• Cada respuesta hace UNA pregunta o avanza UN paso del método. No saltes pasos.
+• Respuestas concisas (máx 200 palabras) pero ricas en detalle accionable.
+• Usa el ADN de marca para personalizar TODAS las recomendaciones.
+• Cuando generes el Master Brief, hazlo completo, estructurado y listo para copiar.
+• El "Prompt maestro" del brief debe funcionar solo, sin contexto adicional.` :
+    `Eres el asesor personal de negocio IA del cliente en Shopy Crafter. Conoces su empresa en profundidad y actúas como un socio estratégico de confianza — no como un chatbot genérico. Hablas siempre en español.
 
 MISIÓN PRINCIPAL:
 • Ser el asesor más informado sobre el negocio del cliente: su sector, competidores, objetivos, retos y oportunidades
@@ -766,12 +826,13 @@ REGLAS:
       { role: "user", content: msg || `[Cliente adjuntó ${attachedFiles.length} archivo(s)]` },
     ];
 
+    const maxTokens = projectMode ? 2000 : 600;
     let reply: string;
     try {
-      reply = await askGeminiChat(chatMessages, systemPrompt, { maxOutputTokens: 600 });
+      reply = await askGeminiChat(chatMessages, systemPrompt, { maxOutputTokens: maxTokens });
       if (!reply) throw new Error("empty");
     } catch {
-      reply = await askClaude(isNaN(pid) ? 0 : pid, chatMessages, systemPrompt, 400, 12000);
+      reply = await askClaude(isNaN(pid) ? 0 : pid, chatMessages, systemPrompt, projectMode ? 1500 : 400, 12000);
     }
 
     // ── Learn from this conversation (fire-and-forget) ───────────────
@@ -784,7 +845,21 @@ REGLAS:
       });
     }
 
-    res.json({ reply, vaultFiles, forwarded, forwardedId });
+    // ── Auto-save to notebook in Project Mode ────────────────────────
+    let autoSaved = false;
+    if (projectMode && reply && msg && !isNaN(pid)) {
+      try {
+        const noteTitle = msg.length > 70 ? msg.slice(0, 70) + "…" : msg;
+        const noteContent = `**Tu mensaje:** ${msg}\n\n**Arquitecto IA:**\n${reply}`;
+        await db.execute(sql`
+          INSERT INTO project_files (project_id, title, content, file_type, category, created_at)
+          VALUES (${pid}, ${noteTitle}, ${noteContent}, 'text', 'notebook', NOW())
+        `);
+        autoSaved = true;
+      } catch { /* silencioso — no bloquear la respuesta */ }
+    }
+
+    res.json({ reply, vaultFiles, forwarded, forwardedId, autoSaved, projectMode });
   } catch (err: any) {
     logger.error({ err: err.message }, "client ai-chat error");
     res.status(500).json({ error: "Error al procesar tu consulta. Por favor inténtalo de nuevo." });

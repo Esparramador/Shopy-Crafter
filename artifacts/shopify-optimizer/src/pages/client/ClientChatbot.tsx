@@ -81,12 +81,15 @@ export function ClientChatbot() {
   const [expanded, setExpanded]     = useState(false);
   const [savedIdxs, setSavedIdxs]   = useState<Set<number>>(new Set());
   const [savingIdx, setSavingIdx]   = useState<number | null>(null);
+  const [projectMode, setProjectMode] = useState(false);
 
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
   const fileRef    = useRef<HTMLInputElement>(null);
   const abortRef   = useRef<AbortController | null>(null);
   const srRef      = useRef<any>(null);
+  const projectModeRef = useRef(false);
+  useEffect(() => { projectModeRef.current = projectMode; }, [projectMode]);
 
   const panelW = expanded ? 540 : 400;
   const panelH = expanded ? 680 : 560;
@@ -198,8 +201,9 @@ export function ClientChatbot() {
         return;
       }
 
-      if (isForward || hasFiles) {
-        // ── JSON path: forward to admin, includes file context ──────────
+      const isProjectMode = projectModeRef.current;
+      if (isForward || hasFiles || isProjectMode) {
+        // ── JSON path: forward to admin, files, or project mode ─────────
         const res = await fetch(`${API}/client/ai-chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -211,6 +215,7 @@ export function ClientChatbot() {
             attachedFiles: filesToSend,
             forwardToAdmin: isForward,
             intentHints: { listFiles: false, listProducts: isListProducts, forward: isForward },
+            projectMode: isProjectMode,
           }),
         });
         const d = await res.json();
@@ -219,8 +224,13 @@ export function ClientChatbot() {
           return;
         }
         const reply = d.reply ?? "No pude procesar tu consulta.";
+        const newIdx = msgs.filter(m => m.role !== "system").length + 1;
         addMsg({ role: "assistant", content: reply, vaultFiles: d.vaultFiles, forwarded: d.forwarded, ts: Date.now() });
         speak(reply);
+        if (d.autoSaved) {
+          setSavedIdxs(prev => { const s = new Set(prev); s.add(newIdx); return s; });
+          addMsg({ role: "system", content: "📋 Guardado automáticamente en el Cuaderno IA", ts: Date.now() });
+        }
         if (d.forwarded) addMsg({ role: "system", content: "✅ Mensaje enviado al equipo de Shopy Crafter. Te responderán pronto.", ts: Date.now() });
       } else {
         // ── SSE STREAMING path: general chat + deep research ────────────
@@ -394,20 +404,41 @@ export function ClientChatbot() {
           )}
 
           {/* Header */}
-          <div style={{ padding: "12px 14px", background: "rgba(201,169,97,0.06)", borderBottom: "1px solid rgba(201,169,97,0.12)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 11, background: "linear-gradient(135deg,rgba(201,169,97,0.2),rgba(201,169,97,0.07))", border: "1px solid rgba(201,169,97,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🤖</div>
+          <div style={{ padding: "12px 14px", background: projectMode ? "rgba(99,102,241,0.12)" : "rgba(201,169,97,0.06)", borderBottom: `1px solid ${projectMode ? "rgba(99,102,241,0.3)" : "rgba(201,169,97,0.12)"}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0, transition: "all 0.3s" }}>
+            <div style={{ width: 38, height: 38, borderRadius: 11, background: projectMode ? "linear-gradient(135deg,rgba(99,102,241,0.3),rgba(139,92,246,0.15))" : "linear-gradient(135deg,rgba(201,169,97,0.2),rgba(201,169,97,0.07))", border: `1px solid ${projectMode ? "rgba(99,102,241,0.4)" : "rgba(201,169,97,0.18)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, transition: "all 0.3s" }}>{projectMode ? "🎯" : "🤖"}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t1,#fff)", margin: 0, lineHeight: 1.2 }}>Asistente Shopy Crafter</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t1,#fff)", margin: 0, lineHeight: 1.2 }}>{projectMode ? "Arquitecto de Proyectos IA" : "Asistente Shopy Crafter"}</p>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#10b981" }} />
-                <p style={{ fontSize: 10, color: "#10b981", margin: 0, fontWeight: 600 }}>En línea · IA + ShopyBrain</p>
+                <div style={{ width: 5, height: 5, borderRadius: "50%", background: projectMode ? "#818cf8" : "#10b981" }} />
+                <p style={{ fontSize: 10, color: projectMode ? "#818cf8" : "#10b981", margin: 0, fontWeight: 600 }}>{projectMode ? "Modo Proyecto · ADN inyectado · Auto-guardando" : "En línea · IA + ShopyBrain"}</p>
               </div>
             </div>
+            {/* Project Mode toggle */}
+            <button
+              onClick={() => {
+                const next = !projectMode;
+                projectModeRef.current = next;
+                setProjectMode(next);
+                if (next) {
+                  addMsg({ role: "system", content: "🎯 Modo Proyecto activado · ADN de marca inyectado · Cada respuesta se auto-guarda en el Cuaderno", ts: Date.now() });
+                  setTimeout(() => {
+                    send("Hola, quiero planificar un proyecto personal. ¿Por dónde empezamos?");
+                  }, 200);
+                } else {
+                  addMsg({ role: "system", content: "💬 Volviendo al modo asistente normal.", ts: Date.now() });
+                }
+              }}
+              title={projectMode ? "Desactivar Modo Proyecto" : "Activar Modo Proyecto (Arquitecto IA)"}
+              style={{ height: 32, padding: "0 10px", borderRadius: 9, border: projectMode ? "1px solid rgba(99,102,241,0.6)" : "1px solid rgba(255,255,255,0.12)", background: projectMode ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.04)", color: projectMode ? "#a5b4fc" : "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, transition: "all 0.2s", flexShrink: 0, whiteSpace: "nowrap" }}
+            >
+              <span style={{ fontSize: 13 }}>{projectMode ? "🎯" : "🎯"}</span>
+              <span>{projectMode ? "Proyecto ON" : "Proyecto"}</span>
+            </button>
             {/* Voice toggle */}
             <button
               onClick={() => { setVoiceOn(v => !v); if (!voiceOn) window.speechSynthesis?.cancel(); }}
               title={voiceOn ? "Desactivar voz" : "Activar respuesta por voz"}
-              style={{ width: 32, height: 32, borderRadius: 9, border: voiceOn ? "1px solid rgba(201,169,97,0.5)" : "1px solid rgba(255,255,255,0.08)", background: voiceOn ? "rgba(201,169,97,0.15)" : "rgba(255,255,255,0.04)", color: voiceOn ? "var(--gold,#c9a961)" : "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
+              style={{ width: 28, height: 28, borderRadius: 8, border: voiceOn ? "1px solid rgba(201,169,97,0.5)" : "1px solid rgba(255,255,255,0.08)", background: voiceOn ? "rgba(201,169,97,0.15)" : "rgba(255,255,255,0.04)", color: voiceOn ? "var(--gold,#c9a961)" : "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
             >
               {voiceOn ? "🔊" : "🔇"}
             </button>
@@ -415,17 +446,24 @@ export function ClientChatbot() {
             <button
               onClick={() => setExpanded(e => !e)}
               title={expanded ? "Compactar" : "Expandir"}
-              style={{ width: 32, height: 32, borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
+              style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
             >
               {expanded ? "⊡" : "⊞"}
             </button>
             <button
               onClick={() => setOpen(false)}
-              style={{ width: 32, height: 32, borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
+              style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
               onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.color = "#f87171"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
             >✕</button>
           </div>
+          {/* Project mode banner */}
+          {projectMode && (
+            <div style={{ padding: "6px 14px", background: "rgba(99,102,241,0.08)", borderBottom: "1px solid rgba(99,102,241,0.15)", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 10 }}>✨</span>
+              <p style={{ fontSize: 10.5, color: "#a5b4fc", margin: 0 }}>Cada respuesta se guarda automáticamente en tu <strong>Cuaderno IA</strong>. Al final pide el <strong>Master Brief</strong>.</p>
+            </div>
+          )}
 
           {/* Messages */}
           <div className="cb-scroll" style={{ flex: 1, overflowY: "auto", padding: "12px 12px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
