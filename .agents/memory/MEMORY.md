@@ -1,3 +1,4 @@
+- [3D Web Effects Library](3d-web-effects-library.md) — 12 templates en master-prompt-library.json key=3d_web_effects; 4 repos GitHub analizados; skill en .agents/skills/3d-web-effects/SKILL.md; 5 patrones: canvas-sequence/glb-scroll/clip-path-video/r3f-showcase/gsap-pinned.
 - [Grok Aurora I2V pipeline](grok-i2v-pipeline.md) — I2V only (no T2V); aurora image not available; "done" = success; 22 min timeout; node -e has no XAI_API_KEY; recovery via disk check + stored request_id.
 - [Drizzle sql TEXT[] array fix](drizzle-sql-array-fix.md) — passing JS array directly to sql`` expands as tuple; sql.array() missing; use `\`{${arr.join(",")}}\`` literal instead.
 - [Missing :root CSS vars (white screen)](missing-root-css-vars.md) — design-system.css :root block MUST have dark-mode vars (--ink,--t,--gold,etc.) + Tailwind HSL tokens; if empty, body shows white.
