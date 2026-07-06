@@ -6,7 +6,7 @@ import { enableLongRunning } from "../lib/long-running.js";
 import {
   synthesizeSpeech, listVoices, listAllVoices, cloneVoice, deleteClonedVoice, listClonedVoices,
   transcribeAudio, isolateAudio, generateSoundEffect,
-  listConvAIAgents, createConvAIAgent, getConvAIAgent, deleteConvAIAgent, getConvAISignedUrl, listConvAIConversations,
+  listConvAIAgents, createConvAIAgent, updateConvAIAgent, getConvAIAgent, deleteConvAIAgent, getConvAISignedUrl, listConvAIConversations,
   listPronunciationDictionaries, createPronunciationDictionary, addRulesToPronunciationDictionary,
   removeRulesFromPronunciationDictionary, deletePronunciationDictionary,
   type ElevenModel, type ElevenOutputFormat, type ConvAIAgentConfig, type PronunciationRule,
@@ -461,17 +461,83 @@ router.post("/voice/audio-isolation",
 // ─── CONVAI AGENT AUTO-PROVISIONING ──────────────────────────────────────────
 // In-process cache (reset on restart; backed by DB for persistence)
 const _agentIdCache: Record<string, string> = {};
+let _sevillanoVoiceIdCache: string | null = null;
 
-const ADMIN_AGENT_PROMPT = `Eres ShopyBrain, el asistente de voz de Shopy Crafter para tiendas Shopify.
-Eres un experto en e-commerce, marketing digital, SEO, gestión de inventario, precios y estrategia de ventas.
+// ── Personalidad andaluza compartida (se inyecta en cada prompt) ──────────────
+const ANDALUZ_STYLE = `
+Personalidad y estilo de habla:
+- Habla de forma natural, cercana y cálida, como lo haría un sevillano de verdad.
+- Usa expresiones coloquiales andaluzas: "venga", "ea", "dale que dale", "tío/tía", "macho", "compadre", "mira", "imagínate", "¿qué hay?", "¿cómo andas?", "a ver", "de verdad", "eso es", "perfecto eso".
+- Elide la 'd' intervocálica como en el habla natural andaluza (no exageres, que suene real, no caricatura).
+- Ritmo vivo y conversacional. Frases cortas. Nada de largos párrafos.
+- Si no sabes algo, dilo con naturalidad: "Eso ya no te lo sé decir yo, macho".
+- Nunca suenes a robot ni a servicio de atención al cliente genérico.`;
+
+const ADMIN_AGENT_PROMPT = `Eres ShopyBrain, el asistente de voz de Shopy Crafter.
+Eres un experto en e-commerce, marketing digital, SEO, gestión de inventario, precios y estrategia de ventas en Shopify.
 Ayuda con: análisis de ventas, informes de stock e inventario, estrategia de precios, SEO técnico, campañas publicitarias, y cualquier duda sobre la tienda.
-Habla en español de forma profesional y cercana. Sé conciso pero completo. No inventes datos — si necesitas datos reales dile al usuario que los consulte en el panel.`;
+No inventes datos — si necesitas datos reales dile al usuario que los consulte en el panel.
+${ANDALUZ_STYLE}`;
 
-const CLIENT_AGENT_PROMPT = `Eres el asistente de informes de voz de Shopy Crafter.
-PUEDES ayudar con: consultas sobre ventas, stock, inventario, y resolver dudas sobre la tienda y la plataforma.
-NO PUEDES crear contenido, imágenes, textos publicitarios, campañas ni ningún tipo de material creativo. Si te lo piden, explica amablemente que esa función requiere acceder al panel.
-Si el usuario quiere dejar un mensaje o contactar con el equipo, toma nota del mensaje y dile que el equipo lo atenderá pronto.
-Habla en español de forma profesional y amigable. Sé directo y útil.`;
+const CLIENT_AGENT_PROMPT = `Eres ShopyBrain, el asistente de voz para clientes de Shopy Crafter.
+PUEDES hacer:
+- Consultas sobre ventas, pedidos, stock e inventario de la tienda del cliente.
+- Generar informes de rendimiento: ventas del día/semana/mes, productos más vendidos, niveles de stock.
+- Resolver dudas sobre la tienda y la plataforma Shopy Crafter.
+- Tomar mensajes para el equipo si el cliente quiere contactar con alguien.
+
+NO PUEDES: crear contenido, imágenes, textos publicitarios, campañas ni material creativo de ningún tipo. Si te lo piden, diles amablemente que eso lo hacen desde el panel de administración.
+${ANDALUZ_STYLE}`;
+
+const LANDING_AGENT_PROMPT = `Eres ShopyBrain, el asistente de voz de la página web de Shopy Crafter.
+Tu misión es dar información sobre Shopy Crafter, explicar cómo funciona la plataforma, resolver dudas sobre precios y planes, y animar al visitante a solicitar acceso o hablar con el equipo.
+
+PUEDES hacer:
+- Explicar qué es Shopy Crafter y cómo ayuda a las tiendas Shopify.
+- Hablar de los planes y precios disponibles.
+- Responder preguntas generales sobre e-commerce y Shopify.
+- Tomar el nombre, email o mensaje del visitante para que el equipo le contacte.
+
+NO PUEDES: acceder a datos de ninguna tienda, generar contenido, crear campañas, ni hacer nada que requiera estar logueado. Si te piden algo así, explícales que eso lo tienen dentro de la plataforma una vez que son clientes.
+${ANDALUZ_STYLE}`;
+
+// ── Helper: encuentra la voz clonada del sevillano en ElevenLabs ──────────────
+async function resolveSevillanoVoiceId(): Promise<string | null> {
+  // 1. Override manual vía env var
+  if (process.env.ELEVEN_SEVILLANO_VOICE_ID?.trim()) {
+    return process.env.ELEVEN_SEVILLANO_VOICE_ID.trim();
+  }
+  // 2. In-memory cache
+  if (_sevillanoVoiceIdCache) return _sevillanoVoiceIdCache;
+  try {
+    const voices = await listVoices();
+    const all = [...voices];
+    // Busca voz clonada con sevillano/sevilla/andaluz en nombre o etiquetas
+    const match = all.find(v =>
+      /sevillan|sevilla|andaluz|andalú|granaín|andaluci/i.test(v.name) ||
+      Object.values(v.labels ?? {}).some(l => /sevillan|sevilla|andaluz/i.test(String(l)))
+    );
+    if (match) {
+      logger.info({ voiceId: match.voice_id, name: match.name }, "ConvAI: voz sevillana encontrada");
+      _sevillanoVoiceIdCache = match.voice_id;
+      return match.voice_id;
+    }
+    // Fallback: primera voz clonada en español
+    const cloned = all.find(v =>
+      v.category === "cloned" &&
+      (Object.values(v.labels ?? {}).some(l => /spanish|español|castella/i.test(String(l))) ||
+       /español|spain|castilla/i.test(v.name))
+    );
+    if (cloned) {
+      logger.info({ voiceId: cloned.voice_id, name: cloned.name }, "ConvAI: usando primera voz clonada española");
+      _sevillanoVoiceIdCache = cloned.voice_id;
+      return cloned.voice_id;
+    }
+  } catch (e) {
+    logger.warn({ err: (e as Error)?.message }, "ConvAI: no se pudo resolver voz sevillana");
+  }
+  return null;
+}
 
 async function ensurePlatformSettingsKV(): Promise<void> {
   try {
@@ -485,13 +551,58 @@ async function ensurePlatformSettingsKV(): Promise<void> {
   } catch { /* already exists */ }
 }
 
-async function getOrCreateConvAIAgent(type: "admin" | "client"): Promise<string> {
+type AgentType = "admin" | "client" | "landing";
+
+function agentConfigFor(type: AgentType, voiceId: string | null): ConvAIAgentConfig {
+  const names: Record<AgentType, string> = {
+    admin:   "ShopyBrain — Asistente Admin",
+    client:  "ShopyBrain — Informes Cliente",
+    landing: "ShopyBrain — Asesor Web",
+  };
+  const first: Record<AgentType, string> = {
+    admin:   "¡Buenas! Soy ShopyBrain. ¿En qué te puedo echar una mano hoy con tu tienda?",
+    client:  "¡Ea, hola! Soy ShopyBrain. Cuéntame, ¿qué informe o consulta necesitas de tu tienda?",
+    landing: "¡Hola! Soy ShopyBrain, el asistente de Shopy Crafter. ¿Tienes alguna pregunta sobre la plataforma o quieres saber cómo podemos ayudarte con tu tienda Shopify?",
+  };
+  const prompts: Record<AgentType, string> = {
+    admin:   ADMIN_AGENT_PROMPT,
+    client:  CLIENT_AGENT_PROMPT,
+    landing: LANDING_AGENT_PROMPT,
+  };
+
+  // Configuración de voz andaluza: rápida, expresiva, muy fiel a la voz original
+  type TtsConfig = NonNullable<NonNullable<ConvAIAgentConfig["conversation_config"]>["tts"]>;
+  const tts: TtsConfig = {
+    ...(voiceId ? { voice_id: voiceId } : {}),
+    voice_settings: {
+      stability: 0.18,        // Baja → más expresiva, menos robótica
+      similarity_boost: 0.92, // Alta → muy fiel al clon original
+      style: 0.82,            // Alta → acento marcado y expresivo
+      use_speaker_boost: true,
+    },
+    speed: 1.2,               // 20% más rápido que la velocidad por defecto
+  };
+
+  return {
+    name: names[type],
+    conversation_config: {
+      agent: {
+        prompt: { prompt: prompts[type] },
+        first_message: first[type],
+        language: "es",
+      },
+      tts,
+    },
+  };
+}
+
+async function getOrCreateConvAIAgent(type: AgentType): Promise<string> {
   const cacheKey = `convai_${type}_agent_id`;
 
   // 1. In-memory cache
   if (_agentIdCache[cacheKey]) return _agentIdCache[cacheKey];
 
-  // 2. Env var (admin only legacy support)
+  // 2. Env var legacy (admin only)
   if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
     _agentIdCache[cacheKey] = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
     return _agentIdCache[cacheKey];
@@ -512,27 +623,14 @@ async function getOrCreateConvAIAgent(type: "admin" | "client"): Promise<string>
     logger.warn({ err: (e as Error)?.message }, "Could not query DB for ConvAI agent ID");
   }
 
-  // 4. Auto-create a new agent via ElevenLabs API
+  // 4. Auto-create — resolve sevillano voice first
   logger.info({ type }, "Auto-creating ConvAI agent in ElevenLabs...");
-  const agentName = type === "admin" ? "ShopyBrain IA — Asistente" : "ShopyBrain IA — Informes";
-  const firstMessage = type === "admin"
-    ? "Hola, soy ShopyBrain. ¿En qué puedo ayudarte hoy con tu tienda Shopify?"
-    : "Hola, soy el asistente de informes de Shopy Crafter. Puedo consultar ventas, stock e inventario, o tomar nota de tu mensaje. ¿Qué necesitas?";
-
-  const agent = await createConvAIAgent({
-    name: agentName,
-    conversation_config: {
-      agent: {
-        prompt: { prompt: type === "admin" ? ADMIN_AGENT_PROMPT : CLIENT_AGENT_PROMPT },
-        first_message: firstMessage,
-        language: "es",
-      },
-    },
-  });
-
+  const voiceId = await resolveSevillanoVoiceId();
+  const config = agentConfigFor(type, voiceId);
+  const agent = await createConvAIAgent(config);
   const newId = agent.agent_id;
 
-  // Save to DB for persistence across restarts
+  // Persist to DB
   try {
     await db.execute(sql`
       INSERT INTO platform_settings_kv (key, value, updated_at)
@@ -544,7 +642,7 @@ async function getOrCreateConvAIAgent(type: "admin" | "client"): Promise<string>
   }
 
   _agentIdCache[cacheKey] = newId;
-  logger.info({ type, agentId: newId }, "ConvAI agent auto-created");
+  logger.info({ type, agentId: newId, voiceId }, "ConvAI agent auto-created");
   return newId;
 }
 
@@ -604,7 +702,7 @@ router.delete("/voice/convai/agents/:agentId", requireAdmin, async (req, res): P
   }
 });
 
-// ── Admin/Full ConvAI voice call (auto-creates agent if needed) ───────────────
+// ── Admin/Full ConvAI voice call ───────────────────────────────────────────────
 router.get("/voice/convai/call-url", async (req, res): Promise<void> => {
   const userId = (req.session as any)?.userId;
   if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
@@ -618,19 +716,19 @@ router.get("/voice/convai/call-url", async (req, res): Promise<void> => {
   }
 });
 
-// ── Public voice call (no auth) — for landing chatbot visitors ────────────────
+// ── Landing page voice call — solo info, sin acceso a datos ni generación ──────
 router.get("/voice/public-call-url", async (_req, res): Promise<void> => {
   try {
-    const agentId = await getOrCreateConvAIAgent("client");
+    const agentId = await getOrCreateConvAIAgent("landing");
     const signed_url = await getConvAISignedUrl(agentId);
-    res.json({ signed_url, agentId, mode: "public" });
+    res.json({ signed_url, agentId, mode: "landing" });
   } catch (err: any) {
     logger.error({ err: err?.message }, "public-call-url failed");
     res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada pública" });
   }
 });
 
-// ── Client voice call — restricted mode (reports + Q&A, no content creation) ──
+// ── Client voice call — informes + Q&A (clientes autenticados) ────────────────
 router.get("/voice/client-call-url", async (req, res): Promise<void> => {
   const userId = (req.session as any)?.userId;
   if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
@@ -641,6 +739,59 @@ router.get("/voice/client-call-url", async (req, res): Promise<void> => {
   } catch (err: any) {
     logger.error({ err: err?.message }, "client-call-url failed");
     res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada" });
+  }
+});
+
+// ── Reset + re-create ConvAI agents (apply new voice/prompts) ─────────────────
+router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    await ensurePlatformSettingsKV();
+    const types: AgentType[] = ["admin", "client", "landing"];
+    const results: Record<string, string> = {};
+    _sevillanoVoiceIdCache = null; // Force re-resolve voice
+
+    for (const type of types) {
+      const cacheKey = `convai_${type}_agent_id`;
+
+      // Delete old agent if we have its ID cached
+      const oldId = _agentIdCache[cacheKey];
+      if (!oldId) {
+        // Try DB
+        try {
+          const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
+          const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
+          const dbId: string | undefined = rowArr[0]?.value;
+          if (dbId) {
+            try { await deleteConvAIAgent(dbId); } catch { /* ignore if already gone */ }
+          }
+        } catch { /* ignore */ }
+      } else {
+        try { await deleteConvAIAgent(oldId); } catch { /* ignore if already gone */ }
+        delete _agentIdCache[cacheKey];
+      }
+
+      // Clear DB entry so getOrCreateConvAIAgent recreates
+      await db.execute(sql`DELETE FROM platform_settings_kv WHERE key = ${cacheKey}`);
+
+      // Re-create with latest config
+      const voiceId = await resolveSevillanoVoiceId();
+      const config = agentConfigFor(type, voiceId);
+      const agent = await createConvAIAgent(config);
+      const newId = agent.agent_id;
+      _agentIdCache[cacheKey] = newId;
+      await db.execute(sql`
+        INSERT INTO platform_settings_kv (key, value, updated_at)
+        VALUES (${cacheKey}, ${newId}, NOW())
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+      `);
+      results[type] = newId;
+      logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
+    }
+
+    res.json({ success: true, agents: results });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "reset-agents failed");
+    res.status(500).json({ error: err?.message || "Error reseteando agentes" });
   }
 });
 

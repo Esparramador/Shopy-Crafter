@@ -496,6 +496,13 @@ export interface ConvAIAgent {
   conversation_config?: Record<string, unknown>;
 }
 
+export interface ConvAIVoiceSettings {
+  stability?: number;
+  similarity_boost?: number;
+  style?: number;
+  use_speaker_boost?: boolean;
+}
+
 export interface ConvAIAgentConfig {
   name: string;
   conversation_config?: {
@@ -504,7 +511,12 @@ export interface ConvAIAgentConfig {
       first_message?: string;
       language?: string;
     };
-    tts?: { voice_id?: string; model_id?: string };
+    tts?: {
+      voice_id?: string;
+      model_id?: string;
+      voice_settings?: ConvAIVoiceSettings;
+      speed?: number;
+    };
   };
   platform_settings?: Record<string, unknown>;
 }
@@ -556,6 +568,24 @@ export async function getConvAIAgent(agentId: string): Promise<ConvAIAgent> {
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     throw new Error(`ElevenLabs ConvAI get ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  return await res.json() as ConvAIAgent;
+}
+
+/**
+ * Update (patch) an existing ConvAI agent.
+ */
+export async function updateConvAIAgent(agentId: string, config: Partial<ConvAIAgentConfig>): Promise<ConvAIAgent> {
+  const apiKey = getApiKey();
+  const res = await fetch(`${ELEVEN_BASE}/convai/agents/${encodeURIComponent(agentId)}`, {
+    method: "PATCH",
+    headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`ElevenLabs ConvAI update ${res.status}: ${errText.slice(0, 300)}`);
   }
   return await res.json() as ConvAIAgent;
 }
