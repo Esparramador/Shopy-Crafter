@@ -131,11 +131,13 @@ router.use(stripeConnectRouter);
 router.use(stripeMasterRouter);
 router.use(chatGroupsRouter);
 
-// fs-pro and visme: every route has its own per-route auth (requireAdmin or requireAuth)
+// fs-pro, visme, youtube: every route has its own per-route auth (requireAdmin or requireAuth)
 // so they must be mounted BEFORE the global requireAdmin gate below.
+// YouTube callback is deliberately public (verified via state token, no session cookie from Google redirect).
 router.use(fsProRouter);
 router.use(vismeRouter);
 router.use(promptExecRouter);
+router.use(youtubeRouter);
 
 router.use(requireAdmin, meshyRouter);
 router.use(requireAdmin, stitchRouter);
@@ -199,7 +201,6 @@ router.use(pluginsRouter);
 router.use(hyperframesRouter);
 router.use(studioRouter);
 router.use(apiUsageStatsRouter);
-router.use(youtubeRouter);
 router.use(calendarRouter);
 router.use(viralRouter);
 router.use(cybersecRouter);

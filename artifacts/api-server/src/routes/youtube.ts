@@ -177,8 +177,8 @@ async function ytSearch(q: string, maxResults: number, oauthToken?: string | nul
   return null;
 }
 
-// ─── PUBLIC: YouTube Search ───────────────────────────────────────────────────
-router.get("/youtube/search", async (req, res) => {
+// ─── ADMIN: YouTube Search ───────────────────────────────────────────────────
+router.get("/youtube/search", requireAdmin, async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
     const maxResults = Math.min(Number(req.query.max) || 5, 10);
