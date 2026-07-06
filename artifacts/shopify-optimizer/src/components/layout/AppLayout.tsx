@@ -24,6 +24,14 @@ const DEFAULT_MODULE_NAV = [
   { id: "meshy",       label: "Meshy Characters", icon: "🧊✨" },
 ];
 
+const STRIPE_MODULE_NAV = [
+  { id: "stripe-hub",     label: "Stripe Hub",      icon: "💳" },
+  { id: "audit",          label: "Auditoría Web",   icon: "📊" },
+  { id: "vault",          label: "Repositorio",     icon: "🗄️" },
+  { id: "fusion-studio",  label: "Studio Foto",     icon: "🧬" },
+  { id: "ad-studio",      label: "Studio Anuncios", icon: "📺" },
+];
+
 const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Centro Shopy Crafter", icon: "🧠", href: "/admin/shopybrain" },
   { label: "Centro de Comando", icon: "⚡", href: "/admin/command-center" },
@@ -263,7 +271,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   // CMS es la fuente de verdad; merge garantiza que items nuevos del código aparezcan
-  const moduleNav    = mergeById(cmsNav?.modules ?? [], DEFAULT_MODULE_NAV);
+  const activePlatformEarly: string = (activeProject as any)?.platformType ?? "shopify";
+  const baseModuleNav = activePlatformEarly === "stripe" ? STRIPE_MODULE_NAV : DEFAULT_MODULE_NAV;
+  const moduleNav    = mergeById(cmsNav?.modules ?? [], baseModuleNav);
   const shopybrainNav = mergeByHref(cmsNav?.shopybrain ?? [], DEFAULT_SHOPYBRAIN_NAV);
   const adminNav: any[] = mergeByHref(cmsNav?.admin ?? [], DEFAULT_ADMIN_NAV);
   const firstProjectId: number | null = projects?.[0]?.id ?? null;

@@ -1,6 +1,7 @@
 import { useRef, useEffect, lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { useNotifications, useCalendarReminders } from "@/hooks/useNotifications";
+import { useListProjects } from "@workspace/api-client-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -112,6 +113,7 @@ const DeckBuilder = lazy(() => import("@/pages/admin/DeckBuilder"));
 const TiendaAdmin = lazy(() => import("@/pages/admin/TiendaAdmin"));
 const StripeManager = lazy(() => import("@/pages/admin/StripeManager"));
 const StripeMasterHub = lazy(() => import("@/pages/admin/StripeMasterHub"));
+const StripeProjectHub = lazy(() => import("@/pages/projects/StripeProjectHub"));
 const ApiUsage = lazy(() => import("@/pages/admin/ApiUsage"));
 const AICatalog = lazy(() => import("@/pages/admin/AICatalog"));
 const ApiKeysManager = lazy(() => import("@/pages/admin/ApiKeysManager"));
@@ -314,6 +316,14 @@ function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
+function SmartProjectRedirect({ id }: { id: string }) {
+  const { data: projects } = useListProjects();
+  if (!projects) return <PageLoader />;
+  const project = projects.find((p: any) => p.id === parseInt(id, 10));
+  const dest = project?.platformType === "stripe" ? "stripe-hub" : "audit";
+  return <Redirect to={`/projects/${id}/${dest}`} />;
+}
+
 function Router() {
   return (
     <>
@@ -502,12 +512,12 @@ function Router() {
           <RequireAdmin><AdminWrapper><AppLayout><S><ApiUsage /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
-        {/* Base project route → audit */}
+        {/* Base project route → smart redirect by platform */}
         <Route path="/project/:id">
-          {(params) => <Redirect to={`/projects/${params.id}/audit`} />}
+          {(params) => <SmartProjectRedirect id={params.id} />}
         </Route>
         <Route path="/projects/:id">
-          {(params) => <Redirect to={`/projects/${params.id}/audit`} />}
+          {(params) => <SmartProjectRedirect id={params.id} />}
         </Route>
 
         <Route path="/projects/:id/audit">
@@ -584,6 +594,9 @@ function Router() {
         </Route>
         <Route path="/projects/:id/meshy">
           <RequireAdmin><AdminWrapper><AppLayout><S><MeshyStudio /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/projects/:id/stripe-hub">
+          <RequireAdmin><AdminWrapper><AppLayout><S><StripeProjectHub /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/web-designer">
           <RequireAdmin><AdminWrapper><AppLayout><S><WebDesigner /></S></AppLayout></AdminWrapper></RequireAdmin>
