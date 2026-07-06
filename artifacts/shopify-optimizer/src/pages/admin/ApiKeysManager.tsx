@@ -58,7 +58,7 @@ export default function ApiKeysManager() {
   const [addForm, setAddForm] = useState({ provider: "", key_name: "", key_value: "", description: "", category: "ai" });
   const [saving, setSaving] = useState(false);
   const [showValue, setShowValue] = useState<Record<string, boolean>>({});
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | null>(null); // "provider:key_name" — unique even when id is null
   const [editValue, setEditValue] = useState("");
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({ ai: true, media: true, audio: true, design: true, social: true, payments: true, other: true });
@@ -318,9 +318,10 @@ export default function ApiKeysManager() {
                             {" · "}{key.description}
                           </div>
                           {/* Masked value or edit */}
-                          {editId === key.id ? (
+                          {editId === `${key.provider}:${key.key_name}` ? (
                             <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                               <input type="password" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="Nueva API key..."
+                                autoFocus
                                 style={{ flex: 1, padding: "7px 10px", borderRadius: 7, background: "var(--ink3)", border: "1px solid var(--jade)", color: "var(--t)", fontSize: 12 }} />
                               <button onClick={() => saveEdit(key)} disabled={saving} style={{ padding: "7px 14px", background: "var(--jade)", border: "none", borderRadius: 7, color: "#000", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Guardar</button>
                               <button onClick={() => { setEditId(null); setEditValue(""); }} style={{ padding: "7px 12px", background: "var(--ink3)", border: "none", borderRadius: 7, color: "var(--t3)", fontSize: 12, cursor: "pointer" }}>✕</button>
@@ -342,7 +343,7 @@ export default function ApiKeysManager() {
                               <ExternalLink size={11} /> Docs
                             </a>
                           )}
-                          <button onClick={() => { setEditId(key.id); setEditValue(""); }} style={{ padding: "6px 12px", borderRadius: 7, background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.3)", color: "var(--gold)", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                          <button onClick={() => { setEditId(`${key.provider}:${key.key_name}`); setEditValue(""); }} style={{ padding: "6px 12px", borderRadius: 7, background: "rgba(200,168,75,0.1)", border: "1px solid rgba(200,168,75,0.3)", color: "var(--gold)", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                             <Key size={11} /> {key.source === "missing" ? "Añadir" : "Editar"}
                           </button>
                           {key.id && (
