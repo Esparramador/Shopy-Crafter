@@ -3164,6 +3164,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     overflow-x: hidden !important;
     max-width: 100vw !important;
   }
+  /* Cancel the margin-top added by ≤768px CSS — first-section padding handles the nav offset */
+  .fp-container { margin-top: 0 !important; }
+  /* Compact nav in landscape */
+  .l-nav { height: 48px !important; padding: 0 16px !important; }
+  .l-nav-gem { width: 24px !important; height: 24px !important; font-size: 12px !important; }
+  .l-nav-logo-text { font-size: 15px !important; }
   .l-root {
     overflow-y: scroll !important;
     overflow-x: hidden !important;

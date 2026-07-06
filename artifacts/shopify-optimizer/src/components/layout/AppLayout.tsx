@@ -84,6 +84,7 @@ const DEFAULT_ADMIN_NAV = [
   { label: "SEO Engine", icon: "🔍", href: "/seo" },
   { label: "Repositorio", icon: "🗄️", href: "/vault" },
   { label: "── CRM & ADMIN ──", icon: "", href: "#", divider: true },
+  { label: "Panel Cliente", icon: "👤", href: "/client" },
   { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
   { label: "Mensajes Clientes", icon: "💬", href: "/admin/messages" },
   { label: "Chat Grupal", icon: "👥", href: "/admin/group-chat" },
@@ -672,7 +673,6 @@ export function AppLayout({ children }: AppLayoutProps) {
               🌐 <span>Ver Landing</span>
             </a>
             <a
-              className="tb-hide-sm"
               href={`${BASE_URL}/client`}
               style={{
                 display: "flex", alignItems: "center", gap: 5,

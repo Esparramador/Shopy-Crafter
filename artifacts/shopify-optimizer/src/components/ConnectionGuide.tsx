@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Copy, Check, ExternalLink, ShoppingBag, Globe, Store, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, Copy, Check, ExternalLink, ShoppingBag, Globe, Store, Info, CreditCard } from "lucide-react";
 import { useCmsSection } from "@/contexts/CmsContext";
 
 type PlatformType = "shopify" | "woocommerce" | "prestashop" | "universal" | "stripe";
@@ -366,12 +366,43 @@ function getUniversalSteps(t: (k: string, fb: string) => string): StepData[] {
   ];
 }
 
+function getStripeSteps(t: (k: string, fb: string) => string): StepData[] {
+  return [
+    {
+      title: t("stripe.step1.title", "Accede a tu cuenta Stripe"),
+      description: t("stripe.step1.description", "Ve a dashboard.stripe.com e inicia sesión. Si no tienes cuenta, créala en stripe.com/register. Stripe es la plataforma de pagos que usaremos para gestionar cobros, suscripciones y facturación de tu negocio."),
+      validation: t("stripe.step1.validation", "Sesión iniciada en Stripe Dashboard"),
+    },
+    {
+      title: t("stripe.step2.title", "Obtén tus claves API"),
+      description: t("stripe.step2.description", "En el Dashboard de Stripe, ve a Desarrolladores → Claves de API. Encontrarás dos claves: la Clave publicable (pk_live_... o pk_test_...) y la Clave secreta (sk_live_... o sk_test_...). Para producción usa las claves \"live\"; para pruebas usa las \"test\". Copia la Clave secreta."),
+      validation: t("stripe.step2.validation", "Clave secreta copiada (sk_live_... o sk_test_...)"),
+      code: "sk_live_XXXXXXXXXXXXXXXXXXXX",
+    },
+    {
+      title: t("stripe.step3.title", "Añade la tienda en Shopy Crafter"),
+      description: t("stripe.step3.description", "En Shopy Crafter, haz clic en \"Nueva tienda\" y selecciona la plataforma Stripe. Introduce el nombre de tu negocio en el campo correspondiente y pega tu Clave secreta de Stripe en el campo \"Clave secreta\". La clave debe empezar por sk_live_ o sk_test_."),
+      validation: t("stripe.step3.validation", "Nombre del negocio y clave secreta introducidos"),
+    },
+    {
+      title: t("stripe.step4.title", "Verifica la conexión"),
+      description: t("stripe.step4.description", "Haz clic en \"Verificar conexión\" para que Shopy Crafter confirme que las credenciales son correctas. Una vez verificado, tendrás acceso a: balance y métricas en tiempo real, gestión de transacciones y clientes, suscripciones y facturas, y el panel Stripe Master Hub con analíticas avanzadas."),
+      validation: t("stripe.step4.validation", "Conexión verificada — estado: Activo"),
+    },
+    {
+      title: t("stripe.step5.title", "Accede al Stripe Manager"),
+      description: t("stripe.step5.description", "Una vez conectado, ve a Admin → Stripe Manager para gestionar todo desde Shopy Crafter: balance disponible y pendiente, transacciones, clientes, suscripciones, productos, facturas y pagos. También puedes acceder a Stripe Master Hub para analíticas globales de todas tus cuentas."),
+      validation: t("stripe.step5.validation", "Stripe Manager accesible con datos en tiempo real"),
+    },
+  ];
+}
+
 const PLATFORM_CONFIG: Record<PlatformType, { label: string; color: string; icon: any; getSteps: (t: (k: string, fb: string) => string) => StepData[] }> = {
   shopify: { label: "Shopify", color: "#95bf47", icon: ShoppingBag, getSteps: getShopifySteps },
   woocommerce: { label: "WooCommerce", color: "#7f54b3", icon: Globe, getSteps: getWooCommerceSteps },
   prestashop: { label: "PrestaShop", color: "#df0067", icon: Store, getSteps: getPrestaShopSteps },
   universal: { label: "Auditoría Universal", color: "#888", icon: Globe, getSteps: getUniversalSteps },
-  stripe: { label: "Stripe", color: "#635bff", icon: Globe, getSteps: getUniversalSteps },
+  stripe: { label: "Stripe", color: "#635bff", icon: CreditCard, getSteps: getStripeSteps },
 };
 
 interface ConnectionGuideProps {
@@ -507,6 +538,7 @@ export function ConnectionGuideTabs() {
     { key: "woocommerce", label: "WooCommerce", color: "#7f54b3", icon: Globe },
     { key: "prestashop", label: "PrestaShop", color: "#df0067", icon: Store },
     { key: "universal", label: "Auditoría", color: "#888", icon: Globe },
+    { key: "stripe", label: "Stripe", color: "#635bff", icon: CreditCard },
   ];
 
   return (

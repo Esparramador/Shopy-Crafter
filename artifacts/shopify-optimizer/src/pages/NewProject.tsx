@@ -204,8 +204,8 @@ export default function NewProject() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData.shopDomain ? { websiteUrl: formData.shopDomain } : {}),
         })
-          .then(() => setLocation(`/projects/${data.id}`))
-          .catch(() => setLocation(`/projects/${data.id}`))
+          .then(() => setLocation(`/projects/${data.id}/settings`))
+          .catch(() => setLocation(`/projects/${data.id}/settings`))
           .finally(() => setResearching(false));
       } else if (isUniversal && formData.shopDomain) {
         setLocation(`/projects/${data.id}/audit`);
