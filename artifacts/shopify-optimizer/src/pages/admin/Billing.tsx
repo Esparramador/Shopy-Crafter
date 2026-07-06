@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CreditCard, Check, Copy, AlertTriangle, RefreshCcw, Plus, Trash2, Pencil, X, Settings, Users } from "lucide-react";
 import { apiGet, apiPost, apiPut, apiDelete, ApiError } from "@/lib/api";
@@ -75,6 +75,42 @@ export default function Billing() {
   const [activeTab, setActiveTab] = useState<"subscription" | "affiliate" | "invoices" | "planes" | "config">("subscription");
   const [copied, setCopied] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ type: "success" | "manual" | "redirect"; message: string; contactEmail?: string; checkoutUrl?: string } | null>(null);
+  const [stripeVerifying, setStripeVerifying] = useState(false);
+
+  // ── Handle Stripe Checkout redirect back ──────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const stripeParam = params.get("stripe");
+    const sessionId = params.get("session_id");
+
+    if (stripeParam === "success" && sessionId) {
+      // Clean URL immediately so a refresh doesn't re-trigger
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+
+      setStripeVerifying(true);
+      fetch(`${(import.meta.env.BASE_URL ?? "").replace(/\/$/, "")}/api/billing/stripe/verify?session_id=${encodeURIComponent(sessionId)}`, {
+        credentials: "include",
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            setUpgradeResult({ type: "success", message: d.message ?? "¡Plan activado correctamente!" });
+            qc.invalidateQueries({ queryKey: billingKeys.subscription });
+            qc.invalidateQueries({ queryKey: billingKeys.invoices });
+          } else {
+            setUpgradeResult({ type: "manual", message: `⚠️ ${d.error ?? "No se pudo verificar el pago. Contacta con soporte."}` });
+          }
+        })
+        .catch(() => {
+          setUpgradeResult({ type: "manual", message: "⚠️ Error al verificar el pago. Contacta con soporte si ya has cobrado." });
+        })
+        .finally(() => setStripeVerifying(false));
+    } else if (stripeParam === "cancelled") {
+      window.history.replaceState({}, "", window.location.pathname);
+      setUpgradeResult({ type: "manual", message: "El pago fue cancelado. Puedes intentarlo de nuevo cuando quieras." });
+    }
+  }, []);
 
   const sub = useQuery({
     queryKey: billingKeys.subscription,
@@ -211,6 +247,20 @@ export default function Billing() {
             : upgrade.error instanceof Error ? upgrade.error.message
             : "Error actualizando plan."}
           </p>
+        </div>
+      )}
+
+      {stripeVerifying && (
+        <div className="glass-card" style={{
+          padding: "14px 16px", marginBottom: 16,
+          borderColor: "var(--gold)", background: "rgba(200,168,75,0.08)",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontSize: 20 }}>💳</span>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t)" }}>Verificando pago con Stripe…</p>
+            <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 2 }}>Activando tu suscripción, espera un momento.</p>
+          </div>
         </div>
       )}
 

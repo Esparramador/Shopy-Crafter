@@ -52,7 +52,9 @@ const PROVIDER_CATALOG = [
   { provider: "meshy", key_name: "MESHY_API_KEY", label: "Meshy AI", icon: "🟣", category: "media", description: "3D con animaciones — 134 presets de movimiento", docs: "https://app.meshy.ai" },
   { provider: "stitch", key_name: "STITCH_API_KEY", label: "Google Stitch", icon: "🎨", category: "design", description: "MCP para diseño UI/UX con IA", docs: "https://stitch.googleapis.com" },
   { provider: "youtube", key_name: "YOUTUBE_CLIENT_ID", label: "YouTube OAuth", icon: "▶️", category: "social", description: "Subir vídeos, gestionar canal, estadísticas", docs: "https://console.cloud.google.com" },
-  { provider: "stripe", key_name: "STRIPE_SECRET_KEY", label: "Stripe", icon: "💳", category: "payments", description: "Cobros a clientes, planes de suscripción", docs: "https://dashboard.stripe.com/apikeys" },
+  { provider: "stripe", key_name: "STRIPE_SECRET_KEY", label: "Stripe — Clave Secreta (sk_...)", icon: "💳", category: "payments", description: "Cobros SaaS via Stripe Checkout — usa sk_test_ para pruebas, sk_live_ en producción", docs: "https://dashboard.stripe.com/apikeys" },
+  { provider: "stripe", key_name: "STRIPE_PUBLISHABLE_KEY", label: "Stripe — Clave Publicable (pk_...)", icon: "💳", category: "payments", description: "Clave pública Stripe (pk_test_ o pk_live_) para el frontend", docs: "https://dashboard.stripe.com/apikeys" },
+  { provider: "stripe", key_name: "STRIPE_WEBHOOK_SECRET", label: "Stripe — Webhook Secret (whsec_...)", icon: "🔔", category: "payments", description: "Firma de webhooks (Stripe Dashboard → Webhooks → Signing secret). Activa activación automática tras pago.", docs: "https://dashboard.stripe.com/webhooks" },
   { provider: "openai", key_name: "OPENAI_API_KEY", label: "OpenAI", icon: "🤖", category: "ai", description: "GPT-4o, gpt-image-2, whisper, embeddings", docs: "https://platform.openai.com/api-keys" },
 ];
 

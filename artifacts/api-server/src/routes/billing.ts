@@ -699,6 +699,131 @@ router.post("/billing/admin/assign-user-plan", requireAdmin, async (req, res): P
   }
 });
 
+// ── GET /billing/stripe/verify?session_id=... ────────────────────────────────
+// Called by the frontend after Stripe redirects back with ?stripe=success&session_id=...
+// Verifies the payment was successful and activates the subscription.
+router.get("/billing/stripe/verify", async (req, res): Promise<void> => {
+  try {
+    const userId = (req.session as any).userId;
+    if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+    const { session_id } = req.query as { session_id?: string };
+    if (!session_id) { res.status(400).json({ error: "session_id requerido" }); return; }
+
+    const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
+    if (!STRIPE_SECRET) { res.status(400).json({ error: "Stripe no configurado en esta plataforma" }); return; }
+
+    const stripe = new Stripe(STRIPE_SECRET, { apiVersion: STRIPE_API_VERSION });
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session.payment_status !== "paid") {
+      res.status(402).json({ error: `El pago aún no se ha completado (estado: ${session.payment_status})` }); return;
+    }
+
+    // Extract metadata saved when the session was created
+    const metaUserId = session.metadata?.userId ?? "";
+    const planId = session.metadata?.planId ?? "";
+
+    // Security: ensure the session belongs to this user
+    if (metaUserId && metaUserId !== String(userId)) {
+      res.status(403).json({ error: "Esta sesión no pertenece a tu cuenta" }); return;
+    }
+
+    const plan = PLANS[planId as keyof typeof PLANS];
+    if (!plan) { res.status(400).json({ error: `Plan desconocido: ${planId}` }); return; }
+
+    const periodEnd = new Date();
+    periodEnd.setDate(periodEnd.getDate() + plan.periodDays);
+
+    const updates = {
+      plan: planId,
+      status: "active",
+      storesLimit: plan.storesLimit,
+      imagesIncluded: plan.imagesIncluded,
+      currentPeriodEnd: periodEnd,
+      trialEndsAt: null,
+      cancelAtPeriodEnd: 0,
+    };
+
+    const existing = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, String(userId)));
+    if (existing.length > 0) {
+      await db.update(subscriptionsTable).set(updates).where(eq(subscriptionsTable.userId, String(userId)));
+    } else {
+      await db.insert(subscriptionsTable).values({ userId: String(userId), ...updates });
+    }
+
+    logger.info({ userId, planId, sessionId: session_id }, "✅ Stripe verify: suscripción activada");
+    res.json({ success: true, plan: { ...plan, id: planId }, message: `¡Plan ${plan.name} activado correctamente!` });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Error interno";
+    logger.error({ err: msg }, "billing/stripe/verify error");
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ── POST /billing/stripe/webhook ─────────────────────────────────────────────
+// Stripe sends checkout.session.completed here (configure in Stripe Dashboard).
+// Requires STRIPE_WEBHOOK_SECRET from the Stripe Dashboard → Webhooks section.
+router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
+  const sig = req.headers["stripe-signature"] as string | undefined;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  let event: any;
+  try {
+    if (webhookSecret && sig) {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", { apiVersion: STRIPE_API_VERSION });
+      event = stripe.webhooks.constructEvent((req as any).rawBody ?? req.body, sig, webhookSecret);
+    } else {
+      // No webhook secret configured — accept the payload directly (less secure, OK for dev)
+      event = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    }
+  } catch (err: any) {
+    logger.warn({ err: err.message }, "stripe webhook signature error");
+    res.status(400).json({ error: `Webhook error: ${err.message}` }); return;
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as any;
+    if (session.payment_status !== "paid") { res.json({ received: true }); return; }
+
+    const metaUserId = session.metadata?.userId;
+    const planId = session.metadata?.planId;
+    const plan = PLANS[planId as keyof typeof PLANS];
+
+    if (!metaUserId || !plan) {
+      logger.warn({ metaUserId, planId }, "stripe webhook: missing metadata");
+      res.json({ received: true }); return;
+    }
+
+    const periodEnd = new Date();
+    periodEnd.setDate(periodEnd.getDate() + plan.periodDays);
+    const updates = {
+      plan: planId,
+      status: "active",
+      storesLimit: plan.storesLimit,
+      imagesIncluded: plan.imagesIncluded,
+      currentPeriodEnd: periodEnd,
+      trialEndsAt: null,
+      cancelAtPeriodEnd: 0,
+    };
+
+    try {
+      const existing = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, metaUserId));
+      if (existing.length > 0) {
+        await db.update(subscriptionsTable).set(updates).where(eq(subscriptionsTable.userId, metaUserId));
+      } else {
+        await db.insert(subscriptionsTable).values({ userId: metaUserId, ...updates });
+      }
+      logger.info({ metaUserId, planId, sessionId: session.id }, "✅ Stripe webhook: suscripción activada");
+    } catch (err: any) {
+      logger.error({ err: err.message }, "stripe webhook: DB error");
+      res.status(500).json({ error: "DB error" }); return;
+    }
+  }
+
+  res.json({ received: true });
+});
+
 router.get("/billing/admin/subscriptions", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const subs = await db.select({
