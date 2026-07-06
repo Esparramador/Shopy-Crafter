@@ -18,6 +18,13 @@ const router = Router();
   try {
     await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS instagram_handle TEXT`);
     await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_description TEXT`);
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS tiktok_handle TEXT`);
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS linkedin_url TEXT`);
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS facebook_url TEXT`);
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_url TEXT`);
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS client_contact_name TEXT`);
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS client_contact_email TEXT`);
+    await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS client_contact_phone TEXT`);
   } catch { /* non-fatal */ }
 })();
 
@@ -273,7 +280,8 @@ router.post("/projects", async (req, res): Promise<void> => {
       name, shopDomain, clientId, clientSecret,
       storeNiche, brandTone, targetAudience, storeMarkets,
       replicateApiToken, anthropicApiKey, plan, platformType: rawPlatformType,
-      instagramHandle, projectDescription,
+      instagramHandle, tiktokHandle, linkedinUrl, facebookUrl, youtubeUrl,
+      projectDescription, clientContactName, clientContactEmail, clientContactPhone,
     } = req.body;
   
     const validPlatforms: PlatformType[] = ["shopify", "woocommerce", "prestashop", "wordpress", "universal", "stripe"];
@@ -359,7 +367,14 @@ router.post("/projects", async (req, res): Promise<void> => {
       targetAudience: targetAudience ?? null,
       storeMarkets: storeMarkets ?? null,
       instagramHandle: instagramHandle ?? null,
+      tiktokHandle: tiktokHandle ?? null,
+      linkedinUrl: linkedinUrl ?? null,
+      facebookUrl: facebookUrl ?? null,
+      youtubeUrl: youtubeUrl ?? null,
       projectDescription: projectDescription ?? null,
+      clientContactName: clientContactName ?? null,
+      clientContactEmail: clientContactEmail ?? null,
+      clientContactPhone: clientContactPhone ?? null,
       replicateApiToken: replicateApiToken ? encrypt(replicateApiToken) : null,
       anthropicApiKey: anthropicApiKey ? encrypt(anthropicApiKey) : null,
       plan: finalPlan as "admin" | "starter" | "agency_pro" | "enterprise" | "trial",

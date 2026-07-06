@@ -55,8 +55,17 @@ export default function NewProject() {
     storeMarkets: "",
     plan: "starter",
     instagramHandle: "",
+    tiktokHandle: "",
+    linkedinUrl: "",
+    facebookUrl: "",
+    youtubeUrl: "",
     projectDescription: "",
+    clientContactName: "",
+    clientContactEmail: "",
+    clientContactPhone: "",
   });
+  const [autoResearch, setAutoResearch] = useState(true);
+  const [researching, setResearching] = useState(false);
   const { t } = useCmsSection("labels.newProject");
   const { t: tGuide } = useCmsSection("labels.connectionGuides");
 
@@ -150,7 +159,14 @@ export default function NewProject() {
         plan: formData.plan,
         platformType: platform,
         instagramHandle: formData.instagramHandle || undefined,
+        tiktokHandle: formData.tiktokHandle || undefined,
+        linkedinUrl: formData.linkedinUrl || undefined,
+        facebookUrl: formData.facebookUrl || undefined,
+        youtubeUrl: formData.youtubeUrl || undefined,
         projectDescription: formData.projectDescription || undefined,
+        clientContactName: formData.clientContactName || undefined,
+        clientContactEmail: formData.clientContactEmail || undefined,
+        clientContactPhone: formData.clientContactPhone || undefined,
       };
 
       if (isShopify || isWoo) {
@@ -177,7 +193,21 @@ export default function NewProject() {
         return;
       }
       await queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
-      if (isUniversal && formData.shopDomain) {
+      if (isUniversal && autoResearch) {
+        setResearching(true);
+        const endpoint = formData.shopDomain
+          ? `${API_BASE}/api/projects/${data.id}/brand-dna/extract-full`
+          : `${API_BASE}/api/projects/${data.id}/brand-dna/research-by-name`;
+        fetch(endpoint, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData.shopDomain ? { websiteUrl: formData.shopDomain } : {}),
+        })
+          .then(() => setLocation(`/projects/${data.id}`))
+          .catch(() => setLocation(`/projects/${data.id}`))
+          .finally(() => setResearching(false));
+      } else if (isUniversal && formData.shopDomain) {
         setLocation(`/projects/${data.id}/audit`);
       } else {
         setLocation(`/projects/${data.id}`);
@@ -231,6 +261,36 @@ export default function NewProject() {
     : isShopify
     ? t("credentialsHint", "Credenciales — Shopify Admin → Apps → Desarrollar apps → tu app → Credenciales de la API")
     : "Credenciales de acceso a la API de la plataforma";
+
+  if (researching) {
+    return (
+      <div style={{ maxWidth: 760, margin: "0 auto", paddingTop: 80, textAlign: "center" }}>
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔬</div>
+          <h2 style={{ fontSize: 20, fontFamily: "var(--fb)", color: "var(--t1)", marginBottom: 8 }}>
+            Investigando la marca con IA...
+          </h2>
+          <p style={{ fontSize: 14, color: "var(--t3)", maxWidth: 400, margin: "0 auto 24px" }}>
+            {formData.shopDomain
+              ? "Estamos analizando el sitio web, redes sociales y construyendo el Brand DNA completo."
+              : "Estamos construyendo el perfil de Brand DNA con la información que has proporcionado."}
+          </p>
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 24 }}>
+            {["Nombre", "Sector", "Tono", "Audiencia", "Valores", "Arquetipo"].map((step, i) => (
+              <div key={step} style={{
+                padding: "4px 10px", borderRadius: 20,
+                background: "rgba(91,155,213,0.12)", border: "1px solid rgba(91,155,213,0.3)",
+                fontSize: 11, color: "#5b9bd5", fontFamily: "var(--fb)",
+                animation: `pulse 1.5s ease-in-out ${i * 0.2}s infinite`,
+              }}>{step}</div>
+            ))}
+          </div>
+          <Loader2 size={24} style={{ color: "#5b9bd5", animation: "spin 1s linear infinite", margin: "0 auto" }} />
+        </div>
+        <p style={{ fontSize: 11, color: "var(--t3)" }}>Esto puede tardar entre 20 y 60 segundos. No cierres la página.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 40 }}>
@@ -307,7 +367,7 @@ export default function NewProject() {
           {isUniversal && (
             <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(91,155,213,0.06)", border: "1px solid rgba(91,155,213,0.2)", marginBottom: 18 }}>
               <p style={{ fontSize: 12, color: "#5b9bd5", lineHeight: 1.5 }}>
-                Solo necesitas el nombre. La URL es opcional — si la añades, podremos analizar SEO, rendimiento y accesibilidad. Puedes añadirla más adelante desde el panel del cliente.
+                💡 Cuanta más información añadas, mejor será el análisis de marca. Solo el nombre es obligatorio — todo lo demás es opcional.
               </p>
             </div>
           )}
@@ -350,29 +410,82 @@ export default function NewProject() {
           {isUniversal && (
             <>
               <div style={{ borderTop: "1px solid var(--bdr)", margin: "20px 0" }} />
-              <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
-                Información del cliente (opcional)
+              <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>
+                📱 Redes sociales
               </p>
-              <div className="grid-2" style={{ marginBottom: 0 }}>
+              <div className="grid-2" style={{ marginBottom: 16 }}>
                 <div className="form-group">
-                  <label className="form-label">Instagram del cliente</label>
-                  <input
-                    className="form-input"
-                    value={formData.instagramHandle}
-                    onChange={e => setFormData(prev => ({ ...prev, instagramHandle: e.target.value }))}
-                    placeholder="@handle o URL completa"
-                  />
+                  <label className="form-label">Instagram</label>
+                  <input className="form-input" value={formData.instagramHandle} onChange={handleChange("instagramHandle")} placeholder="@handle o URL completa" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">TikTok</label>
+                  <input className="form-input" value={formData.tiktokHandle} onChange={handleChange("tiktokHandle")} placeholder="@handle" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Facebook</label>
+                  <input className="form-input" value={formData.facebookUrl} onChange={handleChange("facebookUrl")} placeholder="facebook.com/pagina o @handle" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">LinkedIn</label>
+                  <input className="form-input" value={formData.linkedinUrl} onChange={handleChange("linkedinUrl")} placeholder="linkedin.com/company/..." />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">YouTube</label>
+                  <input className="form-input" value={formData.youtubeUrl} onChange={handleChange("youtubeUrl")} placeholder="@canal o youtube.com/c/..." />
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--bdr)", margin: "16px 0" }} />
+              <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>
+                🎯 Identidad de marca
+              </p>
+              <div className="grid-2" style={{ marginBottom: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Sector / Nicho</label>
+                  <input className="form-input" value={formData.storeNiche} onChange={handleChange("storeNiche")} placeholder="Moda streetwear, Clínica dental, SaaS B2B..." />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tono de comunicación</label>
+                  <input className="form-input" value={formData.brandTone} onChange={handleChange("brandTone")} placeholder="Premium y sofisticado, Cercano y divertido..." />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Audiencia objetivo</label>
+                  <input className="form-input" value={formData.targetAudience} onChange={handleChange("targetAudience")} placeholder="Hombres 25-40 aficionados al deporte..." />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Mercados principales</label>
+                  <input className="form-input" value={formData.storeMarkets} onChange={handleChange("storeMarkets")} placeholder="España, México, LATAM..." />
                 </div>
                 <div className="form-group" style={{ gridColumn: "1 / -1" }}>
-                  <label className="form-label">Descripción del encargo</label>
+                  <label className="form-label">Descripción del cliente / encargo</label>
                   <textarea
                     className="form-input"
                     value={formData.projectDescription}
                     onChange={e => setFormData(prev => ({ ...prev, projectDescription: e.target.value }))}
-                    placeholder="Describe qué necesita el cliente: campañas, auditoría, branding, redes sociales..."
+                    placeholder="Describe el negocio del cliente, qué hace, qué necesita: campañas, branding, SEO, redes sociales..."
                     rows={3}
                     style={{ resize: "vertical", fontFamily: "inherit" }}
                   />
+                </div>
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--bdr)", margin: "16px 0" }} />
+              <p style={{ fontSize: 11, fontFamily: "var(--fb)", color: "var(--t3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>
+                👤 Contacto del cliente
+              </p>
+              <div className="grid-2" style={{ marginBottom: 0 }}>
+                <div className="form-group">
+                  <label className="form-label">Nombre de contacto</label>
+                  <input className="form-input" value={formData.clientContactName} onChange={handleChange("clientContactName")} placeholder="María García" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className="form-input" type="email" value={formData.clientContactEmail} onChange={handleChange("clientContactEmail")} placeholder="maria@empresa.com" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Teléfono</label>
+                  <input className="form-input" value={formData.clientContactPhone} onChange={handleChange("clientContactPhone")} placeholder="+34 600 000 000" />
                 </div>
               </div>
             </>
@@ -640,36 +753,70 @@ export default function NewProject() {
           )}
         </div>
 
-        <div className="card" style={{ padding: "14px 24px", marginBottom: 20 }}>
-          <button
-            type="button"
-            onClick={() => setShowBrand(!showBrand)}
-            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--t2)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--fb)", width: "100%", padding: 0 }}
-          >
-            {showBrand ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            Contexto de marca (opcional — mejora los resultados de la IA)
-          </button>
-          {showBrand && (
-            <div className="grid-2" style={{ marginTop: 16 }}>
-              <div className="form-group">
-                <label className="form-label">Nicho del negocio</label>
-                <input className="form-input" value={formData.storeNiche} onChange={handleChange("storeNiche")} placeholder="Moda urbana, Gadgets tech..." />
+        {!isUniversal && (
+          <div className="card" style={{ padding: "14px 24px", marginBottom: 20 }}>
+            <button
+              type="button"
+              onClick={() => setShowBrand(!showBrand)}
+              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--t2)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--fb)", width: "100%", padding: 0 }}
+            >
+              {showBrand ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              Contexto de marca (opcional — mejora los resultados de la IA)
+            </button>
+            {showBrand && (
+              <div className="grid-2" style={{ marginTop: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Nicho del negocio</label>
+                  <input className="form-input" value={formData.storeNiche} onChange={handleChange("storeNiche")} placeholder="Moda urbana, Gadgets tech..." />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tono de marca</label>
+                  <input className="form-input" value={formData.brandTone} onChange={handleChange("brandTone")} placeholder="Premium y sofisticado..." />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Audiencia objetivo</label>
+                  <input className="form-input" value={formData.targetAudience} onChange={handleChange("targetAudience")} placeholder="Hombres 25-40 streetwear" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Mercados principales</label>
+                  <input className="form-input" value={formData.storeMarkets} onChange={handleChange("storeMarkets")} placeholder="España, México, Colombia" />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Tono de marca</label>
-                <input className="form-input" value={formData.brandTone} onChange={handleChange("brandTone")} placeholder="Premium y sofisticado..." />
+            )}
+          </div>
+        )}
+
+        {isUniversal && (
+          <div className="card" style={{ padding: "16px 24px", marginBottom: 20 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+              <div
+                onClick={() => setAutoResearch(v => !v)}
+                style={{
+                  width: 40, height: 22, borderRadius: 11,
+                  background: autoResearch ? "#5b9bd5" : "var(--bdr)",
+                  position: "relative", transition: "background 0.2s", flexShrink: 0, cursor: "pointer",
+                }}
+              >
+                <div style={{
+                  position: "absolute", top: 3, left: autoResearch ? 21 : 3,
+                  width: 16, height: 16, borderRadius: "50%",
+                  background: "white", transition: "left 0.2s",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                }} />
               </div>
-              <div className="form-group">
-                <label className="form-label">Audiencia objetivo</label>
-                <input className="form-input" value={formData.targetAudience} onChange={handleChange("targetAudience")} placeholder="Hombres 25-40 streetwear" />
+              <div>
+                <span style={{ fontSize: 13, fontFamily: "var(--fb)", color: "var(--t1)" }}>
+                  🔬 Investigar marca con IA al guardar
+                </span>
+                <p style={{ fontSize: 11, color: "var(--t3)", margin: "2px 0 0" }}>
+                  {autoResearch
+                    ? (formData.shopDomain ? "Analizará el sitio web + redes sociales para construir el Brand DNA completo (~30-60 seg)" : "Construirá el Brand DNA usando toda la información que hayas completado (~20-30 seg)")
+                    : "Puedes lanzar el análisis manualmente desde el panel del cliente"}
+                </p>
               </div>
-              <div className="form-group">
-                <label className="form-label">Mercados principales</label>
-                <input className="form-input" value={formData.storeMarkets} onChange={handleChange("storeMarkets")} placeholder="España, México, Colombia" />
-              </div>
-            </div>
-          )}
-        </div>
+            </label>
+          </div>
+        )}
 
         {error && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 8, background: "rgba(220,60,60,0.08)", border: "1px solid rgba(220,60,60,0.3)", marginBottom: 16 }}>

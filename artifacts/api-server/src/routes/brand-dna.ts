@@ -520,4 +520,186 @@ router.put("/projects/:projectId/brand-dna", async (req, res): Promise<void> => 
   }
 });
 
+// POST /api/projects/:projectId/brand-dna/research-by-name
+// Brand DNA research using only the info provided (name, niche, socials, description) — no URL required
+router.post("/projects/:projectId/brand-dna/research-by-name", async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    await ensureMigration();
+    const projectId = parseInt(req.params.projectId, 10);
+    if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
+
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const brandName = project.name;
+    const niche = (project as any).storeNiche ?? "";
+    const tone = (project as any).brandTone ?? "";
+    const audience = (project as any).targetAudience ?? "";
+    const markets = (project as any).storeMarkets ?? "";
+    const description = (project as any).projectDescription ?? "";
+    const instagram = (project as any).instagramHandle ?? "";
+    const tiktok = (project as any).tiktokHandle ?? "";
+    const linkedin = (project as any).linkedinUrl ?? "";
+    const facebook = (project as any).facebookUrl ?? "";
+    const youtube = (project as any).youtubeUrl ?? "";
+
+    await db.execute(sql`
+      INSERT INTO brand_dna (project_id, extraction_status)
+      VALUES (${projectId}, 'extracting')
+      ON CONFLICT (project_id) DO UPDATE SET extraction_status = 'extracting'
+    `).catch(() => {});
+
+    const contextBlock = [
+      `NOMBRE DE LA MARCA: ${brandName}`,
+      niche && `SECTOR/NICHO: ${niche}`,
+      tone && `TONO DE MARCA (indicado por el cliente): ${tone}`,
+      audience && `AUDIENCIA OBJETIVO: ${audience}`,
+      markets && `MERCADOS: ${markets}`,
+      description && `DESCRIPCIÓN DEL PROYECTO/ENCARGO: ${description}`,
+      "",
+      "REDES SOCIALES:",
+      instagram && `Instagram: ${instagram}`,
+      tiktok && `TikTok: ${tiktok}`,
+      linkedin && `LinkedIn: ${linkedin}`,
+      facebook && `Facebook: ${facebook}`,
+      youtube && `YouTube: ${youtube}`,
+    ].filter(Boolean).join("\n");
+
+    const prompt = `Eres un experto mundial en branding estratégico e identidad de marca. Tu misión es construir el Brand DNA más completo posible para la marca "${brandName}" usando la información proporcionada y tu conocimiento.
+
+INFORMACIÓN PROPORCIONADA POR EL CLIENTE:
+${contextBlock}
+
+INSTRUCCIONES:
+- Usa los datos proporcionados como base y enriquécelos con inferencias estratégicas coherentes.
+- Si el cliente indicó un tono, úsalo. Si indicó nicho, especifícalo al máximo.
+- Para campos sin datos explícitos, infiere de forma coherente con el nombre, sector y contexto.
+- Los social handles detectados deben usarse en digitalPresence.socialHandles.
+- dataQuality debe ser "inferred" ya que no hay datos de scraping web real.
+- confidenceScore: 0.65 (buena inferencia sin web scraping).
+- Devuelve SOLO JSON válido con la misma estructura que se describe a continuación.
+
+${BRAND_DNA_EXTRACTION_PROMPT(contextBlock, brandName, "")}`;
+
+    interface DnaResult extends FullBrandDna {}
+
+    const profile = await askClaudeJsonWithBrain<DnaResult>(
+      projectId,
+      prompt,
+      `${SHOPIFY_EXPERT_SYSTEM} Eres experto en identidad de marca y branding estratégico. Construyes perfiles de Brand DNA completos y estratégicamente coherentes basándote en el contexto del cliente. Siempre devuelves JSON válido sin markdown.`,
+      "brand_analysis",
+      undefined,
+      8000,
+      120_000,
+    );
+
+    const colors = profile.visualIdentity?.primaryColors ?? [];
+    const secondaryColors = profile.visualIdentity?.secondaryColors ?? [];
+    const allColors = [...colors, ...secondaryColors];
+    const socialHandles: string[] = [];
+    if (instagram) socialHandles.push(`instagram:${instagram}`);
+    if (tiktok) socialHandles.push(`tiktok:${tiktok}`);
+    if (linkedin) socialHandles.push(`linkedin:${linkedin}`);
+    if (facebook) socialHandles.push(`facebook:${facebook}`);
+    if (youtube) socialHandles.push(`youtube:${youtube}`);
+    (profile.digitalPresence?.socialHandles ?? []).forEach(h => {
+      const key = `${h.platform}:${h.handle}`;
+      if (!socialHandles.includes(key)) socialHandles.push(key);
+    });
+    const services = (profile.services ?? []).map(s => s.name);
+    const profileJson = JSON.stringify(profile);
+
+    const existing = await db.execute(sql`SELECT id FROM brand_dna WHERE project_id = ${projectId} LIMIT 1`);
+
+    if (existing.rows.length > 0) {
+      await db.execute(sql`
+        UPDATE brand_dna SET
+          primary_colors = ${allColors}::text[],
+          typography_style = ${profile.visualIdentity?.typographyStyle ?? null},
+          layout_pattern = ${profile.visualIdentity?.layoutPattern ?? null},
+          visual_density = ${profile.visualIdentity?.visualDensity ?? null},
+          tone_of_voice = ${profile.brandIdentity?.tone ?? null},
+          value_propositions = ${(profile.brandIdentity?.messagingPillars ?? [])}::text[],
+          target_audience = ${profile.targetAudience?.primary ?? null},
+          photography_style = ${profile.visualIdentity?.photographyStyle ?? null},
+          brand_personality = ${(profile.brandIdentity?.personality ?? []).join(", ")},
+          competitive_position = ${profile.marketPosition?.competitiveAdvantage ?? null},
+          sector = ${profile.companyInfo?.sector ?? null},
+          company_description = ${profile.companyInfo?.description ?? null},
+          services = ${services}::text[],
+          brand_values = ${(profile.brandIdentity?.values ?? [])}::text[],
+          brand_archetype = ${profile.brandIdentity?.archetype ?? null},
+          social_handles = ${socialHandles}::text[],
+          unique_value_proposition = ${profile.brandIdentity?.uniqueValueProposition ?? null},
+          taglines = ${(profile.brandIdentity?.taglines ?? [])}::text[],
+          content_pillars = ${(profile.contentStrategy?.contentPillars ?? [])}::text[],
+          full_profile_json = ${profileJson},
+          extraction_status = 'done',
+          updated_at = NOW()
+        WHERE project_id = ${projectId}
+      `);
+    } else {
+      await db.execute(sql`
+        INSERT INTO brand_dna (
+          project_id, primary_colors, typography_style, layout_pattern, visual_density,
+          tone_of_voice, value_propositions, target_audience, photography_style,
+          brand_personality, competitive_position,
+          sector, company_description, services, brand_values, brand_archetype,
+          social_handles, unique_value_proposition, taglines, content_pillars,
+          full_profile_json, extraction_status
+        ) VALUES (
+          ${projectId}, ${allColors}::text[],
+          ${profile.visualIdentity?.typographyStyle ?? null},
+          ${profile.visualIdentity?.layoutPattern ?? null},
+          ${profile.visualIdentity?.visualDensity ?? null},
+          ${profile.brandIdentity?.tone ?? null},
+          ${(profile.brandIdentity?.messagingPillars ?? [])}::text[],
+          ${profile.targetAudience?.primary ?? null},
+          ${profile.visualIdentity?.photographyStyle ?? null},
+          ${(profile.brandIdentity?.personality ?? []).join(", ")},
+          ${profile.marketPosition?.competitiveAdvantage ?? null},
+          ${profile.companyInfo?.sector ?? null},
+          ${profile.companyInfo?.description ?? null},
+          ${services}::text[], ${(profile.brandIdentity?.values ?? [])}::text[],
+          ${profile.brandIdentity?.archetype ?? null}, ${socialHandles}::text[],
+          ${profile.brandIdentity?.uniqueValueProposition ?? null},
+          ${(profile.brandIdentity?.taglines ?? [])}::text[],
+          ${(profile.contentStrategy?.contentPillars ?? [])}::text[],
+          ${profileJson}, 'done'
+        )
+      `);
+    }
+
+    if (profile.companyInfo?.sector) {
+      await db.update(projectsTable).set({
+        storeNiche: profile.companyInfo.sector,
+        brandTone: profile.brandIdentity?.tone ?? undefined,
+        targetAudience: profile.targetAudience?.primary ?? undefined,
+      } as any).where(eq(projectsTable.id, projectId)).catch(() => {});
+    }
+
+    learnFromOperation({
+      operationType: "brand_analysis",
+      niche: profile.companyInfo?.sector ?? niche ?? "general",
+      title: `Brand DNA por nombre: ${brandName}`,
+      content: `Sector: ${profile.companyInfo?.sector ?? ""}\nArquetipo: ${profile.brandIdentity?.archetype ?? ""}\nUVP: ${profile.brandIdentity?.uniqueValueProposition ?? ""}\nTono: ${profile.brandIdentity?.tone ?? ""}\nSummary: ${profile.intelligence?.summary ?? ""}`,
+      confidence: profile.intelligence?.confidenceScore ?? 0.65,
+      tags: ["brand_dna", "name_research", profile.companyInfo?.sector ?? "", profile.brandIdentity?.archetype ?? ""].filter(Boolean),
+    });
+
+    res.json({ ok: true, profile, method: "name_research" });
+
+  } catch (e: any) {
+    logger.error("brand-dna research-by-name error", e);
+    try {
+      const projectId = parseInt(req.params.projectId, 10);
+      if (!isNaN(projectId)) {
+        await db.execute(sql`UPDATE brand_dna SET extraction_status = 'error' WHERE project_id = ${projectId}`).catch(() => {});
+      }
+    } catch { /* ignore */ }
+    res.status(500).json({ error: e.message ?? "Error en investigación de marca" });
+  }
+});
+
 export default router;
