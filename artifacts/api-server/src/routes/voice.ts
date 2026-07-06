@@ -501,42 +501,24 @@ PUEDES hacer:
 NO PUEDES: acceder a datos de ninguna tienda, generar contenido, crear campañas, ni hacer nada que requiera estar logueado. Si te piden algo así, explícales que eso lo tienen dentro de la plataforma una vez que son clientes.
 ${ANDALUZ_STYLE}`;
 
-// ── Helper: encuentra la voz clonada del sevillano en ElevenLabs ──────────────
-async function resolveSevillanoVoiceId(): Promise<string | null> {
+// ── Voz clonada del Sevillano — ID verificado en ElevenLabs ──────────────────
+// Nombre: "Sevillano" | labels: {accent:"sevillano", language:"es"}
+const SEVILLANO_VOICE_ID = "8m4O8qoFLrKBzbmsuL5T";
+
+// ── Modelo requerido por ElevenLabs para agentes no ingleses ──────────────────
+// "Non-english Agents must use turbo or flash v2_5"
+const CONVAI_SPANISH_MODEL = "eleven_turbo_v2_5";
+
+async function resolveSevillanoVoiceId(): Promise<string> {
   // 1. Override manual vía env var
   if (process.env.ELEVEN_SEVILLANO_VOICE_ID?.trim()) {
     return process.env.ELEVEN_SEVILLANO_VOICE_ID.trim();
   }
   // 2. In-memory cache
   if (_sevillanoVoiceIdCache) return _sevillanoVoiceIdCache;
-  try {
-    const voices = await listVoices();
-    const all = [...voices];
-    // Busca voz clonada con sevillano/sevilla/andaluz en nombre o etiquetas
-    const match = all.find(v =>
-      /sevillan|sevilla|andaluz|andalú|granaín|andaluci/i.test(v.name) ||
-      Object.values(v.labels ?? {}).some(l => /sevillan|sevilla|andaluz/i.test(String(l)))
-    );
-    if (match) {
-      logger.info({ voiceId: match.voice_id, name: match.name }, "ConvAI: voz sevillana encontrada");
-      _sevillanoVoiceIdCache = match.voice_id;
-      return match.voice_id;
-    }
-    // Fallback: primera voz clonada en español
-    const cloned = all.find(v =>
-      v.category === "cloned" &&
-      (Object.values(v.labels ?? {}).some(l => /spanish|español|castella/i.test(String(l))) ||
-       /español|spain|castilla/i.test(v.name))
-    );
-    if (cloned) {
-      logger.info({ voiceId: cloned.voice_id, name: cloned.name }, "ConvAI: usando primera voz clonada española");
-      _sevillanoVoiceIdCache = cloned.voice_id;
-      return cloned.voice_id;
-    }
-  } catch (e) {
-    logger.warn({ err: (e as Error)?.message }, "ConvAI: no se pudo resolver voz sevillana");
-  }
-  return null;
+  // 3. ID conocido y verificado — lo usamos directamente
+  _sevillanoVoiceIdCache = SEVILLANO_VOICE_ID;
+  return SEVILLANO_VOICE_ID;
 }
 
 async function ensurePlatformSettingsKV(): Promise<void> {
@@ -553,7 +535,7 @@ async function ensurePlatformSettingsKV(): Promise<void> {
 
 type AgentType = "admin" | "client" | "landing";
 
-function agentConfigFor(type: AgentType, voiceId: string | null): ConvAIAgentConfig {
+function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
   const names: Record<AgentType, string> = {
     admin:   "ShopyBrain — Asistente Admin",
     client:  "ShopyBrain — Informes Cliente",
@@ -573,7 +555,8 @@ function agentConfigFor(type: AgentType, voiceId: string | null): ConvAIAgentCon
   // Configuración de voz andaluza: rápida, expresiva, muy fiel a la voz original
   type TtsConfig = NonNullable<NonNullable<ConvAIAgentConfig["conversation_config"]>["tts"]>;
   const tts: TtsConfig = {
-    ...(voiceId ? { voice_id: voiceId } : {}),
+    voice_id: voiceId,
+    model_id: CONVAI_SPANISH_MODEL,  // Obligatorio para agentes no ingleses
     voice_settings: {
       stability: 0.18,        // Baja → más expresiva, menos robótica
       similarity_boost: 0.92, // Alta → muy fiel al clon original
