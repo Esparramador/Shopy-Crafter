@@ -12443,6 +12443,20 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
 
         // ── STRIPE ACTIONS ──────────────────────────────────────────────────────
 
+        // Helper: auto-resolve accountId — returns first connected Stripe account if not provided
+        const resolveStripeAccountId = async (rawId?: string): Promise<string | null> => {
+          if (rawId && rawId !== "undefined" && rawId.length > 4) return rawId;
+          const port2 = process.env.PORT || 8080;
+          try {
+            const r2 = await fetch(`http://localhost:${port2}/api/stripe/accounts`, { headers: { cookie: req.headers.cookie || "" } });
+            if (!r2.ok) return null;
+            const d2 = await r2.json() as any;
+            const accs = d2.accounts || [];
+            if (!accs.length) return null;
+            return accs[0].accountId || accs[0].account_id || null;
+          } catch { return null; }
+        };
+
         case "stripe_list_accounts": {
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts`, { headers: { cookie: req.headers.cookie || "" } });
@@ -12454,8 +12468,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "stripe_account_overview": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/overview`, { headers: { cookie: req.headers.cookie || "" } });
           const data2 = await r2.json() as any;
@@ -12465,8 +12479,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "stripe_list_transactions": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           const limit2 = Math.min(params?.limit ?? 20, 100);
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/transactions?limit=${limit2}`, { headers: { cookie: req.headers.cookie || "" } });
@@ -12477,8 +12491,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "stripe_list_customers": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           const limit2 = Math.min(params?.limit ?? 20, 100);
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/customers?limit=${limit2}`, { headers: { cookie: req.headers.cookie || "" } });
@@ -12489,8 +12503,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "stripe_list_subscriptions": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/subscriptions`, { headers: { cookie: req.headers.cookie || "" } });
           const data2 = await r2.json() as any;
@@ -12501,8 +12515,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "stripe_list_products": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           const port = process.env.PORT || 8080;
           const limit2 = Math.min(params?.limit ?? 25, 100);
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/products?limit=${limit2}`, { headers: { cookie: req.headers.cookie || "" } });
@@ -12514,8 +12528,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "stripe_list_invoices": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           const port = process.env.PORT || 8080;
           const limit2 = Math.min(params?.limit ?? 25, 100);
           const statusQ = params?.status ? `&status=${params.status}` : "";
@@ -12528,8 +12542,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "stripe_list_payouts": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           const port = process.env.PORT || 8080;
           const limit2 = Math.min(params?.limit ?? 25, 100);
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/payouts?limit=${limit2}`, { headers: { cookie: req.headers.cookie || "" } });
@@ -12541,8 +12555,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
         }
 
         case "stripe_create_product": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           if (!params?.name) { result = { error: "name requerido" }; break; }
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/products`, {
@@ -12551,14 +12565,14 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             body: JSON.stringify({ name: params.name, description: params.description, price: params.price, currency: params.currency, interval: params.interval }),
           });
           const data2 = await r2.json() as any;
-          if (!r2.ok) { result = { error: data2.error || "Error creando producto" }; break; }
+          if (!r2.ok) { result = { error: data2.error || data2.message || "Error creando producto en Stripe" }; break; }
           result = { product: data2.product, price: data2.price, message: data2.message || `Producto "${params.name}" creado en Stripe` };
           break;
         }
 
         case "stripe_create_charge": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           if (!params?.amount) { result = { error: "amount requerido (en céntimos, ej. 4900 = €49)" }; break; }
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/charges`, {
@@ -12567,14 +12581,14 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             body: JSON.stringify({ amount: params.amount, currency: params.currency, customerId: params.customerId, description: params.description, receiptEmail: params.receiptEmail }),
           });
           const data2 = await r2.json() as any;
-          if (!r2.ok) { result = { error: data2.error || "Error creando cobro" }; break; }
+          if (!r2.ok) { result = { error: data2.error || data2.message || "Error creando cobro" }; break; }
           result = { paymentIntent: data2.paymentIntent, message: data2.message || `Cobro creado: ${data2.paymentIntent?.id}` };
           break;
         }
 
         case "stripe_create_customer": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           if (!params?.email) { result = { error: "email requerido" }; break; }
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/customers`, {
@@ -12583,14 +12597,14 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             body: JSON.stringify({ email: params.email, name: params.name, phone: params.phone, description: params.description }),
           });
           const data2 = await r2.json() as any;
-          if (!r2.ok) { result = { error: data2.error || "Error creando cliente" }; break; }
+          if (!r2.ok) { result = { error: data2.error || data2.message || "Error creando cliente" }; break; }
           result = { customer: data2.customer, message: data2.message || `Cliente ${params.email} creado` };
           break;
         }
 
         case "stripe_create_invoice": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           if (!params?.customerId) { result = { error: "customerId requerido" }; break; }
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/invoices`, {
@@ -12599,29 +12613,30 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             body: JSON.stringify({ customerId: params.customerId, description: params.description, daysUntilDue: params.daysUntilDue, lineItems: params.lineItems }),
           });
           const data2 = await r2.json() as any;
-          if (!r2.ok) { result = { error: data2.error || "Error creando factura" }; break; }
+          if (!r2.ok) { result = { error: data2.error || data2.message || "Error creando factura" }; break; }
           result = { invoice: data2.invoice, message: data2.message || `Factura creada: ${data2.invoice?.id}` };
           break;
         }
 
         case "stripe_send_invoice": {
-          const accountId = params?.accountId;
+          const accountId = await resolveStripeAccountId(params?.accountId);
           const invoiceId = params?.invoiceId;
-          if (!accountId || !invoiceId) { result = { error: "accountId e invoiceId requeridos" }; break; }
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
+          if (!invoiceId) { result = { error: "invoiceId requerido" }; break; }
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/invoices/${invoiceId}/send`, {
             method: "POST",
             headers: { "Content-Type": "application/json", cookie: req.headers.cookie || "" },
           });
           const data2 = await r2.json() as any;
-          if (!r2.ok) { result = { error: data2.error || "Error enviando factura" }; break; }
+          if (!r2.ok) { result = { error: data2.error || data2.message || "Error enviando factura" }; break; }
           result = { ok: true, status: data2.status, hostedUrl: data2.hostedUrl, message: data2.message || "Factura enviada al cliente" };
           break;
         }
 
         case "stripe_create_refund": {
-          const accountId = params?.accountId;
-          if (!accountId) { result = { error: "accountId requerido" }; break; }
+          const accountId = await resolveStripeAccountId(params?.accountId);
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
           if (!params?.chargeId && !params?.paymentIntentId) { result = { error: "chargeId o paymentIntentId requerido" }; break; }
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/refunds`, {
@@ -12630,15 +12645,16 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
             body: JSON.stringify({ chargeId: params.chargeId, paymentIntentId: params.paymentIntentId, amount: params.amount, reason: params.reason }),
           });
           const data2 = await r2.json() as any;
-          if (!r2.ok) { result = { error: data2.error || "Error creando reembolso" }; break; }
+          if (!r2.ok) { result = { error: data2.error || data2.message || "Error creando reembolso" }; break; }
           result = { refund: data2.refund, message: data2.message || `Reembolso creado: ${data2.refund?.id}` };
           break;
         }
 
         case "stripe_cancel_subscription": {
-          const accountId = params?.accountId;
+          const accountId = await resolveStripeAccountId(params?.accountId);
           const subscriptionId = params?.subscriptionId;
-          if (!accountId || !subscriptionId) { result = { error: "accountId y subscriptionId requeridos" }; break; }
+          if (!accountId) { result = { error: "No hay cuentas Stripe conectadas. Ve a Admin → Stripe Manager para conectar una." }; break; }
+          if (!subscriptionId) { result = { error: "subscriptionId requerido" }; break; }
           const port = process.env.PORT || 8080;
           const immediately = params?.immediately === true || params?.immediately === "true";
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts/${accountId}/subscriptions/${subscriptionId}?immediately=${immediately}`, {

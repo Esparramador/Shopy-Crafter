@@ -1839,7 +1839,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         `⚠️ Confirmación requerida para \`${action}\`. Re-envía la acción añadiendo "confirma" al mensaje.`
       );
     }
-    if (result.error) return `❌ ${result.message}`;
+    if (result.error) return `❌ ${typeof result.error === "string" ? result.error : (result.message || result.error?.message || "Error inesperado")}`;
 
     switch (action) {
       case "store_status":
@@ -3223,7 +3223,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       const actionResult = await executeShopifyAction(act.action, act.params);
                       if (progInterval) { clearInterval(progInterval); progInterval = null; }
                       if (actionResult) {
-                        assistantContent += "\n\n" + formatActionResult(act.action, actionResult);
+                        const _fmt = formatActionResult(act.action, actionResult);
+                        if (_fmt) assistantContent += "\n\n" + _fmt;
                         action = { type: "shopify-action", label: "Ver resultado", data: actionResult };
                       }
                     }
@@ -3370,8 +3371,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               const actionResult = await executeShopifyAction(act.action, act.params);
               if (progInterval2) { clearInterval(progInterval2); progInterval2 = null; }
               if (actionResult) {
-                const formatted = formatActionResult(act.action, actionResult);
-                results.push(formatted);
+                const formatted = formatActionResult(act.action, actionResult) || "";
+                if (formatted) results.push(formatted);
                 const actionType = act.action === "search_suppliers" ? "supplier-research"
                   : act.action === "browser_action" ? "browser-action"
                   : act.action === "browser_research" ? "browser-action"
