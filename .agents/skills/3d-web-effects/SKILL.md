@@ -1,9 +1,11 @@
 # 3D Web Effects — Skill Library
 
 ## Qué hace este skill
-Genera efectos 3D y animaciones web premium adaptables a cualquier producto, cliente, sector o empresa. Basado en análisis profundo de 4 repos GitHub reales (ThreeJS_Animation_Scroll, game-website, Nimbus-Keyboard-3D, starbucks-3d-animated-site).
+Genera efectos 3D y animaciones web premium adaptables a cualquier producto, cliente, sector o empresa. Basado en análisis profundo de 8 repos GitHub reales:
+- **Batch 1**: ThreeJS_Animation_Scroll, game-website (sanidhyy), Nimbus-Keyboard-3D, starbucks-3d-animated-site
+- **Batch 2**: blesten/3d-landing-page (Suburbia Skate), Ankit-Sharma1011/game-website (Noova), AmirBayat0/3D-Template-Landing-Page (Medical), Meettomb/LaFerrari-3D-Animated-Website
 
-Todos los templates están guardados en el master-prompt-library.json bajo la clave `3d_web_effects` (12 templates ejecutables). Se pueden ejecutar vía POST /api/prompt-library/execute o directamente a través del PromptLibrary.tsx en Shopy Crafter.
+Todos los templates están guardados en el master-prompt-library.json bajo la clave `3d_web_effects` (28 templates ejecutables). Se pueden ejecutar vía POST /api/prompt-library/execute o directamente a través del PromptLibrary.tsx en Shopy Crafter.
 
 ## Los 5 Patrones Fundamentales (extraídos de repos reales)
 
@@ -68,6 +70,93 @@ const bodyMat = useMemo(() => new THREE.MeshStandardMaterial({
 }), [selectedColor, materialType]);
 ```
 
+## Los 4 Nuevos Patrones — Batch 2 (blesten, Ankit, AmirBayat0, Meettomb)
+
+### PATRÓN 6: R3F Interactive Product with GSAP Tricks (Suburbia Skate)
+**Repo**: blesten/3d-landing-page | **Templates**: `3d_effect_13`, `3d_effect_14`, `3d_effect_15`, `3d_effect_16`
+- `InteractiveSkateboard.tsx`: R3F Canvas + 3 invisible click meshes (`visible={false}`) + GSAP timeline tricks
+- Tricks exactos: ollie (tilt X), kickflip (tilt X + rotate Z `+= π*2`), frontside360 (tilt X + rotate Y `+= π*2`)
+- Float idle: `gsap.to(position, { x:.2, repeat:-1, yoyo:true, ease:'sine.inOut' })` simultáneo con rotation
+- Camera zoom responsive: `scale = Math.max(Math.min(1000/window.innerWidth, 2.2), 1)`
+- `FooterPhysics.tsx`: matter-js con sprite textures, chamfer radius:40, restitution:0.8, MouseConstraint
+- `ParallaxImage.tsx`: 2-layer parallax con lerp 0.1 via rAF, foreground 2.5x más rápido que background
+- `SlideIn.tsx`: IntersectionObserver rootMargin:'-150px', CSS keyframe `animation: slide-in ${duration}s`
+
+```typescript
+// GSAP kickflip trick (copiar exacto):
+function kickflip(board: THREE.Group) {
+  jumpBoard(board)  // y: 0→.8→0 con power2 easing
+  gsap.timeline()
+    .to(board.rotation, { x: -.6, duration:.26, ease:'none' })
+    .to(board.rotation, { x: .4, duration:.82, ease:'power2.in' })
+    .to(board.rotation, { z: `+=${Math.PI*2}`, duration:.78, ease:'none' }, .3)  // simultáneo en t=0.3
+    .to(board.rotation, { x: 0, duration:.12, ease:'none' })
+}
+```
+
+### PATRÓN 7: Bento Grid CSS Tilt + GSAP Animated Words (Noova Game)
+**Repo**: Ankit-Sharma1011/game-website | **Templates**: `3d_effect_17`, `3d_effect_18`, `3d_effect_19`, `3d_effect_20`
+- `BentoTilt`: tilt 3D puro con React state — `perspective(700px) rotateX/Y scale3d(0.98)` por onMouseMove
+- Cálculo: `relativeX = (clientX - left) / width`, `tiltY = (relativeX - 0.5) * -5`
+- `AnimatedTitle`: cada palabra es span `.animated-word` con CSS inicial `translate3d(0,-100px,-500px) rotateX(90deg)`
+- GSAP ScrollTrigger anima a `translate3d(0,0,0) rotateX(0)` con stagger:0.02
+- `Story.tsx`: `gsap.to(img, { rotateX, rotateY, transformPerspective:500, duration:0.3, ease:'power1.inOut' })`
+- Stack: gsap@3.14.2, @gsap/react, react@19, tailwind v4, Vite v8 (sin Three.js)
+
+```typescript
+// BentoTilt (copiar exacto — sin GSAP):
+const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const { left, top, width, height } = itemRef.current!.getBoundingClientRect()
+  const relativeX = (e.clientX - left) / width
+  const relativeY = (e.clientY - top) / height
+  const tiltX = (relativeY - 0.5) * 5
+  const tiltY = (relativeX - 0.5) * -5
+  setTransformStyle(`perspective(700px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale3d(0.98,0.98,0.98)`)
+}
+```
+
+### PATRÓN 8: Canvas 2D Scientific + Framer Motion + useCounter (Medical)
+**Repo**: AmirBayat0/3D-Template-Landing-Page | **Templates**: `3d_effect_21`, `3d_effect_22`, `3d_effect_23`, `3d_effect_24`
+- `Medical3DCanvas`: 5 funciones Canvas 2D — drawHeartbeat (ECG waveform), drawDNA (hélice), drawMolecule (red), drawFloatingCross (shape), drawParticles
+- `useScrollAnimation(threshold=0.15)`: IntersectionObserver → `isVisible` state one-shot
+- `useCounter(end, duration=2000)`: easing cúbico `1 - Math.pow(1-progress, 3)`, activado por `activate()`
+- `WhyChooseUs`: framer-motion `initial={{opacity:0,y:40}} animate={isVisible ? {opacity:1,y:0} : {}}` + CounterCard
+- Stack: framer-motion@12, lucide-react, tailwind v4 (sin Three.js, sin GSAP)
+
+```typescript
+// useCounter con cubic easing (copiar exacto):
+const step = (timestamp: number) => {
+  if (!startTime) startTime = timestamp
+  const progress = Math.min((timestamp - startTime) / duration, 1)
+  const eased = 1 - Math.pow(1 - progress, 3)   // ease-out cubic
+  setCount(Math.floor(eased * (end - start) + start))
+  if (progress < 1) requestAnimationFrame(step)
+}
+```
+
+### PATRÓN 9: Three.js GLB Lerp + Snap Scroll + Dual Canvas (Ferrari)
+**Repo**: Meettomb/LaFerrari-3D-Animated-Website | **Templates**: `3d_effect_25`, `3d_effect_26`, `3d_effect_27`, `3d_effect_28`
+- `index.js`: Three.js GLB (scale=56), lerp speed=0.10, IntersectionObserver threshold=0.3 por `.sectionClass`
+- NO usa GSAP — lerp manual en `animate()`: `car.position.lerp(targetPosition, 0.10)`
+- `scroll.js`: snap scroll con wheel/ArrowKey/touch. `scrollIntoView({behavior:'smooth'})` + debounce 1000ms
+- Progress dots generados dinámicamente (JS, no hardcoded), con labels, click-to-navigate
+- Dual canvas: `.wbgl` (background scroll) ↔ `.wbgl2` (3D view interactiva con OrbitControls)
+- Loader: letras FERRARI individuales con CSS stagger animation-delay
+
+```javascript
+// Lerp en animate loop (copiar exacto — sin GSAP):
+function animate() {
+  requestAnimationFrame(animate)
+  if (car) {
+    car.position.lerp(targetPosition, 0.10)
+    car.rotation.x = THREE.MathUtils.lerp(car.rotation.x, targetRotation.x, 0.10)
+    car.rotation.y = THREE.MathUtils.lerp(car.rotation.y, targetRotation.y, 0.10)
+    car.rotation.z = THREE.MathUtils.lerp(car.rotation.z, targetRotation.z, 0.10)
+  }
+  renderer.render(scene, camera)
+}
+```
+
 ## Stack Tecnológico por Efecto
 
 | Efecto | Stack | Dependencias clave |
@@ -79,25 +168,45 @@ const bodyMat = useMemo(() => new THREE.MeshStandardMaterial({
 | GSAP Pinned | React | gsap, @gsap/react, ScrollTrigger |
 | Morphing Blob | Vanilla JS | Three.js CDN (Perlin noise inline) |
 | Particles | Vanilla JS | Three.js CDN, AdditiveBlending |
+| R3F Tricks (Suburbia) | Next.js 15 + R3F | @gsap/react, matter-js, @react-three/drei |
+| Bento Tilt (Noova) | React 19 + Vite | gsap@3.14.2, @gsap/react, tailwind v4 |
+| Canvas 2D Medical | React 19 + Vite | framer-motion@12, lucide-react |
+| GLB Lerp (Ferrari) | Vanilla JS + Vite | three@0.164.0 (sin GSAP) |
 
 ## Templates Disponibles en master-prompt-library.json
 
-Clave de biblioteca: `3d_web_effects` (59 bibliotecas totales)
+Clave de biblioteca: `3d_web_effects` (28 templates — Batch 1: 01-12, Batch 2: 13-28)
 
-| ID | Nombre | Efecto |
-|----|--------|--------|
-| `3d_effect_01_canvas_sequence_hero` | Canvas Sequence Hero | Apple/Starbucks scroll frames |
-| `3d_effect_02_glb_scroll_storytelling` | GLB Scroll Storytelling | Three.js modelo por sección |
-| `3d_effect_03_video_clip_path_hero` | Video Clip-Path Hero | GSAP polygon + video explosion |
-| `3d_effect_04_r3f_product_showcase` | R3F Product Showcase | Configurador de color 3D |
-| `3d_effect_05_gsap_scroll_pinned` | GSAP Pinned Section | Reveals secuenciales anclados |
-| `3d_effect_06_lenis_smooth_scroll_setup` | Lenis + GSAP Setup | Base smooth scroll premium |
-| `3d_effect_07_three_floating_product` | Floating Product Viewer | Auto-rotación cinematográfica |
-| `3d_effect_08_morphing_blob` | Morphing Blob | Hero orgánico Perlin noise |
-| `3d_effect_09_animated_text_reveal` | Animated Text Reveal | Split text sin plugins de pago |
-| `3d_effect_10_full_page_template_product` | Template Completo | Landing page producto 3D full |
-| `3d_effect_11_webgl_particle_hero` | WebGL Particle Hero | Partículas interactivas cursor |
-| `3d_effect_12_gsap_clip_path_reveal` | Clip-Path Reveal | Sistema reveals para galería |
+| ID | Nombre | Efecto | Repo Fuente |
+|----|--------|--------|-------------|
+| `3d_effect_01` | Canvas Sequence Hero | Apple/Starbucks scroll frames | starbucks-3d |
+| `3d_effect_02` | GLB Scroll Storytelling | Three.js modelo por sección | ThreeJS_Animation_Scroll |
+| `3d_effect_03` | Video Clip-Path Hero | GSAP polygon + video explosion | sanidhyy/game-website |
+| `3d_effect_04` | R3F Product Showcase | Configurador de color 3D | Nimbus-Keyboard-3D |
+| `3d_effect_05` | GSAP Pinned Section | Reveals secuenciales anclados | ThreeJS_Animation_Scroll |
+| `3d_effect_06` | Lenis + GSAP Setup | Base smooth scroll premium | multiple |
+| `3d_effect_07` | Floating Product Viewer | Auto-rotación cinematográfica | Nimbus-Keyboard-3D |
+| `3d_effect_08` | Morphing Blob | Hero orgánico Perlin noise | ThreeJS_Animation_Scroll |
+| `3d_effect_09` | Animated Text Reveal | Split text sin plugins de pago | sanidhyy/game-website |
+| `3d_effect_10` | Template Completo Producto | Landing page producto 3D full | multiple |
+| `3d_effect_11` | WebGL Particle Hero | Partículas interactivas cursor | ThreeJS_Animation_Scroll |
+| `3d_effect_12` | Clip-Path Reveal | Sistema reveals para galería | sanidhyy/game-website |
+| `3d_effect_13` | R3F Interactive Tricks | Skateboard/producto con ollie/kickflip/360 | blesten/3d-landing-page |
+| `3d_effect_14` | matter-js Physics Footer | Footer con objetos arrastrables y gravedad | blesten/3d-landing-page |
+| `3d_effect_15` | Parallax 2 Capas Mouse | Foreground 2.5x + lerp rAF sin GSAP | blesten/3d-landing-page |
+| `3d_effect_16` | SlideIn IntersectionObserver | CSS keyframe slide-in con delay | blesten/3d-landing-page |
+| `3d_effect_17` | Bento Tilt Grid CSS | perspective(700px) rotateX/Y solo React state | Ankit/game-website |
+| `3d_effect_18` | Animated Words 3D Scroll | translate3d+rotateY/X stagger GSAP ScrollTrigger | Ankit/game-website |
+| `3d_effect_19` | Video Clip-Path Mini Explosion | Mini-video explota a fullscreen + ScrollTrigger | Ankit/game-website |
+| `3d_effect_20` | Image Mouse Tilt GSAP | rotateX/Y + transformPerspective:500 duration:0.3 | Ankit/game-website |
+| `3d_effect_21` | Canvas 2D Temáticas | ECG + ADN + molécula + partículas sin WebGL | AmirBayat0/medical |
+| `3d_effect_22` | Counters Easing Cúbico | useCounter hook + useScrollAnimation one-shot | AmirBayat0/medical |
+| `3d_effect_23` | Hero Glassmorphism Framer | motion.div + glass-card + btn-3d + dark mode | AmirBayat0/medical |
+| `3d_effect_24` | SVG Floating Elements CSS | Iconos SVG inline + CSS @keyframes float sin JS | AmirBayat0/medical |
+| `3d_effect_25` | Three.js GLB Lerp Sections | IntersectionObserver + lerp 0.10 sin GSAP | Meettomb/LaFerrari |
+| `3d_effect_26` | Snap Scroll Progress Dots | wheel+keyboard+touch+auto-snap+dots dinámicos | Meettomb/LaFerrari |
+| `3d_effect_27` | Letter-by-Letter Loader | CSS stagger animation-delay por letra | Meettomb/LaFerrari |
+| `3d_effect_28` | Dual Canvas WebGL Toggle | .wbgl background ↔ .wbgl2 interactivo via IntersectionObserver | Meettomb/LaFerrari |
 
 ## Variables Estándar ({{VARIABLE}})
 
