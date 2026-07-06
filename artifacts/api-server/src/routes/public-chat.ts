@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { askGeminiChat, askGeminiStream } from "../lib/gemini.js";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { askGeminiWithSearch, askGeminiWithUrls } from "../lib/gemini.js";
 import { MASTER_CATALOG } from "../lib/master-skills-injector.js";
 import { logger } from "../lib/logger.js";
 import { learnFromOperation } from "../lib/claude.js";
@@ -8,10 +9,7 @@ import { buildModulesBlock, buildPricingBlock } from "../lib/platform-knowledge.
 const router = Router();
 
 // ══════════════════════════════════════════════════════════════════════════════
-// INTENT CLASSIFIER — patrones extraídos de Rasa NLU (rasa-demo/data/nlu/)
-// Intents: greet, contact_sales, book_demo, signup_newsletter, thank, bye,
-//          affirm, deny, out_of_scope, need_help_broad, human_handoff,
-//          feedback, faq/pricing, faq/how_it_works, faq/security, faq/features
+// INTENT CLASSIFIER — patrones extraídos de Rasa NLU
 // ══════════════════════════════════════════════════════════════════════════════
 
 interface IntentResult {
@@ -29,78 +27,50 @@ function classifyIntent(
   const msg = message.toLowerCase().trim();
   const entities: Record<string, string> = {};
 
-  // Entity extraction (Rasa: name, email, company, budget)
   const emailMatch = msg.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);
   if (emailMatch) entities.email = emailMatch[0];
   const budgetMatch = msg.match(/(\d+)\s*(€|eur|euros?)/i);
   if (budgetMatch) entities.budget = budgetMatch[0];
 
-  // Human handoff (from Rasa: human_handoff intent)
   if (/hablar con (humano|persona|agente|alguien|empleado|comercial|soporte)|persona real|quiero que me llame|llámame|hablar con vosotros|contacto directo/.test(msg)) {
     return { intent: "human_handoff", entities, confidence: 0.92, needsHumanHandoff: true, buyingIntent: false };
   }
-
-  // Greet (from Rasa: greet intent — 70+ examples)
   if (/^(hola|buenos|buenas|hey|hi|hello|qué tal|saludos|ey|ola|good morning|good afternoon|buenas tardes|buenas noches)\b/.test(msg) && msg.length < 40) {
     return { intent: "greet", entities, confidence: 0.95, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // Contact sales / Book demo (from Rasa: contact_sales + book_demo)
   if (/demo|reservar|agendar|contratar|suscribir|empezar ya|cómo me registro|quiero acceso|quiero (empezar|probarlo|la prueba)|prueba gratuita|free trial|acceso|darme de alta/.test(msg)) {
     return { intent: "contact_sales", entities, confidence: 0.88, needsHumanHandoff: false, buyingIntent: true };
   }
-
-  // FAQ: pricing (from Rasa: faq/pricing)
   if (/cuánto cuesta|precio|tarifa|plan|coste|cost|pricing|cuánto (vale|es)|es gratis|gratuito|pago/.test(msg)) {
     return { intent: "faq/pricing", entities, confidence: 0.85, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // FAQ: how it works
   if (/cómo funciona|cómo se usa|para qué sirve|qué hace|qué es shopy|explicar|cuéntame|cuéntame más|cómo trabaja|cómo ayuda/.test(msg)) {
     return { intent: "faq/how_it_works", entities, confidence: 0.82, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // FAQ: security / trust (from Rasa: out_of_scope handling)
   if (/seguro|seguridad|confianza|oauth|contraseña|datos|privacidad|rgpd|gdpr|acceso a mi tienda|mi tienda es segura/.test(msg)) {
     return { intent: "faq/security", entities, confidence: 0.8, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // FAQ: features / capabilities
   if (/motor|función|qué puede hacer|imagen|seo|email|klaviyo|a\.b test|precio|copywriting|generá|automatiz/.test(msg)) {
     return { intent: "faq/features", entities, confidence: 0.78, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // Signup newsletter (from Rasa: signup_newsletter)
   if (/newsletter|suscribir(me)?|recibir noticias|actualizaciones|novedades/.test(msg)) {
     return { intent: "signup_newsletter", entities, confidence: 0.82, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // Thank (from Rasa: thank intent)
   if (/^(gracias|muchas gracias|genial|perfecto|excelente|muy bien|entendido|ok gracias|fenomenal|guay|estupendo|que bueno|muy útil)/.test(msg)) {
     return { intent: "thank", entities, confidence: 0.88, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // Bye (from Rasa: bye intent)
   if (/^(adiós|hasta luego|bye|chao|nos vemos|hasta pronto|me voy|hasta mañana|hasta)$/.test(msg)) {
     return { intent: "bye", entities, confidence: 0.9, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // Affirm (from Rasa: affirm — 80+ examples: yes, sí, claro, ok, perfecto, sure...)
   if (/^(sí|si|yes|claro|claro que sí|por supuesto|de acuerdo|ok|okay|vale|acepto|afirmativo|exacto|efectivamente|correcto|adelante|va|dale)/.test(msg) && msg.length < 30) {
     return { intent: "affirm", entities, confidence: 0.85, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // Deny (from Rasa: deny — no, nope, no gracias...)
   if (/^(no|nope|no gracias|negativo|para nada|tampoco|ahora no|en otro momento|lo pensaré)/.test(msg) && msg.length < 30) {
     return { intent: "deny", entities, confidence: 0.85, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // Need help broad (from Rasa: need_help_broad)
   if (/ayuda|help|no (sé|entiendo|funciona)|problema|error|issue|soporte/.test(msg)) {
     return { intent: "need_help_broad", entities, confidence: 0.7, needsHumanHandoff: false, buyingIntent: false };
   }
-
-  // Out of scope (from Rasa: out_of_scope — mensajes muy cortos o irrelevantes)
   if (msg.length < 5 || /^(\.\.\.|xd|jaja|gg|lol|wtf|hmm|meh|ok\.|ah\.|ya\.?)$/.test(msg)) {
     return { intent: "out_of_scope", entities, confidence: 0.6, needsHumanHandoff: false, buyingIntent: false };
   }
@@ -109,8 +79,7 @@ function classifyIntent(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CONVERSATION STAGE TRACKER — inspired by Rasa stories.yml
-// Stages mirror Rasa's story flows: initial → exploring → considering → converting
+// CONVERSATION STAGE TRACKER
 // ══════════════════════════════════════════════════════════════════════════════
 
 type ConvStage = "initial" | "exploring" | "considering" | "converting" | "wrapup";
@@ -143,123 +112,296 @@ function getConversationStage(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// DYNAMIC SYSTEM PROMPT — se enriquece con contexto de intent + stage
-// Patrón: Rasa domain.yml responses + stories.yml conditional branches
+// BLOQUE 1 — CLIENT CONTEXT EXTRACTOR
+// Detecta URL, nombre de empresa y hechos clave del negocio en la conversación
 // ══════════════════════════════════════════════════════════════════════════════
 
-const LANDING_SYSTEM_PROMPT_BASE = `Eres el asistente comercial de Shopy Crafter, una plataforma SaaS de inteligencia artificial para ecommerce y creatividad digital. Conoces PERFECTAMENTE cada módulo, herramienta y capacidad de la plataforma.
+interface ClientFacts {
+  niche?: string;
+  audience?: string;
+  challenge?: string;
+  goal?: string;
+  currentPlatform?: string;
+  monthlyRevenue?: string;
+  productType?: string;
+  location?: string;
+}
 
-REGLA ABSOLUTA: NUNCA digas que algo "no existe", "no está disponible" o "solo gestionamos X" si ese módulo aparece en esta descripción. Shopy Crafter es MUCHO más que Shopify — es una plataforma completa de IA con más de 14 módulos en producción. Si preguntan por el Lab Web, Fusion Studio Pro, Librería de Prompts, Tripo3D, o cualquier otro módulo listado aquí — CONFÍRMALO con seguridad y explica qué hace.
+interface ClientContext {
+  detectedUrl?: string;
+  detectedCompanyName?: string;
+  facts: ClientFacts;
+  hasResearchTarget: boolean;
+  advisorMode: boolean;
+  factCount: number;
+}
+
+function extractClientContext(
+  messages: Array<{ role: string; content: string }>,
+): ClientContext {
+  const userText = messages.filter(m => m.role === "user").map(m => m.content).join("\n");
+
+  // URL detection (https or bare domain)
+  const urlMatch = userText.match(/https?:\/\/[^\s,)]+/);
+  const domainMatch = userText.match(/\b([a-zA-Z0-9][a-zA-Z0-9-]{2,}\.(com|es|shop|store|net|org|co\.uk|io|co))\b/i);
+
+  // Company name detection
+  const companyPatterns = [
+    /(?:mi (?:tienda|empresa|marca|negocio|web) (?:se llama|es|lleva el nombre))\s*["']?([A-ZÁÉÍÓÚÑ][a-zA-ZáéíóúñÁÉÍÓÚÑ\s&'-]{2,35})/i,
+    /(?:tengo una? (?:tienda|empresa|marca) (?:llamada?|de nombre)\s+)["']?([A-ZÁÉÍÓÚÑ][a-zA-ZáéíóúñÁÉÍÓÚÑ\s&'-]{2,35})/i,
+    /(?:somos|soy)\s+([A-ZÁÉÍÓÚÑ][a-zA-ZáéíóúñÁÉÍÓÚÑ\s&'-]{2,30})\s+(?:y|,|\.)/i,
+    /(?:la marca|la tienda|el negocio)\s+(?:se llama|es)\s+["']?([A-ZÁÉÍÓÚÑ][a-zA-ZáéíóúñÁÉÍÓÚÑ\s&'-]{2,35})/i,
+  ];
+  let detectedCompanyName: string | undefined;
+  for (const p of companyPatterns) {
+    const m = userText.match(p);
+    if (m?.[1]?.trim()) { detectedCompanyName = m[1].trim(); break; }
+  }
+
+  const facts: ClientFacts = {};
+
+  // Niche / sector
+  const nichePatterns = [
+    /(?:vend(?:emos?|o)|tienda de|me dedico a|negocio de|en el sector|sector|nicho)\s*(?:de|:)?\s*([^.!\n,]{5,60})/i,
+    /(?:somos una?|soy una?)\s+(?:tienda|empresa|marca|negocio)\s+de\s+([^.!\n,]{5,50})/i,
+    /(?:productos?|artículos?|servicios?)\s+(?:de|para)\s+([^.!\n,]{5,50})/i,
+  ];
+  for (const p of nichePatterns) {
+    const m = userText.match(p);
+    if (m?.[1]) { facts.niche = m[1].trim(); break; }
+  }
+
+  // Audience / target
+  const audienceMatch = userText.match(
+    /(?:clientes?|audiencia|target|público objetivo|compran|compradores?)\s*(?:son|es|:)\s*([^.!\n,]{5,60})/i
+  );
+  if (audienceMatch?.[1]) facts.audience = audienceMatch[1].trim();
+
+  // Challenge / problem
+  const challengePatterns = [
+    /(?:problema|reto|dificultad|nos cuesta|no conseguimos?|falla|nos va mal en|bajo en|necesitamos mejorar)\s+(?:es\s+)?([^.!\n,]{5,80})/i,
+    /(?:no estamos? vendiendo|poca? tráfico|pocas? ventas|bajo? conversión|muchos abandonos?)/i,
+  ];
+  for (const p of challengePatterns) {
+    const m = userText.match(p);
+    if (m) { facts.challenge = (m[1] ?? m[0]).trim(); break; }
+  }
+
+  // Goal
+  const goalMatch = userText.match(
+    /(?:quiero|queremos|necesito|buscamos?|objetivo es|meta es|aspiramos? a)\s+([^.!\n,]{5,80})/i
+  );
+  if (goalMatch?.[1]) facts.goal = goalMatch[1].trim();
+
+  // Current platform
+  if (/shopify/i.test(userText)) facts.currentPlatform = "Shopify";
+  else if (/woocommerce|wordpress/i.test(userText)) facts.currentPlatform = "WooCommerce";
+  else if (/prestashop/i.test(userText)) facts.currentPlatform = "PrestaShop";
+  else if (/wix/i.test(userText)) facts.currentPlatform = "Wix";
+  else if (/magento/i.test(userText)) facts.currentPlatform = "Magento";
+  else if (/tiendanube/i.test(userText)) facts.currentPlatform = "Tiendanube";
+
+  // Revenue / size
+  const revMatch = userText.match(/(\d[\d.,]*)\s*(€|eur|euros?|k€|k\s*euros?)\s*(?:al mes|mensual|por mes|\/mes)/i);
+  if (revMatch) facts.monthlyRevenue = revMatch[0];
+
+  // Location
+  const locMatch = userText.match(/(?:somos? de|estamos? en|con sede en|tienda en|España|México|Argentina|Colombia|Madrid|Barcelona|[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{3,})?)\b/);
+  if (locMatch) facts.location = locMatch[0].trim();
+
+  const detectedUrl = urlMatch?.[0] || (domainMatch ? `https://${domainMatch[0]}` : undefined);
+  const hasResearchTarget = !!(detectedUrl || detectedCompanyName);
+  const factCount = Object.values(facts).filter(Boolean).length;
+  const advisorMode = hasResearchTarget || factCount >= 1 || messages.filter(m => m.role === "user").length >= 3;
+
+  return { detectedUrl, detectedCompanyName, facts, hasResearchTarget, advisorMode, factCount };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BLOQUE 2 — QUICK COMPANY RESEARCH (Gemini Search / URL Context)
+// Si detectamos URL o nombre → investigamos en tiempo real → inyectamos el resumen
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function quickResearch(ctx: ClientContext): Promise<string> {
+  try {
+    if (ctx.detectedUrl) {
+      const res = await Promise.race([
+        askGeminiWithUrls(
+          `Analiza este sitio de ecommerce brevemente (máx 300 palabras): ¿qué vende, a quién, precio aproximado, puntos fuertes y debilidades visibles de la tienda online? ¿Qué herramientas de marketing detectas?`,
+          [ctx.detectedUrl],
+          "Eres un auditor experto de ecommerce. Sé conciso y específico.",
+        ),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000)),
+      ]);
+      if (res && typeof res === "object" && "text" in res && res.text) {
+        return `\n\n== ANÁLISIS REAL DEL SITIO WEB DETECTADO (${ctx.detectedUrl}) ==\n${res.text}\n(Análisis realizado ahora mismo con IA web)`;
+      }
+    }
+
+    if (ctx.detectedCompanyName) {
+      const name = ctx.detectedCompanyName;
+      const res = await Promise.race([
+        askGeminiWithSearch(
+          `Busca información sobre "${name}" en ecommerce o retail. ¿Qué venden, dónde están, qué tamaño tienen, qué debilidades de marketing/ecommerce podrían tener? Sé breve (máx 200 palabras).`,
+          "Eres un auditor experto de ecommerce y marketing digital. Sé conciso.",
+        ),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000)),
+      ]);
+      if (res && typeof res === "object" && "text" in res && res.text) {
+        return `\n\n== INVESTIGACIÓN REALIZADA SOBRE "${name}" ==\n${res.text}\n(Búsqueda web realizada ahora mismo)`;
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, "quickResearch timeout/error — skipping");
+  }
+  return "";
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BLOQUE 3 — ADVISOR MODE SYSTEM PROMPT BUILDER
+// Construye el bloque de contexto personalizado + modo consultor
+// ══════════════════════════════════════════════════════════════════════════════
+
+function buildClientContextBlock(ctx: ClientContext, researchSummary: string): string {
+  if (!ctx.advisorMode && !ctx.hasResearchTarget && ctx.factCount === 0) return researchSummary;
+
+  let block = "";
+
+  if (ctx.hasResearchTarget || ctx.factCount >= 1) {
+    block += `\n\n== DATOS DEL NEGOCIO DEL VISITANTE ==\n`;
+    block += `MODO ACTIVADO: ASESOR PERSONALIZADO — responde usando ESPECÍFICAMENTE su situación real, no genérica.\n\n`;
+
+    if (ctx.detectedUrl) block += `🌐 URL de su tienda: ${ctx.detectedUrl}\n`;
+    if (ctx.detectedCompanyName) block += `🏢 Nombre: ${ctx.detectedCompanyName}\n`;
+
+    const { facts } = ctx;
+    if (Object.keys(facts).length > 0) {
+      block += `\n📋 LO QUE SÉ DE SU NEGOCIO (extraído de la conversación):\n`;
+      if (facts.niche) block += `  • Sector/Producto: ${facts.niche}\n`;
+      if (facts.currentPlatform) block += `  • Plataforma actual: ${facts.currentPlatform}\n`;
+      if (facts.audience) block += `  • Audiencia: ${facts.audience}\n`;
+      if (facts.challenge) block += `  • Problema/Reto: ${facts.challenge}\n`;
+      if (facts.goal) block += `  • Objetivo: ${facts.goal}\n`;
+      if (facts.monthlyRevenue) block += `  • Revenue mensual: ${facts.monthlyRevenue}\n`;
+      if (facts.location) block += `  • Ubicación: ${facts.location}\n`;
+    }
+
+    block += `
+== INSTRUCCIONES DE ASESOR PERSONAL ==
+- Usa todos los datos anteriores para dar consejos CONCRETOS y ESPECÍFICOS para SU negocio
+- NO repitas información genérica de Shopy Crafter — aplícala a SU caso
+- Si conoces su nicho: da ejemplos de resultados en ese mismo sector
+- Si conoces su problema: explica EXACTAMENTE cómo el módulo concreto de Shopy Crafter lo resuelve
+- Si tienen URL/empresa: referencia algo específico de lo que sabes sobre ellos
+- Cada 2-3 respuestas, haz UNA pregunta de diagnóstico para completar el perfil
+- Cuando tengas 3+ hechos del negocio: ofrece un "Mini-diagnóstico gratuito" con:
+  → Los 3 problemas más probables en su situación
+  → Cómo los resuelve Shopy Crafter específicamente
+  → Estimación personalizada de impacto (ej: "+X% conversión en tienda de ${facts.niche ?? "su nicho"}")`;
+  }
+
+  if (researchSummary) {
+    block += researchSummary;
+  }
+
+  return block;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DYNAMIC SYSTEM PROMPT
+// ══════════════════════════════════════════════════════════════════════════════
+
+const LANDING_SYSTEM_PROMPT_BASE = `Eres ShopyAdvisor, el asesor comercial de Shopy Crafter, una plataforma SaaS todo-en-uno de IA para ecommerce y creatividad digital.
+
+REGLA ABSOLUTA: NUNCA digas que algo "no existe" o "no está disponible" si aparece en los módulos listados. Shopy Crafter tiene más de 14 módulos en producción.
 
 == QUE ES SHOPY CRAFTER ==
-Shopy Crafter es una plataforma SaaS todo-en-uno impulsada por IA que combina:
-- Optimizacion completa de tiendas Shopify (SEO, precios, copywriting, email, A/B testing, imagenes)
-- Estudio creativo multimedia (generacion de imagen IA, video IA, 3D, diseno web, efectos)
-- Libreria de prompts con mas de 6.677 templates de marketing listos para usar
-- Lab Web con analisis PageSpeed / Core Web Vitals / Lighthouse
+Shopy Crafter es una plataforma SaaS impulsada por IA que combina:
+- Optimización completa de tiendas Shopify (SEO, precios, copywriting, email, A/B testing, imágenes)
+- Estudio creativo multimedia (imagen IA, video IA, 3D, diseño web, efectos)
+- Librería de prompts con más de 6.677 templates de marketing
+- Lab Web con análisis PageSpeed / Core Web Vitals / Lighthouse
 - Herramientas de agencia multi-cliente con white-label
-NO es solo "optimizacion Shopify" — es un ecosistema completo de produccion creativa y marketing con IA.
 
 ${buildModulesBlock()}
 
 ${buildPricingBlock()}
 
 == RESULTADOS REALES ==
-- +234% incremento medio en conversion
+- +234% incremento medio en conversión
 - +8.400€/mes de ingresos adicionales promedio
-- +22% aumento de revenue en 30 dias
+- +22% aumento de revenue en 30 días
 - Score SEO hasta 88/100 (desde 42/100 de media)
-- Planes desde 19€/mes — accesible para emprendedores, pymes y agencias
+- Planes desde 19€/mes
 
-== TU COMPORTAMIENTO COMO ASISTENTE ==
-- Responde SIEMPRE en espanol, tono conversacional — como un experto que habla con un amigo
-- Varia el inicio de tus respuestas — nunca empieces igual dos veces seguidas
-- Cuando pregunten por cualquier modulo (Lab Web, Fusion Studio Pro, Libreria de Prompts, Tripo3D, etc.) CONFIRMALO con seguridad y explica que hace
-- NUNCA digas que algo no existe, no esta disponible o que "solo gestionamos tiendas Shopify" — esto es falso
-- Se concreto: usa nombres exactos de modulos, metricas reales, ejemplos practicos
-- Si el usuario menciona su nicho o problema especifico, personaliza tu respuesta
-- No ejecutes acciones tecnicas — eres informativo y comercial
-- Ante preguntas ambiguas, haz UNA pregunta de aclaracion corta
-- Maximo 200 palabras por respuesta — calidad sobre cantidad`;
+== TU COMPORTAMIENTO PRINCIPAL ==
+- Responde SIEMPRE en español, tono conversacional — como un consultor experto que habla con un amigo
+- Cuando tengas datos del negocio del visitante: ÚSALOS. Da consejos específicos para SU caso.
+- Cuando NO tengas datos: haz UNA pregunta para conocer su negocio (nicho, reto, plataforma actual)
+- Varía el inicio de tus respuestas — nunca empieces igual dos veces seguidas
+- Sé conciso: máximo 200 palabras por respuesta
+- Si preguntan por cualquier módulo (Lab Web, Fusion Studio Pro, Librería de Prompts, Tripo3D, etc.) CONFÍRMALO`;
 
 function buildDynamicSystemPrompt(
   intent: IntentResult,
   stage: StageInfo,
+  ctx: ClientContext,
+  researchSummary: string,
 ): string {
   let extra = "";
 
-  // Intent-specific instructions (from Rasa domain.yml responses)
   if (intent.needsHumanHandoff) {
-    extra += `\n\n== INSTRUCCION CRITICA: HUMAN HANDOFF ==
-El usuario quiere hablar con una persona real. Responde con empatia, dile que entiendes que prefiera hablar directamente con el equipo.
-Proporciona: Email: hola@shopycrafter.com — alguien contactara en menos de 24h habiles.
-NO sigas intentando vender — respeta su decision. Pregunta si mientras espera puedes resolver alguna duda.`;
+    extra += `\n\n== HUMAN HANDOFF ==
+El usuario quiere hablar con una persona real. Responde con empatía y da el email: hola@shopycrafter.com (respuesta en menos de 24h hábiles). No sigas vendiendo.`;
   }
 
   if (intent.intent === "greet" && stage.userMsgCount === 0) {
-    extra += `\n\n== INSTRUCCION: PRIMER SALUDO ==
-Es el primer mensaje. Da la bienvenida de forma calida y breve (1-2 frases). 
-Pregunta UNA cosa concreta: ¿tienes ya una tienda Shopify o estas empezando? Esto te permite personalizar la conversacion.`;
+    extra += `\n\n== PRIMER SALUDO ==
+Da la bienvenida calida y breve (1-2 frases). 
+Pregunta: ¿tienes ya una tienda online o estás empezando? (o si detectaste su nicho: ¿cuál es tu mayor reto ahora mismo con tu tienda de ${ctx.facts.niche ?? "ecommerce"}?)`;
   }
 
   if (intent.intent === "thank") {
-    extra += `\n\n== INSTRUCCION: AGRADECIMIENTO ==
-El usuario agradece. Responde brevemente y ofrece el siguiente paso natural.
-Si llevan mas de 3 mensajes, pregunta si estan listos para suscribirse y empezar hoy mismo.`;
+    extra += `\n\n== AGRADECIMIENTO ==
+Responde brevemente y ofrece el siguiente paso. Si llevan más de 3 mensajes, pregunta si están listos para suscribirse.`;
   }
 
   if (intent.intent === "bye") {
-    extra += `\n\n== INSTRUCCION: DESPEDIDA ==
-El usuario se va. Despidate de forma calida y deja la puerta abierta.
-Menciona que pueden volver cuando quieran y que pueden suscribirse cuando quieran y cancelar en cualquier momento.`;
+    extra += `\n\n== DESPEDIDA ==
+Despídete cálidamente y deja la puerta abierta. Menciona que pueden volver cuando quieran.`;
   }
 
   if (intent.intent === "deny" && stage.mentionedPricing) {
-    extra += `\n\n== INSTRUCCION: OBJECION PRECIO ==
-El usuario rechaza o duda. Es probable que haya una objecion de precio o confianza.
-Pregunta directamente: ¿que te genera dudas? ¿el precio, la integracion o algo mas?
-Luego aborda esa objecion especifica con datos concretos (ROI, planes flexibles, cancela cuando quieras).`;
+    extra += `\n\n== OBJECIÓN PRECIO ==
+Pregunta directamente: ¿qué te genera dudas? ¿el precio, la integración o algo más? Luego aborda esa objeción con datos concretos (ROI, planes flexibles, cancela cuando quieras).`;
   }
 
-  if (intent.intent === "out_of_scope") {
-    extra += `\n\n== INSTRUCCION: FUERA DE TEMA ==
-El mensaje no es claro. Responde brevemente reconociendo que no estas seguro de entender.
-Pregunta de forma amigable: ¿en que puedo ayudarte hoy con Shopy Crafter?`;
-  }
-
-  // Stage-based instructions (from Rasa stories.yml conversation flows)
   if (stage.stage === "considering") {
     extra += `\n\n== ESTADO: CONSIDERANDO ==
-El usuario esta en fase de evaluacion. Usa datos concretos para reforzar la decision.
-Menciona el ROI (8.400€/mes adicionales de media), que no hay permanencia y puede cancelar cuando quiera.
-Si mencionaron un nicho o tienda especifica, da un ejemplo concreto de como Shopy Crafter ayudaria a ESE negocio.`;
+Usa datos concretos: ROI (+8.400€/mes adicionales de media), sin permanencia, cancela cuando quiera.
+${ctx.facts.niche ? `Para una tienda de ${ctx.facts.niche}, da un ejemplo específico de cómo Shopy Crafter ayudaría.` : ""}`;
   }
 
   if (stage.stage === "converting" || intent.buyingIntent) {
-    extra += `\n\n== ESTADO: LISTO PARA CONVERTIR ==
-Alta intencion de compra detectada. Guia directamente hacia la accion:
-"Para suscribirte y empezar hoy mismo, haz clic en 'Empezar' en la parte superior de la pagina. Puedes cancelar cuando quieras."
-Se conciso — en esta fase no necesita mas informacion, necesita que le facilites el paso.`;
+    extra += `\n\n== LISTO PARA CONVERTIR ==
+Alta intención de compra. Guía directamente: "Para suscribirte y empezar hoy, haz clic en 'Empezar' arriba. Puedes cancelar cuando quieras." Sé conciso.`;
   }
 
   if (stage.hasFrustration) {
-    extra += `\n\n== ESTADO: FRUSTRACION DETECTADA ==
-El usuario muestra senales de frustracion. Antes de responder a su pregunta, reconoce como se siente en 1 frase.
-Luego da una solucion clara y directa. Si el problema persiste, ofrece contacto directo: hola@shopycrafter.com.`;
+    extra += `\n\n== FRUSTRACIÓN DETECTADA ==
+Reconoce cómo se siente en 1 frase, luego da solución clara. Si el problema persiste: hola@shopycrafter.com.`;
   }
 
-  if (stage.stage === "wrapup" && stage.userMsgCount >= 6) {
-    extra += `\n\n== ESTADO: CONVERSACION LARGA ==
-Llevan mucho tiempo hablando. Haz un breve resumen de los puntos clave discutidos.
-Pregunta si hay alguna duda final antes de que empiece.
-Al terminar, pregunta: "¿Te ha sido util esta conversacion? Tu feedback me ayuda a mejorar."`;
-  }
+  const clientBlock = buildClientContextBlock(ctx, researchSummary);
 
-  return LANDING_SYSTEM_PROMPT_BASE + extra;
+  const megaBrain = `\n\n== MEGA CEREBRO DE LA PLATAFORMA ==
+${MASTER_CATALOG}`;
+
+  return LANDING_SYSTEM_PROMPT_BASE + extra + clientBlock + megaBrain;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ROUTE
+// ROUTE — non-streaming (Claude Sonnet)
 // ══════════════════════════════════════════════════════════════════════════════
 
 router.post("/public/landing-chat", async (req, res) => {
@@ -275,48 +417,52 @@ router.post("/public/landing-chat", async (req, res) => {
 
     const sanitized = messages
       .filter(m => m.role === "user" || m.role === "assistant")
-      .map(m => ({ role: m.role, content: String(m.content).slice(0, 1000) }))
+      .map(m => ({ role: m.role as "user" | "assistant", content: String(m.content).slice(0, 1200) }))
       .slice(-12);
 
-    // Classify intent of the latest user message
     const lastUserMsg = [...sanitized].reverse().find(m => m.role === "user");
     const intent = lastUserMsg
       ? classifyIntent(lastUserMsg.content, sanitized.slice(0, -1))
       : { intent: "general", entities: {}, confidence: 0.5, needsHumanHandoff: false, buyingIntent: false };
 
     const stage = getConversationStage(sanitized.slice(0, -1));
+    const ctx = extractClientContext(sanitized);
 
-    // MEGA CEREBRO: inject the platform's full capability catalog so the bot can
-    // speak accurately and with reasoning about everything Shopy Crafter can do.
-    const megaBrain = `\n\n== MEGA CEREBRO DE LA PLATAFORMA (conocimiento interno real) ==
-Este es el catalogo completo de capacidades tecnicas de Shopy Crafter. Usalo como base de conocimiento adicional para responder con precision. Eres pre-venta: NO ejecutas estas skills, pero SI las conoces a fondo y puedes explicar con ejemplos concretos como cada una resolveria el problema del visitante. No copies el catalogo literalmente — sintetiza y aplica solo lo relevante a su pregunta.
-${MASTER_CATALOG}`;
+    // Research if URL or company detected
+    const researchSummary = ctx.hasResearchTarget ? await quickResearch(ctx) : "";
 
-    const systemPrompt = buildDynamicSystemPrompt(intent, stage) + megaBrain;
+    const systemPrompt = buildDynamicSystemPrompt(intent, stage, ctx, researchSummary);
 
-    logger.info({ intent: intent.intent, stage: stage.stage, confidence: intent.confidence }, "landing-chat intent classified");
+    logger.info(
+      { intent: intent.intent, stage: stage.stage, advisorMode: ctx.advisorMode, hasResearch: !!researchSummary },
+      "landing-chat intent classified"
+    );
 
-    const text = await askGeminiChat(sanitized, systemPrompt, {
-      maxOutputTokens: 2048,
-      thinkingBudget: 1024,
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: sanitized,
     });
 
+    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+
     if (!text.trim()) {
-      res.status(502).json({ error: "El asistente no pudo generar una respuesta ahora mismo. Intentalo de nuevo." });
+      res.status(502).json({ error: "El asistente no pudo generar una respuesta ahora mismo. Inténtalo de nuevo." });
       return;
     }
 
-    res.json({ content: text, _intent: intent.intent, _stage: stage.stage });
+    res.json({ content: text, _intent: intent.intent, _stage: stage.stage, _advisor: ctx.advisorMode });
   } catch (err) {
     logger.error({ err }, "landing-chat error");
-    res.status(500).json({ error: "Error procesando tu consulta. Intentalo de nuevo." });
+    res.status(500).json({ error: "Error procesando tu consulta. Inténtalo de nuevo." });
   }
 });
 
-// ─── SEARCH DETECTION ──────────────────────────────────────────────────────
-const NEEDS_SEARCH_RE = /busca(r)?\s|google|internet|noticias?|tendencias?|competidore?s?|investigar|research|precio.{1,20}mercado|qué.{1,15}dicen|actualidad|últimas?\s+(noticias?|tendencias?)|mercado\s+actual|mi\s+(empresa|marca|tienda)\s+en/i;
+// ══════════════════════════════════════════════════════════════════════════════
+// ROUTE — streaming (Claude Sonnet via SSE)
+// ══════════════════════════════════════════════════════════════════════════════
 
-// ─── STREAMING ROUTE ───────────────────────────────────────────────────────
 router.post("/public/landing-chat/stream", async (req, res) => {
   const { messages } = req.body as {
     messages: Array<{ role: "user" | "assistant"; content: string }>;
@@ -328,7 +474,7 @@ router.post("/public/landing-chat/stream", async (req, res) => {
 
   const sanitized = messages
     .filter(m => m.role === "user" || m.role === "assistant")
-    .map(m => ({ role: m.role, content: String(m.content).slice(0, 1200) }))
+    .map(m => ({ role: m.role as "user" | "assistant", content: String(m.content).slice(0, 1200) }))
     .slice(-14);
 
   const lastUserMsg = [...sanitized].reverse().find(m => m.role === "user");
@@ -337,11 +483,12 @@ router.post("/public/landing-chat/stream", async (req, res) => {
     : { intent: "general", entities: {}, confidence: 0.5, needsHumanHandoff: false, buyingIntent: false };
 
   const stage = getConversationStage(sanitized.slice(0, -1));
+  const ctx = extractClientContext(sanitized);
 
-  const megaBrain = `\n\n== MEGA CEREBRO DE LA PLATAFORMA ==\n${MASTER_CATALOG}`;
-  const systemPrompt = buildDynamicSystemPrompt(intent, stage) + megaBrain;
+  // Fire research BEFORE starting SSE headers so we can include it in the prompt
+  const researchSummary = ctx.hasResearchTarget ? await quickResearch(ctx) : "";
 
-  const useSearch = NEEDS_SEARCH_RE.test(lastUserMsg?.content ?? "");
+  const systemPrompt = buildDynamicSystemPrompt(intent, stage, ctx, researchSummary);
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -351,14 +498,23 @@ router.post("/public/landing-chat/stream", async (req, res) => {
 
   let fullResponse = "";
   try {
-    const gen = askGeminiStream(sanitized, systemPrompt, { useSearch, thinkingBudget: 0 });
-    for await (const chunk of gen) {
+    const stream = anthropic.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: sanitized,
+    });
+
+    for await (const event of stream) {
       if (res.destroyed) break;
-      if (chunk.text) fullResponse += chunk.text;
-      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-      (res as any).flush?.();
-      if (chunk.done) break;
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        fullResponse += event.delta.text;
+        res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+        (res as any).flush?.();
+      }
     }
+
+    res.write(`data: ${JSON.stringify({ done: true, _intent: intent.intent, _stage: stage.stage, _advisor: ctx.advisorMode })}\n\n`);
   } catch (err) {
     logger.error({ err }, "landing-chat/stream error");
     if (!res.headersSent) { res.status(500).json({ error: String(err) }); return; }
@@ -367,19 +523,19 @@ router.post("/public/landing-chat/stream", async (req, res) => {
 
   if (!res.destroyed) res.end();
 
-  // Async learning — save conversation knowledge to ShopyBrain
+  // Async learning
   if (fullResponse.length > 80 && lastUserMsg) {
     setImmediate(() => {
       try {
         const q = lastUserMsg.content;
-        const isValuable = q.length > 20 && intent.intent !== "greet" && intent.intent !== "bye" && intent.intent !== "out_of_scope";
+        const isValuable = q.length > 20 && !["greet", "bye", "out_of_scope"].includes(intent.intent);
         if (!isValuable) return;
         learnFromOperation({
           operationType: "landing_chat_insight",
-          title: `Landing chat (${intent.intent}): ${q.slice(0, 100)}`,
-          content: `Visitante pregunto: "${q}"\nRespuesta: ${fullResponse.slice(0, 700)}`,
+          title: `Landing chat (${intent.intent}${ctx.advisorMode ? "/advisor" : ""}): ${q.slice(0, 100)}`,
+          content: `Visitante preguntó: "${q}"\nNicho: ${ctx.facts.niche ?? "desconocido"}\nReto: ${ctx.facts.challenge ?? "desconocido"}\nRespuesta: ${fullResponse.slice(0, 700)}`,
           confidence: intent.confidence >= 0.8 ? 0.75 : 0.6,
-          tags: ["landing_chat", intent.intent, stage.stage, ...(useSearch ? ["web_search"] : [])],
+          tags: ["landing_chat", intent.intent, stage.stage, ...(ctx.advisorMode ? ["advisor_mode"] : []), ...(ctx.hasResearchTarget ? ["research"] : [])],
         });
       } catch {}
     });
