@@ -257,6 +257,8 @@ export default function AdminMessages() {
       setJitsiRoom(data.jitsiRoom);
       setJitsiActive(true);
       setActiveCallId(data.callId);
+      // Open Jitsi in new tab — nested iframe blocks camera/mic in dev preview
+      window.open(data.roomUrl, "_blank", "noopener,noreferrer");
       await fetch(`${API}/admin/projects/${selected.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -361,18 +363,14 @@ export default function AdminMessages() {
                 </button>
               </div>
 
-              {/* Jitsi embed */}
+              {/* Active call status bar */}
               {jitsiActive && jitsiRoom && (
-                <div style={{ height: 380, flexShrink: 0, borderBottom: "1px solid var(--bdr)", position: "relative", background: "#000" }}>
-                  <iframe
-                    src={`https://meet.jit.si/${jitsiRoom}#config.startWithAudioMuted=false&config.disableDeepLinking=true&config.prejoinPageEnabled=false&userInfo.displayName=Admin%20ShopyCrafter`}
-                    style={{ width: "100%", height: "100%", border: "none" }}
-                    allow="camera; microphone; display-capture; fullscreen"
-                    title="Videollamada"
-                  />
+                <div style={{ flexShrink: 0, borderBottom: "1px solid rgba(45,212,159,0.2)", background: "rgba(45,212,159,0.05)", padding: "10px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2dd4a0", boxShadow: "0 0 6px #2dd4a0", animation: "pulse 1.5s infinite", flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--jade)", flex: 1 }}>Videollamada en curso — el cliente recibió la notificación</span>
                   <a href={`https://meet.jit.si/${jitsiRoom}`} target="_blank" rel="noopener noreferrer"
-                    style={{ position: "absolute", bottom: 10, right: 10, padding: "5px 10px", background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 7, fontSize: 11, color: "#fff", textDecoration: "none" }}>
-                    Abrir en nueva pestaña ↗
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 20, background: "rgba(45,212,159,0.12)", border: "1px solid rgba(45,212,159,0.35)", color: "#2dd4a0", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+                    🔗 Reabrir sala
                   </a>
                 </div>
               )}

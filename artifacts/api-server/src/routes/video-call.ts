@@ -1,6 +1,6 @@
 import { Router } from "express";
 import webpush from "web-push";
-import { db, projectsTable, platformSettingsTable } from "@workspace/db";
+import { db, projectsTable, platformSettingsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
@@ -12,7 +12,8 @@ const router = Router();
 interface VideoCall {
   id: string;
   projectId: number;
-  clientId: string;
+  clientId: string;           // project.clientId (legacy match)
+  clientUserId: string | null; // users.id of the client user (primary match)
   roomUrl: string;
   jitsiRoom: string;
   status: "ringing" | "active" | "ended" | "rejected";
@@ -29,9 +30,9 @@ setInterval(() => {
   }
 }, 60_000);
 
-// ─── Push helper keys ─────────────────────────────────────────────────────────
-const SUB_KEY_PREFIX   = "push_sub::";
-const CLIENT_SUB_PFX   = "push_sub_client::";
+// ─── Push helper ─────────────────────────────────────────────────────────────
+const SUB_KEY_PREFIX    = "push_sub::";
+const CLIENT_SUB_PFX    = "push_sub_client::";
 const ADMIN_PRIMARY_KEY = "push_sub_admin_primary";
 
 async function getVapidKeys(): Promise<{ publicKey: string | null; privateKey: string | null; subject: string }> {
@@ -73,7 +74,14 @@ async function tryPush(subKey: string, payload: object): Promise<void> {
   }
 }
 
-// ─── Push subscription endpoint (saves by role: clientId or admin-primary) ────
+// Helper: check if a call matches this client session (dual strategy: userId first, clientId fallback)
+function callMatchesClient(call: VideoCall, userId: string | null, clientId: string | null): boolean {
+  if (userId && call.clientUserId && call.clientUserId === userId) return true;
+  if (clientId && call.clientId && call.clientId === clientId) return true;
+  return false;
+}
+
+// ─── Push subscription endpoint ───────────────────────────────────────────────
 router.post("/video-call/push-register", requireAuth, async (req, res): Promise<void> => {
   const session = req.session as any;
   const { subscription } = req.body as { subscription: webpush.PushSubscription };
@@ -92,7 +100,7 @@ router.post("/video-call/push-register", requireAuth, async (req, res): Promise<
   }
 });
 
-// ─── VAPID public key (for SW registration) ───────────────────────────────────
+// ─── VAPID public key ─────────────────────────────────────────────────────────
 router.get("/video-call/vapid-key", async (_req, res): Promise<void> => {
   const keys = await getVapidKeys();
   res.json({ publicKey: keys.publicKey || null });
@@ -106,23 +114,47 @@ router.post("/admin/video-call/initiate", requireAdmin, async (req, res): Promis
   try {
     const [project] = await db.select({ clientId: projectsTable.clientId, name: projectsTable.name })
       .from(projectsTable).where(eq(projectsTable.id, projectId)).limit(1);
-    if (!project?.clientId) { res.status(404).json({ error: "Proyecto no encontrado o sin cliente" }); return; }
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    // Look up the client user's userId — primary key for matching
+    let clientUserId: string | null = null;
+    if (project.clientId) {
+      try {
+        const [clientUser] = await db.select({ id: usersTable.id })
+          .from(usersTable)
+          .where(eq(usersTable.clientId, project.clientId))
+          .limit(1);
+        clientUserId = clientUser?.id ?? null;
+      } catch {}
+    }
 
     const callId = crypto.randomUUID();
-    const token = Math.random().toString(36).slice(2, 8);
+    const token  = Math.random().toString(36).slice(2, 8);
     const jitsiRoom = `ShopyCrafter-${projectId}-${token}`;
-    const roomUrl = `https://meet.jit.si/${jitsiRoom}#config.startWithAudioMuted=false&config.disableDeepLinking=true&config.prejoinPageEnabled=false&userInfo.displayName=Equipo%20Shopy%20Crafter`;
+    const roomUrl   = `https://meet.jit.si/${jitsiRoom}`;
 
-    calls.set(callId, { id: callId, projectId, clientId: project.clientId, roomUrl, jitsiRoom, status: "ringing", initiatedBy: "admin", createdAt: Date.now() });
+    calls.set(callId, {
+      id: callId, projectId,
+      clientId: project.clientId ?? "", clientUserId,
+      roomUrl, jitsiRoom, status: "ringing",
+      initiatedBy: "admin", createdAt: Date.now(),
+    });
 
-    await tryPush(CLIENT_SUB_PFX + project.clientId, {
+    // Best-effort push
+    if (clientUserId) await tryPush(SUB_KEY_PREFIX + clientUserId, {
       type: "incoming_call", callId,
       title: "📹 Shopy Crafter te llama",
-      body: "Tu asesor quiere iniciar una videollamada. Toca para unirte.",
+      body: "Tu asesor quiere iniciar una videollamada.",
+      url: "/client/messages",
+    });
+    if (project.clientId) await tryPush(CLIENT_SUB_PFX + project.clientId, {
+      type: "incoming_call", callId,
+      title: "📹 Shopy Crafter te llama",
+      body: "Tu asesor quiere iniciar una videollamada.",
       url: "/client/messages",
     });
 
-    logger.info({ callId, projectId, clientId: project.clientId }, "video-call: admin initiated");
+    logger.info({ callId, projectId, clientId: project.clientId, clientUserId }, "video-call: admin initiated");
     res.json({ callId, roomUrl, jitsiRoom });
   } catch (err: any) {
     logger.error({ err: err?.message }, "video-call: initiate failed");
@@ -146,36 +178,40 @@ router.post("/admin/video-call/:callId/accept", requireAdmin, async (req, res): 
   const call = calls.get(req.params.callId);
   if (!call) { res.status(404).json({ error: "Llamada no encontrada o expirada" }); return; }
   call.status = "active";
-  await tryPush(CLIENT_SUB_PFX + call.clientId, {
+  // Notify client
+  if (call.clientUserId) await tryPush(SUB_KEY_PREFIX + call.clientUserId, {
     type: "call_accepted", callId: call.id,
-    title: "✅ Llamada aceptada",
-    body: "El equipo de Shopy Crafter aceptó tu llamada. Toca para unirte.",
+    title: "✅ Llamada aceptada — Únete ahora",
+    url: "/client/messages",
+  });
+  if (call.clientId) await tryPush(CLIENT_SUB_PFX + call.clientId, {
+    type: "call_accepted", callId: call.id,
+    title: "✅ Llamada aceptada — Únete ahora",
     url: "/client/messages",
   });
   res.json({ ok: true, roomUrl: call.roomUrl });
 });
 
-// ─── Admin: end call ──────────────────────────────────────────────────────────
+// ─── Admin: end/reject call ───────────────────────────────────────────────────
 router.delete("/admin/video-call/:callId", requireAdmin, async (req, res): Promise<void> => {
   const call = calls.get(req.params.callId);
   if (call) {
     call.status = "ended";
-    await tryPush(CLIENT_SUB_PFX + call.clientId, {
-      type: "call_ended", callId: call.id,
-      title: "📴 Llamada finalizada",
-      body: "La videollamada ha terminado.",
-    });
+    if (call.clientUserId) await tryPush(SUB_KEY_PREFIX + call.clientUserId, { type: "call_ended", callId: call.id, title: "📴 Llamada finalizada" });
   }
   res.json({ ok: true });
 });
 
-// ─── Client: poll for incoming calls ─────────────────────────────────────────
+// ─── Client: poll for incoming calls (matches by userId OR clientId) ──────────
 router.get("/client/video-call/incoming", requireAuth, async (req, res): Promise<void> => {
-  const clientId = (req.session as any).clientId;
-  if (!clientId) { res.json({ call: null }); return; }
+  const session = req.session as any;
+  const userId   = session.userId   as string | null ?? null;
+  const clientId = session.clientId as string | null ?? null;
+
   for (const call of calls.values()) {
-    if (call.clientId === clientId && (call.status === "ringing" || call.status === "active")) {
-      res.json({ call: { id: call.id, roomUrl: call.roomUrl, status: call.status, initiatedBy: call.initiatedBy, createdAt: call.createdAt } });
+    if (call.status !== "ringing" && call.status !== "active") continue;
+    if (callMatchesClient(call, userId, clientId)) {
+      res.json({ call: { id: call.id, roomUrl: call.roomUrl, status: call.status, initiatedBy: call.initiatedBy, projectId: call.projectId, createdAt: call.createdAt } });
       return;
     }
   }
@@ -200,32 +236,32 @@ router.post("/client/video-call/:callId/reject", requireAuth, async (req, res): 
 
 // ─── Client: request call → admin ────────────────────────────────────────────
 router.post("/client/video-call/request", requireAuth, async (req, res): Promise<void> => {
-  const session = req.session as any;
-  const clientId = session.clientId;
-  const projectId = session.projectId || 0;
-  if (!clientId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const session  = req.session as any;
+  const userId   = session.userId   as string ?? "";
+  const clientId = session.clientId as string | null ?? null;
+  const projectId = Number(session.projectId) || 0;
 
-  try {
-    const callId = crypto.randomUUID();
-    const token = Math.random().toString(36).slice(2, 8);
-    const jitsiRoom = `ShopyCrafter-cli-${projectId}-${token}`;
-    const roomUrl = `https://meet.jit.si/${jitsiRoom}#config.startWithAudioMuted=false&config.disableDeepLinking=true&config.prejoinPageEnabled=false&userInfo.displayName=Cliente`;
+  const callId    = crypto.randomUUID();
+  const token     = Math.random().toString(36).slice(2, 8);
+  const jitsiRoom = `ShopyCrafter-cli-${projectId || userId.slice(0, 6)}-${token}`;
+  const roomUrl   = `https://meet.jit.si/${jitsiRoom}`;
 
-    calls.set(callId, { id: callId, projectId, clientId, roomUrl, jitsiRoom, status: "ringing", initiatedBy: "client", createdAt: Date.now() });
+  calls.set(callId, {
+    id: callId, projectId,
+    clientId: clientId ?? userId, clientUserId: userId,
+    roomUrl, jitsiRoom, status: "ringing",
+    initiatedBy: "client", createdAt: Date.now(),
+  });
 
-    await tryPush(ADMIN_PRIMARY_KEY, {
-      type: "incoming_call", callId,
-      title: "📹 Cliente quiere hablar contigo",
-      body: "Un cliente solicita una videollamada. Toca para responder.",
-      url: "/admin/messages",
-    });
+  await tryPush(ADMIN_PRIMARY_KEY, {
+    type: "incoming_call", callId,
+    title: "📹 Cliente quiere hablar contigo",
+    body: "Un cliente solicita una videollamada.",
+    url: "/admin/messages",
+  });
 
-    logger.info({ callId, projectId, clientId }, "video-call: client requested");
-    res.json({ callId, roomUrl });
-  } catch (err: any) {
-    logger.error({ err: err?.message }, "video-call: client request failed");
-    res.status(500).json({ error: err?.message || "Error solicitando llamada" });
-  }
+  logger.info({ callId, projectId, userId }, "video-call: client requested");
+  res.json({ callId, roomUrl });
 });
 
 // ─── Client: end call ─────────────────────────────────────────────────────────

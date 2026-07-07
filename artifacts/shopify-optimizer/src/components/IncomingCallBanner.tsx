@@ -127,6 +127,8 @@ export default function IncomingCallBanner() {
       const res = await fetch(endpoint, { method: "POST", credentials: "include" });
       const data = await res.json();
       const room = data.roomUrl || incomingCall.roomUrl;
+      // Open Jitsi in new tab so camera/mic permissions work correctly
+      window.open(room, "_blank", "noopener,noreferrer");
       setActiveRoom(room);
       setActiveCallId(incomingCall.id);
       setIncomingCall(null);
@@ -251,43 +253,33 @@ export default function IncomingCallBanner() {
         </div>
       )}
 
-      {/* ── Active call: full-screen Jitsi overlay ── */}
+      {/* ── Active call: floating status bar (Jitsi opened in new tab) ── */}
       {activeRoom && (
         <div style={{
-          position: "fixed", inset: 0, zIndex: 99998,
-          background: "#000", display: "flex", flexDirection: "column",
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          zIndex: 99998, display: "flex", alignItems: "center", gap: 12,
+          background: "rgba(10,10,20,0.95)", backdropFilter: "blur(12px)",
+          border: "1px solid rgba(45,212,159,0.35)", borderRadius: 50,
+          padding: "10px 20px 10px 16px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
         }}>
-          {/* Top bar */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "10px 16px",
-            background: "rgba(0,0,0,0.85)", borderBottom: "1px solid rgba(255,255,255,0.08)",
-            flexShrink: 0, zIndex: 1,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2dd4a0", animation: "pulse 2s infinite" }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--t1)" }}>Videollamada en curso</span>
-              <span style={{ fontSize: 11, color: "var(--t3)", fontVariantNumeric: "tabular-nums" }}>{fmt(elapsed)}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 11, color: "var(--t3)" }}>powered by Jitsi Meet</span>
-              <button onClick={endCall} style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "7px 14px", borderRadius: 9,
-                background: "rgba(220,60,60,0.15)", border: "1px solid rgba(220,60,60,0.45)",
-                color: "#e84558", fontSize: 12, fontWeight: 700, cursor: "pointer",
-              }}>
-                <PhoneOff size={13} /> Finalizar
-              </button>
-            </div>
-          </div>
-
-          {/* Jitsi iframe */}
-          <iframe
-            src={activeRoom}
-            allow="camera; microphone; fullscreen; display-capture; autoplay"
-            style={{ flex: 1, border: "none", width: "100%", height: "100%" }}
-          />
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2dd4a0", flexShrink: 0,
+            boxShadow: "0 0 6px #2dd4a0", animation: "callAnswerPulse 1.5s ease-in-out infinite" }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", whiteSpace: "nowrap" }}>
+            Videollamada en curso · {fmt(elapsed)}
+          </span>
+          <button
+            onClick={() => window.open(activeRoom, "_blank", "noopener,noreferrer")}
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 20,
+              background: "rgba(45,212,159,0.15)", border: "1px solid rgba(45,212,159,0.4)",
+              color: "#2dd4a0", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            <Video size={12} /> Reabrir
+          </button>
+          <button onClick={endCall} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px",
+            borderRadius: 20, background: "rgba(220,60,60,0.12)", border: "1px solid rgba(220,60,60,0.4)",
+            color: "#e84558", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            <PhoneOff size={12} /> Finalizar
+          </button>
         </div>
       )}
 

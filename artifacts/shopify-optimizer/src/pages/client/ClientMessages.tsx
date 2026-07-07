@@ -444,6 +444,8 @@ export default function ClientMessages() {
                           setCallRoom(data.roomUrl);
                           setCallId(data.callId);
                           setCallActive(true);
+                          // Open in new tab so camera/mic permissions work correctly
+                          window.open(data.roomUrl, "_blank", "noopener,noreferrer");
                         } catch (e: any) { alert(e?.message || "No se pudo iniciar la llamada"); }
                         finally { setCallRequesting(false); }
                       }}
@@ -773,28 +775,30 @@ export default function ClientMessages() {
         </div>
       )}
     </ClientLayout>
-    {/* ── Client-initiated call: full-screen Jitsi overlay ── */}
+    {/* ── Client-initiated call: floating status bar ── */}
     {callActive && callRoom && !isAdmin && (
-      <div style={{ position: "fixed", inset: 0, zIndex: 99990, background: "#000", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", background: "rgba(0,0,0,0.85)", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2dd4a0", animation: "pulse 2s infinite" }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Videollamada con tu agencia</span>
-          </div>
-          <button
-            onClick={async () => {
-              if (callId) await fetch(`${API_BASE}/api/client/video-call/${callId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
-              setCallActive(false); setCallRoom(""); setCallId(null);
-            }}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, background: "rgba(220,60,60,0.15)", border: "1px solid rgba(220,60,60,0.45)", color: "#e84558", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            📴 Finalizar llamada
-          </button>
-        </div>
-        <iframe
-          src={callRoom}
-          allow="camera; microphone; fullscreen; display-capture; autoplay"
-          style={{ flex: 1, border: "none", width: "100%", height: "100%" }}
-        />
+      <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 99990,
+        display: "flex", alignItems: "center", gap: 12,
+        background: "rgba(10,10,20,0.95)", backdropFilter: "blur(12px)",
+        border: "1px solid rgba(45,212,159,0.35)", borderRadius: 50,
+        padding: "10px 20px 10px 16px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2dd4a0", boxShadow: "0 0 6px #2dd4a0", flexShrink: 0 }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", whiteSpace: "nowrap" }}>Llamada en curso con tu agencia</span>
+        <button onClick={() => window.open(callRoom, "_blank", "noopener,noreferrer")}
+          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 20,
+            background: "rgba(45,212,159,0.15)", border: "1px solid rgba(45,212,159,0.4)",
+            color: "#2dd4a0", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          🔗 Reabrir sala
+        </button>
+        <button onClick={async () => {
+            if (callId) await fetch(`${API_BASE}/api/client/video-call/${callId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+            setCallActive(false); setCallRoom(""); setCallId(null);
+          }}
+          style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 20,
+            background: "rgba(220,60,60,0.12)", border: "1px solid rgba(220,60,60,0.4)",
+            color: "#e84558", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          📴 Finalizar
+        </button>
       </div>
     )}
     </>
