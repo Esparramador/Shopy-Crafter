@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Loader2, Sparkles, ChevronDown, Phone, PhoneOff } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Sparkles, ChevronDown, Phone } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -519,182 +519,42 @@ export default function LandingChatbot() {
   );
 }
 
-// ── Voice call modal for landing page (public, no auth required) ──────────────
+// ── Voice call — Coming Soon modal ────────────────────────────────────────────
 function LandingVoiceModal({ onClose }: { onClose: () => void }) {
-  const [status, setStatus] = useState<"idle" | "provisioning" | "connecting" | "connected" | "error">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [transcript, setTranscript] = useState<Array<{ role: "user" | "agent"; text: string }>>([]);
-  const wsRef = useRef<WebSocket | null>(null);
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const queueRef = useRef<AudioBuffer[]>([]);
-  const playingRef = useRef(false);
-  const endingRef = useRef(false);
-
-  const safeCloseCtx = () => {
-    const ctx = audioCtxRef.current;
-    if (ctx && ctx.state !== "closed") ctx.close().catch(() => {});
-    audioCtxRef.current = null;
-  };
-
-  const playNext = async () => {
-    const ctx = audioCtxRef.current;
-    if (playingRef.current || queueRef.current.length === 0 || !ctx || ctx.state === "closed") return;
-    playingRef.current = true;
-    const buf = queueRef.current.shift()!;
-    try {
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.onended = () => { playingRef.current = false; playNext(); };
-      src.start();
-    } catch { playingRef.current = false; }
-  };
-
-  const startCall = async () => {
-    endingRef.current = false;
-    setStatus("provisioning"); setErrorMsg("");
-    try {
-      const r = await fetch(`${API}/api/voice/public-call-url`);
-      if (!r.ok) { const e = await r.json().catch(() => ({})) as any; throw new Error(e.error ?? "Error iniciando llamada"); }
-      const { signed_url } = await r.json() as { signed_url: string };
-      setStatus("connecting");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") safeCloseCtx();
-      const ctx = new AudioContext();
-      audioCtxRef.current = ctx;
-      if (ctx.state === "suspended") await ctx.resume();
-      const ws = new WebSocket(signed_url);
-      wsRef.current = ws;
-      ws.onopen = () => {
-        setStatus("connected");
-        ws.send(JSON.stringify({
-          type: "conversation_initiation_client_data",
-          conversation_config_override: {
-            tts: { output_format: "mp3_44100_128" },
-          },
-        }));
-        const rec = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
-        mediaRef.current = rec;
-        rec.ondataavailable = (e) => {
-          if (ws.readyState === WebSocket.OPEN && e.data.size > 0) {
-            const reader = new FileReader();
-            reader.onload = () => { const b64 = (reader.result as string).split(",")[1]; if (b64) ws.send(JSON.stringify({ user_audio_chunk: b64 })); };
-            reader.readAsDataURL(e.data);
-          }
-        };
-        rec.start(250);
-      };
-      ws.onmessage = async (evt) => {
-        try {
-          const msg = JSON.parse(evt.data) as Record<string, any>;
-          // ElevenLabs requires ping/pong to keep session alive
-          if (msg.type === "ping") {
-            ws.send(JSON.stringify({ type: "pong", event_id: msg.ping_event?.event_id }));
-            return;
-          }
-          if (msg.type === "audio" && msg.audio_event?.audio_base_64) {
-            const currentCtx = audioCtxRef.current;
-            if (!currentCtx || currentCtx.state === "closed") return;
-            const raw = atob(msg.audio_event.audio_base_64);
-            const bytes = new Uint8Array(raw.length).map((_, i) => raw.charCodeAt(i));
-            try {
-              const decoded = await currentCtx.decodeAudioData(bytes.buffer.slice(0));
-              if (audioCtxRef.current === currentCtx && currentCtx.state !== "closed") {
-                queueRef.current.push(decoded);
-                playNext();
-              }
-            } catch { /* skip bad chunk */ }
-          } else if (msg.type === "transcript" || msg.type === "user_transcript") {
-            const text = msg.transcript ?? msg.user_transcript ?? "";
-            if (text) setTranscript(p => [...p, { role: "user", text }]);
-          } else if (msg.type === "agent_response") {
-            const text = msg.agent_response ?? "";
-            if (text) setTranscript(p => [...p, { role: "agent", text }]);
-          }
-        } catch { /* ignore */ }
-      };
-      ws.onerror = () => { if (!endingRef.current) { setStatus("error"); setErrorMsg("Error de conexión WebSocket"); } };
-      ws.onclose = () => {
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-        if (!endingRef.current) setStatus("idle");
-      };
-    } catch (err: any) {
-      setStatus("error");
-      setErrorMsg(err.message ?? "Error iniciando llamada");
-    }
-  };
-
-  const endCall = (opts?: { unmounting?: boolean }) => {
-    if (endingRef.current) return;
-    endingRef.current = true;
-    const ws = wsRef.current;
-    wsRef.current = null;
-    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) ws.close();
-    if (mediaRef.current?.state !== "inactive") { try { mediaRef.current?.stop(); } catch { /* ignore */ } }
-    mediaRef.current = null;
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    queueRef.current = [];
-    playingRef.current = false;
-    safeCloseCtx();
-    if (!opts?.unmounting) setStatus("idle");
-  };
-
-  useEffect(() => { return () => endCall({ unmounting: true }); }, []);
-
-  const isActive = status === "connected";
-  const isBusy = status === "provisioning" || status === "connecting";
-
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}
-      onClick={e => { if (e.target === e.currentTarget) { endCall(); onClose(); } }}>
-      <div style={{ background: "linear-gradient(160deg,#111010,#0d0d0d)", border: "1px solid rgba(200,168,75,0.25)", borderRadius: 24, padding: "32px 28px", width: "min(380px,92vw)", display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
-        <div style={{ width: 80, height: 80, borderRadius: "50%", background: "linear-gradient(135deg,#c8a84b,#2dd49f)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, animation: (isActive || isBusy) ? "voicePulseL 1.5s ease-in-out infinite" : "none" }}>🤖</div>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#f0e8cc", marginBottom: 4 }}>Asesor Shopy Crafter — Voz</div>
-          <div style={{ fontSize: 12, color: status === "error" ? "#e84558" : status === "connected" ? "#2dd49f" : "#c8a84b", fontWeight: 600 }}>
-            {{ idle: "Listo para hablar", provisioning: "Preparando asistente...", connecting: "Conectando...", connected: "En llamada", error: errorMsg }[status]}
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(10px)" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "linear-gradient(160deg,#111010,#0d0d0d)", border: "1px solid rgba(200,168,75,0.3)", borderRadius: 24, padding: "40px 32px", width: "min(400px,92vw)", display: "flex", flexDirection: "column", alignItems: "center", gap: 20, textAlign: "center" }}>
+        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg,rgba(200,168,75,0.15),rgba(200,168,75,0.05))", border: "2px solid rgba(200,168,75,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>
+          🎙️
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#c8a84b", textTransform: "uppercase", marginBottom: 8 }}>
+            Próximamente
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: "#f0e8cc", marginBottom: 10, lineHeight: 1.3 }}>
+            Asesor IA por voz
+          </div>
+          <p style={{ fontSize: 13, color: "rgba(240,232,204,0.6)", lineHeight: 1.6, maxWidth: 300, margin: "0 auto" }}>
+            Estamos integrando llamadas de voz en tiempo real con IA. Muy pronto podrás hablar directamente con nuestro asesor.
+          </p>
+        </div>
+        <div style={{ width: "100%", background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.15)", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 20 }}>💬</span>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#c8a84b", marginBottom: 2 }}>Mientras tanto, usa el chat</div>
+            <div style={{ fontSize: 11, color: "rgba(240,232,204,0.5)" }}>Nuestro chatbot IA responde al instante, 24/7</div>
           </div>
         </div>
-        {transcript.length > 0 && (
-          <div style={{ width: "100%", maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "8px 10px" }}>
-            {transcript.slice(-5).map((t, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: t.role === "user" ? "flex-end" : "flex-start" }}>
-                <div style={{ background: t.role === "user" ? "rgba(200,168,75,0.15)" : "rgba(45,212,159,0.12)", border: `1px solid ${t.role === "user" ? "rgba(200,168,75,0.3)" : "rgba(45,212,159,0.3)"}`, borderRadius: 8, padding: "4px 8px", fontSize: 11, color: "#f0e8cc", maxWidth: "85%" }}>
-                  <span style={{ fontSize: 9, color: "rgba(240,232,204,0.5)", display: "block", marginBottom: 1 }}>{t.role === "user" ? "Tú" : "IA"}</span>
-                  {t.text}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ display: "flex", gap: 10 }}>
-          {status === "idle" ? (
-            <button onClick={startCall} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 24px", background: "linear-gradient(135deg,#c8a84b,#a07830)", color: "#fff", borderRadius: 30, border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-              <Phone size={16} /> Hablar con IA
-            </button>
-          ) : isBusy ? (
-            <button disabled style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 24px", background: "rgba(255,255,255,0.08)", color: "rgba(240,232,204,0.5)", borderRadius: 30, border: "none", fontSize: 14, fontWeight: 700, cursor: "not-allowed" }}>
-              <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Conectando...
-            </button>
-          ) : status === "connected" ? (
-            <button onClick={endCall} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 24px", background: "#e84558", color: "#fff", borderRadius: 30, border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-              <PhoneOff size={16} /> Colgar
-            </button>
-          ) : (
-            <button onClick={startCall} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 24px", background: "linear-gradient(135deg,#c8a84b,#a07830)", color: "#fff", borderRadius: 30, border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-              Reintentar
-            </button>
-          )}
-          <button onClick={() => { endCall(); onClose(); }} style={{ padding: "10px 16px", background: "rgba(255,255,255,0.06)", color: "rgba(240,232,204,0.6)", borderRadius: 30, border: "1px solid rgba(255,255,255,0.1)", fontSize: 13, cursor: "pointer" }}>Cerrar</button>
-        </div>
-        <p style={{ fontSize: 10, color: "rgba(240,232,204,0.35)", textAlign: "center", maxWidth: 280 }}>Asesor virtual disponible 24/7 · puede resolver dudas y tomar nota de tus mensajes · no genera contenido</p>
+        <button
+          onClick={onClose}
+          style={{ padding: "11px 32px", background: "linear-gradient(135deg,#c8a84b,#a07830)", color: "#fff", borderRadius: 30, border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", width: "100%" }}
+        >
+          Entendido
+        </button>
       </div>
-      <style>{`@keyframes voicePulseL { 0%,100%{box-shadow:0 0 0 0 rgba(200,168,75,0.4)} 50%{box-shadow:0 0 0 12px rgba(200,168,75,0)} }`}</style>
     </div>
   );
 }
