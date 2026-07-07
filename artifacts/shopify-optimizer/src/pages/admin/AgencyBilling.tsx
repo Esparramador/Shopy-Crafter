@@ -28,19 +28,19 @@ interface Invoice {
 }
 
 const CATEGORY_META: Record<string, { label: string; color: string; icon: string; defaultRate: number }> = {
-  estrategia:  { label: "Estrategia IA",       color: "#8b5cf6", icon: "🧠", defaultRate: 120 },
-  diseño:      { label: "Diseño & Branding",    color: "#f59e0b", icon: "🎨", defaultRate: 85 },
-  desarrollo:  { label: "Desarrollo Web",       color: "#60a5fa", icon: "💻", defaultRate: 95 },
-  ia:          { label: "Generación con IA",    color: "#4ade80", icon: "⚡", defaultRate: 150 },
-  gestion:     { label: "Gestión Shopify",      color: "#fb923c", icon: "🛒", defaultRate: 70 },
-  publicidad:  { label: "Publicidad & Ads",     color: "#ec4899", icon: "📣", defaultRate: 80 },
-  seo:         { label: "SEO & Contenido",      color: "#22d3ee", icon: "🔍", defaultRate: 75 },
-  otro:        { label: "Otros servicios",      color: "#94a3b8", icon: "📦", defaultRate: 60 },
+  estrategia:  { label: "Estrategia IA",       color: "#8b5cf6", icon: "🧠", defaultRate: 90 },
+  diseño:      { label: "Diseño & Branding",    color: "#f59e0b", icon: "🎨", defaultRate: 68 },
+  desarrollo:  { label: "Desarrollo Web",       color: "#60a5fa", icon: "💻", defaultRate: 75 },
+  ia:          { label: "Generación con IA",    color: "#4ade80", icon: "⚡", defaultRate: 110 },
+  gestion:     { label: "Gestión Shopify",      color: "#fb923c", icon: "🛒", defaultRate: 55 },
+  publicidad:  { label: "Publicidad & Ads",     color: "#ec4899", icon: "📣", defaultRate: 65 },
+  seo:         { label: "SEO & Contenido",      color: "#22d3ee", icon: "🔍", defaultRate: 60 },
+  otro:        { label: "Otros servicios",      color: "#94a3b8", icon: "📦", defaultRate: 48 },
 };
 
 function newItem(): LineItem {
   const id = Math.random().toString(36).slice(2);
-  return { id, description: "", category: "gestion", hours: 1, rate: 70, quantity: 1, unit: "horas", subtotal: 70 };
+  return { id, description: "", category: "gestion", hours: 1, rate: 55, quantity: 1, unit: "horas", subtotal: 55 };
 }
 
 function calcSubtotal(item: LineItem) {
@@ -50,18 +50,18 @@ function calcSubtotal(item: LineItem) {
 }
 
 const QUICK_SERVICES = [
-  { description: "Estrategia de contenido IA mensual", category: "estrategia" as const, hours: 8, rate: 120, unit: "horas" as const },
-  { description: "Diseño de identidad de marca con IA (DNA Brand)", category: "diseño" as const, hours: 6, rate: 95, unit: "horas" as const },
-  { description: "Configuración y optimización tienda Shopify", category: "gestion" as const, hours: 10, rate: 70, unit: "horas" as const },
-  { description: "Auditoría SEO completa + plan de keywords", category: "seo" as const, hours: 5, rate: 85, unit: "horas" as const },
-  { description: "Generación de imágenes de producto con IA (20 piezas)", category: "ia" as const, quantity: 20, rate: 8, unit: "unidades" as const, hours: 0 },
-  { description: "Vídeos de producto con IA (pack 5 vídeos)", category: "ia" as const, quantity: 5, rate: 35, unit: "unidades" as const, hours: 0 },
-  { description: "Gestión mensual redes sociales + contenido IA", category: "publicidad" as const, rate: 450, unit: "fijo" as const, hours: 0, quantity: 1 },
-  { description: "Campaña publicitaria Meta Ads (setup + gestión)", category: "publicidad" as const, hours: 12, rate: 80, unit: "horas" as const },
-  { description: "Informe de rendimiento mensual con IA", category: "estrategia" as const, rate: 150, unit: "fijo" as const, hours: 0, quantity: 1 },
-  { description: "Desarrollo de landing page optimizada", category: "desarrollo" as const, hours: 16, rate: 95, unit: "horas" as const },
-  { description: "Integración Shopify + automatizaciones", category: "desarrollo" as const, hours: 8, rate: 95, unit: "horas" as const },
-  { description: "Formación en herramientas IA (sesión 2h)", category: "estrategia" as const, rate: 280, unit: "fijo" as const, hours: 0, quantity: 1 },
+  { description: "Estrategia de contenido IA mensual", category: "estrategia" as const, hours: 8, rate: 90, unit: "horas" as const },
+  { description: "Diseño de identidad de marca con IA (DNA Brand)", category: "diseño" as const, hours: 6, rate: 75, unit: "horas" as const },
+  { description: "Configuración y optimización tienda Shopify", category: "gestion" as const, hours: 10, rate: 55, unit: "horas" as const },
+  { description: "Auditoría SEO completa + plan de keywords", category: "seo" as const, hours: 5, rate: 65, unit: "horas" as const },
+  { description: "Generación de imágenes de producto con IA (20 piezas)", category: "ia" as const, quantity: 20, rate: 6, unit: "unidades" as const, hours: 0 },
+  { description: "Vídeos de producto con IA (pack 5 vídeos)", category: "ia" as const, quantity: 5, rate: 25, unit: "unidades" as const, hours: 0 },
+  { description: "Gestión mensual redes sociales + contenido IA", category: "publicidad" as const, rate: 350, unit: "fijo" as const, hours: 0, quantity: 1 },
+  { description: "Campaña publicitaria Meta Ads (setup + gestión)", category: "publicidad" as const, hours: 12, rate: 65, unit: "horas" as const },
+  { description: "Informe de rendimiento mensual con IA", category: "estrategia" as const, rate: 120, unit: "fijo" as const, hours: 0, quantity: 1 },
+  { description: "Desarrollo de landing page optimizada", category: "desarrollo" as const, hours: 16, rate: 75, unit: "horas" as const },
+  { description: "Integración Shopify + automatizaciones", category: "desarrollo" as const, hours: 8, rate: 75, unit: "horas" as const },
+  { description: "Formación en herramientas IA (sesión 2h)", category: "estrategia" as const, rate: 200, unit: "fijo" as const, hours: 0, quantity: 1 },
 ];
 
 export default function AgencyBilling() {

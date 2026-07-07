@@ -14,8 +14,8 @@ export const CANONICAL_PLANS: CanonicalPlan[] = [
   {
     id: "emprendedor",
     name: "Emprendedor",
-    priceMonthly: 19,
-    priceAnnual: 190,
+    priceMonthly: 14,
+    priceAnnual: 140,
     currency: "€",
     featured: false,
     badge: null,
@@ -34,8 +34,8 @@ export const CANONICAL_PLANS: CanonicalPlan[] = [
   {
     id: "starter",
     name: "Starter",
-    priceMonthly: 49,
-    priceAnnual: 490,
+    priceMonthly: 37,
+    priceAnnual: 370,
     currency: "€",
     featured: false,
     badge: null,
@@ -54,8 +54,8 @@ export const CANONICAL_PLANS: CanonicalPlan[] = [
   {
     id: "agency_pro",
     name: "Growth",
-    priceMonthly: 149,
-    priceAnnual: 1490,
+    priceMonthly: 112,
+    priceAnnual: 1120,
     currency: "€",
     featured: true,
     badge: "Más popular",
@@ -74,8 +74,8 @@ export const CANONICAL_PLANS: CanonicalPlan[] = [
   {
     id: "enterprise",
     name: "Enterprise",
-    priceMonthly: 399,
-    priceAnnual: 3990,
+    priceMonthly: 299,
+    priceAnnual: 2990,
     currency: "€",
     featured: false,
     badge: null,

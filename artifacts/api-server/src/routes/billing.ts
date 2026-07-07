@@ -16,19 +16,19 @@ const PLANS: Record<string, {
   periodDays: number; visible?: boolean;
 }> = {
   emprendedor: {
-    name: "Emprendedor", price: 19, storesLimit: 1, imagesIncluded: 10, periodDays: 30,
+    name: "Emprendedor", price: 14, storesLimit: 1, imagesIncluded: 10, periodDays: 30,
     features: ["1 tienda", "5 productos/mes", "10 imágenes IA/mes", "Auditoría Shopify", "Chatbot IA", "SEO básico"],
   },
   starter: {
-    name: "Starter", price: 49, storesLimit: 3, imagesIncluded: 45, periodDays: 30,
+    name: "Starter", price: 37, storesLimit: 3, imagesIncluded: 45, periodDays: 30,
     features: ["3 tiendas", "15 productos/mes", "45 imágenes IA/mes", "Todos los módulos IA", "SEO técnico", "Pricing dinámico", "Soporte prioritario"],
   },
   agency_pro: {
-    name: "Growth", price: 149, storesLimit: 10, imagesIncluded: 300, periodDays: 30,
+    name: "Growth", price: 112, storesLimit: 10, imagesIncluded: 300, periodDays: 30,
     features: ["10 tiendas", "60 productos/mes", "300 imágenes IA/mes", "A/B Testing", "Informes Pro", "Análisis competidores", "API Access"],
   },
   enterprise: {
-    name: "Enterprise", price: 399, storesLimit: -1, imagesIncluded: 1200, periodDays: 30,
+    name: "Enterprise", price: 299, storesLimit: -1, imagesIncluded: 1200, periodDays: 30,
     features: ["Tiendas ilimitadas", "200 productos/mes", "1.200 imágenes IA/mes", "A/B Testing ilimitado", "White-label", "Account Manager", "Soporte 24/7"],
   },
   trial: {
@@ -126,12 +126,12 @@ async function ensureBillingPlansTable(): Promise<void> {
 ensureBillingPlansTable();
 
 // ── Seed canonical plans once per deploy (idempotent via version tag) ─────────
-const CANONICAL_SEED_VERSION = "v10-canonical-5plans-2026";
+const CANONICAL_SEED_VERSION = "v12-canonical-5plans-2026-mid";
 const CANONICAL_BILLING_PLANS = [
   {
     id: "emprendedor",
     name: "Emprendedor",
-    price: 19, priceAnnual: 190,
+    price: 14, priceAnnual: 140,
     currency: "€", featured: false, badge: null,
     features: [
       { text: "5 productos/mes", included: true },
@@ -149,7 +149,7 @@ const CANONICAL_BILLING_PLANS = [
   {
     id: "starter",
     name: "Starter",
-    price: 49, priceAnnual: 490,
+    price: 37, priceAnnual: 370,
     currency: "€", featured: false, badge: null,
     features: [
       { text: "15 productos/mes", included: true },
@@ -167,7 +167,7 @@ const CANONICAL_BILLING_PLANS = [
   {
     id: "agency_pro",
     name: "Growth",
-    price: 149, priceAnnual: 1490,
+    price: 112, priceAnnual: 1120,
     currency: "€", featured: true, badge: "Más popular",
     features: [
       { text: "60 productos/mes", included: true },
@@ -185,7 +185,7 @@ const CANONICAL_BILLING_PLANS = [
   {
     id: "enterprise",
     name: "Enterprise",
-    price: 399, priceAnnual: 3990,
+    price: 299, priceAnnual: 2990,
     currency: "€", featured: false, badge: null,
     features: [
       { text: "200 productos/mes", included: true },

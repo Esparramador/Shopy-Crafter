@@ -31,8 +31,8 @@ export const PLATFORM_PLANS: PlatformPlan[] = [
   {
     id: "emprendedor",
     name: "Emprendedor",
-    priceMonthly: 19,
-    priceAnnual: 190,
+    priceMonthly: 14,
+    priceAnnual: 140,
     currency: "€",
     productsPerMonth: 5,
     imagesPerMonth: 10,
@@ -48,8 +48,8 @@ export const PLATFORM_PLANS: PlatformPlan[] = [
   {
     id: "starter",
     name: "Starter",
-    priceMonthly: 49,
-    priceAnnual: 490,
+    priceMonthly: 37,
+    priceAnnual: 370,
     currency: "€",
     productsPerMonth: 15,
     imagesPerMonth: 45,
@@ -65,8 +65,8 @@ export const PLATFORM_PLANS: PlatformPlan[] = [
   {
     id: "agency_pro",
     name: "Growth",
-    priceMonthly: 149,
-    priceAnnual: 1490,
+    priceMonthly: 112,
+    priceAnnual: 1120,
     currency: "€",
     popular: true,
     productsPerMonth: 60,
@@ -85,8 +85,8 @@ export const PLATFORM_PLANS: PlatformPlan[] = [
   {
     id: "enterprise",
     name: "Enterprise",
-    priceMonthly: 399,
-    priceAnnual: 3990,
+    priceMonthly: 299,
+    priceAnnual: 2990,
     currency: "€",
     productsPerMonth: 200,
     imagesPerMonth: 1200,
