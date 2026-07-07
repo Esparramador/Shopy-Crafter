@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { anthropic } from "@workspace/integrations-anthropic-ai";
-import { askGeminiWithSearch, askGeminiWithUrls } from "../lib/gemini.js";
+import { askGeminiChat, askGeminiStream, askGeminiWithSearch, askGeminiWithUrls } from "../lib/gemini.js";
 import { MASTER_CATALOG } from "../lib/master-skills-injector.js";
 import { logger } from "../lib/logger.js";
 import { learnFromOperation } from "../lib/claude.js";
@@ -401,7 +400,7 @@ ${MASTER_CATALOG}`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ROUTE — non-streaming (Claude Sonnet)
+// ROUTE — non-streaming (Gemini Flash)
 // ══════════════════════════════════════════════════════════════════════════════
 
 router.post("/public/landing-chat", async (req, res) => {
@@ -435,17 +434,10 @@ router.post("/public/landing-chat", async (req, res) => {
 
     logger.info(
       { intent: intent.intent, stage: stage.stage, advisorMode: ctx.advisorMode, hasResearch: !!researchSummary },
-      "landing-chat intent classified"
+      "landing-chat (gemini) intent classified"
     );
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: sanitized,
-    });
-
-    const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+    const text = await askGeminiChat(sanitized, systemPrompt, { maxOutputTokens: 2048 });
 
     if (!text.trim()) {
       res.status(502).json({ error: "El asistente no pudo generar una respuesta ahora mismo. Inténtalo de nuevo." });
@@ -460,7 +452,7 @@ router.post("/public/landing-chat", async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ROUTE — streaming (Claude Sonnet via SSE)
+// ROUTE — streaming (Gemini Flash via SSE)
 // ══════════════════════════════════════════════════════════════════════════════
 
 router.post("/public/landing-chat/stream", async (req, res) => {
@@ -498,23 +490,24 @@ router.post("/public/landing-chat/stream", async (req, res) => {
 
   let fullResponse = "";
   try {
-    const stream = anthropic.messages.stream({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: sanitized,
-    });
+    const stream = askGeminiStream(sanitized, systemPrompt);
 
-    for await (const event of stream) {
+    for await (const chunk of stream) {
       if (res.destroyed) break;
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        fullResponse += event.delta.text;
-        res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+      if (chunk.text) {
+        fullResponse += chunk.text;
+        res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
         (res as any).flush?.();
       }
+      if (chunk.done) {
+        res.write(`data: ${JSON.stringify({ done: true, _intent: intent.intent, _stage: stage.stage, _advisor: ctx.advisorMode })}\n\n`);
+        break;
+      }
+      if (chunk.error) {
+        res.write(`data: ${JSON.stringify({ error: chunk.error, done: true })}\n\n`);
+        break;
+      }
     }
-
-    res.write(`data: ${JSON.stringify({ done: true, _intent: intent.intent, _stage: stage.stage, _advisor: ctx.advisorMode })}\n\n`);
   } catch (err) {
     logger.error({ err }, "landing-chat/stream error");
     if (!res.headersSent) { res.status(500).json({ error: String(err) }); return; }
