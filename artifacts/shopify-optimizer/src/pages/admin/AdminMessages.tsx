@@ -142,6 +142,7 @@ export default function AdminMessages() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [jitsiActive, setJitsiActive] = useState(false);
   const [jitsiRoom, setJitsiRoom] = useState("");
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
 
   const handleProductNav = useCallback((handle: string) => {
     if (selected) {
@@ -244,19 +245,38 @@ export default function AdminMessages() {
 
   const startVideoCall = useCallback(async () => {
     if (!selected) return;
-    const token = Math.random().toString(36).slice(2, 8);
-    const room = `ShopyCrafter-${selected.id}-${token}`;
-    const url = `https://meet.jit.si/${room}`;
-    setJitsiRoom(room);
-    setJitsiActive(true);
-    await fetch(`${API}/admin/projects/${selected.id}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ content: `📹 Videollamada iniciada — únete aquí: ${url}` }),
-    }).catch(() => {});
-    loadMsgs(String(selected.id));
+    try {
+      const res = await fetch(`${API}/admin/video-call/initiate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId: selected.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error iniciando llamada");
+      setJitsiRoom(data.jitsiRoom);
+      setJitsiActive(true);
+      setActiveCallId(data.callId);
+      await fetch(`${API}/admin/projects/${selected.id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: `📹 Videollamada iniciada — únete aquí: https://meet.jit.si/${data.jitsiRoom}` }),
+      }).catch(() => {});
+      loadMsgs(String(selected.id));
+    } catch (err: any) {
+      alert(err?.message || "Error al iniciar la videollamada");
+    }
   }, [selected, loadMsgs]);
+
+  const endVideoCall = useCallback(async () => {
+    if (activeCallId) {
+      await fetch(`${API}/admin/video-call/${activeCallId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+    }
+    setJitsiActive(false);
+    setJitsiRoom("");
+    setActiveCallId(null);
+  }, [activeCallId]);
 
   return (
     <AppLayout>
@@ -333,7 +353,7 @@ export default function AdminMessages() {
                   </div>
                 </div>
                 <button
-                  onClick={jitsiActive ? () => { setJitsiActive(false); setJitsiRoom(""); } : startVideoCall}
+                  onClick={jitsiActive ? endVideoCall : startVideoCall}
                   title={jitsiActive ? "Finalizar videollamada" : "Iniciar videollamada"}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: `1px solid ${jitsiActive ? "rgba(220,60,60,0.4)" : "rgba(45,212,159,0.35)"}`, background: jitsiActive ? "rgba(220,60,60,0.08)" : "rgba(45,212,159,0.07)", color: jitsiActive ? "#e84558" : "var(--jade)", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}>
                   {jitsiActive ? <VideoOff size={14} /> : <Video size={14} />}

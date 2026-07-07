@@ -82,6 +82,7 @@ import youtubeRouter from "./youtube.js";
 import calendarRouter from "./calendar.js";
 import viralRouter from "./viral.js";
 import chatGroupsRouter from "./chat-groups.js";
+import videoCallRouter from "./video-call.js";
 import apiKeysRouter from "./api-keys.js";
 import freepikRouter from "./freepik.js";
 import aiCatalogRouter from "./ai-catalog.js";
@@ -144,6 +145,7 @@ router.use(vismeRouter);
 router.use(promptExecRouter);
 router.use(youtubeRouter);
 router.use(voiceRouter);
+router.use(videoCallRouter);
 
 router.use(requireAdmin, meshyRouter);
 router.use(requireAdmin, stitchRouter);

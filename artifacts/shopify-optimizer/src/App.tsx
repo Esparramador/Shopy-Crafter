@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import SCCursor from "@/components/ui/SCCursor";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { initGlobalErrorHandlers } from "@/lib/global-error-handler";
+import IncomingCallBanner from "@/components/IncomingCallBanner";
 
 const Home = lazy(() => import("@/pages/Home"));
 const NewProject = lazy(() => import("@/pages/NewProject"));
@@ -827,6 +828,7 @@ function App() {
                 <Router />
                 <AdminOmniChatbotSlot />
                 <PublicChatbotSlot />
+                <IncomingCallBanner />
               </WouterRouter>
             </AuthProvider>
           </CmsProvider>

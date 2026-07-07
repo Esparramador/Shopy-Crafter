@@ -183,6 +183,10 @@ export default function ClientMessages() {
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
   const [barsReady, setBarsReady] = useState(false);
+  const [callActive, setCallActive] = useState(false);
+  const [callRoom, setCallRoom] = useState("");
+  const [callId, setCallId] = useState<string | null>(null);
+  const [callRequesting, setCallRequesting] = useState(false);
 
   const loadMessages = useCallback(() => {
     fetch(apid(`${API_BASE}/api/client/messages`), { credentials: "include" })
@@ -284,6 +288,7 @@ export default function ClientMessages() {
   };
 
   return (
+    <>
     <ClientLayout>
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 24, fontWeight: 400, marginBottom: 2 }}>
@@ -421,6 +426,31 @@ export default function ClientMessages() {
                       style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: "1px solid rgba(45,212,159,0.4)", background: "rgba(45,212,159,0.08)", color: "var(--jade)", fontSize: 12, fontWeight: 700, textDecoration: "none", animation: "pulse 2s infinite" }}>
                       <Video size={14} /> Unirse
                     </a>
+                  )}
+                  {!isAdmin && (
+                    <button
+                      disabled={callRequesting}
+                      onClick={async () => {
+                        if (callActive) {
+                          if (callId) await fetch(`${API_BASE}/api/client/video-call/${callId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+                          setCallActive(false); setCallRoom(""); setCallId(null);
+                          return;
+                        }
+                        setCallRequesting(true);
+                        try {
+                          const res = await fetch(`${API_BASE}/api/client/video-call/request`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({}) });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error || "Error");
+                          setCallRoom(data.roomUrl);
+                          setCallId(data.callId);
+                          setCallActive(true);
+                        } catch (e: any) { alert(e?.message || "No se pudo iniciar la llamada"); }
+                        finally { setCallRequesting(false); }
+                      }}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 9, border: `1px solid ${callActive ? "rgba(220,60,60,0.4)" : "rgba(201,169,97,0.4)"}`, background: callActive ? "rgba(220,60,60,0.08)" : "rgba(201,169,97,0.06)", color: callActive ? "#e84558" : "var(--gold)", fontSize: 12, fontWeight: 600, cursor: callRequesting ? "wait" : "pointer", transition: "all 0.15s" }}>
+                      <Video size={14} />
+                      {callRequesting ? "Conectando…" : callActive ? "Finalizar" : "Llamar al equipo"}
+                    </button>
                   )}
                 </div>
                 {callUrl && (
@@ -743,5 +773,30 @@ export default function ClientMessages() {
         </div>
       )}
     </ClientLayout>
+    {/* ── Client-initiated call: full-screen Jitsi overlay ── */}
+    {callActive && callRoom && !isAdmin && (
+      <div style={{ position: "fixed", inset: 0, zIndex: 99990, background: "#000", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", background: "rgba(0,0,0,0.85)", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2dd4a0", animation: "pulse 2s infinite" }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>Videollamada con tu agencia</span>
+          </div>
+          <button
+            onClick={async () => {
+              if (callId) await fetch(`${API_BASE}/api/client/video-call/${callId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+              setCallActive(false); setCallRoom(""); setCallId(null);
+            }}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, background: "rgba(220,60,60,0.15)", border: "1px solid rgba(220,60,60,0.45)", color: "#e84558", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            📴 Finalizar llamada
+          </button>
+        </div>
+        <iframe
+          src={callRoom}
+          allow="camera; microphone; fullscreen; display-capture; autoplay"
+          style={{ flex: 1, border: "none", width: "100%", height: "100%" }}
+        />
+      </div>
+    )}
+    </>
   );
 }
