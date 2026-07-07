@@ -575,6 +575,7 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
   const tts: TtsConfig = {
     voice_id: voiceId,
     model_id: CONVAI_SPANISH_MODEL,  // Obligatorio para agentes no ingleses
+    output_format: "mp3_44100_128",  // MP3 decodificable por Web Audio API (PCM crudo no funciona en browser)
     voice_settings: {
       stability: 0.18,        // Baja → más expresiva, menos robótica
       similarity_boost: 0.92, // Alta → muy fiel al clon original
@@ -609,7 +610,7 @@ async function getOrCreateConvAIAgent(type: AgentType): Promise<string> {
     return _agentIdCache[cacheKey];
   }
 
-  // 3. DB-cached agent ID
+  // 3. DB-cached agent ID — always sync config in background so prompt changes take effect
   try {
     await ensurePlatformSettingsKV();
     const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
@@ -617,7 +618,18 @@ async function getOrCreateConvAIAgent(type: AgentType): Promise<string> {
     const cachedId: string | undefined = rowArr[0]?.value;
     if (cachedId && cachedId.length > 4) {
       _agentIdCache[cacheKey] = cachedId;
-      logger.info({ type, agentId: cachedId }, "ConvAI agent loaded from DB cache");
+      logger.info({ type, agentId: cachedId }, "ConvAI agent loaded from DB cache — syncing config");
+      // Sync config in background so prompt/voice changes always take effect on restart
+      setImmediate(async () => {
+        try {
+          const voiceId = await resolveSevillanoVoiceId();
+          const freshConfig = agentConfigFor(type, voiceId);
+          await updateConvAIAgent(cachedId, freshConfig);
+          logger.info({ type, agentId: cachedId }, "ConvAI agent config synced");
+        } catch (e) {
+          logger.warn({ err: (e as Error)?.message, type }, "ConvAI config sync failed (non-fatal)");
+        }
+      });
       return cachedId;
     }
   } catch (e) {

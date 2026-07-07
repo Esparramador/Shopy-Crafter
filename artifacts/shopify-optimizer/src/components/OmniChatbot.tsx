@@ -4368,7 +4368,7 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
       if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
         safeCloseAudioCtx();
       }
-      const ctx = new AudioContext({ sampleRate: 16000 });
+      const ctx = new AudioContext();
       audioCtxRef.current = ctx;
       if (ctx.state === "suspended") await ctx.resume();
 
@@ -4377,7 +4377,7 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
 
       ws.onopen = () => {
         setStatus("connected");
-        ws.send(JSON.stringify({ type: "conversation_initiation_client_data", conversation_config_override: {} }));
+        ws.send(JSON.stringify({ type: "conversation_initiation_client_data", conversation_config_override: { tts: { output_format: "mp3_44100_128" } } }));
         const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
         mediaRecorderRef.current = recorder;
         recorder.ondataavailable = (e) => {
@@ -4396,6 +4396,10 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
       ws.onmessage = async (evt) => {
         try {
           const msg = JSON.parse(evt.data) as Record<string, any>;
+          if (msg.type === "ping") {
+            ws.send(JSON.stringify({ type: "pong", event_id: msg.ping_event?.event_id }));
+            return;
+          }
           if (msg.type === "audio" && msg.audio_event?.audio_base_64) {
             const currentCtx = audioCtxRef.current;
             if (!currentCtx || currentCtx.state === "closed") return;

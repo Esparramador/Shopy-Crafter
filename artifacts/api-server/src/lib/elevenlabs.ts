@@ -516,6 +516,7 @@ export interface ConvAIAgentConfig {
       model_id?: string;
       voice_settings?: ConvAIVoiceSettings;
       speed?: number;
+      output_format?: string;
     };
   };
   platform_settings?: Record<string, unknown>;
