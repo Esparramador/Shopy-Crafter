@@ -66,7 +66,10 @@ if (!PASSWORD) fail("ADMIN_PASSWORD no está definido en el entorno");
 if (!existsSync(MIC_WAV)) fail(`No existe el fixture de micrófono ${MIC_WAV}`);
 mkdirSync(SHOTS, { recursive: true });
 
-function fail(msg) { console.error(`✗ ${msg}`); process.exit(1); }
+// Una aserción fallida lanza (no process.exit): así el bloque finally siempre
+// llega a borrar el usuario de prueba; el código de salida se fija en el catch.
+class E2EFailure extends Error {}
+function fail(msg) { console.error(`✗ ${msg}`); throw new E2EFailure(msg); }
 function ok(msg) { console.log(`✓ ${msg}`); }
 function assert(cond, msg) { if (!cond) fail(msg); ok(msg); }
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -345,6 +348,9 @@ try {
   await page.getByRole("button", { name: "Cerrar", exact: true }).click();
   console.log(`\nCapturas en ${SHOTS}`);
   console.log("TODO OK");
+} catch (err) {
+  process.exitCode = 1;
+  if (!(err instanceof E2EFailure)) console.error("✗ Error inesperado:", err);
 } finally {
   // El usuario de prueba se borra de verdad (DELETE /api/admin/users/:id) y se
   // comprueba que ya no aparece en el listado; si no se puede, se desactiva para
@@ -352,11 +358,14 @@ try {
   if (testClient?.id) {
     try {
       const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
-      await ctx.request.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
+      const relogin = await ctx.request.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
+      if (!relogin.ok()) throw new Error(`login admin para limpieza → ${relogin.status()}`);
       const del = await ctx.request.delete(`${BASE}/api/admin/users/${testClient.id}`);
       if (del.ok()) {
-        const list = await (await ctx.request.get(`${BASE}/api/admin/users`)).json().catch(() => []);
-        const stillThere = Array.isArray(list) && list.some((u) => u.id === testClient.id);
+        const listRes = await ctx.request.get(`${BASE}/api/admin/users`);
+        const list = listRes.ok() ? await listRes.json().catch(() => null) : null;
+        if (!Array.isArray(list)) throw new Error(`GET /api/admin/users tras el borrado → ${listRes.status()} (no devolvió lista)`);
+        const stillThere = list.some((u) => u.id === testClient.id);
         console.log(`  usuario de prueba ${testClient.email} borrado → ${del.status()}${stillThere ? " ¡PERO SIGUE EN EL LISTADO!" : " (ya no aparece en el listado)"}`);
         if (stillThere) process.exitCode = 1;
       } else {

@@ -5,9 +5,9 @@ import { existsSync } from "fs";
 import { execSync } from "child_process";
 import {
   db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable,
-  onboardingProgressTable, achievementsTable, subscriptionsTable, affiliatesTable, reportTemplatesTable, youtubeTokensTable,
+  onboardingProgressTable, achievementsTable, subscriptionsTable, affiliatesTable, referralTrackingTable, reportTemplatesTable, youtubeTokensTable,
 } from "@workspace/db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
@@ -248,6 +248,16 @@ router.delete("/users/:userId", async (req, res): Promise<void> => {
       await tx.delete(onboardingProgressTable).where(eq(onboardingProgressTable.userId, targetId));
       await tx.delete(achievementsTable).where(eq(achievementsTable.userId, targetId));
       await tx.delete(subscriptionsTable).where(eq(subscriptionsTable.userId, targetId));
+      // Suscripción push (guardada en platform_settings bajo push_sub::<userId>).
+      await tx.delete(platformSettingsTable).where(eq(platformSettingsTable.key, `push_sub::${targetId}`));
+      // Programa de afiliados: si otro afiliado lo refirió, se conserva su comisión
+      // pero sin enlace al usuario; los referidos de su propio código se eliminan.
+      await tx.update(referralTrackingTable).set({ referredUserId: null })
+        .where(eq(referralTrackingTable.referredUserId, targetId));
+      await tx.delete(referralTrackingTable).where(inArray(
+        referralTrackingTable.affiliateId,
+        tx.select({ id: affiliatesTable.id }).from(affiliatesTable).where(eq(affiliatesTable.userId, targetId)),
+      ));
       await tx.delete(affiliatesTable).where(eq(affiliatesTable.userId, targetId));
       await tx.delete(reportTemplatesTable).where(eq(reportTemplatesTable.userId, targetId));
       await tx.delete(youtubeTokensTable).where(eq(youtubeTokensTable.userId, targetId));
