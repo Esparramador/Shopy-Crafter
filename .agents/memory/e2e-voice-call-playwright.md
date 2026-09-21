@@ -10,3 +10,9 @@ description: Durable lessons for browser-testing the ConvAI voice call (fake mic
 **Why:** ElevenLabs event payloads are nested (`user_transcription_event.user_transcript`, `agent_response_event.agent_response`); the modal parsed the flat shape for months and the transcript never rendered without anyone noticing, because nothing checked the user's side of the conversation.
 
 **How to apply:** a spare api-server for env-override paths (e.g. cloned voice → 503) must be launched as a background task, not `nohup … &` in a one-off shell. The session cookie only sticks on the https dev domain, not `http://localhost`.
+
+**Rule 3 (client mode):** run `E2E_MODE=client` (script `e2e:voice-call:client`) for the client-panel path. It creates a throwaway client user via the admin users API (nanoid email under `@e2e.invalid`), drives the client chatbot's own voice entry point, and asserts `GET /voice/convai/health` reports the `client` agent `ok` afterwards. There is no user DELETE route, so cleanup deactivates the user.
+
+**Why:** `VoiceCallModal` had a `mode="client"` branch for months that no client could ever reach — the admin OmniChatbot is mounted only for `role === "admin"`. A mode branch inside a component is not an entry point; verify a role can actually open the modal before testing it.
+
+**How to apply:** any element with an infinite CSS animation (client FAB, pulsing "Colgar") needs `click({ force: true })` after an explicit visibility wait; Playwright's stability check never passes.

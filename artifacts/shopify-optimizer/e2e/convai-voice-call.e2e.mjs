@@ -16,6 +16,15 @@
 //                     define, también se comprueba el camino de error
 //                     (503 voice_not_allowed_on_plan) en el modal.
 //   E2E_SCREENSHOT_DIR carpeta para capturas (por defecto /tmp/convai-e2e)
+//   E2E_MODE          "admin" (por defecto) o "client".
+//                     En modo client se crea un usuario de prueba de rol cliente
+//                     (email aleatorio con nanoid, nunca datos reales) vía
+//                     POST /api/admin/users, se entra con él en /client, se abre el
+//                     chatbot del panel de cliente → "Consultar por voz" y se hace la
+//                     misma llamada real contra GET /api/voice/client-call-url (agente
+//                     "client"; si no existe, ESTA llamada lo crea en ElevenLabs).
+//                     Al terminar se exige que GET /api/voice/convai/health muestre el
+//                     agente client en verde (status "ok") y se desactiva el usuario.
 //
 // Es una llamada REAL (consume créditos ElevenLabs): se cuelga en cuanto Arturo
 // ha contestado a la frase inyectada.
@@ -27,6 +36,7 @@
 // un agent_response con audio: eso solo ocurre si los user_audio_chunk PCM16
 // enviados por el navegador se transcriben correctamente.
 import { chromium } from "playwright";
+import { nanoid } from "nanoid";
 import { execSync } from "node:child_process";
 import { mkdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -37,6 +47,14 @@ const EMAIL = process.env.E2E_ADMIN_EMAIL || "craftershopy@gmail.com";
 const PASSWORD = process.env.ADMIN_PASSWORD;
 const ERROR_API = (process.env.E2E_ERROR_API_URL || "").replace(/\/$/, "");
 const SHOTS = process.env.E2E_SCREENSHOT_DIR || "/tmp/convai-e2e";
+const MODE = process.env.E2E_MODE || "admin";
+if (MODE !== "admin" && MODE !== "client") fail(`E2E_MODE debe ser "admin" o "client" (recibido: ${MODE})`);
+const IS_CLIENT = MODE === "client";
+// Ruta que usa el modal según el modo (VoiceCallModal.tsx) y el texto del botón
+// de inicio: el modo cliente muestra "Consultar por voz" en vez de "Iniciar llamada".
+const CALL_URL_PATH = IS_CLIENT ? "/api/voice/client-call-url" : "/api/voice/convai/call-url";
+const MODAL_TITLE = IS_CLIENT ? "Consultar Informes — Voz" : "Asistente IA — Voz";
+const START_BUTTON = IS_CLIENT ? "Consultar por voz" : "Iniciar llamada";
 const CALL_TIMEOUT_MS = 60_000;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MIC_WAV = path.join(HERE, "fixtures", "user-phrase-16k.wav");
@@ -78,6 +96,9 @@ const wsInfo = {
   micChunks: 0, micBytes: 0, userTranscripts: [], agentResponses: [], interruptions: 0,
 };
 const callUrlResponses = [];
+// Modo cliente: usuario efímero creado para la prueba y estado previo del agente.
+let testClient = null;
+let clientAgentBefore = null;
 
 try {
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
@@ -123,23 +144,60 @@ try {
     });
   });
   page.on("response", async (r) => {
-    if (r.url().includes("/api/voice/convai/call-url")) {
+    if (r.url().includes(CALL_URL_PATH)) {
       let body = null; try { body = await r.json(); } catch {}
       callUrlResponses.push({ status: r.status(), body });
     }
   });
 
   // ── Login (API; la UI de login no es lo que se prueba) ─────────────────────
-  const login = await page.request.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
-  assert(login.ok(), `Login admin ${EMAIL} → ${login.status()}`);
+  // Sesión admin aparte (contexto propio): crea el cliente de prueba, consulta el
+  // health de ConvAI y limpia al final. En modo admin es la misma cuenta que llama.
+  const admin = await browser.newContext({ ignoreHTTPSErrors: true });
+  const adminApi = admin.request;
+  const adminLogin = await adminApi.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
+  assert(adminLogin.ok(), `Login admin ${EMAIL} → ${adminLogin.status()}`);
 
-  await page.goto(`${BASE}/admin`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Abrir asistente Shopy Crafter" }).click({ timeout: 20_000 });
-  const expand = page.getByRole("button", { name: "Expandir chat" });
-  if (await expand.isVisible().catch(() => false)) await expand.click();
-  await page.getByRole("button", { name: "Llamada de voz con IA" }).click({ timeout: 15_000 });
-  await page.getByText("Asistente IA — Voz").waitFor({ timeout: 10_000 });
-  ok("Modal de llamada abierto");
+  if (IS_CLIENT) {
+    // Estado previo del agente client: si no existe, esta llamada debe crearlo.
+    const before = await (await adminApi.get(`${BASE}/api/voice/convai/health`)).json().catch(() => ({}));
+    const beforeClient = before?.agents?.find((a) => a.type === "client");
+    clientAgentBefore = beforeClient?.status ?? "(sin respuesta)";
+    console.log(`  health previo del agente client: ${clientAgentBefore}${beforeClient?.agentId ? ` (${beforeClient.agentId})` : ""}`);
+
+    // Usuario cliente efímero: identificador aleatorio, nunca una cuenta real.
+    const tag = nanoid(10);
+    testClient = { email: `e2e-voz-${tag.toLowerCase()}@e2e.invalid`, password: `E2e-${nanoid(18)}`, name: `E2E Voz ${tag}` };
+    const created = await adminApi.post(`${BASE}/api/admin/users`, {
+      data: { email: testClient.email, name: testClient.name, role: "client", password: testClient.password },
+    });
+    const createdBody = await created.json().catch(() => ({}));
+    assert(created.ok() && createdBody.id && createdBody.role === "client", `Creado usuario cliente de prueba ${testClient.email} → ${created.status()} ${JSON.stringify(createdBody).slice(0, 120)}`);
+    testClient.id = createdBody.id;
+
+    const login = await page.request.post(`${BASE}/api/auth/login`, { data: { email: testClient.email, password: testClient.password } });
+    const loginBody = await login.json().catch(() => ({}));
+    assert(login.ok() && loginBody.role === "client", `Login cliente ${testClient.email} → ${login.status()} role=${loginBody.role}`);
+
+    await page.goto(`${BASE}/client`, { waitUntil: "domcontentloaded" });
+    // FAB del chatbot del panel de cliente (ClientChatbot) → botón 📞 "Abrir consulta por voz".
+    // El FAB "respira" con una animación CSS infinita: Playwright nunca lo ve estable.
+    const fab = page.locator("button.cb-fab");
+    await fab.waitFor({ state: "visible", timeout: 20_000 });
+    await fab.click({ force: true, timeout: 5_000 });
+    await page.getByRole("button", { name: "Abrir consulta por voz", exact: true }).click({ timeout: 15_000 });
+  } else {
+    const login = await page.request.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
+    assert(login.ok(), `Login admin ${EMAIL} → ${login.status()}`);
+
+    await page.goto(`${BASE}/admin`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Abrir asistente Shopy Crafter" }).click({ timeout: 20_000 });
+    const expand = page.getByRole("button", { name: "Expandir chat" });
+    if (await expand.isVisible().catch(() => false)) await expand.click();
+    await page.getByRole("button", { name: "Llamada de voz con IA" }).click({ timeout: 15_000 });
+  }
+  await page.getByText(MODAL_TITLE).waitFor({ timeout: 10_000 });
+  ok(`Modal de llamada abierto (modo ${MODE}: "${MODAL_TITLE}")`);
 
   // ── Llamada real ────────────────────────────────────────────────────────────
   const statesSeen = new Set();
@@ -165,7 +223,9 @@ try {
     for (const t of errorTexts) if (await page.getByText(t, { exact: false }).isVisible().catch(() => false)) errorSeen.push(t);
   }
 
-  await page.getByRole("button", { name: "Iniciar llamada" }).click();
+  // En el modal, el botón de inicio comparte nombre con el estado idle del modo
+  // cliente ("Consultar por voz"): se elige explícitamente el botón.
+  await page.getByRole("button", { name: START_BUTTON, exact: true }).click();
   const started = Date.now();
   // Condición de éxito: transcripción del usuario con la frase inyectada, seguida
   // de una respuesta del agente (texto + audio) posterior a esa transcripción.
@@ -205,7 +265,8 @@ try {
   console.log("  consola formats:", fmtLine ?? "(no encontrado)");
   console.log("");
 
-  assert(callUrlResponses.some(r => r.status === 200 && r.body?.signed_url), "GET /api/voice/convai/call-url → 200 con signed_url");
+  assert(callUrlResponses.some(r => r.status === 200 && r.body?.signed_url), `GET ${CALL_URL_PATH} → 200 con signed_url`);
+  if (IS_CLIENT) assert(callUrlResponses.some(r => r.status === 200 && r.body?.mode === "client"), "La respuesta indica mode=client (agente client, no el admin)");
   assert(wsInfo.opened.some(u => u.includes("elevenlabs.io")), "Se abrió el WebSocket con ElevenLabs");
   assert(!!fmtLine, 'Consola: "ConvAI formats announced" registrado');
   assert(wsInfo.metadata?.agent_output_audio_format === "pcm_16000", `Metadata anuncia agent_output_audio_format=pcm_16000 (recibido: ${wsInfo.metadata?.agent_output_audio_format})`);
@@ -231,8 +292,21 @@ try {
   assert(wsInfo.errors.length === 0, "ElevenLabs no envió eventos de error");
 
   // Tras colgar: el botón de inicio vuelve.
-  await page.getByRole("button", { name: "Iniciar llamada" }).waitFor({ timeout: 5_000 });
+  await page.getByRole("button", { name: START_BUTTON, exact: true }).waitFor({ timeout: 5_000 });
   ok('Tras "Colgar" el modal vuelve a idle');
+
+  // ── Modo cliente: el agente "client" queda creado y sano en ElevenLabs ──────
+  if (IS_CLIENT) {
+    const usedAgentId = callUrlResponses.find(r => r.status === 200)?.body?.agentId;
+    const healthResp = await adminApi.get(`${BASE}/api/voice/convai/health`);
+    const health = await healthResp.json().catch(() => ({}));
+    const clientAgent = health?.agents?.find((a) => a.type === "client");
+    console.log("  health tras la llamada:", JSON.stringify({ healthy: health?.healthy, voice: health?.voice?.ok, client: clientAgent }));
+    assert(healthResp.ok(), `GET /api/voice/convai/health → ${healthResp.status()}`);
+    assert(clientAgent?.status === "ok", `El agente client aparece en verde (status=ok) — antes: ${clientAgentBefore}, ahora: ${clientAgent?.status}${clientAgent?.error ? ` (${clientAgent.error})` : ""}`);
+    assert(!!usedAgentId && clientAgent?.agentId === usedAgentId, `El health apunta al mismo agente usado en la llamada (${usedAgentId})`);
+    if (clientAgentBefore === "not_created") ok("Primera llamada de un cliente: el agente client se creó correctamente en ElevenLabs");
+  }
 
   // ── Camino de error: voz clonada no permitida por el plan ──────────────────
   if (ERROR_API) {
@@ -240,9 +314,10 @@ try {
     // ELEVEN_CONVAI_VOICE_ID=<voz clonada>. Comprobamos su respuesta con la
     // misma sesión y la inyectamos en la petición del modal, que así renderiza
     // exactamente lo que devolvería el backend en producción.
-    const errLogin = await page.request.post(`${ERROR_API}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
+    const errCreds = IS_CLIENT ? { email: testClient.email, password: testClient.password } : { email: EMAIL, password: PASSWORD };
+    const errLogin = await page.request.post(`${ERROR_API}/api/auth/login`, { data: errCreds });
     assert(errLogin.ok(), `Login en api-server de error → ${errLogin.status()}`);
-    const errResp = await page.request.get(`${ERROR_API}/api/voice/convai/call-url`);
+    const errResp = await page.request.get(`${ERROR_API}${CALL_URL_PATH}`);
     const errBody = await errResp.json().catch(() => ({}));
     console.log("  error-api call-url:", errResp.status(), JSON.stringify(errBody).slice(0, 300));
     assert(errResp.status() === 503, `Backend con voz clonada responde 503 (recibido ${errResp.status()})`);
@@ -250,10 +325,10 @@ try {
     assert(/clon instantáneo/.test(errBody.error || ""), "Mensaje explica que la voz es un clon instantáneo no permitido por el plan");
 
     const wsBefore = wsInfo.opened.length;
-    await page.route("**/api/voice/convai/call-url*", (route) => route.fulfill({
+    await page.route(`**${CALL_URL_PATH}*`, (route) => route.fulfill({
       status: 503, contentType: "application/json", body: JSON.stringify(errBody),
     }));
-    await page.getByRole("button", { name: "Iniciar llamada" }).click();
+    await page.getByRole("button", { name: START_BUTTON, exact: true }).click();
     const errLocator = page.getByText(errBody.error, { exact: true });
     await errLocator.waitFor({ timeout: 10_000 });
     await page.screenshot({ path: `${SHOTS}/02-error-voz-plan.png` });
@@ -261,7 +336,7 @@ try {
     await page.getByRole("button", { name: "Reintentar" }).waitFor({ timeout: 3_000 });
     ok('Aparece el botón "Reintentar"');
     assert(wsInfo.opened.length === wsBefore, "No se abrió ningún WebSocket en el intento fallido");
-    await page.unroute("**/api/voice/convai/call-url*");
+    await page.unroute(`**${CALL_URL_PATH}*`);
   } else {
     console.log("(E2E_ERROR_API_URL no definido: camino de error omitido)");
   }
@@ -270,5 +345,18 @@ try {
   console.log(`\nCapturas en ${SHOTS}`);
   console.log("TODO OK");
 } finally {
+  // El usuario de prueba no debe quedar activo (no existe DELETE de usuarios en el
+  // API admin; se desactiva, que es lo que impide iniciar sesión).
+  if (testClient?.id) {
+    try {
+      const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
+      await ctx.request.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
+      const r = await ctx.request.post(`${BASE}/api/admin/users/${testClient.id}/deactivate`);
+      console.log(`  usuario de prueba ${testClient.email} desactivado → ${r.status()}`);
+      await ctx.close();
+    } catch (e) {
+      console.warn(`  no se pudo desactivar el usuario de prueba ${testClient.email}: ${e?.message}`);
+    }
+  }
   await browser.close();
 }

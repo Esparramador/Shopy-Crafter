@@ -1,6 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+// Base without /api: VoiceCallModal appends its own /api/voice/... path.
+const API_ORIGIN = import.meta.env.BASE_URL.replace(/\/$/, "");
+// Lazy: the ConvAI modal (audio pipeline + WebSocket) only loads when the
+// client actually asks for a voice consultation.
+const VoiceCallModal = lazy(() => import("@/components/VoiceCallModal"));
 
 interface UploadedFile {
   fileUrl: string;
@@ -88,6 +93,7 @@ export function ClientChatbot() {
   const [savingIdx, setSavingIdx]   = useState<number | null>(null);
   const [projectMode, setProjectMode] = useState(false);
   const [expandedMsgs, setExpandedMsgs] = useState<Set<number>>(new Set());
+  const [voiceCallOpen, setVoiceCallOpen] = useState(false);
 
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
@@ -451,6 +457,15 @@ export function ClientChatbot() {
               <span style={{ fontSize: 13 }}>{projectMode ? "🎯" : "🎯"}</span>
               <span>{projectMode ? "Proyecto ON" : "Proyecto"}</span>
             </button>
+            {/* ConvAI voice call (Arturo) — consultas de informes por voz */}
+            <button
+              onClick={() => setVoiceCallOpen(true)}
+              aria-label="Abrir consulta por voz"
+              title="Consultar por voz — habla con el asistente IA en tiempo real"
+              style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(56,189,248,0.35)", background: "rgba(56,189,248,0.10)", color: "#38bdf8", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
+            >
+              📞
+            </button>
             {/* Voice toggle */}
             <button
               onClick={() => { setVoiceOn(v => !v); if (!voiceOn) window.speechSynthesis?.cancel(); }}
@@ -702,6 +717,13 @@ export function ClientChatbot() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ConvAI voice call modal — client mode (GET /api/voice/client-call-url) */}
+      {voiceCallOpen && (
+        <Suspense fallback={null}>
+          <VoiceCallModal onClose={() => setVoiceCallOpen(false)} API={API_ORIGIN} mode="client" />
+        </Suspense>
       )}
     </>
   );

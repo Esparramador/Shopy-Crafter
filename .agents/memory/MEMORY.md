@@ -69,5 +69,5 @@
 - [voiceRouter must be pre-gate](voice-router-pre-gate.md) — voiceRouter mixes public (/public-call-url), session-auth (/client-call-url), and requireAdmin routes — must mount BEFORE global requireAdmin gate like fsProRouter.
 - [Platform registry + strict Stripe tenancy](platform-registry-stripe.md) — mirrored platform-capabilities.ts (both artifacts); Stripe projects 409 not Master fallback; unlink clears client_secret too; legacy /stripe/accounts guarded.
 - [ConvAI health check semantics](convai-health-check.md) — GET health is read-only with ok/drift/error; repair only via reset-agents, which must use single-flight and sync the env-pinned admin agent in place.
-- [E2E for microphone/WebSocket voice flows](e2e-voice-call-playwright.md) — testing subagent breaks on mic permission; use e2e:voice-call script (Nix chromium + fake device); force-click pulsing Colgar.
+- [E2E for microphone/WebSocket voice flows](e2e-voice-call-playwright.md) — testing subagent breaks on mic permission; use e2e:voice-call[:client] (Nix chromium + fake device); force-click animated buttons; a mode branch ≠ an entry point.
 - [ConvAI agent voice settings are flat tts.* fields](convai-tts-flat-fields.md) — nested tts.voice_settings is silently ignored by the Agents API; send stability/similarity_boost/speed flat; owner picked 0.5/0.8/1.2 by ear.
