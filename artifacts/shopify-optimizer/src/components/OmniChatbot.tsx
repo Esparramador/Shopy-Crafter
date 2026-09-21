@@ -4322,12 +4322,17 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
   const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const micProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const micMuteRef = useRef<GainNode | null>(null);
-  const audioQueueRef = useRef<AudioBuffer[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioFormatRef = useRef("pcm_16000");
   const decodeChainRef = useRef(Promise.resolve());
-  const playingRef = useRef(false);
+  // Timeline scheduling: each chunk starts exactly where the previous one ends
+  // (sample-contiguous), instead of chaining on `onended` which leaves gaps.
+  const nextStartTimeRef = useRef(0);
+  const activeSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const endingRef = useRef(false); // guard against double-endCall
+
+  // Small jitter buffer before the first chunk of an utterance plays.
+  const PLAYBACK_LEAD_SEC = 0.06;
 
   const safeCloseAudioCtx = () => {
     const ctx = audioCtxRef.current;
@@ -4337,30 +4342,49 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
     audioCtxRef.current = null;
   };
 
-  const playNextAudio = async () => {
-    const ctx = audioCtxRef.current;
-    if (playingRef.current || audioQueueRef.current.length === 0 || !ctx || ctx.state === "closed") return;
-    playingRef.current = true;
-    const buf = audioQueueRef.current.shift()!;
-    try {
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.onended = () => {
-        playingRef.current = false;
+  const stopAgentPlayback = () => {
+    for (const src of activeSourcesRef.current) {
+      src.onended = null;
+      try { src.stop(); } catch { /* already stopped */ }
+    }
+    activeSourcesRef.current.clear();
+    nextStartTimeRef.current = 0;
+    setAgentSpeaking(false);
+  };
+
+  const scheduleAudio = (ctx: AudioContext, buf: AudioBuffer) => {
+    if (ctx.state === "closed") return;
+    const now = ctx.currentTime;
+    const startAt = Math.max(nextStartTimeRef.current, now + PLAYBACK_LEAD_SEC);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    activeSourcesRef.current.add(src);
+    src.onended = () => {
+      activeSourcesRef.current.delete(src);
+      if (activeSourcesRef.current.size === 0 && !endingRef.current) {
         setAgentSpeaking(false);
-        if (audioQueueRef.current.length === 0) setStatus("connected");
-        playNextAudio();
-      };
-      setAgentSpeaking(true);
-      setStatus("speaking");
-      src.start();
-    } catch { playingRef.current = false; }
+        setStatus(prev => (prev === "speaking" ? "connected" : prev));
+      }
+    };
+    src.start(startAt);
+    nextStartTimeRef.current = startAt + buf.duration;
+    setAgentSpeaking(true);
+    setStatus(prev => (prev === "connected" ? "speaking" : prev));
   };
 
   const startCall = async () => {
     endingRef.current = false;
     setStatus("provisioning"); setErrorMsg("");
+    // Create + resume the AudioContext synchronously inside the click gesture.
+    // Doing it after the fetch/getUserMedia awaits loses the user activation on
+    // Safari/mobile and the context stays suspended → silent call.
+    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+      safeCloseAudioCtx();
+    }
+    const ctx = new AudioContext();
+    audioCtxRef.current = ctx;
+    const resumePromise = ctx.state === "suspended" ? ctx.resume().catch(() => {}) : Promise.resolve();
     try {
       const endpoint = mode === "client"
         ? `${API}/api/voice/client-call-url`
@@ -4375,13 +4399,15 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      // Resume or create AudioContext (browsers may suspend it until user gesture)
-      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-        safeCloseAudioCtx();
+      if (endingRef.current || audioCtxRef.current !== ctx) return; // cancelled while awaiting
+      await resumePromise;
+      if (ctx.state !== "running") {
+        // One more attempt now that the mic permission dialog (a user gesture) closed.
+        await ctx.resume().catch(() => {});
       }
-      const ctx = new AudioContext();
-      audioCtxRef.current = ctx;
-      if (ctx.state === "suspended") await ctx.resume();
+      if (ctx.state !== "running") {
+        throw new Error("El navegador bloqueó el audio. Pulsa de nuevo «Iniciar llamada».");
+      }
 
       const ws = new WebSocket(signed_url);
       wsRef.current = ws;
@@ -4428,6 +4454,13 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
             }
             return;
           }
+          if (msg.type === "interruption") {
+            // User barged in: drop everything already scheduled for the agent.
+            stopAgentPlayback();
+            decodeChainRef.current = Promise.resolve();
+            setStatus(prev => (prev === "speaking" ? "connected" : prev));
+            return;
+          }
           if (msg.type === "audio" && msg.audio_event?.audio_base_64) {
             const currentCtx = audioCtxRef.current;
             if (!currentCtx || currentCtx.state === "closed") return;
@@ -4437,9 +4470,8 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
             decodeChainRef.current = decodeChainRef.current.then(async () => {
               try {
                 const decoded = await decodeConvAIAudio(currentCtx, audioBase64, format);
-                if (audioCtxRef.current === currentCtx) {
-                audioQueueRef.current.push(decoded);
-                playNextAudio();
+                if (audioCtxRef.current === currentCtx && !endingRef.current) {
+                  scheduleAudio(currentCtx, decoded);
                 }
               } catch (error) {
                 console.error("ConvAI audio decode failed", { format, error });
@@ -4496,10 +4528,9 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
     micMuteRef.current = null;
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
-    audioQueueRef.current = [];
+    stopAgentPlayback();
     decodeChainRef.current = Promise.resolve();
     audioFormatRef.current = "pcm_16000";
-    playingRef.current = false;
     safeCloseAudioCtx();
     if (!opts?.unmounting) {
       setStatus("idle");

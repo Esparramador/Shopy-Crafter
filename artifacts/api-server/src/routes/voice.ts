@@ -520,9 +520,10 @@ Sé un vendedor nato pero sin presionar — convence con entusiasmo y conocimien
 ${ANDALUZ_STYLE}`;
 
 // ── Voz ConvAI compatible con el plan actual ──────────────────────────────────
-// Dani is a Spanish peninsular premade voice. The Sevillano voice below is an
-// instant clone and ElevenLabs rejects it for ConvAI on the current plan.
-const CONVAI_PREMADE_SPANISH_VOICE_ID = "CdAqYBLnsNjmTqYgD5HaDani";
+// Charlie is an ElevenLabs premade voice and is accepted by Agents/ConvAI.
+// Spanish catalog voices marked "professional" may appear in /voices but still
+// return voice_not_found in ConvAI; instant clones are blocked by the plan.
+const CONVAI_PREMADE_VOICE_ID = "IKne3meq5aSn9XLyUdCD";
 
 // ── Modelo requerido por ElevenLabs para agentes no ingleses ──────────────────
 // "Non-english Agents must use turbo or flash v2_5"
@@ -538,8 +539,8 @@ async function resolveSevillanoVoiceId(): Promise<string> {
   // 3. Use a premade Spanish voice by default. Do not silently select the
   // instant-cloned Sevillano voice: ConvAI closes the WebSocket with a plan
   // error before it can send or receive any audio.
-  _sevillanoVoiceIdCache = CONVAI_PREMADE_SPANISH_VOICE_ID;
-  return CONVAI_PREMADE_SPANISH_VOICE_ID;
+  _sevillanoVoiceIdCache = CONVAI_PREMADE_VOICE_ID;
+  return CONVAI_PREMADE_VOICE_ID;
 }
 
 async function ensurePlatformSettingsKV(): Promise<void> {
@@ -604,42 +605,62 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
   };
 }
 
+// Single-flight: concurrent cold calls (e.g. two tabs after a restart) share
+// one resolution instead of each PATCHing/creating an agent.
+const _agentResolveInFlight: Partial<Record<AgentType, Promise<string>>> = {};
+
 async function getOrCreateConvAIAgent(type: AgentType): Promise<string> {
   const cacheKey = `convai_${type}_agent_id`;
 
-  // 1. In-memory cache
+  // 1. In-memory cache — the config was already synced once in this process.
   if (_agentIdCache[cacheKey]) return _agentIdCache[cacheKey];
 
-  // 2. Env var legacy (admin only)
+  const inFlight = _agentResolveInFlight[type];
+  if (inFlight) return inFlight;
+
+  const pending = resolveConvAIAgentUncached(type, cacheKey).finally(() => {
+    delete _agentResolveInFlight[type];
+  });
+  _agentResolveInFlight[type] = pending;
+  return pending;
+}
+
+async function resolveConvAIAgentUncached(type: AgentType, cacheKey: string): Promise<string> {
+  // 2. Env var legacy (admin only). Synchronize it before returning so an
+  // existing agent cannot keep an unsupported voice or stale audio format.
   if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
-    _agentIdCache[cacheKey] = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
-    return _agentIdCache[cacheKey];
+    const agentId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
+    const voiceId = await resolveSevillanoVoiceId();
+    await updateConvAIAgent(agentId, agentConfigFor(type, voiceId));
+    _agentIdCache[cacheKey] = agentId;
+    logger.info({ type, agentId, voiceId }, "Legacy ConvAI agent config synced");
+    return agentId;
   }
 
-  // 3. DB-cached agent ID — always sync config in background so prompt changes take effect
+  // 3. DB-cached agent ID — synchronize before issuing a signed URL. Running
+  // this in the background created a race where the browser could connect to
+  // the old cloned voice and ElevenLabs closed the call immediately.
+  // Only the DB lookup is tolerant of failure; a provider PATCH failure must
+  // surface (otherwise we would silently create a duplicate agent below).
+  let cachedId: string | undefined;
   try {
     await ensurePlatformSettingsKV();
     const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
     const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
-    const cachedId: string | undefined = rowArr[0]?.value;
-    if (cachedId && cachedId.length > 4) {
-      _agentIdCache[cacheKey] = cachedId;
-      logger.info({ type, agentId: cachedId }, "ConvAI agent loaded from DB cache — syncing config");
-      // Sync config in background so prompt/voice changes always take effect on restart
-      setImmediate(async () => {
-        try {
-          const voiceId = await resolveSevillanoVoiceId();
-          const freshConfig = agentConfigFor(type, voiceId);
-          await updateConvAIAgent(cachedId, freshConfig);
-          logger.info({ type, agentId: cachedId }, "ConvAI agent config synced");
-        } catch (e) {
-          logger.warn({ err: (e as Error)?.message, type }, "ConvAI config sync failed (non-fatal)");
-        }
-      });
-      return cachedId;
-    }
+    cachedId = rowArr[0]?.value;
   } catch (e) {
     logger.warn({ err: (e as Error)?.message }, "Could not query DB for ConvAI agent ID");
+  }
+  if (cachedId && cachedId.length > 4) {
+    const voiceId = await resolveSevillanoVoiceId();
+    const startedAt = Date.now();
+    await updateConvAIAgent(cachedId, agentConfigFor(type, voiceId));
+    _agentIdCache[cacheKey] = cachedId;
+    logger.info(
+      { type, agentId: cachedId, voiceId, syncMs: Date.now() - startedAt },
+      "ConvAI agent config synced before call",
+    );
+    return cachedId;
   }
 
   // 4. Auto-create — resolve sevillano voice first

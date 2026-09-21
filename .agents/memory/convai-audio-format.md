@@ -1,19 +1,19 @@
 ---
 name: ConvAI voice call audio format (PCM vs MP3)
-description: ElevenLabs ConvAI defaults to PCM audio which browser AudioContext cannot decode — must request mp3_44100_128
+description: ConvAI WebSocket audio is raw PCM16 at 16 kHz in both directions and must be encoded/decoded explicitly
 ---
 
 # ConvAI voice call — audio format
 
 ## The rule
-Always request `output_format: "mp3_44100_128"` for ElevenLabs ConvAI voice calls in the browser. Set it in TWO places:
-1. **Agent config** (`agentConfigFor` in voice.ts): `tts.output_format = "mp3_44100_128"` — persisted in ElevenLabs
-2. **WebSocket handshake** (`conversation_initiation_client_data`) override: `{ tts: { output_format: "mp3_44100_128" } }` — per-call override
+Treat the formats announced by `conversation_initiation_metadata_event` as authoritative. The verified live protocol announces `agent_output_audio_format: "pcm_16000"` and `user_input_audio_format: "pcm_16000"`.
 
-**Why:** ElevenLabs ConvAI defaults to `pcm_16000` (raw PCM, no container). `AudioContext.decodeAudioData()` cannot decode headerless PCM — it throws silently (inside `catch { /* skip */ }`), so the agent SPEAKS but the user hears NOTHING. The bug is invisible because the catch block swallows the error.
+**Why:** Raw PCM has no container, so `AudioContext.decodeAudioData()` cannot decode it. `MediaRecorder` produces WebM/Opus, which ConvAI cannot interpret as PCM mic input. This combination made the agent inaudible and unable to understand the user. A live test confirmed a working call returns PCM audio bytes after both directions use PCM16.
 
 **How to apply:**
-- Any new voice call component using ElevenLabs ConvAI WebSocket must always include the output_format override
-- `AudioContext` should NOT have a hardcoded `sampleRate: 16000` — use `new AudioContext()` (default) so it matches whatever format is returned
-- Also add `ping`/`pong` handling: ElevenLabs sends `{ type: "ping", ping_event: { event_id: N } }` and expects `{ type: "pong", event_id: N }` — without it the session may stall
-- Affects: LandingChatbot.tsx VoicePanel and OmniChatbot.tsx VoiceCallModal — both fixed 2026-07-07
+- Decode agent PCM16 little-endian bytes into a mono `AudioBuffer` using the announced sample rate; keep an ordered decode/playback queue.
+- Capture microphone floats, downsample to 16 kHz, encode signed PCM16 little-endian, then send the base64 bytes as `user_audio_chunk`. Do not send a WebM/Opus container.
+- Keep `ping`/`pong` handling: ElevenLabs sends `{ type: "ping", ping_event: { event_id: N } }` and expects `{ type: "pong", event_id: N }`.
+- Do not hide decode failures; surface them to the user and log the announced format.
+- Use a ConvAI-compatible premade voice on the current plan. Instant clones close the socket with a plan error, and some catalog voices marked `professional` return `voice_not_found` from Agents even though `/voices` lists them.
+- Synchronize an existing agent config before returning its signed URL. Background synchronization races with the browser and can issue a call using the stale voice.

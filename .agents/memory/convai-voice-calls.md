@@ -1,21 +1,15 @@
 ---
 name: ElevenLabs ConvAI voice calls in chat
-description: How the real-time voice call feature works in OmniChatbot; endpoint and WebSocket protocol.
+description: Non-obvious constraints of the real-time voice call in OmniChatbot (audio protocol, browser activation, agent sync).
 ---
 
-## Rule
-`GET /api/voice/convai/call-url` (voice.ts) — authenticated users only (not admin-only). Reads `ELEVEN_CONVAI_DEFAULT_AGENT_ID` env var for default agent. Returns `{ signed_url, agentId }`.
+## Rules
+- Audio protocol is raw PCM16 @ 16 kHz in BOTH directions (see convai-audio-format.md). Do NOT send MediaRecorder WebM/Opus chunks and do NOT feed headerless PCM to `decodeAudioData` — both produce a silent call with no error.
+- Create + resume the `AudioContext` synchronously inside the click handler, before any `await` (fetch / getUserMedia). Safari/mobile drop the user activation after the first await and the context stays suspended → silence.
+- Schedule agent chunks on the `AudioContext` timeline (`nextStartTime`), not via `onended` chaining; handle the `interruption` event by stopping all scheduled sources.
+- Backend syncs the agent config (voice + `pcm_16000`) synchronously before returning the signed URL, once per process per agent type, with single-flight dedupe. A background sync raced the browser connect; a per-call PATCH added ~2-3 s latency.
+- Endpoints: admin `/api/voice/convai/call-url`, client `/api/voice/client-call-url`, landing `/api/voice/public-call-url` (landing UI still shows "Próximamente").
 
-The `VoiceCallModal` component in OmniChatbot.tsx:
-1. Fetches signed URL from `/api/voice/convai/call-url`
-2. Opens `new WebSocket(signed_url)` to ElevenLabs
-3. Sends `conversation_initiation_client_data` on open
-4. Streams mic audio as base64 chunks via `MediaRecorder` (250ms intervals) → `{ user_audio_chunk: base64 }`
-5. Receives `{ type: "audio", audio_event: { audio_base_64 } }` → AudioContext decode + queue playback
-6. Receives `{ type: "transcript" }` and `{ type: "agent_response" }` for display
+**Why:** June/July 2026 calls were mute: format mismatch + cloned voice rejected by plan + background sync race. Each cause was silent.
 
-**Why:** Admin `signed-url` endpoint kept for backward compat; new `call-url` endpoint for regular users.
-
-## How to apply
-- Set `ELEVEN_CONVAI_DEFAULT_AGENT_ID` in Replit secrets (get from ElevenLabs ConvAI dashboard)
-- The 📞 phone button in chat opens the modal; works on all authenticated sessions
+**How to apply:** any change to the voice pipeline — verify with a real WebSocket run (signed URL → metadata formats → audio bytes > 0) before shipping.
