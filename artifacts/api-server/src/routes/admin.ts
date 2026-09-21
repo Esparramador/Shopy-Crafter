@@ -3,7 +3,10 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 import { execSync } from "child_process";
-import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable } from "@workspace/db";
+import {
+  db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable,
+  onboardingProgressTable, achievementsTable, subscriptionsTable, affiliatesTable, reportTemplatesTable, youtubeTokensTable,
+} from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
@@ -214,6 +217,55 @@ router.post("/users/:userId/activate", async (req, res): Promise<void> => {
       ipAddress: req.ip ?? "unknown",
     });
     res.json({ success: true });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// Borrado definitivo de un usuario de rol "client". El admin nunca se borra a sí
+// mismo ni a otros admins. No hay FKs hacia users en la BD, así que se limpian a
+// mano las filas que le pertenecen (sesiones, tokens, progreso, suscripciones…).
+// El audit_log se conserva: es el rastro histórico y no debe desaparecer con el usuario.
+router.delete("/users/:userId", async (req, res): Promise<void> => {
+  try {
+    const targetId = req.params["userId"]!;
+    if (targetId === req.session.userId) {
+      res.status(400).json({ error: "No puedes borrar tu propio usuario" });
+      return;
+    }
+    const [user] = await db.select({ id: usersTable.id, email: usersTable.email, role: usersTable.role })
+      .from(usersTable).where(eq(usersTable.id, targetId)).limit(1);
+    if (!user) { res.status(404).json({ error: "Usuario no encontrado" }); return; }
+    if (user.role !== "client") {
+      res.status(403).json({ error: "Solo se pueden borrar usuarios de rol client" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      // Sesiones activas del usuario (express-session guarda userId dentro de sess).
+      await tx.execute(sql`DELETE FROM user_sessions WHERE sess->>'userId' = ${targetId}`);
+      await tx.delete(onboardingProgressTable).where(eq(onboardingProgressTable.userId, targetId));
+      await tx.delete(achievementsTable).where(eq(achievementsTable.userId, targetId));
+      await tx.delete(subscriptionsTable).where(eq(subscriptionsTable.userId, targetId));
+      await tx.delete(affiliatesTable).where(eq(affiliatesTable.userId, targetId));
+      await tx.delete(reportTemplatesTable).where(eq(reportTemplatesTable.userId, targetId));
+      await tx.delete(youtubeTokensTable).where(eq(youtubeTokensTable.userId, targetId));
+      // calendar_tokens se crea con SQL crudo bajo demanda; puede no existir aún.
+      const reg = await tx.execute(sql`SELECT to_regclass('public.calendar_tokens') AS t`);
+      if ((reg.rows[0] as { t: string | null } | undefined)?.t) {
+        await tx.execute(sql`DELETE FROM calendar_tokens WHERE user_id = ${targetId}`);
+      }
+      await tx.delete(usersTable).where(eq(usersTable.id, targetId));
+    });
+
+    await recordAudit({
+      userId: req.session.userId!,
+      action: "delete_user",
+      details: `Deleted user ${targetId} (${user.email})`,
+      ipAddress: req.ip ?? "unknown",
+    });
+    res.json({ success: true, deleted: { id: user.id, email: user.email } });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });

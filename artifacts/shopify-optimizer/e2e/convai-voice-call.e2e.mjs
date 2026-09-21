@@ -24,7 +24,8 @@
 //                     misma llamada real contra GET /api/voice/client-call-url (agente
 //                     "client"; si no existe, ESTA llamada lo crea en ElevenLabs).
 //                     Al terminar se exige que GET /api/voice/convai/health muestre el
-//                     agente client en verde (status "ok") y se desactiva el usuario.
+//                     agente client en verde (status "ok") y se borra el usuario
+//                     (DELETE /api/admin/users/:id) comprobando que ya no está listado.
 //
 // Es una llamada REAL (consume créditos ElevenLabs): se cuelga en cuanto Arturo
 // ha contestado a la frase inyectada.
@@ -345,17 +346,29 @@ try {
   console.log(`\nCapturas en ${SHOTS}`);
   console.log("TODO OK");
 } finally {
-  // El usuario de prueba no debe quedar activo (no existe DELETE de usuarios en el
-  // API admin; se desactiva, que es lo que impide iniciar sesión).
+  // El usuario de prueba se borra de verdad (DELETE /api/admin/users/:id) y se
+  // comprueba que ya no aparece en el listado; si no se puede, se desactiva para
+  // que al menos no pueda iniciar sesión.
   if (testClient?.id) {
     try {
       const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
       await ctx.request.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
-      const r = await ctx.request.post(`${BASE}/api/admin/users/${testClient.id}/deactivate`);
-      console.log(`  usuario de prueba ${testClient.email} desactivado → ${r.status()}`);
+      const del = await ctx.request.delete(`${BASE}/api/admin/users/${testClient.id}`);
+      if (del.ok()) {
+        const list = await (await ctx.request.get(`${BASE}/api/admin/users`)).json().catch(() => []);
+        const stillThere = Array.isArray(list) && list.some((u) => u.id === testClient.id);
+        console.log(`  usuario de prueba ${testClient.email} borrado → ${del.status()}${stillThere ? " ¡PERO SIGUE EN EL LISTADO!" : " (ya no aparece en el listado)"}`);
+        if (stillThere) process.exitCode = 1;
+      } else {
+        const body = await del.text().catch(() => "");
+        const r = await ctx.request.post(`${BASE}/api/admin/users/${testClient.id}/deactivate`);
+        console.warn(`  DELETE del usuario de prueba falló (${del.status()} ${body.slice(0, 120)}); desactivado → ${r.status()}`);
+        process.exitCode = 1;
+      }
       await ctx.close();
     } catch (e) {
-      console.warn(`  no se pudo desactivar el usuario de prueba ${testClient.email}: ${e?.message}`);
+      console.warn(`  no se pudo limpiar el usuario de prueba ${testClient.email}: ${e?.message}`);
+      process.exitCode = 1;
     }
   }
   await browser.close();
