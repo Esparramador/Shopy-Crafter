@@ -511,11 +511,18 @@ export interface ConvAIAgentConfig {
       first_message?: string;
       language?: string;
     };
+    asr?: {
+      /** e.g. "pcm_16000" — must match what the browser sends as user_audio_chunk. */
+      user_input_audio_format?: string;
+    };
     tts?: {
       voice_id?: string;
       model_id?: string;
       voice_settings?: ConvAIVoiceSettings;
       speed?: number;
+      /** e.g. "pcm_16000" — the field ElevenLabs actually persists and announces. */
+      agent_output_audio_format?: string;
+      /** @deprecated ignored by the ElevenLabs API; kept for old callers. */
       output_format?: string;
     };
   };

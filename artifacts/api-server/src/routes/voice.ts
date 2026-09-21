@@ -11,6 +11,10 @@ import {
   removeRulesFromPronunciationDictionary, deletePronunciationDictionary,
   type ElevenModel, type ElevenOutputFormat, type ConvAIAgentConfig, type PronunciationRule,
 } from "../lib/elevenlabs.js";
+import {
+  assertConvAIVoiceUsable, assertConvAIAgentConfigApplied, fetchElevenVoice, fetchElevenSubscription,
+  isConvAIVoiceError, type ElevenSubscriptionInfo,
+} from "../lib/convai-voice-check.js";
 import multer from "multer";
 
 const cloneUpload = multer({
@@ -42,9 +46,9 @@ import { requireAdmin } from "../lib/auth.js";
 
 const router = Router();
 
-// ============================================================
+// ────────────────────────────────────────────────────────────
 // TEXT-TO-SPEECH (ElevenLabs)
-// ============================================================
+// ────────────────────────────────────────────────────────────
 const ALLOWED_TTS_MODELS: ElevenModel[] = [
   "eleven_v3",
   "eleven_multilingual_v2",
@@ -295,9 +299,9 @@ router.post("/voice/command", async (req, res): Promise<void> => {
   }
 });
 
-// ============================================================
+// ────────────────────────────────────────────────────────────
 // SMART VOICE RECOMMENDATION (Claude analyses product → ideal ElevenLabs voice)
-// ============================================================
+// ────────────────────────────────────────────────────────────
 router.get("/voice/recommend", requireAdmin, async (req, res) => {
   try {
     const projectId = parseInt(String(req.query.projectId || "0"), 10);
@@ -529,6 +533,10 @@ const CONVAI_PREMADE_VOICE_ID = "IKne3meq5aSn9XLyUdCD";
 // "Non-english Agents must use turbo or flash v2_5"
 const CONVAI_SPANISH_MODEL = "eleven_turbo_v2_5";
 
+// ── Formatos PCM que habla el navegador (ver convai-audio.ts en el frontend) ──
+const CONVAI_OUTPUT_FORMAT = "pcm_16000";
+const CONVAI_INPUT_FORMAT = "pcm_16000";
+
 async function resolveSevillanoVoiceId(): Promise<string> {
   // An explicit ConvAI voice override is useful if the ElevenLabs plan changes.
   if (process.env.ELEVEN_CONVAI_VOICE_ID?.trim()) {
@@ -541,6 +549,69 @@ async function resolveSevillanoVoiceId(): Promise<string> {
   // error before it can send or receive any audio.
   _sevillanoVoiceIdCache = CONVAI_PREMADE_VOICE_ID;
   return CONVAI_PREMADE_VOICE_ID;
+}
+
+// ── Pre-flight: la voz debe ser aceptada por ConvAI antes de emitir una URL ───
+// Cached per voice ID for a short window so every call-url request does not
+// hit /voices; a rejected voice is NOT cached so a fix takes effect at once.
+const VOICE_CHECK_TTL_MS = 10 * 60 * 1000;
+const _voiceCheckCache = new Map<string, number>();
+let _subscriptionCache: { at: number; value: ElevenSubscriptionInfo | null } | null = null;
+
+async function getSubscriptionCached(): Promise<ElevenSubscriptionInfo | null> {
+  if (_subscriptionCache && Date.now() - _subscriptionCache.at < VOICE_CHECK_TTL_MS) return _subscriptionCache.value;
+  let value: ElevenSubscriptionInfo | null = null;
+  try {
+    value = await fetchElevenSubscription();
+  } catch (e) {
+    logger.warn({ err: (e as Error)?.message }, "ConvAI: could not read ElevenLabs subscription; treating clones as unavailable");
+  }
+  _subscriptionCache = { at: Date.now(), value };
+  return value;
+}
+
+async function resolveVerifiedConvAIVoiceId(): Promise<string> {
+  const voiceId = await resolveSevillanoVoiceId();
+  const checkedAt = _voiceCheckCache.get(voiceId);
+  if (checkedAt && Date.now() - checkedAt < VOICE_CHECK_TTL_MS) return voiceId;
+
+  const [voice, subscription] = await Promise.all([fetchElevenVoice(voiceId), getSubscriptionCached()]);
+  const result = assertConvAIVoiceUsable(voice, voiceId, { modelId: CONVAI_SPANISH_MODEL, subscription });
+  for (const warning of result.warnings) {
+    logger.warn({ voiceId, category: result.category }, `ConvAI voice check: ${warning}`);
+  }
+  logger.info({ voiceId, category: result.category, voiceName: voice?.name }, "ConvAI voice accepted by pre-flight check");
+  _voiceCheckCache.set(voiceId, Date.now());
+  return voiceId;
+}
+
+// ── Sync + verify: lo que ElevenLabs guardó debe anunciar PCM y la voz pedida ─
+async function verifyPersistedConvAIAgent(agentId: string, voiceId: string): Promise<void> {
+  // Create/PATCH responses are not authoritative (create returns only the ID and
+  // PATCH ignores unknown keys), so always read the agent back.
+  const persisted = await getConvAIAgent(agentId);
+  assertConvAIAgentConfigApplied(persisted, {
+    voiceId,
+    modelId: CONVAI_SPANISH_MODEL,
+    outputFormat: CONVAI_OUTPUT_FORMAT,
+    inputFormat: CONVAI_INPUT_FORMAT,
+  });
+}
+
+async function syncConvAIAgentOrThrow(type: AgentType, agentId: string, voiceId: string): Promise<void> {
+  await updateConvAIAgent(agentId, agentConfigFor(type, voiceId));
+  await verifyPersistedConvAIAgent(agentId, voiceId);
+}
+
+function respondCallUrlError(res: import("express").Response, err: unknown, fallback: string): void {
+  const message = (err as Error)?.message || fallback;
+  if (isConvAIVoiceError(err)) {
+    // Configuration problem: the call would connect and stay silent. Make the
+    // cause visible to the client instead of handing out a doomed signed URL.
+    res.status(503).json({ error: message, code: err.code, voiceId: err.voiceId, agentId: err.agentId });
+    return;
+  }
+  res.status(500).json({ error: message });
 }
 
 async function ensurePlatformSettingsKV(): Promise<void> {
@@ -582,7 +653,9 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
     // ConvAI's browser WebSocket advertises and delivers raw PCM 16 kHz.
     // Keep the persisted agent config aligned with that protocol; the client
     // decodes PCM directly instead of passing headerless bytes to decodeAudioData.
-    output_format: "pcm_16000",
+    // NOTE: the real field name is `agent_output_audio_format` (verified on the
+    // live API); `output_format` is silently ignored by ElevenLabs.
+    agent_output_audio_format: CONVAI_OUTPUT_FORMAT,
     voice_settings: {
       stability: 0.18,        // Baja → más expresiva, menos robótica
       similarity_boost: 0.92, // Alta → muy fiel al clon original
@@ -600,6 +673,9 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
         first_message: first[type],
         language: "es",
       },
+      // The browser downsamples the microphone to PCM16 @ 16 kHz; pin the ASR
+      // input format so a dashboard edit cannot silently switch it.
+      asr: { user_input_audio_format: CONVAI_INPUT_FORMAT },
       tts,
     },
   };
@@ -630,10 +706,10 @@ async function resolveConvAIAgentUncached(type: AgentType, cacheKey: string): Pr
   // existing agent cannot keep an unsupported voice or stale audio format.
   if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
     const agentId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
-    const voiceId = await resolveSevillanoVoiceId();
-    await updateConvAIAgent(agentId, agentConfigFor(type, voiceId));
+    const voiceId = await resolveVerifiedConvAIVoiceId();
+    await syncConvAIAgentOrThrow(type, agentId, voiceId);
     _agentIdCache[cacheKey] = agentId;
-    logger.info({ type, agentId, voiceId }, "Legacy ConvAI agent config synced");
+    logger.info({ type, agentId, voiceId }, "Legacy ConvAI agent config synced + verified");
     return agentId;
   }
 
@@ -652,25 +728,28 @@ async function resolveConvAIAgentUncached(type: AgentType, cacheKey: string): Pr
     logger.warn({ err: (e as Error)?.message }, "Could not query DB for ConvAI agent ID");
   }
   if (cachedId && cachedId.length > 4) {
-    const voiceId = await resolveSevillanoVoiceId();
+    // Voice/config problems must propagate: a silently skipped sync is exactly
+    // how a connected-but-mute call happens.
+    const voiceId = await resolveVerifiedConvAIVoiceId();
     const startedAt = Date.now();
-    await updateConvAIAgent(cachedId, agentConfigFor(type, voiceId));
+    await syncConvAIAgentOrThrow(type, cachedId, voiceId);
     _agentIdCache[cacheKey] = cachedId;
     logger.info(
       { type, agentId: cachedId, voiceId, syncMs: Date.now() - startedAt },
-      "ConvAI agent config synced before call",
+      "ConvAI agent config synced + verified before call",
     );
     return cachedId;
   }
 
-  // 4. Auto-create — resolve sevillano voice first
+  // 4. Auto-create — resolve and verify the voice first
   logger.info({ type }, "Auto-creating ConvAI agent in ElevenLabs...");
-  const voiceId = await resolveSevillanoVoiceId();
+  const voiceId = await resolveVerifiedConvAIVoiceId();
   const config = agentConfigFor(type, voiceId);
   const agent = await createConvAIAgent(config);
   const newId = agent.agent_id;
 
-  // Persist to DB
+  // Persist to DB first so a failed verification below does not orphan the
+  // agent: the next request will re-sync and re-verify this same ID.
   try {
     await db.execute(sql`
       INSERT INTO platform_settings_kv (key, value, updated_at)
@@ -681,6 +760,7 @@ async function resolveConvAIAgentUncached(type: AgentType, cacheKey: string): Pr
     logger.warn({ err: (e as Error)?.message }, "Could not persist ConvAI agent ID to DB");
   }
 
+  await verifyPersistedConvAIAgent(newId, voiceId);
   _agentIdCache[cacheKey] = newId;
   logger.info({ type, agentId: newId, voiceId }, "ConvAI agent auto-created");
   return newId;
@@ -751,8 +831,8 @@ router.get("/voice/convai/call-url", async (req, res): Promise<void> => {
     const signed_url = await getConvAISignedUrl(agentId);
     res.json({ signed_url, agentId });
   } catch (err: any) {
-    logger.error({ err: err?.message }, "convai/call-url failed");
-    res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada" });
+    logger.error({ err: err?.message, code: err?.code }, "convai/call-url failed");
+    respondCallUrlError(res, err, "Error obteniendo URL de llamada");
   }
 });
 
@@ -763,8 +843,8 @@ router.get("/voice/public-call-url", async (_req, res): Promise<void> => {
     const signed_url = await getConvAISignedUrl(agentId);
     res.json({ signed_url, agentId, mode: "landing" });
   } catch (err: any) {
-    logger.error({ err: err?.message }, "public-call-url failed");
-    res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada pública" });
+    logger.error({ err: err?.message, code: err?.code }, "public-call-url failed");
+    respondCallUrlError(res, err, "Error obteniendo URL de llamada pública");
   }
 });
 
@@ -777,8 +857,8 @@ router.get("/voice/client-call-url", async (req, res): Promise<void> => {
     const signed_url = await getConvAISignedUrl(agentId);
     res.json({ signed_url, agentId, mode: "client" });
   } catch (err: any) {
-    logger.error({ err: err?.message }, "client-call-url failed");
-    res.status(500).json({ error: err?.message || "Error obteniendo URL de llamada" });
+    logger.error({ err: err?.message, code: err?.code }, "client-call-url failed");
+    respondCallUrlError(res, err, "Error obteniendo URL de llamada");
   }
 });
 
@@ -814,24 +894,25 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
       await db.execute(sql`DELETE FROM platform_settings_kv WHERE key = ${cacheKey}`);
 
       // Re-create with latest config
-      const voiceId = await resolveSevillanoVoiceId();
+      const voiceId = await resolveVerifiedConvAIVoiceId();
       const config = agentConfigFor(type, voiceId);
       const agent = await createConvAIAgent(config);
       const newId = agent.agent_id;
-      _agentIdCache[cacheKey] = newId;
       await db.execute(sql`
         INSERT INTO platform_settings_kv (key, value, updated_at)
         VALUES (${cacheKey}, ${newId}, NOW())
         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
       `);
+      await verifyPersistedConvAIAgent(newId, voiceId);
+      _agentIdCache[cacheKey] = newId;
       results[type] = newId;
       logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
     }
 
     res.json({ success: true, agents: results });
   } catch (err: any) {
-    logger.error({ err: err?.message }, "reset-agents failed");
-    res.status(500).json({ error: err?.message || "Error reseteando agentes" });
+    logger.error({ err: err?.message, code: err?.code }, "reset-agents failed");
+    respondCallUrlError(res, err, "Error reseteando agentes");
   }
 });
 
@@ -998,9 +1079,9 @@ router.post("/voice/gemini-tts", async (req, res): Promise<void> => {
   }
 });
 
-// ============================================================
+// ────────────────────────────────────────────────────────────
 // SOUND EFFECTS (ElevenLabs SFX)
-// ============================================================
+// ────────────────────────────────────────────────────────────
 router.post("/voice/sfx", async (req, res): Promise<void> => {
   try {
     const { text, durationSeconds, promptInfluence } = req.body as {

@@ -8,6 +8,7 @@ description: Non-obvious constraints of the real-time voice call in OmniChatbot 
 - Create + resume the `AudioContext` synchronously inside the click handler, before any `await` (fetch / getUserMedia). Safari/mobile drop the user activation after the first await and the context stays suspended → silence.
 - Schedule agent chunks on the `AudioContext` timeline (`nextStartTime`), not via `onended` chaining; handle the `interruption` event by stopping all scheduled sources.
 - Backend syncs the agent config (voice + `pcm_16000`) synchronously before returning the signed URL, once per process per agent type, with single-flight dedupe. A background sync raced the browser connect; a per-call PATCH added ~2-3 s latency.
+- Tie every AudioContext / MediaStream / WebSocket / mic node to ONE call attempt and detach socket handlers before closing a socket yourself. "Reintentar" or "Colgar" during an await (signed URL, getUserMedia) otherwise lets the old socket's late `close` tear down the new call, or leaves the mic capturing.
 - Endpoints: admin `/api/voice/convai/call-url`, client `/api/voice/client-call-url`, landing `/api/voice/public-call-url` (landing UI still shows "Próximamente").
 
 **Why:** June/July 2026 calls were mute: format mismatch + cloned voice rejected by plan + background sync race. Each cause was silent.

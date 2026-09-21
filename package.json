@@ -15,7 +15,8 @@
     "@upstash/context7-mcp": "^3.2.1",
     "prettier": "^3.8.1",
     "puppeteer-mcp-server": "^0.7.2",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^5.0.1"
   },
   "dependencies": {
     "@modelcontextprotocol/server-everything": "^2026.1.26",

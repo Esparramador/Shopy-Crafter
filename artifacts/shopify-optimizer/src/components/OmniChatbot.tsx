@@ -15,7 +15,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useSafeTimeout } from "@/hooks/useSafeTimeout";
 import { useDraggable } from "@/hooks/use-draggable";
 import { getModelShortName } from "@/lib/model-aliases";
-import { decodeConvAIAudio, float32ToPcm16Base64 } from "@/lib/convai-audio";
+import { createConvAIPlaybackQueue, describeConvAIClose, float32ToPcm16Base64, parsePcmSampleRate } from "@/lib/convai-audio";
+import { createCallAttemptRegistry } from "@/lib/convai-call-attempt";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -4324,102 +4325,118 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [transcript, setTranscript] = useState<Array<{ role: "user" | "agent"; text: string }>>([]);
   const [errorMsg, setErrorMsg] = useState("");
-  const wsRef = useRef<WebSocket | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const micProcessorRef = useRef<ScriptProcessorNode | null>(null);
-  const micMuteRef = useRef<GainNode | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const audioFormatRef = useRef("pcm_16000");
-  const decodeChainRef = useRef(Promise.resolve());
-  // Timeline scheduling: each chunk starts exactly where the previous one ends
-  // (sample-contiguous), instead of chaining on `onended` which leaves gaps.
-  const nextStartTimeRef = useRef(0);
-  const activeSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  const endingRef = useRef(false); // guard against double-endCall
+  // Every AudioContext / MediaStream / WebSocket / mic node belongs to exactly
+  // one call attempt (see @/lib/convai-call-attempt, unit-tested). Starting a
+  // new attempt or hanging up disposes the previous one, and a resource that
+  // arrives late (mic granted after "Colgar", socket after "Reintentar") is
+  // released on the spot instead of leaking or tearing down the new call.
+  const attemptsRef = useRef(createCallAttemptRegistry());
+  const isLive = () => attemptsRef.current.current()?.isActive() === true;
+  // Ordered decode + playback. Lives in @/lib/convai-audio so it is unit-tested;
+  // failures are reported through the handlers instead of being swallowed.
+  const playbackRef = useRef(createConvAIPlaybackQueue({
+    onSpeakingChange: (speaking) => {
+      if (!isLive()) return;
+      setAgentSpeaking(speaking);
+      setStatus(speaking ? "speaking" : "connected");
+    },
+    onDecodeError: (error, format) => {
+      console.error("ConvAI audio decode failed", { format, error });
+      if (!isLive()) return;
+      setStatus("error");
+      setErrorMsg(`No se pudo reproducir el audio recibido (${format}): ${(error as Error)?.message ?? "error desconocido"}`);
+    },
+    onPlaybackError: (error) => {
+      console.error("ConvAI audio playback failed", error);
+      if (!isLive()) return;
+      setStatus("error");
+      setErrorMsg(`No se pudo iniciar la reproducción del audio: ${(error as Error)?.message ?? "error desconocido"}`);
+    },
+  }));
 
-  // Small jitter buffer before the first chunk of an utterance plays.
-  const PLAYBACK_LEAD_SEC = 0.06;
+  // The agent always opens with a first_message, so a connected call that
+  // receives zero audio chunks in this window is a silent call, not a pause.
+  const NO_AUDIO_TIMEOUT_MS = 12_000;
 
-  const safeCloseAudioCtx = () => {
-    const ctx = audioCtxRef.current;
-    if (ctx && ctx.state !== "closed") {
-      ctx.close().catch(() => {});
-    }
-    audioCtxRef.current = null;
-  };
-
-  const stopAgentPlayback = () => {
-    for (const src of activeSourcesRef.current) {
-      src.onended = null;
-      try { src.stop(); } catch { /* already stopped */ }
-    }
-    activeSourcesRef.current.clear();
-    nextStartTimeRef.current = 0;
+  const endCall = (opts?: { unmounting?: boolean }) => {
+    attemptsRef.current.end();
+    playbackRef.current.reset();
+    if (opts?.unmounting) return;
     setAgentSpeaking(false);
-  };
-
-  const scheduleAudio = (ctx: AudioContext, buf: AudioBuffer) => {
-    if (ctx.state === "closed") return;
-    const now = ctx.currentTime;
-    const startAt = Math.max(nextStartTimeRef.current, now + PLAYBACK_LEAD_SEC);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    activeSourcesRef.current.add(src);
-    src.onended = () => {
-      activeSourcesRef.current.delete(src);
-      if (activeSourcesRef.current.size === 0 && !endingRef.current) {
-        setAgentSpeaking(false);
-        setStatus(prev => (prev === "speaking" ? "connected" : prev));
-      }
-    };
-    src.start(startAt);
-    nextStartTimeRef.current = startAt + buf.duration;
-    setAgentSpeaking(true);
-    setStatus(prev => (prev === "connected" ? "speaking" : prev));
+    setStatus("idle");
   };
 
   const startCall = async () => {
-    endingRef.current = false;
+    // begin() disposes any previous attempt ("Reintentar" after a mid-call
+    // error) with its socket handlers detached, so its late close event can
+    // never be mistaken for this call ending.
+    const attempt = attemptsRef.current.begin();
+    playbackRef.current.reset();
+    let micSampleRate = 16000;
+    let audioChunks = 0;
+    let noAudioTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearNoAudioWatchdog = () => {
+      if (noAudioTimer) { clearTimeout(noAudioTimer); noAudioTimer = null; }
+    };
+    attempt.onDispose(clearNoAudioWatchdog);
+    const armNoAudioWatchdog = (format: string) => {
+      clearNoAudioWatchdog();
+      noAudioTimer = setTimeout(() => {
+        noAudioTimer = null;
+        if (!attempt.isActive() || audioChunks > 0) return;
+        console.error("ConvAI call connected but no audio received", { format });
+        setStatus("error");
+        setErrorMsg(`Llamada conectada pero sin audio del agente en ${NO_AUDIO_TIMEOUT_MS / 1000}s (formato anunciado: ${format}). Revisa la voz del agente en ElevenLabs.`);
+      }, NO_AUDIO_TIMEOUT_MS);
+    };
+    // Ends this attempt's resources but leaves the status for the caller to set.
+    const failAttempt = (message: string) => {
+      if (!attempt.isActive()) return;
+      attemptsRef.current.end();
+      playbackRef.current.reset();
+      setAgentSpeaking(false);
+      setStatus("error");
+      setErrorMsg(message);
+    };
+
     setStatus("provisioning"); setErrorMsg("");
     // Create + resume the AudioContext synchronously inside the click gesture.
     // Doing it after the fetch/getUserMedia awaits loses the user activation on
     // Safari/mobile and the context stays suspended → silent call.
-    if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-      safeCloseAudioCtx();
-    }
-    const ctx = new AudioContext();
-    audioCtxRef.current = ctx;
+    const ctx = attempt.ownContext(new AudioContext());
     const resumePromise = ctx.state === "suspended" ? ctx.resume().catch(() => {}) : Promise.resolve();
     try {
       const endpoint = mode === "client"
         ? `${API}/api/voice/client-call-url`
         : `${API}/api/voice/convai/call-url`;
       const resp = await fetch(endpoint, { credentials: "include" });
+      if (!attempt.isActive()) return; // cancelled while provisioning
       if (!resp.ok) {
         const e = await resp.json().catch(() => ({})) as any;
         throw new Error(e.error ?? "No se pudo obtener URL de llamada");
       }
       const { signed_url } = await resp.json() as { signed_url: string };
+      if (!attempt.isActive()) return;
       setStatus("connecting");
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      if (endingRef.current || audioCtxRef.current !== ctx) return; // cancelled while awaiting
+      // ownStream() stops the tracks at once if the call was cancelled while
+      // the permission prompt was open — no microphone left capturing.
+      const stream = attempt.ownStream(await navigator.mediaDevices.getUserMedia({ audio: true }));
+      if (!attempt.isActive()) return;
       await resumePromise;
       if (ctx.state !== "running") {
         // One more attempt now that the mic permission dialog (a user gesture) closed.
         await ctx.resume().catch(() => {});
       }
+      if (!attempt.isActive()) return;
       if (ctx.state !== "running") {
         throw new Error("El navegador bloqueó el audio. Pulsa de nuevo «Iniciar llamada».");
       }
 
-      const ws = new WebSocket(signed_url);
-      wsRef.current = ws;
+      const ws = attempt.ownSocket(new WebSocket(signed_url));
 
       ws.onopen = () => {
+        if (!attempt.isActive()) return;
         setStatus("connected");
         ws.send(JSON.stringify({
           type: "conversation_initiation_client_data",
@@ -4436,18 +4453,17 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
         source.connect(processor);
         processor.connect(mute);
         mute.connect(ctx.destination);
-        micSourceRef.current = source;
-        micProcessorRef.current = processor;
-        micMuteRef.current = mute;
+        attempt.ownNodes(processor, source, mute);
         processor.onaudioprocess = (event) => {
-          if (ws.readyState !== WebSocket.OPEN || endingRef.current) return;
+          if (ws.readyState !== WebSocket.OPEN || !attempt.isActive()) return;
           const input = event.inputBuffer.getChannelData(0);
-          const base64 = float32ToPcm16Base64(input, ctx.sampleRate, 16000);
+          const base64 = float32ToPcm16Base64(input, ctx.sampleRate, micSampleRate);
           ws.send(JSON.stringify({ user_audio_chunk: base64 }));
         };
       };
 
       ws.onmessage = async (evt) => {
+        if (!attempt.isActive()) return;
         try {
           const msg = JSON.parse(evt.data) as Record<string, any>;
           if (msg.type === "ping") {
@@ -4455,39 +4471,42 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
             return;
           }
           if (msg.type === "conversation_initiation_metadata") {
-            const format = msg.conversation_initiation_metadata_event?.agent_output_audio_format;
-            if (typeof format === "string" && format.trim()) {
-              audioFormatRef.current = format.trim();
+            const meta = msg.conversation_initiation_metadata_event ?? {};
+            const outFormat = typeof meta.agent_output_audio_format === "string" ? meta.agent_output_audio_format.trim() : "";
+            const inFormat = typeof meta.user_input_audio_format === "string" ? meta.user_input_audio_format.trim() : "";
+            console.info("ConvAI formats announced", { agent_output_audio_format: outFormat, user_input_audio_format: inFormat });
+            if (outFormat) playbackRef.current.setFormat(outFormat);
+            // Encode the microphone at the rate ElevenLabs expects. If it announces
+            // a non-PCM input format we cannot honour it, so say so up front.
+            if (inFormat) {
+              const micRate = parsePcmSampleRate(inFormat);
+              if (micRate === null) {
+                setStatus("error");
+                setErrorMsg(`ElevenLabs pide micrófono en formato ${inFormat}, pero esta llamada solo envía PCM16. El agente no te oirá.`);
+              } else {
+                micSampleRate = micRate;
+              }
             }
+            armNoAudioWatchdog(outFormat || playbackRef.current.getFormat());
+            return;
+          }
+          if (msg.type === "error" || msg.type === "internal_error") {
+            const detail = msg.error_event?.message ?? msg.message ?? msg.error ?? JSON.stringify(msg).slice(0, 200);
+            console.error("ConvAI error event", msg);
+            setStatus("error");
+            setErrorMsg(`ElevenLabs informó de un error: ${detail}`);
             return;
           }
           if (msg.type === "interruption") {
             // User barged in: drop everything already scheduled for the agent.
-            stopAgentPlayback();
-            decodeChainRef.current = Promise.resolve();
-            setStatus(prev => (prev === "speaking" ? "connected" : prev));
+            playbackRef.current.interrupt();
             return;
           }
           if (msg.type === "audio" && msg.audio_event?.audio_base_64) {
-            const currentCtx = audioCtxRef.current;
-            if (!currentCtx || currentCtx.state === "closed") return;
-            const audioBase64 = msg.audio_event.audio_base_64 as string;
-            const format = audioFormatRef.current;
-            // Decode sequentially so network jitter cannot reorder speech chunks.
-            decodeChainRef.current = decodeChainRef.current.then(async () => {
-              try {
-                const decoded = await decodeConvAIAudio(currentCtx, audioBase64, format);
-                if (audioCtxRef.current === currentCtx && !endingRef.current) {
-                  scheduleAudio(currentCtx, decoded);
-                }
-              } catch (error) {
-                console.error("ConvAI audio decode failed", { format, error });
-                if (!endingRef.current) {
-                  setStatus("error");
-                  setErrorMsg(`No se pudo reproducir el audio recibido (${format}).`);
-              }
-              }
-            });
+            if (ctx.state === "closed") return;
+            audioChunks += 1;
+            clearNoAudioWatchdog();
+            void playbackRef.current.enqueue(ctx, msg.audio_event.audio_base_64 as string);
           } else if (msg.type === "transcript" || msg.type === "user_transcript") {
             const text = typeof msg.transcript === "string"
               ? msg.transcript
@@ -4501,47 +4520,37 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
               : msg.agent_response?.agent_response ?? "";
             if (text) setTranscript(p => [...p, { role: "agent", text }]);
           }
-        } catch { /* ignore parse errors */ }
+        } catch (error) {
+          console.warn("ConvAI message could not be processed", error);
+        }
       };
 
-      ws.onerror = () => { if (!endingRef.current) { setStatus("error"); setErrorMsg("Error de conexión WebSocket"); } };
-      ws.onclose = () => {
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-        if (!endingRef.current) {
+      ws.onerror = () => {
+        if (!attempt.isActive()) return;
+        setStatus("error");
+        setErrorMsg("Error de conexión WebSocket con ElevenLabs");
+      };
+      ws.onclose = (evt) => {
+        // Handlers are detached before we close a socket ourselves, so reaching
+        // here means the remote side (or the network) ended the live call.
+        if (!attempt.isActive()) return;
+        // ElevenLabs closes the socket with a reason when it rejects the voice,
+        // the plan or the audio format. Never hide that behind a silent "idle".
+        const problem = describeConvAIClose(evt.code, evt.reason);
+        const receivedAudio = audioChunks > 0;
+        if (problem) {
+          console.error("ConvAI socket closed with a problem", { code: evt.code, reason: evt.reason, receivedAudio });
+          failAttempt(problem);
+        } else if (!receivedAudio) {
+          console.error("ConvAI socket closed before any audio was received", { code: evt.code });
+          failAttempt("ElevenLabs cerró la llamada sin haber enviado audio. Revisa la voz y el formato del agente.");
+        } else {
           endCall();
-          setStatus("idle");
         }
       };
     } catch (err: any) {
-      setStatus("error");
-      setErrorMsg(err.message ?? "Error iniciando llamada");
-    }
-  };
-
-  const endCall = (opts?: { unmounting?: boolean }) => {
-    if (endingRef.current) return;
-    endingRef.current = true;
-    const ws = wsRef.current;
-    wsRef.current = null;
-    if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
-      ws.close();
-    }
-    micProcessorRef.current?.disconnect();
-    micProcessorRef.current = null;
-    micSourceRef.current?.disconnect();
-    micSourceRef.current = null;
-    micMuteRef.current?.disconnect();
-    micMuteRef.current = null;
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    stopAgentPlayback();
-    decodeChainRef.current = Promise.resolve();
-    audioFormatRef.current = "pcm_16000";
-    safeCloseAudioCtx();
-    if (!opts?.unmounting) {
-      setStatus("idle");
-      setAgentSpeaking(false);
+      // Any failure after resources were acquired releases them here.
+      failAttempt(err?.message ?? "Error iniciando llamada");
     }
   };
 
