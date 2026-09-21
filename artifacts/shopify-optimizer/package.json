@@ -13,7 +13,8 @@
     "e2e:voice-call:client": "E2E_MODE=client node e2e/convai-voice-call.e2e.mjs",
     "e2e:cleanup-users": "node e2e/cleanup-e2e-users.mjs",
     "e2e:client-chatbot-layout": "node e2e/client-chatbot-layout.e2e.mjs",
-    "e2e:admin-delete-client": "node e2e/admin-delete-client.e2e.mjs"
+    "e2e:admin-delete-client": "node e2e/admin-delete-client.e2e.mjs",
+    "e2e:admin-modal-overlay": "node e2e/admin-modal-overlay.e2e.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

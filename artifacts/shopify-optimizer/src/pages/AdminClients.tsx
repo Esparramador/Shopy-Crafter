@@ -3,6 +3,7 @@ import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSq
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { timeSince } from "@/lib/utils";
 import { getModelShortName } from "@/lib/model-aliases";
+import { useModalLock } from "@/hooks/use-modal-lock";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -47,6 +48,7 @@ interface InviteModalProps { onClose: () => void; onInvited: (link: string, emai
 interface ProjectOption { id: number; name: string; shopDomain: string; storeNiche: string | null; }
 
 function InviteModal({ onClose, onInvited }: InviteModalProps) {
+  useModalLock();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -90,7 +92,7 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
   const selectedProject = projects.find(p => String(p.id) === projectId);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.80)", backdropFilter: "blur(8px)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div className="modal-overlay" style={{ backdropFilter: "blur(8px)" }}>
       <div className="modal-box" style={{ maxWidth: 480 }}>
         <p className="modal-title">📨 Invitar Cliente</p>
         <p className="modal-subtitle">El enlace generado es exclusivo e intransferible para esa tienda.</p>
@@ -191,6 +193,7 @@ function InviteModal({ onClose, onInvited }: InviteModalProps) {
 interface PaymentLinkModalProps { client: User; onClose: () => void; onSendToChat?: (msg: string) => void; }
 
 function PaymentLinkModal({ client, onClose, onSendToChat }: PaymentLinkModalProps) {
+  useModalLock();
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [selectedServiceId, setSelectedServiceId] = useState("");
@@ -243,7 +246,7 @@ function PaymentLinkModal({ client, onClose, onSendToChat }: PaymentLinkModalPro
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.80)", backdropFilter: "blur(8px)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div className="modal-overlay" style={{ backdropFilter: "blur(8px)" }}>
       <div style={{ width: "100%", maxWidth: 520, background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, overflow: "hidden" }}>
         {/* Header */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--bdr)", display: "flex", alignItems: "center", gap: 12 }}>
@@ -369,6 +372,7 @@ interface AiSuggestion {
 interface SuggestionModalProps { client: User; onClose: () => void; }
 
 function SuggestionModal({ client, onClose }: SuggestionModalProps) {
+  useModalLock();
   const [mode, setMode] = useState<"choose" | "manual" | "ai">("choose");
   const [form, setForm] = useState({ type: "price_change", title: "", description: "", beforeValue: "", afterValue: "", reasoning: "", estimatedImpact: "" });
   const [sending, setSending] = useState(false);
@@ -438,7 +442,7 @@ function SuggestionModal({ client, onClose }: SuggestionModalProps) {
 
   if (sent) {
     return (
-      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.60)", backdropFilter: "blur(4px)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="modal-overlay" style={{ backdropFilter: "blur(4px)" }}>
         <div className="card" style={{ maxWidth: 360, padding: "40px 32px", textAlign: "center" }}>
           <CheckCircle size={40} style={{ color: "var(--jade)", marginBottom: 12 }} />
           <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Propuesta Enviada</p>
@@ -449,7 +453,7 @@ function SuggestionModal({ client, onClose }: SuggestionModalProps) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.60)", backdropFilter: "blur(4px)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div className="modal-overlay" style={{ backdropFilter: "blur(4px)" }}>
       <div style={{ width: "100%", maxWidth: 560, background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, overflow: "hidden" }}>
         {/* Header */}
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--bdr)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -612,6 +616,7 @@ function SuggestionModal({ client, onClose }: SuggestionModalProps) {
 interface ChatPanelProps { client: User; onClose: () => void; initialMessage?: string; }
 
 function ChatPanel({ client, onClose, initialMessage }: ChatPanelProps) {
+  useModalLock();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState(initialMessage ?? "");
@@ -645,7 +650,7 @@ function ChatPanel({ client, onClose, initialMessage }: ChatPanelProps) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.60)", backdropFilter: "blur(4px)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div className="modal-overlay" style={{ backdropFilter: "blur(4px)" }}>
       <div style={{ width: "100%", maxWidth: 540, height: "80vh", maxHeight: 680, background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* Header */}
         <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--bdr)", display: "flex", alignItems: "center", gap: 10 }}>
@@ -745,6 +750,7 @@ function ChatPanel({ client, onClose, initialMessage }: ChatPanelProps) {
 interface PlansModalProps { client: User; onClose: () => void; }
 
 function PlansModal({ client, onClose }: PlansModalProps) {
+  useModalLock();
   const [clientProjects, setClientProjects] = useState<any[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
@@ -860,7 +866,7 @@ function PlansModal({ client, onClose }: PlansModalProps) {
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div onClick={onClose} className="modal-overlay" style={{ padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: "var(--ink, #0a0a0f)", border: "1px solid var(--bdr, #22222e)", borderRadius: 16, maxWidth: 760, width: "100%", maxHeight: "90vh", overflow: "auto" }}>
         <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--bdr)", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "var(--ink)", zIndex: 1 }}>
           <div>
@@ -1018,6 +1024,7 @@ function buildChartData(daily: Array<{ day: string; provider: string; costUsd: n
 }
 
 function ProjectCostModal({ client, onClose }: ProjectCostModalProps) {
+  useModalLock();
   const projectId = client.clientId;
   const [stats, setStats]         = useState<any>(null);
   const [logs, setLogs]           = useState<any>(null);
@@ -1060,7 +1067,7 @@ function ProjectCostModal({ client, onClose }: ProjectCostModalProps) {
     n == null ? "0" : Number(n).toLocaleString("es-ES");
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+    <div className="modal-overlay" style={{ padding: 20 }} onClick={onClose}>
       <div style={{ background: "var(--ink,#0f0f1a)", border: "1px solid var(--bdr,rgba(255,255,255,0.1))", borderRadius: 14, width: "100%", maxWidth: 900, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 48px rgba(0,0,0,0.7)" }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -1259,6 +1266,7 @@ function ProjectCostModal({ client, onClose }: ProjectCostModalProps) {
 
 /* ─── Delete Client Confirmation Modal ─── */
 function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClose: () => void; onDeleted: (id: string) => void }) {
+  useModalLock();
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -1291,7 +1299,7 @@ function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClo
   return (
     <div
       data-testid="delete-client-modal"
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.80)", backdropFilter: "blur(8px)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      className="modal-overlay" style={{ backdropFilter: "blur(8px)" }}
     >
       <div className="modal-box" style={{ maxWidth: 460, borderColor: "rgba(239,68,68,0.35)" }}>
         <p className="modal-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>

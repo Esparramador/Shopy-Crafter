@@ -1201,6 +1201,11 @@ code {
   background: rgba(0,0,0,.72); display: flex;
   align-items: center; justify-content: center; padding: 16px;
 }
+/* Widgets flotantes (panel Setup, botón de voz, FAB del asistente) tienen
+   z-index > .modal-overlay; mientras haya un modal abierto (hook useModalLock
+   pone data-modal-open en <body>) se ocultan para no tapar el modal. */
+body[data-modal-open] .floating-widget { visibility: hidden; pointer-events: none; }
+
 .modal-box {
   background: var(--ink2); border: 1px solid var(--bdr2);
   border-radius: 20px; padding: 28px;

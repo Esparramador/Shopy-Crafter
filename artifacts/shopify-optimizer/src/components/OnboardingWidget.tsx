@@ -155,7 +155,7 @@ export function OnboardingWidget() {
   };
 
   return (
-    <div style={isMobile ? mobileStyle : desktopStyle}>
+    <div className="floating-widget" style={isMobile ? mobileStyle : desktopStyle}>
       <div
         {...widgetDragHandlers}
         style={{

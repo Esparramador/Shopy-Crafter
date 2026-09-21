@@ -212,6 +212,7 @@ export function VoiceButton() {
     return (
       <div
         {...voiceDragHandlers}
+        className="floating-widget"
         style={{
           position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 900,
           touchAction: "none", userSelect: "none",
@@ -235,6 +236,7 @@ export function VoiceButton() {
     <>
       <div
         {...voiceDragHandlers}
+        className="floating-widget"
         style={{
           position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 900,
           touchAction: "none", userSelect: "none",
@@ -264,7 +266,7 @@ export function VoiceButton() {
       </div>
 
       {showBubble && (
-        <div style={{
+        <div className="floating-widget" style={{
           position: "fixed", bottom: dragPos.bottom + 64, right: dragPos.right, zIndex: 901,
           background: "var(--ink2)", border: "1px solid var(--ink3)",
           borderRadius: 14, padding: "14px 18px",

@@ -3611,6 +3611,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       {!open && (
         <div
           {...chatDragHandlers}
+          className="floating-widget"
           style={{
             position: "fixed",
             bottom: dragPos.bottom,
