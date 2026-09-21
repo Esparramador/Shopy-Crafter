@@ -4508,16 +4508,23 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
             clearNoAudioWatchdog();
             void playbackRef.current.enqueue(ctx, msg.audio_event.audio_base_64 as string);
           } else if (msg.type === "transcript" || msg.type === "user_transcript") {
-            const text = typeof msg.transcript === "string"
-              ? msg.transcript
-              : typeof msg.user_transcript === "string"
-                ? msg.user_transcript
-                : msg.user_transcript?.user_transcript ?? "";
+            // ElevenLabs envía { type: "user_transcript", user_transcription_event: { user_transcript } }.
+            // Se mantienen las formas antiguas por compatibilidad.
+            const text = typeof msg.user_transcription_event?.user_transcript === "string"
+              ? msg.user_transcription_event.user_transcript
+              : typeof msg.transcript === "string"
+                ? msg.transcript
+                : typeof msg.user_transcript === "string"
+                  ? msg.user_transcript
+                  : msg.user_transcript?.user_transcript ?? "";
             if (text) setTranscript(p => [...p, { role: "user", text }]);
           } else if (msg.type === "agent_response") {
-            const text = typeof msg.agent_response === "string"
-              ? msg.agent_response
-              : msg.agent_response?.agent_response ?? "";
+            // ElevenLabs envía { type: "agent_response", agent_response_event: { agent_response } }.
+            const text = typeof msg.agent_response_event?.agent_response === "string"
+              ? msg.agent_response_event.agent_response
+              : typeof msg.agent_response === "string"
+                ? msg.agent_response
+                : msg.agent_response?.agent_response ?? "";
             if (text) setTranscript(p => [...p, { role: "agent", text }]);
           }
         } catch (error) {

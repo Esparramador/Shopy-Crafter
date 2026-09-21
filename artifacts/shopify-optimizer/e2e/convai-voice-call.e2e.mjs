@@ -17,19 +17,34 @@
 //                     (503 voice_not_allowed_on_plan) en el modal.
 //   E2E_SCREENSHOT_DIR carpeta para capturas (por defecto /tmp/convai-e2e)
 //
-// Es una llamada REAL (consume créditos ElevenLabs): se cuelga en cuanto hay audio.
+// Es una llamada REAL (consume créditos ElevenLabs): se cuelga en cuanto Arturo
+// ha contestado a la frase inyectada.
+//
+// "Entiende al usuario": el micrófono falso reproduce e2e/fixtures/user-phrase-16k.wav
+// (7 s de silencio para dejar pasar el saludo del agente + la frase
+// "Hola Arturo. ¿Me escuchas bien? Por favor, di la palabra melocotón." + silencio).
+// Se exige que ElevenLabs devuelva un user_transcript con esa frase y, DESPUÉS,
+// un agent_response con audio: eso solo ocurre si los user_audio_chunk PCM16
+// enviados por el navegador se transcriben correctamente.
 import { chromium } from "playwright";
 import { execSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 const BASE = (process.env.E2E_BASE_URL || `https://${process.env.REPLIT_DEV_DOMAIN}`).replace(/\/$/, "");
 const EMAIL = process.env.E2E_ADMIN_EMAIL || "craftershopy@gmail.com";
 const PASSWORD = process.env.ADMIN_PASSWORD;
 const ERROR_API = (process.env.E2E_ERROR_API_URL || "").replace(/\/$/, "");
 const SHOTS = process.env.E2E_SCREENSHOT_DIR || "/tmp/convai-e2e";
-const CALL_TIMEOUT_MS = 30_000;
+const CALL_TIMEOUT_MS = 60_000;
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const MIC_WAV = path.join(HERE, "fixtures", "user-phrase-16k.wav");
+// Palabras de la frase inyectada que el ASR debe devolver (tolerante a variaciones).
+const PHRASE_PATTERN = /melocot[oó]n|me escuchas/i;
 
 if (!PASSWORD) fail("ADMIN_PASSWORD no está definido en el entorno");
+if (!existsSync(MIC_WAV)) fail(`No existe el fixture de micrófono ${MIC_WAV}`);
 mkdirSync(SHOTS, { recursive: true });
 
 function fail(msg) { console.error(`✗ ${msg}`); process.exit(1); }
@@ -48,6 +63,8 @@ const browser = await chromium.launch({
   args: [
     "--use-fake-device-for-media-stream",
     "--use-fake-ui-for-media-stream",
+    // %noloop: la frase se dice una sola vez (en bucle interrumpiría al agente sin parar).
+    `--use-file-for-fake-audio-capture=${MIC_WAV}%noloop`,
     "--autoplay-policy=no-user-gesture-required",
     "--no-sandbox",
   ],
@@ -56,7 +73,10 @@ const browser = await chromium.launch({
 // Evidencia recogida durante la llamada
 const consoleLines = [];
 const consoleErrors = [];
-const wsInfo = { opened: [], audioFrames: 0, metadata: null, firstAudioAt: null, errors: [] };
+const wsInfo = {
+  opened: [], audioFrames: 0, audioAt: [], metadata: null, firstAudioAt: null, errors: [],
+  micChunks: 0, micBytes: 0, userTranscripts: [], agentResponses: [], interruptions: 0,
+};
 const callUrlResponses = [];
 
 try {
@@ -77,10 +97,29 @@ try {
         if (msg.type === "conversation_initiation_metadata") wsInfo.metadata = msg.conversation_initiation_metadata_event ?? {};
         if (msg.type === "audio" && msg.audio_event?.audio_base_64) {
           wsInfo.audioFrames += 1;
+          wsInfo.audioAt.push(Date.now());
           if (!wsInfo.firstAudioAt) wsInfo.firstAudioAt = Date.now();
         }
+        if (msg.type === "user_transcript") {
+          const text = msg.user_transcription_event?.user_transcript ?? msg.user_transcript?.user_transcript ?? msg.user_transcript ?? "";
+          if (typeof text === "string" && text) wsInfo.userTranscripts.push({ at: Date.now(), text });
+        }
+        if (msg.type === "agent_response") {
+          const text = msg.agent_response_event?.agent_response ?? msg.agent_response?.agent_response ?? msg.agent_response ?? "";
+          if (typeof text === "string" && text) wsInfo.agentResponses.push({ at: Date.now(), text });
+        }
+        if (msg.type === "interruption") wsInfo.interruptions += 1;
         if (msg.type === "error" || msg.type === "internal_error") wsInfo.errors.push(msg);
       } catch { /* frame binario / no JSON */ }
+    });
+    ws.on("framesent", (f) => {
+      try {
+        const msg = JSON.parse(String(f.payload));
+        if (typeof msg.user_audio_chunk === "string" && msg.user_audio_chunk.length > 0) {
+          wsInfo.micChunks += 1;
+          wsInfo.micBytes += Math.floor(msg.user_audio_chunk.length * 3 / 4);
+        }
+      } catch { /* no JSON */ }
     });
   });
   page.on("response", async (r) => {
@@ -104,6 +143,7 @@ try {
 
   // ── Llamada real ────────────────────────────────────────────────────────────
   const statesSeen = new Set();
+  const stateOrder = []; // orden de primera aparición
   const stateLabels = ["Preparando asistente IA...", "Conectando...", "En llamada", "IA respondiendo"];
   const errorTexts = [
     "Llamada conectada pero sin audio del agente",
@@ -116,21 +156,34 @@ try {
   ];
   const errorSeen = [];
   async function pollModal() {
-    for (const l of stateLabels) if (await page.getByText(l, { exact: true }).isVisible().catch(() => false)) statesSeen.add(l);
+    for (const l of stateLabels) {
+      if (await page.getByText(l, { exact: true }).isVisible().catch(() => false)) {
+        if (!statesSeen.has(l)) stateOrder.push(l);
+        statesSeen.add(l);
+      }
+    }
     for (const t of errorTexts) if (await page.getByText(t, { exact: false }).isVisible().catch(() => false)) errorSeen.push(t);
   }
 
   await page.getByRole("button", { name: "Iniciar llamada" }).click();
   const started = Date.now();
+  // Condición de éxito: transcripción del usuario con la frase inyectada, seguida
+  // de una respuesta del agente (texto + audio) posterior a esa transcripción.
+  const heardUser = () => wsInfo.userTranscripts.find(t => PHRASE_PATTERN.test(t.text)) ?? null;
+  const answeredAfter = (t) => t && wsInfo.agentResponses.some(a => a.at >= t.at) && wsInfo.audioAt.some(x => x >= t.at);
+  let midCallShot = false;
   while (Date.now() - started < CALL_TIMEOUT_MS) {
     await pollModal();
-    if (wsInfo.audioFrames > 0 && (statesSeen.has("IA respondiendo") || statesSeen.has("En llamada"))) break;
+    if (!midCallShot && statesSeen.has("IA respondiendo")) { midCallShot = true; await page.screenshot({ path: `${SHOTS}/01-en-llamada.png` }); }
+    if (answeredAfter(heardUser())) break;
     if (errorSeen.length) break;
-    await sleep(250);
+    await sleep(200);
   }
-  // Dar margen para que el estado "IA respondiendo" se pinte tras el primer chunk.
-  for (let i = 0; i < 12 && !statesSeen.has("IA respondiendo") && !errorSeen.length; i++) { await sleep(250); await pollModal(); }
-  await page.screenshot({ path: `${SHOTS}/01-en-llamada.png` });
+  // Margen para que el modal pinte el transcript y el estado tras el último evento.
+  for (let i = 0; i < 8; i++) { await sleep(250); await pollModal(); }
+  await page.screenshot({ path: `${SHOTS}/03-transcript.png` });
+  const heard = heardUser();
+  const userBubble = heard ? await page.getByText(heard.text, { exact: false }).first().isVisible().catch(() => false) : false;
 
   // Colgar cuanto antes: llamada real.
   const hang = page.getByRole("button", { name: "Colgar" });
@@ -144,6 +197,10 @@ try {
   console.log("  websockets:", wsInfo.opened.map(u => u.split("?")[0]));
   console.log("  metadata:", JSON.stringify(wsInfo.metadata));
   console.log("  audio frames:", wsInfo.audioFrames, wsInfo.firstAudioAt ? `(primero a los ${wsInfo.firstAudioAt - started} ms)` : "");
+  console.log("  mic → ElevenLabs:", `${wsInfo.micChunks} user_audio_chunk (${(wsInfo.micBytes / 1024).toFixed(0)} KiB PCM16)`);
+  console.log("  user_transcript:", JSON.stringify(wsInfo.userTranscripts.map(t => `+${t.at - started}ms ${t.text}`)));
+  console.log("  agent_response:", JSON.stringify(wsInfo.agentResponses.map(a => `+${a.at - started}ms ${a.text.slice(0, 120)}`)));
+  console.log("  interrupciones:", wsInfo.interruptions);
   const fmtLine = consoleLines.find(l => l.includes("ConvAI formats announced"));
   console.log("  consola formats:", fmtLine ?? "(no encontrado)");
   console.log("");
@@ -154,9 +211,20 @@ try {
   assert(wsInfo.metadata?.agent_output_audio_format === "pcm_16000", `Metadata anuncia agent_output_audio_format=pcm_16000 (recibido: ${wsInfo.metadata?.agent_output_audio_format})`);
   assert(wsInfo.metadata?.user_input_audio_format === "pcm_16000", `Metadata anuncia user_input_audio_format=pcm_16000 (recibido: ${wsInfo.metadata?.user_input_audio_format})`);
   assert(wsInfo.audioFrames > 0, `Llegó audio del agente (${wsInfo.audioFrames} frames)`);
-  assert(statesSeen.has("Conectando...") || statesSeen.has("Preparando asistente IA..."), "El modal pasó por connecting/provisioning");
-  assert(statesSeen.has("En llamada") || statesSeen.has("IA respondiendo"), "El modal llegó a connected/speaking");
-  assert(statesSeen.has("IA respondiendo"), 'El modal mostró "IA respondiendo" (speaking)');
+  // Secuencia de estados: provisioning → (connecting) → connected → speaking, en ese orden.
+  // "Conectando..." puede durar menos que el muestreo (200 ms), por eso es opcional.
+  const idx = (l) => stateOrder.indexOf(l);
+  assert(idx("Preparando asistente IA...") === 0, `El primer estado fue provisioning (orden visto: ${stateOrder.join(" → ")})`);
+  assert(idx("En llamada") > idx("Preparando asistente IA...") && (idx("Conectando...") === -1 || idx("Conectando...") < idx("En llamada")), "connected llegó después de provisioning/connecting");
+  assert(idx("IA respondiendo") > idx("En llamada"), "speaking llegó después de connected");
+  // El agente ENTIENDE al usuario: la frase inyectada por el micrófono vuelve transcrita
+  // y el agente responde después de oírla.
+  assert(wsInfo.micChunks > 0, `El navegador envió audio del micrófono (${wsInfo.micChunks} user_audio_chunk)`);
+  assert(!!heard, `ElevenLabs transcribió la frase inyectada (${PHRASE_PATTERN}) — recibido: ${JSON.stringify(wsInfo.userTranscripts.map(t => t.text))}`);
+  const reply = heard ? wsInfo.agentResponses.find(a => a.at >= heard.at) : null;
+  assert(!!reply, `El agente respondió tras entender al usuario${reply ? `: "${reply.text.slice(0, 100)}"` : ""}`);
+  assert(heard ? wsInfo.audioAt.some(x => x >= heard.at) : false, "Llegó audio del agente después de la transcripción del usuario");
+  assert(userBubble, 'El transcript del modal muestra la burbuja "Tú" con la frase');
   assert(errorSeen.length === 0, `Sin mensajes de error en el modal ${errorSeen.length ? JSON.stringify(errorSeen) : ""}`);
   const convaiErrors = consoleErrors.filter(t => t.startsWith("ConvAI"));
   assert(convaiErrors.length === 0, `Sin console.error "ConvAI*" ${convaiErrors.length ? JSON.stringify(convaiErrors) : ""}`);
