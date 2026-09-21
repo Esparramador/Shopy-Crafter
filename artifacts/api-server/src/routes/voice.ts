@@ -916,6 +916,79 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
   }
 });
 
+// ── Health check ConvAI: voz + configuración persistida de cada agente ────────
+// Ejecuta el mismo pre-vuelo que una llamada real (voz aceptada por el plan +
+// sync del agente + relectura anunciando PCM16) para admin/client/landing, SIN
+// crear agentes nuevos y SIN caché, para que el admin vea el problema antes de
+// que se queje un usuario.
+type ConvAIAgentHealth = {
+  type: AgentType;
+  agentId: string | null;
+  status: "ok" | "error" | "not_created";
+  code?: string;
+  error?: string;
+};
+async function findExistingConvAIAgentId(type: AgentType): Promise<string | null> {
+  if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) return process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
+  const cacheKey = `convai_${type}_agent_id`;
+  if (_agentIdCache[cacheKey]) return _agentIdCache[cacheKey];
+  await ensurePlatformSettingsKV();
+  const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
+  const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
+  const id: string | undefined = rowArr[0]?.value;
+  return id && id.length > 4 ? id : null;
+}
+router.get("/voice/convai/health", requireAdmin, async (_req, res): Promise<void> => {
+  const checkedAt = new Date().toISOString();
+  const types: AgentType[] = ["admin", "client", "landing"];
+
+  // Sin caché: una comprobación de salud debe reflejar el estado real ahora.
+  _voiceCheckCache.clear();
+  _subscriptionCache = null;
+
+  let voiceId: string | null = null;
+  let voiceError: { code?: string; error: string } | null = null;
+  try {
+    voiceId = await resolveVerifiedConvAIVoiceId();
+  } catch (err: any) {
+    voiceError = { code: isConvAIVoiceError(err) ? err.code : undefined, error: err?.message || "Error comprobando la voz" };
+  }
+
+  const agents: ConvAIAgentHealth[] = [];
+  for (const type of types) {
+    let agentId: string | null = null;
+    try {
+      agentId = await findExistingConvAIAgentId(type);
+    } catch (err: any) {
+      agents.push({ type, agentId: null, status: "error", error: `No se pudo leer el agente: ${err?.message}` });
+      continue;
+    }
+    if (!agentId) { agents.push({ type, agentId: null, status: "not_created" }); continue; }
+    if (!voiceId) { agents.push({ type, agentId, status: "error", code: voiceError?.code, error: voiceError?.error }); continue; }
+    try {
+      // Mismo camino que una llamada en frío: PATCH con la config actual y
+      // relectura para confirmar que ElevenLabs la persistió (voz + PCM16).
+      // Verificar sin sincronizar daría falsos rojos (drift que la llamada repararía)
+      // y sincronizar sin verificar daría falsos verdes (PATCH ignora claves).
+      await syncConvAIAgentOrThrow(type, agentId, voiceId);
+      _agentIdCache[`convai_${type}_agent_id`] = agentId;
+      agents.push({ type, agentId, status: "ok" });
+    } catch (err: any) {
+      // Un agente borrado en el dashboard de ElevenLabs también debe verse en rojo.
+      delete _agentIdCache[`convai_${type}_agent_id`];
+      agents.push({ type, agentId, status: "error", code: isConvAIVoiceError(err) ? err.code : undefined, error: err?.message || "Error verificando el agente" });
+    }
+  }
+
+  const healthy = !voiceError && agents.every(a => a.status !== "error");
+  res.json({
+    healthy,
+    checkedAt,
+    voice: { voiceId, ok: !voiceError, code: voiceError?.code, error: voiceError?.error },
+    agents,
+  });
+});
+
 router.get("/voice/convai/signed-url", requireAdmin, async (req, res): Promise<void> => {
   try {
     const { agentId } = req.query;

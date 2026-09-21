@@ -2292,6 +2292,42 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
 
   useEffect(() => { if (sub === "convai" && !convaiLoaded) loadAgents(); }, [sub]);
 
+  // ── Salud de las llamadas de voz (Arturo): voz + agentes admin/client/landing ──
+  type ConvAIHealth = {
+    healthy: boolean; checkedAt: string;
+    voice: { voiceId: string | null; ok: boolean; code?: string; error?: string };
+    agents: { type: "admin" | "client" | "landing"; agentId: string | null; status: "ok" | "error" | "not_created"; code?: string; error?: string }[];
+  };
+  const [health, setHealth] = useState<ConvAIHealth | null>(null);
+  const [healthBusy, setHealthBusy] = useState(false);
+  const [healthErr, setHealthErr] = useState<string | null>(null);
+  const [resyncBusy, setResyncBusy] = useState(false);
+
+  async function loadHealth() {
+    setHealthBusy(true); setHealthErr(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/convai/health`, { credentials: "include" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error comprobando la salud de ConvAI");
+      setHealth(j);
+    } catch (e: any) { setHealthErr(e.message); }
+    finally { setHealthBusy(false); }
+  }
+
+  async function resyncAgents() {
+    setResyncBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/convai/reset-agents`, { method: "POST", credentials: "include" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Error re-sincronizando agentes");
+      onInfo("Agentes ConvAI re-creados con la configuración actual");
+      await Promise.all([loadHealth(), loadAgents()]);
+    } catch (e: any) { onError(e.message); await loadHealth(); }
+    finally { setResyncBusy(false); }
+  }
+
+  useEffect(() => { if (sub === "convai" && !health && !healthBusy) loadHealth(); }, [sub]);
+
   // ── Diccionarios de Pronunciación ──
   const [dicts, setDicts] = useState<any[]>([]);
   const [dictsBusy, setDictsBusy] = useState(false);
@@ -2479,6 +2515,68 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
           <div style={{ padding: 14, background: "rgba(200,168,75,0.06)", borderRadius: 8, border: "1px solid rgba(200,168,75,0.15)", fontSize: 12, color: "var(--t2)" }}>
             <strong style={{ color: "var(--gold)" }}>ConvAI Agents</strong> — Crea agentes conversacionales con voz en tiempo real. Cada agente tiene su propia personalidad, prompt y voz. Ideal para chatbots de atención al cliente de tus tiendas Shopify.
           </div>
+
+          {/* Salud de las llamadas de voz */}
+          {(() => {
+            const AGENT_LABEL: Record<string, string> = { admin: "Panel admin", client: "Panel cliente", landing: "Landing pública" };
+            const allOk = !!health?.healthy;
+            const anyError = !!health && !health.healthy;
+            const border = anyError ? "rgba(239,68,68,0.45)" : allOk ? "rgba(34,197,94,0.35)" : "rgba(255,255,255,0.07)";
+            const bg = anyError ? "rgba(239,68,68,0.06)" : allOk ? "rgba(34,197,94,0.05)" : "rgba(0,0,0,0.2)";
+            return (
+              <div data-testid="convai-health-card" style={{ background: bg, borderRadius: 8, padding: 14, border: `1px solid ${border}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {healthBusy ? <Loader2 size={14} className="animate-spin" style={{ color: "var(--t3)" }} />
+                      : anyError ? <AlertCircle size={14} style={{ color: "#ef4444" }} />
+                      : allOk ? <CheckCircle2 size={14} style={{ color: "#22c55e" }} />
+                      : <Bot size={14} style={{ color: "var(--t3)" }} />}
+                    <p style={{ fontSize: 12, fontWeight: 600, color: anyError ? "#fca5a5" : allOk ? "#86efac" : "var(--t2)" }}>
+                      {healthBusy ? "Comprobando llamadas de voz…"
+                        : anyError ? "Las llamadas de voz NO funcionarían ahora mismo"
+                        : allOk ? "Llamadas de voz operativas"
+                        : "Salud de las llamadas de voz (Arturo)"}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={loadHealth} disabled={healthBusy || resyncBusy} className="btn" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-health-refresh">
+                      <RefreshCw size={12} className={healthBusy ? "animate-spin" : ""} /> Comprobar
+                    </button>
+                    <button onClick={resyncAgents} disabled={healthBusy || resyncBusy} className="btn btn-gold" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-health-resync"
+                      title="Borra y vuelve a crear los 3 agentes en ElevenLabs con la voz y configuración actuales">
+                      {resyncBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Re-sincronizar
+                    </button>
+                  </div>
+                </div>
+
+                {healthErr && <p style={{ fontSize: 11, color: "#fca5a5", marginTop: 8 }}>{healthErr}</p>}
+
+                {health && (
+                  <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 4, background: health.voice.ok ? "#22c55e" : "#ef4444", flexShrink: 0 }} />
+                      <span style={{ color: "var(--t2)" }}>Voz ConvAI</span>
+                      <span style={{ color: "var(--t3)", fontFamily: "monospace" }}>{health.voice.voiceId ?? "—"}</span>
+                      {!health.voice.ok && <span style={{ color: "#fca5a5" }}>· {health.voice.error}</span>}
+                    </div>
+                    {health.agents.map(a => (
+                      <div key={a.type} data-testid={`convai-health-agent-${a.type}`} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0,
+                          background: a.status === "ok" ? "#22c55e" : a.status === "error" ? "#ef4444" : "rgba(255,255,255,0.25)" }} />
+                        <span style={{ color: "var(--t2)", minWidth: 96 }}>{AGENT_LABEL[a.type] ?? a.type}</span>
+                        <span style={{ color: "var(--t3)", fontFamily: "monospace" }}>{a.agentId ?? "sin crear"}</span>
+                        {a.status === "not_created" && <span style={{ color: "var(--t3)" }}>· se creará en la primera llamada</span>}
+                        {a.status === "error" && <span style={{ color: "#fca5a5" }}>· {a.error}{a.code ? ` (${a.code})` : ""}</span>}
+                      </div>
+                    ))}
+                    <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>
+                      Última comprobación: {new Date(health.checkedAt).toLocaleTimeString()} · Misma verificación que se ejecuta antes de cada llamada (voz aceptada por el plan + audio PCM16).
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Crear agente */}
           <div style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 14, border: "1px solid rgba(255,255,255,0.07)" }}>
