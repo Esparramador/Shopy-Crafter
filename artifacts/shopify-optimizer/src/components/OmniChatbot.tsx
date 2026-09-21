@@ -15,6 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useSafeTimeout } from "@/hooks/useSafeTimeout";
 import { useDraggable } from "@/hooks/use-draggable";
 import { getModelShortName } from "@/lib/model-aliases";
+import { decodeConvAIAudio, float32ToPcm16Base64 } from "@/lib/convai-audio";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -4317,10 +4318,14 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
   const [transcript, setTranscript] = useState<Array<{ role: "user" | "agent"; text: string }>>([]);
   const [errorMsg, setErrorMsg] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const micProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const micMuteRef = useRef<GainNode | null>(null);
   const audioQueueRef = useRef<AudioBuffer[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioFormatRef = useRef("pcm_16000");
+  const decodeChainRef = useRef(Promise.resolve());
   const playingRef = useRef(false);
   const endingRef = useRef(false); // guard against double-endCall
 
@@ -4341,8 +4346,14 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(ctx.destination);
-      src.onended = () => { playingRef.current = false; setAgentSpeaking(false); playNextAudio(); };
+      src.onended = () => {
+        playingRef.current = false;
+        setAgentSpeaking(false);
+        if (audioQueueRef.current.length === 0) setStatus("connected");
+        playNextAudio();
+      };
       setAgentSpeaking(true);
+      setStatus("speaking");
       src.start();
     } catch { playingRef.current = false; }
   };
@@ -4377,20 +4388,30 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
 
       ws.onopen = () => {
         setStatus("connected");
-        ws.send(JSON.stringify({ type: "conversation_initiation_client_data", conversation_config_override: { tts: { output_format: "mp3_44100_128" } } }));
-        const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
-        mediaRecorderRef.current = recorder;
-        recorder.ondataavailable = (e) => {
-          if (ws.readyState === WebSocket.OPEN && e.data.size > 0) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = (reader.result as string).split(",")[1];
-              if (base64) ws.send(JSON.stringify({ user_audio_chunk: base64 }));
-            };
-            reader.readAsDataURL(e.data);
-          }
+        ws.send(JSON.stringify({
+          type: "conversation_initiation_client_data",
+          conversation_config_override: { tts: { output_format: "pcm_16000" } },
+        }));
+
+        // ConvAI's handshake declares pcm_16000 for microphone input. Sending
+        // MediaRecorder's WebM/Opus container here makes the agent hear nothing.
+        // Capture float samples and downsample them to signed 16-bit PCM.
+        const source = ctx.createMediaStreamSource(stream);
+        const processor = ctx.createScriptProcessor(4096, 1, 1);
+        const mute = ctx.createGain();
+        mute.gain.value = 0;
+        source.connect(processor);
+        processor.connect(mute);
+        mute.connect(ctx.destination);
+        micSourceRef.current = source;
+        micProcessorRef.current = processor;
+        micMuteRef.current = mute;
+        processor.onaudioprocess = (event) => {
+          if (ws.readyState !== WebSocket.OPEN || endingRef.current) return;
+          const input = event.inputBuffer.getChannelData(0);
+          const base64 = float32ToPcm16Base64(input, ctx.sampleRate, 16000);
+          ws.send(JSON.stringify({ user_audio_chunk: base64 }));
         };
-        recorder.start(250);
       };
 
       ws.onmessage = async (evt) => {
@@ -4400,23 +4421,45 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
             ws.send(JSON.stringify({ type: "pong", event_id: msg.ping_event?.event_id }));
             return;
           }
+          if (msg.type === "conversation_initiation_metadata") {
+            const format = msg.conversation_initiation_metadata_event?.agent_output_audio_format;
+            if (typeof format === "string" && format.trim()) {
+              audioFormatRef.current = format.trim();
+            }
+            return;
+          }
           if (msg.type === "audio" && msg.audio_event?.audio_base_64) {
             const currentCtx = audioCtxRef.current;
             if (!currentCtx || currentCtx.state === "closed") return;
-            const raw = atob(msg.audio_event.audio_base_64);
-            const bytes = new Uint8Array(raw.length).map((_, i) => raw.charCodeAt(i));
-            try {
-              const decoded = await currentCtx.decodeAudioData(bytes.buffer.slice(0));
-              if (audioCtxRef.current === currentCtx && currentCtx.state !== "closed") {
+            const audioBase64 = msg.audio_event.audio_base_64 as string;
+            const format = audioFormatRef.current;
+            // Decode sequentially so network jitter cannot reorder speech chunks.
+            decodeChainRef.current = decodeChainRef.current.then(async () => {
+              try {
+                const decoded = await decodeConvAIAudio(currentCtx, audioBase64, format);
+                if (audioCtxRef.current === currentCtx) {
                 audioQueueRef.current.push(decoded);
                 playNextAudio();
+                }
+              } catch (error) {
+                console.error("ConvAI audio decode failed", { format, error });
+                if (!endingRef.current) {
+                  setStatus("error");
+                  setErrorMsg(`No se pudo reproducir el audio recibido (${format}).`);
               }
-            } catch { /* decode error — skip chunk */ }
+              }
+            });
           } else if (msg.type === "transcript" || msg.type === "user_transcript") {
-            const text = msg.transcript ?? msg.user_transcript ?? "";
+            const text = typeof msg.transcript === "string"
+              ? msg.transcript
+              : typeof msg.user_transcript === "string"
+                ? msg.user_transcript
+                : msg.user_transcript?.user_transcript ?? "";
             if (text) setTranscript(p => [...p, { role: "user", text }]);
           } else if (msg.type === "agent_response") {
-            const text = msg.agent_response ?? "";
+            const text = typeof msg.agent_response === "string"
+              ? msg.agent_response
+              : msg.agent_response?.agent_response ?? "";
             if (text) setTranscript(p => [...p, { role: "agent", text }]);
           }
         } catch { /* ignore parse errors */ }
@@ -4426,7 +4469,10 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
       ws.onclose = () => {
         streamRef.current?.getTracks().forEach(t => t.stop());
         streamRef.current = null;
-        if (!endingRef.current) setStatus("idle");
+        if (!endingRef.current) {
+          endCall();
+          setStatus("idle");
+        }
       };
     } catch (err: any) {
       setStatus("error");
@@ -4442,13 +4488,17 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
     if (ws && ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
       ws.close();
     }
-    if (mediaRecorderRef.current?.state !== "inactive") {
-      try { mediaRecorderRef.current?.stop(); } catch { /* ignore */ }
-    }
-    mediaRecorderRef.current = null;
+    micProcessorRef.current?.disconnect();
+    micProcessorRef.current = null;
+    micSourceRef.current?.disconnect();
+    micSourceRef.current = null;
+    micMuteRef.current?.disconnect();
+    micMuteRef.current = null;
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
     audioQueueRef.current = [];
+    decodeChainRef.current = Promise.resolve();
+    audioFormatRef.current = "pcm_16000";
     playingRef.current = false;
     safeCloseAudioCtx();
     if (!opts?.unmounting) {
@@ -4550,7 +4600,7 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
               <Loader2 size={18} className="animate-spin" /> {status === "provisioning" ? "Preparando..." : "Conectando..."}
             </button>
           ) : status === "connected" || status === "speaking" ? (
-            <button onClick={endCall} style={{
+            <button onClick={() => endCall()} style={{
               display: "flex", alignItems: "center", gap: 8, padding: "12px 28px",
               background: "var(--crim)", color: "#fff", borderRadius: 40, border: "none",
               fontSize: 15, fontWeight: 700, cursor: "pointer",

@@ -519,24 +519,27 @@ Si te preguntan algo que no sabes responder, ofrécete a poner en contacto al vi
 Sé un vendedor nato pero sin presionar — convence con entusiasmo y conocimiento real, no con palabrería vacía.
 ${ANDALUZ_STYLE}`;
 
-// ── Voz clonada del Sevillano — ID verificado en ElevenLabs ──────────────────
-// Nombre: "Sevillano" | labels: {accent:"sevillano", language:"es"}
-const SEVILLANO_VOICE_ID = "8m4O8qoFLrKBzbmsuL5T";
+// ── Voz ConvAI compatible con el plan actual ──────────────────────────────────
+// Dani is a Spanish peninsular premade voice. The Sevillano voice below is an
+// instant clone and ElevenLabs rejects it for ConvAI on the current plan.
+const CONVAI_PREMADE_SPANISH_VOICE_ID = "CdAqYBLnsNjmTqYgD5HaDani";
 
 // ── Modelo requerido por ElevenLabs para agentes no ingleses ──────────────────
 // "Non-english Agents must use turbo or flash v2_5"
 const CONVAI_SPANISH_MODEL = "eleven_turbo_v2_5";
 
 async function resolveSevillanoVoiceId(): Promise<string> {
-  // 1. Override manual vía env var
-  if (process.env.ELEVEN_SEVILLANO_VOICE_ID?.trim()) {
-    return process.env.ELEVEN_SEVILLANO_VOICE_ID.trim();
+  // An explicit ConvAI voice override is useful if the ElevenLabs plan changes.
+  if (process.env.ELEVEN_CONVAI_VOICE_ID?.trim()) {
+    return process.env.ELEVEN_CONVAI_VOICE_ID.trim();
   }
   // 2. In-memory cache
   if (_sevillanoVoiceIdCache) return _sevillanoVoiceIdCache;
-  // 3. ID conocido y verificado — lo usamos directamente
-  _sevillanoVoiceIdCache = SEVILLANO_VOICE_ID;
-  return SEVILLANO_VOICE_ID;
+  // 3. Use a premade Spanish voice by default. Do not silently select the
+  // instant-cloned Sevillano voice: ConvAI closes the WebSocket with a plan
+  // error before it can send or receive any audio.
+  _sevillanoVoiceIdCache = CONVAI_PREMADE_SPANISH_VOICE_ID;
+  return CONVAI_PREMADE_SPANISH_VOICE_ID;
 }
 
 async function ensurePlatformSettingsKV(): Promise<void> {
@@ -575,7 +578,10 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
   const tts: TtsConfig = {
     voice_id: voiceId,
     model_id: CONVAI_SPANISH_MODEL,  // Obligatorio para agentes no ingleses
-    output_format: "mp3_44100_128",  // MP3 decodificable por Web Audio API (PCM crudo no funciona en browser)
+    // ConvAI's browser WebSocket advertises and delivers raw PCM 16 kHz.
+    // Keep the persisted agent config aligned with that protocol; the client
+    // decodes PCM directly instead of passing headerless bytes to decodeAudioData.
+    output_format: "pcm_16000",
     voice_settings: {
       stability: 0.18,        // Baja → más expresiva, menos robótica
       similarity_boost: 0.92, // Alta → muy fiel al clon original
