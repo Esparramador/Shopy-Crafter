@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import {
   FolderOpen, Download, Trash2, Image, FileText, RefreshCw,
   ArrowLeft, Package, BarChart2, Search, Building2,
@@ -1477,11 +1478,7 @@ Hemos trabajado con más de 50 tiendas Shopify en España y Latinoamérica — e
 
       {/* ── Video Audit Modal (Global Vault) ── */}
       {videoAuditResult && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 9999,
-          background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-        }} onClick={() => setVideoAuditResult(null)}>
+        <ModalOverlay style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", padding: 20 }} onClick={() => setVideoAuditResult(null)}>
           <div style={{
             background: "#111118", border: "1px solid rgba(232,69,88,0.3)", borderRadius: 16,
             padding: 28, maxWidth: 680, width: "100%", maxHeight: "80vh", overflowY: "auto",
@@ -1504,7 +1501,7 @@ Hemos trabajado con más de 50 tiendas Shopify en España y Latinoamérica — e
               Cerrar
             </button>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );

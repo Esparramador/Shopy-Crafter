@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { Search, Copy, Check, Zap, Filter, ChevronDown, BookOpen, Sparkles, Star, Clock, Hash, Play, X, ChevronRight, AlertCircle, Loader2, Brain, Code2, Globe } from "lucide-react";
 
 const WEB_DESIGNER_CATS = new Set([
@@ -295,9 +296,8 @@ function ExecutionPanel({
   const totalVars = vars.length;
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 1000,
-      display: "flex", alignItems: "stretch",
+    <ModalOverlay style={{
+      alignItems: "stretch", justifyContent: "flex-end", padding: 0,
       background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
 
@@ -517,7 +517,7 @@ function ExecutionPanel({
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

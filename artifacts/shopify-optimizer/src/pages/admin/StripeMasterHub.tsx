@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 
 const API = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 function api(path: string, opts?: RequestInit) {
@@ -105,7 +106,7 @@ table.smh-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .smh-btn-sm { padding: 4px 10px; font-size: 11px; }
 .smh-btn:disabled { opacity: .4; cursor: default; }
 .smh-actions-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.smh-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.smh-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .smh-modal { background: #0f0f1a; border: 1px solid rgba(200,168,75,.22); border-radius: 16px; padding: 28px; width: 100%; max-width: 480px; }
 .smh-modal-title { font-size: 17px; font-weight: 800; margin: 0 0 4px; }
 .smh-modal-sub { font-size: 12px; color: rgba(240,237,230,.45); margin: 0 0 22px; }
@@ -152,7 +153,7 @@ function VaultModal({ project, onClose, onDone }: {
   };
 
   return (
-    <div className="smh-modal-bg" onClick={onClose}>
+    <ModalOverlay className="smh-modal-bg" onClick={onClose}>
       <div className="smh-modal" onClick={e => e.stopPropagation()}>
         <div className="smh-modal-title">🔑 The Vault — Asignar clave API</div>
         <div className="smh-modal-sub">Proyecto: <strong>{project.name}</strong></div>
@@ -176,7 +177,7 @@ function VaultModal({ project, onClose, onDone }: {
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -230,7 +231,7 @@ function FactoryModal({ project, onClose, onDone }: {
   };
 
   return (
-    <div className="smh-modal-bg" onClick={onClose}>
+    <ModalOverlay className="smh-modal-bg" onClick={onClose}>
       <div className="smh-modal" onClick={e => e.stopPropagation()}>
         <div className="smh-modal-title">🏭 Account Factory — Connect Custom</div>
         <div className="smh-modal-sub">Crear sub-cuenta desde cero para: <strong>{project.name}</strong></div>
@@ -286,7 +287,7 @@ function FactoryModal({ project, onClose, onDone }: {
           </div>
         </>)}
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -306,7 +307,7 @@ function BalanceModal({ project, onClose }: { project: ProjectRow; onClose: () =
   }, [project.id]);
 
   return (
-    <div className="smh-modal-bg" onClick={onClose}>
+    <ModalOverlay className="smh-modal-bg" onClick={onClose}>
       <div className="smh-modal" onClick={e => e.stopPropagation()}>
         <div className="smh-modal-title">💰 Balance — {project.name}</div>
         <ModeBadge mode={project.stripe_mode} />
@@ -330,7 +331,7 @@ function BalanceModal({ project, onClose }: { project: ProjectRow; onClose: () =
           <button className="smh-btn smh-btn-ghost" onClick={onClose}>Cerrar</button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

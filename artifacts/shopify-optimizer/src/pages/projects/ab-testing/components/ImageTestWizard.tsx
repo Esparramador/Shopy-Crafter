@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { X, ChevronRight, ChevronLeft, Sparkles, Image as ImageIcon, Check, RefreshCw } from "lucide-react";
 import { ActionButton } from "./ActionButton";
 import { ImageVariantCard } from "./ImageVariantCard";
@@ -130,7 +131,7 @@ export function ImageTestWizard({ open, api, onClose, onCreated, preselectedProd
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto p-4">
+    <ModalOverlay className="backdrop-blur-sm overflow-y-auto">
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-5xl my-8 shadow-2xl">
 
         <div className="border-b border-slate-700 p-5">
@@ -420,7 +421,7 @@ export function ImageTestWizard({ open, api, onClose, onCreated, preselectedProd
           )}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

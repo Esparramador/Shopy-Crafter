@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -279,7 +280,7 @@ function PlanModal({
   };
 
   return (
-    <div className="ta-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <ModalOverlay className="ta-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="ta-modal" style={{ maxWidth: 680 }}>
         <div className="ta-modal-header">
           <h3>{isNew ? "➕ Nuevo plan" : `✏️ Editar plan — ${plan?.name}`}</h3>
@@ -387,7 +388,7 @@ function PlanModal({
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -538,7 +539,7 @@ function ServiceModal({
   };
 
   return (
-    <div className="ta-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <ModalOverlay className="ta-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="ta-modal">
         <div className="ta-modal-header">
           <h3>{form.id ? "✏️ Editar servicio" : "➕ Nuevo servicio"}</h3>
@@ -623,7 +624,7 @@ function ServiceModal({
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

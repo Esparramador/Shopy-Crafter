@@ -1,4 +1,5 @@
 import { useRoute } from "wouter";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { GlassCard } from "@/components/ui/GlassCard";
 import {
   useGetFinancialDashboard,
@@ -297,7 +298,7 @@ function CogsModal({
   const inputClass = "w-full bg-background border border-border rounded-xl px-3 py-2 text-foreground focus:outline-none focus:border-primary text-sm transition-all";
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <ModalOverlay className="backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -732,7 +733,7 @@ function CogsModal({
           )}
         </div>
       </motion.div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -802,7 +803,7 @@ function PriceSimulator({ projectId, product, onClose }: { projectId: number; pr
   const inputClass = "bg-background border border-border rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:border-primary text-sm w-full";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <ModalOverlay onClick={onClose}>
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -909,7 +910,7 @@ function PriceSimulator({ projectId, product, onClose }: { projectId: number; pr
           </motion.div>
         )}
       </motion.div>
-    </div>
+    </ModalOverlay>
   );
 }
 

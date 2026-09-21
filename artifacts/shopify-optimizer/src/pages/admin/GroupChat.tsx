@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AppLayout } from "../../components/layout/AppLayout";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { Send, Loader2, Plus, X, Users, Trash2, UserPlus, MessageSquare } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -280,7 +281,7 @@ export default function GroupChat() {
 
       {/* ── Create Group Modal ── */}
       {showCreate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(4px)" }}>
+        <ModalOverlay style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
           <div style={{ background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, padding: 28, width: 440, maxHeight: "80vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--t1)", margin: 0 }}>Nuevo grupo de chat</h3>
@@ -314,12 +315,12 @@ export default function GroupChat() {
               <button onClick={createGroup} disabled={!newGroup.name.trim()} style={{ flex: 2, padding: "9px 0", borderRadius: 9, border: "none", background: newGroup.name.trim() ? "var(--gold)" : "rgba(255,255,255,0.06)", color: newGroup.name.trim() ? "#0a0a14" : "var(--t3)", fontSize: 13, fontWeight: 700, cursor: newGroup.name.trim() ? "pointer" : "not-allowed" }}>Crear grupo</button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* ── Add Member Modal ── */}
       {showAddMember && selected && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(4px)" }}>
+        <ModalOverlay style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
           <div style={{ background: "var(--srf)", border: "1px solid var(--bdr)", borderRadius: 16, padding: 28, width: 380, maxHeight: "70vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--t1)", margin: 0 }}>Añadir cliente al grupo</h3>
@@ -339,7 +340,7 @@ export default function GroupChat() {
               </button>
             ))}
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </AppLayout>
   );

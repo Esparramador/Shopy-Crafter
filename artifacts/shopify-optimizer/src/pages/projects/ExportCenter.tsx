@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { LiveOperation } from "@/components/LiveOperation";
 import {
@@ -744,9 +745,9 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
       )}
 
       {viewerOpen && (
-        <div
-          className="fixed inset-0 z-[9999] flex flex-col"
-          style={{ background: "rgba(0,0,0,.92)" }}
+        <ModalOverlay
+          className="flex-col"
+          style={{ background: "rgba(0,0,0,.92)", padding: 0, alignItems: "stretch", justifyContent: "flex-start" }}
         >
           <div
             className="flex items-center justify-between px-6 py-3 shrink-0"
@@ -790,7 +791,7 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
               sandbox="allow-popups"
             />
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );

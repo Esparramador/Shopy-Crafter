@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { Loader2, Check, X, Sparkles, AlertTriangle } from "lucide-react";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "ai";
@@ -85,7 +86,7 @@ export function ActionButton({
       </button>
 
       {status === "confirming" && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setStatus("idle")}>
+        <ModalOverlay className="backdrop-blur-sm" onClick={() => setStatus("idle")}>
           <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
@@ -112,7 +113,7 @@ export function ActionButton({
               </button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </>
   );

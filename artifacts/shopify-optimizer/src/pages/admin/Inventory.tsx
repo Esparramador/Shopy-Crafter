@@ -1,6 +1,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { Package, AlertTriangle, CheckCircle, RefreshCw, Mail, Download } from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -186,10 +187,7 @@ export default function Inventory() {
       )}
 
       {emailModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }} onClick={() => setEmailModal(null)}>
+        <ModalOverlay onClick={() => setEmailModal(null)}>
           <div style={{ background: "var(--ink2)", borderRadius: 16, padding: 28, maxWidth: 560, width: "90%", maxHeight: "80vh", overflowY: "auto" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
@@ -215,7 +213,7 @@ export default function Inventory() {
               </span>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );

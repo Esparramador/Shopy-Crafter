@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { Search, Copy, Check, Zap, Filter, ChevronDown, BookOpen,
          Sparkles, Star, Hash, Wand2, Play, Download, X, ChevronRight,
          Code2, Eye, RefreshCw, ExternalLink } from "lucide-react";
@@ -1132,7 +1133,7 @@ export default function EffectsStudio() {
 
       {/* ══ COMPOSE FULLSCREEN PREVIEW ══════════════════════════════════════ */}
       {showComposePrev && composeHtml && (
-        <div style={{ position: "fixed", inset: 0, background: S.bg, zIndex: 1000, display: "flex", flexDirection: "column" }}>
+        <ModalOverlay style={{ background: S.bg, flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start", padding: 0 }}>
           {/* Preview topbar */}
           <div style={{ height: 50, background: S.surf, borderBottom: `1px solid ${S.bdr}`, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", flexShrink: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#a5b4fc", flex: 1 }}>
@@ -1164,7 +1165,7 @@ export default function EffectsStudio() {
             ? <iframe srcDoc={composeHtml} sandbox="allow-scripts allow-same-origin" style={{ flex: 1, border: "none", width: "100%", background: "#fff" }} title="Compose preview" />
             : <pre style={{ flex: 1, margin: 0, padding: 20, background: S.surf3, color: "#a8b4d8", fontSize: 11, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowY: "auto", lineHeight: 1.6 }}>{composeHtml}</pre>
           }
-        </div>
+        </ModalOverlay>
       )}
 
       {/* ── Toast ── */}

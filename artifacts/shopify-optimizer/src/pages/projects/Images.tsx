@@ -1,4 +1,6 @@
 import { useRoute, Link } from "wouter";
+import { useModalLock } from "@/hooks/use-modal-lock";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import DOMPurify from "dompurify";
 import { GlassCard } from "@/components/ui/GlassCard";
 import {
@@ -118,7 +120,7 @@ function PromptModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <ModalOverlay className="backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -227,7 +229,7 @@ function PromptModal({
           )}
         </div>
       </motion.div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -311,12 +313,14 @@ function TryonModal({
     }
   };
 
+  useModalLock();
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="modal-overlay backdrop-blur-sm"
       onClick={onClose}
     >
       <motion.div
@@ -526,12 +530,14 @@ function InfographicPremiumModal({
     }
   };
 
+  useModalLock();
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="modal-overlay backdrop-blur-sm"
       onClick={onClose}
     >
       <motion.div
@@ -699,12 +705,14 @@ function ImageLightbox({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  useModalLock();
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+      className="modal-overlay backdrop-blur-sm"
       onClick={onClose}
       data-testid="image-lightbox"
     >

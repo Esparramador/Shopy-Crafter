@@ -1,4 +1,5 @@
 import { useRoute } from "wouter";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import DOMPurify from "dompurify";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { GradeBadge } from "@/components/ui/GradeBadge";
@@ -110,7 +111,7 @@ function PhotoBriefsModal({
   const PHOTO_TYPES = ["Hero (Studio)", "Lifestyle", "Detalle/Macro", "Packaging"];
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <ModalOverlay className="backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -150,7 +151,7 @@ function PhotoBriefsModal({
           ))}
         </div>
       </motion.div>
-    </div>
+    </ModalOverlay>
   );
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { X, Wand2, Film, Shirt, Loader2, Volume2, CheckCircle2, AlertCircle, Download, RefreshCw, Upload, UserCircle2, Plus } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -402,7 +403,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <ModalOverlay className="backdrop-blur-sm" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-card border-b border-border p-5 flex items-center justify-between z-10">
           <div className="flex items-center gap-3 min-w-0">
@@ -929,6 +930,6 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
           </div>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

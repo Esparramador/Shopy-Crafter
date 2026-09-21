@@ -15,6 +15,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import SaveReportButton from "@/components/SaveReportButton";
 import { LiveOperation } from "@/components/LiveOperation";
+import { ModalOverlay } from "@/components/ModalOverlay";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -153,7 +154,7 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <ModalOverlay className="backdrop-blur-sm" onClick={onClose}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -356,7 +357,7 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
           </button>
         </div>
       </motion.div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -487,10 +488,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
   const labelStyle = "block text-xs font-semibold text-[var(--t3)] mb-1.5 uppercase tracking-wider";
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center",
-      background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
-    }} onClick={onClose}>
+    <ModalOverlay style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} onClick={onClose}>
       <div style={{
         background: "var(--ink)", border: "1px solid rgba(200,168,75,0.25)", borderRadius: 16,
         width: "min(640px, 94vw)", maxHeight: "88vh", overflow: "auto",
@@ -734,7 +732,7 @@ function CreateProductModal({ projectId, onClose, onCreated }: {
           </div>
         )}
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -836,8 +834,8 @@ function Tripo3DAutoModal({
   const hasImage = !!product.imageUrl;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    <ModalOverlay
+      className="backdrop-blur-sm"
       onClick={phase !== "generating" ? onClose : undefined}
     >
       <div
@@ -965,7 +963,7 @@ function Tripo3DAutoModal({
           </div>
         )}
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -1873,7 +1871,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
 
       {/* ─── Store Audit Modal ─── */}
       {showAuditModal && (
-        <div onClick={() => setShowAuditModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <ModalOverlay onClick={() => setShowAuditModal(false)} style={{ background: "rgba(0,0,0,0.75)", padding: 20 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: "var(--ink, #0a0a0f)", border: "1px solid var(--bdr, #22222e)", borderRadius: 16, maxWidth: 900, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--bdr)", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "var(--ink, #0a0a0f)", zIndex: 1 }}>
               <div>
@@ -1979,7 +1977,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
               )}
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );

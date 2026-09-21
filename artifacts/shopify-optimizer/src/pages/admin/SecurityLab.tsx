@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { Shield, Search, ChevronRight, Tag, Lock, Target, BookOpen, X, ExternalLink, AlertTriangle, Loader2, Grid3X3, List, ScanLine, Globe, ChevronDown, ChevronUp, Swords, ShieldCheck, History, RotateCw } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -339,6 +340,12 @@ const DOMAIN_COLORS: Record<string, string> = {
   "ransomware-defense": "#e2664f", "compliance-governance": "#b36e6e", "supply-chain-security": "#c8a84b",
 };
 function domainColor(d: string) { return DOMAIN_COLORS[d] || "#7070a0"; }
+// El catálogo a veces devuelve tags/mitre_attack/nist_csf como string suelto en vez de string[].
+function asList(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  if (typeof v === "string" && v.trim()) return v.split(/[,;]\s*/).map(x => x.trim()).filter(Boolean);
+  return [];
+}
 
 function domainLabel(d: string) {
   return d.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
@@ -392,9 +399,9 @@ function SkillCard({ skill, onClick, view }: { skill: SkillMeta; onClick: () => 
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, color: "#e8e8f0", lineHeight: 1.3 }}>{skill.name.replace(/-/g, " ")}</div>
       <div style={{ fontSize: 11, color: "#6868a0", lineHeight: 1.5, flex: 1 }}>{skill.description.slice(0, 90)}{skill.description.length > 90 ? "…" : ""}</div>
-      {skill.mitre_attack?.length > 0 && (
+      {asList(skill.mitre_attack).length > 0 && (
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {skill.mitre_attack.slice(0, 3).map(m => (
+          {asList(skill.mitre_attack).slice(0, 3).map(m => (
             <span key={m} style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: "#1a0a08", color: "#e06060", fontWeight: 600, border: "1px solid rgba(220,80,80,0.2)" }}>{m}</span>
           ))}
         </div>
@@ -420,7 +427,7 @@ function SkillDrawer({ skillId, onClose }: { skillId: string; onClose: () => voi
   const c = data ? domainColor(data.meta?.subdomain || "") : "#7070a0";
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex" }}>
+    <ModalOverlay style={{ alignItems: "stretch", justifyContent: "flex-start", padding: 0, background: "transparent" }}>
       <div onClick={onClose} style={{ flex: 1, background: "rgba(0,0,0,0.6)" }} />
       <div style={{ width: 680, maxWidth: "90vw", background: "#0a0a14", borderLeft: `1px solid ${c}44`, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* Header */}
@@ -438,13 +445,13 @@ function SkillDrawer({ skillId, onClose }: { skillId: string; onClose: () => voi
         {/* Meta badges */}
         {data?.meta && (
           <div style={{ display: "flex", gap: 6, padding: "10px 18px", borderBottom: "1px solid #1e1e2e", flexWrap: "wrap", flexShrink: 0 }}>
-            {data.meta.tags?.slice(0, 6).map(t => (
+            {asList(data.meta.tags).slice(0, 6).map(t => (
               <span key={t} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 12, background: "#13131f", color: "#7070a0", border: "1px solid #252535" }}>{t}</span>
             ))}
-            {data.meta.mitre_attack?.slice(0, 4).map(m => (
+            {asList(data.meta.mitre_attack).slice(0, 4).map(m => (
               <span key={m} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 12, background: "#1a0a08", color: "#e06060", border: "1px solid rgba(220,80,80,0.25)", fontWeight: 600 }}>⚔️ {m}</span>
             ))}
-            {data.meta.nist_csf?.slice(0, 3).map(n => (
+            {asList(data.meta.nist_csf).slice(0, 3).map(n => (
               <span key={n} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 12, background: "#0a1a0a", color: "#5db88a", border: "1px solid rgba(93,184,138,0.25)", fontWeight: 600 }}>🛡 {n}</span>
             ))}
           </div>
@@ -476,7 +483,7 @@ function SkillDrawer({ skillId, onClose }: { skillId: string; onClose: () => voi
           </a>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

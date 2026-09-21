@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import {
   FolderOpen, Download, Trash2, Image, FileText, RefreshCw,
   ArrowLeft, Package, BarChart2, Mail, Search,
@@ -752,11 +753,7 @@ export default function ProjectVault() {
 
     {/* ── Video Audit Modal ── */}
     {videoAuditResult && (
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 9999,
-        background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-      }} onClick={() => setVideoAuditResult(null)}>
+      <ModalOverlay style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", padding: 20 }} onClick={() => setVideoAuditResult(null)}>
         <div style={{
           background: "#111118", border: "1px solid rgba(232,69,88,0.3)", borderRadius: 16,
           padding: 28, maxWidth: 680, width: "100%", maxHeight: "80vh", overflowY: "auto",
@@ -779,7 +776,7 @@ export default function ProjectVault() {
             Cerrar
           </button>
         </div>
-      </div>
+      </ModalOverlay>
     )}
     </>
   );

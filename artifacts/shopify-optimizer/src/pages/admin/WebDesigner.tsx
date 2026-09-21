@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useSearch, useLocation } from "wouter";
+import { ModalOverlay } from "@/components/ModalOverlay";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -302,7 +303,7 @@ export default function WebDesigner() {
 
       {/* ── Import URL Modal ── */}
       {showImportModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={e => { if (e.target === e.currentTarget) setShowImportModal(false); }}>
+        <ModalOverlay style={{ background: "rgba(0,0,0,.7)" }} onClick={e => { if (e.target === e.currentTarget) setShowImportModal(false); }}>
           <div style={{ background: st.surface, border: `1px solid ${st.border}`, borderRadius: 12, padding: 24, width: 440, maxWidth: "90vw" }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>🔗 Importar URL</div>
             <div style={{ fontSize: 12, color: st.t3, marginBottom: 16 }}>Importa cualquier página web para editarla con IA</div>
@@ -322,7 +323,7 @@ export default function WebDesigner() {
               </button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* ── Top bar ── */}

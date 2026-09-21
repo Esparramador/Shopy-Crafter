@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import {
   X, ChevronRight, ChevronLeft, DollarSign, Check, Sparkles,
   Globe, Factory, AlertTriangle,
@@ -145,7 +146,7 @@ export function PriceTestWizard({ open, api, onClose, onCreated, preselectedProd
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto p-4">
+    <ModalOverlay className="backdrop-blur-sm overflow-y-auto">
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-5xl my-8 shadow-2xl">
 
         <div className="border-b border-slate-700 p-5">
@@ -431,7 +432,7 @@ export function PriceTestWizard({ open, api, onClose, onCreated, preselectedProd
           )}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

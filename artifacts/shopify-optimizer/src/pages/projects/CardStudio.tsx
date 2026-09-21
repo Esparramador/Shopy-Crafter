@@ -7,6 +7,7 @@
  *  3. Preview LIVE en CSS (derecha) + preview PNG generado + acciones
  */
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { useRoute } from "wouter";
 import {
   Loader2, Sparkles, Plus, Trash2, Download, Wand2,
@@ -872,7 +873,7 @@ export default function CardStudio() {
 
       {/* AUTO-DESIGN MODAL */}
       {showAutoDesign && (
-        <div style={modalBackdrop} onClick={() => setShowAutoDesign(false)}>
+        <ModalOverlay style={{ padding: 20 }} onClick={() => setShowAutoDesign(false)}>
           <div style={modalContent} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: "0 0 14px", display: "flex", alignItems: "center", gap: 8 }}>
               <Wand2 size={18} style={{ color: "var(--gold)" }} /> Auto-design IA
@@ -891,7 +892,7 @@ export default function CardStudio() {
               </button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );
@@ -1451,12 +1452,6 @@ const btnSmall: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, cursor: "pointer",
   display: "inline-flex", alignItems: "center", gap: 4,
   textDecoration: "none", justifyContent: "center",
-};
-
-const modalBackdrop: React.CSSProperties = {
-  position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-  background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center",
-  zIndex: 1000, padding: 20,
 };
 
 const modalContent: React.CSSProperties = {

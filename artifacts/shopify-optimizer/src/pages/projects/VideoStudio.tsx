@@ -5,6 +5,8 @@
  * IA integrada: T2V, I2V, V2V, extend, edit, face-swap, inpaint, outpaint, audio-mix, SFX
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useModalLock } from "@/hooks/use-modal-lock";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import {
   Loader2, Film, Mic, Music, Type, Sparkles, Download, Play, Pause,
   SkipBack, SkipForward, Volume2, VolumeX, Scissors, Trash2, Plus,
@@ -465,7 +467,7 @@ function AIGenerateModal({ mode, projectId, onClose, onClipReady, onError }: {
   const file2Label    = mode==="audio-mix"?"Música de fondo (WAV/MP3)":mode==="face-swap"?"Imagen destino":"Máscara (B&W)";
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.78)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center" }}>
+    <ModalOverlay style={{ background:"rgba(0,0,0,0.78)" }}>
       <div style={{ background:C.bg3, border:`1px solid ${C.border2}`, borderRadius:12, width:440, overflow:"hidden" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 16px", borderBottom:`1px solid ${C.border}` }}>
           <span style={{ fontWeight:700, fontSize:14 }}>{TITLES[mode]}</span>
@@ -539,7 +541,7 @@ function AIGenerateModal({ mode, projectId, onClose, onClipReady, onError }: {
           </div>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -551,7 +553,7 @@ function SFXModal({ catalog, onSelect, onClose }: {
   const cats = ["Todos", ...Array.from(new Set(catalog.map(s=>s.category)))];
   const visible = filter==="Todos" ? catalog : catalog.filter(s=>s.category===filter);
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.78)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center" }}>
+    <ModalOverlay style={{ background:"rgba(0,0,0,0.78)" }}>
       <div style={{ background:C.bg3, border:`1px solid ${C.border2}`, borderRadius:12, width:540, maxHeight:"72vh", display:"flex", flexDirection:"column" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 16px", borderBottom:`1px solid ${C.border}` }}>
           <span style={{ fontWeight:700, fontSize:14 }}>🔊 Catálogo SFX — {catalog.length} efectos</span>
@@ -571,7 +573,7 @@ function SFXModal({ catalog, onSelect, onClose }: {
           ))}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -618,7 +620,7 @@ function ExportModal({ clips, format, projectId, totalDuration, onClose, onSucce
   };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.78)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center" }}>
+    <ModalOverlay style={{ background:"rgba(0,0,0,0.78)" }}>
       <div style={{ background:C.bg3, border:`1px solid ${C.border2}`, borderRadius:12, width:440, overflow:"hidden" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 16px", borderBottom:`1px solid ${C.border}` }}>
           <span style={{ fontWeight:700, fontSize:14 }}>🎬 Exportar video final</span>
@@ -655,7 +657,7 @@ function ExportModal({ clips, format, projectId, totalDuration, onClose, onSucce
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -856,6 +858,8 @@ export default function VideoStudio({ projectId, onSuccess, onError }: {
   const [showGrid, setShowGrid]     = useState(false);
   const [sfxLoaded, setSfxLoaded]   = useState(false);
   const [fullScreen, setFullScreen] = useState(false);
+  // En pantalla completa el estudio tapa toda la página; ocultar los widgets flotantes igual que un modal.
+  useModalLock(fullScreen);
 
   // ── Canvas overlay system (T003) ──────────────────────────────────────────
   const [overlays, setOverlays]           = useState<CanvasOverlay[]>([]);

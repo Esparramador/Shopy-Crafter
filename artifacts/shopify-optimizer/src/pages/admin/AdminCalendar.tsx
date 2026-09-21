@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { RefreshCw, Plus, X, Check, Clock, User, Building, Mail, Phone, FileText, ChevronLeft, ChevronRight, Calendar, Link, Unlink, Trash2, Edit3, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -77,7 +78,6 @@ const S = {
   label: { fontSize: 11, fontWeight: 700, color: "var(--t2)", textTransform: "uppercase" as const, letterSpacing: 1, display: "block", marginBottom: 6 },
   input: { width: "100%", background: "var(--ink3)", border: "1px solid var(--ink4)", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "var(--t)", outline: "none" },
   btn: (color = "var(--gold)") => ({ padding: "8px 18px", borderRadius: 8, border: "none", background: color, color: "#000", fontWeight: 700, cursor: "pointer", fontSize: 13 }),
-  modal: { position: "fixed" as const, inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 },
   modalBox: { background: "var(--ink2)", border: "1px solid var(--ink3)", borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto" as const },
 };
 
@@ -502,7 +502,7 @@ export default function AdminCalendar() {
           MODAL — CREATE APPOINTMENT
       ══════════════════════════════════════════════════════════════════════ */}
       {showCreate && (
-        <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setShowCreate(false); }}>
+        <ModalOverlay style={{ background: "rgba(0,0,0,0.8)" }} onClick={e => { if (e.target === e.currentTarget) setShowCreate(false); }}>
           <div style={S.modalBox}>
             <div style={{ padding: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>📅 Nueva Cita</h2>
@@ -600,14 +600,14 @@ export default function AdminCalendar() {
               </button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           MODAL — APPOINTMENT DETAIL
       ══════════════════════════════════════════════════════════════════════ */}
       {showDetail && (
-        <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setShowDetail(null); }}>
+        <ModalOverlay style={{ background: "rgba(0,0,0,0.8)" }} onClick={e => { if (e.target === e.currentTarget) setShowDetail(null); }}>
           <div style={{ ...S.modalBox, maxWidth: 560 }}>
             <div style={{ padding: "20px 24px 0", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
               <div>
@@ -684,14 +684,14 @@ export default function AdminCalendar() {
               </div>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           MODAL — COMPLETE MEETING
       ══════════════════════════════════════════════════════════════════════ */}
       {showComplete && (
-        <div style={S.modal} onClick={e => { if (e.target === e.currentTarget) setShowComplete(null); }}>
+        <ModalOverlay style={{ background: "rgba(0,0,0,0.8)" }} onClick={e => { if (e.target === e.currentTarget) setShowComplete(null); }}>
           <div style={S.modalBox}>
             <div style={{ padding: "20px 24px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
@@ -781,7 +781,7 @@ export default function AdminCalendar() {
               </button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );
