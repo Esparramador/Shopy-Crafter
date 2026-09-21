@@ -67,3 +67,4 @@
 - [Vault binary file storage pattern](vault-buffer-storage-pattern.md) — pass content:buffer.toString("base64")+mimeType+fileSizeBytes to saveToVault(); it auto-handles size-limit/Object-Storage fallback — don't build a separate upload path.
 - [Vault file type & audit fixes (July 2026)](vault-fixes-2026-07.md) — fs-pro-*/ad-studio-* types missing from ProjectVault FOLDER_CONFIG; video audit backend + button; entity sort by latestDate.
 - [voiceRouter must be pre-gate](voice-router-pre-gate.md) — voiceRouter mixes public (/public-call-url), session-auth (/client-call-url), and requireAdmin routes — must mount BEFORE global requireAdmin gate like fsProRouter.
+- [Platform registry + strict Stripe tenancy](platform-registry-stripe.md) — mirrored platform-capabilities.ts (both artifacts); Stripe projects 409 not Master fallback; unlink clears client_secret too; legacy /stripe/accounts guarded.
