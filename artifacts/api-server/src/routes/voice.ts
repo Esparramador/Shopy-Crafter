@@ -873,40 +873,68 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
     for (const type of types) {
       const cacheKey = `convai_${type}_agent_id`;
 
-      // Delete old agent if we have its ID cached
-      const oldId = _agentIdCache[cacheKey];
-      if (!oldId) {
-        // Try DB
-        try {
-          const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
-          const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
-          const dbId: string | undefined = rowArr[0]?.value;
-          if (dbId) {
-            try { await deleteConvAIAgent(dbId); } catch { /* ignore if already gone */ }
-          }
-        } catch { /* ignore */ }
-      } else {
-        try { await deleteConvAIAgent(oldId); } catch { /* ignore if already gone */ }
+      // No pisar una resolución de llamada en curso para este tipo.
+      const inFlight = _agentResolveInFlight[type];
+      if (inFlight) await inFlight.catch(() => undefined);
+
+      // El agente admin fijado por ELEVEN_CONVAI_DEFAULT_AGENT_ID es inmutable para
+      // nosotros: borrarlo y crear otro dejaría al arranque apuntando a un ID muerto.
+      // Se sincroniza y verifica en sitio.
+      if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
+        const envId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
         delete _agentIdCache[cacheKey];
+        const voiceId = await resolveVerifiedConvAIVoiceId();
+        await syncConvAIAgentOrThrow(type, envId, voiceId);
+        _agentIdCache[cacheKey] = envId;
+        results[type] = envId;
+        logger.info({ type, agentId: envId, voiceId }, "ConvAI env-pinned agent re-synced in place");
+        continue;
       }
 
-      // Clear DB entry so getOrCreateConvAIAgent recreates
-      await db.execute(sql`DELETE FROM platform_settings_kv WHERE key = ${cacheKey}`);
+      // Publicar el trabajo como resolución en curso: cualquier llamada que llegue
+      // mientras borramos/recreamos espera y recibe el ID nuevo (sin duplicar agentes).
+      const work = (async (): Promise<string> => {
+        // Delete old agent if we have its ID cached
+        const oldId = _agentIdCache[cacheKey];
+        delete _agentIdCache[cacheKey];
+        if (!oldId) {
+          // Try DB
+          try {
+            const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
+            const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
+            const dbId: string | undefined = rowArr[0]?.value;
+            if (dbId) {
+              try { await deleteConvAIAgent(dbId); } catch { /* ignore if already gone */ }
+            }
+          } catch { /* ignore */ }
+        } else {
+          try { await deleteConvAIAgent(oldId); } catch { /* ignore if already gone */ }
+        }
 
-      // Re-create with latest config
-      const voiceId = await resolveVerifiedConvAIVoiceId();
-      const config = agentConfigFor(type, voiceId);
-      const agent = await createConvAIAgent(config);
-      const newId = agent.agent_id;
-      await db.execute(sql`
-        INSERT INTO platform_settings_kv (key, value, updated_at)
-        VALUES (${cacheKey}, ${newId}, NOW())
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-      `);
-      await verifyPersistedConvAIAgent(newId, voiceId);
-      _agentIdCache[cacheKey] = newId;
-      results[type] = newId;
-      logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
+        // Clear DB entry so getOrCreateConvAIAgent recreates
+        await db.execute(sql`DELETE FROM platform_settings_kv WHERE key = ${cacheKey}`);
+
+        // Re-create with latest config
+        const voiceId = await resolveVerifiedConvAIVoiceId();
+        const config = agentConfigFor(type, voiceId);
+        const agent = await createConvAIAgent(config);
+        const newId = agent.agent_id;
+        await db.execute(sql`
+          INSERT INTO platform_settings_kv (key, value, updated_at)
+          VALUES (${cacheKey}, ${newId}, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        `);
+        await verifyPersistedConvAIAgent(newId, voiceId);
+        _agentIdCache[cacheKey] = newId;
+        logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
+        return newId;
+      })();
+      _agentResolveInFlight[type] = work;
+      try {
+        results[type] = await work;
+      } finally {
+        if (_agentResolveInFlight[type] === work) delete _agentResolveInFlight[type];
+      }
     }
 
     res.json({ success: true, agents: results });
@@ -917,14 +945,21 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
 });
 
 // ── Health check ConvAI: voz + configuración persistida de cada agente ────────
-// Ejecuta el mismo pre-vuelo que una llamada real (voz aceptada por el plan +
-// sync del agente + relectura anunciando PCM16) para admin/client/landing, SIN
-// crear agentes nuevos y SIN caché, para que el admin vea el problema antes de
-// que se queje un usuario.
+// Comprueba lo mismo que el pre-vuelo de una llamada real (voz aceptada por el
+// plan + agente anunciando la voz y PCM16) para admin/client/landing, SIN crear
+// agentes, SIN modificar nada en ElevenLabs y SIN caché, para que el admin vea el
+// problema antes de que se queje un usuario.
 type ConvAIAgentHealth = {
   type: AgentType;
   agentId: string | null;
-  status: "ok" | "error" | "not_created";
+  /**
+   * ok           → el agente persistido anuncia la voz aceptada + PCM16: la llamada funcionaría.
+   * drift        → la config guardada difiere, pero la próxima llamada la re-sincroniza antes de conectar
+   *                (se invalida la caché en memoria para forzarlo). "Re-sincronizar" la aplica ahora.
+   * error        → la llamada fallaría (voz rechazada, agente borrado en ElevenLabs, API caída…).
+   * not_created  → aún no existe; se crea en la primera llamada.
+   */
+  status: "ok" | "drift" | "error" | "not_created";
   code?: string;
   error?: string;
 };
@@ -938,6 +973,8 @@ async function findExistingConvAIAgentId(type: AgentType): Promise<string | null
   const id: string | undefined = rowArr[0]?.value;
   return id && id.length > 4 ? id : null;
 }
+// GET = solo lectura sobre ElevenLabs (no hace PATCH): abrir la pestaña no debe
+// tocar la configuración. La reparación explícita es POST /voice/convai/reset-agents.
 router.get("/voice/convai/health", requireAdmin, async (_req, res): Promise<void> => {
   const checkedAt = new Date().toISOString();
   const types: AgentType[] = ["admin", "client", "landing"];
@@ -956,6 +993,11 @@ router.get("/voice/convai/health", requireAdmin, async (_req, res): Promise<void
 
   const agents: ConvAIAgentHealth[] = [];
   for (const type of types) {
+    const cacheKey = `convai_${type}_agent_id`;
+    // No solapar con una resolución de llamada en curso (single-flight): leer después.
+    const inFlight = _agentResolveInFlight[type];
+    if (inFlight) await inFlight.catch(() => undefined);
+
     let agentId: string | null = null;
     try {
       agentId = await findExistingConvAIAgentId(type);
@@ -966,23 +1008,29 @@ router.get("/voice/convai/health", requireAdmin, async (_req, res): Promise<void
     if (!agentId) { agents.push({ type, agentId: null, status: "not_created" }); continue; }
     if (!voiceId) { agents.push({ type, agentId, status: "error", code: voiceError?.code, error: voiceError?.error }); continue; }
     try {
-      // Mismo camino que una llamada en frío: PATCH con la config actual y
-      // relectura para confirmar que ElevenLabs la persistió (voz + PCM16).
-      // Verificar sin sincronizar daría falsos rojos (drift que la llamada repararía)
-      // y sincronizar sin verificar daría falsos verdes (PATCH ignora claves).
-      await syncConvAIAgentOrThrow(type, agentId, voiceId);
-      _agentIdCache[`convai_${type}_agent_id`] = agentId;
+      await verifyPersistedConvAIAgent(agentId, voiceId);
       agents.push({ type, agentId, status: "ok" });
     } catch (err: any) {
-      // Un agente borrado en el dashboard de ElevenLabs también debe verse en rojo.
-      delete _agentIdCache[`convai_${type}_agent_id`];
-      agents.push({ type, agentId, status: "error", code: isConvAIVoiceError(err) ? err.code : undefined, error: err?.message || "Error verificando el agente" });
+      const code = isConvAIVoiceError(err) ? err.code : undefined;
+      if (code === "agent_config_mismatch") {
+        // La config guardada difiere de la nuestra (p. ej. editada en el dashboard de
+        // ElevenLabs). Invalidar la caché en memoria garantiza que la siguiente llamada
+        // vuelva a sincronizar + verificar antes de emitir la URL firmada.
+        delete _agentIdCache[cacheKey];
+        agents.push({ type, agentId, status: "drift", code, error: err?.message });
+      } else {
+        // Agente borrado en ElevenLabs, API caída, etc.: la llamada fallaría.
+        delete _agentIdCache[cacheKey];
+        agents.push({ type, agentId, status: "error", code, error: err?.message || "Error verificando el agente" });
+      }
     }
   }
 
-  const healthy = !voiceError && agents.every(a => a.status !== "error");
+  const healthy = !voiceError && agents.every(a => a.status === "ok" || a.status === "not_created");
+  const degraded = !healthy && !voiceError && agents.every(a => a.status !== "error");
   res.json({
     healthy,
+    degraded,
     checkedAt,
     voice: { voiceId, ok: !voiceError, code: voiceError?.code, error: voiceError?.error },
     agents,

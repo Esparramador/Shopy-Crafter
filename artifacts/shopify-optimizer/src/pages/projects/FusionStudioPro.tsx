@@ -2294,9 +2294,9 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
 
   // ── Salud de las llamadas de voz (Arturo): voz + agentes admin/client/landing ──
   type ConvAIHealth = {
-    healthy: boolean; checkedAt: string;
+    healthy: boolean; degraded: boolean; checkedAt: string;
     voice: { voiceId: string | null; ok: boolean; code?: string; error?: string };
-    agents: { type: "admin" | "client" | "landing"; agentId: string | null; status: "ok" | "error" | "not_created"; code?: string; error?: string }[];
+    agents: { type: "admin" | "client" | "landing"; agentId: string | null; status: "ok" | "drift" | "error" | "not_created"; code?: string; error?: string }[];
   };
   const [health, setHealth] = useState<ConvAIHealth | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
@@ -2310,7 +2310,7 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Error comprobando la salud de ConvAI");
       setHealth(j);
-    } catch (e: any) { setHealthErr(e.message); }
+    } catch (e: any) { setHealth(null); setHealthErr(e.message); } // estado desconocido: no mantener un verde antiguo
     finally { setHealthBusy(false); }
   }
 
@@ -2520,20 +2520,23 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
           {(() => {
             const AGENT_LABEL: Record<string, string> = { admin: "Panel admin", client: "Panel cliente", landing: "Landing pública" };
             const allOk = !!health?.healthy;
-            const anyError = !!health && !health.healthy;
-            const border = anyError ? "rgba(239,68,68,0.45)" : allOk ? "rgba(34,197,94,0.35)" : "rgba(255,255,255,0.07)";
-            const bg = anyError ? "rgba(239,68,68,0.06)" : allOk ? "rgba(34,197,94,0.05)" : "rgba(0,0,0,0.2)";
+            const degraded = !!health?.degraded;
+            const anyError = !!health && !health.healthy && !health.degraded;
+            const border = anyError ? "rgba(239,68,68,0.45)" : degraded ? "rgba(245,158,11,0.45)" : allOk ? "rgba(34,197,94,0.35)" : "rgba(255,255,255,0.07)";
+            const bg = anyError ? "rgba(239,68,68,0.06)" : degraded ? "rgba(245,158,11,0.06)" : allOk ? "rgba(34,197,94,0.05)" : "rgba(0,0,0,0.2)";
             return (
               <div data-testid="convai-health-card" style={{ background: bg, borderRadius: 8, padding: 14, border: `1px solid ${border}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {healthBusy ? <Loader2 size={14} className="animate-spin" style={{ color: "var(--t3)" }} />
                       : anyError ? <AlertCircle size={14} style={{ color: "#ef4444" }} />
+                      : degraded ? <AlertCircle size={14} style={{ color: "#f59e0b" }} />
                       : allOk ? <CheckCircle2 size={14} style={{ color: "#22c55e" }} />
                       : <Bot size={14} style={{ color: "var(--t3)" }} />}
-                    <p style={{ fontSize: 12, fontWeight: 600, color: anyError ? "#fca5a5" : allOk ? "#86efac" : "var(--t2)" }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: anyError ? "#fca5a5" : degraded ? "#fcd34d" : allOk ? "#86efac" : "var(--t2)" }}>
                       {healthBusy ? "Comprobando llamadas de voz…"
                         : anyError ? "Las llamadas de voz NO funcionarían ahora mismo"
+                        : degraded ? "Configuración desactualizada: se corrige al iniciar la próxima llamada"
                         : allOk ? "Llamadas de voz operativas"
                         : "Salud de las llamadas de voz (Arturo)"}
                     </p>
@@ -2562,15 +2565,16 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
                     {health.agents.map(a => (
                       <div key={a.type} data-testid={`convai-health-agent-${a.type}`} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11 }}>
                         <span style={{ width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0,
-                          background: a.status === "ok" ? "#22c55e" : a.status === "error" ? "#ef4444" : "rgba(255,255,255,0.25)" }} />
+                          background: a.status === "ok" ? "#22c55e" : a.status === "error" ? "#ef4444" : a.status === "drift" ? "#f59e0b" : "rgba(255,255,255,0.25)" }} />
                         <span style={{ color: "var(--t2)", minWidth: 96 }}>{AGENT_LABEL[a.type] ?? a.type}</span>
                         <span style={{ color: "var(--t3)", fontFamily: "monospace" }}>{a.agentId ?? "sin crear"}</span>
                         {a.status === "not_created" && <span style={{ color: "var(--t3)" }}>· se creará en la primera llamada</span>}
+                        {a.status === "drift" && <span style={{ color: "#fcd34d" }}>· config distinta a la esperada (se re-sincroniza antes de la próxima llamada, o pulsa Re-sincronizar) — {a.error}</span>}
                         {a.status === "error" && <span style={{ color: "#fca5a5" }}>· {a.error}{a.code ? ` (${a.code})` : ""}</span>}
                       </div>
                     ))}
                     <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 2 }}>
-                      Última comprobación: {new Date(health.checkedAt).toLocaleTimeString()} · Misma verificación que se ejecuta antes de cada llamada (voz aceptada por el plan + audio PCM16).
+                      Última comprobación: {new Date(health.checkedAt).toLocaleTimeString()} · Solo lectura (no modifica nada en ElevenLabs): voz aceptada por el plan + agente anunciando esa voz y audio PCM16.
                     </p>
                   </div>
                 )}
