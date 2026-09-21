@@ -13,6 +13,7 @@ import { logger } from "./lib/logger.js";
 import { pool } from "@workspace/db";
 import { PgRateLimitStore, startRateLimitCleanup } from "./lib/pg-rate-limit-store.js";
 import { validateEncryptionKey } from "./lib/crypto.js";
+import { revalidateSession } from "./lib/auth.js";
 
 // BE-8: validar ENCRYPTION_KEY ANTES de cualquier inicialización (fail-fast)
 validateEncryptionKey();
@@ -158,6 +159,8 @@ app.use(
     },
   }),
 );
+// Sesiones de usuarios borrados/desactivados dejan de valer en la siguiente petición.
+app.use(revalidateSession);
 
 // ── No-cache for all API responses (prevents stale data in production) ────────
 app.use("/api", (_req: Request, res: Response, next: NextFunction) => {
