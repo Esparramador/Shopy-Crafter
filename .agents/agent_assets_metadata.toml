@@ -185,513 +185,599 @@ id = "9EyhiMCidMT9gdjJwunVq"
 uri = "file://all-css-for-claude.txt"
 type = "text"
 title = "Los 3 CSS completos (1879 líneas) — para Claude"
+logical_id = "f9997ef5-d8f9-440a-bb68-3fb9ee0fa20c"
 
 [[outputs]]
 id = "yfw292hTbdy9RCRREuGH2"
 uri = "file://MANUAL_AUTOMATIZACION_COMPLETO.md"
 type = "text"
 title = "Manual Completo de Automatizacion — ShopyBrain"
+logical_id = "a4351d24-f7bf-4023-a4d2-e91f79718460"
 
 [[outputs]]
 id = "1c38DRC9ULgblKY6KtZ9b"
 uri = "file://CMS_DOCUMENTATION.md"
 type = "text"
 title = "CMS ShopyBrain — Documentación Completa"
+logical_id = "87a516bb-e61f-4b94-a3d9-66b9bc0e1048"
 
 [[outputs]]
 id = "UQum0MgCY1SOySXAAvOo2"
 uri = "file://artifacts/shopify-optimizer/public/informe-shopycrafter-servicios.md"
 type = "text"
 title = "Informe Ejecutivo Shopy Crafter — Servicios y Capacidades Completas"
+logical_id = "6c94fb4e-b373-4c03-91ff-6a07d4eb7e53"
 
 [[outputs]]
 id = "SOPW50suSr1kJKfvL1aCs"
 uri = "file://Informe-Servicios-ShopyCrafter-2026.pdf"
 type = "pdf"
 title = "Informe Auditoría Comic Crafter — v3 (DejaVu Sans, ✓✗€©áéíóúñ, 20 págs, 124 KB)"
+logical_id = "39904011-4203-44a7-b610-aaef66f0b334"
 
 [[outputs]]
 id = "O85o2XGeHUXDGQMlBF6pB"
 uri = "file://Informe-ShopyCrafter-Auditoria-2026-v1774818596816.pdf"
 type = "pdf"
 title = "Informe Auditoría Comic Crafter v4 — NUEVO (Shopy Crafter corregido, 19 págs, sin páginas vacías)"
+logical_id = "09316c89-21f6-442a-b9ae-339bddebe8a6"
 
 [[outputs]]
 id = "CQqnNn4WmZBqa37A9NJYU"
 uri = "file://Informe-Final-ShopyCrafter-2026.pdf"
 type = "pdf"
 title = "Informe Comic Crafter - 17 páginas, fondo oscuro corregido en TODAS las páginas"
+logical_id = "70d25e34-5fbc-4084-acc8-66a1bd6ce296"
 
 [[outputs]]
 id = "5_4uj5i3Z3VjRt2gXibVU"
 uri = "file://exports/Comic-Crafter-Auditoria-Completa-2026.pdf"
 type = "pdf"
 title = "Auditoría Completa Comic Crafter 2026 (101 páginas)"
+logical_id = "53992cc6-6874-426d-89ac-90e6d2ecd660"
 
 [[outputs]]
 id = "NdPFyaKBOgk8yCmDjn8M2"
 uri = "file://exports/Lazy_Lizard_Elegance_Audit.pdf"
 type = "pdf"
 title = "Lazy Lizard — Auditoría con COGS (Elegance, 1040 KB)"
+logical_id = "6e5d945d-04b3-4b67-8704-eaf5e6e0e233"
 
 [[outputs]]
 id = "NDZ9KWmk7Cj7GPFybPk3W"
 uri = "file://exports/Rasta_Lo_Prestige_Audit.pdf"
 type = "pdf"
 title = "Rasta Lo — Auditoría con COGS (Prestige, 974 KB)"
+logical_id = "7c0afd48-cf8b-4a45-957e-210b1e21e14f"
 
 [[outputs]]
 id = "KKgnVpMh7T-VknI61lTiu"
 uri = "file://artifacts/shopify-optimizer/public/informes/lazy-lizard-elegance.pdf"
 type = "pdf"
 title = "Informe Lazy Lizard Elegance (PDF - 12 páginas)"
+logical_id = "aca0724f-0089-4082-87df-81f3abe1970b"
 
 [[outputs]]
 id = "txP_G2qcpJNq8exPWjGzX"
 uri = "file://exports/Auditoria_Completa_Comic_Crafter.pdf"
 type = "pdf"
 title = "Auditoría Completa Comic Crafter - 57 Productos"
+logical_id = "ee670699-eb25-4bff-8cd1-bbbbf205674e"
 
 [[outputs]]
 id = "bT1emMpliPm0Yt9JkDF_L"
 uri = "file://exports/Informe_Ventas_Stock_Comic_Crafter.pdf"
 type = "pdf"
 title = "Informe de Ventas y Stock - Comic Crafter (59 productos, todas las variantes)"
+logical_id = "4d67adc6-af8d-474f-ba34-42ad9cf24844"
 
 [[outputs]]
 id = "rqv_A8QKCHFlBpN1jBjqa"
 uri = "file://exports/portada-classic.pdf"
 type = "pdf"
 title = "CLASSIC (Dorado) - Sin márgenes"
+logical_id = "011036d7-afa8-4da9-b6d2-830980b83577"
 
 [[outputs]]
 id = "dizepQUsBm2mK3KhQz2Qs"
 uri = "file://exports/portada-elegance.pdf"
 type = "pdf"
 title = "ELEGANCE (Plata) - Sin márgenes"
+logical_id = "85a63ccc-1f4f-43bb-b71f-7b686b15c3e9"
 
 [[outputs]]
 id = "ojcZIyZeu-niKwXkDxn31"
 uri = "file://exports/portada-prestige.pdf"
 type = "pdf"
 title = "PRESTIGE (Cobre) - Sin márgenes"
+logical_id = "c6d15f45-2fc4-413b-8eef-a427979511a1"
 
 [[outputs]]
 id = "j4cFTQ0OpQjTgYcT9McKz"
 uri = "file://FULL_CODE_EXPORT.txt"
 type = "text"
 title = "Código Completo (todo junto) — 4.2 MB, 86,359 líneas"
+logical_id = "54d09efb-1720-4412-a51a-6b4749097732"
 
 [[outputs]]
 id = "5qyC7YzSK_KJmh7HLVfCC"
 uri = "file://CODE_PARTE_1_de_6.txt"
 type = "text"
 title = "Parte 1: Backend Core + AI Engine + Shopify/Platform libs + inicio Routes"
+logical_id = "3816ebae-947f-40c8-9050-be7a2c13eff0"
 
 [[outputs]]
 id = "ve6h1vFHrOBuoVwfNFs4v"
 uri = "file://CODE_PARTE_2_de_6.txt"
 type = "text"
 title = "Parte 2: Backend Routes (action-buttons → intelligence)"
+logical_id = "8d3f76df-f2a1-4f6d-933f-b9e2659a1075"
 
 [[outputs]]
 id = "1eRvWlymP_rQNtvIuJYAh"
 uri = "file://CODE_PARTE_3_de_6.txt"
 type = "text"
 title = "Parte 3: Backend Routes (inventory → shopybrain)"
+logical_id = "0ec20f8f-36bb-4cdd-96bc-f4c3d6c1b964"
 
 [[outputs]]
 id = "7sxSTVGpHAJ4KELjgGoVz"
 uri = "file://CODE_PARTE_4_de_6.txt"
 type = "text"
 title = "Parte 4: Backend Routes fin + Frontend Core + Páginas inicio"
+logical_id = "a8076f3f-66d1-49f5-8f77-20add6cdb416"
 
 [[outputs]]
 id = "QaYvpx6ixnLxSch7baNBb"
 uri = "file://CODE_PARTE_5_de_6.txt"
 type = "text"
 title = "Parte 5: Frontend Páginas admin + client + projects inicio"
+logical_id = "7ef37227-01cf-467f-9a53-834acee7f548"
 
 [[outputs]]
 id = "1qCHshDNaL9wJQ6hGgTAu"
 uri = "file://CODE_PARTE_6_de_6.txt"
 type = "text"
 title = "Parte 6: Frontend Projects fin + Components + CSS Design System"
+logical_id = "2a70452b-dc85-4721-ae28-e02275bec231"
 
 [[outputs]]
 id = "d5Da8ioolR7LyNQbGdcBv"
 uri = "file://shopycrafter_full_code.txt"
 type = "text"
 title = "Shopy Crafter — Código Fuente Completo (96K líneas)"
+logical_id = "20ed728a-9a05-4238-b53e-e87d86818208"
 
 [[outputs]]
 id = "77MBQydZfGflTbR2gjA4w"
 uri = "file://exports/shopycrafter_codigo_completo.tar.gz"
 type = "unspecified"
 title = "Código COMPLETO de Shopy Crafter (714 archivos)"
+logical_id = "ce08f490-d4c2-4e73-8483-47b9f7956f3e"
 
 [[outputs]]
 id = "9EBNXSCoAuzFUxs_JRsOb"
 uri = "file://exports/shopycrafter_lib.tar.gz"
 type = "unspecified"
 title = "Carpeta lib/ de Shopy Crafter"
+logical_id = "af1672db-02da-4451-8a4c-be3908f77440"
 
 [[outputs]]
 id = "PvgLuR3SnHBvPcT0QzoC9"
 uri = "file://exports/api-server-lib.tar.gz"
 type = "unspecified"
 title = "artifacts/api-server/src/lib"
+logical_id = "de14fb17-f957-4431-bf5d-1c14942d01c0"
 
 [[outputs]]
 id = "VPc_XgHrW_f5iYVgce7-o"
 uri = "file://exports/frontend-lib-y-app.tar.gz"
 type = "unspecified"
 title = "Frontend lib/ + App.tsx + cliente API generado"
+logical_id = "e5ccc803-c27e-448a-a049-ae8743b70c17"
 
 [[outputs]]
 id = "aHkn4w9WGgD4_s2kcfAof"
 uri = "file://exports/MANIFEST.txt"
 type = "text"
 title = "Listado de archivos incluidos (verificación)"
+logical_id = "b2443941-cde6-453b-ac3d-8424dea3ec62"
 
 [[outputs]]
 id = "7lUwHpFxJWHBwP1P2ruTv"
 uri = "file://exports/frontend-completo.tar.gz"
 type = "unspecified"
 title = "Frontend completo de Shopy Crafter (pages, components, contexts, hooks)"
+logical_id = "2f1e3bfc-091c-469a-be25-f7dc41d9fbca"
 
 [[outputs]]
 id = "q7G35UfOpbhM3n1pVHUtb"
 uri = "file://exports/prod_schema_dump.txt"
 type = "text"
 title = "Schema dump de producción (information_schema, equivalente a pg_dump --schema-only)"
+logical_id = "27bdf50e-8d7c-4061-a7e8-6a0a91a5c9ae"
 
 [[outputs]]
 id = "EYzYq2EzWoDpA1HDaEqJS"
 uri = "file://exports/prod_table_sizes.txt"
 type = "text"
 title = "Tamaños de tablas en prod (pg_stat_user_tables.n_live_tup)"
+logical_id = "073150f1-0803-4f2d-a286-f92f26f8ccba"
 
 [[outputs]]
 id = "AcZaW7m4xV4G3G-qQ_gT-"
 uri = "file://exports/prod_enum_preflight.txt"
 type = "text"
 title = "Pre-flight enums — SELECT DISTINCT por columna en prod"
+logical_id = "0a777de1-0b4b-45df-9df1-bdd11281da39"
 
 [[outputs]]
 id = "2i2wQ028xd1_DPe4kyfDQ"
 uri = "file://attached_assets/AUDITORIA_FINAL_2026-04-29.md"
 type = "text"
 title = "Auditoría exhaustiva — comparativa 46 patches vs estado real"
+logical_id = "7957324a-7e72-4634-ba62-f104ca80cad9"
 
 [[outputs]]
 id = "V3ER6BWanoWjfw3E6hu0G"
 uri = "file://attached_assets/generated_images/comic_crafter_ad_hero_9x16.png"
 type = "image"
 title = "Anuncio Comic Crafter — Reels/TikTok 9:16 (Hero shot)"
+logical_id = "bf235b3f-527c-41b0-8d3d-88a7037be0f0"
 
 [[outputs]]
 id = "_UdtA7W-87qObL03Khh50"
 uri = "file://attached_assets/generated_images/comic_crafter_ad_feed_1x1.png"
 type = "image"
 title = "Anuncio Comic Crafter — Feed 1:1 (Triple producto)"
+logical_id = "8ab65e04-ac22-460f-b6de-55c93e18d24d"
 
 [[outputs]]
 id = "8-0FdPnGajp22rCiEUf20"
 uri = "file://attached_assets/generated_videos/comic_crafter_ad_cinematic_showcase.mp4"
 type = "video"
 title = "Video Anuncio Comic Crafter — Cinematic Showcase 9:16 (6s, 720x1280, H.264 + AAC)"
+logical_id = "ae9a6411-dfb0-488d-845c-ed2f9545ad6a"
 
 [[outputs]]
 id = "3vihcVzAaW7dq9BhUHyvV"
 uri = "file://attached_assets/ads/ad1_camiseta_blanca_tokio.png"
 type = "image"
 title = "Anuncio 1 — Camiseta blanca koi · Shibuya golden hour"
+logical_id = "a2c9a854-3f30-47b6-99c6-2997523e660c"
 
 [[outputs]]
 id = "mtVaFoAb4ma_UHOBN4fS6"
 uri = "file://attached_assets/ads/ad2_camisetas_negras_templo.png"
 type = "image"
 title = "Anuncio 2 — Camisetas negras koi/Fuji · Templo blue hour"
+logical_id = "4fd6a61c-36ee-4912-916b-4da23fe92b60"
 
 [[outputs]]
 id = "aUUQMdGIhdLlHC-qAZFvG"
 uri = "file://attached_assets/hanakaze_serigraphy_montaje_25s.mp4"
 type = "video"
 title = "Hanakaze Serigraphy — montaje cinematográfico (17.7s · 1080p)"
+logical_id = "9931c986-b0c1-4408-857c-f9926e73fb31"
 
 [[outputs]]
 id = "S-A3kJGtzefqQ_POIdBR4"
 uri = "file://exports/hanakaze-super-anuncio-v2.mp4"
 type = "video"
 title = "Hanakaze Serigraphy — Super Anuncio v2 (71s, fiel a la colección real)"
+logical_id = "1c218e3a-bd71-4097-87b8-ac82611a00cd"
 
 [[outputs]]
 id = "3fnDJtTCyPeArb2kbpFGF"
 uri = "file://exports/hanakaze-perchero-1-catalogo-rooftop.png"
 type = "image"
 title = "Hanakaze Perchero 1 — Catálogo rooftop completo"
+logical_id = "42ab9e63-4fab-4348-80ab-03ee4f562cc2"
 
 [[outputs]]
 id = "drZjiF6lJCsl6dWiVE6qL"
 uri = "file://exports/hanakaze-perchero-3-coleccion-rooftop.png"
 type = "image"
 title = "Hanakaze Perchero 3 — Colección rooftop al sol"
+logical_id = "d546876c-8367-47d5-98fa-f327cc6edaf3"
 
 [[outputs]]
 id = "NoqCzrvyV6a8IJM-fpDA4"
 uri = "file://exports/hanakaze-perchero-4-lookbook-frontal.png"
 type = "image"
 title = "Hanakaze Perchero 4 — Lookbook frontal minimalista"
+logical_id = "48709367-7864-4032-a6ff-5d3e0bdaae07"
 
 [[outputs]]
 id = "50mjBpTxNHq29RM1dT5T5"
 uri = "file://exports/hanakaze-perchero-2-detalle-azules.png"
 type = "image"
 title = "Hanakaze Perchero 2 — Detalle dúo azules"
+logical_id = "35776185-5274-4c92-8706-6b7138655663"
 
 [[outputs]]
 id = "dhUhdC6Pa6cqriP9pDiRp"
 uri = "file://exports/hanakaze-infografia-1-kanji-royal.png"
 type = "image"
 title = "Infografía 1 — HANAKAZE SEAL CREWNECK (royal blue)"
+logical_id = "01132101-f009-4013-b160-06b44a96a885"
 
 [[outputs]]
 id = "cBURDG36vE_GlSzb85zPC"
 uri = "file://exports/hanakaze-infografia-2-mariposa-navy.png"
 type = "image"
 title = "Infografía 2 — BUTTERFLY CREWNECK NAVY"
+logical_id = "55262c6b-3ab2-4d37-9aa6-9c1220e03568"
 
 [[outputs]]
 id = "fR7vwGDsQ1KdebFQ-JFKi"
 uri = "file://exports/hanakaze-infografia-3-hoodie-mariposa.png"
 type = "image"
 title = "Infografía 3 — BLACK BUTTERFLY HOODIE"
+logical_id = "a7dba14e-eb59-440d-b9da-2d9b0f52f6bd"
 
 [[outputs]]
 id = "DXzt2XXXNgoK-tIYI5Oiw"
 uri = "file://exports/hanakaze-infografia-4-samurai-tee.png"
 type = "image"
 title = "Infografía 4 — SAMURAI TEE WHITE"
+logical_id = "0cde431c-40ba-4b50-abc2-7582149d0e84"
 
 [[outputs]]
 id = "QAF80ViKfjR7bqqJ22HOq"
 uri = "file://exports/hanakaze-deconstruccion-sudadera-royal.mp4"
 type = "video"
 title = "Vídeo Deconstrucción — Sudadera Royal Blue Kanji (estilo Seedance 2.0, 8s vertical 1080p)"
+logical_id = "3b478dad-69e4-4990-a6c7-78e95ce99749"
 
 [[outputs]]
 id = "c0xXfW2QNXOgMaq_2c2GW"
 uri = "file://exports/hanakaze-deconstruccion-extendida-24s.mp4"
 type = "video"
 title = "Vídeo Deconstrucción Extendido — Sudadera Royal Blue (front kanji + back mariposa + hero, 23s)"
+logical_id = "3bda05f9-7bf8-45cb-b66b-097b9b5275b5"
 
 [[outputs]]
 id = "VghOLYYUqB3j-e7VzeO1F"
 uri = "file://exports/hanakaze-deconstruccion-extendida-24s-light.mp4"
 type = "video"
 title = "Vídeo Deconstrucción Extendido — Sudadera Royal (front + back mariposa + hero, 23s, 28MB)"
+logical_id = "158fb0d3-5ba5-4de1-8170-2f63818369ff"
 
 [[outputs]]
 id = "DX1hiHo0ZhJoAcUiZbQkv"
 uri = "file://.local/validation/PDF_ORDER_VALIDATED.pdf"
 type = "pdf"
 title = "PDF validado — 4 hojas: Portada → Contraportada → Info → Contenido"
+logical_id = "483bc020-3328-4d54-892a-dff7707b5211"
 
 [[outputs]]
 id = "j4h-s5WHrjvTVPinp8TB8"
 uri = "file://exports/comic_crafter_smart_quick_ad.mp4"
 type = "video"
 title = "Anuncio Comic Crafter - Smart Quick Ad (9:16, 5s, H.264)"
+logical_id = "ad4ce59f-b602-4ba9-ab3c-282f480f7619"
 
 [[outputs]]
 id = "SpbUJ8AmX-UviGwhORseX"
 uri = "file://exports/comic_crafter_10s_FIXED.mp4"
 type = "video"
 title = "Comic Crafter 10s — AUDIO ARREGLADO (-15.8 dB, copy ajustado a duración)"
+logical_id = "c9fd5765-93a5-4cbf-b639-bcca34c1cebc"
 
 [[outputs]]
 id = "xWYD0uutFB5vjwD-y8Kek"
 uri = "file://exports/comic_crafter_15s_CINEMATIC.mp4"
 type = "video"
 title = "Comic Crafter 15s CINEMATIC — 3 escenas, 1080×1920, narrativa multi-shot"
+logical_id = "2d79b08e-9d63-439f-a2a7-61eb2605c18f"
 
 [[outputs]]
 id = "7Rdi7-HTD8I-sNFh6oNZO"
 uri = "file://attached_assets/e2e-test/card_front.png"
 type = "image"
 title = "✅ Tarjeta FRENTE generada (1080×720, texto bakeado)"
+logical_id = "6c567120-5518-4109-92dd-0e5e3d5f7258"
 
 [[outputs]]
 id = "F-3Cie7HM7PjeozmQfgir"
 uri = "file://attached_assets/e2e-test/card_bg_texture.png"
 type = "image"
 title = "✅ Textura FONDO puro (1080×720 RGBA, SIN texto)"
+logical_id = "f2cbfd3a-53e4-4a79-9359-74dfafa5dfa0"
 
 [[outputs]]
 id = "fyeZYyxHJ54-sOn4gYDTH"
 uri = "file://attached_assets/e2e-test/card_qr.png"
 type = "image"
 title = "✅ QR code (760×760, endpoint /cards/8/qr.png)"
+logical_id = "bcebd5b0-77a8-4e69-8ae7-d3f036e76d3e"
 
 [[outputs]]
 id = "JJMi5Y21_PQoEejONvna3"
 uri = "file://attached_assets/e2e-test/final_front_xai.png"
 type = "image"
 title = "✅ FRENTE generado (1080×720 RGBA — compuesto con texto+QR)"
+logical_id = "aa4acdb6-8934-4061-a338-4eeba48800a4"
 
 [[outputs]]
 id = "CXCF0vNQeIghCjxmyf8Kp"
 uri = "file://attached_assets/e2e-test/final_bg_xai.png"
 type = "image"
 title = "✅ FONDO xAI (1080×720 RGB — textura pura SIN texto, grok-imagine-image)"
+logical_id = "7e0da59c-087b-40d0-b2e8-72b184519dd9"
 
 [[outputs]]
 id = "R7wYgmQv6X-5NmNoN7V31"
 uri = "file://attached_assets/e2e-test/final_qr_xai.png"
 type = "image"
 title = "✅ QR code (760×760 — endpoint /cards/8/qr.png HTTP 200)"
+logical_id = "ec932ef5-4c35-4bc3-b4e5-7ca2359e506a"
 
 [[outputs]]
 id = "pyT5wOB0b1Lp237xFSm6O"
 uri = "file://ultimo_frame_landing.jpg"
 type = "image"
 title = "Último frame — vídeo de fondo landing"
+logical_id = "6606f848-34c5-4a7b-b892-8c8f83466a6e"
 
 [[outputs]]
 id = "8vfYneV-Q2gl2v1a9-Yzk"
 uri = "file://artifacts/shopify-optimizer/public/videos/monologuista_sevillano.mp4"
 type = "video"
 title = "🎤 El Monologuista Sevillano — Turistas en Andalucía"
+logical_id = "96f4fce3-fef7-42a6-9ffe-649daf2aba7f"
 
 [[outputs]]
 id = "dcLJpt6TXLTNFy5QVoV39"
 uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_definitivo_2026-06-27T00-36-14.mp4"
 type = "video"
 title = "Sevillano — Monólogo Shopy Crafter (DEFINITIVO)"
+logical_id = "cf7e7b22-f170-4a70-b646-de3675ea674c"
 
 [[outputs]]
 id = "Gqybn7Aa0ce2TaY-HCoV2"
 uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_definitivo_sync_2026-06-27T00-37-35.mp4"
 type = "video"
 title = "Sevillano — Monólogo DEFINITIVO (audio+vídeo sincronizados al ms)"
+logical_id = "f1191f5d-fbea-42f8-8fad-2e6ee6c7f9f7"
 
 [[outputs]]
 id = "j3mq2QFmqcXG9kJNM6BAm"
 uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_animado_2026-06-27T00-46-54.mp4"
 type = "video"
 title = "Sevillano — Vídeo Animado Real (Seedance I2V + Voz Clonada naturalizada)"
+logical_id = "e897cb9b-6141-48f0-a54a-0a2adbb58e8d"
 
 [[outputs]]
 id = "sFeNeChYPaNkeHmHzjljq"
 uri = "file://artifacts/shopify-optimizer/public/media/sevillano/sevillano_lipsync_2026-06-27T00-52-31.mp4"
 type = "video"
 title = "Sevillano — LIP-SYNC REAL (SadTalker + Voz Naturalizada ElevenLabs)"
+logical_id = "8fa5f16a-9216-45d7-8cbc-24c8d3cd53c4"
 
 [[outputs]]
 id = "aTctCXb319OdhKXn-ogvv"
 uri = "file://tmp_vault_exports/video_1405_seedance.mp4"
 type = "video"
 title = "🎬 Vídeo IA — Seedance Pro (Hombre Balinés) · 17.6 MB"
+logical_id = "6f5d60ad-2481-4926-9a00-abb8decd5c97"
 
 [[outputs]]
 id = "P4KbgJC-Mfl51bs__4xTz"
 uri = "file://tmp_vault_exports/img_1399_multiangle.png"
 type = "image"
 title = "🖼️ Multi-ángulo — Relojería de Lujo"
+logical_id = "27229a37-166e-485f-b4f4-62c3fd38ea2a"
 
 [[outputs]]
 id = "q9fvQxAvopDGwqbG2eUdp"
 uri = "file://tmp_vault_exports/img_1400_hero.png"
 type = "image"
 title = "🖼️ Hero — Relojería de Lujo"
+logical_id = "d3450875-a997-4e8d-9000-9660845fefdc"
 
 [[outputs]]
 id = "LkRip4mkm56dV_Ss8Xkyc"
 uri = "file://tmp_vault_exports/img_1401_lifestyle.png"
 type = "image"
 title = "🖼️ Lifestyle — Relojería de Lujo"
+logical_id = "75b29756-dc63-457a-b4a9-937d42e831cd"
 
 [[outputs]]
 id = "MvnXJC0WhwfeRge6j7TYx"
 uri = "file://tmp_vault_exports/img_1402_model_fashion.png"
 type = "image"
 title = "🖼️ Model Fashion — Relojería de Lujo"
+logical_id = "aac29084-f7b8-445b-9df0-3126a6d084f0"
 
 [[outputs]]
 id = "Uzdb8_xyEriBz5a7xdxMO"
 uri = "file://tmp_vault_exports/img_1403_ugc.webp"
 type = "image"
 title = "🖼️ UGC — Relojería de Lujo"
+logical_id = "4cedd1ca-6959-4c43-b6ec-e5232046a8ae"
 
 [[outputs]]
 id = "JEY9Nc98_kbQJl-hBJWTv"
 uri = "file://artifacts/shopify-optimizer/public/muscle-factory-warriors-iso-ad-FULL.mp4"
 type = "video"
 title = "Warriors ISO — v3 PROFESIONAL · 32s · 9:16 · Playa + Guerreros Reales"
+logical_id = "871ee34a-894f-48fc-9eb8-78c5473dae8d"
 
 [[outputs]]
 id = "UEE1Gev8rm5SrKbyybapo"
 uri = "file://artifacts/shopify-optimizer/public/muscle-factory-warriors-iso-ad.mp4"
 type = "video"
 title = "Warriors ISO — V2 Pineapple Coconut + Title Card (17s)"
+logical_id = "448d02f3-eb34-4cb2-aa7c-9fb9895273ed"
 
 [[outputs]]
 id = "fKyC4YZ8f24udbWxdS0Qa"
 uri = "file://artifacts/shopify-optimizer/public/muscle-factory-v2-pinacocо-adam.mp4"
 type = "video"
 title = "Warriors ISO — V2 Piña Coco 17s — voz Adam (solo ese sabor)"
+logical_id = "a8d5f26a-5b17-4980-8539-5d2325168dd2"
 
 [[outputs]]
 id = "8GEPvYkFKwx3vesSYNjBi"
 uri = "file://exports/skills_ciberseguridad_shopy_crafter.xlsx"
 type = "table"
 title = "Catálogo de 817 Skills de Ciberseguridad — Verificado"
+logical_id = "ac0771ca-41a1-4956-b955-bc27182f021d"
 
 [[outputs]]
 id = "uIRKgVRCMwv0MRakqFsUJ"
 uri = "file://exports/skills_completo_shopy_crafter.xlsx"
 type = "table"
 title = "Inventario Completo: 3 Catálogos de Skills (Ciberseguridad + Prompts + Agente)"
+logical_id = "97a81ca2-45e6-466f-aba4-f815c95bf0c3"
 
 [[outputs]]
 id = "1Dv3ywz_j6lSnQBS5ixBK"
 uri = "file://.local/video-output/rolex-datejust-twotone-explode-35s.mp4"
 type = "video"
 title = "Rolex Datejust Two-Tone — Explode View 35s"
+logical_id = "1ecc958b-62e9-458b-97db-3c57f9c2b67a"
 
 [[outputs]]
 id = "f6epwygkknrfbi10XCc3u"
 uri = "file://artifacts/shopify-optimizer/public/rolex-1-angle.png"
 type = "image"
 title = "Rolex — Ángulo"
+logical_id = "fb51d90b-8b69-42be-a590-9d0c0bbe41da"
 
 [[outputs]]
 id = "YFe5F8cScJaJwSVV8Xyt9"
 uri = "file://artifacts/shopify-optimizer/public/rolex-2-dial.png"
 type = "image"
 title = "Rolex — Esfera"
+logical_id = "0d1b8e05-b258-4284-9ce0-0902d4b058f8"
 
 [[outputs]]
 id = "Cc852K_QNcCj3qvapV6HV"
 uri = "file://artifacts/shopify-optimizer/public/rolex-3-crown.png"
 type = "image"
 title = "Rolex — Corona"
+logical_id = "254991f8-cd01-4392-b408-0b358d2b42fb"
 
 [[outputs]]
 id = "LO3yo_aheYHKgHBwT-4Bq"
 uri = "file://artifacts/shopify-optimizer/public/rolex-4-front.png"
 type = "image"
 title = "Rolex — Frontal"
+logical_id = "c72e46b1-0d65-4686-9e29-446e418d6a82"
 
 [[outputs]]
 id = "z2cCKu5SLAqEOy5UyHX4M"
 uri = "file://artifacts/shopify-optimizer/public/rolex-5-flatlay.png"
 type = "image"
 title = "Rolex — Flatlay"
+logical_id = "882c1a74-c348-43b2-a38e-e2148ddb3c7c"
 
 [[outputs]]
 id = "pmJ82nlGrzmcXrRrZoKox"
 uri = "file://.local/research/rolex-datejust-41-explode-view-complete.md"
 type = "text"
 title = "Investigación Rolex Datejust 41 — Completa"
+logical_id = "123a3fee-bc31-4867-8ce5-90a4feabf7bb"
