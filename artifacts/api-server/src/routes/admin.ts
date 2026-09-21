@@ -10,6 +10,7 @@ import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { deleteClientUser } from "../lib/user-deletion.js";
+import { cancelClientSubscription } from "../lib/subscription-cancel.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { askClaude } from "../lib/claude.js";
 import { sendPushToClientByProject } from "../lib/push-helper.js";
@@ -238,6 +239,30 @@ router.delete("/users/:userId", async (req, res): Promise<void> => {
       ipAddress: req.ip ?? "unknown",
     });
     res.json({ success: true, deleted: result.deleted });
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// Cancela en Stripe (inmediato) la suscripción que bloquea el borrado de un cliente.
+router.post("/users/:userId/cancel-subscription", async (req, res): Promise<void> => {
+  try {
+    const targetId = req.params["userId"]!;
+    const result = await cancelClientSubscription(targetId, req.session.userId!);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error, stripeDashboardUrl: result.stripeDashboardUrl });
+      return;
+    }
+    if (result.localUpdated) {
+      await recordAudit({
+        userId: req.session.userId!,
+        action: "cancel_subscription",
+        details: `${result.alreadyCanceled ? "Confirmed canceled" : "Canceled"} Stripe subscription ${result.stripeSubscriptionId} for user ${targetId}`,
+        ipAddress: req.ip ?? "unknown",
+      });
+    }
+    res.json({ success: true, alreadyCanceled: result.alreadyCanceled, stripeSubscriptionId: result.stripeSubscriptionId, status: result.status });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });

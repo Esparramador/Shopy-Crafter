@@ -72,3 +72,4 @@
 - [E2E harness: voice flows, client chatbot layout, admin pages](e2e-voice-call-playwright.md) — testing subagent breaks on mic permission; use e2e:* node scripts; admin pages need CoachMarks dismissed via localStorage; hide #replit-dev-banner.
 - [ConvAI agent voice settings are flat tts.* fields](convai-tts-flat-fields.md) — nested tts.voice_settings is silently ignored by the Agents API; send stability/similarity_boost/speed flat; owner picked 0.5/0.8/1.2 by ear.
 - [Session revalidation](session-revalidation.md) — revoke via global revalidation (regenerate, never destroy); session.impersonating = client id; refuse user delete while Stripe still bills.
+- [Stripe resource_missing is not proof of "gone"](admin-stripe-cancel-on-delete.md) — fail closed on billing guards (wrong-mode/account key gives same code); retrieve→decide→mutate; omit SDK apiVersion pin.

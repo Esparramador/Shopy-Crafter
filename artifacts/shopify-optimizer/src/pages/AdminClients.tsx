@@ -1264,37 +1264,75 @@ function ProjectCostModal({ client, onClose }: ProjectCostModalProps) {
   );
 }
 
-/* ─── Delete Client Confirmation Modal ─── */
+type BlockingSubscription = { plan: string | null; status: string | null; stripeSubscriptionId: string; stripeDashboardUrl?: string };
 function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClose: () => void; onDeleted: (id: string) => void }) {
   useModalLock();
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  // Suscripción de Stripe que bloquea el borrado (409). Mientras exista, el modal ofrece cancelarla aquí mismo.
+  const [blockingSub, setBlockingSub] = useState<BlockingSubscription | null>(null);
+  const [confirmCancelSub, setConfirmCancelSub] = useState(false);
+  const [cancelingSub, setCancelingSub] = useState(false);
   const canDelete = confirmText.trim().toLowerCase() === client.email.trim().toLowerCase();
+
+  // Devuelve true si el usuario quedó borrado; si el API responde 409 con suscripción, la guarda para ofrecer cancelarla.
+  const requestDelete = async (): Promise<boolean> => {
+    const res = await fetch(`${API_BASE}/api/admin/users/${client.id}`, { method: "DELETE", credentials: "include" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return true;
+    if (res.status === 409 && data?.subscription?.stripeSubscriptionId) {
+      setBlockingSub(data.subscription as BlockingSubscription);
+      setError("");
+      return false;
+    }
+    let msg: string = data?.error || `Error ${res.status} al borrar el usuario`;
+    if (data?.subscription?.plan || data?.subscription?.status) {
+      msg += ` (plan: ${data.subscription.plan ?? "–"}, estado: ${data.subscription.status ?? "–"})`;
+    }
+    setError(msg);
+    return false;
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canDelete || deleting) return;
+    if (!canDelete || deleting || cancelingSub) return;
     setDeleting(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/api/admin/users/${client.id}`, { method: "DELETE", credentials: "include" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        let msg: string = data?.error || `Error ${res.status} al borrar el usuario`;
-        if (data?.subscription?.plan || data?.subscription?.status) {
-          msg += ` (plan: ${data.subscription.plan ?? "–"}, estado: ${data.subscription.status ?? "–"})`;
-        }
-        setError(msg);
-        return;
-      }
-      onDeleted(client.id);
+      if (await requestDelete()) onDeleted(client.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de red al borrar el usuario");
     } finally {
       setDeleting(false);
     }
   };
+
+  // Cancela la suscripción en Stripe y, si sale bien, reintenta el borrado automáticamente.
+  const cancelSubscriptionAndDelete = async () => {
+    if (!blockingSub || cancelingSub || deleting) return;
+    setCancelingSub(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${client.id}/cancel-subscription`, { method: "POST", credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error || `Error ${res.status} al cancelar la suscripción`);
+        return;
+      }
+      setBlockingSub(null);
+      setConfirmCancelSub(false);
+      setDeleting(true);
+      if (await requestDelete()) onDeleted(client.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de red al cancelar la suscripción");
+    } finally {
+      setCancelingSub(false);
+      setDeleting(false);
+    }
+  };
+
+  const busy = deleting || cancelingSub;
 
   return (
     <div
@@ -1341,6 +1379,67 @@ function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClo
               />
             </div>
 
+            {blockingSub && (
+              <div data-testid="delete-client-subscription-block" style={{ padding: "12px 14px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <CreditCard size={14} style={{ color: "#f59e0b", flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: "#f59e0b" }}>Suscripción de Stripe activa</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--t2)", lineHeight: 1.5 }}>
+                      Stripe seguiría cobrando a este cliente tras borrarlo. Plan: <b>{blockingSub.plan ?? "–"}</b> · estado: <b>{blockingSub.status ?? "–"}</b>
+                      {" · "}
+                      <a
+                        href={blockingSub.stripeDashboardUrl ?? `https://dashboard.stripe.com/subscriptions/${blockingSub.stripeSubscriptionId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "var(--gold2)", display: "inline-flex", alignItems: "center", gap: 3 }}
+                        data-testid="delete-client-stripe-link"
+                      >
+                        <span style={{ fontFamily: "var(--fm)" }}>{blockingSub.stripeSubscriptionId}</span>
+                        <ExternalLink size={10} />
+                      </a>
+                    </p>
+                  </div>
+                </div>
+
+                {!confirmCancelSub ? (
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmCancelSub(true); setError(""); }}
+                    disabled={busy}
+                    className="btn btn-danger"
+                    style={{ justifyContent: "center", width: "100%" }}
+                    data-testid="delete-client-cancel-sub-btn"
+                  >
+                    <CreditCard size={14} />
+                    Cancelar suscripción y borrar
+                  </button>
+                ) : (
+                  <div data-testid="delete-client-cancel-sub-confirm" style={{ padding: "10px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <p style={{ margin: 0, fontSize: 11.5, color: "var(--crim,#ef4444)", lineHeight: 1.6 }}>
+                      ⚠️ <b>Afecta a la facturación.</b> Se cancelará la suscripción <b>de inmediato</b> en Stripe (sin reembolso automático del periodo en curso) y acto seguido se borrará el usuario. ¿Confirmas?
+                    </p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button type="button" onClick={() => setConfirmCancelSub(false)} disabled={busy} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }} data-testid="delete-client-cancel-sub-back-btn">
+                        Volver
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelSubscriptionAndDelete}
+                        disabled={busy}
+                        className="btn btn-danger"
+                        style={{ flex: 1, justifyContent: "center" }}
+                        data-testid="delete-client-cancel-sub-confirm-btn"
+                      >
+                        {busy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        {cancelingSub ? "Cancelando en Stripe…" : deleting ? "Borrando…" : "Sí, cancelar y borrar"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {error && (
               <div data-testid="delete-client-error" style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8 }}>
                 <AlertCircle size={14} style={{ color: "var(--crim,#ef4444)", flexShrink: 0, marginTop: 1 }} />
@@ -1349,13 +1448,14 @@ function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClo
             )}
 
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={onClose} disabled={deleting} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }}>Cancelar</button>
+              <button type="button" onClick={onClose} disabled={busy} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }}>Cancelar</button>
               <button
                 type="submit"
-                disabled={!canDelete || deleting}
+                disabled={!canDelete || busy || !!blockingSub}
                 className="btn btn-danger"
                 style={{ flex: 1, justifyContent: "center" }}
                 data-testid="delete-client-confirm-btn"
+                title={blockingSub ? "Cancela primero la suscripción de Stripe" : undefined}
               >
                 {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                 {deleting ? "Borrando…" : "Borrar definitivamente"}

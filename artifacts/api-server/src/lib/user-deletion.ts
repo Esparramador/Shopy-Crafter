@@ -3,10 +3,11 @@ import {
   affiliatesTable, referralTrackingTable, reportTemplatesTable, youtubeTokensTable,
 } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
+import { stripeSubscriptionDashboardUrl } from "./stripe-dashboard-url.js";
 
 export type DeleteUserResult =
   | { ok: true; deleted: { id: string; email: string } }
-  | { ok: false; status: 400 | 403 | 404 | 409; error: string; subscription?: { plan: string | null; status: string | null; stripeSubscriptionId: string } };
+  | { ok: false; status: 400 | 403 | 404 | 409; error: string; subscription?: { plan: string | null; status: string | null; stripeSubscriptionId: string; stripeDashboardUrl: string } };
 
 // Estados de Stripe en los que la suscripción ya no cobra. Cualquier otro estado
 // con stripe_subscription_id significa que Stripe seguiría facturando tras borrar
@@ -42,7 +43,10 @@ export async function deleteClientUser(targetId: string, actorId: string): Promi
     return {
       ok: false, status: 409,
       error: "El usuario tiene una suscripción de Stripe activa; cancélala antes de borrarlo",
-      subscription: { plan: sub!.plan, status: sub!.status, stripeSubscriptionId: sub!.stripeSubscriptionId! },
+      subscription: {
+        plan: sub!.plan, status: sub!.status, stripeSubscriptionId: sub!.stripeSubscriptionId!,
+        stripeDashboardUrl: stripeSubscriptionDashboardUrl(sub!.stripeSubscriptionId!),
+      },
     };
   }
 
