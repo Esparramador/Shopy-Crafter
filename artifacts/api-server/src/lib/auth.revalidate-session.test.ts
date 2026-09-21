@@ -93,7 +93,7 @@ describe("revalidateSession", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("con impersonación, si el cliente suplantado fue borrado la sesión entera se invalida", async () => {
+  it("con impersonación (ambos endpoints /api/admin/impersonate y /api/auth/impersonate guardan el id del cliente suplantado), si ese cliente fue borrado la sesión entera se invalida", async () => {
     usersInDb = { admin1: 1 }; // el cliente "gone" ya no existe
     const req = makeReq({ userId: "admin1", role: "client", impersonating: "gone", clientId: "7" });
     await run(req);

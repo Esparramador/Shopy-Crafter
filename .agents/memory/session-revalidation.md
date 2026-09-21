@@ -1,9 +1,9 @@
 ---
-name: Session revalidation middleware
-description: How deleted/deactivated users lose their session, and the express-session destroy vs regenerate gotcha
+name: Session revalidation
+description: Durable rules for revoking access (delete/deactivate) with express-session in this project
 ---
-Rule: any account revocation (delete, deactivate) relies on the global `revalidateSession` middleware (mounted right after express-session), not on purging `user_sessions` rows — a login racing the DELETE can persist a fresh session after the purge.
+Rule: account revocation must go through the global per-request session revalidation, not through purging session rows — a login racing a delete can persist a fresh session after the purge.
 
-**Why:** code review rejected a permanent-delete endpoint whose only revocation was deleting session rows; per-request PK lookup was accepted as the tradeoff.
+**Why:** a permanent-delete endpoint that only purged `user_sessions` was rejected in review for exactly that race.
 
-**How to apply:** in a middleware, invalidate with `req.session.regenerate()`, NOT `req.session.destroy()` — destroy deletes `req.session` entirely and every later `req.session.userId` read throws. Impersonation keeps `session.userId` = admin and `session.impersonating` = client; validate both. There are no DB foreign keys to `users`; user-owned rows must be removed by hand (see the DELETE /admin/users route for the current list).
+**How to apply:** invalidate with `req.session.regenerate()`, never `destroy()` in middleware (destroy removes `req.session` and later reads throw). `session.impersonating` must always hold the impersonated client's id, not the admin's. Deleting a user must refuse while a Stripe subscription still bills (409) — local rows disappearing don't stop Stripe.

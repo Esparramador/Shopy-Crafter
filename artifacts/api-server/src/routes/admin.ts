@@ -3,15 +3,13 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 import { execSync } from "child_process";
-import {
-  db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable,
-  onboardingProgressTable, achievementsTable, subscriptionsTable, affiliatesTable, referralTrackingTable, reportTemplatesTable, youtubeTokensTable,
-} from "@workspace/db";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable } from "@workspace/db";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
 import { recordAudit } from "../lib/audit.helper.js";
+import { deleteClientUser } from "../lib/user-deletion.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { askClaude } from "../lib/claude.js";
 import { sendPushToClientByProject } from "../lib/push-helper.js";
@@ -223,59 +221,23 @@ router.post("/users/:userId/activate", async (req, res): Promise<void> => {
   }
 });
 
-// Borrado definitivo de un usuario de rol "client". El admin nunca se borra a sí
-// mismo ni a otros admins. No hay FKs hacia users en la BD, así que se limpian a
-// mano las filas que le pertenecen (sesiones, tokens, progreso, suscripciones…).
-// El audit_log se conserva: es el rastro histórico y no debe desaparecer con el usuario.
+// Borrado definitivo de un usuario de rol "client" (reglas y limpieza en lib/user-deletion.ts).
 router.delete("/users/:userId", async (req, res): Promise<void> => {
   try {
     const targetId = req.params["userId"]!;
-    if (targetId === req.session.userId) {
-      res.status(400).json({ error: "No puedes borrar tu propio usuario" });
+    const result = await deleteClientUser(targetId, req.session.userId!);
+    if (!result.ok) {
+      const { ok: _ok, status, ...body } = result;
+      res.status(status).json(body);
       return;
     }
-    const [user] = await db.select({ id: usersTable.id, email: usersTable.email, role: usersTable.role })
-      .from(usersTable).where(eq(usersTable.id, targetId)).limit(1);
-    if (!user) { res.status(404).json({ error: "Usuario no encontrado" }); return; }
-    if (user.role !== "client") {
-      res.status(403).json({ error: "Solo se pueden borrar usuarios de rol client" });
-      return;
-    }
-
-    await db.transaction(async (tx) => {
-      // Sesiones activas del usuario (express-session guarda userId dentro de sess).
-      await tx.execute(sql`DELETE FROM user_sessions WHERE sess->>'userId' = ${targetId}`);
-      await tx.delete(onboardingProgressTable).where(eq(onboardingProgressTable.userId, targetId));
-      await tx.delete(achievementsTable).where(eq(achievementsTable.userId, targetId));
-      await tx.delete(subscriptionsTable).where(eq(subscriptionsTable.userId, targetId));
-      // Suscripción push (guardada en platform_settings bajo push_sub::<userId>).
-      await tx.delete(platformSettingsTable).where(eq(platformSettingsTable.key, `push_sub::${targetId}`));
-      // Programa de afiliados: si otro afiliado lo refirió, se conserva su comisión
-      // pero sin enlace al usuario; los referidos de su propio código se eliminan.
-      await tx.update(referralTrackingTable).set({ referredUserId: null })
-        .where(eq(referralTrackingTable.referredUserId, targetId));
-      await tx.delete(referralTrackingTable).where(inArray(
-        referralTrackingTable.affiliateId,
-        tx.select({ id: affiliatesTable.id }).from(affiliatesTable).where(eq(affiliatesTable.userId, targetId)),
-      ));
-      await tx.delete(affiliatesTable).where(eq(affiliatesTable.userId, targetId));
-      await tx.delete(reportTemplatesTable).where(eq(reportTemplatesTable.userId, targetId));
-      await tx.delete(youtubeTokensTable).where(eq(youtubeTokensTable.userId, targetId));
-      // calendar_tokens se crea con SQL crudo bajo demanda; puede no existir aún.
-      const reg = await tx.execute(sql`SELECT to_regclass('public.calendar_tokens') AS t`);
-      if ((reg.rows[0] as { t: string | null } | undefined)?.t) {
-        await tx.execute(sql`DELETE FROM calendar_tokens WHERE user_id = ${targetId}`);
-      }
-      await tx.delete(usersTable).where(eq(usersTable.id, targetId));
-    });
-
     await recordAudit({
       userId: req.session.userId!,
       action: "delete_user",
-      details: `Deleted user ${targetId} (${user.email})`,
+      details: `Deleted user ${targetId} (${result.deleted.email})`,
       ipAddress: req.ip ?? "unknown",
     });
-    res.json({ success: true, deleted: { id: user.id, email: user.email } });
+    res.json({ success: true, deleted: result.deleted });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });

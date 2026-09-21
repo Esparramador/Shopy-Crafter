@@ -285,7 +285,9 @@ router.post("/impersonate/:userId", requireAuth, async (req, res): Promise<void>
       return;
     }
 
-    req.session.impersonating = adminId;
+    // Misma representación que /api/admin/impersonate: el id del cliente suplantado
+    // (la revalidación de sesión comprueba que siga existiendo y activo).
+    req.session.impersonating = targetId;
     req.session.role = "client";
     req.session.clientId = target.clientId ?? null;
     req.session.name = target.name;
