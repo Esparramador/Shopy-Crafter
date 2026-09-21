@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle, ClipboardList, Eye, CreditCard, Sparkles, ChevronRight, ChevronLeft, RotateCcw, DollarSign, TrendingUp, TrendingDown, Minus, Activity, Zap, BarChart2 } from "lucide-react";
+import { UserPlus, UserCheck, UserX, Loader2, Mail, Copy, CheckCircle, MessageSquare, Send, X, ArrowLeft, ShoppingCart, ExternalLink, AlertCircle, ClipboardList, Eye, CreditCard, Sparkles, ChevronRight, ChevronLeft, RotateCcw, DollarSign, TrendingUp, TrendingDown, Minus, Activity, Zap, BarChart2, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { timeSince } from "@/lib/utils";
 import { getModelShortName } from "@/lib/model-aliases";
@@ -1257,6 +1257,109 @@ function ProjectCostModal({ client, onClose }: ProjectCostModalProps) {
   );
 }
 
+/* ─── Delete Client Confirmation Modal ─── */
+function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClose: () => void; onDeleted: (id: string) => void }) {
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const canDelete = confirmText.trim().toLowerCase() === client.email.trim().toLowerCase();
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canDelete || deleting) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${client.id}`, { method: "DELETE", credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        let msg: string = data?.error || `Error ${res.status} al borrar el usuario`;
+        if (data?.subscription?.plan || data?.subscription?.status) {
+          msg += ` (plan: ${data.subscription.plan ?? "–"}, estado: ${data.subscription.status ?? "–"})`;
+        }
+        setError(msg);
+        return;
+      }
+      onDeleted(client.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de red al borrar el usuario");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div
+      data-testid="delete-client-modal"
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.80)", backdropFilter: "blur(8px)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+    >
+      <div className="modal-box" style={{ maxWidth: 460, borderColor: "rgba(239,68,68,0.35)" }}>
+        <p className="modal-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Trash2 size={18} style={{ color: "var(--crim,#ef4444)" }} />
+          Borrar cliente definitivamente
+        </p>
+        <p className="modal-subtitle">Esta acción no se puede deshacer.</p>
+
+        <form onSubmit={submit}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ padding: "12px 14px", background: "var(--ink3)", border: "1px solid var(--bdr)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+              <div className="logo-gem" style={{ width: 34, height: 34, fontSize: 12, flexShrink: 0, background: client.avatarColor ? `${client.avatarColor}22` : "rgba(200,168,75,0.1)", color: client.avatarColor ?? "var(--gold2)" }}>
+                {client.name.slice(0, 2).toUpperCase()}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>{client.name}</p>
+                <p style={{ margin: 0, fontSize: 11.5, color: "var(--t3)", overflow: "hidden", textOverflow: "ellipsis" }}>{client.email}</p>
+                {client.clientId && <p style={{ margin: 0, fontSize: 11, color: "var(--t3)", fontFamily: "var(--fm)" }}>Proyecto #{client.clientId}</p>}
+              </div>
+            </div>
+
+            <div style={{ padding: "10px 12px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8 }}>
+              <p style={{ margin: 0, fontSize: 11.5, color: "var(--crim,#ef4444)", lineHeight: 1.6 }}>
+                ⚠️ <b>Irreversible.</b> Se eliminará el usuario junto con sus sesiones, tokens de acceso, progreso, suscripciones push y datos de afiliado. No podrá volver a iniciar sesión. Si solo quieres bloquear el acceso temporalmente, usa <b>Revocar</b>.
+              </p>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Escribe el email <b style={{ color: "var(--t)" }}>{client.email}</b> para confirmar</label>
+              <input
+                type="text"
+                className="form-input"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder={client.email}
+                autoComplete="off"
+                autoFocus
+                data-testid="delete-client-confirm-input"
+              />
+            </div>
+
+            {error && (
+              <div data-testid="delete-client-error" style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8 }}>
+                <AlertCircle size={14} style={{ color: "var(--crim,#ef4444)", flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontSize: 12, color: "var(--crim,#ef4444)" }}>{error}</p>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" onClick={onClose} disabled={deleting} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }}>Cancelar</button>
+              <button
+                type="submit"
+                disabled={!canDelete || deleting}
+                className="btn btn-danger"
+                style={{ flex: 1, justifyContent: "center" }}
+                data-testid="delete-client-confirm-btn"
+              >
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {deleting ? "Borrando…" : "Borrar definitivamente"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminClients() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1270,6 +1373,7 @@ export default function AdminClients() {
   const [suggestionClient, setSuggestionClient] = useState<User | null>(null);
   const [plansClient, setPlansClient] = useState<User | null>(null);
   const [costsClient, setCostsClient] = useState<User | null>(null);
+  const [deleteClient, setDeleteClient] = useState<User | null>(null);
   const [costByProject, setCostByProject] = useState<Record<string, { costUsd: number; calls: number }>>({});
 
   const load = () => {
@@ -1371,6 +1475,16 @@ export default function AdminClients() {
         <ProjectCostModal
           client={costsClient}
           onClose={() => setCostsClient(null)}
+        />
+      )}
+      {deleteClient && (
+        <DeleteClientModal
+          client={deleteClient}
+          onClose={() => setDeleteClient(null)}
+          onDeleted={(id) => {
+            setUsers((prev) => prev.filter((u) => u.id !== id));
+            setDeleteClient(null);
+          }}
         />
       )}
 
@@ -1535,6 +1649,19 @@ export default function AdminClients() {
                           {processing === u.id ? <Loader2 size={11} className="animate-spin" /> : u.isActive ? <UserX size={11} /> : <UserCheck size={11} />}
                           {u.isActive ? "Revocar" : "Activar"}
                         </button>
+                        {u.role === "client" && (
+                          <button
+                            onClick={() => setDeleteClient(u)}
+                            disabled={processing === u.id}
+                            className="btn btn-sm btn-ghost"
+                            title="Borrar definitivamente este cliente"
+                            style={{ borderColor: "rgba(239,68,68,0.35)", color: "var(--crim,#ef4444)" }}
+                            data-testid={`delete-client-btn-${u.id}`}
+                          >
+                            <Trash2 size={11} />
+                            Borrar
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
