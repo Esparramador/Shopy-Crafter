@@ -71,3 +71,4 @@
 - [ConvAI health check semantics](convai-health-check.md) — GET health is read-only with ok/drift/error; repair only via reset-agents, which must use single-flight and sync the env-pinned admin agent in place.
 - [E2E for microphone/WebSocket voice flows](e2e-voice-call-playwright.md) — testing subagent breaks on mic permission; use e2e:voice-call[:client] (Nix chromium + fake device); force-click animated buttons; a mode branch ≠ an entry point.
 - [ConvAI agent voice settings are flat tts.* fields](convai-tts-flat-fields.md) — nested tts.voice_settings is silently ignored by the Agents API; send stability/similarity_boost/speed flat; owner picked 0.5/0.8/1.2 by ear.
+- [Session revalidation middleware](session-revalidation.md) — revocation = global revalidateSession (regenerate, never destroy); purging user_sessions alone loses the login/delete race; no FKs to users.
