@@ -537,6 +537,15 @@ const CONVAI_SPANISH_MODEL = "eleven_turbo_v2_5";
 const CONVAI_OUTPUT_FORMAT = "pcm_16000";
 const CONVAI_INPUT_FORMAT = "pcm_16000";
 
+// ── Ajustes de voz de Arturo ──────────────────────────────────────────────────
+// These are the fields ElevenLabs actually persists under conversation_config.tts
+// (flat, not inside a voice_settings block). Verified on the live API.
+// Values chosen by the owner after A/B listening (Sept 2026): the more stable
+// 0.5 / 0.8 pair was preferred over the expressive 0.18 / 0.92 one.
+const CONVAI_TTS_STABILITY = 0.5;        // Media → voz estable, sin altibajos
+const CONVAI_TTS_SIMILARITY_BOOST = 0.8; // Alta → fiel a la voz original
+const CONVAI_TTS_SPEED = 1.2;            // 20% más rápido que la velocidad por defecto
+
 async function resolveSevillanoVoiceId(): Promise<string> {
   // An explicit ConvAI voice override is useful if the ElevenLabs plan changes.
   if (process.env.ELEVEN_CONVAI_VOICE_ID?.trim()) {
@@ -595,6 +604,9 @@ async function verifyPersistedConvAIAgent(agentId: string, voiceId: string): Pro
     modelId: CONVAI_SPANISH_MODEL,
     outputFormat: CONVAI_OUTPUT_FORMAT,
     inputFormat: CONVAI_INPUT_FORMAT,
+    stability: CONVAI_TTS_STABILITY,
+    similarityBoost: CONVAI_TTS_SIMILARITY_BOOST,
+    speed: CONVAI_TTS_SPEED,
   });
 }
 
@@ -645,7 +657,7 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
     landing: LANDING_AGENT_PROMPT,
   };
 
-  // Configuración de voz andaluza: rápida, expresiva, muy fiel a la voz original
+  // Configuración de voz: ver constantes CONVAI_TTS_* (elegidas escuchando muestras)
   type TtsConfig = NonNullable<NonNullable<ConvAIAgentConfig["conversation_config"]>["tts"]>;
   const tts: TtsConfig = {
     voice_id: voiceId,
@@ -656,13 +668,13 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
     // NOTE: the real field name is `agent_output_audio_format` (verified on the
     // live API); `output_format` is silently ignored by ElevenLabs.
     agent_output_audio_format: CONVAI_OUTPUT_FORMAT,
-    voice_settings: {
-      stability: 0.18,        // Baja → más expresiva, menos robótica
-      similarity_boost: 0.92, // Alta → muy fiel al clon original
-      style: 0.82,            // Alta → acento marcado y expresivo
-      use_speaker_boost: true,
-    },
-    speed: 1.2,               // 20% más rápido que la velocidad por defecto
+    // NOTE: ConvAI expects these as FLAT fields under `tts`. A nested
+    // `tts.voice_settings{...}` block is silently ignored (verified live: the
+    // agent kept stability 0.5 / similarity_boost 0.8 for months). `style` and
+    // `use_speaker_boost` do not exist in the persisted agent schema at all.
+    stability: CONVAI_TTS_STABILITY,
+    similarity_boost: CONVAI_TTS_SIMILARITY_BOOST,
+    speed: CONVAI_TTS_SPEED,
   };
 
   return {

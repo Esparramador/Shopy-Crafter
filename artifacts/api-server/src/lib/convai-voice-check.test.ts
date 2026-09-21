@@ -92,7 +92,10 @@ describe("readConvAIAgentAudioConfig", () => {
     const agent = {
       agent_id: "agent_x",
       conversation_config: {
-        tts: { model_id: MODEL, voice_id: premadeCharlie.voice_id, agent_output_audio_format: "pcm_16000", speed: 1.2 },
+        tts: {
+          model_id: MODEL, voice_id: premadeCharlie.voice_id, agent_output_audio_format: "pcm_16000",
+          stability: 0.18, similarity_boost: 0.92, speed: 1.2,
+        },
         asr: { quality: "high", provider: "scribe_realtime", user_input_audio_format: "pcm_16000" },
         agent: { language: "es" },
       },
@@ -102,27 +105,97 @@ describe("readConvAIAgentAudioConfig", () => {
       modelId: MODEL,
       outputFormat: "pcm_16000",
       inputFormat: "pcm_16000",
+      stability: 0.18,
+      similarityBoost: 0.92,
+      speed: 1.2,
     });
   });
 
+  it("ignores a nested tts.voice_settings block (ElevenLabs never persists it)", () => {
+    const agent = {
+      conversation_config: {
+        tts: { voice_settings: { stability: 0.18, similarity_boost: 0.92 }, stability: 0.5, similarity_boost: 0.8 },
+      },
+    };
+    const read = readConvAIAgentAudioConfig(agent);
+    expect(read.stability).toBe(0.5);
+    expect(read.similarityBoost).toBe(0.8);
+  });
+
   it("returns nulls instead of crashing on a partial payload", () => {
-    expect(readConvAIAgentAudioConfig({})).toEqual({ voiceId: null, modelId: null, outputFormat: null, inputFormat: null });
+    expect(readConvAIAgentAudioConfig({})).toEqual({
+      voiceId: null, modelId: null, outputFormat: null, inputFormat: null,
+      stability: null, similarityBoost: null, speed: null,
+    });
     expect(readConvAIAgentAudioConfig({ conversation_config: { tts: { voice_id: "  " } } }).voiceId).toBeNull();
+    expect(readConvAIAgentAudioConfig({ conversation_config: { tts: { stability: "0.18" } } }).stability).toBeNull();
   });
 });
 
 describe("assertConvAIAgentConfigApplied (post-sync verification)", () => {
-  const expected = { voiceId: premadeCharlie.voice_id, modelId: MODEL, outputFormat: "pcm_16000", inputFormat: "pcm_16000" };
+  const expected = {
+    voiceId: premadeCharlie.voice_id, modelId: MODEL, outputFormat: "pcm_16000", inputFormat: "pcm_16000",
+    stability: 0.18, similarityBoost: 0.92, speed: 1.2,
+  };
   const goodAgent = {
     agent_id: "agent_ok",
     conversation_config: {
-      tts: { model_id: MODEL, voice_id: premadeCharlie.voice_id, agent_output_audio_format: "pcm_16000" },
+      tts: {
+        model_id: MODEL, voice_id: premadeCharlie.voice_id, agent_output_audio_format: "pcm_16000",
+        stability: 0.18, similarity_boost: 0.92, speed: 1.2,
+      },
       asr: { user_input_audio_format: "pcm_16000" },
     },
   };
 
-  it("passes when voice, model and both PCM formats match", () => {
+  it("passes when voice, model, both PCM formats and voice settings match", () => {
     expect(() => assertConvAIAgentConfigApplied(goodAgent, expected)).not.toThrow();
+  });
+
+  it("fails when ElevenLabs kept the default voice settings (the nested voice_settings regression)", () => {
+    // Exactly what a live GET returned while the code sent tts.voice_settings{...}:
+    // the block was ignored and the defaults 0.5 / 0.8 stayed persisted.
+    const agent = structuredClone(goodAgent);
+    agent.conversation_config.tts.stability = 0.5;
+    agent.conversation_config.tts.similarity_boost = 0.8;
+    try {
+      assertConvAIAgentConfigApplied(agent, expected);
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toEqual(expect.objectContaining({ code: "agent_config_mismatch" }));
+      const message = (err as Error).message;
+      expect(message).toMatch(/stability esperada 0\.18, ElevenLabs guardó 0\.5/);
+      expect(message).toMatch(/similarity_boost esperado 0\.92, ElevenLabs guardó 0\.8/);
+      expect(message).not.toMatch(/speed esperada/);
+    }
+  });
+
+  it("fails when speed drifted or a voice setting is missing entirely", () => {
+    const agent = structuredClone(goodAgent);
+    agent.conversation_config.tts.speed = 1.0;
+    delete (agent.conversation_config.tts as { stability?: number }).stability;
+    try {
+      assertConvAIAgentConfigApplied(agent, expected);
+      throw new Error("should have thrown");
+    } catch (err) {
+      const message = (err as Error).message;
+      expect(message).toMatch(/speed esperada 1\.2, ElevenLabs guardó 1/);
+      expect(message).toMatch(/stability esperada 0\.18, ElevenLabs guardó \(ninguna\)/);
+    }
+  });
+
+  it("tolerates float representation noise in the echoed values", () => {
+    const agent = structuredClone(goodAgent);
+    agent.conversation_config.tts.stability = 0.18000000000000002;
+    agent.conversation_config.tts.similarity_boost = 0.9199999999;
+    expect(() => assertConvAIAgentConfigApplied(agent, expected)).not.toThrow();
+  });
+
+  it("skips voice-setting checks when the caller does not specify them", () => {
+    const agent = structuredClone(goodAgent);
+    agent.conversation_config.tts.stability = 0.5;
+    const { stability: _s, similarityBoost: _b, speed: _p, ...audioOnly } = expected;
+    expect(() => assertConvAIAgentConfigApplied(agent, audioOnly)).not.toThrow();
   });
 
   it("fails when ElevenLabs kept a different voice than the one we synced", () => {
@@ -171,6 +244,9 @@ describe("assertConvAIAgentConfigApplied (post-sync verification)", () => {
       expect(message).toMatch(/modelo esperado/);
       expect(message).toMatch(/formato de salida/);
       expect(message).toMatch(/formato de micrófono/);
+      expect(message).toMatch(/stability esperada/);
+      expect(message).toMatch(/similarity_boost esperado/);
+      expect(message).toMatch(/speed esperada/);
     }
   });
 });

@@ -496,13 +496,6 @@ export interface ConvAIAgent {
   conversation_config?: Record<string, unknown>;
 }
 
-export interface ConvAIVoiceSettings {
-  stability?: number;
-  similarity_boost?: number;
-  style?: number;
-  use_speaker_boost?: boolean;
-}
-
 export interface ConvAIAgentConfig {
   name: string;
   conversation_config?: {
@@ -518,7 +511,14 @@ export interface ConvAIAgentConfig {
     tts?: {
       voice_id?: string;
       model_id?: string;
-      voice_settings?: ConvAIVoiceSettings;
+      /**
+       * Voice settings are FLAT fields on `tts` in the ConvAI agent schema.
+       * A nested `voice_settings{...}` block (as used by the plain TTS
+       * endpoint) is silently ignored by the Agents API. `style` and
+       * `use_speaker_boost` are not part of the persisted agent config.
+       */
+      stability?: number;
+      similarity_boost?: number;
       speed?: number;
       /** e.g. "pcm_16000" — the field ElevenLabs actually persists and announces. */
       agent_output_audio_format?: string;

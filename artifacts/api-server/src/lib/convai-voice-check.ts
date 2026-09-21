@@ -133,6 +133,14 @@ export interface ExpectedConvAIAgentAudio {
   outputFormat: string;
   /** e.g. "pcm_16000" */
   inputFormat: string;
+  /**
+   * Voice settings ElevenLabs persists as FLAT `tts.*` fields (a nested
+   * `voice_settings` block is ignored). Optional so callers that only care
+   * about audio transport can skip them.
+   */
+  stability?: number;
+  similarityBoost?: number;
+  speed?: number;
 }
 
 /**
@@ -146,20 +154,36 @@ export function readConvAIAgentAudioConfig(agent: { conversation_config?: unknow
   modelId: string | null;
   outputFormat: string | null;
   inputFormat: string | null;
+  stability: number | null;
+  similarityBoost: number | null;
+  speed: number | null;
 } {
   const cc = (agent.conversation_config ?? {}) as Record<string, unknown>;
   const tts = (cc.tts ?? {}) as Record<string, unknown>;
   const asr = (cc.asr ?? {}) as Record<string, unknown>;
   const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
   return {
     voiceId: str(tts.voice_id),
     modelId: str(tts.model_id),
     outputFormat: str(tts.agent_output_audio_format) ?? str(tts.output_format),
     inputFormat: str(asr.user_input_audio_format),
+    // Flat fields only: `tts.voice_settings.*` is never persisted by ConvAI,
+    // so reading it here would mask exactly the regression we want to catch.
+    stability: num(tts.stability),
+    similarityBoost: num(tts.similarity_boost),
+    speed: num(tts.speed),
   };
 }
 
 const PCM_FORMAT_RE = /^pcm_\d+$/i;
+
+/** ElevenLabs echoes floats back as-is, but allow for float representation noise. */
+const VOICE_SETTING_TOLERANCE = 0.005;
+
+function voiceSettingMatches(actual: number | null, expected: number): boolean {
+  return actual !== null && Math.abs(actual - expected) <= VOICE_SETTING_TOLERANCE;
+}
 
 /**
  * Verify the agent ElevenLabs returned matches what we just synchronized.
@@ -185,11 +209,24 @@ export function assertConvAIAgentConfigApplied(
     problems.push(`formato de micrófono esperado ${expected.inputFormat}, el agente anuncia ${actual.inputFormat ?? "(ninguno)"}`);
   }
 
+  // Voice settings: a nested voice_settings block is silently dropped by the
+  // API, so the persisted flat values are the only proof the voice sounds as
+  // configured (this went unnoticed for months before this check existed).
+  if (expected.stability !== undefined && !voiceSettingMatches(actual.stability, expected.stability)) {
+    problems.push(`stability esperada ${expected.stability}, ElevenLabs guardó ${actual.stability ?? "(ninguna)"}`);
+  }
+  if (expected.similarityBoost !== undefined && !voiceSettingMatches(actual.similarityBoost, expected.similarityBoost)) {
+    problems.push(`similarity_boost esperado ${expected.similarityBoost}, ElevenLabs guardó ${actual.similarityBoost ?? "(ninguno)"}`);
+  }
+  if (expected.speed !== undefined && !voiceSettingMatches(actual.speed, expected.speed)) {
+    problems.push(`speed esperada ${expected.speed}, ElevenLabs guardó ${actual.speed ?? "(ninguna)"}`);
+  }
+
   if (problems.length > 0) {
     throw new ConvAIVoiceError(
       "agent_config_mismatch",
-      `El agente ConvAI ${agent.agent_id ?? ""} no quedó configurado para audio PCM: ${problems.join("; ")}. ` +
-        "La llamada conectaría sin audio. Re-sincroniza los agentes o revisa la voz configurada.",
+      `El agente ConvAI ${agent.agent_id ?? ""} no quedó configurado como se pidió: ${problems.join("; ")}. ` +
+        "La llamada podría conectar sin audio o con una voz distinta a la configurada. Re-sincroniza los agentes o revisa la voz configurada.",
       { agentId: agent.agent_id, voiceId: expected.voiceId },
     );
   }

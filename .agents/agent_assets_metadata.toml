@@ -781,3 +781,31 @@ uri = "file://.local/research/rolex-datejust-41-explode-view-complete.md"
 type = "text"
 title = "Investigación Rolex Datejust 41 — Completa"
 logical_id = "123a3fee-bc31-4867-8ce5-90a4feabf7bb"
+
+[[outputs]]
+id = "xEhvdMi2wo9nphMqreGgh"
+uri = "file://attached_assets/voice-samples/arturo-nuevo.mp3"
+type = "audio"
+title = "Arturo — ajustes NUEVOS (stability 0.18 / similarity 0.92 / speed 1.2)"
+description = "Voz Charlie + eleven_turbo_v2_5 con los valores que ahora sí persisten en el agente ConvAI."
+logical_id = "da2c9943-9e4b-4258-ae63-3c7e678d801e"
+content_hash = "sha256:9ffbd05ba4af55918873cbfd92cc464ed4ccc9c7a93acbacb1c469e2846bb42a"
+size = 109549
+mtime_ms = 1790008895247
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/da2c9943-9e4b-4258-ae63-3c7e678d801e/7c99f7fd-784d-444c-9621-619bffd52ad1"
+storage_version_token = "1790008902320533"
+content_type = "audio/mpeg"
+
+[[outputs]]
+id = "KIzL2al-vv5pOy0EZ22mI"
+uri = "file://attached_assets/voice-samples/arturo-anterior.mp3"
+type = "audio"
+title = "Arturo — ajustes ANTERIORES (stability 0.5 / similarity 0.8 / speed 1.2)"
+description = "Lo que ElevenLabs aplicaba en realidad hasta ahora, porque ignoraba el bloque voice_settings anidado."
+logical_id = "10d4bd46-f48a-4596-8283-5cb649d67d12"
+content_hash = "sha256:e176bd28489fa6bb077af500e263c48b70ca393c969577fe0635ce16793cd84c"
+size = 117908
+mtime_ms = 1790008895726
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/10d4bd46-f48a-4596-8283-5cb649d67d12/6156e138-0bc1-483b-aec0-0403a3731381"
+storage_version_token = "1790008903199225"
+content_type = "audio/mpeg"
