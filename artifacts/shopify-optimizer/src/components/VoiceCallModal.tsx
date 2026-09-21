@@ -270,7 +270,10 @@ export default function VoiceCallModal({ onClose, API, mode = "admin" }: { onClo
       background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
     }} onClick={e => { if (e.target === e.currentTarget) { endCall(); onClose(); } }}>
       <div style={{
-        background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 20, padding: 32, width: "min(420px, 92vw)",
+        background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 20, padding: "32px clamp(16px, 6vw, 32px)", width: "min(420px, 92vw)",
+        // En móvil (375px) la tarjeta nunca supera la altura del viewport: si el
+        // transcript + error crecen, se hace scroll dentro en vez de recortar los botones.
+        boxSizing: "border-box", maxHeight: "calc(100dvh - 24px)", overflowY: "auto",
         display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
       }}>
         {/* Avatar */}
@@ -324,11 +327,11 @@ export default function VoiceCallModal({ onClose, API, mode = "admin" }: { onClo
           </div>
         )}
 
-        {/* Controls */}
-        <div style={{ display: "flex", gap: 12 }}>
+        {/* Controls: en 375px la fila puede saltar de línea; los botones no parten su texto. */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
           {status === "idle" ? (
             <button onClick={startCall} style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px",
+              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px", whiteSpace: "nowrap",
               background: isClientMode ? "linear-gradient(135deg,#38bdf8,#7c3aed)" : "var(--jade)",
               color: "#fff", borderRadius: 40, border: "none",
               fontSize: 15, fontWeight: 700, cursor: "pointer",
@@ -337,7 +340,7 @@ export default function VoiceCallModal({ onClose, API, mode = "admin" }: { onClo
             </button>
           ) : status === "provisioning" || status === "connecting" ? (
             <button disabled style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px",
+              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px", whiteSpace: "nowrap",
               background: "var(--ink3)", color: "var(--t3)", borderRadius: 40, border: "none",
               fontSize: 15, fontWeight: 700, cursor: "not-allowed", opacity: 0.7,
             }}>

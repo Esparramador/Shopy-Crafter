@@ -16,3 +16,9 @@ description: Durable lessons for browser-testing the ConvAI voice call (fake mic
 **Why:** `VoiceCallModal` had a `mode="client"` branch for months that no client could ever reach — the admin OmniChatbot is mounted only for `role === "admin"`. A mode branch inside a component is not an entry point; verify a role can actually open the modal before testing it.
 
 **How to apply:** any element with an infinite CSS animation (client FAB, pulsing "Colgar") needs `click({ force: true })` after an explicit visibility wait; Playwright's stability check never passes.
+
+**Rule 4 (layout checks):** responsive verification of the client chatbot is a measurement script, not a screenshot eyeball: `e2e:client-chatbot-layout` drives 375/768/1280 × compact/expanded and asserts with `getBoundingClientRect` (panel inside viewport, controls inside panel, no pairwise overlaps, title 1 line + no clip). Headless Nix chromium has no emoji font — icons render as boxes; that is the harness, not a bug.
+
+**Why:** the 400px compact panel cannot hold the avatar + a nowrap title + 5 inline header controls; the header must fold Modo Proyecto / respuesta-por-voz into a `⋯` menu whenever `narrow || !expanded`. On ≤480px the panel switches to left/right:12 + `dvh` heights and the expand control moves into the menu too.
+
+**How to apply:** the `.replit.dev` dev banner (`#replit-dev-banner`) overlaps a full-height mobile panel header and intercepts clicks — hide it via `addStyleTag` in scripts. Accessible names for `menuitemcheckbox` include the trailing ON/OFF text unless the item carries an explicit `aria-label`.

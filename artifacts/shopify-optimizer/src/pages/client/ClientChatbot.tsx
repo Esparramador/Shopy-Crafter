@@ -73,6 +73,23 @@ function fmtDate(iso: string): string {
   catch { return iso; }
 }
 
+// Panel de 400/540px no cabe en un móvil: por debajo de este ancho el panel
+// ocupa casi todo el viewport y los controles secundarios de la cabecera
+// (Modo Proyecto, respuesta por voz, expandir) pasan a un menú "⋯" para que el
+// título y el botón 📞 de consulta por voz sigan visibles sin desbordar.
+const NARROW_MAX_PX = 480;
+function useNarrowViewport(): boolean {
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth <= NARROW_MAX_PX);
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${NARROW_MAX_PX}px)`);
+    const onChange = () => setNarrow(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return narrow;
+}
+
 const SR_API: any = typeof window !== "undefined"
   ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
   : null;
@@ -94,6 +111,8 @@ export function ClientChatbot() {
   const [projectMode, setProjectMode] = useState(false);
   const [expandedMsgs, setExpandedMsgs] = useState<Set<number>>(new Set());
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
+  const [menuOpen, setMenuOpen]     = useState(false);
+  const narrow = useNarrowViewport();
 
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
@@ -101,7 +120,22 @@ export function ClientChatbot() {
   const abortRef   = useRef<AbortController | null>(null);
   const srRef      = useRef<any>(null);
   const projectModeRef = useRef(false);
+  const menuRef    = useRef<HTMLDivElement>(null);
   useEffect(() => { projectModeRef.current = projectMode; }, [projectMode]);
+
+  // Menú "⋯" (solo en pantallas estrechas): se cierra al tocar fuera o con Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointer = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onPointer); document.removeEventListener("keydown", onKey); };
+  }, [menuOpen]);
+  // Cabecera "estrecha": panel compacto (400px) o móvil. Con 5 controles inline el
+  // título "Asistente Shopy Crafter" no cabe en 400px; expandido (540px) sí.
+  const compactHeader = narrow || !expanded;
+  useEffect(() => { if (!compactHeader) setMenuOpen(false); }, [compactHeader]);
 
   const panelW = expanded ? 540 : 400;
   const panelH = expanded ? 680 : 560;
@@ -357,9 +391,44 @@ export function ClientChatbot() {
     });
   }
 
+  function toggleProjectMode() {
+    const next = !projectMode;
+    projectModeRef.current = next;
+    setProjectMode(next);
+    if (next) {
+      addMsg({ role: "system", content: "🎯 Modo Proyecto activado · ADN de marca inyectado · Cada respuesta se auto-guarda en el Cuaderno", ts: Date.now() });
+      setTimeout(() => {
+        send("Hola, quiero planificar un proyecto personal. ¿Por dónde empezamos?");
+      }, 200);
+    } else {
+      addMsg({ role: "system", content: "💬 Volviendo al modo asistente normal.", ts: Date.now() });
+    }
+  }
+
+  function toggleVoice() {
+    setVoiceOn(v => !v);
+    if (!voiceOn) window.speechSynthesis?.cancel();
+  }
+
+  // Botón de icono de la cabecera (28px en escritorio, 32px en móvil para el dedo).
+  const iconBtn: React.CSSProperties = {
+    width: narrow ? 32 : 28, height: narrow ? 32 : 28, borderRadius: 8,
+    border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)",
+    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0, padding: 0,
+  };
+  const menuItem: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 40, padding: "8px 10px", borderRadius: 8,
+    border: "none", background: "transparent", color: "rgba(255,255,255,0.85)", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left",
+  };
+
   const panelStyle: React.CSSProperties = {
-    position: "fixed", bottom: 20, right: 20, zIndex: 9999,
-    width: panelW, height: panelH,
+    position: "fixed", zIndex: 9999,
+    // Nunca más grande que el viewport: en escritorio se recorta a la ventana,
+    // en móvil (≤480px) ocupa el ancho completo con 12px de margen y, expandido,
+    // toda la altura disponible (dvh respeta las barras del navegador móvil).
+    ...(narrow
+      ? { left: 12, right: 12, bottom: 12, width: "auto", height: expanded ? "calc(100dvh - 24px)" : `min(${panelH}px, calc(100dvh - 24px))` }
+      : { bottom: 20, right: 20, width: panelW, maxWidth: "calc(100vw - 40px)", height: `min(${panelH}px, calc(100dvh - 40px))` }),
     borderRadius: 20,
     background: "linear-gradient(160deg, #0c0c1a 0%, #10101f 60%, #0d0d18 100%)",
     border: "1px solid rgba(201,169,97,0.2)",
@@ -427,64 +496,96 @@ export function ClientChatbot() {
           )}
 
           {/* Header */}
-          <div style={{ padding: "12px 14px", background: projectMode ? "rgba(99,102,241,0.12)" : "rgba(201,169,97,0.06)", borderBottom: `1px solid ${projectMode ? "rgba(99,102,241,0.3)" : "rgba(201,169,97,0.12)"}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0, transition: "all 0.3s" }}>
-            <div style={{ width: 38, height: 38, borderRadius: 11, background: projectMode ? "linear-gradient(135deg,rgba(99,102,241,0.3),rgba(139,92,246,0.15))" : "linear-gradient(135deg,rgba(201,169,97,0.2),rgba(201,169,97,0.07))", border: `1px solid ${projectMode ? "rgba(99,102,241,0.4)" : "rgba(201,169,97,0.18)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, transition: "all 0.3s" }}>{projectMode ? "🎯" : "🤖"}</div>
+          <div style={{ padding: narrow ? "10px 12px" : "12px 14px", background: projectMode ? "rgba(99,102,241,0.12)" : "rgba(201,169,97,0.06)", borderBottom: `1px solid ${projectMode ? "rgba(99,102,241,0.3)" : "rgba(201,169,97,0.12)"}`, display: "flex", alignItems: "center", gap: narrow ? 6 : 8, flexShrink: 0, transition: "all 0.3s" }}>
+            <div style={{ width: narrow ? 34 : 38, height: narrow ? 34 : 38, borderRadius: 11, background: projectMode ? "linear-gradient(135deg,rgba(99,102,241,0.3),rgba(139,92,246,0.15))" : "linear-gradient(135deg,rgba(201,169,97,0.2),rgba(201,169,97,0.07))", border: `1px solid ${projectMode ? "rgba(99,102,241,0.4)" : "rgba(201,169,97,0.18)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, transition: "all 0.3s" }}>{projectMode ? "🎯" : "🤖"}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: "var(--t1,#fff)", margin: 0, lineHeight: 1.2 }}>{projectMode ? "Arquitecto de Proyectos IA" : "Asistente Shopy Crafter"}</p>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                <div style={{ width: 5, height: 5, borderRadius: "50%", background: projectMode ? "#818cf8" : "#10b981" }} />
-                <p style={{ fontSize: 10, color: projectMode ? "#818cf8" : "#10b981", margin: 0, fontWeight: 600 }}>{projectMode ? "Modo Proyecto · ADN inyectado · Auto-guardando" : "En línea · IA + ShopyBrain"}</p>
+              <p className="cb-title" title={projectMode ? "Arquitecto de Proyectos IA" : "Asistente Shopy Crafter"} style={{ fontSize: 13, fontWeight: 700, color: "var(--t1,#fff)", margin: 0, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{projectMode ? "Arquitecto de Proyectos IA" : "Asistente Shopy Crafter"}</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, minWidth: 0 }}>
+                <div style={{ width: 5, height: 5, borderRadius: "50%", background: projectMode ? "#818cf8" : "#10b981", flexShrink: 0 }} />
+                <p style={{ fontSize: 10, color: projectMode ? "#818cf8" : "#10b981", margin: 0, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{projectMode ? "Modo Proyecto · ADN inyectado · Auto-guardando" : "En línea · IA + ShopyBrain"}</p>
               </div>
             </div>
-            {/* Project Mode toggle */}
-            <button
-              onClick={() => {
-                const next = !projectMode;
-                projectModeRef.current = next;
-                setProjectMode(next);
-                if (next) {
-                  addMsg({ role: "system", content: "🎯 Modo Proyecto activado · ADN de marca inyectado · Cada respuesta se auto-guarda en el Cuaderno", ts: Date.now() });
-                  setTimeout(() => {
-                    send("Hola, quiero planificar un proyecto personal. ¿Por dónde empezamos?");
-                  }, 200);
-                } else {
-                  addMsg({ role: "system", content: "💬 Volviendo al modo asistente normal.", ts: Date.now() });
-                }
-              }}
-              title={projectMode ? "Desactivar Modo Proyecto" : "Activar Modo Proyecto (Arquitecto IA)"}
-              style={{ height: 32, padding: "0 10px", borderRadius: 9, border: projectMode ? "1px solid rgba(99,102,241,0.6)" : "1px solid rgba(255,255,255,0.12)", background: projectMode ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.04)", color: projectMode ? "#a5b4fc" : "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, transition: "all 0.2s", flexShrink: 0, whiteSpace: "nowrap" }}
-            >
-              <span style={{ fontSize: 13 }}>{projectMode ? "🎯" : "🎯"}</span>
-              <span>{projectMode ? "Proyecto ON" : "Proyecto"}</span>
-            </button>
-            {/* ConvAI voice call (Arturo) — consultas de informes por voz */}
+            {/* Cabecera holgada (escritorio expandido, 540px): todos los controles inline */}
+            {!compactHeader && (
+              <button
+                onClick={toggleProjectMode}
+                aria-pressed={projectMode}
+                aria-label={projectMode ? "Desactivar Modo Proyecto" : "Activar Modo Proyecto"}
+                title={projectMode ? "Desactivar Modo Proyecto" : "Activar Modo Proyecto (Arquitecto IA)"}
+                style={{ height: 32, padding: "0 10px", borderRadius: 9, border: projectMode ? "1px solid rgba(99,102,241,0.6)" : "1px solid rgba(255,255,255,0.12)", background: projectMode ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.04)", color: projectMode ? "#a5b4fc" : "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, transition: "all 0.2s", flexShrink: 0, whiteSpace: "nowrap" }}
+              >
+                <span style={{ fontSize: 13 }}>🎯</span>
+                <span>{projectMode ? "Proyecto ON" : "Proyecto"}</span>
+              </button>
+            )}
+            {/* ConvAI voice call (Arturo) — consultas de informes por voz. Siempre visible. */}
             <button
               onClick={() => setVoiceCallOpen(true)}
               aria-label="Abrir consulta por voz"
               title="Consultar por voz — habla con el asistente IA en tiempo real"
-              style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(56,189,248,0.35)", background: "rgba(56,189,248,0.10)", color: "#38bdf8", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
+              style={{ ...iconBtn, border: "1px solid rgba(56,189,248,0.35)", background: "rgba(56,189,248,0.10)", color: "#38bdf8", fontSize: 13 }}
             >
               📞
             </button>
-            {/* Voice toggle */}
-            <button
-              onClick={() => { setVoiceOn(v => !v); if (!voiceOn) window.speechSynthesis?.cancel(); }}
-              title={voiceOn ? "Desactivar voz" : "Activar respuesta por voz"}
-              style={{ width: 28, height: 28, borderRadius: 8, border: voiceOn ? "1px solid rgba(201,169,97,0.5)" : "1px solid rgba(255,255,255,0.08)", background: voiceOn ? "rgba(201,169,97,0.15)" : "rgba(255,255,255,0.04)", color: voiceOn ? "var(--gold,#c9a961)" : "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
-            >
-              {voiceOn ? "🔊" : "🔇"}
-            </button>
-            {/* Expand */}
-            <button
-              onClick={() => setExpanded(e => !e)}
-              title={expanded ? "Compactar" : "Expandir"}
-              style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
-            >
-              {expanded ? "⊡" : "⊞"}
-            </button>
+            {compactHeader ? (
+              /* Cabecera estrecha (panel compacto de 400px o móvil): Modo Proyecto y
+                 respuesta por voz van en un menú ⋯ para que el título quepa entero.
+                 En móvil también entra aquí Expandir/Compactar. */
+              <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
+                <button
+                  onClick={() => setMenuOpen(o => !o)}
+                  aria-label="Más opciones del chat"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  title={`Más opciones${projectMode ? " · Modo Proyecto ON" : ""}${voiceOn ? " · Voz ON" : ""}`}
+                  style={{ ...iconBtn, fontSize: 16, ...(menuOpen || voiceOn || projectMode ? { border: "1px solid rgba(201,169,97,0.5)", background: "rgba(201,169,97,0.12)", color: "var(--gold,#c9a961)" } : {}) }}
+                >
+                  ⋯
+                </button>
+                {menuOpen && (
+                  <div role="menu" aria-label="Opciones del chat" style={{ position: "absolute", top: iconBtn.height as number + 4, right: 0, zIndex: 20, minWidth: 220, padding: 6, borderRadius: 12, background: "#12122a", border: "1px solid rgba(201,169,97,0.25)", boxShadow: "0 16px 48px rgba(0,0,0,0.7)", display: "flex", flexDirection: "column", gap: 2 }}>
+                    <button role="menuitemcheckbox" aria-checked={projectMode} aria-label="Modo Proyecto" onClick={() => { setMenuOpen(false); toggleProjectMode(); }} style={{ ...menuItem, color: projectMode ? "#a5b4fc" : menuItem.color }}>
+                      <span style={{ width: 20, textAlign: "center" }}>🎯</span><span style={{ flex: 1 }}>Modo Proyecto</span><span style={{ fontSize: 10, fontWeight: 700, opacity: 0.8 }}>{projectMode ? "ON" : "OFF"}</span>
+                    </button>
+                    <button role="menuitemcheckbox" aria-checked={voiceOn} aria-label="Respuesta por voz" onClick={() => { setMenuOpen(false); toggleVoice(); }} style={{ ...menuItem, color: voiceOn ? "var(--gold,#c9a961)" : menuItem.color }}>
+                      <span style={{ width: 20, textAlign: "center" }}>{voiceOn ? "🔊" : "🔇"}</span><span style={{ flex: 1 }}>Respuesta por voz</span><span style={{ fontSize: 10, fontWeight: 700, opacity: 0.8 }}>{voiceOn ? "ON" : "OFF"}</span>
+                    </button>
+                    {narrow && (
+                      <button role="menuitem" aria-label={expanded ? "Compactar chat" : "Expandir chat"} onClick={() => { setMenuOpen(false); setExpanded(e => !e); }} style={menuItem}>
+                        <span style={{ width: 20, textAlign: "center" }}>{expanded ? "⊡" : "⊞"}</span><span style={{ flex: 1 }}>{expanded ? "Compactar chat" : "Expandir chat"}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Voice toggle */
+              <button
+                onClick={toggleVoice}
+                aria-pressed={voiceOn}
+                aria-label={voiceOn ? "Desactivar respuesta por voz" : "Activar respuesta por voz"}
+                title={voiceOn ? "Desactivar voz" : "Activar respuesta por voz"}
+                style={{ ...iconBtn, fontSize: 13, ...(voiceOn ? { border: "1px solid rgba(201,169,97,0.5)", background: "rgba(201,169,97,0.15)", color: "var(--gold,#c9a961)" } : {}) }}
+              >
+                {voiceOn ? "🔊" : "🔇"}
+              </button>
+            )}
+            {/* Expand (inline salvo en móvil, donde está en el menú ⋯) */}
+            {!narrow && (
+              <button
+                onClick={() => setExpanded(e => !e)}
+                aria-label={expanded ? "Compactar chat" : "Expandir chat"}
+                title={expanded ? "Compactar" : "Expandir"}
+                style={{ ...iconBtn, fontSize: 11 }}
+              >
+                {expanded ? "⊡" : "⊞"}
+              </button>
+            )}
             <button
               onClick={() => setOpen(false)}
-              style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", flexShrink: 0 }}
+              aria-label="Cerrar chat"
+              title="Cerrar chat"
+              style={{ ...iconBtn, fontSize: 12 }}
               onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.color = "#f87171"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
             >✕</button>
