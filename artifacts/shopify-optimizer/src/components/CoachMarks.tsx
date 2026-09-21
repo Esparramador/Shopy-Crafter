@@ -37,14 +37,36 @@ const STEPS: CoachStep[] = [
   },
 ];
 
+// Overlays that must never be covered by the tour (e.g. the voice-call modal)
+// mark their root with this attribute. While any such element is mounted the
+// tour stays hidden — paused, not dismissed — and resumes when it goes away.
+const TOUR_BLOCKER_SELECTOR = "[data-blocks-tour]";
+
 function getElementRect(selector: string): DOMRect | null {
   const el = document.querySelector(selector);
   return el ? el.getBoundingClientRect() : null;
 }
 
+function useTourBlocked(): boolean {
+  const [blocked, setBlocked] = useState(() =>
+    typeof document !== "undefined" && !!document.querySelector(TOUR_BLOCKER_SELECTOR)
+  );
+  useEffect(() => {
+    const check = () => setBlocked(!!document.querySelector(TOUR_BLOCKER_SELECTOR));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-blocks-tour"] });
+    return () => observer.disconnect();
+  }, []);
+  return blocked;
+}
+
 export function CoachMarks() {
   const [step, setStep] = useState(0);
-  const [visible, setVisible] = useState(false);
+  // "active" = the tour wants to be shown (not dismissed, intro delay elapsed).
+  const [active, setActive] = useState(false);
+  const blocked = useTourBlocked();
+  const visible = active && !blocked;
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
@@ -52,7 +74,7 @@ export function CoachMarks() {
   useEffect(() => {
     const dismissed = localStorage.getItem(COACH_MARKS_KEY);
     if (!dismissed) {
-      const timer = setTimeout(() => setVisible(true), 1500);
+      const timer = setTimeout(() => setActive(true), 1500);
       return () => clearTimeout(timer);
     }
     return undefined;
@@ -89,7 +111,7 @@ export function CoachMarks() {
   }, [visible, step, targetRect]);
 
   const dismiss = () => {
-    setVisible(false);
+    setActive(false);
     localStorage.setItem(COACH_MARKS_KEY, "1");
   };
 

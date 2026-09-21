@@ -972,7 +972,7 @@ function FlowModal({ flow, onClose }: { flow: KlaviyoWorkflowResult["plan"]["flo
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: fmIsMobile ? 8 : 20 }}>
+    <div data-blocks-tour="flow-modal" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: fmIsMobile ? 8 : 20 }}>
       <div style={{ background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: fmIsMobile ? 10 : 14, width: "100%", maxWidth: fmIsMobile ? "100%" : 900, maxHeight: fmIsMobile ? "calc(100dvh - 16px)" : "90vh", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: fmIsMobile ? "10px 12px" : "14px 20px", borderBottom: "1px solid var(--ink3)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -4575,7 +4575,9 @@ function VoiceCallModal({ onClose, API, mode = "admin" }: { onClose: () => void;
   };
 
   return (
-    <div style={{
+    // data-blocks-tour: el tour de bienvenida (CoachMarks) se mantiene oculto
+    // mientras este modal esté montado; sin ello se abría encima de la llamada.
+    <div data-blocks-tour="voice-call" style={{
       position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
       background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
     }} onClick={e => { if (e.target === e.currentTarget) { endCall(); onClose(); } }}>
