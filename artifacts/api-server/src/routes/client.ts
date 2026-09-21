@@ -1,3 +1,5 @@
+import clientStripeRouter from "./client-stripe.js";
+import { getPlatform } from "../lib/platform-capabilities.js";
 import { Router } from "express";
 import { randomBytes } from "crypto";
 import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable, projectsTable, brandDnaTable } from "@workspace/db";
@@ -22,6 +24,9 @@ import { sendPushToAdmins, sendPushToClientByProject } from "../lib/push-helper.
 
 const router = Router();
 router.use(requireAuth);
+
+// Vista Stripe del cliente (solo lectura, sesión de cliente)
+router.use("/stripe", clientStripeRouter);
 
 function getClientProjectId(req: import("express").Request): string {
   if (req.session.clientId) return String(req.session.clientId);
@@ -76,12 +81,17 @@ router.get("/dashboard", async (req, res): Promise<void> => {
 router.get("/project-info", async (req, res): Promise<void> => {
   try {
     const projectId = getClientProjectId(req);
-    if (!projectId) { res.json({ name: null, shopDomain: null }); return; }
-    const [project] = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain })
+    if (!projectId) { res.json({ name: null, shopDomain: null, platformType: null }); return; }
+    const [project] = await db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain, platformType: projectsTable.platformType })
       .from(projectsTable).where(eq(projectsTable.id, parseInt(projectId))).limit(1);
-    res.json(project ?? { name: null, shopDomain: null });
+    if (!project) { res.json({ name: null, shopDomain: null, platformType: null }); return; }
+    const platform = getPlatform(project.platformType);
+    res.json({
+      ...project,
+      platform: { key: platform.key, label: platform.label, icon: platform.icon, color: platform.color, entityLabel: platform.entityLabel, capabilities: platform.capabilities },
+    });
   } catch {
-    res.json({ name: null, shopDomain: null });
+    res.json({ name: null, shopDomain: null, platformType: null });
   }
 });
 

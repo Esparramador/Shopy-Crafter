@@ -79,6 +79,7 @@ router.get("/projects-list", async (_req, res): Promise<void> => {
       storeNiche: projectsTable.storeNiche,
       clientId: projectsTable.clientId,
       plan: projectsTable.plan,
+      platformType: projectsTable.platformType,
     }).from(projectsTable).orderBy(desc(projectsTable.createdAt));
     res.json(projects);
   } catch (err: any) {

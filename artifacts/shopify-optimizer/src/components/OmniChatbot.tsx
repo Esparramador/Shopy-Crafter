@@ -1060,10 +1060,10 @@ function AttachmentPreview({ file, url, onRemove }: {
 type QuickAction = { icon: string; label: string; prompt: string; isResearch?: boolean };
 const FALLBACK_QUICK_ACTIONS: QuickAction[] = [
   { icon: "❓", label: "¿Qué puedo hacer aquí?",   prompt: "¿Qué puedo hacer en esta página? Guíame paso a paso con los botones y opciones disponibles." },
-  { icon: "🏪", label: "Estado de la tienda",       prompt: "Muéstrame el estado completo de la tienda: productos con score, pedidos recientes y estado del token Shopify." },
-  { icon: "🔍", label: "Auditoría rápida",          prompt: "Haz una auditoría rápida de mi tienda: top-3 problemas críticos de SEO, conversión e imágenes con su impacto estimado en ventas." },
-  { icon: "📊", label: "Analizar métricas",         prompt: "Analiza las métricas clave de mi tienda: conversión, AOV, tasa de abandono y top productos. Detecta los cuellos de botella del funnel." },
-  { icon: "💰", label: "Analizar precios",          prompt: "Analiza los precios de mis productos: compáralos con el mercado y sugiere ajustes para maximizar margen y conversión." },
+  { icon: "🏪", label: "Estado del proyecto",       prompt: "Muéstrame el estado completo del proyecto activo según su plataforma: conexión con la plataforma, datos principales y alertas." },
+  { icon: "🔍", label: "Auditoría rápida",          prompt: "Haz una auditoría rápida del proyecto activo: top-3 problemas críticos con su impacto estimado en ventas o ingresos." },
+  { icon: "📊", label: "Analizar métricas",         prompt: "Analiza las métricas clave del proyecto activo (ventas o cobros, ticket medio, recurrencia, clientes) y detecta cuellos de botella." },
+  { icon: "💰", label: "Analizar precios",          prompt: "Analiza los precios o planes del proyecto activo: compáralos con el mercado y sugiere ajustes para maximizar margen y conversión." },
   { icon: "🔬", label: "Investigar marca/URL",      prompt: "__RESEARCH__", isResearch: true },
   { icon: "🚀", label: "Plan de lanzamiento",       prompt: "Crea un plan de lanzamiento de 30 días para mi tienda/producto: pre-lanzamiento, lanzamiento y post-lanzamiento con presupuesto estimado." },
   { icon: "🧠", label: "Estado del sistema",        prompt: "¿Qué conocimiento ha absorbido Shopy Crafter? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
@@ -1364,6 +1364,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [selectedFlow, setSelectedFlow] = useState<KlaviyoWorkflowResult["plan"]["flows"][0] | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [quickActions, setQuickActions] = useState<QuickAction[]>(FALLBACK_QUICK_ACTIONS);
+  // Plataforma del proyecto activo (la devuelve /quick-actions) → contexto real para Gemini
+  const [activePlatform, setActivePlatform] = useState<{ key: string; label: string; icon: string; entityLabel: string; capabilities: string[]; chatbotContext: string } | null>(null);
   const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only" | "grok" | "gpt" | "nvidia">("auto");
   const [claudeModel, setClaudeModel] = useState<"claude-haiku-3-5" | "claude-sonnet-4-6" | "claude-opus-4-8">("claude-sonnet-4-6");
   const [gptModel, setGptModel] = useState<"gpt-4.1-nano" | "gpt-4.1-mini" | "gpt-4.1" | "gpt-4o">("gpt-4.1-mini");
@@ -1505,7 +1507,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     fetch(url, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(j => {
-        if (cancelled || !j?.actions || !Array.isArray(j.actions)) return;
+        if (cancelled) return;
+        setActivePlatform(j?.platform ?? null);
+        if (!j?.actions || !Array.isArray(j.actions)) return;
         setQuickActions(j.actions);
       })
       .catch(() => { /* fallback ya está */ });
@@ -3128,9 +3132,12 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
 
             // Inyectar projectId en el system prompt para que Gemini pueda emitir acciones correctas
             const geminiProjectId = location.match(/\/projects\/(\d+)/)?.[1];
+            const platformBlock = activePlatform
+              ? `\nPlataforma del proyecto: ${activePlatform.icon} ${activePlatform.label} (${activePlatform.key}). Entidad: ${activePlatform.entityLabel}. Capacidades reales: ${activePlatform.capabilities.join(", ")}.\n${activePlatform.chatbotContext}\nNO ofrezcas acciones que la plataforma no soporta (p. ej. productos/temas Shopify en un proyecto Stripe).`
+              : "";
             const geminiSysPrompt = geminiProjectId
-              ? `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nProyecto activo: projectId=${geminiProjectId} (número entero).\nCuando emitas bloques :::ACTION::: usa SIEMPRE "projectId":${geminiProjectId} en los params.`
-              : `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nNo hay proyecto Shopify activo en esta sesión. Si el usuario pide generar vídeos, imágenes, auditorías, informes o cualquier acción que requiera projectId, usa projectId=0 en los params — el sistema creará automáticamente una carpeta "Shopy Crafter" donde se guardará todo lo generado.`;
+              ? `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nProyecto activo: projectId=${geminiProjectId} (número entero).${platformBlock}\nCuando emitas bloques :::ACTION::: usa SIEMPRE "projectId":${geminiProjectId} en los params.`
+              : `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nNo hay ningún proyecto activo en esta sesión (ni Shopify, ni WooCommerce, ni PrestaShop, ni Stripe). Si el usuario pide generar vídeos, imágenes, auditorías, informes o cualquier acción que requiera projectId, usa projectId=0 en los params — el sistema creará automáticamente una carpeta "Shopy Crafter" donde se guardará todo lo generado.`;
 
             let streamFailed = false;
             try {

@@ -16,7 +16,7 @@ import { sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
-import { getPlatformStripe, saveDirectApiKey } from "../lib/stripe-tenant.js";
+import { getPlatformStripe, saveDirectApiKey, resolveStripeForProject, getStripeConnection, unlinkStripeForProject } from "../lib/stripe-tenant.js";
 
 const router = Router();
 
@@ -181,7 +181,7 @@ router.post("/admin/stripe/assign-key", requireAdmin, async (req: Request, res: 
     });
   } catch (err: any) {
     logger.error({ err }, "stripe-master: assign-key error");
-    res.status(500).json({ error: err?.message ?? "Error guardando clave" });
+    sendStripeError(res, err, "Error guardando clave");
   }
 });
 
@@ -196,7 +196,7 @@ router.post("/admin/stripe/rotate-key/:projectId", requireAdmin, async (req: Req
     await saveDirectApiKey(projectId, secretKey);
     res.json({ success: true, message: "Clave rotada y re-encriptada correctamente" });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error rotando clave" });
+    sendStripeError(res, err, "Error rotando clave");
   }
 });
 
@@ -204,11 +204,14 @@ router.post("/admin/stripe/rotate-key/:projectId", requireAdmin, async (req: Req
 router.delete("/admin/stripe/accounts/:projectId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
+    // Mismo camino que DELETE /admin/stripe/project/:id/link: borrar stripe_accounts Y limpiar
+    // projects.client_secret, si no ensureStripeAccountForProject() volvería a auto-vincular la clave.
+    const removed = await unlinkStripeForProject(projectId);
     const db = await getDb();
-    await db.execute(sql`DELETE FROM stripe_accounts WHERE project_id = ${projectId}`);
-    res.json({ success: true, message: "Cuenta Stripe desvinculada" });
+    await db.execute(sql`UPDATE projects SET client_secret = '', updated_at = NOW() WHERE id = ${projectId} AND platform_type = 'stripe'`);
+    res.json({ success: true, removed, message: "Cuenta Stripe desvinculada" });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error desvinculando cuenta" });
+    sendStripeError(res, err, "Error desvinculando cuenta");
   }
 });
 
@@ -217,8 +220,7 @@ router.delete("/admin/stripe/accounts/:projectId", requireAdmin, async (req: Req
 router.get("/admin/stripe/balance/:projectId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
-    const { resolveStripeForProject } = await import("../lib/stripe-tenant.js");
-    const { stripe, mode } = await resolveStripeForProject(projectId);
+    const { stripe, mode } = await resolveProject(projectId);
 
     const balance = await stripe.balance.retrieve();
     const available = balance.available.reduce((s, b) => s + b.amount, 0);
@@ -227,7 +229,7 @@ router.get("/admin/stripe/balance/:projectId", requireAdmin, async (req: Request
 
     res.json({ available, pending, currency, mode });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error obteniendo balance" });
+    sendStripeError(res, err, "Error obteniendo balance");
   }
 });
 
@@ -236,13 +238,12 @@ router.get("/admin/stripe/transactions/:projectId", requireAdmin, async (req: Re
   try {
     const projectId = parseInt(String(req.params.projectId), 10);
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
-    const { resolveStripeForProject } = await import("../lib/stripe-tenant.js");
-    const { stripe } = await resolveStripeForProject(projectId);
+    const { stripe } = await resolveProject(projectId);
 
     const charges = await stripe.charges.list({ limit });
     res.json({ charges: charges.data, hasMore: charges.has_more });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error obteniendo transacciones" });
+    sendStripeError(res, err, "Error obteniendo transacciones");
   }
 });
 
@@ -256,8 +257,7 @@ router.post("/admin/stripe/payment-intent", requireAdmin, async (req: Request, r
       return;
     }
 
-    const { resolveStripeForProject } = await import("../lib/stripe-tenant.js");
-    const { stripe, mode } = await resolveStripeForProject(projectId);
+    const { stripe, mode } = await resolveProject(projectId);
 
     const pi = await stripe.paymentIntents.create({
       amount: Math.round(Number(amount) * 100),
@@ -273,7 +273,7 @@ router.post("/admin/stripe/payment-intent", requireAdmin, async (req: Request, r
 
     res.json({ clientSecret: pi.client_secret, paymentIntentId: pi.id, mode });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error creando PaymentIntent" });
+    sendStripeError(res, err, "Error creando PaymentIntent");
   }
 });
 
@@ -282,15 +282,65 @@ router.post("/admin/stripe/payment-intent", requireAdmin, async (req: Request, r
 // Todas usan resolveStripeForProject → no necesitan accountId externo
 // ════════════════════════════════════════════════════════════════════════════
 
+/** Resolución ESTRICTA: un proyecto Stripe sin cuenta vinculada devuelve 409, nunca datos de la cuenta Master. */
 async function resolveProject(projectId: number) {
-  const { resolveStripeForProject } = await import("../lib/stripe-tenant.js");
-  return resolveStripeForProject(projectId);
+  return resolveStripeForProject(projectId, { strict: true });
 }
+
+function sendStripeError(res: Response, err: any, fallback = "Error") {
+  const status = Number(err?.statusCode) || 500;
+  res.status(status >= 400 && status < 600 ? status : 500).json({
+    error: err?.message ?? fallback,
+    code: err?.code,
+  });
+}
+
+// GET /admin/stripe/project/:id/connection ───────────────────────────────────
+// Estado de la vinculación (para cabecera del Hub y el chatbot). Nunca lanza.
+router.get("/admin/stripe/project/:id/connection", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const pid = parseInt(String(req.params.id), 10);
+  res.json(await getStripeConnection(pid));
+});
+
+// POST /admin/stripe/project/:id/link ────────────────────────────────────────
+// Vincular / sustituir la clave secreta del proyecto desde el Hub.
+router.post("/admin/stripe/project/:id/link", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const pid = parseInt(String(req.params.id), 10);
+    const { secretKey, publishableKey } = req.body as any;
+    if (!secretKey) { res.status(400).json({ error: "secretKey requerido" }); return; }
+    const result = await saveDirectApiKey(pid, String(secretKey), publishableKey ? String(publishableKey) : undefined);
+    // Mantener projects.client_secret coherente con la clave activa
+    const db = await getDb();
+    await db.execute(sql`UPDATE projects SET client_secret = ${encrypt(String(secretKey).trim())}, updated_at = NOW() WHERE id = ${pid} AND platform_type = 'stripe'`);
+    res.json({ success: true, ...result, connection: await getStripeConnection(pid) });
+  } catch (err: any) {
+    sendStripeError(res, err, "Error vinculando cuenta Stripe");
+  }
+});
+
+// DELETE /admin/stripe/project/:id/link ──────────────────────────────────────
+router.delete("/admin/stripe/project/:id/link", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const pid = parseInt(String(req.params.id), 10);
+    const removed = await unlinkStripeForProject(pid);
+    const db = await getDb();
+    await db.execute(sql`UPDATE projects SET client_secret = '', updated_at = NOW() WHERE id = ${pid} AND platform_type = 'stripe'`);
+    res.json({ success: true, removed });
+  } catch (err: any) {
+    sendStripeError(res, err, "Error desvinculando cuenta Stripe");
+  }
+});
 
 // GET /admin/stripe/project/:id/overview ─────────────────────────────────────
 router.get("/admin/stripe/project/:id/overview", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
+    const connection = await getStripeConnection(pid);
+    if (!connection.connected) {
+      res.json({ connected: false, connection, mode: null, balance: null, volume30: 0, count30: 0, aov: 0, trend: 0, mrr: 0, activeSubCount: 0, customerCount: 0, dailyChart: [], recentCharges: [] });
+      return;
+    }
     const { stripe, mode } = await resolveProject(pid);
 
     const [balance, charges, customers, subs] = await Promise.allSettled([
@@ -343,6 +393,8 @@ router.get("/admin/stripe/project/:id/overview", requireAdmin, async (req: Reque
       }, 0);
 
     res.json({
+      connected: true,
+      connection,
       mode,
       balance: bal ? {
         available: bal.available.reduce((s, b) => s + b.amount, 0),
@@ -360,14 +412,14 @@ router.get("/admin/stripe/project/:id/overview", requireAdmin, async (req: Reque
       })),
     });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // GET /admin/stripe/project/:id/transactions ──────────────────────────────────
 router.get("/admin/stripe/project/:id/transactions", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10), 100);
     const { stripe } = await resolveProject(pid);
     const charges = await stripe.charges.list({ limit });
@@ -379,14 +431,14 @@ router.get("/admin/stripe/project/:id/transactions", requireAdmin, async (req: R
       paymentMethod: (c as any).payment_method_details?.type ?? "card",
     })), hasMore: charges.has_more });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // GET /admin/stripe/project/:id/customers ─────────────────────────────────────
 router.get("/admin/stripe/project/:id/customers", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10), 100);
     const { stripe } = await resolveProject(pid);
     const customers = await stripe.customers.list({ limit, expand: ["data.subscriptions"] });
@@ -399,28 +451,28 @@ router.get("/admin/stripe/project/:id/customers", requireAdmin, async (req: Requ
     }));
     res.json({ data, hasMore: customers.has_more });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // POST /admin/stripe/project/:id/customers ────────────────────────────────────
 router.post("/admin/stripe/project/:id/customers", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { email, name, phone, description, metadata } = req.body as any;
     if (!email) { res.status(400).json({ error: "email requerido" }); return; }
     const { stripe } = await resolveProject(pid);
     const customer = await stripe.customers.create({ email, name, phone, description, metadata });
     res.json({ customer });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // GET /admin/stripe/project/:id/subscriptions ─────────────────────────────────
 router.get("/admin/stripe/project/:id/subscriptions", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10), 100);
     const status = (req.query.status as string) || undefined;
     const { stripe } = await resolveProject(pid);
@@ -432,7 +484,7 @@ router.get("/admin/stripe/project/:id/subscriptions", requireAdmin, async (req: 
       const price = item?.price;
       return {
         id: s.id, status: s.status, created: s.created,
-        currentPeriodEnd: s.current_period_end,
+        currentPeriodEnd: (s as any).current_period_end ?? item?.current_period_end ?? null,
         cancelAtPeriodEnd: s.cancel_at_period_end,
         customer: typeof s.customer === "string" ? { id: s.customer } : { id: (s.customer as any).id, email: (s.customer as any).email, name: (s.customer as any).name },
         priceAmount: price?.unit_amount ?? 0,
@@ -444,26 +496,26 @@ router.get("/admin/stripe/project/:id/subscriptions", requireAdmin, async (req: 
     });
     res.json({ data, hasMore: subs.has_more });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // DELETE /admin/stripe/project/:id/subscriptions/:subId ───────────────────────
 router.delete("/admin/stripe/project/:id/subscriptions/:subId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { stripe } = await resolveProject(pid);
-    const sub = await stripe.subscriptions.cancel(req.params.subId);
+    const sub = await stripe.subscriptions.cancel(String(req.params.subId));
     res.json({ status: sub.status });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // GET /admin/stripe/project/:id/products ──────────────────────────────────────
 router.get("/admin/stripe/project/:id/products", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { stripe } = await resolveProject(pid);
     const [products, prices] = await Promise.all([
       stripe.products.list({ limit: 100, active: true }),
@@ -487,14 +539,14 @@ router.get("/admin/stripe/project/:id/products", requireAdmin, async (req: Reque
     }));
     res.json({ data });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // POST /admin/stripe/project/:id/products ──────────────────────────────────────
 router.post("/admin/stripe/project/:id/products", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { name, description, amount, currency = "eur", interval } = req.body as any;
     if (!name || !amount) { res.status(400).json({ error: "name y amount requeridos" }); return; }
     const { stripe } = await resolveProject(pid);
@@ -508,14 +560,14 @@ router.post("/admin/stripe/project/:id/products", requireAdmin, async (req: Requ
     const price = await stripe.prices.create(priceParams);
     res.json({ product, price });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // GET /admin/stripe/project/:id/invoices ──────────────────────────────────────
 router.get("/admin/stripe/project/:id/invoices", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10), 100);
     const { stripe } = await resolveProject(pid);
     const invoices = await stripe.invoices.list({ limit, expand: ["data.customer"] });
@@ -530,14 +582,14 @@ router.get("/admin/stripe/project/:id/invoices", requireAdmin, async (req: Reque
     }));
     res.json({ data, hasMore: invoices.has_more });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // POST /admin/stripe/project/:id/invoices ─────────────────────────────────────
 router.post("/admin/stripe/project/:id/invoices", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { customerId, description, amount, currency = "eur", daysUntilDue = 30, autoSend = false } = req.body as any;
     if (!customerId || !amount) { res.status(400).json({ error: "customerId y amount requeridos" }); return; }
     const { stripe } = await resolveProject(pid);
@@ -556,38 +608,38 @@ router.post("/admin/stripe/project/:id/invoices", requireAdmin, async (req: Requ
     if (autoSend) await stripe.invoices.sendInvoice(finalized.id);
     res.json({ invoice: finalized });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // POST /admin/stripe/project/:id/invoices/:invId/send ─────────────────────────
 router.post("/admin/stripe/project/:id/invoices/:invId/send", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { stripe } = await resolveProject(pid);
-    const inv = await stripe.invoices.sendInvoice(req.params.invId);
+    const inv = await stripe.invoices.sendInvoice(String(req.params.invId));
     res.json({ status: inv.status });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // POST /admin/stripe/project/:id/invoices/:invId/void ─────────────────────────
 router.post("/admin/stripe/project/:id/invoices/:invId/void", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { stripe } = await resolveProject(pid);
-    const inv = await stripe.invoices.voidInvoice(req.params.invId);
+    const inv = await stripe.invoices.voidInvoice(String(req.params.invId));
     res.json({ status: inv.status });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // GET /admin/stripe/project/:id/payouts ───────────────────────────────────────
 router.get("/admin/stripe/project/:id/payouts", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const limit = Math.min(parseInt(String(req.query.limit ?? "20"), 10), 50);
     const { stripe } = await resolveProject(pid);
     const [payouts, balance] = await Promise.all([
@@ -608,14 +660,14 @@ router.get("/admin/stripe/project/:id/payouts", requireAdmin, async (req: Reques
       },
     });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // POST /admin/stripe/project/:id/charges ──────────────────────────────────────
 router.post("/admin/stripe/project/:id/charges", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { amount, currency = "eur", description, customerEmail } = req.body as any;
     if (!amount) { res.status(400).json({ error: "amount requerido" }); return; }
     const { stripe } = await resolveProject(pid);
@@ -627,14 +679,14 @@ router.post("/admin/stripe/project/:id/charges", requireAdmin, async (req: Reque
     });
     res.json({ clientSecret: pi.client_secret, paymentIntentId: pi.id });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 
 // POST /admin/stripe/project/:id/refunds ──────────────────────────────────────
 router.post("/admin/stripe/project/:id/refunds", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const pid = parseInt(req.params.id, 10);
+    const pid = parseInt(String(req.params.id), 10);
     const { chargeId, amount, reason = "requested_by_customer" } = req.body as any;
     if (!chargeId) { res.status(400).json({ error: "chargeId requerido" }); return; }
     const { stripe } = await resolveProject(pid);
@@ -643,7 +695,7 @@ router.post("/admin/stripe/project/:id/refunds", requireAdmin, async (req: Reque
     const refund = await stripe.refunds.create(params);
     res.json({ refund });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message ?? "Error" });
+    sendStripeError(res, err);
   }
 });
 

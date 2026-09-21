@@ -12,6 +12,7 @@ import consistencyRouter from "./consistency.js";
 import authRouter from "./auth.js";
 import adminRouter from "./admin.js";
 import clientRouter from "./client.js";
+import { listPlatforms } from "../lib/platform-capabilities.js";
 import cmsRouter from "./cms.js";
 import intelligenceRouter from "./intelligence.js";
 import inventoryRouter from "./inventory.js";
@@ -96,6 +97,8 @@ router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/admin", adminRouter);
 router.use("/client", clientRouter);
+// Registro de capacidades por plataforma (única fuente de verdad del servidor)
+router.get("/platforms", requireAuth, (_req, res) => { res.json(listPlatforms()); });
 router.use("/cms", (req, res, next) => {
   // Endpoints públicos del CMS (no requieren admin):
   //   GET /content                → contenido global del sitio

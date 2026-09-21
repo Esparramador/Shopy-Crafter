@@ -1,6 +1,7 @@
 import { useRef, useEffect, lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { useNotifications, useCalendarReminders } from "@/hooks/useNotifications";
+import { getPlatform } from "@/lib/platform-capabilities";
 import { useListProjects } from "@workspace/api-client-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -123,6 +124,7 @@ const ApiKeysManager = lazy(() => import("@/pages/admin/ApiKeysManager"));
 const AgencyBilling = lazy(() => import("@/pages/admin/AgencyBilling"));
 
 const ClientDashboard = lazy(() => import("@/pages/client/ClientDashboard"));
+const ClientStripe = lazy(() => import("@/pages/client/ClientStripe"));
 const ClientApprovals = lazy(() => import("@/pages/client/ClientApprovals"));
 const ClientMessages = lazy(() => import("@/pages/client/ClientMessages"));
 const ClientProducts = lazy(() => import("@/pages/client/ClientProducts"));
@@ -322,13 +324,9 @@ function S({ children }: { children: React.ReactNode }) {
 function SmartProjectRedirect({ id }: { id: string }) {
   const { data: projects } = useListProjects();
   if (!projects) return <PageLoader />;
-  const project = projects.find((p: any) => p.id === parseInt(id, 10));
-  const pt = project?.platformType;
-  const dest =
-    pt === "stripe"      ? "stripe-hub" :
-    pt === "woocommerce" ? "woo-hub"    :
-    pt === "prestashop"  ? "ps-hub"     :
-    "audit";
+  const project = projects.find((p: any) => p.id === parseInt(id, 10)) as any;
+  // El primer módulo del registro de plataformas es la "home" del proyecto (stripe-hub, woo-hub, audit…)
+  const dest = getPlatform(project?.platformType).adminModules[0]?.id ?? "audit";
   return <Redirect to={`/projects/${id}/${dest}`} />;
 }
 
@@ -733,6 +731,9 @@ function Router() {
         </Route>
         <Route path="/client/products">
           <RequireClient><S><ClientProducts /></S></RequireClient>
+        </Route>
+        <Route path="/client/stripe">
+          <RequireClient><S><ClientStripe /></S></RequireClient>
         </Route>
         <Route path="/client/approvals">
           <RequireClient><S><ClientApprovals /></S></RequireClient>

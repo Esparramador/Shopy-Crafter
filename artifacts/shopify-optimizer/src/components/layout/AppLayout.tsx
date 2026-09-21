@@ -9,64 +9,12 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
+import { PLATFORMS, getPlatform } from "@/lib/platform-capabilities";
+
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-const DEFAULT_MODULE_NAV = [
-  { id: "audit",       label: "Auditoría",    icon: "📊" },
-  { id: "redesign",    label: "Rediseño IA",  icon: "✏️" },
-  { id: "images",      label: "Imágenes",     icon: "🖼" },
-  { id: "consistency", label: "Consistencia", icon: "🎨" },
-  { id: "ab-testing",  label: "A/B Testing",  icon: "📈" },
-  { id: "pricing",     label: "Pricing",      icon: "💰" },
-  { id: "seo",         label: "SEO Engine",   icon: "🔍" },
-  { id: "vault",       label: "Repositorio",  icon: "🗄️" },
-  { id: "tripo3d",     label: "Tripo 3D Studio", icon: "🧊" },
-  { id: "meshy",       label: "Meshy Characters", icon: "🧊✨" },
-];
-
-const STRIPE_MODULE_NAV = [
-  { id: "stripe-hub",     label: "Stripe Hub",      icon: "💳" },
-  { id: "audit",          label: "Auditoría Web",   icon: "📊" },
-  { id: "vault",          label: "Repositorio",     icon: "🗄️" },
-  { id: "fusion-studio",  label: "Studio Foto",     icon: "🧬" },
-  { id: "ad-studio",      label: "Studio Anuncios", icon: "📺" },
-];
-
-const WOO_MODULE_NAV = [
-  { id: "woo-hub",           label: "WooCommerce Hub",    icon: "🟣" },
-  { id: "audit",             label: "Auditoría",          icon: "📊" },
-  { id: "redesign",          label: "Rediseño IA",        icon: "✏️" },
-  { id: "images",            label: "Imágenes IA",        icon: "🖼" },
-  { id: "consistency",       label: "Consistencia",       icon: "🎨" },
-  { id: "ab-testing",        label: "A/B Testing",        icon: "📈" },
-  { id: "pricing",           label: "Pricing Engine",     icon: "💰" },
-  { id: "seo",               label: "SEO Engine",         icon: "🔍" },
-  { id: "fusion-studio",     label: "Studio Foto IA",     icon: "🧬" },
-  { id: "fusion-studio-pro", label: "Studio Vídeo IA",   icon: "⚡" },
-  { id: "ad-studio",         label: "Studio Anuncios",    icon: "📺" },
-  { id: "campaign-kit",      label: "Kit Campañas",       icon: "🎬" },
-  { id: "generator",         label: "Generador IA",       icon: "✨" },
-  { id: "vault",             label: "Repositorio",        icon: "🗄️" },
-  { id: "exports",           label: "Informes / Exportar",icon: "📥" },
-];
-
-const PS_MODULE_NAV = [
-  { id: "ps-hub",            label: "PrestaShop Hub",     icon: "🔴" },
-  { id: "audit",             label: "Auditoría",          icon: "📊" },
-  { id: "redesign",          label: "Rediseño IA",        icon: "✏️" },
-  { id: "images",            label: "Imágenes IA",        icon: "🖼" },
-  { id: "consistency",       label: "Consistencia",       icon: "🎨" },
-  { id: "ab-testing",        label: "A/B Testing",        icon: "📈" },
-  { id: "pricing",           label: "Pricing Engine",     icon: "💰" },
-  { id: "seo",               label: "SEO Engine",         icon: "🔍" },
-  { id: "fusion-studio",     label: "Studio Foto IA",     icon: "🧬" },
-  { id: "fusion-studio-pro", label: "Studio Vídeo IA",   icon: "⚡" },
-  { id: "ad-studio",         label: "Studio Anuncios",    icon: "📺" },
-  { id: "campaign-kit",      label: "Kit Campañas",       icon: "🎬" },
-  { id: "generator",         label: "Generador IA",       icon: "✨" },
-  { id: "vault",             label: "Repositorio",        icon: "🗄️" },
-  { id: "exports",           label: "Informes / Exportar",icon: "📥" },
-];
+// Los módulos por plataforma viven en el registro central (src/lib/platform-capabilities.ts)
+const DEFAULT_MODULE_NAV = PLATFORMS.shopify.adminModules;
 
 const DEFAULT_SHOPYBRAIN_NAV = [
   { label: "Centro Shopy Crafter", icon: "🧠", href: "/admin/shopybrain" },
@@ -308,12 +256,17 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   // CMS es la fuente de verdad; merge garantiza que items nuevos del código aparezcan
   const activePlatformEarly: string = (activeProject as any)?.platformType ?? "shopify";
-  const baseModuleNav =
-    activePlatformEarly === "stripe"      ? STRIPE_MODULE_NAV :
-    activePlatformEarly === "woocommerce" ? WOO_MODULE_NAV    :
-    activePlatformEarly === "prestashop"  ? PS_MODULE_NAV     :
-    DEFAULT_MODULE_NAV;
-  const moduleNav    = mergeById(cmsNav?.modules ?? [], baseModuleNav);
+  const activePlatformDef = getPlatform(activePlatformEarly);
+  // Shopify: el CMS manda (merge). Otras plataformas: manda el registro de capacidades;
+  // el CMS solo puede renombrar/re-iconar módulos por id, nunca añadir módulos que la plataforma no gestiona.
+  const moduleNav = activePlatformDef.key === "shopify"
+    ? mergeById(cmsNav?.modules ?? [], DEFAULT_MODULE_NAV)
+    : activePlatformDef.adminModules
+        .filter(m => !activePlatformDef.hiddenTabs.includes(m.id))
+        .map(m => {
+          const cms = (cmsNav?.modules ?? []).find((c: any) => c.id === m.id);
+          return cms ? { ...m, label: cms.label ?? m.label, icon: cms.icon ?? m.icon } : m;
+        });
   const shopybrainNav = mergeByHref(cmsNav?.shopybrain ?? [], DEFAULT_SHOPYBRAIN_NAV);
   const adminNav: any[] = mergeByHref(cmsNav?.admin ?? [], DEFAULT_ADMIN_NAV);
   const firstProjectId: number | null = projects?.[0]?.id ?? null;
@@ -370,26 +323,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     };
   }, [darkMode]);
 
-  // ── Platform accent injection ──────────────────────────────────────────────
-  const PLATFORM_COLORS: Record<string, string> = {
-    shopify:     "#95bf47",
-    woocommerce: "#96588a",
-    prestashop:  "#df0067",
-    universal:   "#5b9bd5",
-    stripe:      "#635bff",
-    tiendanube:  "#00a0e3",
-  };
-  const PLATFORM_ICONS: Record<string, string> = {
-    shopify:     "🟢",
-    woocommerce: "🟣",
-    prestashop:  "🔴",
-    universal:   "🌐",
-    stripe:      "💳",
-    tiendanube:  "☁️",
-  };
-  const activePlatform: string = (activeProject as any)?.platformType ?? "shopify";
-  const platformAccent = PLATFORM_COLORS[activePlatform] ?? "var(--gold)";
-  const platformIcon   = PLATFORM_ICONS[activePlatform] ?? "🟢";
+  // ── Platform accent injection (color/icono salen del registro de plataformas) ──
+  const activePlatform: string = activePlatformDef.key;
+  const platformAccent = activePlatformDef.color;
+  const platformIcon   = activePlatformDef.icon;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -458,11 +395,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           ) : (
             projects?.map((project: { id: number; name: string; shopDomain?: string; [k: string]: any }) => {
               const isActive = activeProjectId === project.id;
-              const pType: string = project.platformType ?? "shopify";
-              const pColor = PLATFORM_COLORS[pType] ?? "#95bf47";
-              const pIcon  = PLATFORM_ICONS[pType] ?? "🟢";
+              const pDef = getPlatform(project.platformType);
+              const pColor = pDef.color;
+              const pIcon  = pDef.icon;
               return (
-                <Link key={project.id} href={`/projects/${project.id}/audit`}>
+                <Link key={project.id} href={`/projects/${project.id}/${pDef.adminModules[0]?.id ?? "audit"}`}>
                   <div
                     className={`client-pill${isActive ? " active" : ""}`}
                     role="button"
@@ -529,6 +466,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           <span className="sidebar-label">{ap.sidebarLabels?.admin ?? "Administración"}</span>
 
           {adminNav.map(item => (
+            item.divider || item.href === "#" ? (
+              <div key={`div-${item.label}`} style={{ padding: "10px 14px 4px", fontSize: 9, fontWeight: 800, color: "var(--t4)", textTransform: "uppercase", letterSpacing: "0.12em", pointerEvents: "none" }}>
+                {String(item.label).replace(/^──\s*|\s*──$/g, "").trim()}
+              </div>
+            ) : (
             <Link key={item.href} href={item.href}>
               <div
                 className={`nav-item${location === item.href ? " active" : ""}`}
@@ -550,6 +492,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 )}
               </div>
             </Link>
+            )
           ))}
 
           {activeProject && (
@@ -702,7 +645,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     color: platformAccent, flexShrink: 0,
                   }}
                 >
-                  {platformIcon} {activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)}
+                  {platformIcon} {activePlatformDef.label}
                 </span>
                 <span className="topbar-client">{activeProject.name}</span>
                 <span className="topbar-sep">/</span>
@@ -873,8 +816,8 @@ export function AppLayout({ children }: AppLayoutProps) {
           >›</button>
         </div>
 
-        {/* Token expired banner */}
-        {activeProject && match && (
+        {/* Token expired banner — solo plataformas con token de tienda (Stripe/universal no lo usan) */}
+        {activeProject && match && activePlatformDef.usesStoreToken && (
           !activeProject.hasAccessToken ||
           (activeProject.tokenExpiresAt && new Date(activeProject.tokenExpiresAt) < new Date())
         ) && (

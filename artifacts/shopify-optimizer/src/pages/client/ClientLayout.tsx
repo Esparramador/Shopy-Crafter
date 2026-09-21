@@ -4,30 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";
 import { LogOut, Menu, X } from "lucide-react";
 
-const PLATFORM_COLORS: Record<string, string> = {
-  shopify:     "#95bf47",
-  woocommerce: "#96588a",
-  prestashop:  "#df0067",
-  universal:   "#5b9bd5",
-  stripe:      "#635bff",
-  tiendanube:  "#00a0e3",
-};
-const PLATFORM_ICONS: Record<string, string> = {
-  shopify:     "🟢",
-  woocommerce: "🟣",
-  prestashop:  "🔴",
-  universal:   "🌐",
-  stripe:      "💳",
-  tiendanube:  "☁️",
-};
-const PLATFORM_LABELS: Record<string, string> = {
-  shopify:     "Shopify",
-  woocommerce: "WooCommerce",
-  prestashop:  "PrestaShop",
-  universal:   "Auditoría Web",
-  stripe:      "Stripe",
-  tiendanube:  "Tienda Nube",
-};
+import { getPlatform, getClientNav } from "@/lib/platform-capabilities";
 import { ClientChatbot } from "./ClientChatbot";
 import { useClientPreview } from "./ClientPreviewContext";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -35,15 +12,13 @@ import { useNotifications } from "@/hooks/useNotifications";
 const _BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-const DEFAULT_NAV_ITEMS = [
-  { href: "/client",            label: "Dashboard",    icon: "📊" },
-  { href: "/client/products",   label: "Productos",    icon: "📦" },
-  { href: "/client/approvals",  label: "Aprobaciones", icon: "✅" },
-  { href: "/client/messages",   label: "Mensajes",     icon: "💬" },
-  { href: "/client/reports",    label: "Reportes",     icon: "📈" },
-  { href: "/client/tienda",     label: "Mis Planes",   icon: "🛒" },
-  { href: "/client/notebook",   label: "Cuaderno IA",  icon: "📋" },
-];
+// La navegación del cliente depende de la plataforma del proyecto (registro central)
+const DEFAULT_NAV_ITEMS = getClientNav("shopify");
+
+// Caché a nivel de módulo: ClientLayout se monta en cada página del cliente; sin esto,
+// cada navegación arranca con platformType desconocido y la barra lateral parpadea con la nav de Shopify.
+type ClientProjectInfo = { name: string | null; shopDomain: string | null; platformType?: string | null };
+let cachedClientProjectInfo: ClientProjectInfo | null = null;
 
 interface ClientCmsPanel {
   navItems?: { label: string; icon: string }[];
@@ -70,7 +45,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   useEffect(() => { locationRef.current = location; }, [location]);
   const { previewPid, setPreviewPid } = useClientPreview();
   const [projects, setProjects] = useState<Array<{ id: number; name: string; shopDomain: string }>>([]);
-  const [clientProjectInfo, setClientProjectInfo] = useState<{ name: string | null; shopDomain: string | null; platformType?: string | null } | null>(null);
+  const [clientProjectInfo, setClientProjectInfo] = useState<ClientProjectInfo | null>(cachedClientProjectInfo);
 
   useEffect(() => {
     if (user?.role !== "admin") return;
@@ -88,7 +63,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
     if (user?.role === "admin") return;
     fetch(`${API_BASE}/api/client/project-info`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setClientProjectInfo(d); })
+      .then(d => { if (d) { cachedClientProjectInfo = d; setClientProjectInfo(d); } })
       .catch(() => {});
   }, [user?.role]);
 
@@ -148,24 +123,39 @@ export function ClientLayout({ children }: { children: ReactNode }) {
     if (location === "/client/messages") setUnreadMessages(0);
   }, [location]);
 
-  const NAV_ITEMS = DEFAULT_NAV_ITEMS.map((item, i) => ({
-    ...item,
-    label: cp.navItems?.[i]?.label ?? item.label,
-    icon: cp.navItems?.[i]?.icon ?? item.icon,
-  }));
-
   const activeProject = user?.role === "admin"
     ? (projects.find(p => String(p.id) === previewPid) ?? null)
-    : clientProjectInfo ? { name: clientProjectInfo.name, shopDomain: clientProjectInfo.shopDomain } : null;
+    : clientProjectInfo ? { name: clientProjectInfo.name, shopDomain: clientProjectInfo.shopDomain, platformType: clientProjectInfo.platformType } : null;
+
+  // Platform theming — todo sale del registro central de plataformas
+  const clientPlatform: string = (clientProjectInfo?.platformType ?? (activeProject as any)?.platformType ?? "shopify");
+  const platformDef = getPlatform(clientPlatform);
+  const clientPlatformColor  = platformDef.color;
+  const clientPlatformIcon   = platformDef.icon;
+  const clientPlatformLabel  = platformDef.label;
+
+  // Shopify: el CMS puede renombrar los items por posición (comportamiento histórico).
+  // Otras plataformas: la navegación la dicta la plataforma; el CMS solo renombra por href coincidente.
+  // Hasta conocer la plataforma real no pintamos ninguna nav (evita el parpadeo Shopify→Stripe en la primera carga)
+  const platformKnown = user?.role === "admin" ? projects.length > 0 : clientProjectInfo !== null;
+  const NAV_ITEMS = !platformKnown
+    ? []
+    : platformDef.key === "shopify"
+    ? DEFAULT_NAV_ITEMS.map((item, i) => ({
+        ...item,
+        label: cp.navItems?.[i]?.label ?? item.label,
+        icon: cp.navItems?.[i]?.icon ?? item.icon,
+      }))
+    : getClientNav(platformDef.key).map(item => {
+        const idx = DEFAULT_NAV_ITEMS.findIndex(d => d.href === item.href);
+        const cms = idx >= 0 ? cp.navItems?.[idx] : undefined;
+        return { ...item, label: cms?.label ?? item.label, icon: cms?.icon ?? item.icon };
+      });
 
   const displayName = activeProject?.name ?? cp.sidebar?.defaultName ?? "Cliente";
-  const displayDomain = activeProject?.shopDomain ?? cp.sidebar?.storePanel ?? "Panel de tienda";
-
-  // Platform theming
-  const clientPlatform: string = (clientProjectInfo?.platformType ?? (activeProject as any)?.platformType ?? "shopify");
-  const clientPlatformColor  = PLATFORM_COLORS[clientPlatform]  ?? "#95bf47";
-  const clientPlatformIcon   = PLATFORM_ICONS[clientPlatform]   ?? "🟢";
-  const clientPlatformLabel  = PLATFORM_LABELS[clientPlatform]  ?? "Shopify";
+  const displayDomain = activeProject?.shopDomain
+    || (platformDef.key === "shopify" ? (cp.sidebar?.storePanel ?? platformDef.panelLabel) : platformDef.panelLabel);
+  const yourEntityLabel = !platformKnown ? "\u00a0" : platformDef.key === "shopify" ? (cp.sidebar?.yourStore ?? "Tu Tienda") : platformDef.entityLabel;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -201,7 +191,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
 
         {/* Client identity */}
         <div className="sidebar-clients">
-          <span className="sidebar-label">{cp.sidebar?.yourStore ?? "Tu Tienda"}</span>
+          <span className="sidebar-label">{yourEntityLabel}</span>
           <div className="client-pill active" style={{ borderLeft: `2px solid ${clientPlatformColor}`, borderRadius: 8 }}>
             <div className="client-dot" style={{ background: clientPlatformColor, boxShadow: `0 0 6px ${clientPlatformColor}80` }} />
             <div className="client-info">
@@ -209,18 +199,18 @@ export function ClientLayout({ children }: { children: ReactNode }) {
                 <span style={{ marginRight: 4 }}>{clientPlatformIcon}</span>
                 {displayName}
               </p>
-              <p className="client-domain">{displayDomain}</p>
+              <p className="client-domain">{platformKnown ? displayDomain : "Cargando…"}</p>
             </div>
           </div>
-          {/* Platform badge */}
-          <div style={{
+          {/* Platform badge (solo cuando ya sabemos la plataforma real) */}
+          {platformKnown && <div style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             padding: "3px 9px", borderRadius: 20, marginTop: 4,
             background: `${clientPlatformColor}18`,
             border: `1px solid ${clientPlatformColor}40`,
           }}>
             <span style={{ fontSize: 10, color: clientPlatformColor, fontWeight: 700 }}>{clientPlatformLabel}</span>
-          </div>
+          </div>}
 
           {/* Agency status pill */}
           <div

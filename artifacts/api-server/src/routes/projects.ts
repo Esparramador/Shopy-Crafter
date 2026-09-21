@@ -6,6 +6,7 @@ import type { PlatformType } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { refreshToken, validateToken, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
+import { verifyStripeSecretKey, saveDirectApiKey } from "../lib/stripe-tenant.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { getConnector, PlatformNotSupportedError } from "../lib/connectors/index";
 import { learnFromOperation } from "../lib/claude";
@@ -277,7 +278,7 @@ router.get("/projects", async (_req, res): Promise<void> => {
 router.post("/projects", async (req, res): Promise<void> => {
   try {
     const {
-      name, shopDomain, clientId, clientSecret,
+      name, shopDomain, clientId, clientSecret, publishableKey,
       storeNiche, brandTone, targetAudience, storeMarkets,
       replicateApiToken, anthropicApiKey, plan, platformType: rawPlatformType,
       instagramHandle, tiktokHandle, linkedinUrl, facebookUrl, youtubeUrl,
@@ -290,12 +291,27 @@ router.post("/projects", async (req, res): Promise<void> => {
     const isShopify = platformType === "shopify";
     const isUniversal = platformType === "universal";
     const isPrestaShop = platformType === "prestashop";
+    const isStripe = platformType === "stripe";
+  
+    // Stripe: la clave se valida contra Stripe ANTES de crear nada (como Shopify con su token)
+    if (isStripe) {
+      if (!clientSecret) {
+        res.status(400).json({ error: "La clave secreta de Stripe (sk_test_… o sk_live_…) es obligatoria" });
+        return;
+      }
+      try {
+        await verifyStripeSecretKey(String(clientSecret));
+      } catch (err: any) {
+        res.status(400).json({ error: err?.message ?? "Clave de Stripe inválida" });
+        return;
+      }
+    }
   
     if (!name) {
       res.status(400).json({ error: "El nombre del proyecto es obligatorio" });
       return;
     }
-    if (!isUniversal && !shopDomain) {
+    if (!isUniversal && !isStripe && !shopDomain) {
       res.status(400).json({ error: "name y shopDomain (URL de la tienda) son obligatorios" });
       return;
     }
@@ -392,6 +408,44 @@ router.post("/projects", async (req, res): Promise<void> => {
         });
         return;
       }
+    } else if (isStripe) {
+      // Registrar la cuenta en stripe_accounts (The Vault). Si falla, el proyecto no se crea.
+      let stripeLink: Awaited<ReturnType<typeof saveDirectApiKey>>;
+      try {
+        stripeLink = await saveDirectApiKey(project.id, String(clientSecret), publishableKey ? String(publishableKey) : undefined);
+      } catch (err: any) {
+        req.log.warn({ projectId: project.id, err }, "Stripe account link failed — rolling back project");
+        await db.delete(projectsTable).where(eq(projectsTable.id, project.id));
+        res.status(400).json({ error: err?.message ?? "No se pudo vincular la cuenta Stripe" });
+        return;
+      }
+  
+      await recordAudit({
+        userId: req.session.userId!,
+        action: "project_create",
+        projectId: String(project.id),
+        details: `Created stripe project "${name}" — linked ${stripeLink.stripeAccountId} (${stripeLink.keyMode})`,
+        ipAddress: req.ip ?? "unknown",
+      });
+  
+      res.status(201).json({
+        ...project,
+        clientSecret: "••••••••",
+        accessToken: undefined,
+        hasAccessToken: false,
+        tokenExpiresAt: null,
+        createdAt: project.createdAt.toISOString(),
+        updatedAt: project.updatedAt.toISOString(),
+        stripeConnection: {
+          connected: true,
+          mode: "direct",
+          keyMode: stripeLink.keyMode,
+          stripeAccountId: stripeLink.stripeAccountId,
+          displayName: stripeLink.displayName,
+          email: stripeLink.email,
+        },
+      });
+      return;
     } else if (isWooCommerce) {
       let wcConnectionResult: { connected: boolean; error?: string | null; errorCode?: string; storeName?: string | null; productCount?: number | null } = { connected: false };
       try {
@@ -556,7 +610,22 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
       updateData.shopDomain = platform === "shopify" ? normalizeShopDomain(shopDomain) : shopDomain.replace(/\/$/, "");
     }
     if (clientId !== undefined) updateData.clientId = (platform === "woocommerce" && clientId) ? encrypt(clientId) : clientId;
-    if (clientSecret !== undefined) updateData.clientSecret = encrypt(clientSecret);
+    if (clientSecret !== undefined) {
+      if (platform === "stripe") {
+        // Cambio de clave Stripe: validar contra Stripe y re-vincular la cuenta antes de guardar
+        if (!clientSecret) {
+          res.status(400).json({ error: "La clave secreta de Stripe no puede quedar vacía" });
+          return;
+        }
+        try {
+          await saveDirectApiKey(id, String(clientSecret), req.body.publishableKey ? String(req.body.publishableKey) : undefined);
+        } catch (err: any) {
+          res.status(400).json({ error: err?.message ?? "Clave de Stripe inválida" });
+          return;
+        }
+      }
+      updateData.clientSecret = encrypt(clientSecret);
+    }
     if (storeNiche !== undefined) updateData.storeNiche = storeNiche;
     if (brandTone !== undefined) updateData.brandTone = brandTone;
     if (targetAudience !== undefined) updateData.targetAudience = targetAudience;

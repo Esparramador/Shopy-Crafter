@@ -116,6 +116,10 @@ export default function StripeProjectHub() {
   const [actionResult, setActionResult] = useState<any>(null);
 
   const [overview, setOverview] = useState<any>(null);
+  const [connection, setConnection] = useState<any>(null);
+  const [linkForm, setLinkForm] = useState({ secretKey: "", publishableKey: "" });
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
@@ -133,27 +137,78 @@ export default function StripeProjectHub() {
   const apiFetch = useCallback((path: string, opts?: RequestInit) =>
     fetch(`${API}${path}`, { credentials:"include", ...opts }), [API]);
 
+  const loadConnection = useCallback(() => {
+    if (!projectId) return Promise.resolve(null);
+    return apiFetch(`/admin/stripe/project/${projectId}/connection`).then(r => r.json()).then(c => { setConnection(c); return c; }).catch(() => null);
+  }, [projectId, apiFetch]);
+
+  useEffect(() => { loadConnection(); }, [loadConnection]);
+
+  // Cualquier respuesta no-OK (409 sin vincular, 400 clave inválida, 5xx) se muestra con el mensaje real del servidor
+  const readJson = async (r: Response) => {
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d?.error ?? `HTTP ${r.status}`);
+    return d;
+  };
+
   useEffect(() => {
     if (!projectId) return;
     setErr(""); setMsg("");
     setLoading(true);
     const base = `/admin/stripe/project/${projectId}`;
     const fetchers: Record<Tab, () => Promise<void>> = {
-      overview: () => apiFetch(`${base}/overview`).then(r => r.json()).then(setOverview),
-      transactions: () => apiFetch(`${base}/transactions?limit=50`).then(r => r.json()).then(d => setTransactions(d.data ?? [])),
-      customers: () => apiFetch(`${base}/customers?limit=50`).then(r => r.json()).then(d => setCustomers(d.data ?? [])),
-      subscriptions: () => apiFetch(`${base}/subscriptions?limit=50`).then(r => r.json()).then(d => setSubscriptions(d.data ?? [])),
-      products: () => apiFetch(`${base}/products`).then(r => r.json()).then(d => setProducts(d.data ?? [])),
-      invoices: () => apiFetch(`${base}/invoices?limit=50`).then(r => r.json()).then(d => setInvoices(d.data ?? [])),
-      payouts: () => apiFetch(`${base}/payouts`).then(r => r.json()).then(d => { setPayouts(d.data ?? []); setBalance(d.balance ?? null); }),
+      overview: () => apiFetch(`${base}/overview`).then(readJson).then(d => { setOverview(d); if (d?.connection) setConnection(d.connection); }),
+      transactions: () => apiFetch(`${base}/transactions?limit=50`).then(readJson).then(d => setTransactions(d.data ?? [])),
+      customers: () => apiFetch(`${base}/customers?limit=50`).then(readJson).then(d => setCustomers(d.data ?? [])),
+      subscriptions: () => apiFetch(`${base}/subscriptions?limit=50`).then(readJson).then(d => setSubscriptions(d.data ?? [])),
+      products: () => apiFetch(`${base}/products`).then(readJson).then(d => setProducts(d.data ?? [])),
+      invoices: () => apiFetch(`${base}/invoices?limit=50`).then(readJson).then(d => setInvoices(d.data ?? [])),
+      payouts: () => apiFetch(`${base}/payouts`).then(readJson).then(d => { setPayouts(d.data ?? []); setBalance(d.balance ?? null); }),
       acciones: async () => {},
     };
     fetchers[tab]()
-      .catch(() => setErr(`Error cargando ${tab}`))
+      .catch((e: any) => setErr(e?.message ? `Error cargando ${tab}: ${e.message}` : `Error cargando ${tab}`))
       .finally(() => setLoading(false));
   }, [tab, projectId]);
 
-  const mode = overview?.mode;
+  const isConnected = connection?.connected === true;
+  const keyMode: "live" | "test" | null = connection?.keyMode ?? null;
+  const MODE_LABEL: Record<string, string> = { direct: "Clave directa", connect_custom: "Connect Custom", connect_oauth: "Connect OAuth", platform: "Cuenta Master" };
+
+  async function handleLink() {
+    if (!linkForm.secretKey.trim()) { setErr("Introduce la clave secreta (sk_test_… o sk_live_…)"); return; }
+    setLinkBusy(true); setErr(""); setMsg("");
+    try {
+      const d = await apiFetch(`/admin/stripe/project/${projectId}/link`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secretKey: linkForm.secretKey.trim(), publishableKey: linkForm.publishableKey.trim() || undefined }),
+      }).then(readJson);
+      setConnection(d.connection ?? null);
+      setLinkForm({ secretKey: "", publishableKey: "" });
+      setShowLinkForm(false);
+      setMsg(`✅ Cuenta ${d.displayName || d.stripeAccountId} vinculada (${d.keyMode === "live" ? "LIVE" : "modo test"})`);
+      setLoading(true); setTab("overview");
+      // fuerza recarga del overview aunque ya estuviéramos en esa pestaña
+      const o = await apiFetch(`/admin/stripe/project/${projectId}/overview`).then(readJson).catch(() => null);
+      if (o) setOverview(o);
+      setLoading(false);
+    } catch (e: any) {
+      setErr(e?.message ?? "No se pudo vincular la cuenta");
+    } finally { setLinkBusy(false); }
+  }
+
+  async function handleUnlink() {
+    if (!confirm("¿Desvincular la cuenta Stripe de este proyecto? El cliente dejará de ver sus datos hasta que vuelvas a vincularla.")) return;
+    setLinkBusy(true); setErr(""); setMsg("");
+    try {
+      await apiFetch(`/admin/stripe/project/${projectId}/link`, { method: "DELETE" }).then(readJson);
+      setConnection({ connected: false });
+      setOverview(null);
+      setMsg("Cuenta desvinculada");
+    } catch (e: any) {
+      setErr(e?.message ?? "No se pudo desvincular");
+    } finally { setLinkBusy(false); }
+  }
 
   async function handleCreateCustomer() {
     if (!customerForm.email) { setErr("Email requerido"); return; }
@@ -268,20 +323,60 @@ export default function StripeProjectHub() {
           <div style={{ width:46, height:46, borderRadius:13, background:`linear-gradient(135deg,${SP},${SL})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, boxShadow:`0 4px 20px ${SP}50` }}>💳</div>
           <div>
             <h1 style={{ margin:0, fontSize:22, fontWeight:800, color:"#fff" }}>Stripe Project Hub</h1>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:3 }}>
-              <span style={{ fontSize:12, color:"rgba(240,237,230,0.5)" }}>Gestión completa de la cuenta Stripe del cliente</span>
-              {mode && (
-                <span style={{ fontSize:10, fontWeight:800, padding:"2px 8px", borderRadius:100, background: mode==="live" ? "rgba(52,211,153,0.12)" : "rgba(251,191,36,0.12)", color: mode==="live" ? "#34d399" : "#fbbf24", border:`1px solid ${mode==="live" ? "rgba(52,211,153,0.25)" : "rgba(251,191,36,0.25)"}`, textTransform:"uppercase", letterSpacing:"0.07em" }}>
-                  {mode}
-                </span>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:3, flexWrap:"wrap" }}>
+              {isConnected ? (
+                <>
+                  <span style={{ fontSize:12, color:"rgba(240,237,230,0.7)", fontWeight:600 }}>
+                    {connection.displayName || connection.stripeAccountId || "Cuenta Stripe"}{connection.email ? ` · ${connection.email}` : ""}
+                  </span>
+                  <span style={{ fontSize:10, fontWeight:800, padding:"2px 8px", borderRadius:100, background: keyMode==="live" ? "rgba(52,211,153,0.12)" : "rgba(251,191,36,0.12)", color: keyMode==="live" ? "#34d399" : "#fbbf24", border:`1px solid ${keyMode==="live" ? "rgba(52,211,153,0.25)" : "rgba(251,191,36,0.25)"}`, textTransform:"uppercase", letterSpacing:"0.07em" }}>
+                    {keyMode === "live" ? "LIVE" : "TEST"}
+                  </span>
+                  <span style={{ fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:100, background:"rgba(99,91,255,0.12)", color:SL, border:"1px solid rgba(99,91,255,0.25)" }}>
+                    {MODE_LABEL[connection.mode] ?? connection.mode}
+                  </span>
+                  {connection.stripeAccountId && <span style={{ fontSize:10, color:"rgba(240,237,230,0.4)", fontFamily:"monospace" }}>{connection.stripeAccountId}</span>}
+                </>
+              ) : connection ? (
+                <span style={{ fontSize:12, color:"#f43f5e", fontWeight:700 }}>● Sin cuenta Stripe vinculada — este proyecto no muestra datos de la cuenta Master</span>
+              ) : (
+                <span style={{ fontSize:12, color:"rgba(240,237,230,0.5)" }}>Comprobando vinculación…</span>
               )}
             </div>
           </div>
         </div>
-        <button className="sh-btn" style={{ ...S.btn, ...S.btnG, ...S.btnSm }} onClick={() => { setLoading(true); setTab(t => t); }}>
-          ↻ Actualizar
-        </button>
+        <div style={{ display:"flex", gap:8 }}>
+          {isConnected && (
+            <>
+              <button className="sh-btn" style={{ ...S.btn, ...S.btnG, ...S.btnSm }} disabled={linkBusy} onClick={() => setShowLinkForm(v => !v)}>🔑 Cambiar clave</button>
+              <button className="sh-btn" style={{ ...S.btn, ...S.btnG, ...S.btnSm, color:"#f43f5e" }} disabled={linkBusy} onClick={handleUnlink}>Desvincular</button>
+            </>
+          )}
+          <button className="sh-btn" style={{ ...S.btn, ...S.btnG, ...S.btnSm }} onClick={() => { setLoading(true); loadConnection(); setTab(t => t); }}>
+            ↻ Actualizar
+          </button>
+        </div>
       </div>
+
+      {/* ── VINCULACIÓN ── */}
+      {connection && (!isConnected || showLinkForm) && (
+        <div className="sh-card" style={{ background:"rgba(99,91,255,0.06)", border:`1px solid ${SP}40`, borderRadius:14, padding:"18px 20px", marginBottom:20 }}>
+          <div style={{ fontSize:14, fontWeight:800, color:"#fff", marginBottom:4 }}>{isConnected ? "Sustituir la clave secreta" : "Vincular la cuenta Stripe del cliente"}</div>
+          <div style={{ fontSize:12, color:"rgba(240,237,230,0.6)", marginBottom:12, lineHeight:1.5 }}>
+            Pega la <b>clave secreta</b> de la cuenta Stripe del cliente (Dashboard de Stripe → Developers → API keys). Se valida contra Stripe
+            antes de guardarse, se almacena cifrada y nunca se vuelve a mostrar. Usa <code>sk_test_…</code> para pruebas o <code>sk_live_…</code> para producción.
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1.4fr auto", gap:10, alignItems:"end" }}>
+            <label style={{ fontSize:11, color:"rgba(240,237,230,0.6)" }}>Clave secreta *
+              <input type="password" autoComplete="off" value={linkForm.secretKey} onChange={e => setLinkForm(f => ({ ...f, secretKey: e.target.value }))} placeholder="sk_test_… / sk_live_…" style={{ ...S.inp, marginTop:4 }} />
+            </label>
+            <label style={{ fontSize:11, color:"rgba(240,237,230,0.6)" }}>Clave publicable (opcional)
+              <input value={linkForm.publishableKey} onChange={e => setLinkForm(f => ({ ...f, publishableKey: e.target.value }))} placeholder="pk_…" style={{ ...S.inp, marginTop:4 }} />
+            </label>
+            <button className="sh-btn" style={{ ...S.btn, ...S.btnP }} disabled={linkBusy} onClick={handleLink}>{linkBusy ? "Validando…" : (isConnected ? "Guardar nueva clave" : "Vincular cuenta")}</button>
+          </div>
+        </div>
+      )}
 
       {/* ── ALERTS ── */}
       {err && <div style={S.err}>{err} <button onClick={() => setErr("")} style={{ float:"right", background:"none", border:"none", color:"inherit", cursor:"pointer", fontSize:14 }}>✕</button></div>}
@@ -305,7 +400,7 @@ export default function StripeProjectHub() {
       )}
 
       {/* ══ OVERVIEW ══════════════════════════════════════════════════════════ */}
-      {!loading && tab === "overview" && overview && (
+      {!loading && tab === "overview" && overview && overview.connected !== false && (
         <div className="sh-card">
           {/* KPI Grid */}
           <div style={S.grid4}>

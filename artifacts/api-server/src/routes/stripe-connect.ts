@@ -1,9 +1,10 @@
-import { Router, type Request, type Response } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
+import { resolveStripeForAccount } from "../lib/stripe-tenant.js";
 
 const router = Router();
 
@@ -59,6 +60,37 @@ async function ensureStripeTables(): Promise<void> {
 
 ensureStripeTables();
 
+// ── Aislamiento de tenant ─────────────────────────────────────────────────────
+// Las rutas /stripe/accounts/:accountId/* se montan ANTES del gate global requireAdmin y
+// solo llevan requireAuth, así que una sesión de cliente podría alcanzarlas. Un cliente
+// (no admin) solo puede operar sobre la cuenta Stripe vinculada a SU propio proyecto.
+function sessionOf(req: Request): { role?: string; clientId?: number | string | null } {
+  return ((req as any).session ?? {}) as any;
+}
+function ownProjectId(req: Request): number | null {
+  const s = sessionOf(req);
+  if (s.role === "admin") return null; // admin: sin restricción
+  const own = s.clientId ? parseInt(String(s.clientId), 10) : NaN;
+  return Number.isFinite(own) && own > 0 ? own : 0; // 0 = cliente sin proyecto asignado
+}
+async function requireStripeAccountAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const own = ownProjectId(req);
+    if (own === null) { next(); return; }
+    if (own === 0) { res.status(403).json({ error: "Tu sesión no tiene ningún proyecto asignado" }); return; }
+    const db = await getDb();
+    const r = await db.execute(sql`SELECT project_id FROM stripe_accounts WHERE account_id = ${String(req.params.accountId)} LIMIT 1`);
+    const row = r.rows[0] as any;
+    if (!row) { res.status(404).json({ error: "Cuenta Stripe no encontrada" }); return; }
+    if (Number(row.project_id) !== own) { res.status(403).json({ error: "No tienes acceso a esta cuenta Stripe" }); return; }
+    next();
+  } catch (err: any) {
+    logger.error({ err }, "requireStripeAccountAccess error");
+    res.status(500).json({ error: err.message });
+  }
+}
+router.use("/stripe/accounts/:accountId", requireAuth, requireStripeAccountAccess);
+
 // ── OAuth state map (same pattern as Shopify) ─────────────────────────────────
 const oauthState = new Map<string, { projectId: number; userId: string }>();
 
@@ -75,6 +107,12 @@ router.get("/stripe/oauth/start", requireAuth, async (req: Request, res: Respons
     const projectId = parseInt(String(req.query.projectId ?? "0"), 10);
     if (!projectId) {
       res.status(400).json({ error: "projectId requerido" });
+      return;
+    }
+    // Un cliente solo puede vincular Stripe a su propio proyecto
+    const own = ownProjectId(req);
+    if (own !== null && own !== projectId) {
+      res.status(403).json({ error: "No puedes vincular Stripe a un proyecto que no es tuyo" });
       return;
     }
 
@@ -168,7 +206,15 @@ router.get("/stripe/oauth/callback", async (req: Request, res: Response): Promis
 router.get("/stripe/accounts", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const db = await getDb();
-    const projectId = req.query.projectId ? parseInt(String(req.query.projectId), 10) : null;
+    let projectId = req.query.projectId ? parseInt(String(req.query.projectId), 10) : null;
+
+    // Un cliente (no admin) solo puede ver la cuenta de SU proyecto
+    const sess: any = (req as any).session ?? {};
+    if (sess.role !== "admin") {
+      const own = sess.clientId ? parseInt(String(sess.clientId), 10) : NaN;
+      if (!own) { res.json([]); return; }
+      projectId = own;
+    }
 
     let rows: any[];
     if (projectId) {
@@ -205,14 +251,7 @@ router.get("/stripe/accounts/:accountId/overview", requireAuth, async (req: Requ
     const { accountId } = req.params;
     const db = await getDb();
 
-    const result = await db.execute(sql`
-      SELECT access_token_enc, currency FROM stripe_accounts WHERE account_id = ${accountId}
-    `);
-    const row = result.rows[0] as any;
-    if (!row) { res.status(404).json({ error: "Cuenta Stripe no encontrada" }); return; }
-
-    const accessToken = decrypt(row.access_token_enc);
-    const stripe = new Stripe(accessToken, { apiVersion: "2026-05-27.dahlia" });
+    const { stripe, row } = await getStripeForAccount(accountId);
 
     const [balance, charges, customers, subscriptions] = await Promise.all([
       stripe.balance.retrieve(),
@@ -283,13 +322,7 @@ router.get("/stripe/accounts/:accountId/transactions", requireAuth, async (req: 
     const startingAfter = req.query.starting_after as string | undefined;
 
     const db = await getDb();
-    const result = await db.execute(sql`
-      SELECT access_token_enc FROM stripe_accounts WHERE account_id = ${accountId}
-    `);
-    const row = result.rows[0] as any;
-    if (!row) { res.status(404).json({ error: "Cuenta no encontrada" }); return; }
-
-    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2026-05-27.dahlia" });
+    const { stripe } = await getStripeForAccount(accountId);
 
     const params: Stripe.ChargeListParams = { limit };
     if (startingAfter) params.starting_after = startingAfter;
@@ -327,13 +360,7 @@ router.get("/stripe/accounts/:accountId/customers", requireAuth, async (req: Req
     const startingAfter = req.query.starting_after as string | undefined;
 
     const db = await getDb();
-    const result = await db.execute(sql`
-      SELECT access_token_enc FROM stripe_accounts WHERE account_id = ${accountId}
-    `);
-    const row = result.rows[0] as any;
-    if (!row) { res.status(404).json({ error: "Cuenta no encontrada" }); return; }
-
-    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2026-05-27.dahlia" });
+    const { stripe } = await getStripeForAccount(accountId);
     const params: Stripe.CustomerListParams = { limit };
     if (startingAfter) params.starting_after = startingAfter;
 
@@ -364,13 +391,7 @@ router.get("/stripe/accounts/:accountId/subscriptions", requireAuth, async (req:
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
 
     const db = await getDb();
-    const result = await db.execute(sql`
-      SELECT access_token_enc FROM stripe_accounts WHERE account_id = ${accountId}
-    `);
-    const row = result.rows[0] as any;
-    if (!row) { res.status(404).json({ error: "Cuenta no encontrada" }); return; }
-
-    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2026-05-27.dahlia" });
+    const { stripe } = await getStripeForAccount(accountId);
     const subs = await stripe.subscriptions.list({ limit, status: "all" });
 
     res.json({
@@ -430,13 +451,7 @@ router.post("/stripe/accounts/:accountId/sync", requireAuth, async (req: Request
     const { accountId } = req.params;
     const db = await getDb();
 
-    const result = await db.execute(sql`
-      SELECT access_token_enc FROM stripe_accounts WHERE account_id = ${accountId}
-    `);
-    const row = result.rows[0] as any;
-    if (!row) { res.status(404).json({ error: "Cuenta no encontrada" }); return; }
-
-    const stripe = new Stripe(decrypt(row.access_token_enc), { apiVersion: "2026-05-27.dahlia" });
+    const { stripe } = await getStripeForAccount(accountId);
     const account = await stripe.accounts.retrieve(String(accountId));
 
     await db.execute(sql`
@@ -546,15 +561,10 @@ router.post("/stripe/draft-order", requireAuth, async (req: Request, res: Respon
 });
 
 // ── Helper: Get Stripe instance from accountId (supports all 3 modes) ─────────
-async function getStripeForAccount(accountId: string): Promise<{ stripe: Stripe; row: any }> {
-  const db = await getDb();
-  const result = await db.execute(sql`
-    SELECT access_token_enc, stripe_key_enc, currency FROM stripe_accounts WHERE account_id = ${accountId}
-  `);
-  const row = result.rows[0] as any;
-  if (!row) throw new Error("Cuenta Stripe no encontrada");
-  const token = row.stripe_key_enc ? decrypt(row.stripe_key_enc) : decrypt(row.access_token_enc);
-  return { stripe: new Stripe(token, { apiVersion: "2026-05-27.dahlia" }), row };
+async function getStripeForAccount(accountId: string | string[]): Promise<{ stripe: Stripe; row: any }> {
+  // Soporta cuentas directas (stripe_key_enc), Connect Custom y OAuth — misma lógica que resolveStripeForProject
+  const { stripe, row } = await resolveStripeForAccount(String(accountId));
+  return { stripe, row };
 }
 
 // ── GET /stripe/accounts/:accountId/products ──────────────────────────────────

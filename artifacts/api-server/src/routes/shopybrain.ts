@@ -29,6 +29,7 @@ import {
   normalizeListDirectory,
 } from "../lib/shopybrain-helpers.js";
 import multer from "multer";
+import { getPlatform } from "../lib/platform-capabilities.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -295,8 +296,31 @@ router.get("/shopybrain/quick-actions", requireAdmin, async (req, res): Promise<
       { icon: "🧠", label: "Estado del sistema", prompt: "¿Qué conocimiento ha absorbido Shopy Crafter? Dame un resumen de las memorias, dominios y contenido absorbido hasta ahora." },
     ];
 
+    // Plataforma del proyecto activo → prompts y contexto específicos (Stripe ≠ tienda)
+    let platformInfo: { key: string; label: string; icon: string; color: string; entityLabel: string; capabilities: string[]; chatbotContext: string } | null = null;
+    const pidNum = parseInt(String(projectId ?? ""), 10);
+    if (pidNum > 0) {
+      try {
+        const [proj] = await db.select({ platformType: projectsTable.platformType }).from(projectsTable).where(eq(projectsTable.id, pidNum)).limit(1);
+        if (proj) {
+          const def = getPlatform(proj.platformType);
+          platformInfo = { key: def.key, label: def.label, icon: def.icon, color: def.color, entityLabel: def.entityLabel, capabilities: def.capabilities, chatbotContext: def.chatbotContext };
+        }
+      } catch { /* sin plataforma → prompts por ruta */ }
+    }
+
     // Acciones contextuales según ruta
     let contextActions: Array<{ icon: string; label: string; prompt: string; isResearch?: boolean }> = [];
+
+    if (platformInfo && platformInfo.key !== "shopify" && r.startsWith("/projects/")) {
+      // Proyecto no-Shopify: los prompts los dicta el registro de capacidades, no la ruta
+      contextActions = [
+        ...getPlatform(platformInfo.key).quickPrompts,
+        { icon: "🔬", label: "Investigar marca", prompt: "__RESEARCH__", isResearch: true },
+      ];
+      res.json({ actions: [...globalActions, ...contextActions], platform: platformInfo });
+      return;
+    }
 
     if (r.startsWith("/admin/inventory")) {
       contextActions = [
@@ -352,7 +376,7 @@ router.get("/shopybrain/quick-actions", requireAdmin, async (req, res): Promise<
       ];
     }
 
-    res.json({ actions: [...globalActions, ...contextActions] });
+    res.json({ actions: [...globalActions, ...contextActions], platform: platformInfo });
   } catch (err: any) {
     handleRouteError(res, err);
   }
@@ -2562,6 +2586,23 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           }
         }
       }
+
+      // Stripe helper — declarado FUERA del switch: dentro de un `case` posterior quedaría en TDZ (ReferenceError en runtime)
+      // Helper: auto-resolve accountId — returns first connected Stripe account if not provided
+      const resolveStripeAccountId = async (rawId?: string): Promise<string | null> => {
+        if (rawId && rawId !== "undefined" && rawId.length > 4) return rawId;
+        const port2 = process.env.PORT || 8080;
+        // Prioridad: la cuenta del proyecto activo → primera cuenta vinculada
+        const pidQ = Number(params?.projectId) > 0 ? `?projectId=${Number(params.projectId)}` : "";
+        try {
+          const r2 = await fetch(`http://localhost:${port2}/api/stripe/accounts${pidQ}`, { headers: { cookie: req.headers.cookie || "" } });
+          if (!r2.ok) return null;
+          const d2 = await r2.json() as any;
+          const accs: any[] = Array.isArray(d2) ? d2 : (d2.accounts || []);
+          if (!accs.length) return null;
+          return accs[0].accountId || accs[0].account_id || null;
+        } catch { return null; }
+      };
 
       switch (action) {
         case "store_status": {
@@ -12443,27 +12484,15 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
 
         // ── STRIPE ACTIONS ──────────────────────────────────────────────────────
 
-        // Helper: auto-resolve accountId — returns first connected Stripe account if not provided
-        const resolveStripeAccountId = async (rawId?: string): Promise<string | null> => {
-          if (rawId && rawId !== "undefined" && rawId.length > 4) return rawId;
-          const port2 = process.env.PORT || 8080;
-          try {
-            const r2 = await fetch(`http://localhost:${port2}/api/stripe/accounts`, { headers: { cookie: req.headers.cookie || "" } });
-            if (!r2.ok) return null;
-            const d2 = await r2.json() as any;
-            const accs = d2.accounts || [];
-            if (!accs.length) return null;
-            return accs[0].accountId || accs[0].account_id || null;
-          } catch { return null; }
-        };
 
         case "stripe_list_accounts": {
           const port = process.env.PORT || 8080;
           const r2 = await fetch(`http://localhost:${port}/api/stripe/accounts`, { headers: { cookie: req.headers.cookie || "" } });
           const data2 = await r2.json() as any;
           if (!r2.ok) { result = { error: data2.error || "Error listando cuentas Stripe" }; break; }
-          const accounts = (data2.accounts || []) as Array<{ accountId: string; email?: string; businessName?: string; connected: boolean }>;
-          result = { accounts, total: accounts.length, message: `${accounts.length} cuenta(s) Stripe conectada(s):\n${accounts.map((a: any) => `• ${a.businessName || a.email || a.accountId} (${a.accountId})`).join("\n")}` };
+          const rawAccs: any[] = Array.isArray(data2) ? data2 : (data2.accounts || []);
+          const accounts = rawAccs.map((a: any) => ({ accountId: a.accountId || a.account_id, email: a.email ?? null, businessName: a.businessName || a.display_name || null, projectId: a.project_id ?? a.projectId ?? null, projectName: a.project_name ?? null, type: a.account_type ?? null, connected: a.onboarding_complete ?? true }));
+          result = { accounts, total: accounts.length, message: `${accounts.length} cuenta(s) Stripe conectada(s):\n${accounts.map((a: any) => `• ${a.businessName || a.email || a.accountId}${a.projectName ? ` — proyecto ${a.projectName}` : ""} (${a.accountId})`).join("\n")}` };
           break;
         }
 
