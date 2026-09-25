@@ -1,5 +1,7 @@
 import { REPORT_LEVELS, LEVEL_SYSTEM_PROMPTS, type ReportLevel } from "./config.js";
-import { askClaudeWithBrain, learnFromOperation } from "./claude.js";
+import { learnFromOperation } from "./claude.js";
+import { askClaudeTextComplete, stripCodeFences } from "./ai-json.js";
+import { isAiOutputError } from "./ai-errors.js";
 import { saveToVault } from "./vault.js";
 import { getReportShell, type ReportTemplate } from "../routes/exports.js";
 import { logger } from "./logger.js";
@@ -14,6 +16,8 @@ export interface LeveledReportResult {
     vaultId: number | null;
   }>;
   totalPages: number;
+  /** Documentos secundarios que no se generaron porque la IA no los completó. */
+  failed?: Array<{ type: string; reason: string }>;
 }
 
 export async function generateLeveledReport(params: {
@@ -36,11 +40,12 @@ ${levelPrompt}
 
 REGLAS DE CALIDAD:
 - Cada dato debe tener badge: [VERIFICADO] [INVESTIGADO] o [ESTIMADO]
-- Nombra productos ESPECÍFICOS del catálogo del cliente
-- Usa números concretos, no generalidades
-- Cada recomendación debe tener impacto estimado en € o %
+- Nombra productos ESPECÍFICOS del catálogo del cliente (solo los que aparecen en los datos; si no hay catálogo, no hables de productos)
+- Usa números concretos, no generalidades — pero NUNCA inventes cifras: si un dato no está en los datos proporcionados, dilo y márcalo como dato que falta
+- Cada impacto estimado en € o % va con [ESTIMADO] y el dato en que se basa; si no hay base, no lo cuantifiques
+- Adapta el informe al tipo de negocio real (tienda online, restaurante, servicios…)
 - Responde SIEMPRE en español profesional
-- Formato: HTML con <h2>, <h3>, <p>, <ul>, <ol>, <strong>, <table>`;
+- Formato: HTML con <h2>, <h3>, <p>, <ul>, <ol>, <strong>, <table>. Sin bloques de código \`\`\` alrededor del HTML`;
 
   const files: LeveledReportResult["files"] = [];
   const reportShell = getReportShell(template);
@@ -48,11 +53,28 @@ REGLAS DE CALIDAD:
 
   logger.info({ projectId, level, reportType }, `Generating Level ${level} report: ${reportTitle}`);
 
-  const mainReport = await askClaudeWithBrain(
-    projectId,
-    [{ role: "user", content: `Genera el informe ${levelConfig.name} para:\n\n${dataBlock}` }],
-    systemPrompt, "general", niche, levelConfig.maxTokens
-  );
+  // HTML libre: si se corta por max_tokens se pide continuación; si aun así no
+  // termina, error tipado en vez de guardar medio informe en la bóveda.
+  const ask = (prompt: string, maxTokens: number, part: string) =>
+    askClaudeTextComplete(projectId, prompt, systemPrompt, {
+      useCase: "general", niche, maxTokens, label: `report-levels:${reportType}:${part}`,
+    }).then(stripCodeFences);
+
+  // Los documentos secundarios no tumban el informe principal (ya guardado): se
+  // omiten y se informa en `failed`.
+  const failed: NonNullable<LeveledReportResult["failed"]> = [];
+  const askSecondary = async (prompt: string, maxTokens: number, part: string): Promise<string | null> => {
+    try {
+      return await ask(prompt, maxTokens, part);
+    } catch (err) {
+      if (!isAiOutputError(err)) throw err;
+      logger.error({ projectId, level, part, err: err.message }, "Documento del informe por niveles omitido: la IA no lo completó");
+      failed.push({ type: part, reason: err.message });
+      return null;
+    }
+  };
+
+  const mainReport = await ask(`Genera el informe ${levelConfig.name} para:\n\n${dataBlock}`, levelConfig.maxTokens, "main-report");
 
   const mainHtml = reportShell(
     `${reportTitle} — ${levelConfig.label}`,
@@ -103,33 +125,31 @@ GENERA la guía con este formato EXACTO para CADA mejora:
 
 Incluye TODOS los pasos necesarios. Mínimo 8-12 pasos.`;
 
-    const guide = await askClaudeWithBrain(
-      projectId,
-      [{ role: "user", content: guidePrompt }],
-      systemPrompt, "general", niche, 12000
-    );
+    const guide = await askSecondary(guidePrompt, 12000, "implementation-guide");
 
-    const guideHtml = reportShell(
-      `Guía de Implementación — ${reportTitle}`,
-      `Paso a paso detallado — ${levelConfig.label}`,
-      guide,
-      date,
-      "ShopyBrain Intelligence"
-    );
+    if (guide !== null) {
+      const guideHtml = reportShell(
+        `Guía de Implementación — ${reportTitle}`,
+        `Paso a paso detallado — ${levelConfig.label}`,
+        guide,
+        date,
+        "ShopyBrain Intelligence"
+      );
 
-    const guideVaultId = await saveToVault({
-      projectId,
-      fileType: "implementation-guide",
-      category: "informes",
-      title: `Guía Implementación — ${reportTitle}`,
-      description: `Guía paso a paso para implementar las mejoras del informe`,
-      mimeType: "text/html",
-      generatedBy: "report-levels",
-      content: guideHtml,
-      metadata: { level, reportType, parentReport: mainVaultId },
-    });
+      const guideVaultId = await saveToVault({
+        projectId,
+        fileType: "implementation-guide",
+        category: "informes",
+        title: `Guía Implementación — ${reportTitle}`,
+        description: `Guía paso a paso para implementar las mejoras del informe`,
+        mimeType: "text/html",
+        generatedBy: "report-levels",
+        content: guideHtml,
+        metadata: { level, reportType, parentReport: mainVaultId },
+      });
 
-    files.push({ type: "implementation-guide", title: `Guía Implementación — ${reportTitle}`, htmlContent: guideHtml, vaultId: guideVaultId });
+      files.push({ type: "implementation-guide", title: `Guía Implementación — ${reportTitle}`, htmlContent: guideHtml, vaultId: guideVaultId });
+    }
   }
 
   if (level >= 3) {
@@ -155,33 +175,31 @@ Cada pieza de contenido debe estar en un bloque:
   <p class="copy-note"><small>Copia y pega esto directamente en [dónde]</small></p>
 </div>`;
 
-    const produced = await askClaudeWithBrain(
-      projectId,
-      [{ role: "user", content: contentPrompt }],
-      systemPrompt, "general", niche, 16000
-    );
+    const produced = await askSecondary(contentPrompt, 16000, "produced-content");
 
-    const producedHtml = reportShell(
-      `Contenido Producido — ${reportTitle}`,
-      `Listo para copiar y pegar`,
-      produced,
-      date,
-      "ShopyBrain Intelligence"
-    );
+    if (produced !== null) {
+      const producedHtml = reportShell(
+        `Contenido Producido — ${reportTitle}`,
+        `Listo para copiar y pegar`,
+        produced,
+        date,
+        "ShopyBrain Intelligence"
+      );
 
-    const producedVaultId = await saveToVault({
-      projectId,
-      fileType: "produced-content",
-      category: "informes",
-      title: `Contenido Producido — ${reportTitle}`,
-      description: `Contenido terminado listo para usar`,
-      mimeType: "text/html",
-      generatedBy: "report-levels",
-      content: producedHtml,
-      metadata: { level, reportType, parentReport: mainVaultId },
-    });
+      const producedVaultId = await saveToVault({
+        projectId,
+        fileType: "produced-content",
+        category: "informes",
+        title: `Contenido Producido — ${reportTitle}`,
+        description: `Contenido terminado listo para usar`,
+        mimeType: "text/html",
+        generatedBy: "report-levels",
+        content: producedHtml,
+        metadata: { level, reportType, parentReport: mainVaultId },
+      });
 
-    files.push({ type: "produced-content", title: `Contenido Producido — ${reportTitle}`, htmlContent: producedHtml, vaultId: producedVaultId });
+      files.push({ type: "produced-content", title: `Contenido Producido — ${reportTitle}`, htmlContent: producedHtml, vaultId: producedVaultId });
+    }
   }
 
   if (level >= 4) {
@@ -199,32 +217,30 @@ Incluye:
 
 Cada activo en bloque separado con título claro.`;
 
-    const assets = await askClaudeWithBrain(
-      projectId,
-      [{ role: "user", content: assetsPrompt }],
-      systemPrompt, "general", niche, 16000
-    );
+    const assets = await askSecondary(assetsPrompt, 16000, "premium-assets");
 
-    const assetsHtml = reportShell(
-      `Activos Premium — ${reportTitle}`,
-      `CSS, Schemas, Brief, Calendario, Emails`,
-      assets,
-      date,
-      "ShopyBrain Intelligence"
-    );
+    if (assets !== null) {
+      const assetsHtml = reportShell(
+        `Activos Premium — ${reportTitle}`,
+        `CSS, Schemas, Brief, Calendario, Emails`,
+        assets,
+        date,
+        "ShopyBrain Intelligence"
+      );
 
-    const assetsVaultId = await saveToVault({
-      projectId,
-      fileType: "premium-assets",
-      category: "informes",
-      title: `Activos Premium — ${reportTitle}`,
-      mimeType: "text/html",
-      generatedBy: "report-levels",
-      content: assetsHtml,
-      metadata: { level, reportType },
-    });
+      const assetsVaultId = await saveToVault({
+        projectId,
+        fileType: "premium-assets",
+        category: "informes",
+        title: `Activos Premium — ${reportTitle}`,
+        mimeType: "text/html",
+        generatedBy: "report-levels",
+        content: assetsHtml,
+        metadata: { level, reportType },
+      });
 
-    files.push({ type: "premium-assets", title: `Activos Premium — ${reportTitle}`, htmlContent: assetsHtml, vaultId: assetsVaultId });
+      files.push({ type: "premium-assets", title: `Activos Premium — ${reportTitle}`, htmlContent: assetsHtml, vaultId: assetsVaultId });
+    }
   }
 
   if (level >= 5) {
@@ -245,32 +261,30 @@ Incluye:
 
 Formato: tablas HTML profesionales con colores.`;
 
-    const roadmap = await askClaudeWithBrain(
-      projectId,
-      [{ role: "user", content: roadmapPrompt }],
-      systemPrompt, "general", niche, 16000
-    );
+    const roadmap = await askSecondary(roadmapPrompt, 16000, "enterprise-roadmap");
 
-    const roadmapHtml = reportShell(
-      `Roadmap Enterprise — ${reportTitle}`,
-      `Estrategia 12 meses completa`,
-      roadmap,
-      date,
-      "ShopyBrain Intelligence"
-    );
+    if (roadmap !== null) {
+      const roadmapHtml = reportShell(
+        `Roadmap Enterprise — ${reportTitle}`,
+        `Estrategia 12 meses completa`,
+        roadmap,
+        date,
+        "ShopyBrain Intelligence"
+      );
 
-    const roadmapVaultId = await saveToVault({
-      projectId,
-      fileType: "enterprise-roadmap",
-      category: "informes",
-      title: `Roadmap Enterprise — ${reportTitle}`,
-      mimeType: "text/html",
-      generatedBy: "report-levels",
-      content: roadmapHtml,
-      metadata: { level, reportType },
-    });
+      const roadmapVaultId = await saveToVault({
+        projectId,
+        fileType: "enterprise-roadmap",
+        category: "informes",
+        title: `Roadmap Enterprise — ${reportTitle}`,
+        mimeType: "text/html",
+        generatedBy: "report-levels",
+        content: roadmapHtml,
+        metadata: { level, reportType },
+      });
 
-    files.push({ type: "enterprise-roadmap", title: `Roadmap Enterprise — ${reportTitle}`, htmlContent: roadmapHtml, vaultId: roadmapVaultId });
+      files.push({ type: "enterprise-roadmap", title: `Roadmap Enterprise — ${reportTitle}`, htmlContent: roadmapHtml, vaultId: roadmapVaultId });
+    }
   }
 
   learnFromOperation({
@@ -287,5 +301,6 @@ Formato: tablas HTML profesionales con colores.`;
     levelName: levelConfig.name,
     files,
     totalPages: files.length,
+    ...(failed.length > 0 ? { failed } : {}),
   };
 }
