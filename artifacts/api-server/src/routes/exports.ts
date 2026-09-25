@@ -20,7 +20,11 @@ import { sanitizeHtml } from "../lib/html-escape.js";
 // hoja 2 dentro de `buildCoverPage` (orden DIN-A4: portada → contraportada → info).
 import { shopifyRequest } from "../lib/shopify";
 import { randomUUID } from "crypto";
-import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
+import { learnFromOperation } from "../lib/claude.js";
+import { askClaudeJsonValidated, askClaudeTextComplete, type AiJsonSchema } from "../lib/ai-json.js";
+import { z } from "zod";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { planStrategicReport, groupSchema, assembleStrategicReport, STRATEGIC_REPORT_SYSTEM, STRATEGIC_SECTION_LABELS, type StrategicReportInput, type StrategicSection, type StrategicSectionKey } from "../lib/strategic-report.js";
 import { logger } from "../lib/logger.js";
 import { buildProductCardsSection, type ProductCardData } from "../lib/product-card.js";
 // LOGO_CORPORATE_B64 / LOGO_PRESTIGE_B64 ahora solo se usan dentro de buildCoverPage en lib/report-cover.ts
@@ -568,14 +572,12 @@ REGLAS OBLIGATORIAS:
 - INCLUYE sección Multi-Plataforma con rutas reales
 - CADA ACCIÓN incluye "✅ Comprobación" verificable por el cliente`;
 
-    const result = await askClaudeWithBrain(
-      projectId,
-      [{ role: "user", content: prompt }],
-      AI_REPORT_SYSTEM,
-      area === "financial" || area === "pricing" || area === "revenue" ? "pricing" : area === "seo" ? "seo" : "general",
+    const result = await askClaudeTextComplete(projectId, prompt, AI_REPORT_SYSTEM, {
+      useCase: area === "financial" || area === "pricing" || area === "revenue" ? "pricing" : area === "seo" ? "seo" : "general",
       niche,
-      16000,
-    );
+      maxTokens: 16000,
+      label: `exports/ai-recommendations:${area}`,
+    });
 
     const sanitized = sanitizeAiHtmlOutput(result);
     const htmlMatch = sanitized.match(/<div class="ai-analysis">[\s\S]*$/);
@@ -593,6 +595,14 @@ REGLAS OBLIGATORIAS:
     </div>`;
   } catch (err) {
     logger.warn({ err, area }, "AI recommendations generation failed — report continues without AI section");
+    if (isAiOutputError(err)) {
+      // Visible en el informe: mejor avisar que entregar medio análisis o nada sin explicación.
+      return `
+    <div class="section">
+      <div class="section-title">Análisis y Recomendaciones IA</div>
+      <div class="card" style="padding:20px;font-size:13px;">${sanitizeHtml(aiOutputErrorMessage(err))}</div>
+    </div>`;
+    }
     return "";
   }
 }
@@ -730,10 +740,10 @@ Responde en JSON con esta estructura exacta:
   "annualProjection": {"revenueMin":60000,"revenueMax":90000,"costsMin":38400,"costsMax":49200,"profitMin":10800,"profitMax":40800}
 }`;
 
-    const result = await askClaudeJsonWithBrain<CogsEstimation>(
+    const result = await askClaudeJsonValidated<CogsEstimation>(
       projectId, prompt,
       "Eres un analista financiero senior especializado en consultoría de costes para PYMEs en España. Conoces en detalle los convenios colectivos por sector y CCAA, los precios de alquiler por barrio en las principales ciudades, los costes de proveedores sectoriales, los impuestos y tasas aplicables, y las estructuras de costes típicas por tipo de negocio. NUNCA inventes datos. Cita SIEMPRE fuentes verificables reales (Idealista, INE, convenios colectivos, AEAT, proveedores con nombre). Tus estimaciones deben ser tan precisas que un empresario del sector las reconozca como realistas.",
-      "financial", undefined, 8000
+      { schema: cogsEstimationSchema, useCase: "financial", maxTokens: 8000, retryMaxTokens: 16000, label: "exports/estimate-cogs" },
     );
     return result;
   } catch (err) {
@@ -741,6 +751,21 @@ Responde en JSON con esta estructura exacta:
     return null;
   }
 }
+
+// Solo exige lo que buildCogsEstimationHtml recorre sin comprobar; el resto se
+// deja pasar tal cual (passthrough) para no rechazar respuestas válidas.
+const cogsEstimationSchema = z.object({
+  businessType: z.string(),
+  location: z.string(),
+  fixedCosts: z.array(z.object({ concept: z.string(), rangeMin: z.number(), rangeMax: z.number() }).passthrough()),
+  variableCosts: z.array(z.object({ concept: z.string() }).passthrough()),
+  initialInvestment: z.array(z.object({ concept: z.string(), rangeMin: z.number(), rangeMax: z.number() }).passthrough()),
+  competitors: z.array(z.object({ name: z.string() }).passthrough()),
+  rentAnalysis: z.object({}).passthrough(),
+  breakeven: z.object({}).passthrough(),
+  totalMonthlyCosts: z.object({ min: z.number(), max: z.number() }),
+  annualProjection: z.object({}).passthrough(),
+}).passthrough() as unknown as AiJsonSchema<CogsEstimation>;
 
 function buildCogsEstimationHtml(est: CogsEstimation, brandColors: { accent: string; muted: string; jade: string; orange: string; card: string; surface: string; border: string; silver?: string }): string {
   const C = brandColors;
@@ -2706,163 +2731,126 @@ router.post("/projects/:projectId/exports/generate-ai-report", requireProjectAcc
   
       const cogsMap = new Map(allCogs.map(c => [c.shopifyProductId, c]));
       const seoMap = new Map(seoData.map(s => [s.shopifyProductId, s]));
-      const activeProducts = products.filter(p => p.status === "active");
-      const draftProducts = products.filter(p => p.status === "draft");
-      const archivedProducts = products.filter(p => p.status === "archived");
-      const avgPrice = products.length > 0 ? products.reduce((s, p) => s + parseFloat(p.price ?? "0"), 0) / products.length : 0;
       const catalogPrices = products.map(p => parseFloat(p.price ?? "0"));
-      const totalCatalogValue = catalogPrices.reduce((s, p) => s + p, 0);
+      const positivePrices = catalogPrices.filter(p => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
+      const totalCatalogValue = catalogPrices.reduce((s, p) => s + (Number.isFinite(p) ? p : 0), 0);
       const totalCogs = allCogs.reduce((s, c) => s + c.totalCogs, 0);
-      const avgMargin = totalCatalogValue > 0 ? ((totalCatalogValue - totalCogs) / totalCatalogValue) * 100 : 0;
       const totalRevenue = revenueSnapshots.reduce((s, r) => s + (r.revenue ?? 0), 0);
       const totalOrders = revenueSnapshots.reduce((s, r) => s + (r.orders ?? 0), 0);
-  
+
       const liveAudit = products.map(p => {
         const seo = seoMap.get(p.shopifyProductId);
         return { product: p, seo, ...calculateSeoScoreInline(p, seo) };
       });
       const avgSeo = liveAudit.length > 0 ? liveAudit.reduce((s, a) => s + a.score, 0) / liveAudit.length : 0;
       const storeGrade = avgSeo >= 90 ? "A" : avgSeo >= 75 ? "B" : avgSeo >= 60 ? "C" : avgSeo >= 45 ? "D" : "F";
-  
-      const productTypes = [...new Set(products.map(p => p.productType).filter(Boolean))];
-      const priceRange = products.length > 0
-        ? { min: Math.min(...catalogPrices), max: Math.max(...catalogPrices) }
-        : { min: 0, max: 0 };
-  
       const worst5Seo = [...liveAudit].sort((a, b) => a.score - b.score).slice(0, 5);
       const best5Seo = [...liveAudit].sort((a, b) => b.score - a.score).slice(0, 5);
-  
-      const productSummary = products.slice(0, 25).map(p => {
+
+      const productLines = products.slice(0, 25).map(p => {
         const cogs = cogsMap.get(p.shopifyProductId);
         const price = parseFloat(p.price ?? "0");
         const margin = cogs && price > 0 ? ((price - cogs.totalCogs) / price) * 100 : null;
         const audit = liveAudit.find(a => a.product.shopifyProductId === p.shopifyProductId);
         return `- "${p.title}" | ${price.toFixed(2)}€ | ${p.status} | COGS: ${cogs ? cogs.totalCogs.toFixed(2) + "€" : "sin datos"} | Margen: ${margin != null ? margin.toFixed(0) + "%" : "N/A"} | SEO: ${audit ? audit.grade + " (" + audit.score + "/100)" : "N/A"} | Imgs: ${p.imageCount ?? 0} | Tipo: ${p.productType || "sin tipo"} | Handle: ${p.handle}`;
-      }).join("\n");
-  
-      const seoIssuesSummary = worst5Seo.map(a =>
-        `- "${a.product.title}" SEO ${a.grade} (${a.score}/100): Meta title: ${a.hasMetaTitle ? "SI" : "NO"}, Meta desc: ${a.hasMetaDesc ? "SI" : "NO"}, Schema: ${a.hasSchema ? "SI" : "NO"}, Alt texts: ${a.hasAltTexts ? "SI" : "NO"}, Handle limpio: ${a.cleanHandle ? "SI" : "NO"}, Desc: ${a.descLen} chars`
-      ).join("\n");
-  
-      const competitorList = competitors.slice(0, 5).map(c => `- ${c.name} (${c.url || "sin URL"}) — tipo: ${c.type || "direct"}`).join("\n");
-  
-      const dataBlock = `
-  === DATOS DE LA TIENDA ===
-  Nombre: ${project.name}
-  Dominio: ${project.shopDomain}
-  Nicho: ${project.storeNiche || "No definido"}
-  Tono de marca: ${project.brandTone || "No definido"}
-  Audiencia objetivo: ${project.targetAudience || "No definida"}
-  Mercados: ${project.storeMarkets || "No definidos"}
-  
-  === CATALOGO ===
-  Total productos: ${products.length} (${activeProducts.length} activos, ${draftProducts.length} borradores, ${archivedProducts.length} archivados)
-  Precio medio: ${avgPrice.toFixed(2)}€
-  Rango: ${priceRange.min.toFixed(2)}€ – ${priceRange.max.toFixed(2)}€
-  Mediana: ${(() => { const sorted = [...catalogPrices].sort((a, b) => a - b); return sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)].toFixed(2) : "0.00"; })()}€
-  Categorias: ${productTypes.join(", ") || "sin categorizar"}
-  Visual DNA: ${visualDna.length > 0 ? JSON.stringify({ bg: visualDna[0].backgroundStyle, lighting: visualDna[0].lightingStyle, mood: visualDna[0].mood, composition: visualDna[0].composition }) : "No configurado"}
-  
-  === SEO ===
-  Score medio: ${avgSeo.toFixed(1)}/100 (Grade ${storeGrade})
-  Con meta title: ${liveAudit.filter(a => a.hasMetaTitle).length}/${products.length}
-  Con meta description: ${liveAudit.filter(a => a.hasMetaDesc).length}/${products.length}
-  Con Schema JSON-LD: ${liveAudit.filter(a => a.hasSchema).length}/${products.length}
-  Con alt texts: ${liveAudit.filter(a => a.hasAltTexts).length}/${products.length}
-  Con handle limpio: ${liveAudit.filter(a => a.cleanHandle).length}/${products.length}
-  Con descripcion +300 chars: ${liveAudit.filter(a => a.descLen >= 300).length}/${products.length}
-  
-  Top 5 PEORES SEO:
-  ${seoIssuesSummary}
-  
-  Top 5 MEJORES SEO:
-  ${best5Seo.map(a => `- "${a.product.title}" SEO ${a.grade} (${a.score}/100)`).join("\n")}
-  
-  === FINANCIERO ===
-  Valor catalogo total: ${totalCatalogValue.toFixed(2)}€
-  COGS total registrado: ${totalCogs.toFixed(2)}€ (${allCogs.length}/${products.length} productos)
-  Margen bruto medio: ${allCogs.length > 0 ? avgMargin.toFixed(1) + "%" : "sin datos COGS"}
-  Revenue Shopify (ultimos 90 dias): ${totalRevenue.toFixed(2)}€
-  Pedidos totales: ${totalOrders}
-  AOV: ${totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) + "€" : "sin pedidos"}
-  
-  === A/B TESTING ===
-  Tests totales: ${tests.length}
-  Activos: ${tests.filter(t => t.status === "running").length}
-  Completados: ${tests.filter(t => t.status === "completed" || t.status === "winner_applied").length}
-  
-  === COMPETIDORES ===
-  ${competitorList || "Sin competidores registrados"}
-  
-  === DETALLE DE PRODUCTOS (hasta 25) ===
-  ${productSummary}
-  `;
-  
-      const systemPrompt = `Eres ShopyBrain, el motor de inteligencia artificial de Shopy Crafter, una agencia independiente de optimización IA para tiendas Shopify. Generas informes exhaustivos, estrategicos y profundamente analiticos para clientes de e-commerce. IMPORTANTE: Shopy Crafter NO es Shopify. Somos un servicio independiente que optimiza tiendas en la plataforma Shopify.
-  
-  Tu analisis debe ser EXTENSO, DETALLADO, ESPECIFICO al negocio del cliente. No uses frases genericas ni recomendaciones vagas. Cada parrafo debe contener datos concretos del cliente, numeros exactos, y recomendaciones accionables con estimaciones de impacto.
-  
-  Escribe SIEMPRE en español. Usa lenguaje profesional pero accesible. Se exhaustivo — cuanto mas largo y detallado, mejor. Minimo 3-4 parrafos por seccion.`;
-  
-      const userPrompt = `Genera un analisis EXHAUSTIVO y PROFUNDO de esta tienda Shopify. Responde en formato JSON con las siguientes claves (cada valor es texto largo en HTML con parrafos <p>, negritas <strong>, listas <ul><li>, etc.):
-  
-  ${dataBlock}
-  
-  FORMATO JSON REQUERIDO:
-  {
-    "executiveSummary": "Narrativa de 4-5 parrafos: estado general de la tienda, hallazgos criticos, fortalezas detectadas, debilidades principales, y una valoracion profesional honesta. Incluye datos numericos concretos.",
-    "brandAnalysis": "3-4 parrafos: analisis de coherencia de marca, alineacion entre nicho declarado y catalogo real, consistencia visual (basado en Visual DNA si existe), y recomendaciones de posicionamiento de marca con acciones concretas.",
-    "seoDeepAnalysis": "4-5 parrafos: diagnostico detallado de la situacion SEO actual con numeros exactos, analisis de los 5 peores productos y que les falta especificamente, oportunidades de quick-wins (que mejorar primero para maximo impacto), estrategia de schema markup, y plan de accion SEO priorizado por esfuerzo/impacto.",
-    "pricingStrategy": "4-5 parrafos: analisis de la estructura de precios actual, distribucion por rangos, coherencia de pricing dentro de cada categoria, oportunidades de pricing psicologico (con ejemplos concretos de productos), estrategia de compare-at-price, y recomendaciones de ajuste con estimacion de impacto en revenue.",
-    "financialAnalysis": "3-4 parrafos: analisis de margenes (si hay COGS), productos con margen critico, productos con margen saludable, estructura de costes, y recomendaciones para mejorar rentabilidad. Si no hay COGS, explicar por que es critico registrarlos y que impacto tiene no tenerlos.",
-    "productMixStrategy": "3-4 parrafos: analisis del mix de productos, oportunidades de bundle y cross-sell con productos ESPECIFICOS del catalogo (nombrar los productos), estrategia de upsell, productos ancla vs productos de entrada, y como optimizar el AOV.",
-    "competitivePosition": "2-3 parrafos: posicionamiento competitivo basado en los competidores registrados (o analisis general del nicho si no hay competidores), ventajas diferenciales, areas de mejora competitiva.",
-    "actionPlan30Days": "Lista HTML detallada de las 7-10 acciones prioritarias para los proximos 30 dias, ordenadas por impacto esperado. Cada accion debe incluir: que hacer exactamente, en que productos, resultado esperado, y nivel de esfuerzo (bajo/medio/alto). Usar <ol> con <li> detallados.",
-    "revenueProjection": "2-3 parrafos: proyeccion realista de revenue basada en los datos actuales, escenarios optimista/base/pesimista para 30/60/90 dias, y que palancas mover para alcanzar cada escenario."
-  }
-  
-  IMPORTANTE: Cada seccion debe ser EXTENSA (minimo 3-4 parrafos), ESPECIFICA (nombrar productos concretos del catalogo), y con DATOS NUMERICOS del cliente. No uses placeholder ni contenido generico. El JSON debe ser valido.`;
-  
-      const aiResponse = await askClaudeWithBrain(projectId, [{ role: "user", content: userPrompt }], systemPrompt, "general", project.storeNiche ?? undefined, 8192);
-  
-      let aiReport: Record<string, string>;
-      try {
-        const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("No JSON found in response");
-        aiReport = JSON.parse(jsonMatch[0]);
-      } catch {
-        aiReport = { executiveSummary: aiResponse, raw: "true" };
-      }
-  
+      });
+
+      const reportInput: StrategicReportInput = {
+        project: {
+          name: project.name,
+          shopDomain: project.shopDomain || null,
+          platformType: project.platformType ?? null,
+          storeNiche: project.storeNiche,
+          brandTone: project.brandTone,
+          targetAudience: project.targetAudience,
+          storeMarkets: project.storeMarkets,
+          projectDescription: (project as { projectDescription?: string | null }).projectDescription ?? null,
+        },
+        catalog: {
+          total: products.length,
+          active: products.filter(p => p.status === "active").length,
+          draft: products.filter(p => p.status === "draft").length,
+          archived: products.filter(p => p.status === "archived").length,
+          pricedCount: positivePrices.length,
+          avgPrice: positivePrices.length > 0 ? positivePrices.reduce((s, p) => s + p, 0) / positivePrices.length : 0,
+          minPrice: positivePrices[0] ?? 0,
+          maxPrice: positivePrices[positivePrices.length - 1] ?? 0,
+          medianPrice: positivePrices[Math.floor(positivePrices.length / 2)] ?? 0,
+          productTypes: [...new Set(products.map(p => p.productType).filter((t): t is string => !!t))],
+          productLines,
+        },
+        seo: {
+          avgScore: avgSeo,
+          grade: storeGrade,
+          withMetaTitle: liveAudit.filter(a => a.hasMetaTitle).length,
+          withMetaDesc: liveAudit.filter(a => a.hasMetaDesc).length,
+          withSchema: liveAudit.filter(a => a.hasSchema).length,
+          withAltTexts: liveAudit.filter(a => a.hasAltTexts).length,
+          withCleanHandle: liveAudit.filter(a => a.cleanHandle).length,
+          withLongDesc: liveAudit.filter(a => a.descLen >= 300).length,
+          worstLines: worst5Seo.map(a =>
+            `- "${a.product.title}" SEO ${a.grade} (${a.score}/100): Meta title: ${a.hasMetaTitle ? "SI" : "NO"}, Meta desc: ${a.hasMetaDesc ? "SI" : "NO"}, Schema: ${a.hasSchema ? "SI" : "NO"}, Alt texts: ${a.hasAltTexts ? "SI" : "NO"}, Handle limpio: ${a.cleanHandle ? "SI" : "NO"}, Desc: ${a.descLen} chars`),
+          bestLines: best5Seo.map(a => `- "${a.product.title}" SEO ${a.grade} (${a.score}/100)`),
+        },
+        financial: {
+          catalogValue: totalCatalogValue,
+          cogsTotal: totalCogs,
+          cogsCount: allCogs.length,
+          avgMarginPct: allCogs.length > 0 && totalCatalogValue > 0 ? ((totalCatalogValue - totalCogs) / totalCatalogValue) * 100 : null,
+          revenue90d: totalRevenue,
+          orders90d: totalOrders,
+        },
+        abTests: {
+          total: tests.length,
+          running: tests.filter(t => t.status === "running").length,
+          completed: tests.filter(t => t.status === "completed" || t.status === "winner_applied").length,
+        },
+        competitors: competitors.slice(0, 5).map(c => `- ${c.name} (${c.url || "sin URL"}) — tipo: ${c.type || "direct"}`),
+        visualDna: visualDna.length > 0 ? JSON.stringify({ bg: visualDna[0].backgroundStyle, lighting: visualDna[0].lightingStyle, mood: visualDna[0].mood, composition: visualDna[0].composition }) : null,
+      };
+
+      // Una llamada por bloque de secciones (en paralelo): cada salida es un JSON
+      // corto validado y el HTML se monta en el servidor. Las secciones sin datos
+      // no se piden a la IA.
+      const plan = planStrategicReport(reportInput);
+      const groupResults = await Promise.all(plan.groups.map(g =>
+        askClaudeJsonValidated(projectId, g.prompt, STRATEGIC_REPORT_SYSTEM, {
+          schema: groupSchema(g.keys),
+          useCase: "general",
+          niche: project.storeNiche ?? undefined,
+          maxTokens: 6000,
+          retryMaxTokens: 12000,
+          label: `exports/generate-ai-report:bloque-${g.group}`,
+        }),
+      ));
+      const generated: Partial<Record<StrategicSectionKey, StrategicSection>> = {};
+      for (const r of groupResults) Object.assign(generated, r.sections);
+      const aiReport: Record<string, string> = assembleStrategicReport(plan, generated);
+
+      // aiReportJson también guarda banderas del conector WooCommerce (seoWriteSupported…):
+      // se conservan en vez de pisarlas.
+      let previousMeta: Record<string, unknown> = {};
+      try { previousMeta = project.aiReportJson ? JSON.parse(project.aiReportJson) : {}; } catch { /* informe previo ilegible */ }
+      const preservedMeta = Object.fromEntries(Object.entries(previousMeta).filter(([k]) => k === "seoWriteSupported" || k === "seoWriteSnippet"));
+
       await db.update(projectsTable)
         .set({
-          aiReportJson: JSON.stringify(aiReport),
+          aiReportJson: JSON.stringify({ ...preservedMeta, ...aiReport }),
           aiReportGeneratedAt: new Date(),
         })
         .where(eq(projectsTable.id, projectId));
-  
+
+      const plainText = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       learnFromOperation({
         operationType: "ai_strategic_report",
         title: `Informe IA estratégico: ${project.name ?? "tienda"} — ${Object.keys(aiReport).length} secciones`,
-        content: `Informe IA generado. Secciones: ${Object.keys(aiReport).join(", ")}. Resumen: ${aiReport.executiveSummary ?? ""}. Plan 30d: ${aiReport.actionPlan30Days ?? ""}. Revenue: ${aiReport.revenueProjection ?? ""}`,
+        content: `Informe IA generado. Secciones: ${Object.keys(aiReport).join(", ")}. Sin datos: ${plan.missingSections.map(m => m.key).join(", ") || "ninguna"}. Resumen: ${plainText(aiReport.executiveSummary ?? "")}. Plan 30d: ${plainText(aiReport.actionPlan30Days ?? "")}. Revenue: ${plainText(aiReport.revenueProjection ?? "")}`,
         confidence: 0.92,
         tags: ["report", "strategic", "ai_analysis", project.storeNiche ?? "general"],
       });
-  
-      const sectionLabels: Record<string, string> = {
-        executiveSummary: "Resumen Ejecutivo",
-        brandAnalysis: "Análisis de Marca",
-        seoDeepAnalysis: "Análisis SEO Profundo",
-        pricingStrategy: "Estrategia de Precios",
-        financialAnalysis: "Análisis Financiero",
-        productMixStrategy: "Estrategia de Mix de Productos",
-        competitivePosition: "Posición Competitiva",
-        actionPlan30Days: "Plan de Acción 30 Días",
-        revenueProjection: "Proyección de Revenue",
-      };
+
       const sectionsHtml = Object.entries(aiReport)
-        .filter(([k]) => k !== "raw")
-        .map(([k, v]) => `<h2>${sanitizeHtml(sectionLabels[k] || k)}</h2>\n<div>${v}</div>`)
+        .map(([k, v]) => `<h2>${sanitizeHtml(STRATEGIC_SECTION_LABELS[k as StrategicSectionKey] || k)}</h2>\n<div>${sanitizeAiHtmlOutput(v)}</div>`)
         .join("\n\n");
       const aiHtmlReport = reportShell(
         `Informe Estratégico IA — ${project.name}`,
@@ -2871,7 +2859,7 @@ router.post("/projects/:projectId/exports/generate-ai-report", requireProjectAcc
         new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
       );
       const savedId = await autoSaveReport(projectId, `Informe Estratégico IA — ${project.name}`, aiHtmlReport, "ai_strategic_report");
-  
+
       res.json({
         ok: true,
         projectId,
@@ -2883,6 +2871,10 @@ router.post("/projects/:projectId/exports/generate-ai-report", requireProjectAcc
       });
     } catch (err: any) {
       console.error("generate-ai-report error:", err);
+      if (isAiOutputError(err)) {
+        res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code });
+        return;
+      }
       res.status(500).json({ error: "Error generando analisis IA. Intentalo de nuevo." });
     }
   } catch (err: any) {
