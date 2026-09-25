@@ -3,7 +3,10 @@ import { db } from "@workspace/db";
 import { inventoryTrackingTable, restockOrdersTable, projectsTable, salesAnalyticsTable, refundsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { askClaudeWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
+import { learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
+import { askClaudeJsonValidated } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { z } from "zod";
 import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify.js";
 import { getConnector } from "../lib/connectors/index";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
@@ -74,6 +77,13 @@ router.get("/inventory/alerts", async (req, res): Promise<void> => {
   }
 });
 
+const restockEmailSchema = z.object({
+  subject: z.string().min(1),
+  body: z.string().min(1),
+  urgency: z.enum(["critical", "high", "medium"]).catch("high"),
+  suggestedQuantity: z.coerce.number().int().positive().catch(90),
+});
+
 router.post("/inventory/restock-email", async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
@@ -99,18 +109,13 @@ router.post("/inventory/restock-email", async (req, res): Promise<void> => {
   
     try {
       const niche = project?.storeNiche ?? undefined;
-      const text = await askClaudeWithBrain(
+      // Antes, si el JSON no parseaba, el texto crudo de la IA acababa como cuerpo del email.
+      const email = await askClaudeJsonValidated(
         parseInt(projectId),
-        [{ role: "user", content: prompt }],
-        `${SHOPIFY_EXPERT_SYSTEM} You are also an expert in supply chain and inventory management for e-commerce. Generate professional supplier communications that reflect the store's brand voice.`,
-        "general",
-        niche
+        prompt,
+        `${SHOPIFY_EXPERT_SYSTEM} You are also an expert in supply chain and inventory management for e-commerce. Generate professional supplier communications that reflect the store's brand voice. Respond ONLY with valid JSON.`,
+        { schema: restockEmailSchema, niche, maxTokens: 4000, label: "inventory/restock-email" },
       );
-      const match = text.match(/\{[\s\S]*\}/);
-      const defaultEmail = { subject: "Restock Request", body: text, urgency: "high", suggestedQuantity: 90 };
-      let email: any;
-      if (match) { try { email = JSON.parse(match[0]); } catch { email = defaultEmail; } }
-      else { email = defaultEmail; }
   
       const [order] = await db.insert(restockOrdersTable).values({
         id: randomUUID(), projectId, productId, productTitle,
@@ -128,6 +133,7 @@ router.post("/inventory/restock-email", async (req, res): Promise<void> => {
   
       res.json({ ...email, orderId: order.id });
     } catch (e: any) {
+      if (isAiOutputError(e)) { res.status(502).json({ error: aiOutputErrorMessage(e) }); return; }
       res.status(500).json({ error: e.message });
     }
   } catch (err: any) {

@@ -1,6 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
+import { askClaudeJsonValidated, parseAiJson, type AiJsonSchema } from "../lib/ai-json.js";
+import { z } from "zod";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { scrapeWebsite, validateUrlWithDnsCheck } from "../lib/web-scraper.js";
 import { runPageSpeedAudit } from "../lib/pagespeed.js";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
@@ -261,6 +264,18 @@ interface WebLabAnalysis {
   summary: string;
 }
 
+// Lo que el informe y el Vault leen sin comprobar. Las puntuaciones son
+// obligatorias: antes, si faltaban, se rellenaban con 50 (cifras inventadas).
+const score = z.coerce.number().min(0).max(100);
+const webLabAnalysisSchema = z.object({
+  overallScore: score.nullish(),
+  categories: z.object({ design: score, ux: score, responsive: score, accessibility: score, performance: score, consistency: score }),
+  issues: z.array(z.object({ selector: z.string(), property: z.string() }).passthrough()).default([]),
+  improvedCss: z.string().min(1),
+  improvedHtmlFragments: z.array(z.object({ section: z.string(), improved: z.string() }).passthrough()).default([]),
+  summary: z.string().min(1),
+}).passthrough() as unknown as AiJsonSchema<WebLabAnalysis>;
+
 const WEB_DESIGN_SYSTEM = `Eres un experto mundial en diseño web, UX/UI, accesibilidad WCAG 2.1, CSS profesional y responsive design.
 Tu trabajo es analizar el código real (HTML y CSS) de una página web y producir un REDISEÑO COMPLETO con CSS profesional específico para esa marca.
 
@@ -474,11 +489,8 @@ router.post("/web-lab/analyze", async (req: Request, res: Response): Promise<voi
 
       const parseSafe = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>): Record<string, unknown> | null => {
         if (r.status !== "fulfilled") return null;
-        try {
-          const text = r.value?.text ?? "";
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          return jsonMatch ? JSON.parse(jsonMatch[0]) as Record<string, unknown> : null;
-        } catch { return null; }
+        const parsed = parseAiJson<Record<string, unknown>>(r.value?.text ?? "", { expect: "object" });
+        return parsed.ok ? parsed.data : null;
       };
 
       brandResearch.brandInfo = parseSafe(brandResult);
@@ -538,15 +550,9 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
 
     const userPrompt = `Analiza en profundidad esta página web. Tienes el HTML y CSS REALES extraídos directamente del sitio.\n\n${contextParts.join("\n")}`;
 
-    const analysis = await askClaudeJsonWithBrain<WebLabAnalysis>(
-      pid, userPrompt, WEB_DESIGN_SYSTEM, "general", undefined, 16000, 300_000
-    );
-
-    if (!analysis.improvedCss) analysis.improvedCss = "/* No se generaron mejoras CSS */";
-    if (!analysis.issues) analysis.issues = [];
-    if (!analysis.categories) {
-      analysis.categories = { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 };
-    }
+    const analysis = await askClaudeJsonValidated<WebLabAnalysis>(pid, userPrompt, WEB_DESIGN_SYSTEM, {
+      schema: webLabAnalysisSchema, maxTokens: 16000, retryMaxTokens: 32000, timeoutMs: 300_000, label: "web-lab/analyze",
+    });
 
     // ── T004: Auditoría de calidad / uniqueness ──
     // Severos (CSS < 200 líneas, placeholder/lorem detectados) → rechazamos.
@@ -699,10 +705,11 @@ REGLA CRÍTICA: NO generes CSS genérico. El CSS debe sentirse EXACTAMENTE como 
     res.end(result);
   } catch (err: any) {
     logger.error({ err }, "Web Lab analysis failed");
+    const message = isAiOutputError(err) ? aiOutputErrorMessage(err) : (err.message || "Error en el análisis");
     if (!res.headersSent) {
-      res.status(500).json({ error: err.message || "Error en el análisis" });
+      res.status(isAiOutputError(err) ? 502 : 500).json({ error: message });
     } else {
-      try { res.end(JSON.stringify({ error: err.message || "Error en el análisis" })); } catch {}
+      try { res.end(JSON.stringify({ error: message })); } catch {}
     }
   }
 });
@@ -1355,15 +1362,9 @@ export async function runWebLabAnalysis(url: string, projectId: number, template
 
   const userPrompt = `Analiza en profundidad esta página web. Tienes el HTML y CSS REALES.\n\n${contextParts.join("\n")}`;
 
-  const analysis = await askClaudeJsonWithBrain<WebLabAnalysis>(
-    projectId, userPrompt, WEB_DESIGN_SYSTEM, "general", undefined, 16000, 300_000
-  );
-
-  if (!analysis.improvedCss) analysis.improvedCss = "/* No se generaron mejoras CSS */";
-  if (!analysis.issues) analysis.issues = [];
-  if (!analysis.categories) {
-    analysis.categories = { design: 50, ux: 50, responsive: 50, accessibility: 50, performance: 50, consistency: 50 };
-  }
+  const analysis = await askClaudeJsonValidated<WebLabAnalysis>(projectId, userPrompt, WEB_DESIGN_SYSTEM, {
+    schema: webLabAnalysisSchema, maxTokens: 16000, retryMaxTokens: 32000, timeoutMs: 300_000, label: "web-lab/analyze",
+  });
   if (!analysis.overallScore) {
     const cats = analysis.categories;
     analysis.overallScore = Math.round((cats.design + cats.ux + cats.responsive + cats.accessibility + cats.performance + cats.consistency) / 6);

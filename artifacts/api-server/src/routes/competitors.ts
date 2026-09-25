@@ -8,6 +8,9 @@ import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { recordApiUsage } from "../lib/api-usage.js";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
+import { askClaudeJsonValidated, parseAiJson } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { z } from "zod";
 import net from "net";
 import { enableLongRunning } from "../lib/long-running.js";
 import { getReportShell } from "./exports.js";
@@ -436,6 +439,30 @@ RESPONDE con JSON exacto:
   }
 });
 
+const optText = z.string().nullish();
+const optList = z.array(z.string()).nullish();
+const comparativeReportSchema = z.object({
+  executiveSummary: z.string(),
+  ourStrengths: optList,
+  ourWeaknesses: optList,
+  marketPositioning: optText,
+  competitors: z.array(z.object({
+    name: z.string(),
+    priceLevel: optText,
+    priceRange: optText,
+    productAnalysis: optText,
+    qualityImage: optText,
+    webSeo: optText,
+    social: z.object({ instagram: optText, facebook: optText, tiktok: optText }).partial().nullish()
+      .transform(v => v ? Object.fromEntries(Object.entries(v).filter(([, x]) => !!x)) as Record<string, string> : undefined),
+    strengths: optList,
+    weaknesses: optList,
+    actionable: optText,
+  })).min(1),
+  recommendations: optList,
+});
+type ComparativeReport = z.infer<typeof comparativeReportSchema>;
+
 // ─── POST /competitors/comparative-report ─────────────────────────────────────
 // Genera informe HTML profesional comparando NUESTRA tienda contra los
 // competidores registrados, en precio / producto / calidad / imagen / social.
@@ -531,35 +558,32 @@ DEVUELVE SOLO un JSON válido:
   "recommendations": ["...", "..."]
 }`;
 
-    const safeParseJson = (raw: string): any => {
-      try {
-        const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-        const candidate = fence ? fence[1].trim() : raw.trim();
-        try { return JSON.parse(candidate); } catch {
-          const obj = candidate.match(/\{[\s\S]*\}/);
-          if (obj) return JSON.parse(obj[0]);
-        }
-      } catch { /* */ }
-      return null;
+    // Gemini: se parsea sin reintento (si falla, cae a Claude). Claude: helper con
+    // validación, un reintento y error tipado — nunca texto crudo en el informe.
+    const parseGemini = (raw: string): ComparativeReport | null => {
+      const r = parseAiJson(raw, { schema: comparativeReportSchema, expect: "object" });
+      if (!r.ok) logger.warn({ code: r.code, reason: r.message }, "Comparative report: JSON de Gemini inutilizable");
+      return r.ok ? r.data : null;
     };
+    const askClaudeReport = (system: string) => askClaudeJsonValidated(projectIdNum, aiPrompt, system, {
+      schema: comparativeReportSchema, useCase: "competitors", niche, maxTokens: 12000, retryMaxTokens: 24000,
+      label: "competitors/comparative-report",
+    });
+    const CLAUDE_REPORT_SYSTEM = `${SHOPIFY_EXPERT_SYSTEM} You are a world-class competitive intelligence consultant. Respond ONLY with valid JSON. You have NO live web access here: never invent prices, follower counts or URLs — if you don't know a data point, omit the field or write "sin datos verificados".`;
 
     const t0 = Date.now();
-    let parsed: any = null;
+    let parsed: ComparativeReport | null = null;
     let sources: string[] = [];
+    let usedClaude = false;
+    let aiError: unknown = null;
 
     if (isGeminiSearchBlocked()) {
       logger.info("Comparative report: Gemini blocked, using Claude directly");
       try {
-        const claudeText = await askClaudeWithBrain(
-          projectIdNum,
-          [{ role: "user", content: aiPrompt }],
-          `${SHOPIFY_EXPERT_SYSTEM} You are a world-class competitive intelligence consultant. Respond ONLY with valid JSON. Use your knowledge to provide realistic competitive analysis.`,
-          "competitors",
-          niche,
-        );
-        parsed = safeParseJson(claudeText);
+        parsed = await askClaudeReport(CLAUDE_REPORT_SYSTEM);
         sources = ["Claude AI analysis"];
-      } catch { /* parsed stays null */ }
+        usedClaude = true;
+      } catch (err) { aiError = err; }
     } else {
       try {
         const gemCompResult = await askGeminiWithSearch(
@@ -567,7 +591,7 @@ DEVUELVE SOLO un JSON válido:
           "Eres un investigador competitivo. Verifica todo con Google. Responde SIEMPRE con JSON estricto, sin texto fuera del JSON. Si un dato no existe, omite el campo.",
         );
         sources = gemCompResult.sources;
-        parsed = safeParseJson(gemCompResult.text);
+        parsed = parseGemini(gemCompResult.text);
         if (gemCompResult.usage) {
           void recordApiUsage({
             provider: "gemini",
@@ -588,22 +612,17 @@ DEVUELVE SOLO un JSON válido:
       if (!parsed || !Array.isArray(parsed.competitors)) {
         logger.warn("Comparative report: Gemini failed/empty, falling back to Claude");
         try {
-          const claudeText = await askClaudeWithBrain(
-            projectIdNum,
-            [{ role: "user", content: aiPrompt }],
-            `${SHOPIFY_EXPERT_SYSTEM} You are a world-class competitive intelligence consultant. Respond ONLY with valid JSON. Use your knowledge to estimate realistic data when needed.`,
-            "competitors",
-            niche,
-          );
-          parsed = safeParseJson(claudeText);
+          parsed = await askClaudeReport(CLAUDE_REPORT_SYSTEM);
           sources = ["Claude AI analysis"];
-        } catch { /* parsed stays null */ }
+          usedClaude = true;
+        } catch (err) { aiError = err; }
       }
     }
     const elapsedMs = Date.now() - t0;
 
-    if (!parsed || !Array.isArray(parsed.competitors)) {
-      res.status(502).json({ error: "No se pudo generar el informe comparativo. Intenta de nuevo." });
+    if (!parsed) {
+      if (aiError && !isAiOutputError(aiError)) logger.error({ err: String(aiError) }, "Comparative report: Claude falló");
+      res.status(502).json({ error: isAiOutputError(aiError) ? aiOutputErrorMessage(aiError) : "No se pudo generar el informe comparativo. Intenta de nuevo." });
       return;
     }
 
@@ -627,8 +646,8 @@ DEVUELVE SOLO un JSON válido:
         </tr></tbody>
       </table>`;
 
-    const compHtml = (parsed.competitors as any[]).map(c => {
-      const social = c.social || {};
+    const compHtml = parsed.competitors.map(c => {
+      const social: Record<string, string | undefined> = c.social || {};
       return `
       <h2>${esc(c.name)}</h2>
       <table>
@@ -652,7 +671,9 @@ DEVUELVE SOLO un JSON válido:
 
     const recsHtml = `<h2>Recomendaciones globales</h2>
       <ul>${(parsed.recommendations || []).map((r: string) => `<li>${esc(r)}</li>`).join("")}</ul>
-      <p style="font-size:11px;color:#94a3b8;margin-top:18px">Análisis basado en investigación con Google Search en tiempo real (${sources.length} fuentes verificadas, ${Math.round(elapsedMs / 1000)}s).</p>`;
+      <p style="font-size:11px;color:#94a3b8;margin-top:18px">${usedClaude
+        ? `Análisis generado por Claude sin búsqueda web en tiempo real: los datos no verificados se indican como tales (${Math.round(elapsedMs / 1000)}s).`
+        : `Análisis basado en investigación con Google Search en tiempo real (${sources.length} fuentes verificadas, ${Math.round(elapsedMs / 1000)}s).`}</p>`;
 
     const body = summaryHtml + compHtml + recsHtml;
     const shell = getReportShell("prestige");

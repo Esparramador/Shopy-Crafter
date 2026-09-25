@@ -3,6 +3,8 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, abTestsTable, trackEventsTable, cogsTable, supplierEntriesTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { askClaudeJsonWithBrain, askClaudeWithVision, learnFromOperation, safeJsonParse } from "../lib/claude";
+import { askClaudeJsonValidated } from "../lib/ai-json.js";
+import { z } from "zod";
 import { enableLongRunning } from "../lib/long-running.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { requireProjectAccess } from "../lib/access.js";
@@ -1604,6 +1606,14 @@ router.get("/projects/:projectId/ab-tests/:testId/stats", async (req, res): Prom
   }
 });
 
+const abNarrativeSchema = z.object({
+  executiveSummary: z.string().min(1),
+  keyFindings: z.array(z.coerce.string()).default([]),
+  recommendation: z.string().default(""),
+  risks: z.array(z.coerce.string()).default([]),
+  nextSteps: z.array(z.coerce.string()).default([]),
+});
+
 router.post("/projects/:projectId/ab-tests/:testId/report", requireProjectAccess, async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
@@ -1680,24 +1690,21 @@ Devuelve JSON estricto con esta forma exacta:
 }
 
 Reglas: nada de inventar cifras, no usar emojis, tono ejecutivo. Si los datos son insuficientes, dilo explícitamente.`;
-      const ai = await askClaudeJsonWithBrain<Narrative>(
+      // Validado y con un reintento; si aun así falla, se queda la narrativa
+      // calculada arriba con los datos reales (nunca texto crudo de la IA).
+      const ai = await askClaudeJsonValidated(
         projectId,
         prompt,
         "Eres un analista de e-commerce que produce informes ejecutivos en español. Solo respondes JSON válido.",
-        "general",
-        undefined,
-        2000,
-        45_000,
+        { schema: abNarrativeSchema, maxTokens: 2000, retryMaxTokens: 4000, timeoutMs: 45_000, label: "ab-testing/report" },
       );
-      if (ai && typeof ai === "object" && ai.executiveSummary) {
-        narrative = {
-          executiveSummary: String(ai.executiveSummary),
-          keyFindings: Array.isArray(ai.keyFindings) ? ai.keyFindings.map(String).slice(0, 6) : narrative.keyFindings,
-          recommendation: String(ai.recommendation || narrative.recommendation),
-          risks: Array.isArray(ai.risks) ? ai.risks.map(String).slice(0, 5) : [],
-          nextSteps: Array.isArray(ai.nextSteps) ? ai.nextSteps.map(String).slice(0, 6) : narrative.nextSteps,
-        };
-      }
+      narrative = {
+        executiveSummary: ai.executiveSummary,
+        keyFindings: ai.keyFindings.length > 0 ? ai.keyFindings.slice(0, 6) : narrative.keyFindings,
+        recommendation: ai.recommendation || narrative.recommendation,
+        risks: ai.risks.slice(0, 5),
+        nextSteps: ai.nextSteps.length > 0 ? ai.nextSteps.slice(0, 6) : narrative.nextSteps,
+      };
     } catch (e) {
       logger.warn({ err: e instanceof Error ? e.message : String(e) }, "[ab-report] Claude narrative failed, using fallback");
     }

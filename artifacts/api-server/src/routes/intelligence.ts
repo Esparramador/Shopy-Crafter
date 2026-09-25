@@ -5,6 +5,8 @@ import { randomUUID } from "crypto";
 import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { parseAiJson } from "../lib/ai-json.js";
+import { logger } from "../lib/logger.js";
 
 // ─── INTELLIGENCE EXTRACTION ENGINE ─────────────────────────────────────────
 // ShopyBrain Universal Input Extractor — takes ANY input and extracts max intelligence
@@ -562,10 +564,14 @@ router.post("/intelligence/analyze", async (req, res): Promise<void> => {
         niche: project?.storeNiche ?? undefined,
       });
       const text = dualResult.final;
-      const match = text.match(/\{[\s\S]*\}/);
-      let analysis: any;
-      if (match) { try { analysis = JSON.parse(match[0]); } catch { analysis = { summary: text, topInsights: [], recommendations: [] }; } }
-      else { analysis = { summary: text, topInsights: [], recommendations: [] }; }
+      // dualAI no expone stop_reason: sin reintento, pero nunca el texto crudo como "summary".
+      const parsed = parseAiJson<Record<string, unknown>>(text, { expect: "object" });
+      if (!parsed.ok) {
+        logger.warn({ projectId, code: parsed.code, reason: parsed.message }, "intelligence/analyze: respuesta de IA inutilizable");
+        res.status(502).json({ error: "La IA devolvió una respuesta con formato inválido. Inténtalo de nuevo." });
+        return;
+      }
+      const analysis = { topInsights: [], recommendations: [], ...parsed.data };
       res.json({ analysis, projectId, analyzedAt: new Date().toISOString(), dualAI: { mode: dualResult.mode, timings: dualResult.timings } });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
