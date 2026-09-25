@@ -65,7 +65,8 @@
     "stripe": "^22.2.3",
     "uuid": "^14.0.0",
     "web-push": "^3.6.7",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

@@ -5,6 +5,9 @@ import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnic
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 import { logger } from "./logger.js";
+import { AiTruncatedError } from "./ai-errors.js";
+
+export { AiTruncatedError } from "./ai-errors.js";
 
 function repairJson(raw: string): string {
   let s = raw.trim();
@@ -176,6 +179,33 @@ export interface ClaudeCallOpts {
   model?: string;
   /** Pick by tier — "fast"|"smart"|"genius"|"vision". DB/env can remap. */
   tier?: import("./ai-models.js").AITier;
+  /**
+   * Si la respuesta se corta por max_tokens, lanza AiTruncatedError en vez de
+   * devolver el texto a medias. Por defecto false (solo log) por compatibilidad.
+   */
+  failOnTruncation?: boolean;
+}
+
+/** Log + (opcional) error tipado cuando stop_reason === "max_tokens". */
+function checkTruncation(
+  response: { stop_reason: string | null; usage?: { input_tokens?: number; output_tokens?: number } },
+  ctx: { label: string; maxTokens: number; model: string; failOnTruncation?: boolean },
+): boolean {
+  if (response.stop_reason !== "max_tokens") return false;
+  const outputTokens = response.usage?.output_tokens;
+  logger.warn({ maxTokens: ctx.maxTokens, model: ctx.model, inputTokens: response.usage?.input_tokens, outputTokens }, `[${ctx.label}] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit`);
+  if (ctx.failOnTruncation) {
+    throw new AiTruncatedError(`[${ctx.label}] Respuesta cortada por max_tokens (${ctx.maxTokens})`, {
+      label: ctx.label, maxTokens: ctx.maxTokens, model: ctx.model, outputTokens,
+    });
+  }
+  return true;
+}
+
+function firstText(response: { content: Array<{ type: string }> }, errorMessage = "Unexpected non-text Claude response"): string {
+  const block = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
+  if (!block) throw new Error(errorMessage);
+  return block.text;
 }
 
 async function resolveClaudeModel(opts?: ClaudeCallOpts): Promise<string> {
@@ -200,14 +230,27 @@ export interface ClaudeUsage {
   model: string;
 }
 
-export async function askClaudeWithUsage(
+export interface ClaudeTextResult {
+  text: string;
+  stopReason: string | null;
+  /** true si stop_reason === "max_tokens": el texto está incompleto. */
+  truncated: boolean;
+  usage: ClaudeUsage;
+}
+
+/**
+ * Núcleo de askClaude / askClaudeWithUsage: devuelve el texto junto con el
+ * stop_reason para que quien llama pueda detectar el truncado.
+ */
+export async function askClaudeDetailed(
   projectId: number,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   systemPrompt?: string,
   maxTokens = 32000,
   timeoutMs = 300_000,
   opts?: ClaudeCallOpts,
-): Promise<{ text: string; usage: ClaudeUsage }> {
+  operation = "askClaudeDetailed",
+): Promise<ClaudeTextResult> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
     const client = await getClaudeClient(projectId);
@@ -224,18 +267,16 @@ export async function askClaudeWithUsage(
     );
     const response = await stream.finalMessage();
 
-    if (response.stop_reason === "max_tokens") {
-      logger.warn({ maxTokens, model, inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
-    }
-
     const inTok = response.usage?.input_tokens ?? 0;
     const outTok = response.usage?.output_tokens ?? 0;
+    let costUsd = 0;
+    // Track real cost (fire-and-forget, never blocks response)
     try {
       const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
-      const costUsd = calcClaudeCost(model, inTok, outTok);
+      costUsd = calcClaudeCost(model, inTok, outTok);
       void recordApiUsage({
         provider: "claude",
-        operation: "askClaudeWithUsage",
+        operation,
         model,
         projectId: projectId || null,
         inputUnits: inTok,
@@ -243,15 +284,28 @@ export async function askClaudeWithUsage(
         unitsLabel: "tokens",
         costUsd,
       });
-      const content = response.content[0];
-      if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
-      return { text: content.text, usage: { inputTokens: inTok, outputTokens: outTok, costUsd, model } };
-    } catch (err) {
-      const content = response.content[0];
-      if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
-      return { text: content.text, usage: { inputTokens: inTok, outputTokens: outTok, costUsd: 0, model } };
-    }
+    } catch { /* nunca bloquea */ }
+
+    const truncated = checkTruncation(response, { label: "Claude", maxTokens, model, failOnTruncation: opts?.failOnTruncation });
+    return {
+      text: firstText(response),
+      stopReason: response.stop_reason,
+      truncated,
+      usage: { inputTokens: inTok, outputTokens: outTok, costUsd, model },
+    };
   });
+}
+
+export async function askClaudeWithUsage(
+  projectId: number,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  systemPrompt?: string,
+  maxTokens = 32000,
+  timeoutMs = 300_000,
+  opts?: ClaudeCallOpts,
+): Promise<{ text: string; usage: ClaudeUsage }> {
+  const r = await askClaudeDetailed(projectId, messages, systemPrompt, maxTokens, timeoutMs, opts, "askClaudeWithUsage");
+  return { text: r.text, usage: r.usage };
 }
 
 export async function askClaude(
@@ -262,48 +316,8 @@ export async function askClaude(
   timeoutMs = 300_000,
   opts?: ClaudeCallOpts,
 ): Promise<string> {
-  const { withClaudeQueue } = await import("./claude-queue.js");
-  return withClaudeQueue(async () => {
-    const client = await getClaudeClient(projectId);
-    const model = await resolveClaudeModel(opts);
-
-    const stream = client.messages.stream(
-      {
-        model,
-        max_tokens: maxTokens,
-        system: systemPrompt ?? SHOPIFY_EXPERT_SYSTEM,
-        messages,
-      },
-      { signal: AbortSignal.timeout(timeoutMs) }
-    );
-    const response = await stream.finalMessage();
-
-    if (response.stop_reason === "max_tokens") {
-      logger.warn({ maxTokens, model, inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
-    }
-
-    // Track real cost (fire-and-forget, never blocks response)
-    try {
-      const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
-      const inTok = response.usage?.input_tokens ?? 0;
-      const outTok = response.usage?.output_tokens ?? 0;
-      const costUsd = calcClaudeCost(model, inTok, outTok);
-      void recordApiUsage({
-        provider: "claude",
-        operation: "askClaude",
-        model,
-        projectId: projectId || null,
-        inputUnits: inTok,
-        outputUnits: outTok,
-        unitsLabel: "tokens",
-        costUsd,
-      });
-    } catch { /* nunca bloquea */ }
-
-    const content = response.content[0];
-    if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
-    return content.text;
-  });
+  const r = await askClaudeDetailed(projectId, messages, systemPrompt, maxTokens, timeoutMs, opts, "askClaude");
+  return r.text;
 }
 
 export async function askClaudeJson<T>(
@@ -397,9 +411,7 @@ export async function askClaudeWithVision(
     );
     const response = await stream.finalMessage();
 
-    if (response.stop_reason === "max_tokens") {
-      logger.warn({ maxTokens, model }, "[Claude Vision] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
-    }
+    checkTruncation(response, { label: "Claude Vision", maxTokens, model, failOnTruncation: opts?.failOnTruncation });
 
     // Track real cost
     try {
@@ -427,7 +439,8 @@ export async function askClaudeVisionWithBrain(
   useCase: BrainUseCase = "general",
   niche?: string,
   maxTokens = 16000,
-  timeoutMs = 300_000
+  timeoutMs = 300_000,
+  opts?: Pick<ClaudeCallOpts, "failOnTruncation">,
 ): Promise<string> {
   const platform = await resolvePlatformType(projectId);
   const [brainContext, brandDna] = await Promise.all([
@@ -460,9 +473,7 @@ export async function askClaudeVisionWithBrain(
     );
     const response = await stream.finalMessage();
 
-    if (response.stop_reason === "max_tokens") {
-      logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude VisionBrain] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
-    }
+    checkTruncation(response, { label: "Claude VisionBrain", maxTokens, model: CLAUDE_MODEL, failOnTruncation: opts?.failOnTruncation });
 
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
@@ -470,7 +481,7 @@ export async function askClaudeVisionWithBrain(
   });
 }
 
-export async function claude(prompt: string, maxTokens = 32000): Promise<string> {
+export async function claude(prompt: string, maxTokens = 32000, opts?: Pick<ClaudeCallOpts, "failOnTruncation">): Promise<string> {
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
     const client = getDefaultClient();
@@ -484,9 +495,7 @@ export async function claude(prompt: string, maxTokens = 32000): Promise<string>
     );
     const response = await stream.finalMessage();
 
-    if (response.stop_reason === "max_tokens") {
-      logger.warn({ maxTokens, model: CLAUDE_MODEL }, "[Claude] ⚠️ RESPONSE TRUNCATED — hit max_tokens limit");
-    }
+    checkTruncation(response, { label: "Claude", maxTokens, model: CLAUDE_MODEL, failOnTruncation: opts?.failOnTruncation });
 
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text response");
@@ -987,7 +996,8 @@ export async function askClaudeWithBrain(
   useCase: BrainUseCase = "general",
   niche?: string,
   maxTokens = 32000,
-  timeoutMs = 180_000
+  timeoutMs = 180_000,
+  opts?: ClaudeCallOpts,
 ): Promise<string> {
   const lastUserMsg = messages.filter(m => m.role === "user").pop()?.content;
   const platform = await resolvePlatformType(projectId);
@@ -999,7 +1009,35 @@ export async function askClaudeWithBrain(
   const enrichedSystem = base + (brainContext || "") + (brandDna || "");
   const totalUserContent = messages.map(m => m.content).join("\n");
   const budget = enforcePromptBudget(enrichedSystem, totalUserContent, maxTokens);
-  return askClaude(projectId, messages, budget.system, maxTokens, timeoutMs);
+  return askClaude(projectId, messages, budget.system, maxTokens, timeoutMs, opts);
+}
+
+/**
+ * askClaudeWithBrain que además devuelve stop_reason/truncated. El contexto
+ * ShopyBrain se busca con el PRIMER mensaje de usuario (el encargo), así las
+ * continuaciones ("continúa donde lo dejaste") reutilizan el mismo contexto.
+ */
+export async function askClaudeWithBrainDetailed(
+  projectId: number,
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  systemPrompt?: string,
+  useCase: BrainUseCase = "general",
+  niche?: string,
+  maxTokens = 32000,
+  timeoutMs = 180_000,
+  opts?: ClaudeCallOpts,
+): Promise<ClaudeTextResult> {
+  const firstUserMsg = messages.find(m => m.role === "user")?.content;
+  const platform = await resolvePlatformType(projectId);
+  const [brainContext, brandDna] = await Promise.all([
+    buildSmartBrainContext(firstUserMsg ?? "", useCase, niche, platform),
+    buildBrandDnaContext(projectId),
+  ]);
+  const base = systemPrompt ?? SHOPIFY_EXPERT_SYSTEM;
+  const enrichedSystem = base + (brainContext || "") + (brandDna || "");
+  const totalUserContent = messages.map(m => m.content).join("\n");
+  const budget = enforcePromptBudget(enrichedSystem, totalUserContent, maxTokens);
+  return askClaudeDetailed(projectId, messages, budget.system, maxTokens, timeoutMs, opts, "askClaudeWithBrain");
 }
 
 export async function askClaudeJsonWithBrain<T>(
