@@ -8,6 +8,7 @@ import multer from "multer";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
 import { askClaudeJsonWithBrain, askClaudeWithBrain, askClaudeVisionWithBrain } from "../lib/claude.js";
+import { askGeminiChat } from "../lib/gemini.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
 import { sanitizeHtml } from "../lib/html-escape.js";
@@ -649,6 +650,32 @@ async function scrapeLeadUrl(lead: LeadData): Promise<WebScrapingResult | null> 
   }
 }
 
+const PRE_REPORT_SECTION_MAX_TOKENS = 6000;
+const PRE_REPORT_CLAUDE_TIMEOUT_MS = 240_000;
+const PRE_REPORT_LENGTH_RULE = "\n- Extensión: entre 500 y 900 palabras, directo y accionable.";
+
+// Claude primero; si falla (sin saldo, tiempo agotado, sobrecarga) se genera con Gemini
+// para que el pre-informe nunca llegue con las secciones vacías.
+async function researchSection(
+  label: string,
+  prompt: string,
+  system: string,
+  useCase: Parameters<typeof askClaudeWithBrain>[3],
+  niche: string,
+): Promise<string> {
+  const content = prompt + PRE_REPORT_LENGTH_RULE;
+  try {
+    const text = await askClaudeWithBrain(0, [{ role: "user", content }], system, useCase, niche, PRE_REPORT_SECTION_MAX_TOKENS, PRE_REPORT_CLAUDE_TIMEOUT_MS);
+    if (text.trim()) return text;
+    logger.warn({ label }, "[contact] pre-informe: Claude devolvió texto vacío — probando Gemini");
+  } catch (err) {
+    logger.warn({ label, err: err instanceof Error ? err.message : String(err) }, "[contact] pre-informe: Claude falló — probando Gemini");
+  }
+  const text = await askGeminiChat([{ role: "user", content }], system, { useProModel: true, maxOutputTokens: 8192 });
+  if (!text.trim()) throw new Error(`pre-informe (${label}): sin respuesta de Claude ni de Gemini`);
+  return text;
+}
+
 async function researchWithClaude(
   lead: LeadData,
   scrapedData: WebScrapingResult | null,
@@ -663,9 +690,9 @@ async function researchWithClaude(
     : `\n\n[No se proporcionó URL o no se pudo acceder a la web del cliente]`;
 
   const [businessResult, marketResult, seoResult, supplierResult] = await Promise.allSettled([
-    askClaudeWithBrain(
-      0,
-      [{ role: "user", content: `Realiza un análisis EXHAUSTIVO del negocio "${entityName}" en el nicho "${nicheInfo}".
+    researchSection(
+      "negocio",
+      `Realiza un análisis EXHAUSTIVO del negocio "${entityName}" en el nicho "${nicheInfo}".
 ${lead.storeUrl ? `URL: ${lead.storeUrl}` : ""}
 ${lead.socialMedia ? `Redes sociales: ${lead.socialMedia}` : ""}${extraContext}
 ${scrapedContext}
@@ -682,16 +709,15 @@ REGLAS:
 - Usa SOLO datos reales del scraping proporcionado — NO inventes datos que no estén en el análisis
 - Si el scraping muestra datos concretos (título, meta description, headings, imágenes sin alt, etc.), CÍTALOS textualmente
 - Incluye la URL del cliente como fuente verificada
-- Responde en español con formato estructurado` }],
+- Responde en español con formato estructurado`,
       "Eres un consultor senior de inteligencia empresarial de Shopy Crafter. Analizas datos REALES extraídos de la web del cliente. NUNCA inventas datos — solo usas lo que encuentras en el scraping y tu conocimiento del sector. Responde en español.",
       "general",
       nicheInfo,
-      16000,
     ),
 
-    askClaudeWithBrain(
-      0,
-      [{ role: "user", content: `Análisis de mercado y competencia para el nicho "${nicheInfo}" en España y mercados hispanohablantes.
+    researchSection(
+      "mercado",
+      `Análisis de mercado y competencia para el nicho "${nicheInfo}" en España y mercados hispanohablantes.
 ${lead.storeUrl ? `La tienda del cliente es: ${lead.storeUrl}` : ""}${extraContext}
 ${scrapedContext}
 
@@ -712,16 +738,15 @@ REGLAS:
 - Basa tus competidores en marcas REALES y CONOCIDAS del sector
 - Las métricas financieras deben ser estimaciones realistas basadas en datos del sector eCommerce
 - Si el cliente proporcionó datos de facturación (${lead.revenue || "no proporcionó"}), compáralos con el sector
-- Responde en español` }],
+- Responde en español`,
       "Eres un analista senior de mercado y competencia de Shopy Crafter. Proporcionas datos de mercado realistas basados en tu conocimiento profundo del sector eCommerce. Responde en español.",
       "general",
       nicheInfo,
-      16000,
     ),
 
-    askClaudeWithBrain(
-      0,
-      [{ role: "user", content: `Auditoría SEO técnica y de presencia digital para "${entityName}" en el nicho "${nicheInfo}".
+    researchSection(
+      "seo",
+      `Auditoría SEO técnica y de presencia digital para "${entityName}" en el nicho "${nicheInfo}".
 ${lead.storeUrl ? `URL: ${lead.storeUrl}` : ""}
 ${scrapedContext}
 
@@ -741,16 +766,15 @@ REGLAS:
 - Usa EXCLUSIVAMENTE los datos del scraping — no inventes valores que no estén ahí
 - Si un dato no está disponible, di "No detectado" en vez de inventar
 - Cada hallazgo debe tener impacto (CRÍTICO/ALTO/MEDIO/BAJO)
-- Responde en español` }],
+- Responde en español`,
       "Eres un experto SEO técnico senior de Shopy Crafter. Auditas con datos REALES del scraping. No inventas métricas. Responde en español.",
       "seo",
       nicheInfo,
-      16000,
     ),
 
-    askClaudeWithBrain(
-      0,
-      [{ role: "user", content: `Análisis de proveedores y revenue estimado para el nicho "${nicheInfo}".
+    researchSection(
+      "proveedores",
+      `Análisis de proveedores y revenue estimado para el nicho "${nicheInfo}".
 ${lead.storeUrl ? `Tienda del cliente: ${lead.storeUrl}` : ""}
 ${lead.revenue ? `Facturación actual declarada: ${lead.revenue}` : ""}${extraContext}${suppliersContext}
 ${scrapedContext}
@@ -795,16 +819,20 @@ REGLAS:
 - Usa proveedores REALES que existan — no inventes nombres
 - Los márgenes y precios deben ser estimaciones realistas del sector
 - Incluye siempre la fuente del dato (conocimiento del sector, datos públicos, etc.)
-- Responde en español con formato estructurado` }],
+- Responde en español con formato estructurado`,
       "Eres un experto en supply chain y proveedores eCommerce de Shopy Crafter. Conoces proveedores reales de cada nicho. Proporcionas estimaciones de revenue realistas. Responde en español.",
       "general",
       nicheInfo,
-      16000,
     ),
   ]);
 
-  const extractText = (r: PromiseSettledResult<string>, fallback: string): string =>
-    r.status === "fulfilled" && r.value ? r.value : fallback;
+  const extractText = (r: PromiseSettledResult<string>, fallback: string): string => {
+    if (r.status === "fulfilled" && r.value) return r.value;
+    if (r.status === "rejected") {
+      logger.error({ err: r.reason instanceof Error ? r.reason.message : String(r.reason) }, `[contact] pre-informe: sección sin generar — ${fallback}`);
+    }
+    return fallback;
+  };
 
   return {
     business: extractText(businessResult, "No se pudo analizar el negocio."),
