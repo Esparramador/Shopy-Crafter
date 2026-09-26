@@ -1,6 +1,6 @@
 # Informes IA — robustez de las respuestas (inventario)
 
-Rama `fix/informes-ia-robustos`. Estado a 24/09/2026.
+Rama `fix/informes-ia-robustos` (ya en `master`). Estado a 26/09/2026.
 
 ## Causa raíz (confirmada en el código)
 
@@ -32,7 +32,7 @@ Rama `fix/informes-ia-robustos`. Estado a 24/09/2026.
 
 ## Inventario de sitios
 
-Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` → **47** sitios. Migrados en esta rama: 5 de esos 47, más 12 llamadas de informes que usaban `askClaudeJsonWithBrain`/`askClaudeWithBrain` con reparación o corte silencioso. Quedan **42** sitios con la regex (más la mención en el comentario de `lib/ai-json.ts`).
+Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` → **47** sitios. Migrados en esta rama: 5 de esos 47, más 12 llamadas de informes que usaban `askClaudeJsonWithBrain`/`askClaudeWithBrain` con reparación o corte silencioso. Después se migraron los dos pendientes de prioridad alta (absorber de imágenes y Brand Book). Quedan **40** sitios con la regex (más la mención en el comentario de `lib/ai-json.ts`).
 
 "Fallback" indica qué pasa hoy si el JSON no parsea: **crudo** = el texto de la IA acaba en un campo visible (el bug del informe); **vacío** = se usa `{}`/`[]`/`null`; **defecto** = valores por defecto inventados; **error** = responde error.
 
@@ -50,6 +50,8 @@ Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` �
 | routes/inventory.ts `restock-email` (antes :109) | Email de reposición al proveedor | `askClaudeJsonValidated`; antes el texto crudo se guardaba como cuerpo del email (**crudo**) |
 | routes/ab-testing.ts `/ab-tests/:testId/report` | Narrativa del informe A/B | `askClaudeJsonValidated`; si falla, se mantiene la narrativa calculada con los datos reales |
 | routes/intelligence.ts `/intelligence/analyze` (antes :565) | Atribución de revenue (dual AI) | `parseAiJson`; 502 en vez de meter el texto como `summary` (**crudo**) |
+| routes/absorber.ts `analyzeImageWithClaude` (antes :342) | Absorber de imágenes (Claude Vision, 16000 tokens) | `generateAiJson` con detección de `max_tokens` y reintento a 32000; antes devolvía `{ raw: text }` (**crudo**) y se guardaba en ShopyBrain una memoria visual vacía. `/shopybrain/absorb-visual` responde 502 con mensaje claro; el análisis de la imagen de una URL sigue siendo no crítico |
+| routes/shopybrain.ts execute-action `generate_brand_book` (antes :11742) | Brand Book renderizado a HTML y guardado en el Vault | `generateAiJson` + esquema zod (nombre, misión, historia, valores y paleta con hex válido obligatorios); 8000 tokens con reintento a 16000 (antes 4000, se cortaba). Antes, si no parseaba, se guardaba un brand book vacío con solo el nombre (**defecto**) |
 
 ### Pendientes (regex codiciosa)
 
@@ -57,14 +59,13 @@ Prioridad alta = fallback **crudo** o datos que llegan a un informe/cliente.
 
 | Fichero:línea | Qué genera | Fallback hoy | Prioridad |
 |---|---|---|---|
-| routes/absorber.ts:342 | `analyzeImageWithClaude` (absorber de imágenes) | crudo (`{ raw: text }`) | alta |
-| routes/absorber.ts:881 | Crear producto desde imagen: análisis visual | vacío | media |
-| routes/absorber.ts:929 | Crear producto desde imagen: investigación de precios | vacío (usa estimación visual) | media |
-| routes/absorber.ts:978 | Crear producto desde imagen: copy del producto | vacío | media |
-| routes/absorber.ts:1240 | Investigación de proveedores: proveedores | vacío | baja |
-| routes/absorber.ts:1245 | Investigación de proveedores: costes | vacío | baja |
-| routes/absorber.ts:1250 | Investigación de proveedores: ofertas | vacío | baja |
-| routes/absorber.ts:1309 | Investigación de proveedores: síntesis | vacío | media |
+| routes/absorber.ts:885 | Crear producto desde imagen: análisis visual | vacío | media |
+| routes/absorber.ts:933 | Crear producto desde imagen: investigación de precios | vacío (usa estimación visual) | media |
+| routes/absorber.ts:982 | Crear producto desde imagen: copy del producto | vacío | media |
+| routes/absorber.ts:1244 | Investigación de proveedores: proveedores | vacío | baja |
+| routes/absorber.ts:1249 | Investigación de proveedores: costes | vacío | baja |
+| routes/absorber.ts:1254 | Investigación de proveedores: ofertas | vacío | baja |
+| routes/absorber.ts:1313 | Investigación de proveedores: síntesis | vacío | media |
 | routes/admin.ts:410 | `/projects/:projectId/ai-suggest` sugerencias | vacío | baja |
 | routes/cms.ts:461 | `/ai/generate-section` configuración de sección CMS | error | baja |
 | routes/competitors.ts:163 | `/competitors/scan` snapshot de competidor | vacío (snapshot con campos nulos) | media |
@@ -79,10 +80,9 @@ Prioridad alta = fallback **crudo** o datos que llegan a un informe/cliente.
 | routes/pricing.ts:384 | Precio óptimo: investigación de proveedores (Gemini) | vacío | media |
 | routes/pricing.ts:738 | Estimación COGS por producto: materiales/envío (Gemini) | vacío | media |
 | routes/report-templates.ts:212 | Sugerencia de plantilla de informe | vacío (`suggestion` nulo) | baja |
-| routes/shopybrain.ts:185 | `researchRealPricing` | defecto | media |
-| routes/shopybrain.ts:2107 | `/shopybrain/study` | vacío | baja |
-| routes/shopybrain.ts:7943 | execute-action: generación de UI | reintento propio limpiando fences | baja |
-| routes/shopybrain.ts:11742 | execute-action: Brand Book (se renderiza a HTML) | defecto (brand book vacío con nombre) | alta |
+| routes/shopybrain.ts:209 | `researchRealPricing` | defecto | media |
+| routes/shopybrain.ts:2131 | `/shopybrain/study` | vacío | baja |
+| routes/shopybrain.ts:7967 | execute-action: generación de UI | reintento propio limpiando fences | baja |
 | routes/suppliers.ts:59 | `safeJsonParse` local de proveedores | vacío (`null`) | baja |
 | lib/brain-ingester.ts:150 | Extracción de insights para el Brain | vacío | baja (interno) |
 | lib/client-advisor.ts:156 | Hechos aprendidos del chat del cliente | se ignora | baja (interno) |

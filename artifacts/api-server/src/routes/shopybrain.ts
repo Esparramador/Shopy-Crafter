@@ -11,10 +11,13 @@ import { buildMasterSkillsBlock } from "../lib/master-skills-injector.js";
 import { buildPricingBlock } from "../lib/platform-knowledge.js";
 import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
-import { learnFromOperation, askClaude, askClaudeWithUsage, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
+import { learnFromOperation, askClaude, askClaudeDetailed, askClaudeWithUsage, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
 import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
+import { generateAiJson } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { z } from "zod";
 import { saveToVault } from "../lib/vault.js";
 import { buildCoverPage } from "../lib/report-cover.js";
 import { analyzeImageForFusion } from "../lib/fusion-studio.js";
@@ -134,6 +137,27 @@ function resolveFilePath(filePath: string): string | null {
 }
 
 const router = Router();
+
+// Brand book (execute-action generate_brand_book). Lo mínimo para no renderizar un
+// manual vacío; el resto de secciones pasan tal cual y el render ya tolera que falten.
+const brandBookSchema = z.object({
+  brandName: z.string().min(1),
+  tagline: z.string().default(""),
+  mission: z.string().min(1),
+  vision: z.string().default(""),
+  brandStory: z.string().min(1),
+  values: z.array(z.object({
+    name: z.string(),
+    description: z.string().default(""),
+    icon: z.string().default(""),
+  }).passthrough()).min(1),
+  colorPalette: z.array(z.object({
+    name: z.string(),
+    hex: z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "hex inválido"),
+    usage: z.string().default(""),
+    psychology: z.string().default(""),
+  }).passthrough()).min(1),
+}).passthrough();
 
 async function researchRealPricing(productTitle: string, productType: string, niche: string, currentPrice?: string): Promise<{
   marketPriceRange: { min: number; max: number; median: number };
@@ -11692,7 +11716,6 @@ ${buildCoverPage({ reportTitle, reportSubtitle: `Investigación generada por IA 
               } catch { /* no hay DNA, continuar */ }
             }
 
-            const { askClaude: ask } = await import("../lib/claude.js");
             const { buildCoverPage } = await import("../lib/report-cover.js");
             const reportDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -11721,27 +11744,28 @@ Responde SIEMPRE en formato JSON válido con esta estructura exacta:
   "messagingFramework": {"valueProposition": "propuesta de valor principal", "keyMessages": ["mensaje1","mensaje2","mensaje3"], "elevator": "pitch de 30 segundos", "headlines": ["titular1","titular2","titular3"]},
   "competitivePositioning": {"position": "posicionamiento diferencial", "differentiators": ["diferenciador1","diferenciador2","diferenciador3"], "competitors": [{"name": "competidor", "difference": "cómo nos diferenciamos"}]}
 }`;
-            const brandBookData = await ask(
-              projectId || 0,
-              [{ role: "user" as const, content: `Genera un brand book completo para:
+            const brandBookPrompt = `Genera un brand book completo para:
 Marca: ${brandName}
 Sector: ${industry || "e-commerce / Shopify"}
 ${customNotes ? `Información adicional: ${customNotes}` : ""}
 ${brandContext ? `\nBrand DNA extraído de la empresa:\n${brandContext.slice(0, 3000)}` : ""}
 
-Genera contenido específico, detallado y profesional. NO uses placeholders genéricos.` }],
-              brandBookSystem,
-              4000,
-              undefined,
-              { tier: "smart" as any },
-            );
+Genera contenido específico, detallado y profesional. NO uses placeholders genéricos.`;
 
-            // Parsear JSON del brand book
-            let bb: Record<string, any> = {};
-            try {
-              const jsonMatch = brandBookData.match(/\{[\s\S]*\}/);
-              if (jsonMatch) bb = JSON.parse(jsonMatch[0]);
-            } catch { bb = { brandName, tagline: "", mission: "", vision: "", brandStory: "", values: [], archetype: {}, personality: [], toneOfVoice: {}, colorPalette: [], typography: {}, logoGuidelines: {}, imagery: {}, contentPillars: [], targetAudience: {}, socialMedia: {}, messagingFramework: {}, competitivePositioning: {} }; }
+            // Antes: 4000 tokens para todo el JSON (se cortaba) y, si no parseaba, se
+            // renderizaba y guardaba en el Vault un brand book vacío con solo el nombre.
+            const bb: Record<string, any> = await generateAiJson({
+              prompt: brandBookPrompt,
+              maxTokens: 8000,
+              retryMaxTokens: 16000,
+              schema: brandBookSchema,
+              expect: "object",
+              label: "shopybrain/generate_brand_book",
+              call: async ({ prompt, maxTokens }) => {
+                const r = await askClaudeDetailed(projectId || 0, [{ role: "user", content: prompt }], brandBookSystem, maxTokens, undefined, { tier: "smart" }, "generate_brand_book");
+                return { text: r.text, truncated: r.truncated };
+              },
+            });
 
             // ─── Render HTML del Brand Book ───────────────────────────────
             const colors = (bb.colorPalette || []) as Array<{hex:string;name:string;usage:string;psychology:string}>;
@@ -12041,7 +12065,8 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
                 : `📖 **Brand Book generado**\n\n🏷️ **${bb.brandName || brandName}** — "${bb.tagline}"\n🎭 Arquetipo: **${(bb.archetype||{}).name}**\n🎨 ${colors.length} colores | 💡 ${values.length} valores\n\n⚠️ No se pudo guardar en vault (falta projectId)`,
             };
           } catch (err) {
-            result = { error: true, message: `❌ Error generando Brand Book: ${err instanceof Error ? err.message : String(err)}` };
+            const reason = isAiOutputError(err) ? aiOutputErrorMessage(err) : err instanceof Error ? err.message : String(err);
+            result = { error: true, message: `❌ Error generando Brand Book: ${reason}` };
           }
           break;
         }

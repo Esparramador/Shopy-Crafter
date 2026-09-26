@@ -22,6 +22,9 @@ import { desc, eq } from "drizzle-orm";
 import { saveToVault } from "../lib/vault.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { processUploadedFile } from "../lib/file-processor.js";
+import { generateAiJson } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { z } from "zod";
 
 const router = Router();
 
@@ -298,6 +301,10 @@ const PROVENANCE_NOTE: Record<string, string> = {
   ai_search_inference: "⚠️ La plataforma bloquea el acceso público sin API oficial. Esto es una INVESTIGACIÓN con IA + búsqueda web (inferencia), NO datos extraídos directamente — verifícalo antes de usarlo.",
 };
 
+// El prompt de visión no fija claves obligatorias; basta con un objeto no vacío.
+const visionAnalysisSchema = z.record(z.string(), z.unknown())
+  .refine(o => Object.keys(o).length > 0, { message: "análisis vacío" });
+
 // ─── HELPER: Analyze image with Claude Vision ──────────────────────────────────
 async function analyzeImageWithClaude(
   imageData: Buffer | string,
@@ -320,30 +327,26 @@ async function analyzeImageWithClaude(
         },
       };
   
-  const absorbStream = client.messages.stream({
-    model: CLAUDE_MODEL,
-    max_tokens: 16000,
-    system: `ShopyBrain Vision Analysis Engine.${brainCtx}`,
-    messages: [{
-      role: "user",
-      content: [
-        imageBlock,
-        {
-          type: "text",
-          text: VISION_MASTER_PROMPT + "\n\nReturn ONLY valid JSON. No markdown, no explanation.",
-        },
-      ],
-    }],
+  // Antes, si el JSON no parseaba, se devolvía { raw: text } y se guardaba en ShopyBrain
+  // una memoria "visual" con todos los campos vacíos. Ahora: un reintento y error tipado.
+  return generateAiJson<Record<string, unknown>>({
+    prompt: VISION_MASTER_PROMPT + "\n\nReturn ONLY valid JSON. No markdown, no explanation.",
+    maxTokens: 16000,
+    retryMaxTokens: 32000,
+    schema: visionAnalysisSchema,
+    expect: "object",
+    label: "absorber/vision",
+    call: async ({ prompt, maxTokens }) => {
+      const res = await client.messages.stream({
+        model: CLAUDE_MODEL,
+        max_tokens: maxTokens,
+        system: `ShopyBrain Vision Analysis Engine.${brainCtx}`,
+        messages: [{ role: "user", content: [imageBlock, { type: "text", text: prompt }] }],
+      }).finalMessage();
+      const text = res.content.map(b => (b.type === "text" ? b.text : "")).join("");
+      return { text, truncated: res.stop_reason === "max_tokens" };
+    },
   });
-  const res = await absorbStream.finalMessage();
-  
-  const text = res.content[0].type === "text" ? res.content[0].text : "{}";
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : { raw: text };
-  } catch {
-    return { raw: text };
-  }
 }
 
 // ─── HELPER: Analyze with Gemini (video / complex URLs) ───────────────────────
@@ -658,6 +661,7 @@ router.post("/shopybrain/absorb-image",
         });
       } catch (err) {
         logger.error(err, "ShopyBrain image/video absorb failed");
+        if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code }); return; }
         res.status(500).json({ error: String(err) });
       }
   } catch (err: any) {
