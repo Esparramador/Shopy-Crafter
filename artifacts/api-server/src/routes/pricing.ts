@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { logger } from "../lib/logger.js";
 import { randomUUID } from "crypto";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, cogsTable, priceHistoryTable, abTestsTable } from "@workspace/db";
@@ -1853,6 +1854,15 @@ Responde SOLO JSON: { "costeUnitario": 0, "materiales": 0, "tejidos": 0, "impres
             job.errors > 0
               ? `Completado con ${job.errors} errores de ${job.total}`
               : `${job.total} productos estimados correctamente`;
+          job.completedAt = new Date().toISOString();
+        }
+      } catch (err) {
+        // Sin este catch un fallo de BD dejaba el job "running" para siempre.
+        logger.error({ err, jobId }, "COGS batch job failed");
+        const job = batchJobs.get(jobId);
+        if (job) {
+          job.status = "error";
+          job.message = "Error interno del lote de COGS";
           job.completedAt = new Date().toISOString();
         }
       } finally {

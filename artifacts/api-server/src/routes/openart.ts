@@ -30,7 +30,7 @@ import { z } from "zod";
 const router = Router();
 
 // ─── GET /api/openart/styles ──────────────────────────────────────────────────
-router.get("/api/openart/styles", requireAuth, (req, res) => {
+router.get("/openart/styles", requireAuth, (req, res) => {
   const { category, tag, q } = req.query as Record<string, string>;
   let styles = STYLE_PRESETS;
   if (category) styles = styles.filter(s => s.category.toLowerCase() === category.toLowerCase());
@@ -44,7 +44,7 @@ router.get("/api/openart/styles", requireAuth, (req, res) => {
 });
 
 // ─── GET /api/openart/models ──────────────────────────────────────────────────
-router.get("/api/openart/models", requireAuth, (req, res) => {
+router.get("/openart/models", requireAuth, (req, res) => {
   const { type, quality, styleId, useCase } = req.query as Record<string, string>;
   const task = (type === "video" ? "video" : "image") as "image" | "video";
   const recommended = recommendModels(task, styleId, useCase);
@@ -53,7 +53,7 @@ router.get("/api/openart/models", requireAuth, (req, res) => {
 });
 
 // ─── GET /api/openart/templates ───────────────────────────────────────────────
-router.get("/api/openart/templates", requireAuth, (req, res) => {
+router.get("/openart/templates", requireAuth, (req, res) => {
   const { category, tag, q } = req.query as Record<string, string>;
   let templates = PROMPT_TEMPLATES;
   if (category) templates = templates.filter(t => t.category.toLowerCase() === category.toLowerCase());
@@ -67,7 +67,7 @@ router.get("/api/openart/templates", requireAuth, (req, res) => {
 });
 
 // ─── GET /api/openart/prompt-book ────────────────────────────────────────────
-router.get("/api/openart/prompt-book", requireAuth, (req, res) => {
+router.get("/openart/prompt-book", requireAuth, (req, res) => {
   const { chapter } = req.query as Record<string, string>;
   if (chapter) {
     const ch = PROMPT_BOOK_CHAPTERS.find(c => c.id === chapter);
@@ -78,12 +78,12 @@ router.get("/api/openart/prompt-book", requireAuth, (req, res) => {
 });
 
 // ─── GET /api/openart/blocks ──────────────────────────────────────────────────
-router.get("/api/openart/blocks", requireAuth, (req, res) => {
+router.get("/openart/blocks", requireAuth, (req, res) => {
   res.json(PROMPT_BLOCKS);
 });
 
 // ─── POST /api/openart/build-prompt ──────────────────────────────────────────
-router.post("/api/openart/build-prompt", requireAuth, async (req, res) => {
+router.post("/openart/build-prompt", requireAuth, async (req, res) => {
   const {
     subject,
     styleId,
@@ -113,7 +113,7 @@ router.post("/api/openart/build-prompt", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/openart/enhance-prompt ─────────────────────────────────────────
-router.post("/api/openart/enhance-prompt", requireAuth, async (req, res) => {
+router.post("/openart/enhance-prompt", requireAuth, async (req, res) => {
   const { prompt, styleId, target = "image", language = "es", mode = "enhance" } = req.body;
   if (!prompt?.trim()) return res.status(400).json({ error: "prompt requerido" });
 
@@ -165,7 +165,7 @@ const promptAnalysisSchema = z.object({
 });
 
 // ─── POST /api/openart/analyze-prompt ────────────────────────────────────────
-router.post("/api/openart/analyze-prompt", requireAuth, async (req, res) => {
+router.post("/openart/analyze-prompt", requireAuth, async (req, res) => {
   const { prompt } = req.body;
   if (!prompt?.trim()) return res.status(400).json({ error: "prompt requerido" });
 
@@ -202,7 +202,7 @@ router.post("/api/openart/analyze-prompt", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/openart/template-fill ─────────────────────────────────────────
-router.post("/api/openart/template-fill", requireAuth, async (req, res) => {
+router.post("/openart/template-fill", requireAuth, async (req, res) => {
   const { templateId, variables, styleId } = req.body;
   const template = PROMPT_TEMPLATES.find(t => t.id === templateId);
   if (!template) return res.status(404).json({ error: "Template no encontrado" });

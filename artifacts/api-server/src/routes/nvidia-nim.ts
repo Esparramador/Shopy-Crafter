@@ -186,7 +186,7 @@ const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
 
 // ── GET /api/nvidia/catalog ─────────────────────────────────────────────────
 // Catálogo completo de 121 modelos organizado por categoría
-router.get("/api/nvidia/catalog", requireAuth, (_req, res) => {
+router.get("/nvidia/catalog", requireAuth, (_req, res) => {
   const summary = {
     total: Object.values(NVIDIA_CATALOG).reduce((s, arr) => s + arr.length, 0),
     categories: {
@@ -206,13 +206,13 @@ router.get("/api/nvidia/catalog", requireAuth, (_req, res) => {
 });
 
 // ── GET /api/nvidia/models (retrocompatibilidad) ────────────────────────────
-router.get("/api/nvidia/models", requireAuth, (_req, res) => {
+router.get("/nvidia/models", requireAuth, (_req, res) => {
   res.json({ text: NVIDIA_CATALOG.text, image: NVIDIA_CATALOG.image, video: NVIDIA_CATALOG.video });
 });
 
 // ── GET /api/nvidia/skills ───────────────────────────────────────────────────
 // Skills catalog con prompts, use-cases y endpoints por capacidad
-router.get("/api/nvidia/skills", requireAuth, async (_req, res) => {
+router.get("/nvidia/skills", requireAuth, async (_req, res) => {
   try {
     const { readFile } = await import("fs/promises");
     const { resolve, dirname } = await import("path");
@@ -235,7 +235,7 @@ router.get("/api/nvidia/skills", requireAuth, async (_req, res) => {
 
 // ── POST /api/nvidia/chat ───────────────────────────────────────────────────
 // Chat con modelos NVIDIA NIM — fallback a Claude si no hay key o falla
-router.post("/api/nvidia/chat", requireAuth, async (req, res) => {
+router.post("/nvidia/chat", requireAuth, async (req, res) => {
   try {
     const {
       prompt, systemPrompt, model = "nvidia/llama-3.3-nemotron-super-49b-v1",
@@ -266,7 +266,7 @@ router.post("/api/nvidia/chat", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/vision ─────────────────────────────────────────────────
 // Análisis de imagen — NVIDIA Vision 90B con fallback a Claude Vision
-router.post("/api/nvidia/vision", requireAuth, async (req, res) => {
+router.post("/nvidia/vision", requireAuth, async (req, res) => {
   try {
     const {
       prompt, imageUrl, imageBase64, mimeType = "image/jpeg",
@@ -326,7 +326,7 @@ router.post("/api/nvidia/vision", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/code ───────────────────────────────────────────────────
 // Generación de código — StarCoder2/Codestral con fallback a Claude
-router.post("/api/nvidia/code", requireAuth, async (req, res) => {
+router.post("/nvidia/code", requireAuth, async (req, res) => {
   try {
     const { prompt, language = "javascript", model = "bigcode/starcoder2-15b", maxTokens = 4096, systemContext } =
       req.body as { prompt: string; language?: string; model?: string; maxTokens?: number; systemContext?: string };
@@ -353,7 +353,7 @@ router.post("/api/nvidia/code", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/translate ──────────────────────────────────────────────
 // Traducción profesional — RIVA Translate con fallback a Claude
-router.post("/api/nvidia/translate", requireAuth, async (req, res) => {
+router.post("/nvidia/translate", requireAuth, async (req, res) => {
   try {
     const { text, sourceLang = "auto", targetLang = "es", model = "nvidia/riva-translate-4b-instruct" } =
       req.body as { text: string; sourceLang?: string; targetLang?: string; model?: string };
@@ -381,7 +381,7 @@ router.post("/api/nvidia/translate", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/safety ─────────────────────────────────────────────────
 // Análisis de seguridad — Llama Guard 4 con fallback a Claude como moderador
-router.post("/api/nvidia/safety", requireAuth, async (req, res) => {
+router.post("/nvidia/safety", requireAuth, async (req, res) => {
   try {
     const { content, checkType = "content", model = "meta/llama-guard-4-12b" } =
       req.body as { content: string; checkType?: "content" | "pii" | "topic"; model?: string };
@@ -412,7 +412,7 @@ router.post("/api/nvidia/safety", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/creative ────────────────────────────────────────────────
 // Copywriting premium — Palmyra Creative 122B con fallback a Claude
-router.post("/api/nvidia/creative", requireAuth, async (req, res) => {
+router.post("/nvidia/creative", requireAuth, async (req, res) => {
   try {
     const { prompt, tone = "professional", brandName, model = "writer/palmyra-creative-122b", maxTokens = 8192 } =
       req.body as { prompt: string; tone?: string; brandName?: string; model?: string; maxTokens?: number };
@@ -436,7 +436,7 @@ router.post("/api/nvidia/creative", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/finance ─────────────────────────────────────────────────
 // Análisis financiero — Palmyra Finance 70B con fallback a Claude
-router.post("/api/nvidia/finance", requireAuth, async (req, res) => {
+router.post("/nvidia/finance", requireAuth, async (req, res) => {
   try {
     const { prompt, context, model = "writer/palmyra-fin-70b-32k", maxTokens = 8192 } =
       req.body as { prompt: string; context?: string; model?: string; maxTokens?: number };
@@ -461,7 +461,7 @@ router.post("/api/nvidia/finance", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/embed ───────────────────────────────────────────────────
 // Embeddings semánticos — BGE-M3/NV-Embed con fallback informativo
-router.post("/api/nvidia/embed", requireAuth, async (req, res) => {
+router.post("/nvidia/embed", requireAuth, async (req, res) => {
   try {
     const key = nimKey();
     const { texts, model = "baai/bge-m3", inputType = "query" } =
@@ -509,7 +509,7 @@ router.post("/api/nvidia/embed", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/generate-image ─────────────────────────────────────────
 // Genera imagen — NVIDIA NIM con fallback a Replicate (FLUX Schnell)
-router.post("/api/nvidia/generate-image", requireAuth, async (req, res) => {
+router.post("/nvidia/generate-image", requireAuth, async (req, res) => {
   try {
     const {
       prompt, negativePrompt, model: reqModel, aspectRatio = "1:1",
@@ -588,7 +588,7 @@ router.post("/api/nvidia/generate-image", requireAuth, async (req, res) => {
 
 // ── POST /api/nvidia/generate-video ─────────────────────────────────────────
 // Genera vídeo — NVIDIA Cosmos con fallback a Replicate (Seedance/WAN)
-router.post("/api/nvidia/generate-video", requireAuth, async (req, res) => {
+router.post("/nvidia/generate-video", requireAuth, async (req, res) => {
   try {
     const { prompt, model = "nvidia/cosmos-predict2-2b", duration = 6, resolution = "1280x720", fps = 24, seed, projectId } =
       req.body as { prompt: string; model?: string; duration?: number; resolution?: string; fps?: number; seed?: number; projectId?: number };

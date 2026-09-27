@@ -97,9 +97,12 @@ router.post("/amr/compare", async (req, res) => {
 
   const results = await Promise.allSettled(
     modelIds.slice(0, 5).map(async (id) => {
+      const t0 = Date.now();
       const text = await askAMR(msgs, id, { maxTokens: 2048 });
       const model = getModelById(id);
-      return { modelId: id, modelName: model?.name ?? id, text };
+      // `content`/`provider`/`latencyMs` son los campos que pinta AMRStudio
+      // (antes solo `text`: la comparativa salía en blanco).
+      return { modelId: id, modelName: model?.name ?? id, provider: model?.provider ?? "", text, content: text, latencyMs: Date.now() - t0 };
     })
   );
 
@@ -108,7 +111,7 @@ router.post("/amr/compare", async (req, res) => {
     results: results.map((r, i) =>
       r.status === "fulfilled"
         ? r.value
-        : { modelId: modelIds[i], error: r.reason?.message ?? "Error desconocido" }
+        : { modelId: modelIds[i], modelName: getModelById(modelIds[i])?.name ?? modelIds[i], provider: getModelById(modelIds[i])?.provider ?? "", content: "", error: r.reason?.message ?? "Error desconocido" }
     ),
   });
 });

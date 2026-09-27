@@ -23,7 +23,7 @@ import emailsRouter from "./emails.js";
 import emailTemplatesRouter from "./email-templates.js";
 import storeRouter from "./store.js";
 import voiceRouter from "./voice.js";
-import pushRouter from "./push.js";
+import pushRouter, { pushUserRouter } from "./push.js";
 import shopybrainRouter from "./shopybrain.js";
 import agencyRouter from "./agency.js";
 import vaultRouter, { vaultClientRouter } from "./vault.js";
@@ -151,6 +151,8 @@ router.use(voiceRouter);
 router.use(videoCallRouter);
 // Portal de cliente: descarga de archivos de SU proyecto (canAccessProject).
 router.use(vaultClientRouter);
+// Push: suscripción y clave pública para cualquier usuario autenticado.
+router.use(pushUserRouter);
 
 router.use(requireAdmin, meshyRouter);
 router.use(requireAdmin, stitchRouter);

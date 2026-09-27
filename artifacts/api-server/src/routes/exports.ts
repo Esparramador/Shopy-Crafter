@@ -5316,15 +5316,13 @@ router.get("/projects/:projectId/exports/suppliers-xlsx", requireProjectAccess, 
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    let entries: any[] = [];
-    try {
-      const result = await db.execute(sql`
-        SELECT * FROM supplier_entries WHERE research_id IN (
-          SELECT id FROM supplier_researches WHERE project_id = ${projectId}
-        ) ORDER BY score DESC NULLS LAST
-      `);
-      entries = (result as any).rows || [];
-    } catch { entries = []; }
+    // Antes: tabla `supplier_researches` (no existe) y el error se tragaba →
+    // Excel vacío con 200. supplier_entries ya lleva project_id.
+    const result = await db.execute(sql`
+      SELECT * FROM supplier_entries WHERE project_id = ${String(projectId)}
+      ORDER BY score DESC NULLS LAST
+    `);
+    const entries: any[] = (result as any).rows || [];
 
     const suppliers = entries.map((e: any) => ({
       name: e.name || "Sin nombre",

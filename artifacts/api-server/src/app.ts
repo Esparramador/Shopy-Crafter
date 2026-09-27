@@ -344,6 +344,20 @@ app.use((req: Request, res: Response) => {
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   if (res.headersSent) {
     logger.error({ err: err?.message, path: req.path }, "Error after headers sent");
+    // Cerrar la respuesta: antes quedaba abierta hasta el timeout del servidor
+    // (60 min). SSE recibe un evento de error; JSON tras latido, el cuerpo de
+    // error con su código (ver long-running.ts).
+    if (!res.writableEnded) {
+      try {
+        const ct = String(res.getHeader("Content-Type") ?? "");
+        if (ct.includes("text/event-stream")) {
+          res.write(`data: ${JSON.stringify({ type: "error", error: "Error interno del servidor" })}\n\n`);
+        } else if (ct.includes("application/json")) {
+          res.write(JSON.stringify({ error: "Error interno del servidor", __httpStatus: 500 }));
+        }
+      } catch { /* socket ya cerrado */ }
+      res.end();
+    }
     return;
   }
 

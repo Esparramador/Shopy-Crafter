@@ -67,7 +67,7 @@ export default function DeckBuilder() {
     setSlides([]);
 
     try {
-      const r = await fetch(`${API_BASE}/api/hyperframes/deck/generate`, {
+      const r = await fetch(`${API_BASE}/api/hyperframes/deck/slides`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -91,17 +91,37 @@ export default function DeckBuilder() {
     if (slides.length === 0) return;
     setExporting(format);
     try {
+      if (format === "pdf") {
+        // PDF: documento imprimible con las diapositivas (Guardar como PDF del navegador).
+        const esc = (t: string) => t.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+        const t = selectedTheme;
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(deckTitle)}</title><style>
+@page{size:1280px 720px;margin:0}body{margin:0;font-family:Arial,sans-serif}
+.s{width:1280px;height:720px;box-sizing:border-box;padding:80px;background:${t.bg};color:${t.text};page-break-after:always;display:flex;flex-direction:column;justify-content:center}
+h1{color:${t.accent};font-size:48px;margin:0 0 32px}p{font-size:26px;line-height:1.5;white-space:pre-line;margin:0}
+</style></head><body>${slides.map(s => `<section class="s"><h1>${esc(s.title)}</h1><p>${esc(s.content)}</p></section>`).join("")}
+<script>window.onload=()=>{window.print()}</script></body></html>`;
+        const w = window.open("", "_blank");
+        if (!w) throw new Error("El navegador bloqueó la ventana de impresión");
+        w.document.write(html);
+        w.document.close();
+        return;
+      }
       const r = await fetch(`${API_BASE}/api/hyperframes/pptx/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ slides, theme, brandName, deckTitle, format }),
+        body: JSON.stringify({ slides, deckTitle, themeColors: { bg: selectedTheme.bg, text: selectedTheme.text, accent: selectedTheme.accent } }),
       });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || "Error exportando");
+      }
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${brandName.replace(/\s+/g, "-")}-${deckTitle.replace(/\s+/g, "-")}.${format}`;
+      a.download = `${brandName.replace(/\s+/g, "-")}-${deckTitle.replace(/\s+/g, "-")}.pptx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: unknown) {

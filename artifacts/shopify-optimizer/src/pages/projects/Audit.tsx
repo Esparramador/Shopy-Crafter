@@ -1033,6 +1033,8 @@ export default function AuditPage() {
   const [storeAuditStatus, setStoreAuditStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [storeAuditMsg, setStoreAuditMsg] = useState<string>("");
   const [storeAuditResults, setStoreAuditResults] = useState<any>(null);
+  const auditPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => () => { if (auditPollRef.current) clearInterval(auditPollRef.current); }, []);
   const [storeAuditHistory, setStoreAuditHistory] = useState<any[]>([]);
   const [showAuditModal, setShowAuditModal] = useState(false);
 
@@ -1041,7 +1043,7 @@ export default function AuditPage() {
       const r = await fetch(`${API}/api/projects/${projectId}/audit/results`, { credentials: "include" });
       if (r.ok) {
         const d = await r.json();
-        setStoreAuditResults(d);
+        setStoreAuditResults(d?.hasResults && d.result ? mapAuditResult(d.result) : null);
       }
     } catch {}
   };
@@ -1056,7 +1058,33 @@ export default function AuditPage() {
     } catch {}
   };
 
+  // /audit/results devuelve { hasResults, result: fila de audit_results }; el panel
+  // pinta { scores, summary, recommendations, issues } (antes se buscaban esos
+  // campos en la raíz y nunca aparecían resultados).
+  const mapAuditResult = (row: any) => {
+    const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : null);
+    const scores: Record<string, { score: number }> = {};
+    const add = (k: string, v: unknown) => { const x = n(v); if (x !== null) scores[k] = { score: x }; };
+    add("global", row.overallScore);
+    add("rendimiento", row.performanceScore);
+    add("seo", row.seoScore);
+    add("accesibilidad", row.accessibilityScore);
+    add("buenas prácticas", row.bestPracticesScore);
+    add("contenido", row.contentQualityScore);
+    add("móvil", row.mobileFriendlinessScore);
+    add("seo técnico", row.technicalSeoScore);
+    const ai = row.aiAnalysis;
+    const summary = typeof ai === "string" ? ai : (ai?.summary ?? ai?.executiveSummary ?? null);
+    return {
+      scores,
+      summary: typeof summary === "string" ? summary : null,
+      recommendations: Array.isArray(row.recommendations) ? row.recommendations : [],
+      issues: Array.isArray(row.issues) ? row.issues : [],
+    };
+  };
+
   const runStoreAudit = async () => {
+    const startedAt = Date.now();
     setStoreAuditStatus("running");
     setStoreAuditMsg("Auditoría en curso. Análisis de PageSpeed + scraping + Claude... esto tarda 1-3 minutos");
     setShowAuditModal(true);
@@ -1071,14 +1099,17 @@ export default function AuditPage() {
       setStoreAuditMsg(data.message || "Auditoría iniciada. Refresca en 1-2 minutos para ver resultados.");
       // FIX: avoid stale closure — read fetch response directly inside interval, not state
       let attempts = 0;
+      if (auditPollRef.current) clearInterval(auditPollRef.current);
       const poll = setInterval(async () => {
         attempts++;
         try {
           const r = await fetch(`${API}/api/projects/${projectId}/audit/results`, { credentials: "include" });
           if (r.ok) {
             const d = await r.json();
-            if (d && (d.scores || d.summary || d.recommendations)) {
-              setStoreAuditResults(d);
+            // Solo el resultado de ESTA ejecución (no el de una auditoría anterior).
+            const row = d?.hasResults ? d.result : null;
+            if (row && new Date(row.auditedAt).getTime() >= startedAt - 5000) {
+              setStoreAuditResults(mapAuditResult(row));
               clearInterval(poll);
               setStoreAuditStatus("done");
               await fetchStoreAuditHistory();
@@ -1092,6 +1123,7 @@ export default function AuditPage() {
           await fetchStoreAuditHistory();
         }
       }, 15000);
+      auditPollRef.current = poll;
     } catch (e: any) {
       setStoreAuditStatus("error");
       setStoreAuditMsg(e?.message || "Error en auditoría");

@@ -173,7 +173,7 @@ const ALL_DOMAINS: Record<string, string> = {
 };
 
 // ─── REVENUE SNAPSHOTS ───────────────────────────────────────────────────────
-export async function runRevenueSnapshots() {
+async function runRevenueSnapshotsImpl() {
   log("revenue-snapshots", "Starting daily revenue snapshots");
   try {
     const projects = await db.select().from(projectsTable);
@@ -226,7 +226,7 @@ export async function runRevenueSnapshots() {
 }
 
 // ─── INVENTORY SYNC ──────────────────────────────────────────────────────────
-export async function runInventorySync() {
+async function runInventorySyncImpl() {
   log("inventory-sync", "Starting daily inventory sync");
   try {
     const projects = await db.select().from(projectsTable);
@@ -324,7 +324,7 @@ export async function runInventorySync() {
 }
 
 // ─── COMPETITOR SCANS ────────────────────────────────────────────────────────
-export async function runCompetitorScans() {
+async function runCompetitorScansImpl() {
   log("competitor-scan", "Starting daily competitor scans");
   try {
     const competitors = await db.select().from(competitorsTable);
@@ -380,7 +380,7 @@ export async function runCompetitorScans() {
 }
 
 // ─── OMNICORE REAL DATA INTEGRATION ─────────────────────────────────────────
-export async function runOmnicoreRealDataIntegration() {
+async function runOmnicoreRealDataIntegrationImpl() {
   log("omnicore-realdata", "Starting OmniCore real data integration");
   try {
     const projects = await db.select().from(projectsTable);
@@ -422,7 +422,7 @@ export async function runOmnicoreRealDataIntegration() {
 // ─── OMNICORE MICRO-LEARNING (cada 3h) ───────────────────────────────────────
 // Selecciona los 2 dominios con mayor antigüedad de estudio y genera 3 insights
 // por dominio. Promueve los de alta confianza (≥0.82) a memorias permanentes.
-export async function runOmniCoreMicroLearning() {
+async function runOmniCoreMicroLearningImpl() {
   log("omnicore-micro", "⚡ Micro-learning cycle starting");
   try {
     // Priorizar dominios sin sesión reciente (least-recently-studied first)
@@ -499,7 +499,7 @@ export async function runOmniCoreMicroLearning() {
 // ─── OMNICORE MEMORY CONSOLIDATION (cada 6h) ────────────────────────────────
 // Promueve insights recientes de alta confianza a memorias y refuerza
 // las memorias de alto uso generadas en la última semana.
-export async function runOmniCoreMemoryConsolidation() {
+async function runOmniCoreMemoryConsolidationImpl() {
   log("omnicore-consolidate", "🧠 Memory consolidation starting");
   try {
     // Insights recientes con confianza ≥ 0.85
@@ -541,7 +541,7 @@ export async function runOmniCoreMemoryConsolidation() {
 // ─── OMNICORE CROSS-DOMAIN SYNTHESIS (cada 12h) ──────────────────────────────
 // Elige 3 dominios al azar y pide a Claude conexiones accionables entre ellos.
 // Guarda las conexiones en omnicore_cross_connections y en memorias.
-export async function runOmniCoreCrossConnections() {
+async function runOmniCoreCrossConnectionsImpl() {
   log("omnicore-cross", "🔗 Cross-domain synthesis starting");
   try {
     const allDomains = await db.select().from(omnicoreKnowledgeDomainsTable);
@@ -594,7 +594,7 @@ export async function runOmniCoreCrossConnections() {
 // ─── OMNICORE DAILY DEEP STUDY — TODOS LOS DOMINIOS (1am diario) ─────────────
 // Cubre los 14 dominios en profundidad, generando 5 insights premium por dominio.
 // Es el ciclo más exhaustivo: 70 insights/día máximo.
-export async function runOmniCoreDailyDeepStudy() {
+async function runOmniCoreDailyDeepStudyImpl() {
   log("omnicore-daily", "🎓 Daily deep study starting — all domains");
   const sessionId = `daily-${new Date().toISOString().split("T")[0]}`;
   let totalInsights = 0;
@@ -693,7 +693,7 @@ Think like a polymath — combine wisdom from art, science, technology, psycholo
 // ─── OMNICORE MEGA-SYNTHESIS SEMANAL (Domingo medianoche) ────────────────────
 // Síntesis de alto nivel que conecta los aprendizajes de la semana,
 // genera perfiles de nicho actualizados y crea conexiones meta-cruzadas.
-export async function runOmniCoreMegaSynthesis() {
+async function runOmniCoreMegaSynthesisImpl() {
   log("omnicore-mega", "🚀 Weekly mega-synthesis starting");
   const sessionId = `mega-${new Date().toISOString().split("T")[0]}`;
   let totalInsights = 0;
@@ -782,7 +782,7 @@ Return ONLY valid JSON:
 // ─── TOKEN AUTO-REFRESH ───────────────────────────────────────────────────────
 // Cada hora revisa todos los proyectos y renueva el token si está caducado
 // o le quedan menos de 2 horas de validez. Garantiza acceso continuo a la API.
-export async function runTokenRefresh() {
+async function runTokenRefreshImpl() {
   log("token-refresh", "🔑 Validating Shopify tokens for all projects");
   try {
     const projects = await db.select().from(projectsTable);
@@ -836,7 +836,7 @@ export async function runTokenRefresh() {
 // ─── RETROACTIVE REANALYSIS (Domingo 3am) ────────────────────────────────────
 // Re-evaluates insights older than 7 days using current knowledge context,
 // updates confidence scores, and tracks retroactive versions.
-export async function runRetroactiveReanalysis() {
+async function runRetroactiveReanalysisImpl() {
   log("omnicore-retro", "🔄 Retroactive reanalysis starting");
   const sessionId = `retro-${new Date().toISOString().split("T")[0]}`;
   let updated = 0;
@@ -918,7 +918,7 @@ Return ONLY valid JSON:
 // ─── MONTHLY SELF-EVALUATION (1st of each month) ────────────────────────────
 // Aggregates learning stats, assesses prediction accuracy, identifies weak
 // domains, and generates a performance report stored as a special insight.
-export async function runMonthlySelfEvaluation() {
+async function runMonthlySelfEvaluationImpl() {
   log("omnicore-eval", "📊 Monthly self-evaluation starting");
   const sessionId = `eval-${new Date().toISOString().slice(0, 7)}`;
 
@@ -1036,7 +1036,7 @@ Return ONLY valid JSON:
 }
 
 // ─── AI COST ALERT CHECK ─────────────────────────────────────────────────────
-export async function runAiCostAlertCheck() {
+async function runAiCostAlertCheckImpl() {
   log("ai-cost-alert", "🔔 Checking monthly AI spend vs alert threshold");
   try {
     const settingKeys = [
@@ -1167,7 +1167,7 @@ export async function runAiCostAlertCheck() {
 }
 
 // ─── REGISTRO DE TODOS LOS CRON JOBS ─────────────────────────────────────────
-export async function runAdaptiveStudy() {
+async function runAdaptiveStudyImpl() {
   log("adaptive-study", "🧠 Starting adaptive study session at 5:30am...");
   try {
     const recentMemories = await db
@@ -1357,3 +1357,41 @@ export function registerCronJobs() {
     "  📊 Auto-evaluación   → 1º/mes  (informe mensual de rendimiento)",
   ].join("\n"));
 }
+
+// ── Ejecución única por job ──────────────────────────────────────────────────
+// Cron, botones de /shopybrain/run/*, automations y el warmup de arranque
+// disparan los mismos jobs sin coordinarse: un doble clic o un clic a la hora
+// del cron lanzaba dos tandas de llamadas IA en paralelo (coste e insights
+// duplicados). Mientras un job corre, las llamadas siguientes reciben la misma
+// promesa en vez de lanzar otra ejecución.
+const runningJobs = new Map<string, Promise<unknown>>();
+export function singleFlight<T>(name: string, fn: () => Promise<T>): () => Promise<T> {
+  return () => {
+    const running = runningJobs.get(name) as Promise<T> | undefined;
+    if (running) {
+      log("scheduler", `${name} ya en ejecución — se reutiliza la ejecución en curso`);
+      return running;
+    }
+    const p = fn().finally(() => runningJobs.delete(name));
+    runningJobs.set(name, p);
+    return p;
+  };
+}
+export function isJobRunning(name: string): boolean {
+  return runningJobs.has(name);
+}
+
+export const runRevenueSnapshots = singleFlight("runRevenueSnapshots", runRevenueSnapshotsImpl);
+export const runInventorySync = singleFlight("runInventorySync", runInventorySyncImpl);
+export const runCompetitorScans = singleFlight("runCompetitorScans", runCompetitorScansImpl);
+export const runOmnicoreRealDataIntegration = singleFlight("runOmnicoreRealDataIntegration", runOmnicoreRealDataIntegrationImpl);
+export const runOmniCoreMicroLearning = singleFlight("runOmniCoreMicroLearning", runOmniCoreMicroLearningImpl);
+export const runOmniCoreMemoryConsolidation = singleFlight("runOmniCoreMemoryConsolidation", runOmniCoreMemoryConsolidationImpl);
+export const runOmniCoreCrossConnections = singleFlight("runOmniCoreCrossConnections", runOmniCoreCrossConnectionsImpl);
+export const runOmniCoreDailyDeepStudy = singleFlight("runOmniCoreDailyDeepStudy", runOmniCoreDailyDeepStudyImpl);
+export const runOmniCoreMegaSynthesis = singleFlight("runOmniCoreMegaSynthesis", runOmniCoreMegaSynthesisImpl);
+export const runTokenRefresh = singleFlight("runTokenRefresh", runTokenRefreshImpl);
+export const runRetroactiveReanalysis = singleFlight("runRetroactiveReanalysis", runRetroactiveReanalysisImpl);
+export const runMonthlySelfEvaluation = singleFlight("runMonthlySelfEvaluation", runMonthlySelfEvaluationImpl);
+export const runAiCostAlertCheck = singleFlight("runAiCostAlertCheck", runAiCostAlertCheckImpl);
+export const runAdaptiveStudy = singleFlight("runAdaptiveStudy", runAdaptiveStudyImpl);

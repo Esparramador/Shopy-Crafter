@@ -36,8 +36,11 @@ export default function HyperFrames() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [exportFormat, setExportFormat] = useState<"html" | "pdf" | "pptx">("html");
+  const [exportFormat, setExportFormat] = useState<"html" | "pdf" | "mp4">("html");
   const [exporting, setExporting] = useState(false);
+
+  const tpl = FRAME_TEMPLATES.find(t => t.id === template);
+  const sty = STYLE_PRESETS.find(x => x.id === style);
 
   async function generateFrame() {
     if (!brandName.trim()) { setError("Escribe el nombre de la marca"); return; }
@@ -51,7 +54,19 @@ export default function HyperFrames() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ template, style, brandName, productName, tagline, extraInstructions }),
+        // El API espera prompt/type/brandDna (antes 400 "prompt o brandDna requerido").
+        body: JSON.stringify({
+          prompt: [
+            `${tpl?.label ?? template}: ${tpl?.desc ?? ""}`,
+            `Marca: ${brandName.trim()}`,
+            productName.trim() ? `Producto: ${productName.trim()}` : "",
+            tagline.trim() ? `Tagline: ${tagline.trim()}` : "",
+            `Estilo visual: ${sty?.label ?? style} (colores ${sty?.colors.join(", ") ?? ""})`,
+            extraInstructions.trim() ? `Instrucciones extra: ${extraInstructions.trim()}` : "",
+          ].filter(Boolean).join("\n"),
+          type: template === "promo" ? "promo-video" : template === "story" ? "brand-intro" : template === "review" ? "testimonial" : "product-showcase",
+          brandDna: { BRAND_NAME: brandName.trim(), PRIMARY_COLOR: sty?.colors[2] ?? "" },
+        }),
       });
       if (!r.ok) {
         const err = await r.json();
@@ -67,33 +82,42 @@ export default function HyperFrames() {
     }
   }
 
-  async function exportFrame(format: "html" | "pdf" | "pptx") {
+  async function exportFrame(format: "html" | "pdf" | "mp4") {
     if (!generatedHtml) return;
     setExporting(true);
+    setError(null);
+    const base = `${brandName.replace(/\s+/g, "-")}-${template}`;
+    const download = (blob: Blob, ext: string) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${base}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
     try {
-      const r = await fetch(`${API_BASE}/api/hyperframes/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ html: generatedHtml, format, title: `${brandName}-${template}` }),
-      });
-
       if (format === "html") {
-        const blob = new Blob([generatedHtml], { type: "text/html" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${brandName.replace(/\s+/g, "-")}-${template}.html`;
-        a.click();
-        URL.revokeObjectURL(url);
+        download(new Blob([generatedHtml], { type: "text/html" }), "html");
+      } else if (format === "pdf") {
+        // PDF desde el navegador (Guardar como PDF) sobre el HTML generado.
+        const w = window.open("", "_blank");
+        if (!w) throw new Error("El navegador bloqueó la ventana de impresión");
+        w.document.write(generatedHtml);
+        w.document.close();
+        w.onload = () => w.print();
       } else {
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${brandName.replace(/\s+/g, "-")}-${template}.${format}`;
-        a.click();
-        URL.revokeObjectURL(url);
+        // MP4: render real en el servidor (Chromium + ffmpeg).
+        const r = await fetch(`${API_BASE}/api/hyperframes/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ html: generatedHtml, title: base }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error((err as { error?: string }).error || `Error ${r.status} renderizando vídeo`);
+        }
+        download(await r.blob(), "mp4");
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error exportando");
@@ -242,8 +266,8 @@ export default function HyperFrames() {
                   <button onClick={() => exportFrame("pdf")} disabled={exporting} style={{ background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 7, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "var(--t2)", display: "flex", alignItems: "center", gap: 4 }}>
                     <Download size={12} /> PDF
                   </button>
-                  <button onClick={() => exportFrame("pptx")} disabled={exporting} style={{ background: "var(--gold)", border: "none", borderRadius: 7, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#000", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-                    <Download size={12} /> PPTX
+                  <button onClick={() => exportFrame("mp4")} disabled={exporting} style={{ background: "var(--gold)", border: "none", borderRadius: 7, padding: "6px 12px", fontSize: 12, cursor: "pointer", color: "#000", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Download size={12} /> MP4
                   </button>
                   <button onClick={generateFrame} disabled={generating} style={{ background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 7, padding: "6px 10px", fontSize: 12, cursor: "pointer", color: "var(--t2)" }}>
                     <RefreshCw size={12} />
