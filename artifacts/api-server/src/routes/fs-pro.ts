@@ -3704,7 +3704,7 @@ router.post(
         generatedBy: "fs-pro:audio:mix",
       });
 
-      res.json({ success: true, vaultId, url: `/api/vault/file/${vaultId}` });
+      res.json({ success: true, vaultId, url: `/api/vault/${vaultId}/file`, dataUrl: `data:audio/mpeg;base64,${mixedBuffer.toString("base64")}` });
     } catch (err: any) {
       logger.error({ err: err?.message }, "fs-pro audio/mix failed");
       res.status(500).json({ error: err?.message || "Error mezclando audio" });
@@ -3720,14 +3720,20 @@ router.get("/fs-pro/audio/sfx-catalog", async (req, res) => {
 // ─── TTS: ADVANCED ───────────────────────────────────────────────────────
 router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
   try {
-    const { text, voiceId, model, stability, style, similarityBoost, outputFormat, projectId } = req.body;
+    // Acepta los nombres que envía FusionStudioPro (modelId, similarity, speed);
+    // antes se ignoraban y los sliders no tenían efecto.
+    const { text, voiceId, outputFormat, projectId, stability, style } = req.body;
+    const model = req.body.model ?? req.body.modelId;
+    const similarityBoost = req.body.similarityBoost ?? req.body.similarity;
+    const speed = req.body.speed;
     if (!text || !voiceId) {
       res.status(400).json({ error: "text y voiceId requeridos" });
       return;
     }
 
+    const num = (v: unknown) => (v === undefined || v === null || v === "" || !Number.isFinite(Number(v)) ? undefined : Number(v));
     const audioBuffer = await generateVoiceWithClone(text, voiceId, {
-      model, stability, style, similarityBoost, outputFormat
+      model, stability: num(stability), style: num(style), similarityBoost: num(similarityBoost), speed: num(speed), outputFormat,
     });
 
     const vaultId = await saveToVaultSmart({
@@ -3740,7 +3746,7 @@ router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
       generatedBy: "fs-pro:tts:advanced",
     });
 
-    res.json({ success: true, vaultId, url: `/api/vault/file/${vaultId}` });
+    res.json({ success: true, vaultId, url: `/api/vault/${vaultId}/file`, dataUrl: `data:audio/mpeg;base64,${audioBuffer.toString("base64")}` });
   } catch (err: any) {
     logger.error({ err: err?.message }, "fs-pro tts/advanced failed");
     res.status(500).json({ error: err?.message || "Error en TTS avanzado" });

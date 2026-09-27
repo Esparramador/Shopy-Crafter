@@ -12,8 +12,8 @@ interface Plugin {
   author: string;
   tags: string[];
   pricing: "free" | "freemium" | "paid" | "enterprise";
-  rating: number;
-  installs: number;
+  rating: number | null;
+  installs: number | null;
   capabilities: string[];
   requiredKeys: string[];
   configSchema: Record<string, unknown>;
@@ -54,7 +54,9 @@ const PRICING_META = {
   enterprise: { label: "Enterprise", color: "#a78bfa" },
 };
 
-function StarRating({ rating }: { rating: number }) {
+function StarRating({ rating }: { rating: number | null }) {
+  // Sin valoraciones reales no se pinta nada (antes eran números aleatorios).
+  if (rating === null || !Number.isFinite(rating)) return null;
   return (
     <span style={{ color: "#fbbf24", fontSize: 11 }}>
       {"★".repeat(Math.round(rating))}{"☆".repeat(5 - Math.round(rating))}
@@ -297,9 +299,9 @@ export default function PluginsCatalog() {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
                       <StarRating rating={plugin.rating} />
-                      <span style={{ color: "var(--t4)" }}>·</span>
+                      {plugin.rating !== null && <span style={{ color: "var(--t4)" }}>·</span>}
                       <span style={{ color: priceMeta.color, fontWeight: 600 }}>{priceMeta.label}</span>
-                      <span style={{ marginLeft: "auto", color: "var(--t4)" }}>{plugin.installs.toLocaleString()} installs</span>
+                      {plugin.installs !== null && <span style={{ marginLeft: "auto", color: "var(--t4)" }}>{plugin.installs.toLocaleString()} installs</span>}
                     </div>
                   </div>
                 );

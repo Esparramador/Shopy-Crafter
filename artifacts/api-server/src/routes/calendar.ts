@@ -14,6 +14,7 @@
  * POST /api/calendar/sync                 — sync from Google Calendar
  */
 
+import { sanitizeHtml } from "../lib/html-escape.js";
 import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -219,9 +220,9 @@ router.get("/calendar/oauth/callback", async (req: Request, res: Response): Prom
       <div style="text-align:center">
         <div style="font-size:48px">📅</div>
         <h2 style="color:#f59e0b">¡Google Calendar conectado!</h2>
-        <p style="color:#888">${email || "craftershopy@gmail.com"}</p>
+        <p style="color:#888">${sanitizeHtml(email || "")}</p>
         <p style="color:#666;font-size:13px">Puedes cerrar esta pestaña</p>
-        <script>window.opener?.postMessage({type:"CALENDAR_CONNECTED",email:"${email}"},"*");setTimeout(()=>window.close(),2000)</script>
+        <script>window.opener?.postMessage({type:"CALENDAR_CONNECTED",email:${JSON.stringify(String(email || "")).replace(/</g, "\\u003c")}},"*");setTimeout(()=>window.close(),2000)</script>
       </div></body></html>`);
   } catch (err: any) {
     logger.error({ err }, "calendar oauth callback error");
@@ -231,8 +232,14 @@ router.get("/calendar/oauth/callback", async (req: Request, res: Response): Prom
 
 // ─── DISCONNECT ──────────────────────────────────────────────────────────────
 router.delete("/calendar/oauth/disconnect", async (_req: Request, res: Response): Promise<void> => {
-  await db.execute(sql`DELETE FROM calendar_tokens WHERE user_id = 'admin'`).catch(() => {});
-  res.json({ ok: true });
+  try {
+    await db.execute(sql`DELETE FROM calendar_tokens WHERE user_id = 'admin'`);
+    res.json({ ok: true });
+  } catch (err: any) {
+    // Antes se tragaba el error y respondía ok aunque el token siguiera guardado.
+    logger.error({ err }, "calendar disconnect failed");
+    res.status(500).json({ error: "No se pudo desconectar Google Calendar" });
+  }
 });
 
 // ─── LIST EVENTS ─────────────────────────────────────────────────────────────
@@ -346,15 +353,25 @@ router.delete("/calendar/events/:id", async (req: Request, res: Response): Promi
 
     await db.execute(sql`DELETE FROM calendar_appointments WHERE id = ${id}`);
 
-    // Remove from Google Calendar
+    // Remove from Google Calendar. Si falla, se informa: antes respondía ok y el
+    // evento seguía existiendo en Google sin que nadie lo supiera.
+    let googleSynced = true;
+    let warning: string | undefined;
     if (googleEventId) {
       try {
         const cal = await getCalendarClient();
         await cal.events.delete({ calendarId: "primary", eventId: googleEventId });
-      } catch {}
+      } catch (err: any) {
+        const code = Number(err?.code ?? err?.response?.status);
+        if (code !== 404 && code !== 410) {
+          googleSynced = false;
+          warning = "Cita borrada aquí, pero no se pudo borrar en Google Calendar: bórrala allí manualmente.";
+          logger.warn({ err: err?.message, id }, "calendar: Google event delete failed");
+        }
+      }
     }
 
-    res.json({ ok: true });
+    res.json({ ok: true, googleSynced, ...(warning ? { warning } : {}) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

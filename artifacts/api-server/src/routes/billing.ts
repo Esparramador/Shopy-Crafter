@@ -127,7 +127,6 @@ async function ensureBillingPlansTable(): Promise<void> {
     logger.warn({ err }, "billing_plans table setup warning");
   }
 }
-ensureBillingPlansTable();
 
 // ── Seed canonical plans once per deploy (idempotent via version tag) ─────────
 const CANONICAL_SEED_VERSION = "v12-canonical-5plans-2026-mid";
@@ -264,7 +263,10 @@ async function seedCanonicalBillingPlans(): Promise<void> {
     logger.warn({ err }, "billing plans seed warning (non-fatal)");
   }
 }
-seedCanonicalBillingPlans();
+// Seed DESPUÉS de crear la tabla (antes se lanzaban en paralelo: en una BD nueva
+// el seed podía correr sin billing_plans y no se sembraba nada hasta reiniciar).
+const billingPlansReady = ensureBillingPlansTable().then(seedCanonicalBillingPlans);
+void billingPlansReady;
 
 function rowToPlan(row: any) {
   return {
