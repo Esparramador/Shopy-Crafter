@@ -6,7 +6,7 @@ import { shopifyRequest } from "../lib/shopify";
 import { askClaudeWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini";
 import { recordApiUsage } from "../lib/api-usage.js";
-import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
+import { createBulkJob, updateJobProgress, completeJob, runAsync, runAsyncJob } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
 import { safeFetch } from "../lib/web-scraper.js";
@@ -327,7 +327,7 @@ router.post("/projects/:projectId/seo/generate-metas", async (req, res): Promise
       message: `Generando metas para ${products.length} productos...`,
     });
   
-    runAsync(async () => {
+    runAsyncJob(jobId, async () => {
       let completed = 0;
       let failed = 0;
   
@@ -723,7 +723,7 @@ router.post("/projects/:projectId/seo/fix-alt-texts", async (req, res): Promise<
       message: `Generando alt texts para ${products.length} productos...`,
     });
   
-    runAsync(async () => {
+    runAsyncJob(jobId, async () => {
       let completed = 0;
       let failed = 0;
   
@@ -786,7 +786,7 @@ router.post("/projects/:projectId/seo/generate-schemas", async (req, res): Promi
       message: `Generando schemas JSON-LD para ${products.length} productos e inyectando en theme...`,
     });
   
-    runAsync(async () => {
+    runAsyncJob(jobId, async () => {
       let completed = 0;
       let failed = 0;
       const generatedSchemas: Array<{ productId: string; title: string; schema: string }> = [];

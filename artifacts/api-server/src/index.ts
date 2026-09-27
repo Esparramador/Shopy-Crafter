@@ -176,7 +176,10 @@ async function warmupProdKnowledge() {
         .from(productsTable).where(eq(productsTable.projectId, project.id));
       const productTotal = Number(prodCount?.c ?? 0);
 
-      if (productTotal === 0) {
+      // La precarga de catálogo usa la API de Shopify: WooCommerce/PrestaShop se
+      // sincronizan desde su propio flujo (antes se intentaba OAuth de Shopify
+      // contra su dominio con sus claves y siempre fallaba).
+      if (productTotal === 0 && platformType === "shopify") {
         logger.info({ projectId: project.id, domain: project.shopDomain }, "🔄 Warmup: syncing products from Shopify...");
         try {
           let allProducts: ShopifyProductRaw[] = [];
@@ -357,6 +360,8 @@ const server = app.listen(port, (err?: Error) => {
 
   // Inject DB-stored API keys into process.env (non-blocking)
   injectDbApiKeys().catch(() => {});
+  // Jobs masivos que estaban "running" murieron con el proceso anterior.
+  import("./lib/bulk-queue.js").then(m => m.failStaleBulkJobs()).catch(err => logger.warn({ err }, "failStaleBulkJobs failed"));
 
   db.execute(sql`
     CREATE TABLE IF NOT EXISTS rate_limits (

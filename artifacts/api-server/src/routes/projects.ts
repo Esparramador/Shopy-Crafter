@@ -805,7 +805,12 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
         res.status(400).json({ error: "El nuevo token no es válido para esta tienda." });
         return;
       }
-      await db.update(projectsTable).set({ accessToken: encrypt(newAccessToken) }).where(eq(projectsTable.id, id));
+      // Token manual (offline, no caduca): se fija la caducidad lejana. Sin ella
+      // getShopifyHeaders lo consideraba vencido y lo sustituía al instante.
+      await db.update(projectsTable).set({
+        accessToken: encrypt(newAccessToken),
+        tokenExpiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000),
+      }).where(eq(projectsTable.id, id));
       await recordAudit({
         userId: req.session.userId!,
         action: "shopify_token_manual_update",

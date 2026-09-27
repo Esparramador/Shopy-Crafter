@@ -8,6 +8,7 @@ import { requireAuth } from "../lib/auth.js";
 import { checkMessageAttachments, msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
+import { businessYmd } from "../lib/tz.js";
 import { askClaude, learnFromOperation } from "../lib/claude.js";
 import { askGeminiChat } from "../lib/gemini.js";
 import { buildClientPlatformContext } from "../lib/platform-knowledge.js";
@@ -34,45 +35,130 @@ function getClientProjectId(req: import("express").Request): string {
   return "";
 }
 
+/** Media redondeada de las puntuaciones presentes (null si no hay ninguna). */
+function avgOf(vals: Array<number | null>): number | null {
+  const nums = vals.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  return nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null;
+}
+
+/**
+ * Ingresos reales de la tienda a partir de los snapshots diarios: serie de los
+ * últimos 30 días con datos, su total y la variación frente a los 30 anteriores
+ * (null si no hay periodo anterior con ingresos con el que comparar).
+ */
+async function revenueSummary(projectId: string): Promise<{
+  series: Array<{ date: string; revenue: number | null }>;
+  revenue30d: number | null;
+  trendPct: number | null;
+}> {
+  // Una fila por día (si hubiera duplicados antiguos, gana la más reciente).
+  const rows = await db.execute(sql`
+    SELECT DISTINCT ON (date) date, revenue
+    FROM revenue_snapshots
+    WHERE project_id = ${projectId} AND date >= to_char((NOW() AT TIME ZONE 'Europe/Madrid') - INTERVAL '60 days', 'YYYY-MM-DD')
+    ORDER BY date ASC, created_at DESC NULLS LAST
+  `);
+  const all = (rows.rows as Array<{ date: string; revenue: number | null }>)
+    .map(r => ({ date: String(r.date), revenue: r.revenue === null ? null : Number(r.revenue) }));
+  if (!all.length) return { series: [], revenue30d: null, trendPct: null };
+  const d = new Date(`${all[all.length - 1]!.date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 29);
+  const cutoff = d.toISOString().slice(0, 10);
+  const series = all.filter(r => r.date >= cutoff);
+  const prev = all.filter(r => r.date < cutoff);
+  const sum = (rs: typeof all) => rs.reduce((acc, r) => acc + (r.revenue ?? 0), 0);
+  const revenue30d = Math.round(sum(series) * 100) / 100;
+  const prevRevenue = sum(prev);
+  const trendPct = prev.length > 0 && prevRevenue > 0
+    ? Math.round(((revenue30d - prevRevenue) / prevRevenue) * 1000) / 10
+    : null;
+  return { series, revenue30d, trendPct };
+}
+
 router.get("/dashboard", async (req, res): Promise<void> => {
   try {
     const projectId = getClientProjectId(req);
-    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
-  
-    const [project, products, pendingApprovals, recentActivity] = await Promise.all([
-      db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain, platformType: (projectsTable as any).platformType })
-        .from(projectsTable).where(eq(projectsTable.id, parseInt(projectId))).limit(1),
+    const pid = parseInt(projectId, 10);
+    if (!projectId || !Number.isFinite(pid)) { res.status(400).json({ error: "No project linked" }); return; }
+
+    const [project, products, pendingApprovals, recentActivity, engineRows, revenue] = await Promise.all([
+      db.select({ id: projectsTable.id, name: projectsTable.name, shopDomain: projectsTable.shopDomain, platformType: projectsTable.platformType })
+        .from(projectsTable).where(eq(projectsTable.id, pid)).limit(1),
       db.select({
-        id: productsTable.id,
-        title: productsTable.title,
         auditScore: productsTable.auditScore,
-        price: productsTable.price,
-      }).from(productsTable).where(eq(productsTable.projectId, parseInt(projectId))),
+        titleScore: productsTable.titleScore,
+        descriptionScore: productsTable.descriptionScore,
+        seoScore: productsTable.seoScore,
+        imageScore: productsTable.imageScore,
+      }).from(productsTable).where(eq(productsTable.projectId, pid)),
       db.select({ id: approvalsTable.id })
         .from(approvalsTable)
         .where(and(eq(approvalsTable.projectId, projectId), eq(approvalsTable.status, "pending"))),
       db.select().from(auditLogTable)
         .where(eq(auditLogTable.projectId, projectId))
         .orderBy(desc(auditLogTable.createdAt)).limit(20),
+      db.execute(sql`
+        SELECT
+          (SELECT COUNT(DISTINCT shopify_product_id) FROM redesigns WHERE project_id = ${pid})::int AS redesigned_products,
+          (SELECT COUNT(*) FROM redesigns WHERE project_id = ${pid} AND applied_at IS NOT NULL)::int AS redesigns_applied,
+          (SELECT COUNT(*) FROM generation_jobs WHERE project_id = ${pid} AND status = 'succeeded')::int AS images_generated,
+          (SELECT consistency_score FROM visual_dna WHERE project_id = ${pid} AND consistency_score IS NOT NULL ORDER BY updated_at DESC LIMIT 1) AS consistency_score,
+          (SELECT COUNT(*) FROM ab_tests WHERE project_id = ${pid} AND status = 'running')::int AS ab_running,
+          (SELECT COUNT(*) FROM ab_tests WHERE project_id = ${pid} AND status = 'completed')::int AS ab_completed,
+          (SELECT COUNT(*) FROM seo_data WHERE project_id = ${pid})::int AS seo_rows,
+          (SELECT AVG(seo_score) FROM seo_data WHERE project_id = ${pid} AND seo_score IS NOT NULL) AS seo_avg,
+          (SELECT COUNT(*) FROM price_history WHERE project_id = ${pid} AND change_source <> 'sync' AND recorded_at > NOW() - INTERVAL '30 days')::int AS price_changes_30d,
+          (SELECT COUNT(*) FROM price_history WHERE project_id = ${pid} AND change_source <> 'sync')::int AS price_changes_total
+      `),
+      revenueSummary(projectId),
     ]);
-  
-    const scored = products.filter((p) => p.auditScore !== null);
-    const avgScore = scored.length > 0
-      ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length)
-      : null;
-  
+
+    const avgScore = avgOf(products.map(p => p.auditScore));
+    const subscores = {
+      title: avgOf(products.map(p => p.titleScore)),
+      description: avgOf(products.map(p => p.descriptionScore)),
+      seo: avgOf(products.map(p => p.seoScore)),
+      image: avgOf(products.map(p => p.imageScore)),
+    };
+
+    const e = (engineRows.rows[0] ?? {}) as Record<string, unknown>;
+    const n = (v: unknown): number => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+    const nOrNull = (v: unknown): number | null => (v === null || v === undefined ? null : Number.isFinite(Number(v)) ? Math.round(Number(v)) : null);
+    const total = products.length;
+    const audited = products.filter(p => p.auditScore !== null).length;
+    const pctOf = (part: number): number | null => (total > 0 ? Math.min(100, Math.round((part / total) * 100)) : null);
+    const redesignedProducts = n(e.redesigned_products);
+    const seoAvg = nOrNull(e.seo_avg);
+    const consistency = nOrNull(e.consistency_score);
+
+    const engines = [
+      { key: "audit", active: audited > 0, pct: pctOf(audited), detail: `${audited} de ${total} productos auditados` },
+      { key: "redesign", active: redesignedProducts > 0, pct: pctOf(redesignedProducts), detail: `${redesignedProducts} productos rediseñados · ${n(e.redesigns_applied)} aplicados` },
+      { key: "images", active: n(e.images_generated) > 0, pct: null, detail: `${n(e.images_generated)} imágenes generadas` },
+      { key: "consistency", active: consistency !== null, pct: consistency, detail: consistency !== null ? `Consistencia visual ${consistency}/100` : "Sin análisis de consistencia" },
+      { key: "ab", active: n(e.ab_running) + n(e.ab_completed) > 0, pct: null, detail: `${n(e.ab_running)} en curso · ${n(e.ab_completed)} completados` },
+      { key: "seo", active: n(e.seo_rows) > 0, pct: seoAvg, detail: seoAvg !== null ? `${n(e.seo_rows)} productos analizados · SEO medio ${seoAvg}/100` : `${n(e.seo_rows)} productos analizados` },
+      { key: "pricing", active: n(e.price_changes_total) > 0, pct: null, detail: `${n(e.price_changes_30d)} cambios de precio en 30 días` },
+    ];
+
     res.json({
-      totalProducts: products.length,
+      totalProducts: total,
       avgScore,
+      subscores,
       pendingApprovals: pendingApprovals.length,
       recentActivity,
-      enginesActive: 6,
+      engines,
+      enginesActive: engines.filter(x => x.active).length,
+      revenueSeries: revenue.series,
+      revenue30d: revenue.revenue30d,
+      revenueTrendPct: revenue.trendPct,
       lastOptimized: recentActivity[0]?.createdAt ?? null,
       projectName: project[0]?.name ?? null,
       shopDomain: project[0]?.shopDomain ?? null,
-      platformType: (project[0] as any)?.platformType ?? "shopify",
+      platformType: project[0]?.platformType ?? "shopify",
     });
   } catch (err: any) {
+    logger.error({ err }, "[client/dashboard] failed");
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
   }
@@ -321,38 +407,39 @@ router.get("/reports", async (req, res): Promise<void> => {
     const projectId = getClientProjectId(req);
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
   
-    const products = await db.select({
-      id: productsTable.id,
-      title: productsTable.title,
-      auditScore: productsTable.auditScore,
-      imagesJson: productsTable.imagesJson,
-    }).from(productsTable).where(eq(productsTable.projectId, parseInt(projectId)));
-  
-    const scored = products.filter((p) => p.auditScore !== null);
-    const avgSeoScore = scored.length > 0
-      ? Math.round(scored.reduce((s, p) => s + (p.auditScore ?? 0), 0) / scored.length)
-      : null;
-  
-    let imagesGenerated = 0;
-    for (const p of products) {
-      try {
-        const imgs = p.imagesJson ? (typeof p.imagesJson === "string" ? JSON.parse(p.imagesJson) : p.imagesJson) : [];
-        imagesGenerated += Array.isArray(imgs) ? imgs.length : 0;
-      } catch {}
-    }
-  
-    const recentActivity = await db.select().from(auditLogTable)
-      .where(eq(auditLogTable.projectId, projectId))
-      .orderBy(desc(auditLogTable.createdAt)).limit(20);
-  
-    const productsOptimized = scored.length;
-    const revenueImpact = avgSeoScore != null && avgSeoScore > 60 ? `+${Math.round((avgSeoScore - 50) * 0.3)}%` : "—";
-  
+    const pid = parseInt(projectId, 10);
+    if (!Number.isFinite(pid)) { res.status(400).json({ error: "No project linked" }); return; }
+    const [products, imagesRow, recentActivity, revenue] = await Promise.all([
+      db.select({
+        auditScore: productsTable.auditScore,
+        titleScore: productsTable.titleScore,
+        descriptionScore: productsTable.descriptionScore,
+        seoScore: productsTable.seoScore,
+        imageScore: productsTable.imageScore,
+        priceScore: productsTable.priceScore,
+      }).from(productsTable).where(eq(productsTable.projectId, pid)),
+      // Imágenes realmente generadas por IA (no todas las fotos del catálogo).
+      db.execute(sql`SELECT COUNT(*)::int AS n FROM generation_jobs WHERE project_id = ${pid} AND status = 'succeeded'`),
+      db.select().from(auditLogTable)
+        .where(eq(auditLogTable.projectId, projectId))
+        .orderBy(desc(auditLogTable.createdAt)).limit(20),
+      revenueSummary(projectId),
+    ]);
+
     res.json({
-      productsOptimized,
-      imagesGenerated,
-      avgSeoScore,
-      revenueImpact,
+      productsOptimized: products.filter(p => p.auditScore !== null).length,
+      imagesGenerated: Number((imagesRow.rows[0] as { n?: number } | undefined)?.n ?? 0),
+      avgScore: avgOf(products.map(p => p.auditScore)),
+      avgSeoScore: avgOf(products.map(p => p.seoScore)),
+      subscores: {
+        title: avgOf(products.map(p => p.titleScore)),
+        description: avgOf(products.map(p => p.descriptionScore)),
+        seo: avgOf(products.map(p => p.seoScore)),
+        image: avgOf(products.map(p => p.imageScore)),
+        price: avgOf(products.map(p => p.priceScore)),
+      },
+      revenue30d: revenue.revenue30d,
+      revenueTrendPct: revenue.trendPct,
       timeline: recentActivity,
     });
   } catch (err: any) {
@@ -912,32 +999,32 @@ router.get("/platform-data", async (req, res): Promise<void> => {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, pid)).limit(1);
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    const platformType: string = ((project as any).platformType as string) ?? "shopify";
+    const platformType: string = project.platformType ?? "shopify";
 
-    // Last 30 days revenue snapshots
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600_000).toISOString().split("T")[0];
+    // Ingresos: snapshots diarios de los últimos 30 días frente a los 30 anteriores,
+    // una fila por día (antes los duplicados de un mismo día se sumaban dos veces).
     const snapshots = await db.execute(sql`
-      SELECT date, revenue, orders, aov
+      SELECT DISTINCT ON (date) date, revenue, orders
       FROM revenue_snapshots
-      WHERE project_id = ${String(pid)} AND date >= ${thirtyDaysAgo}
-      ORDER BY date ASC
-    `).catch(() => ({ rows: [] }));
-    const rows = (snapshots.rows ?? []) as Array<{ date: string; revenue: number; orders: number; aov: number }>;
+      WHERE project_id = ${String(pid)} AND date >= to_char((NOW() AT TIME ZONE 'Europe/Madrid') - INTERVAL '60 days', 'YYYY-MM-DD')
+      ORDER BY date ASC, created_at DESC NULLS LAST
+    `);
+    const allRows = (snapshots.rows ?? []) as Array<{ date: string; revenue: number | null; orders: number | null }>;
+    const thirtyDaysAgo = (() => {
+      const d = new Date(`${businessYmd()}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - 29);
+      return d.toISOString().slice(0, 10);
+    })();
+    const rows = allRows.filter(r => String(r.date) >= thirtyDaysAgo);
+    const priorRowsList = allRows.filter(r => String(r.date) < thirtyDaysAgo);
 
-    // Prior 30 days for comparison
-    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 3600_000).toISOString().split("T")[0];
-    const priorRows = await db.execute(sql`
-      SELECT SUM(revenue) as total_revenue, SUM(orders) as total_orders
-      FROM revenue_snapshots
-      WHERE project_id = ${String(pid)} AND date >= ${sixtyDaysAgo} AND date < ${thirtyDaysAgo}
-    `).catch(() => ({ rows: [{ total_revenue: 0, total_orders: 0 }] }));
-    const prior = (priorRows.rows?.[0] ?? { total_revenue: 0, total_orders: 0 }) as { total_revenue: number; total_orders: number };
-
-    const currentRevenue = rows.reduce((s, r) => s + parseFloat(String(r.revenue ?? 0)), 0);
-    const currentOrders = rows.reduce((s, r) => s + parseInt(String(r.orders ?? 0)), 0);
+    const currentRevenue = rows.reduce((s, r) => s + (Number(r.revenue) || 0), 0);
+    const currentOrders = rows.reduce((s, r) => s + (Number(r.orders) || 0), 0);
     const avgAov = currentOrders > 0 ? currentRevenue / currentOrders : 0;
-    const priorRevenue = parseFloat(String(prior.total_revenue ?? 0));
-    const revenueTrend = priorRevenue > 0 ? ((currentRevenue - priorRevenue) / priorRevenue) * 100 : 0;
+    const priorRevenue = priorRowsList.reduce((s, r) => s + (Number(r.revenue) || 0), 0);
+    // Sin periodo anterior con ingresos no hay tendencia (antes se mostraba 0 %).
+    const revenueTrend = priorRevenue > 0 ? ((currentRevenue - priorRevenue) / priorRevenue) * 100 : null;
+    const lastDataDate = allRows.length ? String(allRows[allRows.length - 1]!.date) : null;
 
     // Top products by audit score
     const topProducts = await db.execute(sql`
@@ -978,9 +1065,10 @@ router.get("/platform-data", async (req, res): Promise<void> => {
         total30d: parseFloat(currentRevenue.toFixed(2)),
         orders30d: currentOrders,
         aov: parseFloat(avgAov.toFixed(2)),
-        trend: parseFloat(revenueTrend.toFixed(1)),
-        dailyChart: rows.map(r => ({ date: r.date, revenue: parseFloat(String(r.revenue ?? 0)), orders: parseInt(String(r.orders ?? 0)) })),
+        trend: revenueTrend === null ? null : parseFloat(revenueTrend.toFixed(1)),
+        dailyChart: rows.map(r => ({ date: String(r.date), revenue: Number(r.revenue) || 0, orders: Number(r.orders) || 0 })),
       },
+      lastDataDate,
       topProducts: (topProducts.rows ?? []),
       events: (events.rows ?? []),
       inventoryAlerts: (invAlerts.rows ?? []),

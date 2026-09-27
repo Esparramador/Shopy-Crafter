@@ -19,7 +19,7 @@ import { escapeHtmlDeep, sanitizeHtml } from "../lib/html-escape.js";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 // `buildBackCover` ya no se usa directamente: la contraportada se inserta como
 // hoja 2 dentro de `buildCoverPage` (orden DIN-A4: portada → contraportada → info).
-import { shopifyRequest } from "../lib/shopify";
+import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify";
 import { randomUUID } from "crypto";
 import { learnFromOperation } from "../lib/claude.js";
 import { askClaudeJsonValidated, askClaudeTextComplete, type AiJsonSchema } from "../lib/ai-json.js";
@@ -2658,16 +2658,18 @@ router.post("/projects/:projectId/exports/run-full-audit", requireProjectAccess,
           let pageInfo: string | null = null;
           let fetchCount = 0;
   
-          while (hasMore && fetchCount < 10) {
-            const url = pageInfo
-              ? `/orders.json?status=any&financial_status=paid&limit=250&page_info=${pageInfo}`
-              : `/orders.json?status=any&financial_status=paid&created_at_min=${since}&limit=250`;
-            const data = await shopifyRequest<{
+          while (hasMore && fetchCount < 200) {
+            const url: string = pageInfo
+              ? `/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`
+              : `/orders.json?status=any&financial_status=paid&created_at_min=${encodeURIComponent(since)}&limit=250`;
+            const paged = await shopifyRequestPaged<{
               orders: Array<{
                 id: number; created_at: string; total_price: string;
                 line_items: Array<{ variant_id: number; title: string; variant_title: string; quantity: number; price: string; product_id: number }>;
               }>;
             }>(projectId, project.shopDomain, url);
+            const data = paged.data;
+            const nextPageInfo: string | null = paged.nextPageInfo;
   
             for (const order of data.orders) {
               const date = order.created_at.split("T")[0];
@@ -2683,8 +2685,9 @@ router.post("/projects/:projectId/exports/run-full-audit", requireProjectAccess,
               }
             }
   
-            hasMore = data.orders.length === 250;
-            pageInfo = null;
+            // Cursor real (antes pageInfo = null repetía la primera página: pedidos ×10).
+            pageInfo = nextPageInfo;
+            hasMore = !!nextPageInfo;
             fetchCount++;
           }
   
@@ -5380,18 +5383,24 @@ router.get("/projects/:projectId/exports/financial-xlsx", requireProjectAccess, 
 
     topProducts.sort((a, b) => b.revenue - a.revenue);
 
-    try {
+    // Pedidos e ingresos REALES de los últimos 30 días (antes: columnas
+    // inexistentes total_orders/snapshot_date → error tragado y "pedidos" =
+    // número de productos del catálogo).
+    let realRevenue30d = 0;
+    {
       const snapResult = await db.execute(sql`
-        SELECT total_orders FROM revenue_snapshots 
-        WHERE project_id = ${projectId} ORDER BY snapshot_date DESC LIMIT 1
+        SELECT COALESCE(SUM(orders), 0)::int AS orders, COALESCE(SUM(revenue), 0)::float AS revenue
+        FROM revenue_snapshots
+        WHERE project_id = ${String(projectId)} AND date >= to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')
       `);
-      const rows = (snapResult as any).rows || [];
-      if (rows[0]) totalOrders = Number(rows[0].total_orders) || products.length;
-    } catch { totalOrders = products.length; }
+      const row = ((snapResult as any).rows || [])[0];
+      totalOrders = Number(row?.orders) || 0;
+      realRevenue30d = Number(row?.revenue) || 0;
+    }
 
     const grossProfit = totalRevenue - totalCogs;
     const grossMarginPct = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 1000) / 10 : 0;
-    const aov = totalOrders > 0 ? Math.round((totalRevenue / totalOrders) * 100) / 100 : 0;
+    const aov = totalOrders > 0 ? Math.round((realRevenue30d / totalOrders) * 100) / 100 : 0;
 
     const alerts: string[] = [];
     if (grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20%");
@@ -5454,18 +5463,24 @@ router.get("/projects/:projectId/exports/executive-pptx", requireProjectAccess, 
       productList.push({ title: p.title || "Sin título", price, totalCogs: cogs, marginPct: margin });
     }
 
-    try {
+    // Pedidos e ingresos REALES de los últimos 30 días (antes: columnas
+    // inexistentes total_orders/snapshot_date → error tragado y "pedidos" =
+    // número de productos del catálogo).
+    let realRevenue30d = 0;
+    {
       const snapResult = await db.execute(sql`
-        SELECT total_orders FROM revenue_snapshots 
-        WHERE project_id = ${projectId} ORDER BY snapshot_date DESC LIMIT 1
+        SELECT COALESCE(SUM(orders), 0)::int AS orders, COALESCE(SUM(revenue), 0)::float AS revenue
+        FROM revenue_snapshots
+        WHERE project_id = ${String(projectId)} AND date >= to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')
       `);
-      const rows = (snapResult as any).rows || [];
-      if (rows[0]) totalOrders = Number(rows[0].total_orders) || products.length;
-    } catch { totalOrders = products.length; }
+      const row = ((snapResult as any).rows || [])[0];
+      totalOrders = Number(row?.orders) || 0;
+      realRevenue30d = Number(row?.revenue) || 0;
+    }
 
     const grossProfit = totalRevenue - totalCogs;
     const grossMarginPct = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 1000) / 10 : 0;
-    const aov = totalOrders > 0 ? Math.round((totalRevenue / totalOrders) * 100) / 100 : 0;
+    const aov = totalOrders > 0 ? Math.round((realRevenue30d / totalOrders) * 100) / 100 : 0;
 
     const alerts: string[] = [];
     if (grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20% — revisar estructura de costes urgente");
@@ -5546,18 +5561,24 @@ router.get("/projects/:projectId/exports/executive-docx", requireProjectAccess, 
       productList.push({ title: p.title || "Sin título", price, totalCogs: cogs, marginPct: margin });
     }
 
-    try {
+    // Pedidos e ingresos REALES de los últimos 30 días (antes: columnas
+    // inexistentes total_orders/snapshot_date → error tragado y "pedidos" =
+    // número de productos del catálogo).
+    let realRevenue30d = 0;
+    {
       const snapResult = await db.execute(sql`
-        SELECT total_orders FROM revenue_snapshots 
-        WHERE project_id = ${projectId} ORDER BY snapshot_date DESC LIMIT 1
+        SELECT COALESCE(SUM(orders), 0)::int AS orders, COALESCE(SUM(revenue), 0)::float AS revenue
+        FROM revenue_snapshots
+        WHERE project_id = ${String(projectId)} AND date >= to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')
       `);
-      const rows = (snapResult as any).rows || [];
-      if (rows[0]) totalOrders = Number(rows[0].total_orders) || products.length;
-    } catch { totalOrders = products.length; }
+      const row = ((snapResult as any).rows || [])[0];
+      totalOrders = Number(row?.orders) || 0;
+      realRevenue30d = Number(row?.revenue) || 0;
+    }
 
     const grossProfit = totalRevenue - totalCogs;
     const grossMarginPct = totalRevenue > 0 ? Math.round((grossProfit / totalRevenue) * 1000) / 10 : 0;
-    const aov = totalOrders > 0 ? Math.round((totalRevenue / totalOrders) * 100) / 100 : 0;
+    const aov = totalOrders > 0 ? Math.round((realRevenue30d / totalOrders) * 100) / 100 : 0;
 
     const alerts: string[] = [];
     if (grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20% — revisar estructura de costes urgente");

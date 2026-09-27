@@ -7,6 +7,9 @@ import {
   omnicoreInsightsTable, omnicoreCrossConnectionsTable, platformSettingsTable,
 } from "@workspace/db";
 import { desc, eq, gte, sql, and, inArray } from "drizzle-orm";
+import { businessDayBounds, businessYmd, previousBusinessYmd } from "./tz.js";
+import { fetchOrdersInWindow, isCountableOrder } from "./orders.js";
+import { toLooseNumber } from "./ai-schema.js";
 import { refreshToken, rotateToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
 import { askClaudeWithBrainDetailed, buildShopyBrainContext, type BrainUseCase } from "./claude.js";
@@ -20,7 +23,11 @@ import { randomBytes } from "crypto";
 import { sendEmail, isGmailAvailable } from "./gmail.js";
 import { apiUsageLogTable } from "@workspace/db/schema";
 
-let geminiOnly = false;
+// Fallback temporal a Gemini: antes un solo 429/"overloaded" pasajero dejaba
+// TODOS los jobs en Gemini hasta reiniciar. Ahora caduca (1 h; 12 h si es falta
+// de crédito, que no se arregla sola).
+let geminiOnlyUntil = 0;
+const isGeminiOnly = () => Date.now() < geminiOnlyUntil;
 
 const selfEvaluationSchema = z.object({
   report: z.object({
@@ -39,7 +46,7 @@ type AiGenerateOpts = { system: string; prompt: string; maxTokens: number; timeo
 
 /** Claude con ShopyBrain y, si Anthropic se queda sin crédito, Gemini. Devuelve si se cortó. */
 async function aiGenerateDetailed(opts: AiGenerateOpts): Promise<{ text: string; truncated: boolean }> {
-  if (!geminiOnly) {
+  if (!isGeminiOnly()) {
     try {
       const r = await askClaudeWithBrainDetailed(
         0,
@@ -54,8 +61,9 @@ async function aiGenerateDetailed(opts: AiGenerateOpts): Promise<{ text: string;
     } catch (err: unknown) {
       const msg = String((err as { message?: string })?.message ?? err ?? "");
       if (msg.includes("credit balance") || msg.includes("billing") || msg.includes("overloaded") || (err as { status?: number })?.status === 429) {
-        geminiOnly = true;
-        log("ai-fallback", "⚠️ Anthropic credits exhausted — switching to Gemini for all scheduler AI jobs");
+        const creditIssue = msg.includes("credit balance") || msg.includes("billing");
+        geminiOnlyUntil = Date.now() + (creditIssue ? 12 : 1) * 60 * 60 * 1000;
+        log("ai-fallback", `⚠️ Anthropic ${creditIssue ? "sin crédito" : "saturado/429"} — jobs de IA en Gemini hasta ${new Date(geminiOnlyUntil).toISOString()}`);
       } else {
         throw err;
       }
@@ -182,39 +190,22 @@ async function runRevenueSnapshotsImpl() {
       const p = project as Record<string, unknown>;
       if (!p.accessToken && !p.clientId && !p.clientSecret) continue;
       try {
-        const now = new Date();
-        const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
         const { getProjectConnector } = await import("./platform-helper.js");
         const connector = await getProjectConnector(project.id);
         if (!connector || !connector.supportsFeature("orders")) continue;
 
-        const ordersList = await connector.getOrders({
-          limit: 250,
-          after: since,
-        });
-        const revenue = ordersList.reduce((sum, o) => sum + parseFloat(o.total ?? "0"), 0);
-        const data = { orders: ordersList };
-        const today = new Date().toISOString().split("T")[0];
-        const existing = await db.select({ id: revenueSnapshotsTable.id })
-          .from(revenueSnapshotsTable)
-          .where(and(eq(revenueSnapshotsTable.projectId, String(project.id)), eq(revenueSnapshotsTable.date, today)))
-          .limit(1);
-        const aov = data.orders.length > 0 ? revenue / data.orders.length : 0;
-        if (existing.length > 0) {
-          await db.update(revenueSnapshotsTable)
-            .set({ revenue, orders: data.orders.length, aov })
-            .where(eq(revenueSnapshotsTable.id, existing[0].id));
-        } else {
-          await db.insert(revenueSnapshotsTable).values({
-            id: randomBytes(16).toString("hex"),
-            projectId: String(project.id),
-            date: today,
-            revenue,
-            orders: data.orders.length,
-            aov,
-          });
-        }
-        log("revenue-snapshots", `Project ${project.id}: €${revenue.toFixed(2)}, ${data.orders.length} orders`);
+        // Día CERRADO anterior en Europe/Madrid. Antes: últimas 24 h móviles
+        // guardadas con la fecha UTC del día nuevo (mezclaba dos días), solo la
+        // primera página y contando cancelados/reembolsados.
+        const day = previousBusinessYmd();
+        const { start, end } = businessDayBounds(day);
+        const orders = (await fetchOrdersInWindow(connector, start, end))
+          .filter(o => isCountableOrder(o.status))
+          .filter(o => { const t = new Date(o.createdAt).getTime(); return t >= start.getTime() && t < end.getTime(); });
+        const revenue = orders.reduce((sum, o) => sum + (Number.parseFloat(o.total ?? "0") || 0), 0);
+        const data = { orders };
+        const today = day;
+        log("revenue-snapshots", `Project ${project.id} ${today}: €${revenue.toFixed(2)}, ${data.orders.length} orders`);
       } catch (err) {
         logger.warn({ projectId: project.id, err }, "Revenue snapshot failed for project");
       }
@@ -222,7 +213,22 @@ async function runRevenueSnapshotsImpl() {
     log("revenue-snapshots", "Complete");
   } catch (err) {
     logger.error({ err }, "Revenue snapshots job failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
+}
+
+// Todos los productos de la tienda, paginando según la plataforma.
+async function fetchAllPlatformProducts(conn: import("./connectors/types.js").IPlatformConnector): Promise<import("./connectors/types.js").PlatformProduct[]> {
+  const withAll = conn as { listAllProducts?: () => Promise<import("./connectors/types.js").PlatformProduct[]> };
+  if (typeof withAll.listAllProducts === "function") return withAll.listAllProducts();
+  const out: import("./connectors/types.js").PlatformProduct[] = [];
+  const pageSize = 100;
+  for (let page = 1; page <= 200; page++) {
+    const batch = await conn.getProducts({ page, limit: pageSize });
+    out.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+  return out;
 }
 
 // ─── INVENTORY SYNC ──────────────────────────────────────────────────────────
@@ -235,81 +241,66 @@ async function runInventorySyncImpl() {
       const pInv = project as Record<string, unknown>;
       if (!pInv.accessToken && !pInv.clientId && !pInv.clientSecret) continue;
       try {
-        type InventoryProduct = { id: number; title: string; product_type: string; vendor: string; options: Array<{ name: string }>; variants: Array<{ id: number; inventory_quantity: number; sku: string; barcode: string; product_id: number; title: string; price: string; compare_at_price: string | null; option1: string | null; option2: string | null; option3: string | null; weight: number | null; weight_unit: string | null; inventory_policy: string; inventory_management: string | null; requires_shipping: boolean }> };
-        let allProducts: InventoryProduct[] = [];
         const { getProjectConnector } = await import("./platform-helper.js");
         const invConnector = await getProjectConnector(project.id);
         if (!invConnector || !invConnector.supportsFeature("products")) continue;
-        try {
-          const platformProducts = await invConnector.getProducts({ status: "active", limit: 250 });
-          allProducts = (platformProducts as unknown as InventoryProduct[]) || [];
-        } catch {
-          for (const st of ["active", "draft", "archived"]) {
-            const d = await shopifyRequest<{ products: InventoryProduct[] }>(
-              project.id, project.shopDomain, `/products.json?limit=250&status=${st}&published_status=any&fields=id,title,product_type,vendor,options,variants,status`
-            );
-            allProducts = allProducts.concat(d.products || []);
-          }
-        }
+        // Antes se forzaba el tipo a la forma cruda de Shopify (variant.id,
+        // inventory_quantity…) sobre PlatformProduct: todo valía undefined, el
+        // cálculo daba NaN y el job fallaba en todos los proyectos. Además solo
+        // leía la primera página y filtraba por variantId sin proyecto.
+        const allProducts = await fetchAllPlatformProducts(invConnector);
+        const projectKey = String(project.id);
         for (const product of allProducts) {
-          const optionNames = product.options || [];
-          for (const variant of product.variants) {
-            const existing = await db.select().from(inventoryTrackingTable)
-              .where(eq(inventoryTrackingTable.variantId, String(variant.id))).limit(1);
-            const prev = existing[0];
-            const velocity = prev ? Math.max(0, (prev.currentStock ?? 0) - variant.inventory_quantity) : 0;
-            const prevSold = prev?.totalUnitsSold ?? 0;
-            const newSold = prevSold + velocity;
-            const daysRemaining = velocity > 0 ? Math.round(variant.inventory_quantity / velocity) : null;
+          for (const variant of product.variants ?? []) {
+            const variantId = String(variant.platformId);
+            const qty = Number.isFinite(Number(variant.inventoryQuantity)) ? Number(variant.inventoryQuantity) : 0;
+            const scope = and(eq(inventoryTrackingTable.projectId, projectKey), eq(inventoryTrackingTable.variantId, variantId));
+            const [prev] = await db.select().from(inventoryTrackingTable).where(scope).limit(1);
+            const velocity = prev ? Math.max(0, (prev.currentStock ?? 0) - qty) : 0;
+            const newSold = (prev?.totalUnitsSold ?? 0) + velocity;
+            const daysRemaining = velocity > 0 ? Math.round(qty / velocity) : null;
+            const price = variant.price != null && variant.price !== "" ? Number.parseFloat(String(variant.price)) : NaN;
+            const compareAt = variant.compareAtPrice ? Number.parseFloat(String(variant.compareAtPrice)) : NaN;
             const updateFields = {
-              currentStock: variant.inventory_quantity,
+              currentStock: qty,
               avgDailySales: velocity,
               totalUnitsSold: newSold,
               daysRemaining,
               productTitle: product.title,
               variantTitle: variant.title || "Default",
               sku: variant.sku || null,
-              barcode: variant.barcode || null,
-              option1Name: optionNames[0]?.name || null,
               option1Value: variant.option1 || null,
-              option2Name: optionNames[1]?.name || null,
               option2Value: variant.option2 || null,
-              option3Name: optionNames[2]?.name || null,
               option3Value: variant.option3 || null,
-              productType: product.product_type || null,
+              productType: product.productType || null,
               vendor: product.vendor || null,
-              price: variant.price ? parseFloat(variant.price) : null,
-              compareAtPrice: variant.compare_at_price ? parseFloat(variant.compare_at_price) : null,
-              weight: variant.weight,
-              weightUnit: variant.weight_unit || "kg",
-              inventoryPolicy: variant.inventory_policy || "deny",
-              requiresShipping: variant.requires_shipping ? 1 : 0,
+              price: Number.isFinite(price) ? price : null,
+              compareAtPrice: Number.isFinite(compareAt) ? compareAt : null,
               updatedAt: new Date(),
             };
             let status = "healthy";
             if (daysRemaining !== null && daysRemaining <= 7) status = "critical";
             else if (daysRemaining !== null && daysRemaining <= 14) status = "warning";
             if (prev) {
-              await db.update(inventoryTrackingTable).set({ ...updateFields, status })
-                .where(eq(inventoryTrackingTable.variantId, String(variant.id)));
+              await db.update(inventoryTrackingTable).set({ ...updateFields, status }).where(scope);
             } else {
               await db.insert(inventoryTrackingTable).values({
                 id: randomBytes(8).toString("hex"),
-                projectId: String(project.id),
-                productId: String(variant.product_id),
-                variantId: String(variant.id),
+                projectId: projectKey,
+                productId: String(product.platformId),
+                variantId,
                 ...updateFields,
                 status,
               }).onConflictDoNothing();
             }
-            if (variant.inventory_quantity > 0 && variant.inventory_quantity <= 5) {
+            if (qty > 0 && qty <= 5) {
               const optDesc = [variant.option1, variant.option2, variant.option3].filter(Boolean).join("/");
               await db.insert(eventsTable).values({
                 id: randomBytes(8).toString("hex"),
-                projectId: String(project.id),
+                projectId: projectKey,
                 eventType: "stock_critical",
-                payload: `Stock critico: ${product.title} ${optDesc ? `(${optDesc})` : ""} SKU:${variant.sku ?? variant.id} — ${variant.inventory_quantity} uds`,
-              }).catch(() => {});
+                payload: `Stock critico: ${product.title} ${optDesc ? `(${optDesc})` : ""} SKU:${variant.sku ?? variantId} — ${qty} uds`,
+              }).catch(err => logger.warn({ err }, "stock_critical event insert failed"));
             }
           }
         }
@@ -320,6 +311,7 @@ async function runInventorySyncImpl() {
     log("inventory-sync", "Complete");
   } catch (err) {
     logger.error({ err }, "Inventory sync job failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -330,14 +322,22 @@ async function runCompetitorScansImpl() {
     const competitors = await db.select().from(competitorsTable);
     for (const competitor of competitors) {
       try {
-        const response = await fetch(competitor.url, {
+        const { safeFetch } = await import("./web-scraper.js");
+        const response = await safeFetch(competitor.url, {
           headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopifyAI-Monitor/1.0)" },
           signal: AbortSignal.timeout(30_000),
         });
+        // Página de error/captcha: no se guarda como precio (generaba alertas falsas).
+        if (!response.ok) {
+          logger.warn({ competitorId: competitor.id, status: response.status }, "Competitor scan: respuesta no OK — omitido");
+          continue;
+        }
         const html = await response.text();
         const priceMatch = html.match(/["']price["']:\s*["']?([\d.,]+)["']?/i) ??
           html.match(/€\s*([\d.,]+)/) ?? html.match(/\$\s*([\d.,]+)/);
-        const price = priceMatch ? parseFloat(priceMatch[1].replace(",", ".")) : null;
+        // "1.299,00" y "1,299.00" → 1299 (antes 1.299 → falsas bajadas del 99 %).
+        const parsed = priceMatch ? toLooseNumber(priceMatch[1]) : NaN;
+        const price = typeof parsed === "number" && Number.isFinite(parsed) ? parsed : null;
 
         await db.insert(competitorSnapshotsTable).values({
           id: randomBytes(8).toString("hex"),
@@ -376,6 +376,7 @@ async function runCompetitorScansImpl() {
     log("competitor-scan", "Complete");
   } catch (err) {
     logger.error({ err }, "Competitor scan job failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -416,6 +417,7 @@ async function runOmnicoreRealDataIntegrationImpl() {
     log("omnicore-realdata", "Complete");
   } catch (err) {
     logger.error({ err }, "OmniCore real data integration job failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -493,6 +495,7 @@ async function runOmniCoreMicroLearningImpl() {
     log("omnicore-micro", "⚡ Micro-learning cycle complete");
   } catch (err) {
     logger.error({ err }, "Micro-learning job failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -511,7 +514,7 @@ async function runOmniCoreMemoryConsolidationImpl() {
     let consolidated = 0;
     for (const ins of recent) {
       try {
-        await db.insert(omnicoreMemoriesTable).values({
+        const inserted = await db.insert(omnicoreMemoriesTable).values({
           id: `consol-${ins.id}`,
           memoryType: "general",
           niche: "general",
@@ -519,22 +522,18 @@ async function runOmniCoreMemoryConsolidationImpl() {
           content: (ins.insight ?? "").slice(0, 4000),
           confidence: ins.confidence ?? 0.85,
           sourceType: "memory_consolidation",
-        }).onConflictDoNothing();
-        consolidated++;
-      } catch { /* duplicate — ok */ }
+        }).onConflictDoNothing().returning({ id: omnicoreMemoriesTable.id });
+        // Solo cuenta lo realmente insertado (antes contaba también duplicados).
+        if (inserted.length) consolidated++;
+      } catch (err) { logger.warn({ err, insightId: ins.id }, "consolidation insert failed"); }
     }
-
-    // Incrementar useCount en memorias de alta confianza de la última semana
-    await db.execute(sql`
-      UPDATE omnicore_memories
-      SET use_count = COALESCE(use_count, 0) + 1
-      WHERE created_at > NOW() - INTERVAL '7 days'
-        AND confidence > 0.88
-    `);
+    // Ya no se incrementa use_count desde el cron: inflaba el uso de memorias
+    // nunca usadas y el estudio adaptativo las clasificaba como "fuertes".
 
     log("omnicore-consolidate", `🧠 Consolidation complete: ${consolidated} insights promoted`);
   } catch (err) {
     logger.error({ err }, "Memory consolidation failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -588,6 +587,7 @@ async function runOmniCoreCrossConnectionsImpl() {
     log("omnicore-cross", `🔗 Cross-synthesis complete: ${(parsed.connections ?? []).length} connections generated`);
   } catch (err) {
     logger.error({ err }, "Cross-domain synthesis failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -596,7 +596,8 @@ async function runOmniCoreCrossConnectionsImpl() {
 // Es el ciclo más exhaustivo: 70 insights/día máximo.
 async function runOmniCoreDailyDeepStudyImpl() {
   log("omnicore-daily", "🎓 Daily deep study starting — all domains");
-  const sessionId = `daily-${new Date().toISOString().split("T")[0]}`;
+  // Fecha de negocio (Madrid) + sufijo único: dos ejecuciones el mismo día ya no comparten id.
+  const sessionId = `daily-${businessYmd()}-${randomBytes(3).toString("hex")}`;
   let totalInsights = 0;
 
   try {
@@ -687,6 +688,7 @@ Think like a polymath — combine wisdom from art, science, technology, psycholo
     log("omnicore-daily", `🎓 Daily deep study complete: ${totalInsights} insights across ${domains.length} domains`);
   } catch (err) {
     logger.error({ err }, "Daily deep study failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -695,7 +697,8 @@ Think like a polymath — combine wisdom from art, science, technology, psycholo
 // genera perfiles de nicho actualizados y crea conexiones meta-cruzadas.
 async function runOmniCoreMegaSynthesisImpl() {
   log("omnicore-mega", "🚀 Weekly mega-synthesis starting");
-  const sessionId = `mega-${new Date().toISOString().split("T")[0]}`;
+  // Fecha de negocio (Madrid) + sufijo único: dos ejecuciones el mismo día ya no comparten id.
+  const sessionId = `mega-${businessYmd()}-${randomBytes(3).toString("hex")}`;
   let totalInsights = 0;
 
   try {
@@ -776,6 +779,7 @@ Return ONLY valid JSON:
     log("omnicore-mega", `🚀 Mega-synthesis complete: ${totalInsights} strategic insights`);
   } catch (err) {
     logger.error({ err }, "Mega-synthesis failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -792,6 +796,8 @@ async function runTokenRefreshImpl() {
     let noToken = 0;
 
     for (const project of projects) {
+      // Solo tiendas Shopify (antes se validaban también Woo/PrestaShop contra la API de Shopify).
+      if (((project as { platformType?: string }).platformType ?? "shopify") !== "shopify") continue;
       if (!project.accessToken) {
         noToken++;
         logger.warn({ projectId: project.id, domain: project.shopDomain }, "Project has no access token");
@@ -799,7 +805,10 @@ async function runTokenRefreshImpl() {
       }
 
       try {
-        const isValid = await validateToken(project.shopDomain, project.accessToken);
+        // Renovación preventiva si caduca en < 2 h (antes solo se validaba y el
+        // token caducaba igualmente entre ejecuciones).
+        const expiresSoon = !!project.tokenExpiresAt && new Date(project.tokenExpiresAt).getTime() < Date.now() + 2 * 3600 * 1000;
+        const isValid = !expiresSoon && await validateToken(project.shopDomain, project.accessToken);
         if (isValid) {
           valid++;
           continue;
@@ -830,6 +839,7 @@ async function runTokenRefreshImpl() {
     log("token-refresh", `🔑 Done: ${valid} valid, ${rotated} rotated, ${failed} failed, ${noToken} missing`);
   } catch (err) {
     logger.error({ err }, "Token validation job failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -838,7 +848,8 @@ async function runTokenRefreshImpl() {
 // updates confidence scores, and tracks retroactive versions.
 async function runRetroactiveReanalysisImpl() {
   log("omnicore-retro", "🔄 Retroactive reanalysis starting");
-  const sessionId = `retro-${new Date().toISOString().split("T")[0]}`;
+  // Fecha de negocio (Madrid) + sufijo único: dos ejecuciones el mismo día ya no comparten id.
+  const sessionId = `retro-${businessYmd()}-${randomBytes(3).toString("hex")}`;
   let updated = 0;
 
   try {
@@ -912,6 +923,7 @@ Return ONLY valid JSON:
     log("omnicore-retro", `🔄 Retroactive reanalysis complete: ${updated} insights updated`);
   } catch (err) {
     logger.error({ err }, "Retroactive reanalysis failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -1032,6 +1044,7 @@ Return ONLY valid JSON:
     log("omnicore-eval", `📊 Monthly self-evaluation complete. Score: ${reportData.overallScore ?? "N/A"}`);
   } catch (err) {
     logger.error({ err }, "Monthly self-evaluation failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -1163,6 +1176,7 @@ async function runAiCostAlertCheckImpl() {
     }
   } catch (err) {
     logger.error({ err }, "AI cost alert check failed");
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 
@@ -1275,6 +1289,7 @@ Responde en JSON: { "insights": [{ "domain": "string", "content": "string", "con
     log("adaptive-study", `✅ Adaptive study complete: ${savedCount} insights saved, focus=${studyFocus}, weak=${weakMemories.length}, strong=${strongMemories.length}`);
   } catch (err) {
     log("adaptive-study", `❌ Error: ${err instanceof Error ? err.message : String(err)}`);
+    throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
   }
 }
 

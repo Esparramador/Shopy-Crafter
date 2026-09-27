@@ -9,6 +9,8 @@ import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { updateCogsBenchmark } from "../lib/cogs-benchmarks.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { getProjectConnector } from "../lib/platform-helper.js";
+import { fetchOrdersInWindow, isCountableOrder } from "../lib/orders.js";
 import { z } from "zod";
 import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
 
@@ -615,86 +617,103 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
       return;
     }
   
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  
+    // Pedidos reales de los últimos 30 días en cualquier plataforma, todas las
+    // páginas y sin cancelados/reembolsados. Antes: solo Shopify, 250 pedidos
+    // como máximo, contando cancelados y con 0 € silencioso si fallaba.
+    const end = new Date();
+    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
     let grossRevenue = 0;
     let aov = 0;
     let orderCount = 0;
+    let ordersError: string | null = null;
+    const customers = new Set<string>();
     const productSales = new Map<string, { units: number; revenue: number }>();
-  
+
     try {
-      const ordersData = await shopifyRequest<{ orders: Array<{ total_price: string; line_items: Array<{ product_id: number; quantity: number; price: string }> }> }>(
-        projectId,
-        project.shopDomain,
-        `/orders.json?status=any&created_at_min=${thirtyDaysAgo}&limit=250`
-      );
-      orderCount = ordersData.orders.length;
-      grossRevenue = ordersData.orders.reduce((sum, o) => sum + parseFloat(o.total_price), 0);
+      const connector = await getProjectConnector(projectId);
+      if (!connector || !connector.supportsFeature("orders")) throw new Error("La tienda no tiene conexión de pedidos configurada");
+      const orders = (await fetchOrdersInWindow(connector, start, end))
+        .filter(o => isCountableOrder(o.status))
+        .filter(o => { const t = new Date(o.createdAt).getTime(); return t >= start.getTime() && t < end.getTime(); });
+      orderCount = orders.length;
+      grossRevenue = orders.reduce((sum, o) => sum + (Number.parseFloat(o.total ?? "0") || 0), 0);
       aov = orderCount > 0 ? grossRevenue / orderCount : 0;
-  
-      for (const order of ordersData.orders) {
-        for (const item of order.line_items) {
-          const pid = String(item.product_id);
+      for (const order of orders) {
+        if (order.customerEmail) customers.add(order.customerEmail.toLowerCase());
+        for (const item of order.lineItems) {
+          if (!item.productId) continue;
+          const pid = String(item.productId);
           const existing = productSales.get(pid) ?? { units: 0, revenue: 0 };
           existing.units += item.quantity;
-          existing.revenue += item.quantity * parseFloat(item.price);
+          existing.revenue += item.quantity * (Number.parseFloat(item.price) || 0);
           productSales.set(pid, existing);
         }
       }
-    } catch {
-      grossRevenue = 0;
-      aov = 0;
+    } catch (err) {
+      ordersError = err instanceof Error ? err.message : String(err);
+      logger.warn({ err, projectId }, "financial-dashboard: no se pudieron leer los pedidos");
     }
-  
+
     const allCogs = await db.select().from(cogsTable).where(eq(cogsTable.projectId, projectId));
     const products = await db.select().from(productsTable).where(eq(productsTable.projectId, projectId));
-  
-    const productProfitability = products.slice(0, 50).map((p) => {
-      const cogs = allCogs.find((c) => c.shopifyProductId === p.shopifyProductId);
+    const cogsByProduct = new Map(allCogs.map(c => [c.shopifyProductId, c]));
+
+    // Margen solo donde hay COGS: sin coste conocido el margen no es 100 %, es desconocido.
+    const allRows = products.map((p) => {
+      const cogs = cogsByProduct.get(p.shopifyProductId);
       const sales = productSales.get(p.shopifyProductId);
       const unitsSold = sales?.units ?? 0;
       const revenue = sales?.revenue ?? 0;
-      const cogsTotal = cogs?.totalCogs ?? 0;
-      const profit = revenue - cogsTotal * unitsSold;
-      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-      const grade = margin >= 40 ? "A" : margin >= 20 ? "B" : margin >= 10 ? "C" : "F";
+      const hasCogs = cogs?.totalCogs != null;
+      const cogsTotal = hasCogs ? (cogs!.totalCogs ?? 0) * unitsSold : 0;
+      const profit = revenue - cogsTotal;
+      const margin = hasCogs && revenue > 0 ? (profit / revenue) * 100 : null;
+      const grade = margin === null ? "N/D" : margin >= 40 ? "A" : margin >= 20 ? "B" : margin >= 10 ? "C" : "F";
       return {
         productId: p.shopifyProductId,
         title: p.title,
         unitsSold,
         revenue: Math.round(revenue * 100) / 100,
-        cogs: Math.round(cogsTotal * unitsSold * 100) / 100,
+        cogs: Math.round(cogsTotal * 100) / 100,
         grossProfit: Math.round(profit * 100) / 100,
-        marginPct: Math.round(margin * 10) / 10,
+        marginPct: margin === null ? 0 : Math.round(margin * 10) / 10,
         grade,
+        hasCogs,
       };
     }).sort((a, b) => b.revenue - a.revenue);
-  
-    const totalCogsAgg = productProfitability.reduce((sum, p) => sum + p.cogs, 0);
-    const grossProfit = grossRevenue - totalCogsAgg;
-    const grossMarginPct = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
-  
+
+    const withCogs = allRows.filter(r => r.hasCogs);
+    const revenueWithCogs = withCogs.reduce((sum, r) => sum + r.revenue, 0);
+    const totalCogsAgg = withCogs.reduce((sum, r) => sum + r.cogs, 0);
+    const lineRevenue = allRows.reduce((sum, r) => sum + r.revenue, 0);
+    const grossMarginPct = revenueWithCogs > 0 ? ((revenueWithCogs - totalCogsAgg) / revenueWithCogs) * 100 : 0;
+    const grossProfit = grossRevenue * (grossMarginPct / 100);
+    const cogsCoveragePct = lineRevenue > 0 ? Math.round((revenueWithCogs / lineRevenue) * 1000) / 10 : null;
+
     const cogsWithCac = allCogs.filter((c) => c.cac != null && c.cac > 0);
     const avgCac = cogsWithCac.length > 0
       ? cogsWithCac.reduce((sum, c) => sum + (c.cac ?? 0), 0) / cogsWithCac.length
       : null;
 
-    let ltv12m: number | null = null;
-    let ltvCacRatio: number | null = null;
-    if (aov > 0) {
-      const repurchaseRate = 2.5;
-      ltv12m = Math.round(aov * repurchaseRate * 100) / 100;
-      if (avgCac && avgCac > 0) {
-        ltvCacRatio = Math.round((ltv12m / avgCac) * 100) / 100;
-      }
-    }
+    // Margen neto: el bruto menos el coste de adquisición real (CAC × pedidos).
+    // Sin CAC registrado no se resta nada inventado (antes: bruto − 10 puntos fijos).
+    const acquisitionCost = avgCac ? avgCac * orderCount : 0;
+    const netMarginPct = grossRevenue > 0 ? ((grossProfit - acquisitionCost) / grossRevenue) * 100 : 0;
+
+    // Valor por cliente real de la ventana (pedidos con email); sin tasa de recompra supuesta.
+    const customerValue30d = customers.size > 0 ? Math.round((grossRevenue / customers.size) * 100) / 100 : null;
+    const ltvCacRatio = customerValue30d !== null && avgCac ? Math.round((customerValue30d / avgCac) * 100) / 100 : null;
 
     const alerts: string[] = [];
-    if (grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20% — revisar estructura de costes");
-    const lowMarginProducts = productProfitability.filter((p) => p.marginPct < 15);
+    if (ordersError) alerts.push(`No se pudieron leer los pedidos de la tienda: ${ordersError}`);
+    if (cogsCoveragePct !== null && cogsCoveragePct < 100) {
+      alerts.push(`Solo el ${cogsCoveragePct}% de las ventas tiene COGS registrado — los márgenes se calculan sobre esa parte`);
+    }
+    if (revenueWithCogs > 0 && grossMarginPct < 20) alerts.push("Margen bruto global por debajo del 20% — revisar estructura de costes");
+    const lowMarginProducts = withCogs.filter((p) => p.revenue > 0 && p.marginPct < 15);
     if (lowMarginProducts.length > 0) alerts.push(`${lowMarginProducts.length} productos con margen < 15% — riesgo de pérdida con devoluciones`);
-    if (ltvCacRatio !== null && ltvCacRatio < 3.0) {
-      alerts.push(`ALERTA ROJA LTV/CAC: Ratio ${ltvCacRatio.toFixed(1)}x (< 3.0). El coste de adquisición de cliente (€${avgCac?.toFixed(2)}) es demasiado alto respecto al valor de vida del cliente (€${ltv12m?.toFixed(2)}). Optimiza retención o reduce CAC urgentemente.`);
+    if (ltvCacRatio !== null && ltvCacRatio < 1) {
+      alerts.push(`El valor por cliente de los últimos 30 días (€${customerValue30d?.toFixed(2)}) no cubre el CAC medio (€${avgCac?.toFixed(2)})`);
     }
 
     const breakEvenUnits = avgCac && aov > 0 && grossMarginPct > 0
@@ -706,13 +725,15 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
       totalCogs: Math.round(totalCogsAgg * 100) / 100,
       grossProfit: Math.round(grossProfit * 100) / 100,
       grossMarginPct: Math.round(grossMarginPct * 10) / 10,
-      netMarginPct: Math.round((grossMarginPct - 10) * 10) / 10,
+      netMarginPct: Math.round(netMarginPct * 10) / 10,
       aov: Math.round(aov * 100) / 100,
+      orders30d: orderCount,
       cac: avgCac ? Math.round(avgCac * 100) / 100 : null,
       ltvCacRatio,
-      ltv12m,
+      customerValue30d,
+      cogsCoveragePct,
       breakEvenUnits,
-      productProfitability,
+      productProfitability: allRows.slice(0, 50).map(({ hasCogs: _h, ...r }) => r),
       alerts,
     });
   } catch (err: any) {

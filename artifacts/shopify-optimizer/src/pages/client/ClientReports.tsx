@@ -9,7 +9,9 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 interface ReportsData {
   productsOptimized: number; imagesGenerated: number;
-  avgSeoScore: number | null; revenueImpact: string;
+  avgScore: number | null; avgSeoScore: number | null;
+  subscores: { title: number | null; description: number | null; seo: number | null; image: number | null; price: number | null };
+  revenue30d: number | null; revenueTrendPct: number | null;
   timeline: Array<{ id: string; action: string; details: string; createdAt: string }>;
 }
 interface VaultFile { id: string; title: string; fileType: string; category: string; description?: string; createdAt: string; downloadUrl?: string; }
@@ -69,7 +71,7 @@ export default function ClientReports() {
     { label: "Productos optimizados", value: data?.productsOptimized ?? 0, icon: <Package size={16} />, color: "var(--jade)", sub: "por motores IA" },
     { label: "Imágenes generadas", value: data?.imagesGenerated ?? 0, icon: <Image size={16} />, color: "#60a5fa", sub: "con IA generativa" },
     { label: "Score SEO promedio", value: data?.avgSeoScore != null ? `${data.avgSeoScore}` : "–", icon: <Search size={16} />, color: "var(--gold)", sub: "de tu catálogo" },
-    { label: "Impacto estimado", value: data?.revenueImpact ?? "–", icon: <TrendingUp size={16} />, color: "var(--jade)", sub: "en conversiones" },
+    { label: "Ingresos 30 días", value: data?.revenueTrendPct != null ? `${data.revenueTrendPct > 0 ? "+" : ""}${data.revenueTrendPct}%` : "–", icon: <TrendingUp size={16} />, color: "var(--jade)", sub: "vs 30 días anteriores" },
   ];
 
   const ACT_ICONS: Record<string, string> = { audit: "🔍", optimize: "⚡", image: "🖼", seo: "🔎", approve: "✅", reject: "❌", generate: "🤖" };
@@ -163,7 +165,7 @@ export default function ClientReports() {
                       Tu tienda ha sido optimizada con <strong style={{ color: "var(--jade)" }}>{data?.productsOptimized ?? 0} productos</strong> procesados
                       {" "}y <strong style={{ color: "#60a5fa" }}>{data?.imagesGenerated ?? 0} imágenes</strong> generadas por IA.
                       {data?.avgSeoScore != null && <> El score SEO promedio es <strong style={{ color: "var(--gold)" }}>{data.avgSeoScore}/100</strong>.</>}
-                      {" "}El impacto estimado en conversiones es <strong style={{ color: "var(--jade)" }}>{data?.revenueImpact ?? "—"}</strong>.
+                      {data?.revenueTrendPct != null && <>{" "}Tus ingresos de los últimos 30 días han variado <strong style={{ color: "var(--jade)" }}>{data.revenueTrendPct > 0 ? "+" : ""}{data.revenueTrendPct}%</strong> frente a los 30 anteriores.</>}
                     </p>
                     <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
                       <button onClick={() => handleExport("txt")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "linear-gradient(135deg,rgba(201,169,97,0.15),rgba(201,169,97,0.08))", border: "1px solid rgba(201,169,97,0.3)", borderRadius: 9, color: "var(--gold)", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s" }}>
@@ -182,11 +184,12 @@ export default function ClientReports() {
                 <div style={{ padding: 22 }}>
                   {data?.avgSeoScore != null ? (
                     <>
-                      <ScoreBar score={data.avgSeoScore} label="Score general" />
-                      <ScoreBar score={Math.min(100, data.avgSeoScore + 8)} label="Títulos y descripciones" />
-                      <ScoreBar score={Math.max(0, data.avgSeoScore - 5)} label="Meta tags" />
-                      <ScoreBar score={Math.min(100, data.avgSeoScore + 3)} label="Imágenes ALT text" />
-                      <ScoreBar score={Math.min(100, data.avgSeoScore + 1)} label="Estructura de contenido" />
+                      {data.avgScore != null && <ScoreBar score={data.avgScore} label="Score general" />}
+                      <ScoreBar score={data.avgSeoScore} label="SEO" />
+                      {data.subscores?.title != null && <ScoreBar score={data.subscores.title} label="Títulos" />}
+                      {data.subscores?.description != null && <ScoreBar score={data.subscores.description} label="Descripciones" />}
+                      {data.subscores?.image != null && <ScoreBar score={data.subscores.image} label="Imágenes" />}
+                      {data.subscores?.price != null && <ScoreBar score={data.subscores.price} label="Precios" />}
                       <div style={{ marginTop: 16, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.07)" }}>
                         <p style={{ fontSize: 12.5, color: "var(--t2)", margin: 0, lineHeight: 1.6 }}>
                           {data.avgSeoScore >= 80

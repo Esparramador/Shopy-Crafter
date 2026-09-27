@@ -47,22 +47,47 @@ export async function updateJobProgress(
 }
 
 export async function completeJob(jobId: string, result?: object): Promise<void> {
+  // El estado final depende de lo ocurrido: antes siempre "completed", incluso
+  // si fallaban todos los elementos (pisaba el "failed" de updateJobProgress).
+  const [job] = await db.select().from(bulkJobsTable).where(eq(bulkJobsTable.jobId, jobId));
+  const allFailed = !!job && job.totalItems > 0 && (job.completedItems ?? 0) === 0 && (job.failedItems ?? 0) > 0;
   await db
     .update(bulkJobsTable)
-    .set({ status: "completed", result: result ?? null })
+    .set({ status: allFailed || job?.status === "failed" ? "failed" : "completed", result: result ?? null })
     .where(eq(bulkJobsTable.jobId, jobId));
 }
 
 export async function failJob(jobId: string, error: string): Promise<void> {
   logger.error({ jobId, error }, "Bulk job failed");
+  const [job] = await db.select({ log: bulkJobsTable.log }).from(bulkJobsTable).where(eq(bulkJobsTable.jobId, jobId));
   await db
     .update(bulkJobsTable)
-    .set({ status: "failed", log: [error] })
+    .set({ status: "failed", log: [...(job?.log ?? []), `✗ ${error}`] })
     .where(eq(bulkJobsTable.jobId, jobId));
 }
 
-export function runAsync(fn: () => Promise<void>): void {
+/**
+ * Ejecuta en segundo plano. Si la función lanza fuera de su propio manejo de
+ * errores, el job se marca "failed" (antes quedaba "running" para siempre).
+ */
+export function runAsync(fn: () => Promise<void>, jobId?: string): void {
   fn().catch((err: Error) => {
-    logger.error({ err: err.message }, "Async job error");
+    logger.error({ err: err?.message, jobId }, "Async job error");
+    if (jobId) failJob(jobId, err?.message || "Error interno").catch(() => {});
   });
+}
+
+/** runAsync ligado a un bulk job: si revienta, el job queda "failed". */
+export function runAsyncJob(jobId: string, fn: () => Promise<void>): void {
+  runAsync(fn, jobId);
+}
+
+/** Al arrancar: los jobs que estaban "running" murieron con el proceso anterior. */
+export async function failStaleBulkJobs(): Promise<number> {
+  const rows = await db.update(bulkJobsTable)
+    .set({ status: "failed" })
+    .where(eq(bulkJobsTable.status, "running"))
+    .returning({ jobId: bulkJobsTable.jobId });
+  if (rows.length) logger.warn({ count: rows.length }, "bulk jobs interrumpidos por reinicio marcados como failed");
+  return rows.length;
 }

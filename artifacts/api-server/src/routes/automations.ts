@@ -1,3 +1,4 @@
+import { nextCronRun } from "../lib/tz.js";
 import { Router } from "express";
 import {
   runRevenueSnapshots,
@@ -10,6 +11,7 @@ import {
   runOmniCoreDailyDeepStudy,
   runOmniCoreMegaSynthesis,
   runTokenRefresh,
+  isJobRunning,
 } from "../lib/scheduler.js";
 import { logger } from "../lib/logger.js";
 
@@ -30,34 +32,10 @@ interface CronJobInfo {
 const jobRunning = new Map<string, boolean>();
 const jobLastRun = new Map<string, { time: string; result: string }>();
 
-function parseNextRun(schedule: string): string {
-  const now = new Date();
-  const parts = schedule.split(" ");
-  const [min, hour, _dom, _mon, dow] = parts;
-
-  if (min.startsWith("*/") || hour.startsWith("*/")) {
-    const interval = min.startsWith("*/")
-      ? parseInt(min.slice(2)) * 60 * 1000
-      : parseInt(hour.slice(2)) * 60 * 60 * 1000;
-    const offset = min.startsWith("*/") ? 0 : parseInt(min) * 60 * 1000;
-    const base = Math.ceil((now.getTime() + offset) / interval) * interval;
-    return new Date(base).toISOString();
-  }
-
-  if (hour !== "*" && min !== "*") {
-    const next = new Date(now);
-    next.setHours(parseInt(hour), parseInt(min), 0, 0);
-    if (next <= now) next.setDate(next.getDate() + 1);
-    if (dow !== "*") {
-      const targetDay = parseInt(dow);
-      while (next.getDay() !== targetDay) {
-        next.setDate(next.getDate() + 1);
-      }
-    }
-    return next.toISOString();
-  }
-
-  return new Date(now.getTime() + 3600000).toISOString();
+// Próxima ejecución en Europe/Madrid (zona de los cron). Antes se calculaba en
+// UTC e ignoraba el minuto con "*/N" en horas.
+function parseNextRun(schedule: string): string | null {
+  return nextCronRun(schedule)?.toISOString() ?? null;
 }
 
 const JOBS: CronJobInfo[] = [
@@ -156,17 +134,31 @@ const JOB_RUNNERS: Record<string, () => Promise<void>> = {
   "token-refresh": runTokenRefresh,
 };
 
+// Nombre del job en el single-flight del scheduler.
+const SCHEDULER_NAMES: Record<string, string> = {
+  "micro-learning": "runOmniCoreMicroLearning",
+  "memory-consolidation": "runOmniCoreMemoryConsolidation",
+  "cross-synthesis": "runOmniCoreCrossConnections",
+  "daily-deep-study": "runOmniCoreDailyDeepStudy",
+  "revenue-snapshots": "runRevenueSnapshots",
+  "real-data-integration": "runOmnicoreRealDataIntegration",
+  "competitor-scans": "runCompetitorScans",
+  "inventory-sync": "runInventorySync",
+  "mega-synthesis": "runOmniCoreMegaSynthesis",
+  "token-refresh": "runTokenRefresh",
+};
+
 router.get("/automations/jobs", async (_req, res): Promise<void> => {
   try {
     const jobs = JOBS.map(job => {
       const lastRun = jobLastRun.get(job.id);
-      const isRunning = jobRunning.get(job.id) ?? false;
+      const isRunning = (jobRunning.get(job.id) ?? false) || isJobRunning(SCHEDULER_NAMES[job.id] ?? "");
       return {
         ...job,
         lastRunTime: lastRun?.time ?? null,
         lastRunResult: lastRun?.result ?? null,
         nextRunTime: parseNextRun(job.schedule),
-        status: isRunning ? "running" as const : "idle" as const,
+        status: isRunning ? "running" as const : lastRun?.result === "error" ? "error" as const : "idle" as const,
       };
     });
     res.json(jobs);
@@ -189,7 +181,9 @@ router.post("/automations/jobs/:jobId/run", async (req, res): Promise<void> => {
       return;
     }
   
-    if (jobRunning.get(jobId)) {
+    // También cuenta una ejecución lanzada por cron, warmup u otro botón
+    // (antes cada origen tenía su propio registro y aparecía "idle").
+    if (jobRunning.get(jobId) || isJobRunning(SCHEDULER_NAMES[jobId] ?? "")) {
       res.status(409).json({ error: "El job ya está en ejecución" });
       return;
     }

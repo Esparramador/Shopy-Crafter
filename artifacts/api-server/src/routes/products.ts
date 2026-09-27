@@ -1,3 +1,4 @@
+import { wooPricesToInternal } from "../lib/connectors/woocommerce.js";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, seoDataTable } from "@workspace/db";
@@ -223,13 +224,20 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
         let platformProducts: Awaited<ReturnType<typeof connector.getProducts>> = [];
         let page = 1;
         const pageSize = 100;
+        // Páginas SIN filtro de estado: el conector de PrestaShop filtra en cliente
+        // y una página con borradores parecía la última (se perdían páginas enteras).
         while (true) {
-          const batch = await connector.getProducts({ status: statusParam, page, limit: pageSize });
+          const batch = await connector.getProducts({ page, limit: pageSize });
           if (batch.length === 0) break;
           platformProducts = platformProducts.concat(batch);
           if (batch.length < pageSize) break;
           page++;
           await new Promise((r) => setTimeout(r, 200));
+        }
+        const allPsIds = platformProducts.map((p) => p.platformId);
+        if (statusParam) {
+          const wanted = statusParam === "active";
+          platformProducts = platformProducts.filter((p) => (p.status === "active") === wanted);
         }
   
         logger.info({ projectId: id, totalProducts: platformProducts.length }, "PrestaShop sync: all pages fetched");
@@ -307,7 +315,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
           totalScore += audit.overallScore;
         }
   
-        const psIds = platformProducts.map((p) => p.platformId);
+        const psIds = allPsIds;
         const localProducts = await db
           .select({ shopifyProductId: productsTable.shopifyProductId })
           .from(productsTable)
@@ -363,8 +371,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
   
           const tags = (wp.tags ?? []).map((t: { name: string }) => t.name).join(", ");
           const images = wp.images ?? [];
-          const price = wp.regular_price ?? wp.price ?? null;
-          const compareAtPrice = wp.sale_price || null;
+          const { price, compareAtPrice } = wooPricesToInternal(wp);
   
           let variantCount = 1;
           if (wp.type === "variable" && wp.variations) {
@@ -753,7 +760,9 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
     const localProducts = await db.select({ shopifyProductId: productsTable.shopifyProductId })
       .from(productsTable)
       .where(eq(productsTable.projectId, id));
-    const orphanIds = localProducts
+    // Solo se borran huérfanos en un sync completo: con statusFilter (p. ej.
+    // "active") se borraban de la BD todos los borradores y archivados.
+    const orphanIds = requestedFilter !== "any" ? [] : localProducts
       .filter(lp => !shopifyIds.includes(lp.shopifyProductId))
       .map(lp => lp.shopifyProductId);
     let removedCount = 0;
@@ -1356,16 +1365,19 @@ router.post("/projects/:projectId/audit", async (req, res): Promise<void> => {
     let totalScore = 0;
     const allIssues: string[] = [];
   
-    products.forEach((p) => {
+    // Solo productos auditados: uno sin auditar no es un "F" con 0 puntos.
+    const audited = products.filter((p) => p.auditScore !== null && p.auditScore !== undefined);
+    audited.forEach((p) => {
       const g = (p.auditGrade ?? "F") as keyof typeof gradeCounts;
       if (g in gradeCounts) gradeCounts[g]++;
       totalScore += p.auditScore ?? 0;
       allIssues.push(...(p.auditProblems ?? []));
     });
   
-    const avgScore = products.length ? totalScore / products.length : 0;
-    const needsImprovement = products.filter((p) => (p.auditScore ?? 0) < 75).length;
-    const criticalIssues = products.filter((p) => (p.auditScore ?? 0) < 45).length;
+    const avgScore = audited.length ? totalScore / audited.length : 0;
+    const needsImprovement = audited.filter((p) => (p.auditScore ?? 0) < 75).length;
+    const criticalIssues = audited.filter((p) => (p.auditScore ?? 0) < 45).length;
+    const notAudited = products.length - audited.length;
   
     const issueCounts: Record<string, number> = {};
     allIssues.forEach((issue) => { issueCounts[issue] = (issueCounts[issue] ?? 0) + 1; });
@@ -1374,9 +1386,12 @@ router.post("/projects/:projectId/audit", async (req, res): Promise<void> => {
       .slice(0, 5)
       .map(([issue, count]) => `${issue} (${count} productos)`);
   
-    const revenueImpact = needsImprovement > 0
-      ? `+${(needsImprovement * 15).toFixed(0)}% conversión estimada si se mejoran ${needsImprovement} productos`
-      : "Tienda bien optimizada";
+    // Sin porcentajes inventados (antes: +15 % de conversión por producto, p. ej. +1500 %).
+    const revenueImpact = audited.length === 0
+      ? "Sin productos auditados todavía"
+      : needsImprovement > 0
+        ? `${needsImprovement} de ${audited.length} productos auditados por debajo de 75/100 (${criticalIssues} críticos)${notAudited > 0 ? ` · ${notAudited} sin auditar` : ""}`
+        : `Todos los productos auditados superan 75/100${notAudited > 0 ? ` · ${notAudited} sin auditar` : ""}`;
   
     res.json({
       totalProducts: products.length,

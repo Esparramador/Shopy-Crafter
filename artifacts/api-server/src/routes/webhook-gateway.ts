@@ -4,6 +4,7 @@ import { db, projectsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { safeDecrypt } from "../lib/crypto.js";
+import { businessYmd } from "../lib/tz.js";
 
 const router = Router();
 
@@ -60,6 +61,19 @@ function ensureWebhookSchema(): Promise<void> {
         AND (COALESCE(a.created_at, 'epoch'), a.ctid) < (COALESCE(b.created_at, 'epoch'), b.ctid)
     `);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS revenue_snapshots_project_date_uq ON revenue_snapshots (project_id, date)`);
+    // WooCommerce envía order.updated en cada cambio de estado: sin esto un mismo
+    // pedido se sumaba varias veces a los ingresos del día.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS webhook_order_seen (
+        project_id TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        order_id TEXT NOT NULL,
+        amount REAL,
+        date TEXT,
+        counted_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (project_id, platform, order_id)
+      )
+    `);
   })().catch(err => {
     schemaReady = null;
     logger.error({ err }, "webhook-gateway: schema migration failed");
@@ -68,6 +82,27 @@ function ensureWebhookSchema(): Promise<void> {
 }
 
 router.use("/webhooks", (_req, _res, next) => { void ensureWebhookSchema().then(() => next()); });
+
+/** Registra el pedido como contado; false si ya lo estaba. */
+async function markOrderCounted(projectId: string, platform: string, orderId: string, amount: number, date: string): Promise<boolean> {
+  const r = await db.execute(sql`
+    INSERT INTO webhook_order_seen (project_id, platform, order_id, amount, date)
+    VALUES (${projectId}, ${platform}, ${orderId}, ${amount}, ${date})
+    ON CONFLICT DO NOTHING
+    RETURNING order_id
+  `);
+  return ((r as any).rows ?? []).length > 0;
+}
+
+/** Quita la marca de contado y devuelve importe y día con que se contó (o null). */
+async function unmarkOrderCounted(projectId: string, platform: string, orderId: string): Promise<{ amount: number; date: string } | null> {
+  const r = await db.execute(sql`
+    DELETE FROM webhook_order_seen WHERE project_id = ${projectId} AND platform = ${platform} AND order_id = ${orderId}
+    RETURNING amount, date
+  `);
+  const row = ((r as any).rows ?? [])[0];
+  return row ? { amount: Number(row.amount) || 0, date: String(row.date) } : null;
+}
 
 /** clientSecret se guarda cifrado; proyectos antiguos pueden tenerlo en claro. */
 function projectWebhookSecret(stored: string | null | undefined): string {
@@ -182,7 +217,7 @@ router.post("/webhooks/shopify/refunds", async (req: Request, res: Response) => 
           ON CONFLICT DO NOTHING
         `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
         // Adjust today's revenue snapshot
-        const today = new Date().toISOString().split("T")[0];
+        const today = businessYmd(); // día de negocio (Europe/Madrid), igual que el cierre diario
         await db.execute(sql`
           UPDATE revenue_snapshots
           SET revenue = GREATEST(0, revenue - ${refundAmount}), updated_at = NOW()
@@ -222,35 +257,46 @@ router.post("/webhooks/woocommerce/:projectId", async (req: Request, res: Respon
     const topic = (req.headers["x-wc-webhook-topic"] as string) ?? "";
     const payload = req.body as Record<string, any>;
 
-    if (topic === "order.created" || topic === "order.updated") {
-      if (payload.status === "completed" || payload.status === "processing") {
-        const total = parseFloat(payload.total ?? "0");
-        const today = new Date().toISOString().split("T")[0];
-        await db.execute(sql`
-          INSERT INTO revenue_snapshots (id, project_id, date, revenue, orders, aov, created_at)
-          VALUES (gen_random_uuid(), ${String(project.id)}, ${today}, ${total}, 1, ${total}, NOW())
-          ON CONFLICT (project_id, date)
-          DO UPDATE SET revenue = revenue_snapshots.revenue + ${total},
-                        orders = revenue_snapshots.orders + 1,
-                        aov = (revenue_snapshots.revenue + ${total}) / (revenue_snapshots.orders + 1),
-                        updated_at = NOW()
-        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
-        await db.execute(sql`
-          INSERT INTO events (id, project_id, event_type, payload, created_at)
-          VALUES (gen_random_uuid(), ${String(project.id)}, 'woo_order',
-            ${"WooCommerce: Pedido #" + (payload.number ?? payload.id) + " €" + total.toFixed(2) + " — " + (payload.status ?? "")}, NOW())
-          ON CONFLICT DO NOTHING
-        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
-        logger.info({ projectId: project.id, orderId: payload.id, total, topic }, "WooCommerce order procesado");
-      }
-    } else if (topic === "order.deleted") {
-      const total = parseFloat(payload.total ?? "0");
-      const today = new Date().toISOString().split("T")[0];
+    const pid = String(project.id);
+    const orderId = String(payload.id ?? "");
+    const subtractCounted = async () => {
+      const prev = orderId ? await unmarkOrderCounted(pid, "woocommerce", orderId) : null;
+      if (!prev) return;
       await db.execute(sql`
         UPDATE revenue_snapshots
-        SET revenue = GREATEST(0, revenue - ${total}), orders = GREATEST(0, orders - 1), updated_at = NOW()
-        WHERE project_id = ${String(project.id)} AND date = ${today}
+        SET revenue = GREATEST(0, revenue - ${prev.amount}), orders = GREATEST(0, orders - 1), updated_at = NOW()
+        WHERE project_id = ${pid} AND date = ${prev.date}
       `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
+    };
+
+    if ((topic === "order.created" || topic === "order.updated") && orderId) {
+      if (payload.status === "completed" || payload.status === "processing") {
+        const total = parseFloat(payload.total ?? "0") || 0;
+        const today = businessYmd(); // día de negocio (Europe/Madrid), igual que el cierre diario
+        // Cada pedido cuenta una sola vez (order.updated llega en cada cambio de estado).
+        if (await markOrderCounted(pid, "woocommerce", orderId, total, today)) {
+          await db.execute(sql`
+            INSERT INTO revenue_snapshots (id, project_id, date, revenue, orders, aov, created_at)
+            VALUES (gen_random_uuid(), ${pid}, ${today}, ${total}, 1, ${total}, NOW())
+            ON CONFLICT (project_id, date)
+            DO UPDATE SET revenue = revenue_snapshots.revenue + ${total},
+                          orders = revenue_snapshots.orders + 1,
+                          aov = (revenue_snapshots.revenue + ${total}) / (revenue_snapshots.orders + 1),
+                          updated_at = NOW()
+          `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
+          await db.execute(sql`
+            INSERT INTO events (id, project_id, event_type, payload, created_at)
+            VALUES (gen_random_uuid(), ${pid}, 'woo_order',
+              ${"WooCommerce: Pedido #" + (payload.number ?? payload.id) + " €" + total.toFixed(2) + " — " + (payload.status ?? "")}, NOW())
+            ON CONFLICT DO NOTHING
+          `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
+          logger.info({ projectId: project.id, orderId, total, topic }, "WooCommerce order procesado");
+        }
+      } else if (["cancelled", "refunded", "failed", "trash"].includes(String(payload.status))) {
+        await subtractCounted();
+      }
+    } else if (topic === "order.deleted" && orderId) {
+      await subtractCounted();
     }
 
     res.sendStatus(200);
@@ -281,35 +327,43 @@ router.post("/webhooks/prestashop/:projectId", async (req: Request, res: Respons
     const event = (req.headers["x-prestashop-event"] as string) ?? req.body?.event ?? "order.validated";
     const payload = req.body as Record<string, any>;
 
-    if (event === "order.validated" || event === "order.paid" || event === "actionValidateOrder") {
-      const total = parseFloat(payload.total_paid ?? payload.total ?? "0");
-      const today = new Date().toISOString().split("T")[0];
-      await db.execute(sql`
-        INSERT INTO revenue_snapshots (id, project_id, date, revenue, orders, aov, created_at)
-        VALUES (gen_random_uuid(), ${String(project.id)}, ${today}, ${total}, 1, ${total}, NOW())
-        ON CONFLICT (project_id, date)
-        DO UPDATE SET revenue = revenue_snapshots.revenue + ${total},
-                      orders = revenue_snapshots.orders + 1,
-                      aov = (revenue_snapshots.revenue + ${total}) / (revenue_snapshots.orders + 1),
-                      updated_at = NOW()
-      `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
-      await db.execute(sql`
-        INSERT INTO events (id, project_id, event_type, payload, created_at)
-        VALUES (gen_random_uuid(), ${String(project.id)}, 'presta_order',
-          ${"PrestaShop: Pedido #" + (payload.id_order ?? payload.id ?? "") + " €" + total.toFixed(2)}, NOW())
-        ON CONFLICT DO NOTHING
-      `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
-      logger.info({ projectId: project.id, orderId: payload.id_order, total }, "PrestaShop order procesado");
-    } else if (event === "order.cancelled" || event === "actionOrderStatusUpdate") {
-      const status = payload.current_state ?? payload.status ?? "";
-      if (String(status) === "6" || String(status).toLowerCase().includes("cancel")) {
-        const total = parseFloat(payload.total_paid ?? "0");
-        const today = new Date().toISOString().split("T")[0];
+    const pid = String(project.id);
+    const orderId = String(payload.id_order ?? payload.id ?? "");
+    if ((event === "order.validated" || event === "order.paid" || event === "actionValidateOrder") && orderId) {
+      const total = parseFloat(payload.total_paid ?? payload.total ?? "0") || 0;
+      const today = businessYmd(); // día de negocio (Europe/Madrid), igual que el cierre diario
+      // validated y paid llegan ambos para el mismo pedido: se cuenta una vez.
+      if (await markOrderCounted(pid, "prestashop", orderId, total, today)) {
         await db.execute(sql`
-          UPDATE revenue_snapshots
-          SET revenue = GREATEST(0, revenue - ${total}), orders = GREATEST(0, orders - 1), updated_at = NOW()
-          WHERE project_id = ${String(project.id)} AND date = ${today}
+          INSERT INTO revenue_snapshots (id, project_id, date, revenue, orders, aov, created_at)
+          VALUES (gen_random_uuid(), ${pid}, ${today}, ${total}, 1, ${total}, NOW())
+          ON CONFLICT (project_id, date)
+          DO UPDATE SET revenue = revenue_snapshots.revenue + ${total},
+                        orders = revenue_snapshots.orders + 1,
+                        aov = (revenue_snapshots.revenue + ${total}) / (revenue_snapshots.orders + 1),
+                        updated_at = NOW()
         `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
+        await db.execute(sql`
+          INSERT INTO events (id, project_id, event_type, payload, created_at)
+          VALUES (gen_random_uuid(), ${pid}, 'presta_order',
+            ${"PrestaShop: Pedido #" + orderId + " €" + total.toFixed(2)}, NOW())
+          ON CONFLICT DO NOTHING
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
+        logger.info({ projectId: project.id, orderId, total }, "PrestaShop order procesado");
+      }
+    } else if ((event === "order.cancelled" || event === "actionOrderStatusUpdate") && orderId) {
+      const status = payload.current_state ?? payload.status ?? "";
+      const st = String(status).toLowerCase();
+      if (st === "6" || st === "7" || st.includes("cancel") || st.includes("refund")) {
+        // Solo se resta lo que se contó, en el día en que se contó.
+        const prev = await unmarkOrderCounted(pid, "prestashop", orderId);
+        if (prev) {
+          await db.execute(sql`
+            UPDATE revenue_snapshots
+            SET revenue = GREATEST(0, revenue - ${prev.amount}), orders = GREATEST(0, orders - 1), updated_at = NOW()
+            WHERE project_id = ${pid} AND date = ${prev.date}
+          `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
+        }
       }
     }
 
@@ -352,7 +406,7 @@ router.post("/webhooks/stripe", async (req: Request, res: Response) => {
           .limit(1);
         const projectId = proj?.id;
         if (projectId) {
-          const today = new Date().toISOString().split("T")[0];
+          const today = businessYmd(); // día de negocio (Europe/Madrid), igual que el cierre diario
           await db.execute(sql`
             INSERT INTO revenue_snapshots (id, project_id, date, revenue, orders, aov, created_at)
             VALUES (gen_random_uuid(), ${String(projectId)}, ${today}, ${amount}, 1, ${amount}, NOW())

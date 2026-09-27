@@ -14,6 +14,10 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 interface DashData {
   totalProducts: number; avgScore: number | null; pendingApprovals: number;
   enginesActive: number; lastOptimized: string | null;
+  subscores?: { title: number | null; description: number | null; seo: number | null; image: number | null };
+  engines?: Array<{ key: string; active: boolean; pct: number | null; detail: string }>;
+  revenueSeries?: Array<{ date: string; revenue: number | null }>;
+  revenue30d?: number | null; revenueTrendPct?: number | null;
   recentActivity: Array<{ id: string; action: string; details: string; createdAt: string }>;
   projectName: string | null; shopDomain: string | null; platformType?: string | null;
 }
@@ -63,15 +67,29 @@ function actStyle(action: string) {
   return ACT_MAP[k ?? ""] ?? { icon: "📋", color: "#6b7280" };
 }
 
-const ENGINES = [
-  { name: "Auditoría de Productos", icon: "🔍", color: "#60a5fa", pct: 88 },
-  { name: "Rediseño IA", icon: "✏️", color: "#a78bfa", pct: 72 },
-  { name: "Generación de Imágenes", icon: "🖼", color: "#f472b6", pct: 65 },
-  { name: "Consistencia Visual", icon: "🎨", color: "#34d399", pct: 91 },
-  { name: "A/B Testing", icon: "📊", color: "#f59e0b", pct: 55 },
-  { name: "SEO & Contenido", icon: "🔎", color: "#22c55e", pct: 80 },
-  { name: "Precios Inteligentes", icon: "💰", color: "#c9a961", pct: 78 },
-];
+const ENGINE_META: Record<string, { name: string; icon: string; color: string }> = {
+  audit: { name: "Auditoría de Productos", icon: "🔍", color: "#60a5fa" },
+  redesign: { name: "Rediseño IA", icon: "✏️", color: "#a78bfa" },
+  images: { name: "Generación de Imágenes", icon: "🖼", color: "#f472b6" },
+  consistency: { name: "Consistencia Visual", icon: "🎨", color: "#34d399" },
+  ab: { name: "A/B Testing", icon: "📊", color: "#f59e0b" },
+  seo: { name: "SEO & Contenido", icon: "🔎", color: "#22c55e" },
+  pricing: { name: "Precios Inteligentes", icon: "💰", color: "#c9a961" },
+};
+
+/** Trazado SVG (viewBox 280×56) de la serie diaria real de ingresos. */
+function revenuePath(series: Array<{ revenue: number | null }>): string | null {
+  const vals = series.map(r => r.revenue ?? 0);
+  if (vals.length < 2) return null;
+  const max = Math.max(...vals);
+  const min = Math.min(...vals);
+  const span = max - min || 1;
+  return vals.map((v, i) => {
+    const x = Math.round((i / (vals.length - 1)) * 2800) / 10;
+    const y = Math.round((52 - ((v - min) / span) * 50) * 10) / 10;
+    return `${i === 0 ? "M" : "L"}${x},${y}`;
+  }).join(" ");
+}
 
 export default function ClientDashboard() {
   const { user } = useAuth();
@@ -122,7 +140,7 @@ export default function ClientDashboard() {
   const kpis = [
     { label: "Productos", value: prod, suffix: "", icon: "📦", color: "#60a5fa", sub: "en catálogo", href: "/client/products" },
     { label: "Score Promedio", value: score, suffix: "/100", icon: "📊", color: "var(--jade)", sub: "calidad IA", href: null },
-    { label: "Motores IA", value: eng, suffix: "", icon: "⚡", color: "var(--gold)", sub: "activos 24/7", href: null },
+    { label: "Motores IA", value: eng, suffix: "", icon: "⚡", color: "var(--gold)", sub: `de ${data?.engines?.length ?? 7} con actividad`, href: null },
     { label: "Aprobaciones", value: pend, suffix: "", icon: "✅", color: "#f59e0b", sub: "pendientes", href: "/client/approvals" },
   ];
 
@@ -339,35 +357,46 @@ export default function ClientDashboard() {
 
         {/* ═══ CHARTS ROW ═══ */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-          {/* Revenue trend */}
+          {/* Revenue trend (snapshots diarios reales) */}
           <div style={{ background: "var(--srf)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "18px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
               <div>
-                <p style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0, marginBottom: 4 }}>Tendencia de Revenue</p>
+                <p style={{ fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0, marginBottom: 4 }}>Ingresos · últimos 30 días</p>
                 <p style={{ fontSize: 24, fontWeight: 800, color: "#34d399", margin: 0 }}>
-                  +{data?.avgScore ? Math.round(data.avgScore * 0.32) : "—"}%
+                  {data?.revenue30d != null ? data.revenue30d.toLocaleString("es-ES", { maximumFractionDigits: 0 }) : "—"}
                 </p>
               </div>
-              <span style={{ fontSize: 10, color: "var(--jade)", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", padding: "3px 9px", borderRadius: 100 }}>↑ Estimado</span>
+              {data?.revenueTrendPct != null && (
+                <span style={{ fontSize: 10, color: data.revenueTrendPct >= 0 ? "var(--jade)" : "#f43f5e", background: data.revenueTrendPct >= 0 ? "rgba(34,197,94,0.1)" : "rgba(244,63,94,0.1)", border: `1px solid ${data.revenueTrendPct >= 0 ? "rgba(34,197,94,0.2)" : "rgba(244,63,94,0.2)"}`, padding: "3px 9px", borderRadius: 100 }}>
+                  {data.revenueTrendPct >= 0 ? "↑" : "↓"} {Math.abs(data.revenueTrendPct)}% vs 30 días previos
+                </span>
+              )}
             </div>
-            <svg viewBox="0 0 280 56" style={{ width: "100%", height: 56 }}>
-              <defs>
-                <linearGradient id="rg1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#34d399" stopOpacity="0.28" />
-                  <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path d="M0,52 C30,50 46,44 70,38 S110,26 140,18 S190,8 220,5 S256,3 280,1" fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" />
-              <path d="M0,52 C30,50 46,44 70,38 S110,26 140,18 S190,8 220,5 S256,3 280,1 L280,56 L0,56 Z" fill="url(#rg1)" />
-              {[[0,52],[70,38],[140,18],[210,6],[280,1]].map(([x,y],i) => (
-                <circle key={i} cx={x} cy={y} r={i===4?3.5:2.5} fill="#34d399" opacity={i===4?1:0.45} />
-              ))}
-            </svg>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
-              {["Ene","Feb","Mar","Abr","May","Jun","Jul"].map(m => (
-                <span key={m} style={{ fontSize: 9, color: "var(--t3)" }}>{m}</span>
-              ))}
-            </div>
+            {(() => {
+              const series = data?.revenueSeries ?? [];
+              const d = revenuePath(series);
+              if (!d) {
+                return <p style={{ fontSize: 11.5, color: "var(--t3)", margin: "18px 0 0" }}>Aún no hay datos de ventas sincronizados de tu tienda.</p>;
+              }
+              return (
+                <>
+                  <svg viewBox="0 0 280 56" style={{ width: "100%", height: 56 }}>
+                    <defs>
+                      <linearGradient id="rg1" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#34d399" stopOpacity="0.28" />
+                        <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path d={d} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d={`${d} L280,56 L0,56 Z`} fill="url(#rg1)" />
+                  </svg>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
+                    <span style={{ fontSize: 9, color: "var(--t3)" }}>{series[0]!.date.slice(5)}</span>
+                    <span style={{ fontSize: 9, color: "var(--t3)" }}>{series[series.length - 1]!.date.slice(5)}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* Score donut */}
@@ -393,11 +422,19 @@ export default function ClientDashboard() {
               </div>
               <div style={{ flex: 1 }}>
                 {[
-                  { l: "Títulos", v: (data?.avgScore ?? 0) + 8 },
-                  { l: "Descrip.", v: data?.avgScore ?? 0 },
-                  { l: "SEO tags", v: (data?.avgScore ?? 0) - 5 },
-                  { l: "Alt texts", v: (data?.avgScore ?? 0) + 3 },
+                  { l: "Títulos", v: data?.subscores?.title ?? null },
+                  { l: "Descrip.", v: data?.subscores?.description ?? null },
+                  { l: "SEO", v: data?.subscores?.seo ?? null },
+                  { l: "Imágenes", v: data?.subscores?.image ?? null },
                 ].map(({ l, v }) => {
+                  if (v === null) {
+                    return (
+                      <div key={l} style={{ marginBottom: 7, display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 10, color: "var(--t3)" }}>{l}</span>
+                        <span style={{ fontSize: 10, color: "var(--t3)" }}>–</span>
+                      </div>
+                    );
+                  }
                   const cl = Math.max(0, Math.min(100, v));
                   const c = cl >= 80 ? "var(--jade)" : cl >= 60 ? "#f59e0b" : "#f43f5e";
                   return (
@@ -441,7 +478,7 @@ export default function ClientDashboard() {
           <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             {[
               { id: "activity", label: "📈 Actividad Real", count: data?.recentActivity?.length ?? 0 },
-              { id: "engines", label: "⚡ Motores IA", count: ENGINES.length },
+              { id: "engines", label: "⚡ Motores IA", count: data?.enginesActive ?? 0 },
               { id: "reports", label: "📁 Archivos & Reportes", count: vault.length },
             ].map(t => (
               <button key={t.id} className="dash-tab" onClick={() => setTab(t.id as any)} style={{
@@ -492,24 +529,30 @@ export default function ClientDashboard() {
           {/* Engines */}
           {tab === "engines" && (
             <div>
-              {ENGINES.map((e, i) => (
-                <div key={e.name} className="eng-row" style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 20px", borderBottom: i < ENGINES.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}>
+              {(data?.engines ?? []).map((eng, i, all) => {
+                const e = { ...(ENGINE_META[eng.key] ?? { name: eng.key, icon: "⚙️", color: "#9ca3af" }), ...eng };
+                return (
+                <div key={e.key} className="eng-row" style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 20px", borderBottom: i < all.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}>
                   <div style={{ width: 36, height: 36, borderRadius: 11, background: `${e.color}18`, border: `1px solid ${e.color}25`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{e.icon}</div>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t1)", margin: 0 }}>{e.name}</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                      <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${e.pct}%`, borderRadius: 2, background: `linear-gradient(90deg, ${e.color}cc, ${e.color})`, backgroundSize: "200% auto", animation: "shimmer-bar 2s infinite" }} />
+                    <p style={{ fontSize: 10.5, color: "var(--t3)", margin: "2px 0 0" }}>{e.detail}</p>
+                    {e.pct !== null && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                        <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${e.pct}%`, borderRadius: 2, background: `linear-gradient(90deg, ${e.color}cc, ${e.color})` }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: e.color, fontWeight: 700, width: 28, textAlign: "right" }}>{e.pct}%</span>
                       </div>
-                      <span style={{ fontSize: 10, color: e.color, fontWeight: 700, width: 28, textAlign: "right" }}>{e.pct}%</span>
-                    </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--jade)" }} />
-                    <span style={{ fontSize: 10.5, color: "var(--jade)", fontWeight: 600 }}>Activo</span>
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: e.active ? "var(--jade)" : "var(--t3)" }} />
+                    <span style={{ fontSize: 10.5, color: e.active ? "var(--jade)" : "var(--t3)", fontWeight: 600 }}>{e.active ? "Con actividad" : "Sin actividad"}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

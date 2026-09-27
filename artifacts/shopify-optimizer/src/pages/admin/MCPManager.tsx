@@ -8,7 +8,6 @@ const MCP_SERVERS = [
     id: "stitch",
     name: "Google Stitch MCP",
     icon: "🎨",
-    status: "active",
     description: "AI UI/UX design y generación de código. Genera pantallas, lista proyectos, descarga HTML/Tailwind UI assets.",
     capabilities: ["Generar pantallas UI", "Listar proyectos Stitch", "Descargar HTML/Tailwind", "Diseño con IA"],
     source: "Google Stitch API",
@@ -24,7 +23,6 @@ const MCP_SERVERS = [
     id: "filesystem",
     name: "Filesystem MCP",
     icon: "📁",
-    status: "active",
     description: "Lectura/escritura/listado de archivos y directorios en el workspace. Operaciones de archivos, assets de proyectos y gestión de uploads.",
     capabilities: ["Leer archivos", "Escribir archivos", "Listar directorios", "Buscar contenido"],
     source: "@modelcontextprotocol/server-filesystem",
@@ -40,7 +38,6 @@ const MCP_SERVERS = [
     id: "memory",
     name: "Memory MCP (Knowledge Graph)",
     icon: "🧠",
-    status: "active",
     description: "Grafo de conocimiento persistente entre sesiones. Almacena y recupera entidades, relaciones y observaciones sobre clientes, marcas y proyectos.",
     capabilities: ["Crear entidades", "Añadir relaciones", "Observaciones", "Búsqueda semántica", "Memoria multi-sesión"],
     source: "@modelcontextprotocol/server-memory",
@@ -56,7 +53,6 @@ const MCP_SERVERS = [
     id: "context7",
     name: "Context7 MCP (Docs IA)",
     icon: "📚",
-    status: "active",
     description: "Documentación actualizada de cualquier paquete npm, framework o herramienta. Resuelve /use [nombre-librería] para inyectar docs precisas en generación de código.",
     capabilities: ["Docs de npm packages", "Frameworks actualizados", "React, Vue, Next.js", "Tailwind, shadcn", "APIs REST"],
     source: "@upstash/context7-mcp",
@@ -72,7 +68,6 @@ const MCP_SERVERS = [
     id: "puppeteer",
     name: "Puppeteer MCP (Browser)",
     icon: "🤖",
-    status: "active",
     description: "Automatización de navegador: navegar URLs, screenshots, extracción de contenido, formularios, clicks. Para web scraping, auditorías visuales y análisis de páginas.",
     capabilities: ["Screenshots de páginas", "Extracción de contenido", "Navegación web", "Relleno de formularios", "Análisis visual"],
     source: "puppeteer-mcp-server",
@@ -88,7 +83,6 @@ const MCP_SERVERS = [
     id: "everything",
     name: "Everything MCP (Test)",
     icon: "⚡",
-    status: "active",
     description: "Servidor de testing completo con prompts, recursos, sampling y demos de herramientas. Para probar integraciones MCP y características del protocolo.",
     capabilities: ["Test de prompts", "Test de recursos", "Sampling MCP", "Debug de herramientas"],
     source: "@modelcontextprotocol/server-everything",
@@ -101,6 +95,22 @@ const MCP_SERVERS = [
     docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
   },
 ];
+
+type McpStatus = { status: Record<string, boolean>; env: Record<string, boolean> } | null;
+
+/** Nombre sin versión: "@scope/pkg@1.2.3" → "@scope/pkg". */
+function pkgName(spec: string): string {
+  const at = spec.lastIndexOf("@");
+  return at > 0 ? spec.slice(0, at) : spec;
+}
+
+/** Estado real: paquete instalado (si lo necesita) y variables de entorno presentes. null = aún sin comprobar. */
+function serverReady(server: { npmPackage: string | null; envRequired: string[] }, st: McpStatus): boolean | null {
+  if (!st) return null;
+  const installed = server.npmPackage ? st.status[pkgName(server.npmPackage)] === true : true;
+  const envOk = server.envRequired.every(e => st.env?.[e] === true);
+  return installed && envOk;
+}
 
 const PLANNED_SERVERS = [
   { name: "GitHub MCP", icon: "🐙", desc: "Gestión de repos, PRs, issues, branches y code review.", npm: "@octokit/mcp-server", color: "#6e40c9" },
@@ -143,7 +153,7 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 
-function ServerCard({ server }: { server: typeof MCP_SERVERS[0] }) {
+function ServerCard({ server, ready }: { server: typeof MCP_SERVERS[0]; ready: boolean | null }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{
@@ -163,11 +173,11 @@ function ServerCard({ server }: { server: typeof MCP_SERVERS[0] }) {
             <span style={{ fontWeight: 700, color: "var(--t1)", fontSize: 15 }}>{server.name}</span>
             <span style={{
               padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700,
-              background: server.status === "active" ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.15)",
-              color: server.status === "active" ? "#4ade80" : "#f87171",
-              border: `1px solid ${server.status === "active" ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`,
+              background: ready === null ? "rgba(255,255,255,0.06)" : ready ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.15)",
+              color: ready === null ? "var(--t3)" : ready ? "#4ade80" : "#f87171",
+              border: `1px solid ${ready === null ? "rgba(255,255,255,0.1)" : ready ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`,
             }}>
-              {server.status === "active" ? "✓ ACTIVO" : "INACTIVO"}
+              {ready === null ? "…" : ready ? "✓ LISTO" : "NO DISPONIBLE"}
             </span>
             <span style={{
               padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 600,
@@ -250,6 +260,7 @@ function ServerCard({ server }: { server: typeof MCP_SERVERS[0] }) {
 export default function MCPManager() {
   const [copied, setCopied] = useState(false);
   const [installStatus, setInstallStatus] = useState<Record<string, boolean>>({});
+  const [mcpStatus, setMcpStatus] = useState<McpStatus>(null);
   const [installing, setInstalling] = useState<string | null>(null);
   const [installResults, setInstallResults] = useState<Record<string, { ok: boolean; error?: string }>>({});
   const [pinging, setPinging] = useState(false);
@@ -258,8 +269,8 @@ export default function MCPManager() {
 
   function loadStatus() {
     fetch(`${API_BASE}/api/admin/mcp/status`, { credentials: "include" })
-      .then(r => r.json())
-      .then(d => { if (d?.status) setInstallStatus(d.status); })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.status) { setInstallStatus(d.status); setMcpStatus({ status: d.status, env: d.env ?? {} }); } })
       .catch(() => {});
   }
 
@@ -270,10 +281,14 @@ export default function MCPManager() {
     setPingResult(null);
     try {
       const r = await fetch(`${API_BASE}/api/admin/mcp/status`, { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
-      if (d?.status) setInstallStatus(d.status);
+      const st: McpStatus = { status: d?.status ?? {}, env: d?.env ?? {} };
+      setInstallStatus(st.status);
+      setMcpStatus(st);
       const total = MCP_SERVERS.length;
-      const ok = MCP_SERVERS.filter(s => d?.status?.[s.npmPackage ?? s.id] !== false).length;
+      // Antes un paquete no comprobado contaba como OK ("6/6" siempre).
+      const ok = MCP_SERVERS.filter(s => serverReady(s, st) === true).length;
       setPingResult({ ok: ok === total, checked: total, msg: `${ok}/${total} servidores verificados` });
       setLastPing(new Date().toLocaleTimeString("es-ES"));
     } catch (e: any) {
@@ -296,6 +311,7 @@ export default function MCPManager() {
       if (d.ok) {
         setInstallStatus(prev => ({ ...prev, [npmPackage]: true }));
         setInstallResults(prev => ({ ...prev, [npmPackage]: { ok: true } }));
+        loadStatus();
       } else {
         setInstallResults(prev => ({ ...prev, [npmPackage]: { ok: false, error: d.error || "Error desconocido" } }));
       }
@@ -326,7 +342,7 @@ export default function MCPManager() {
           <span style={{
             padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
             background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)"
-          }}>6 servidores activos</span>
+          }}>{mcpStatus ? `${MCP_SERVERS.filter(s => serverReady(s, mcpStatus)).length}/${MCP_SERVERS.length} servidores listos` : "Comprobando…"}</span>
           <button
             onClick={reconnectAll}
             disabled={pinging}
@@ -389,7 +405,7 @@ export default function MCPManager() {
           <Zap size={16} style={{ color: "#4ade80" }} /> Servidores Instalados y Activos
         </h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {MCP_SERVERS.map(s => <ServerCard key={s.id} server={s} />)}
+          {MCP_SERVERS.map(s => <ServerCard key={s.id} server={s} ready={serverReady(s, mcpStatus)} />)}
         </div>
       </div>
 

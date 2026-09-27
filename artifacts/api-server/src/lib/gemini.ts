@@ -144,8 +144,9 @@ export function resetGeminiCircuitBreakers(): { search: boolean; generation: boo
   return { search: searchWasOpen, generation: genWasOpen };
 }
 
-export function getGeminiStatus(): { searchBlocked: boolean; generationBlocked: boolean; cooldownMs: number; searchBlockedSecsAgo: number; generationBlockedSecsAgo: number } {
+export function getGeminiStatus(): { configured: boolean; searchBlocked: boolean; generationBlocked: boolean; cooldownMs: number; searchBlockedSecsAgo: number; generationBlockedSecsAgo: number } {
   return {
+    configured: Boolean(process.env.GEMINI_API_KEY || (process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL)),
     searchBlocked: isGeminiSearchBlocked(),
     generationBlocked: isGeminiGenerationBlocked(),
     cooldownMs: CIRCUIT_BREAKER_COOLDOWN_MS,

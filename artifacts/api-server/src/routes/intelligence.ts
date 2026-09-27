@@ -3,7 +3,7 @@ import { db, eventsTable, revenueSnapshotsTable, projectsTable } from "@workspac
 import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
-import { shopifyRequest } from "../lib/shopify.js";
+import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { parseAiJson } from "../lib/ai-json.js";
 import { logger } from "../lib/logger.js";
@@ -454,14 +454,18 @@ router.post("/intelligence/sync-revenue", async (req, res): Promise<void> => {
   
       // Fetch all paid orders page by page (max 250/page)
       while (hasMore) {
-        const url = pageInfo
-          ? `/orders.json?status=any&financial_status=paid&limit=250&page_info=${pageInfo}`
-          : `/orders.json?status=any&financial_status=paid&created_at_min=${since}&limit=250`;
+        // Con page_info Shopify solo admite limit/fields (los filtros viajan en el cursor).
+        const url: string = pageInfo
+          ? `/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`
+          : `/orders.json?status=any&financial_status=paid&created_at_min=${encodeURIComponent(since)}&limit=250`;
   
-        const data = await shopifyRequest<{
+        const paged = await shopifyRequestPaged<{
           orders: Array<{ id: number; created_at: string; total_price: string; subtotal_price: string }>;
-          link?: string;
         }>(parseInt(projectId), project.shopDomain, url);
+  
+        const data = paged.data;
+  
+        const nextPageInfo: string | null = paged.nextPageInfo;
   
         for (const order of data.orders) {
           const date = order.created_at.split("T")[0];
@@ -470,10 +474,11 @@ router.post("/intelligence/sync-revenue", async (req, res): Promise<void> => {
           dailyMap[date].orders += 1;
         }
   
-        // Shopify pagination — stop when no more pages
-        hasMore = data.orders.length === 250 && page < 10;
+        // Antes: pageInfo = null → se volvía a pedir la PRIMERA página hasta 10
+        // veces y los pedidos se sumaban ×10. Ahora se sigue el cursor real.
+        pageInfo = nextPageInfo;
+        hasMore = !!nextPageInfo && page < 200;
         page++;
-        pageInfo = null; // simple pagination by page count
       }
   
       let inserted = 0;

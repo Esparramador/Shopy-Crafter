@@ -128,6 +128,24 @@ export class ShopifyConnector implements IPlatformConnector {
     return data.products.map(mapShopifyProduct);
   }
 
+  /** Todos los productos (cualquier estado), paginando con page_info. */
+  async listAllProducts(): Promise<PlatformProduct[]> {
+    const out: PlatformProduct[] = [];
+    let pageInfo: string | null = null;
+    for (let i = 0; i < 400; i++) {
+      const path: string = pageInfo
+        ? `/products.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`
+        : `/products.json?limit=250`;
+      const { data, nextPageInfo } = await shopifyRequestPaged<{ products: ShopifyRawProduct[] }>(
+        this.projectId, this.storeDomain, path,
+      );
+      out.push(...(data.products ?? []).map(mapShopifyProduct));
+      if (!nextPageInfo) break;
+      pageInfo = nextPageInfo;
+    }
+    return out;
+  }
+
   async getProduct(platformProductId: string): Promise<PlatformProduct> {
     const data = await shopifyRequest<{ product: ShopifyRawProduct }>(
       this.projectId, this.storeDomain, `/products/${platformProductId}.json`
@@ -197,6 +215,39 @@ export class ShopifyConnector implements IPlatformConnector {
         productId: li.product_id ? String(li.product_id) : undefined,
       })),
     }));
+  }
+
+  /** Todos los pedidos en [after, before), paginando con page_info. */
+  async listAllOrders(params: { after: string; before: string }): Promise<PlatformOrder[]> {
+    const out: PlatformOrder[] = [];
+    let pageInfo: string | null = null;
+    for (let i = 0; i < 400; i++) {
+      const path: string = pageInfo
+        ? `/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}`
+        : `/orders.json?limit=250&status=any&created_at_min=${encodeURIComponent(params.after)}&created_at_max=${encodeURIComponent(params.before)}`;
+      const paged = await shopifyRequestPaged<{ orders: ShopifyRawOrder[] }>(this.projectId, this.storeDomain, path);
+      for (const o of paged.data.orders ?? []) {
+        out.push({
+          platformId: String(o.id),
+          orderNumber: String(o.order_number ?? o.name ?? o.id),
+          // Pedido cancelado: se marca como tal aunque el estado financiero sea otro.
+          status: (o as { cancelled_at?: string | null }).cancelled_at ? "cancelled" : (o.financial_status ?? o.fulfillment_status ?? "unknown"),
+          total: o.total_price ?? "0",
+          currency: o.currency ?? "EUR",
+          createdAt: o.created_at ?? new Date().toISOString(),
+          customerEmail: o.email ?? undefined,
+          lineItems: (o.line_items ?? []).map((li: ShopifyLineItem) => ({
+            title: li.title ?? "",
+            quantity: li.quantity ?? 1,
+            price: li.price ?? "0",
+            productId: li.product_id ? String(li.product_id) : undefined,
+          })),
+        });
+      }
+      if (!paged.nextPageInfo) break;
+      pageInfo = paged.nextPageInfo;
+    }
+    return out;
   }
 
   async getProductCount(params?: { status?: string }): Promise<number> {

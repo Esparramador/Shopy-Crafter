@@ -64,12 +64,33 @@ const QUICK_SERVICES = [
   { description: "Formación en herramientas IA (sesión 2h)", category: "estrategia" as const, rate: 200, unit: "fijo" as const, hours: 0, quantity: 1 },
 ];
 
+/** Siguiente número correlativo del año (SC-AAAA-NNN) según las facturas guardadas. */
+function nextInvoiceNumber(saved: Invoice[], year = new Date().getFullYear()): string {
+  const prefix = `SC-${year}-`;
+  const max = saved.reduce((m, inv) => {
+    if (!inv.number?.startsWith(prefix)) return m;
+    const n = parseInt(inv.number.slice(prefix.length), 10);
+    return Number.isFinite(n) && n > m ? n : m;
+  }, 0);
+  return `${prefix}${String(max + 1).padStart(3, "0")}`;
+}
+
+function loadSavedInvoices(): Invoice[] {
+  try {
+    const raw = localStorage.getItem("sc_invoices");
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function AgencyBilling() {
   const [projects, setProjects] = useState<{ id: number; storeName: string }[]>([]);
   const [invoice, setInvoice] = useState<Invoice>({
     id: Date.now().toString(),
     client: "", project: "",
-    number: `SC-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`,
+    number: nextInvoiceNumber(loadSavedInvoices()),
     date: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
     items: [newItem()], notes: "", taxPct: 21, status: "borrador",
@@ -77,14 +98,13 @@ export default function AgencyBilling() {
   const [aiLoading, setAiLoading] = useState(false);
   const [showQuick, setShowQuick] = useState(false);
   const [tab, setTab] = useState<"editor" | "preview" | "history">("editor");
-  const [savedInvoices, setSavedInvoices] = useState<Invoice[]>([]);
+  const [savedInvoices, setSavedInvoices] = useState<Invoice[]>(() => loadSavedInvoices());
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch(`${API}/api/projects`, { credentials: "include" }).then(r => r.ok ? r.json() : [])
-      .then((list: any[]) => setProjects(list.map(p => ({ id: p.id, storeName: p.storeName || p.store_name || `Proyecto ${p.id}` }))));
-    const saved = localStorage.getItem("sc_invoices");
-    if (saved) setSavedInvoices(JSON.parse(saved));
+      .then((list: any[]) => setProjects((Array.isArray(list) ? list : []).map(p => ({ id: p.id, storeName: p.name || p.storeName || `Proyecto ${p.id}` }))))
+      .catch(() => {});
   }, []);
 
   function updateItem(id: string, patch: Partial<LineItem>) {
@@ -170,7 +190,7 @@ export default function AgencyBilling() {
           <p style={{ margin: 0, fontSize: 12, color: "var(--t3)" }}>Crea presupuestos y facturas profesionales con estimación de costes por IA</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setInvoice({ id: Date.now().toString(), client: "", project: "", number: `SC-${new Date().getFullYear()}-${String(Math.floor(Math.random()*900)+100)}`, date: new Date().toISOString().split("T")[0], dueDate: new Date(Date.now() + 30*86400000).toISOString().split("T")[0], items: [newItem()], notes: "", taxPct: 21, status: "borrador" }); setTab("editor"); }}
+          <button onClick={() => { setInvoice({ id: Date.now().toString(), client: "", project: "", number: nextInvoiceNumber(savedInvoices), date: new Date().toISOString().split("T")[0], dueDate: new Date(Date.now() + 30*86400000).toISOString().split("T")[0], items: [newItem()], notes: "", taxPct: 21, status: "borrador" }); setTab("editor"); }}
             style={{ padding: "8px 14px", background: "var(--ink2)", border: "1px solid var(--ink4)", borderRadius: 9, color: "var(--t3)", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
             <Plus size={14} /> Nueva factura
           </button>
@@ -357,10 +377,6 @@ export default function AgencyBilling() {
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                     <span style={{ color: "var(--t3)" }}>Tarifa media</span>
                     <span style={{ color: "var(--gold)", fontWeight: 700 }}>€{totalHours > 0 ? (subtotal / totalHours).toFixed(0) : "-"}/h</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                    <span style={{ color: "var(--t3)" }}>Neto estimado (30%)</span>
-                    <span style={{ color: "#4ade80", fontWeight: 700 }}>€{(subtotal * 0.7).toFixed(2)}</span>
                   </div>
                 </div>
               </div>

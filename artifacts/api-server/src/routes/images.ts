@@ -7,7 +7,8 @@ import { safeDownloadReplicateImage } from "../lib/safe-image-fetch.js";
 import { eq, and } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude";
-import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
+import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync, runAsyncJob } from "../lib/bulk-queue";
+import { safeDecrypt as safeDecryptSync } from "../lib/crypto.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
@@ -258,6 +259,14 @@ function buildFallbackPrompt(
  * Core image generation logic — shared by single and bulk generators.
  * Handles Replicate call with proper timeout, DB updates, vault save, and learning.
  */
+/** Token de Replicate: el del proyecto (cifrado) o, si no tiene, el global del
+ *  panel de API keys (REPLICATE_API_TOKEN). Antes solo valía el del proyecto y
+ *  el módulo fallaba aunque la clave global estuviera configurada. */
+function resolveReplicateToken(projectToken: string | null | undefined): string {
+  if (projectToken) return safeDecryptSync(projectToken) || projectToken;
+  return process.env.REPLICATE_API_TOKEN ?? "";
+}
+
 export async function runImageGeneration(params: {
   job: { id: number };
   projectId: number;
@@ -275,8 +284,8 @@ export async function runImageGeneration(params: {
 
   await db.update(generationJobsTable).set({ status: "generating" }).where(eq(generationJobsTable.id, job.id));
 
-  if (!project.replicateApiToken) {
-    const msg = "No hay Replicate API token configurado en el proyecto";
+  if (!resolveReplicateToken(project.replicateApiToken)) {
+    const msg = "No hay Replicate API token configurado (proyecto ni REPLICATE_API_TOKEN global)";
     await db.update(generationJobsTable)
       .set({ status: "failed", errorMessage: msg })
       .where(eq(generationJobsTable.id, job.id));
@@ -286,7 +295,7 @@ export async function runImageGeneration(params: {
   try {
     const Replicate = (await import("replicate")).default;
     const { safeDecrypt } = await import("../lib/crypto.js");
-    const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+    const replicateToken = resolveReplicateToken(project.replicateApiToken);
     const replicate = new Replicate({ auth: replicateToken });
 
     // Cada modelo de Replicate acepta un esquema de input diferente.
@@ -1484,7 +1493,7 @@ router.post("/projects/:projectId/products/:productId/images/generate-explode-ph
     if (!project || !product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
     const limitCheck = await checkProductionLimit(projectId, "image", 1);
     if (!limitCheck.allowed) { res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true }); return; }
-    if (!project.replicateApiToken) { res.status(400).json({ error: "Replicate API token requerido en la configuración del proyecto" }); return; }
+    if (!resolveReplicateToken(project.replicateApiToken)) { res.status(400).json({ error: "Replicate API token requerido en la configuración del proyecto" }); return; }
 
     const productTitle = product.title || "Producto";
     const productDescription = (product.bodyHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800);
@@ -1518,7 +1527,7 @@ Output ONLY the prompt in English (max 180 words). No explanations.`;
 
     const Replicate = (await import("replicate")).default;
     const { safeDecrypt } = await import("../lib/crypto.js");
-    const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+    const replicateToken = resolveReplicateToken(project.replicateApiToken);
     const replicate = new Replicate({ auth: replicateToken });
 
     const output = await withTimeout(
@@ -1583,7 +1592,7 @@ router.post("/projects/:projectId/products/:productId/images/generate-biography-
     if (!project || !product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
     const limitCheck = await checkProductionLimit(projectId, "image", 1);
     if (!limitCheck.allowed) { res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true }); return; }
-    if (!project.replicateApiToken) { res.status(400).json({ error: "Replicate API token requerido" }); return; }
+    if (!resolveReplicateToken(project.replicateApiToken)) { res.status(400).json({ error: "Replicate API token requerido" }); return; }
 
     const productTitle = product.title || "Producto";
     const vendor = product.vendor || project.name || "";
@@ -1623,7 +1632,7 @@ Output ONLY the image generation prompt in English for Ideogram (max 200 words, 
 
     const Replicate = (await import("replicate")).default;
     const { safeDecrypt } = await import("../lib/crypto.js");
-    const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+    const replicateToken = resolveReplicateToken(project.replicateApiToken);
     const replicate = new Replicate({ auth: replicateToken });
 
     const output = await withTimeout(
@@ -1685,7 +1694,7 @@ router.post("/projects/:projectId/products/:productId/images/generate-story-shee
     if (!project || !product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
     const limitCheck = await checkProductionLimit(projectId, "image", 1);
     if (!limitCheck.allowed) { res.status(403).json({ error: "Límite de imágenes alcanzado para tu plan", planLimit: true }); return; }
-    if (!project.replicateApiToken) { res.status(400).json({ error: "Replicate API token requerido" }); return; }
+    if (!resolveReplicateToken(project.replicateApiToken)) { res.status(400).json({ error: "Replicate API token requerido" }); return; }
 
     const productTitle = product.title || "Producto";
     const vendor = product.vendor || project.name || "";
@@ -1724,7 +1733,7 @@ Output ONLY the image generation prompt in English for Ideogram (max 200 words, 
 
     const Replicate = (await import("replicate")).default;
     const { safeDecrypt } = await import("../lib/crypto.js");
-    const replicateToken = safeDecrypt(project.replicateApiToken!) || project.replicateApiToken!;
+    const replicateToken = resolveReplicateToken(project.replicateApiToken);
     const replicate = new Replicate({ auth: replicateToken });
 
     const output = await withTimeout(
@@ -2044,15 +2053,15 @@ router.post("/projects/:projectId/bulk-generate-images", async (req, res): Promi
     });
   
     // ── Background: actually generate each image ──────────────────────────────
-    runAsync(async () => {
+    runAsyncJob(jobId, async () => {
       const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
       if (!project) {
-        await completeJob(jobId, { error: "Proyecto no encontrado" });
+        await failJob(jobId, "Proyecto no encontrado");
         return;
       }
   
-      if (!project.replicateApiToken) {
-        await completeJob(jobId, { error: "No hay Replicate API token configurado" });
+      if (!resolveReplicateToken(project.replicateApiToken)) {
+        await failJob(jobId, "No hay Replicate API token configurado (proyecto ni REPLICATE_API_TOKEN global)");
         return;
       }
   
@@ -2162,7 +2171,7 @@ router.post("/projects/:projectId/bulk-upload-generated-images", async (req, res
     const jobId = await createBulkJob(projectId, "bulk_image_upload", notUploaded.length);
     res.json({ jobId, message: `Subiendo ${notUploaded.length} imágenes a Shopify...`, total: notUploaded.length });
   
-    runAsync(async () => {
+    runAsyncJob(jobId, async () => {
       let uploaded = 0;
       let failed = 0;
       for (const job of notUploaded) {

@@ -224,7 +224,7 @@ export class WooCommerceConnector implements IPlatformConnector {
 
       for (const variant of data.variants) {
         const varPayload: Record<string, unknown> = {
-          regular_price: variant.price,
+          ...internalPricesToWoo(variant.price, variant.compareAtPrice),
           sku: variant.sku ?? "",
         };
 
@@ -245,10 +245,6 @@ export class WooCommerceConnector implements IPlatformConnector {
         if (variant.inventoryQuantity !== undefined) {
           varPayload.manage_stock = true;
           varPayload.stock_quantity = variant.inventoryQuantity;
-        }
-
-        if (variant.compareAtPrice) {
-          varPayload.sale_price = variant.compareAtPrice;
         }
 
         await this.wcRequest("POST", `/products/${created.id}/variations`, varPayload);
@@ -622,6 +618,24 @@ function mapWooStatusToInternal(wcStatus: string): string {
   }
 }
 
+/**
+ * Semántica de precios: en WooCommerce `price` es el precio activo, `regular_price`
+ * el original y `sale_price` el rebajado. En el modelo interno (tipo Shopify)
+ * `price` es lo que paga el cliente y `compareAtPrice` el precio tachado.
+ * Antes se guardaba price = regular y compareAt = sale (invertido).
+ */
+export function wooPricesToInternal(src: { price?: string; regular_price?: string; sale_price?: string }): { price: string | null; compareAtPrice: string | null } {
+  const price = src.price || src.sale_price || src.regular_price || null;
+  const onSale = !!src.sale_price && !!src.regular_price && Number(src.regular_price) > Number(src.sale_price);
+  return { price, compareAtPrice: onSale ? src.regular_price! : null };
+}
+
+export function internalPricesToWoo(price: string | null | undefined, compareAt: string | null | undefined): Record<string, string> {
+  if (price == null || price === "") return {};
+  if (compareAt && Number(compareAt) > Number(price)) return { regular_price: String(compareAt), sale_price: String(price) };
+  return { regular_price: String(price), sale_price: "" };
+}
+
 function mapWooProduct(p: WCProduct): PlatformProduct {
   const variations = p._variations ?? [];
   const tags = (p.tags ?? []).map(t => t.name).join(", ");
@@ -629,8 +643,8 @@ function mapWooProduct(p: WCProduct): PlatformProduct {
   let variants = variations.map(v => ({
     platformId: String(v.id),
     title: (v.attributes ?? []).map(a => a.option).join(" / ") || "Default",
-    price: v.regular_price ?? v.price ?? "0",
-    compareAtPrice: v.sale_price && v.regular_price ? v.regular_price : null,
+    price: wooPricesToInternal(v).price ?? "0",
+    compareAtPrice: wooPricesToInternal(v).compareAtPrice,
     sku: v.sku ?? "",
     inventoryQuantity: v.stock_quantity ?? 0,
     option1: v.attributes?.[0]?.option,
@@ -642,8 +656,8 @@ function mapWooProduct(p: WCProduct): PlatformProduct {
     variants = [{
       platformId: String(p.id),
       title: "Default",
-      price: p.regular_price ?? p.price ?? "0",
-      compareAtPrice: p.sale_price && p.regular_price ? p.regular_price : null,
+      price: wooPricesToInternal(p).price ?? "0",
+      compareAtPrice: wooPricesToInternal(p).compareAtPrice,
       sku: p.sku ?? "",
       inventoryQuantity: p.stock_quantity ?? 0,
       option1: undefined,
@@ -661,8 +675,7 @@ function mapWooProduct(p: WCProduct): PlatformProduct {
     productType: p.type ?? "simple",
     status: mapWooStatusToInternal(p.status ?? "draft"),
     tags,
-    price: p.regular_price ?? p.price ?? null,
-    compareAtPrice: p.sale_price || null,
+    ...wooPricesToInternal(p),
     images: (p.images ?? []).map((img, i) => ({
       src: img.src,
       alt: img.alt,
@@ -689,8 +702,7 @@ function mapToWooPayload(data: Partial<PlatformProduct>): Record<string, unknown
     };
     payload.status = statusMap[data.status] ?? data.status;
   }
-  if (data.price !== undefined) payload.regular_price = data.price;
-  if (data.compareAtPrice !== undefined) payload.sale_price = data.compareAtPrice;
+  if (data.price !== undefined) Object.assign(payload, internalPricesToWoo(data.price, data.compareAtPrice));
   if (data.images) {
     payload.images = data.images.map(img => ({ src: img.src, alt: img.alt ?? "" }));
   }
