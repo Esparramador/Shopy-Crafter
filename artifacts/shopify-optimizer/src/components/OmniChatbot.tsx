@@ -1077,6 +1077,8 @@ interface SlashSkill {
   engine: string;
   prompt: string;
   isResearch?: boolean;
+  /** Si se indica, el comando cambia el chat a NVIDIA con este modelo antes de enviar. */
+  nvidiaModel?: string;
 }
 const SLASH_SKILLS: SlashSkill[] = [
   // ── ANÁLISIS & AUDITORÍA ──────────────────────────────────────────────────
@@ -3475,7 +3477,16 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, claudeModel, gptModel, location]);
+  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, claudeModel, gptModel, nvidiaModel, location]);
+
+  // Prompt de un slash command que cambia de motor/modelo: se envía en el render
+  // siguiente, cuando sendMessage ya ve el engineMode/nvidiaModel nuevos.
+  const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
+  useEffect(() => {
+    if (queuedPrompt === null) return;
+    setQueuedPrompt(null);
+    sendMessage(queuedPrompt);
+  }, [queuedPrompt, sendMessage]);
 
   useEffect(() => {
     if (!isListening && pendingTranscriptRef.current) {
@@ -3558,10 +3569,18 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
     setSlashMenuOpen(false);
     setSlashFilter("");
     setInput("");
+    // Antes nvidiaModel se declaraba en los /nvidia-* pero nadie lo leía: el mensaje
+    // salía con el motor y modelo que hubiera seleccionados.
+    if (skill.nvidiaModel) {
+      setEngineMode("nvidia");
+      setNvidiaModel(skill.nvidiaModel);
+    }
     if (skill.isResearch || skill.prompt.trim() === "" || skill.prompt.endsWith(" ")) {
       // Show inline input instead of browser prompt()
       setSlashPendingSkill(skill);
       setSlashPendingInput("");
+    } else if (skill.nvidiaModel) {
+      setQueuedPrompt(skill.prompt);
     } else {
       sendMessage(skill.prompt);
     }

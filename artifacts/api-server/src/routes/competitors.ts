@@ -11,11 +11,60 @@ import { logger } from "../lib/logger.js";
 import { askClaudeJsonValidated, parseAiJson } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { z } from "zod";
+import { lenientArray, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
 import net from "net";
 import { enableLongRunning } from "../lib/long-running.js";
 import { getReportShell } from "./exports.js";
 
 const router = Router();
+
+// ─── Esquemas de las respuestas de IA de competidores ───────────────────────
+// Antes se usaban sin validar: un "priceMin": "29,99 €" o un "productsFound": "~50"
+// hacían fallar el INSERT (columnas real/integer) y un JSON roto guardaba un
+// snapshot de "0 productos" como si fuera un dato real.
+const optionalInt = optionalLooseNumber.transform(n => (n === undefined ? undefined : Math.round(n)));
+const stringList = lenientArray(looseString);
+const competitorInsightSchema = z.object({
+  severity: z.string().default("low"),
+  type: z.string().default("general"),
+  title: z.string().min(1),
+  description: z.string().default(""),
+  action: z.string().default(""),
+});
+const competitorScanSchema = z.object({
+  productsFound: optionalInt,
+  priceMin: optionalLooseNumber,
+  priceMax: optionalLooseNumber,
+  priceMedian: optionalLooseNumber,
+  newProducts: z.array(z.unknown()).catch([]),
+  outOfStock: z.array(z.unknown()).catch([]),
+  promotionsDetected: z.array(z.unknown()).catch([]),
+  insights: lenientArray(competitorInsightSchema),
+  overallThreatLevel: z.string().optional().catch(undefined),
+});
+const discoveredCompetitorsSchema = z.object({
+  competitors: lenientArray(z.object({
+    name: z.string().optional().catch(undefined),
+    url: z.string().min(1),
+    type: z.string().optional().catch(undefined),
+    reason: z.string().optional().catch(undefined),
+    features: stringList,
+    priceLevel: z.string().optional().catch(undefined),
+    threatLevel: z.string().optional().catch(undefined),
+    estimatedPriceRange: z.string().optional().catch(undefined),
+  })),
+});
+const competitorAnalysisSchema = z.object({
+  productsFound: optionalInt,
+  priceMin: optionalLooseNumber,
+  priceMax: optionalLooseNumber,
+  featuresTheyHave: stringList,
+  strengths: stringList,
+  weaknesses: stringList,
+  opportunities: stringList,
+  threatLevel: z.string().optional().catch(undefined),
+  insights: lenientArray(competitorInsightSchema),
+}).passthrough();
 
 function isSafePublicUrl(rawUrl: string): boolean {
   try {
@@ -153,27 +202,24 @@ router.post("/competitors/scan", async (req, res): Promise<void> => {
   
     try {
       const niche = project?.storeNiche ?? undefined;
-      const text = await askClaudeWithBrain(
+      const data = await askClaudeJsonValidated(
         parseInt(projectId),
-        [{ role: "user", content: prompt }],
+        prompt,
         `${SHOPIFY_EXPERT_SYSTEM} You are also a world-class competitive intelligence analyst. Use your accumulated knowledge about pricing patterns, market positioning, and e-commerce trends to identify real threats and opportunities.`,
-        "general",
-        niche
+        { schema: competitorScanSchema, useCase: "general", niche, maxTokens: 16000, label: "competitors/scan" },
       );
-      const match = text.match(/\{[\s\S]*\}/);
-      let data: any = {};
-      if (match) { try { data = JSON.parse(match[0]); } catch { data = {}; } }
+      const text = JSON.stringify(data);
   
       const [snap] = await db.insert(competitorSnapshotsTable).values({
         id: randomUUID(),
         competitorId,
-        productsFound: data.productsFound ?? 0,
+        productsFound: data.productsFound ?? null,
         priceMin: data.priceMin ?? null,
         priceMax: data.priceMax ?? null,
         priceMedian: data.priceMedian ?? null,
-        newProducts: JSON.stringify(data.newProducts ?? []),
-        outOfStock: JSON.stringify(data.outOfStock ?? []),
-        promotionsDetected: JSON.stringify(data.promotionsDetected ?? []),
+        newProducts: JSON.stringify(data.newProducts),
+        outOfStock: JSON.stringify(data.outOfStock),
+        promotionsDetected: JSON.stringify(data.promotionsDetected),
         rawData: text,
       }).returning();
   
@@ -181,7 +227,7 @@ router.post("/competitors/scan", async (req, res): Promise<void> => {
         .set({ lastScanned: new Date() })
         .where(eq(competitorsTable.id, competitorId));
   
-      for (const insight of (data.insights ?? [])) {
+      for (const insight of data.insights) {
         await db.insert(competitorAlertsTable).values({
           id: randomUUID(),
           projectId,
@@ -211,12 +257,13 @@ router.post("/competitors/scan", async (req, res): Promise<void> => {
         mimeType: "application/json",
         fileSizeBytes: Buffer.from(text).length,
         generatedBy: "competitor_scanner",
-        content: JSON.stringify({ competitor: { name: competitor.name, url: competitor.url }, data, rawAnalysis: text }, null, 2),
+        content: JSON.stringify({ competitor: { name: competitor.name, url: competitor.url }, data }, null, 2),
         metadata: { competitorId, competitorName: competitor.name, threatLevel: data.overallThreatLevel },
       }).catch(() => {});
   
-      res.json({ snapshot: snap, insights: data.insights ?? [], threatLevel: data.overallThreatLevel });
+      res.json({ snapshot: snap, insights: data.insights, threatLevel: data.overallThreatLevel });
     } catch (e: any) {
+      if (isAiOutputError(e)) { res.status(502).json({ error: aiOutputErrorMessage(e), code: e.code }); return; }
       res.status(500).json({ error: e.message });
     }
   } catch (err: any) {
@@ -313,11 +360,9 @@ RESPONDE con JSON exacto:
 }`;
 
     const parseDiscovered = (rawText: string) => {
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return [];
-      let parsed: any = {};
-      try { parsed = JSON.parse(jsonMatch[0]); } catch { parsed = { competitors: [] }; }
-      return (parsed.competitors || []).filter((c: { url?: string }) => {
+      const parsed = parseResearchJson(rawText, discoveredCompetitorsSchema, "competitors/auto-discover");
+      if (!parsed) return [];
+      return parsed.competitors.filter(c => {
         if (!c.url || !isSafePublicUrl(c.url)) return false;
         try {
           const u = new URL(c.url);
@@ -325,7 +370,13 @@ RESPONDE con JSON exacto:
           if (shopDomain && origin.includes(shopDomain.toLowerCase().replace(/^https?:\/\//, ""))) return false;
           return !existingUrls.includes(origin) && !existingUrls.includes(c.url.toLowerCase());
         } catch { return false; }
-      });
+      }).map(c => ({
+        // name es NOT NULL: sin nombre se usa el dominio (antes el INSERT fallaba en silencio).
+        name: c.name?.trim() || new URL(c.url).hostname,
+        url: c.url,
+        type: c.type || "direct",
+        reason: c.reason ?? "",
+      }));
     };
 
     if (isGeminiSearchBlocked()) {
@@ -816,11 +867,10 @@ Responde SOLO JSON válido:
     for (const result of searchResults) {
       if (result.status !== "fulfilled" || !result.value) continue;
       const raw = typeof result.value === "string" ? result.value : "";
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) continue;
+      const parsed = parseResearchJson(raw, discoveredCompetitorsSchema, "competitors/auto-analyze:descubrimiento");
+      if (!parsed) continue;
       try {
-        const parsed = JSON.parse(match[0]);
-        for (const c of (parsed.competitors ?? [])) {
+        for (const c of parsed.competitors) {
           if (!c.url || !isSafePublicUrl(c.url)) continue;
           let hostname: string;
           try { hostname = new URL(c.url).hostname.toLowerCase(); } catch { continue; }
@@ -833,7 +883,7 @@ Responde SOLO JSON válido:
             url: c.url,
             type: c.type ?? "direct",
             reason: c.reason ?? "",
-            features: Array.isArray(c.features) ? c.features : [],
+            features: c.features,
             priceLevel: c.priceLevel ?? "mid",
             threatLevel: c.threatLevel ?? "medium",
           });
@@ -894,8 +944,7 @@ ANALIZA y responde SOLO JSON:
           : await askGeminiWithSearch(analysisPrompt, `Analista de inteligencia competitiva ecommerce. Busca en Google info real. Responde SOLO JSON válido.`).then(r => r.text ?? "");
 
         const raw = typeof r === "string" ? r : "";
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (match) { try { analysis = JSON.parse(match[0]); } catch {} }
+        analysis = parseResearchJson(raw, competitorAnalysisSchema, `competitors/auto-analyze:${comp.name}`);
       } catch {}
 
       return { ...comp, analysis };
@@ -922,7 +971,7 @@ ANALIZA y responde SOLO JSON:
         await db.insert(competitorSnapshotsTable).values({
           id: randomUUID(),
           competitorId: comp.id,
-          productsFound: item.analysis?.productsFound ?? 0,
+          productsFound: item.analysis?.productsFound ?? null,
           priceMin: item.analysis?.priceMin ?? null,
           priceMax: item.analysis?.priceMax ?? null,
           priceMedian: null,

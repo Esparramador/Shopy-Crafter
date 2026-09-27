@@ -9,6 +9,10 @@ import { cmsContent, cmsVersions, cmsPages } from "@workspace/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { DEFAULT_CMS_CONTENT } from "../lib/cms-defaults.js";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
+import { askClaudeJsonValidated } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { lenientArray } from "../lib/ai-schema.js";
+import { z } from "zod";
 import { cached, invalidateCache } from "../lib/cache.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { writeSiteThemeToCss, SiteTheme } from "../lib/theme-css-writer.js";
@@ -457,25 +461,37 @@ Reglas:
 - Los valores por defecto deben ser contenido real y profesional para una agencia de marketing digital
 - El icon debe ser un emoji apropiado para el tipo de sección`;
 
-    const raw = await askClaudeWithBrain(0, [{ role: "user", content: userPrompt }], systemPrompt, "general", undefined, 2048);
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in AI response");
-    const config = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-
-    if (!config.id || !config.fields || !Array.isArray(config.fields)) {
-      throw new Error("Invalid section structure");
-    }
-    config.id = sectionId;
+    // Campos validados: tipo permitido y path DENTRO de la sección nueva (antes un
+    // path de la IA podía apuntar a cualquier otra sección del CMS).
+    const sectionSchema = z.object({
+      icon: z.string().default("🧩"),
+      label: z.string().min(1).transform(s => s.slice(0, 25)),
+      fields: lenientArray(z.object({
+        label: z.string().min(1),
+        path: z.string().regex(new RegExp(`^${sectionId}\\.[a-z0-9_]+$`)),
+        type: z.enum(["text", "textarea", "color", "boolean", "image", "url"]),
+        placeholder: z.string().default(""),
+      })).refine(f => f.length > 0, { message: "sin campos válidos" }),
+      defaultContent: z.record(z.string(), z.unknown()).catch({}),
+    });
+    const parsed = await askClaudeJsonValidated(0, userPrompt, systemPrompt, {
+      schema: sectionSchema,
+      useCase: "general",
+      maxTokens: 2048,
+      label: "cms/ai/generate-section",
+    });
+    const config = { id: sectionId, ...parsed };
 
     learnFromOperation({
       operationType: "cms_section_generated",
       title: `Nueva sección CMS: ${String(config.label || "custom")}`,
-      content: `Descripción: ${description}. Campos: ${(config.fields as unknown[]).length}`,
+      content: `Descripción: ${description}. Campos: ${config.fields.length}`,
       tags: ["cms", "section", "ai-generated"],
     });
 
     res.json({ section: config });
   } catch (e) {
+    if (isAiOutputError(e)) { res.status(502).json({ error: aiOutputErrorMessage(e), code: e.code }); return; }
     const msg = e instanceof Error ? e.message : "unknown";
     res.status(500).json({ error: `Section generation failed: ${msg}` });
   }

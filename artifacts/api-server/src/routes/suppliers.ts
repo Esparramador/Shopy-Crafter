@@ -3,7 +3,11 @@ import { db, projectsTable, suppliersResearchTable, supplierEntriesTable } from 
 import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { askGeminiWithSearch, isGeminiSearchBlocked, resetGeminiCircuitBreakers, getGeminiStatus } from "../lib/gemini.js";
-import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
+import { learnFromOperation } from "../lib/claude.js";
+import { askClaudeJsonValidated, extractJson } from "../lib/ai-json.js";
+import { lenientArray, looseString, optionalLooseNumber } from "../lib/ai-schema.js";
+import { logger } from "../lib/logger.js";
+import { z } from "zod";
 import { recordApiUsage } from "../lib/api-usage.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { requireProjectAccess } from "../lib/access.js";
@@ -46,20 +50,53 @@ function parseProjectId(raw: unknown): number | null {
   return n;
 }
 
+// Extracción balanceada (ai-json): la regex codiciosa se tragaba la prosa de
+// alrededor y un JSON cortado se descartaba sin decir por qué.
 function safeJsonParse<T = unknown>(text: string): T | null {
   if (!text) return null;
-  // Try to find a fenced JSON block
-  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fence ? fence[1].trim() : text.trim();
-  // Try direct parse
-  try { return JSON.parse(candidate) as T; } catch {}
-  // Try to extract first JSON array or object
-  const arr = candidate.match(/\[[\s\S]*\]/);
-  if (arr) { try { return JSON.parse(arr[0]) as T; } catch {} }
-  const obj = candidate.match(/\{[\s\S]*\}/);
-  if (obj) { try { return JSON.parse(obj[0]) as T; } catch {} }
+  const extracted = extractJson(text, "object");
+  if (extracted.ok) return extracted.value as T;
+  logger.warn({ code: extracted.code, reason: extracted.message, chars: text.length }, "[Suppliers] respuesta sin JSON utilizable");
   return null;
 }
+
+const optText = z.string().optional().catch(undefined);
+const optTextList = lenientArray(looseString);
+const supplierReportAiSchema = z.object({
+  executiveSummary: optText,
+  marketContext: optText,
+  topPicks: lenientArray(z.object({
+    rank: optionalLooseNumber, supplierName: optText, supplierId: optText, scenario: optText, reason: optText, recommendedFor: optText,
+  })),
+  supplierDeepAnalysis: lenientArray(z.object({
+    supplierId: optText, supplierName: optText, category: optText,
+    marginAnalysis: z.object({
+      costAvgEur: optionalLooseNumber, suggestedRetailMin: optionalLooseNumber, suggestedRetailMax: optionalLooseNumber,
+      grossMarginPct: optionalLooseNumber, revenueAt100Units: optionalLooseNumber, revenueAt500Units: optionalLooseNumber,
+      revenueAt1000Units: optionalLooseNumber, note: optText,
+    }).optional().catch(undefined),
+    contractingPlan: z.object({ starter: optText, growth: optText, scale: optText }).optional().catch(undefined),
+    hiringRecommendation: optText,
+    riskLevel: optText, riskFactors: optTextList, strengths: optTextList, productFit: optText,
+  })),
+  categoryComparison: lenientArray(z.object({
+    category: optText, suppliersInCategory: optionalLooseNumber, bestSupplier: optText, worstSupplier: optText,
+    avgScore: optionalLooseNumber, avgPriceRange: optText, priceSpread: optText, recommendation: optText,
+  })),
+  competitiveMatrix: z.record(z.string(), z.string()).optional().catch(undefined),
+  riskMatrix: z.record(z.string(), z.string()).optional().catch(undefined),
+  contractingPlanGeneral: z.object({ starter: optText, growth: optText, scale: optText }).optional().catch(undefined),
+  hiringPlan: z.object({ immediate: optText, growth: optText, tools: optText }).optional().catch(undefined),
+  keyRecommendations: optTextList,
+  nextSteps: optTextList,
+}).refine(r => Boolean(r.executiveSummary || r.supplierDeepAnalysis.length || r.topPicks.length), {
+  message: "el análisis no trae resumen ni proveedores",
+});
+
+const claudeSuppliersSchema = z.object({
+  summary: z.string().optional().catch(undefined),
+  suppliers: z.array(z.record(z.string(), z.unknown())).min(1),
+});
 
 interface SupplierJson {
   name: string;
@@ -182,14 +219,13 @@ FORMATO DE RESPUESTA — SOLO UN JSON válido, sin texto adicional, sin comentar
         searchEngine = "claude-fallback";
         try {
           req.log.info("[Suppliers] Gemini sin resultados — fallback a Claude");
-          const claudeResult = await askClaudeJsonWithBrain<{ summary?: string; suppliers?: SupplierJson[] }>(
+          // Antes askClaudeJsonWithBrain "reparaba" un JSON cortado y se guardaba una
+          // lista de proveedores incompleta sin avisar.
+          const claudeResult = await askClaudeJsonValidated(
             projectIdNum,
             userPrompt + `\n\nIMPORTANTE: Proporciona proveedores REALES que conozcas. Incluye empresas verificables con webs reales. Marca en "notes" que la info debe verificarse. Prioriza proveedores establecidos y conocidos del sector.`,
             "Eres un consultor B2B experto con 15 años de experiencia. Responde SOLO con JSON válido con la estructura exacta: {\"summary\":\"...\",\"suppliers\":[...]}. Proporciona proveedores reales conocidos, priorizando los más establecidos y verificables.",
-            "competitors",
-            effectiveNiche || undefined,
-            8192,
-            120_000
+            { schema: claudeSuppliersSchema, useCase: "competitors", niche: effectiveNiche || undefined, maxTokens: 8192, timeoutMs: 120_000, label: "suppliers/research:claude" },
           );
           req.log.info({ claudeResultType: typeof claudeResult, hasSuppliers: !!(claudeResult as any)?.suppliers }, "[Suppliers] Claude respondió");
           aiText = JSON.stringify(claudeResult);
@@ -605,19 +641,19 @@ REGLAS CRÍTICAS:
         nextSteps?: string[];
       }
 
+      // Antes askClaudeJsonWithBrain "reparaba" un JSON cortado: secciones a medias y
+      // cifras en texto que salían como "€NaN". Ahora esquema + reintento; si falla, el
+      // informe se genera solo con los datos reales (como antes ante un error).
       let ai: SupplierReportAI = {};
       try {
-        ai = await askClaudeJsonWithBrain<SupplierReportAI>(
+        ai = await askClaudeJsonValidated(
           projectIdNum,
           reportPrompt,
           "Eres un CFO y consultor de aprovisionamiento de nivel C-suite. Devuelves SOLO JSON válido con análisis profundo y cifras reales derivadas de los datos del proveedor.",
-          "pricing",
-          niche || undefined,
-          16000,
-          180_000,
+          { schema: supplierReportAiSchema, useCase: "pricing", niche: niche || undefined, maxTokens: 16000, timeoutMs: 180_000, label: "suppliers/report" },
         ) as SupplierReportAI;
       } catch (aiErr: any) {
-        console.warn("[SupplierReport] Claude AI failed:", aiErr?.message?.slice(0, 200));
+        logger.warn({ err: aiErr?.message?.slice(0, 200) }, "[SupplierReport] análisis IA omitido; informe solo con datos");
       }
 
       // ─── STYLE HELPERS ────────────────────────────────────────────────────────

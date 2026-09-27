@@ -8,8 +8,60 @@ import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { updateCogsBenchmark } from "../lib/cogs-benchmarks.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { z } from "zod";
+import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
 
 const router = Router();
+
+// Respuestas de Gemini con búsqueda. Antes se mezclaban sin validar
+// ({ ...defaults, ...JSON.parse }): un campo que no fuera lista rompía el .map
+// y un precio "12,50 €" acababa como NaN en los cálculos.
+const marketRangeSchema = z.object({ min: looseNumber, max: looseNumber, median: looseNumber });
+const competitorResearchSchema = z.object({
+  competitorPrices: lenientArray(z.object({
+    source: looseString,
+    price: looseNumber.transform(String),
+    url: z.string().optional(),
+    productName: z.string().optional(),
+  })),
+  marketPriceRange: marketRangeSchema.optional().catch(undefined),
+  marketPosition: z.string().optional().catch(undefined),
+  pricingStrategy: z.string().optional().catch(undefined),
+});
+const supplierPriceResearchSchema = z.object({
+  supplierPrices: lenientArray(z.object({
+    supplier: looseString,
+    priceRange: looseString,
+    moq: looseString.optional().catch(undefined),
+    origin: z.string().optional().catch(undefined),
+  })),
+  avgSupplierCost: optionalLooseNumber,
+  supplierInsight: z.string().optional().catch(undefined),
+});
+const materialResearchSchema = z.object({
+  materials: lenientArray(z.object({ material: looseString, priceRange: looseString, source: looseString.default(""), url: z.string().optional().catch(undefined) })),
+  avgMaterialCost: optionalLooseNumber,
+  insight: z.string().optional().catch(undefined),
+});
+const shippingResearchSchema = z.object({
+  carriers: lenientArray(z.object({ carrier: looseString, domestic: looseString, international: looseString.default(""), source: looseString.default("") })),
+  insight: z.string().optional().catch(undefined),
+});
+const cogsSupplierResearchSchema = z.object({
+  suppliers: lenientArray(z.object({ supplier: looseString, priceRange: looseString, moq: looseString.optional().catch(undefined), origin: z.string().optional().catch(undefined), url: z.string().optional().catch(undefined) })),
+  avgCost: optionalLooseNumber,
+  insight: z.string().optional().catch(undefined),
+});
+const packagingResearchSchema = z.object({
+  items: lenientArray(z.object({ item: looseString, pricePerUnit: looseNumber, source: looseString.default("") })),
+  totalPackagingCost: optionalLooseNumber,
+  insight: z.string().optional().catch(undefined),
+});
+
+/** Quita las claves `undefined` para que no pisen los valores por defecto al mezclar. */
+function definedOnly<T extends Record<string, unknown>>(o: T): Partial<T> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
 
 const FINANCIAL_ANALYST_SYSTEM = `You are a senior financial analyst and pricing strategist with 20 years experience in e-commerce and retail economics. You combine:
 
@@ -374,18 +426,14 @@ RESPONDE con este formato JSON exacto:
           ),
         ]);
 
-        if (compResult.status === "fulfilled") {
-          const jsonMatch = compResult.value.text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try { competitorResearch = { ...competitorResearch, ...JSON.parse(jsonMatch[0]) }; } catch {}
-          }
-        }
-        if (suppResult.status === "fulfilled") {
-          const jsonMatch = suppResult.value.text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try { supplierResearch = { ...supplierResearch, ...JSON.parse(jsonMatch[0]) }; } catch {}
-          }
-        }
+        const comp = compResult.status === "fulfilled"
+          ? parseResearchJson(compResult.value.text, competitorResearchSchema, "pricing/optimal:competidores")
+          : null;
+        if (comp) competitorResearch = { ...competitorResearch, ...definedOnly(comp) };
+        const supp = suppResult.status === "fulfilled"
+          ? parseResearchJson(suppResult.value.text, supplierPriceResearchSchema, "pricing/optimal:proveedores")
+          : null;
+        if (supp) supplierResearch = { ...supplierResearch, ...definedOnly(supp) };
       } catch {}
     }
 
@@ -733,15 +781,16 @@ router.post("/projects/:projectId/products/:productId/ai-estimate-cogs", async (
           askGeminiWithSearch(`packaging ecommerce caja envío España precio\n\nJSON: {"items":[{"item":"","pricePerUnit":0,"source":""}],"totalPackagingCost":0,"insight":""}`, "Packaging analyst. ONLY JSON."),
         ]);
 
-        const parseGemini = (r: PromiseSettledResult<{ text: string }>) => {
-          if (r.status !== "fulfilled") return null;
-          const m = r.value.text.match(/\{[\s\S]*\}/);
-          return m ? JSON.parse(m[0]) : null;
-        };
-        try { const d = parseGemini(matResult); if (d) materialResearch = { ...materialResearch, ...d }; } catch {}
-        try { const d = parseGemini(shipResult); if (d) shippingResearch = { ...shippingResearch, ...d }; } catch {}
-        try { const d = parseGemini(suppResult); if (d) supplierResearch = { ...supplierResearch, ...d }; } catch {}
-        try { const d = parseGemini(packResult); if (d) packagingResearch = { ...packagingResearch, ...d }; } catch {}
+        const parseGemini = <T,>(r: PromiseSettledResult<{ text: string }>, schema: z.ZodType<T, z.ZodTypeDef, unknown>, label: string): T | null =>
+          r.status === "fulfilled" ? parseResearchJson(r.value.text, schema, `pricing/cogs:${label}`) : null;
+        const mat = parseGemini(matResult, materialResearchSchema, "materiales");
+        if (mat) materialResearch = { ...materialResearch, ...definedOnly(mat) };
+        const ship = parseGemini(shipResult, shippingResearchSchema, "envios");
+        if (ship) shippingResearch = { ...shippingResearch, ...definedOnly(ship) };
+        const supp = parseGemini(suppResult, cogsSupplierResearchSchema, "proveedores");
+        if (supp) supplierResearch = { ...supplierResearch, ...definedOnly(supp) };
+        const pack = parseGemini(packResult, packagingResearchSchema, "packaging");
+        if (pack) packagingResearch = { ...packagingResearch, ...definedOnly(pack) };
       } catch {}
     }
 

@@ -7,7 +7,11 @@ import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import Stripe from "stripe";
 
-const STRIPE_API_VERSION = "2025-01-27.acacia" as const;
+// Misma versión que lib/stripe-tenant.ts y la que tipa el SDK instalado (stripe@22).
+// Aquí solo se usan Checkout Sessions (create/retrieve: payment_status, metadata),
+// que no cambian entre acacia y dahlia; la versión de los eventos del webhook la
+// fija el endpoint en el panel de Stripe, no este cliente.
+const STRIPE_API_VERSION = "2026-05-27.dahlia" as const;
 
 const router = Router();
 
@@ -768,22 +772,30 @@ router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
   const sig = req.headers["stripe-signature"] as string | undefined;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  let event: any;
+  // SECURITY: fail-closed. Antes, sin secreto O sin cabecera stripe-signature se
+  // aceptaba el payload tal cual: cualquiera podía enviar un checkout.session.completed
+  // falso y activarse un plan de pago. Además rawBody no existía y constructEvent
+  // fallaba siempre, así que la vía firmada nunca funcionó.
+  if (!webhookSecret) {
+    logger.error("stripe webhook: STRIPE_WEBHOOK_SECRET no configurado — petición rechazada");
+    res.status(503).json({ error: "Webhook de Stripe no configurado" }); return;
+  }
+  const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
+  if (!sig || !rawBody) {
+    res.status(400).json({ error: "Falta la firma stripe-signature o el cuerpo original" }); return;
+  }
+
+  let event: Stripe.Event;
   try {
-    if (webhookSecret && sig) {
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", { apiVersion: STRIPE_API_VERSION });
-      event = stripe.webhooks.constructEvent((req as any).rawBody ?? req.body, sig, webhookSecret);
-    } else {
-      // No webhook secret configured — accept the payload directly (less secure, OK for dev)
-      event = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    }
+    // Verificar la firma no necesita la API key (new Stripe("") lanza si falta).
+    event = Stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: any) {
     logger.warn({ err: err.message }, "stripe webhook signature error");
     res.status(400).json({ error: `Webhook error: ${err.message}` }); return;
   }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as any;
+    const session = event.data.object as Stripe.Checkout.Session;
     if (session.payment_status !== "paid") { res.json({ received: true }); return; }
 
     const metaUserId = session.metadata?.userId;

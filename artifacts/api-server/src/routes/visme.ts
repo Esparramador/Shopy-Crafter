@@ -14,6 +14,8 @@ import {
 } from "../lib/visme-effects.js";
 import { streamHtmlClaude } from "../lib/web-designer.js";
 import { logger } from "../lib/logger.js";
+import { generateCompleteText } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 
 /** Same pattern as claude.ts getDefaultClient — prefers AI Integrations proxy */
 function makeAnthropicClient(): Anthropic {
@@ -308,7 +310,10 @@ PROMPT ADAPTADO PARA ${projectName.toUpperCase()}:`;
           res.write(`data: ${JSON.stringify({ chunk: event.delta.text })}\n\n`);
         }
       }
-      res.write(`data: ${JSON.stringify({ done: true, adapted: fullText, dna })}\n\n`);
+      // Si se cortó por max_tokens, se avisa en el evento final en vez de darlo por completo.
+      const truncated = (await stream.finalMessage()).stop_reason === "max_tokens";
+      if (truncated) logger.warn({ chars: fullText.length }, "visme/adapt: respuesta cortada por max_tokens");
+      res.write(`data: ${JSON.stringify({ done: true, adapted: fullText, dna, truncated })}\n\n`);
     } finally {
       clearInterval(heartbeat);
       res.end();
@@ -442,14 +447,17 @@ REQUIREMENTS:
 5. Full height sections, smooth animations, polished typography.
 6. Output ONLY the raw HTML — no markdown, no code fences, no explanation.`;
 
+    // Antes: una página completa en 8000 tokens sin mirar stop_reason; se devolvía
+    // HTML cortado con ok:true. Ahora continúa si se corta y, si sigue, 502.
     const ant = makeAnthropicClient();
-    const msg = await ant.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 8000,
-      messages: [{ role: "user", content: composePrompt }],
+    const raw = await generateCompleteText({
+      prompt: composePrompt,
+      label: "visme/compose",
+      call: async (messages) => {
+        const msg = await ant.messages.create({ model: "claude-sonnet-4-5", max_tokens: 8000, messages });
+        return { text: msg.content.map(b => (b.type === "text" ? b.text : "")).join(""), truncated: msg.stop_reason === "max_tokens" };
+      },
     });
-
-    const raw = (msg.content[0] as any)?.text ?? "";
     const { stripFences } = await import("../lib/web-designer.js");
     const html = stripFences(raw);
 
@@ -460,6 +468,7 @@ REQUIREMENTS:
     res.json({ ok: true, html, effects: foundSnippets.map(s => s.id) });
   } catch (err: any) {
     logger.error({ err }, "visme/compose error");
+    if (isAiOutputError(err)) { res.status(502).json({ ok: false, error: aiOutputErrorMessage(err), code: err.code }); return; }
     res.status(500).json({ ok: false, error: err.message });
   }
 });

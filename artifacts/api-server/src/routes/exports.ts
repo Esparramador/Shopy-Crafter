@@ -15,7 +15,8 @@ import { revenueSnapshotsTable, forecastsTable } from "@workspace/db/schema";
 import { visualDnaTable } from "@workspace/db/schema";
 import archiver from "archiver";
 import ExcelJS from "exceljs";
-import { sanitizeHtml } from "../lib/html-escape.js";
+import { escapeHtmlDeep, sanitizeHtml } from "../lib/html-escape.js";
+import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 // `buildBackCover` ya no se usa directamente: la contraportada se inserta como
 // hoja 2 dentro de `buildCoverPage` (orden DIN-A4: portada → contraportada → info).
 import { shopifyRequest } from "../lib/shopify";
@@ -629,11 +630,47 @@ interface CogsEstimation {
   annualProjection: { revenueMin: number; revenueMax: number; costsMin: number; costsMax: number; profitMin: number; profitMax: number };
 }
 
+/** Datos reales (con URL) para la estimación de costes: alquiler, convenio, competidores, tasas. */
+async function researchCogsInputs(info: { name: string; sector: string; location: string; services: string[] }): Promise<{ text: string; sources: string[] } | null> {
+  if (isGeminiSearchBlocked()) return null;
+  try {
+    const r = await askGeminiWithSearch(
+      `Busca datos REALES y actuales, con la URL de cada fuente, para estimar los costes de un negocio de "${info.sector}" (${info.services.slice(0, 6).join(", ")}) en "${info.location}", España:
+1. Precio de alquiler de locales comerciales en €/m² en esa zona exacta, con 2-3 anuncios comparables (portal, m², precio).
+2. Salario bruto según el convenio colectivo del sector en esa comunidad autónoma (nombre del convenio y año).
+3. 3-5 competidores reales de la zona con precios de sus servicios principales.
+4. Tasas municipales relevantes (basura, licencia de apertura, terraza si aplica).
+Para cada dato indica la fuente. Si no encuentras algo, dilo explícitamente en vez de estimarlo.`,
+      "Investigador de costes para PYMEs españolas. Usa Google Search. Nunca inventes datos ni fuentes.",
+    );
+    if (!r.text.trim() || r.sources.length === 0) return null;
+    return { text: r.text, sources: r.sources };
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, "COGS: investigación con Gemini fallida, estimación sin búsqueda");
+    return null;
+  }
+}
+
 async function estimateCogsWithAI(projectId: number, businessInfo: {
   name: string; sector: string; location: string; services: string[];
   products: Array<{ title: string; price: string }>; domain?: string;
 }): Promise<CogsEstimation | null> {
   try {
+    // Claude no tiene búsqueda web. Antes el prompt le pedía "buscar" precios en
+    // Idealista y citar fuentes "reales verificables", y el informe decía que los
+    // datos se habían buscado en fuentes públicas: no era verdad. Ahora se investiga
+    // primero con Gemini + Google Search y Claude solo puede citar esas fuentes.
+    const research = await researchCogsInputs(businessInfo);
+    const researchBlock = research
+      ? `DATOS ENCONTRADOS EN BÚSQUEDA WEB (en tiempo real):
+${research.text.slice(0, 12000)}
+
+URLs consultadas:
+${research.sources.slice(0, 20).join("\n")}
+
+Cita como "source" SOLO estas fuentes (nombre + dato). Todo lo que no salga de aquí márcalo en "source" como "Estimación sectorial (sin fuente verificada)".`
+      : `NO HAY BÚSQUEDA WEB DISPONIBLE. No cites anuncios, convenios ni proveedores concretos que no puedas verificar: en "source" pon "Estimación sectorial (sin fuente verificada)" salvo para datos normativos generales (tipos de IVA, cotización a la Seguridad Social).`;
+
     const prompt = `Eres un ANALISTA FINANCIERO SENIOR con 20 años de experiencia en consultoría de costes para PYMEs españolas. Tu trabajo es generar un análisis COGS (Coste de Bienes/Servicios Vendidos) de nivel profesional, TAN PRECISO como sea posible sin acceso a la contabilidad real del negocio.
 
 NEGOCIO A ANALIZAR:
@@ -644,6 +681,8 @@ NEGOCIO A ANALIZAR:
 ${businessInfo.products.length > 0 ? `- Catálogo (${businessInfo.products.length} productos): ${businessInfo.products.slice(0, 15).map(p => `${p.title} (${p.price}€)`).join(", ")}` : ""}
 ${businessInfo.domain ? `- Web: ${businessInfo.domain}` : ""}
 
+${researchBlock}
+
 INSTRUCCIONES — SÉ EXHAUSTIVO Y PRECISO:
 
 1. PERSONAL Y NÓMINAS:
@@ -653,9 +692,9 @@ INSTRUCCIONES — SÉ EXHAUSTIVO Y PRECISO:
    - Fuentes: convenios colectivos sectoriales, INE, InfoJobs promedios zona
 
 2. ALQUILER — ANÁLISIS POR ZONA:
-   - Busca el precio REAL del m² en la zona EXACTA del negocio (barrio, calle si es posible)
+   - Usa el precio del m² de la zona EXACTA del negocio si está en los datos encontrados; si no, estímalo y márcalo como estimación
    - Estima los m² necesarios para este tipo de negocio
-   - Cita comparables reales de Idealista/Fotocasa en la zona
+   - Cita comparables SOLO si aparecen en los datos encontrados
    - Si es zona prime (centro, turística), refleja el sobrecoste
 
 3. COSTES FIJOS MENSUALES (desglose exhaustivo):
@@ -712,8 +751,8 @@ INSTRUCCIONES — SÉ EXHAUSTIVO Y PRECISO:
     - Proyección anual: ingresos, costes y beneficio estimado (escenario conservador)
 
 REGLAS ABSOLUTAS:
-- NUNCA inventes datos — usa siempre precios y fuentes reales verificables
-- Cita SIEMPRE la fuente: "Idealista Poble Sec 2026", "Convenio Peluquerías Catalunya", "Amazon Business", "Manutan.es", etc.
+- NUNCA inventes datos ni fuentes: una fuente citada tiene que estar en los datos encontrados
+- Si un dato es una estimación tuya, dilo en "source" ("Estimación sectorial (sin fuente verificada)")
 - Los rangos deben ser ESTRECHOS y realistas, no amplios e inútiles
 - El resultado debe ser tan preciso que el dueño diga "esto se acerca mucho a mi realidad"
 
@@ -722,7 +761,7 @@ Responde en JSON con esta estructura exacta:
   "businessType": "tipo de negocio",
   "location": "ubicación",
   "locationDetail": "barrio/zona exacta con contexto (ej: Poble Sec, zona residencial cerca de Montjuïc)",
-  "disclaimer": "Estimación profesional basada en datos de mercado reales buscados, cercados y comparados en fuentes públicas verificables (Idealista, INE, convenios colectivos, proveedores sectoriales). Los costes reales pueden variar ±10-15% según condiciones contractuales, antigüedad y volumen.",
+  "disclaimer": "(lo rellena el sistema)",
   "staffCosts": [{"role":"Puesto","count":1,"grossSalary":1400,"socialSecurity":462,"totalCost":1862,"source":"Convenio X"}],
   "fixedCosts": [{"concept":"Alquiler","rangeMin":800,"rangeMax":1000,"unit":"€/mes","source":"Idealista zona X","category":"Local"}],
   "variableCosts": [{"concept":"Comisión","costPerUnit":"1.5%","basis":"Tarifas Redsys"}],
@@ -742,9 +781,13 @@ Responde en JSON con esta estructura exacta:
 
     const result = await askClaudeJsonValidated<CogsEstimation>(
       projectId, prompt,
-      "Eres un analista financiero senior especializado en consultoría de costes para PYMEs en España. Conoces en detalle los convenios colectivos por sector y CCAA, los precios de alquiler por barrio en las principales ciudades, los costes de proveedores sectoriales, los impuestos y tasas aplicables, y las estructuras de costes típicas por tipo de negocio. NUNCA inventes datos. Cita SIEMPRE fuentes verificables reales (Idealista, INE, convenios colectivos, AEAT, proveedores con nombre). Tus estimaciones deben ser tan precisas que un empresario del sector las reconozca como realistas.",
+      "Eres un analista financiero senior especializado en consultoría de costes para PYMEs en España. Conoces las estructuras de costes típicas por tipo de negocio, la normativa fiscal y laboral y los órdenes de magnitud de alquileres y salarios. NUNCA inventes datos ni fuentes: cita solo las fuentes de los datos encontrados que se te dan y marca como estimación todo lo demás. Tus estimaciones deben ser realistas para un empresario del sector.",
       { schema: cogsEstimationSchema, useCase: "financial", maxTokens: 8000, retryMaxTokens: 16000, label: "exports/estimate-cogs" },
     );
+    // El aviso lo escribe el servidor según haya habido búsqueda real o no.
+    result.disclaimer = research
+      ? `Estimación basada en ${research.sources.length} fuentes consultadas en tiempo real (Google Search) y en conocimiento sectorial. Los datos marcados como "Estimación sectorial" no tienen fuente verificada. Los costes reales pueden variar ±10-15% según condiciones contractuales, antigüedad y volumen.`
+      : `Estimación basada en conocimiento sectorial del modelo de IA, SIN búsqueda web en tiempo real: los importes son orientativos y deben contrastarse con presupuestos, anuncios y convenios reales antes de tomar decisiones.`;
     return result;
   } catch (err) {
     logger.error({ err, projectId }, "Failed to estimate COGS with AI");
@@ -3373,7 +3416,8 @@ router.get("/projects/:projectId/exports/complete-report", requireProjectAccess,
           domain: project.shopDomain ?? undefined,
         });
         if (cogsEst) {
-          cogsEstimationHtml = buildCogsEstimationHtml(cogsEst, {
+          // Todo el texto viene de la IA: se escapa antes de la plantilla.
+          cogsEstimationHtml = buildCogsEstimationHtml(escapeHtmlDeep(cogsEst), {
             accent: BRAND.gold, muted: BRAND.muted, jade: BRAND.jade,
             orange: "#f59e0b", card: BRAND.card, surface: BRAND.surface, border: BRAND.border, silver: BRAND.mutedLight,
           });

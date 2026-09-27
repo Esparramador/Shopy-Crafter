@@ -22,6 +22,10 @@ import { desc, eq } from "drizzle-orm";
 import { saveToVault } from "../lib/vault.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { processUploadedFile } from "../lib/file-processor.js";
+import { claudeMessagesJson } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { z } from "zod";
+import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
 
 const router = Router();
 
@@ -298,6 +302,10 @@ const PROVENANCE_NOTE: Record<string, string> = {
   ai_search_inference: "⚠️ La plataforma bloquea el acceso público sin API oficial. Esto es una INVESTIGACIÓN con IA + búsqueda web (inferencia), NO datos extraídos directamente — verifícalo antes de usarlo.",
 };
 
+// El prompt de visión no fija claves obligatorias; basta con un objeto no vacío.
+const visionAnalysisSchema = z.record(z.string(), z.unknown())
+  .refine(o => Object.keys(o).length > 0, { message: "análisis vacío" });
+
 // ─── HELPER: Analyze image with Claude Vision ──────────────────────────────────
 async function analyzeImageWithClaude(
   imageData: Buffer | string,
@@ -320,31 +328,89 @@ async function analyzeImageWithClaude(
         },
       };
   
-  const absorbStream = client.messages.stream({
-    model: CLAUDE_MODEL,
-    max_tokens: 16000,
+  // Antes, si el JSON no parseaba, se devolvía { raw: text } y se guardaba en ShopyBrain
+  // una memoria "visual" con todos los campos vacíos. Ahora: un reintento y error tipado.
+  return claudeJson(client, {
     system: `ShopyBrain Vision Analysis Engine.${brainCtx}`,
-    messages: [{
-      role: "user",
-      content: [
-        imageBlock,
-        {
-          type: "text",
-          text: VISION_MASTER_PROMPT + "\n\nReturn ONLY valid JSON. No markdown, no explanation.",
-        },
-      ],
-    }],
+    imageBlock,
+    prompt: VISION_MASTER_PROMPT + "\n\nReturn ONLY valid JSON. No markdown, no explanation.",
+    schema: visionAnalysisSchema,
+    label: "absorber/vision",
   });
-  const res = await absorbStream.finalMessage();
-  
-  const text = res.content[0].type === "text" ? res.content[0].text : "{}";
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : { raw: text };
-  } catch {
-    return { raw: text };
-  }
 }
+
+type ClaudeClient = Awaited<ReturnType<typeof getClaudeClient>>;
+type ClaudeImageBlock =
+  | { type: "image"; source: { type: "url"; url: string } }
+  | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png" | "image/gif" | "image/webp"; data: string } };
+
+/** JSON validado con el modelo por defecto (imagen opcional); ver claudeMessagesJson. */
+function claudeJson<T>(
+  client: ClaudeClient,
+  opts: { system: string; prompt: string; schema: z.ZodType<T, z.ZodTypeDef, unknown>; label: string; imageBlock?: ClaudeImageBlock; maxTokens?: number },
+): Promise<T> {
+  return claudeMessagesJson<T>(client, {
+    model: CLAUDE_MODEL,
+    system: opts.system,
+    prompt: opts.prompt,
+    schema: opts.schema,
+    label: opts.label,
+    maxTokens: opts.maxTokens ?? 16000,
+    images: opts.imageBlock ? [opts.imageBlock] : undefined,
+  });
+}
+
+// Crear producto desde imagen. Antes, si el JSON de visión o del copy no parseaba,
+// se creaba igualmente en Shopify un "Nuevo Producto" vacío, y un recommendedPrice
+// en texto hacía fallar el .toFixed().
+const stringList = lenientArray(looseString);
+const productAnalysisSchema = z.object({
+  productName: z.string().min(1),
+  productCategory: z.string().default(""),
+  materials: stringList,
+  qualityTier: z.string().optional().catch(undefined),
+  targetMarket: z.string().optional().catch(undefined),
+  searchKeywords: stringList,
+  keyFeatures: stringList,
+  comparableProducts: lenientArray(z.object({ name: looseString, brand: looseString.default(""), priceRange: looseString.default("") })),
+  suggestedTitle: z.string().default(""),
+  suggestedTags: stringList,
+  estimatedPriceRange: z.string().optional().catch(undefined),
+  detailedDescription: z.string().default(""),
+});
+const productPricingSchema = z.object({
+  researchedPrices: lenientArray(z.object({
+    source: looseString,
+    product: looseString.default(""),
+    price: looseNumber,
+    url: z.string().optional().catch(undefined),
+  })),
+  averageMarketPrice: optionalLooseNumber,
+  lowestFound: optionalLooseNumber,
+  highestFound: optionalLooseNumber,
+  recommendedPrice: optionalLooseNumber,
+  compareAtPrice: optionalLooseNumber,
+  priceJustification: z.string().optional().catch(undefined),
+  marginAnalysis: z.string().optional().catch(undefined),
+  competitivePosition: z.string().optional().catch(undefined),
+});
+type ProductPricing = z.output<typeof productPricingSchema>;
+
+// Investigación de proveedores: las tres búsquedas tienen formatos libres que se
+// devuelven tal cual (basta con que sean un objeto); la síntesis sí se valida.
+const researchObjectSchema = z.record(z.string(), z.unknown());
+const supplierSynthesisSchema = z.object({
+  topRecommendation: z.object({ supplier: z.string().min(1) }).passthrough(),
+  strategy: z.string().min(1),
+}).passthrough();
+const productCopySchema = z.object({
+  title: z.string().min(1),
+  bodyHtml: z.string().min(1),
+  tags: stringList,
+  seoTitle: z.string().optional().catch(undefined),
+  seoDescription: z.string().optional().catch(undefined),
+  vendor: z.string().optional().catch(undefined),
+});
 
 // ─── HELPER: Analyze with Gemini (video / complex URLs) ───────────────────────
 async function analyzeWithGemini(content: string, type: "video_url" | "url_content" | "social"): Promise<Record<string, unknown>> {
@@ -658,6 +724,7 @@ router.post("/shopybrain/absorb-image",
         });
       } catch (err) {
         logger.error(err, "ShopyBrain image/video absorb failed");
+        if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code }); return; }
         res.status(500).json({ error: String(err) });
       }
   } catch (err: any) {
@@ -829,17 +896,12 @@ router.post("/shopybrain/create-product-from-image",
               },
             };
   
-        const visionStream = productClient.messages.stream({
-          model: CLAUDE_MODEL,
-          max_tokens: 16000,
+        const productAnalysis = await claudeJson(productClient, {
           system: `ShopyBrain Product Intelligence Engine.${brainCtx2}${brandDna2}`,
-          messages: [{
-            role: "user",
-            content: [
-              imageBlock,
-              {
-                type: "text",
-                text: `You are ShopyBrain's Product Intelligence Engine. Analyze this product image with MAXIMUM DEPTH.
+          imageBlock,
+          schema: productAnalysisSchema,
+          label: "absorber/product-from-image:vision",
+          prompt: `You are ShopyBrain's Product Intelligence Engine. Analyze this product image with MAXIMUM DEPTH.
   
   EXTRACT:
   1. PRODUCT IDENTIFICATION: What EXACTLY is this product? Be specific (brand if visible, exact category, subcategory, material, style)
@@ -871,28 +933,18 @@ router.post("/shopybrain/create-product-from-image",
     "estimatedPriceRange": "€XX-€XX",
     "detailedDescription": "what this product is in detail"
   }`,
-              },
-            ],
-          }],
         });
-        const visionRes = await visionStream.finalMessage();
-  
-        const visionText = (visionRes.content[0] as { type: string; text: string }).text;
-        const visionMatch = visionText.match(/\{[\s\S]*\}/);
-        let productAnalysis: any = {};
-        if (visionMatch) { try { productAnalysis = JSON.parse(visionMatch[0]); } catch { productAnalysis = {}; } }
-  
+
         logger.info({ product: productAnalysis.productName, category: productAnalysis.productCategory }, "Vision analysis complete");
   
-        const searchKeywords = productAnalysis.searchKeywords?.slice(0, 5)?.join(", ") || productAnalysis.productName;
-        const comparables = productAnalysis.comparableProducts?.map((p: { name: string; brand: string; priceRange: string }) =>
-          `${p.brand} ${p.name}: ${p.priceRange}`).join(", ") || "";
+        const searchKeywords = productAnalysis.searchKeywords.slice(0, 5).join(", ") || productAnalysis.productName;
+        const comparables = productAnalysis.comparableProducts.map(p => `${p.brand} ${p.name}: ${p.priceRange}`).join(", ");
   
         const pricingPrompt = `MISIÓN CRÍTICA: Investigar precios REALES y ACTUALES del mercado para este producto.
   
   PRODUCTO: ${productAnalysis.productName || "producto de la imagen"}
   CATEGORÍA: ${productAnalysis.productCategory || "general"}
-  MATERIALES: ${(productAnalysis.materials || []).join(", ")}
+  MATERIALES: ${productAnalysis.materials.join(", ")}
   CALIDAD: ${productAnalysis.qualityTier || "mid-range"}
   MERCADO OBJETIVO: ${productAnalysis.targetMarket || "general"}
   KEYWORDS DE BÚSQUEDA: ${searchKeywords}
@@ -924,17 +976,14 @@ router.post("/shopybrain/create-product-from-image",
           "Eres un analista de precios eCommerce profesional. SIEMPRE usa Google Search para encontrar precios REALES y ACTUALES. No inventes precios. Busca en tiendas reales. Responde SOLO con JSON válido."
         );
   
-        let pricingData: Record<string, unknown> = {};
-        try {
-          const pricingMatch = pricingResult.text.match(/\{[\s\S]*\}/);
-          if (pricingMatch) pricingData = JSON.parse(pricingMatch[0]);
-        } catch {
-          logger.warn("Could not parse pricing JSON, using vision estimate");
-        }
-  
-        const recommendedPrice = (pricingData.recommendedPrice as number) || 0;
-        const compareAtPrice = (pricingData.compareAtPrice as number) || 0;
-        const priceSources = (pricingData.researchedPrices as Array<{ source: string; product: string; price: number }>) || [];
+        // Sin investigación utilizable el producto queda a 0,00 € en borrador (como antes);
+        // lo que ya no pasa es romper con un precio en texto.
+        const pricingData: Partial<ProductPricing> =
+          parseResearchJson(pricingResult.text, productPricingSchema, "absorber/product-from-image:precios") ?? {};
+
+        const recommendedPrice = pricingData.recommendedPrice && pricingData.recommendedPrice > 0 ? pricingData.recommendedPrice : 0;
+        const compareAtPrice = pricingData.compareAtPrice ?? 0;
+        const priceSources = pricingData.researchedPrices ?? [];
   
         logger.info({
           recommendedPrice,
@@ -943,17 +992,15 @@ router.post("/shopybrain/create-product-from-image",
           geminiSources: pricingResult.sources?.length
         }, "Pricing research complete");
   
-        const copyStream = productClient.messages.stream({
-          model: CLAUDE_MODEL,
-          max_tokens: 16000,
+        const productCopy = await claudeJson(productClient, {
+          schema: productCopySchema,
+          label: "absorber/product-from-image:copy",
           system: `Eres un experto en copywriting eCommerce Shopify. Genera contenido que CONVIERTA.
   Tienda: ${project.name || "Shopify Store"}
   Nicho: ${project.storeNiche || "general"}
   Tono: ${project.brandTone || "profesional"}
   El producto ha sido analizado visualmente y los precios han sido investigados con datos REALES del mercado.${brainCtx2}${brandDna2}`,
-          messages: [{
-            role: "user",
-            content: `Genera contenido Shopify OPTIMIZADO para este producto:
+          prompt: `Genera contenido Shopify OPTIMIZADO para este producto:
   
   ANÁLISIS VISUAL: ${JSON.stringify(productAnalysis)}
   INVESTIGACIÓN DE PRECIOS: ${JSON.stringify(pricingData)}
@@ -970,24 +1017,17 @@ router.post("/shopybrain/create-product-from-image",
     "seoDescription": "meta description max 160 chars",
     "vendor": "marca si se identifica o nombre genérico"
   }`,
-          }],
         });
-        const copyRes = await copyStream.finalMessage();
-  
-        const copyText = (copyRes.content[0] as { type: string; text: string }).text;
-        const copyMatch = copyText.match(/\{[\s\S]*\}/);
-        let productCopy: any = {};
-        if (copyMatch) { try { productCopy = JSON.parse(copyMatch[0]); } catch { productCopy = {}; } }
-  
+
         const finalPrice = recommendedPrice > 0 ? recommendedPrice.toFixed(2) : "0.00";
         const finalCompareAt = compareAtPrice > recommendedPrice ? compareAtPrice.toFixed(2) : null;
   
         const imageBase64 = file ? file.buffer.toString("base64") : null;
   
         const shopifyProduct: Record<string, unknown> = {
-          title: productCopy.title || productAnalysis.suggestedTitle || "Nuevo Producto",
-          body_html: productCopy.bodyHtml || `<p>${productAnalysis.detailedDescription || ""}</p>`, // nosemgrep
-          tags: Array.isArray(productCopy.tags) ? productCopy.tags.join(", ") : (productAnalysis.suggestedTags || []).join(", "),
+          title: productCopy.title,
+          body_html: productCopy.bodyHtml, // nosemgrep
+          tags: (productCopy.tags.length > 0 ? productCopy.tags : productAnalysis.suggestedTags).join(", "),
           vendor: productCopy.vendor || undefined,
           product_type: productAnalysis.productCategory || undefined,
           status: "draft",
@@ -1016,9 +1056,9 @@ router.post("/shopybrain/create-product-from-image",
           `Title: ${created.product.title}`,
           `Price: €${finalPrice} (researched from ${priceSources.length} sources)`,
           `Category: ${productAnalysis.productCategory}`,
-          `Materials: ${(productAnalysis.materials || []).join(", ")}`,
+          `Materials: ${productAnalysis.materials.join(", ")}`,
           `Quality: ${productAnalysis.qualityTier}`,
-          `Pricing Sources: ${priceSources.map((s: { source: string; price: number }) => `${s.source}: €${s.price}`).join(", ")}`,
+          `Pricing Sources: ${priceSources.map(s => `${s.source}: €${s.price}`).join(", ")}`,
           `Justification: ${pricingData.priceJustification || "N/A"}`,
         ].join("\n");
   
@@ -1083,6 +1123,7 @@ router.post("/shopybrain/create-product-from-image",
         });
       } catch (err) {
         logger.error(err, "Create product from image failed");
+        if (isAiOutputError(err)) { res.status(502).json({ error: `${aiOutputErrorMessage(err)} No se ha creado ningún producto.`, code: err.code }); return; }
         res.status(500).json({ error: String(err) });
       }
   } catch (err: any) {
@@ -1232,25 +1273,10 @@ router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, 
   
       const supplierSearches = supplierSearchResults.map(r => r.status === "fulfilled" ? r.value : { text: "", sources: [] as string[], queries: [] as string[] });
 
-      let suppliersData: Record<string, unknown> = {};
-      let costsData: Record<string, unknown> = {};
-      let dealsData: Record<string, unknown> = {};
-  
-      try {
-        const m1 = supplierSearches[0].text.match(/\{[\s\S]*\}/);
-        if (m1) suppliersData = JSON.parse(m1[0]);
-      } catch { logger.warn("Could not parse suppliers JSON"); }
-  
-      try {
-        const m2 = supplierSearches[1].text.match(/\{[\s\S]*\}/);
-        if (m2) costsData = JSON.parse(m2[0]);
-      } catch { logger.warn("Could not parse costs JSON"); }
-  
-      try {
-        const m3 = supplierSearches[2].text.match(/\{[\s\S]*\}/);
-        if (m3) dealsData = JSON.parse(m3[0]);
-      } catch { logger.warn("Could not parse deals JSON"); }
-  
+      const suppliersData: Record<string, unknown> = parseResearchJson(supplierSearches[0].text, researchObjectSchema, "absorber/supplier-research:proveedores") ?? {};
+      const costsData: Record<string, unknown> = parseResearchJson(supplierSearches[1].text, researchObjectSchema, "absorber/supplier-research:costes") ?? {};
+      const dealsData: Record<string, unknown> = parseResearchJson(supplierSearches[2].text, researchObjectSchema, "absorber/supplier-research:ofertas") ?? {};
+
       const allSources = [
         ...supplierSearches[0].sources,
         ...supplierSearches[1].sources,
@@ -1259,13 +1285,16 @@ router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, 
   
       const supplierBrainCtx = await buildShopyBrainContext(undefined, "ecommerce", `sourcing suppliers for ${productName}`);
       const supplierClient = await getClaudeClient(0);
-      const synthesisStream = supplierClient.messages.stream({
-        model: CLAUDE_MODEL,
-        max_tokens: 16000,
-        system: `Eres un consultor de sourcing estratégico para eCommerce. Analiza datos de proveedores y da recomendaciones claras y accionables. Responde en español. Responde SOLO JSON válido.${supplierBrainCtx}`,
-        messages: [{
-          role: "user",
-          content: `Analiza estos datos de proveedores para "${productName}" y genera una recomendación estratégica.
+      // Si la síntesis falla tras el reintento se devuelven igualmente las tres
+      // búsquedas (son lo caro) con el motivo, en vez de una síntesis vacía.
+      let synthesis: Record<string, unknown> = {};
+      let synthesisError: string | undefined;
+      try {
+        synthesis = await claudeJson(supplierClient, {
+          schema: supplierSynthesisSchema,
+          label: "absorber/supplier-research:sintesis",
+          system: `Eres un consultor de sourcing estratégico para eCommerce. Analiza datos de proveedores y da recomendaciones claras y accionables. Responde en español. Responde SOLO JSON válido.${supplierBrainCtx}`,
+          prompt: `Analiza estos datos de proveedores para "${productName}" y genera una recomendación estratégica.
   
   PROVEEDORES ENCONTRADOS: ${JSON.stringify(suppliersData)}
   COSTES DE PRODUCCIÓN/LOGÍSTICA: ${JSON.stringify(costsData)}
@@ -1299,17 +1328,12 @@ router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, 
     "risks": ["riesgo1", "riesgo2"],
     "nextSteps": ["paso1", "paso2", "paso3"]
   }`,
-        }],
-      });
-      const synthesisRes = await synthesisStream.finalMessage();
-  
-      let synthesis: Record<string, unknown> = {};
-      try {
-        const synthText = (synthesisRes.content[0] as { type: string; text: string }).text;
-        const synthMatch = synthText.match(/\{[\s\S]*\}/);
-        if (synthMatch) synthesis = JSON.parse(synthMatch[0]);
-      } catch { logger.warn("Could not parse synthesis JSON"); }
-  
+        });
+      } catch (err) {
+        if (!isAiOutputError(err)) throw err;
+        synthesisError = aiOutputErrorMessage(err);
+      }
+
       const memoryContent = [ // nosemgrep
         `SUPPLIER RESEARCH: ${productName}`,
         `Category: ${productCategory || "general"}`,
@@ -1342,6 +1366,7 @@ router.post("/shopybrain/supplier-research", requireAdmin, async (req: Request, 
         costs: costsData,
         deals: dealsData,
         synthesis,
+        synthesisError,
         sourcesAnalyzed: allSources.length,
         memoryId,
       });

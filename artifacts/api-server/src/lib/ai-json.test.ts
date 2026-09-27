@@ -8,12 +8,14 @@ vi.mock("./logger.js", () => ({
 import {
   AiJsonError,
   AiTruncatedError,
+  claudeMessagesJson,
   extractJson,
   generateAiJson,
   generateCompleteText,
   parseAiJson,
   stripCodeFences,
   type AiJsonCaller,
+  type ClaudeMessagesClient,
   type AiRawResponse,
 } from "./ai-json";
 
@@ -194,5 +196,51 @@ describe("stripCodeFences", () => {
   it("quita el envoltorio ```html", () => {
     expect(stripCodeFences("```html\n<h2>Hola</h2>\n```")).toBe("<h2>Hola</h2>");
     expect(stripCodeFences("<h2>Sin fence</h2>")).toBe("<h2>Sin fence</h2>");
+  });
+});
+
+describe("claudeMessagesJson", () => {
+  type Req = { max_tokens: number; messages: Array<{ content: unknown }> };
+  const fakeClient = (responses: Array<{ text: string; stop_reason: string }>) => {
+    const requests: Req[] = [];
+    const client = {
+      messages: {
+        stream: (body: Req) => {
+          requests.push(body);
+          const r = responses.shift()!;
+          return { finalMessage: async () => ({ content: [{ type: "text", text: r.text }], stop_reason: r.stop_reason }) };
+        },
+      },
+    };
+    return { client: client as unknown as ClaudeMessagesClient, requests };
+  };
+
+  it("si se corta por max_tokens reintenta con más presupuesto y valida", async () => {
+    const { client, requests } = fakeClient([
+      { text: '{"items": [1, 2', stop_reason: "max_tokens" },
+      { text: '{"items": [1, 2, 3]}', stop_reason: "end_turn" },
+    ]);
+    const out = await claudeMessagesJson(client, {
+      model: "m", system: "s", prompt: "p", label: "t", maxTokens: 1000,
+      schema: z.object({ items: z.array(z.number()) }),
+    });
+    expect(out).toEqual({ items: [1, 2, 3] });
+    expect(requests.map(r => r.max_tokens)).toEqual([1000, 2000]);
+  });
+
+  it("incluye las imágenes antes del texto", async () => {
+    const { client, requests } = fakeClient([{ text: '{"ok": true}', stop_reason: "end_turn" }]);
+    const image = { type: "image" as const, source: { type: "url" as const, url: "https://x/y.png" } };
+    await claudeMessagesJson(client, { model: "m", system: "s", prompt: "p", label: "t", maxTokens: 100, images: [image] });
+    expect(requests[0].messages[0].content).toEqual([image, { type: "text", text: "p" }]);
+  });
+
+  it("tras dos respuestas inválidas lanza AiJsonError", async () => {
+    const { client } = fakeClient([
+      { text: "no hay json", stop_reason: "end_turn" },
+      { text: "tampoco", stop_reason: "end_turn" },
+    ]);
+    await expect(claudeMessagesJson(client, { model: "m", system: "s", prompt: "p", label: "t", maxTokens: 100 }))
+      .rejects.toBeInstanceOf(AiJsonError);
   });
 });

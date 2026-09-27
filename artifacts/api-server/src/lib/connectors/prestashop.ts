@@ -173,6 +173,7 @@ export class PrestaShopConnector implements IPlatformConnector {
         productCount,
         tokenValid: true,
         error: null,
+        resources,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error desconocido";

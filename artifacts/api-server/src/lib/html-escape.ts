@@ -135,3 +135,28 @@ export function renderHtmlOrText(val: unknown): string {
   if (looksLikeHtml) return sanitizeRichHtml(s);
   return sanitizeHtml(s);
 }
+
+/**
+ * Escapa en profundidad todas las cadenas (valores y claves) de un objeto que
+ * viene de la IA, para interpolarlo en una plantilla HTML sin riesgo de XSS.
+ * Números, booleanos y null se conservan tal cual.
+ */
+export function escapeHtmlDeep<T>(value: T): T {
+  if (typeof value === "string") return sanitizeHtml(value) as T;
+  if (Array.isArray(value)) return value.map(v => escapeHtmlDeep(v)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [sanitizeHtml(k), escapeHtmlDeep(v)]),
+    ) as T;
+  }
+  return value;
+}
+
+/**
+ * Nombre de fuente seguro para `font-family:'…'` dentro de un atributo style:
+ * las entidades HTML se decodifican antes de llegar al CSS, así que escapar no
+ * basta; se dejan solo letras, números, espacios y guiones.
+ */
+export function cssFontName(value: unknown): string {
+  return String(value ?? "").replace(/[^\p{L}\p{N} \-]/gu, "").trim().slice(0, 80);
+}

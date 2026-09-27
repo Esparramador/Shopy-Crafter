@@ -335,16 +335,22 @@ router.post("/webhooks/shopify/orders-paid", async (req: Request, res: Response)
     const secret = process.env.SHOPIFY_WEBHOOK_SECRET ?? "";
     const hmacHeader = (req.headers["x-shopify-hmac-sha256"] as string) ?? "";
 
-    if (secret) {
-      const rawBody: Buffer = (req as any).rawBody ?? Buffer.from(JSON.stringify(req.body));
-      const digest = createHmac("sha256", secret).update(rawBody).digest("base64");
-      const digestBuf = Buffer.from(digest);
-      const headerBuf = Buffer.from(hmacHeader);
-      const valid = digestBuf.length === headerBuf.length && timingSafeEqual(digestBuf, headerBuf);
-      if (!valid) {
-        logger.warn("Shopify webhook HMAC inválido");
-        return void res.status(401).json({ error: "HMAC inválido" });
-      }
+    // SECURITY: fail-closed (como webhook-gateway.ts). Antes, sin SHOPIFY_WEBHOOK_SECRET
+    // se aceptaba cualquier POST y activaba el plan indicado en note_attributes.ref
+    // para cualquier usuario.
+    if (!secret) {
+      logger.error("Shopify orders-paid: SHOPIFY_WEBHOOK_SECRET no configurado — petición rechazada");
+      return void res.status(503).json({ error: "Webhook no configurado" });
+    }
+    const rawBody: Buffer | undefined = (req as unknown as { rawBody?: Buffer }).rawBody;
+    if (!rawBody) return void res.status(400).json({ error: "Falta el cuerpo original" });
+    const digest = createHmac("sha256", secret).update(rawBody).digest("base64");
+    const digestBuf = Buffer.from(digest);
+    const headerBuf = Buffer.from(hmacHeader);
+    const valid = digestBuf.length === headerBuf.length && timingSafeEqual(digestBuf, headerBuf);
+    if (!valid) {
+      logger.warn("Shopify webhook HMAC inválido");
+      return void res.status(401).json({ error: "HMAC inválido" });
     }
 
     const order = req.body as any;

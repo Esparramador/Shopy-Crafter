@@ -1,6 +1,48 @@
 import { logger } from "./logger.js";
-import { askClaudeVisionWithBrain, askClaudeJsonWithBrain, learnFromOperation } from "./claude.js";
+import { askClaudeVisionWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "./claude.js";
 import { askGeminiWithSearch } from "./gemini.js";
+import { askClaudeJsonValidated, generateAiJson, type AiJsonSchema } from "./ai-json.js";
+import { AiTruncatedError } from "./ai-errors.js";
+import { lenientArray, looseString, parseResearchJson } from "./ai-schema.js";
+import { z } from "zod";
+
+type VisionImage = { base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" };
+
+/**
+ * Claude Vision + ShopyBrain con JSON validado: si se corta por max_tokens reintenta
+ * con más presupuesto; si no parsea o no cumple el esquema, reintenta pidiendo
+ * repararlo; si vuelve a fallar, error tipado. (Antes: regex codiciosa y
+ * "limpiezas" con replace que también alteraban el texto de las cadenas.)
+ */
+async function visionJson<T>(opts: {
+  prompt: string;
+  images: VisionImage[];
+  system: string;
+  niche?: string;
+  maxTokens: number;
+  schema: AiJsonSchema<T>;
+  label: string;
+}): Promise<T> {
+  return generateAiJson<T>({
+    prompt: opts.prompt,
+    maxTokens: opts.maxTokens,
+    retryMaxTokens: Math.min(opts.maxTokens * 2, 64000),
+    schema: opts.schema,
+    expect: "object",
+    label: opts.label,
+    call: async ({ prompt, maxTokens }) => {
+      try {
+        const text = await askClaudeVisionWithBrain(0, prompt, opts.images, opts.system, "images", opts.niche, maxTokens, undefined, { failOnTruncation: true });
+        return { text, truncated: false };
+      } catch (err) {
+        if (err instanceof AiTruncatedError) return { text: "", truncated: true };
+        throw err;
+      }
+    },
+  });
+}
+
+const looseRecord = z.record(z.string(), z.unknown());
 
 export interface GarmentSide {
   imageIndex: number;
@@ -21,10 +63,21 @@ export async function detectGarmentSides(
     mediaType: f.mimetype as VisionMediaType,
   }));
 
+  const sidesSchema = z.object({
+    sides: lenientArray(z.object({
+      imageIndex: z.number().int().min(0).max(images.length - 1),
+      side: z.enum(["front", "back"]),
+      reason: z.string().default(""),
+    })).refine(s => s.length === images.length, { message: `se esperaban ${images.length} imágenes` }),
+  });
+
   try {
-    const text = await askClaudeVisionWithBrain(
-      0,
-      `You are analyzing ${images.length} images of a garment (${productCategory || "clothing"}).
+    const parsed = await visionJson({
+      label: "fusion-studio:garment-sides",
+      maxTokens: 8192,
+      schema: sidesSchema,
+      images,
+      prompt: `You are analyzing ${images.length} images of a garment (${productCategory || "clothing"}).
 For EACH image, determine if it shows the FRONT or BACK of the garment.
 
 Front indicators: smaller logo/brand mark on chest, front collar view, buttons/zippers visible from front, main facing side
@@ -32,21 +85,10 @@ Back indicators: larger print/artwork on back, back of collar/neck, back label, 
 
 Return ONLY valid JSON:
 { "sides": [${images.map((_, i) => `{ "imageIndex": ${i}, "side": "front" | "back", "reason": "brief reason" }`).join(", ")}] }`,
-      images,
-      "You are a garment analysis expert specializing in identifying the front and back of clothing items. Be precise.",
-      "images",
-      undefined,
-      8192,
-    );
-
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      const parsed = JSON.parse(match[0]);
-      if (parsed.sides && Array.isArray(parsed.sides)) {
-        logger.info({ sides: parsed.sides }, "Fusion Studio: Garment sides detected");
-        return parsed.sides;
-      }
-    }
+      system: "You are a garment analysis expert specializing in identifying the front and back of clothing items. Be precise.",
+    });
+    logger.info({ sides: parsed.sides }, "Fusion Studio: Garment sides detected");
+    return parsed.sides;
   } catch (err) {
     logger.warn({ err }, "Fusion Studio: Garment side detection failed, using defaults");
   }
@@ -215,6 +257,31 @@ export interface ImageAnalysis {
   };
 }
 
+// Validación de la respuesta de análisis: las listas SIEMPRE son listas (una cadena o
+// un objeto donde se espera array rompía los .map posteriores) y tiene que haber al
+// menos una de las secciones principales. Lo demás pasa tal cual y abajo se rellenan
+// los valores por defecto de lo que falte.
+const optionalRecord = looseRecord.optional().catch(undefined);
+const fusionAnalysisSchema = z.object({
+  sceneClassification: optionalRecord,
+  layers: lenientArray(looseRecord),
+  componentBreakdown: lenientArray(looseRecord),
+  colors: z.object({ dominant: lenientArray(looseString), palette: lenientArray(looseRecord) }).passthrough().optional().catch(undefined),
+  textures: lenientArray(looseRecord),
+  composition: optionalRecord,
+  modelAnalysis: z.unknown().optional(),
+  foodAnalysis: z.unknown().optional(),
+  product: z.object({ estimatedMaterials: lenientArray(looseString) }).passthrough().optional().catch(undefined),
+  visualDna: z.object({ moodBoard: lenientArray(looseString), uniqueElements: lenientArray(looseString) }).passthrough().optional().catch(undefined),
+  productGeneration: z.object({
+    suggestedTags: lenientArray(looseString),
+    seoKeywords: lenientArray(looseString),
+    photoBriefs: lenientArray(z.unknown()),
+  }).passthrough().optional().catch(undefined),
+}).passthrough().refine(a => Boolean(a.product || a.sceneClassification || a.productGeneration), {
+  message: "faltan product, sceneClassification y productGeneration",
+});
+
 export async function analyzeImageForFusion(
   imageBase64: string,
   mimeType: string,
@@ -331,34 +398,15 @@ RESPONDE EXCLUSIVAMENTE con JSON válido:
   "productGeneration": { "suggestedTitle": "...", "suggestedDescription": "...(HTML)...", "suggestedTags": [...], "suggestedCategory": "...", "suggestedPrice": "...", "seoKeywords": [...], "photoBriefs": [...] }
 }`;
 
-  const text = await askClaudeVisionWithBrain(
-    0,
+  const analysis = await visionJson({
+    label: "fusion-studio:analyze-image",
     prompt,
-    allImages,
-    `Eres el Fusion Studio de ShopyBrain — el motor de visión artificial más avanzado del mundo para eCommerce. Extraes el 100% de la información de CUALQUIER imagen: productos, comida, tecnología, moda, joyería, arte, animales, personas. Desglosas cada componente como un plano técnico de ingeniería.`,
-    "images",
-    context?.niche,
-    24000,
-  );
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("No JSON in Fusion Studio response");
-
-  let analysis: ImageAnalysis;
-  try {
-    analysis = JSON.parse(jsonMatch[0]) as ImageAnalysis;
-  } catch (parseErr) {
-    logger.warn({ textPreview: jsonMatch[0].slice(0, 300) }, "Fusion Studio: JSON parse failed, attempting cleanup");
-    const cleaned = jsonMatch[0]
-      .replace(/,\s*([}\]])/g, "$1")
-      .replace(/[\x00-\x1f]/g, " ")
-      .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
-    try {
-      analysis = JSON.parse(cleaned) as ImageAnalysis;
-    } catch {
-      logger.error({ parseErr }, "Fusion Studio: Double parse failure");
-      throw new Error("Fusion Studio: AI returned invalid JSON");
-    }
-  }
+    images: allImages,
+    schema: fusionAnalysisSchema as unknown as AiJsonSchema<ImageAnalysis>,
+    niche: context?.niche,
+    maxTokens: 24000,
+    system: `Eres el Fusion Studio de ShopyBrain — el motor de visión artificial más avanzado del mundo para eCommerce. Extraes el 100% de la información de CUALQUIER imagen: productos, comida, tecnología, moda, joyería, arte, animales, personas. Desglosas cada componente como un plano técnico de ingeniería.`,
+  });
 
   if (!analysis.sceneClassification) analysis.sceneClassification = { type: "product_only", subtype: "", hasModel: false, hasMultipleProducts: false, isFood: false, isTech: false, isFashion: false, isJewelry: false, isArt: false, isAnimal: false, isInfographic: false, renderType: "photo", confidence: 0.5 };
   if (!analysis.componentBreakdown) analysis.componentBreakdown = [];
@@ -413,14 +461,8 @@ export async function researchBrandForFusion(opts: {
 }> {
   const searchName = opts.companyName || opts.url?.replace(/https?:\/\/(www\.)?/, "").split("/")[0] || "brand";
 
-  const parseSafe = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>): Record<string, unknown> | null => {
-    if (r.status !== "fulfilled") return null;
-    try {
-      const text = r.value?.text ?? "";
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-    } catch { return null; }
-  };
+  const parseSafe = (r: PromiseSettledResult<{ text: string; sources: string[]; queries: string[] }>): Record<string, unknown> | null =>
+    r.status === "fulfilled" ? parseResearchJson(r.value?.text ?? "", looseRecord, "fusion-studio:brand-research") : null;
 
   logger.info({ searchName, url: opts.url, instagram: opts.instagram }, "Fusion Studio: Starting brand research with 4 parallel Gemini searches");
 
@@ -458,6 +500,15 @@ export async function researchBrandForFusion(opts: {
   };
 }
 
+const photoSettingsSchema = z.object({
+  lighting: z.string().min(1),
+  background: z.string().min(1),
+  perspective: z.string().min(1),
+  props: lenientArray(looseString),
+  colorGrading: z.string().min(1),
+  reasoning: z.string().default(""),
+});
+
 export async function autoSuggestPhotoSettings(
   productAnalysis: ImageAnalysis,
   brandDna: Record<string, unknown> | null,
@@ -487,11 +538,17 @@ Return JSON:
   "reasoning": "Brief explanation of why these settings work for this product+brand"
 }`;
 
-  const text = await askClaudeVisionWithBrain(0, prompt, [], undefined, "images", undefined, 8192);
+  // Sin imágenes: no hace falta visión. Si la IA falla tras el reintento se usan los
+  // ajustes por defecto, marcados como tales en "reasoning" (y queda en el registro).
   try {
-    const match = text.match(/\{[\s\S]*\}/);
-    return match ? JSON.parse(match[0]) : { lighting: "studio-3pt", background: "white-pure", perspective: "3/4 (45°)", props: [], colorGrading: "neutral", reasoning: "Default settings" };
-  } catch {
+    return await askClaudeJsonValidated(0, prompt, SHOPIFY_EXPERT_SYSTEM, {
+      schema: photoSettingsSchema,
+      useCase: "images",
+      maxTokens: 8192,
+      label: "fusion-studio:auto-suggest-photo-settings",
+    });
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, "Fusion Studio: sugerencia de ajustes fallida, se usan los de por defecto");
     return { lighting: "studio-3pt", background: "white-pure", perspective: "3/4 (45°)", props: [], colorGrading: "neutral", reasoning: "Default settings" };
   }
 }

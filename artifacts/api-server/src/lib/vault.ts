@@ -169,6 +169,11 @@ interface VaultFileParams {
   generatedBy?: string;
   metadata?: Record<string, unknown>;
   content?: string;
+  /**
+   * Binario ya en memoria (vídeos de ffmpeg, etc.). Si cabe en la columna se guarda
+   * como base64 en `content`; si no, se sube a Object Storage como el resto.
+   */
+  buffer?: Buffer;
 }
 
 // Registra un archivo generado en el vault del proyecto
@@ -226,6 +231,18 @@ export async function saveToVault(params: VaultFileParams): Promise<number | nul
           { err, projectId: params.projectId, url: sourceUrl.slice(0, 120), mime: params.mimeType },
           "Error downloading binary at save time — will rely on originalUrl (CONTENIDO PUEDE EXPIRAR)"
         );
+      }
+    }
+
+    // Binario pasado directamente (antes varios callers de fs-pro lo pasaban como
+    // `buffer`, un campo que no existía, y el vídeo no se guardaba).
+    if (params.buffer && params.buffer.length > 0 && !params.content && !params.objectPath && !pendingLargeBuffer) {
+      const maxBytes = getMaxBytesFor(params.mimeType);
+      if (params.buffer.length <= maxBytes) {
+        params = { ...params, content: params.buffer.toString("base64"), fileSizeBytes: params.buffer.length };
+      } else {
+        pendingLargeBuffer = params.buffer;
+        params = { ...params, fileSizeBytes: params.buffer.length };
       }
     }
 

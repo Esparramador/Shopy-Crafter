@@ -1115,7 +1115,8 @@ export async function askGeminiVisionJson<T = unknown>(
   );
 
   const cand = response.candidates?.[0];
-  if ((cand as any)?.finishReason === "MAX_TOKENS") {
+  const visionTruncated = (cand as any)?.finishReason === "MAX_TOKENS";
+  if (visionTruncated) {
     logger.warn({ model, images: images.length }, "[Gemini Vision JSON] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens");
   }
 
@@ -1135,6 +1136,12 @@ export async function askGeminiVisionJson<T = unknown>(
     });
   } catch { /* never blocks */ }
 
+  // Un JSON cortado no se parsea ni se "repara": error tipado para que quien llama
+  // use su respaldo sabiendo el motivo.
+  if (visionTruncated) {
+    const { AiTruncatedError } = await import("./ai-errors.js");
+    throw new AiTruncatedError(`[askGeminiVisionJson(${model})] Respuesta cortada por maxOutputTokens`, { label: "askGeminiVisionJson", model });
+  }
   const text = response.text ?? "{}";
   try {
     return JSON.parse(text) as T;

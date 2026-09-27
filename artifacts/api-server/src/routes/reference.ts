@@ -13,6 +13,7 @@ import { Router } from "express";
 import { askClaudeWithVision, claude, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude.js";
 import { ingestImageKnowledge, ingestVideoKnowledge } from "../lib/brain-ingester.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 
 const router = Router();
 
@@ -181,33 +182,11 @@ router.post("/reference/analyze-image", async (req, res): Promise<void> => {
       const pid = typeof projectId === "number" && projectId > 0 ? projectId : 0;
       let intelligence: string;
   
-      if (pid > 0) {
-        intelligence = await askClaudeWithVision(pid, prompt, validImages, IMAGE_ANALYSIS_SYSTEM, 3000);
-      } else {
-        const client = (await import("@anthropic-ai/sdk")).default;
-        const ant = new client({ apiKey: process.env.ANTHROPIC_API_KEY });
-        const stream = ant.messages.stream(
-          {
-            model: "claude-sonnet-4-5",
-            max_tokens: 16000,
-            system: IMAGE_ANALYSIS_SYSTEM,
-            messages: [{
-              role: "user",
-              content: [
-                ...validImages.map((img) => ({
-                  type: "image" as const,
-                  source: { type: "base64" as const, media_type: img.mediaType, data: img.base64 },
-                })),
-                { type: "text" as const, text: prompt },
-              ],
-            }],
-          },
-          { signal: AbortSignal.timeout(180_000) }
-        );
-        const resp = await stream.finalMessage();
-        const c = resp.content[0];
-        intelligence = c.type === "text" ? c.text : "";
-      }
+      // Antes: con proyecto, 3000 tokens (el análisis se cortaba y se guardaba en el
+      // Brain a medias); sin proyecto, un cliente propio solo con ANTHROPIC_API_KEY (con
+      // la integración de Replit fallaba). Ahora el mismo cliente para ambos (proyecto
+      // o global), 16000 tokens y error tipado si aun así se corta.
+      intelligence = await askClaudeWithVision(pid, prompt, validImages, IMAGE_ANALYSIS_SYSTEM, 16000, 180_000, { failOnTruncation: true });
   
       // ── AUTO-INGEST TO SHOPYBRAIN ──────────────────────────────────────────
       ingestImageKnowledge({
@@ -225,6 +204,7 @@ router.post("/reference/analyze-image", async (req, res): Promise<void> => {
       });
     } catch (err: any) {
       console.error("[reference/analyze-image]", err);
+      if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code }); return; }
       res.status(500).json({ error: err.message ?? "Error al analizar la imagen" });
     }
   } catch (err: any) {
@@ -420,7 +400,9 @@ router.post("/reference/analyze-video", async (req, res): Promise<void> => {
   Responde en español. Sé exhaustivo, técnico y estratégico. Este análisis alimenta directamente el megacerebro ShopyBrain.`;
   
     try {
-      const intelligence = await claude(prompt, 4000);
+      // Antes 4000 tokens para un análisis "exhaustivo": se cortaba y se guardaba en el
+      // Brain a medias. Ahora 16000 y error tipado si aun así se corta.
+      const intelligence = await claude(prompt, 16000, { failOnTruncation: true });
   
       // ── AUTO-INGEST TO SHOPYBRAIN ────────────────────────────────────────────
       ingestVideoKnowledge({
@@ -440,6 +422,7 @@ router.post("/reference/analyze-video", async (req, res): Promise<void> => {
       });
     } catch (err: any) {
       console.error("[reference/analyze-video]", err);
+      if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code }); return; }
       res.status(500).json({ error: err.message ?? "Error al analizar el vídeo" });
     }
   } catch (err: any) {

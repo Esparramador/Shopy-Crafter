@@ -18,7 +18,34 @@ import { logger } from "../lib/logger.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { askGeminiWithSearch, askGeminiChat } from "../lib/gemini.js";
-import { askClaudeJson } from "../lib/claude.js";
+import { askClaudeDetailed } from "../lib/claude.js";
+import { generateAiJson, type AiJsonCaller } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { lenientArray, looseString } from "../lib/ai-schema.js";
+import { z } from "zod";
+
+const viralScriptSchema = z.object({
+  title: z.string().min(1),
+  titleAlternatives: lenientArray(looseString),
+  description: z.string().default(""),
+  tags: lenientArray(looseString),
+  hook: z.string().default(""),
+  script: z.string().min(1),
+  voiceoverText: z.string().default(""),
+  visualPrompt: z.string().default(""),
+  thumbnailPrompt: z.string().default(""),
+  callToAction: z.string().default(""),
+  contentTechniques: lenientArray(looseString),
+  viralSignals: z.object({
+    hasStrongHook: z.boolean().catch(false),
+    hasEmotionalPeak: z.boolean().catch(false),
+    hasConflict: z.boolean().catch(false),
+    hasPracticalValue: z.boolean().catch(false),
+    hasStoryArc: z.boolean().catch(false),
+  }).optional().catch(undefined),
+  shortsVersion: z.string().default(""),
+  postingRecommendation: z.string().default(""),
+}).passthrough();
 import {
   VIDEO_FORMATS, COMEDY_PROMPTS, HOOK_FRAMEWORKS, SECTOR_STRATEGIES,
   ALGORITHM_SIGNALS, TITLE_PATTERNS, VIRALITY_SIGNALS, buildYouTubeExpertPrompt,
@@ -359,40 +386,59 @@ Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks):
 }`;
 
   try {
-    let script: any = null;
-    let engineUsed = engine;
+    let engineUsed: string = engine;
+    let call: AiJsonCaller;
 
     if (engine === "grok") {
       const xaiKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
       if (!xaiKey) { res.status(500).json({ error: "XAI_API_KEY no configurada — ve a Secrets y verifica que existe la variable XAI_API_KEY con tu clave de api.x.ai" }); return; }
       const grokModel = process.env.GROK_MODEL || "grok-3";
-      const grokRes = await fetch("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${xaiKey}` },
-        body: JSON.stringify({
-          model: grokModel, messages: [{ role: "user", content: PROMPT }],
-          temperature: 0.9, max_tokens: 5000,
-        }),
-      });
-      if (!grokRes.ok) {
-        const errText = await grokRes.text().catch(() => "");
-        throw new Error(`Grok API error (${grokRes.status}): ${errText.slice(0, 300)}`);
-      }
-      const grokData = await grokRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-      const raw = grokData.choices?.[0]?.message?.content || "";
-      script = JSON.parse(raw.replace(/```json|```/g, "").trim());
       engineUsed = grokModel;
-
+      call = async ({ prompt, maxTokens }) => {
+        const grokRes = await fetch("https://api.x.ai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${xaiKey}` },
+          body: JSON.stringify({
+            model: grokModel, messages: [{ role: "user", content: prompt }],
+            temperature: 0.9, max_tokens: maxTokens,
+          }),
+        });
+        if (!grokRes.ok) {
+          const errText = await grokRes.text().catch(() => "");
+          throw new Error(`Grok API error (${grokRes.status}): ${errText.slice(0, 300)}`);
+        }
+        const grokData = await grokRes.json() as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }> };
+        const choice = grokData.choices?.[0];
+        return { text: choice?.message?.content || "", truncated: choice?.finish_reason === "length" };
+      };
     } else if (engine === "gemini") {
-      const result = await askGeminiChat([{ role: "user", content: PROMPT }]);
-      const raw = typeof result === "string" ? result : (result as any).text || "";
-      script = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      // askGeminiChat usa 2048 tokens por defecto: el guion (14 campos) se cortaba.
+      call = async ({ prompt, maxTokens }) => ({
+        text: await askGeminiChat([{ role: "user", content: prompt }], undefined, { maxOutputTokens: maxTokens }),
+        truncated: false,
+      });
       engineUsed = "gemini";
-
     } else {
-      script = await (askClaudeJson as any)(PROMPT);
+      // Antes: askClaudeJson(PROMPT), con el prompt en el lugar del projectId y sin
+      // prompt: el motor por defecto fallaba siempre.
+      call = async ({ prompt, maxTokens }) => {
+        const r = await askClaudeDetailed(0, [{ role: "user", content: prompt }], undefined, maxTokens);
+        return { text: r.text, truncated: r.truncated };
+      };
       engineUsed = "claude";
     }
+
+    // Los tres motores: extracción balanceada + esquema + un reintento (antes
+    // JSON.parse directo tras quitar los ``` : cualquier texto alrededor lo rompía).
+    const script = await generateAiJson({
+      call,
+      prompt: PROMPT,
+      maxTokens: 6000,
+      retryMaxTokens: 12000,
+      schema: viralScriptSchema,
+      expect: "object",
+      label: `viral/script:${engineUsed}`,
+    });
 
     // Auto-calculate virality score if signals present
     let viralScore: any = null;
@@ -412,6 +458,7 @@ Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks):
     res.json({ success: true, script, engineUsed, viralScore });
   } catch (err: any) {
     logger.error({ err }, "viral/script failed");
+    if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code }); return; }
     res.status(500).json({ error: err?.message || "Error generando guión" });
   }
 });

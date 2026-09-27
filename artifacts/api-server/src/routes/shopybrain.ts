@@ -11,10 +11,15 @@ import { buildMasterSkillsBlock } from "../lib/master-skills-injector.js";
 import { buildPricingBlock } from "../lib/platform-knowledge.js";
 import { shopifyRequest, shopifyGraphQL, refreshToken, getShopifyHeaders, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify.js";
 import { safeDecrypt } from "../lib/crypto.js";
-import { learnFromOperation, askClaude, askClaudeWithUsage, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
+import { learnFromOperation, askClaude, askClaudeDetailed, askClaudeWithUsage, askClaudeJsonWithBrain, askClaudeWithBrain, buildBrandDnaContext, buildShopyBrainContext, SHOPIFY_EXPERT_SYSTEM as CLAUDE_EXPERT_SYSTEM } from "../lib/claude.js";
 import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
+import { cssFontName, escapeHtmlDeep, sanitizeHtml } from "../lib/html-escape.js";
+import { askClaudeJsonValidated, generateAiJson } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
+import { z } from "zod";
 import { saveToVault } from "../lib/vault.js";
 import { buildCoverPage } from "../lib/report-cover.js";
 import { analyzeImageForFusion } from "../lib/fusion-studio.js";
@@ -25,6 +30,7 @@ import {
   getSessionProjectId,
   fetchImageWithSizeLimit,
   requireConfirmation,
+  isConfirmed,
   validateFixCodePath,
   normalizeListDirectory,
 } from "../lib/shopybrain-helpers.js";
@@ -43,6 +49,10 @@ function handleRouteError(res: any, err: any): void {
         ? "La tienda de Shopify no está disponible. Verifica el estado de tu tienda en el panel de Shopify."
         : "La conexión con Shopify expiró. Reconecta tu tienda en Configuración.";
     res.status(422).json({ error: userMsg, shopify_auth_error: true });
+    return;
+  }
+  if (isAiOutputError(err)) {
+    res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code });
     return;
   }
   const msg = err instanceof Error ? err.message : "Internal server error";
@@ -135,6 +145,71 @@ function resolveFilePath(filePath: string): string | null {
 
 const router = Router();
 
+// modify_ui: cambios de código propuestos por la IA.
+const uiChangesSchema = z.object({
+  files: z.array(z.object({
+    filePath: z.string().min(1),
+    changes: z.array(z.object({
+      oldCode: z.string().min(1),
+      newCode: z.string(),
+      description: z.string().optional().catch(undefined),
+    })).min(1),
+  })).min(1),
+  summary: z.string().optional().catch(undefined),
+});
+
+// Sesión de estudio (/shopybrain/study).
+const scoreField = (fallback: number) => optionalLooseNumber.transform(n => Math.max(0, Math.min(1, n ?? fallback)));
+const studySessionSchema = z.object({
+  insights: lenientArray(z.object({
+    domain: z.string().min(1).optional().catch(undefined),
+    insightType: z.string().min(1).catch("principle"),
+    title: z.string().min(1),
+    insight: z.string().min(1),
+    evidence: z.string().optional().catch(undefined),
+    confidence: scoreField(0.6),
+    impactScore: scoreField(0.5),
+    relatedDomains: lenientArray(looseString),
+  })).refine(a => a.length > 0, { message: "sin insights válidos" }),
+  summary: z.string().optional().catch(undefined),
+  keyDiscoveries: lenientArray(looseString),
+});
+
+// Brand book (execute-action generate_brand_book). Lo mínimo para no renderizar un
+// manual vacío; el resto de secciones pasan tal cual y el render ya tolera que falten.
+const brandBookSchema = z.object({
+  brandName: z.string().min(1),
+  tagline: z.string().default(""),
+  mission: z.string().min(1),
+  vision: z.string().default(""),
+  brandStory: z.string().min(1),
+  values: z.array(z.object({
+    name: z.string(),
+    description: z.string().default(""),
+    icon: z.string().default(""),
+  }).passthrough()).min(1),
+  colorPalette: z.array(z.object({
+    name: z.string(),
+    hex: z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "hex inválido"),
+    usage: z.string().default(""),
+    psychology: z.string().default(""),
+  }).passthrough()).min(1),
+}).passthrough();
+
+// Precio de mercado con Gemini + búsqueda. Antes se usaba sin validar: un
+// "suggestedPrice" en texto ("29,99") hacía fallar el .toFixed() de quien lo usa.
+const realPricingSchema = z.object({
+  competitorPrices: lenientArray(z.object({
+    source: looseString,
+    price: looseNumber.transform(String),
+    url: z.string().optional().catch(undefined),
+  })),
+  marketPriceRange: z.object({ min: looseNumber, max: looseNumber, median: looseNumber }).optional().catch(undefined),
+  suggestedPrice: optionalLooseNumber,
+  suggestedCompareAtPrice: optionalLooseNumber,
+  pricingStrategy: z.string().optional().catch(undefined),
+});
+
 async function researchRealPricing(productTitle: string, productType: string, niche: string, currentPrice?: string): Promise<{
   marketPriceRange: { min: number; max: number; median: number };
   competitorPrices: Array<{ source: string; price: string; url?: string }>;
@@ -182,15 +257,12 @@ RESPONDE con este formato JSON exacto (sin texto adicional):
       `You are a pricing analyst. Search for REAL current prices of similar products online. Always use Google Search to find actual prices from real stores. Return ONLY valid JSON.`
     );
 
-    const jsonMatch = geminiResult.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return defaultResult;
-
-    let parsed: any;
-    try { parsed = JSON.parse(jsonMatch[0]); } catch { return defaultResult; }
+    const parsed = parseResearchJson(geminiResult.text, realPricingSchema, "shopybrain/researchRealPricing");
+    if (!parsed) return defaultResult;
     const result = {
       marketPriceRange: parsed.marketPriceRange ?? defaultResult.marketPriceRange,
-      competitorPrices: parsed.competitorPrices ?? [],
-      suggestedPrice: parsed.suggestedPrice ?? (currentPrice ? parseFloat(currentPrice) : 0),
+      competitorPrices: parsed.competitorPrices,
+      suggestedPrice: parsed.suggestedPrice ?? defaultResult.suggestedPrice,
       suggestedCompareAtPrice: parsed.suggestedCompareAtPrice ?? 0,
       pricingStrategy: parsed.pricingStrategy ?? "",
       sources: geminiResult.sources || [],
@@ -1983,8 +2055,10 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           16000
         );
       } else {
+        // Sin proyecto activo: contexto global (0). Antes se usaba el proyecto 2 fijo,
+        // con su ADN de marca y, si la tenía, su propia API key de Anthropic.
         aiContent = await askClaudeWithBrain(
-          2,
+          0,
           [{ role: "user", content: query }],
           researchSystemPrompt,
           "general",
@@ -2094,35 +2168,30 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
   Responde SOLO con el JSON, sin texto adicional.`;
   
     const studyQuery = `Realiza sesión de estudio para dominios: ${domainsToStudy.join(", ")}`;
-    const rawText = await askClaudeWithBrain(
-      2,
-      [{ role: "user", content: studyQuery }],
-      systemPrompt,
-      "general",
-      undefined,
-      16000
-    );
-    let parsed: any = {};
-    try {
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-    } catch {}
-  
+    // Contexto global (0), no el proyecto 2 fijo de antes. JSON validado: antes un fallo
+    // de parseo registraba una sesión "completada" con 0 insights; ahora 502.
+    const parsed = await askClaudeJsonValidated(0, studyQuery, systemPrompt, {
+      schema: studySessionSchema,
+      useCase: "general",
+      maxTokens: 16000,
+      label: "shopybrain/study",
+    });
+
     const sessionId = randomBytes(16).toString("hex");
     let insightsCreated = 0;
   
-    if (parsed.insights?.length) {
+    if (parsed.insights.length) {
       for (const insight of parsed.insights) {
         await db.insert(omnicoreInsightsTable).values({
           id: randomBytes(16).toString("hex"),
           domain: insight.domain ?? domainsToStudy[0],
-          insightType: insight.insightType ?? "principle",
-          title: insight.title ?? "Insight",
-          insight: insight.insight ?? "",
+          insightType: insight.insightType,
+          title: insight.title,
+          insight: insight.insight,
           evidence: insight.evidence ?? null,
           confidence: insight.confidence ?? 0.6,
           impactScore: insight.impactScore ?? 0.5,
-          relatedDomains: insight.relatedDomains ? JSON.stringify(insight.relatedDomains) : null,
+          relatedDomains: insight.relatedDomains.length ? JSON.stringify(insight.relatedDomains) : null,
           source: "study_session",
         });
         insightsCreated++;
@@ -2145,8 +2214,8 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
       durationSeconds: Math.round((Date.now() - startTime) / 1000),
       insightsCreated,
       summary: parsed.summary ?? `Sesión de estudio completada para ${domainsToStudy.length} dominios`,
-      keyDiscoveries: parsed.keyDiscoveries ? JSON.stringify(parsed.keyDiscoveries) : null,
-      tokensUsed: rawText.length,
+      keyDiscoveries: parsed.keyDiscoveries.length ? JSON.stringify(parsed.keyDiscoveries) : null,
+      tokensUsed: JSON.stringify(parsed).length,
     });
   
     res.json({
@@ -2154,7 +2223,7 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
       sessionId,
       insightsCreated,
       summary: parsed.summary,
-      keyDiscoveries: parsed.keyDiscoveries ?? [],
+      keyDiscoveries: parsed.keyDiscoveries,
       durationMs: Date.now() - startTime,
     });
   } catch (err: any) {
@@ -5137,7 +5206,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const backupPath = `${resolvedPath}.bak.${Date.now()}`;
           fs.writeFileSync(backupPath, fileContent, "utf-8");
   
-          const newContent = fileContent.replace(oldCode, newCode);
+          // Función como reemplazo: con una cadena, "$&", "$'" o "$1" del código nuevo
+          // se interpretaban como patrones de String.replace y corrompían el archivo.
+          const newContent = fileContent.replace(oldCode, () => newCode);
           fs.writeFileSync(resolvedPath, newContent, "utf-8");
   
           const changedLines = newCode.split("\n").length;
@@ -6555,14 +6626,22 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             };
             const fmt = STORY_FORMATS[format] || STORY_FORMATS.manifesto;
             const { askClaudeWithBrain: acwb } = await import("../lib/claude.js");
-            const storyContent = await acwb(parseInt(String(projectId)), [{ role: "user", content: `${brandContext}\n\n${fmt.prompt}` }], `Eres un copywriter de marca de élite especializado en storytelling auténtico. Tu trabajo es crear narrativas que conecten emocionalmente, no textos de marketing genéricos.`, "content", proj.storeNiche ?? undefined, 4000);
+            const storyContent = await acwb(parseInt(String(projectId)), [{ role: "user", content: `${brandContext}\n\n${fmt.prompt}` }], `Eres un copywriter de marca de élite especializado en storytelling auténtico. Tu trabajo es crear narrativas que conecten emocionalmente, no textos de marketing genéricos.`, "brand_analysis", proj.storeNiche ?? undefined, 4000);
             result = {
               message: `✍️ **${fmt.name}** generado para **${proj.name}**\n\n---\n\n${storyContent}\n\n---\n\n💡 *Disponible como DOCX descargable — usa \`generate_office_document\` con el contenido anterior para crear el archivo.*`,
               storyContent,
               format,
               brandName: proj.name,
             };
-            await learnFromOperation(parseInt(String(projectId)), `Brand Story generado: ${fmt.name} en ${langLabel}`, "content_generation");
+            // Antes: learnFromOperation(projectId, texto, tipo), firma inexistente → TypeError
+            // después de generar la historia, y el usuario veía "❌ Error".
+            learnFromOperation({
+              operationType: "brand_story",
+              niche: proj.storeNiche ?? undefined,
+              title: `Brand Story generado: ${fmt.name} en ${langLabel}`,
+              content: storyContent.slice(0, 4000),
+              sourceProjectId: parseInt(String(projectId)),
+            });
           } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
           break;
         }
@@ -7927,44 +8006,31 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   }`;
   
             const modifyUiProjectId = getSessionProjectId(req, params);
-            const uiText = await askClaudeWithBrain(
-              modifyUiProjectId,
-              [{ role: "user", content: analyzePrompt }],
-              "Eres un experto frontend senior. Responde SOLO JSON válido. Los paths de archivo son relativos desde src/ sin incluir src/ al inicio.",
-              "general",
-              undefined,
-              3000
-            );
-            // HIGH-1: parsing robusto de JSON con fallback en cascada
-            let uiJson: { files?: Array<{ filePath: string; changes: Array<{ oldCode: string; newCode: string; description?: string }> }>; summary?: string } = {};
+            // Antes: 3000 tokens (el JSON de cambios se cortaba) y una cascada de
+            // JSON.parse/regex. Ahora esquema (oldCode no vacío: con "" el replace
+            // insertaba el código al principio del archivo), reintento y error tipado.
+            let uiJson: z.output<typeof uiChangesSchema>;
             try {
-              uiJson = JSON.parse(uiText);
-            } catch {
-              const m = uiText.match(/\{[\s\S]*\}/);
-              if (m) {
-                try { uiJson = JSON.parse(m[0]); }
-                catch {
-                  const cleaned = uiText.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
-                  try { uiJson = JSON.parse(cleaned); }
-                  catch {
-                    result = { error: true, message: `❌ Claude devolvió JSON inválido. Respuesta (primeros 300 chars): ${uiText.slice(0, 300)}` };
-                    break;
-                  }
-                }
-              } else {
-                result = { error: true, message: `❌ Claude no devolvió JSON. Respuesta (primeros 300 chars): ${uiText.slice(0, 300)}` };
-                break;
-              }
+              uiJson = await askClaudeJsonValidated(
+                modifyUiProjectId,
+                analyzePrompt,
+                "Eres un experto frontend senior. Responde SOLO JSON válido. Los paths de archivo son relativos desde src/ sin incluir src/ al inicio.",
+                { schema: uiChangesSchema, useCase: "general", maxTokens: 8000, label: "shopybrain/modify_ui" },
+              );
+            } catch (aiErr) {
+              if (!isAiOutputError(aiErr)) throw aiErr;
+              result = { error: true, message: `❌ ${aiOutputErrorMessage(aiErr)} No se ha modificado ningún archivo.` };
+              break;
             }
-  
+
             let changesApplied = 0;
             const appliedFiles: string[] = [];
             const failedFiles: string[] = [];
             const failedChanges: string[] = [];
   
-            if (uiJson.files) {
+            {
               for (const file of uiJson.files) {
-                const rawPath = String(file.filePath).replace(/^src\//, "");
+                const rawPath = file.filePath.replace(/^src\//, "");
 
                 // FIX CRIT-1 bis: aplicar también whitelist en modify_ui (no solo fix_code)
                 const pathToValidate = rawPath.startsWith("src/") ? rawPath : `src/${rawPath}`;
@@ -7985,9 +8051,11 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                 }
                 let content = fs.readFileSync(fullPath, "utf-8");
                 let fileChanged = false;
-                for (const ch of file.changes || []) {
+                for (const ch of file.changes) {
                   if (content.includes(ch.oldCode)) {
-                    content = content.replace(ch.oldCode, ch.newCode);
+                    // Función como reemplazo: con una cadena, "$&", "$'" o "$1" del código
+                    // nuevo se interpretaban como patrones especiales de String.replace.
+                    content = content.replace(ch.oldCode, () => ch.newCode);
                     changesApplied++;
                     fileChanged = true;
                   } else {
@@ -8146,14 +8214,14 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               result = { error: true, message: `❌ No se encontró el bloque a reemplazar en '${assetKey}'. Usa read_theme_file para ver el contenido actual y copia el texto EXACTO.` };
               break;
             }
-            finalContent = currentContent.replace(oldCode, newCode);
+            finalContent = currentContent.replace(oldCode, () => newCode);
             changeLog.push(`Bloque reemplazado (${oldCode.length} chars → ${newCode.length} chars)`);
           } else if (editType === "add_css") {
             finalContent = currentContent.trimEnd() + "\n\n/* " + (description ?? "Añadido por Shopy Crafter") + " */\n" + newCode.trim() + "\n";
             changeLog.push("CSS añadido al final del archivo");
           } else if (editType === "modify_section") {
             if (oldCode && currentContent.includes(oldCode)) {
-              finalContent = currentContent.replace(oldCode, newCode);
+              finalContent = currentContent.replace(oldCode, () => newCode);
               changeLog.push("Sección modificada (replace_block)");
             } else {
               const mergeResult = intelligentMerge(currentContent, description ?? "", newCode, fileInfo.type);
@@ -8169,7 +8237,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             changeLog.push("Contenido reemplazado completamente");
           } else {
             if (oldCode && currentContent.includes(oldCode)) {
-              finalContent = currentContent.replace(oldCode, newCode);
+              finalContent = currentContent.replace(oldCode, () => newCode);
               changeLog.push("Smart edit: bloque encontrado y reemplazado");
             } else if (fileInfo.type === "css") {
               finalContent = currentContent.trimEnd() + "\n\n" + newCode.trim() + "\n";
@@ -11479,7 +11547,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               analysisPrompt = `El usuario quiere subir/procesar un archivo con la siguiente descripción: "${fileContext}"\n\nOrientale sobre:\n1. Cómo puede subir el archivo al chat\n2. Qué puede hacer el sistema con ese tipo de archivo\n3. Qué información puede extraer automáticamente`;
             }
 
-            const analysis = await (askClaude as any)(analysisPrompt, { maxTokens: 2000 });
+            // Antes: askClaude(analysisPrompt, { maxTokens }) con los argumentos cambiados
+            // (el texto como projectId): el análisis de archivos fallaba siempre.
+            const analysis = await askClaude(getSessionProjectId(req, params), [{ role: "user", content: analysisPrompt }], undefined, 2000);
 
             result = {
               fileName,
@@ -11692,7 +11762,6 @@ ${buildCoverPage({ reportTitle, reportSubtitle: `Investigación generada por IA 
               } catch { /* no hay DNA, continuar */ }
             }
 
-            const { askClaude: ask } = await import("../lib/claude.js");
             const { buildCoverPage } = await import("../lib/report-cover.js");
             const reportDate = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -11721,29 +11790,35 @@ Responde SIEMPRE en formato JSON válido con esta estructura exacta:
   "messagingFramework": {"valueProposition": "propuesta de valor principal", "keyMessages": ["mensaje1","mensaje2","mensaje3"], "elevator": "pitch de 30 segundos", "headlines": ["titular1","titular2","titular3"]},
   "competitivePositioning": {"position": "posicionamiento diferencial", "differentiators": ["diferenciador1","diferenciador2","diferenciador3"], "competitors": [{"name": "competidor", "difference": "cómo nos diferenciamos"}]}
 }`;
-            const brandBookData = await ask(
-              projectId || 0,
-              [{ role: "user" as const, content: `Genera un brand book completo para:
+            const brandBookPrompt = `Genera un brand book completo para:
 Marca: ${brandName}
 Sector: ${industry || "e-commerce / Shopify"}
 ${customNotes ? `Información adicional: ${customNotes}` : ""}
 ${brandContext ? `\nBrand DNA extraído de la empresa:\n${brandContext.slice(0, 3000)}` : ""}
 
-Genera contenido específico, detallado y profesional. NO uses placeholders genéricos.` }],
-              brandBookSystem,
-              4000,
-              undefined,
-              { tier: "smart" as any },
-            );
+Genera contenido específico, detallado y profesional. NO uses placeholders genéricos.`;
 
-            // Parsear JSON del brand book
-            let bb: Record<string, any> = {};
-            try {
-              const jsonMatch = brandBookData.match(/\{[\s\S]*\}/);
-              if (jsonMatch) bb = JSON.parse(jsonMatch[0]);
-            } catch { bb = { brandName, tagline: "", mission: "", vision: "", brandStory: "", values: [], archetype: {}, personality: [], toneOfVoice: {}, colorPalette: [], typography: {}, logoGuidelines: {}, imagery: {}, contentPillars: [], targetAudience: {}, socialMedia: {}, messagingFramework: {}, competitivePositioning: {} }; }
+            // Antes: 4000 tokens para todo el JSON (se cortaba) y, si no parseaba, se
+            // renderizaba y guardaba en el Vault un brand book vacío con solo el nombre.
+            const bbRaw: Record<string, any> = await generateAiJson({
+              prompt: brandBookPrompt,
+              maxTokens: 8000,
+              retryMaxTokens: 16000,
+              schema: brandBookSchema,
+              expect: "object",
+              label: "shopybrain/generate_brand_book",
+              call: async ({ prompt, maxTokens }) => {
+                const r = await askClaudeDetailed(projectId || 0, [{ role: "user", content: prompt }], brandBookSystem, maxTokens, undefined, { tier: "smart" }, "generate_brand_book");
+                return { text: r.text, truncated: r.truncated };
+              },
+            });
 
             // ─── Render HTML del Brand Book ───────────────────────────────
+            // Todo lo que viene de la IA o del usuario se escapa antes de entrar en el
+            // HTML (se guarda en el Vault y se sirve como text/html). La portada ya
+            // escapa por su cuenta, así que a buildCoverPage se le pasan los valores crudos.
+            const bb: Record<string, any> = escapeHtmlDeep(bbRaw);
+            const safeBrandName = sanitizeHtml(brandName);
             const colors = (bb.colorPalette || []) as Array<{hex:string;name:string;usage:string;psychology:string}>;
             const values = (bb.values || []) as Array<{icon:string;name:string;description:string}>;
             const pillars = (bb.contentPillars || []) as Array<{pillar:string;percentage:string;description:string;examples:string[]}>;
@@ -11798,7 +11873,7 @@ Genera contenido específico, detallado y profesional. NO uses placeholders gen�
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Brand Book — ${bb.brandName || brandName}</title>
+  <title>Brand Book — ${bb.brandName || safeBrandName}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
@@ -11838,15 +11913,15 @@ Genera contenido específico, detallado y profesional. NO uses placeholders gen�
 <body>
 
 <!-- ── PORTADA ── -->
-${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName || brandName} · Manual de Identidad de Marca`, companyName: bb.brandName || brandName, date: reportDate, template: "prestige", includeBackCover: false })}
+${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bbRaw.brandName || brandName} · Manual de Identidad de Marca`, companyName: bbRaw.brandName || brandName, date: reportDate, template: "prestige", includeBackCover: false })}
 
 <!-- ── HERO ── -->
 <div class="hero">
   <div class="bb-section" style="padding:0;max-width:800px">
     <div class="section-tag">Brand Book · Identidad de Marca</div>
-    <h1>${bb.brandName || brandName}</h1>
+    <h1>${bb.brandName || safeBrandName}</h1>
     <div class="tagline">"${bb.tagline || ""}"</div>
-    <p style="max-width:600px;margin:0 auto;text-align:center;font-size:15px;color:#9a9080">${(bb.mission || "").slice(0, 200)}</p>
+    <p style="max-width:600px;margin:0 auto;text-align:center;font-size:15px;color:#9a9080">${sanitizeHtml((bbRaw.mission || "").slice(0, 200))}</p>
   </div>
 </div>
 
@@ -11917,9 +11992,9 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
   <div style="margin-top:40px">
     <h3>Sistema Tipográfico</h3>
     <div class="grid-3">
-      ${(bb.typography?.primary ? `<div class="card"><div class="section-tag">Principal</div><div class="font-sample" style="font-family:'${bb.typography.primary.name}',serif">${bb.typography.primary.name}</div><div class="font-meta">Pesos: ${(bb.typography.primary.weights||[]).join(", ")}<br>${bb.typography.primary.usage}</div></div>` : "")}
-      ${(bb.typography?.secondary ? `<div class="card"><div class="section-tag">Secundaria</div><div class="font-sample" style="font-family:'${bb.typography.secondary.name}',sans-serif;font-size:1.5rem">${bb.typography.secondary.name}</div><div class="font-meta">Pesos: ${(bb.typography.secondary.weights||[]).join(", ")}<br>${bb.typography.secondary.usage}</div></div>` : "")}
-      ${(bb.typography?.accent ? `<div class="card"><div class="section-tag">Acento</div><div class="font-sample" style="font-family:'${bb.typography.accent.name}',cursive;font-size:1.5rem">${bb.typography.accent.name}</div><div class="font-meta">${bb.typography.accent.usage}</div></div>` : "")}
+      ${(bb.typography?.primary ? `<div class="card"><div class="section-tag">Principal</div><div class="font-sample" style="font-family:'${cssFontName(bbRaw.typography.primary.name)}',serif">${bb.typography.primary.name}</div><div class="font-meta">Pesos: ${(bb.typography.primary.weights||[]).join(", ")}<br>${bb.typography.primary.usage}</div></div>` : "")}
+      ${(bb.typography?.secondary ? `<div class="card"><div class="section-tag">Secundaria</div><div class="font-sample" style="font-family:'${cssFontName(bbRaw.typography.secondary.name)}',sans-serif;font-size:1.5rem">${bb.typography.secondary.name}</div><div class="font-meta">Pesos: ${(bb.typography.secondary.weights||[]).join(", ")}<br>${bb.typography.secondary.usage}</div></div>` : "")}
+      ${(bb.typography?.accent ? `<div class="card"><div class="section-tag">Acento</div><div class="font-sample" style="font-family:'${cssFontName(bbRaw.typography.accent.name)}',cursive;font-size:1.5rem">${bb.typography.accent.name}</div><div class="font-meta">${bb.typography.accent.usage}</div></div>` : "")}
     </div>
   </div>
 
@@ -12007,7 +12082,7 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
 
   <!-- ── FOOTER ── -->
   <div class="footer-bb">
-    Brand Book · ${bb.brandName || brandName} · Generado por Shopy Crafter Intelligence Engine · ${reportDate}<br>
+    Brand Book · ${bb.brandName || safeBrandName} · Generado por Shopy Crafter Intelligence Engine · ${reportDate}<br>
     Documento confidencial — uso interno y para agencias autorizadas.
   </div>
 </div>
@@ -12021,7 +12096,7 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
                 projectId,
                 fileType: "brand_book",
                 category: "branding",
-                title: `Brand Book — ${bb.brandName || brandName}`,
+                title: `Brand Book — ${bbRaw.brandName || brandName}`,
                 mimeType: "text/html",
                 content: Buffer.from(brandBookHtml).toString("base64"),
               });
@@ -12029,19 +12104,20 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
 
             result = {
               success: true,
-              brandName: bb.brandName || brandName,
-              tagline: bb.tagline || "",
-              archetype: (bb.archetype || {}).name || "",
-              colorsCount: colors.length,
-              valuesCount: values.length,
+              brandName: bbRaw.brandName || brandName,
+              tagline: bbRaw.tagline || "",
+              archetype: (bbRaw.archetype || {}).name || "",
+              colorsCount: bbRaw.colorPalette.length,
+              valuesCount: bbRaw.values.length,
               vaultId,
               vaultUrl: vaultId ? `/api/vault/${vaultId}/download` : undefined,
               message: vaultId
-                ? `📖 **Brand Book generado y guardado**\n\n🏷️ **${bb.brandName || brandName}** — "${bb.tagline}"\n🎭 Arquetipo: **${(bb.archetype||{}).name}**\n🎨 ${colors.length} colores | 💡 ${values.length} valores | 📣 ${pillars.length} pilares de contenido\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver Brand Book: /api/vault/${vaultId}/download\n📥 Descargar PDF: /api/vault/${vaultId}/download?format=pdf`
-                : `📖 **Brand Book generado**\n\n🏷️ **${bb.brandName || brandName}** — "${bb.tagline}"\n🎭 Arquetipo: **${(bb.archetype||{}).name}**\n🎨 ${colors.length} colores | 💡 ${values.length} valores\n\n⚠️ No se pudo guardar en vault (falta projectId)`,
+                ? `📖 **Brand Book generado y guardado**\n\n🏷️ **${bbRaw.brandName || brandName}** — "${bbRaw.tagline}"\n🎭 Arquetipo: **${(bbRaw.archetype||{}).name}**\n🎨 ${bbRaw.colorPalette.length} colores | 💡 ${bbRaw.values.length} valores | 📣 ${(bbRaw.contentPillars || []).length} pilares de contenido\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver Brand Book: /api/vault/${vaultId}/download\n📥 Descargar PDF: /api/vault/${vaultId}/download?format=pdf`
+                : `📖 **Brand Book generado**\n\n🏷️ **${bbRaw.brandName || brandName}** — "${bbRaw.tagline}"\n🎭 Arquetipo: **${(bbRaw.archetype||{}).name}**\n🎨 ${bbRaw.colorPalette.length} colores | 💡 ${bbRaw.values.length} valores\n\n⚠️ No se pudo guardar en vault (falta projectId)`,
             };
           } catch (err) {
-            result = { error: true, message: `❌ Error generando Brand Book: ${err instanceof Error ? err.message : String(err)}` };
+            const reason = isAiOutputError(err) ? aiOutputErrorMessage(err) : err instanceof Error ? err.message : String(err);
+            result = { error: true, message: `❌ Error generando Brand Book: ${reason}` };
           }
           break;
         }
@@ -12303,7 +12379,7 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const send = (msg: string) => { try { (res as any).write?.(`data: ${JSON.stringify({message: msg})}\n\n`); } catch {} };
           const projectId = params?.projectId ?? (req.session as any)?.projectId;
           const port = process.env.PORT || 8080;
-          (send as any)(`⚙️ Iniciando pipeline Muscle Factory (30s, 6 clips Grok I2V/T2V en paralelo)...`);
+          send(`⚙️ Iniciando pipeline Muscle Factory (30s, 6 clips Grok I2V/T2V en paralelo)...`);
           let adResult: any = null;
           await new Promise<void>((resolve) => {
             fetch(`http://localhost:${port}/api/muscle-factory/generate-ad`, {
@@ -12326,13 +12402,13 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
                   if (!dataLine) continue;
                   try {
                     const evt = JSON.parse(dataLine.slice(5).trim());
-                    if (evt.message) (send as any)(`🎬 ${evt.message}`);
+                    if (evt.message) send(`🎬 ${evt.message}`);
                     if (evt.success) adResult = evt;
                   } catch { /* ignore */ }
                 }
               }
               resolve();
-            }).catch(err => { (send as any)(`❌ Error pipeline: ${err.message}`); resolve(); });
+            }).catch(err => { send(`❌ Error pipeline: ${err.message}`); resolve(); });
           });
           result = adResult
             ? { ...(adResult as Record<string,unknown>), message: adResult.message || `✅ Anuncio Muscle Factory 30s listo en Vault #${adResult.vaultId}` }
@@ -12385,8 +12461,9 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           if (!projectId) { result = { error: "projectId requerido" }; break; }
           const title = params?.title;
           if (!title) { result = { error: "title requerido" }; break; }
-          const confirmed = await (requireConfirmation as any)(req, `crear producto "${title}" en la tienda`);
-          if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas crear el producto "${title}"?` }; break; }
+          // Antes: requireConfirmation(req, texto) con la firma equivocada devolvía siempre
+          // null → se pedía confirmación siempre y la acción nunca se ejecutaba.
+          if (!isConfirmed(params)) { result = { requiresConfirmation: true, message: `¿Confirmas crear el producto "${title}"?` }; break; }
           const productData = {
             title,
             price: params?.price ? String(params.price) : "0.00",
@@ -12426,8 +12503,9 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const projectId = params?.projectId;
           const pid = params?.platformProductId;
           if (!projectId || !pid) { result = { error: "projectId y platformProductId requeridos" }; break; }
-          const confirmed = await (requireConfirmation as any)(req, `eliminar producto ID ${pid}`);
-          if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas ELIMINAR el producto ${pid}? Esta acción es irreversible.` }; break; }
+          // Antes: requireConfirmation(req, texto) con la firma equivocada devolvía siempre
+          // null → se pedía confirmación siempre y la acción nunca se ejecutaba.
+          if (!isConfirmed(params)) { result = { requiresConfirmation: true, message: `¿Confirmas ELIMINAR el producto ${pid}? Esta acción es irreversible.` }; break; }
           const r2 = await withPlatform(parseInt(projectId), "product_delete", async (connector) => {
             await connector.deleteProduct(pid);
             return { deleted: true };
@@ -12459,8 +12537,9 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
           const pid = params?.platformProductId;
           const quantity = params?.quantity;
           if (!projectId || !pid || quantity === undefined) { result = { error: "projectId, platformProductId y quantity requeridos" }; break; }
-          const confirmed = await (requireConfirmation as any)(req, `actualizar stock del producto ${pid} a ${quantity} unidades`);
-          if (!confirmed) { result = { requiresConfirmation: true, message: `¿Confirmas actualizar el stock a ${quantity} unidades?` }; break; }
+          // Antes: requireConfirmation(req, texto) con la firma equivocada devolvía siempre
+          // null → se pedía confirmación siempre y la acción nunca se ejecutaba.
+          if (!isConfirmed(params)) { result = { requiresConfirmation: true, message: `¿Confirmas actualizar el stock a ${quantity} unidades?` }; break; }
           const r2 = await withPlatform(parseInt(projectId), "inventory", async (connector) => {
             return connector.updateInventory(pid, parseInt(quantity), params?.variantId);
           });

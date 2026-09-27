@@ -8,6 +8,7 @@
 
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "./gemini.js";
 import { logger } from "./logger.js";
+import { extractJson } from "./ai-json.js";
 
 export interface GoogleReview {
   rating: number;
@@ -112,13 +113,15 @@ Devuelve JSON válido con esta estructura exacta:
 
     const result = await askGeminiWithSearch(userPrompt, systemPrompt, [domain]);
 
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      logger.warn({ businessName }, "google-reviews: no JSON in Gemini response");
+    // Extracción balanceada: la regex codiciosa se tragaba la prosa de alrededor
+    // y cualquier llave del texto hacía fallar el JSON.parse.
+    const extracted = extractJson(result.text, "object");
+    if (!extracted.ok) {
+      logger.warn({ businessName, code: extracted.code, reason: extracted.message }, "google-reviews: no usable JSON in Gemini response");
       return { ...EMPTY, source: "unavailable" };
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<GoogleBusinessProfile>;
+    const parsed = extracted.value as Partial<GoogleBusinessProfile>;
 
     const profile: GoogleBusinessProfile = {
       businessName: parsed.businessName ?? businessName,

@@ -3010,22 +3010,38 @@ Genera el HTML COMPLETO ahora:`;
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = baseURL ? new Anthropic({ baseURL, apiKey }) : new Anthropic({ apiKey });
 
-    const stream = await client.messages.stream({
-      model: "claude-sonnet-4-5",
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    });
-
     send({ status: "streaming" });
 
-    for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        send({ token: event.delta.text });
+    // Un HTML completo no siempre cabe en 8192 tokens: antes se cortaba a mitad y
+    // se daba por terminado. Si se corta, se pide que continúe (hasta 2 veces) y
+    // el cliente sigue recibiendo tokens; el evento final dice si aun así quedó cortado.
+    const { CONTINUE_INSTRUCTION } = await import("../lib/ai-json.js");
+    const messages: Array<{ role: "user" | "assistant"; content: string }> = [{ role: "user", content: userPrompt }];
+    let generated = "";
+    let truncated = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const stream = client.messages.stream({
+        model: "claude-sonnet-4-5",
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages,
+      });
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          generated += event.delta.text;
+          send({ token: event.delta.text });
+        }
       }
+      truncated = (await stream.finalMessage()).stop_reason === "max_tokens";
+      if (!truncated) break;
+      messages.splice(1, messages.length - 1,
+        { role: "assistant", content: generated.trimEnd() },
+        { role: "user", content: CONTINUE_INSTRUCTION },
+      );
     }
+    if (truncated) logger.warn({ chars: generated.length }, "web-lab stream: HTML cortado tras 2 continuaciones");
 
-    send({ done: true });
+    send({ done: true, truncated });
     res.end();
   } catch (e: any) {
     clearInterval(heartbeat);

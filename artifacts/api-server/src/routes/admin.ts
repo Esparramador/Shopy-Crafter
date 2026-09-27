@@ -12,7 +12,25 @@ import { recordAudit } from "../lib/audit.helper.js";
 import { deleteClientUser } from "../lib/user-deletion.js";
 import { cancelClientSubscription } from "../lib/subscription-cancel.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
-import { askClaude } from "../lib/claude.js";
+import { askClaudeDetailed } from "../lib/claude.js";
+import { generateAiJson } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { z } from "zod";
+
+// Propuestas de mejora (ai-suggest). Antes: 900 tokens para 4 propuestas detalladas
+// (se cortaba) y cualquier fallo devolvía [], que el panel mostraba como "no hay
+// productos, sincroniza la tienda".
+const aiSuggestionsSchema = z.object({
+  suggestions: z.array(z.object({
+    type: z.enum(["seo_update", "price_change", "product_update", "strategy"]).catch("strategy"),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    beforeValue: z.string().default(""),
+    afterValue: z.string().default(""),
+    reasoning: z.string().default(""),
+    estimatedImpact: z.string().default(""),
+  })).min(1),
+});
 import { sendPushToClientByProject } from "../lib/push-helper.js";
 import { msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
 
@@ -406,16 +424,20 @@ Genera propuestas en formato JSON exactamente así (sin texto adicional antes o 
 Tipos válidos: "seo_update", "price_change", "product_update", "strategy".
 Prioriza los productos con score más bajo. Responde SOLO con el JSON.`;
 
-    const reply = await askClaude(pid, [{ role: "user", content: prompt }], undefined, 900);
-    const match = reply.match(/\{[\s\S]*\}/);
-    if (!match) { res.json({ suggestions: [] }); return; }
-    try {
-      const parsed = JSON.parse(match[0]);
-      res.json({ suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [] });
-    } catch {
-      res.json({ suggestions: [] });
-    }
+    const parsed = await generateAiJson({
+      prompt,
+      maxTokens: 2500,
+      schema: aiSuggestionsSchema,
+      expect: "object",
+      label: "admin/ai-suggest",
+      call: async ({ prompt: p, maxTokens }) => {
+        const r = await askClaudeDetailed(pid, [{ role: "user", content: p }], undefined, maxTokens);
+        return { text: r.text, truncated: r.truncated };
+      },
+    });
+    res.json({ suggestions: parsed.suggestions });
   } catch (err: any) {
+    if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code }); return; }
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
   }

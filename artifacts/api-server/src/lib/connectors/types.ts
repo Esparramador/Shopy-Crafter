@@ -8,6 +8,8 @@ export interface ConnectionTestResult {
   tokenValid: boolean;
   error: string | null;
   errorCode?: string;
+  /** Recursos de la API accesibles con las credenciales (PrestaShop Webservice). */
+  resources?: string[];
 }
 
 export interface PlatformProduct {
