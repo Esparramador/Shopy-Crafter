@@ -159,19 +159,58 @@ function startBackgroundRefresh(): void {
 startBackgroundRefresh();
 
 /**
+ * Modelos retirados por el proveedor → sucesor vigente. Un override guardado en
+ * ajustes o en el entorno con uno de estos IDs haría fallar TODAS las llamadas
+ * de ese tier; se sustituye y se avisa en el log.
+ */
+const RETIRED_MODELS: Record<string, string> = {
+  "claude-3-opus-20240229": "claude-opus-4-8",
+  "claude-3-opus-latest": "claude-opus-4-8",
+  "claude-3-5-sonnet-20241022": "claude-sonnet-4-6",
+  "claude-3-5-sonnet-20240620": "claude-sonnet-4-6",
+  "claude-3-5-sonnet-latest": "claude-sonnet-4-6",
+  "claude-3-7-sonnet-20250219": "claude-sonnet-4-6",
+  "claude-3-7-sonnet-latest": "claude-sonnet-4-6",
+  "claude-3-5-haiku-20241022": "claude-haiku-4-5",
+  "claude-3-5-haiku-latest": "claude-haiku-4-5",
+  "claude-3-haiku-20240307": "claude-haiku-4-5",
+  "claude-haiku-3-5": "claude-haiku-4-5",
+  "claude-haiku-3-5-20241022": "claude-haiku-4-5",
+  "claude-opus-4-1": "claude-opus-4-8",
+  "claude-opus-4-1-20250805": "claude-opus-4-8",
+  "gemini-2.0-flash": "gemini-2.5-flash",
+  "gemini-2.0-flash-001": "gemini-2.5-flash",
+  "gemini-2.0-flash-exp": "gemini-2.5-flash",
+  "gemini-2.0-flash-lite": "gemini-2.5-flash-lite",
+  "gemini-2.0-flash-lite-001": "gemini-2.5-flash-lite",
+  "gemini-1.5-flash": "gemini-2.5-flash",
+  "gemini-1.5-pro": "gemini-2.5-pro",
+};
+const warnedRetired = new Set<string>();
+export function replaceRetiredModel(model: string): string {
+  const next = RETIRED_MODELS[model];
+  if (!next) return model;
+  if (!warnedRetired.has(model)) {
+    warnedRetired.add(model);
+    logger.warn({ model, replacement: next }, "[ai-models] modelo retirado por el proveedor — usando su sucesor; actualiza el ajuste");
+  }
+  return next;
+}
+
+/**
  * Resolves the actual model name for a given provider + tier.
  * Override chain: explicit arg → DB setting → env var → hard default.
  */
 export async function pickModel(provider: AIProvider, tier: AITier = "smart", override?: string): Promise<string> {
   if (override && typeof override === "string" && override.trim().length > 0) {
-    return override.trim();
+    return replaceRetiredModel(override.trim());
   }
   const settings = await loadSettingsFromDb();
   const dbVal = settings.get(SETTINGS_KEYS[provider][tier]);
-  if (dbVal) return dbVal;
+  if (dbVal) return replaceRetiredModel(dbVal);
   const envKey = ENV_KEYS[provider][tier];
   const envVal = process.env[envKey];
-  if (envVal && envVal.trim().length > 0) return envVal.trim();
+  if (envVal && envVal.trim().length > 0) return replaceRetiredModel(envVal.trim());
   return HARD_DEFAULTS[provider][tier];
 }
 
@@ -180,10 +219,10 @@ export async function pickModel(provider: AIProvider, tier: AITier = "smart", ov
  *  Falls back to ENV → hard default. */
 export function pickModelSync(provider: AIProvider, tier: AITier = "smart"): string {
   const snapVal = snapshot.get(SETTINGS_KEYS[provider][tier]);
-  if (snapVal) return snapVal;
+  if (snapVal) return replaceRetiredModel(snapVal);
   const envKey = ENV_KEYS[provider][tier];
   const envVal = process.env[envKey];
-  if (envVal && envVal.trim().length > 0) return envVal.trim();
+  if (envVal && envVal.trim().length > 0) return replaceRetiredModel(envVal.trim());
   return HARD_DEFAULTS[provider][tier];
 }
 
@@ -232,20 +271,19 @@ export async function setAIModelOverride(provider: AIProvider, tier: AITier, mod
 /** Catalog of known June-2026 models for the admin UI dropdowns. */
 export const KNOWN_MODELS: Record<AIProvider, Array<{ id: string; label: string; tierHint: AITier; notes?: string }>> = {
   claude: [
-    { id: "claude-fable-5", label: "Claude Fable 5", tierHint: "genius", notes: "Modelo creativo especializado en narrativa y generación de contenido largo" },
+    // IDs vigentes (sep-2026). Retirados por Anthropic y eliminados de la lista:
+    // Claude 3 / 3.5 / 3.7 y Opus 4.1 (retirado 05-08-2026).
+    { id: "claude-fable-5-1", label: "Claude Fable 5.1", tierHint: "genius", notes: "El más capaz; razonamiento y tareas agénticas largas (pensamiento siempre activo)" },
+    { id: "claude-fable-5", label: "Claude Fable 5", tierHint: "genius", notes: "Generación anterior de Fable" },
+    { id: "claude-opus-5", label: "Claude Opus 5", tierHint: "genius", notes: "Opus actual — razonamiento profundo y programación" },
     { id: "claude-opus-4-8", label: "Claude Opus 4.8", tierHint: "genius", notes: "Máximo razonamiento, ideal para tareas complejas y programación avanzada" },
     { id: "claude-opus-4-7", label: "Claude Opus 4.7", tierHint: "genius", notes: "Alta capacidad de razonamiento y análisis de datos complejos" },
-    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", tierHint: "smart", notes: "El mejor equilibrio entre velocidad y capacidad, con soporte de visión" },
     { id: "claude-opus-4-6", label: "Claude Opus 4.6", tierHint: "genius", notes: "Modelo de alto rendimiento para razonamiento profundo" },
-    { id: "claude-opus-4-5-20251101", label: "Claude Opus 4.5", tierHint: "genius", notes: "Versión estable de Opus para flujos de trabajo críticos" },
-    { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", tierHint: "fast", notes: "Ultra rápido y económico, ideal para clasificación y extracción de datos" },
-    { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", tierHint: "smart", notes: "Versión estable de Sonnet con excelentes capacidades multimodales" },
-    { id: "claude-opus-4-1-20250805", label: "Claude Opus 4.1", tierHint: "genius", notes: "Versión legacy de Opus optimizada para estabilidad" },
-    { id: "claude-3-7-sonnet-20250219", label: "Claude 3.7 Sonnet", tierHint: "smart", notes: "Modelo de la generación anterior con gran rendimiento en visión" },
-    { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", tierHint: "smart", notes: "Modelo legacy ampliamente probado y fiable" },
-    { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku", tierHint: "fast", notes: "Haiku de generación anterior para tareas sencillas" },
-    { id: "claude-3-opus-20240229", label: "Claude 3 Opus", tierHint: "genius", notes: "El primer gran modelo de la familia Claude 3" },
-    { id: "claude-3-haiku-20240307", label: "Claude 3 Haiku", tierHint: "fast", notes: "Modelo ultra-rápido legacy" }
+    { id: "claude-opus-4-5", label: "Claude Opus 4.5", tierHint: "genius", notes: "Versión estable de Opus para flujos de trabajo críticos" },
+    { id: "claude-sonnet-5", label: "Claude Sonnet 5", tierHint: "smart", notes: "Sonnet actual — calidad cercana a Opus a menor coste" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", tierHint: "smart", notes: "El mejor equilibrio entre velocidad y capacidad, con soporte de visión" },
+    { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", tierHint: "smart", notes: "Versión estable de Sonnet con excelentes capacidades multimodales" },
+    { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", tierHint: "fast", notes: "Ultra rápido y económico, ideal para clasificación y extracción de datos" },
   ],
   // ── GEMINI — Verified 2026-06-25 via GET /v1beta/models (direct API) ──────
   // All IDs below confirmed present in the models list. HTTP 200 smoke-tested:
@@ -275,10 +313,6 @@ export const KNOWN_MODELS: Record<AIProvider, Array<{ id: string; label: string;
     { id: "gemini-2.5-flash",                       label: "Gemini 2.5 Flash",                        tierHint: "fast",   notes: "default vision multimodal (verificado 2026-06-25)" },
     { id: "gemini-2.5-pro",                         label: "Gemini 2.5 Pro",                          tierHint: "smart",  notes: "verificado 2026-06-25" },
     { id: "gemini-2.5-computer-use-preview-10-2025", label: "Gemini 2.5 Computer Use Preview",        tierHint: "genius", notes: "🤖 Agente autónomo / computer use (experimental)" },
-    { id: "gemini-2.0-flash",                       label: "Gemini 2.0 Flash",                        tierHint: "fast",   notes: "verificado 2026-06-25" },
-    { id: "gemini-2.0-flash-001",                   label: "Gemini 2.0 Flash 001",                    tierHint: "fast",   notes: "versión anclada estable de 2.0 Flash" },
-    { id: "gemini-2.0-flash-lite",                  label: "Gemini 2.0 Flash Lite",                   tierHint: "fast",   notes: "verificado 2026-06-25" },
-    { id: "gemini-2.0-flash-lite-001",              label: "Gemini 2.0 Flash Lite 001",               tierHint: "fast",   notes: "versión anclada estable de 2.0 Flash Lite" },
     // ── Aliases (resuelven siempre al modelo más reciente) ────────────────
     { id: "gemini-flash-latest",                    label: "Gemini Flash Latest (alias)",             tierHint: "fast",   notes: "🔄 Resuelve al flash más reciente automáticamente" },
     { id: "gemini-flash-lite-latest",               label: "Gemini Flash Lite Latest (alias)",        tierHint: "fast",   notes: "🔄 Resuelve al flash-lite más reciente" },

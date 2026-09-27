@@ -3,7 +3,8 @@ import { requireAdmin } from "../lib/auth.js";
 
 const router = Router();
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? process.env.GITHUB_API_TOKEN ?? "";
+// Leído en cada uso (claves del panel de API keys se cargan tras importar el módulo).
+const githubToken = () => process.env.GITHUB_TOKEN ?? process.env.GITHUB_API_TOKEN ?? "";
 const REPO = "Esparramador/Shopy-Crafter";
 const WORKFLOW_ID = "build-apk.yml";
 const RELEASE_TAG = "apk-latest";
@@ -12,7 +13,7 @@ async function ghFetch(path: string, opts: RequestInit = {}) {
   return fetch(`https://api.github.com${path}`, {
     ...opts,
     headers: {
-      Authorization: `token ${GITHUB_TOKEN}`,
+      Authorization: `token ${githubToken()}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       ...(opts.headers ?? {}),
@@ -22,7 +23,7 @@ async function ghFetch(path: string, opts: RequestInit = {}) {
 
 router.get("/apk/status", async (_req, res): Promise<void> => {
   try {
-    if (!GITHUB_TOKEN) {
+    if (!githubToken()) {
       res.json({ available: false, building: false, error: "GITHUB_TOKEN no configurado" });
       return;
     }
@@ -54,7 +55,7 @@ router.get("/apk/status", async (_req, res): Promise<void> => {
 
 router.post("/apk/build", requireAdmin, async (_req, res): Promise<void> => {
   try {
-    if (!GITHUB_TOKEN) {
+    if (!githubToken()) {
       res.status(503).json({ success: false, error: "GITHUB_TOKEN no configurado en el servidor" });
       return;
     }
@@ -81,7 +82,7 @@ router.post("/apk/build", requireAdmin, async (_req, res): Promise<void> => {
 
 router.get("/apk/download", async (_req, res): Promise<void> => {
   try {
-    if (!GITHUB_TOKEN) {
+    if (!githubToken()) {
       res.status(503).json({ error: "Descarga no disponible — GITHUB_TOKEN no configurado" });
       return;
     }

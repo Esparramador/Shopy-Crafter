@@ -1369,7 +1369,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   // Plataforma del proyecto activo (la devuelve /quick-actions) → contexto real para Gemini
   const [activePlatform, setActivePlatform] = useState<{ key: string; label: string; icon: string; entityLabel: string; capabilities: string[]; chatbotContext: string } | null>(null);
   const [engineMode, setEngineMode] = useState<"auto" | "claude" | "gemini" | "brain_only" | "grok" | "gpt" | "nvidia">("auto");
-  const [claudeModel, setClaudeModel] = useState<"claude-haiku-3-5" | "claude-sonnet-4-6" | "claude-opus-4-8">("claude-sonnet-4-6");
+  const [claudeModel, setClaudeModel] = useState<"claude-haiku-4-5" | "claude-sonnet-4-6" | "claude-opus-4-8">("claude-sonnet-4-6");
   const [gptModel, setGptModel] = useState<"gpt-4.1-nano" | "gpt-4.1-mini" | "gpt-4.1" | "gpt-4o">("gpt-4.1-mini");
   const [nvidiaModel, setNvidiaModel] = useState<string>("nvidia/llama-3.3-nemotron-super-49b-v1");
   const [slashPendingSkill, setSlashPendingSkill] = useState<SlashSkill | null>(null);
@@ -4236,7 +4236,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                   {engineMode === "claude" && (
                     <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "center" }}>
                       {([
-                        { key: "claude-haiku-3-5",  label: "Haiku",  title: "Claude Haiku 3.5 — rapidísimo y económico • $0.25/M in, $1.25/M out" },
+                        { key: "claude-haiku-4-5",  label: "Haiku",  title: "Claude Haiku 4.5 — rapidísimo y económico • $1/M in, $5/M out" },
                         { key: "claude-sonnet-4-6", label: "Sonnet", title: "Claude Sonnet 4.6 — equilibrado, inteligente • $3/M in, $15/M out" },
                         { key: "claude-opus-4-8",   label: "Opus",   title: "Claude Opus 4.8 — máxima inteligencia, más lento • $15/M in, $75/M out" },
                       ] as const).map(({ key, label, title }) => (

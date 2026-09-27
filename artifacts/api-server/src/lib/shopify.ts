@@ -4,6 +4,13 @@ import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { encrypt, safeDecrypt } from "./crypto.js";
 
+/**
+ * Versión única de la Admin API de Shopify. Shopify da soporte a cada versión 12
+ * meses; había llamadas con 2024-01 y 2024-10 (sin soporte: Shopify las sirve
+ * con la versión más antigua aún soportada, con cambios de comportamiento).
+ */
+export const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION?.trim() || "2026-01";
+
 const SHOPIFY_FETCH_TIMEOUT = 45_000;
 const TOKEN_OP_TIMEOUT = 20_000;
 
@@ -135,7 +142,7 @@ export async function shopifyRequest<T>(
 ): Promise<T> {
   const domain = normalizeShopDomain(shopDomain);
   const headers = await getShopifyHeaders(projectId);
-  const url = `https://${domain}/admin/api/2026-01${path}`;
+  const url = `https://${domain}/admin/api/${SHOPIFY_API_VERSION}${path}`;
 
   const doFetch = (hdrs: Record<string, string>) => () =>
     fetch(url, {
@@ -176,7 +183,7 @@ export async function shopifyRequestPaged<T>(
 ): Promise<{ data: T; nextPageInfo: string | null }> {
   const domain = normalizeShopDomain(shopDomain);
   const hdrs = await getShopifyHeaders(projectId);
-  const url = `https://${domain}/admin/api/2026-01${path}`;
+  const url = `https://${domain}/admin/api/${SHOPIFY_API_VERSION}${path}`;
 
   const doPagedFetch = async (fetchHeaders: Record<string, string>): Promise<{ data: T; nextPageInfo: string | null }> => {
     let lastResp: Response | null = null;
@@ -286,7 +293,7 @@ export async function shopifyGraphQL<T = Record<string, unknown>>(
 ): Promise<T> {
   const domain = normalizeShopDomain(shopDomain);
   const headers = await getShopifyHeaders(projectId);
-  const url = `https://${domain}/admin/api/2026-01/graphql.json`;
+  const url = `https://${domain}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
 
   let retried401 = false;
   const doFetch = async (hdrs: Record<string, string>): Promise<T> => {
@@ -331,7 +338,7 @@ export async function validateToken(shopDomain: string, accessToken: string): Pr
   const domain = normalizeShopDomain(shopDomain);
   const plainToken = safeDecrypt(accessToken) || accessToken;
   try {
-    const resp = await fetch(`https://${domain}/admin/api/2024-01/shop.json`, {
+    const resp = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/shop.json`, {
       headers: { "X-Shopify-Access-Token": plainToken, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
     });

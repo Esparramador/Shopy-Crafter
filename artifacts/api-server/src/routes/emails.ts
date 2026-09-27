@@ -286,59 +286,24 @@ router.post("/emails/flows/:id/push", async (req, res): Promise<void> => {
       });
       const klaviyoTemplateId = templateRes.data?.id;
       if (!klaviyoTemplateId) throw new Error("Template creation failed");
-  
-      const flowRes = await klaviyoPost<any>("/flows/", {
-        data: {
-          type: "flow",
-          attributes: {
-            name: templateName,
-            status: "live",
-            trigger_type: "metric",
-            trigger_options: {
-              metric: { name: TRIGGER_MAP[flow.trigger_type] || "Placed Order" },
-            },
-          },
-        },
-      });
-      const klaviyoFlowId = flowRes.data?.id;
-      if (!klaviyoFlowId) throw new Error("Flow creation failed");
-  
-  
-      await klaviyoPost("/flow-actions/", {
-        data: {
-          type: "flow-action",
-          attributes: {
-            action_type: "send_email",
-            settings: {
-              subject: flow.subject_a || "{{ subject }}",
-              preview_text: flow.preview_text || "",
-              from_email: flow.from_email || "craftershopy@gmail.com",
-              from_label: flow.from_name || flow.project_name || "Shopy Crafter",
-              reply_to_email: flow.reply_email || flow.from_email || "craftershopy@gmail.com",
-            },
-            send_options: { use_smart_sending: true },
-            rendering_options: {
-              shorten_links: true,
-              add_tracking_params: true,
-              add_org_prefix: false,
-            },
-          },
-          relationships: {
-            flow: { data: { type: "flow", id: klaviyoFlowId } },
-            template: { data: { type: "template", id: klaviyoTemplateId } },
-          },
-        },
-      });
-  
+
+      // Antes se llamaba a POST /flows con un cuerpo que la API no acepta (exige
+      // una "definition" completa) y a POST /flow-actions, que no existe: el push
+      // fallaba siempre. Se crea la plantilla real; el flow se monta en Klaviyo
+      // eligiendo esta plantilla (la API no crea flows sin definición completa).
       await pool.query(
         `UPDATE email_flows 
-         SET klaviyo_template_id = $1, klaviyo_flow_id = $2, klaviyo_status = 'live', 
+         SET klaviyo_template_id = $1, klaviyo_status = 'template',
              klaviyo_error = NULL, pushed_at = NOW(), updated_at = NOW()
-         WHERE id = $3`,
-        [klaviyoTemplateId, klaviyoFlowId, flowId]
+         WHERE id = $2`,
+        [klaviyoTemplateId, flowId]
       );
   
-      res.json({ success: true, klaviyoTemplateId, klaviyoFlowId });
+      res.json({
+        success: true,
+        klaviyoTemplateId,
+        note: `Plantilla "${templateName}" creada en Klaviyo. Asígnala al flow "${TRIGGER_MAP[flow.trigger_type] || "Placed Order"}" en el editor de flows de Klaviyo.`,
+      });
     } catch (err: any) {
       logger.error("Push to Klaviyo error:", err.message);
       await pool.query(
@@ -367,21 +332,21 @@ router.post("/emails/flows/:id/sync", async (req, res): Promise<void> => {
         return;
       }
   
-      const metricsRes = await fetch(`${KLAVIYO_BASE}/flow-actions/?filter=equals(flow.id,"${flow.klaviyo_flow_id}")`, {
+      // GET /flows/{id} (antes /flow-actions/?filter=…, que no es un endpoint válido).
+      const flowRes = await fetch(`${KLAVIYO_BASE}/flows/${encodeURIComponent(flow.klaviyo_flow_id)}/`, {
         headers: klaviyoHeaders(),
       });
-  
-      if (metricsRes.ok) {
-        const data = await metricsRes.json() as any;
-        const action = data.data?.[0];
-        if (action) {
-          await pool.query(
-            `UPDATE email_flows SET last_synced_at = NOW(), updated_at = NOW() WHERE id = $1`,
-            [flowId]
-          );
-        }
+      if (!flowRes.ok) {
+        res.status(502).json({ error: `Klaviyo ${flowRes.status}: ${(await flowRes.text()).slice(0, 300)}` });
+        return;
       }
-  
+      const data = await flowRes.json() as { data?: { attributes?: { status?: string } } };
+      const kStatus = data.data?.attributes?.status;
+      await pool.query(
+        `UPDATE email_flows SET klaviyo_status = $1, last_synced_at = NOW(), updated_at = NOW() WHERE id = $2`,
+        [kStatus === "live" ? "live" : "template", flowId]
+      );
+
       res.json({ success: true, synced_at: new Date().toISOString() });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

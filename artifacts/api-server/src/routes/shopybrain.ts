@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { SHOPIFY_API_VERSION } from "../lib/shopify.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { recordApiUsage } from "../lib/api-usage.js";
 import { randomBytes } from "crypto";
@@ -1728,7 +1729,8 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
         // GPT (OpenAI): razonamiento avanzado, código, escritura, multimodal
         const openaiKey = process.env.OPENAI_API_KEY;
         if (!openaiKey) throw new Error("OPENAI_API_KEY no configurada — contacta al administrador");
-        const VALID_GPT_MODELS = ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "o1-mini", "o3-mini"] as const;
+        // o1-mini retirado por OpenAI (27-10-2025).
+        const VALID_GPT_MODELS = ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3-mini"] as const;
         const gptModelId = typeof reqGptModel === "string" && (VALID_GPT_MODELS as readonly string[]).includes(reqGptModel) ? reqGptModel : "gpt-4.1-mini";
         const gptRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -1739,8 +1741,10 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
               { role: "system", content: sysPrompt },
               { role: "user", content: userContent },
             ],
-            max_tokens: 16384,
-            temperature: 0.7,
+            // Los modelos de razonamiento (o*) rechazan max_tokens y temperature.
+            ...(/^o\d/.test(gptModelId)
+              ? { max_completion_tokens: 16384 }
+              : { max_tokens: 16384, temperature: 0.7 }),
           }),
           signal: AbortSignal.timeout(120_000),
         });
@@ -1924,8 +1928,13 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
         } // close else (nvidiaKey exists)
       } else {
         // Claude: escritura profunda, guiones, código, JSON estructurado, razonamiento complejo
-        const VALID_CLAUDE_MODELS = ["claude-haiku-3-5", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-opus-4", "claude-opus-4-8"] as const;
-        const claudeModelOverride = typeof reqClaudeModel === "string" && (VALID_CLAUDE_MODELS as readonly string[]).includes(reqClaudeModel) ? reqClaudeModel : undefined;
+        // "claude-haiku-3-5" y "claude-opus-4" no son IDs válidos de la API (Haiku 3.5
+        // está retirado): elegir "Haiku" en el chat devolvía error siempre. Se
+        // aceptan como alias de clientes antiguos y se traducen a modelos vigentes.
+        const VALID_CLAUDE_MODELS = ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-sonnet-5", "claude-opus-4-8", "claude-opus-5"] as const;
+        const LEGACY_CLAUDE_ALIASES: Record<string, string> = { "claude-haiku-3-5": "claude-haiku-4-5", "claude-opus-4": "claude-opus-4-8" };
+        const reqClaudeResolved = typeof reqClaudeModel === "string" ? (LEGACY_CLAUDE_ALIASES[reqClaudeModel] ?? reqClaudeModel) : undefined;
+        const claudeModelOverride = reqClaudeResolved && (VALID_CLAUDE_MODELS as readonly string[]).includes(reqClaudeResolved) ? reqClaudeResolved : undefined;
         const claudeResult = await askClaudeWithUsage(
           resolvedProjectId ? parseInt(resolvedProjectId) || 0 : 0,
           [{ role: "user", content: userContent }],
@@ -4851,7 +4860,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             try {
               const headers = await getShopifyHeaders(parseInt(projectId));
               const domain = normalizeShopDomain(project.shopDomain);
-              const shopRes = await fetch(`https://${domain}/admin/api/2024-01/shop.json`, {
+              const shopRes = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/shop.json`, {
                 headers,
                 signal: AbortSignal.timeout(10000),
               });
@@ -4901,7 +4910,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             try {
               const headers = await getShopifyHeaders(parseInt(projectId));
               const domain = normalizeShopDomain(project.shopDomain);
-              const countRes = await fetch(`https://${domain}/admin/api/2026-01/products/count.json`, {
+              const countRes = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/products/count.json`, {
                 headers,
                 signal: AbortSignal.timeout(10000),
               });
@@ -6060,7 +6069,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               result = { error: true, message: "❌ Falta productId o variantId para identificar qué stock actualizar" }; break;
             }
   
-            const locationsResp = await fetch(`https://${domain}/admin/api/2024-01/locations.json`, {
+            const locationsResp = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/locations.json`, {
               headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
             });
             const locationsData = await locationsResp.json() as { locations: Array<{ id: number; name: string }> };
@@ -6069,7 +6078,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   
             const updated: string[] = [];
             for (const tv of targetVariants) {
-              const levelResp = await fetch(`https://${domain}/admin/api/2024-01/inventory_levels/set.json`, {
+              const levelResp = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/inventory_levels/set.json`, {
                 method: "POST",
                 headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -6107,7 +6116,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             const token = safeDecrypt(project.accessToken);
             const domain = project.shopDomain;
   
-            const locationsResp = await fetch(`https://${domain}/admin/api/2024-01/locations.json`, {
+            const locationsResp = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/locations.json`, {
               headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
             });
             const locationsData = await locationsResp.json() as { locations: Array<{ id: number }> };
@@ -6136,7 +6145,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                   label = String(pData.product.title);
                 }
                 if (!inventoryItemId) { failCount++; details.push(`❌ ${label || item.variantId || item.productId}: sin inventory_item_id`); continue; }
-                const resp = await fetch(`https://${domain}/admin/api/2024-01/inventory_levels/set.json`, {
+                const resp = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/inventory_levels/set.json`, {
                   method: "POST",
                   headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
                   body: JSON.stringify({ location_id: locationId, inventory_item_id: inventoryItemId, available: item.quantity }),
@@ -7201,13 +7210,13 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   
             if (params?.quantity !== undefined) {
               const token = safeDecrypt(project.accessToken);
-              const locResp = await fetch(`https://${project.shopDomain}/admin/api/2024-01/locations.json`, {
+              const locResp = await fetch(`https://${project.shopDomain}/admin/api/${SHOPIFY_API_VERSION}/locations.json`, {
                 headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
               });
               const locData = await locResp.json() as { locations: Array<{ id: number }> };
               const locId = locData.locations?.[0]?.id;
               if (locId && v.inventory_item_id) {
-                await fetch(`https://${project.shopDomain}/admin/api/2024-01/inventory_levels/set.json`, {
+                await fetch(`https://${project.shopDomain}/admin/api/${SHOPIFY_API_VERSION}/inventory_levels/set.json`, {
                   method: "POST",
                   headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
                   body: JSON.stringify({ location_id: locId, inventory_item_id: v.inventory_item_id, available: parseInt(String(params.quantity)) }),
@@ -7251,13 +7260,13 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   
             if (params?.quantity !== undefined) {
               const token = safeDecrypt(project.accessToken);
-              const locResp = await fetch(`https://${project.shopDomain}/admin/api/2024-01/locations.json`, {
+              const locResp = await fetch(`https://${project.shopDomain}/admin/api/${SHOPIFY_API_VERSION}/locations.json`, {
                 headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
               });
               const locData = await locResp.json() as { locations: Array<{ id: number }> };
               const locId = locData.locations?.[0]?.id;
               if (locId && v.inventory_item_id) {
-                await fetch(`https://${project.shopDomain}/admin/api/2024-01/inventory_levels/set.json`, {
+                await fetch(`https://${project.shopDomain}/admin/api/${SHOPIFY_API_VERSION}/inventory_levels/set.json`, {
                   method: "POST",
                   headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
                   body: JSON.stringify({ location_id: locId, inventory_item_id: v.inventory_item_id, available: parseInt(String(params.quantity)) }),
@@ -10776,13 +10785,13 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             if (!project?.accessToken) { result = { error: true, message: "❌ Proyecto sin token de acceso" }; break; }
             const token = safeDecrypt(project.accessToken);
             const domain = project.shopDomain;
-            const collectsResp = await fetch(`https://${domain}/admin/api/2024-01/collects.json?collection_id=${collectionId}&product_id=${productId}`, {
+            const collectsResp = await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/collects.json?collection_id=${collectionId}&product_id=${productId}`, {
               headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
             });
             const collectsData = await collectsResp.json() as { collects: Array<{ id: number }> };
             if (!collectsData.collects?.length) { result = { error: true, message: "❌ El producto no está en esa colección" }; break; }
             for (const c of collectsData.collects) {
-              await fetch(`https://${domain}/admin/api/2024-01/collects/${c.id}.json`, {
+              await fetch(`https://${domain}/admin/api/${SHOPIFY_API_VERSION}/collects/${c.id}.json`, {
                 method: "DELETE", headers: { "X-Shopify-Access-Token": token },
               });
             }

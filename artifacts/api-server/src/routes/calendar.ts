@@ -26,8 +26,10 @@ const router = Router();
 router.use(requireAdmin);
 
 // ─── OAuth config (reuses Google OAuth client from YouTube integration) ───────
-const CLIENT_ID     = process.env.YOUTUBE_CLIENT_ID     || "";
-const CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || "";
+// Leídas en cada uso (no al importar): así valen las claves actualizadas desde el
+// panel de API keys, que se cargan después del arranque del módulo.
+const clientId     = () => process.env.YOUTUBE_CLIENT_ID     || "";
+const clientSecret = () => process.env.YOUTUBE_CLIENT_SECRET || "";
 
 const CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar",
@@ -41,7 +43,7 @@ function getRedirectUri(): string {
 }
 
 function makeOAuth2Client() {
-  return new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, getRedirectUri());
+  return new google.auth.OAuth2(clientId(), clientSecret(), getRedirectUri());
 }
 
 // ─── Ensure DB tables ──────────────────────────────────────────────────────────
@@ -170,7 +172,7 @@ router.get("/calendar/status", async (_req: Request, res: Response): Promise<voi
 
 // ─── OAUTH URL ───────────────────────────────────────────────────────────────
 router.get("/calendar/oauth/url", (_req: Request, res: Response): void => {
-  if (!CLIENT_ID || !CLIENT_SECRET) {
+  if (!clientId() || !clientSecret()) {
     res.status(500).json({ error: "YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET no configurados." });
     return;
   }
