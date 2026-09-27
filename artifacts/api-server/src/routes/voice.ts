@@ -501,6 +501,10 @@ Puedes ayudarle con:
 - Resolver dudas sobre cómo funciona la plataforma y sus módulos.
 - Tomar mensajes para el equipo si el cliente necesita hablar con alguien.
 
+Datos reales y actuales de SU tienda (del panel de Shopy Crafter, solo de este cliente):
+{{store_context}}
+Usa EXCLUSIVAMENTE esos datos para cualquier cifra. Si algo no aparece ahí, dilo con naturalidad y no inventes números.
+
 No puedes: crear contenido, imágenes, textos ni campañas — eso lo hacen desde el panel. Si te lo piden, díselo con simpatía y redirigelos al panel de administración.
 Muestra siempre interés genuino por el negocio del cliente. Pregunta cómo le van las ventas, qué productos tiene más movimiento. Sé un secretario de verdad, no un contestador automático.
 ${ANDALUZ_STYLE}`;
@@ -684,6 +688,9 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
         prompt: { prompt: prompts[type] },
         first_message: first[type],
         language: "es",
+        ...(type === "client"
+          ? { dynamic_variables: { dynamic_variable_placeholders: { store_context: "Sin datos disponibles de la tienda en este momento." } } }
+          : {}),
       },
       // The browser downsamples the microphone to PCM16 @ 16 kHz; pin the ASR
       // input format so a dashboard edit cannot silently switch it.
@@ -861,6 +868,39 @@ router.get("/voice/public-call-url", async (_req, res): Promise<void> => {
   }
 });
 
+/** Resumen compacto y real del proyecto para el agente de voz del cliente. */
+async function buildClientStoreContext(pid: number): Promise<string> {
+  const q = async (query: ReturnType<typeof sql>): Promise<any[]> => {
+    try { const r = await db.execute(query); return ((r as any).rows ?? []) as any[]; }
+    catch (err) { logger.warn({ err, pid }, "voice store context query failed"); return []; }
+  };
+  const [proj] = await q(sql`SELECT name, shop_domain, platform_type FROM projects WHERE id = ${pid}`);
+  if (!proj) return "Sin proyecto vinculado.";
+  const [prod] = await q(sql`SELECT COUNT(*)::int AS n FROM products WHERE project_id = ${pid}`);
+  const [rev] = await q(sql`
+    SELECT COALESCE(SUM(revenue),0)::float AS revenue, COALESCE(SUM(orders),0)::int AS orders, COUNT(*)::int AS days
+    FROM revenue_snapshots WHERE project_id = ${String(pid)} AND date >= to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')`);
+  const [appr] = await q(sql`SELECT COUNT(*)::int AS n FROM approvals WHERE project_id = ${String(pid)} AND status = 'pending'`);
+  const stock = await q(sql`
+    SELECT product_title, current_stock FROM inventory_tracking
+    WHERE project_id = ${String(pid)} AND status IN ('critical','warning')
+    ORDER BY days_remaining ASC NULLS LAST LIMIT 5`);
+  const [audit] = await q(sql`SELECT overall_score, audited_at FROM audit_results WHERE project_id = ${pid} ORDER BY audited_at DESC LIMIT 1`);
+  const lines = [
+    `Tienda: ${proj.name ?? "—"} (${proj.shop_domain ?? "—"}, ${proj.platform_type ?? "shopify"}).`,
+    `Productos en catálogo: ${prod?.n ?? 0}.`,
+    rev && rev.days > 0
+      ? `Últimos 30 días (${rev.days} días con datos): ventas ${Number(rev.revenue).toFixed(2)} €, ${rev.orders} pedidos.`
+      : "Ventas últimos 30 días: sin datos sincronizados todavía.",
+    `Propuestas pendientes de aprobar: ${appr?.n ?? 0}.`,
+    stock.length
+      ? `Stock bajo: ${stock.map(s => `${s.product_title} (${s.current_stock ?? "?"} uds)`).join("; ")}.`
+      : "Sin alertas de stock.",
+    audit ? `Última auditoría web: ${Math.round(Number(audit.overall_score ?? 0))}/100.` : "Sin auditoría web registrada.",
+  ];
+  return lines.join("\n");
+}
+
 // ── Client voice call — informes + Q&A (clientes autenticados) ────────────────
 router.get("/voice/client-call-url", async (req, res): Promise<void> => {
   const userId = (req.session as any)?.userId;
@@ -868,7 +908,12 @@ router.get("/voice/client-call-url", async (req, res): Promise<void> => {
   try {
     const agentId = await getOrCreateConvAIAgent("client");
     const signed_url = await getConvAISignedUrl(agentId);
-    res.json({ signed_url, agentId, mode: "client" });
+    // Datos reales del proyecto de la sesión (antes el agente prometía ventas y
+    // stock pero no recibía ningún dato: respondía a ciegas).
+    const session = req.session as any;
+    const pid = Number(session.role === "admin" ? req.query.pid : session.clientId);
+    const store_context = Number.isInteger(pid) && pid > 0 ? await buildClientStoreContext(pid) : "Sin proyecto vinculado.";
+    res.json({ signed_url, agentId, mode: "client", dynamic_variables: { store_context } });
   } catch (err: any) {
     logger.error({ err: err?.message, code: err?.code }, "client-call-url failed");
     respondCallUrlError(res, err, "Error obteniendo URL de llamada");

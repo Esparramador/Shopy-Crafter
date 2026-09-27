@@ -163,7 +163,11 @@ export class ShopifyConnector implements IPlatformConnector {
   async uploadImage(platformProductId: string, imageSource: string, alt?: string): Promise<{ src: string; id?: string }> {
     const data = await shopifyRequest<{ image: { id: number; src: string } }>(
       this.projectId, this.storeDomain, `/products/${platformProductId}/images.json`,
-      { method: "POST", body: JSON.stringify({ image: { src: imageSource, alt: alt ?? "" } }) }
+      // Shopify REST acepta URL pública en `src`, pero una imagen en base64 debe ir
+      // en `attachment` (un data: URL en `src` se rechaza y la foto no se subía).
+      { method: "POST", body: JSON.stringify({ image: imageSource.startsWith("data:")
+        ? { attachment: imageSource.slice(imageSource.indexOf(",") + 1), alt: alt ?? "" }
+        : { src: imageSource, alt: alt ?? "" } }) }
     );
     return { src: data.image.src, id: String(data.image.id) };
   }

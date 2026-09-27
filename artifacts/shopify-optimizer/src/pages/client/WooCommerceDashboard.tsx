@@ -48,7 +48,10 @@ export default function WooCommerceDashboard({ apid }: { apid: (url: string) => 
 
   useEffect(() => {
     fetch(apid(`${API}/client/platform-data`), { credentials: "include" })
-      .then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+      // Si el API falla, sin datos (antes se guardaba el cuerpo de error y la
+      // página se caía al leer data.revenue).
+      .then(async r => { const d = await r.json().catch(() => null); setData(r.ok && d?.revenue ? d : null); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
   const kpis = [

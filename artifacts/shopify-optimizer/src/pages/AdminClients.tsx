@@ -404,7 +404,8 @@ function SuggestionModal({ client, onClose }: SuggestionModalProps) {
     if (!projectId) return;
     setAiLoading(true); setAiError(""); setAiSuggestions([]);
     try {
-      const r = await fetch(`${API_BASE}/api/admin/projects/${projectId}/ai-suggest`, { credentials: "include" });
+      // El endpoint es POST (antes GET → 404 "Error 404").
+      const r = await fetch(`${API_BASE}/api/admin/projects/${projectId}/ai-suggest`, { method: "POST", credentials: "include" });
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
         throw new Error(body.error || `Error ${r.status}`);

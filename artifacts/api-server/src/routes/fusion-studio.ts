@@ -401,12 +401,31 @@ router.post("/fusion-studio/create-product", upload.array("images", 5), async (r
       variants: [{ platformId: "", title: "Default", price: pg.suggestedPrice?.replace(/[^0-9.]/g, "") || "0" }],
     });
 
+    let uploadedReferenceCount = 0;
     for (const file of files) {
       try {
         const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
         await connector.uploadImage(createdProduct.platformId, dataUrl, pg.suggestedTitle);
+        uploadedReferenceCount++;
       } catch (imgErr) {
         logger.warn({ err: imgErr }, "Failed to upload image to product");
+      }
+    }
+
+    // Fotos generadas por IA en la galería (antes el frontend las enviaba y se
+    // ignoraban). Solo URLs públicas http(s): la plataforma las descarga.
+    let generatedUrls: string[] = [];
+    try {
+      const raw = JSON.parse(String(req.body.generatedPhotoUrls ?? "[]"));
+      if (Array.isArray(raw)) generatedUrls = raw.filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u)).slice(0, 20);
+    } catch { generatedUrls = []; }
+    let uploadedGeneratedCount = 0;
+    for (const url of generatedUrls) {
+      try {
+        await connector.uploadImage(createdProduct.platformId, url, pg.suggestedTitle);
+        uploadedGeneratedCount++;
+      } catch (imgErr) {
+        logger.warn({ err: imgErr, url }, "Failed to upload generated image to product");
       }
     }
 
@@ -433,7 +452,9 @@ router.post("/fusion-studio/create-product", upload.array("images", 5), async (r
       success: true,
       product: createdProduct,
       analysis,
-      message: `Producto "${pg.suggestedTitle}" creado con ${files.length} imágenes`,
+      uploadedReferenceCount,
+      uploadedGeneratedCount,
+      message: `Producto "${pg.suggestedTitle}" creado con ${uploadedReferenceCount + uploadedGeneratedCount} imágenes`,
     });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : "Error creando producto";

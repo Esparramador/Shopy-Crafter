@@ -103,7 +103,7 @@ export default function VoiceCallModal({ onClose, API, mode = "admin" }: { onClo
         const e = await resp.json().catch(() => ({})) as any;
         throw new Error(e.error ?? "No se pudo obtener URL de llamada");
       }
-      const { signed_url } = await resp.json() as { signed_url: string };
+      const { signed_url, dynamic_variables } = await resp.json() as { signed_url: string; dynamic_variables?: Record<string, string> };
       if (!attempt.isActive()) return;
       setStatus("connecting");
 
@@ -129,6 +129,8 @@ export default function VoiceCallModal({ onClose, API, mode = "admin" }: { onClo
         ws.send(JSON.stringify({
           type: "conversation_initiation_client_data",
           conversation_config_override: { tts: { output_format: "pcm_16000" } },
+          // Datos reales de la tienda del cliente para el agente ({{store_context}}).
+          ...(dynamic_variables ? { dynamic_variables } : {}),
         }));
 
         // ConvAI's handshake declares pcm_16000 for microphone input. Sending

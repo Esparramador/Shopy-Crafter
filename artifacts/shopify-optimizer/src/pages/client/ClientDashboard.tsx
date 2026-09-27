@@ -50,22 +50,6 @@ function useCountUp(target: number, duration = 1100) {
   return n;
 }
 
-function Spark({ vals, color }: { vals: number[]; color: string }) {
-  if (vals.length < 2) return null;
-  const max = Math.max(...vals, 1); const w = 80; const h = 28;
-  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * w},${h - (v / max) * (h - 2) - 1}`).join(" ");
-  return (
-    <svg width={w} height={h} style={{ overflow: "visible", opacity: 0.65 }}>
-      <defs>
-        <linearGradient id={`sg-${color.replace(/[^a-z0-9]/gi, "")}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 const ACT_MAP: Record<string, { icon: string; color: string }> = {
   audit: { icon: "🔍", color: "#60a5fa" }, optimize: { icon: "⚡", color: "#c9a961" },
@@ -136,10 +120,10 @@ export default function ClientDashboard() {
   }, [msgDraft]);
 
   const kpis = [
-    { label: "Productos", value: prod, suffix: "", icon: "📦", color: "#60a5fa", spark: [12,16,18,22,24,data?.totalProducts??24], sub: "en catálogo", href: "/client/products" },
-    { label: "Score Promedio", value: score, suffix: "/100", icon: "📊", color: "var(--jade)", spark: [52,58,62,66,70,data?.avgScore??70], sub: "calidad IA", href: null },
-    { label: "Motores IA", value: eng, suffix: "", icon: "⚡", color: "var(--gold)", spark: [4,5,5,6,6,data?.enginesActive??6], sub: "activos 24/7", href: null },
-    { label: "Aprobaciones", value: pend, suffix: "", icon: "✅", color: "#f59e0b", spark: [0,1,2,3,2,data?.pendingApprovals??0], sub: "pendientes", href: "/client/approvals" },
+    { label: "Productos", value: prod, suffix: "", icon: "📦", color: "#60a5fa", sub: "en catálogo", href: "/client/products" },
+    { label: "Score Promedio", value: score, suffix: "/100", icon: "📊", color: "var(--jade)", sub: "calidad IA", href: null },
+    { label: "Motores IA", value: eng, suffix: "", icon: "⚡", color: "var(--gold)", sub: "activos 24/7", href: null },
+    { label: "Aprobaciones", value: pend, suffix: "", icon: "✅", color: "#f59e0b", sub: "pendientes", href: "/client/approvals" },
   ];
 
   // ── PLATFORM ROUTING ─────────────────────────────────────────────────────────
@@ -259,7 +243,7 @@ export default function ClientDashboard() {
             }}>
               <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 110% 110%, ${k.color}14 0%, transparent 65%)`, pointerEvents: "none" }} />
               <div style={{ position: "absolute", top: 12, right: 14, opacity: 0.6 }}>
-                <Spark vals={k.spark} color={k.color} />
+                {/* Sin histórico real no se dibuja tendencia (antes eran series inventadas). */}
               </div>
               <div style={{ fontSize: 22, marginBottom: 5 }}>{k.icon}</div>
               <div style={{ fontSize: 30, fontWeight: 800, color: k.color, lineHeight: 1, letterSpacing: "-0.02em" }}>

@@ -115,9 +115,12 @@ router.post("/approvals/:id/approve", async (req, res): Promise<void> => {
     if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
     const [item] = await db.select().from(approvalsTable).where(eq(approvalsTable.id, req.params["id"]!));
     if (!item || item.projectId !== projectId) { res.status(403).json({ error: "Access denied" }); return; }
-  
-    await db.update(approvalsTable).set({ status: "approved", reviewedAt: new Date() })
-      .where(eq(approvalsTable.id, req.params["id"]!));
+    // Solo se decide una vez (antes se podía rechazar algo ya aprobado y viceversa).
+    const [updated] = await db.update(approvalsTable).set({ status: "approved", reviewedAt: new Date() })
+      .where(and(eq(approvalsTable.id, req.params["id"]!), eq(approvalsTable.status, "pending")))
+      .returning({ id: approvalsTable.id });
+    if (!updated) { res.status(409).json({ error: "Esta propuesta ya fue revisada" }); return; }
+    sendPushToAdmins("✅ Propuesta aprobada", `${req.session.name ?? "El cliente"} aprobó: ${item.title}`, "/admin/approvals").catch(() => {});
   
     await db.insert(auditLogTable).values({
       id: randomBytes(8).toString("hex"),
@@ -142,9 +145,12 @@ router.post("/approvals/:id/reject", async (req, res): Promise<void> => {
     if (!item || item.projectId !== projectId) { res.status(403).json({ error: "Access denied" }); return; }
   
     const { comment } = req.body as { comment?: string };
-    await db.update(approvalsTable).set({
-      status: "rejected", reviewedAt: new Date(), clientComment: comment,
-    }).where(eq(approvalsTable.id, req.params["id"]!));
+    const [updated] = await db.update(approvalsTable).set({
+      status: "rejected", reviewedAt: new Date(), clientComment: typeof comment === "string" ? comment.slice(0, 2000) : null,
+    }).where(and(eq(approvalsTable.id, req.params["id"]!), eq(approvalsTable.status, "pending")))
+      .returning({ id: approvalsTable.id });
+    if (!updated) { res.status(409).json({ error: "Esta propuesta ya fue revisada" }); return; }
+    sendPushToAdmins("❌ Propuesta rechazada", `${req.session.name ?? "El cliente"} rechazó: ${item.title}`, "/admin/approvals").catch(() => {});
   
     await db.insert(auditLogTable).values({
       id: randomBytes(8).toString("hex"),
@@ -182,10 +188,14 @@ router.get("/messages", async (req, res): Promise<void> => {
       WHERE project_id = ${projectId}
       ORDER BY created_at ASC
     `);
-    await db.execute(sql`
-      UPDATE messages SET is_read = 1
-      WHERE project_id = ${projectId} AND from_role = 'admin'
-    `);
+    // Solo el cliente marca como leídos los mensajes del admin (en la vista
+    // previa del admin se perdía el contador de no leídos del cliente).
+    if (req.session.role === "client") {
+      await db.execute(sql`
+        UPDATE messages SET is_read = 1
+        WHERE project_id = ${projectId} AND from_role = 'admin'
+      `);
+    }
     res.json((result as any).rows ?? result);
   } catch (err: any) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
@@ -215,7 +225,9 @@ router.get("/products", async (req, res): Promise<void> => {
     ]);
     const shopDomain = projectRows[0]?.shopDomain ?? null;
     const products = prods.map(p => {
-      const rawImages = Array.isArray(p.imagesJson) ? p.imagesJson : (typeof p.imagesJson === "string" ? JSON.parse(p.imagesJson) : []);
+      let rawImages: unknown = [];
+      try { rawImages = Array.isArray(p.imagesJson) ? p.imagesJson : (typeof p.imagesJson === "string" ? JSON.parse(p.imagesJson) : []); } catch { rawImages = []; }
+      if (!Array.isArray(rawImages)) rawImages = [];
       const images: string[] = (rawImages as any[]).map((img: any) => typeof img === "string" ? img : (img.src ?? img.url ?? "")).filter(Boolean);
       const imageUrl = images[0] ?? null;
       return { id: p.id, title: p.title, price: p.price, auditScore: p.auditScore, auditGrade: p.auditGrade, handle: p.handle, images, imageUrl, bodyHtml: p.bodyHtml, vendor: p.vendor, shopDomain };
@@ -439,31 +451,7 @@ router.get("/reports/export", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/products", async (req, res): Promise<void> => {
-  try {
-    const projectId = getClientProjectId(req);
-    if (!projectId) { res.status(400).json({ error: "No project linked" }); return; }
-    const rows = await db.select({
-      id: productsTable.id,
-      title: productsTable.title,
-      price: productsTable.price,
-      auditScore: productsTable.auditScore,
-      auditGrade: productsTable.auditGrade,
-      imagesJson: productsTable.imagesJson,
-    }).from(productsTable)
-      .where(eq(productsTable.projectId, parseInt(projectId)))
-      .orderBy(desc(productsTable.auditScore));
-    const products = rows.map((r) => {
-      let images: string[] | null = null;
-      try { images = r.imagesJson ? (typeof r.imagesJson === "string" ? JSON.parse(r.imagesJson) : r.imagesJson as string[]) : null; } catch {}
-      return { id: r.id, title: r.title, price: r.price, auditScore: r.auditScore, auditGrade: r.auditGrade, images };
-    });
-    res.json(products);
-  } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
-  }
-});
+// (Había una segunda ruta GET /products aquí, inalcanzable: la de arriba la tapaba.)
 
 // ── NOTEBOOK ─────────────────────────────────────────────────────────────────
 router.get("/notebook", async (req, res): Promise<void> => {
@@ -495,8 +483,8 @@ router.post("/notebook", async (req, res): Promise<void> => {
     if (!content?.trim()) { res.status(400).json({ error: "content required" }); return; }
     const noteTitle = (title?.trim() || content.trim().split("\n")[0].slice(0, 80)) || "Nota sin título";
     await db.execute(
-      sql`INSERT INTO project_files (project_id, title, content, file_type, category, created_at)
-          VALUES (${pid}, ${noteTitle}, ${content.trim()}, 'text', 'notebook', NOW())`
+      sql`INSERT INTO project_files (project_id, title, content, file_type, category, mime_type, created_at)
+          VALUES (${pid}, ${noteTitle}, ${content.trim()}, 'text', 'notebook', 'text/markdown', NOW())`
     );
     res.json({ ok: true });
   } catch (err: any) {
@@ -602,7 +590,7 @@ router.get("/vault-files", async (req, res): Promise<void> => {
       objectPath: projectFilesTable.objectPath,
       hasContent: sql<boolean>`${projectFilesTable.content} IS NOT NULL`,
     }).from(projectFilesTable)
-      .where(eq(projectFilesTable.projectId, pid))
+      .where(and(eq(projectFilesTable.projectId, pid), sql`coalesce(${projectFilesTable.category}, '') <> 'notebook'`))
       .orderBy(desc(projectFilesTable.createdAt));
 
     const result = files.map(f => ({
@@ -873,8 +861,8 @@ REGLAS:
           : msg || "Informe IA";
         const fullContent = `# ${reportTitle}\n\n_Generado: ${new Date().toLocaleString("es-ES")}_\n\n---\n\n${reply}`;
         const result = await db.execute(sql`
-          INSERT INTO project_files (project_id, title, content, file_type, category, created_at)
-          VALUES (${pid}, ${reportTitle}, ${fullContent}, 'text', 'report', NOW())
+          INSERT INTO project_files (project_id, title, content, file_type, category, mime_type, created_at)
+          VALUES (${pid}, ${reportTitle}, ${fullContent}, 'text', 'report', 'text/markdown', NOW())
           RETURNING id
         `);
         const rows = (result as any).rows ?? (Array.isArray(result) ? result : []);
@@ -889,8 +877,8 @@ REGLAS:
         const noteTitle = msg.length > 70 ? msg.slice(0, 70) + "…" : msg;
         const noteContent = `**Tu mensaje:** ${msg}\n\n**Arquitecto IA:**\n${reply}`;
         await db.execute(sql`
-          INSERT INTO project_files (project_id, title, content, file_type, category, created_at)
-          VALUES (${pid}, ${noteTitle}, ${noteContent}, 'text', 'notebook', NOW())
+          INSERT INTO project_files (project_id, title, content, file_type, category, mime_type, created_at)
+          VALUES (${pid}, ${noteTitle}, ${noteContent}, 'text', 'notebook', 'text/markdown', NOW())
         `);
         autoSaved = true;
       } catch { /* silencioso — no bloquear la respuesta */ }
@@ -979,10 +967,10 @@ router.get("/platform-data", async (req, res): Promise<void> => {
     const cogsData = await db.execute(sql`
       SELECT p.title, c.total_cogs, c.unit_cost, c.shopify_payment_fee, c.shipping_cost_domestic
       FROM cogs c
-      JOIN products p ON p.id = c.product_id
-      WHERE p.project_id = ${pid}
+      JOIN products p ON p.shopify_product_id = c.shopify_product_id AND p.project_id = c.project_id
+      WHERE c.project_id = ${pid}
       ORDER BY c.total_cogs DESC LIMIT 8
-    `).catch(() => ({ rows: [] }));
+    `).catch((err) => { logger.warn({ err, pid }, "client platform-data: COGS query failed"); return { rows: [] }; });
 
     res.json({
       platformType,
