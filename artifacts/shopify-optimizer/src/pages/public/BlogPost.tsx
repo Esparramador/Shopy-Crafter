@@ -51,6 +51,7 @@ export default function BlogPost() {
         title={`${post.title} — Blog de Shopy Crafter`}
         description={post.excerpt}
         canonical={`https://shopycrafter.com/blog/${post.slug}`}
+        noindex={post.slug === "comic-crafter-caso-exito"}
       />
       <script
         type="application/ld+json"

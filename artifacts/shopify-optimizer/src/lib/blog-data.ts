@@ -121,7 +121,7 @@ export const POSTS: BlogPost[] = [
     readTime: "12 min",
     body: `
 <h2>¿Por qué migrar de WooCommerce a Shopify?</h2>
-<p>Las razones más frecuentes que escuchamos de nuestros clientes: cansancio del mantenimiento técnico de WordPress (actualizaciones constantes, problemas de seguridad, caídas por mal hosting), querer escalar sin preocupaciones de infraestructura, y aprovechar las integraciones modernas de IA que la API de Shopify permite. La migración bien planificada no solo es posible — puede dejarte con una tienda mejor que la original.</p>
+<p>Las razones más habituales para migrar: cansancio del mantenimiento técnico de WordPress (actualizaciones constantes, problemas de seguridad, caídas por mal hosting), querer escalar sin preocupaciones de infraestructura, y aprovechar las integraciones modernas de IA que la API de Shopify permite. La migración bien planificada no solo es posible — puede dejarte con una tienda mejor que la original.</p>
 
 <h2>Antes de migrar: el inventario completo</h2>
 <p>El primer paso es saber exactamente qué tienes en WooCommerce. Exporta y documenta: número de productos y variantes, categorías y colecciones, clientes y su historial de pedidos, cupones y descuentos activos, páginas de contenido (about, FAQ, políticas), reseñas de producto, y cualquier customización de tema o funcionalidad específica.</p>
@@ -302,13 +302,13 @@ export const POSTS: BlogPost[] = [
 <p>StyleLock extrae automáticamente el ADN visual de la marca (paleta de colores, estilo de fotografía, tipografía de marca) analizando las imágenes existentes. Todas las imágenes IA generadas respetan este ADN automáticamente: el resultado es un catálogo visualmente coherente aunque tengas 500 productos de 20 proveedores diferentes.</p>
 
 <h2>Motor 6: Auto-Pilot 24/7</h2>
-<p>Auto-Pilot es el orquestador central que conecta todos los motores via webhooks de Shopify. Cuando se añade un nuevo producto, Auto-Pilot activa los motores en orden: primero la generación de imágenes, luego SEO, luego pricing, finalmente configuración del A/B test. El comerciante puede definir qué motores se activan automáticamente y cuáles requieren aprobación manual. El 73% de los usuarios de Shopy Crafter tienen todo en automático completo.</p>
+<p>Auto-Pilot es el orquestador central que conecta todos los motores via webhooks de Shopify. Cuando se añade un nuevo producto, Auto-Pilot activa los motores en orden: primero la generación de imágenes, luego SEO, luego pricing, finalmente configuración del A/B test. El comerciante puede definir qué motores se activan automáticamente y cuáles requieren aprobación manual.</p>
 
-<h2>Resultados reales en 90 días</h2>
-<p>Las tiendas Shopify con los 6 motores activos en piloto automático durante 90 días muestran, de media: +67% en conversión, -34% en tiempo de gestión de catálogo, +89% en imágenes de producto (de ~2 imágenes/producto a ~6), y +41% en tráfico orgánico. El tiempo de amortización de la inversión en la plataforma es de 2-3 meses para tiendas con más de 30 productos activos.</p>
+<h2>Cómo medir los resultados en tu tienda</h2>
+<p>Cada tienda parte de una situación distinta, así que no publicamos promedios genéricos. Lo que sí hace la plataforma es medir tu punto de partida con una auditoría (puntuación por producto de título, descripción, SEO, imágenes y precio) y registrar a diario los ingresos y pedidos reales de tu tienda. Así puedes comparar antes y después con tus propios datos, no con cifras de marketing.</p>
 
 <h2>¿Es posible la automatización total?</h2>
-<p>El 73% de nuestros usuarios usa el piloto automático completo sin intervención manual. El 27% restante prefiere revisar y aprobar las sugerencias de pricing o las imágenes antes de publicarlas. Ambas opciones son válidas: la plataforma se adapta al nivel de autonomía que el comerciante prefiere. La tendencia clara es hacia más autonomía a medida que el comerciante comprueba la calidad de los resultados automáticos.</p>
+<p>Depende de ti. Puedes dejar que los cambios se apliquen solos o pasar cada propuesta por el panel de aprobaciones antes de publicarla: el cliente ve la propuesta en su portal, la aprueba o la rechaza, y solo entonces se aplica. La mayoría de tiendas empiezan revisándolo todo y automatizan lo que ya han comprobado.</p>
     `.trim(),
   },
   {
@@ -336,8 +336,8 @@ export const POSTS: BlogPost[] = [
 <h3>4. Schema JSON-LD completo</h3>
 <p>El schema Product debe incluir: name, description, image, brand, offers (con price, priceCurrency, availability), aggregateRating y gtin/mpn si están disponibles. Un schema incompleto puede hacer que Google ignore tus rich results aunque el contenido sea de calidad.</p>
 
-<h2>Resultados medidos</h2>
-<p>Las tiendas que aplican este proceso completo ven, de media: -23% en CPC de Shopping Ads, +67% en CTR orgánico de fichas de producto, y +41% en tasa de conversión desde Shopping. El motor de Shopy Crafter automatiza todos estos pasos y genera los cambios listos para importar en Shopify.</p>
+<h2>Automatizar el proceso</h2>
+<p>El motor de Shopy Crafter automatiza estos pasos y genera los cambios listos para aplicar en tu tienda Shopify, WooCommerce o PrestaShop. Mide el efecto con tus propios datos de Merchant Center y Search Console antes y después de aplicarlos.</p>
     `.trim(),
   },
   {

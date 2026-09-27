@@ -43,8 +43,8 @@ export default function ComparisonPage() {
 
       <div style={{ padding: "80px 24px 64px", maxWidth: 900, margin: "0 auto" }}>
         <Link href="/" style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          color: "var(--t4, #666)", fontSize: 13, textDecoration: "none", marginBottom: 32,
+          display: "flex", width: "fit-content", alignItems: "center", gap: 6,
+          color: "var(--t4, #666)", fontSize: 13, textDecoration: "none", marginBottom: 20,
         }}>
           ← Inicio
         </Link>

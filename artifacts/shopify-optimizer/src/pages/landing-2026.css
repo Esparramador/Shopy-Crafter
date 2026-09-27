@@ -1,0 +1,233 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Landing 2026 — secciones Servicios, Plataformas, Portfolio y Proceso.
+   Usa los tokens --l-* de design-system.css (oro #c8a84b, jade #2dd49f).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.lx-wrap { max-width: 1200px; padding: 0 8px; box-sizing: border-box; }
+.lx-sub { max-width: 620px; margin-left: auto; margin-right: auto; }
+.lx-center { display: flex; justify-content: center; margin-top: 22px; }
+.lx-note { text-align: center; font-size: 13px; color: var(--l-t2); margin: 18px 0 0; }
+
+.lx-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 13px; font-weight: 600; color: var(--l-gold2);
+  text-decoration: none; margin-top: auto; padding-top: 14px;
+  transition: color .2s, transform .2s;
+}
+.lx-link:hover { color: var(--l-gold3); transform: translateX(2px); }
+
+/* ── HERO: hechos verificables ─────────────────────────────────────── */
+.lx-facts {
+  position: relative; z-index: 2;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+  width: min(460px, 100%);
+  transition: transform .25s ease-out;
+}
+.lx-fact {
+  padding: 22px 20px;
+  background: linear-gradient(160deg, rgba(28,28,46,.92), rgba(14,14,26,.92));
+  border: 1px solid rgba(200,168,75,.16);
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.45);
+  backdrop-filter: blur(10px);
+  animation: lx-float 7s ease-in-out infinite;
+}
+.lx-fact-1 { animation-delay: -1.8s; margin-top: 26px; }
+.lx-fact-2 { animation-delay: -3.6s; margin-top: -26px; }
+.lx-fact-3 { animation-delay: -5.2s; }
+.lx-fact-val { font-family: var(--l-fh); font-size: 40px; line-height: 1; color: var(--l-gold2); letter-spacing: -.5px; }
+.lx-fact-1 .lx-fact-val { color: var(--l-jade); }
+.lx-fact-2 .lx-fact-val { color: var(--l-sky); font-size: 32px; }
+.lx-fact-lbl { margin-top: 10px; font-size: 14px; font-weight: 600; color: var(--l-t); }
+.lx-fact-sub { margin-top: 4px; font-size: 11.5px; color: var(--l-t2); line-height: 1.45; }
+@keyframes lx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+/* ── SERVICIOS ─────────────────────────────────────────────────────── */
+.lx-services { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.lx-service {
+  --lx-accent: var(--l-gold);
+  position: relative; display: flex; flex-direction: column;
+  padding: 24px 22px;
+  background: var(--l-ink3);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 18px; overflow: hidden;
+  transition: border-color .25s, transform .25s, background .25s;
+}
+.lx-service::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--lx-accent), transparent);
+  opacity: .55;
+}
+.lx-service:hover { border-color: color-mix(in srgb, var(--lx-accent) 40%, transparent); transform: translateY(-3px); background: var(--l-ink4); }
+.lx-service-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  color: var(--lx-accent);
+  background: color-mix(in srgb, var(--lx-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lx-accent) 25%, transparent);
+  margin-bottom: 14px;
+}
+.lx-service-title { font-size: 17px; font-weight: 700; color: var(--l-t); margin: 0 0 8px; }
+.lx-service-text { font-size: 13px; line-height: 1.6; color: var(--l-t2); margin: 0 0 14px; }
+.lx-tags { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.lx-tags li {
+  font-size: 11px; padding: 3px 9px; border-radius: 100px;
+  color: var(--l-t2); background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.07);
+}
+
+/* ── PLATAFORMAS ───────────────────────────────────────────────────── */
+.lx-platforms { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.lx-platform {
+  --lx-brand: var(--l-gold);
+  display: flex; flex-direction: column; text-decoration: none;
+  padding: 22px 22px 20px;
+  background: rgba(21,21,36,.88);
+  border: 1px solid rgba(255,255,255,.07);
+  border-top: 3px solid var(--lx-brand);
+  border-radius: 16px;
+  transition: transform .25s, box-shadow .25s, border-color .25s;
+}
+.lx-platform:hover { transform: translateY(-4px); box-shadow: 0 16px 40px color-mix(in srgb, var(--lx-brand) 18%, transparent); }
+.lx-platform-head { display: flex; align-items: center; gap: 10px; }
+.lx-platform-head h3 { margin: 0; font-size: 20px; font-weight: 700; color: var(--l-t); }
+.lx-platform-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--lx-brand); box-shadow: 0 0 12px var(--lx-brand); }
+.lx-platform-conn { font-family: var(--l-fm); font-size: 11px; color: var(--l-t2); margin: 8px 0 14px; }
+.lx-platform ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 7px; }
+.lx-platform li { position: relative; padding-left: 18px; font-size: 13px; color: var(--l-t); opacity: .88; }
+.lx-platform li::before { content: "✓"; position: absolute; left: 0; color: var(--l-jade); font-size: 12px; }
+
+/* ── PORTFOLIO ─────────────────────────────────────────────────────── */
+.lx-portfolio { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; align-items: stretch; }
+.lx-demos { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.lx-demo {
+  position: relative; display: flex; flex-direction: column; gap: 6px; height: 100%;
+  box-sizing: border-box; padding: 18px 16px; min-height: 118px;
+  text-decoration: none; border-radius: 14px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(200,168,75,.12), transparent 60%),
+    var(--l-ink3);
+  border: 1px solid rgba(255,255,255,.06);
+  transition: transform .25s, border-color .25s;
+}
+.lx-demo:hover { transform: translateY(-3px); border-color: rgba(200,168,75,.35); }
+.lx-demo::after { content: "↗"; position: absolute; top: 14px; right: 14px; color: var(--l-gold); font-size: 13px; opacity: .6; }
+.lx-demo-num { font-family: var(--l-fm); font-size: 11px; color: var(--l-gold); }
+.lx-demo-title { font-size: 14px; font-weight: 600; color: var(--l-t); line-height: 1.35; padding-right: 14px; }
+.lx-demo-tags { margin-top: auto; font-size: 11px; color: var(--l-t2); }
+
+.lx-app {
+  display: flex; gap: 20px; align-items: center;
+  padding: 24px; border-radius: 18px;
+  background: linear-gradient(150deg, rgba(45,212,159,.08), rgba(21,21,36,.9) 55%);
+  border: 1px solid rgba(45,212,159,.18);
+}
+.lx-app h3 { margin: 0 0 8px; font-size: 18px; color: var(--l-t); }
+.lx-app p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--l-t2); }
+.lx-app-phone {
+  position: relative; flex-shrink: 0; width: 78px; height: 150px; border-radius: 18px;
+  background: #05050b; border: 2px solid rgba(200,168,75,.35);
+  box-shadow: 0 14px 34px rgba(0,0,0,.5), inset 0 0 0 4px #0e0e1a;
+}
+.lx-app-notch { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 26px; height: 5px; border-radius: 4px; background: #1c1c2e; }
+.lx-app-screen {
+  position: absolute; inset: 20px 8px 10px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 30%, rgba(200,168,75,.35), #080810 70%);
+}
+.lx-app-screen span {
+  width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #080810; background: linear-gradient(135deg, var(--l-gold2), #b8860b);
+}
+
+/* ── PROCESO + PORTAL ──────────────────────────────────────────────── */
+.lx-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 18px; counter-reset: none; }
+.lx-steps li { display: flex; gap: 16px; align-items: flex-start; }
+.lx-step-num {
+  flex-shrink: 0; width: 38px; height: 38px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--l-fm); font-size: 13px; color: var(--l-gold2);
+  background: rgba(200,168,75,.08); border: 1px solid rgba(200,168,75,.22);
+}
+.lx-step-title { font-size: 15px; font-weight: 700; color: var(--l-t); margin-bottom: 3px; }
+.lx-step-text { font-size: 13px; line-height: 1.6; color: var(--l-t2); }
+
+.lx-portal {
+  width: 100%; box-sizing: border-box; padding: 26px 24px; border-radius: 20px;
+  background: linear-gradient(165deg, rgba(28,28,46,.95), rgba(14,14,26,.95));
+  border: 1px solid rgba(200,168,75,.18);
+  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+}
+.lx-portal-head { font-family: var(--l-fh); font-size: 28px; color: var(--l-t); }
+.lx-portal-sub { margin: 4px 0 18px; font-size: 13px; color: var(--l-jade); }
+.lx-portal ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.lx-portal li {
+  display: flex; gap: 12px; align-items: center; padding: 11px 12px; border-radius: 12px;
+  background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.05);
+}
+.lx-portal-ico { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: rgba(45,212,159,.08); font-size: 15px; }
+.lx-portal strong { display: block; font-size: 13.5px; color: var(--l-t); }
+.lx-portal li span:not(.lx-portal-ico) { display: block; font-size: 12px; color: var(--l-t2); }
+
+/* ── FOOTER ────────────────────────────────────────────────────────── */
+.lx-footer-links { flex: 1; min-width: 0; }
+
+/* ── RESPONSIVE ────────────────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .lx-services, .lx-platforms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lx-portfolio { grid-template-columns: 1fr; }
+}
+/* Escritorio con poca altura: compactar para que cada sección quepa */
+@media (min-width: 901px) and (max-height: 860px) {
+  .lx-service { padding: 18px 18px; }
+  .lx-service-text { margin-bottom: 10px; }
+  .lx-platform { padding: 16px 18px; }
+  .lx-demo { min-height: 96px; padding: 14px; }
+  .lx-app { padding: 18px; }
+  .lx-steps { gap: 12px; }
+  .lx-portal li { padding: 8px 10px; }
+}
+@media (max-width: 900px) {
+  .lx-facts { margin: 28px auto 0; }
+  .lx-fact-1 { margin-top: 18px; }
+  .lx-fact-2 { margin-top: -18px; }
+  .lx-demos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .lx-services, .lx-platforms { grid-template-columns: 1fr; }
+  .lx-fact { padding: 16px 14px; }
+  .lx-fact-val { font-size: 30px; }
+  .lx-fact-2 .lx-fact-val { font-size: 24px; }
+  .lx-app { flex-direction: column; align-items: flex-start; }
+  .lx-app-phone { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lx-fact { animation: none; }
+  .lx-service, .lx-platform, .lx-demo { transition: none; }
+}
+
+/* Títulos de sección (design-system no define tamaño base de .l-h2/.l-sub) */
+.lx-wrap .l-h2,
+#fp-process .l-h2 {
+  font-family: var(--l-fh); font-weight: 400;
+  font-size: clamp(34px, 3.6vw, 54px); line-height: 1.08; letter-spacing: -.5px;
+  color: var(--l-t); margin: 0 0 12px;
+}
+.lx-wrap .l-sub { font-size: 16px; line-height: 1.6; color: var(--l-t2); margin: 0 auto; }
+.lx-wrap .fp-section-header { margin-bottom: 30px; }
+@media (min-width: 901px) and (max-height: 860px) {
+  .lx-wrap .l-h2, #fp-process .l-h2 { font-size: clamp(30px, 3vw, 44px); }
+  .lx-wrap .fp-section-header { margin-bottom: 20px; }
+}
+@media (max-width: 600px) {
+  .lx-wrap .l-h2, #fp-process .l-h2 { font-size: 30px !important; }
+  .lx-wrap .l-sub { font-size: 14px !important; }
+}
+
+/* Botón "Visitar Comic Crafter": en móvil va en el flujo, no encima del contenido */
+@media (max-width: 900px) {
+  .lx-magnet {
+    position: relative !important; bottom: auto !important; right: auto !important;
+    align-self: center; margin-top: 22px; transform: none !important;
+  }
+}

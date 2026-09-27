@@ -4,6 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import PageMeta from "@/components/PageMeta";
 import { VismeFormHero } from "@/components/VismeFormHero";
 import { CANONICAL_PLANS, type CanonicalPlan } from "@/lib/pricing-plans";
+import ApkDownloadButton from "@/components/ApkDownloadButton";
+import SiteLinks from "@/components/SiteLinks";
+import { metaFor } from "@/components/PageMeta";
+import { HERO, SERVICES, PLATFORMS, PROCESS, PORTAL_FEATURES, FEATURED_DEMOS } from "@/lib/landing-content";
+import { WEB_DEMOS } from "@/lib/portfolio-data";
+import "./landing-2026.css";
 
 function SectionVideoBg({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -120,7 +126,7 @@ function MagnetStoreButton() {
         userSelect: "none",
         whiteSpace: "nowrap",
       }}
-      className="justify-start items-center text-center">
+      className="lx-magnet justify-start items-center text-center">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
         <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -138,73 +144,6 @@ function MagnetStoreButton() {
 }
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-
-function ApkDownloadButton({ labels }: { labels?: { idle: string; checking: string; downloading: string; building: string; unavailable: string } }) {
-  const [status, setStatus] = useState<"idle" | "checking" | "downloading" | "unavailable">("idle");
-  const [apkAvailable, setApkAvailable] = useState<boolean | null>(null);
-  const lb = labels ?? { idle: "📱 Descargar App Android", checking: "Verificando...", downloading: "⬇ Descargando...", building: "🔜 Disponible próximamente", unavailable: "No disponible" };
-
-  const handleClick = async () => {
-    if (status === "downloading") return;
-    setStatus("checking");
-    try {
-      const r = await fetch(`${API_BASE_LANDING}/api/apk/status`);
-      const data = await r.json() as { available: boolean; building?: boolean };
-      if (data.available) {
-        setApkAvailable(true);
-        setStatus("downloading");
-        const a = document.createElement("a");
-        a.href = `${API_BASE_LANDING}/api/apk/download`;
-        a.download = "ShopyCrafter.apk";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => setStatus("idle"), 3000);
-      } else if (data.building) {
-        setApkAvailable(false);
-        setStatus("unavailable");
-        setTimeout(() => setStatus("idle"), 4000);
-      } else {
-        setApkAvailable(false);
-        setStatus("unavailable");
-        setTimeout(() => setStatus("idle"), 4000);
-      }
-    } catch {
-      setStatus("idle");
-    }
-  };
-
-  const label = status === "checking" ? lb.checking
-    : status === "downloading" ? lb.downloading
-    : status === "unavailable" ? (apkAvailable === false ? lb.building : lb.unavailable)
-    : lb.idle;
-
-  return (
-    <button
-      onClick={handleClick}
-      disabled={status !== "idle"}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        marginTop: 14,
-        padding: "10px 22px",
-        borderRadius: 10,
-        background: status === "downloading" ? "rgba(45,212,159,0.15)" : "rgba(200,168,75,0.08)",
-        border: `1px solid ${status === "downloading" ? "rgba(45,212,159,0.5)" : "rgba(200,168,75,0.35)"}`,
-        color: status === "downloading" ? "#2dd49f" : "#c8a84b",
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: status !== "idle" ? "not-allowed" : "pointer",
-        transition: "all 0.2s",
-        letterSpacing: 0.2,
-        opacity: status !== "idle" && status !== "downloading" ? 0.75 : 1,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
 
 type CMSContent = {
   site: { name: string; tagline: string; logo: { type: string; value: string; imageUrl: string | null }; primaryColor: string; accentColor: string; font_heading: string; font_body: string };
@@ -250,35 +189,9 @@ const LANDING_FALLBACK: CMSContent = {
   footer: { tagline: "Optimización IA para tiendas Shopify", columns: [], copyright: `© ${new Date().getFullYear()} Shopy Crafter`, badges: ["RGPD", "SSL", "Shopify Partner"] },
 };
 
-const FP_SECTION_IDS = ["fp-hero", "fp-engines", "fp-demo", "fp-results", "fp-pricing", "fp-calculator", "fp-contact"];
-const DEFAULT_SECTION_NAV = ["Inicio", "Motores", "Demo", "Resultados", "Precios", "Calculadora", "Contactar"];
+const FP_SECTION_IDS = ["fp-hero", "fp-services", "fp-platforms", "fp-portfolio", "fp-process", "fp-pricing", "fp-calculator", "fp-contact"];
+const DEFAULT_SECTION_NAV = ["Inicio", "Servicios", "Plataformas", "Portfolio", "Proceso", "Precios", "Calculadora", "Contactar"];
 
-function AnimatedCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
-  const [val, setVal] = useState(0);
-  const [started, setStarted] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const obs = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && !started) {
-        setStarted(true);
-        const start = Date.now();
-        const tick = () => {
-          const elapsed = Date.now() - start;
-          const progress = Math.min(elapsed / duration, 1);
-          const eased = 1 - Math.pow(1 - progress, 3);
-          setVal(Math.round(target * eased));
-          if (progress < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }
-    }, { threshold: 0.5 });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, [target, duration, started]);
-
-  return <span ref={ref}>{val}</span>;
-}
 
 export default function Landing() {
   const { user } = useAuth();
@@ -286,7 +199,6 @@ export default function Landing() {
   const isAdmin = !isPreview && user?.role === "admin";
   const [content, setContent] = useState<CMSContent>(LANDING_FALLBACK);
   const [currentSection, setCurrentSection] = useState(0);
-  const [activeEngine, setActiveEngine] = useState(0);
   const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});
   const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
   const [calcCategory, setCalcCategory] = useState("all");
@@ -353,6 +265,10 @@ export default function Landing() {
     // Final fallback
     return CANONICAL_PLANS;
   }, [apiPlansState, content?.pricing?.plans]);
+  // Ahorro anual real (antes "17%" fijo): el mayor de los planes de pago.
+  const annualSavingPct = useMemo(() => Math.max(0, ...displayPlans
+    .filter(p => p.priceMonthly > 0 && p.priceAnnual > 0)
+    .map(p => Math.round((1 - p.priceAnnual / (p.priceMonthly * 12)) * 100))), [displayPlans]);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "", suppliers: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -366,7 +282,9 @@ export default function Landing() {
   const heroSectionRef = useRef<HTMLElement>(null);
   const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
 
-  const sectionNavLabels = content?.sectionNav ?? DEFAULT_SECTION_NAV;
+  // Las etiquetas del CMS iban por índice de las secciones antiguas: con la nueva
+  // estructura se usan las propias.
+  const sectionNavLabels = DEFAULT_SECTION_NAV;
   const FP_SECTIONS = FP_SECTION_IDS.map((id, i) => ({ id, nav: sectionNavLabels[i] ?? DEFAULT_SECTION_NAV[i] }));
 
   const CF = (field: keyof typeof contactForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -511,10 +429,11 @@ export default function Landing() {
     const alias: Record<string, string> = {
       cta: "fp-contact", "fp-cta": "fp-contact",
       contact: "fp-contact", contacto: "fp-contact", contacta: "fp-contact", contactar: "fp-contact",
-      how: "fp-demo", "fp-how": "fp-demo", como: "fp-demo", "cómo": "fp-demo",
+      how: "fp-process", "fp-how": "fp-process", como: "fp-process", "cómo": "fp-process", proceso: "fp-process",
       planes: "fp-pricing", precios: "fp-pricing", pricing: "fp-pricing",
-      demo: "fp-demo", resultados: "fp-results", results: "fp-results",
-      motores: "fp-engines", engines: "fp-engines",
+      demo: "fp-portfolio", "fp-demo": "fp-portfolio", resultados: "fp-portfolio", results: "fp-portfolio", "fp-results": "fp-portfolio", portfolio: "fp-portfolio",
+      motores: "fp-services", engines: "fp-services", "fp-engines": "fp-services", servicios: "fp-services", services: "fp-services",
+      plataformas: "fp-platforms", platforms: "fp-platforms",
       calculadora: "fp-calculator", calculator: "fp-calculator",
       inicio: "fp-hero", home: "fp-hero",
     };
@@ -730,7 +649,6 @@ export default function Landing() {
     };
   }, [isPreview]);
 
-  const hLines = String(content?.hero?.headline ?? "").split("\n");
   const progressPct = FP_SECTIONS.length > 1 ? (currentSection / (FP_SECTIONS.length - 1)) * 100 : 0;
 
   const bgFor = (section: string) => content.backgrounds?.[section] ?? { type: "none" };
@@ -777,11 +695,7 @@ export default function Landing() {
           (el as any).__cleanup = () => window.removeEventListener("mousemove", move);
         }}
       />
-      <PageMeta
-        title="Shopy Crafter — IA para Shopify: SEO, imágenes, pricing y conversión automática"
-        description="Optimiza tu tienda Shopify con 6 motores de IA: SEO técnico, imágenes profesionales, pricing inteligente y tests A/B en piloto automático 24/7. La alternativa inteligente si vienes de WooCommerce o PrestaShop. Setup en 48h."
-        canonical="https://shopycrafter.com/"
-      />
+      <PageMeta {...metaFor("/")} />
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">
         <a href="#" className="l-nav-logo" onClick={e => { e.preventDefault(); goToSection(0); }}>
@@ -864,244 +778,192 @@ export default function Landing() {
 
           <div className="fp-content fp-hero-layout">
             <div className="fp-hero-left">
-              {content.hero.pill.visible && (
-                <div className={`l-hero-pill ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }} {...cmsProps("hero.pill.text")}>
-                  <div className="l-pill-dot"></div>
-                  {content.hero.pill.text}
-                </div>
-              )}
-              <h1 className={`l-hero-h1 ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }} onClick={cmsClick("hero.headline")} {...cmsData("hero.headline")}>
-                {hLines.map((line, i) => (
+              <div className={`l-hero-pill ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
+                <div className="l-pill-dot"></div>
+                {HERO.pill}
+              </div>
+              <h1 className={`l-hero-h1 ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+                {HERO.headline.map((line, i) => (
                   <span key={i} className={i > 0 ? "l-block" : undefined}>
-                    {content.hero.headlineHighlight && line.includes(content.hero.headlineHighlight)
-                      ? line.split(content.hero.headlineHighlight).flatMap((part, pi, arr) =>
-                          pi < arr.length - 1 ? [part, <span key={pi}>{content.hero.headlineHighlight}</span>] : [part]
-                        )
+                    {line.includes(HERO.highlight)
+                      ? <>{line.split(HERO.highlight)[0]}<span>{HERO.highlight}</span>{line.split(HERO.highlight)[1]}</>
                       : line}
                   </span>
                 ))}
               </h1>
-              <p className={`l-hero-sub ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.22s" }} onClick={cmsClick("hero.subheadline")} {...cmsData("hero.subheadline")}>{content.hero.subheadline}</p>
+              <p className={`l-hero-sub ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.22s" }}>{HERO.sub}</p>
               <div className={`l-hero-ctas ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.34s" }}>
-                <a href={`#${resolveSectionId(content.hero.ctaPrimary?.href) ?? "fp-pricing"}`} className="l-btn-primary btn-jelly" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaPrimary.label", e) : goToHref(content.hero.ctaPrimary?.href, 4); }} {...cmsData("hero.ctaPrimary.label")}>{content.hero.ctaPrimary?.label ?? "Ver planes →"}</a>
-                <a href={`#${resolveSectionId(content.hero.ctaSecondary?.href) ?? "fp-demo"}`} className="l-btn-secondary btn-jelly" onClick={e => { e.preventDefault(); isPreview ? cmsNotify("hero.ctaSecondary.label", e) : goToHref(content.hero.ctaSecondary?.href, 2); }} {...cmsData("hero.ctaSecondary.label")}>{content.hero.ctaSecondary.label}</a>
+                <a href="#fp-contact" className="l-btn-primary btn-jelly" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); }}>Solicitar propuesta →</a>
+                <a href="#fp-portfolio" className="l-btn-secondary btn-jelly" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-portfolio")); setHashRobust("fp-portfolio"); }}>Ver portfolio</a>
               </div>
-              
               <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
-                {content.hero.trustItems.map((item, i) => (
-                  <div key={i} className="l-trust-item" {...cmsProps(`hero.trustItems.${i}`)}><div className="l-trust-check">✓</div>{item}</div>
+                {HERO.trust.map(item => (
+                  <div key={item} className="l-trust-item"><div className="l-trust-check">✓</div>{item}</div>
                 ))}
               </div>
             </div>
 
             <div className={`fp-hero-right ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s", position: "relative" }}>
               <div className="l-preview-glow"></div>
-              {content.hero.imageUrl ? (
-                <div className="l-preview-frame" style={{ padding: 0, overflow: "hidden" }}>
-                  <img src={`${API_BASE_LANDING}${content.hero.imageUrl}`} alt="Hero" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }} onError={e => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
-                </div>
-              ) : (
-                <div className="hero-visual-float">
-                  <div className="hv-glow" />
-                  <div className="hv-card hv-c1">
-                    <div className="hv-icon">📈</div>
-                    <div className="hv-num">+67%</div>
-                    <div className="hv-label">Conversión</div>
+              <div className="lx-facts" style={{ transform: `perspective(1200px) rotateY(${heroTilt.x * 0.4}deg) rotateX(${-heroTilt.y * 0.4}deg)` }}>
+                {HERO.facts.map((f, i) => (
+                  <div key={f.label} className={`lx-fact lx-fact-${i}`}>
+                    <div className="lx-fact-val">{f.value}</div>
+                    <div className="lx-fact-lbl">{f.label}</div>
+                    <div className="lx-fact-sub">{f.sub}</div>
                   </div>
-                  <div className="hv-card hv-c2">
-                    <div className="hv-icon">⚡</div>
-                    <div className="hv-num">48h</div>
-                    <div className="hv-label">Configuración</div>
-                  </div>
-                  <div className="hv-card hv-c3">
-                    <div className="hv-icon">🎯</div>
-                    <div className="hv-num">6 IA</div>
-                    <div className="hv-label">Motores</div>
-                  </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           </div>
 
           <MagnetStoreButton />
 
           <div className="fp-scroll-hint">
-            <div className="fp-scroll-hint-text" {...cmsProps("hero.scrollHint")}>{content.hero.scrollHint ?? "Desliza para explorar"}</div>
+            <div className="fp-scroll-hint-text">Desliza para explorar</div>
             <div className="fp-scroll-hint-arrow">↓</div>
           </div>
         </section>
 
         {/* ══════════════════════════════════════
-            SECTION 02 — ENGINES (6 motors)
+            SECTION 02 — SERVICIOS
         ══════════════════════════════════════ */}
-        <section className="fp-section fp-section-dark" id="fp-engines" data-nav="Motores" data-effect={eff("engines")}>
+        <section className="fp-section fp-section-dark" id="fp-services" data-nav="Servicios" data-effect={eff("engines")}>
           <div className="fp-bg-solid">{videoBg("features")}</div>
-          <div className="fp-content fp-engines-layout">
-            <div className={`fp-section-header ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill" {...cmsProps("features.pill")}>{content.features.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("features.headline")} {...cmsData("features.headline")}>{String(content.features.headline ?? "").split(".")[0]}. <em>{String(content.features.headline ?? "").split(".").slice(1).join(".")}</em></h2>
-              <p className="l-sub" {...cmsProps("features.subheadline")}>{content.features.subheadline}</p>
+          <div className="fp-content lx-wrap">
+            <div className={`fp-section-header ${!isAnimated("fp-services") ? "fp-animate" : "fp-animated"}`}>
+              <div className="l-pill">Qué hacemos</div>
+              <h2 className="l-h2">Un solo equipo para tu tienda, <em>tu web y tu app.</em></h2>
+              <p className="l-sub lx-sub">Plataforma de IA propia y personas que la operan para ti.</p>
             </div>
-
-            <div className={`fp-engine-tabs ${!isAnimated("fp-engines") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-              {content.features.items.map((feat, i) => (
-                <button key={feat.id} className={`fp-etab${activeEngine === i ? " active" : ""}`} onClick={() => setActiveEngine(i)}>
-                  <span className="fp-etab-num">{feat.num}</span>
-                  <span className="fp-etab-icon">{feat.icon}</span>
-                  <span className="fp-etab-name" {...cmsProps(`features.items.${i}.title`)}>{String(feat.title ?? "").split(" ")[0]}</span>
-                </button>
+            <div className={`lx-services ${!isAnimated("fp-services") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+              {SERVICES.map(svc => (
+                <article key={svc.id} className="lx-service" style={{ ["--lx-accent" as string]: svc.accent }}>
+                  <div className="lx-service-icon" aria-hidden="true">{svc.icon}</div>
+                  <h3 className="lx-service-title">{svc.title}</h3>
+                  <p className="lx-service-text">{svc.text}</p>
+                  <ul className="lx-tags">
+                    {svc.items.map(it => <li key={it}>{it}</li>)}
+                  </ul>
+                  <Link href={svc.href} className="lx-link">{svc.cta} →</Link>
+                </article>
               ))}
             </div>
-
-            {content.features.items[activeEngine] && (
-              <div className={`fp-engine-panel${!isAnimated("fp-engines") ? " fp-animate" : " fp-animated"}`} style={{ animationDelay: "0.2s" }} key={activeEngine}>
-                <div className="fp-engine-icon-wrap">
-                  <div className="fp-engine-icon-large" style={{ background: content.features.items[activeEngine].iconBg }}>
-                    {content.features.items[activeEngine].icon}
-                  </div>
-                  <div className="fp-engine-num-badge">{content.features.items[activeEngine].num}</div>
-                </div>
-                <div className="fp-engine-info">
-                  <h3 className="fp-engine-title" {...cmsProps(`features.items.${activeEngine}.title`)}>{content.features.items[activeEngine].title}</h3>
-                  <p className="fp-engine-desc" {...cmsProps(`features.items.${activeEngine}.description`)}>{content.features.items[activeEngine].description}</p>
-                  <div className="fp-engine-tags">
-                    {(Array.isArray(content.features.items[activeEngine].tags)
-                      ? content.features.items[activeEngine].tags
-                      : String(content.features.items[activeEngine].tags ?? "").split(",").map((s: string) => s.trim()).filter(Boolean)
-                    ).map((tag: string, ti: number) => (
-                      <span key={ti} className="fp-engine-tag">{tag}</span>
-                    ))}
-                  </div>
-                </div>
-                <div className="fp-engine-stats">
-                  {(content.features.items[activeEngine].stats ?? [
-                    { label: "Precisión", value: "94%" },
-                    { label: "Velocidad", value: "<2s" },
-                    { label: "Uptime", value: "99.9%" },
-                  ]).map((stat, si) => (
-                    <div key={si} className="fp-engine-stat">
-                      <div className="fp-engine-stat-val" style={{ color: ["var(--l-jade)", "var(--l-gold)", "var(--l-sky)"][si] ?? "var(--l-jade)" }}>{stat.value}</div>
-                      <div className="fp-engine-stat-lbl">{stat.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
         {/* ══════════════════════════════════════
-            SECTION 03 — DEMO (split layout)
+            SECTION 03 — PLATAFORMAS
         ══════════════════════════════════════ */}
-        <section className="fp-section" id="fp-demo" data-nav="Demo" data-effect={eff("demo")}>
+        <section className="fp-section" id="fp-platforms" data-nav="Plataformas" data-effect={eff("demo")}>
           <div className="fp-bg">
             {videoBg("how")}
-            <div className="l-hero-grid" style={{ opacity: 0.3 }}></div>
+            <div className="l-hero-grid" style={{ opacity: 0.25 }}></div>
           </div>
-          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.8)" }}></div>
-          <div className="fp-content fp-split-layout">
-            <div className={`fp-split-left ${!isAnimated("fp-demo") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill" {...cmsProps("how.pill")}>{content.how.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("how.headline")} {...cmsData("how.headline")}>
-                {String(content.how.headline ?? "").split("\n").map((line, i) => (
-                  <span key={i} className={i > 0 ? "l-block" : undefined}>
-                    {content.how.headlineHighlight && line.includes(content.how.headlineHighlight)
-                      ? line.split(content.how.headlineHighlight).flatMap((p, pi, arr) =>
-                          pi < arr.length - 1 ? [p, <em key={pi}>{content.how.headlineHighlight}</em>] : [p]
-                        )
-                      : line}
-                  </span>
-                ))}
-              </h2>
-              <div className="fp-demo-steps">
-                {content.how.steps.map((step, si) => (
-                  <div key={step.num} className="fp-demo-step">
-                    <div className="fp-demo-step-num">{step.num}</div>
-                    <div className="fp-demo-step-content">
-                      <div className="fp-demo-step-title" {...cmsProps(`how.steps.${si}.title`)}>{step.title}</div>
-                      <div className="fp-demo-step-desc" {...cmsProps(`how.steps.${si}.desc`)}>{step.desc}</div>
-                    </div>
+          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.82)" }}></div>
+          <div className="fp-content lx-wrap">
+            <div className={`fp-section-header ${!isAnimated("fp-platforms") ? "fp-animate" : "fp-animated"}`}>
+              <div className="l-pill">Conexión nativa</div>
+              <h2 className="l-h2">Trabajamos donde ya <em>vende tu negocio.</em></h2>
+              <p className="l-sub lx-sub">Sin migraciones obligatorias: nos conectamos a tu plataforma por su API oficial.</p>
+            </div>
+            <div className={`lx-platforms ${!isAnimated("fp-platforms") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+              {PLATFORMS.map(p => (
+                <Link key={p.key} href={p.href} className="lx-platform" style={{ ["--lx-brand" as string]: p.color }}>
+                  <div className="lx-platform-head">
+                    <span className="lx-platform-dot" aria-hidden="true" />
+                    <h3>{p.name}</h3>
                   </div>
+                  <div className="lx-platform-conn">{p.connection}</div>
+                  <ul>
+                    {p.capabilities.map(c => <li key={c}>{c}</li>)}
+                  </ul>
+                  <span className="lx-link">Ver {p.name} →</span>
+                </Link>
+              ))}
+            </div>
+            <p className="lx-note">¿Otra plataforma? Auditamos cualquier web a partir de su URL pública.</p>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════
+            SECTION 04 — PORTFOLIO
+        ══════════════════════════════════════ */}
+        <section className="fp-section fp-section-dark" id="fp-portfolio" data-nav="Portfolio" data-effect={eff("results")}>
+          <div className="fp-bg-solid">{videoBg("results")}</div>
+          <div className="fp-content lx-wrap">
+            <div className={`fp-section-header ${!isAnimated("fp-portfolio") ? "fp-animate" : "fp-animated"}`}>
+              <div className="l-pill">Portfolio</div>
+              <h2 className="l-h2">Lo que construimos, <em>abierto para que lo pruebes.</em></h2>
+              <p className="l-sub lx-sub">{WEB_DEMOS.length} demos web interactivas y nuestra propia app Android.</p>
+            </div>
+            <div className={`lx-portfolio ${!isAnimated("fp-portfolio") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+              <ul className="lx-demos">
+                {FEATURED_DEMOS.map(i => WEB_DEMOS[i]).filter(Boolean).map(d => (
+                  <li key={d.file}>
+                    <a href={`/web-demos/${d.file}`} target="_blank" rel="noopener" className="lx-demo">
+                      <span className="lx-demo-num">{d.file.slice(0, 2)}</span>
+                      <span className="lx-demo-title">{d.title}</span>
+                      <span className="lx-demo-tags">{d.tags.join(" · ")}</span>
+                    </a>
+                  </li>
                 ))}
+              </ul>
+              <div className="lx-app">
+                <div className="lx-app-phone" aria-hidden="true">
+                  <div className="lx-app-notch" />
+                  <div className="lx-app-screen"><span>SC</span></div>
+                </div>
+                <div>
+                  <h3>App Android de Shopy Crafter</h3>
+                  <p>Construida con Capacitor sobre la misma base de código que la web. Así convertimos webs y tiendas en apps nativas.</p>
+                  <ApkDownloadButton labels={content.apkLabels} />
+                </div>
               </div>
             </div>
-            <div className={`fp-split-right ${!isAnimated("fp-demo") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.15s" }}>
-              {(content.howCards ?? [
-                { icon: "✓", title: "Auditoría completada", sub: "234 productos analizados · 12 acciones urgentes", barPercent: "88" },
-                { icon: "🎨", title: "Imágenes generándose", sub: "flux-1.1-pro · 48/234 productos", barPercent: "21" },
-                { icon: "⚗️", title: "A/B Test activo", sub: "Bomber Hero · 342 visitas · 67% confianza", barPercent: "67" },
-              ]).map((c, i) => {
-                const colors = ["#2dd49f", "#e6c668", "#4a9edd"];
-                const cl = colors[i % colors.length];
-                return (
-                  <div key={i} className="l-how-card">
-                    <div className="l-how-card-h">
-                      <div className="l-how-card-ico" style={{ background: `${cl}18`, color: cl }}>{c.icon}</div>
-                      <div><div className="l-how-card-title" {...cmsProps(`howCards.${i}.title`)}>{c.title}</div><div className="l-how-card-sub" {...cmsProps(`howCards.${i}.sub`)}>{c.sub}</div></div>
-                    </div>
-                    <div className="l-how-bar"><div className="l-how-bar-f" style={{ width: `${c.barPercent}%`, background: `linear-gradient(90deg,${cl},${cl}88)`, transition: "width 3s ease" }}></div></div>
-                  </div>
-                );
-              })}
-              {(() => {
-                const imp = content.howImpact ?? { icon: "💰", title: "Impacto estimado", sub: "+€8,400/mes proyectados este mes" };
-                return (
-                  <div className="l-how-card l-how-card-green">
-                    <div className="l-how-card-h">
-                      <div className="l-how-card-ico" style={{ background: "rgba(45,212,159,.1)", color: "#2dd49f" }}>{imp.icon}</div>
-                      <div><div className="l-how-card-title">{imp.title}</div><div className="l-how-card-sub" style={{ color: "#2dd49f" }}>{imp.sub}</div></div>
-                    </div>
-                  </div>
-                );
-              })()}
+            <div className="lx-center">
+              <Link href="/portfolio" className="l-btn-secondary btn-jelly">Ver las {WEB_DEMOS.length} demos →</Link>
             </div>
           </div>
         </section>
 
         {/* ══════════════════════════════════════
-            SECTION 04 — RESULTS (counters)
+            SECTION 05 — PROCESO + PORTAL
         ══════════════════════════════════════ */}
-        <section className="fp-section fp-results-section" id="fp-results" data-nav="Resultados" data-effect={eff("results")}>
+        <section className="fp-section" id="fp-process" data-nav="Proceso" data-effect={eff("demo")}>
           <div className="fp-bg">
-            {videoBg("results")}
-            <div className="fp-results-bg-pattern"></div>
+            <div className="l-hero-grid" style={{ opacity: 0.2 }}></div>
           </div>
-          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.72)" }}></div>
-          <div className="fp-content fp-results-layout">
-            <div className={`fp-section-header ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill" {...cmsProps("results.pill")}>{content.results?.pill ?? "Resultados probados"}</div>
-              <h2 className="l-h2" onClick={cmsClick("results.headline")} {...cmsData("results.headline")}>{(() => {
-                const hl = content.results?.headline ?? "Números que hablan solos";
-                const hlHighlight = content.results?.headlineHighlight ?? "hablan solos";
-                if (hl.includes(hlHighlight)) {
-                  const parts = hl.split(hlHighlight);
-                  return <>{parts[0]}<em>{hlHighlight}</em>{parts.slice(1).join(hlHighlight)}</>;
-                }
-                return hl;
-              })()}</h2>
+          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.85)" }}></div>
+          <div className="fp-content fp-split-layout">
+            <div className={`fp-split-left ${!isAnimated("fp-process") ? "fp-animate" : "fp-animated"}`}>
+              <div className="l-pill">Cómo trabajamos</div>
+              <h2 className="l-h2">Nada se publica <em>sin tu visto bueno.</em></h2>
+              <ol className="lx-steps">
+                {PROCESS.map(step => (
+                  <li key={step.num}>
+                    <span className="lx-step-num">{step.num}</span>
+                    <div>
+                      <div className="lx-step-title">{step.title}</div>
+                      <div className="lx-step-text">{step.text}</div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
-            <div className={`fp-stats-grid ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-              {(content.results?.stats ?? [
-                { prefix: "+", num: "234", suffix: "%", label: "Incremento medio en conversión", color: "var(--l-jade)" },
-                { prefix: "€", num: "8400", suffix: "/mes", label: "Ingresos adicionales promedio", color: "var(--l-gold)" },
-                { prefix: "", num: "99", suffix: ".9%", label: "Uptime garantizado de la plataforma", color: "var(--l-sky)" },
-                { prefix: "", num: "6", suffix: " motores", label: "Optimizando tu tienda 24/7", color: "#8b5cf6" },
-              ]).map((stat, i) => (
-                <div key={i} className="fp-stat-card">
-                  <div className="fp-stat-val" style={{ color: stat.color }}>
-                    {stat.prefix}<AnimatedCounter target={parseInt(String(stat.num), 10) || 0} />{stat.suffix}
-                  </div>
-                  <div className="fp-stat-label">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-            <div className={`fp-tech-logos ${!isAnimated("fp-results") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.25s" }}>
-              {(content.results?.techBadges ?? [{ icon: "🛍️", label: "eCommerce API" }, { icon: "🤖", label: "Claude AI" }, { icon: "🎨", label: "Replicate" }, { icon: "🔍", label: "GSC" }, { icon: "📧", label: "Klaviyo" }, { icon: "🔐", label: "AES-256" }, { icon: "⚡", label: "Automation" }]).map((badge, i) => (
-                <div key={i} className="fp-tech-badge">
-                  <span>{badge.icon}</span>
-                  <span>{badge.label}</span>
-                </div>
-              ))}
+            <div className={`fp-split-right ${!isAnimated("fp-process") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.15s" }}>
+              <div className="lx-portal">
+                <div className="lx-portal-head">Tu portal de cliente</div>
+                <p className="lx-portal-sub">Privado: cada cliente ve solo su proyecto.</p>
+                <ul>
+                  {PORTAL_FEATURES.map(f => (
+                    <li key={f.title}>
+                      <span className="lx-portal-ico" aria-hidden="true">{f.icon}</span>
+                      <div><strong>{f.title}</strong><span>{f.text}</span></div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </section>
@@ -1127,7 +989,7 @@ export default function Landing() {
                   Anual
                 </button>
               </div>
-              <span className={`fp-bt-save-ext${billingPeriod === "annual" ? " active" : ""}`} style={{ opacity: billingPeriod === "annual" ? 1 : 0.38 }}>🎁 Ahorra 17% con el plan Anual</span>
+              {annualSavingPct > 0 && <span className={`fp-bt-save-ext${billingPeriod === "annual" ? " active" : ""}`} style={{ opacity: billingPeriod === "annual" ? 1 : 0.38 }}>🎁 Ahorra {annualSavingPct}% con el plan anual</span>}
             </div>
             <div className="fp-pricing-carousel-wrap">
               {pricingIdx > 0 && (
@@ -1145,24 +1007,14 @@ export default function Landing() {
                       {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
                       {plan.featured && <div className="pc-savings-tag">✨ MÁS POPULAR</div>}
                       <div className="l-pricing-plan" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
-                      {plan.id === "starter" && <div className="pc-roi-badge">📈 Clientes ven +40% conversión media</div>}
-                      {plan.id === "agency_pro" && <div className="pc-roi-badge">📈 ROI medio ×2.1 en los primeros 60 días</div>}
-                      {plan.id === "enterprise" && <div className="pc-roi-badge">🚀 ROI medio ×3.6 para agencias</div>}
-                      {plan.id === "personalizado" && <div className="pc-roi-badge">🤝 Solución 100% a medida</div>}
                       <div style={{ position: "relative", zIndex: 2 }}>
                         <div className="l-pricing-price">{plan.priceMonthly === 0 ? <span style={{ fontSize: "0.55em", letterSpacing: "-1px" }}>A medida</span> : <>{plan.currency}{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</>}</div>
                         <div className={`pc-annual-pill${billingPeriod === "annual" && plan.priceMonthly > 0 ? " visible" : ""}`}>
-                          <span className="pc-annual-pill-pct">−17%</span>
-                          <span className="pc-annual-pill-txt">{plan.currency}{plan.priceAnnual > 0 ? plan.priceAnnual : "—"}/año · ahorras {plan.currency}{plan.priceMonthly * 2}</span>
+                          {plan.priceMonthly * 12 > plan.priceAnnual && <span className="pc-annual-pill-pct">−{Math.round((1 - plan.priceAnnual / (plan.priceMonthly * 12)) * 100)}%</span>}
+                          <span className="pc-annual-pill-txt">{plan.currency}{plan.priceAnnual > 0 ? plan.priceAnnual : "—"}/año{plan.priceMonthly * 12 > plan.priceAnnual ? <> · ahorras {plan.currency}{plan.priceMonthly * 12 - plan.priceAnnual}</> : null}</span>
                         </div>
                       </div>
                       <div className="l-pricing-period" style={{ position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "/mes · sin permanencia" : "/mes · facturado anual"}</div>
-                      {plan.featured && (
-                        <div className="pc-urgency">
-                          <div className="pc-urgency-dot"></div>
-                          <span>Plazas limitadas · Onboarding 1:1 incluido</span>
-                        </div>
-                      )}
                       <div className="l-pricing-divider" style={{ position: "relative", zIndex: 2 }}></div>
                       <ul className="l-pricing-features" style={{ position: "relative", zIndex: 2 }}>
                         {plan.features.map((f, fi) => (
@@ -1611,69 +1463,15 @@ export default function Landing() {
                     )}
                     <div className="l-nav-logo-text">{content.site.name}</div>
                   </a>
-                  <p className="l-footer-desc" {...cmsProps("footer.tagline")}>{content.footer.tagline}</p>
+                  <p className="l-footer-desc">IA para tiendas Shopify, WooCommerce y PrestaShop, gestión de Stripe, diseño web y apps nativas.</p>
                 </div>
-                <div className="fp-footer-cols">
-                {content.footer.columns.slice(0, 4).map((col, i) => (
-                  <div key={i} className="fp-footer-col">
-                    <div className="l-footer-col-title" {...cmsProps(`footer.columns.${i}.title`)}>{col.title}</div>
-                    <ul className="l-footer-links">
-                      {col.links.slice(0, 4).map((l, li) => {
-                        const href = (l.href || "").trim();
-                        const LEGAL_ROUTES: Record<string, string> = {
-                          "#legal:privacy": "/privacidad",
-                          "#legal:terms": "/terminos",
-                          "#legal:cookies": "/cookies",
-                          "#legal:gdpr": "/privacidad",
-                        };
-                        const ANCHOR_ROUTES: Record<string, string> = {
-                          "#about-us": "/sobre-nosotros",
-                          "#case-studies": "/casos-de-exito",
-                          "#affiliates": "/programa-de-afiliados",
-                        };
-                        if (LEGAL_ROUTES[href]) {
-                          return <li key={li}><Link href={LEGAL_ROUTES[href]}>{l.label}</Link></li>;
-                        }
-                        if (ANCHOR_ROUTES[href]) {
-                          return <li key={li}><Link href={ANCHOR_ROUTES[href]}>{l.label}</Link></li>;
-                        }
-                        if (href.startsWith("/") && !href.startsWith("//")) {
-                          return <li key={li}><Link href={href}>{l.label}</Link></li>;
-                        }
-                        if (href.startsWith("mailto:") || href.startsWith("tel:")) {
-                          return <li key={li}><a href={href}>{l.label}</a></li>;
-                        }
-                        if (href.startsWith("http://") || href.startsWith("https://")) {
-                          return <li key={li}><a href={href} target="_blank" rel="noopener noreferrer">{l.label}</a></li>;
-                        }
-                        if (href.startsWith("#")) {
-                          const id = href.slice(1);
-                          const fpIdx = FP_SECTION_IDS.indexOf(id);
-                          const onAnchor = (e: React.MouseEvent<HTMLAnchorElement>) => {
-                            if (fpIdx >= 0) {
-                              e.preventDefault();
-                              goToSection(fpIdx);
-                              setHashRobust(id);
-                            } else {
-                              const target = document.getElementById(id);
-                              if (target) { e.preventDefault(); target.scrollIntoView({ behavior: "smooth", block: "start" }); setHashRobust(id); }
-                            }
-                          };
-                          return <li key={li}><a href={href} onClick={onAnchor}>{l.label}</a></li>;
-                        }
-                        if (!href) {
-                          return <li key={li}><span style={{ color: "var(--t4)", cursor: "default" }}>{l.label}</span></li>;
-                        }
-                        return <li key={li}><a href={href}>{l.label}</a></li>;
-                      })}
-                    </ul>
-                  </div>
-                ))}
+                <div className="fp-footer-cols lx-footer-links">
+                  <SiteLinks />
                 </div>
               </div>
               <div className="l-footer-bottom">
                 <div className="l-footer-copy" {...cmsProps("footer.copyright")}>{content.footer.copyright}</div>
-                <div className="l-footer-badges">{content.footer.badges.map((b, i) => <span key={i} className="l-footer-badge">{b}</span>)}</div>
+                <a href="mailto:craftershopy@gmail.com" className="l-footer-copy" style={{ textDecoration: "none" }}>craftershopy@gmail.com</a>
               </div>
             </footer>
 

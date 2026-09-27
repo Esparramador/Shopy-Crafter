@@ -1,16 +1,12 @@
 import { Link } from "wouter";
-import PageMeta from "@/components/PageMeta";
+import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 import { RELEASES } from "@/lib/changelog-data";
 
 export default function Changelog() {
   return (
     <>
-      <PageMeta
-        title="Changelog — Novedades de Shopy Crafter"
-        description="Historial de actualizaciones, nuevas funciones y mejoras de la plataforma Shopy Crafter."
-        canonical="https://shopycrafter.com/changelog"
-      />
+      <PageMeta {...metaFor("/changelog")} />
       <PublicLayout>
       <div style={{ padding: "80px 24px", maxWidth: 820, margin: "0 auto" }}>
         <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Changelog</div>

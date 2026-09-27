@@ -1,10 +1,19 @@
 import { useEffect } from "react";
+import { staticSeoFor, canonicalUrl } from "@/seo/meta";
 
 interface PageMetaProps {
   title: string;
   description: string;
   canonical: string;
   ogImage?: string;
+  noindex?: boolean;
+}
+
+/** Props de <PageMeta> desde el registro SEO (mismos valores que el HTML prerenderizado). */
+export function metaFor(path: string): PageMetaProps {
+  const r = staticSeoFor(path);
+  if (!r) throw new Error(`Ruta sin registro SEO: ${path}`);
+  return { title: r.title, description: r.description, canonical: canonicalUrl(r), noindex: r.noindex };
 }
 
 const DEFAULT_OG_IMAGE = "https://shopycrafter.com/opengraph.jpg";
@@ -29,7 +38,7 @@ function upsertLink(rel: string, href: string) {
   el.href = href;
 }
 
-export default function PageMeta({ title, description, canonical, ogImage = DEFAULT_OG_IMAGE }: PageMetaProps) {
+export default function PageMeta({ title, description, canonical, ogImage = DEFAULT_OG_IMAGE, noindex = false }: PageMetaProps) {
   useEffect(() => {
     document.title = title;
 
@@ -48,7 +57,9 @@ export default function PageMeta({ title, description, canonical, ogImage = DEFA
     upsertMeta('meta[name="twitter:title"]', { name: "twitter:title" }, title);
     upsertMeta('meta[name="twitter:description"]', { name: "twitter:description" }, description);
     upsertMeta('meta[name="twitter:image"]', { name: "twitter:image" }, ogImage);
-  }, [title, description, canonical, ogImage]);
+    upsertMeta('meta[name="robots"]', { name: "robots" },
+      noindex ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1");
+  }, [title, description, canonical, ogImage, noindex]);
 
   return null;
 }

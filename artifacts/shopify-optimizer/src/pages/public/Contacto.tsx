@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import PageMeta from "@/components/PageMeta";
+import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
@@ -564,11 +564,7 @@ export default function Contacto() {
 
   return (
     <>
-      <PageMeta
-        title="Contacto — Shopy Crafter"
-        description="Contacta con el equipo de Shopy Crafter. Respondemos en menos de 24 horas con un análisis personalizado de tu tienda."
-        canonical="https://shopycrafter.com/contacto"
-      />
+      <PageMeta {...metaFor("/contacto")} />
       <PublicLayout>
         <div className="ctc-root">
           <style>{CSS}</style>
