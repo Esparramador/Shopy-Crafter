@@ -1685,6 +1685,24 @@ async function probeDurationSec(filePath: string): Promise<number> {
 }
 
 /**
+ * Locución del guion con ElevenLabs ajustada a la duración real del vídeo
+ * (TTS → ffprobe del vídeo → fitVoiceToVideo). Devuelve un mp3 de la misma
+ * duración que el vídeo.
+ */
+export async function voiceoverForVideo(videoBuffer: Buffer, script: string, voiceId: string, languageCode?: string): Promise<Buffer> {
+  const tmp = await makeTmpDir("voiceover");
+  try {
+    const videoPath = path.join(tmp, "video.mp4");
+    await fs.writeFile(videoPath, videoBuffer);
+    const videoSec = await probeDurationSec(videoPath);
+    const rawVoice = await generateTTS(script, { voiceId, languageCode });
+    return await fitVoiceToVideo(rawVoice, videoSec);
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+/**
  * Adjust a voiceover Buffer so the speech ends at LEAST 1s before the target
  * video duration — and the audio stream's TOTAL length equals the video's
  * length exactly (padded with silence). This eliminates the "voice cut off

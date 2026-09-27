@@ -170,13 +170,18 @@ export interface ConfirmationResult {
   message: string;
 }
 
+/** El usuario ha confirmado explícitamente la acción (`"confirmed": true` en params). */
+export function isConfirmed(params: Record<string, unknown> | undefined): boolean {
+  return params?.confirmed === true || params?.confirmed === "true";
+}
+
 export function requireConfirmation(
   params: Record<string, unknown> | undefined,
   action: string,
   preview: ConfirmationPreview,
 ): ConfirmationResult | null {
   if (!DESTRUCTIVE_ACTIONS.has(action)) return null;
-  if (params?.confirmed === true || params?.confirmed === "true") return null;
+  if (isConfirmed(params)) return null;
 
   return {
     requiresConfirmation: true,

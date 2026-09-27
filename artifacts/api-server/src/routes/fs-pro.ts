@@ -211,7 +211,7 @@ export async function saveToVaultSmart(params: {
     try {
       uploadedFileRef = await getStorage().getObjectEntityFile(objectPath);
       await getStorage().uploadObject(uploadedFileRef, params.buffer, params.mimeType);
-      const vaultId = await (saveToVault as any)({
+      const vaultId = await saveToVault({
         projectId: params.projectId,
         fileType: params.fileType,
         category: params.category,
@@ -246,7 +246,7 @@ export async function saveToVaultSmart(params: {
       // Fall through to content base64 (sólo si cabe en el límite real)
     }
   }
-  const vaultId = await (saveToVault as any)({
+  const vaultId = await saveToVault({
     projectId: params.projectId,
     fileType: params.fileType,
     category: params.category,
@@ -3793,10 +3793,11 @@ router.post("/fs-pro/trim", requireAdmin, async (req, res) => {
 
     const rangeLabel = endSec != null ? `${startSec}s–${endSec}s` : `desde ${startSec}s`;
     const savedTitle = (title || `${file.title || "clip"} [trim ${rangeLabel}]`).slice(0, 200);
-    const newVaultId = await (saveToVault as any)({
+    const newVaultId = await saveToVault({
       projectId, buffer: trimmedBuf, mimeType: "video/mp4",
       title: savedTitle, fileType: "fs-pro-trim", generatedBy: "fs-pro:ffmpeg-trim",
     });
+    if (newVaultId === null) throw new Error("No se pudo guardar el vídeo en el Vault");
     res.json({ success: true, vaultId: newVaultId, sizeBytes: trimmedBuf.length, startSec, endSec, title: savedTitle });
   } catch (err: any) {
     logger.error({ err }, "fs-pro trim failed");
@@ -3822,10 +3823,11 @@ router.post("/fs-pro/extract-audio", requireAdmin, async (req, res) => {
     const { extractAudioMp3 } = await import("../lib/fusion-studio-pro.js");
     const audioBuf = await extractAudioMp3(videoBuf);
     const savedTitle = (title || `Audio — ${file.title || `vault ${vaultId}`}`).slice(0, 200);
-    const newVaultId = await (saveToVault as any)({
+    const newVaultId = await saveToVault({
       projectId, buffer: audioBuf, mimeType: "audio/mpeg",
       title: savedTitle, fileType: "fs-pro-audio", generatedBy: "fs-pro:ffmpeg-extract-audio",
     });
+    if (newVaultId === null) throw new Error("No se pudo guardar el vídeo en el Vault");
     res.json({ success: true, vaultId: newVaultId, sizeBytes: audioBuf.length, title: savedTitle });
   } catch (err: any) {
     logger.error({ err }, "fs-pro extract-audio failed");
@@ -3854,10 +3856,11 @@ router.post("/fs-pro/strip-audio", requireAdmin, async (req, res) => {
       if (!buf) continue;
       const stripped = await stripAudio(buf);
       const t = (title || `${file.title || `clip ${vid}`} [sin audio]`).slice(0, 200);
-      const newVaultId = await (saveToVault as any)({
+      const newVaultId = await saveToVault({
         projectId, buffer: stripped, mimeType: "video/mp4",
         title: t, fileType: "fs-pro-silent", generatedBy: "fs-pro:ffmpeg-strip-audio",
       });
+      if (newVaultId === null) throw new Error(`No se pudo guardar en el Vault el clip ${vid} sin audio`);
       results.push({ vaultId: vid, newVaultId, title: t });
     }
     res.json({ success: true, results, count: results.length });
@@ -3954,10 +3957,11 @@ router.post("/fs-pro/burn-text", requireAdmin, async (req, res) => {
     }
 
     const savedTitle = (title || `${file.title || `clip ${vaultId}`} [${usedMode}]`).slice(0, 200);
-    const newVaultId = await (saveToVault as any)({
+    const newVaultId = await saveToVault({
       projectId, buffer: resultBuf, mimeType: "video/mp4",
       title: savedTitle, fileType: `fs-pro-${mode}`, generatedBy: `fs-pro:ffmpeg-${mode}`,
     });
+    if (newVaultId === null) throw new Error("No se pudo guardar el vídeo en el Vault");
     res.json({ success: true, vaultId: newVaultId, sizeBytes: resultBuf.length, mode, title: savedTitle });
   } catch (err: any) {
     logger.error({ err }, "fs-pro burn-text failed");
@@ -3985,9 +3989,11 @@ router.post("/fs-pro/add-voice", requireAdmin, async (req, res) => {
     const videoBuf = await readVaultContent(file);
     if (!videoBuf) { res.status(500).json({ error: "No se pudo leer el vídeo" }); return; }
 
-    const { fitVoiceToVideo, composeAd } = await import("../lib/fusion-studio-pro.js");
+    const { voiceoverForVideo, composeAd } = await import("../lib/fusion-studio-pro.js");
     const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"; // Rachel ES
-    const voiceBuf = await (fitVoiceToVideo as any)(videoBuf, script, voiceId || DEFAULT_VOICE);
+    // Antes: fitVoiceToVideo(vídeo, guion, voz) — esa función ajusta un audio YA
+    // generado a una duración; no había TTS y el vídeo se procesaba como si fuera mp3.
+    const voiceBuf = await voiceoverForVideo(videoBuf, script, voiceId || DEFAULT_VOICE, language);
 
     let musicBuf: Buffer | undefined;
     if (musicVaultId) {
@@ -4006,10 +4012,11 @@ router.post("/fs-pro/add-voice", requireAdmin, async (req, res) => {
     });
 
     const savedTitle = (title || `${file.title || `clip ${vaultId}`} [con voz]`).slice(0, 200);
-    const newVaultId = await (saveToVault as any)({
+    const newVaultId = await saveToVault({
       projectId, buffer: composed, mimeType: "video/mp4",
       title: savedTitle, fileType: "fs-pro-voiced", generatedBy: "fs-pro:fitVoiceToVideo",
     });
+    if (newVaultId === null) throw new Error("No se pudo guardar el vídeo en el Vault");
     res.json({ success: true, vaultId: newVaultId, sizeBytes: composed.length, title: savedTitle });
   } catch (err: any) {
     logger.error({ err }, "fs-pro add-voice failed");
@@ -4079,10 +4086,11 @@ router.post("/fs-pro/face-swap-video", requireAdmin, async (req, res) => {
 
     await recordUsage(projectId, "image", CREDITS);
     const savedTitle = (title || `${vf.title || `clip ${videoVaultId}`} [face swap]`).slice(0, 200);
-    const newVaultId = await (saveToVault as any)({
+    const newVaultId = await saveToVault({
       projectId, buffer: resultBuf, mimeType: "video/mp4",
       title: savedTitle, fileType: "fs-pro-faceswap", generatedBy: "fs-pro:replicate-face-swap-video",
     });
+    if (newVaultId === null) throw new Error("No se pudo guardar el vídeo en el Vault");
     res.json({ success: true, vaultId: newVaultId, sizeBytes: resultBuf.length, title: savedTitle });
   } catch (err: any) {
     logger.error({ err }, "fs-pro face-swap-video failed");
@@ -4105,7 +4113,7 @@ router.post("/fs-pro/trim-concat", requireAdmin, async (req, res) => {
     if (!projectId || !Array.isArray(segments) || segments.length < 1) {
       res.status(400).json({ error: "projectId y segments[] (mín 1) requeridos" }); return;
     }
-    const { concatVideos, fitVoiceToVideo, composeAd } = await import("../lib/fusion-studio-pro.js");
+    const { concatVideos, voiceoverForVideo, composeAd } = await import("../lib/fusion-studio-pro.js");
     const { mkdtemp, writeFile: wf, readFile: rf, rm } = await import("fs/promises");
     const { join } = await import("path");
     const { tmpdir } = await import("os");
@@ -4146,7 +4154,7 @@ router.post("/fs-pro/trim-concat", requireAdmin, async (req, res) => {
     // Add AI voice if script provided
     if (script?.trim()) {
       const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM";
-      const voiceBuf = await (fitVoiceToVideo as any)(finalBuf, script, voiceId || DEFAULT_VOICE);
+      const voiceBuf = await voiceoverForVideo(finalBuf, script, voiceId || DEFAULT_VOICE);
       let musicBuf: Buffer | undefined;
       if (musicVaultId) {
         const [mf] = await db.select().from(projectFilesTable).where(
@@ -4159,10 +4167,11 @@ router.post("/fs-pro/trim-concat", requireAdmin, async (req, res) => {
 
     const totalSec = segments.reduce((s, seg) => s + (seg.endSec - seg.startSec), 0);
     const savedTitle = (title || `Montaje inteligente ${segments.length} fragmentos`).slice(0, 200);
-    const newVaultId = await (saveToVault as any)({
+    const newVaultId = await saveToVault({
       projectId, buffer: finalBuf, mimeType: "video/mp4",
       title: savedTitle, fileType: "fs-pro-trim-concat", generatedBy: "fs-pro:trim-concat",
     });
+    if (newVaultId === null) throw new Error("No se pudo guardar el vídeo en el Vault");
     res.json({ success: true, vaultId: newVaultId, sizeBytes: finalBuf.length, clipsCount: trimmedBufs.length, totalSec, title: savedTitle });
   } catch (err: any) {
     logger.error({ err }, "fs-pro trim-concat failed");
@@ -4204,7 +4213,7 @@ async function extractLastFrameLocal(videoBuf: Buffer, sizePx = 1280): Promise<B
 // Pipeline: Claude prompts → Grok T2V 15s → frame → Grok I2V 10s → frame → Grok I2V 10s → ffmpeg concat → vault
 // ═══════════════════════════════════════════════════════════════════════════
 router.post("/fs-pro/explode-view-sequence", requireAdmin, async (req: Request, res: Response) => {
-  (enableLongRunning as any)(req, res, 30 * 60_000); // 30 min max
+  enableLongRunning(res); // heartbeat cada 25 s; la ruta termina ella sola
 
   // SSE setup
   res.setHeader("Content-Type", "text/event-stream");
