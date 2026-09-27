@@ -1,4 +1,5 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import { keepRawBodyForWebhooks } from "./lib/raw-body.js";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -111,7 +112,8 @@ startRateLimitCleanup();
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
 // 50mb to support up to 5 base64-encoded high-res images in reference analysis
-app.use(express.json({ limit: "50mb" }));
+// Las rutas de webhook necesitan el cuerpo exacto para verificar la firma.
+app.use(express.json({ limit: "50mb", verify: keepRawBodyForWebhooks }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ── Global input sanitization — strips prototype pollution on all POST/PUT ──
