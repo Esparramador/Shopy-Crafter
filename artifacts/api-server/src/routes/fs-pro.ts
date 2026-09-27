@@ -9,7 +9,10 @@ import { logger } from "../lib/logger.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { saveToVault } from "../lib/vault.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
-import { learnFromOperation, askClaude, askClaudeWithBrain, safeJsonParse } from "../lib/claude.js";
+import { learnFromOperation, askClaudeDetailed } from "../lib/claude.js";
+import { askClaudeJsonValidated, generateAiJson } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { z } from "zod";
 import { ObjectStorageService, signObjectURL, objectStorageClient } from "../lib/objectStorage.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { checkTtsQuota } from "./voice.js";
@@ -139,6 +142,20 @@ import {
 import { planCampaign, type CampaignBudget, type ShotRequest } from "../lib/campaign-planner.js";
 
 const router = Router();
+
+// Respuestas JSON de Claude en Campaign Production y Exploded View.
+const adaptedCampaignSchema = z.object({
+  brandName: z.string().min(1),
+  videos: z.array(z.unknown()).min(1),
+}).passthrough();
+const explodedSequenceSchema = z.object({
+  clips: z.array(z.object({ prompt: z.string().min(1) }).passthrough()).min(1),
+}).passthrough();
+const explodeClipPromptsSchema = z.object({
+  clip1: z.string().min(1),
+  clip2: z.string().min(1),
+  clip3: z.string().min(1),
+});
 // 500MB — admite vídeo 4K vertical hasta ~2min con CRF 14. Multer usa memoryStorage,
 // así que mantenemos el techo razonable para evitar OOM (admin-only, pero protege accidentes).
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
@@ -1208,23 +1225,17 @@ router.post("/fs-pro/campaign-production/adapt-for-brand", requireAdmin, async (
     const systemPrompt = buildAdaptationSystemPrompt();
     const userPrompt = buildAdaptationUserPrompt(input);
 
-    const raw = await askClaudeWithBrain(
-      projectId,
-      [{ role: "user", content: userPrompt }],
-      systemPrompt,
-      "campaign_production",
-      industry,
-      8192,
-      120_000
-    );
-
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) { res.status(500).json({ error: "Claude no devolvió JSON válido" }); return; }
-
-    const parsed = safeJsonParse<Record<string, unknown>>(jsonMatch[0], "adapt-for-brand");
-    if (!parsed || typeof parsed !== "object" || !parsed.brandName || !Array.isArray(parsed.videos)) {
-      res.status(500).json({ error: "Respuesta de Claude con estructura inválida" }); return;
-    }
+    // Antes safeJsonParse "reparaba" un JSON cortado a 8192 tokens y devolvía el kit
+    // con los últimos vídeos perdidos sin avisar. Ahora: reintento con más margen o 502.
+    const parsed = await askClaudeJsonValidated(projectId, userPrompt, systemPrompt, {
+      schema: adaptedCampaignSchema,
+      useCase: "campaign_production",
+      niche: industry,
+      maxTokens: 8192,
+      retryMaxTokens: 16384,
+      timeoutMs: 120_000,
+      label: "fs-pro/campaign-production:adapt-for-brand",
+    });
 
     learnFromOperation({
       operationType: "campaign_adaptation",
@@ -1240,6 +1251,7 @@ router.post("/fs-pro/campaign-production/adapt-for-brand", requireAdmin, async (
     res.json({ ok: true, adapted: parsed, inputBrand: input.brandName });
   } catch (e: any) {
     logger.error({ err: e?.message }, "campaign-production adapt-for-brand failed");
+    if (isAiOutputError(e)) { res.status(502).json({ error: aiOutputErrorMessage(e), code: e.code }); return; }
     res.status(500).json({ error: e?.message || "Error al adaptar campaña para la marca" });
   }
 });
@@ -1465,21 +1477,19 @@ GLOBAL STATE: ${gsId}
 Genera los 5 clips con prompts listos para producción.`;
 
     const numericProjectId = projectId ? Number(projectId) : 0;
-    const claudeRes = await askClaude(
-      numericProjectId,
-      [{ role: "user", content: userPrompt }],
-      systemPrompt,
-      8000,
-      120000,
-    );
-
-    const jsonMatch = claudeRes.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) { res.status(500).json({ error: "Claude no devolvió JSON válido para la secuencia" }); return; }
-
-    const parsed = safeJsonParse(jsonMatch[0]) as Record<string, unknown> | null;
-    if (!parsed || !Array.isArray(parsed.clips) || parsed.clips.length === 0) {
-      res.status(500).json({ error: "Respuesta de Claude no contiene clips válidos" }); return;
-    }
+    // Antes un JSON cortado se "reparaba" y la secuencia salía con clips de menos.
+    const parsed = await generateAiJson({
+      prompt: userPrompt,
+      maxTokens: 8000,
+      retryMaxTokens: 16000,
+      schema: explodedSequenceSchema,
+      expect: "object",
+      label: "fs-pro/exploded-view:generate-sequence",
+      call: async ({ prompt, maxTokens }) => {
+        const r = await askClaudeDetailed(numericProjectId, [{ role: "user", content: prompt }], systemPrompt, maxTokens, 120_000);
+        return { text: r.text, truncated: r.truncated };
+      },
+    });
 
     learnFromOperation({
       operationType: "exploded_view_generation",
@@ -1495,6 +1505,7 @@ Genera los 5 clips con prompts listos para producción.`;
     res.json({ ok: true, sequence: parsed, inputProduct: productName, mode });
   } catch (e: any) {
     logger.error({ err: e?.message }, "exploded-view generate-sequence failed");
+    if (isAiOutputError(e)) { res.status(502).json({ error: aiOutputErrorMessage(e), code: e.code }); return; }
     res.status(500).json({ error: e?.message || "Error al generar secuencia de vista explosionada" });
   }
 });
@@ -4258,15 +4269,20 @@ Description: ${objectDescription}
 Materials: ${materials || "not specified"}
 Key components: ${components || "not specified"}`;
 
-    const promptsRaw = await (askClaude as any)(userMsg, { systemPrompt, maxTokens: 2000 });
-    const jsonMatch = promptsRaw.match(/\{[\s\S]*\}/);
-    const prompts = (safeJsonParse as any)(
-      jsonMatch ? jsonMatch[0] : promptsRaw,
-      { clip1: "", clip2: "", clip3: "" },
-    );
-    if (!prompts.clip1 || !prompts.clip2 || !prompts.clip3) {
-      throw new Error("Claude no pudo generar los 3 prompts — intenta de nuevo");
-    }
+    // Antes: askClaude(userMsg, {…}) con los argumentos cambiados (el texto iba como
+    // projectId y un objeto como messages), así que este paso fallaba siempre.
+    const prompts = await generateAiJson({
+      prompt: userMsg,
+      maxTokens: 2000,
+      retryMaxTokens: 4000,
+      schema: explodeClipPromptsSchema,
+      expect: "object",
+      label: "fs-pro/explode-view-sequence:prompts",
+      call: async ({ prompt, maxTokens }) => {
+        const r = await askClaudeDetailed(Number(projectId) || 0, [{ role: "user", content: prompt }], systemPrompt, maxTokens, 120_000);
+        return { text: r.text, truncated: r.truncated };
+      },
+    });
     send("prompts", { clip1: prompts.clip1, clip2: prompts.clip2, clip3: prompts.clip3 });
 
     // ── Step 2: Clip 1 — Grok T2V 15 s ─────────────────────────────────
@@ -4332,7 +4348,7 @@ Key components: ${components || "not specified"}`;
 
   } catch (err: any) {
     logger.error({ err }, "explode-view-sequence failed");
-    send("error", { message: err?.message || "Error desconocido generando la secuencia" });
+    send("error", { message: isAiOutputError(err) ? aiOutputErrorMessage(err) : err?.message || "Error desconocido generando la secuencia" });
     return res.end();
   }
 });
