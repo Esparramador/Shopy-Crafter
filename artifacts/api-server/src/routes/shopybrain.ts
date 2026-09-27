@@ -15,6 +15,7 @@ import { learnFromOperation, askClaude, askClaudeDetailed, askClaudeWithUsage, a
 import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
+import { cssFontName, escapeHtmlDeep, sanitizeHtml } from "../lib/html-escape.js";
 import { generateAiJson } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
@@ -11766,7 +11767,7 @@ Genera contenido específico, detallado y profesional. NO uses placeholders gen�
 
             // Antes: 4000 tokens para todo el JSON (se cortaba) y, si no parseaba, se
             // renderizaba y guardaba en el Vault un brand book vacío con solo el nombre.
-            const bb: Record<string, any> = await generateAiJson({
+            const bbRaw: Record<string, any> = await generateAiJson({
               prompt: brandBookPrompt,
               maxTokens: 8000,
               retryMaxTokens: 16000,
@@ -11780,6 +11781,11 @@ Genera contenido específico, detallado y profesional. NO uses placeholders gen�
             });
 
             // ─── Render HTML del Brand Book ───────────────────────────────
+            // Todo lo que viene de la IA o del usuario se escapa antes de entrar en el
+            // HTML (se guarda en el Vault y se sirve como text/html). La portada ya
+            // escapa por su cuenta, así que a buildCoverPage se le pasan los valores crudos.
+            const bb: Record<string, any> = escapeHtmlDeep(bbRaw);
+            const safeBrandName = sanitizeHtml(brandName);
             const colors = (bb.colorPalette || []) as Array<{hex:string;name:string;usage:string;psychology:string}>;
             const values = (bb.values || []) as Array<{icon:string;name:string;description:string}>;
             const pillars = (bb.contentPillars || []) as Array<{pillar:string;percentage:string;description:string;examples:string[]}>;
@@ -11834,7 +11840,7 @@ Genera contenido específico, detallado y profesional. NO uses placeholders gen�
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Brand Book — ${bb.brandName || brandName}</title>
+  <title>Brand Book — ${bb.brandName || safeBrandName}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
@@ -11874,15 +11880,15 @@ Genera contenido específico, detallado y profesional. NO uses placeholders gen�
 <body>
 
 <!-- ── PORTADA ── -->
-${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName || brandName} · Manual de Identidad de Marca`, companyName: bb.brandName || brandName, date: reportDate, template: "prestige", includeBackCover: false })}
+${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bbRaw.brandName || brandName} · Manual de Identidad de Marca`, companyName: bbRaw.brandName || brandName, date: reportDate, template: "prestige", includeBackCover: false })}
 
 <!-- ── HERO ── -->
 <div class="hero">
   <div class="bb-section" style="padding:0;max-width:800px">
     <div class="section-tag">Brand Book · Identidad de Marca</div>
-    <h1>${bb.brandName || brandName}</h1>
+    <h1>${bb.brandName || safeBrandName}</h1>
     <div class="tagline">"${bb.tagline || ""}"</div>
-    <p style="max-width:600px;margin:0 auto;text-align:center;font-size:15px;color:#9a9080">${(bb.mission || "").slice(0, 200)}</p>
+    <p style="max-width:600px;margin:0 auto;text-align:center;font-size:15px;color:#9a9080">${sanitizeHtml((bbRaw.mission || "").slice(0, 200))}</p>
   </div>
 </div>
 
@@ -11953,9 +11959,9 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
   <div style="margin-top:40px">
     <h3>Sistema Tipográfico</h3>
     <div class="grid-3">
-      ${(bb.typography?.primary ? `<div class="card"><div class="section-tag">Principal</div><div class="font-sample" style="font-family:'${bb.typography.primary.name}',serif">${bb.typography.primary.name}</div><div class="font-meta">Pesos: ${(bb.typography.primary.weights||[]).join(", ")}<br>${bb.typography.primary.usage}</div></div>` : "")}
-      ${(bb.typography?.secondary ? `<div class="card"><div class="section-tag">Secundaria</div><div class="font-sample" style="font-family:'${bb.typography.secondary.name}',sans-serif;font-size:1.5rem">${bb.typography.secondary.name}</div><div class="font-meta">Pesos: ${(bb.typography.secondary.weights||[]).join(", ")}<br>${bb.typography.secondary.usage}</div></div>` : "")}
-      ${(bb.typography?.accent ? `<div class="card"><div class="section-tag">Acento</div><div class="font-sample" style="font-family:'${bb.typography.accent.name}',cursive;font-size:1.5rem">${bb.typography.accent.name}</div><div class="font-meta">${bb.typography.accent.usage}</div></div>` : "")}
+      ${(bb.typography?.primary ? `<div class="card"><div class="section-tag">Principal</div><div class="font-sample" style="font-family:'${cssFontName(bbRaw.typography.primary.name)}',serif">${bb.typography.primary.name}</div><div class="font-meta">Pesos: ${(bb.typography.primary.weights||[]).join(", ")}<br>${bb.typography.primary.usage}</div></div>` : "")}
+      ${(bb.typography?.secondary ? `<div class="card"><div class="section-tag">Secundaria</div><div class="font-sample" style="font-family:'${cssFontName(bbRaw.typography.secondary.name)}',sans-serif;font-size:1.5rem">${bb.typography.secondary.name}</div><div class="font-meta">Pesos: ${(bb.typography.secondary.weights||[]).join(", ")}<br>${bb.typography.secondary.usage}</div></div>` : "")}
+      ${(bb.typography?.accent ? `<div class="card"><div class="section-tag">Acento</div><div class="font-sample" style="font-family:'${cssFontName(bbRaw.typography.accent.name)}',cursive;font-size:1.5rem">${bb.typography.accent.name}</div><div class="font-meta">${bb.typography.accent.usage}</div></div>` : "")}
     </div>
   </div>
 
@@ -12043,7 +12049,7 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
 
   <!-- ── FOOTER ── -->
   <div class="footer-bb">
-    Brand Book · ${bb.brandName || brandName} · Generado por Shopy Crafter Intelligence Engine · ${reportDate}<br>
+    Brand Book · ${bb.brandName || safeBrandName} · Generado por Shopy Crafter Intelligence Engine · ${reportDate}<br>
     Documento confidencial — uso interno y para agencias autorizadas.
   </div>
 </div>
@@ -12057,7 +12063,7 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
                 projectId,
                 fileType: "brand_book",
                 category: "branding",
-                title: `Brand Book — ${bb.brandName || brandName}`,
+                title: `Brand Book — ${bbRaw.brandName || brandName}`,
                 mimeType: "text/html",
                 content: Buffer.from(brandBookHtml).toString("base64"),
               });
@@ -12065,16 +12071,16 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bb.brandName ||
 
             result = {
               success: true,
-              brandName: bb.brandName || brandName,
-              tagline: bb.tagline || "",
-              archetype: (bb.archetype || {}).name || "",
-              colorsCount: colors.length,
-              valuesCount: values.length,
+              brandName: bbRaw.brandName || brandName,
+              tagline: bbRaw.tagline || "",
+              archetype: (bbRaw.archetype || {}).name || "",
+              colorsCount: bbRaw.colorPalette.length,
+              valuesCount: bbRaw.values.length,
               vaultId,
               vaultUrl: vaultId ? `/api/vault/${vaultId}/download` : undefined,
               message: vaultId
-                ? `📖 **Brand Book generado y guardado**\n\n🏷️ **${bb.brandName || brandName}** — "${bb.tagline}"\n🎭 Arquetipo: **${(bb.archetype||{}).name}**\n🎨 ${colors.length} colores | 💡 ${values.length} valores | 📣 ${pillars.length} pilares de contenido\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver Brand Book: /api/vault/${vaultId}/download\n📥 Descargar PDF: /api/vault/${vaultId}/download?format=pdf`
-                : `📖 **Brand Book generado**\n\n🏷️ **${bb.brandName || brandName}** — "${bb.tagline}"\n🎭 Arquetipo: **${(bb.archetype||{}).name}**\n🎨 ${colors.length} colores | 💡 ${values.length} valores\n\n⚠️ No se pudo guardar en vault (falta projectId)`,
+                ? `📖 **Brand Book generado y guardado**\n\n🏷️ **${bbRaw.brandName || brandName}** — "${bbRaw.tagline}"\n🎭 Arquetipo: **${(bbRaw.archetype||{}).name}**\n🎨 ${bbRaw.colorPalette.length} colores | 💡 ${bbRaw.values.length} valores | 📣 ${(bbRaw.contentPillars || []).length} pilares de contenido\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver Brand Book: /api/vault/${vaultId}/download\n📥 Descargar PDF: /api/vault/${vaultId}/download?format=pdf`
+                : `📖 **Brand Book generado**\n\n🏷️ **${bbRaw.brandName || brandName}** — "${bbRaw.tagline}"\n🎭 Arquetipo: **${(bbRaw.archetype||{}).name}**\n🎨 ${bbRaw.colorPalette.length} colores | 💡 ${bbRaw.values.length} valores\n\n⚠️ No se pudo guardar en vault (falta projectId)`,
             };
           } catch (err) {
             const reason = isAiOutputError(err) ? aiOutputErrorMessage(err) : err instanceof Error ? err.message : String(err);
