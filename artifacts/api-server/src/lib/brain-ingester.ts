@@ -15,6 +15,23 @@ import { randomBytes } from "crypto";
 import { db, omnicoreMemoriesTable, omnicoreInsightsTable, omnicoreKnowledgeDomainsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { getClaudeClient, CLAUDE_MODEL } from "./claude.js";
+import { claudeMessagesJson } from "./ai-json.js";
+import { lenientArray, optionalLooseNumber } from "./ai-schema.js";
+import { logger } from "./logger.js";
+import { z } from "zod";
+
+const score = (fallback: number) => optionalLooseNumber.transform(n => Math.max(0, Math.min(1, n ?? fallback)));
+const structuredInsightsSchema = z.object({
+  insights: lenientArray(z.object({
+    domain: z.string().min(1).catch("general"),
+    insightType: z.string().min(1).catch("principle"),
+    title: z.string().min(1).transform(s => s.slice(0, 200)),
+    insight: z.string().min(1),
+    evidence: z.string().default(""),
+    confidence: score(0.65),
+    impactScore: score(0.7),
+  })),
+});
 
 // ── Domain weights for auto-categorisation ─────────────────────────────────
 const DOMAIN_MAP: Record<string, string[]> = {
@@ -133,25 +150,23 @@ Responde exactamente con este JSON:
   ]
 }`;
 
+  // Antes: regex codiciosa + JSON.parse sin validar y cualquier error se tragaba
+  // en silencio. Ahora: extracción balanceada, esquema, un reintento y el motivo
+  // en el registro (sigue sin lanzar: es fire-and-forget).
   try {
     const client = await getClaudeClient(0);
-    const stream = client.messages.stream(
-      {
-        model: CLAUDE_MODEL,
-        max_tokens: 16000,
-        system,
-        messages: [{ role: "user", content: prompt }],
-      },
-      { signal: AbortSignal.timeout(90_000) }
-    );
-    const resp = await stream.finalMessage();
-
-    const raw = resp.content[0].type === "text" ? resp.content[0].text : "{}";
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return [];
-    const parsed = JSON.parse(match[0]);
-    return parsed.insights ?? [];
-  } catch {
+    const parsed = await claudeMessagesJson(client, {
+      model: CLAUDE_MODEL,
+      system,
+      prompt,
+      schema: structuredInsightsSchema,
+      label: `brain-ingester:${sourceLabel}`,
+      maxTokens: 16000,
+      timeoutMs: 90_000,
+    });
+    return parsed.insights;
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err.message : String(err), sourceLabel }, "brain-ingester: extracción de insights omitida");
     return [];
   }
 }

@@ -14,6 +14,7 @@
  * La parte pura (extractJson, parseAiJson, generateAiJson, generateCompleteText)
  * recibe el cliente de IA inyectado, así se testea sin llamar a Anthropic.
  */
+import type Anthropic from "@anthropic-ai/sdk";
 import { AiJsonError, AiTruncatedError, type AiJsonErrorCode } from "./ai-errors.js";
 import { logger } from "./logger.js";
 
@@ -376,6 +377,57 @@ export async function askClaudeTextComplete(
         projectId, messages, systemPrompt, opts.useCase ?? "general", opts.niche, opts.maxTokens, opts.timeoutMs,
       );
       return { text: r.text, truncated: r.truncated };
+    },
+  });
+}
+
+// ─── Llamadas directas al SDK de Anthropic ───────────────────────────────────
+
+/** Lo mínimo del cliente de Anthropic que se usa (permite inyectar uno falso en tests). */
+export type ClaudeMessagesClient = Pick<Anthropic, "messages">;
+
+/**
+ * Para el código que llama a `client.messages.stream` directamente (con su propio
+ * modelo, imágenes o timeout) y necesita JSON: detecta el corte por max_tokens,
+ * valida con el esquema, reintenta una vez y si no, error tipado.
+ */
+export async function claudeMessagesJson<T>(
+  client: ClaudeMessagesClient,
+  opts: {
+    model: string;
+    system: string;
+    prompt: string;
+    label: string;
+    maxTokens: number;
+    retryMaxTokens?: number;
+    schema?: AiJsonSchema<T>;
+    expect?: JsonRoot;
+    images?: Anthropic.ImageBlockParam[];
+    timeoutMs?: number;
+  },
+): Promise<T> {
+  return generateAiJson<T>({
+    prompt: opts.prompt,
+    maxTokens: opts.maxTokens,
+    retryMaxTokens: opts.retryMaxTokens ?? opts.maxTokens * 2,
+    schema: opts.schema,
+    expect: opts.expect ?? "object",
+    label: opts.label,
+    call: async ({ prompt, maxTokens }) => {
+      const res = await client.messages.stream(
+        {
+          model: opts.model,
+          max_tokens: maxTokens,
+          system: opts.system,
+          messages: [{
+            role: "user",
+            content: opts.images?.length ? [...opts.images, { type: "text", text: prompt }] : prompt,
+          }],
+        },
+        opts.timeoutMs ? { signal: AbortSignal.timeout(opts.timeoutMs) } : undefined,
+      ).finalMessage();
+      const text = res.content.map(b => (b.type === "text" ? b.text : "")).join("");
+      return { text, truncated: res.stop_reason === "max_tokens" };
     },
   });
 }

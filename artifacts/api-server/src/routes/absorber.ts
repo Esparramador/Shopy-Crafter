@@ -22,7 +22,7 @@ import { desc, eq } from "drizzle-orm";
 import { saveToVault } from "../lib/vault.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { processUploadedFile } from "../lib/file-processor.js";
-import { generateAiJson } from "../lib/ai-json.js";
+import { claudeMessagesJson } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { z } from "zod";
 import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
@@ -344,35 +344,19 @@ type ClaudeImageBlock =
   | { type: "image"; source: { type: "url"; url: string } }
   | { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png" | "image/gif" | "image/webp"; data: string } };
 
-/**
- * Llamada directa al SDK (con imagen opcional) que devuelve JSON validado:
- * detecta el corte por max_tokens, reintenta una vez y si no, error tipado.
- */
-async function claudeJson<T>(
+/** JSON validado con el modelo por defecto (imagen opcional); ver claudeMessagesJson. */
+function claudeJson<T>(
   client: ClaudeClient,
   opts: { system: string; prompt: string; schema: z.ZodType<T, z.ZodTypeDef, unknown>; label: string; imageBlock?: ClaudeImageBlock; maxTokens?: number },
 ): Promise<T> {
-  const maxTokens = opts.maxTokens ?? 16000;
-  return generateAiJson<T>({
+  return claudeMessagesJson<T>(client, {
+    model: CLAUDE_MODEL,
+    system: opts.system,
     prompt: opts.prompt,
-    maxTokens,
-    retryMaxTokens: maxTokens * 2,
     schema: opts.schema,
-    expect: "object",
     label: opts.label,
-    call: async ({ prompt, maxTokens: budget }) => {
-      const res = await client.messages.stream({
-        model: CLAUDE_MODEL,
-        max_tokens: budget,
-        system: opts.system,
-        messages: [{
-          role: "user",
-          content: opts.imageBlock ? [opts.imageBlock, { type: "text", text: prompt }] : prompt,
-        }],
-      }).finalMessage();
-      const text = res.content.map(b => (b.type === "text" ? b.text : "")).join("");
-      return { text, truncated: res.stop_reason === "max_tokens" };
-    },
+    maxTokens: opts.maxTokens ?? 16000,
+    images: opts.imageBlock ? [opts.imageBlock] : undefined,
   });
 }
 

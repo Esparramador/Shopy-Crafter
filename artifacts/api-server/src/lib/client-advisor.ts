@@ -16,16 +16,25 @@
  */
 
 import { randomBytes } from "crypto";
-import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import { db, clientKnowledgeTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { logger } from "./logger.js";
 import { ingestToShopyBrain } from "./brain-ingester.js";
+import { getClaudeClient } from "./claude.js";
+import { claudeMessagesJson } from "./ai-json.js";
+import { lenientArray, optionalLooseNumber } from "./ai-schema.js";
 
-// ── Anthropic client (shared CLAUDE_MODEL) ───────────────────────────────────
-function getClient(): Anthropic {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" });
-}
+// ── Extracción de hechos del chat: esquema y modelo ─────────────────────────
+const learnedFactsSchema = z.object({
+  facts: lenientArray(z.object({
+    category: z.string().min(1).catch("free_knowledge"),
+    title: z.string().min(1),
+    content: z.string().min(1),
+    confidence: optionalLooseNumber,
+  })),
+  sector: z.string().min(1).nullable().optional().catch(null),
+});
 
 const FAST_MODEL = "claude-sonnet-4-5";
 
@@ -120,10 +129,15 @@ export function extractAndLearnFromChat(params: {
 
   setImmediate(async () => {
     try {
-      const client = getClient();
-      const extraction = await client.messages.create({
+      // Antes: new Anthropic({ apiKey: ANTHROPIC_API_KEY }) — sin esa variable (p. ej.
+      // con la integración de Replit) la extracción fallaba siempre y solo quedaba en
+      // un log de debug. Ahora el mismo cliente que el resto del API.
+      const client = await getClaudeClient(Number(projectId) || 0);
+      const parsed = await claudeMessagesJson(client, {
         model: FAST_MODEL,
-        max_tokens: 1200,
+        maxTokens: 1200,
+        schema: learnedFactsSchema,
+        label: "client-advisor:extract-facts",
         system: `Eres un extractor de inteligencia de negocio. Analiza la conversación entre un cliente y su asesor IA y extrae hechos concretos y relevantes sobre el negocio del cliente.
 
 Devuelve SOLO un JSON con esta estructura exacta:
@@ -144,30 +158,15 @@ REGLAS:
 - Si el cliente no revela info nueva, devuelve {"facts":[],"sector":null}
 - No extraigas conversación genérica, solo datos de negocio reales
 - Máx 5 hechos por conversación`,
-        messages: [
-          {
-            role: "user",
-            content: `MENSAJE DEL CLIENTE: "${userMessage}"\n\nRESPUESTA DEL ASESOR: "${aiReply.slice(0, 600)}"`,
-          },
-        ],
+        prompt: `MENSAJE DEL CLIENTE: "${userMessage}"\n\nRESPUESTA DEL ASESOR: "${aiReply.slice(0, 600)}"`,
       });
 
-      const raw = (extraction.content[0] as any)?.text ?? "{}";
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return;
-
-      const parsed = JSON.parse(jsonMatch[0]) as {
-        facts: Array<{ category: string; title: string; content: string; confidence: number }>;
-        sector: string | null;
-      };
-
-      if (!parsed.facts?.length) return;
+      if (!parsed.facts.length) return;
 
       const resolvedNiche = parsed.sector ?? niche ?? null;
 
       for (const fact of parsed.facts) {
-        if (!fact.title || !fact.content) continue;
-        const id = randomBytes(12).toString("hex");
+const id = randomBytes(12).toString("hex");
         await db
           .insert(clientKnowledgeTable)
           .values({
@@ -193,7 +192,7 @@ REGLAS:
         });
       }
     } catch (err: any) {
-      logger.debug({ err: err?.message }, "client-advisor extract skipped");
+      logger.warn({ err: err?.message }, "client-advisor: extracción de hechos omitida");
     }
   });
 }
