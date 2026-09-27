@@ -26,19 +26,18 @@ export interface AMRModel {
 
 export const AMR_MODELS: AMRModel[] = [
   // ── Claude ────────────────────────────────────────────────────────────────
-  { id: "claude-sonnet",   name: "Claude Sonnet 4",  provider: "claude",   apiModel: "claude-sonnet-4-5",             contextWindow: 200000, description: "Balanceado, rápido y creativo — ideal para la mayoría de tareas", tags: ["smart","fast","creative"], isPremium: false, supportsVision: true,  supportsStreaming: true },
-  { id: "claude-opus",     name: "Claude Opus 4",    provider: "claude",   apiModel: "claude-opus-4-5",               contextWindow: 200000, description: "Máxima inteligencia Claude — análisis profundo y razonamiento", tags: ["genius","deep","analysis"], isPremium: true,  supportsVision: true,  supportsStreaming: true },
-  { id: "claude-haiku",    name: "Claude Haiku 3.5", provider: "claude",   apiModel: "claude-haiku-3-5-20241022",     contextWindow: 200000, description: "Ultra rápido y económico — tareas simples en milisegundos",        tags: ["fast","cheap","simple"],   isPremium: false, supportsVision: true,  supportsStreaming: true },
+  { id: "claude-sonnet",   name: "Claude Sonnet 4.6", provider: "claude",  apiModel: "claude-sonnet-4-6",             contextWindow: 1000000, description: "Balanceado, rápido y creativo — ideal para la mayoría de tareas", tags: ["smart","fast","creative"], isPremium: false, supportsVision: true,  supportsStreaming: true },
+  { id: "claude-opus",     name: "Claude Opus 4.8",  provider: "claude",   apiModel: "claude-opus-4-8",               contextWindow: 1000000, description: "Máxima inteligencia Claude — análisis profundo y razonamiento", tags: ["genius","deep","analysis"], isPremium: true,  supportsVision: true,  supportsStreaming: true },
+  { id: "claude-haiku",    name: "Claude Haiku 4.5", provider: "claude",   apiModel: "claude-haiku-4-5",              contextWindow: 200000, description: "Ultra rápido y económico — tareas simples en milisegundos",        tags: ["fast","cheap","simple"],   isPremium: false, supportsVision: true,  supportsStreaming: true },
   // ── GPT ───────────────────────────────────────────────────────────────────
   { id: "gpt-4.1",         name: "GPT-4.1",          provider: "openai",   apiModel: "gpt-4.1",                       contextWindow: 128000, description: "Última versión GPT — gran rendimiento en código y razonamiento",  tags: ["smart","code","reasoning"], isPremium: false, supportsVision: true,  supportsStreaming: true },
   { id: "gpt-4o",          name: "GPT-4o",            provider: "openai",   apiModel: "gpt-4o",                        contextWindow: 128000, description: "Multimodal omni — visión, audio y texto en un solo modelo",        tags: ["multimodal","vision"],      isPremium: false, supportsVision: true,  supportsStreaming: true },
   { id: "gpt-4o-mini",     name: "GPT-4o Mini",       provider: "openai",   apiModel: "gpt-4o-mini",                   contextWindow: 128000, description: "Versión ligera de GPT-4o — rápido y económico",                    tags: ["fast","cheap"],            isPremium: false, supportsVision: true,  supportsStreaming: true },
   { id: "o3-mini",         name: "o3-mini",           provider: "openai",   apiModel: "o3-mini",                       contextWindow: 200000, description: "Razonamiento avanzado OpenAI — matemáticas y lógica compleja",     tags: ["reasoning","math","logic"], isPremium: true,  supportsVision: false, supportsStreaming: false },
-  { id: "o1-mini",         name: "o1-mini",           provider: "openai",   apiModel: "o1-mini",                       contextWindow: 128000, description: "Modelo de razonamiento cadena-de-pensamiento",                     tags: ["reasoning","cot"],         isPremium: true,  supportsVision: false, supportsStreaming: false },
   // ── Gemini ────────────────────────────────────────────────────────────────
   { id: "gemini-2.5-pro",  name: "Gemini 2.5 Pro",   provider: "gemini",   apiModel: "gemini-2.5-pro",                contextWindow: 1000000, description: "Contexto de 1M tokens — documentos largos y análisis exhaustivo", tags: ["long-context","analysis"],  isPremium: true,  supportsVision: true,  supportsStreaming: true },
   { id: "gemini-2.5-flash",name: "Gemini 2.5 Flash",  provider: "gemini",   apiModel: "gemini-2.5-flash",              contextWindow: 1000000, description: "Flash de Google — velocidad excepcional con contexto enorme",      tags: ["fast","long-context"],     isPremium: false, supportsVision: true,  supportsStreaming: true },
-  { id: "gemini-2.0-flash",name: "Gemini 2.0 Flash",  provider: "gemini",   apiModel: "gemini-2.0-flash",              contextWindow: 1000000, description: "Gemini 2.0 con búsqueda web en tiempo real integrada",            tags: ["search","grounding"],      isPremium: false, supportsVision: true,  supportsStreaming: true },
+  { id: "gemini-3.5-flash",name: "Gemini 3.5 Flash",  provider: "gemini",   apiModel: "gemini-3.5-flash",              contextWindow: 1000000, description: "Flash de última generación — rápido y económico",                  tags: ["fast","long-context"],     isPremium: false, supportsVision: true,  supportsStreaming: true },
   // ── DeepSeek ──────────────────────────────────────────────────────────────
   { id: "deepseek-v3",     name: "DeepSeek V3",       provider: "deepseek", apiModel: "deepseek-chat",                 contextWindow: 128000, description: "Modelo chino de vanguardia — excelente en código y ciencias",      tags: ["code","science","chinese"], isPremium: false, supportsVision: false, supportsStreaming: true },
   { id: "deepseek-r1",     name: "DeepSeek R1",       provider: "deepseek", apiModel: "deepseek-reasoner",             contextWindow: 128000, description: "Razonador DeepSeek — chain-of-thought abierto",                    tags: ["reasoning","cot","open"],  isPremium: false, supportsVision: false, supportsStreaming: true },
@@ -112,7 +111,10 @@ async function callOpenAICompatible(
   const resp = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages, max_tokens: 4096, temperature: 0.7 }),
+    // Los modelos de razonamiento de OpenAI (o*) rechazan max_tokens y temperature.
+    body: JSON.stringify(/^o\d/.test(model)
+      ? { model, messages, max_completion_tokens: 4096 }
+      : { model, messages, max_tokens: 4096, temperature: 0.7 }),
   });
   if (!resp.ok) {
     const err = await resp.text();

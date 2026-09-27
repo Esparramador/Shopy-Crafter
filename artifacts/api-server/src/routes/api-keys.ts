@@ -9,8 +9,49 @@ import { requireAdmin } from "../lib/auth.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { encrypt, isUsingTemporaryKey, safeDecrypt } from "../lib/crypto.js";
 
 const router = Router();
+
+// ── Aplicación de claves al proceso ──────────────────────────────────────────
+// La clave guardada en el panel es la decisión más reciente del admin: manda
+// sobre la del entorno (antes, tras reiniciar, la clave vieja del entorno ganaba
+// y la actualizada en el panel se ignoraba). Se guarda el valor original del
+// entorno para restaurarlo al desactivar o borrar la clave del panel.
+const originalEnv = new Map<string, string | undefined>();
+
+function applyKey(name: string, value: string): void {
+  if (!originalEnv.has(name)) originalEnv.set(name, process.env[name]);
+  process.env[name] = value;
+}
+
+function revertKey(name: string): void {
+  if (!originalEnv.has(name)) return;
+  const original = originalEnv.get(name);
+  if (original === undefined) delete process.env[name];
+  else process.env[name] = original;
+  originalEnv.delete(name);
+}
+
+/** En BD cifrada (si hay ENCRYPTION_KEY persistente); filas antiguas en claro siguen valiendo. */
+function sealKey(value: string): string {
+  return isUsingTemporaryKey() ? value : encrypt(value);
+}
+function openKey(stored: string): string {
+  return safeDecrypt(stored) || stored;
+}
+
+// Solo nombres de variable de credenciales; nunca la configuración del propio
+// servidor (BD, sesión, cifrado, entorno).
+const KEY_NAME_RE = /^[A-Z][A-Z0-9_]{2,119}$/;
+const PROTECTED_ENV = new Set([
+  "DATABASE_URL", "SESSION_SECRET", "ENCRYPTION_KEY", "NODE_ENV", "PORT", "PATH", "HOME",
+  "PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE", "APP_URL", "BASE_PATH",
+  "REPL_IDENTITY", "WEB_REPL_RENEWAL", "REPLIT_DOMAINS", "REPLIT_DEV_DOMAIN", "REPLIT_CONNECTORS_HOSTNAME",
+]);
+function isAllowedKeyName(name: unknown): name is string {
+  return typeof name === "string" && KEY_NAME_RE.test(name) && !PROTECTED_ENV.has(name) && !name.startsWith("PG") && !name.startsWith("REPL");
+}
 
 // ── Ensure table ─────────────────────────────────────────────────────────────
 async function ensureApiKeysTable() {
@@ -86,7 +127,7 @@ router.get("/admin/api-keys", requireAdmin, async (_req: Request, res: Response)
         docs: cat.docs,
         source: dbRow ? "db" : hasEnv ? "env" : "missing",
         is_active: dbRow ? dbRow.is_active : hasEnv,
-        masked_value: dbRow ? maskKey(dbRow.key_value) : hasEnv ? maskKey(envVal!) : null,
+        masked_value: dbRow ? maskKey(openKey(dbRow.key_value)) : hasEnv ? maskKey(envVal!) : null,
         last_tested_at: dbRow?.last_tested_at || null,
         last_test_ok: dbRow?.last_test_ok ?? (hasEnv ? null : false),
         last_test_error: dbRow?.last_test_error || null,
@@ -99,7 +140,7 @@ router.get("/admin/api-keys", requireAdmin, async (_req: Request, res: Response)
         id: r.id, provider: r.provider, key_name: r.key_name, label: r.provider,
         icon: "🔑", category: r.category || "other", description: r.description || "",
         docs: "", source: "db", is_active: r.is_active,
-        masked_value: maskKey(r.key_value),
+        masked_value: maskKey(openKey(r.key_value)),
         last_tested_at: r.last_tested_at, last_test_ok: r.last_test_ok,
         last_test_error: r.last_test_error,
       }));
@@ -113,23 +154,28 @@ router.get("/admin/api-keys", requireAdmin, async (_req: Request, res: Response)
 // ── POST /api/admin/api-keys ──────────────────────────────────────────────────
 router.post("/admin/api-keys", requireAdmin, async (req: Request, res: Response) => {
   const { provider, key_name, key_value, description, category } = req.body;
-  if (!provider || !key_name || !key_value) {
+  if (!provider || !key_name || typeof key_value !== "string" || !key_value.trim()) {
     res.status(400).json({ error: "provider, key_name y key_value son requeridos" }); return;
   }
+  if (!isAllowedKeyName(key_name)) {
+    res.status(400).json({ error: "key_name debe ser una variable de credencial (MAYÚSCULAS_CON_GUIONES) y no una variable del sistema" }); return;
+  }
+  const cleanValue = key_value.trim();
   try {
     await db.execute(sql`
       INSERT INTO platform_api_keys (provider, key_name, key_value, description, category, updated_at)
-      VALUES (${provider}, ${key_name}, ${key_value}, ${description || ""}, ${category || "other"}, NOW())
+      VALUES (${provider}, ${key_name}, ${sealKey(cleanValue)}, ${description || ""}, ${category || "other"}, NOW())
       ON CONFLICT (provider, key_name) DO UPDATE SET
         key_value = EXCLUDED.key_value,
+        is_active = TRUE,
         description = EXCLUDED.description,
         category = EXCLUDED.category,
         updated_at = NOW(),
         last_test_ok = NULL,
         last_test_error = NULL
     `);
-    // Inject into process.env so it takes effect immediately for this process
-    process.env[key_name] = key_value;
+    // Efecto inmediato en este proceso (los clientes SDK se recrean al detectar la clave nueva).
+    applyKey(key_name, cleanValue);
     logger.info({ provider, key_name }, "api-key saved and injected to env");
     res.json({ success: true, message: `Key ${key_name} guardada y activada en tiempo real` });
   } catch (err: any) {
@@ -147,7 +193,7 @@ router.post("/admin/api-keys/:id/test", requireAdmin, async (req: Request, res: 
 
     let ok = false;
     let detail = "";
-    const val = key.key_value;
+    const val = openKey(key.key_value);
     const kn = key.key_name as string;
 
     try {
@@ -204,7 +250,10 @@ router.post("/admin/api-keys/:id/test", requireAdmin, async (req: Request, res: 
 router.delete("/admin/api-keys/:id", requireAdmin, async (req: Request, res: Response) => {
   const id = parseInt(String(req.params.id));
   try {
-    await db.execute(sql`DELETE FROM platform_api_keys WHERE id = ${id}`);
+    const rows = await db.execute(sql`DELETE FROM platform_api_keys WHERE id = ${id} RETURNING key_name`);
+    const name = (rows.rows[0] as { key_name?: string } | undefined)?.key_name;
+    // Antes la clave borrada seguía activa en el proceso hasta reiniciar.
+    if (name) revertKey(name);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -215,8 +264,14 @@ router.delete("/admin/api-keys/:id", requireAdmin, async (req: Request, res: Res
 router.put("/admin/api-keys/:id/toggle", requireAdmin, async (req: Request, res: Response) => {
   const id = parseInt(String(req.params.id));
   try {
-    await db.execute(sql`UPDATE platform_api_keys SET is_active = NOT is_active, updated_at = NOW() WHERE id = ${id}`);
-    res.json({ success: true });
+    const rows = await db.execute(sql`UPDATE platform_api_keys SET is_active = NOT is_active, updated_at = NOW() WHERE id = ${id} RETURNING key_name, key_value, is_active`);
+    const row = rows.rows[0] as { key_name: string; key_value: string; is_active: boolean } | undefined;
+    // Antes desactivar no tenía efecto hasta reiniciar.
+    if (row && isAllowedKeyName(row.key_name)) {
+      if (row.is_active) applyKey(row.key_name, openKey(row.key_value));
+      else revertKey(row.key_name);
+    }
+    res.json({ success: true, is_active: row?.is_active ?? null });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -257,15 +312,23 @@ router.post("/admin/billing-config", requireAdmin, async (req: Request, res: Res
 export async function injectDbApiKeys() {
   try {
     const rows = await db.execute(sql`SELECT key_name, key_value FROM platform_api_keys WHERE is_active = TRUE`);
-    let count = 0;
-    for (const row of rows.rows as any[]) {
-      if (!process.env[row.key_name]) { // Don't override existing env vars
-        process.env[row.key_name] = row.key_value;
-        count++;
+    const applied: string[] = [];
+    const overridden: string[] = [];
+    for (const row of rows.rows as Array<{ key_name: string; key_value: string }>) {
+      if (!isAllowedKeyName(row.key_name)) {
+        logger.warn({ key_name: row.key_name }, "api-keys: nombre de variable no permitido — ignorado");
+        continue;
       }
+      const value = openKey(row.key_value);
+      if (!value) continue;
+      if (process.env[row.key_name] && process.env[row.key_name] !== value) overridden.push(row.key_name);
+      applyKey(row.key_name, value);
+      applied.push(row.key_name);
     }
-    if (count > 0) logger.info({ count }, "api-keys: injected DB keys into env");
-  } catch (_) {}
+    if (applied.length) logger.info({ applied, overridden }, "api-keys: claves del panel aplicadas (mandan sobre el entorno)");
+  } catch (err) {
+    logger.error({ err }, "api-keys: no se pudieron cargar las claves del panel");
+  }
 }
 
 export default router;

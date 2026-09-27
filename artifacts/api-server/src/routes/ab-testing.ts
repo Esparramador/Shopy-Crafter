@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { SHOPIFY_API_VERSION } from "../lib/shopify.js";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, abTestsTable, trackEventsTable, cogsTable, supplierEntriesTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
@@ -438,7 +439,7 @@ router.post("/projects/:projectId/ab-tests/:testId/declare-winner", requireProje
             appliedToShopify = { ok: false, message: "El test no tiene producto Shopify asociado." };
           } else {
             const adminDomain = shopDomain.replace(/^https?:\/\//, "").replace(/\/$/, "");
-            const apiBase = `https://${adminDomain}/admin/api/2024-10`;
+            const apiBase = `https://${adminDomain}/admin/api/${SHOPIFY_API_VERSION}`;
             const headers = { "Content-Type": "application/json", "X-Shopify-Access-Token": adminToken };
             // Extrae numeric id del GID si llega como gid://shopify/Product/123456
             const numericProductId = String(test.shopifyProductId).replace(/^.*\//, "");

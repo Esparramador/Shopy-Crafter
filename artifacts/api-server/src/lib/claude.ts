@@ -5,12 +5,13 @@ import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnic
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 import { logger } from "./logger.js";
+import { replaceRetiredModel } from "./ai-models.js";
 import { AiTruncatedError } from "./ai-errors.js";
 import { generateAiJson } from "./ai-json.js";
 
 export { AiTruncatedError } from "./ai-errors.js";
 
-export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+export const CLAUDE_MODEL = replaceRetiredModel(process.env.CLAUDE_MODEL || "claude-sonnet-4-6");
 
 export type BrainUseCase = "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ab_test_prediction" | "ecommerce" | "cogs_estimation" | "financial" | "email_content" | "brand_analysis" | "consistency" | "web_lab" | "generator" | "campaign_production" | "exploded_view";
 
@@ -31,19 +32,20 @@ async function resolvePlatformType(projectId: number): Promise<string | undefine
 }
 
 let defaultClient: Anthropic | null = null;
+let defaultClientSig = "";
 
+// El cliente se recrea si cambian las credenciales (clave actualizada desde el
+// panel de API keys): antes se quedaba con la clave del arranque hasta reiniciar.
 function getDefaultClient(): Anthropic {
-  if (!defaultClient) {
-    if (process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL && process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY) {
-      defaultClient = new Anthropic({
-        baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-        apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
-      });
-    } else {
-      defaultClient = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-      });
-    }
+  const proxyUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+  const proxyKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+  const useProxy = !!(proxyUrl && proxyKey);
+  const sig = useProxy ? `proxy:${proxyUrl}:${proxyKey}` : `direct:${process.env.ANTHROPIC_API_KEY ?? ""}`;
+  if (!defaultClient || sig !== defaultClientSig) {
+    defaultClient = useProxy
+      ? new Anthropic({ baseURL: proxyUrl, apiKey: proxyKey })
+      : new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    defaultClientSig = sig;
   }
   return defaultClient;
 }
@@ -100,7 +102,7 @@ function enforcePromptBudget(systemPrompt: string, userContent: string, reserveF
 }
 
 export interface ClaudeCallOpts {
-  /** Override the model entirely (e.g. "claude-opus-4-1"). */
+  /** Override the model entirely (e.g. "claude-opus-4-8"). */
   model?: string;
   /** Pick by tier — "fast"|"smart"|"genius"|"vision". DB/env can remap. */
   tier?: import("./ai-models.js").AITier;
@@ -134,7 +136,7 @@ function firstText(response: { content: Array<{ type: string }> }, errorMessage 
 }
 
 async function resolveClaudeModel(opts?: ClaudeCallOpts): Promise<string> {
-  if (opts?.model && opts.model.trim().length > 0) return opts.model.trim();
+  if (opts?.model && opts.model.trim().length > 0) return replaceRetiredModel(opts.model.trim());
   if (opts?.tier) {
     const { pickModel } = await import("./ai-models.js");
     return pickModel("claude", opts.tier);

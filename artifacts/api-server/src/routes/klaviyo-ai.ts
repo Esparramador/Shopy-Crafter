@@ -12,7 +12,8 @@ import { enableLongRunning } from "../lib/long-running.js";
 const router = Router();
 
 const KLAVIYO_BASE = "https://a.klaviyo.com/api";
-const REVISION = "2024-02-15";
+// 2024-02-15 está retirada (Klaviyo mantiene cada revisión 2 años); misma que emails.ts.
+const REVISION = "2024-10-15";
 
 function kHeaders() {
   return getKlaviyoHeaders(REVISION);
@@ -296,38 +297,38 @@ router.post("/klaviyo-ai/push-flow", requireAdmin, async (req: Request, res: Res
     const { flow } = req.body as { flow: FlowSpec };
     if (!flow) { res.status(400).json({ error: "flow requerido" }); return; }
   
-    try {
-      // Create the flow via Klaviyo API
-      const flowData = await kPost<{ data: { id: string } }>("/flows/", {
-        data: {
-          type: "flow",
-          attributes: {
-            name: flow.name,
-            status: "draft",
-            trigger_type: "metric",
-          },
-        },
-      });
-  
-      const flowId = flowData.data.id;
-      logger.info({ flowId, name: flow.name }, "Flow created in Klaviyo");
-  
-      res.json({
-        success: true,
-        flowId,
-        flowName: flow.name,
-        note: "Flow creado como draft en Klaviyo. Las acciones de email deben configurarse manualmente en el editor de Klaviyo. Los templates HTML están listos para copiar.",
-        klaviyoUrl: `https://www.klaviyo.com/flows/${flowId}`,
-      });
-    } catch (err) {
-      logger.error(err, "Klaviyo push flow failed");
-      // Return helpful error but don't fail completely
-      res.status(200).json({
-        success: false,
-        error: String(err),
-        note: "No se pudo crear el flow via API. Usa los templates HTML generados para crear el flow manualmente en Klaviyo.",
-      });
+    if (!Array.isArray(flow.emails) || flow.emails.length === 0) {
+      res.status(400).json({ error: "El flow no tiene emails generados" }); return;
     }
+    // Antes: POST /flows solo con nombre y trigger_type (la API exige una
+    // "definition" completa) → fallaba siempre y respondía 200. Ahora se crea una
+    // plantilla real por email; el flow se monta en Klaviyo con esas plantillas.
+    const templates: Array<{ position: number; subject: string; templateId: string }> = [];
+    const errors: string[] = [];
+    for (const email of flow.emails) {
+      try {
+        const t = await kPost<{ data: { id: string } }>("/templates/", {
+          data: {
+            type: "template",
+            attributes: {
+              name: `[${flow.name}] #${email.position} — ${email.subject}`.slice(0, 200),
+              editor_type: "CODE",
+              html: email.html_body,
+            },
+          },
+        });
+        templates.push({ position: email.position, subject: email.subject, templateId: t.data.id });
+      } catch (err) {
+        errors.push(`Email #${email.position}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    logger.info({ flow: flow.name, created: templates.length, failed: errors.length }, "Klaviyo templates pushed");
+    res.status(templates.length ? 200 : 502).json({
+      success: templates.length > 0 && errors.length === 0,
+      templates,
+      errors,
+      note: "Plantillas creadas en Klaviyo. Crea el flow en el editor de Klaviyo (disparador y esperas) y asigna cada plantilla a su email.",
+    });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });

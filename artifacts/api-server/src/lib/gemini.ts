@@ -19,8 +19,15 @@ let _ai: GoogleGenAI | null = null;
 let _aiDirect: GoogleGenAI | null = null;
 let _aiProxy: GoogleGenAI | null = null;
 
+// Firmas de credenciales: los clientes se recrean si la clave cambia (p. ej.
+// actualizada desde el panel de API keys) en vez de quedarse con la del arranque.
+let _aiSig = "", _aiDirectSig = "", _aiProxySig = "";
+
 function getGeminiClient(): GoogleGenAI {
+  const sig = `${process.env.GEMINI_API_KEY ?? ""}|${process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? ""}|${process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ?? ""}`;
+  if (_ai && sig !== _aiSig) _ai = null;
   if (!_ai) {
+    _aiSig = sig;
     const directKey = process.env.GEMINI_API_KEY;
     const proxyKey  = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
     const proxyUrl  = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
@@ -46,7 +53,9 @@ function getGeminiClient(): GoogleGenAI {
 function getGeminiDirectClient(): GoogleGenAI | null {
   const directKey = process.env.GEMINI_API_KEY;
   if (!directKey) return null;
+  if (_aiDirect && directKey !== _aiDirectSig) _aiDirect = null;
   if (!_aiDirect) {
+    _aiDirectSig = directKey;
     const savedGoogleKey = process.env.GOOGLE_API_KEY;
     if (savedGoogleKey) delete process.env.GOOGLE_API_KEY;
     _aiDirect = new GoogleGenAI({ apiKey: directKey });
@@ -64,7 +73,9 @@ function getGeminiProxyClient(): GoogleGenAI | null {
   const proxyKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
   const proxyUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
   if (!proxyKey || !proxyUrl) return null;
+  if (_aiProxy && `${proxyKey}|${proxyUrl}` !== _aiProxySig) _aiProxy = null;
   if (!_aiProxy) {
+    _aiProxySig = `${proxyKey}|${proxyUrl}`;
     _aiProxy = new GoogleGenAI({ apiKey: proxyKey, httpOptions: { apiVersion: "", baseUrl: proxyUrl } });
   }
   return _aiProxy;

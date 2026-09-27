@@ -204,7 +204,7 @@ CODE: liquid-custom-section, shopify-app-snippet, storefront-api-query
 🧠 CLAUDE API — MODELOS DISPONIBLES:
 • claude-opus-4-8   — Máxima capacidad (genius mode): análisis complejo, estrategia, código avanzado
 • claude-sonnet-4-6 — Smart mode equilibrado: respuestas rápidas de calidad
-• claude-3-haiku    — Ultra-rápido: clasificación, extracción simple
+• claude-haiku-4-5  — Ultra-rápido: clasificación, extracción simple
 
 REGLA: Cuando el usuario pida algo, SIEMPRE consulta este catálogo y usa la skill más adecuada.
 No digas "no tengo información sobre X" si X está en este catálogo. EJECÚTALO.

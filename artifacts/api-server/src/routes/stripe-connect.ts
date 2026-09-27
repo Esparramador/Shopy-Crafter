@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
+import { SHOPIFY_API_VERSION } from "../lib/shopify.js";
 import { sql } from "drizzle-orm";
 import Stripe from "stripe";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
@@ -523,7 +524,7 @@ router.post("/stripe/draft-order", requireAdmin, async (req: Request, res: Respo
     };
 
     const shopifyRes = await fetch(
-      `https://${shopDomain}/admin/api/2026-01/draft_orders.json`,
+      `https://${shopDomain}/admin/api/${SHOPIFY_API_VERSION}/draft_orders.json`,
       {
         method: "POST",
         headers: {

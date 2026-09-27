@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { SHOPIFY_API_VERSION } from "../lib/shopify.js";
 import { randomBytes } from "crypto";
 import { db, agencyCostStructureTable, serviceCatalogTable, pricingDecisionsTable, projectsTable } from "@workspace/db";
 import { apiUsageLogTable } from "@workspace/db/schema";
@@ -430,7 +431,7 @@ router.get("/agency/shopify-products", requireAdmin, async (_req, res): Promise<
   
     const domain = shopDomain.replace(/^https?:\/\//, "").replace(/\/$/, "");
     try {
-      const response = await fetch(`https://${domain}/api/2024-10/graphql.json`, {
+      const response = await fetch(`https://${domain}/api/${SHOPIFY_API_VERSION}/graphql.json`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Shopify-Storefront-Access-Token": storefrontToken },
         body: JSON.stringify({
@@ -486,7 +487,7 @@ router.post("/agency/payment-link", requireAdmin, async (req, res): Promise<void
     const customNote = [clientName && `Cliente: ${clientName}`, note].filter(Boolean).join(" — ");
   
     try {
-      const response = await fetch(`https://${domain}/api/2024-10/graphql.json`, {
+      const response = await fetch(`https://${domain}/api/${SHOPIFY_API_VERSION}/graphql.json`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Shopify-Storefront-Access-Token": storefrontToken },
         body: JSON.stringify({
@@ -601,7 +602,7 @@ router.post("/agency/push-services-to-shopify", requireAdmin, async (req, res): 
   
     const adminDomain = shopDomain.replace(/^https?:\/\//, "").replace(/\/$/, "");
     const headers = { "Content-Type": "application/json", "X-Shopify-Access-Token": adminToken };
-    const apiBase = `https://${adminDomain}/admin/api/2024-10`;
+    const apiBase = `https://${adminDomain}/admin/api/${SHOPIFY_API_VERSION}`;
   
     const results: Array<{ service: string; shopifyId: string | null; status: string; error?: string }> = [];
     const createdIds: string[] = [];

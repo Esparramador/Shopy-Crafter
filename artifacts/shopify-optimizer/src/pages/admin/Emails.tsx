@@ -8,7 +8,7 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 type FlowType = "checkout_abandoned" | "order_placed" | "welcome" | "win_back" | "review_requested" | "vip_upgrade" | "stock_back" | "price_drop";
 type Tone = "urgente" | "amigable" | "premium" | "casual" | "formal";
 type Delay = "immediate" | "1h" | "3h" | "24h" | "3d" | "7d";
-type KlaviyoStatus = "draft" | "live" | "error";
+type KlaviyoStatus = "draft" | "template" | "live" | "error";
 
 interface EmailFlow {
   id: number;
@@ -70,6 +70,7 @@ const DELAYS: Record<Delay, string> = {
 
 const STATUS_CONFIG: Record<KlaviyoStatus, { label: string; color: string; icon: React.ReactNode }> = {
   draft: { label: "Borrador", color: "#6b7280", icon: <Clock size={13} /> },
+  template: { label: "Plantilla en Klaviyo", color: "#c9a961", icon: <CheckCircle size={13} /> },
   live: { label: "Live en Klaviyo", color: "#10b981", icon: <CheckCircle size={13} /> },
   error: { label: "Error", color: "#ef4444", icon: <AlertCircle size={13} /> },
 };
@@ -308,7 +309,7 @@ export default function Emails() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Push failed");
       await fetchFlows();
-      alert("✅ Flow activado en Klaviyo exitosamente");
+      alert(`✅ ${data.note ?? "Plantilla creada en Klaviyo"}`);
     } catch (e: any) {
       alert("Error al enviar a Klaviyo: " + e.message);
     }
@@ -671,9 +672,9 @@ export default function Emails() {
                         {STATUS_CONFIG[currentStatus].icon}
                         <span style={{ color: STATUS_CONFIG[currentStatus].color, fontWeight: 700 }}>{STATUS_CONFIG[currentStatus].label}</span>
                       </div>
-                      {liveFlow?.klaviyo_flow_id && (
+                      {(liveFlow?.klaviyo_template_id || liveFlow?.klaviyo_flow_id) && (
                         <div style={{ marginTop: 6, fontSize: 10, color: "var(--t3)" }}>
-                          Template ID: {liveFlow.klaviyo_template_id} · Flow ID: {liveFlow.klaviyo_flow_id}
+                          Template ID: {liveFlow.klaviyo_template_id ?? "—"}{liveFlow.klaviyo_flow_id ? ` · Flow ID: ${liveFlow.klaviyo_flow_id}` : ""}
                         </div>
                       )}
                       {liveFlow?.klaviyo_error && (
@@ -687,8 +688,8 @@ export default function Emails() {
                       </div>
                     ) : (
                       <div style={{ padding: "12px 14px", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 9, marginBottom: 16 }}>
-                        <p style={{ fontSize: 11, color: "#10b981", fontWeight: 700, margin: "0 0 7px" }}>Klaviyo creará automáticamente:</p>
-                        {["Template HTML en Klaviyo", "Flow con trigger configurado", "A/B test de asuntos activado", "Smart sending habilitado"].map(item => (
+                        <p style={{ fontSize: 11, color: "#10b981", fontWeight: 700, margin: "0 0 7px" }}>Se creará en Klaviyo:</p>
+                        {["Plantilla HTML con el contenido generado", "Después: asígnala a tu flow en el editor de Klaviyo"].map(item => (
                           <div key={item} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--t2)", marginBottom: 5 }}>
                             <TickIcon size={11} style={{ color: "#10b981" }} /> {item}
                           </div>
@@ -707,12 +708,12 @@ export default function Emails() {
                       }}>
                       {pushing
                         ? <><Loader2 size={15} style={{ animation: "spin 0.6s linear infinite" }} /> Creando en Klaviyo...</>
-                        : <><Send size={15} /> {currentStatus === "live" ? "Re-activar en Klaviyo" : "Crear y activar en Klaviyo"}</>
+                        : <><Send size={15} /> {currentStatus === "draft" || currentStatus === "error" ? "Crear plantilla en Klaviyo" : "Volver a subir plantilla"}</>
                       }
                     </button>
 
                     <p style={{ textAlign: "center", fontSize: 11, color: "var(--t3)", marginTop: 12, lineHeight: 1.5 }}>
-                      Nunca necesitas abrir Klaviyo · Shopy Crafter controla todo el contenido y la lógica
+                      El contenido se genera aquí · la activación del flow se hace en Klaviyo
                     </p>
                   </div>
                 </div>
