@@ -1365,16 +1365,19 @@ router.post("/projects/:projectId/audit", async (req, res): Promise<void> => {
     let totalScore = 0;
     const allIssues: string[] = [];
   
-    products.forEach((p) => {
+    // Solo productos auditados: uno sin auditar no es un "F" con 0 puntos.
+    const audited = products.filter((p) => p.auditScore !== null && p.auditScore !== undefined);
+    audited.forEach((p) => {
       const g = (p.auditGrade ?? "F") as keyof typeof gradeCounts;
       if (g in gradeCounts) gradeCounts[g]++;
       totalScore += p.auditScore ?? 0;
       allIssues.push(...(p.auditProblems ?? []));
     });
   
-    const avgScore = products.length ? totalScore / products.length : 0;
-    const needsImprovement = products.filter((p) => (p.auditScore ?? 0) < 75).length;
-    const criticalIssues = products.filter((p) => (p.auditScore ?? 0) < 45).length;
+    const avgScore = audited.length ? totalScore / audited.length : 0;
+    const needsImprovement = audited.filter((p) => (p.auditScore ?? 0) < 75).length;
+    const criticalIssues = audited.filter((p) => (p.auditScore ?? 0) < 45).length;
+    const notAudited = products.length - audited.length;
   
     const issueCounts: Record<string, number> = {};
     allIssues.forEach((issue) => { issueCounts[issue] = (issueCounts[issue] ?? 0) + 1; });
@@ -1383,9 +1386,12 @@ router.post("/projects/:projectId/audit", async (req, res): Promise<void> => {
       .slice(0, 5)
       .map(([issue, count]) => `${issue} (${count} productos)`);
   
-    const revenueImpact = needsImprovement > 0
-      ? `+${(needsImprovement * 15).toFixed(0)}% conversión estimada si se mejoran ${needsImprovement} productos`
-      : "Tienda bien optimizada";
+    // Sin porcentajes inventados (antes: +15 % de conversión por producto, p. ej. +1500 %).
+    const revenueImpact = audited.length === 0
+      ? "Sin productos auditados todavía"
+      : needsImprovement > 0
+        ? `${needsImprovement} de ${audited.length} productos auditados por debajo de 75/100 (${criticalIssues} críticos)${notAudited > 0 ? ` · ${notAudited} sin auditar` : ""}`
+        : `Todos los productos auditados superan 75/100${notAudited > 0 ? ` · ${notAudited} sin auditar` : ""}`;
   
     res.json({
       totalProducts: products.length,

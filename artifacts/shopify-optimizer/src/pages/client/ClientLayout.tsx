@@ -37,6 +37,15 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   const { content: cmsContent } = useCms();
   const cp: ClientCmsPanel = (cmsContent?.clientPanel as ClientCmsPanel) ?? {};
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Estado real de la conexión del navegador (antes el chip decía "Online" siempre).
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const prevUnreadClientRef = useRef(-1);
   const [clientToast, setClientToast] = useState<string | null>(null);
@@ -228,7 +237,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
                 {cp.sidebar?.managedBy ?? "Gestionado por"} <span style={{ color: "var(--jade)", fontWeight: 600 }}>{cp.sidebar?.agency ?? "tu agencia"}</span>
               </span>
             </div>
-            <p style={{ fontSize: 10, color: "var(--t3)" }}>{cp.sidebar?.enginesActive ?? "6 motores IA activos"}</p>
+            <p style={{ fontSize: 10, color: "var(--t3)" }}>{!cp.sidebar?.enginesActive || cp.sidebar.enginesActive === "6 motores IA activos" ? "7 motores IA a tu servicio" : cp.sidebar.enginesActive}</p>
           </div>
         </div>
 
@@ -373,9 +382,9 @@ export function ClientLayout({ children }: { children: ReactNode }) {
             <span className="topbar-page">{cp.topbar ?? "Tu agencia trabaja para ti 24/7"}</span>
           </div>
           <div className="topbar-right">
-            <div className="status-chip">
-              <div className="status-pulse" />
-              {cp.statusOnline ?? "Online"}
+            <div className="status-chip" style={isOnline ? undefined : { color: "#f43f5e", borderColor: "rgba(244,63,94,0.3)" }}>
+              <div className="status-pulse" style={isOnline ? undefined : { background: "#f43f5e" }} />
+              {isOnline ? (cp.statusOnline ?? "Online") : "Sin conexión"}
             </div>
             <button className="notif-btn" title="Notificaciones" onClick={() => { navigate("/client/messages"); }}>🔔</button>
           </div>

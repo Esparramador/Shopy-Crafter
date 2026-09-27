@@ -812,19 +812,6 @@ export const EFFECT_SNIPPETS: EffectSnippet[] = [
     js: `var wrap=document.getElementById('fx-rv-stars');if(wrap){['⭐','⭐','⭐','⭐','⭐'].forEach(function(s,i){var span=document.createElement('span');span.className='fx-rv-star';span.textContent=s;span.style.animationDelay=(i*.1)+'s';wrap.appendChild(span);});}`,
   },
   {
-    id: "live_visitors_counter",
-    name: "Contador de Visitantes en Vivo",
-    category: "micro_interactions",
-    description: "Badge 'X personas viendo ahora' con fluctuación realista — CSS + JS",
-    libs: [],
-    html: '<div class="fx-live-badge"><span class="fx-live-dot"></span><span class="fx-live-count" id="fx-live-n">27</span> personas viendo ahora</div>',
-    css: `.fx-live-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:100px;font-family:__FONT__,sans-serif;font-size:.85rem;color:rgba(255,255,255,.65);}
-.fx-live-dot{width:8px;height:8px;background:#10b981;border-radius:50%;animation:live-blink 1.2s ease-in-out infinite;}
-.fx-live-count{color:#10b981;font-weight:700;}
-@keyframes live-blink{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.8);}}`,
-    js: `(function(){var el=document.getElementById('fx-live-n');if(!el)return;var n=24+Math.floor(Math.random()*12);el.textContent=n;setInterval(function(){var delta=Math.random()<.5?1:-1;n=Math.max(18,Math.min(45,n+delta));el.textContent=n;},3500+Math.random()*2000);})();`,
-  },
-  {
     id: "avatar_group_stack",
     name: "Grupo de Avatares Apilados",
     category: "cards",
@@ -838,23 +825,6 @@ export const EFFECT_SNIPPETS: EffectSnippet[] = [
 .fx-av-label{margin-left:20px;font-family:__FONT__,sans-serif;color:rgba(255,255,255,.45);font-size:.8rem;}`,
     js: "",
   },
-  {
-    id: "notification_popup",
-    name: "Notificación de Venta Reciente",
-    category: "micro_interactions",
-    description: "Popup de compra reciente que aparece en esquina — JS + CSS, sin deps",
-    libs: [],
-    html: '<div class="fx-sale-notif" id="fx-sale-popup" style="display:none"><div class="fx-sn-icon">🛒</div><div class="fx-sn-text"><strong>María de Madrid</strong><span>Compró __NAME__ · hace 3 min</span></div></div>',
-    css: `.fx-sale-notif{position:fixed;bottom:24px;left:24px;z-index:9999;display:flex!important;align-items:center;gap:14px;padding:14px 20px;background:__SURFACE__;border:1px solid rgba(255,255,255,.1);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);transform:translateX(-120%);transition:transform .4s cubic-bezier(.215,.61,.355,1);}
-.fx-sale-notif.show{transform:translateX(0);}
-.fx-sn-icon{font-size:1.5rem;}
-.fx-sn-text{display:flex;flex-direction:column;}
-.fx-sn-text strong{font-family:__FONT__,sans-serif;color:__TEXT__;font-size:.85rem;}
-.fx-sn-text span{color:rgba(255,255,255,.4);font-size:.75rem;}`,
-    js: `(function(){var el=document.getElementById('fx-sale-popup');if(!el)return;function show(){el.style.display='flex';setTimeout(function(){el.classList.add('show');},50);setTimeout(function(){el.classList.remove('show');setTimeout(function(){el.style.display='none';},400);},4000);}setTimeout(show,2000);setInterval(show,12000);})();`,
-  },
-
-  // ── BATCH 6: Loading & Transiciones ─────────────────────────────────────
   {
     id: "progress_ring",
     name: "Anillo de Progreso Circular",

@@ -4,7 +4,8 @@ const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 interface PlatformData {
   platformType: string;
-  revenue: { total30d: number; orders30d: number; aov: number; trend: number; dailyChart: Array<{ date: string; revenue: number; orders: number }> };
+  revenue: { total30d: number; orders30d: number; aov: number; trend: number | null; dailyChart: Array<{ date: string; revenue: number; orders: number }> };
+  lastDataDate?: string | null;
   topProducts: Array<{ title: string; price: string; audit_score: number; audit_grade: string }>;
   events: Array<{ event_type: string; payload: string; created_at: string }>;
   inventoryAlerts: Array<{ product_title: string; variant_title: string; current_stock: number; days_remaining: number; status: string; sku: string }>;
@@ -80,8 +81,10 @@ export default function PrestaShopDashboard({ apid }: { apid: (url: string) => s
             <p style={{ margin: 0, fontSize: 11.5, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>Motor financiero real · últimos 30 días</p>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 8px #34d399" }} />
-            <span style={{ fontSize: 10.5, color: "#34d399", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>Conectado</span>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: data?.lastDataDate ? "#34d399" : "#6b7280", boxShadow: data?.lastDataDate ? "0 0 8px #34d399" : "none" }} />
+            <span style={{ fontSize: 10.5, color: data?.lastDataDate ? "#34d399" : "#9ca3af", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              {loading ? "…" : data?.lastDataDate ? `Datos al ${data.lastDataDate.slice(8, 10)}/${data.lastDataDate.slice(5, 7)}` : "Sin datos sincronizados"}
+            </span>
           </div>
         </div>
       </div>
@@ -108,7 +111,7 @@ export default function PrestaShopDashboard({ apid }: { apid: (url: string) => s
           <p style={{ margin: "0 0 4px", fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Revenue Diario — 30 días</p>
           <p style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 800, color: PRESTA_RED }}>
             €{(data?.revenue.total30d ?? 0).toLocaleString("es-ES")}
-            <span style={{ marginLeft: 8 }}>{data && <TrendBadge value={data.revenue.trend} />}</span>
+            <span style={{ marginLeft: 8 }}>{data && data.revenue.trend !== null && <TrendBadge value={data.revenue.trend} />}</span>
           </p>
           <MiniChart data={data?.revenue.dailyChart ?? []} color={PRESTA_RED} />
         </div>

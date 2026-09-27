@@ -193,6 +193,8 @@ export default function Home() {
   const [, navigate] = useLocation();
   const { data: projects, isLoading } = useListProjects();
   const [brainStatus, setBrainStatus] = useState<BrainStatus | null>(null);
+  const [jobs, setJobs] = useState<Array<{ id: string; status: "running" | "error" | "idle" }> | null>(null);
+  const [promptTotal, setPromptTotal] = useState<number | null>(null);
   const [chatSummary, setChatSummary] = useState<ChatSummary | null>(null);
   const [stores, setStores] = useState<StoreSummary[]>([]);
   const [syncingAll, setSyncingAll] = useState(false);
@@ -208,8 +210,17 @@ export default function Home() {
   })();
 
   useEffect(() => {
+    // Solo con 200: un cuerpo de error ({ error }) rompía el render (totalMemories undefined).
     fetch(`${API_BASE}/api/shopybrain/status`, { credentials: "include" })
-      .then(r => r.json()).then(setBrainStatus).catch(() => {});
+      .then(r => r.ok ? r.json() : null).then(d => { if (d && typeof d.totalMemories === "number") setBrainStatus(d); }).catch(() => {});
+    fetch(`${API_BASE}/api/automations/jobs`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (Array.isArray(d)) setJobs(d); })
+      .catch(() => {});
+    fetch(`${API_BASE}/api/fs-pro/prompt-library-master?indexOnly=1`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { const n = Number(d?.meta?.total_templates); if (Number.isFinite(n)) setPromptTotal(n); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -340,7 +351,7 @@ export default function Home() {
           icon={<Brain size={18} />}
           label="Cerebro IA"
           value={brainStatus ? `${(brainStatus.totalMemories / 1000).toFixed(1)}K` : "—"}
-          sub={brainStatus ? `${(brainStatus.totalInsights / 1000).toFixed(0)}K insights · ${Math.round(brainStatus.brainHealth ?? 98)}% salud` : "Cargando..."}
+          sub={brainStatus ? `${(brainStatus.totalInsights / 1000).toFixed(0)}K insights · ${Math.round(brainStatus.brainHealth ?? 0)}% salud` : "Cargando..."}
           color="var(--gold)"
         />
       </div>
@@ -369,8 +380,8 @@ export default function Home() {
             <Zap size={14} style={{ color: "#f59e0b" }} />
             <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: "var(--t3)" }}>Motores IA</span>
           </div>
-          <p style={{ fontSize: 22, fontWeight: 900, color: "var(--t)" }}>7 <span style={{ fontSize: 13, fontWeight: 500, color: "#4ade80" }}>activos</span></p>
-          <p style={{ fontSize: 10, color: "var(--t4)" }}>24h/7d continuo</p>
+          <p style={{ fontSize: 22, fontWeight: 900, color: "var(--t)" }}>{jobs ? jobs.length : "—"} <span style={{ fontSize: 13, fontWeight: 500, color: "#4ade80" }}>programados</span></p>
+          <p style={{ fontSize: 10, color: "var(--t4)" }}>{jobs ? `${jobs.filter(j => j.status === "running").length} en ejecución ahora` : "Cargando..."}</p>
         </div>
 
         <div className="glass-card" style={{ padding: "14px 16px" }}>
@@ -379,10 +390,18 @@ export default function Home() {
             <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: "var(--t3)" }}>Estado</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80" }} />
-            <p style={{ fontSize: 16, fontWeight: 800, color: "#4ade80" }}>Operativo</p>
+            {(() => {
+              const failed = jobs?.filter(j => j.status === "error").length ?? 0;
+              const color = !jobs ? "var(--t3)" : failed > 0 ? "#f59e0b" : "#4ade80";
+              return (
+                <>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
+                  <p style={{ fontSize: 16, fontWeight: 800, color }}>{!jobs ? "—" : failed > 0 ? "Con incidencias" : "Operativo"}</p>
+                </>
+              );
+            })()}
           </div>
-          <p style={{ fontSize: 10, color: "var(--t4)" }}>Todos los sistemas OK</p>
+          <p style={{ fontSize: 10, color: "var(--t4)" }}>{!jobs ? "Sin datos de jobs" : (() => { const failed = jobs.filter(j => j.status === "error").length; return failed > 0 ? `${failed} job${failed > 1 ? "s" : ""} con error en su última ejecución` : "Sin errores en la última ejecución de los jobs"; })()}</p>
         </div>
 
         <div className="glass-card" style={{ padding: "14px 16px" }}>
@@ -390,7 +409,7 @@ export default function Home() {
             <Package size={14} style={{ color: "#a78bfa" }} />
             <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", color: "var(--t3)" }}>Prompts</span>
           </div>
-          <p style={{ fontSize: 22, fontWeight: 900, color: "var(--t)" }}>6.2K</p>
+          <p style={{ fontSize: 22, fontWeight: 900, color: "var(--t)" }}>{promptTotal === null ? "—" : promptTotal >= 1000 ? `${(promptTotal / 1000).toFixed(1)}K` : promptTotal}</p>
           <p style={{ fontSize: 10, color: "var(--t4)" }}>Templates en librería</p>
         </div>
       </div>
@@ -465,7 +484,7 @@ export default function Home() {
                 {[
                   { label: "Memorias", value: brainStatus.totalMemories.toLocaleString("es-ES"), color: "var(--gold)" },
                   { label: "Insights", value: brainStatus.totalInsights.toLocaleString("es-ES"), color: "var(--jade)" },
-                  { label: "Salud IA", value: `${Math.round(brainStatus.brainHealth ?? 98)}%`, color: "#4ade80" },
+                  { label: "Salud IA", value: `${Math.round(brainStatus.brainHealth ?? 0)}%`, color: "#4ade80" },
                 ].map(row => (
                   <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 11, color: "var(--t3)" }}>{row.label}</span>
@@ -474,7 +493,7 @@ export default function Home() {
                 ))}
                 <div style={{ marginTop: 4 }}>
                   <div style={{ height: 4, borderRadius: 4, background: "var(--ink3)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round(brainStatus.brainHealth ?? 98)}%`, background: "linear-gradient(90deg, var(--jade), #4ade80)", borderRadius: 4 }} />
+                    <div style={{ height: "100%", width: `${Math.round(brainStatus.brainHealth ?? 0)}%`, background: "linear-gradient(90deg, var(--jade), #4ade80)", borderRadius: 4 }} />
                   </div>
                 </div>
               </div>

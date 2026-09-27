@@ -811,7 +811,7 @@ router.delete("/stripe/accounts/:accountId/subscriptions/:subId", requireAuth, a
 });
 
 // ── GET /stripe/oauth/check ───────────────────────────────────────────────────
-router.get("/stripe/oauth/check", async (_req: Request, res: Response): Promise<void> => {
+router.get("/stripe/oauth/check", requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   const clientId = process.env.STRIPE_CLIENT_ID;
   const secretKey = process.env.STRIPE_SECRET_KEY;
   res.json({

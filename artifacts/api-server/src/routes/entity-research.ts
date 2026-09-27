@@ -794,12 +794,17 @@ router.post("/shopybrain/research-entity-sync", requireAdmin, async (req: Reques
         memoriesSaved:   memoryIds.length,
         memoriesCreated,
         memoriesUpdated,
-        dimensionsResearched: 12,
+        // Dimensiones que devolvieron contenido (antes: 12 fijo aunque fallaran).
+        dimensionsResearched: [
+          research.overview, research.products, research.social, research.news, research.reviews,
+          research.competitors, research.ecommerce, research.pricing, research.paidAds,
+          research.founders, research.international, research.urlDeepDive,
+        ].filter(v => typeof v === "string" && v.trim().length > 0).length,
         urlDeepDiveChars: research.urlDeepDive?.length ?? 0,
         allSources:  research.allSources.slice(0, 60),
         allQueries:  research.allQueries,
         elapsed: `${elapsed}s`,
-        pipeline: "gemini-2.5-flash (15×search+urlContext+thinking) → claude-sonnet-4-5 (pro synthesis)",
+        pipeline: "Gemini (búsqueda + urlContext) → Claude (síntesis)",
         knowledgeReuse: {
           hadPreviousKnowledge: existingKnowledge.hasKnowledge,
           previousMemories:     existingKnowledge.memories.length,

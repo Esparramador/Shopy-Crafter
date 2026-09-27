@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { existsSync } from "fs";
+import path from "path";
 import { execSync } from "child_process";
 import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -1015,6 +1016,34 @@ router.post("/ai-models", async (req, res) => {
   }
 });
 
+// Paquetes MCP que el panel conoce (los del MCP Manager). Solo estos se pueden
+// instalar desde el panel: `pnpm add` ejecuta scripts de instalación, así que
+// aceptar cualquier nombre equivalía a ejecución remota de código.
+const MCP_PACKAGES = [
+  "@modelcontextprotocol/server-filesystem", "@modelcontextprotocol/server-memory",
+  "@upstash/context7-mcp", "puppeteer-mcp-server", "@modelcontextprotocol/server-everything",
+  "@octokit/mcp-server", "@notionhq/notion-mcp-server", "@hubspot/mcp-server",
+  "@sentry/mcp-server", "figma-mcp", "@playwright/mcp", "mcp-server-postgres", "@slack/mcp-server",
+];
+const MCP_ENV_VARS = ["STITCH_API_KEY"];
+
+/** Nombre sin versión: "@scope/pkg@1.2.3" → "@scope/pkg". */
+function mcpPackageName(spec: string): string {
+  const at = spec.lastIndexOf("@");
+  return at > 0 ? spec.slice(0, at) : spec;
+}
+
+/** Instalado = existe node_modules/<pkg>/package.json en el cwd o un directorio padre. */
+function isPackageInstalled(pkg: string): boolean {
+  let dir = process.cwd();
+  for (;;) {
+    if (existsSync(path.join(dir, "node_modules", pkg, "package.json"))) return true;
+    const parent = path.dirname(dir);
+    if (parent === dir) return false;
+    dir = parent;
+  }
+}
+
 // POST /api/admin/mcp/install — install a new MCP server package
 router.post("/mcp/install", async (req, res): Promise<void> => {
   try {
@@ -1025,6 +1054,9 @@ router.post("/mcp/install", async (req, res): Promise<void> => {
     // Security: only allow valid npm package names (no shell injection)
     if (!/^[@a-zA-Z0-9_\-./]+$/.test(npmPackage) || npmPackage.includes("..") || npmPackage.includes(";") || npmPackage.includes("&")) {
       res.status(400).json({ error: "Nombre de paquete inválido" }); return;
+    }
+    if (!MCP_PACKAGES.includes(mcpPackageName(npmPackage))) {
+      res.status(400).json({ error: "Paquete no permitido: solo servidores MCP del catálogo" }); return;
     }
     logger.info({ npmPackage }, "MCP install requested");
 
@@ -1064,24 +1096,13 @@ router.post("/mcp/install", async (req, res): Promise<void> => {
   }
 });
 
-// GET /api/admin/mcp/status — check if npm packages are installed
-router.get("/mcp/status", (_req, res): Promise<void> => {
-  const packagesToCheck = [
-    "@octokit/mcp-server", "@notionhq/notion-mcp-server", "@hubspot/mcp-server",
-    "@sentry/mcp-server", "figma-mcp", "@playwright/mcp", "mcp-server-postgres", "@slack/mcp-server",
-  ];
+// GET /api/admin/mcp/status — paquetes instalados y variables de entorno presentes
+router.get("/mcp/status", (_req, res): void => {
   const status: Record<string, boolean> = {};
-  for (const pkg of packagesToCheck) {
-    try {
-      const safePkg = pkg.replace(/[^a-zA-Z0-9@/_\-.]/g, "");
-      execSync(`node -e "require.resolve('${safePkg}')"`, { stdio: "pipe", timeout: 5000 });
-      status[pkg] = true;
-    } catch {
-      status[pkg] = false;
-    }
-  }
-  res.json({ status });
-  return Promise.resolve();
+  for (const pkg of MCP_PACKAGES) status[pkg] = isPackageInstalled(pkg);
+  const env: Record<string, boolean> = {};
+  for (const name of MCP_ENV_VARS) env[name] = Boolean(process.env[name]?.trim());
+  res.json({ status, env });
 });
 
 export default router;

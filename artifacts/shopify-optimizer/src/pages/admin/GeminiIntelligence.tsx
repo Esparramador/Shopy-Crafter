@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Brain, Search, TrendingUp, Building2, Package, Zap, ChevronDown, ChevronUp, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import SaveToVaultButton from "@/components/SaveToVaultButton";
 
@@ -270,6 +270,14 @@ function FullAuditResult({ data }: { data: { businessProfile: Record<string, unk
 export default function GeminiIntelligence() {
   const [activeTab, setActiveTab] = useState<Tab>("full-audit");
   const [state, setState] = useState<ResearchState>({ loading: false, data: null, error: null });
+  // Estado real de Gemini (clave configurada y circuit breakers); antes "ONLINE" fijo.
+  const [gemini, setGemini] = useState<{ configured: boolean; searchBlocked: boolean; generationBlocked: boolean } | null>(null);
+  useEffect(() => {
+    fetch(`${API}/api/gemini/status`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && typeof d.searchBlocked === "boolean") setGemini({ configured: d.configured !== false, searchBlocked: d.searchBlocked, generationBlocked: d.generationBlocked }); })
+      .catch(() => {});
+  }, [state.error]);
 
   const [bizForm, setBizForm] = useState({ businessName: "", domain: "", niche: "", market: "es" });
   const [marketForm, setMarketForm] = useState({ niche: "", market: "es" });
@@ -329,7 +337,11 @@ export default function GeminiIntelligence() {
                 label="Guardar"
               />
             )}
-            <div style={{ fontSize: 10, padding: "4px 10px", borderRadius: 20, background: "rgba(66,133,244,0.15)", color: "#4285f4", fontWeight: 700 }}>ONLINE</div>
+            {(() => {
+              const label = !gemini ? "…" : !gemini.configured ? "SIN CLAVE" : gemini.generationBlocked ? "BLOQUEADO" : gemini.searchBlocked ? "SIN BÚSQUEDA" : "DISPONIBLE";
+              const ok = !!gemini && gemini.configured && !gemini.generationBlocked && !gemini.searchBlocked;
+              return <div style={{ fontSize: 10, padding: "4px 10px", borderRadius: 20, background: ok ? "rgba(66,133,244,0.15)" : "rgba(248,113,113,0.15)", color: ok ? "#4285f4" : "#f87171", fontWeight: 700 }}>{label}</div>;
+            })()}
           </div>
         </div>
 

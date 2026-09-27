@@ -815,7 +815,7 @@ export default function PromptLibrary() {
     return 0;
   });
 
-  const totalTemplates = libIndex.reduce((s, l) => s + l.count, 0) || 6677;
+  const totalTemplates = libIndex.reduce((s, l) => s + l.count, 0);
 
   return (
     <div className="page-inner" style={{ maxWidth: 1100 }}>

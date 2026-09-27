@@ -326,7 +326,7 @@ export const DEFAULT_CMS_CONTENT = {
       storePanel: "Panel de tienda",
       managedBy: "Gestionado por",
       agency: "tu agencia",
-      enginesActive: "6 motores IA activos",
+      enginesActive: "7 motores IA a tu servicio",
       navigation: "Navegación",
       aiOptimizations: "Optimizaciones IA",
     },
