@@ -205,9 +205,13 @@ const reportAuth = async (req: Request, res: Response, next: NextFunction): Prom
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  // Per-project ownership check for A/B test reports: filename pattern `ab-test-<testId>-<ts>.html`
-  const filePath = req.path.replace(/^\/+/, "");
+  // Per-project ownership check for A/B test reports: filename pattern `ab-test-<testId>-<ts>.html`.
+  // Se comprueba la ruta DECODIFICADA (express.static decodifica: %61b-test-… se
+  // saltaba el control) y cualquier otro fichero del directorio es solo admin.
+  let filePath = "";
+  try { filePath = decodeURIComponent(req.path).replace(/^\/+/, ""); } catch { res.status(400).end(); return; }
   const abMatch = filePath.match(/^ab-test-(\d+)-\d+\.html$/);
+  if (!abMatch && sess.role !== "admin") { res.status(403).json({ error: "Forbidden" }); return; }
   if (abMatch) {
     try {
       const { db, abTestsTable } = await import("@workspace/db");

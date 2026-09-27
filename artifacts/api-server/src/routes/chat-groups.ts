@@ -200,7 +200,7 @@ router.post("/admin/chat-groups/:id/messages", requireAdmin, async (req, res): P
 router.get("/client/chat-groups", requireAuth, async (req, res): Promise<void> => {
   try {
     const db = await getDb();
-    const projectId = (req.session as any).projectId;
+    const projectId = Number((req.session as any).clientId) || null; // el proyecto del cliente es session.clientId
     if (!projectId) { res.json({ groups: [] }); return; }
     const groups = await db.execute(sql`
       SELECT g.id, g.name, g.description, g.created_at,
@@ -221,7 +221,7 @@ router.get("/client/chat-groups/:id/messages", requireAuth, async (req, res): Pr
   try {
     const db = await getDb();
     const gid = Number(req.params.id);
-    const projectId = (req.session as any).projectId;
+    const projectId = Number((req.session as any).clientId) || null; // el proyecto del cliente es session.clientId
     const member = await db.execute(sql`
       SELECT id FROM chat_group_members WHERE group_id = ${gid} AND project_id = ${Number(projectId)}
     `);
@@ -247,8 +247,8 @@ router.post("/client/chat-groups/:id/messages", requireAuth, async (req, res): P
   try {
     const db = await getDb();
     const gid = Number(req.params.id);
-    const projectId = (req.session as any).projectId;
-    const projectName = (req.session as any).projectName ?? "Cliente";
+    const projectId = Number((req.session as any).clientId) || null; // el proyecto del cliente es session.clientId
+    const projectName = (req.session as any).name ?? "Cliente";
     const member = await db.execute(sql`
       SELECT id FROM chat_group_members WHERE group_id = ${gid} AND project_id = ${Number(projectId)}
     `);

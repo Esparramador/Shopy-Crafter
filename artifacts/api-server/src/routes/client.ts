@@ -600,7 +600,7 @@ router.get("/vault-files", async (req, res): Promise<void> => {
       description: projectFilesTable.description,
       createdAt: projectFilesTable.createdAt,
       objectPath: projectFilesTable.objectPath,
-      hasContent: projectFilesTable.content,
+      hasContent: sql<boolean>`${projectFilesTable.content} IS NOT NULL`,
     }).from(projectFilesTable)
       .where(eq(projectFilesTable.projectId, pid))
       .orderBy(desc(projectFilesTable.createdAt));
@@ -689,7 +689,7 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
           description: projectFilesTable.description,
           createdAt: projectFilesTable.createdAt,
           objectPath: projectFilesTable.objectPath,
-          hasContent: projectFilesTable.content,
+          hasContent: sql<boolean>`${projectFilesTable.content} IS NOT NULL`,
         }).from(projectFilesTable)
           .where(eq(projectFilesTable.projectId, pid))
           .orderBy(desc(projectFilesTable.createdAt));

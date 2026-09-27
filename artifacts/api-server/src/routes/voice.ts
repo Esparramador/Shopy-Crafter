@@ -835,9 +835,10 @@ router.delete("/voice/convai/agents/:agentId", requireAdmin, async (req, res): P
 });
 
 // ── Admin/Full ConvAI voice call ───────────────────────────────────────────────
-router.get("/voice/convai/call-url", async (req, res): Promise<void> => {
-  const userId = (req.session as any)?.userId;
-  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+// Solo admin: el agente "admin" tiene contexto de toda la agencia (todos los
+// clientes). Antes cualquier cliente autenticado obtenía su URL firmada, o la de
+// cualquier agentId de la cuenta pasándolo por query.
+router.get("/voice/convai/call-url", requireAdmin, async (req, res): Promise<void> => {
   try {
     const agentId = (req.query.agentId as string) || await getOrCreateConvAIAgent("admin");
     const signed_url = await getConvAISignedUrl(agentId);

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { createRequire } from "module";
 import { db, projectFilesTable, projectsTable } from "@workspace/db";
 import { generationJobsTable } from "@workspace/db/schema";
@@ -104,7 +104,7 @@ router.get("/projects/:projectId/vault", requireAuth, async (req, res): Promise<
     if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
   
     const session = req.session as any;
-    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso a este proyecto" }); return;
     }
   
@@ -165,7 +165,7 @@ router.get("/projects/:projectId/vault/stats", requireAuth, async (req, res): Pr
     if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
   
     const session = req.session as any;
-    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso" }); return;
     }
   
@@ -200,7 +200,7 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
     if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
   
     const session = req.session as any;
-    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso" }); return;
     }
   
@@ -341,13 +341,16 @@ router.get(["/vault/:fileId/download", "/vault/:fileId/file", "/vault/:fileId/vi
   }
 });
 
-router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (req, res): Promise<void> => {
+// Handler compartido: lo usa el admin (router principal, tras requireAdmin) y el
+// cliente (vaultClientRouter, montado antes del gate) para descargar archivos
+// de SU proyecto — canAccessProject limita al cliente a su proyecto.
+async function downloadVaultFile(req: Request, res: Response): Promise<void> {
   const projectId = parseInt(String(req.params.projectId));
   const fileId = parseInt(String(req.params.fileId));
   if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
 
   const session = req.session as any;
-  if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+  if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
@@ -438,6 +441,14 @@ router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (re
   }
 
   res.status(410).json({ error: "Archivo ya no disponible en origen" });
+}
+router.get("/projects/:projectId/vault/:fileId/download", requireAuth, downloadVaultFile);
+
+/** Descarga de archivos del vault para el portal de cliente (solo su proyecto). */
+export const vaultClientRouter = Router();
+vaultClientRouter.get("/projects/:projectId/vault/:fileId/download", requireAuth, (req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  downloadVaultFile(req, res).catch(next);
 });
 
 // ─── PREVISUALIZAR UN ARCHIVO (inline, sin descarga) ─────────────────────────
@@ -447,7 +458,7 @@ router.get("/projects/:projectId/vault/:fileId/preview", requireAuth, async (req
   if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
 
   const session = req.session as any;
-  if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+  if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
@@ -599,7 +610,7 @@ router.get("/projects/:projectId/vault/download-all", requireAuth, async (req, r
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
   const session = req.session as any;
-  if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+  if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
@@ -734,7 +745,7 @@ router.post("/projects/:projectId/vault/download-selected", requireAuth, async (
   if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
   const session = req.session as any;
-  if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+  if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
     res.status(403).json({ error: "Sin acceso" }); return;
   }
 
@@ -1065,7 +1076,7 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
     if (isNaN(projectId) || isNaN(fileId)) { res.status(400).json({ error: "IDs inválidos" }); return; }
   
     const session = req.session as any;
-    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso" }); return;
     }
   
@@ -1266,7 +1277,7 @@ router.get("/projects/:projectId/vault/download-images/:format", requireAuth, as
     if (isNaN(projectId)) { res.status(400).json({ error: "projectId inválido" }); return; }
   
     const session = req.session as any;
-    if (projectId !== 0 && !(await canAccessProject(session.role, session.clientId, projectId))) {
+    if (!(projectId === 0 ? session.role === "admin" : await canAccessProject(session.role, session.clientId, projectId))) {
       res.status(403).json({ error: "Sin acceso" }); return;
     }
   

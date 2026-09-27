@@ -72,7 +72,9 @@ export const requireProjectAccess: RequestHandler = async (
     return;
   }
   if (projectId === 0) {
-    next();
+    // Proyecto 0 = espacio global de la agencia: solo admin.
+    if ((req.session as { role?: string } | undefined)?.role === "admin") { next(); return; }
+    res.status(403).json({ error: "Sin acceso a este proyecto" });
     return;
   }
   const ok = await canAccessProject(session.role, session.clientId, projectId);

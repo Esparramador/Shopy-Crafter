@@ -26,7 +26,7 @@ import voiceRouter from "./voice.js";
 import pushRouter from "./push.js";
 import shopybrainRouter from "./shopybrain.js";
 import agencyRouter from "./agency.js";
-import vaultRouter from "./vault.js";
+import vaultRouter, { vaultClientRouter } from "./vault.js";
 import referenceRouter from "./reference.js";
 import geminiResearchRouter from "./gemini-research.js";
 import klaviyoAiRouter from "./klaviyo-ai.js";
@@ -149,6 +149,8 @@ router.use(promptExecRouter);
 router.use(youtubeRouter);
 router.use(voiceRouter);
 router.use(videoCallRouter);
+// Portal de cliente: descarga de archivos de SU proyecto (canAccessProject).
+router.use(vaultClientRouter);
 
 router.use(requireAdmin, meshyRouter);
 router.use(requireAdmin, stitchRouter);
