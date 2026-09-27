@@ -12,11 +12,26 @@ import { safeDecrypt } from "./crypto.js";
 import { askClaudeWithBrain, buildShopyBrainContext, type BrainUseCase } from "./claude.js";
 import { askGeminiWithSearch } from "./gemini.js";
 import { logger } from "./logger.js";
+import { z } from "zod";
+import { lenientArray, looseString, optionalLooseNumber, parseResearchJson } from "./ai-schema.js";
 import { randomBytes } from "crypto";
 import { sendEmail, isGmailAvailable } from "./gmail.js";
 import { apiUsageLogTable } from "@workspace/db/schema";
 
 let geminiOnly = false;
+
+const selfEvaluationSchema = z.object({
+  report: z.object({
+    summary: z.string().min(1),
+    keyMetrics: lenientArray(looseString),
+    strengths: lenientArray(looseString),
+    weaknesses: lenientArray(looseString),
+    recommendations: lenientArray(looseString),
+    knowledgeGaps: lenientArray(looseString),
+    overallScore: optionalLooseNumber,
+  }).passthrough(),
+});
+type SelfEvaluationReport = z.output<typeof selfEvaluationSchema>["report"];
 
 async function aiGenerate(opts: { system: string; prompt: string; maxTokens: number; timeoutMs?: number; useCase?: BrainUseCase; niche?: string }): Promise<string> {
   if (!geminiOnly) {
@@ -981,11 +996,14 @@ Return ONLY valid JSON:
       maxTokens: 8192,
     });
 
-    const match = text.match(/\{[\s\S]*\}/);
-    let reportData: any = { summary: `Monthly stats: ${stats.insightsThisMonth} insights, ${stats.studySessions} sessions, avg confidence ${stats.avgConfidence}` };
-    if (match) {
-      try { reportData = JSON.parse(match[0]).report ?? reportData; } catch {}
-    }
+    // Si la IA no devuelve un informe válido se guarda solo el resumen con las
+    // estadísticas reales (antes el fallo se tragaba en silencio y un campo que no
+    // fuera lista rompía el spread de knowledgeGaps).
+    const parsedEval = parseResearchJson(text, selfEvaluationSchema, "scheduler/monthly-self-evaluation");
+    const reportData: SelfEvaluationReport = parsedEval?.report ?? {
+      summary: `Monthly stats: ${stats.insightsThisMonth} insights, ${stats.studySessions} sessions, avg confidence ${stats.avgConfidence}`,
+      keyMetrics: [], strengths: [], weaknesses: [], recommendations: [], knowledgeGaps: [],
+    };
 
     const reportInsightId = `eval-report-${sessionId}`;
     await db.insert(omnicoreInsightsTable).values({
@@ -1003,10 +1021,10 @@ Return ONLY valid JSON:
       memoryType: "self_evaluation",
       niche: "general",
       title: `[Eval] Auto-evaluación ${new Date().toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`,
-      content: typeof reportData.summary === "string" ? reportData.summary.slice(0, 4000) : JSON.stringify(reportData).slice(0, 4000),
+      content: reportData.summary.slice(0, 4000),
       confidence: 0.95,
       sourceType: "monthly_self_evaluation",
-      tags: JSON.stringify(["self_evaluation", "monthly", ...(reportData.knowledgeGaps ?? []).slice(0, 3)]),
+      tags: JSON.stringify(["self_evaluation", "monthly", ...reportData.knowledgeGaps.slice(0, 3)]),
     }).onConflictDoNothing();
 
     await db.insert(omnicoreStudySessionsTable).values({
@@ -1015,8 +1033,8 @@ Return ONLY valid JSON:
       domainsStudied: JSON.stringify(domains.map(d => d.domain)),
       trigger: "cron_monthly_1st",
       insightsCreated: 1,
-      summary: reportData.summary ?? `Monthly evaluation completed. Score: ${reportData.overallScore ?? "N/A"}`,
-      keyDiscoveries: JSON.stringify(reportData.recommendations ?? []),
+      summary: reportData.summary,
+      keyDiscoveries: JSON.stringify(reportData.recommendations),
     }).onConflictDoNothing();
 
     log("omnicore-eval", `📊 Monthly self-evaluation complete. Score: ${reportData.overallScore ?? "N/A"}`);

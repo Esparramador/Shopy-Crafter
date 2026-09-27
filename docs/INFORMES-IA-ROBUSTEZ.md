@@ -1,6 +1,6 @@
 # Informes IA — robustez de las respuestas (inventario)
 
-Rama `fix/informes-ia-robustos` (ya en `master`). Estado a 26/09/2026.
+Rama `fix/informes-ia-robustos` (ya en `master`). Estado a 27/09/2026.
 
 ## Causa raíz (confirmada en el código)
 
@@ -24,6 +24,7 @@ Rama `fix/informes-ia-robustos` (ya en `master`). Estado a 26/09/2026.
   - `askClaudeDetailed` y `askClaudeWithBrainDetailed` devuelven `{ text, stopReason, truncated, usage }`.
   - `ClaudeCallOpts.failOnTruncation` (por defecto `false`): si es `true`, `askClaude`, `askClaudeWithUsage`, `askClaudeWithVision`, `askClaudeVisionWithBrain` y `claude()` lanzan `AiTruncatedError`. Sin la opción, todo sigue devolviendo texto como antes.
   - `askClaudeWithBrain` acepta `opts` como último parámetro opcional.
+- `lib/ai-schema.ts` (con tests): piezas zod tolerantes para respuestas de Gemini con búsqueda — `looseNumber` ("12,50 €" → 12.5; rangos como "5-10" o "4.5/5" se descartan, nunca un 0 inventado), `lenientArray` (conserva solo los elementos válidos), `parseResearchJson` (extracción balanceada + esquema, sin reintento; `null` y motivo en el registro).
 - `lib/strategic-report.ts` + `generate-ai-report`: 2-3 llamadas pequeñas en paralelo (bloques de secciones), JSON corto por sección validado con zod, HTML montado y escapado en el servidor. Reglas de veracidad en el sistema ("si no hay datos, dilo; no inventes cifras"). Las secciones que dependen de datos inexistentes (catálogo, precios, COGS/ventas, histórico de pedidos) no se piden a la IA: se escribe "qué datos faltan". El prompt cambia según haya catálogo o no. Mismo contrato HTTP (`ok, projectId, sections, generatedAt, savedToVault, savedFileId, preview`) y mismo guardado en bóveda; si la IA falla tras el reintento responde 502 con mensaje claro y **no guarda nada**. Conserva `seoWriteSupported`/`seoWriteSnippet` que el conector WooCommerce guarda en `ai_report_json`.
 
 ## Modelo
@@ -32,7 +33,7 @@ Rama `fix/informes-ia-robustos` (ya en `master`). Estado a 26/09/2026.
 
 ## Inventario de sitios
 
-Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` → **47** sitios. Migrados en esta rama: 5 de esos 47, más 12 llamadas de informes que usaban `askClaudeJsonWithBrain`/`askClaudeWithBrain` con reparación o corte silencioso. Después se migraron los dos pendientes de prioridad alta (absorber de imágenes y Brand Book). Quedan **40** sitios con la regex (más la mención en el comentario de `lib/ai-json.ts`).
+Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` → **47** sitios. Migrados en esta rama: 5 de esos 47, más 12 llamadas de informes que usaban `askClaudeJsonWithBrain`/`askClaudeWithBrain` con reparación o corte silencioso. Después se migraron los de prioridad alta (absorber de imágenes, Brand Book) y todos los de prioridad media. Quedan **20** sitios con la regex, todos de prioridad baja (más la mención en el comentario de `lib/ai-json.ts`).
 
 "Fallback" indica qué pasa hoy si el JSON no parsea: **crudo** = el texto de la IA acaba en un campo visible (el bug del informe); **vacío** = se usa `{}`/`[]`/`null`; **defecto** = valores por defecto inventados; **error** = responde error.
 
@@ -52,37 +53,30 @@ Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` �
 | routes/intelligence.ts `/intelligence/analyze` (antes :565) | Atribución de revenue (dual AI) | `parseAiJson`; 502 en vez de meter el texto como `summary` (**crudo**) |
 | routes/absorber.ts `analyzeImageWithClaude` (antes :342) | Absorber de imágenes (Claude Vision, 16000 tokens) | `generateAiJson` con detección de `max_tokens` y reintento a 32000; antes devolvía `{ raw: text }` (**crudo**) y se guardaba en ShopyBrain una memoria visual vacía. `/shopybrain/absorb-visual` responde 502 con mensaje claro; el análisis de la imagen de una URL sigue siendo no crítico |
 | routes/shopybrain.ts execute-action `generate_brand_book` (antes :11742) | Brand Book renderizado a HTML y guardado en el Vault | `generateAiJson` + esquema zod (nombre, misión, historia, valores y paleta con hex válido obligatorios); 8000 tokens con reintento a 16000 (antes 4000, se cortaba). Antes, si no parseaba, se guardaba un brand book vacío con solo el nombre (**defecto**) |
+| routes/absorber.ts create-product-from-image (antes :885, :933, :982) | Crear producto en Shopify desde imagen: visión, precios, copy | Visión y copy con `generateAiJson` + esquema: si fallan, 502 **sin crear el producto** (antes se creaba un "Nuevo Producto" vacío). Precios con `parseResearchJson`: un `recommendedPrice` en texto rompía el `.toFixed()` |
+| routes/absorber.ts supplier-research (antes :1244, :1249, :1254, :1313) | Investigación de proveedores (3 búsquedas + síntesis) | Búsquedas con `parseResearchJson`; síntesis validada y, si falla, se devuelven las búsquedas con `synthesisError` en vez de una síntesis vacía |
+| routes/competitors.ts `/competitors/scan` (antes :163) | Snapshot de competidor | `askClaudeJsonValidated`; 502 sin snapshot (antes guardaba "0 productos" como dato real) |
+| routes/competitors.ts auto-discover y auto-analyze (antes :316, :819, :897) | Descubrimiento y análisis de competidores | `parseResearchJson` con esquema: precios/recuentos en texto rompían el INSERT (columnas real/integer) y los competidores sin nombre fallaban en silencio |
+| routes/fs-pro.ts adapt-for-brand (antes :1221) | Campaign production: adaptar a marca | `askClaudeJsonValidated` (antes `safeJsonParse` reparaba el JSON cortado y se perdían vídeos) |
+| routes/fs-pro.ts exploded-view generate-sequence (antes :1476) | Secuencia de vista explosionada | `generateAiJson` + esquema de clips |
+| routes/fs-pro.ts explode-view-sequence (antes :4262) | Prompts de los 3 clips | La llamada tenía los argumentos cambiados (`askClaude(texto, {…})`) y **fallaba siempre**; ahora `askClaudeDetailed` + esquema |
+| routes/pricing.ts precio óptimo y COGS (antes :378, :384, :738) | Investigación de competencia, proveedores, materiales, envíos y packaging (Gemini) | `parseResearchJson` con esquemas tolerantes; antes se mezclaba el JSON sin validar (NaN en cálculos, `.map` sobre algo que no era lista) |
+| routes/shopybrain.ts `researchRealPricing` (antes :209) | Precio de mercado para crear/optimizar producto | `parseResearchJson`; un `suggestedPrice` en texto rompía el `.toFixed()` |
+| lib/google-reviews.ts (antes :115) | Perfil de Google Business | `extractJson` balanceado (la validación campo a campo ya existía) |
+| lib/scheduler.ts autoevaluación mensual (antes :984) | Informe mensual de OmniCore | `parseResearchJson` con esquema; si falla, resumen con las estadísticas reales |
 
 ### Pendientes (regex codiciosa)
 
-Prioridad alta = fallback **crudo** o datos que llegan a un informe/cliente.
+Prioridad alta = fallback **crudo** o datos que llegan a un informe/cliente. Ya no queda ninguno de prioridad alta ni media.
 
 | Fichero:línea | Qué genera | Fallback hoy | Prioridad |
 |---|---|---|---|
-| routes/absorber.ts:885 | Crear producto desde imagen: análisis visual | vacío | media |
-| routes/absorber.ts:933 | Crear producto desde imagen: investigación de precios | vacío (usa estimación visual) | media |
-| routes/absorber.ts:982 | Crear producto desde imagen: copy del producto | vacío | media |
-| routes/absorber.ts:1244 | Investigación de proveedores: proveedores | vacío | baja |
-| routes/absorber.ts:1249 | Investigación de proveedores: costes | vacío | baja |
-| routes/absorber.ts:1254 | Investigación de proveedores: ofertas | vacío | baja |
-| routes/absorber.ts:1313 | Investigación de proveedores: síntesis | vacío | media |
 | routes/admin.ts:410 | `/projects/:projectId/ai-suggest` sugerencias | vacío | baja |
 | routes/cms.ts:461 | `/ai/generate-section` configuración de sección CMS | error | baja |
-| routes/competitors.ts:163 | `/competitors/scan` snapshot de competidor | vacío (snapshot con campos nulos) | media |
-| routes/competitors.ts:316 | `/competitors/auto-discover` | vacío | baja |
-| routes/competitors.ts:819 | `/competitors/auto-analyze` descubrimiento | vacío | baja |
-| routes/competitors.ts:897 | `/competitors/auto-analyze` análisis por competidor | vacío | media |
-| routes/fs-pro.ts:1221 | Campaign production: adaptar a marca | error (usa `safeJsonParse`, repara truncados) | media |
-| routes/fs-pro.ts:1476 | Exploded view: secuencia | error (repara truncados) | media |
-| routes/fs-pro.ts:4262 | Explode-view: prompts de 3 clips | defecto (clips vacíos) | baja |
 | routes/openart.ts:168 | Análisis de prompt OpenArt | error | baja |
-| routes/pricing.ts:378 | Precio óptimo: investigación de competencia (Gemini) | vacío | media |
-| routes/pricing.ts:384 | Precio óptimo: investigación de proveedores (Gemini) | vacío | media |
-| routes/pricing.ts:738 | Estimación COGS por producto: materiales/envío (Gemini) | vacío | media |
 | routes/report-templates.ts:212 | Sugerencia de plantilla de informe | vacío (`suggestion` nulo) | baja |
-| routes/shopybrain.ts:209 | `researchRealPricing` | defecto | media |
-| routes/shopybrain.ts:2131 | `/shopybrain/study` | vacío | baja |
-| routes/shopybrain.ts:7967 | execute-action: generación de UI | reintento propio limpiando fences | baja |
+| routes/shopybrain.ts:2143 | `/shopybrain/study` | vacío | baja |
+| routes/shopybrain.ts:7979 | execute-action: generación de UI | reintento propio limpiando fences | baja |
 | routes/suppliers.ts:59 | `safeJsonParse` local de proveedores | vacío (`null`) | baja |
 | lib/brain-ingester.ts:150 | Extracción de insights para el Brain | vacío | baja (interno) |
 | lib/client-advisor.ts:156 | Hechos aprendidos del chat del cliente | se ignora | baja (interno) |
@@ -90,15 +84,13 @@ Prioridad alta = fallback **crudo** o datos que llegan a un informe/cliente.
 | lib/fusion-studio.ts:343 | Análisis de imagen para Fusion Studio | error | baja |
 | lib/fusion-studio.ts:420 | Investigación de marca para Fusion | vacío (`null`) | baja |
 | lib/fusion-studio.ts:492 | Ajustes de foto sugeridos | defecto | baja |
-| lib/google-reviews.ts:115 | Perfil de Google Business (Gemini) | vacío (`unavailable`) | media |
 | lib/product-dna.ts:189 | ADN de producto | defecto (síntesis desde texto) | baja |
-| lib/scheduler.ts:373 | OmniCore micro-learning | se ignora | baja (cron interno) |
-| lib/scheduler.ts:505 | OmniCore conexiones cruzadas | se ignora | baja (cron interno) |
-| lib/scheduler.ts:600 | OmniCore estudio diario | se ignora | baja (cron interno) |
-| lib/scheduler.ts:711 | OmniCore mega-síntesis | se ignora | baja (cron interno) |
-| lib/scheduler.ts:871 | Reanálisis retroactivo | se ignora | baja (cron interno) |
-| lib/scheduler.ts:984 | Autoevaluación mensual (informe) | defecto (resumen con estadísticas) | media |
-| lib/scheduler.ts:1229 | Estudio adaptativo | se ignora | baja (cron interno) |
+| lib/scheduler.ts:388 | OmniCore micro-learning | se ignora | baja (cron interno) |
+| lib/scheduler.ts:520 | OmniCore conexiones cruzadas | se ignora | baja (cron interno) |
+| lib/scheduler.ts:615 | OmniCore estudio diario | se ignora | baja (cron interno) |
+| lib/scheduler.ts:726 | OmniCore mega-síntesis | se ignora | baja (cron interno) |
+| lib/scheduler.ts:886 | Reanálisis retroactivo | se ignora | baja (cron interno) |
+| lib/scheduler.ts:1247 | Estudio adaptativo | se ignora | baja (cron interno) |
 
 ### Pendientes sin regex pero con el mismo riesgo
 
