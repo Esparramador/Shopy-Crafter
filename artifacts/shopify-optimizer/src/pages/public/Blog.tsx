@@ -1,16 +1,12 @@
 import { Link } from "wouter";
-import PageMeta from "@/components/PageMeta";
+import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 import { POSTS } from "@/lib/blog-data";
 
 export default function Blog() {
   return (
     <>
-      <PageMeta
-        title="Blog de Shopy Crafter — Estrategias eCommerce con IA"
-        description="Artículos, tutoriales y casos reales para hacer crecer tu tienda Shopify con inteligencia artificial."
-        canonical="https://shopycrafter.com/blog"
-      />
+      <PageMeta {...metaFor("/blog")} />
       <PublicLayout>
       <div style={{ padding: "80px 24px", maxWidth: 980, margin: "0 auto" }}>
         <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Blog</div>

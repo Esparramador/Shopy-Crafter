@@ -35,6 +35,7 @@ export default function CasoDeExitoDetail() {
         title={`${caso.name} — Caso de éxito · Shopy Crafter`}
         description={`${caso.name} (${caso.niche}): ${caso.before}. Resultado: ${caso.after}. En ${caso.time}.`}
         canonical={`https://shopycrafter.com/casos-de-exito/${caso.slug}`}
+        noindex
       />
       <script
         type="application/ld+json"

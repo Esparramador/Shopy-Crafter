@@ -1,26 +1,21 @@
+# Shopy Crafter — robots.txt
+# Todo el contenido público es rastreable (páginas, blog, demos web, CSS/JS e
+# imágenes). Solo se excluyen las áreas privadas que requieren sesión.
+
 User-agent: *
 Allow: /
 
-# Marketing & public pages
-Allow: /sobre-nosotros
-Allow: /casos-de-exito
-Allow: /programa-de-afiliados
-Allow: /faq
-Allow: /preguntas-frecuentes
-Allow: /blog
-Allow: /changelog
-Allow: /privacidad
-Allow: /terminos
-Allow: /cookies
-Allow: /contacto
-
-# Block private / authenticated areas
-Disallow: /admin/
 Disallow: /api/
+Disallow: /admin
+Disallow: /client
+Disallow: /project/
+Disallow: /projects/
+Disallow: /dashboard
+Disallow: /new-project
+Disallow: /invite/
+Disallow: /reset-password
+Disallow: /oauth-success
 Disallow: /shopify/
+Disallow: /web-demos/test-failed-charizard.html
 
-# Block dev/test paths
-Disallow: /web-demos/
-
-# Sitemaps
 Sitemap: https://shopycrafter.com/sitemap.xml

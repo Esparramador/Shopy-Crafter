@@ -480,7 +480,7 @@ Necesitarás redirecciones 301 para TODAS las URLs de producto y categoría.</p>
 <p>Optimizar manualmente los títulos, meta descriptions, schemas y descripciones de 500 productos puede llevar semanas de trabajo. Un motor de IA como el de Shopy Crafter procesa 500 productos en 2-3 horas con resultados más consistentes que los humanos (no se cansa, no omite campos, sigue siempre la misma estructura óptima).</p>
 
 <h3>3. Fijación de precios inteligente</h3>
-<p>El pricing estático (fijar precios una vez y no tocarlos) es el estándar en el 70% de las tiendas online. En 2026, el pricing dinámico con IA (análisis de competencia en tiempo real, cálculo de COGS real, tests A/B de precio automáticos) es accesible para cualquier tienda Shopify. Las tiendas que lo usan muestran márgenes brutos 8-15 puntos porcentuales superiores.</p>
+<p>Muchas tiendas fijan precios una vez y no vuelven a tocarlos. Con IA, el pricing se apoya en datos: coste real de cada producto (COGS con comisiones, envío y embalaje), precios de la competencia y tests A/B de precio. Así cada cambio de precio se decide sabiendo el margen que deja.</p>
 
 <h3>4. Tests A/B estadísticos</h3>
 <p>El A/B testing tradicional requería: configuración técnica, esperar semanas para resultados estadísticos, interpretación manual y aplicación manual del ganador. En 2026, el A/B testing con IA es completamente automático: se configura solo, declara ganador al llegar al 95% de confianza, y aplica el cambio automáticamente. El tiempo de ciclo pasa de semanas a días.</p>
@@ -499,14 +499,191 @@ Necesitarás redirecciones 301 para TODAS las URLs de producto y categoría.</p>
 </ul>
 
 <h2>¿Cuánto se puede automatizar realmente?</h2>
-<p>Basándonos en datos de nuestros clientes: el 73% usa Shopy Crafter en piloto automático completo — cada nuevo producto se optimiza automáticamente sin ninguna intervención. El 27% prefiere revisar las sugerencias antes de publicarlas. Ambos modos son válidos; la tendencia es hacia más autonomía a medida que el comerciante comprueba la calidad de los resultados.</p>
+<p>Tanto como quieras: los cambios pueden aplicarse solos o pasar antes por el panel de aprobaciones del cliente. Lo habitual es empezar revisando cada propuesta y automatizar lo que ya se ha comprobado.</p>
 <p>Las tareas que siguen requiriendo intervención humana: estrategia de colecciones y categorías, fotografías de producto para lanzamientos premium, atención al cliente, y decisiones estratégicas de pricing en momentos críticos (rebajas, Black Friday).</p>
 
 <h2>Por qué Shopify es la plataforma IA-first en 2026</h2>
-<p>La elección de plataforma determina cuánto puedes automatizar. Shopify tiene la API más moderna y el ecosistema de herramientas IA más rico. La diferencia con WooCommerce o PrestaShop no es solo de features: es de arquitectura. Los webhooks en tiempo real de Shopify permiten que la automatización sea instantánea; en plataformas alternativas, habría que desarrollar esta infraestructura desde cero. Es la razón por la que Shopy Crafter está disponible exclusivamente para Shopify.</p>
+<p>La elección de plataforma determina cuánto puedes automatizar. Shopify tiene la API más moderna y el ecosistema de herramientas IA más rico. La diferencia con WooCommerce o PrestaShop no es solo de features: es de arquitectura. Los webhooks en tiempo real de Shopify permiten que la automatización sea instantánea; en plataformas alternativas, habría que desarrollar esta infraestructura desde cero. Aun así, Shopy Crafter también se conecta de forma nativa a WooCommerce (REST API v3) y PrestaShop (Webservice), con auditoría, SEO, imágenes, pricing, pedidos e inventario.</p>
 
 <h2>Cómo empezar con IA en tu tienda Shopify</h2>
 <p>El camino más sencillo: conecta tu tienda Shopify a Shopy Crafter (requiere solo el Access Token de Shopify, no código ni instalaciones), lanza una auditoría completa del catálogo (gratuita), y activa los motores que más valor aportan para tu nicho. En 48 horas, tu catálogo estará optimizado con IA y el auto-pilot activado para todos los productos futuros.</p>
+    `.trim(),
+  },
+  {
+    path: "/automatizacion-shopify-ia",
+    canonical: "https://shopycrafter.com/automatizacion-shopify-ia",
+    metaTitle: "Automatización de tiendas Shopify con IA — Shopy Crafter",
+    metaDescription: "Automatiza tu tienda Shopify con IA: auditoría de catálogo, SEO de fichas, imágenes de producto, pricing con COGS real, A/B testing, inventario y pedidos. Conexión nativa con la API de Shopify.",
+    badge: "Shopify + IA",
+    tag: "Shopify",
+    h1: "Automatización de tiendas Shopify con inteligencia artificial",
+    subtitle: "Conectamos tu tienda Shopify por API y ponemos a trabajar la IA sobre tu catálogo, tus precios y tus pedidos, con aprobación previa de cada cambio si así lo quieres.",
+    body: `
+<h2>Qué automatizamos en Shopify</h2>
+<p>Shopy Crafter se conecta a tu tienda con la API oficial de Shopify (app con Client ID y Client Secret, o token de acceso) y trabaja directamente sobre tus datos reales:</p>
+<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
+<li><strong>Auditoría de catálogo:</strong> puntuación por producto de título, descripción, SEO, imágenes y precio, con la lista de problemas concretos de cada ficha.</li>
+<li><strong>Rediseño de fichas con IA:</strong> nuevos títulos, descripciones, etiquetas, meta title y meta description, listos para aplicar en Shopify.</li>
+<li><strong>Imágenes de producto con IA:</strong> fondos limpios, lifestyle y variantes, con consistencia visual de marca (Visual DNA).</li>
+<li><strong>SEO técnico:</strong> datos estructurados, textos alternativos y análisis de rendimiento por producto.</li>
+<li><strong>Pricing con COGS real:</strong> coste por producto con comisiones, envío y embalaje; márgenes y precio recomendado; simulador de escenarios.</li>
+<li><strong>A/B testing:</strong> tests de imagen y de precio con decisión estadística.</li>
+<li><strong>Colecciones, temas, inventario y pedidos:</strong> gestión desde el mismo panel.</li>
+</ul>
+
+<h2>Datos reales, no estimaciones</h2>
+<p>La plataforma registra cada día los ingresos y pedidos de tu tienda (día cerrado, sin contar cancelados ni reembolsos) y recibe los webhooks de Shopify de pedidos pagados, cancelados y reembolsos. Con eso ves la evolución real de tu negocio junto a cada cambio que aplicamos.</p>
+
+<h2>Tú decides qué se publica</h2>
+<p>Cada propuesta puede pasar por el panel de aprobaciones de tu portal de cliente: la ves, la apruebas o la rechazas, y solo entonces se aplica. En el mismo portal tienes mensajes directos con tu gestor, informes y todos los archivos de tu proyecto, aislados del resto de clientes.</p>
+
+<h2>¿Tienes WooCommerce o PrestaShop?</h2>
+<p>La misma plataforma trabaja también con <a href="/automatizacion-woocommerce-ia" style="color:#e6c668">WooCommerce</a> y <a href="/automatizacion-prestashop-ia" style="color:#e6c668">PrestaShop</a>, y gestiona pagos con <a href="/gestion-stripe-ia" style="color:#e6c668">Stripe</a>.</p>
+    `.trim(),
+  },
+  {
+    path: "/automatizacion-woocommerce-ia",
+    canonical: "https://shopycrafter.com/automatizacion-woocommerce-ia",
+    metaTitle: "Automatización WooCommerce con IA: SEO, pedidos e inventario — Shopy Crafter",
+    metaDescription: "Conecta tu WooCommerce por REST API y automatiza con IA la auditoría de productos, el SEO, las imágenes, los precios, pedidos, clientes, cupones e inventario. Sin plugins pesados.",
+    badge: "WooCommerce + IA",
+    tag: "WooCommerce",
+    h1: "Automatización de tiendas WooCommerce con inteligencia artificial",
+    subtitle: "Optimiza tu tienda WooCommerce sin migrar de plataforma: conexión directa por REST API v3 y la IA trabajando sobre tu catálogo real.",
+    body: `
+<h2>Conexión directa con la REST API de WooCommerce</h2>
+<p>Solo necesitamos una Consumer Key (ck_) y un Consumer Secret (cs_) de tu WooCommerce. Sin instalar plugins adicionales en tu WordPress: la plataforma lee y escribe a través de la API oficial.</p>
+
+<h2>Qué gestionamos en WooCommerce</h2>
+<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
+<li><strong>Productos:</strong> auditoría por ficha, rediseño de títulos y descripciones con IA, edición y precios.</li>
+<li><strong>Pedidos y clientes:</strong> listado, estado y datos de cliente para entender quién compra.</li>
+<li><strong>Cupones:</strong> consulta de los cupones activos y sus condiciones.</li>
+<li><strong>Inventario:</strong> stock por producto y variante, con alertas de rotura.</li>
+<li><strong>Informes de ventas:</strong> ingresos y pedidos por periodo.</li>
+<li><strong>Imágenes, SEO y pricing con IA:</strong> los mismos motores que en Shopify: imágenes de producto, SEO de fichas y precio con COGS real.</li>
+</ul>
+
+<h2>Ingresos contados una sola vez</h2>
+<p>Los webhooks de pedidos de WooCommerce alimentan tus métricas diarias: cada pedido cuenta una sola vez y se descuenta si se cancela, se reembolsa o se elimina. Así tus informes cuadran con tu contabilidad.</p>
+
+<h2>WooCommerce o Shopify</h2>
+<p>No hace falta cambiar de plataforma para usar IA. Si aun así estás valorando el cambio, lee nuestra <a href="/shopify-vs-woocommerce" style="color:#e6c668">comparativa Shopify vs WooCommerce</a> y la <a href="/migrar-woocommerce-shopify" style="color:#e6c668">guía de migración</a>.</p>
+    `.trim(),
+  },
+  {
+    path: "/automatizacion-prestashop-ia",
+    canonical: "https://shopycrafter.com/automatizacion-prestashop-ia",
+    metaTitle: "Automatización PrestaShop con IA: SEO, catálogo y pedidos — Shopy Crafter",
+    metaDescription: "Conecta PrestaShop por Webservice y automatiza con IA el SEO de productos, categorías, imágenes, precios, pedidos e inventario. Para tiendas PrestaShop en España y Latinoamérica.",
+    badge: "PrestaShop + IA",
+    tag: "PrestaShop",
+    h1: "Automatización de tiendas PrestaShop con inteligencia artificial",
+    subtitle: "Tu PrestaShop, optimizado con IA a través del Webservice oficial: catálogo, SEO, categorías, pedidos e inventario desde un único panel.",
+    body: `
+<h2>Conexión por el Webservice de PrestaShop</h2>
+<p>Basta con una clave del Webservice de PrestaShop (32 caracteres) con los permisos adecuados. La plataforma trabaja con la API oficial, sin módulos de terceros.</p>
+
+<h2>Qué gestionamos en PrestaShop</h2>
+<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
+<li><strong>Productos:</strong> auditoría de fichas, rediseño con IA y edición.</li>
+<li><strong>SEO por producto:</strong> meta título y meta descripción escritos directamente en tu tienda.</li>
+<li><strong>Categorías:</strong> estructura del catálogo.</li>
+<li><strong>Pedidos:</strong> con los estados de PrestaShop (cancelado, reembolsado o error de pago no cuentan como venta).</li>
+<li><strong>Inventario:</strong> stock y alertas.</li>
+<li><strong>Imágenes y pricing con IA:</strong> imágenes de producto y precio con COGS real, igual que en el resto de plataformas.</li>
+</ul>
+
+<h2>Pensado para el mercado hispanohablante</h2>
+<p>Todo el panel, los informes y el contenido que genera la IA están en español, y la plataforma trabaja en la zona horaria de Madrid para los cortes diarios de ventas.</p>
+
+<h2>¿Valorando otra plataforma?</h2>
+<p>Consulta la <a href="/shopify-vs-prestashop" style="color:#e6c668">comparativa Shopify vs PrestaShop</a> y la <a href="/migrar-prestashop-shopify" style="color:#e6c668">guía de migración PrestaShop → Shopify</a>.</p>
+    `.trim(),
+  },
+  {
+    path: "/gestion-stripe-ia",
+    canonical: "https://shopycrafter.com/gestion-stripe-ia",
+    metaTitle: "Gestión de Stripe con IA: cobros, suscripciones y facturas — Shopy Crafter",
+    metaDescription: "Gestiona tu cuenta Stripe desde un panel con IA: clientes, cobros, suscripciones, facturas, reembolsos, pagos a banco y balance. Stripe Connect y portal de cliente incluidos.",
+    badge: "Stripe",
+    tag: "Stripe",
+    h1: "Gestión de pagos con Stripe: cobros, suscripciones y facturación en un solo panel",
+    subtitle: "Conecta tu cuenta Stripe y gestiona clientes, cobros, suscripciones y facturas sin entrar en cinco pantallas distintas.",
+    body: `
+<h2>Qué gestionamos en Stripe</h2>
+<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
+<li><strong>Clientes:</strong> alta y consulta de clientes.</li>
+<li><strong>Cobros y payment intents:</strong> cobros puntuales desde el panel.</li>
+<li><strong>Suscripciones:</strong> consulta y cancelación.</li>
+<li><strong>Facturas:</strong> creación, envío y anulación.</li>
+<li><strong>Reembolsos:</strong> totales o parciales.</li>
+<li><strong>Pagos a banco (payouts) y balance:</strong> qué tienes disponible y qué está en camino.</li>
+<li><strong>Productos de Stripe:</strong> alta y baja de productos y precios.</li>
+<li><strong>Transacciones:</strong> historial completo.</li>
+</ul>
+
+<h2>Stripe Connect y claves seguras</h2>
+<p>Puedes conectar tu cuenta mediante Stripe Connect (OAuth) o con tu clave secreta. Las claves se guardan cifradas y se pueden rotar desde el panel. Los webhooks de Stripe se verifican con firma.</p>
+
+<h2>Portal de cliente con vista de Stripe</h2>
+<p>Si trabajamos para ti, ves en tu portal la actividad de tu cuenta Stripe: cobros, clientes, facturas, suscripciones y pagos, en modo solo lectura.</p>
+
+<h2>Stripe con tu tienda online</h2>
+<p>Stripe se combina con <a href="/automatizacion-shopify-ia" style="color:#e6c668">Shopify</a>, <a href="/automatizacion-woocommerce-ia" style="color:#e6c668">WooCommerce</a> o <a href="/automatizacion-prestashop-ia" style="color:#e6c668">PrestaShop</a>. Para Shopify en concreto, lee la <a href="/shopify-stripe-pagos" style="color:#e6c668">guía de Stripe + Shopify</a>.</p>
+    `.trim(),
+  },
+  {
+    path: "/diseno-web-profesional",
+    canonical: "https://shopycrafter.com/diseno-web-profesional",
+    metaTitle: "Diseño web profesional con 3D, animación e IA — Shopy Crafter",
+    metaDescription: "Diseñamos y desarrollamos webs y landings a medida: 3D con Three.js, animaciones con GSAP, scroll inmersivo y diseño basado en el ADN de tu marca. Mira nuestras 30 demos interactivas.",
+    badge: "Diseño web",
+    tag: "Diseño y desarrollo web",
+    h1: "Diseño y desarrollo web a medida, con 3D, animación e IA",
+    subtitle: "Webs y landings que se sienten de otro nivel: diseño a partir del ADN de tu marca, 3D en tiempo real y animaciones fluidas, sin plantillas.",
+    body: `
+<h2>Cómo diseñamos</h2>
+<p>Partimos del ADN de tu marca: colores, tipografías, tono y referencias visuales. Nuestro estudio de diseño con IA genera la propuesta en HTML real, que vemos en vivo y afinamos contigo antes de publicarla.</p>
+
+<h2>Tecnologías que dominamos</h2>
+<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
+<li><strong>3D en tiempo real:</strong> Three.js y React Three Fiber, modelos GLB, vistas explosionadas y visores de producto.</li>
+<li><strong>Animación:</strong> GSAP, ScrollTrigger, SplitType y scroll suave con Lenis.</li>
+<li><strong>Efectos:</strong> shaders, partículas, degradados animados, cursor magnético y transiciones de página.</li>
+<li><strong>Componentes premium:</strong> bento grids, carruseles 3D, visualización de datos y secciones hero.</li>
+</ul>
+
+<h2>30 demos interactivas</h2>
+<p>Hemos publicado 30 demos que puedes abrir y probar en tu navegador: desde héroes con partículas hasta narrativas 3D con scroll. Míralas en nuestro <a href="/portfolio" style="color:#e6c668">portfolio</a>.</p>
+
+<h2>Webs para tiendas online</h2>
+<p>Si tu web es una tienda, la combinamos con la optimización de catálogo con IA para <a href="/automatizacion-shopify-ia" style="color:#e6c668">Shopify</a>, <a href="/automatizacion-woocommerce-ia" style="color:#e6c668">WooCommerce</a> o <a href="/automatizacion-prestashop-ia" style="color:#e6c668">PrestaShop</a>.</p>
+    `.trim(),
+  },
+  {
+    path: "/desarrollo-apps-nativas",
+    canonical: "https://shopycrafter.com/desarrollo-apps-nativas",
+    metaTitle: "Desarrollo de apps nativas Android e iOS — Shopy Crafter",
+    metaDescription: "Convertimos tu web o tu tienda en app nativa para Android e iOS con Capacitor: una sola base de código, notificaciones push y acceso al dispositivo. Nuestra propia app Android es el ejemplo.",
+    badge: "Apps nativas",
+    tag: "Apps móviles",
+    h1: "Desarrollo de apps nativas para Android e iOS",
+    subtitle: "Tu web o tu tienda como app instalable, con notificaciones push y experiencia nativa, a partir de una sola base de código.",
+    body: `
+<h2>Nuestra propia app como prueba</h2>
+<p>Shopy Crafter tiene su propia app Android, construida con Capacitor sobre la misma base de código que la plataforma web. Puedes descargarla desde nuestra <a href="/" style="color:#e6c668">página principal</a>.</p>
+
+<h2>Cómo construimos las apps</h2>
+<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
+<li><strong>Capacitor:</strong> una sola base de código web (React) empaquetada como app nativa para Android e iOS.</li>
+<li><strong>Notificaciones push:</strong> avisos en el móvil para pedidos, mensajes o novedades.</li>
+<li><strong>Acceso al dispositivo:</strong> cámara, archivos y almacenamiento cuando la app lo necesita.</li>
+<li><strong>Actualizaciones:</strong> los cambios de la web se reflejan en la app sin rehacerla.</li>
+</ul>
+
+<h2>Para qué tipo de proyectos</h2>
+<p>Tiendas online que quieren fidelizar con una app, paneles internos para equipos y portales de cliente. Si ya tienes web, partimos de ella; si no, la <a href="/diseno-web-profesional" style="color:#e6c668">diseñamos</a> pensando desde el principio en web y app.</p>
     `.trim(),
   },
 ];

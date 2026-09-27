@@ -397,86 +397,38 @@ const server = app.listen(port, (err?: Error) => {
       return seedStripeKnowledge();
     })
     .then(async () => {
-      // ── Landing content v2 patch ──────────────────────────────────────────
-      // Pushes professional stats/copy to the live DB. Idempotent: only runs
-      // once (guarded by meta.landingV === 2). Does NOT overwrite other admin
-      // customisations — only the specific fields listed below are replaced.
+      // ── Landing content v3 ────────────────────────────────────────────────
+      // La v2 escribía en el CMS cifras inventadas (+50 tiendas, +67 % de
+      // conversión, métricas de tiendas ficticias…). La landing ya no las lee;
+      // aquí se borran una sola vez de la BD (guardado por meta.landingV === 3).
       try {
         const { cmsContent: cmsTable } = await import("@workspace/db/schema");
         const rows = await db.select().from(cmsTable).limit(1);
         if (!rows.length) return;
         const row = rows[0];
         const content = structuredClone(row.content) as Record<string, any>;
-        if ((content?.meta as any)?.landingV === 2) return;
+        if ((content?.meta as any)?.landingV === 3) return;
 
-        content.results = content.results ?? {};
-        content.results.stats = [
-          { prefix: "+", num: "67", suffix: "%", label: "Incremento medio en conversión en 90 días", color: "var(--l-jade)" },
-          { prefix: "", num: "95", suffix: "%", label: "Confianza estadística en todos los A/B tests", color: "var(--l-gold)" },
-          { prefix: "", num: "99", suffix: ".9%", label: "Uptime garantizado de la plataforma", color: "var(--l-sky)" },
-          { prefix: "", num: "6", suffix: " motores", label: "Trabajando autónomamente en tu tienda 24/7", color: "#8b5cf6" },
-        ];
-        content.results.techBadges = [
-          { icon: "🛍️", label: "Shopify API" },
-          { icon: "🤖", label: "Claude AI" },
-          { icon: "✨", label: "Gemini AI" },
-          { icon: "🎨", label: "Replicate" },
-          { icon: "🔍", label: "Google Search" },
-          { icon: "📧", label: "Klaviyo" },
-          { icon: "🔐", label: "AES-256" },
-          { icon: "⚡", label: "Shopify Flow" },
-          { icon: "🎵", label: "ElevenLabs" },
-        ];
-
-        content.hero = content.hero ?? {};
-        content.hero.pill = { text: "+50 tiendas activas · 6 motores de IA · Setup en 48h", visible: true };
-        content.hero.trustItems = ["Setup completo en 48h", "Integración real con API Shopify", "RGPD compliant"];
-        content.hero.demo = content.hero.demo ?? {};
-        content.hero.demo.url = "shopycrafter.com/admin — Moda Urbana";
-        content.hero.demo.metrics = [
-          { label: "Revenue", value: "€18.7K", change: "↑ 18%" },
-          { label: "Conversión", value: "3.8%", change: "↑ 0.7pp" },
-          { label: "Margen", value: "52%", change: "↑ 7pts" },
-          { label: "SEO", value: "81", change: "↑ 19pts" },
-        ];
-        content.hero.demo.stores = [
-          { name: "Moda Urbana", score: "81" },
-          { name: "TechGadgets", score: "68" },
-          { name: "Casa & Arte", score: "44" },
-        ];
-        content.hero.demo.activity = [
-          "A/B Test ganador · +22% conv.",
-          "21 imágenes · €5.88",
-          "Schema SEO · 87 productos",
-        ];
-
-        content.howCards = [
-          { icon: "✓", title: "Auditoría completada", sub: "87 productos analizados · 6 acciones urgentes", barPercent: "88" },
-          { icon: "🎨", title: "Imágenes generándose", sub: "flux-1.1-pro · 21/87 productos", barPercent: "24" },
-          { icon: "⚗️", title: "A/B Test activo", sub: "Precio A vs B · 187 visitas · 71% confianza", barPercent: "71" },
-        ];
-        content.howImpact = { icon: "💰", title: "Impacto estimado", sub: "+€1.850/mes proyectados" };
-
-        if (Array.isArray(content.features?.items)) {
-          const featureStats = [
-            [{ label: "Tipos imagen", value: "8" }, { label: "Generación", value: "<2.5s" }, { label: "Coste/prod", value: "~€0.25" }],
-            [{ label: "ADN visual", value: "StyleLock" }, { label: "Análisis", value: "<3s" }, { label: "Coherencia", value: "100%" }],
-            [{ label: "Confianza", value: "95%" }, { label: "Evaluación", value: "<1s" }, { label: "Auto-winner", value: "✓" }],
-            [{ label: "Trigger", value: "Webhook" }, { label: "Ejecución", value: "<5s" }, { label: "Uptime", value: "99.9%" }],
-            [{ label: "Motor COGS", value: "real" }, { label: "Actualización", value: "<2s" }, { label: "P&L", value: "en vivo" }],
-            [{ label: "Schema", value: "JSON-LD" }, { label: "Core Web Vitals", value: "✓" }, { label: "Blog IA", value: "auto" }],
-          ];
-          content.features.items = content.features.items.map((item: any, i: number) => ({
-            ...item,
-            stats: featureStats[i] ?? item.stats,
-          }));
+        if (content.results) { delete content.results.stats; }
+        delete content.howCards;
+        delete content.howImpact;
+        delete content.stats;
+        if (content.hero) {
+          delete content.hero.demo;
+          if (typeof content.hero.pill?.text === "string" && /tiendas activas|motores de IA/i.test(content.hero.pill.text)) {
+            content.hero.pill = { text: "Shopify · WooCommerce · PrestaShop · Stripe", visible: true };
+          }
         }
+        if (Array.isArray(content.features?.items)) {
+          content.features.items = content.features.items.map((item: any) => { const { stats: _s, ...rest } = item ?? {}; return rest; });
+        }
+        if (Array.isArray(content.testimonials?.items)) content.testimonials.items = [];
 
-        content.meta = { ...(content.meta ?? {}), landingV: 2, lastUpdated: new Date().toISOString() };
+        content.meta = { ...(content.meta ?? {}), landingV: 3, lastUpdated: new Date().toISOString() };
         await db.update(cmsTable).set({ content, version: (row.version ?? 1) + 1, updatedAt: new Date() }).where(eq(cmsTable.id, row.id));
-        logger.info("✅ Landing content patched to v2 (professional stats)");
+        logger.info("✅ Landing content v3: cifras inventadas eliminadas del CMS");
       } catch (patchErr) {
-        logger.warn({ err: patchErr }, "⚠️  patchLandingContentV2 failed — non-blocking");
+        logger.warn({ err: patchErr }, "⚠️  Landing content v3 cleanup failed — non-blocking");
       }
     })
     .catch((err) => logger.error({ err }, "⚠️  Startup seeding failed — continuing startup"))

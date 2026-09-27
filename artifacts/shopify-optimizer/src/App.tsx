@@ -81,6 +81,7 @@ const TerminosPage = lazy(() => import("@/pages/public/Terminos"));
 const CookiesPage = lazy(() => import("@/pages/public/Cookies"));
 const ContactoPage = lazy(() => import("@/pages/public/Contacto"));
 const ComparisonPage = lazy(() => import("@/pages/public/ComparisonPage"));
+const PortfolioPage = lazy(() => import("@/pages/public/Portfolio"));
 
 const AuditPage = lazy(() => import("@/pages/projects/Audit"));
 const RedesignPage = lazy(() => import("@/pages/projects/Redesign"));
@@ -374,6 +375,13 @@ function Router() {
         <Route path="/shopify-stripe-pagos">{() => <S><ComparisonPage /></S>}</Route>
         <Route path="/agencia-shopify-ia">{() => <S><ComparisonPage /></S>}</Route>
         <Route path="/ecommerce-ia-automatizacion">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/automatizacion-shopify-ia">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/automatizacion-woocommerce-ia">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/automatizacion-prestashop-ia">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/gestion-stripe-ia">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/diseno-web-profesional">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/desarrollo-apps-nativas">{() => <S><ComparisonPage /></S>}</Route>
+        <Route path="/portfolio">{() => <S><PortfolioPage /></S>}</Route>
 
         {/* Root — redirects by role */}
         <Route path="/">

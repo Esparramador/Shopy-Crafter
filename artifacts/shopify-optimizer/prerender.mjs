@@ -20,46 +20,26 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST   = join(__dirname, 'dist/public');
 const SERVER = join(__dirname, 'dist/server');
 
-// ── All routes to prerender ─────────────────────────────────────────────────
-const ROUTES = [
-  // Landing / public
-  '/',
-  '/landing',
-  '/sobre-nosotros',
-  '/casos-de-exito',
-  '/programa-de-afiliados',
-  '/faq',
-  '/blog',
-  '/changelog',
-  '/privacidad',
-  '/terminos',
-  '/cookies',
-  '/contacto',
-  '/tienda',
-  '/precios',
-  // Auth
-  '/login',
-  '/forgot-password',
-  // Blog posts
-  '/blog/optimizar-fichas-google-shopping-2026',
-  '/blog/claude-vs-gemini-ecommerce',
-  '/blog/guia-cogs-tiendas-online',
-  '/blog/ab-testing-automatizado-ia',
-  '/blog/comic-crafter-caso-exito',
-  '/blog/17-motores-ia-ecommerce',
-  // Success cases
-  '/casos-de-exito/comic-crafter',
-  '/casos-de-exito/sakura-studio',
-  '/casos-de-exito/audit-multipart',
-  // Changelog releases
-  '/changelog/3.8.0',
-  '/changelog/3.7.0',
-  '/changelog/3.6.0',
-  '/changelog/3.5.0',
-  '/changelog/3.4.0',
-  '/changelog/3.3.0',
-  '/changelog/3.2.0',
-];
+// ── Rutas: salen del registro SEO del bundle SSR (src/seo/routes.ts) ──────────
+// Antes era una lista fija que se desincronizaba (faltaban blog y páginas por
+// keyword, y había rutas inexistentes como /tienda o /precios).
+const SITE_URL = 'https://shopycrafter.com';
+
+function xmlEsc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function buildSitemap(routeList) {
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = routeList
+    .filter(r => r.inSitemap)
+    .sort((a, b) => b.priority - a.priority)
+    .map(r => {
+      const loc = r.path === '/' ? `${SITE_URL}/` : `${SITE_URL}${r.path}`;
+      return `  <url>\n    <loc>${xmlEsc(loc)}</loc>\n    <lastmod>${r.lastmod ?? today}</lastmod>\n    <changefreq>${r.changefreq}</changefreq>\n    <priority>${r.priority.toFixed(2)}</priority>\n  </url>`;
+    });
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+}
 
 // ── Fallback SSR shell (used if entry-server.js is unavailable) ─────────────
 function fallbackShell() {
@@ -84,6 +64,7 @@ async function main() {
   // 2. Load the SSR render function built from entry-server.tsx
   //    Vite hashes the filename, so we scan the assets dir to find it.
   let render;
+  let routeList = null;
   try {
     const candidates = [
       join(SERVER, 'entry-server.js'),
@@ -101,11 +82,17 @@ async function main() {
     if (!ssrFile) throw new Error('No SSR file found');
     const ssrMod = await import(pathToFileURL(ssrFile).href);
     render = ssrMod.render;
+    routeList = typeof ssrMod.routes === 'function' ? ssrMod.routes() : null;
     console.log(`✅ SSR bundle loaded from ${ssrFile}`);
   } catch {
     render = null;
     console.log('⚠️  SSR bundle not found — using fallback shell (scripts still included)');
   }
+
+  // Sin bundle SSR no hay registro: se deja index.html y el sitemap estático de public/
+  // (como antes, un fallo del prerender nunca aborta el despliegue).
+  if (!routeList) console.error('⚠️  El bundle SSR no exporta routes(): solo se prerenderiza "/" y se mantiene public/sitemap.xml');
+  const ROUTES = routeList ? routeList.map(r => r.path) : ['/'];
 
   let fullBody = 0;
   let metadataOnly = 0;
@@ -114,11 +101,14 @@ async function main() {
   for (const route of ROUTES) {
     try {
       let appHtml = '';
+      let headHtml = '';
       if (render) {
         try {
           const result = render(route);
           appHtml = result?.html ?? '';
-        } catch {
+          headHtml = result?.head ?? '';
+        } catch (err) {
+          console.error(`✗ SSR ${route}: ${err.message}`);
           appHtml = fallbackShell();
         }
       } else {
@@ -128,7 +118,11 @@ async function main() {
       const hasBody = appHtml.trim().length > 0;
 
       // Inject SSR content — ALL <script> and <link> tags are preserved from template
-      const finalHtml = template.replace('<!--app-html-->', appHtml);
+      let finalHtml = template.replace('<!--app-html-->', appHtml);
+      // Head propio de la ruta (title, description, canonical, robots, OG, JSON-LD)
+      if (headHtml) {
+        finalHtml = finalHtml.replace(/<!--seo:start-->[\s\S]*?<!--seo:end-->/, `<!--seo:start-->\n    ${headHtml}\n    <!--seo:end-->`);
+      }
 
       // Write HTML file
       if (route === '/') {
@@ -158,6 +152,13 @@ async function main() {
   console.log(
     `\nPrerendered ${ROUTES.length} routes (${fullBody} with full body content, ${metadataOnly} metadata-only).`
   );
+
+  // 4. sitemap.xml generado del mismo registro (todas las rutas indexables)
+  if (routeList) {
+    const sitemap = buildSitemap(routeList);
+    writeFileSync(join(DIST, 'sitemap.xml'), sitemap, 'utf-8');
+    console.log(`✓ sitemap.xml (${routeList.filter(r => r.inSitemap).length} URLs)`);
+  }
   console.log('Removed all cached metadata files');
 }
 

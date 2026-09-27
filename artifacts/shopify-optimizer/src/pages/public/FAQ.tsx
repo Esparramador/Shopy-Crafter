@@ -1,4 +1,4 @@
-import PageMeta from "@/components/PageMeta";
+import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 import { useState } from "react";
 
@@ -6,18 +6,18 @@ const FAQS = [
   {
     category: "General",
     items: [
-      { q: "¿Qué es Shopy Crafter?", a: "Shopy Crafter es una plataforma SaaS de agencia eCommerce con 17 motores de IA que automatizan tareas como auditorías de producto, generación de imágenes, optimización SEO, A/B testing, pricing y mucho más." },
+      { q: "¿Qué es Shopy Crafter?", a: "Shopy Crafter es una plataforma de IA y un equipo que la opera para tu tienda: auditoría de productos, SEO, imágenes, precios con COGS real, A/B testing, inventario y pedidos en Shopify, WooCommerce y PrestaShop, gestión de pagos con Stripe, diseño web y apps nativas." },
       { q: "¿Necesito conocimientos técnicos?", a: "No. La plataforma está diseñada para que cualquier persona pueda usarla sin ser técnico. Todo funciona con un clic o a través de nuestro chatbot de IA." },
-      { q: "¿Con qué plataformas de eCommerce funciona?", a: "Actualmente optimizamos para Shopify, WooCommerce y cualquier tienda online con acceso a sus datos. La integración es directa con Shopify y manual para el resto." },
-      { q: "¿Cuánto tarda en verse resultados?", a: "Depende del estado actual de tu tienda, pero la mayoría de clientes ven mejoras medibles (SEO, conversión, calidad de imágenes) en las primeras 2-4 semanas." },
+      { q: "¿Con qué plataformas de eCommerce funciona?", a: "Conexión nativa por API con Shopify, WooCommerce (REST API v3) y PrestaShop (Webservice), y con Stripe para pagos. Cualquier otra web se puede auditar a partir de su URL pública." },
+      { q: "¿Cuánto tarda en verse resultados?", a: "Depende del punto de partida de tu tienda. Por eso empezamos con una auditoría que puntúa cada producto y registramos a diario tus ingresos y pedidos reales: así mides el antes y el después con tus propios datos." },
     ],
   },
   {
     category: "Precios y planes",
     items: [
-      { q: "¿Puedo probar gratis?", a: "Sí. Ofrecemos un trial de 14 días sin tarjeta de crédito. Puedes usar todos los motores de IA durante ese periodo." },
-      { q: "¿Puedo cancelar en cualquier momento?", a: "Sí. No hay permanencia ni penalización. Puedes cancelar desde tu panel de billing en cualquier momento." },
-      { q: "¿Qué incluye cada plan?", a: "Cada plan incluye acceso a los 17 motores de IA con diferentes límites de uso. Los planes superiores incluyen más proyectos, más generaciones al mes y soporte prioritario." },
+      { q: "¿Puedo probar gratis?", a: "Sí. Al activar tu cuenta tienes 14 días de prueba con 1 tienda, 100 imágenes IA y auditoría básica." },
+      { q: "¿Puedo cancelar en cualquier momento?", a: "Sí. No hay permanencia ni penalización." },
+      { q: "¿Qué incluye cada plan?", a: "Los planes se diferencian en número de tiendas, productos optimizados e imágenes IA al mes, A/B testing, informes y nivel de soporte. Tienes el detalle actualizado en la sección de precios de la página principal." },
       { q: "¿Los precios incluyen IVA?", a: "Los precios mostrados no incluyen IVA. El IVA se calcula según tu país de residencia en el momento de la facturación." },
     ],
   },
@@ -33,9 +33,9 @@ const FAQS = [
   {
     category: "Seguridad y privacidad",
     items: [
-      { q: "¿Mis datos están seguros?", a: "Sí. Usamos cifrado en tránsito (TLS) y en reposo (AES-256), control de accesos por rol y copias de seguridad diarias. Cumplimos con RGPD." },
+      { q: "¿Mis datos están seguros?", a: "Sí. Las conexiones van cifradas (TLS), las credenciales de tu tienda y de Stripe se guardan cifradas, y cada cliente solo accede a su propio proyecto: archivos, mensajes e informes no se comparten entre clientes. Cumplimos con el RGPD." },
       { q: "¿Compartís mis datos con terceros?", a: "No. Tus datos nunca se venden ni se ceden. Los proveedores tecnológicos que usamos (hosting, IA) actúan como encargados del tratamiento bajo contratos RGPD." },
-      { q: "¿Dónde se almacenan mis datos?", a: "Los datos se almacenan en servidores dentro de la UE/EEE siempre que es posible. Para los servicios de IA, aseguramos garantías adecuadas según el RGPD." },
+      { q: "¿Dónde se almacenan mis datos?", a: "Los datos se tratan conforme al RGPD. Los proveedores de infraestructura e IA actúan como encargados del tratamiento; puedes pedirnos la lista en craftershopy@gmail.com." },
     ],
   },
 ];
@@ -69,11 +69,7 @@ export default function FAQ() {
 
   return (
     <>
-      <PageMeta
-        title="Preguntas Frecuentes — Shopy Crafter"
-        description="Resuelve dudas sobre precios, integraciones, seguridad y resultados de Shopy Crafter para eCommerce Shopify."
-        canonical="https://shopycrafter.com/faq"
-      />
+      <PageMeta {...metaFor("/faq")} />
       <PublicLayout>
       <script
         type="application/ld+json"

@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
+import SiteLinks from "./SiteLinks";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -13,8 +14,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     fetch(`${API_BASE}/api/cms/content`, { credentials: "include" })
-      .then(r => r.json())
-      .then(d => setFooter({ site: d.site, footer: d.footer }))
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.site && d?.footer) setFooter({ site: d.site, footer: d.footer }); })
       .catch(() => {});
   }, []);
 
@@ -57,53 +58,29 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         {children}
       </main>
 
-      {footer && (
-        <footer style={{ borderTop: "1px solid var(--ink3, #1e1e22)", padding: "48px 24px 24px", background: "var(--ink2, #111113)" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 32, marginBottom: 32 }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                {footer.site.logo.imageUrl ? (
-                  <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt={footer.site.name} style={{ height: 22, borderRadius: 4 }} />
-                ) : (
-                  <span style={{ width: 22, height: 22, background: "linear-gradient(135deg,#c8a84b,#b8860b)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#060500", flexShrink: 0 }}>{footer.site.logo.value}</span>
-                )}
-                <span style={{ fontSize: 14, fontWeight: 700 }}>{footer.site.name}</span>
-              </div>
-              <p style={{ fontSize: 12, color: "var(--t4, #666)", lineHeight: 1.5, margin: 0 }}>{footer.footer.tagline}</p>
+      <footer style={{ borderTop: "1px solid var(--ink3, #1e1e22)", padding: "48px 24px 24px", background: "var(--ink2, #111113)" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(200px, 1fr) 3fr", gap: 32, marginBottom: 32 }} className="pl-footer-grid">
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              {footer?.site.logo.imageUrl ? (
+                <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt={footer.site.name} style={{ height: 22, borderRadius: 4 }} />
+              ) : (
+                <span style={{ width: 22, height: 22, background: "linear-gradient(135deg,#c8a84b,#b8860b)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#060500", flexShrink: 0 }}>{footer?.site.logo.value ?? "SC"}</span>
+              )}
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{footer?.site.name ?? "Shopy Crafter"}</span>
             </div>
-            {footer.footer.columns.map((col, i) => (
-              <div key={i}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--t3, #999)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>{col.title}</div>
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-                  {col.links.map((l, li) => {
-                    const rawHref = (l.href || "").trim();
-                    const href = rawHref === "/faq" ? "/preguntas-frecuentes" : rawHref;
-                    const label = rawHref === "/faq" ? "Preguntas Frecuentes" : l.label;
-                    if (href.startsWith("/") && !href.startsWith("//")) {
-                      return <li key={li}><Link href={href} style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{label}</Link></li>;
-                    }
-                    if (href.startsWith("http")) {
-                      return <li key={li}><a href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{label}</a></li>;
-                    }
-                    if (href.startsWith("mailto:") || href.startsWith("tel:")) {
-                      return <li key={li}><a href={href} style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none" }}>{label}</a></li>;
-                    }
-                    return <li key={li}><span style={{ fontSize: 13, color: "var(--t4, #555)", cursor: "default" }}>{label}</span></li>;
-                  })}
-                </ul>
-              </div>
-            ))}
+            <p style={{ fontSize: 12, color: "var(--t4, #666)", lineHeight: 1.5, margin: 0 }}>
+              IA para tiendas Shopify, WooCommerce y PrestaShop, gestión de Stripe, diseño web y apps nativas.
+            </p>
           </div>
-          <div style={{ borderTop: "1px solid var(--ink3, #1e1e22)", paddingTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-            <div style={{ fontSize: 12, color: "var(--t4, #555)" }}>{footer.footer.copyright}</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {footer.footer.badges.map((b, i) => (
-                <span key={i} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: "rgba(200,168,75,0.08)", color: "var(--t4, #666)", border: "1px solid rgba(200,168,75,0.15)" }}>{b}</span>
-              ))}
-            </div>
-          </div>
-        </footer>
-      )}
+          <SiteLinks />
+        </div>
+        <div style={{ maxWidth: 1100, margin: "0 auto", borderTop: "1px solid var(--ink3, #1e1e22)", paddingTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ fontSize: 12, color: "var(--t4, #555)" }}>{footer?.footer.copyright ?? `© ${new Date().getFullYear()} Shopy Crafter`}</div>
+          <a href="mailto:craftershopy@gmail.com" style={{ fontSize: 12, color: "var(--t3, #999)", textDecoration: "none" }}>craftershopy@gmail.com</a>
+        </div>
+        <style>{`@media (max-width: 720px) { .pl-footer-grid { grid-template-columns: 1fr !important; } }`}</style>
+      </footer>
     </div>
   );
 }
