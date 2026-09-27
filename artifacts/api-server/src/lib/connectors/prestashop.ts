@@ -764,6 +764,13 @@ export class PrestaShopConnector implements IPlatformConnector {
   }
 
   private async downloadImage(url: string): Promise<Buffer> {
+    // Imagen ya en memoria (data:…;base64): se usa tal cual (antes se rechazaba
+    // y las fotos subidas desde Fusion Studio no llegaban a PrestaShop).
+    if (url.startsWith("data:")) {
+      const comma = url.indexOf(",");
+      if (comma < 0 || !url.slice(0, comma).includes(";base64")) throw new Error("data: URL de imagen inválido");
+      return Buffer.from(url.slice(comma + 1), "base64");
+    }
     const parsed = new URL(url);
     if (!["http:", "https:"].includes(parsed.protocol)) {
       throw new Error("Only HTTP(S) image URLs are supported");

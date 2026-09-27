@@ -2515,7 +2515,8 @@ router.post("/web-lab/generate-3d-effects", async (req: Request, res: Response):
       brandInfo?: string;
     };
 
-    if (!url && !html) { res.status(400).json({ error: "Se requiere url o html" }); return; }
+    // El frontend puede mandar solo el CSS mejorado (sin URL): antes daba 400.
+    if (!url && !html && !css) { res.status(400).json({ error: "Se requiere url, html o css" }); return; }
 
     const pid = projectId ?? 0;
 
@@ -2547,7 +2548,7 @@ router.post("/web-lab/generate-3d-effects", async (req: Request, res: Response):
 
     const userPrompt = `Analiza este sitio web y genera 5 efectos 3D/animación REALES adaptados a su marca y sector.
 
-URL: ${url || "HTML directo"}
+URL: ${url || (html ? "HTML directo" : "solo CSS")}
 ${brandInfo ? `INFO DE MARCA: ${brandInfo}` : ""}
 
 COLORES DETECTADOS EN EL CSS: ${topColors}

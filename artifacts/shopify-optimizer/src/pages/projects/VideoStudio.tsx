@@ -421,28 +421,28 @@ function AIGenerateModal({ mode, projectId, onClose, onClipReady, onError }: {
         setLive("Realizando face swap..."); 
         const r = await fetch(`${API_BASE}/api/fs-pro/image/face-swap`, { method:"POST", credentials:"include", body:fd });
         const d = await r.json(); if (!r.ok) throw new Error(d.error||"Error");
-        vaultId = d.vaultId; url = d.url || d.base64; type = "image";
+        vaultId = d.vaultId; url = d.dataUrl ?? (d.base64 ? `data:image/png;base64,${d.base64}` : d.url); type = "image";
       } else if (mode === "inpaint") {
         if (!file || !file2) throw new Error("Sube imagen e imagen de máscara");
         fd.append("image", file); fd.append("mask", file2); fd.append("prompt", prompt);
         setLive("Inpainting con Flux...");
         const r = await fetch(`${API_BASE}/api/fs-pro/image/inpaint`, { method:"POST", credentials:"include", body:fd });
         const d = await r.json(); if (!r.ok) throw new Error(d.error||"Error");
-        vaultId = d.vaultId; url = d.url || d.base64; type = "image";
+        vaultId = d.vaultId; url = d.dataUrl ?? (d.base64 ? `data:image/png;base64,${d.base64}` : d.url); type = "image";
       } else if (mode === "outpaint") {
         if (!file) throw new Error("Sube una imagen primero");
         fd.append("image", file); fd.append("prompt", prompt); fd.append("direction", direction);
         setLive("Expandiendo canvas con IA...");
         const r = await fetch(`${API_BASE}/api/fs-pro/image/outpaint`, { method:"POST", credentials:"include", body:fd });
         const d = await r.json(); if (!r.ok) throw new Error(d.error||"Error");
-        vaultId = d.vaultId; url = d.url || d.base64; type = "image";
+        vaultId = d.vaultId; url = d.dataUrl ?? (d.base64 ? `data:image/png;base64,${d.base64}` : d.url); type = "image";
       } else if (mode === "variations") {
         if (!file) throw new Error("Sube una imagen primero");
         fd.append("image", file); fd.append("prompt", prompt); fd.append("count", "4");
         setLive("Generando 4 variaciones...");
         const r = await fetch(`${API_BASE}/api/fs-pro/image/variations`, { method:"POST", credentials:"include", body:fd });
         const d = await r.json(); if (!r.ok) throw new Error(d.error||"Error");
-        vaultId = d.vaultId; url = d.url || d.results?.[0]?.url; type = "image";
+        vaultId = d.results?.[0]?.vaultId; url = d.results?.[0]?.dataUrl; type = "image";
       } else if (mode === "audio-mix") {
         if (!file || !file2) throw new Error("Sube narración y música de fondo");
         fd.append("tts", file); fd.append("music", file2);

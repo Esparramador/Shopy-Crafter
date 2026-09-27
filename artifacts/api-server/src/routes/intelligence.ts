@@ -526,8 +526,12 @@ router.post("/intelligence/analyze", async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
-    const { projectId, timeframe = "30d" } = req.body;
+    const { projectId, timeframe = "30d", referenceContext } = req.body;
     if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
+    // Contexto de referencia (vídeo/URL analizados en la página); antes se enviaba
+    // y se ignoraba.
+    const refText = referenceContext == null ? ""
+      : (typeof referenceContext === "string" ? referenceContext : JSON.stringify(referenceContext)).slice(0, 4000);
   
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
     const events = await db.select().from(eventsTable)
@@ -542,7 +546,7 @@ router.post("/intelligence/analyze", async (req, res): Promise<void> => {
   Events (last 50): ${JSON.stringify(events.slice(0, 20))}
   Revenue snapshots: ${JSON.stringify(snapshots.slice(0, 14))}
   Timeframe: ${timeframe}
-  
+  ${refText ? `\n  Reference context supplied by the user (use it to compare and ground the recommendations):\n  ${refText}\n` : ""}
   Return JSON:
   {
     "topInsights": ["insight1", "insight2", "insight3"],

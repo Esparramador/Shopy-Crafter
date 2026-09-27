@@ -57,6 +57,64 @@ const SECTOR_META: Record<string, { icon: string; color: string }> = {
   health: { icon: "🏥", color: "#34d399" },
 };
 
+/** Forma del API (lib/design-systems.ts). */
+interface ApiDesignSystem {
+  id: string; name: string; category: string; description: string;
+  primaryColor: string; secondaryColor: string; accentColor: string;
+  bgColor: string; surfaceColor: string; textColor: string; textMuted: string;
+  fontHeading: string; fontBody: string; fontMono?: string;
+  borderRadius: string; toneWords: string[]; principles: string[];
+  motionStyle: string; logoStyle: string; spacingScale: string;
+  designLanguage: string; buttonStyle: string; shadowStyle: string;
+}
+
+const CATEGORY_TO_SECTOR: Record<string, string> = {
+  "Tech": "tech", "Fashion": "fashion", "Food & Drink": "food", "Finance": "finance",
+  "Beauty": "beauty", "Travel": "travel", "Automotive": "automotive", "SaaS": "saas", "E-commerce": "ecommerce",
+};
+
+function fromApi(d: ApiDesignSystem): DesignSystem {
+  const tone = Array.isArray(d.toneWords) ? d.toneWords : [];
+  return {
+    id: d.id,
+    brand: d.name,
+    industry: d.category,
+    sector: CATEGORY_TO_SECTOR[d.category] ?? d.category.toLowerCase(),
+    primaryColor: d.primaryColor,
+    secondaryColor: d.secondaryColor,
+    accentColor: d.accentColor,
+    backgroundColor: d.bgColor,
+    textColor: d.textColor,
+    colorTokens: [
+      { name: "Primario", hex: d.primaryColor, usage: "Marca y acciones principales" },
+      { name: "Secundario", hex: d.secondaryColor, usage: "Apoyo" },
+      { name: "Acento", hex: d.accentColor, usage: "Destacados" },
+      { name: "Fondo", hex: d.bgColor, usage: "Fondo" },
+      { name: "Superficie", hex: d.surfaceColor, usage: "Tarjetas y paneles" },
+      { name: "Texto", hex: d.textColor, usage: "Texto principal" },
+    ],
+    typography: [
+      { role: "Titulares", family: d.fontHeading, size: "", weight: "" },
+      { role: "Cuerpo", family: d.fontBody, size: "", weight: "" },
+      ...(d.fontMono ? [{ role: "Mono", family: d.fontMono, size: "", weight: "" }] : []),
+    ],
+    borderRadius: d.borderRadius,
+    spacing: d.spacingScale,
+    shadowStyle: d.shadowStyle,
+    tone: tone.join(", "),
+    personality: tone,
+    targetAudience: "",
+    designPrinciples: Array.isArray(d.principles) ? d.principles : [],
+    logoStyle: d.logoStyle,
+    iconStyle: "",
+    imageStyle: "",
+    patternStyle: d.designLanguage,
+    description: d.description,
+    tags: tone.map(t => t.toLowerCase()),
+    inspiration: [],
+  };
+}
+
 export default function DesignSystems() {
   const [systems, setSystems] = useState<DesignSystem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +135,9 @@ export default function DesignSystems() {
       const r = await fetch(`${API_BASE}/api/design-systems?limit=200`, { credentials: "include" });
       if (!r.ok) throw new Error("Error cargando sistemas de diseño");
       const data = await r.json();
-      setSystems(data.systems || []);
+      // El API devuelve { designSystems } con name/category/bgColor/fontHeading…
+      // (antes se leía data.systems → lista siempre vacía).
+      setSystems(Array.isArray(data.designSystems) ? data.designSystems.map(fromApi) : []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error desconocido");
     } finally {
@@ -112,8 +172,13 @@ export default function DesignSystems() {
         credentials: "include",
         body: JSON.stringify({}),
       });
-      const data = await r.json();
-      setApplyMsg(data.message || "Sistema aplicado correctamente");
+      const data = await r.json() as { css?: string; googleFontsUrl?: string; error?: string };
+      if (!r.ok || !data.css) throw new Error(data.error || `Error ${r.status}`);
+      // El API devuelve los tokens CSS del sistema (no "aplica" nada en la tienda):
+      // se copian al portapapeles para pegarlos en el tema.
+      const block = `${data.googleFontsUrl ? `@import url("${data.googleFontsUrl}");\n\n` : ""}${data.css}`;
+      await navigator.clipboard.writeText(block);
+      setApplyMsg("✅ Variables CSS del sistema copiadas al portapapeles — pégalas en el CSS de tu tema");
     } catch (e: unknown) {
       setApplyMsg(`Error: ${e instanceof Error ? e.message : "Desconocido"}`);
     } finally {
@@ -296,7 +361,7 @@ export default function DesignSystems() {
                   style={{ background: "var(--jade)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                 >
                   {applying ? <Loader2 size={14} style={{ animation: "spin 0.6s linear infinite" }} /> : <Eye size={14} />}
-                  Aplicar Sistema
+                  Copiar CSS del sistema
                 </button>
               </div>
 

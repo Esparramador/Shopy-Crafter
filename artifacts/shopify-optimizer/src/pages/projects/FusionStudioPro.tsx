@@ -1805,7 +1805,7 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
         )}
 
         {!isXaiMode && (
-          <Section title="Negative Prompt (presets Renoise)">
+          <Section title="Negative Prompt (presets Renoise · se aplica en modelos Kling)">
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
               <button
                 onClick={() => { setNegPreset(""); setNegativePrompt(""); }}

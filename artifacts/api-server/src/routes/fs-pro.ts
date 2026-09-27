@@ -1849,7 +1849,7 @@ router.post("/fs-pro/image/remove-bg", requireAdmin, upload.single("image"), asy
       buffer: out,
     });
     await recordUsage(projectId, "image", 1);
-    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+    { const b64 = out.toString("base64"); res.json({ success: true, vaultId, base64: b64, dataUrl: `data:image/png;base64,${b64}`, metadata: { mimeType: "image/png" } }); }
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error eliminando fondo" });
   }
@@ -1881,7 +1881,7 @@ router.post("/fs-pro/image/replace-bg", requireAdmin, upload.single("image"), as
       buffer: out,
     });
     await recordUsage(projectId, "image", 1);
-    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+    { const b64 = out.toString("base64"); res.json({ success: true, vaultId, base64: b64, dataUrl: `data:image/png;base64,${b64}`, metadata: { mimeType: "image/png" } }); }
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error reemplazando fondo" });
   }
@@ -1914,7 +1914,7 @@ router.post("/fs-pro/image/clarity-upscale", requireAdmin, upload.single("image"
       buffer: out,
     });
     await recordUsage(projectId, "image", 1);
-    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+    { const b64 = out.toString("base64"); res.json({ success: true, vaultId, base64: b64, dataUrl: `data:image/png;base64,${b64}`, metadata: { mimeType: "image/png" } }); }
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error en clarity upscale" });
   }
@@ -1944,7 +1944,7 @@ router.post("/fs-pro/image/face-swap", requireAdmin, multer().fields([{ name: "f
       buffer: out,
     });
     await recordUsage(projectId, "image", 2);
-    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+    { const b64 = out.toString("base64"); res.json({ success: true, vaultId, base64: b64, dataUrl: `data:image/png;base64,${b64}`, metadata: { mimeType: "image/png" } }); }
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error en face swap" });
   }
@@ -1978,7 +1978,7 @@ router.post("/fs-pro/image/variations", requireAdmin, upload.single("image"), as
         mimeType: "image/png", generatedBy: "fs-pro:image:variations",
         buffer: buffers[i],
       });
-      results.push({ vaultId, base64: buffers[i].toString("base64") });
+      { const b64 = buffers[i].toString("base64"); results.push({ vaultId, base64: b64, dataUrl: `data:image/png;base64,${b64}` }); }
     }
 
     await recordUsage(projectId, "image", buffers.length);
@@ -2014,7 +2014,7 @@ router.post("/fs-pro/image/outpaint", requireAdmin, upload.single("image"), asyn
       buffer: out,
     });
     await recordUsage(projectId, "image", 2);
-    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+    { const b64 = out.toString("base64"); res.json({ success: true, vaultId, base64: b64, dataUrl: `data:image/png;base64,${b64}`, metadata: { mimeType: "image/png" } }); }
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error en outpaint" });
   }
@@ -2044,7 +2044,7 @@ router.post("/fs-pro/image/inpaint", requireAdmin, multer().fields([{ name: "ima
       buffer: out,
     });
     await recordUsage(projectId, "image", 2);
-    res.json({ success: true, vaultId, base64: out.toString("base64"), metadata: { mimeType: "image/png" } });
+    { const b64 = out.toString("base64"); res.json({ success: true, vaultId, base64: b64, dataUrl: `data:image/png;base64,${b64}`, metadata: { mimeType: "image/png" } }); }
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Error en inpaint" });
   }
@@ -2055,7 +2055,7 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
   enableLongRunning(res);
   try {
     const f = req.file;
-    const { projectId: pidStr, model, prompt, duration, aspect, sourceImageUrl, cameraPreset } = req.body;
+    const { projectId: pidStr, model, prompt, duration, aspect, sourceImageUrl, cameraPreset, negativePrompt } = req.body;
     if (!model || !prompt) { res.status(400).json({ error: "model y prompt son requeridos" }); return; }
 
     // projectId opcional — si no se indica o es 0, usa el primer proyecto disponible
@@ -2105,6 +2105,7 @@ router.post("/fs-pro/generate-video", requireAdmin, upload.single("image"), asyn
           aspect: aspect || "9:16",
           replicateToken: getProjectReplicateToken(project),
           cameraPreset: typeof cameraPreset === "string" ? cameraPreset : undefined,
+          negativePrompt: typeof negativePrompt === "string" && negativePrompt.trim() ? negativePrompt.trim().slice(0, 1000) : undefined,
         });
 
     // Validar que el buffer no esté vacío — indica fallo silencioso del proveedor
@@ -2297,10 +2298,15 @@ router.post("/fs-pro/video/edit", requireAdmin, upload.single("video"), async (r
   enableLongRunning(res);
   try {
     const f = req.file;
-    const { projectId: pidStr, prompt, model } = req.body;
-    const projectId = parseInt(pidStr || "0", 10);
+    const { projectId: pidStr, prompt, model, videoUrl } = req.body;
+    const projectId = parseInt(String(pidStr ?? "0"), 10);
     if (!projectId || !prompt || !model) {
       res.status(400).json({ error: "projectId, prompt, model requeridos" }); return;
+    }
+    // Fichero subido o URL (FusionStudioPro envía videoUrl en JSON; antes solo se
+    // aceptaba fichero y el modo "editar vídeo" daba siempre 400).
+    if (!f && !(typeof videoUrl === "string" && videoUrl.trim())) {
+      res.status(400).json({ error: "Video requerido (archivo o videoUrl)" }); return;
     }
 
     const VIDEO_CREDITS = 6;
@@ -2310,9 +2316,8 @@ router.post("/fs-pro/video/edit", requireAdmin, upload.single("video"), async (r
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    if (!f) { res.status(400).json({ error: "Video requerido" }); return; }
-
-    const out = await editVideoWithPrompt(f.buffer, prompt, model, getProjectReplicateToken(project));
+    const sourceBuf = f ? f.buffer : await fetchToBuffer(String(videoUrl).trim());
+    const out = await editVideoWithPrompt(sourceBuf, prompt, model, getProjectReplicateToken(project));
 
     const vaultId = await saveToVaultSmart({
       projectId, fileType: "fs-pro-video-edit", category: "fusion-studio-pro",

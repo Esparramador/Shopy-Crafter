@@ -1190,7 +1190,7 @@ export async function generateVideoFromImage(
   model: VideoModel,
   imageBuffer: Buffer | null, imageMime: string,
   prompt: string,
-  opts: { duration?: number; aspect?: string; replicateToken?: string; cameraPreset?: string },
+  opts: { duration?: number; aspect?: string; replicateToken?: string; cameraPreset?: string; negativePrompt?: string },
 ): Promise<Buffer> {
   const cfg = VIDEO_MODELS[model];
   if (!cfg) throw new Error(`Modelo de video desconocido: ${model}`);
@@ -1418,6 +1418,8 @@ export async function generateVideoFromImage(
     // Kling: start_image opcional, T2V puro soportado en v2.1
     input = { prompt, duration, aspect_ratio: aspect };
     if (dataUri) input.start_image = dataUri;
+    // Kling en Replicate acepta negative_prompt (los demás modelos de esta cascada no).
+    if (opts.negativePrompt) input.negative_prompt = opts.negativePrompt;
   } else if (cfg.modelId.startsWith("minimax/")) {
     // Hailuo: first_frame_image opcional
     input = { prompt, duration };

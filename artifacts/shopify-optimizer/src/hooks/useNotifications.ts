@@ -79,19 +79,24 @@ export function useCalendarReminders() {
     const check = async () => {
       if (Notification.permission !== "granted") return;
       try {
-        const r = await fetch(`${API}/calendar/events?view=list&days=1`, { credentials: "include" });
+        // /calendar/events devuelve { appointments } con meeting_date/client_name
+        // (antes se leían data.events/ev.start y nunca saltaba ningún aviso).
+        const from = new Date().toISOString();
+        const to = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+        const r = await fetch(`${API}/calendar/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { credentials: "include" });
         if (!r.ok) return;
-        const data = await r.json();
-        const events: any[] = data.events || data || [];
+        const data = await r.json() as { appointments?: Array<{ id: number; meeting_date: string; client_name?: string; company?: string; status?: string }> };
+        const events = Array.isArray(data.appointments) ? data.appointments : [];
         const now = Date.now();
         for (const ev of events) {
-          const start = new Date(ev.start || ev.startTime || ev.startDateTime).getTime();
+          if (ev.status === "cancelled" || ev.status === "completed") continue;
+          const start = new Date(ev.meeting_date).getTime();
           const diffMin = (start - now) / 60000;
-          const key = ev.id || ev.title;
+          const key = String(ev.id);
           if (diffMin > 0 && diffMin <= 20 && !notifiedRef.current.has(key)) {
             notifiedRef.current.add(key);
             new Notification(`📅 Reunión en ${Math.round(diffMin)} min`, {
-              body: ev.title || ev.summary || "Cita próxima",
+              body: [ev.client_name, ev.company].filter(Boolean).join(" · ") || "Cita próxima",
               icon: "/favicon.png",
               badge: "/favicon.png",
               tag: `meeting-${key}`,
