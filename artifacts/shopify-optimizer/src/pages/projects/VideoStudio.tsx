@@ -391,7 +391,8 @@ function AIGenerateModal({ mode, projectId, onClose, onClipReady, onError }: {
         fd.append(mode==="v2v"?"video":"image", file);
         fd.append("prompt", prompt); fd.append("model", model);
         setLive(`Procesando ${mode==="v2v"?"video":"imagen"} con IA...`);
-        const ep = mode==="v2v" ? "/api/fs-pro/video/v2v" : "/api/fs-pro/video/generate";
+        // i2v: /fs-pro/generate-video acepta la imagen origen (antes /fs-pro/video/generate, que no existe).
+        const ep = mode==="v2v" ? "/api/fs-pro/video/v2v" : "/api/fs-pro/generate-video";
         const r = await fetch(`${API_BASE}${ep}`, { method:"POST", credentials:"include", body:fd });
         const d = await r.json(); if (!r.ok) throw new Error(d.error||"Error");
         vaultId = d.vaultId; url = d.url || `${API_BASE}/api/projects/${projectId}/vault/${vaultId}/download`;
@@ -407,7 +408,7 @@ function AIGenerateModal({ mode, projectId, onClose, onClipReady, onError }: {
         type = "audio";
       } else if (mode === "music") {
         setLive("Generando música con IA...");
-        const r = await fetch(`${API_BASE}/api/fs-pro/generate-music`, {
+        const r = await fetch(`${API_BASE}/api/fs-pro/music`, {
           method:"POST", credentials:"include", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({ prompt, projectId, duration: 30 }),
         });
@@ -602,15 +603,16 @@ function ExportModal({ clips, format, projectId, totalDuration, onClose, onSucce
       fd.append("width", String(format.w));
       fd.append("height", String(format.h));
       fd.append("fps", String(format.fps));
-      fd.append("crossfadeDuration", String(crossfade));
-      fd.append("totalDuration", String(totalDuration));
-      videoClips.forEach((c,i) => { if(c.file) fd.append(`video_${i}`, c.file); });
+      fd.append("crossfadeSec", String(crossfade));
+      // /fs-pro/concat-uploaded espera los clips en orden en el campo "clips"
+      // (antes: /fs-pro/concat-export, que no existe, con campos video_0, video_1…).
+      videoClips.forEach(c => { if (c.file) fd.append("clips", c.file); });
       const voiceClip = clips.find(c=>c.trackId==="voice"&&c.file);
       const musicClip = clips.find(c=>c.trackId==="music"&&c.file);
       if (voiceClip?.file) fd.append("voice", voiceClip.file);
       if (musicClip?.file) fd.append("music", musicClip.file);
       setLive("Procesando con FFmpeg en servidor...");
-      const r = await fetch(`${API_BASE}/api/fs-pro/concat-export`, { method:"POST", credentials:"include", body:fd });
+      const r = await fetch(`${API_BASE}/api/fs-pro/concat-uploaded`, { method:"POST", credentials:"include", body:fd });
       const d = await r.json(); if (!r.ok) throw new Error(d.error||"Error");
       setResult(d.url || `${API_BASE}/api/projects/${projectId}/vault/${d.vaultId}/download`);
       onSuccess(d.vaultId, d.url);

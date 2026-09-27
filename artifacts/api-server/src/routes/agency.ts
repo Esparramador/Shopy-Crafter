@@ -7,6 +7,10 @@ import { requireAdmin } from "../lib/auth.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { askClaudeJsonWithBrain, askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { askClaudeJsonValidated } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { looseNumber } from "../lib/ai-schema.js";
+import { z } from "zod";
 
 const router = Router();
 
@@ -47,6 +51,39 @@ async function ensureDefaultCostStructure() {
     });
   }
 }
+
+// ─── POST /agency/invoice-estimate ───────────────────────────────────────────
+// Partidas de factura sugeridas por la IA. Antes el panel de facturación llamaba a
+// POST /api/shopybrain (no existe) y el error se tragaba: "Estimar con IA" no hacía nada.
+const invoiceEstimateSchema = z.object({
+  items: z.array(z.object({
+    description: z.string().min(1),
+    category: z.enum(["estrategia", "diseño", "desarrollo", "ia", "gestion", "publicidad", "seo", "otro"]).catch("otro"),
+    rate: looseNumber.pipe(z.number().positive()),
+    unit: z.enum(["horas", "unidades", "fijo"]).catch("horas"),
+    hours: looseNumber.catch(0),
+    quantity: looseNumber.pipe(z.number().positive()).catch(1),
+    reasoning: z.string().default(""),
+  })).min(1),
+});
+
+router.post("/agency/invoice-estimate", requireAdmin, async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  const { project, client, currentItems } = req.body as { project?: string; client?: string; currentItems?: string[] };
+  if (!project?.trim()) { res.status(400).json({ error: "project requerido" }); return; }
+  try {
+    const context = `Proyecto: ${project.slice(0, 500)}\nCliente: ${(client || "Sin especificar").slice(0, 200)}\nÍtems actuales: ${(currentItems ?? []).filter(Boolean).join(", ").slice(0, 1500)}`;
+    const result = await askClaudeJsonValidated(0,
+      `Analiza este proyecto y sugiere partidas de facturación realistas con precios de mercado en España para una agencia digital premium con IA:\n\n${context}\n\nDevuelve SOLO este JSON:\n{"items":[{"description":"...","category":"estrategia|diseño|desarrollo|ia|gestion|publicidad|seo|otro","rate":NUMBER,"unit":"horas|unidades|fijo","hours":NUMBER_o_0,"quantity":NUMBER_o_1,"reasoning":"..."}]}`,
+      "Eres un consultor de agencias digitales en España. Precios realistas de mercado. Responde SOLO con JSON válido.",
+      { schema: invoiceEstimateSchema, useCase: "financial", maxTokens: 4000, label: "agency/invoice-estimate" },
+    );
+    res.json(result);
+  } catch (err) {
+    if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err) }); return; }
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error estimando la factura" });
+  }
+});
 
 router.get("/agency/cost-structure", requireAdmin, async (_req, res): Promise<void> => {
   try {

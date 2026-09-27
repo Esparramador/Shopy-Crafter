@@ -89,14 +89,12 @@ export default function DesignSystems() {
     setGenerating(true);
     setGeneratedMd(null);
     try {
-      const r = await fetch(`${API_BASE}/api/design-systems/${ds.id}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({}),
-      });
+      // El DESIGN.md de un sistema existente lo sirve GET /design-systems/:id/design-md
+      // (antes POST /design-systems/:id/generate, que no existe).
+      const r = await fetch(`${API_BASE}/api/design-systems/${ds.id}/design-md`, { credentials: "include" });
       const data = await r.json();
-      setGeneratedMd(data.designMd || data.markdown || "");
+      if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
+      setGeneratedMd(data.markdown || "");
     } catch (e: unknown) {
       setGeneratedMd(`Error: ${e instanceof Error ? e.message : "Desconocido"}`);
     } finally {

@@ -5,6 +5,27 @@ import {
   searchDesignSystems, generateDesignMd,
 } from "../lib/design-systems.js";
 import { askAMR } from "../lib/amr.js";
+import { parseAiJson } from "../lib/ai-json.js";
+import { lenientArray, looseString } from "../lib/ai-schema.js";
+import { z } from "zod";
+
+// Los colores y fuentes acaban en CSS (apply) y en el DESIGN.md: solo hex y nombres seguros.
+const hex = z.string().trim().regex(/^#[0-9a-fA-F]{3,8}$/);
+const font = z.string().trim().regex(/^[\p{L}\p{N} \-]{1,60}$/u);
+const generatedSystemSchema = z.object({
+  primaryColor: hex, secondaryColor: hex, accentColor: hex, bgColor: hex,
+  surfaceColor: hex, textColor: hex, textMuted: hex,
+  fontHeading: font, fontBody: font,
+  borderRadius: z.enum(["none", "sm", "md", "lg", "full"]).catch("md"),
+  toneWords: lenientArray(looseString),
+  principles: lenientArray(looseString),
+  motionStyle: z.string().catch("functional"),
+  logoStyle: z.string().catch(""),
+  spacingScale: z.string().catch("normal"),
+  designLanguage: z.string().catch(""),
+  buttonStyle: z.string().catch(""),
+  shadowStyle: z.string().catch("soft"),
+});
 
 const router = Router();
 
@@ -127,16 +148,16 @@ Responde SÓLO con un JSON válido con esta estructura exacta (sin markdown, sin
     const output = await askAMR(
       [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       "claude-sonnet",
-      { maxTokens: 1000 }
+      { maxTokens: 2000 }
     );
 
-    let json: Record<string, unknown>;
-    try {
-      const cleaned = output.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      json = JSON.parse(cleaned) as Record<string, unknown>;
-    } catch {
-      res.status(500).json({ error: "Error generando design system, intenta de nuevo" }); return;
+    // Antes: JSON.parse tras quitar ``` (cualquier texto alrededor lo rompía) y sin
+    // validar: un color inválido acababa en las variables CSS de "apply".
+    const parsed = parseAiJson(output, { schema: generatedSystemSchema, expect: "object" });
+    if (!parsed.ok) {
+      res.status(502).json({ error: "La IA no devolvió un sistema de diseño válido. Inténtalo de nuevo." }); return;
     }
+    const json = parsed.data;
 
     const customSystem = {
       id: `custom-${Date.now()}`,

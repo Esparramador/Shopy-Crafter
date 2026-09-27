@@ -185,7 +185,7 @@ export default function AvatarStudio() {
         vaultId: j.vaultId,
         sizeBytes: j.sizeBytes,
         durationSec: j.durationSec,
-        videoUrl: `${API}/api/projects/${projectId}/vault/file/${j.vaultId}/download`,
+        videoUrl: `${API}/api/projects/${projectId}/vault/${j.vaultId}/download`,
       });
       setProgress("");
     } catch (err: any) {

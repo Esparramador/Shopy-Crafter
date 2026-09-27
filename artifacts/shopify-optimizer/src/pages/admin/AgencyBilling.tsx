@@ -124,27 +124,22 @@ export default function AgencyBilling() {
     if (!invoice.project) return;
     setAiLoading(true);
     try {
-      const context = `Proyecto: ${invoice.project}\nCliente: ${invoice.client || "Sin especificar"}\nÍtems actuales: ${invoice.items.map(it => it.description).filter(Boolean).join(", ")}`;
-      const r = await fetch(`${API}/api/shopybrain`, {
+      // Antes: POST /api/shopybrain (no existe) y catch {} → el botón no hacía nada.
+      const r = await fetch(`${API}/api/agency/invoice-estimate`, {
         method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: `Eres un consultor de agencias digital. Analiza este proyecto y sugiere items de facturación realistas con precios de mercado en España 2024 para una agencia IA premium:\n\n${context}\n\nDevuelve exactamente este JSON (sin markdown):\n{"items":[{"description":"...","category":"estrategia|diseño|desarrollo|ia|gestion|publicidad|seo|otro","rate":NUMBER,"unit":"horas|unidades|fijo","hours":NUMBER_or_0,"quantity":NUMBER_or_1,"reasoning":"..."}]}`,
-          engine: "claude",
-        }),
+        body: JSON.stringify({ project: invoice.project, client: invoice.client, currentItems: invoice.items.map(it => it.description) }),
       });
       const d = await r.json();
-      const text = d.response || d.content || "";
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) {
-        const parsed = JSON.parse(match[0]);
-        const newItems: LineItem[] = (parsed.items || []).map((it: any) => {
-          const item: LineItem = { id: Math.random().toString(36).slice(2), description: it.description, category: it.category || "otro", hours: it.hours || 0, rate: it.rate || 50, quantity: it.quantity || 1, unit: it.unit || "horas", subtotal: 0 };
-          item.subtotal = calcSubtotal(item);
-          return item;
-        });
-        setInvoice(inv => ({ ...inv, items: [...inv.items.filter(it => it.description), ...newItems] }));
-      }
-    } catch {}
+      if (!r.ok) throw new Error(d.error || `Error ${r.status}`);
+      const newItems: LineItem[] = (d.items as Array<Omit<LineItem, "id" | "subtotal">>).map(it => {
+        const item: LineItem = { id: Math.random().toString(36).slice(2), description: it.description, category: it.category, hours: it.hours, rate: it.rate, quantity: it.quantity, unit: it.unit, subtotal: 0 };
+        item.subtotal = calcSubtotal(item);
+        return item;
+      });
+      setInvoice(inv => ({ ...inv, items: [...inv.items.filter(it => it.description), ...newItems] }));
+    } catch (e) {
+      alert(`No se pudo estimar con IA: ${e instanceof Error ? e.message : "error desconocido"}`);
+    }
     setAiLoading(false);
   }
 
