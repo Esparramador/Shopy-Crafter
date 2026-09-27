@@ -115,6 +115,8 @@ export default function TemplateStudio() {
           sectionStyle: s.sectionStyle || p.sectionStyle,
         }));
         setMsg(`Diseño sugerido${s.reasoning ? `: ${(s.reasoning as string).slice(0, 100)}` : ""}`);
+      } else {
+        setMsg(data.error || "No se pudo obtener una sugerencia");
       }
     } catch { setMsg("Error en sugerencia IA"); }
     setAiLoading(false);

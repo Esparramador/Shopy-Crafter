@@ -19,7 +19,10 @@
  *   - Beneficios funcionales que VEN (no inventados)
  */
 
-import { askClaudeWithVision, safeJsonParse } from "./claude.js";
+import { askClaudeWithVision } from "./claude.js";
+import { generateAiJson, type AiJsonSchema } from "./ai-json.js";
+import { AiTruncatedError } from "./ai-errors.js";
+import { z } from "zod";
 import { askGeminiVisionJson, isGeminiAvailable } from "./gemini.js";
 import { logger } from "./logger.js";
 
@@ -62,6 +65,13 @@ export interface ProductDNA {
 }
 
 const PRODUCT_DNA_SYSTEM = `Eres un director de arte y product photographer senior con 20 años en campañas premium (Apple, Hermès, Tesla, Nike). Tu trabajo: extraer un dossier 100% REAL del producto observando sus imágenes y leyendo su descripción. Nunca inventas. Si no lo ves, no lo escribes. Devuelves SIEMPRE JSON válido sin texto fuera.`;
+
+// Lo mínimo para que el ADN sirva: un objeto con nombre o alguna lista de
+// componentes. El resto de campos se normaliza más abajo.
+const productDnaSchema = z.record(z.string(), z.unknown()).refine(
+  o => ["productName", "materials", "layers", "textures", "keyFeatures"].some(k => o[k] !== undefined),
+  { message: "el ADN no trae nombre ni componentes" },
+);
 
 /**
  * Build the Product DNA from one or more product images + textual description.
@@ -169,27 +179,37 @@ REGLAS DURAS (NO violar):
 
   if (!parsed) {
     // ── Path B: Claude Sonnet vision (legacy / fallback) ──
-    let raw = "";
+    // Antes safeJsonParse "reparaba" un JSON cortado a 8192 tokens y el ADN salía
+    // incompleto sin avisar. Ahora: reintento con más presupuesto o, si vuelve a
+    // fallar, el ADN desde texto (como antes ante cualquier error), con el motivo.
     try {
-      raw = await askClaudeWithVision(
-        args.projectId,
-        userPrompt,
-        imageBlocks.slice(0, 5), // Claude SDK practical cap
-        PRODUCT_DNA_SYSTEM,
-        8192,
-        180_000,
-        { tier: "vision" },
-      );
+      parsed = await generateAiJson<ProductDNA>({
+        prompt: userPrompt,
+        maxTokens: 8192,
+        retryMaxTokens: 16384,
+        schema: productDnaSchema as unknown as AiJsonSchema<ProductDNA>,
+        expect: "object",
+        label: "product-dna:claude-vision",
+        call: async ({ prompt, maxTokens }) => {
+          try {
+            const text = await askClaudeWithVision(
+              args.projectId,
+              prompt,
+              imageBlocks.slice(0, 5), // Claude SDK practical cap
+              PRODUCT_DNA_SYSTEM,
+              maxTokens,
+              180_000,
+              { tier: "vision", failOnTruncation: true },
+            );
+            return { text, truncated: false };
+          } catch (err) {
+            if (err instanceof AiTruncatedError) return { text: "", truncated: true };
+            throw err;
+          }
+        },
+      });
     } catch (err: any) {
-      logger.warn({ err: err?.message, projectId: args.projectId }, "buildProductDNA: vision call failed, falling back to text-only DNA");
-      return synthDNAFromText(args);
-    }
-    try {
-      const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
-      const obj = cleaned.match(/\{[\s\S]*\}/);
-      parsed = safeJsonParse<ProductDNA>(obj ? obj[0] : cleaned, "buildProductDNA");
-    } catch (err: any) {
-      logger.warn({ err: err?.message, raw: raw.slice(0, 200) }, "buildProductDNA: parse failed, using text fallback");
+      logger.warn({ err: err?.message, projectId: args.projectId }, "buildProductDNA: Claude vision sin JSON utilizable, se usa el ADN desde texto");
       return synthDNAFromText(args);
     }
   }

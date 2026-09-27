@@ -16,7 +16,7 @@ import { auditProduct, scoreToGrade } from "../lib/audit.js";
 import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { cssFontName, escapeHtmlDeep, sanitizeHtml } from "../lib/html-escape.js";
-import { generateAiJson } from "../lib/ai-json.js";
+import { askClaudeJsonValidated, generateAiJson } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
 import { z } from "zod";
@@ -48,6 +48,10 @@ function handleRouteError(res: any, err: any): void {
         ? "La tienda de Shopify no está disponible. Verifica el estado de tu tienda en el panel de Shopify."
         : "La conexión con Shopify expiró. Reconecta tu tienda en Configuración.";
     res.status(422).json({ error: userMsg, shopify_auth_error: true });
+    return;
+  }
+  if (isAiOutputError(err)) {
+    res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code });
     return;
   }
   const msg = err instanceof Error ? err.message : "Internal server error";
@@ -139,6 +143,36 @@ function resolveFilePath(filePath: string): string | null {
 }
 
 const router = Router();
+
+// modify_ui: cambios de código propuestos por la IA.
+const uiChangesSchema = z.object({
+  files: z.array(z.object({
+    filePath: z.string().min(1),
+    changes: z.array(z.object({
+      oldCode: z.string().min(1),
+      newCode: z.string(),
+      description: z.string().optional().catch(undefined),
+    })).min(1),
+  })).min(1),
+  summary: z.string().optional().catch(undefined),
+});
+
+// Sesión de estudio (/shopybrain/study).
+const scoreField = (fallback: number) => optionalLooseNumber.transform(n => Math.max(0, Math.min(1, n ?? fallback)));
+const studySessionSchema = z.object({
+  insights: lenientArray(z.object({
+    domain: z.string().min(1).optional().catch(undefined),
+    insightType: z.string().min(1).catch("principle"),
+    title: z.string().min(1),
+    insight: z.string().min(1),
+    evidence: z.string().optional().catch(undefined),
+    confidence: scoreField(0.6),
+    impactScore: scoreField(0.5),
+    relatedDomains: lenientArray(looseString),
+  })).refine(a => a.length > 0, { message: "sin insights válidos" }),
+  summary: z.string().optional().catch(undefined),
+  keyDiscoveries: lenientArray(looseString),
+});
 
 // Brand book (execute-action generate_brand_book). Lo mínimo para no renderizar un
 // manual vacío; el resto de secciones pasan tal cual y el render ya tolera que falten.
@@ -2020,8 +2054,10 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
           16000
         );
       } else {
+        // Sin proyecto activo: contexto global (0). Antes se usaba el proyecto 2 fijo,
+        // con su ADN de marca y, si la tenía, su propia API key de Anthropic.
         aiContent = await askClaudeWithBrain(
-          2,
+          0,
           [{ role: "user", content: query }],
           researchSystemPrompt,
           "general",
@@ -2131,35 +2167,30 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
   Responde SOLO con el JSON, sin texto adicional.`;
   
     const studyQuery = `Realiza sesión de estudio para dominios: ${domainsToStudy.join(", ")}`;
-    const rawText = await askClaudeWithBrain(
-      2,
-      [{ role: "user", content: studyQuery }],
-      systemPrompt,
-      "general",
-      undefined,
-      16000
-    );
-    let parsed: any = {};
-    try {
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-    } catch {}
-  
+    // Contexto global (0), no el proyecto 2 fijo de antes. JSON validado: antes un fallo
+    // de parseo registraba una sesión "completada" con 0 insights; ahora 502.
+    const parsed = await askClaudeJsonValidated(0, studyQuery, systemPrompt, {
+      schema: studySessionSchema,
+      useCase: "general",
+      maxTokens: 16000,
+      label: "shopybrain/study",
+    });
+
     const sessionId = randomBytes(16).toString("hex");
     let insightsCreated = 0;
   
-    if (parsed.insights?.length) {
+    if (parsed.insights.length) {
       for (const insight of parsed.insights) {
         await db.insert(omnicoreInsightsTable).values({
           id: randomBytes(16).toString("hex"),
           domain: insight.domain ?? domainsToStudy[0],
-          insightType: insight.insightType ?? "principle",
-          title: insight.title ?? "Insight",
-          insight: insight.insight ?? "",
+          insightType: insight.insightType,
+          title: insight.title,
+          insight: insight.insight,
           evidence: insight.evidence ?? null,
           confidence: insight.confidence ?? 0.6,
           impactScore: insight.impactScore ?? 0.5,
-          relatedDomains: insight.relatedDomains ? JSON.stringify(insight.relatedDomains) : null,
+          relatedDomains: insight.relatedDomains.length ? JSON.stringify(insight.relatedDomains) : null,
           source: "study_session",
         });
         insightsCreated++;
@@ -2182,8 +2213,8 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
       durationSeconds: Math.round((Date.now() - startTime) / 1000),
       insightsCreated,
       summary: parsed.summary ?? `Sesión de estudio completada para ${domainsToStudy.length} dominios`,
-      keyDiscoveries: parsed.keyDiscoveries ? JSON.stringify(parsed.keyDiscoveries) : null,
-      tokensUsed: rawText.length,
+      keyDiscoveries: parsed.keyDiscoveries.length ? JSON.stringify(parsed.keyDiscoveries) : null,
+      tokensUsed: JSON.stringify(parsed).length,
     });
   
     res.json({
@@ -2191,7 +2222,7 @@ router.post("/shopybrain/study", requireAdmin, async (req, res): Promise<void> =
       sessionId,
       insightsCreated,
       summary: parsed.summary,
-      keyDiscoveries: parsed.keyDiscoveries ?? [],
+      keyDiscoveries: parsed.keyDiscoveries,
       durationMs: Date.now() - startTime,
     });
   } catch (err: any) {
@@ -5174,7 +5205,9 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           const backupPath = `${resolvedPath}.bak.${Date.now()}`;
           fs.writeFileSync(backupPath, fileContent, "utf-8");
   
-          const newContent = fileContent.replace(oldCode, newCode);
+          // Función como reemplazo: con una cadena, "$&", "$'" o "$1" del código nuevo
+          // se interpretaban como patrones de String.replace y corrompían el archivo.
+          const newContent = fileContent.replace(oldCode, () => newCode);
           fs.writeFileSync(resolvedPath, newContent, "utf-8");
   
           const changedLines = newCode.split("\n").length;
@@ -7972,44 +8005,31 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
   }`;
   
             const modifyUiProjectId = getSessionProjectId(req, params);
-            const uiText = await askClaudeWithBrain(
-              modifyUiProjectId,
-              [{ role: "user", content: analyzePrompt }],
-              "Eres un experto frontend senior. Responde SOLO JSON válido. Los paths de archivo son relativos desde src/ sin incluir src/ al inicio.",
-              "general",
-              undefined,
-              3000
-            );
-            // HIGH-1: parsing robusto de JSON con fallback en cascada
-            let uiJson: { files?: Array<{ filePath: string; changes: Array<{ oldCode: string; newCode: string; description?: string }> }>; summary?: string } = {};
+            // Antes: 3000 tokens (el JSON de cambios se cortaba) y una cascada de
+            // JSON.parse/regex. Ahora esquema (oldCode no vacío: con "" el replace
+            // insertaba el código al principio del archivo), reintento y error tipado.
+            let uiJson: z.output<typeof uiChangesSchema>;
             try {
-              uiJson = JSON.parse(uiText);
-            } catch {
-              const m = uiText.match(/\{[\s\S]*\}/);
-              if (m) {
-                try { uiJson = JSON.parse(m[0]); }
-                catch {
-                  const cleaned = uiText.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
-                  try { uiJson = JSON.parse(cleaned); }
-                  catch {
-                    result = { error: true, message: `❌ Claude devolvió JSON inválido. Respuesta (primeros 300 chars): ${uiText.slice(0, 300)}` };
-                    break;
-                  }
-                }
-              } else {
-                result = { error: true, message: `❌ Claude no devolvió JSON. Respuesta (primeros 300 chars): ${uiText.slice(0, 300)}` };
-                break;
-              }
+              uiJson = await askClaudeJsonValidated(
+                modifyUiProjectId,
+                analyzePrompt,
+                "Eres un experto frontend senior. Responde SOLO JSON válido. Los paths de archivo son relativos desde src/ sin incluir src/ al inicio.",
+                { schema: uiChangesSchema, useCase: "general", maxTokens: 8000, label: "shopybrain/modify_ui" },
+              );
+            } catch (aiErr) {
+              if (!isAiOutputError(aiErr)) throw aiErr;
+              result = { error: true, message: `❌ ${aiOutputErrorMessage(aiErr)} No se ha modificado ningún archivo.` };
+              break;
             }
-  
+
             let changesApplied = 0;
             const appliedFiles: string[] = [];
             const failedFiles: string[] = [];
             const failedChanges: string[] = [];
   
-            if (uiJson.files) {
+            {
               for (const file of uiJson.files) {
-                const rawPath = String(file.filePath).replace(/^src\//, "");
+                const rawPath = file.filePath.replace(/^src\//, "");
 
                 // FIX CRIT-1 bis: aplicar también whitelist en modify_ui (no solo fix_code)
                 const pathToValidate = rawPath.startsWith("src/") ? rawPath : `src/${rawPath}`;
@@ -8030,9 +8050,11 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
                 }
                 let content = fs.readFileSync(fullPath, "utf-8");
                 let fileChanged = false;
-                for (const ch of file.changes || []) {
+                for (const ch of file.changes) {
                   if (content.includes(ch.oldCode)) {
-                    content = content.replace(ch.oldCode, ch.newCode);
+                    // Función como reemplazo: con una cadena, "$&", "$'" o "$1" del código
+                    // nuevo se interpretaban como patrones especiales de String.replace.
+                    content = content.replace(ch.oldCode, () => ch.newCode);
                     changesApplied++;
                     fileChanged = true;
                   } else {
@@ -8191,14 +8213,14 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
               result = { error: true, message: `❌ No se encontró el bloque a reemplazar en '${assetKey}'. Usa read_theme_file para ver el contenido actual y copia el texto EXACTO.` };
               break;
             }
-            finalContent = currentContent.replace(oldCode, newCode);
+            finalContent = currentContent.replace(oldCode, () => newCode);
             changeLog.push(`Bloque reemplazado (${oldCode.length} chars → ${newCode.length} chars)`);
           } else if (editType === "add_css") {
             finalContent = currentContent.trimEnd() + "\n\n/* " + (description ?? "Añadido por Shopy Crafter") + " */\n" + newCode.trim() + "\n";
             changeLog.push("CSS añadido al final del archivo");
           } else if (editType === "modify_section") {
             if (oldCode && currentContent.includes(oldCode)) {
-              finalContent = currentContent.replace(oldCode, newCode);
+              finalContent = currentContent.replace(oldCode, () => newCode);
               changeLog.push("Sección modificada (replace_block)");
             } else {
               const mergeResult = intelligentMerge(currentContent, description ?? "", newCode, fileInfo.type);
@@ -8214,7 +8236,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             changeLog.push("Contenido reemplazado completamente");
           } else {
             if (oldCode && currentContent.includes(oldCode)) {
-              finalContent = currentContent.replace(oldCode, newCode);
+              finalContent = currentContent.replace(oldCode, () => newCode);
               changeLog.push("Smart edit: bloque encontrado y reemplazado");
             } else if (fileInfo.type === "css") {
               finalContent = currentContent.trimEnd() + "\n\n" + newCode.trim() + "\n";

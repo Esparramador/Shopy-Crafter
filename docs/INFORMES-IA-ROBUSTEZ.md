@@ -1,6 +1,6 @@
 # Informes IA — robustez de las respuestas (inventario)
 
-Rama `fix/informes-ia-robustos` (ya en `master`). Estado a 27/09/2026.
+Rama `fix/informes-ia-robustos` (ya en `master`). Estado a 27/09/2026 (inventario completado).
 
 ## Causa raíz (confirmada en el código)
 
@@ -33,7 +33,7 @@ Rama `fix/informes-ia-robustos` (ya en `master`). Estado a 27/09/2026.
 
 ## Inventario de sitios
 
-Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` → **47** sitios. Migrados en esta rama: 5 de esos 47, más 12 llamadas de informes que usaban `askClaudeJsonWithBrain`/`askClaudeWithBrain` con reparación o corte silencioso. Después se migraron los de prioridad alta (absorber de imágenes, Brand Book) y todos los de prioridad media. Quedan **20** sitios con la regex, todos de prioridad baja (más la mención en el comentario de `lib/ai-json.ts`).
+Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` → **47** sitios. Migrados en esta rama: 5 de esos 47, más 12 llamadas de informes que usaban `askClaudeJsonWithBrain`/`askClaudeWithBrain` con reparación o corte silencioso. Después se migraron los de prioridad alta (absorber de imágenes, Brand Book), los de prioridad media y los 20 de prioridad baja. Quedan **0**.
 
 "Fallback" indica qué pasa hoy si el JSON no parsea: **crudo** = el texto de la IA acaba en un campo visible (el bug del informe); **vacío** = se usa `{}`/`[]`/`null`; **defecto** = valores por defecto inventados; **error** = responde error.
 
@@ -64,33 +64,22 @@ Recuento inicial: `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` �
 | routes/shopybrain.ts `researchRealPricing` (antes :209) | Precio de mercado para crear/optimizar producto | `parseResearchJson`; un `suggestedPrice` en texto rompía el `.toFixed()` |
 | lib/google-reviews.ts (antes :115) | Perfil de Google Business | `extractJson` balanceado (la validación campo a campo ya existía) |
 | lib/scheduler.ts autoevaluación mensual (antes :984) | Informe mensual de OmniCore | `parseResearchJson` con esquema; si falla, resumen con las estadísticas reales |
+| lib/scheduler.ts crons de OmniCore (antes :388, :520, :615, :726, :886, :1247) | Micro-learning, conexiones cruzadas, estudio diario, mega-síntesis, reanálisis retroactivo, estudio adaptativo | `aiGenerateJson` (Claude con detección de corte o Gemini sin crédito) + esquema; un `newConfidence` en texto guardaba NaN; las "reparaciones" con replace alteraban también el contenido de las cadenas |
+| lib/brain-ingester.ts (antes :150) | Extracción de insights para el Brain | `claudeMessagesJson` + esquema; el fallo queda en el registro |
+| lib/client-advisor.ts (antes :156) | Hechos aprendidos del chat del cliente | `claudeMessagesJson` + esquema; además usaba su propio cliente solo con `ANTHROPIC_API_KEY` (con la integración de Replit fallaba siempre, en silencio) |
+| lib/fusion-studio.ts (antes :42, :343, :420, :492) | Caras de prenda, análisis de imagen, investigación de marca, ajustes de foto | `visionJson` (reintento con más presupuesto si Claude Vision se corta), `parseResearchJson` y `askClaudeJsonValidated` |
+| lib/product-dna.ts (antes :189) | ADN de producto (Claude Vision) | `generateAiJson` con `failOnTruncation`; antes `safeJsonParse` reparaba el JSON cortado |
+| routes/openart.ts (antes :168) | Mejorar y analizar prompts | La llamada tenía los argumentos cambiados (`askClaude(system, texto, …)`) y **fallaba siempre**; ahora `askClaude`/`askClaudeDetailed` correctos + esquema |
+| routes/cms.ts (antes :461) | Generar sección CMS | `askClaudeJsonValidated`; los `path` de los campos deben estar dentro de la sección nueva (antes la IA podía apuntar a otra sección) |
+| routes/admin.ts (antes :410) | Propuestas de mejora (ai-suggest) | 900 → 2500 tokens + esquema; antes cualquier fallo devolvía `[]` y el panel decía "sincroniza la tienda" |
+| routes/report-templates.ts (antes :212) | Sugerencia de plantilla de informe | `parseResearchJson`; solo hex válidos y nombres de fuente seguros (acaban en CSS); 502 en vez de sugerencia vacía |
+| routes/shopybrain.ts `/shopybrain/study` (antes :2143) | Sesión de estudio | `askClaudeJsonValidated`; usaba el proyecto 2 fijo (su ADN de marca y su API key); ahora contexto global |
+| routes/shopybrain.ts `modify_ui` (antes :7979) | Cambios de código de UI | Esquema (oldCode no vacío), 3000 → 8000 tokens; reemplazo con función (ver abajo) |
+| routes/suppliers.ts (antes :59) | Investigación e informe de proveedores | `extractJson` balanceado; el respaldo con Claude y el informe usan `askClaudeJsonValidated` con esquema (antes `askClaudeJsonWithBrain` reparaba truncados y salían cifras "€NaN") |
 
 ### Pendientes (regex codiciosa)
 
-Prioridad alta = fallback **crudo** o datos que llegan a un informe/cliente. Ya no queda ninguno de prioridad alta ni media.
-
-| Fichero:línea | Qué genera | Fallback hoy | Prioridad |
-|---|---|---|---|
-| routes/admin.ts:410 | `/projects/:projectId/ai-suggest` sugerencias | vacío | baja |
-| routes/cms.ts:461 | `/ai/generate-section` configuración de sección CMS | error | baja |
-| routes/openart.ts:168 | Análisis de prompt OpenArt | error | baja |
-| routes/report-templates.ts:212 | Sugerencia de plantilla de informe | vacío (`suggestion` nulo) | baja |
-| routes/shopybrain.ts:2143 | `/shopybrain/study` | vacío | baja |
-| routes/shopybrain.ts:7979 | execute-action: generación de UI | reintento propio limpiando fences | baja |
-| routes/suppliers.ts:59 | `safeJsonParse` local de proveedores | vacío (`null`) | baja |
-| lib/brain-ingester.ts:150 | Extracción de insights para el Brain | vacío | baja (interno) |
-| lib/client-advisor.ts:156 | Hechos aprendidos del chat del cliente | se ignora | baja (interno) |
-| lib/fusion-studio.ts:42 | Detección de caras de prenda | se ignora | baja |
-| lib/fusion-studio.ts:343 | Análisis de imagen para Fusion Studio | error | baja |
-| lib/fusion-studio.ts:420 | Investigación de marca para Fusion | vacío (`null`) | baja |
-| lib/fusion-studio.ts:492 | Ajustes de foto sugeridos | defecto | baja |
-| lib/product-dna.ts:189 | ADN de producto | defecto (síntesis desde texto) | baja |
-| lib/scheduler.ts:388 | OmniCore micro-learning | se ignora | baja (cron interno) |
-| lib/scheduler.ts:520 | OmniCore conexiones cruzadas | se ignora | baja (cron interno) |
-| lib/scheduler.ts:615 | OmniCore estudio diario | se ignora | baja (cron interno) |
-| lib/scheduler.ts:726 | OmniCore mega-síntesis | se ignora | baja (cron interno) |
-| lib/scheduler.ts:886 | Reanálisis retroactivo | se ignora | baja (cron interno) |
-| lib/scheduler.ts:1247 | Estudio adaptativo | se ignora | baja (cron interno) |
+Ninguno. `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` solo encuentra la mención en el comentario de `lib/ai-json.ts`.
 
 ### Pendientes sin regex pero con el mismo riesgo
 

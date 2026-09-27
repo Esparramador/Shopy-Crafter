@@ -4,6 +4,30 @@ import { reportTemplatesTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { logger } from "../lib/logger.js";
+import { parseResearchJson } from "../lib/ai-schema.js";
+import { cssFontName } from "../lib/html-escape.js";
+import { z } from "zod";
+
+// Sugerencia de plantilla con Gemini. Colores y fuentes acaban en el CSS de los
+// informes: solo hex válidos y nombres de fuente con caracteres seguros.
+const hexColor = z.string().trim().regex(/^#[0-9a-fA-F]{3,8}$/).optional().catch(undefined);
+const fontName = z.string().transform(cssFontName).pipe(z.string().min(1)).optional().catch(undefined);
+const templateSuggestionSchema = z.object({
+  companyName: z.string().optional().catch(undefined),
+  primaryColor: hexColor,
+  secondaryColor: hexColor,
+  accentColor: hexColor,
+  textColor: hexColor,
+  bgColor: hexColor,
+  cardBg: hexColor,
+  borderColor: hexColor,
+  headingFont: fontName,
+  bodyFont: fontName,
+  coverStyle: z.enum(["centered", "left-aligned"]).optional().catch(undefined),
+  sectionStyle: z.enum(["card", "accent-bar"]).optional().catch(undefined),
+  tagline: z.string().optional().catch(undefined),
+  reasoning: z.string().optional().catch(undefined),
+}).refine(s => Boolean(s.primaryColor || s.companyName), { message: "sin color principal ni nombre" });
 import { enableLongRunning } from "../lib/long-running.js";
 import multer from "multer";
 
@@ -207,11 +231,12 @@ router.post("/report-templates/ai-suggest", async (req: Request, res: Response):
       "Brand design analyst. Return ONLY valid JSON. Use real hex colors from the brand."
     );
 
-    let suggestion: Record<string, unknown> = {};
-    try {
-      const match = result.text.match(/\{[\s\S]*\}/);
-      if (match) suggestion = JSON.parse(match[0]);
-    } catch { /* ignore parse errors */ }
+    // Antes, si no parseaba, respondía success con una sugerencia vacía.
+    const suggestion = parseResearchJson(result.text, templateSuggestionSchema, "report-templates/ai-suggest");
+    if (!suggestion) {
+      res.status(502).json({ error: "No se pudo obtener una sugerencia válida de la marca. Inténtalo de nuevo o revisa el nombre/URL." });
+      return;
+    }
 
     res.json({ success: true, suggestion });
   } catch (err) {

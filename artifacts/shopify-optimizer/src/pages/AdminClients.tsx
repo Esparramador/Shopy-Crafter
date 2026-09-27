@@ -402,7 +402,10 @@ function SuggestionModal({ client, onClose }: SuggestionModalProps) {
     setAiLoading(true); setAiError(""); setAiSuggestions([]);
     try {
       const r = await fetch(`${API_BASE}/api/admin/projects/${projectId}/ai-suggest`, { credentials: "include" });
-      if (!r.ok) throw new Error(`Error ${r.status}`);
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.error || `Error ${r.status}`);
+      }
       const data = await r.json();
       setAiSuggestions(data.suggestions ?? []);
       if (!data.suggestions?.length) setAiError("No se encontraron productos para analizar. Sincroniza la tienda primero.");

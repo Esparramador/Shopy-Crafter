@@ -21,7 +21,11 @@ import {
   getTemplatesByCategory,
   recommendModels,
 } from "../lib/openart-engine.js";
-import { askClaude } from "../lib/claude.js";
+import { askClaude, askClaudeDetailed } from "../lib/claude.js";
+import { generateAiJson } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { lenientArray, looseString } from "../lib/ai-schema.js";
+import { z } from "zod";
 
 const router = Router();
 
@@ -137,12 +141,27 @@ Tarea: ${instruction}
 Target: ${target === "video" ? "generación de vídeo AI (describe movimiento y escena)" : "generación de imagen AI"}`;
 
   try {
-    const enhanced = await (askClaude as any)(systemPrompt, userMsg, { maxTokens: 1000 });
+    // Antes: askClaude(systemPrompt, userMsg, …) con los argumentos cambiados (el texto
+    // iba como projectId y como messages): el endpoint fallaba siempre.
+    const enhanced = (await askClaude(0, [{ role: "user", content: userMsg }], systemPrompt, 1000)).trim();
     const negativePrompt = preset ? preset.negativePrompt : "low quality, blurry, watermark, text, logo, distorted, ugly, amateur";
     res.json({ enhanced, negativePrompt, originalPrompt: prompt, style: preset?.name });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
+});
+
+const nullableText = z.string().nullable().optional().catch(null);
+const promptAnalysisSchema = z.object({
+  score: z.preprocess(v => (typeof v === "string" ? Number(v) : v), z.number().min(1).max(100)),
+  subject: nullableText,
+  style: nullableText,
+  lighting: nullableText,
+  mood: nullableText,
+  strengths: lenientArray(looseString),
+  weaknesses: lenientArray(looseString),
+  suggestions: lenientArray(looseString),
+  missingBlocks: lenientArray(looseString),
 });
 
 // ─── POST /api/openart/analyze-prompt ────────────────────────────────────────
@@ -164,11 +183,20 @@ router.post("/api/openart/analyze-prompt", requireAuth, async (req, res) => {
 }`;
 
   try {
-    const response = await (askClaude as any)(systemPrompt, `Prompt: "${prompt}"`, { maxTokens: 600 });
-    const match = response.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("No JSON en respuesta");
-    res.json(JSON.parse(match[0]));
+    const analysis = await generateAiJson({
+      prompt: `Prompt: "${prompt}"`,
+      maxTokens: 1000,
+      schema: promptAnalysisSchema,
+      expect: "object",
+      label: "openart/analyze-prompt",
+      call: async ({ prompt: p, maxTokens }) => {
+        const r = await askClaudeDetailed(0, [{ role: "user", content: p }], systemPrompt, maxTokens);
+        return { text: r.text, truncated: r.truncated };
+      },
+    });
+    res.json(analysis);
   } catch (e: any) {
+    if (isAiOutputError(e)) return res.status(502).json({ error: aiOutputErrorMessage(e), code: e.code });
     res.status(500).json({ error: e.message });
   }
 });
