@@ -16,6 +16,7 @@ import { eq, sql } from "drizzle-orm";
 import { enableLongRunning } from "../lib/long-running.js";
 import { getClaudeClient, buildBrandDnaContext, buildShopyBrainContext, CLAUDE_MODEL, learnFromOperation } from "../lib/claude.js";
 import { logger } from "../lib/logger.js";
+import { requireAdmin } from "../lib/auth.js";
 import { randomUUID } from "crypto";
 
 const router = Router();
@@ -160,7 +161,7 @@ function resolveTemplate(template: string, vars: DnaVarMap): {
 
 // ─── POST /api/prompt-library/execute ───────────────────────────────────────
 
-router.post("/prompt-library/execute", async (req: Request, res: Response): Promise<void> => {
+router.post("/prompt-library/execute", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   enableLongRunning(res);
   const opId = randomUUID();
 
@@ -271,7 +272,7 @@ ${brandDnaContext}${brainCtx}`;
 // ─── POST /api/prompt-library/preview-vars ───────────────────────────────────
 // Returns which {{VARIABLES}} in a template will resolve with a given project's DNA
 
-router.post("/prompt-library/preview-vars", async (req: Request, res: Response): Promise<void> => {
+router.post("/prompt-library/preview-vars", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { template, projectId } = req.body as { template: string; projectId?: number };
     if (!template) { res.status(400).json({ error: "template requerido" }); return; }

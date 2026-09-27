@@ -108,6 +108,18 @@ const aiLimiter = rateLimit({
   skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
 });
 
+// Chat público de la landing (sin sesión, Gemini con búsqueda): con solo el límite
+// general (300/min por IP) cualquiera podía gastar IA a coste de la plataforma.
+const publicAiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new PgRateLimitStore("public_ai"),
+  message: { error: "Demasiados mensajes seguidos. Espera un momento.", code: "RATE_LIMITED" },
+  skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
+});
+
 startRateLimitCleanup();
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
@@ -216,6 +228,7 @@ app.use("/api/msg-uploads", (req: Request, res: Response, next: NextFunction) =>
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authLimiter);
+app.use("/api/public/landing-chat", publicAiLimiter);
 app.use("/api/shopybrain/study", aiLimiter);
 app.use("/api/intelligence", aiLimiter);
 app.use("/api/redesign", aiLimiter);

@@ -11,7 +11,7 @@ import type {
 } from "./types";
 import { FeatureNotSupportedError } from "./types";
 import type { PlatformType } from "@workspace/db";
-import { scrapeWebsite, validateAuditUrl, validateUrlWithDnsCheck, type WebScrapingResult } from "../web-scraper.js";
+import { safeFetch, scrapeWebsite, validateAuditUrl, validateUrlWithDnsCheck, type WebScrapingResult } from "../web-scraper.js";
 import { runDualPageSpeed, type PageSpeedResult } from "../pagespeed.js";
 
 const NOT_SUPPORTED_MSG = "Los proyectos de auditoría universal no gestionan productos";
@@ -70,10 +70,9 @@ export class UniversalAuditConnector implements IPlatformConnector {
     }
 
     try {
-      const resp = await fetch(url, {
+      const resp = await safeFetch(url, {
         method: "HEAD",
         headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopyCrafter/1.0)" },
-        redirect: "follow",
         signal: AbortSignal.timeout(15_000),
       });
       const isReachable = resp.ok || resp.status === 301 || resp.status === 302;

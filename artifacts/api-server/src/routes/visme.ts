@@ -8,6 +8,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import Anthropic from "@anthropic-ai/sdk";
+import { requireAdmin } from "../lib/auth.js";
 import {
   EFFECT_SNIPPETS, loadVismeTemplates, loadEffectsPrompts, applyDna, buildDnaFromProject, buildEffectPreviewHtml,
   type DnaVars, DEFAULT_DNA,
@@ -63,7 +64,7 @@ router.get("/visme/stats", (_req: Request, res: Response) => {
   });
 });
 
-router.get("/visme/snippets", async (req: Request, res: Response): Promise<void> => {
+router.get("/visme/snippets", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { category, search, projectId } = req.query as Record<string, string>;
     let snippets = [...EFFECT_SNIPPETS];
@@ -103,7 +104,7 @@ router.get("/visme/snippets", async (req: Request, res: Response): Promise<void>
   }
 });
 
-router.get("/visme/snippets/:id", async (req: Request, res: Response): Promise<void> => {
+router.get("/visme/snippets/:id", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId } = req.query as Record<string, string>;
     const snippet = EFFECT_SNIPPETS.find(s => s.id === req.params.id);
@@ -133,7 +134,7 @@ router.get("/visme/snippets/:id", async (req: Request, res: Response): Promise<v
   }
 });
 
-router.get("/visme/templates", async (req: Request, res: Response): Promise<void> => {
+router.get("/visme/templates", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { category, search, page = "1", limit = "24" } = req.query as Record<string, string>;
     const allTemplates = loadVismeTemplates();
@@ -163,7 +164,7 @@ router.get("/visme/templates", async (req: Request, res: Response): Promise<void
   }
 });
 
-router.post("/visme/generate", async (req: Request, res: Response): Promise<void> => {
+router.post("/visme/generate", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { prompt, projectId, includeSnippets = true } = req.body as {
       prompt: string;
@@ -224,7 +225,7 @@ router.post("/visme/generate", async (req: Request, res: Response): Promise<void
  * using Brand DNA injection via Claude streaming.
  * Body: { prompt, projectId?, outputType?, clientContext? }
  */
-router.post("/visme/adapt", async (req: Request, res: Response): Promise<void> => {
+router.post("/visme/adapt", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { prompt, projectId, outputType = "copy", clientContext = "" } = req.body as {
       prompt: string; projectId?: number; outputType?: string; clientContext?: string;
@@ -325,7 +326,7 @@ PROMPT ADAPTADO PARA ${projectName.toUpperCase()}:`;
   }
 });
 
-router.post("/visme/preview", async (req: Request, res: Response): Promise<void> => {
+router.post("/visme/preview", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { snippetId, html, css, js, projectId } = req.body as {
       snippetId?: string; html?: string; css?: string; js?: string; projectId?: number;
@@ -371,7 +372,7 @@ router.post("/visme/preview", async (req: Request, res: Response): Promise<void>
  * Body: { effect_ids: string[], dna?: {...}, page_type?: string }
  * Returns: { ok: true, html: string }
  */
-router.post("/visme/compose", async (req: Request, res: Response): Promise<void> => {
+router.post("/visme/compose", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { effect_ids, dna: bodyDna, page_type = "landing", projectId } = req.body as {
       effect_ids: string[];

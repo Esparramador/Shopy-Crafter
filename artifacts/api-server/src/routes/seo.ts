@@ -9,6 +9,7 @@ import { recordApiUsage } from "../lib/api-usage.js";
 import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
+import { safeFetch } from "../lib/web-scraper.js";
 import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
@@ -1266,10 +1267,9 @@ Return specific numbers and URLs you found in the search results.`,
       const batchResults = await Promise.allSettled(batch.map(async (product) => {
         const productUrl = `https://${shopDomain}/products/${product.handle}`;
         try {
-          const resp = await fetch(productUrl, {
+          const resp = await safeFetch(productUrl, {
             headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
             signal: AbortSignal.timeout(15_000),
-            redirect: "follow",
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const html = await resp.text();

@@ -4,7 +4,7 @@ import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { askClaudeJsonValidated, parseAiJson, type AiJsonSchema } from "../lib/ai-json.js";
 import { z } from "zod";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
-import { scrapeWebsite, validateUrlWithDnsCheck } from "../lib/web-scraper.js";
+import { safeFetch, scrapeWebsite, validateUrlWithDnsCheck } from "../lib/web-scraper.js";
 import { runPageSpeedAudit } from "../lib/pagespeed.js";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { recordApiUsage } from "../lib/api-usage.js";
@@ -2368,18 +2368,17 @@ router.post("/web-lab/deep-scan", async (req: Request, res: Response): Promise<v
 
     await validateUrlWithDnsCheck(normalizedUrl);
 
-    // Fetch HTML + HEAD in parallel
+    // Fetch HTML + HEAD in parallel. safeFetch valida cada redirección (antes
+    // redirect:"follow" podía acabar en una IP interna tras un 302).
     const [htmlResp, headResp] = await Promise.all([
-      fetch(normalizedUrl, {
+      safeFetch(normalizedUrl, {
         headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
         signal: AbortSignal.timeout(25_000),
-        redirect: "follow",
       }).catch(() => null),
-      fetch(normalizedUrl, {
+      safeFetch(normalizedUrl, {
         method: "HEAD",
         headers: { "User-Agent": BROWSER_UA },
         signal: AbortSignal.timeout(15_000),
-        redirect: "follow",
       }).catch(() => null),
     ]);
 
@@ -2532,8 +2531,7 @@ router.post("/web-lab/generate-3d-effects", async (req: Request, res: Response):
       let normalizedUrl = url.trim();
       if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = "https://" + normalizedUrl;
       try {
-        await validateUrlWithDnsCheck(normalizedUrl);
-        const resp = await fetch(normalizedUrl, {
+        const resp = await safeFetch(normalizedUrl, {
           headers: { "User-Agent": BROWSER_UA },
           signal: AbortSignal.timeout(20_000),
         });
