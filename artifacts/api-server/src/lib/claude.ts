@@ -371,7 +371,8 @@ export async function askClaudeJson<T>(
 export async function askClaudeWithVision(
   projectId: number,
   prompt: string,
-  images: Array<{ base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" }>,
+  /** base64 + tipo, o una URL pública (la descarga la hace Anthropic, no este servidor). */
+  images: Array<{ base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" } | { url: string }>,
   systemPrompt?: string,
   maxTokens = 16000,
   timeoutMs = 300_000,
@@ -383,14 +384,11 @@ export async function askClaudeWithVision(
     // Vision tier by default (resolves to a vision-capable Claude model — Sonnet 4.5).
     const model = await resolveClaudeModel({ tier: "vision", ...opts });
 
-    const imageBlocks: Anthropic.ImageBlockParam[] = images.map((img) => ({
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: img.mediaType,
-        data: img.base64,
-      },
-    }));
+    const imageBlocks: Anthropic.ImageBlockParam[] = images.map((img) => (
+      "url" in img
+        ? { type: "image", source: { type: "url", url: img.url } }
+        : { type: "image", source: { type: "base64", media_type: img.mediaType, data: img.base64 } }
+    ));
 
     const stream = client.messages.stream(
       {

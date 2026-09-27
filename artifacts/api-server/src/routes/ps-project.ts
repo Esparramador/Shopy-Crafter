@@ -20,6 +20,11 @@ import { PrestaShopConnector } from "../lib/connectors/prestashop.js";
 
 const router = Router();
 
+/** Express 5 tipa los params como string | string[]; en estas rutas siempre es uno. */
+function routeParam(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 // ── Helper: carga proyecto PrestaShop y crea conector ───────────────────────
 async function resolvePS(projectId: number) {
   const { db, projectsTable } = await import("@workspace/db");
@@ -41,7 +46,7 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const projectId = Number(req.params.id);
-      const { connector } = await resolvePS(projectId);
+      const { project, connector } = await resolvePS(projectId);
 
       const [connResult, productsResult, ordersResult, categoriesResult] = await Promise.allSettled([
         connector.testConnection(),
@@ -64,12 +69,13 @@ router.get(
       res.json({
         connected:       conn?.connected ?? false,
         storeName:       conn?.storeName ?? "PrestaShop",
-        storeUrl:        conn?.storeUrl  ?? "",
+        // ConnectionTestResult no trae la URL (antes siempre salía ""): es la del proyecto.
+        storeUrl:        project.shopDomain ? `https://${project.shopDomain.replace(/^https?:\/\//, "").replace(/\/+$/, "")}` : "",
         productCount,
         categoryCount:   categories.length,
         orderCount:      orders.length,
         revenue30d,
-        resources:       (conn as any)?.resources ?? [],
+        resources:       conn?.resources ?? [],
         recentOrders: (orders as any[]).map((o: any) => ({
           id:           o.id,
           reference:    o.orderNumber ?? o.reference ?? `#${o.id}`,
@@ -87,7 +93,7 @@ router.get(
         })),
       });
     } catch (err: any) {
-      logger.error("PS overview error", err);
+      logger.error({ err }, "PS overview error");
       res.status(err.status ?? 500).json({ error: err.message });
     }
   }
@@ -128,7 +134,7 @@ router.get(
         })),
       });
     } catch (err: any) {
-      logger.error("PS orders error", err);
+      logger.error({ err }, "PS orders error");
       res.status(err.status ?? 500).json({ error: err.message });
     }
   }
@@ -166,7 +172,7 @@ router.get(
         })),
       });
     } catch (err: any) {
-      logger.error("PS products error", err);
+      logger.error({ err }, "PS products error");
       res.status(err.status ?? 500).json({ error: err.message });
     }
   }
@@ -199,7 +205,7 @@ router.get(
 
       res.json({ categories, tree: roots, total: categories.length });
     } catch (err: any) {
-      logger.error("PS categories error", err);
+      logger.error({ err }, "PS categories error");
       res.status(err.status ?? 500).json({ error: err.message });
     }
   }
@@ -245,7 +251,7 @@ router.get(
         totalTracked:    products.length,
       });
     } catch (err: any) {
-      logger.error("PS inventory error", err);
+      logger.error({ err }, "PS inventory error");
       res.status(err.status ?? 500).json({ error: err.message });
     }
   }
@@ -258,12 +264,12 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const projectId = Number(req.params.id);
-      const productId = req.params.pid;
+      const productId = routeParam(req.params.pid);
       const { connector } = await resolvePS(projectId);
       const seo = await connector.getSeoData(productId);
       res.json({ seo });
     } catch (err: any) {
-      logger.error("PS seo get error", err);
+      logger.error({ err }, "PS seo get error");
       res.status(err.status ?? 500).json({ error: err.message });
     }
   }
@@ -276,13 +282,13 @@ router.put(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const projectId = Number(req.params.id);
-      const productId = req.params.pid;
+      const productId = routeParam(req.params.pid);
       const { connector } = await resolvePS(projectId);
       const { metaTitle, metaDescription } = req.body;
       const updated = await connector.updateSeo(productId, { metaTitle, metaDescription });
       res.json({ success: true, seo: updated });
     } catch (err: any) {
-      logger.error("PS seo update error", err);
+      logger.error({ err }, "PS seo update error");
       res.status(err.status ?? 500).json({ error: err.message });
     }
   }
@@ -295,12 +301,12 @@ router.put(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const projectId = Number(req.params.id);
-      const productId = req.params.pid;
+      const productId = routeParam(req.params.pid);
       const { connector } = await resolvePS(projectId);
       const updated = await connector.updateProduct(productId, req.body);
       res.json({ success: true, product: updated });
     } catch (err: any) {
-      logger.error("PS product update error", err);
+      logger.error({ err }, "PS product update error");
       res.status(err.status ?? 500).json({ error: err.message });
     }
   }

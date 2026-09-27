@@ -1536,17 +1536,32 @@ Output ONLY the prompt in English (max 180 words). No explanations.`;
     const b64 = dl.buffer.toString("base64");
     const dataUri = `data:${dl.mime};base64,${b64}`;
 
+    // Antes faltaban fileType/title (NOT NULL): la imagen nunca llegaba al Vault. Y
+    // learnFromOperation se llamaba con una firma inexistente, lanzaba TypeError y el
+    // cliente recibía un 500 con la imagen ya generada y cobrada.
     const vaultId = await saveToVault({
       projectId,
+      fileType: "image",
       category: "explode_photo",
+      title: `Explode View — ${productTitle}`,
       content: b64,
       mimeType: dl.mime,
       fileSizeBytes: dl.buffer.length,
+      productId: shopifyProductId,
+      productTitle,
+      generatedBy: "flux-kontext-max",
       metadata: { productTitle, model: "flux-kontext-max", shopifyProductId },
     });
 
     await recordUsage(projectId, "image", 1);
-    await learnFromOperation(projectId, `Explode View Foto generada para "${productTitle}"`, "image_generation");
+    learnFromOperation({
+      operationType: "image_generation",
+      niche,
+      title: `Explode View Foto generada para "${productTitle}"`,
+      content: `Explode view (flux-kontext-max, ${aspectRatio}) para "${productTitle}". Prompt: ${imagePrompt}`,
+      sourceProjectId: projectId,
+      relatedProductId: shopifyProductId,
+    });
 
     res.json({ dataUri, model: "flux-kontext-max", vaultId, promptUsed: imagePrompt });
   } catch (err: any) {
@@ -1628,15 +1643,27 @@ Output ONLY the image generation prompt in English for Ideogram (max 200 words, 
 
     const vaultId = await saveToVault({
       projectId,
+      fileType: "image",
       category: "biography_premium",
+      title: `Biografía de marca — ${vendor || productTitle}`,
       content: b64,
       mimeType: dl.mime,
       fileSizeBytes: dl.buffer.length,
+      productId: shopifyProductId,
+      productTitle,
+      generatedBy: "ideogram-v3-quality",
       metadata: { productTitle, vendor, model: "ideogram-v3-quality", shopifyProductId },
     });
 
     await recordUsage(projectId, "image", 1);
-    await learnFromOperation(projectId, `Biografía Premium generada para "${vendor || productTitle}"`, "image_generation");
+    learnFromOperation({
+      operationType: "image_generation",
+      niche,
+      title: `Biografía Premium generada para "${vendor || productTitle}"`,
+      content: `Biografía de marca premium (ideogram-v3-quality, ${aspectRatio}) para "${vendor || productTitle}". Prompt: ${imagePrompt}`,
+      sourceProjectId: projectId,
+      relatedProductId: shopifyProductId,
+    });
 
     res.json({ dataUri, model: "ideogram-v3-quality", vaultId, promptUsed: imagePrompt });
   } catch (err: any) {
@@ -1717,15 +1744,27 @@ Output ONLY the image generation prompt in English for Ideogram (max 200 words, 
 
     const vaultId = await saveToVault({
       projectId,
+      fileType: "image",
       category: "story_sheet",
+      title: `Story Sheet (${storyType}) — ${vendor || productTitle}`,
       content: b64,
       mimeType: dl.mime,
       fileSizeBytes: dl.buffer.length,
+      productId: shopifyProductId,
+      productTitle,
+      generatedBy: "ideogram-v3-quality",
       metadata: { productTitle, vendor, model: "ideogram-v3-quality", storyType, shopifyProductId },
     });
 
     await recordUsage(projectId, "image", 1);
-    await learnFromOperation(projectId, `Story Sheet generado para "${vendor || productTitle}" (tipo: ${storyType})`, "image_generation");
+    learnFromOperation({
+      operationType: "image_generation",
+      niche,
+      title: `Story Sheet generado para "${vendor || productTitle}" (tipo: ${storyType})`,
+      content: `Story sheet ${storyType} (ideogram-v3-quality, ${aspectRatio}) para "${vendor || productTitle}". Prompt: ${imagePrompt}`,
+      sourceProjectId: projectId,
+      relatedProductId: shopifyProductId,
+    });
 
     res.json({ dataUri, model: "ideogram-v3-quality", vaultId, promptUsed: imagePrompt, storyType });
   } catch (err: any) {

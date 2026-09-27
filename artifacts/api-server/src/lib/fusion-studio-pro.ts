@@ -1398,8 +1398,10 @@ export async function generateVideoFromImage(
         }
       } catch { /* fall through to Replicate fallback */ }
     }
-    // Fallback to seedance-fast via Replicate
-    return generateVideo("seedance-fast" as VideoModel, prompt, opts);
+    // Fallback to seedance-fast via Replicate. (Antes llamaba a generateVideo, que no
+    // existe en este módulo: el respaldo lanzaba ReferenceError.) El prompt ya lleva
+    // aplicado el preset de cámara, así que no se vuelve a pasar.
+    return generateVideoFromImage("seedance-fast", imageBuffer, imageMime, prompt, { ...opts, cameraPreset: undefined });
   }
 
   // Replicate (T2V o I2V según haya imagen)

@@ -2,7 +2,6 @@ import { Router } from "express";
 import { requireAuth } from "../lib/auth.js";
 import { saveToVault } from "../lib/vault.js";
 import { claude, askClaudeWithVision } from "../lib/claude.js";
-import { askGeminiChat } from "../lib/gemini.js";
 import { generateImage } from "../lib/fusion-studio-pro.js";
 
 const router = Router();
@@ -189,7 +188,7 @@ const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
 // Catálogo completo de 121 modelos organizado por categoría
 router.get("/api/nvidia/catalog", requireAuth, (_req, res) => {
   const summary = {
-    total: Object.values(NVIDIA_CATALOG).reduce((s, arr) => s + (arr as unknown[]).length, 0),
+    total: Object.values(NVIDIA_CATALOG).reduce((s, arr) => s + arr.length, 0),
     categories: {
       text:        { count: NVIDIA_CATALOG.text.length,        description: "LLMs de chat y razonamiento general" },
       code:        { count: NVIDIA_CATALOG.code.length,        description: "Modelos especializados en generación de código" },
@@ -310,9 +309,11 @@ router.post("/api/nvidia/vision", requireAuth, async (req, res) => {
           : "image/jpeg";
         analysis = await askClaudeWithVision(0, prompt.trim(), [{ base64: imageBase64, mediaType: mime }]);
       } else {
-        // Fallback: Gemini con URL (describe la imagen a partir de la URL)
-        const msgs = [{ role: "user" as const, parts: [{ text: `Analiza esta imagen y responde: ${prompt}\n\nURL de imagen: ${imageUrl}` }] }];
-        analysis = await askGeminiChat(msgs, "Eres un experto en análisis de imágenes.", "vision");
+        // Fallback: Claude Vision con la URL (Anthropic descarga la imagen). Antes se
+        // mandaba a Gemini un mensaje con un formato que no lee (llegaba vacío) y, aun
+        // así, Gemini chat no puede ver una imagen solo por su URL.
+        if (!/^https:\/\//i.test(imageUrl ?? "")) { res.status(400).json({ error: "imageUrl debe ser https" }); return; }
+        analysis = await askClaudeWithVision(0, prompt.trim(), [{ url: imageUrl! }]);
       }
       provider = "claude-fallback";
     }
@@ -556,15 +557,14 @@ router.post("/api/nvidia/generate-image", requireAuth, async (req, res) => {
     if (!images.length) {
       // Fallback: Replicate FLUX Schnell vía fusion-studio-pro
       try {
-        const fallbackModel = modelId.includes("sdxl") ? "sdxl" : modelId.includes("flux-dev") ? "flux-dev" : "flux-schnell";
-        const buf = await generateImage(fallbackModel as any, prompt.trim(), {
+        // Antes: modelos "sdxl"/"flux-dev" que no existen en fusion-studio-pro y
+        // buf.toString() sobre un objeto { buffer } (devolvía "[object Object]").
+        const fallbackModel = modelId.includes("sdxl") ? "stable-diffusion-3.5-large" : "flux-schnell";
+        const generated = await generateImage(fallbackModel, prompt.trim(), {
           aspectRatio,
           negativePrompt: negativePrompt ?? undefined,
         });
-        if (buf) {
-          const b64 = buf.toString("base64");
-          images = [{ b64, url: null, revisedPrompt: null }];
-        }
+        images = [{ b64: generated.buffer.toString("base64"), url: null, revisedPrompt: null }];
         usedModel = `replicate/${fallbackModel}`;
         provider = "replicate-fallback";
       } catch { /* last resort */ }

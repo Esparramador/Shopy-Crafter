@@ -6592,14 +6592,22 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
             };
             const fmt = STORY_FORMATS[format] || STORY_FORMATS.manifesto;
             const { askClaudeWithBrain: acwb } = await import("../lib/claude.js");
-            const storyContent = await acwb(parseInt(String(projectId)), [{ role: "user", content: `${brandContext}\n\n${fmt.prompt}` }], `Eres un copywriter de marca de élite especializado en storytelling auténtico. Tu trabajo es crear narrativas que conecten emocionalmente, no textos de marketing genéricos.`, "content", proj.storeNiche ?? undefined, 4000);
+            const storyContent = await acwb(parseInt(String(projectId)), [{ role: "user", content: `${brandContext}\n\n${fmt.prompt}` }], `Eres un copywriter de marca de élite especializado en storytelling auténtico. Tu trabajo es crear narrativas que conecten emocionalmente, no textos de marketing genéricos.`, "brand_analysis", proj.storeNiche ?? undefined, 4000);
             result = {
               message: `✍️ **${fmt.name}** generado para **${proj.name}**\n\n---\n\n${storyContent}\n\n---\n\n💡 *Disponible como DOCX descargable — usa \`generate_office_document\` con el contenido anterior para crear el archivo.*`,
               storyContent,
               format,
               brandName: proj.name,
             };
-            await learnFromOperation(parseInt(String(projectId)), `Brand Story generado: ${fmt.name} en ${langLabel}`, "content_generation");
+            // Antes: learnFromOperation(projectId, texto, tipo), firma inexistente → TypeError
+            // después de generar la historia, y el usuario veía "❌ Error".
+            learnFromOperation({
+              operationType: "brand_story",
+              niche: proj.storeNiche ?? undefined,
+              title: `Brand Story generado: ${fmt.name} en ${langLabel}`,
+              content: storyContent.slice(0, 4000),
+              sourceProjectId: parseInt(String(projectId)),
+            });
           } catch (err) { result = { error: true, message: `❌ Error: ${err instanceof Error ? err.message : String(err)}` }; }
           break;
         }

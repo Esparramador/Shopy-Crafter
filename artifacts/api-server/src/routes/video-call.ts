@@ -175,7 +175,7 @@ router.get("/admin/video-call/pending", requireAdmin, async (_req, res): Promise
 
 // ─── Admin: accept client call request ───────────────────────────────────────
 router.post("/admin/video-call/:callId/accept", requireAdmin, async (req, res): Promise<void> => {
-  const call = calls.get(req.params.callId);
+  const call = calls.get(String(req.params.callId));
   if (!call) { res.status(404).json({ error: "Llamada no encontrada o expirada" }); return; }
   call.status = "active";
   // Notify client
@@ -194,7 +194,7 @@ router.post("/admin/video-call/:callId/accept", requireAdmin, async (req, res): 
 
 // ─── Admin: end/reject call ───────────────────────────────────────────────────
 router.delete("/admin/video-call/:callId", requireAdmin, async (req, res): Promise<void> => {
-  const call = calls.get(req.params.callId);
+  const call = calls.get(String(req.params.callId));
   if (call) {
     call.status = "ended";
     if (call.clientUserId) await tryPush(SUB_KEY_PREFIX + call.clientUserId, { type: "call_ended", callId: call.id, title: "📴 Llamada finalizada" });
@@ -220,7 +220,7 @@ router.get("/client/video-call/incoming", requireAuth, async (req, res): Promise
 
 // ─── Client: accept incoming call ────────────────────────────────────────────
 router.post("/client/video-call/:callId/accept", requireAuth, async (req, res): Promise<void> => {
-  const call = calls.get(req.params.callId);
+  const call = calls.get(String(req.params.callId));
   if (!call) { res.status(404).json({ error: "Llamada no encontrada o expirada" }); return; }
   call.status = "active";
   res.json({ ok: true, roomUrl: call.roomUrl });
@@ -228,7 +228,7 @@ router.post("/client/video-call/:callId/accept", requireAuth, async (req, res): 
 
 // ─── Client: reject incoming call ────────────────────────────────────────────
 router.post("/client/video-call/:callId/reject", requireAuth, async (req, res): Promise<void> => {
-  const call = calls.get(req.params.callId);
+  const call = calls.get(String(req.params.callId));
   if (!call) { res.status(404).json({ error: "Llamada no encontrada" }); return; }
   call.status = "rejected";
   res.json({ ok: true });
@@ -266,7 +266,7 @@ router.post("/client/video-call/request", requireAuth, async (req, res): Promise
 
 // ─── Client: end call ─────────────────────────────────────────────────────────
 router.delete("/client/video-call/:callId", requireAuth, async (req, res): Promise<void> => {
-  const call = calls.get(req.params.callId);
+  const call = calls.get(String(req.params.callId));
   if (call) call.status = "ended";
   res.json({ ok: true });
 });
