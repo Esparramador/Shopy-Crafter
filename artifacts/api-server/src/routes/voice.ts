@@ -196,7 +196,7 @@ router.get("/voice/voices", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/voice/command", async (req, res): Promise<void> => {
+router.post("/voice/command", requireAdmin, async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
@@ -1215,7 +1215,7 @@ router.post("/voice/gemini-tts", async (req, res): Promise<void> => {
 // ────────────────────────────────────────────────────────────
 // SOUND EFFECTS (ElevenLabs SFX)
 // ────────────────────────────────────────────────────────────
-router.post("/voice/sfx", async (req, res): Promise<void> => {
+router.post("/voice/sfx", requireAdmin, async (req, res): Promise<void> => {
   try {
     const { text, durationSeconds, promptInfluence } = req.body as {
       text: string;

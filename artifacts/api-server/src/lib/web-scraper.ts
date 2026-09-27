@@ -1,4 +1,5 @@
-import { resolve as dnsResolve } from "node:dns/promises";
+import { lookup as dnsLookup } from "node:dns/promises";
+import { isIP } from "node:net";
 
 export interface WebScrapingResult {
   url: string;
@@ -112,11 +113,35 @@ const BLOCKED_HOSTS = [
   "metadata.google.internal", "169.254.169.254",
 ];
 
-function isPrivateIp(ip: string): boolean {
-  if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(ip)) return true;
-  if (ip.startsWith("127.") || ip === "0.0.0.0" || ip === "::1") return true;
-  if (ip.startsWith("169.254.")) return true;
-  if (ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe80:")) return true;
+/**
+ * IP privada, local, reservada o de metadatos. Acepta IPv6 entre corchetes (como
+ * lo da URL.hostname) y direcciones IPv4 mapeadas en IPv6: antes
+ * "http://[::ffff:127.0.0.1]/" (hostname "[::ffff:7f00:1]") pasaba el filtro.
+ */
+export function isPrivateIp(raw: string): boolean {
+  let ip = raw.replace(/^\[|\]$/g, "").toLowerCase();
+  const mapped = ip.match(/^::ffff:(.+)$/);
+  if (mapped) {
+    const rest = mapped[1];
+    const hex = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (isIP(rest) === 4) ip = rest;
+    else if (hex) {
+      const hi = parseInt(hex[1], 16), lo = parseInt(hex[2], 16);
+      ip = `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+    }
+  }
+  if (isIP(ip) === 4) {
+    const [a, b] = ip.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || a >= 224
+      || (a === 169 && b === 254)
+      || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168)
+      || (a === 100 && b >= 64 && b <= 127)   // CGNAT (redes internas de proveedores)
+      || (a === 198 && (b === 18 || b === 19));
+  }
+  if (isIP(ip) === 6) {
+    return ip === "::" || ip === "::1" || ip.startsWith("fc") || ip.startsWith("fd") || /^fe[89ab]/.test(ip);
+  }
   return false;
 }
 
@@ -153,18 +178,38 @@ async function validateUrlWithDns(url: string): Promise<void> {
   const parsed = new URL(url);
   const hostname = parsed.hostname.toLowerCase();
 
-  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return;
+  // IP literal: ya la ha comprobado validateUrl.
+  if (isIP(hostname.replace(/^\[|\]$/g, ""))) return;
 
+  // lookup (como fetch) devuelve IPv4 e IPv6; antes resolve() solo miraba registros A.
   try {
-    const addresses = await dnsResolve(hostname);
-    for (const addr of addresses) {
-      if (isPrivateIp(addr)) {
+    const addresses = await dnsLookup(hostname, { all: true });
+    for (const { address } of addresses) {
+      if (isPrivateIp(address)) {
         throw new Error("URL no permitida: el dominio resuelve a una dirección privada");
       }
     }
   } catch (err) {
     if (err instanceof Error && err.message.includes("no permitida")) throw err;
   }
+}
+
+/**
+ * fetch para URLs que vienen de usuarios: valida la URL y CADA redirección (antes
+ * redirect:"follow" validaba solo la primera y un 302 podía llevar a 127.0.0.1 o
+ * a 169.254.169.254).
+ */
+export async function safeFetch(url: string, init: RequestInit = {}, maxRedirects = 5): Promise<Response> {
+  let current = url;
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    await validateUrlWithDns(current);
+    const resp = await fetch(current, { ...init, redirect: "manual" });
+    const location = resp.status >= 300 && resp.status < 400 ? resp.headers.get("location") : null;
+    if (!location) return resp;
+    await resp.body?.cancel().catch(() => {});
+    current = new URL(location, current).toString();
+  }
+  throw new Error("Demasiadas redirecciones");
 }
 
 export function validateAuditUrl(rawUrl: string): string | null {
@@ -183,9 +228,8 @@ export async function scrapeWebsite(rawUrl: string): Promise<WebScrapingResult> 
   const baseUrl = getBaseUrl(url);
   const ssl = url.startsWith("https://");
 
-  const resp = await fetch(url, {
+  const resp = await safeFetch(url, {
     headers: { "User-Agent": BROWSER_UA, Accept: "text/html,application/xhtml+xml" },
-    redirect: "follow",
     signal: AbortSignal.timeout(45_000),
   });
 
