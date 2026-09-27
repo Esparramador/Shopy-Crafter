@@ -1,11 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
 import { db, projectsTable, usersTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
+import { clientOwnsProjectId } from "./access.js";
 
 /**
  * Middleware: requires that the request's `:projectId` (or `:id`) param
  * corresponds to a project owned by the currently logged-in client.
- * Admin role is always allowed. Verifica project.clientId vs session.clientId.
+ * Admin role is always allowed. Un cliente solo accede al proyecto de su invitación.
  */
 export async function requireProjectAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!req.session.userId) {
@@ -35,7 +36,7 @@ export async function requireProjectAccess(req: Request, res: Response, next: Ne
     return;
   }
   try {
-    const [project] = await db.select({ clientId: projectsTable.clientId })
+    const [project] = await db.select({ id: projectsTable.id })
       .from(projectsTable)
       .where(eq(projectsTable.id, projectId))
       .limit(1);
@@ -43,7 +44,9 @@ export async function requireProjectAccess(req: Request, res: Response, next: Ne
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    if (project.clientId !== req.session.clientId) {
+    // users.client_id guarda el id del proyecto asignado; projects.client_id es
+    // la credencial OAuth de la tienda y no sirve para autorizar.
+    if (!clientOwnsProjectId(req.session.clientId, projectId)) {
       res.status(403).json({ error: "Access denied to this project" });
       return;
     }

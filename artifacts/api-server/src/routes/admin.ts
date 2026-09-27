@@ -16,6 +16,9 @@ import { askClaudeDetailed } from "../lib/claude.js";
 import { generateAiJson } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { z } from "zod";
+import { newAccountToken, publicAppUrl } from "../lib/account-tokens.js";
+import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
+import { sanitizeHtml } from "../lib/html-escape.js";
 
 // Propuestas de mejora (ai-suggest). Antes: 900 tokens para 4 propuestas detalladas
 // (se cortaba) y cualquier fallo devolvía [], que el panel mostraba como "no hay
@@ -57,21 +60,38 @@ router.get("/users", async (_req, res): Promise<void> => {
   }
 });
 
+const createUserSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(254),
+  name: z.string().trim().min(1).max(120),
+  clientId: z.union([z.string(), z.number()]).transform(String).pipe(z.string().regex(/^[1-9]\d*$/)).optional(),
+  password: z.string().min(8).max(200).optional(),
+});
+
 router.post("/users", async (req, res): Promise<void> => {
   try {
-    const { email, name, role, clientId, password } = req.body as {
-      email: string; name: string; role: "admin" | "client";
-      clientId?: string; password?: string;
-    };
+    const parsed = createUserSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "Email válido, nombre y contraseña de 8+ caracteres (si se indica) son obligatorios" });
+      return;
+    }
+    const { email, name, clientId, password } = parsed.data;
   
-    // Solo se puede crear el rol "client" desde aquí — el único admin es craftershopy@gmail.com
-    const safeRole: "admin" | "client" = role === "admin" ? "client" : role;
+    // Solo se puede crear el rol "client" desde aquí (antes un role ausente o
+    // arbitrario llegaba tal cual a la BD).
+    const safeRole = "client" as const;
+    if (clientId) {
+      const [project] = await db.select({ id: projectsTable.id }).from(projectsTable).where(eq(projectsTable.id, Number(clientId)));
+      if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+    }
   
+    const [dup] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email));
+    if (dup) { res.status(409).json({ error: "Ya existe un usuario con ese email" }); return; }
+
     const id = randomBytes(16).toString("hex");
     const hashed = await bcrypt.hash(password ?? randomBytes(16).toString("hex"), 12);
   
     await db.insert(usersTable).values({
-      id, email: email.toLowerCase().trim(), password: hashed, name, role: safeRole,
+      id, email, password: hashed, name, role: safeRole,
       clientId: clientId ?? null, isActive: 1,
     });
   
@@ -108,57 +128,105 @@ router.get("/projects-list", async (_req, res): Promise<void> => {
   }
 });
 
+const inviteSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(254),
+  name: z.string().trim().min(1).max(120),
+});
+
+function inviteEmailHtml(p: { name: string; storeName: string; shopDomain: string; link: string }): string {
+  const e = sanitizeHtml;
+  const store = p.storeName || p.shopDomain;
+  return `<!doctype html><html><body style="margin:0;background:#0d0d1a;font-family:Arial,sans-serif;color:#e8e6e1">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#13131f;border:1px solid #2a2a3a;border-radius:12px;padding:32px">
+<tr><td>
+<h1 style="margin:0 0 16px;font-size:22px;color:#c9a961">Hola ${e(p.name)},</h1>
+<p style="font-size:15px;line-height:1.6;margin:0 0 12px">Te han invitado a acceder al portal de Shopy Crafter${store ? ` para la tienda <strong>${e(store)}</strong>` : ""}.</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 24px">Pulsa el botón para crear tu contraseña y entrar. El enlace caduca en 48 horas y solo puede usarse una vez.</p>
+<p style="text-align:center;margin:0 0 24px"><a href="${e(p.link)}" style="display:inline-block;background:#c9a961;color:#0d0d1a;text-decoration:none;font-weight:bold;padding:14px 28px;border-radius:8px">Activar mi cuenta</a></p>
+<p style="font-size:12px;color:#8a8898;line-height:1.5;margin:0">Si el botón no funciona, copia este enlace en el navegador:<br><span style="word-break:break-all">${e(p.link)}</span></p>
+<p style="font-size:12px;color:#8a8898;margin:16px 0 0">Si no esperabas esta invitación, ignora este correo.</p>
+</td></tr></table></td></tr></table></body></html>`;
+}
+
 router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
   try {
-    const { projectId } = req.params;
-    const { email, name } = req.body as { email: string; name: string };
-  
-    const token = randomBytes(32).toString("hex");
+    const projectId = Number(req.params["projectId"]);
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+      res.status(400).json({ error: "Proyecto inválido" });
+      return;
+    }
+    const parsed = inviteSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: "Email válido y nombre son obligatorios" });
+      return;
+    }
+    const { email, name } = parsed.data;
+
+    const [project] = await db.select({
+      id: projectsTable.id,
+      name: projectsTable.name,
+      shopDomain: projectsTable.shopDomain,
+    }).from(projectsTable).where(eq(projectsTable.id, projectId));
+    if (!project) {
+      res.status(404).json({ error: "Proyecto no encontrado" });
+      return;
+    }
+
+    const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    // Invitar el email de un administrador lo desactivaba (isActive=0) y lo
+    // convertía en "cliente" de la tienda sin cambiarle el rol: bloqueo del admin.
+    if (existing && existing.role !== "client") {
+      res.status(409).json({ error: "Ese email pertenece a un administrador; usa otro email para el cliente" });
+      return;
+    }
+
+    const { token, stored } = newAccountToken();
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000);
-  
-    const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase()));
-  
+
     if (existing) {
+      // Cliente ya existente: se le asigna esta tienda y un enlace nuevo. Si ya
+      // tenía la cuenta activa la conserva (antes se le desactivaba y perdía el
+      // acceso hasta volver a abrir el enlace).
       await db.update(usersTable).set({
-        clientId: projectId,
-        inviteToken: token,
+        clientId: String(projectId),
+        inviteToken: stored,
         inviteExpires: expires,
-        isActive: 0,
       }).where(eq(usersTable.id, existing.id));
     } else {
       const id = randomBytes(16).toString("hex");
       const tempPw = await bcrypt.hash(randomBytes(16).toString("hex"), 12);
       await db.insert(usersTable).values({
-        id, email: email.toLowerCase(), password: tempPw, name,
-        role: "client", clientId: projectId,
-        inviteToken: token, inviteExpires: expires, isActive: 0,
+        id, email, password: tempPw, name,
+        role: "client", clientId: String(projectId),
+        inviteToken: stored, inviteExpires: expires, isActive: 0,
       });
     }
-  
-    // Fetch the project to include shop info in the response
-    const [project] = await db.select({
-      id: projectsTable.id,
-      name: projectsTable.name,
-      shopDomain: projectsTable.shopDomain,
-    }).from(projectsTable).where(eq(projectsTable.id, Number(projectId)));
-  
-    const replitDev = process.env.REPLIT_DEV_DOMAIN;
-    const baseUrl = process.env.APP_URL
-      ?? (replitDev ? `https://${replitDev}` : null)
-      ?? "https://shopycrafter.com";
+
+    const baseUrl = publicAppUrl() ?? `${req.protocol}://${req.get("host")}`;
     const inviteLink = `${baseUrl}/invite/${token}`;
-  
+
     await db.insert(auditLogTable).values({
       id: randomBytes(8).toString("hex"),
       userId: req.session.userId!,
-      projectId,
+      projectId: String(projectId),
       action: "invite_client",
-      details: `Invited ${email} to project ${projectId} (${project?.shopDomain ?? "unknown"})`,
+      details: `Invited ${email} to project ${projectId} (${project.shopDomain ?? "unknown"})`,
     });
-  
+
+    // Envío real por Gmail (plantilla propia). Klaviyo solo registra un evento
+    // "Client Invite": el correo sale únicamente si hay un flow activo sobre esa
+    // métrica, así que no se presenta como "email enviado".
     let emailSent = false;
-    const klaviyoKey = process.env.KLAVIYO_API_KEY;
-    if (klaviyoKey) {
+    let klaviyoEvent = false;
+    if (isGmailAvailable()) {
+      emailSent = await sendEmail(
+        email,
+        `Tu acceso a Shopy Crafter${project.name ? ` — ${project.name}` : ""}`,
+        inviteEmailHtml({ name, storeName: project.name ?? "", shopDomain: project.shopDomain ?? "", link: inviteLink }),
+      );
+    }
+    if (!emailSent && process.env.KLAVIYO_API_KEY) {
       try {
         const klaviyoRes = await fetch("https://a.klaviyo.com/api/events/", {
           method: "POST",
@@ -169,36 +237,40 @@ router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
               attributes: {
                 properties: {
                   clientName: name,
-                  shopDomain: project?.shopDomain ?? "",
-                  storeName: project?.name ?? "",
+                  shopDomain: project.shopDomain ?? "",
+                  storeName: project.name ?? "",
                   inviteUrl: inviteLink,
                   agencyName: "Shopy Crafter",
                   expiresIn: "48 horas",
                 },
                 metric: { data: { type: "metric", attributes: { name: "Client Invite" } } },
-                profile: { data: { type: "profile", attributes: { email: email.toLowerCase(), first_name: name } } },
+                profile: { data: { type: "profile", attributes: { email, first_name: name } } },
               },
             },
           }),
         });
-        emailSent = klaviyoRes.ok;
+        klaviyoEvent = klaviyoRes.ok;
         if (!klaviyoRes.ok) {
-          logger.warn({ status: klaviyoRes.status }, "Klaviyo invite email failed — link still generated");
+          logger.warn({ status: klaviyoRes.status }, "Klaviyo invite event failed — link still generated");
         }
       } catch (err) {
-        logger.warn({ err }, "Klaviyo invite email error — link still generated");
+        logger.warn({ err }, "Klaviyo invite event error — link still generated");
       }
     }
-  
+
+    const store = project.shopDomain ?? project.name ?? String(projectId);
     res.json({
       success: true,
       inviteLink,
-      storeName: project?.name ?? null,
-      shopDomain: project?.shopDomain ?? null,
+      storeName: project.name ?? null,
+      shopDomain: project.shopDomain ?? null,
       emailSent,
+      klaviyoEvent,
       message: emailSent
-        ? `Invitación enviada por email a ${email} — tienda: ${project?.shopDomain ?? projectId}`
-        : `Enlace de invitación creado para ${email} — tienda: ${project?.shopDomain ?? projectId}. Envía el enlace manualmente.`,
+        ? `Invitación enviada por email a ${email} — tienda: ${store}`
+        : klaviyoEvent
+          ? `Enlace creado y evento "Client Invite" enviado a Klaviyo para ${email} — el correo solo sale si tienes un flow activo sobre esa métrica. Envía el enlace manualmente si no.`
+          : `Enlace de invitación creado para ${email} — tienda: ${store}. No hay email configurado: envía el enlace manualmente.`,
     });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";

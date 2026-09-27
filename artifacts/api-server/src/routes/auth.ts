@@ -1,14 +1,30 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { randomBytes } from "crypto";
 import { db, usersTable, rateLimitsTable } from "@workspace/db";
-import { eq, lt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { establishSession, newAccountToken, publicAppUrl, tokenLookupValues } from "../lib/account-tokens.js";
 import { requireAuth } from "../lib/auth.js";
 import { recordAudit } from "../lib/audit.helper.js";
 import { logger } from "../lib/logger.js";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
+import { isGmailAvailable, sendEmail } from "../lib/gmail.js";
+import { sanitizeHtml } from "../lib/html-escape.js";
 
 const router = Router();
+
+function resetEmailHtml(name: string, link: string): string {
+  const e = sanitizeHtml;
+  return `<!doctype html><html><body style="margin:0;background:#0d0d1a;font-family:Arial,sans-serif;color:#e8e6e1">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#13131f;border:1px solid #2a2a3a;border-radius:12px;padding:32px">
+<tr><td>
+<h1 style="margin:0 0 16px;font-size:22px;color:#c9a961">Hola ${e(name)},</h1>
+<p style="font-size:15px;line-height:1.6;margin:0 0 24px">Has pedido restablecer tu contraseña. El enlace caduca en 60 minutos y solo puede usarse una vez.</p>
+<p style="text-align:center;margin:0 0 24px"><a href="${e(link)}" style="display:inline-block;background:#c9a961;color:#0d0d1a;text-decoration:none;font-weight:bold;padding:14px 28px;border-radius:8px">Crear nueva contraseña</a></p>
+<p style="font-size:12px;color:#8a8898;line-height:1.5;margin:0">Si el botón no funciona, copia este enlace:<br><span style="word-break:break-all">${e(link)}</span></p>
+<p style="font-size:12px;color:#8a8898;margin:16px 0 0">Si no lo pediste tú, ignora este correo: tu contraseña no cambia.</p>
+</td></tr></table></td></tr></table></body></html>`;
+}
 
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -116,11 +132,7 @@ router.post("/login", async (req, res): Promise<void> => {
       clearRateLimit(rateLimitKeyEmail),
     ]);
   
-    req.session.userId = user.id;
-    req.session.role = user.role;
-    req.session.clientId = user.clientId ?? null;
-    req.session.name = user.name;
-    req.session.email = user.email;
+    await establishSession(req, user);
   
     await db.update(usersTable).set({ lastLogin: new Date() }).where(eq(usersTable.id, user.id));
   
@@ -180,9 +192,13 @@ router.get("/me", requireAuth, async (req, res): Promise<void> => {
 
 router.get("/invite/:token", async (req, res): Promise<void> => {
   try {
-    const { token } = req.params;
+    const lookup = tokenLookupValues(req.params["token"]);
+    if (!lookup) {
+      res.status(410).json({ error: "Enlace expirado o inválido" });
+      return;
+    }
     const [user] = await db.select().from(usersTable)
-      .where(eq(usersTable.inviteToken, token));
+      .where(inArray(usersTable.inviteToken, lookup));
   
     if (!user || !user.inviteExpires || user.inviteExpires < new Date()) {
       res.status(410).json({ error: "Enlace expirado o inválido" });
@@ -200,7 +216,9 @@ router.get("/invite/:token", async (req, res): Promise<void> => {
         }).from(projectsTable).where(eq(projectsTable.id, Number(user.clientId)));
         storeName = project?.name ?? null;
         shopDomain = project?.shopDomain ?? null;
-      } catch {}
+      } catch (err) {
+        logger.warn({ err, clientId: user.clientId }, "invite: project lookup failed");
+      }
     }
   
     res.json({
@@ -219,35 +237,39 @@ router.get("/invite/:token", async (req, res): Promise<void> => {
 
 router.post("/invite/:token/setup", async (req, res): Promise<void> => {
   try {
-    const { token } = req.params;
-    const { password } = req.body as { password: string };
-  
-    const [user] = await db.select().from(usersTable)
-      .where(eq(usersTable.inviteToken, token));
-  
-    if (!user || !user.inviteExpires || user.inviteExpires < new Date()) {
+    const lookup = tokenLookupValues(req.params["token"]);
+    const { password } = (req.body ?? {}) as { password?: unknown };
+
+    if (!lookup) {
       res.status(410).json({ error: "Enlace expirado o inválido" });
       return;
     }
-  
-    if (!password || password.length < 8) {
+    if (typeof password !== "string" || password.length < 8) {
       res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres" });
       return;
     }
-  
+    if (password.length > 200) {
+      res.status(400).json({ error: "La contraseña es demasiado larga" });
+      return;
+    }
+
     const hashed = await bcrypt.hash(password, 12);
-    await db.update(usersTable).set({
+    // Consumo atómico del token: dos envíos simultáneos del mismo enlace no
+    // pueden fijar dos contraseñas distintas.
+    const [user] = await db.update(usersTable).set({
       password: hashed,
       isActive: 1,
       inviteToken: null,
       inviteExpires: null,
-    }).where(eq(usersTable.id, user.id));
-  
-    req.session.userId = user.id;
-    req.session.role = user.role;
-    req.session.clientId = user.clientId ?? null;
-    req.session.name = user.name;
-    req.session.email = user.email;
+    }).where(and(inArray(usersTable.inviteToken, lookup), gt(usersTable.inviteExpires, new Date())))
+      .returning();
+
+    if (!user) {
+      res.status(410).json({ error: "Enlace expirado o inválido" });
+      return;
+    }
+
+    await establishSession(req, user);
   
     await recordAudit({
       userId: user.id,
@@ -389,35 +411,46 @@ router.post("/forgot-password", async (req, res): Promise<void> => {
       .where(eq(usersTable.email, email.toLowerCase().trim()));
   
     if (user && user.isActive) {
-      const token = randomBytes(32).toString("hex");
+      const { token, stored } = newAccountToken();
       const expires = new Date(Date.now() + 60 * 60 * 1000);
       await db.update(usersTable).set({
-        resetToken: token,
+        resetToken: stored,
         resetExpires: expires,
       }).where(eq(usersTable.id, user.id));
   
-      const klaviyoKey = process.env.KLAVIYO_API_KEY;
-      if (klaviyoKey) {
-        const appUrl = process.env.APP_URL ?? (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "https://shopycrafter.com");
+      const appUrl = publicAppUrl();
+      if (!appUrl) {
+        req.log?.error("APP_URL no configurada: no se envía el enlace de recuperación (no tendría dominio)");
+      } else {
         const resetUrl = `${appUrl}/reset-password?token=${token}`;
-        try {
-          await fetch("https://a.klaviyo.com/api/events/", {
-            method: "POST",
-            headers: getKlaviyoHeaders(),
-            body: JSON.stringify({
-              data: {
-                type: "event",
-                attributes: {
-                  properties: { resetUrl, userName: user.name, expireMinutes: 60 },
-                  metric: { data: { type: "metric", attributes: { name: "Password Reset Requested" } } },
-                  profile: { data: { type: "profile", attributes: { email: user.email } } },
-                },
-              },
-            }),
-          });
-        } catch (err) {
-          req.log?.warn({ err }, "Klaviyo password reset email failed");
+        let sent = false;
+        if (isGmailAvailable()) {
+          sent = await sendEmail(user.email, "Recupera tu contraseña de Shopy Crafter", resetEmailHtml(user.name, resetUrl));
         }
+        if (!sent && process.env.KLAVIYO_API_KEY) {
+          // Evento Klaviyo: el correo solo sale si hay un flow activo sobre la métrica.
+          try {
+            const r = await fetch("https://a.klaviyo.com/api/events/", {
+              method: "POST",
+              headers: getKlaviyoHeaders(),
+              body: JSON.stringify({
+                data: {
+                  type: "event",
+                  attributes: {
+                    properties: { resetUrl, userName: user.name, expireMinutes: 60 },
+                    metric: { data: { type: "metric", attributes: { name: "Password Reset Requested" } } },
+                    profile: { data: { type: "profile", attributes: { email: user.email } } },
+                  },
+                },
+              }),
+            });
+            sent = r.ok;
+            if (!r.ok) req.log?.warn({ status: r.status }, "Klaviyo password reset event rejected");
+          } catch (err) {
+            req.log?.warn({ err }, "Klaviyo password reset event failed");
+          }
+        }
+        if (!sent) req.log?.error({ userId: user.id }, "Password reset: ningún canal de email disponible");
       }
   
       await recordAudit({
@@ -449,20 +482,24 @@ router.post("/reset-password", async (req, res): Promise<void> => {
       return;
     }
   
-    const [user] = await db.select().from(usersTable)
-      .where(eq(usersTable.resetToken, token));
-  
-    if (!user || !user.resetExpires || user.resetExpires < new Date()) {
+    const lookup = tokenLookupValues(token);
+    if (!lookup) {
       res.status(410).json({ error: "El enlace ha expirado o no es válido" });
       return;
     }
   
     const hashed = await bcrypt.hash(password, 12);
-    await db.update(usersTable).set({
+    const [user] = await db.update(usersTable).set({
       password: hashed,
       resetToken: null,
       resetExpires: null,
-    }).where(eq(usersTable.id, user.id));
+    }).where(and(inArray(usersTable.resetToken, lookup), gt(usersTable.resetExpires, new Date())))
+      .returning({ id: usersTable.id });
+  
+    if (!user) {
+      res.status(410).json({ error: "El enlace ha expirado o no es válido" });
+      return;
+    }
   
     await recordAudit({
       userId: user.id,

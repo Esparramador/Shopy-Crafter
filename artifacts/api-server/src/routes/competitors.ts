@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { canAccessProject } from "../lib/access.js";
 import { db } from "@workspace/db";
 import { competitorsTable, competitorSnapshotsTable, competitorAlertsTable, projectsTable, productsTable, clientKnowledgeTable } from "@workspace/db";
 import { eq, desc, inArray } from "drizzle-orm";
@@ -529,11 +530,8 @@ router.post("/competitors/comparative-report", async (req, res): Promise<void> =
     if (!Number.isFinite(projectIdNum)) { res.status(400).json({ error: "projectId inválido" }); return; }
 
     // access check
-    if (session.role !== "admin") {
-      const [proj] = await db.select({ clientId: projectsTable.clientId }).from(projectsTable).where(eq(projectsTable.id, projectIdNum)).limit(1);
-      if (!proj || String(proj.clientId) !== String(session.clientId)) {
-        res.status(403).json({ error: "Forbidden" }); return;
-      }
+    if (!(await canAccessProject(session.role, session.clientId, projectIdNum))) {
+      res.status(403).json({ error: "Forbidden" }); return;
     }
 
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectIdNum)).limit(1);
