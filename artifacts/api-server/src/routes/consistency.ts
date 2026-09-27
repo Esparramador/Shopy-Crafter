@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { projectsTable, productsTable, visualDnaTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
-import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
+import { createBulkJob, updateJobProgress, completeJob, runAsync, runAsyncJob } from "../lib/bulk-queue";
 import { enableLongRunning } from "../lib/long-running.js";
 
 const router = Router();
@@ -243,7 +243,7 @@ router.post("/projects/:projectId/repair-consistency", async (req, res): Promise
       message: `Generando briefs de corrección para ${products.length} productos...`,
     });
   
-    runAsync(async () => {
+    runAsyncJob(jobId, async () => {
       const [_dna] = await db.select().from(visualDnaTable).where(eq(visualDnaTable.projectId, projectId));
       let completed = 0;
       let failed = 0;

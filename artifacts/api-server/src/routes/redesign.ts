@@ -4,7 +4,7 @@ import { projectsTable, productsTable, redesignsTable } from "@workspace/db";
 import { eq, and, lte, desc } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
-import { createBulkJob, updateJobProgress, completeJob, runAsync } from "../lib/bulk-queue";
+import { createBulkJob, updateJobProgress, completeJob, runAsync, runAsyncJob } from "../lib/bulk-queue";
 import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
 import { enableLongRunning } from "../lib/long-running.js";
@@ -514,7 +514,7 @@ router.post("/projects/:projectId/bulk-redesign", async (req, res): Promise<void
       message: `Procesando ${products.length} productos...`,
     });
   
-    runAsync(async () => {
+    runAsyncJob(jobId, async () => {
       let completed = 0;
       let failed = 0;
       for (const product of products) {

@@ -342,7 +342,8 @@ export async function validateToken(shopDomain: string, accessToken: string): Pr
       headers: { "X-Shopify-Access-Token": plainToken, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
     });
-    return resp.status !== 401 && resp.status !== 403;
+    // Solo 2xx es válido (antes 404 por dominio mal escrito o 5xx contaban como OK).
+    return resp.ok;
   } catch {
     return false;
   }
