@@ -240,10 +240,14 @@ ${brandDnaContext}${brainCtx}`;
       }
     }
 
-    res.write(`data: ${JSON.stringify({ type: "done", totalLength: fullResult.length })}\n\n`);
+    // Si se cortó por max_tokens se dice en el evento final y no se aprende de un
+    // resultado a medias.
+    const truncated = (await stream.finalMessage()).stop_reason === "max_tokens";
+    if (truncated) logger.warn({ opId, maxTokens, outputLength: fullResult.length }, "prompt-exec: salida cortada por max_tokens");
+    res.write(`data: ${JSON.stringify({ type: "done", totalLength: fullResult.length, truncated })}\n\n`);
     res.end();
 
-    if (saveToMemory && projectId && fullResult.length > 100) {
+    if (saveToMemory && projectId && fullResult.length > 100 && !truncated) {
       learnFromOperation({
         operationType: "prompt_library_execution",
         sourceProjectId: typeof projectId === "number" ? projectId : undefined,

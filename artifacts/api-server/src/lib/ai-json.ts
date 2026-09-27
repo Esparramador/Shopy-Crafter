@@ -270,7 +270,7 @@ export async function generateAiJson<T = unknown>(opts: GenerateAiJsonOptions<T>
 
 // ─── Texto/HTML largo con continuación ───────────────────────────────────────
 
-const CONTINUE_INSTRUCTION = "Tu respuesta anterior se cortó por longitud. Continúa EXACTAMENTE desde el último carácter que escribiste, sin repetir nada, sin introducción ni comentarios, y termina el documento.";
+export const CONTINUE_INSTRUCTION = "Tu respuesta anterior se cortó por longitud. Continúa EXACTAMENTE desde el último carácter que escribiste, sin repetir nada, sin introducción ni comentarios, y termina el documento.";
 
 /**
  * Genera texto libre (HTML de informes) y, si se corta por max_tokens, pide que
@@ -356,6 +356,40 @@ export async function askClaudeJsonValidated<T>(
         opts.useCase ?? "general", opts.niche, maxTokens, opts.timeoutMs,
       );
       return { text: r.text, truncated: r.truncated };
+    },
+  });
+}
+
+type ClaudeVisionImages = Parameters<typeof import("./claude.js").askClaudeWithVision>[2];
+
+/**
+ * Claude Vision (sin ShopyBrain) con JSON validado: si se corta por max_tokens
+ * reintenta con más presupuesto; si no parsea o no cumple el esquema, reintenta
+ * pidiendo repararlo; después, error tipado.
+ */
+export async function askClaudeVisionJsonValidated<T>(
+  projectId: number,
+  prompt: string,
+  images: ClaudeVisionImages,
+  systemPrompt: string,
+  opts: { schema?: AiJsonSchema<T>; expect?: JsonRoot; maxTokens: number; timeoutMs?: number; label: string },
+): Promise<T> {
+  const { askClaudeWithVision } = await import("./claude.js");
+  return generateAiJson<T>({
+    prompt,
+    maxTokens: opts.maxTokens,
+    retryMaxTokens: Math.min(opts.maxTokens * 2, MAX_RETRY_TOKENS),
+    schema: opts.schema,
+    expect: opts.expect ?? "object",
+    label: opts.label,
+    call: async ({ prompt: p, maxTokens }) => {
+      try {
+        const text = await askClaudeWithVision(projectId, p, images, systemPrompt, maxTokens, opts.timeoutMs, { failOnTruncation: true });
+        return { text, truncated: false };
+      } catch (err) {
+        if (err instanceof AiTruncatedError) return { text: "", truncated: true };
+        throw err;
+      }
     },
   });
 }

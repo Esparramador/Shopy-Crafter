@@ -6,85 +6,9 @@ import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { safeDecrypt } from "./crypto.js";
 import { logger } from "./logger.js";
 import { AiTruncatedError } from "./ai-errors.js";
+import { generateAiJson } from "./ai-json.js";
 
 export { AiTruncatedError } from "./ai-errors.js";
-
-function repairJson(raw: string): string {
-  let s = raw.trim();
-
-  s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, " ");
-
-  s = s.replace(/,\s*([}\]])/g, "$1");
-
-  let braces = 0;
-  let brackets = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (escape) { escape = false; continue; }
-    if (c === "\\") { escape = true; continue; }
-    if (c === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (c === "{") braces++;
-    else if (c === "}") braces--;
-    else if (c === "[") brackets++;
-    else if (c === "]") brackets--;
-  }
-
-  // Caso: respuesta truncada en mitad de un valor string (e.g. HTML/CSS muy largos).
-  // Cerramos la string colgante y luego cortamos en el último punto seguro.
-  if (inString) {
-    // Si terminamos con un escape pendiente (\) lo eliminamos para no romper la "
-    if (escape) s = s.slice(0, -1);
-    s += '"';
-  }
-
-  if (braces > 0 || brackets > 0) {
-    const lastValidIdx = findLastValidJsonPosition(s);
-    if (lastValidIdx > 0 && lastValidIdx < s.length - 1) {
-      s = s.substring(0, lastValidIdx + 1);
-    }
-    s = s.replace(/,\s*$/, "");
-    for (let i = 0; i < brackets; i++) s += "]";
-    for (let i = 0; i < braces; i++) s += "}";
-  }
-
-  return s;
-}
-
-function findLastValidJsonPosition(s: string): number {
-  let inStr = false;
-  let esc = false;
-  let lastGoodPos = 0;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (esc) { esc = false; continue; }
-    if (c === "\\") { esc = true; continue; }
-    if (c === '"') { inStr = !inStr; lastGoodPos = i; continue; }
-    if (inStr) continue;
-    if (c === "}" || c === "]" || c === "," || c === ":") lastGoodPos = i;
-    if (/[\w\d]/.test(c)) lastGoodPos = i;
-  }
-  return lastGoodPos;
-}
-
-export function safeJsonParse<T>(text: string, label?: string): T {
-  try {
-    return JSON.parse(text) as T;
-  } catch (firstErr) {
-    try {
-      const repaired = repairJson(text);
-      const result = JSON.parse(repaired) as T;
-      logger.warn({ label }, "JSON repaired successfully after initial parse failure");
-      return result;
-    } catch (secondErr) {
-      const truncated = text.length > 200 ? text.substring(0, 200) + "..." : text;
-      logger.error({ label, firstErr, truncated }, "JSON parse failed even after repair");
-      throw firstErr;
-    }
-  }
-}
 
 export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
 
@@ -320,6 +244,13 @@ export async function askClaude(
   return r.text;
 }
 
+/**
+ * JSON de Claude sin reparaciones silenciosas. Antes: regex codiciosa +
+ * repairJson, que "cerraba" a mano un JSON cortado por max_tokens y devolvía un
+ * resultado a medias como si fuera completo (lo usaban ~70 llamadas). Ahora:
+ * corte detectado por stop_reason, extracción balanceada, un reintento (con más
+ * presupuesto si se cortó) y, si vuelve a fallar, AiTruncatedError / AiJsonError.
+ */
 export async function askClaudeJson<T>(
   projectId: number,
   prompt: string,
@@ -328,40 +259,23 @@ export async function askClaudeJson<T>(
   timeoutMs = 300_000,
   opts?: ClaudeCallOpts,
 ): Promise<T> {
-  const text = await askClaude(
-    projectId,
-    [{ role: "user", content: prompt }],
-    systemPrompt,
+  return generateAiJson<T>({
+    prompt,
     maxTokens,
-    timeoutMs,
-    opts,
-  );
-
-  // 1) Fence ```json ... ``` cerrado correctamente.
-  const codeBlockMatch = text.match(/```json\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    return safeJsonParse<T>(codeBlockMatch[1], "askClaudeJson:codeblock");
-  }
-
-  // 2) Fence ```json sin cerrar (respuesta truncada) — capturamos hasta el final.
-  //    safeJsonParse hará la reparación del JSON incompleto.
-  const openFenceMatch = text.match(/```(?:json)?\s*([\s\S]*)$/);
-  if (openFenceMatch && /^[\s]*[\{\[]/.test(openFenceMatch[1])) {
-    const stripped = openFenceMatch[1].replace(/```\s*$/, "");
-    return safeJsonParse<T>(stripped, "askClaudeJson:openfence");
-  }
-
-  const objectMatch = text.match(/(\{[\s\S]*\})/);
-  const arrayMatch = text.match(/(\[[\s\S]*\])/);
-
-  if (objectMatch) {
-    return safeJsonParse<T>(objectMatch[1], "askClaudeJson:object");
-  }
-  if (arrayMatch) {
-    return safeJsonParse<T>(arrayMatch[1], "askClaudeJson:array");
-  }
-
-  return safeJsonParse<T>(text, "askClaudeJson:raw");
+    label: "askClaudeJson",
+    call: async ({ prompt: p, maxTokens: budget }) => {
+      const r = await askClaudeDetailed(
+        projectId,
+        [{ role: "user", content: p }],
+        systemPrompt,
+        budget,
+        timeoutMs,
+        { ...opts, failOnTruncation: false },
+        "askClaudeJson",
+      );
+      return { text: r.text, truncated: r.truncated };
+    },
+  });
 }
 
 /**

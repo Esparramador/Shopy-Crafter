@@ -15,7 +15,9 @@
  *   from lib/brand-overlay, OR for the user to edit and persist.
  */
 
-import { askClaudeWithVision, safeJsonParse } from "./claude.js";
+import { askClaudeVisionJsonValidated } from "./ai-json.js";
+import { lenientArray, looseString, optionalLooseNumber } from "./ai-schema.js";
+import { z } from "zod";
 import { logger } from "./logger.js";
 import { extractFromBuffers, type ExtractedAsset, type ExtractedImage } from "./file-extractor.js";
 
@@ -112,6 +114,23 @@ interface VisionOcrResult {
   logoReason: string;
 }
 
+const textList = lenientArray(looseString);
+const visionOcrSchema = z.object({
+  brandName: z.string().min(1).nullable().optional().catch(null).transform(v => v ?? null),
+  brandNameAlternatives: textList,
+  taglines: textList,
+  socialHandles: lenientArray(z.object({ platform: z.string(), handle: z.string() })),
+  urls: textList,
+  emails: textList,
+  phones: textList,
+  hexColors: lenientArray(z.string().regex(/^#[0-9a-fA-F]{3,8}$/)),
+  fonts: textList,
+  visibleText: textList,
+  looksLikeLogo: z.boolean().catch(false),
+  logoConfidence: optionalLooseNumber.transform(n => Math.max(0, Math.min(1, n ?? 0))),
+  logoReason: z.string().catch(""),
+});
+
 const EMPTY_OCR: VisionOcrResult = {
   brandName: null, brandNameAlternatives: [], taglines: [],
   socialHandles: [], urls: [], emails: [], phones: [],
@@ -139,15 +158,14 @@ async function ocrSingleImage(projectId: number, image: ExtractedImage): Promise
       }
     }
 
-    const raw = await askClaudeWithVision(
+    // Antes safeJsonParse "reparaba" un JSON cortado y mezclaba campos sin validar.
+    const parsed = await askClaudeVisionJsonValidated(
       projectId,
       VISION_OCR_PROMPT,
       [{ base64: image.buffer.toString("base64"), mediaType }],
       "You are a precise OCR + brand-asset auditor. Always reply with strict JSON.",
-      4096,
-      120_000,
+      { schema: visionOcrSchema, maxTokens: 4096, timeoutMs: 120_000, label: "brand-kit:ocr" },
     );
-    const parsed = safeJsonParse<VisionOcrResult>(raw, "brand-kit-ocr");
     return { ...EMPTY_OCR, ...parsed };
   } catch (err: any) {
     logger.warn({ err: err?.message, filename: image.filename }, "brand-kit: OCR failed for image");

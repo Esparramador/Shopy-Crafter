@@ -83,9 +83,17 @@ Ninguno. `grep -rnF '.match(/\{[\s\S]*\}/)' artifacts/api-server/src` solo encue
 
 ### Pendientes sin regex pero con el mismo riesgo
 
-- `askClaudeJson` / `askClaudeJsonWithBrain` (`lib/claude.ts`) siguen reparando JSON truncados en silencio con `repairJson`. Se ha dejado así para no cambiar el comportamiento de sus ~60 llamadas; migrar cada uno a `askClaudeJsonValidated` con su esquema. Los más visibles: `routes/web-lab.ts` (:1220 iterate, :1824 rediseño HTML/CSS, :2565), `routes/ab-testing.ts` (predicción, forecasts).
-- Llamadas directas al SDK fuera de `claude.ts` (p. ej. `routes/web-lab.ts`:3015 con `max_tokens: 8192`) no pasan por `checkTruncation`.
-- `estimateCogsWithAI` exige "fuentes reales verificables" (Idealista, convenios…) a un modelo sin búsqueda web: el esquema garantiza la forma, no la veracidad. Conviene pasarlo por Gemini con búsqueda o rebajar la promesa del texto.
+Resueltos:
+
+- `askClaudeJson` / `askClaudeJsonWithBrain` (`lib/claude.ts`, ~70 llamadas): reescritos sobre `generateAiJson` — corte detectado por `stop_reason`, extracción balanceada, un reintento (con más presupuesto si se cortó) y error tipado. `repairJson` y `safeJsonParse` eliminados: ya nada "cierra" a mano un JSON cortado. Las llamadas no cambian de firma.
+- Visión + `safeJsonParse` (`routes/ab-testing.ts` ×2, `lib/brand-kit-extractor.ts`): `askClaudeVisionJsonValidated` con esquema (las puntuaciones que faltaban salían como 0).
+- Llamadas directas al SDK:
+  - `routes/studio.ts` edición de archivos: el archivo modificado se cortaba a 16000 tokens y se devolvía así (y se podía escribir a disco). Claude con continuación; Grok/Gemini dan error si se cortan.
+  - `routes/visme.ts` compose: página HTML completa con continuación (antes cortada con `ok: true`); adapt avisa `truncated` en el evento final.
+  - `routes/web-lab.ts` streaming de HTML: continúa en el mismo stream hasta 2 veces; `done` incluye `truncated`.
+  - `routes/reference.ts`: análisis de imagen (3000 tokens con proyecto; sin proyecto, cliente solo con `ANTHROPIC_API_KEY`) y de vídeo (4000) → 16000 con `failOnTruncation` y el cliente común.
+  - `routes/prompt-exec.ts` y `lib/amr.ts`: avisan del corte y no aprenden de salidas a medias.
+- `estimateCogsWithAI`: antes pedía "buscar" en Idealista a un modelo sin búsqueda y el informe afirmaba que los datos se habían buscado en fuentes públicas. Ahora investiga primero con Gemini + Google Search (alquiler, convenio, competidores, tasas, con URL), Claude solo cita esas fuentes y marca el resto como estimación, y el aviso del informe lo escribe el servidor según haya habido búsqueda o no. El HTML del informe se escapa.
 
 ## Cómo probar
 

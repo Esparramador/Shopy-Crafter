@@ -2,9 +2,27 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, abTestsTable, trackEventsTable, cogsTable, supplierEntriesTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
-import { askClaudeJsonWithBrain, askClaudeWithVision, learnFromOperation, safeJsonParse } from "../lib/claude";
-import { askClaudeJsonValidated } from "../lib/ai-json.js";
+import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
+import { askClaudeJsonValidated, askClaudeVisionJsonValidated } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { lenientArray, looseNumber, looseString } from "../lib/ai-schema.js";
 import { z } from "zod";
+
+// Puntuación de una imagen de producto (Claude Vision). Todas las notas son
+// obligatorias: antes, si faltaban, se mostraban como 0.
+const score = (max: number) => looseNumber.pipe(z.number().min(0).max(max));
+const imageScoreSchema = z.object({
+  scoreOverall: score(100),
+  scoreComposition: score(10),
+  scoreLighting: score(10),
+  scoreContext: score(10),
+  scoreAppeal: score(10),
+  scoreClarity: score(10),
+  warnings: lenientArray(looseString),
+  strengths: lenientArray(looseString),
+  improvementSuggestions: lenientArray(looseString),
+  detectedElements: lenientArray(looseString),
+});
 import { enableLongRunning } from "../lib/long-running.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { requireProjectAccess } from "../lib/access.js";
@@ -941,24 +959,15 @@ router.post("/projects/:projectId/ab-tests/image/analyze", async (req, res): Pro
 }
 
 Sé crítico y honesto. Una imagen genérica de fondo blanco mediocre debería rondar 50/100. Una foto profesional excepcional 85+. Responde SOLO el JSON.`;
-    const text = await askClaudeWithVision(projectId, prompt, [img], "Eres un experto en fotografía de producto e-commerce. Analizas imágenes con criterio profesional crítico. SIEMPRE devuelves JSON válido.", 4096);
-    const parsed = safeJsonParse<Record<string, unknown>>(text, "image-analyze");
-    res.json({
-      imageUrl,
-      scoreOverall: Number(parsed.scoreOverall) || 0,
-      scoreComposition: Number(parsed.scoreComposition) || 0,
-      scoreLighting: Number(parsed.scoreLighting) || 0,
-      scoreContext: Number(parsed.scoreContext) || 0,
-      scoreAppeal: Number(parsed.scoreAppeal) || 0,
-      scoreClarity: Number(parsed.scoreClarity) || 0,
-      warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
-      improvementSuggestions: Array.isArray(parsed.improvementSuggestions) ? parsed.improvementSuggestions : [],
-      detectedElements: Array.isArray(parsed.detectedElements) ? parsed.detectedElements : [],
-      analyzedAt: new Date().toISOString(),
+    // Antes: safeJsonParse "reparaba" un JSON cortado y las puntuaciones que faltaban
+    // salían como 0. Ahora esquema (puntuaciones obligatorias), reintento y 502.
+    const parsed = await askClaudeVisionJsonValidated(projectId, prompt, [img], "Eres un experto en fotografía de producto e-commerce. Analizas imágenes con criterio profesional crítico. SIEMPRE devuelves JSON válido.", {
+      schema: imageScoreSchema, maxTokens: 4096, label: "ab-testing/image-analyze",
     });
+    res.json({ imageUrl, ...parsed, analyzedAt: new Date().toISOString() });
   } catch (err) {
     logger.error({ err }, "image/analyze failed");
+    if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err), code: err.code }); return; }
     res.status(500).json({ error: err instanceof Error ? err.message : "Error analizando imagen" });
   }
 });
@@ -1010,22 +1019,10 @@ async function analyzeImageBase64(projectId: number, base64: string, mimeType: s
 
   const prompt = `Analiza esta imagen de producto e-commerce y devuelve EXCLUSIVAMENTE JSON: { "scoreOverall": 0-100, "scoreComposition": 0-10, "scoreLighting": 0-10, "scoreContext": 0-10, "scoreAppeal": 0-10, "scoreClarity": 0-10, "warnings": [], "strengths": [], "improvementSuggestions": [], "detectedElements": [] }. Sé crítico.`;
   try {
-    const text = await askClaudeWithVision(projectId, prompt, [{ base64, mediaType }], "Experto fotografía producto. JSON estricto.", 2048);
-    const parsed = safeJsonParse<Record<string, unknown>>(text, "variant-analyze");
-    return {
-      imageUrl,
-      scoreOverall: Number(parsed.scoreOverall) || 0,
-      scoreComposition: Number(parsed.scoreComposition) || 0,
-      scoreLighting: Number(parsed.scoreLighting) || 0,
-      scoreContext: Number(parsed.scoreContext) || 0,
-      scoreAppeal: Number(parsed.scoreAppeal) || 0,
-      scoreClarity: Number(parsed.scoreClarity) || 0,
-      warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
-      improvementSuggestions: Array.isArray(parsed.improvementSuggestions) ? parsed.improvementSuggestions : [],
-      detectedElements: Array.isArray(parsed.detectedElements) ? parsed.detectedElements : [],
-      analyzedAt: new Date().toISOString(),
-    };
+    const parsed = await askClaudeVisionJsonValidated(projectId, prompt, [{ base64, mediaType }], "Experto fotografía producto. JSON estricto.", {
+      schema: imageScoreSchema, maxTokens: 2048, label: "ab-testing/variant-analyze",
+    });
+    return { imageUrl, ...parsed, analyzedAt: new Date().toISOString() };
   } catch (e) {
     logger.warn({ err: e }, "Variant analysis failed, returning baseline");
     return {

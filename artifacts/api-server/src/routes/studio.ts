@@ -2,6 +2,8 @@ import { Router } from "express";
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
 import Anthropic from "@anthropic-ai/sdk";
+import { generateCompleteText } from "../lib/ai-json.js";
+import { AiTruncatedError, aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 
 const router = Router();
 
@@ -90,6 +92,10 @@ ${original}
         contents: `${SYSTEM}\n\n${USER}`,
         config: { maxOutputTokens: 65536 },
       });
+      // La salida es el archivo ENTERO: si se corta, sería un archivo roto.
+      if (resp.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+        throw new AiTruncatedError("[studio/edit:gemini] El archivo modificado se cortó por longitud", { label: "studio/edit:gemini" });
+      }
       modified = resp.text ?? "";
     } else if (model === "grok") {
       const key = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
@@ -104,25 +110,38 @@ ${original}
         }),
       });
       const data: any = await resp.json();
+      if (data.choices?.[0]?.finish_reason === "length") {
+        throw new AiTruncatedError("[studio/edit:grok] El archivo modificado se cortó por longitud", { label: "studio/edit:grok" });
+      }
       modified = data.choices?.[0]?.message?.content ?? "";
     } else {
       const apiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
       const baseURL = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
       if (!apiKey) throw new Error("Claude no configurado — falta ANTHROPIC_API_KEY");
       const client = baseURL ? new Anthropic({ apiKey, baseURL }) : new Anthropic({ apiKey });
-      const msg = await client.messages.create({
-        model: process.env.CLAUDE_MODEL || "claude-sonnet-4-6",
-        max_tokens: 16000,
-        system: SYSTEM,
-        messages: [{ role: "user", content: USER }],
+      // Antes: 16000 tokens sin mirar stop_reason — un archivo largo volvía cortado
+      // y se escribía a disco así. Ahora, si se corta, se pide que continúe; si
+      // sigue cortado, error (nunca medio archivo).
+      modified = await generateCompleteText({
+        prompt: USER,
+        label: "studio/edit:claude",
+        call: async (messages) => {
+          const msg = await client.messages.create({
+            model: process.env.CLAUDE_MODEL || "claude-sonnet-4-6",
+            max_tokens: 16000,
+            system: SYSTEM,
+            messages,
+          });
+          return { text: msg.content.map(b => (b.type === "text" ? b.text : "")).join(""), truncated: msg.stop_reason === "max_tokens" };
+        },
       });
-      modified = msg.content.map((b: any) => b.type === "text" ? b.text : "").join("");
     }
 
     modified = modified.replace(/^```[\w]*\n?/, "").replace(/\n?```[\w]*\s*$/, "").trim();
     res.json({ modified, original, filePath });
   } catch (e: any) {
     console.error("[studio] edit error:", e.message);
+    if (isAiOutputError(e)) { res.status(502).json({ error: aiOutputErrorMessage(e), code: e.code }); return; }
     res.status(500).json({ error: e.message });
   }
 });

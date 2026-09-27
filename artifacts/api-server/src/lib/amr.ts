@@ -91,8 +91,9 @@ async function callClaude(messages: Array<{ role: string; content: string }>, mo
     system,
     messages: userMsgs,
   });
-  const block = resp.content[0];
-  return block.type === "text" ? block.text : "";
+  if (resp.stop_reason === "max_tokens") logger.warn({ model, maxTokens }, "AMR: respuesta de Claude cortada por max_tokens");
+  // Todos los bloques de texto (antes solo el primero, que podía no ser de texto).
+  return resp.content.map(b => (b.type === "text" ? b.text : "")).join("");
 }
 
 async function callGemini(messages: Array<{ role: string; content: string }>, model: string): Promise<string> {
@@ -193,6 +194,10 @@ export async function streamAMR(
         if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
           sendChunk(event.delta.text);
         }
+      }
+      if ((await stream.finalMessage()).stop_reason === "max_tokens") {
+        logger.warn({ model: model.apiModel }, "AMR stream: respuesta de Claude cortada por max_tokens");
+        sendChunk("\n\n[Respuesta cortada por longitud — pide que continúe]");
       }
       sendDone();
       return;
