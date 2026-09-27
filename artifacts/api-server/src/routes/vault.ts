@@ -322,6 +322,25 @@ router.post("/projects/:projectId/vault/save-report", requireAuth, async (req, r
 });
 
 // ─── DESCARGAR UN ARCHIVO ────────────────────────────────────────────────────
+// Alias por id de archivo. El chat (Brand Book, informes de investigación) y el
+// explode-view enlazaban a /api/vault/:id/download y /api/vault/:id/file, rutas que no
+// existían (404). Se busca el proyecto del archivo y se redirige a la ruta real, que
+// hace su propia comprobación de acceso.
+router.get(["/vault/:fileId/download", "/vault/:fileId/file", "/vault/:fileId/view"], requireAuth, async (req, res): Promise<void> => {
+  const fileId = parseInt(String(req.params.fileId));
+  if (isNaN(fileId)) { res.status(400).json({ error: "ID inválido" }); return; }
+  const [file] = await db.select({ id: projectFilesTable.id, projectId: projectFilesTable.projectId })
+    .from(projectFilesTable).where(eq(projectFilesTable.id, fileId)).limit(1);
+  if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+  const base = `/api/projects/${file.projectId}/vault/${file.id}`;
+  const format = typeof req.query.format === "string" ? req.query.format.toLowerCase() : "";
+  if (req.path.endsWith("/download")) {
+    res.redirect(307, /^[a-z]{3,4}$/.test(format) ? `${base}/download/${format}` : `${base}/download`);
+  } else {
+    res.redirect(307, `${base}/preview`);
+  }
+});
+
 router.get("/projects/:projectId/vault/:fileId/download", requireAuth, async (req, res): Promise<void> => {
   const projectId = parseInt(String(req.params.projectId));
   const fileId = parseInt(String(req.params.fileId));

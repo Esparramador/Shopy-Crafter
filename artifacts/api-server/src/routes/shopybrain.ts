@@ -11735,7 +11735,7 @@ ${buildCoverPage({ reportTitle, reportSubtitle: `Investigación generada por IA 
               vaultUrl,
               htmlPreview: synthesizedHtml.slice(0, 500) + "...",
               message: vaultId
-                ? `📊 **Informe de investigación generado y guardado**\n\n📋 **${reportTitle}**\n🔍 ${uniqueSources.length} fuentes web reales consultadas\n📁 Queries: ${queries.slice(0, 3).join(" | ")}\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver informe: ${vaultUrl}\n📥 Descargar PDF: ${vaultUrl}?format=pdf`
+                ? `📊 **Informe de investigación generado y guardado**\n\n📋 **${reportTitle}**\n🔍 ${uniqueSources.length} fuentes web reales consultadas\n📁 Queries: ${queries.slice(0, 3).join(" | ")}\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver informe: ${vaultUrl?.replace(/\/download$/, "/view")}\n📥 Descargar PDF: ${vaultUrl}?format=pdf`
                 : `📊 **Informe de investigación generado**\n\n${synthesizedHtml.replace(/<[^>]+>/g, " ").slice(0, 800)}`,
             };
           } catch (err) {
@@ -12112,7 +12112,7 @@ ${buildCoverPage({ reportTitle: `Brand Book`, reportSubtitle: `${bbRaw.brandName
               vaultId,
               vaultUrl: vaultId ? `/api/vault/${vaultId}/download` : undefined,
               message: vaultId
-                ? `📖 **Brand Book generado y guardado**\n\n🏷️ **${bbRaw.brandName || brandName}** — "${bbRaw.tagline}"\n🎭 Arquetipo: **${(bbRaw.archetype||{}).name}**\n🎨 ${bbRaw.colorPalette.length} colores | 💡 ${bbRaw.values.length} valores | 📣 ${(bbRaw.contentPillars || []).length} pilares de contenido\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver Brand Book: /api/vault/${vaultId}/download\n📥 Descargar PDF: /api/vault/${vaultId}/download?format=pdf`
+                ? `📖 **Brand Book generado y guardado**\n\n🏷️ **${bbRaw.brandName || brandName}** — "${bbRaw.tagline}"\n🎭 Arquetipo: **${(bbRaw.archetype||{}).name}**\n🎨 ${bbRaw.colorPalette.length} colores | 💡 ${bbRaw.values.length} valores | 📣 ${(bbRaw.contentPillars || []).length} pilares de contenido\n\n💾 **Guardado en el Vault** (ID: ${vaultId})\n🌐 Ver Brand Book: /api/vault/${vaultId}/view\n📥 Descargar PDF: /api/vault/${vaultId}/download?format=pdf`
                 : `📖 **Brand Book generado**\n\n🏷️ **${bbRaw.brandName || brandName}** — "${bbRaw.tagline}"\n🎭 Arquetipo: **${(bbRaw.archetype||{}).name}**\n🎨 ${bbRaw.colorPalette.length} colores | 💡 ${bbRaw.values.length} valores\n\n⚠️ No se pudo guardar en vault (falta projectId)`,
             };
           } catch (err) {
