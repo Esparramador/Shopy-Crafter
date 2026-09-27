@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { clientOwnsProjectId } from "../lib/access.js";
 import { analyzeImageForFusion, researchBrandForFusion, autoSuggestPhotoSettings, detectGarmentSides, getGarmentCategory, buildModelPersonPrompt } from "../lib/fusion-studio.js";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
@@ -1499,8 +1500,8 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
       return;
     }
 
-    // FIX CRITICAL ACL: comparar project.clientId vs session.clientId (NO contra pid)
-    // y denegar siempre a no-admin sin clientId válido.
+    // ACL: el cliente solo accede al proyecto de su invitación (session.clientId
+    // = id de proyecto; projects.client_id es la credencial OAuth de la tienda).
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, pid));
     if (!project) {
       res.status(404).json({ error: "Proyecto no encontrado" });
@@ -1509,7 +1510,7 @@ router.post("/fusion-studio/generate-video", async (req: Request, res: Response)
     const sessionRole = (req.session as any)?.role;
     const sessionClientId = (req.session as any)?.clientId;
     if (sessionRole !== "admin") {
-      if (!sessionClientId || String(sessionClientId) !== String(project.clientId)) {
+      if (sessionRole !== "client" || !clientOwnsProjectId(sessionClientId, pid)) {
         res.status(403).json({ error: "Sin acceso a este proyecto" });
         return;
       }

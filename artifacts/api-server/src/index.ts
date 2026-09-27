@@ -4,6 +4,13 @@ validateEncryptionKey();
 
 import app from "./app";
 import { logger } from "./lib/logger";
+
+// Una promesa rechazada sin catch (job en segundo plano, IIFE…) tiraba el
+// proceso entero (comportamiento por defecto de Node) y cortaba todas las
+// peticiones en curso. Se registra y el servidor sigue.
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason }, "unhandledRejection");
+});
 import {
   registerCronJobs,
   runOmniCoreDailyDeepStudy,

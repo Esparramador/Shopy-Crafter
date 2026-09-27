@@ -15,6 +15,7 @@ export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
 export type BrainUseCase = "redesign" | "seo" | "pricing" | "images" | "general" | "inventory" | "competitors" | "intelligence" | "ab_testing" | "ab_test_prediction" | "ecommerce" | "cogs_estimation" | "financial" | "email_content" | "brand_analysis" | "consistency" | "web_lab" | "generator" | "campaign_production" | "exploded_view";
 
 const platformTypeCache = new Map<number, { value: string; ts: number }>();
+let pricingIntelligenceReady: Promise<void> | null = null;
 
 async function resolvePlatformType(projectId: number): Promise<string | undefined> {
   const cached = platformTypeCache.get(projectId);
@@ -1178,14 +1179,32 @@ export function learnFromOperation(params: {
   }).catch(() => {});
 
   if (params.monetaryValues && Object.keys(params.monetaryValues).length > 0) {
-    db.execute(sql`
+    // La tabla no se creaba en ningún sitio: cada INSERT fallaba en silencio.
+    pricingIntelligenceReady ??= db.execute(sql`
+      CREATE TABLE IF NOT EXISTS pricing_intelligence (
+        id TEXT PRIMARY KEY,
+        niche TEXT,
+        product_type TEXT,
+        operation_type TEXT,
+        revenue REAL,
+        cost REAL,
+        margin REAL,
+        price REAL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `).then(() => undefined).catch(err => {
+      pricingIntelligenceReady = null;
+      logger.error({ err }, "pricing_intelligence: create table failed");
+    });
+    const mv = params.monetaryValues;
+    pricingIntelligenceReady.then(() => db.execute(sql`
       INSERT INTO pricing_intelligence (id, niche, product_type, operation_type, 
         revenue, cost, margin, price, created_at)
       VALUES (${randomBytes(8).toString("hex")}, ${params.niche ?? null}, ${params.productType ?? null}, 
-        ${params.operationType}, ${params.monetaryValues.revenue ?? null}, ${params.monetaryValues.cost ?? null},
-        ${params.monetaryValues.margin ?? null}, ${params.monetaryValues.price ?? null}, NOW())
+        ${params.operationType}, ${mv.revenue ?? null}, ${mv.cost ?? null},
+        ${mv.margin ?? null}, ${mv.price ?? null}, NOW())
       ON CONFLICT DO NOTHING
-    `).catch(() => {});
+    `)).catch(err => logger.warn({ err }, "pricing_intelligence insert failed"));
   }
 
   detectAndSaveCrossConnections(params.operationType, params.content, params.niche ?? null, allTags).catch(() => {});

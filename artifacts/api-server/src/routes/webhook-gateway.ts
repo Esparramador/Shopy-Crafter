@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { db, projectsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { safeDecrypt } from "../lib/crypto.js";
 
 const router = Router();
 
@@ -44,6 +45,41 @@ function verifyStripeSignature(secret: string, rawBody: Buffer, sigHeader: strin
   } catch { return false; }
 }
 
+// Las consultas de ingresos usan ON CONFLICT (project_id, date) y updated_at,
+// que el esquema original no tenía: fallaban en silencio y ningún webhook
+// registraba ventas. Migración idempotente, una vez por proceso.
+let schemaReady: Promise<void> | null = null;
+function ensureWebhookSchema(): Promise<void> {
+  schemaReady ??= (async () => {
+    await db.execute(sql`ALTER TABLE revenue_snapshots ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`);
+    await db.execute(sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`);
+    // Duplicados (project_id, date) impedirían el índice único: se deja la fila más reciente.
+    await db.execute(sql`
+      DELETE FROM revenue_snapshots a USING revenue_snapshots b
+      WHERE a.project_id = b.project_id AND a.date = b.date
+        AND (COALESCE(a.created_at, 'epoch'), a.ctid) < (COALESCE(b.created_at, 'epoch'), b.ctid)
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS revenue_snapshots_project_date_uq ON revenue_snapshots (project_id, date)`);
+  })().catch(err => {
+    schemaReady = null;
+    logger.error({ err }, "webhook-gateway: schema migration failed");
+  });
+  return schemaReady;
+}
+
+router.use("/webhooks", (_req, _res, next) => { void ensureWebhookSchema().then(() => next()); });
+
+/** clientSecret se guarda cifrado; proyectos antiguos pueden tenerlo en claro. */
+function projectWebhookSecret(stored: string | null | undefined): string {
+  if (!stored) return "";
+  return safeDecrypt(stored) || stored;
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a), y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
 async function getProjectByCriteria(where: "shopDomain" | "id", value: string) {
   if (where === "id") {
     const [p] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(value))).limit(1);
@@ -55,10 +91,12 @@ async function getProjectByCriteria(where: "shopDomain" | "id", value: string) {
 }
 
 async function deactivateProject(projectId: number, reason: string) {
+  // projects no tiene user_id (la consulta anterior fallaba en silencio y nunca
+  // cancelaba nada): el cliente del proyecto es users.client_id = id del proyecto.
   await db.execute(sql`
     UPDATE subscriptions SET status = 'cancelled', updated_at = NOW()
-    WHERE user_id = (SELECT user_id FROM projects WHERE id = ${projectId} LIMIT 1)
-  `).catch(() => {});
+    WHERE user_id IN (SELECT id FROM users WHERE client_id = ${String(projectId)} AND role = 'client')
+  `).catch(err => logger.error({ err, projectId }, "deactivateProject: subscription cancel failed"));
   logger.info({ projectId, reason }, "🔴 Project deactivated via webhook");
 }
 
@@ -78,7 +116,7 @@ router.post("/webhooks/shopify/app-uninstalled", async (req: Request, res: Respo
         await deactivateProject(project.id, "app_uninstalled");
         await db.execute(sql`
           UPDATE projects SET access_token = NULL, updated_at = NOW() WHERE id = ${project.id}
-        `).catch(() => {});
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
       }
     }
     logger.info({ shopDomain }, "Shopify app/uninstalled procesado");
@@ -110,7 +148,7 @@ router.post("/webhooks/shopify/orders-cancelled", async (req: Request, res: Resp
           VALUES (gen_random_uuid(), ${String(project.id)}, 'order_cancelled',
             ${"Pedido cancelado #" + (order.order_number ?? order.id) + " — €" + cancelAmount.toFixed(2)}, NOW())
           ON CONFLICT DO NOTHING
-        `).catch(() => {});
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
         logger.info({ projectId: project.id, orderId: order.id, amount: cancelAmount }, "Pedido cancelado registrado");
       }
     }
@@ -142,14 +180,14 @@ router.post("/webhooks/shopify/refunds", async (req: Request, res: Response) => 
           VALUES (gen_random_uuid(), ${String(project.id)}, 'refund_created',
             ${"Reembolso registrado: €" + refundAmount.toFixed(2) + " (pedido #" + (refund.order_id ?? "") + ")"}, NOW())
           ON CONFLICT DO NOTHING
-        `).catch(() => {});
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
         // Adjust today's revenue snapshot
         const today = new Date().toISOString().split("T")[0];
         await db.execute(sql`
           UPDATE revenue_snapshots
           SET revenue = GREATEST(0, revenue - ${refundAmount}), updated_at = NOW()
           WHERE project_id = ${String(project.id)} AND date = ${today}
-        `).catch(() => {});
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
         logger.info({ projectId: project.id, refundAmount }, "Reembolso Shopify procesado");
       }
     }
@@ -170,11 +208,13 @@ router.post("/webhooks/woocommerce/:projectId", async (req: Request, res: Respon
     const project = await getProjectByCriteria("id", projectId);
     if (!project) return void res.status(404).json({ error: "Proyecto no encontrado" });
 
-    // Verify WooCommerce HMAC-SHA256 signature
-    const secret = (project as any).clientSecret ? String((project as any).clientSecret) : "";
-    const rawBody: Buffer = (req as any).rawBody ?? Buffer.from(JSON.stringify(req.body));
+    // Verify WooCommerce HMAC-SHA256 signature. Fail-closed: sin secret no se
+    // acepta nada (antes cualquiera podía inyectar pedidos en proyectos sin
+    // secret). El secret se guarda cifrado: se compara con el valor en claro.
+    const secret = projectWebhookSecret(project.clientSecret);
+    const rawBody: Buffer | undefined = (req as any).rawBody;
     const sigHeader = (req.headers["x-wc-webhook-signature"] as string) ?? "";
-    if (secret && !verifyWooCommerceHmac(secret, rawBody, sigHeader)) {
+    if (!rawBody || !verifyWooCommerceHmac(secret, rawBody, sigHeader)) {
       logger.warn({ projectId }, "WooCommerce webhook firma inválida");
       return void res.status(401).json({ error: "Firma inválida" });
     }
@@ -194,13 +234,13 @@ router.post("/webhooks/woocommerce/:projectId", async (req: Request, res: Respon
                         orders = revenue_snapshots.orders + 1,
                         aov = (revenue_snapshots.revenue + ${total}) / (revenue_snapshots.orders + 1),
                         updated_at = NOW()
-        `).catch(() => {});
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
         await db.execute(sql`
           INSERT INTO events (id, project_id, event_type, payload, created_at)
           VALUES (gen_random_uuid(), ${String(project.id)}, 'woo_order',
             ${"WooCommerce: Pedido #" + (payload.number ?? payload.id) + " €" + total.toFixed(2) + " — " + (payload.status ?? "")}, NOW())
           ON CONFLICT DO NOTHING
-        `).catch(() => {});
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
         logger.info({ projectId: project.id, orderId: payload.id, total, topic }, "WooCommerce order procesado");
       }
     } else if (topic === "order.deleted") {
@@ -210,7 +250,7 @@ router.post("/webhooks/woocommerce/:projectId", async (req: Request, res: Respon
         UPDATE revenue_snapshots
         SET revenue = GREATEST(0, revenue - ${total}), orders = GREATEST(0, orders - 1), updated_at = NOW()
         WHERE project_id = ${String(project.id)} AND date = ${today}
-      `).catch(() => {});
+      `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
     }
 
     res.sendStatus(200);
@@ -230,10 +270,10 @@ router.post("/webhooks/prestashop/:projectId", async (req: Request, res: Respons
     const project = await getProjectByCriteria("id", projectId);
     if (!project) return void res.status(404).json({ error: "Proyecto no encontrado" });
 
-    // Verify via shared secret header
-    const secret = (project as any).clientSecret ? String((project as any).clientSecret) : "";
+    // Verify via shared secret header (fail-closed, comparación en tiempo constante)
+    const secret = projectWebhookSecret(project.clientSecret);
     const receivedSecret = (req.headers["x-prestashop-secret"] as string) ?? "";
-    if (secret && receivedSecret !== secret) {
+    if (!secret || !safeEqual(receivedSecret, secret)) {
       logger.warn({ projectId }, "PrestaShop webhook secret inválido");
       return void res.status(401).json({ error: "Secret inválido" });
     }
@@ -252,13 +292,13 @@ router.post("/webhooks/prestashop/:projectId", async (req: Request, res: Respons
                       orders = revenue_snapshots.orders + 1,
                       aov = (revenue_snapshots.revenue + ${total}) / (revenue_snapshots.orders + 1),
                       updated_at = NOW()
-      `).catch(() => {});
+      `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
       await db.execute(sql`
         INSERT INTO events (id, project_id, event_type, payload, created_at)
         VALUES (gen_random_uuid(), ${String(project.id)}, 'presta_order',
           ${"PrestaShop: Pedido #" + (payload.id_order ?? payload.id ?? "") + " €" + total.toFixed(2)}, NOW())
         ON CONFLICT DO NOTHING
-      `).catch(() => {});
+      `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
       logger.info({ projectId: project.id, orderId: payload.id_order, total }, "PrestaShop order procesado");
     } else if (event === "order.cancelled" || event === "actionOrderStatusUpdate") {
       const status = payload.current_state ?? payload.status ?? "";
@@ -269,7 +309,7 @@ router.post("/webhooks/prestashop/:projectId", async (req: Request, res: Respons
           UPDATE revenue_snapshots
           SET revenue = GREATEST(0, revenue - ${total}), orders = GREATEST(0, orders - 1), updated_at = NOW()
           WHERE project_id = ${String(project.id)} AND date = ${today}
-        `).catch(() => {});
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
       }
     }
 
@@ -321,13 +361,13 @@ router.post("/webhooks/stripe", async (req: Request, res: Response) => {
                           orders = revenue_snapshots.orders + 1,
                           aov = (revenue_snapshots.revenue + ${amount}) / (revenue_snapshots.orders + 1),
                           updated_at = NOW()
-          `).catch(() => {});
+          `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
           await db.execute(sql`
             INSERT INTO events (id, project_id, event_type, payload, created_at)
             VALUES (gen_random_uuid(), ${String(projectId)}, 'stripe_payment',
               ${"Stripe: Pago recibido " + amount.toFixed(2) + " " + currency}, NOW())
             ON CONFLICT DO NOTHING
-          `).catch(() => {});
+          `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
           logger.info({ projectId, amount, currency }, "✅ Stripe payment registrado via webhook");
         }
       }

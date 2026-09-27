@@ -2,10 +2,16 @@ import { Router } from "express";
 import { db, platformSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { requireAuth } from "../lib/auth.js";
 // FIX C6: real push delivery via web-push (was a stub before)
 import webpush from "web-push";
 
 const router = Router();
+/**
+ * Suscripción push de cualquier usuario autenticado (admin y clientes). Se monta
+ * ANTES del gate requireAdmin; el resto de /push/* sigue siendo solo admin.
+ */
+export const pushUserRouter = Router();
 
 // ─── VAPID KEY MANAGEMENT (env or platform_settings table) ──────────────────
 async function getVapidKeys(): Promise<{ publicKey: string | null; privateKey: string | null; subject: string }> {
@@ -94,7 +100,7 @@ async function deleteSubscription(userId: string): Promise<void> {
 
 // ─── ENDPOINTS ───────────────────────────────────────────────────────────────
 
-router.post("/push/subscribe", async (req, res): Promise<void> => {
+pushUserRouter.post("/push/subscribe", requireAuth, async (req, res): Promise<void> => {
   try {
     const userId = (req.session as any).userId;
     if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
@@ -115,7 +121,7 @@ router.post("/push/subscribe", async (req, res): Promise<void> => {
   }
 });
 
-router.delete("/push/subscribe", async (req, res): Promise<void> => {
+pushUserRouter.delete("/push/subscribe", requireAuth, async (req, res): Promise<void> => {
   try {
     const userId = (req.session as any).userId;
     if (userId) await deleteSubscription(userId);
@@ -170,7 +176,7 @@ router.post("/push/send", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/push/vapid-key", async (_req, res): Promise<void> => {
+pushUserRouter.get("/push/vapid-key", requireAuth, async (_req, res): Promise<void> => {
   try {
     const { publicKey } = await getVapidKeys();
     if (!publicKey) { res.json({ key: null, configured: false }); return; }

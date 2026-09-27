@@ -4,8 +4,13 @@ import { eq } from "drizzle-orm";
 
 /**
  * Returns true if the session can access the given project.
- * Admin (role='admin') can always access. Regular users can only access
- * projects belonging to their `clientId`.
+ * Admin (role='admin') can always access. A client can only access the project
+ * it was invited to: `users.client_id` (→ `session.clientId`) holds that
+ * project's id.
+ *
+ * Ojo: `projects.client_id` NO identifica al cliente — es el client_id OAuth de
+ * Shopify / consumer key de WooCommerce. Compararlo con la sesión (como se hacía)
+ * negaba el acceso a todo cliente invitado.
  *
  * IMPORTANT: this is the canonical access check. All routes that operate on
  * a specific project MUST use either this function or the
@@ -17,15 +22,24 @@ export async function canAccessProject(
   projectId: number,
 ): Promise<boolean> {
   if (sessionRole === "admin") return true;
-  if (sessionClientId === null || sessionClientId === undefined) return false;
+  if (sessionRole !== "client") return false;
+  if (!clientOwnsProjectId(sessionClientId, projectId)) return false;
   const [project] = await db
-    .select({ clientId: projectsTable.clientId })
+    .select({ id: projectsTable.id })
     .from(projectsTable)
     .where(eq(projectsTable.id, projectId))
     .limit(1);
-  if (!project) return false;
-  // clientId may be number or string depending on schema; normalize to string compare
-  return String(project.clientId) === String(sessionClientId);
+  return !!project;
+}
+
+/** `session.clientId` de un cliente es el id del proyecto al que fue invitado. */
+export function clientOwnsProjectId(
+  sessionClientId: string | number | null | undefined,
+  projectId: number,
+): boolean {
+  if (sessionClientId === null || sessionClientId === undefined || sessionClientId === "") return false;
+  const assigned = Number(sessionClientId);
+  return Number.isInteger(assigned) && assigned > 0 && assigned === projectId;
 }
 
 /**
@@ -58,7 +72,9 @@ export const requireProjectAccess: RequestHandler = async (
     return;
   }
   if (projectId === 0) {
-    next();
+    // Proyecto 0 = espacio global de la agencia: solo admin.
+    if ((req.session as { role?: string } | undefined)?.role === "admin") { next(); return; }
+    res.status(403).json({ error: "Sin acceso a este proyecto" });
     return;
   }
   const ok = await canAccessProject(session.role, session.clientId, projectId);

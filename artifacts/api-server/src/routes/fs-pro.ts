@@ -496,6 +496,12 @@ router.get("/fs-pro/prompt-library", requireAuth, async (req, res) => {
     // Parse promptTemplate (we stored seeds as { systemPrompt, userTemplate })
     // and variables as JSON array. Be defensive against legacy rows that stored
     // the prompt as a raw string.
+    // Cada cliente ve las plantillas públicas/seed y las suyas; el admin, todas.
+    const sess = (req as any).session ?? {};
+    const me = `user:${sess.userId}`;
+    if (sess.role !== "admin") {
+      rows = rows.filter(r => r.isPublic === 1 || r.createdBy === me || (typeof r.id === "string" && r.id.startsWith("seed:")));
+    }
     const items = rows.map(r => {
       let template: any = r.promptTemplate;
       try {
@@ -549,8 +555,10 @@ router.post("/fs-pro/prompt-library", requireAuth, async (req, res) => {
       variables: Array.isArray(variables) ? JSON.stringify(variables.slice(0, 30).map(String)) : "[]",
       avgQualityScore: 0.5,
       useCount: 0,
-      createdBy: ((req as any).session?.userId ? `user:${(req as any).session.userId}` : "user:unknown"),
-      isPublic: 1,
+      createdBy: `user:${(req as any).session.userId}`,
+      // Plantillas de clientes son privadas (antes se forzaban públicas y todos
+      // los clientes veían las de los demás). Las del admin sí se comparten.
+      isPublic: (req as any).session?.role === "admin" ? 1 : 0,
     });
     res.json({ ok: true, id });
   } catch (e: any) {
@@ -564,6 +572,13 @@ router.delete("/fs-pro/prompt-library/:id", requireAuth, async (req, res) => {
     const id = String(req.params.id);
     if (id.startsWith("seed:")) {
       res.status(403).json({ error: "Las plantillas pre-cargadas (seeds) no se pueden eliminar." }); return;
+    }
+    const sess = (req as any).session ?? {};
+    const [row] = await _dbForLibrary.select({ createdBy: omnicorePromptLibraryTable.createdBy })
+      .from(omnicorePromptLibraryTable).where(_eqLib(omnicorePromptLibraryTable.id, id));
+    if (!row) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
+    if (sess.role !== "admin" && row.createdBy !== `user:${sess.userId}`) {
+      res.status(403).json({ error: "Solo puedes borrar tus propias plantillas" }); return;
     }
     await _dbForLibrary.delete(omnicorePromptLibraryTable).where(_eqLib(omnicorePromptLibraryTable.id, id));
     res.json({ ok: true });
@@ -3689,7 +3704,7 @@ router.post(
         generatedBy: "fs-pro:audio:mix",
       });
 
-      res.json({ success: true, vaultId, url: `/api/vault/file/${vaultId}` });
+      res.json({ success: true, vaultId, url: `/api/vault/${vaultId}/file`, dataUrl: `data:audio/mpeg;base64,${mixedBuffer.toString("base64")}` });
     } catch (err: any) {
       logger.error({ err: err?.message }, "fs-pro audio/mix failed");
       res.status(500).json({ error: err?.message || "Error mezclando audio" });
@@ -3705,14 +3720,20 @@ router.get("/fs-pro/audio/sfx-catalog", async (req, res) => {
 // ─── TTS: ADVANCED ───────────────────────────────────────────────────────
 router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
   try {
-    const { text, voiceId, model, stability, style, similarityBoost, outputFormat, projectId } = req.body;
+    // Acepta los nombres que envía FusionStudioPro (modelId, similarity, speed);
+    // antes se ignoraban y los sliders no tenían efecto.
+    const { text, voiceId, outputFormat, projectId, stability, style } = req.body;
+    const model = req.body.model ?? req.body.modelId;
+    const similarityBoost = req.body.similarityBoost ?? req.body.similarity;
+    const speed = req.body.speed;
     if (!text || !voiceId) {
       res.status(400).json({ error: "text y voiceId requeridos" });
       return;
     }
 
+    const num = (v: unknown) => (v === undefined || v === null || v === "" || !Number.isFinite(Number(v)) ? undefined : Number(v));
     const audioBuffer = await generateVoiceWithClone(text, voiceId, {
-      model, stability, style, similarityBoost, outputFormat
+      model, stability: num(stability), style: num(style), similarityBoost: num(similarityBoost), speed: num(speed), outputFormat,
     });
 
     const vaultId = await saveToVaultSmart({
@@ -3725,7 +3746,7 @@ router.post("/fs-pro/tts/advanced", requireAdmin, async (req, res) => {
       generatedBy: "fs-pro:tts:advanced",
     });
 
-    res.json({ success: true, vaultId, url: `/api/vault/file/${vaultId}` });
+    res.json({ success: true, vaultId, url: `/api/vault/${vaultId}/file`, dataUrl: `data:audio/mpeg;base64,${audioBuffer.toString("base64")}` });
   } catch (err: any) {
     logger.error({ err: err?.message }, "fs-pro tts/advanced failed");
     res.status(500).json({ error: err?.message || "Error en TTS avanzado" });

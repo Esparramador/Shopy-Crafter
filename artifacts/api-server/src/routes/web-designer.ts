@@ -15,6 +15,7 @@ import {
 } from "../lib/web-designer.js";
 import { buildDnaFromProject } from "../lib/visme-effects.js";
 import { logger } from "../lib/logger.js";
+import { saveToVault } from "../lib/vault.js";
 import { randomBytes } from "crypto";
 
 const router = Router();
@@ -175,22 +176,23 @@ router.post("/web-designer/deploy", async (req: Request, res: Response): Promise
     if (!html) { res.status(400).json({ error: "html is required" }); return; }
     if (!projectId) { res.status(400).json({ error: "projectId is required" }); return; }
 
-    const { db } = await import("@workspace/db");
-    const { sql } = await import("drizzle-orm");
-    const title = `${pageName} — Web Designer`;
-    const tags = ["web-designer", pageName, sessionId ?? ""].filter(Boolean);
+    const pid = Number(projectId);
+    if (!Number.isInteger(pid) || pid < 0) { res.status(400).json({ error: "projectId inválido" }); return; }
+    // Antes: INSERT en `vault_files`, tabla que no existe (el botón siempre
+    // fallaba). El vault real es project_files vía saveToVault.
+    const vaultId = await saveToVault({
+      projectId: pid,
+      fileType: "html",
+      category: "web-designer",
+      title: `${pageName} — Web Designer`,
+      mimeType: "text/html",
+      content: html,
+      generatedBy: "web-designer",
+      metadata: { sessionId: sessionId ?? null, pageName, chars: html.length },
+    });
+    if (!vaultId) { res.status(500).json({ error: "No se pudo guardar en la bóveda" }); return; }
 
-    const vaultRows = await db.execute(sql`
-      INSERT INTO vault_files (project_id, title, category, file_type, content, metadata, generated_by, created_at)
-      VALUES (${projectId}, ${title}, 'web-designer', 'html', ${html},
-        ${JSON.stringify({ sessionId, pageName, chars: html.length })},
-        'web-designer', NOW())
-      ON CONFLICT DO NOTHING
-      RETURNING id
-    `);
-    const vault = (vaultRows as unknown as any[])[0];
-
-    res.json({ success: true, message: `"${pageName}" desplegado a la bóveda`, vaultId: (vault as any)?.id });
+    res.json({ success: true, message: `"${pageName}" desplegado a la bóveda`, vaultId });
   } catch (err: any) {
     logger.error({ err }, "web-designer/deploy error");
     res.status(500).json({ error: err.message });

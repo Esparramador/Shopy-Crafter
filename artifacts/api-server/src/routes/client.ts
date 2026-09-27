@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable, projectsTable, brandDnaTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
-import { msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
+import { checkMessageAttachments, msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { askClaude, learnFromOperation } from "../lib/claude.js";
@@ -267,6 +267,9 @@ router.post("/messages", async (req, res): Promise<void> => {
     };
     const hasFiles = !!(fileUrl || (filesJson && filesJson.length > 0));
     if (!content?.trim() && !hasFiles) { res.status(400).json({ error: "Content or file required" }); return; }
+    if (filesJson !== undefined && filesJson !== null && !Array.isArray(filesJson)) { res.status(400).json({ error: "filesJson inválido" }); return; }
+    const attachErr = checkMessageAttachments(Number(projectId), req.session.role, [fileUrl, ...(filesJson ?? []).map(f => f?.fileUrl)]);
+    if (attachErr) { res.status(400).json({ error: attachErr }); return; }
     const id = randomBytes(16).toString("hex");
     const senderName = req.session.name ?? "Cliente";
     const filesJsonVal = filesJson && filesJson.length > 0 ? JSON.stringify(filesJson) : null;
@@ -597,7 +600,7 @@ router.get("/vault-files", async (req, res): Promise<void> => {
       description: projectFilesTable.description,
       createdAt: projectFilesTable.createdAt,
       objectPath: projectFilesTable.objectPath,
-      hasContent: projectFilesTable.content,
+      hasContent: sql<boolean>`${projectFilesTable.content} IS NOT NULL`,
     }).from(projectFilesTable)
       .where(eq(projectFilesTable.projectId, pid))
       .orderBy(desc(projectFilesTable.createdAt));
@@ -643,6 +646,9 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
       projectMode?: boolean;
     };
 
+    if (!Array.isArray(attachedFiles)) { res.status(400).json({ error: "attachedFiles inválido" }); return; }
+    const attachErr = checkMessageAttachments(Number(projectId), req.session.role, attachedFiles.map(f => f?.fileUrl));
+    if (attachErr) { res.status(400).json({ error: attachErr }); return; }
     const msg = message?.trim() ?? "";
     const hasFiles = attachedFiles.length > 0;
     if (!msg && !hasFiles) { res.status(400).json({ error: "Message or files required" }); return; }
@@ -683,7 +689,7 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
           description: projectFilesTable.description,
           createdAt: projectFilesTable.createdAt,
           objectPath: projectFilesTable.objectPath,
-          hasContent: projectFilesTable.content,
+          hasContent: sql<boolean>`${projectFilesTable.content} IS NOT NULL`,
         }).from(projectFilesTable)
           .where(eq(projectFilesTable.projectId, pid))
           .orderBy(desc(projectFilesTable.createdAt));

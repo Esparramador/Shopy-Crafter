@@ -288,6 +288,27 @@ router.delete("/tienda/services/:id", requireAdmin, async (req: Request, res: Re
   }
 });
 
+// ref = userId:planId:firma. Firma HMAC con SESSION_SECRET (obligatorio al arrancar).
+function checkoutRefSig(userId: string, planId: string): string {
+  const key = process.env.SESSION_SECRET;
+  if (!key) throw new Error("SESSION_SECRET not set");
+  return createHmac("sha256", key).update(`tienda-ref:${userId}:${planId}`).digest("hex").slice(0, 32);
+}
+
+export function signCheckoutRef(userId: string, planId: string): string {
+  return `${userId}:${planId}:${checkoutRefSig(userId, planId)}`;
+}
+
+export function verifyCheckoutRef(ref: string): { userId: string; planId: string } | null {
+  const parts = ref.split(":");
+  if (parts.length !== 3) return null;
+  const [userId, planId, sig] = parts;
+  if (!userId || !planId || !sig) return null;
+  const expected = Buffer.from(checkoutRefSig(userId, planId));
+  const got = Buffer.from(sig);
+  return expected.length === got.length && timingSafeEqual(expected, got) ? { userId, planId } : null;
+}
+
 // ── CLIENT: POST /tienda/create-checkout ─────────────────────────────────────
 // Generates a Shopify checkout URL pre-filled with the user's email + a ref
 // token (userId:planId) so the orders/paid webhook can activate the right plan.
@@ -312,7 +333,7 @@ router.post("/tienda/create-checkout", requireAuth, async (req: Request, res: Re
     const userRes = await db.execute(sql`SELECT email FROM users WHERE id = ${userId}`);
     const userEmail = (userRes.rows[0] as any)?.email ?? "";
 
-    const ref = `${userId}:${planId}`;
+    const ref = signCheckoutRef(String(userId), String(planId));
     const url = new URL(plan.shopify_checkout_url);
     if (userEmail) url.searchParams.set("email", userEmail);
     url.searchParams.set("note_attributes[ref]", ref);
@@ -362,13 +383,19 @@ router.post("/webhooks/shopify/orders-paid", async (req: Request, res: Response)
       return void res.sendStatus(200);
     }
 
-    const [userId, planId] = refAttr.value.split(":");
-    if (!userId || !planId) return void res.sendStatus(200);
+    // El ref va en la URL de checkout (lo controla el comprador): solo vale si
+    // lleva nuestra firma. Antes bastaba con escribir otro userId o planId.
+    const verified = verifyCheckoutRef(refAttr.value);
+    if (!verified) {
+      logger.warn({ orderId: order.id }, "Webhook orders/paid con ref sin firma válida — ignorado");
+      return void res.sendStatus(200);
+    }
+    const { userId, planId } = verified;
 
     const db = await getDb();
 
     const planRes = await db.execute(sql`
-      SELECT id, period_days FROM billing_plans WHERE id = ${planId}
+      SELECT id, price, period_days, stores_limit, images_included FROM billing_plans WHERE id = ${planId}
     `);
     const plan = planRes.rows[0] as any;
     if (!plan) {
@@ -376,26 +403,44 @@ router.post("/webhooks/shopify/orders-paid", async (req: Request, res: Response)
       return void res.sendStatus(200);
     }
 
-    const periodDays = plan.period_days ?? 30;
+    // Lo pagado debe cubrir el precio del plan (evita pagar el checkout de un
+    // plan barato con el ref firmado de uno caro).
+    const paid = Number(order.total_price ?? order.current_total_price ?? NaN);
+    const price = Number(plan.price ?? 0);
+    if (!Number.isFinite(paid) || paid + 0.01 < price) {
+      logger.warn({ orderId: order.id, planId, paid, price }, "Webhook orders/paid: importe menor que el plan — no se activa");
+      return void res.sendStatus(200);
+    }
+
+    const periodDays = Number(plan.period_days) || 30;
     const periodEnd = new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000);
 
+    await db.execute(sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS shopify_order_id TEXT`);
+    await db.execute(sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`);
+    // Columnas reales del esquema (antes period_end/… inexistentes: el INSERT
+    // fallaba, se respondía 200 y el cliente pagaba sin recibir el plan).
     await db.execute(sql`
-      INSERT INTO subscriptions (user_id, plan, status, period_end, shopify_order_id, updated_at)
-      VALUES (${userId}, ${planId}, 'active', ${periodEnd.toISOString()}, ${String(order.id ?? "")}, NOW())
+      INSERT INTO subscriptions (user_id, plan, status, current_period_end, stores_limit, images_included, trial_ends_at, cancel_at_period_end, shopify_order_id, updated_at)
+      VALUES (${userId}, ${planId}, 'active', ${periodEnd.toISOString()}, ${plan.stores_limit ?? 1}, ${plan.images_included ?? 10}, NULL, 0, ${String(order.id ?? "")}, NOW())
       ON CONFLICT (user_id)
       DO UPDATE SET
-        plan            = EXCLUDED.plan,
-        status          = 'active',
-        period_end      = EXCLUDED.period_end,
-        shopify_order_id = EXCLUDED.shopify_order_id,
-        updated_at      = NOW()
+        plan               = EXCLUDED.plan,
+        status             = 'active',
+        current_period_end = EXCLUDED.current_period_end,
+        stores_limit       = EXCLUDED.stores_limit,
+        images_included    = EXCLUDED.images_included,
+        trial_ends_at      = NULL,
+        cancel_at_period_end = 0,
+        shopify_order_id   = EXCLUDED.shopify_order_id,
+        updated_at         = NOW()
     `);
 
     logger.info({ userId, planId, orderId: order.id }, "✅ Plan activado via Shopify webhook");
     res.sendStatus(200);
   } catch (err: any) {
+    // 500 → Shopify reintenta (antes 200: un fallo de BD perdía el pago).
     logger.error({ err }, "POST /webhooks/shopify/orders-paid error");
-    res.sendStatus(200);
+    res.sendStatus(500);
   }
 });
 

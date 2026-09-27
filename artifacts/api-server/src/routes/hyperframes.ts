@@ -3,6 +3,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { askAMR, streamAMR } from "../lib/amr.js";
 import { logger } from "../lib/logger.js";
+import { z } from "zod";
+import { askClaudeJsonValidated } from "../lib/ai-json.js";
+import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -229,12 +232,62 @@ Output: HTML completo autocontenido. Sin explicaciones.`;
   }
 });
 
+// POST /api/hyperframes/deck/slides — deck estructurado (JSON) para DeckBuilder.
+// DeckBuilder edita y exporta diapositivas sueltas; /deck/generate devuelve un
+// HTML completo y exige otros campos (topic), así que la página recibía 400.
+const DECK_SLIDE_TYPES = ["cover", "agenda", "content", "data", "quote", "cta", "team", "closing"] as const;
+const deckSlidesSchema = z.object({
+  slides: z.array(z.object({
+    title: z.string().min(1),
+    content: z.string(),
+    type: z.preprocess(v => (DECK_SLIDE_TYPES as readonly string[]).includes(String(v)) ? v : "content", z.enum(DECK_SLIDE_TYPES)),
+    notes: z.string().optional(),
+  })).min(1),
+});
+
+router.post("/hyperframes/deck/slides", async (req, res) => {
+  const { deckType = "pitch", brandName, deckTitle, audience, numSlides = 10 } = (req.body ?? {}) as {
+    deckType?: string; brandName?: string; deckTitle?: string; audience?: string; numSlides?: number;
+  };
+  if (!brandName?.trim() || !deckTitle?.trim()) {
+    res.status(400).json({ error: "brandName y deckTitle son obligatorios" }); return;
+  }
+  const n = Math.min(Math.max(Math.round(Number(numSlides) || 10), 3), 30);
+  const prompt = `Crea el contenido de una presentación tipo "${deckType}" de exactamente ${n} diapositivas.
+Marca: ${brandName.trim()}
+Título: ${deckTitle.trim()}
+Audiencia: ${audience?.trim() || "general"}
+
+Estructura: la 1ª "cover", una "agenda" al principio, la última "closing" o "cta"; el resto variado entre "content", "data", "quote", "team".
+Cada diapositiva: "title" (corto), "content" (viñetas separadas por salto de línea, máx. 6, concretas, sin relleno) y "notes" (notas del orador).
+No inventes cifras presentadas como reales: si pones datos, márcalos como estimación o ejemplo.
+
+Responde SOLO JSON: {"slides":[{"title":"","content":"","type":"cover","notes":""}]}`;
+  try {
+    const data = await askClaudeJsonValidated(0, prompt, "Eres un estratega y diseñador de presentaciones. Respondes solo JSON válido en español.", {
+      schema: deckSlidesSchema, label: "deck-slides", maxTokens: 6000, useCase: "general",
+    });
+    res.json({ slides: data.slides.slice(0, n), topic: deckTitle.trim() });
+  } catch (err: unknown) {
+    if (isAiOutputError(err)) { res.status(502).json({ error: aiOutputErrorMessage(err) }); return; }
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error({ err }, "deck/slides failed");
+    res.status(500).json({ error: msg });
+  }
+});
+
 // POST /api/hyperframes/pptx/export — export HTML deck to PPTX
 router.post("/hyperframes/pptx/export", async (req, res) => {
-  const { slides, title = "Deck" } = req.body as {
-    slides: Array<{ title: string; content: string; backgroundColor?: string }>;
+  const { slides, title: rawTitle, deckTitle, themeColors } = req.body as {
+    slides: Array<{ title: string; content: string; backgroundColor?: string; notes?: string }>;
     title?: string;
+    deckTitle?: string;
+    themeColors?: { bg?: string; text?: string; accent?: string };
   };
+  const title = rawTitle || deckTitle || "Deck";
+  const hex = (v: unknown, fallback: string) => (typeof v === "string" && /^#?[0-9a-f]{6}$/i.test(v) ? v.replace("#", "") : fallback);
+  const textColor = hex(themeColors?.text, "FFFFFF");
+  const accentColor = hex(themeColors?.accent, "FFFFFF");
 
   if (!Array.isArray(slides) || !slides.length) {
     res.status(400).json({ error: "slides array requerido" }); return;
@@ -249,17 +302,18 @@ router.post("/hyperframes/pptx/export", async (req, res) => {
 
     for (const slide of slides) {
       const s = pres.addSlide();
-      s.background = { color: (slide.backgroundColor ?? "#1a1a2e").replace("#", "") };
-      s.addText(slide.title, {
-        x: 0.5, y: 1.5, w: 9, h: 1,
-        fontSize: 36, bold: true, color: "FFFFFF",
+      s.background = { color: hex(slide.backgroundColor ?? themeColors?.bg, "1A1A2E") };
+      s.addText(String(slide.title ?? ""), {
+        x: 0.5, y: 1.2, w: 9, h: 1,
+        fontSize: 32, bold: true, color: accentColor,
         align: "center",
       });
-      s.addText(slide.content, {
-        x: 0.5, y: 2.8, w: 9, h: 2,
-        fontSize: 18, color: "CCCCCC",
-        align: "center", wrap: true,
+      s.addText(String(slide.content ?? ""), {
+        x: 0.5, y: 2.4, w: 9, h: 2.8,
+        fontSize: 16, color: textColor,
+        align: "center", valign: "top", wrap: true,
       });
+      if (slide.notes) s.addNotes(String(slide.notes));
     }
 
     const buffer = await pres.write({ outputType: "arraybuffer" });

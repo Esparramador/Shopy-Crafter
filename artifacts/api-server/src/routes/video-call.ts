@@ -1,7 +1,7 @@
 import { Router } from "express";
 import webpush from "web-push";
 import { db, projectsTable, platformSettingsTable, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
 import crypto from "crypto";
@@ -12,7 +12,7 @@ const router = Router();
 interface VideoCall {
   id: string;
   projectId: number;
-  clientId: string;           // project.clientId (legacy match)
+  clientId: string;           // id del proyecto (= session.clientId del cliente)
   clientUserId: string | null; // users.id of the client user (primary match)
   roomUrl: string;
   jitsiRoom: string;
@@ -112,30 +112,33 @@ router.post("/admin/video-call/initiate", requireAdmin, async (req, res): Promis
   if (!projectId) { res.status(400).json({ error: "projectId required" }); return; }
 
   try {
-    const [project] = await db.select({ clientId: projectsTable.clientId, name: projectsTable.name })
+    const [project] = await db.select({ id: projectsTable.id, name: projectsTable.name })
       .from(projectsTable).where(eq(projectsTable.id, projectId)).limit(1);
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    // Look up the client user's userId — primary key for matching
+    // El cliente de un proyecto es el usuario cuyo users.client_id = id del
+    // proyecto (projects.client_id es la credencial OAuth de la tienda, no sirve).
+    const projectClientKey = String(project.id);
     let clientUserId: string | null = null;
-    if (project.clientId) {
-      try {
-        const [clientUser] = await db.select({ id: usersTable.id })
-          .from(usersTable)
-          .where(eq(usersTable.clientId, project.clientId))
-          .limit(1);
-        clientUserId = clientUser?.id ?? null;
-      } catch {}
+    try {
+      const [clientUser] = await db.select({ id: usersTable.id })
+        .from(usersTable)
+        .where(and(eq(usersTable.clientId, projectClientKey), eq(usersTable.role, "client")))
+        .limit(1);
+      clientUserId = clientUser?.id ?? null;
+    } catch (err) {
+      logger.warn({ err, projectId }, "video-call: client user lookup failed");
     }
 
     const callId = crypto.randomUUID();
-    const token  = Math.random().toString(36).slice(2, 8);
+    // Sala pública en meet.jit.si: el nombre debe ser impredecible.
+    const token  = crypto.randomBytes(12).toString("hex");
     const jitsiRoom = `ShopyCrafter-${projectId}-${token}`;
     const roomUrl   = `https://meet.jit.si/${jitsiRoom}`;
 
     calls.set(callId, {
       id: callId, projectId,
-      clientId: project.clientId ?? "", clientUserId,
+      clientId: projectClientKey, clientUserId,
       roomUrl, jitsiRoom, status: "ringing",
       initiatedBy: "admin", createdAt: Date.now(),
     });
@@ -147,14 +150,14 @@ router.post("/admin/video-call/initiate", requireAdmin, async (req, res): Promis
       body: "Tu asesor quiere iniciar una videollamada.",
       url: "/client/messages",
     });
-    if (project.clientId) await tryPush(CLIENT_SUB_PFX + project.clientId, {
+    await tryPush(CLIENT_SUB_PFX + projectClientKey, {
       type: "incoming_call", callId,
       title: "📹 Shopy Crafter te llama",
       body: "Tu asesor quiere iniciar una videollamada.",
       url: "/client/messages",
     });
 
-    logger.info({ callId, projectId, clientId: project.clientId, clientUserId }, "video-call: admin initiated");
+    logger.info({ callId, projectId, clientUserId }, "video-call: admin initiated");
     res.json({ callId, roomUrl, jitsiRoom });
   } catch (err: any) {
     logger.error({ err: err?.message }, "video-call: initiate failed");
@@ -239,10 +242,11 @@ router.post("/client/video-call/request", requireAuth, async (req, res): Promise
   const session  = req.session as any;
   const userId   = session.userId   as string ?? "";
   const clientId = session.clientId as string | null ?? null;
-  const projectId = Number(session.projectId) || 0;
+  // session.projectId no existe: el proyecto del cliente es session.clientId.
+  const projectId = Number(clientId) || 0;
 
   const callId    = crypto.randomUUID();
-  const token     = Math.random().toString(36).slice(2, 8);
+  const token     = crypto.randomBytes(12).toString("hex");
   const jitsiRoom = `ShopyCrafter-cli-${projectId || userId.slice(0, 6)}-${token}`;
   const roomUrl   = `https://meet.jit.si/${jitsiRoom}`;
 
@@ -266,8 +270,11 @@ router.post("/client/video-call/request", requireAuth, async (req, res): Promise
 
 // ─── Client: end call ─────────────────────────────────────────────────────────
 router.delete("/client/video-call/:callId", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
   const call = calls.get(String(req.params.callId));
-  if (call) call.status = "ended";
+  if (call && (session.role === "admin" || callMatchesClient(call, session.userId ?? null, session.clientId ?? null))) {
+    call.status = "ended";
+  }
   res.json({ ok: true });
 });
 

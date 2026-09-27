@@ -21,8 +21,10 @@ function normalizePlugin(p: ReturnType<typeof getPluginById>) {
     author: "Shopy Crafter",
     tags: p.tags ?? [],
     pricing: p.isPremium ? "paid" as const : "free" as const,
-    rating: 4.2 + Math.round((Math.random() * 0.7) * 10) / 10,
-    installs: Math.floor(100 + (p.usageCount ?? 0) * 50 + Math.random() * 900),
+    // No hay métricas reales de valoración/instalaciones: null (antes
+    // Math.random() — cifras inventadas que cambiaban en cada carga).
+    rating: null,
+    installs: null,
     capabilities: [p.action],
     requiredKeys: [],
     configSchema: {},
@@ -98,17 +100,27 @@ router.post("/plugins/:id/execute", async (req, res) => {
   const plugin = getPluginById(req.params.id);
   if (!plugin) { res.status(404).json({ error: "Plugin no encontrado" }); return; }
 
-  const { context, modelId, brandDna } = req.body as {
+  const { context, modelId, brandDna, action } = req.body as {
     context?: Record<string, string>;
     modelId?: string;
     brandDna?: Record<string, string>;
+    action?: string;
+    config?: Record<string, string>;
   };
+
+  // health_check al activar: comprobación local, sin llamada IA (antes cada
+  // activación lanzaba una generación completa y cobraba tokens). La config
+  // (credenciales) nunca se envía a la IA.
+  if (action === "health_check") {
+    res.json({ output: `${plugin.name} disponible (${plugin.action}).`, plugin: { id: plugin.id, name: plugin.name, category: plugin.category } });
+    return;
+  }
 
   // Build prompt from plugin template or description
   const vars = { ...brandDna, ...context };
   let prompt = plugin.promptTemplate ?? "";
   if (!prompt) {
-    prompt = `Ejecuta la siguiente tarea como experto en ${plugin.category}:\n\n${plugin.description}\n\nContexto del negocio: ${JSON.stringify(vars)}`;
+    prompt = `Ejecuta la siguiente tarea como experto en ${plugin.category}:\n\n${plugin.description}${action && action !== plugin.action ? `\n\nAcción solicitada: ${action}` : ""}\n\nContexto del negocio: ${JSON.stringify(vars)}`;
   } else {
     for (const [key, value] of Object.entries(vars)) {
       prompt = prompt.replaceAll(`{{${key}}}`, String(value));

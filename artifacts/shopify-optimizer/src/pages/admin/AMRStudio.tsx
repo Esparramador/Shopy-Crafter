@@ -71,10 +71,11 @@ export default function AMRStudio() {
   const [filterCategory, setFilterCategory] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const streamRef = useRef<EventSource | null>(null);
+  const streamRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     fetchModels();
+    return () => streamRef.current?.abort();
   }, []);
 
   async function fetchModels() {
@@ -96,26 +97,48 @@ export default function AMRStudio() {
     setStreamingResult({ modelId, content: "" });
     setActiveTab("single");
 
+    // POST + lectura del stream SSE (antes EventSource hacía GET contra una ruta
+    // POST y esperaba {chunk}/{done}; el servidor envía {text} y "[DONE]").
+    const controller = new AbortController();
+    streamRef.current = controller;
     try {
-      const evtSource = new EventSource(
-        `${API_BASE}/api/amr/stream?modelId=${encodeURIComponent(modelId)}&prompt=${encodeURIComponent(prompt)}&system=${encodeURIComponent(systemPrompt)}`
-      );
-      streamRef.current = evtSource;
-
-      evtSource.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.done) {
-          evtSource.close();
-          setGenerating(false);
-        } else if (data.chunk) {
-          setStreamingResult(prev => prev ? { ...prev, content: prev.content + data.chunk } : null);
+      const r = await fetch(`${API_BASE}/api/amr/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ modelId, prompt, system: systemPrompt || undefined }),
+        signal: controller.signal,
+      });
+      if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const ev of events) {
+          const line = ev.split("\n").find(l => l.startsWith("data: "));
+          if (!line) continue;
+          const payload = line.slice(6);
+          if (payload === "[DONE]") continue;
+          let data: { text?: string; error?: string };
+          try { data = JSON.parse(payload); } catch { continue; }
+          if (data.error) setError(data.error);
+          if (data.text) {
+            const chunk = data.text;
+            setStreamingResult(prev => prev ? { ...prev, content: prev.content + chunk } : null);
+          }
         }
-      };
-      evtSource.onerror = () => {
-        evtSource.close();
-        setGenerating(false);
-      };
-    } catch {
+      }
+    } catch (e: unknown) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setError(e instanceof Error ? e.message : "Error en la generación");
+      }
+    } finally {
+      if (streamRef.current === controller) streamRef.current = null;
       setGenerating(false);
     }
   }
@@ -131,7 +154,7 @@ export default function AMRStudio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ modelIds: selectedModels, prompt, systemPrompt }),
+        body: JSON.stringify({ modelIds: selectedModels, prompt, system: systemPrompt || undefined }),
       });
       const data = await r.json();
       setResults(data.results || []);

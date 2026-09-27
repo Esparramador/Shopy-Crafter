@@ -53,6 +53,9 @@ export function enableLongRunning(resOrReq: Response | Request, resOrNext?: Resp
 
 function _applyLongRunning(res: Response): LongRunningHandle {
   res.setHeader("X-No-Compression", "1");
+  // El frontend (lib/long-running-fetch.ts) usa esta marca para recuperar el
+  // código de error real cuando llega en el cuerpo (ver __httpStatus abajo).
+  res.setHeader("X-Long-Running", "1");
   res.setHeader("X-Accel-Buffering", "no");
   res.setHeader("Connection", "keep-alive");
 
@@ -64,6 +67,10 @@ function _applyLongRunning(res: Response): LongRunningHandle {
   }
 
   let stopped = false;
+  // Status pedido DESPUÉS del primer latido: la cabecera ya salió con 200, así
+  // que el código real viaja en el cuerpo como __httpStatus (antes se perdía y
+  // un error tras 25 s llegaba como éxito HTTP 200).
+  let lateStatus: number | null = null;
 
   const originalJson = res.json.bind(res);
   const originalStatus = res.status.bind(res);
@@ -71,6 +78,9 @@ function _applyLongRunning(res: Response): LongRunningHandle {
   (res as any).json = function patchedJson(body: any) {
     if (res.headersSent) {
       try {
+        if (lateStatus !== null && lateStatus >= 400 && body && typeof body === "object" && !Array.isArray(body)) {
+          body = { ...body, __httpStatus: lateStatus };
+        }
         const payload = JSON.stringify(body);
         res.write(payload);
         res.end();
@@ -84,6 +94,7 @@ function _applyLongRunning(res: Response): LongRunningHandle {
 
   (res as any).status = function patchedStatus(code: number) {
     if (res.headersSent) {
+      lateStatus = code;
       return res;
     }
     return originalStatus(code);

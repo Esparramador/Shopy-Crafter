@@ -234,7 +234,7 @@ export default function RolexStorySheet() {
     try {
       const r = await fetch(`${API_BASE}/api/voice/tts`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ text: fullScript, voiceId: "pNInz6obpgDQGcFmaJgB", model: "eleven_v3", stability: 0.45, similarity_boost: 0.85, style: 0.3 }),
+        body: JSON.stringify({ text: fullScript, voiceId: "pNInz6obpgDQGcFmaJgB", modelId: "eleven_v3", voiceSettings: { stability: 0.45, similarity_boost: 0.85, style: 0.3 } }),
       });
       if (!r.ok) throw new Error(await r.text());
       setVoAudioUrl(URL.createObjectURL(await r.blob()));

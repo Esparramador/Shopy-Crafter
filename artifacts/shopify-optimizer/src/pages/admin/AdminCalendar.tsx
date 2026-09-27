@@ -167,7 +167,12 @@ export default function AdminCalendar() {
   }
 
   async function disconnectGoogle() {
-    await fetch(`${API}/calendar/oauth/disconnect`, { method: "DELETE", credentials: "include" });
+    const r = await fetch(`${API}/calendar/oauth/disconnect`, { method: "DELETE", credentials: "include" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      alert((d as { error?: string }).error ?? "No se pudo desconectar Google Calendar");
+      return;
+    }
     setConnected(false); setConnectedEmail(null);
   }
 
@@ -223,7 +228,10 @@ export default function AdminCalendar() {
   // ── Delete appointment ────────────────────────────────────────────────────────
   async function deleteAppointment(id: number) {
     if (!confirm("¿Cancelar esta cita?")) return;
-    await fetch(`${API}/calendar/events/${id}`, { method: "DELETE", credentials: "include" });
+    const r = await fetch(`${API}/calendar/events/${id}`, { method: "DELETE", credentials: "include" });
+    const d = await r.json().catch(() => ({})) as { error?: string; warning?: string };
+    if (!r.ok) alert(d.error ?? "No se pudo cancelar la cita");
+    else if (d.warning) alert(d.warning);
     await load();
   }
 

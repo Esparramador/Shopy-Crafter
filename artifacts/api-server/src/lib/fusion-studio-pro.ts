@@ -2632,6 +2632,7 @@ export async function generateVoiceWithClone(
     stability?: number;
     style?: number;
     similarityBoost?: number;
+    speed?: number;
     outputFormat?: string;
   } = {},
 ): Promise<Buffer> {
@@ -2644,6 +2645,8 @@ export async function generateVoiceWithClone(
       similarity_boost: opts.similarityBoost ?? 0.75,
       style: opts.style ?? 0,
       use_speaker_boost: true,
+      // ElevenLabs acepta speed 0.7–1.2.
+      ...(opts.speed !== undefined ? { speed: Math.min(1.2, Math.max(0.7, opts.speed)) } : {}),
     },
   };
 

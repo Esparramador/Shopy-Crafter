@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "@workspace/db";
+import { msgUploadHeaders, parseMsgUploadName } from "./lib/msg-uploads.js";
 import { PgRateLimitStore, startRateLimitCleanup } from "./lib/pg-rate-limit-store.js";
 import { validateEncryptionKey } from "./lib/crypto.js";
 import { revalidateSession } from "./lib/auth.js";
@@ -110,6 +111,16 @@ const aiLimiter = rateLimit({
 
 // Chat público de la landing (sin sesión, Gemini con búsqueda): con solo el límite
 // general (300/min por IP) cualquiera podía gastar IA a coste de la plataforma.
+const publicQrLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new PgRateLimitStore("public_qr"),
+  message: { error: "Demasiadas peticiones. Espera un momento.", code: "RATE_LIMITED" },
+  skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
+});
+
 const publicAiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 15,
@@ -194,9 +205,13 @@ const reportAuth = async (req: Request, res: Response, next: NextFunction): Prom
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  // Per-project ownership check for A/B test reports: filename pattern `ab-test-<testId>-<ts>.html`
-  const filePath = req.path.replace(/^\/+/, "");
+  // Per-project ownership check for A/B test reports: filename pattern `ab-test-<testId>-<ts>.html`.
+  // Se comprueba la ruta DECODIFICADA (express.static decodifica: %61b-test-… se
+  // saltaba el control) y cualquier otro fichero del directorio es solo admin.
+  let filePath = "";
+  try { filePath = decodeURIComponent(req.path).replace(/^\/+/, ""); } catch { res.status(400).end(); return; }
   const abMatch = filePath.match(/^ab-test-(\d+)-\d+\.html$/);
+  if (!abMatch && sess.role !== "admin") { res.status(403).json({ error: "Forbidden" }); return; }
   if (abMatch) {
     try {
       const { db, abTestsTable } = await import("@workspace/db");
@@ -220,15 +235,42 @@ app.use("/api/reports", (req, res, next) => { void reportAuth(req, res, next); }
 app.use("/reports", (req, res, next) => { void reportAuth(req, res, next); }, express.static(reportsDir));
 
 const msgUploadsDir = path.resolve(process.cwd(), "msg-uploads");
-app.use("/api/msg-uploads", (req: Request, res: Response, next: NextFunction) => {
-  const sess = req.session as { userId?: string } | undefined;
+app.use("/api/msg-uploads", async (req: Request, res: Response, next: NextFunction) => {
+  const sess = req.session as { userId?: string; role?: string; clientId?: string | number | null } | undefined;
   if (!sess?.userId) { res.status(401).end(); return; }
-  next();
-}, express.static(msgUploadsDir));
+  if (sess.role === "admin") { next(); return; }
+  // Cliente: solo adjuntos de su proyecto.
+  let name = "";
+  try { name = decodeURIComponent(req.path.replace(/^\/+/, "")); } catch { /* URL mal codificada → 404 */ }
+  const parsed = parseMsgUploadName(name);
+  const own = Number(sess.clientId);
+  if (!parsed || !Number.isInteger(own) || own <= 0) { res.status(404).end(); return; }
+  if (parsed.projectId !== null) {
+    if (parsed.projectId === own) { next(); return; }
+    res.status(404).end();
+    return;
+  }
+  // Fichero antiguo sin prefijo: vale si un mensaje de su proyecto lo cita.
+  try {
+    const url = `/api/msg-uploads/${name}`;
+    const r = await pool.query(
+      `SELECT 1 FROM messages WHERE project_id = $1 AND (file_url = $2 OR files_json::text LIKE $3) LIMIT 1`,
+      [String(own), url, `%"${url}"%`],
+    );
+    if (r.rowCount) { next(); return; }
+    res.status(404).end();
+  } catch (err) {
+    logger.warn({ err }, "[msg-uploads] ownership check failed");
+    res.status(500).end();
+  }
+}, express.static(msgUploadsDir, { setHeaders: (res, filePath) => msgUploadHeaders(res, filePath) }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authLimiter);
 app.use("/api/public/landing-chat", publicAiLimiter);
+// Tarjetas públicas por id secuencial: limita la enumeración masiva (un QR
+// real se abre unas pocas veces por minuto desde una misma IP).
+app.use("/api/public/qr", publicQrLimiter);
 app.use("/api/shopybrain/study", aiLimiter);
 app.use("/api/intelligence", aiLimiter);
 app.use("/api/redesign", aiLimiter);
@@ -302,6 +344,20 @@ app.use((req: Request, res: Response) => {
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   if (res.headersSent) {
     logger.error({ err: err?.message, path: req.path }, "Error after headers sent");
+    // Cerrar la respuesta: antes quedaba abierta hasta el timeout del servidor
+    // (60 min). SSE recibe un evento de error; JSON tras latido, el cuerpo de
+    // error con su código (ver long-running.ts).
+    if (!res.writableEnded) {
+      try {
+        const ct = String(res.getHeader("Content-Type") ?? "");
+        if (ct.includes("text/event-stream")) {
+          res.write(`data: ${JSON.stringify({ type: "error", error: "Error interno del servidor" })}\n\n`);
+        } else if (ct.includes("application/json")) {
+          res.write(JSON.stringify({ error: "Error interno del servidor", __httpStatus: 500 }));
+        }
+      } catch { /* socket ya cerrado */ }
+      res.end();
+    }
     return;
   }
 

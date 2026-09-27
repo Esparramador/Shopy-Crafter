@@ -474,7 +474,7 @@ router.post("/stripe/accounts/:accountId/sync", requireAuth, async (req: Request
 // ── POST /stripe/draft-order ──────────────────────────────────────────────────
 // Crea un Draft Order en la tienda Shopify vinculada y devuelve la URL de checkout
 // El usuario paga en el checkout de Shopify (con su pasarela: Stripe Payments, etc.)
-router.post("/stripe/draft-order", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/draft-order", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { amount, currency = "EUR", description, customerEmail, note, lineItems } = req.body ?? {};
     if (!amount || amount <= 0) {

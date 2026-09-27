@@ -224,7 +224,7 @@ async function tripoPollTask(taskId: string): Promise<any> {
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 /* GET /api/tripo3d/animations — lista de presets con metadatos */
-router.get("/api/tripo3d/animations", async (_req, res) => {
+router.get("/tripo3d/animations", async (_req, res) => {
   res.json({
     animations: TRIPO_ANIMATIONS,
     categories: ANIMATION_CATEGORIES,
@@ -233,7 +233,7 @@ router.get("/api/tripo3d/animations", async (_req, res) => {
 });
 
 /* GET /api/tripo3d/balance — saldo Tripo3D */
-router.get("/api/tripo3d/balance", async (_req, res) => {
+router.get("/tripo3d/balance", async (_req, res) => {
   try {
     const data = await tripoFetch("/user/balance");
     res.json(data);
@@ -243,7 +243,7 @@ router.get("/api/tripo3d/balance", async (_req, res) => {
 });
 
 /* GET /api/tripo3d/task/:taskId — poll task status */
-router.get("/api/tripo3d/task/:taskId", async (req, res) => {
+router.get("/tripo3d/task/:taskId", async (req, res) => {
   try {
     const data = await tripoFetch(`/task/${req.params.taskId}`);
     res.json(data);
@@ -253,7 +253,7 @@ router.get("/api/tripo3d/task/:taskId", async (req, res) => {
 });
 
 /* POST /api/tripo3d/text-to-model — texto → 3D */
-router.post("/api/tripo3d/text-to-model", async (req: Request, res: Response) => {
+router.post("/tripo3d/text-to-model", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -306,7 +306,7 @@ router.post("/api/tripo3d/text-to-model", async (req: Request, res: Response) =>
 });
 
 /* POST /api/tripo3d/image-to-model — imagen → 3D */
-router.post("/api/tripo3d/image-to-model", upload.single("image"), async (req: Request, res: Response) => {
+router.post("/tripo3d/image-to-model", upload.single("image"), async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -356,7 +356,7 @@ router.post("/api/tripo3d/image-to-model", upload.single("image"), async (req: R
 
 /* POST /api/tripo3d/multiview-to-model — 4 imágenes → 3D */
 router.post(
-  "/api/tripo3d/multiview-to-model",
+  "/tripo3d/multiview-to-model",
   multiUpload.fields([
     { name: "front", maxCount: 1 },
     { name: "left",  maxCount: 1 },
@@ -420,7 +420,7 @@ router.post(
 );
 
 /* POST /api/tripo3d/refine — refinar borrador */
-router.post("/api/tripo3d/refine", async (req: Request, res: Response) => {
+router.post("/tripo3d/refine", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -445,7 +445,7 @@ router.post("/api/tripo3d/refine", async (req: Request, res: Response) => {
 });
 
 /* POST /api/tripo3d/prerig — comprobar si el modelo puede ser rigueado */
-router.post("/api/tripo3d/prerig", async (req: Request, res: Response) => {
+router.post("/tripo3d/prerig", async (req: Request, res: Response) => {
   const { original_model_task_id } = req.body ?? {};
   if (!original_model_task_id) { res.status(400).json({ error: "original_model_task_id requerido" }); return; }
   try {
@@ -462,7 +462,7 @@ router.post("/api/tripo3d/prerig", async (req: Request, res: Response) => {
 });
 
 /* POST /api/tripo3d/rig — esqueleto y rigging automático */
-router.post("/api/tripo3d/rig", async (req: Request, res: Response) => {
+router.post("/tripo3d/rig", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -501,7 +501,7 @@ router.post("/api/tripo3d/rig", async (req: Request, res: Response) => {
 });
 
 /* POST /api/tripo3d/retarget — aplicar animación preset a modelo rigueado */
-router.post("/api/tripo3d/retarget", async (req: Request, res: Response) => {
+router.post("/tripo3d/retarget", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -548,7 +548,7 @@ router.post("/api/tripo3d/retarget", async (req: Request, res: Response) => {
 
 /* POST /api/tripo3d/batch — hasta 10 modelos simultáneos (imagen→3D en lote) */
 router.post(
-  "/api/tripo3d/batch",
+  "/tripo3d/batch",
   multiUpload.array("images", 10),
   async (req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/event-stream");
@@ -623,7 +623,7 @@ router.post(
 
 /* POST /api/tripo3d/convert — convertir formato del modelo
    Acepta: original_model_task_id (Tripo SDK nativo) o taskId (alias corto) */
-router.post("/api/tripo3d/convert", async (req: Request, res: Response) => {
+router.post("/tripo3d/convert", async (req: Request, res: Response) => {
   const { taskId: taskIdAlias, original_model_task_id, format = "glb", quad, face_limit, texture_size, pivot_to_center_bottom } = req.body ?? {};
   const sourceTaskId = original_model_task_id || taskIdAlias;
   if (!sourceTaskId) { res.status(400).json({ error: "original_model_task_id (o taskId) requerido" }); return; }
@@ -645,7 +645,7 @@ router.post("/api/tripo3d/convert", async (req: Request, res: Response) => {
 });
 
 /* POST /api/tripo3d/stylize — aplicar estilo artístico */
-router.post("/api/tripo3d/stylize", async (req: Request, res: Response) => {
+router.post("/tripo3d/stylize", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -693,7 +693,7 @@ router.post("/api/tripo3d/stylize", async (req: Request, res: Response) => {
  *  - Si no hay imagen → Claude genera prompt inteligente → text_to_model
  * Streams SSE progress y guarda en vault al finalizar.
  */
-router.post("/api/tripo3d/auto-generate", async (req: Request, res: Response) => {
+router.post("/tripo3d/auto-generate", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -841,7 +841,7 @@ El modelo 3D debe representar visualmente el valor del producto/servicio de form
 });
 
 /* GET /api/tripo3d/local-models — lista los GLBs guardados localmente */
-router.get("/api/tripo3d/local-models", async (_req, res) => {
+router.get("/tripo3d/local-models", async (_req, res) => {
   try {
     if (!existsSync(TRIPO3D_LOCAL_DIR)) {
       res.json({ models: [] });
@@ -860,7 +860,7 @@ router.get("/api/tripo3d/local-models", async (_req, res) => {
 });
 
 /* POST /api/tripo3d/text-to-model-advanced — prompt, style, quality, seed, multiview */
-router.post("/api/tripo3d/text-to-model-advanced", async (req: Request, res: Response) => {
+router.post("/tripo3d/text-to-model-advanced", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -912,7 +912,7 @@ router.post("/api/tripo3d/text-to-model-advanced", async (req: Request, res: Res
 
 /* POST /api/tripo3d/segment — segmentar modelo 3D en partes semánticas
    Tripo3D divide el modelo en componentes (cuerpo, ruedas, cabello, ropa…) */
-router.post("/api/tripo3d/segment", async (req: Request, res: Response) => {
+router.post("/tripo3d/segment", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -954,7 +954,7 @@ router.post("/api/tripo3d/segment", async (req: Request, res: Response) => {
    Dado un archivo imagen, genera 4 renders angulares (front/left/back/right)
    usando visión IA (Gemini) para describir el objeto, luego xAI Aurora para renderizar */
 router.post(
-  "/api/tripo3d/image-to-multiview",
+  "/tripo3d/image-to-multiview",
   upload.single("image"),
   async (req: Request, res: Response): Promise<any> => {
     if (!req.file) return res.status(400).json({ error: "Imagen requerida" });
@@ -1035,7 +1035,7 @@ router.post(
 );
 
 /* POST /api/tripo3d/text-to-texture — aplicar textura basada en texto a modelo existente */
-router.post("/api/tripo3d/text-to-texture", async (req: Request, res: Response) => {
+router.post("/tripo3d/text-to-texture", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
@@ -1076,7 +1076,7 @@ router.post("/api/tripo3d/text-to-texture", async (req: Request, res: Response) 
 });
 
 /* POST /api/tripo3d/generate-views — text prompt → 4 angle images via xAI Aurora */
-router.post("/api/tripo3d/generate-views", async (req: Request, res: Response): Promise<any> => {
+router.post("/tripo3d/generate-views", async (req: Request, res: Response): Promise<any> => {
   const { prompt } = req.body ?? {};
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Se requiere un prompt" });

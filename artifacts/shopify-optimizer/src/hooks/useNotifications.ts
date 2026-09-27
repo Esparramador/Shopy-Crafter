@@ -39,9 +39,9 @@ export function useNotifications() {
       if (perm !== "granted") return;
 
       try {
-        const r = await fetch(`${API}/push/vapid-public-key`, { credentials: "include" });
+        const r = await fetch(`${API}/push/vapid-key`, { credentials: "include" });
         if (!r.ok) return;
-        const { publicKey } = await r.json();
+        const { key: publicKey } = await r.json() as { key: string | null };
         if (!publicKey) return;
 
         const reg = await navigator.serviceWorker.ready;
