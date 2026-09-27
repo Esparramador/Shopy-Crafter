@@ -449,20 +449,6 @@ router.post("/billing/upgrade", async (req, res): Promise<void> => {
       return;
     }
 
-    const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
-
-    if (SHOPIFY_CLIENT_ID) {
-      const returnUrl = `${APP_URL}/api/billing/shopify/callback`;
-      const confirmationUrl = `https://accounts.shopify.com/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&scope=&redirect_uri=${encodeURIComponent(returnUrl)}&state=${planId}_${userId}`;
-      res.json({
-        requiresPayment: true,
-        confirmationUrl,
-        plan,
-        message: `Serás redirigido a Shopify para confirmar el pago de ${plan.name} (€${plan.price}/mes)`,
-      });
-      return;
-    }
-
     const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "craftershopy@gmail.com";
     const subject = encodeURIComponent(`Solicitud de upgrade al plan ${plan.name}`);
     const body = encodeURIComponent(
@@ -487,42 +473,12 @@ router.post("/billing/upgrade", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/billing/shopify/callback", async (req, res): Promise<void> => {
-  try {
-    const { state, code } = req.query as { state?: string; code?: string };
-    if (!state) { res.status(400).json({ error: "Estado inválido" }); return; }
-
-    const [planId, userId] = state.split("_");
-    const plan = PLANS[planId];
-    if (!plan || !userId) { res.status(400).json({ error: "Parámetros inválidos" }); return; }
-
-    const periodEnd = new Date();
-    periodEnd.setDate(periodEnd.getDate() + plan.periodDays);
-
-    const existing = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId));
-    const updates = {
-      plan: planId,
-      status: "active",
-      storesLimit: plan.storesLimit,
-      imagesIncluded: plan.imagesIncluded,
-      currentPeriodEnd: periodEnd,
-      trialEndsAt: null,
-      cancelAtPeriodEnd: 0,
-    };
-
-    if (existing.length > 0) {
-      await db.update(subscriptionsTable).set(updates).where(eq(subscriptionsTable.userId, userId));
-    } else {
-      await db.insert(subscriptionsTable).values({ userId, ...updates });
-    }
-
-    logger.info({ userId, planId, code }, "✅ Shopify billing callback processed");
-    const APP_URL = process.env.APP_URL || `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
-    res.redirect(`${APP_URL}/#billing?success=1&plan=${planId}`);
-  } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
-  }
+// Antes: activaba el plan del `state` (plan_userId, puesto por quien llama) sin
+// sesión, sin cobro ni verificación con Shopify → Enterprise gratis para cualquiera
+// y cambio de plan de otras cuentas. El flujo "Shopify" nunca creaba un cargo real
+// (era una autorización OAuth vacía), así que se retira: el pago va por Stripe.
+router.get("/billing/shopify/callback", (_req, res): void => {
+  res.status(410).json({ error: "Flujo de pago retirado: usa el checkout de Stripe" });
 });
 
 router.get("/billing/affiliate", async (req, res): Promise<void> => {

@@ -35,7 +35,7 @@ const aiSuggestionsSchema = z.object({
   })).min(1),
 });
 import { sendPushToClientByProject } from "../lib/push-helper.js";
-import { msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
+import { checkMessageAttachments, msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -601,6 +601,9 @@ router.post("/projects/:projectId/messages", async (req, res): Promise<void> => 
     };
     const hasFiles = !!(fileUrl || (filesJson && filesJson.length > 0));
     if (!content?.trim() && !hasFiles) { res.status(400).json({ error: "Content or file required" }); return; }
+    if (filesJson !== undefined && filesJson !== null && !Array.isArray(filesJson)) { res.status(400).json({ error: "filesJson inválido" }); return; }
+    const attachErr = checkMessageAttachments(Number(projectId), req.session.role, [fileUrl, ...(filesJson ?? []).map(f => f?.fileUrl)]);
+    if (attachErr) { res.status(400).json({ error: attachErr }); return; }
     const id = randomBytes(16).toString("hex");
     const adminName = req.session.name ?? "Tu agencia";
     const filesJsonVal = filesJson && filesJson.length > 0 ? JSON.stringify(filesJson) : null;

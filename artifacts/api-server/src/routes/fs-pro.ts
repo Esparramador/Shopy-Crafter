@@ -496,6 +496,12 @@ router.get("/fs-pro/prompt-library", requireAuth, async (req, res) => {
     // Parse promptTemplate (we stored seeds as { systemPrompt, userTemplate })
     // and variables as JSON array. Be defensive against legacy rows that stored
     // the prompt as a raw string.
+    // Cada cliente ve las plantillas públicas/seed y las suyas; el admin, todas.
+    const sess = (req as any).session ?? {};
+    const me = `user:${sess.userId}`;
+    if (sess.role !== "admin") {
+      rows = rows.filter(r => r.isPublic === 1 || r.createdBy === me || (typeof r.id === "string" && r.id.startsWith("seed:")));
+    }
     const items = rows.map(r => {
       let template: any = r.promptTemplate;
       try {
@@ -549,8 +555,10 @@ router.post("/fs-pro/prompt-library", requireAuth, async (req, res) => {
       variables: Array.isArray(variables) ? JSON.stringify(variables.slice(0, 30).map(String)) : "[]",
       avgQualityScore: 0.5,
       useCount: 0,
-      createdBy: ((req as any).session?.userId ? `user:${(req as any).session.userId}` : "user:unknown"),
-      isPublic: 1,
+      createdBy: `user:${(req as any).session.userId}`,
+      // Plantillas de clientes son privadas (antes se forzaban públicas y todos
+      // los clientes veían las de los demás). Las del admin sí se comparten.
+      isPublic: (req as any).session?.role === "admin" ? 1 : 0,
     });
     res.json({ ok: true, id });
   } catch (e: any) {
@@ -564,6 +572,13 @@ router.delete("/fs-pro/prompt-library/:id", requireAuth, async (req, res) => {
     const id = String(req.params.id);
     if (id.startsWith("seed:")) {
       res.status(403).json({ error: "Las plantillas pre-cargadas (seeds) no se pueden eliminar." }); return;
+    }
+    const sess = (req as any).session ?? {};
+    const [row] = await _dbForLibrary.select({ createdBy: omnicorePromptLibraryTable.createdBy })
+      .from(omnicorePromptLibraryTable).where(_eqLib(omnicorePromptLibraryTable.id, id));
+    if (!row) { res.status(404).json({ error: "Plantilla no encontrada" }); return; }
+    if (sess.role !== "admin" && row.createdBy !== `user:${sess.userId}`) {
+      res.status(403).json({ error: "Solo puedes borrar tus propias plantillas" }); return;
     }
     await _dbForLibrary.delete(omnicorePromptLibraryTable).where(_eqLib(omnicorePromptLibraryTable.id, id));
     res.json({ ok: true });
