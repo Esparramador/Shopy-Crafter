@@ -503,6 +503,8 @@ export interface ConvAIAgentConfig {
       prompt?: { prompt: string };
       first_message?: string;
       language?: string;
+      /** Valores por defecto de las {{variables}} del prompt (se sustituyen al iniciar la conversación). */
+      dynamic_variables?: { dynamic_variable_placeholders?: Record<string, string> };
     };
     asr?: {
       /** e.g. "pcm_16000" — must match what the browser sends as user_audio_chunk. */

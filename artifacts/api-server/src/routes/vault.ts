@@ -360,9 +360,11 @@ async function downloadVaultFile(req: Request, res: Response): Promise<void> {
 
   if (!file) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
 
-  const filename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.${getExtension(file.mimeType ?? "application/octet-stream")}`;
+  // Notas/informes de texto antiguos sin mime_type se descargaban como .bin.
+  const effectiveMime = file.mimeType ?? (file.fileType === "text" ? "text/markdown" : "application/octet-stream");
+  const filename = `${file.title.replace(/[^a-zA-Z0-9._-]/g, "_")}.${getExtension(effectiveMime)}`;
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.setHeader("Content-Type", file.mimeType ?? "application/octet-stream");
+  res.setHeader("Content-Type", effectiveMime);
 
   // PRIORIDAD: objectPath → diskFallback → content → originalUrl → metadata
   // El contenido REAL guardado siempre gana sobre re-fetchar la URL origen
@@ -400,7 +402,7 @@ async function downloadVaultFile(req: Request, res: Response): Promise<void> {
     // FIX: binary mime types are stored as base64 in `content` by saveToVaultSmart
     // (when buffer < 2MB and object storage isn't used). Decode them properly
     // instead of sending the base64 string as utf-8 (which corrupts binaries).
-    const mt = file.mimeType ?? "text/html";
+    const mt = effectiveMime === "application/octet-stream" ? "text/html" : effectiveMime;
     const isBinary = !mt.startsWith("text/")
       && !mt.startsWith("application/json")
       && !mt.startsWith("application/xml")

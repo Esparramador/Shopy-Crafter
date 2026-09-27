@@ -213,6 +213,9 @@ router.get("/client/video-call/incoming", requireAuth, async (req, res): Promise
 
   for (const call of calls.values()) {
     if (call.status !== "ringing" && call.status !== "active") continue;
+    // Solo llamadas del equipo: antes el cliente recibía como "entrante" su
+    // propia solicitud y le sonaba el timbre cada 3 s.
+    if (call.initiatedBy !== "admin") continue;
     if (callMatchesClient(call, userId, clientId)) {
       res.json({ call: { id: call.id, roomUrl: call.roomUrl, status: call.status, initiatedBy: call.initiatedBy, projectId: call.projectId, createdAt: call.createdAt } });
       return;
@@ -223,16 +226,22 @@ router.get("/client/video-call/incoming", requireAuth, async (req, res): Promise
 
 // ─── Client: accept incoming call ────────────────────────────────────────────
 router.post("/client/video-call/:callId/accept", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
   const call = calls.get(String(req.params.callId));
-  if (!call) { res.status(404).json({ error: "Llamada no encontrada o expirada" }); return; }
+  if (!call || !(session.role === "admin" || callMatchesClient(call, session.userId ?? null, session.clientId ?? null))) {
+    res.status(404).json({ error: "Llamada no encontrada o expirada" }); return;
+  }
   call.status = "active";
   res.json({ ok: true, roomUrl: call.roomUrl });
 });
 
 // ─── Client: reject incoming call ────────────────────────────────────────────
 router.post("/client/video-call/:callId/reject", requireAuth, async (req, res): Promise<void> => {
+  const session = req.session as any;
   const call = calls.get(String(req.params.callId));
-  if (!call) { res.status(404).json({ error: "Llamada no encontrada" }); return; }
+  if (!call || !(session.role === "admin" || callMatchesClient(call, session.userId ?? null, session.clientId ?? null))) {
+    res.status(404).json({ error: "Llamada no encontrada" }); return;
+  }
   call.status = "rejected";
   res.json({ ok: true });
 });

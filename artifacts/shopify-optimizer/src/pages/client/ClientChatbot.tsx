@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useClientPreview } from "./ClientPreviewContext";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 // Base without /api: VoiceCallModal appends its own /api/voice/... path.
@@ -95,6 +97,12 @@ const SR_API: any = typeof window !== "undefined"
   : null;
 
 export function ClientChatbot() {
+  // Previsualización del admin: mismo ?pid que el resto del portal (antes todas
+  // las llamadas daban 400 "No project linked" en la vista previa).
+  const { user } = useAuth();
+  const { previewPid } = useClientPreview();
+  const isAdmin = user?.role === "admin";
+  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
   const [open, setOpen]             = useState(false);
   const [msgs, setMsgs]             = useState<ChatMsg[]>([]);
   const [input, setInput]           = useState("");
@@ -199,7 +207,7 @@ export function ClientChatbot() {
     try {
       const fd = new FormData();
       Array.from(files).forEach(f => fd.append("files", f));
-      const r = await fetch(`${API}/client/messages/upload-multi`, {
+      const r = await fetch(apid(`${API}/client/messages/upload-multi`), {
         method: "POST", credentials: "include", body: fd,
       });
       if (!r.ok) throw new Error("Error subiendo archivos");
@@ -234,11 +242,22 @@ export function ClientChatbot() {
     if (abortRef.current) abortRef.current.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
-    const timer = setTimeout(() => ctrl.abort(), 30000);
+    // Timeout por INACTIVIDAD (antes 30 s fijos que cortaban respuestas largas y
+    // la investigación en streaming a medias, sin avisar). Se rearma con cada
+    // fragmento recibido.
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = (ms: number) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
+    };
+    arm(180_000);
 
     try {
       const hasFiles = filesToSend.length > 0;
-      const isForward = FORWARD_WORDS.test(t) && hasFiles;
+      // Reenviar al equipo también sin adjuntos (antes "dile a Joan que…" solo con
+      // texto iba al chat en streaming, que no reenvía nada).
+      const isForward = FORWARD_WORDS.test(t);
       const isListFiles = LIST_FILES_WORDS.test(t) && !t.includes("producto");
       const isListProducts = LIST_PRODUCTS_WORDS.test(t) && t.includes("producto");
 
@@ -250,7 +269,7 @@ export function ClientChatbot() {
       const isProjectMode = projectModeRef.current;
       if (isForward || hasFiles || isProjectMode) {
         // ── JSON path: forward to admin, files, or project mode ─────────
-        const res = await fetch(`${API}/client/ai-chat`, {
+        const res = await fetch(apid(`${API}/client/ai-chat`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -294,7 +313,7 @@ export function ClientChatbot() {
         const botTs = Date.now();
         setMsgs(prev => [...prev, { role: "assistant" as const, content: "", ts: botTs }]);
 
-        const res = await fetch(`${API}/client/ai-chat/stream`, {
+        const res = await fetch(apid(`${API}/client/ai-chat/stream`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -315,9 +334,11 @@ export function ClientChatbot() {
         let buf = "";
         let acc = "";
 
+        arm(60_000);
         outer: while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          arm(60_000);
           buf += dec.decode(value, { stream: true });
           const parts = buf.split("\n\n");
           buf = parts.pop() ?? "";
@@ -341,6 +362,8 @@ export function ClientChatbot() {
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         addMsg({ role: "assistant", content: "No pude conectar. Inténtalo de nuevo.", ts: Date.now() });
+      } else if (timedOut) {
+        addMsg({ role: "system", content: "⚠️ La respuesta se interrumpió por falta de actividad del servidor. Inténtalo de nuevo.", ts: Date.now() });
       }
     } finally {
       clearTimeout(timer);
@@ -351,7 +374,7 @@ export function ClientChatbot() {
 
   async function handleListFiles(query: string) {
     try {
-      const r = await fetch(`${API}/client/vault-files`, { credentials: "include" });
+      const r = await fetch(apid(`${API}/client/vault-files`), { credentials: "include" });
       if (!r.ok) throw new Error("No se pudieron cargar los archivos");
       const files: VaultFile[] = await r.json();
 
@@ -680,7 +703,7 @@ export function ClientChatbot() {
                             if (savedIdxs.has(i) || savingIdx === i) return;
                             setSavingIdx(i);
                             try {
-                              await fetch(`${API}/client/notebook`, {
+                              await fetch(apid(`${API}/client/notebook`), {
                                 method: "POST", credentials: "include",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ content: m.content }),

@@ -400,7 +400,10 @@ export default function ClientMessages() {
         }}>
           {/* Chat header */}
           {(() => {
-            const callMsg = [...messages].reverse().find(m => m.fromRole === "admin" && m.content?.includes("📹 Videollamada iniciada"));
+            // Solo avisos recientes: las salas caducan a los 10 min (antes el banner
+            // quedaba para siempre apuntando a una sala muerta).
+            const callMsg = [...messages].reverse().find(m => m.fromRole === "admin" && m.content?.includes("📹 Videollamada iniciada")
+              && Date.now() - new Date(m.createdAt).getTime() < 10 * 60 * 1000);
             const callUrl = callMsg?.content?.match(/https:\/\/meet\.jit\.si\/[^\s]+/)?.[0];
             return (
               <>
