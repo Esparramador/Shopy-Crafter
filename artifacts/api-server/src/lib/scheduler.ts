@@ -9,11 +9,13 @@ import {
 import { desc, eq, gte, sql, and, inArray } from "drizzle-orm";
 import { refreshToken, rotateToken, validateToken, shopifyRequest } from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
-import { askClaudeWithBrain, buildShopyBrainContext, type BrainUseCase } from "./claude.js";
+import { askClaudeWithBrainDetailed, buildShopyBrainContext, type BrainUseCase } from "./claude.js";
+import { generateAiJson } from "./ai-json.js";
+import { isAiOutputError } from "./ai-errors.js";
 import { askGeminiWithSearch } from "./gemini.js";
 import { logger } from "./logger.js";
 import { z } from "zod";
-import { lenientArray, looseString, optionalLooseNumber, parseResearchJson } from "./ai-schema.js";
+import { lenientArray, looseString, optionalLooseNumber } from "./ai-schema.js";
 import { randomBytes } from "crypto";
 import { sendEmail, isGmailAvailable } from "./gmail.js";
 import { apiUsageLogTable } from "@workspace/db/schema";
@@ -33,10 +35,13 @@ const selfEvaluationSchema = z.object({
 });
 type SelfEvaluationReport = z.output<typeof selfEvaluationSchema>["report"];
 
-async function aiGenerate(opts: { system: string; prompt: string; maxTokens: number; timeoutMs?: number; useCase?: BrainUseCase; niche?: string }): Promise<string> {
+type AiGenerateOpts = { system: string; prompt: string; maxTokens: number; timeoutMs?: number; useCase?: BrainUseCase; niche?: string };
+
+/** Claude con ShopyBrain y, si Anthropic se queda sin crédito, Gemini. Devuelve si se cortó. */
+async function aiGenerateDetailed(opts: AiGenerateOpts): Promise<{ text: string; truncated: boolean }> {
   if (!geminiOnly) {
     try {
-      return await askClaudeWithBrain(
+      const r = await askClaudeWithBrainDetailed(
         0,
         [{ role: "user", content: opts.prompt }],
         opts.system,
@@ -45,6 +50,7 @@ async function aiGenerate(opts: { system: string; prompt: string; maxTokens: num
         opts.maxTokens,
         opts.timeoutMs ?? 120_000,
       );
+      return { text: r.text, truncated: r.truncated };
     } catch (err: unknown) {
       const msg = String((err as { message?: string })?.message ?? err ?? "");
       if (msg.includes("credit balance") || msg.includes("billing") || msg.includes("overloaded") || (err as { status?: number })?.status === 429) {
@@ -58,8 +64,65 @@ async function aiGenerate(opts: { system: string; prompt: string; maxTokens: num
 
   const result = await askGeminiWithSearch(opts.prompt, opts.system);
   log("ai-fallback", "📊 Gemini fallback used");
-  return result?.text ?? "";
+  return { text: result?.text ?? "", truncated: false };
 }
+
+/**
+ * JSON validado para los crons de OmniCore. Antes: regex codiciosa + "reparaciones"
+ * con replace (que tocaban también el contenido de las cadenas) y campos sin validar
+ * (un newConfidence en texto guardaba NaN; un insight sin texto rompía el INSERT).
+ * Ahora: extracción balanceada, esquema, un reintento y error tipado.
+ */
+async function aiGenerateJson<T>(opts: AiGenerateOpts, schema: z.ZodType<T, z.ZodTypeDef, unknown>, label: string): Promise<T> {
+  return generateAiJson<T>({
+    prompt: opts.prompt,
+    maxTokens: opts.maxTokens,
+    retryMaxTokens: opts.maxTokens * 2,
+    schema,
+    expect: "object",
+    label: `scheduler/${label}`,
+    call: ({ prompt, maxTokens }) => aiGenerateDetailed({ ...opts, prompt, maxTokens }),
+  });
+}
+
+const confidence = optionalLooseNumber.transform(n => (n === undefined ? undefined : Math.max(0.1, Math.min(1, n))));
+const studyInsightsSchema = z.object({
+  insights: lenientArray(z.object({
+    title: z.string().min(1),
+    insight: z.string().min(1),
+    confidence,
+    memoryType: z.string().optional().catch(undefined),
+    tags: lenientArray(looseString),
+    domains: lenientArray(looseString),
+    priority: z.string().optional().catch(undefined),
+  })).refine(a => a.length > 0, { message: "sin insights válidos" }),
+});
+const crossConnectionsSchema = z.object({
+  connections: lenientArray(z.object({
+    fromDomain: z.string().min(1),
+    toDomain: z.string().min(1),
+    insight: z.string().min(1),
+    synergy: z.string().default(""),
+    confidence,
+  })).refine(a => a.length > 0, { message: "sin conexiones válidas" }),
+});
+const retroEvaluationsSchema = z.object({
+  evaluations: lenientArray(z.object({
+    index: z.preprocess(v => (typeof v === "string" ? Number(v) : v), z.number().int().positive()),
+    newConfidence: z.preprocess(v => (typeof v === "string" ? Number(v) : v), z.number().finite().min(0).max(1)),
+    stillValid: z.boolean().optional().catch(undefined),
+    notes: z.string().default(""),
+  })).refine(a => a.length > 0, { message: "sin evaluaciones válidas" }),
+});
+const adaptiveStudySchema = z.object({
+  insights: lenientArray(z.object({
+    domain: z.string().min(1).catch("general"),
+    content: z.string().min(1),
+    confidence,
+    tags: lenientArray(looseString),
+    connectionTo: z.string().optional().catch(undefined),
+  })).refine(a => a.length > 0, { message: "sin insights válidos" }),
+});
 
 function log(job: string, msg: string) {
   logger.info({ job }, msg);
@@ -380,31 +443,11 @@ export async function runOmniCoreMicroLearning() {
         const prompt = `You are a world-class expert in ${label}. Your knowledge is UNIVERSAL — not limited to any single industry. Generate exactly 3 fresh, deeply researched, actionable insights that combine best practices from multiple industries and disciplines. Each insight must be specific, backed by real-world data or established frameworks, and immediately applicable to improve quality of content, strategy, or execution for an eCommerce agency managing Shopify stores. Think broadly: draw from psychology, neuroscience, art, architecture, fashion, technology, data science, behavioral economics, or ANY discipline that enriches the topic. Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.82,"memoryType":"pricing_pattern","tags":["tag1","tag2"]}]}`;
 
-        const text = await aiGenerate({
+        const parsed = await aiGenerateJson({
           system: `You are OmniCore Micro-Learning Engine — an omniscient knowledge engine that learns from ALL disciplines and fields of human knowledge. Your mission is to accumulate the deepest, most actionable knowledge possible. You are NOT limited to eCommerce — you absorb wisdom from art, science, psychology, technology, design, business strategy, finance, law, marketing, photography, video, AI, data science, logistics, sustainability, and ANY other field relevant to creating exceptional content and strategy. Always connect knowledge to practical application. ${brainCtxMicro}`,
           prompt,
           maxTokens: 8192,
-        });
-        const match = text.match(/\{[\s\S]*\}/);
-        if (!match) { log("omnicore-micro", `No JSON from Claude for domain ${domain.domain}`); continue; }
-
-        let parsed: { insights: Array<{ title: string; insight: string; confidence: number; memoryType?: string; tags?: string[] }> };
-        try {
-          let jsonStr = match[0]
-            .replace(/,\s*]/g, "]")
-            .replace(/,\s*}/g, "}")
-            .replace(/[\x00-\x1f\x7f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? c : "");
-          parsed = JSON.parse(jsonStr);
-        } catch {
-          log("omnicore-micro", `Malformed JSON from AI for domain ${domain.domain}, attempting line-by-line repair`);
-          try {
-            const raw = match[0].replace(/```json?\s*/g, "").replace(/```/g, "").trim();
-            parsed = JSON.parse(raw.replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
-          } catch {
-            log("omnicore-micro", `JSON repair failed for domain ${domain.domain} — skipping`);
-            continue;
-          }
-        }
+        }, studyInsightsSchema, `omnicore-micro:${domain.domain}`);
 
         for (const ins of parsed.insights ?? []) {
           const insId = `micro-${domain.id}-${uid()}`;
@@ -512,33 +555,11 @@ export async function runOmniCoreCrossConnections() {
     const prompt = `Find 3 powerful hidden cross-domain insights connecting these knowledge areas: ${names.join(" | ")}. Each insight should reveal a non-obvious synergy — drawing from ANY discipline (neuroscience, art, architecture, behavioral economics, technology, culture, science, nature, music, etc.) that creates compounding value. The BEST cross-domain insights connect fields that nobody would think are related. Return ONLY valid JSON:
 {"connections":[{"fromDomain":"domain_key","toDomain":"domain_key","insight":"...","synergy":"...","confidence":0.8}]}`;
 
-    const text = await aiGenerate({
+    const parsed = await aiGenerateJson({
       system: `You are OmniCore Cross-Domain Synthesis Engine — a polymathic intelligence that discovers hidden connections between ANY knowledge domains. You draw from science, art, psychology, philosophy, technology, nature, mathematics, and the ENTIRE spectrum of human knowledge. The most valuable insights come from connecting seemingly unrelated fields. ${brainCtx}`,
       prompt,
       maxTokens: 8192,
-    });
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) { log("omnicore-cross", "No JSON from Claude"); return; }
-
-    let parsed: {
-      connections: Array<{ fromDomain: string; toDomain: string; insight: string; synergy: string; confidence: number }>
-    };
-    try {
-      const jsonStr = match[0]
-        .replace(/,\s*]/g, "]")
-        .replace(/,\s*}/g, "}")
-        .replace(/[\x00-\x1f\x7f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? c : "");
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      log("omnicore-cross", "Malformed JSON from AI, attempting repair");
-      try {
-        const raw = match[0].replace(/```json?\s*/g, "").replace(/```/g, "").trim();
-        parsed = JSON.parse(raw.replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
-      } catch {
-        log("omnicore-cross", "JSON repair failed — skipping cross-synthesis");
-        return;
-      }
-    }
+    }, crossConnectionsSchema, "omnicore-cross");
 
     for (const conn of parsed.connections ?? []) {
       const crossId = `cross-${uid()}`;
@@ -606,26 +627,12 @@ export async function runOmniCoreDailyDeepStudy() {
 Think like a polymath — combine wisdom from art, science, technology, psychology, business, design, finance, law, and culture. Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.87,"memoryType":"pricing_pattern"}]}`;
 
-        const text = await aiGenerate({
+        const parsed = await aiGenerateJson({
           system: `You are OmniCore Daily Deep Study Engine — the most advanced autonomous learning system ever built. You are an OMNISCIENT POLYMATH that accumulates knowledge from EVERY discipline: art, architecture, neuroscience, behavioral economics, photography, cinematography, fashion, industrial design, data science, AI/ML, psychology, sociology, law, finance, logistics, sustainability, copywriting, storytelling, music theory, color science, material science, cultural anthropology, and more. Your mission: generate the deepest, most actionable knowledge that elevates the quality of every output — from product descriptions to pricing strategies to visual content. NEVER limit yourself to a single industry. The BEST insights come from connecting knowledge across disciplines. ${brainCtxDaily}`,
           prompt,
           maxTokens: 8192,
-        });
+        }, studyInsightsSchema, `omnicore-daily:${domain.domain}`);
         consecutiveFails = 0;
-        const match = text.match(/\{[\s\S]*\}/);
-        if (!match) continue;
-
-        let parsed: { insights: Array<{ title: string; insight: string; confidence: number; memoryType?: string }> };
-        try {
-          parsed = JSON.parse(match[0].replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
-        } catch {
-          try {
-            parsed = JSON.parse(match[0].replace(/```json?\s*/g, "").replace(/```/g, "").trim().replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
-          } catch {
-            log("omnicore-daily", `JSON repair failed for domain ${domain.domain} — skipping`);
-            continue;
-          }
-        }
 
         for (const ins of parsed.insights ?? []) {
           const insId = `daily-${domain.id}-${uid()}`;
@@ -665,7 +672,9 @@ Think like a polymath — combine wisdom from art, science, technology, psycholo
 
         log("omnicore-daily", `✅ ${domain.domain}: ${(parsed.insights ?? []).length} insights → depth ${newDepth}`);
       } catch (err) {
-        consecutiveFails++;
+        // Un JSON inutilizable no es un fallo de Claude: no cuenta para el circuit breaker.
+        if (isAiOutputError(err)) consecutiveFails = 0;
+        else consecutiveFails++;
         logger.warn({ domainId: domain.id, err, consecutiveFails }, "Daily study failed for domain");
       }
     }
@@ -717,55 +726,46 @@ ${memorySummary}
 Return ONLY valid JSON:
 {"insights":[{"title":"...","insight":"...","confidence":0.92,"domains":["domain1","domain2"],"priority":"high"}]}`;
 
-    const text = await aiGenerate({
-      system: `You are OmniCore Mega-Synthesis Engine — the HIGHEST-LEVEL REASONING LAYER of the entire ShopyBrain system. You are an omniscient polymath that synthesizes an entire week of multi-domain, multi-disciplinary learning into strategic masterclass insights. You draw from EVERY field of human knowledge: science, art, psychology, technology, business, philosophy, neuroscience, behavioral economics, design, photography, cinematography, storytelling, music, architecture, material science, cultural studies, law, and beyond. Your insights are the kind that change businesses overnight. ${brainCtx}`,
-      prompt,
-      maxTokens: 8192,
-      timeoutMs: 180_000,
-    });
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      let parsed: {
-        insights: Array<{ title: string; insight: string; confidence: number; domains?: string[]; priority?: string }>
-      };
-      try {
-        parsed = JSON.parse(match[0].replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
-      } catch {
-        try {
-          parsed = JSON.parse(match[0].replace(/```json?\s*/g, "").replace(/```/g, "").trim().replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
-        } catch {
-          log("omnicore-mega", "JSON repair failed for mega-synthesis — skipping");
-          return;
-        }
-      }
+    let megaInsights: z.output<typeof studyInsightsSchema>["insights"] = [];
+    try {
+      const parsed = await aiGenerateJson({
+        system: `You are OmniCore Mega-Synthesis Engine — the HIGHEST-LEVEL REASONING LAYER of the entire ShopyBrain system. You are an omniscient polymath that synthesizes an entire week of multi-domain, multi-disciplinary learning into strategic masterclass insights. You draw from EVERY field of human knowledge: science, art, psychology, technology, business, philosophy, neuroscience, behavioral economics, design, photography, cinematography, storytelling, music, architecture, material science, cultural studies, law, and beyond. Your insights are the kind that change businesses overnight. ${brainCtx}`,
+        prompt,
+        maxTokens: 8192,
+        timeoutMs: 180_000,
+      }, studyInsightsSchema, "omnicore-mega");
+      megaInsights = parsed.insights;
+    } catch (err) {
+      if (!isAiOutputError(err)) throw err;
+      log("omnicore-mega", "Respuesta de la IA inutilizable tras el reintento — sin insights esta semana");
+    }
 
-      for (const ins of parsed.insights ?? []) {
-        const insId = `mega-${uid()}`;
-        const conf = ins.confidence ?? 0.9;
+    for (const ins of megaInsights) {
+      const insId = `mega-${uid()}`;
+      const conf = ins.confidence ?? 0.9;
 
-        await db.insert(omnicoreInsightsTable).values({
-          id: insId,
-          domain: (ins.domains ?? ["general"])[0],
-          insightType: "mega_synthesis",
-          title: ins.title,
-          insight: ins.insight,
-          confidence: conf,
-          source: "weekly_mega_synthesis",
-        }).onConflictDoNothing();
+      await db.insert(omnicoreInsightsTable).values({
+        id: insId,
+        domain: ins.domains[0] ?? "general",
+        insightType: "mega_synthesis",
+        title: ins.title,
+        insight: ins.insight,
+        confidence: conf,
+        source: "weekly_mega_synthesis",
+      }).onConflictDoNothing();
 
-        await db.insert(omnicoreMemoriesTable).values({
-          id: `mem-${insId}`,
-          memoryType: "mega_insight",
-          niche: "general",
-          title: `[MEGA] ${ins.title}`,
-          content: ins.insight.slice(0, 4000),
-          confidence: conf,
-          sourceType: "mega_synthesis",
-          tags: JSON.stringify(["mega", "strategic", ...(ins.domains ?? [])]),
-        }).onConflictDoNothing();
+      await db.insert(omnicoreMemoriesTable).values({
+        id: `mem-${insId}`,
+        memoryType: "mega_insight",
+        niche: "general",
+        title: `[MEGA] ${ins.title}`,
+        content: ins.insight.slice(0, 4000),
+        confidence: conf,
+        sourceType: "mega_synthesis",
+        tags: JSON.stringify(["mega", "strategic", ...ins.domains]),
+      }).onConflictDoNothing();
 
-        totalInsights++;
-      }
+      totalInsights++;
     }
 
     await db.update(omnicoreStudySessionsTable).set({
@@ -868,7 +868,7 @@ export async function runRetroactiveReanalysis() {
       ).join("\n");
 
       try {
-        const text = await aiGenerate({
+        const parsed = await aiGenerateJson({
           system: `You are OmniCore Retroactive Analyst. You re-evaluate existing insights using the latest knowledge, data, and trends. Your job: assess if each insight is still valid, update confidence scores, and add notes on what has changed. Be rigorous and honest — lower confidence if evidence has weakened, raise it if new evidence supports it. ${brainCtx}`,
           prompt: `Re-evaluate these existing insights with your current knowledge. For each insight, determine:
 1. Is it still accurate and relevant?
@@ -881,26 +881,13 @@ ${insightsSummary}
 Return ONLY valid JSON:
 {"evaluations":[{"index":1,"newConfidence":0.85,"stillValid":true,"notes":"Brief explanation of changes"}]}`,
           maxTokens: 8192,
-        });
+        }, retroEvaluationsSchema, "omnicore-retro");
 
-        const match = text.match(/\{[\s\S]*\}/);
-        if (!match) continue;
-
-        let parsed: {
-          evaluations: Array<{ index: number; newConfidence: number; stillValid: boolean; notes: string }>
-        };
-        try {
-          parsed = JSON.parse(match[0].replace(/,\s*]/g, "]").replace(/,\s*}/g, "}"));
-        } catch {
-          log("omnicore-retro", "JSON repair failed for retroanalysis batch — skipping");
-          continue;
-        }
-
-        for (const ev of parsed.evaluations ?? []) {
+        for (const ev of parsed.evaluations) {
           const ins = batch[ev.index - 1];
           if (!ins) continue;
 
-          const newConf = Math.max(0.1, Math.min(1.0, ev.newConfidence));
+          const newConf = Math.max(0.1, Math.min(1.0, ev.newConfidence)); // validado: número 0-1 (antes podía guardar NaN)
           await db.update(omnicoreInsightsTable).set({
             confidence: newConf,
             retroactiveVersion: sql`COALESCE(retroactive_version, 0) + 1`,
@@ -977,9 +964,11 @@ export async function runMonthlySelfEvaluation() {
 
     const brainCtx = await buildShopyBrainContext(undefined, "ecommerce", "shopify ecommerce optimization learning");
 
-    const text = await aiGenerate({
-      system: `You are OmniCore Self-Evaluation Engine. You produce honest, data-driven monthly performance reports about the brain's learning progress. Be specific, use the numbers provided, and give actionable recommendations. Respond in Spanish. ${brainCtx}`,
-      prompt: `Generate a monthly self-evaluation report for OmniCore Brain based on these stats:
+    let parsedEval: z.output<typeof selfEvaluationSchema> | null = null;
+    try {
+      parsedEval = await aiGenerateJson({
+        system: `You are OmniCore Self-Evaluation Engine. You produce honest, data-driven monthly performance reports about the brain's learning progress. Be specific, use the numbers provided, and give actionable recommendations. Respond in Spanish. ${brainCtx}`,
+        prompt: `Generate a monthly self-evaluation report for OmniCore Brain based on these stats:
 
 ${JSON.stringify(stats, null, 2)}
 
@@ -993,13 +982,16 @@ The report should include:
 
 Return ONLY valid JSON:
 {"report":{"summary":"...","keyMetrics":["metric1","metric2"],"strengths":["..."],"weaknesses":["..."],"recommendations":["..."],"overallScore":85,"knowledgeGaps":["..."]}}`,
-      maxTokens: 8192,
-    });
+        maxTokens: 8192,
+      }, selfEvaluationSchema, "monthly-self-evaluation");
+    } catch (err) {
+      if (!isAiOutputError(err)) throw err;
+      log("omnicore-eval", "Informe de la IA inutilizable tras el reintento — se guarda el resumen con las estadísticas");
+    }
 
     // Si la IA no devuelve un informe válido se guarda solo el resumen con las
     // estadísticas reales (antes el fallo se tragaba en silencio y un campo que no
     // fuera lista rompía el spread de knowledgeGaps).
-    const parsedEval = parseResearchJson(text, selfEvaluationSchema, "scheduler/monthly-self-evaluation");
     const reportData: SelfEvaluationReport = parsedEval?.report ?? {
       summary: `Monthly stats: ${stats.insightsThisMonth} insights, ${stats.studySessions} sessions, avg confidence ${stats.avgConfidence}`,
       keyMetrics: [], strengths: [], weaknesses: [], recommendations: [], knowledgeGaps: [],
@@ -1237,27 +1229,13 @@ TAREA: Genera exactamente 5 insights nuevos que:
 
 Responde en JSON: { "insights": [{ "domain": "string", "content": "string", "confidence": 0.7, "tags": ["string"], "connectionTo": "string (dominio conectado)" }] }`;
 
-    const studyResult = await aiGenerate({
+    const parsed = await aiGenerateJson({
       system: "You are ShopyBrain's adaptive learning engine. Generate high-value cross-domain insights for e-commerce optimization. Always respond in Spanish. Return ONLY valid JSON.",
       prompt: studyPrompt,
       maxTokens: 4096,
       timeoutMs: 90_000,
-    });
-
-    const jsonMatch = studyResult.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      log("adaptive-study", "⚠️ No JSON in study result");
-      return;
-    }
-
-    let parsed: any;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch {
-      log("adaptive-study", "⚠️ Failed to parse study results JSON");
-      parsed = { insights: [], crossConnections: [] };
-    }
-    const insights = Array.isArray(parsed.insights) ? parsed.insights : [];
+    }, adaptiveStudySchema, "adaptive-study");
+    const insights = parsed.insights;
 
     let savedCount = 0;
     for (const insight of insights.slice(0, 5)) {
@@ -1266,8 +1244,8 @@ Responde en JSON: { "insights": [{ "domain": "string", "content": "string", "con
           id: randomBytes(12).toString("hex"),
           domain: insight.domain ?? "general",
           insightType: "adaptive_study",
-          title: `Adaptive: ${(insight.content ?? "").slice(0, 80)}`,
-          insight: insight.content ?? "",
+          title: `Adaptive: ${insight.content.slice(0, 80)}`,
+          insight: insight.content,
           confidence: insight.confidence ?? 0.6,
           source: "adaptive_study_cron",
         });
@@ -1289,7 +1267,7 @@ Responde en JSON: { "insights": [{ "domain": "string", "content": "string", "con
     await db.insert(omnicoreStudySessionsTable).values({
       id: sessionId,
       sessionType: "adaptive_study",
-      domainsStudied: [...new Set(insights.map((i: any) => i.domain))].join(", "),
+      domainsStudied: [...new Set(insights.map(i => i.domain))].join(", "),
       insightsCreated: savedCount,
       summary: `Adaptive study: focus=${studyFocus}, weak=${weakMemories.length}, strong=${strongMemories.length}, saved=${savedCount}`,
     }).catch(() => {});
