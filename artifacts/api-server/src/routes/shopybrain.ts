@@ -17,6 +17,7 @@ import { askGeminiWithSearch } from "../lib/gemini.js";
 import { logger } from "../lib/logger.js";
 import { generateAiJson } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
 import { z } from "zod";
 import { saveToVault } from "../lib/vault.js";
 import { buildCoverPage } from "../lib/report-cover.js";
@@ -159,6 +160,20 @@ const brandBookSchema = z.object({
   }).passthrough()).min(1),
 }).passthrough();
 
+// Precio de mercado con Gemini + búsqueda. Antes se usaba sin validar: un
+// "suggestedPrice" en texto ("29,99") hacía fallar el .toFixed() de quien lo usa.
+const realPricingSchema = z.object({
+  competitorPrices: lenientArray(z.object({
+    source: looseString,
+    price: looseNumber.transform(String),
+    url: z.string().optional().catch(undefined),
+  })),
+  marketPriceRange: z.object({ min: looseNumber, max: looseNumber, median: looseNumber }).optional().catch(undefined),
+  suggestedPrice: optionalLooseNumber,
+  suggestedCompareAtPrice: optionalLooseNumber,
+  pricingStrategy: z.string().optional().catch(undefined),
+});
+
 async function researchRealPricing(productTitle: string, productType: string, niche: string, currentPrice?: string): Promise<{
   marketPriceRange: { min: number; max: number; median: number };
   competitorPrices: Array<{ source: string; price: string; url?: string }>;
@@ -206,15 +221,12 @@ RESPONDE con este formato JSON exacto (sin texto adicional):
       `You are a pricing analyst. Search for REAL current prices of similar products online. Always use Google Search to find actual prices from real stores. Return ONLY valid JSON.`
     );
 
-    const jsonMatch = geminiResult.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return defaultResult;
-
-    let parsed: any;
-    try { parsed = JSON.parse(jsonMatch[0]); } catch { return defaultResult; }
+    const parsed = parseResearchJson(geminiResult.text, realPricingSchema, "shopybrain/researchRealPricing");
+    if (!parsed) return defaultResult;
     const result = {
       marketPriceRange: parsed.marketPriceRange ?? defaultResult.marketPriceRange,
-      competitorPrices: parsed.competitorPrices ?? [],
-      suggestedPrice: parsed.suggestedPrice ?? (currentPrice ? parseFloat(currentPrice) : 0),
+      competitorPrices: parsed.competitorPrices,
+      suggestedPrice: parsed.suggestedPrice ?? defaultResult.suggestedPrice,
       suggestedCompareAtPrice: parsed.suggestedCompareAtPrice ?? 0,
       pricingStrategy: parsed.pricingStrategy ?? "",
       sources: geminiResult.sources || [],
