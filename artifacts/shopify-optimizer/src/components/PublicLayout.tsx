@@ -36,7 +36,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           {footer?.site.logo.imageUrl ? (
             <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt={footer.site.name} style={{ height: 26, borderRadius: 6 }} />
           ) : (
-            <span style={{ width: 28, height: 28, background: "linear-gradient(135deg,#c8a84b,#b8860b)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#060500", flexShrink: 0 }}>{footer?.site.logo.value ?? "SC"}</span>
+            <img src={`${API_BASE}/images/logo-sc-default.png`} alt="" width={30} height={30} style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0, boxShadow: "0 0 0 1px rgba(200,168,75,.35)" }} />
           )}
           <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.3 }}>{footer?.site.name ?? "Shopy Crafter"}</span>
         </Link>
@@ -65,7 +65,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               {footer?.site.logo.imageUrl ? (
                 <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt={footer.site.name} style={{ height: 22, borderRadius: 4 }} />
               ) : (
-                <span style={{ width: 22, height: 22, background: "linear-gradient(135deg,#c8a84b,#b8860b)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#060500", flexShrink: 0 }}>{footer?.site.logo.value ?? "SC"}</span>
+                <img src={`${API_BASE}/images/logo-sc-default.png`} alt="" width={26} height={26} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
               )}
               <span style={{ fontSize: 14, fontWeight: 700 }}>{footer?.site.name ?? "Shopy Crafter"}</span>
             </div>

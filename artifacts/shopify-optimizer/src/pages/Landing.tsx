@@ -144,6 +144,8 @@ function MagnetStoreButton() {
 }
 
 const API_BASE_LANDING = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+/** Logo de la app (el mismo que el icono de la app Android y la PWA). */
+const APP_LOGO = `${API_BASE_LANDING}/images/logo-sc-default.png`;
 
 type CMSContent = {
   site: { name: string; tagline: string; logo: { type: string; value: string; imageUrl: string | null }; primaryColor: string; accentColor: string; font_heading: string; font_body: string };
@@ -702,7 +704,7 @@ export default function Landing() {
           {content.site.logo.imageUrl && !logoError ? (
             <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt="" width={32} height={32} style={{ height: 32, width: 32, borderRadius: 6 }} onError={() => setLogoError(true)} />
           ) : (
-            <div className="l-nav-gem">{content.site.logo.value}</div>
+            <img src={APP_LOGO} alt="" width={34} height={34} className="lx-logo-img" />
           )}
           <div className="l-nav-logo-text">{content.site.name}</div>
         </a>
@@ -912,7 +914,7 @@ export default function Landing() {
               <div className="lx-app">
                 <div className="lx-app-phone" aria-hidden="true">
                   <div className="lx-app-notch" />
-                  <div className="lx-app-screen"><span>SC</span></div>
+                  <div className="lx-app-screen"><img src={APP_LOGO} alt="" width={46} height={46} /></div>
                 </div>
                 <div>
                   <h3>App Android de Shopy Crafter</h3>
@@ -1459,7 +1461,7 @@ export default function Landing() {
                     {content.site.logo.imageUrl && !logoError ? (
                       <img src={`${API_BASE_LANDING}${content.site.logo.imageUrl}`} alt="" width={28} height={28} style={{ height: 28, width: 28, borderRadius: 6 }} onError={() => setLogoError(true)} />
                     ) : (
-                      <div className="l-nav-gem">{content.site.logo.value}</div>
+                      <img src={APP_LOGO} alt="" width={30} height={30} className="lx-logo-img" style={{ width: 30, height: 30 }} />
                     )}
                     <div className="l-nav-logo-text">{content.site.name}</div>
                   </a>
