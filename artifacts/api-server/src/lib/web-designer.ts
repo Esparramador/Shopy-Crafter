@@ -3,7 +3,7 @@
  * Multi-model HTML page generation with streaming (Claude / Gemini / GPT-4.1)
  * 3-panel: Chat | Live Preview | Code Editor
  */
-import { DnaVars, DEFAULT_DNA, applyDna } from "./visme-effects.js";
+import type { DnaVars } from "./visme-effects.js";
 
 export const DESIGN_SYSTEM_PROMPT = `You are an expert web designer & 3D developer building pages like claude.ai/design, Apple.com, and award-winning Awwwards sites.
 
@@ -161,112 +161,131 @@ function buildUserMessage(prompt: string, currentHtml: string, dna?: DnaVars): s
 - BG: ${dna.bg} | Font: ${dna.font}
 - Headline: "${dna.headline}" | Tagline: "${dna.tagline}" | CTA: "${dna.cta}"` : "";
   if (currentHtml && currentHtml.length > 50) {
-    return `EDIT THIS PAGE:\n\n${currentHtml.slice(0, 12000)}\n\nINSTRUCTION: ${prompt}${dnaStr}`;
+    // La página completa: con un recorte el modelo devolvía la página truncada.
+    return `EDIT THIS PAGE:\n\n${currentHtml.slice(0, 120_000)}\n\nINSTRUCTION: ${prompt}${dnaStr}`;
   }
   return `CREATE A WEB PAGE: ${prompt}${dnaStr}`;
 }
 
-export async function* streamHtmlClaude(
-  prompt: string, currentHtml: string, model: string, history: Array<{role: string; content: string}>, dna?: DnaVars
-): AsyncGenerator<string> {
-  const key = process.env.ANTHROPIC_API_KEY ?? "";
-  if (!key) { yield _fallback(prompt); return; }
-  const { apiModel } = normalizeModel(model);
-  const messages: Array<{role: string; content: string}> = [];
+/** Margen de salida: una página con Three.js/GSAP supera con facilidad 16k tokens. */
+const MAX_OUTPUT_TOKENS = 32_000;
+
+export interface StreamHtmlOptions {
+  projectId?: number | null;
+  /** Se llama al terminar: truncated = el modelo agotó el máximo de salida. */
+  onFinish?: (info: { truncated: boolean; inputTokens: number; outputTokens: number; costUsd: number }) => void;
+}
+
+function historyTurns(history: Array<{ role: string; content: string }>): Array<{ role: "user" | "assistant"; content: string }> {
+  const out: Array<{ role: "user" | "assistant"; content: string }> = [];
   for (const turn of history.slice(-8)) {
-    if (["user", "assistant"].includes(turn.role) && turn.content) {
-      messages.push({ role: turn.role, content: turn.content.slice(0, 4000) });
+    if ((turn.role === "user" || turn.role === "assistant") && turn.content) {
+      const content = turn.content.slice(0, 4000);
+      const last = out[out.length - 1];
+      if (last && last.role === turn.role) last.content += "\n" + content;
+      else out.push({ role: turn.role, content });
     }
   }
-  messages.push({ role: "user", content: buildUserMessage(prompt, currentHtml, dna) });
-  const clean: typeof messages = [];
-  for (const m of messages) {
-    if (clean.length && clean[clean.length - 1].role === m.role) {
-      clean[clean.length - 1].content += "\n" + m.content;
-    } else { clean.push({ ...m }); }
-  }
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: apiModel, max_tokens: 16000, stream: true, system: DESIGN_SYSTEM_PROMPT, messages: clean }),
-    signal: AbortSignal.timeout(120_000),
+  return out;
+}
+
+async function logUsage(provider: "claude" | "gemini" | "openai", model: string, projectId: number | null | undefined,
+  inTok: number, outTok: number): Promise<number> {
+  const { recordApiUsage, calcClaudeCost, calcGeminiCost, calcOpenAiCost } = await import("./api-usage.js");
+  const costUsd = provider === "claude" ? calcClaudeCost(model, inTok, outTok)
+    : provider === "gemini" ? calcGeminiCost(model, inTok, outTok)
+    : calcOpenAiCost(model, inTok, outTok);
+  void recordApiUsage({
+    provider, operation: "web-designer", model, projectId: projectId || null,
+    inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens", costUsd,
   });
-  if (!resp.ok || !resp.body) { yield `<!-- Claude ${resp.status} -->`; return; }
-  const reader = resp.body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6);
-      if (data === "[DONE]") return;
-      try {
-        const ev = JSON.parse(data);
-        if (ev.type === "content_block_delta") {
-          const chunk = ev.delta?.text ?? "";
-          if (chunk) yield chunk;
-        }
-      } catch {}
-    }
+  return costUsd;
+}
+
+export async function* streamHtmlClaude(
+  prompt: string, currentHtml: string, model: string, history: Array<{role: string; content: string}>, dna?: DnaVars,
+  opts: StreamHtmlOptions = {},
+): AsyncGenerator<string> {
+  const { apiModel } = normalizeModel(model);
+  // Mismo cliente que el resto de la plataforma (key propia, directa o proxy de integraciones).
+  const { getClaudeClient } = await import("./claude.js");
+  const client = await getClaudeClient(opts.projectId ?? 0);
+  const messages = historyTurns(history);
+  const userMsg = buildUserMessage(prompt, currentHtml, dna);
+  if (messages.length && messages[messages.length - 1].role === "user") messages[messages.length - 1].content += "\n" + userMsg;
+  else messages.push({ role: "user", content: userMsg });
+  if (messages[0]?.role === "assistant") messages.shift();
+
+  const stream = client.messages.stream(
+    { model: apiModel, max_tokens: MAX_OUTPUT_TOKENS, system: DESIGN_SYSTEM_PROMPT, messages },
+    { signal: AbortSignal.timeout(300_000) },
+  );
+  for await (const ev of stream) {
+    if (ev.type === "content_block_delta" && ev.delta.type === "text_delta" && ev.delta.text) yield ev.delta.text;
   }
+  const final = await stream.finalMessage();
+  const inTok = final.usage?.input_tokens ?? 0;
+  const outTok = final.usage?.output_tokens ?? 0;
+  const costUsd = await logUsage("claude", apiModel, opts.projectId, inTok, outTok);
+  opts.onFinish?.({ truncated: final.stop_reason === "max_tokens", inputTokens: inTok, outputTokens: outTok, costUsd });
 }
 
 export async function* streamHtmlGemini(
-  prompt: string, currentHtml: string, model: string, history: Array<{role: string; content: string}>, dna?: DnaVars
+  prompt: string, currentHtml: string, model: string, history: Array<{role: string; content: string}>, dna?: DnaVars,
+  opts: StreamHtmlOptions = {},
 ): AsyncGenerator<string> {
-  const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY ?? "";
-  if (!key) { yield _fallback(prompt); return; }
   const { apiModel } = normalizeModel(model);
-  const contents: Array<{role: string; parts: Array<{text: string}>}> = [];
-  for (const turn of history.slice(-8)) {
-    const role = turn.role === "assistant" ? "model" : "user";
-    if (["user", "model"].includes(role) && turn.content) {
-      contents.push({ role, parts: [{ text: turn.content.slice(0, 4000) }] });
-    }
-  }
+  const { getGeminiClient } = await import("./gemini.js");
+  const ai = getGeminiClient();
+  const contents = historyTurns(history).map(t => ({ role: t.role === "assistant" ? "model" : "user", parts: [{ text: t.content }] }));
   contents.push({ role: "user", parts: [{ text: buildUserMessage(prompt, currentHtml, dna) }] });
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${key}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ system_instruction: { parts: [{ text: DESIGN_SYSTEM_PROMPT }] }, contents, generationConfig: { maxOutputTokens: 16000, temperature: 0.7 } }),
-    signal: AbortSignal.timeout(120_000),
+
+  const stream = await ai.models.generateContentStream({
+    model: apiModel,
+    contents,
+    // Gemini 2.5 cuenta el razonamiento dentro del máximo de salida: se reserva aparte.
+    config: { systemInstruction: DESIGN_SYSTEM_PROMPT, maxOutputTokens: 65_536, temperature: 0.7, thinkingConfig: { thinkingBudget: 2048 } },
   });
-  if (!resp.ok) { yield `<!-- Gemini ${resp.status} -->`; return; }
-  const data = await resp.json() as any;
-  const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  yield text || _fallback(prompt);
+  let usage: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } = {};
+  let finishReason = "";
+  for await (const chunk of stream) {
+    const text = chunk.text;
+    if (text) yield text;
+    if (chunk.usageMetadata) usage = chunk.usageMetadata;
+    const fr = chunk.candidates?.[0]?.finishReason;
+    if (fr) finishReason = String(fr);
+  }
+  const inTok = usage.promptTokenCount ?? 0;
+  const outTok = (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0);
+  const costUsd = await logUsage("gemini", apiModel, opts.projectId, inTok, outTok);
+  opts.onFinish?.({ truncated: finishReason === "MAX_TOKENS", inputTokens: inTok, outputTokens: outTok, costUsd });
 }
 
 export async function* streamHtmlOpenai(
-  prompt: string, currentHtml: string, model: string, history: Array<{role: string; content: string}>, dna?: DnaVars
+  prompt: string, currentHtml: string, model: string, history: Array<{role: string; content: string}>, dna?: DnaVars,
+  opts: StreamHtmlOptions = {},
 ): AsyncGenerator<string> {
   const key = process.env.OPENAI_API_KEY ?? "";
-  if (!key) { yield _fallback(prompt); return; }
+  if (!key) throw new Error("OPENAI_API_KEY no configurada: elige un modelo de Claude o Gemini.");
   const { apiModel } = normalizeModel(model);
-  const messages: Array<{role: string; content: string}> = [{ role: "system", content: DESIGN_SYSTEM_PROMPT }];
-  for (const turn of history.slice(-8)) {
-    if (["user", "assistant"].includes(turn.role) && turn.content) {
-      messages.push({ role: turn.role, content: turn.content.slice(0, 4000) });
-    }
-  }
+  const messages: Array<{role: string; content: string}> = [{ role: "system", content: DESIGN_SYSTEM_PROMPT }, ...historyTurns(history)];
   messages.push({ role: "user", content: buildUserMessage(prompt, currentHtml, dna) });
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: apiModel, max_tokens: 16000, stream: true, messages }),
-    signal: AbortSignal.timeout(120_000),
+    // gpt-4.1 admite hasta 32.768 tokens de salida.
+    body: JSON.stringify({ model: apiModel, max_tokens: MAX_OUTPUT_TOKENS, stream: true, stream_options: { include_usage: true }, messages }),
+    signal: AbortSignal.timeout(300_000),
   });
-  if (!resp.ok || !resp.body) { yield `<!-- GPT ${resp.status} -->`; return; }
+  if (!resp.ok || !resp.body) {
+    const detail = await resp.text().catch(() => "");
+    throw new Error(`OpenAI respondió ${resp.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
+  }
   const reader = resp.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
-  while (true) {
+  let inTok = 0, outTok = 0, finish = "";
+  outer: while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buf += dec.decode(value, { stream: true });
@@ -275,81 +294,129 @@ export async function* streamHtmlOpenai(
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
       const data = line.slice(6).trim();
-      if (data === "[DONE]") return;
+      if (data === "[DONE]") break outer;
       try {
         const ev = JSON.parse(data);
         const chunk = ev.choices?.[0]?.delta?.content ?? "";
+        if (ev.choices?.[0]?.finish_reason) finish = ev.choices[0].finish_reason;
+        if (ev.usage) { inTok = ev.usage.prompt_tokens ?? 0; outTok = ev.usage.completion_tokens ?? 0; }
         if (chunk) yield chunk;
-      } catch {}
+      } catch { /* línea parcial */ }
     }
   }
+  const costUsd = await logUsage("openai", apiModel, opts.projectId, inTok, outTok);
+  opts.onFinish?.({ truncated: finish === "length", inputTokens: inTok, outputTokens: outTok, costUsd });
 }
 
+/**
+ * Genera la página en streaming. Errores reales (sin key, cuota, proveedor caído)
+ * se lanzan: nunca se devuelve una página de relleno como si fuera el diseño.
+ */
 export async function* streamHtml(
-  prompt: string, currentHtml: string, model: string, history: Array<{role: string; content: string}>, dna?: DnaVars
+  prompt: string, currentHtml: string, model: string, history: Array<{role: string; content: string}>, dna?: DnaVars,
+  opts: StreamHtmlOptions = {},
 ): AsyncGenerator<string> {
+  const { assertAiBudget } = await import("./ai-budget.js");
+  await assertAiBudget(opts.projectId ?? null);
   const { provider } = normalizeModel(model);
-  if (provider === "gemini") { yield* streamHtmlGemini(prompt, currentHtml, model, history, dna); return; }
-  if (provider === "openai") { yield* streamHtmlOpenai(prompt, currentHtml, model, history, dna); return; }
-  yield* streamHtmlClaude(prompt, currentHtml, model, history, dna);
+  if (provider === "gemini") { yield* streamHtmlGemini(prompt, currentHtml, model, history, dna, opts); return; }
+  if (provider === "openai") { yield* streamHtmlOpenai(prompt, currentHtml, model, history, dna, opts); return; }
+  yield* streamHtmlClaude(prompt, currentHtml, model, history, dna, opts);
 }
 
 function stripFences(text: string): string {
   let t = text.trim();
   t = t.replace(/^```(?:html)?\s*\n?/gm, "").replace(/\n?```\s*$/gm, "").trim();
-  const start = t.indexOf("<!DOCTYPE");
+  const start = t.search(/<!DOCTYPE/i);
   if (start > 0) t = t.slice(start);
   return t;
 }
 
 export { stripFences };
 
-function _fallback(prompt: string): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>AI Web Designer</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#0a0a0f;color:#f0f0f0;min-height:100vh;display:flex;align-items:center;justify-content:center}.card{max-width:600px;padding:60px 40px;text-align:center;border:1px solid rgba(255,255,255,.08);border-radius:16px}h1{font-size:2.5rem;font-weight:300;margin-bottom:1rem;color:#c9a961}p{color:#999;font-size:1rem;line-height:1.7}.note{margin-top:2rem;padding:16px;background:rgba(201,169,97,.1);border-radius:8px;font-size:.85rem;color:#c9a961}</style>
-</head>
-<body><div class="card"><h1>AI Web Designer</h1><p>Configura tu API Key en Configuración para generar diseños con IA.</p><div class="note">Prompt: ${prompt.slice(0, 100)}</div></div></body>
-</html>`;
-}
-
-// Simple in-memory session store
-interface DesignSession {
+// ── Sesiones persistentes (antes vivían en memoria y se perdían al reiniciar) ──
+export interface DesignSession {
   id: string;
   title: string;
   currentHtml: string;
   history: Array<{role: string; content: string}>;
   model: string;
-  projectId?: number;
+  projectId?: number | null;
   createdAt: string;
   updatedAt: string;
 }
 
-const _sessions = new Map<string, DesignSession>();
+let sessionsTableReady: Promise<void> | null = null;
+function ensureSessionsTable(): Promise<void> {
+  sessionsTableReady ??= (async () => {
+    const { db } = await import("@workspace/db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS web_designer_sessions (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL DEFAULT 'Nuevo diseño',
+        current_html TEXT NOT NULL DEFAULT '',
+        history JSONB NOT NULL DEFAULT '[]'::jsonb,
+        model TEXT NOT NULL DEFAULT 'claude-sonnet-4-5',
+        project_id INTEGER,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+  })().catch(err => { sessionsTableReady = null; throw err; });
+  return sessionsTableReady;
+}
 
-export function getSession(id: string): DesignSession {
-  return _sessions.get(id) ?? {
-    id, title: "New Design", currentHtml: "", history: [],
-    model: "claude-sonnet-4-5", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+function rowToSession(r: Record<string, unknown>): DesignSession {
+  return {
+    id: String(r.id), title: String(r.title ?? "Nuevo diseño"), currentHtml: String(r.current_html ?? ""),
+    history: Array.isArray(r.history) ? r.history as DesignSession["history"] : [],
+    model: String(r.model ?? "claude-sonnet-4-5"),
+    projectId: r.project_id == null ? null : Number(r.project_id),
+    createdAt: new Date(String(r.created_at)).toISOString(), updatedAt: new Date(String(r.updated_at)).toISOString(),
   };
 }
 
-export function saveSession(data: Partial<DesignSession> & { id: string }): DesignSession {
-  const existing = _sessions.get(data.id) ?? {
-    id: data.id, title: "New Design", currentHtml: "", history: [],
-    model: "claude-sonnet-4-5", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  };
-  const updated: DesignSession = { ...existing, ...data, updatedAt: new Date().toISOString() };
-  _sessions.set(data.id, updated);
-  // Auto-title from first message
-  if (!data.title && updated.history.length === 1 && updated.history[0].role === "user") {
-    updated.title = updated.history[0].content.slice(0, 60);
-  }
-  return updated;
+export async function getSession(id: string): Promise<DesignSession | null> {
+  await ensureSessionsTable();
+  const { db } = await import("@workspace/db");
+  const { sql } = await import("drizzle-orm");
+  const r = await db.execute(sql`SELECT * FROM web_designer_sessions WHERE id = ${id}`);
+  return r.rows[0] ? rowToSession(r.rows[0] as Record<string, unknown>) : null;
 }
 
-export function listSessions(): DesignSession[] {
-  return [..._sessions.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 50);
+export async function saveSession(data: Partial<DesignSession> & { id: string }): Promise<DesignSession> {
+  await ensureSessionsTable();
+  const { db } = await import("@workspace/db");
+  const { sql } = await import("drizzle-orm");
+  const existing = await getSession(data.id);
+  const history = (data.history ?? existing?.history ?? []).slice(-40);
+  const firstUser = history.find(h => h.role === "user")?.content;
+  const title = (data.title ?? (existing && existing.title !== "Nuevo diseño" ? existing.title : firstUser) ?? "Nuevo diseño").slice(0, 80);
+  const currentHtml = data.currentHtml ?? existing?.currentHtml ?? "";
+  const model = data.model ?? existing?.model ?? "claude-sonnet-4-5";
+  const projectId = data.projectId ?? existing?.projectId ?? null;
+  const r = await db.execute(sql`
+    INSERT INTO web_designer_sessions (id, title, current_html, history, model, project_id)
+    VALUES (${data.id}, ${title}, ${currentHtml}, ${JSON.stringify(history)}::jsonb, ${model}, ${projectId})
+    ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, current_html = EXCLUDED.current_html,
+      history = EXCLUDED.history, model = EXCLUDED.model, project_id = EXCLUDED.project_id, updated_at = NOW()
+    RETURNING *
+  `);
+  return rowToSession(r.rows[0] as Record<string, unknown>);
+}
+
+export async function listSessions(): Promise<DesignSession[]> {
+  await ensureSessionsTable();
+  const { db } = await import("@workspace/db");
+  const { sql } = await import("drizzle-orm");
+  const r = await db.execute(sql`SELECT * FROM web_designer_sessions ORDER BY updated_at DESC LIMIT 50`);
+  return (r.rows as Record<string, unknown>[]).map(rowToSession);
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await ensureSessionsTable();
+  const { db } = await import("@workspace/db");
+  const { sql } = await import("drizzle-orm");
+  await db.execute(sql`DELETE FROM web_designer_sessions WHERE id = ${id}`);
 }

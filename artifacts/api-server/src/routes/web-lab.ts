@@ -721,7 +721,7 @@ router.get("/web-lab/fetch-source", async (req: Request, res: Response): Promise
     const targetUrl = raw.startsWith("http") ? raw : `https://${raw}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(targetUrl, {
+    const response = await safeFetch(targetUrl, {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; ShopyCrafter/1.0; +https://shopycrafter.com)",
@@ -2782,7 +2782,7 @@ async function ddgSearch(query: string, n = 5): Promise<Record<string, any>> {
 
 async function scrapeSocial(plat: string, url: string, handle: string): Promise<Record<string, any>> {
   try {
-    const r = await fetch(url, { headers: { "User-Agent": BROWSER_UA }, signal: AbortSignal.timeout(12000) });
+    const r = await safeFetch(url, { headers: { "User-Agent": BROWSER_UA }, signal: AbortSignal.timeout(12000) });
     const html = await r.text();
     const d: Record<string, any> = { source: plat, handle, url };
     const desc = dnaMetaContent(html, "og:description");
@@ -2846,21 +2846,7 @@ async function researchBrand(brand: string, domain: string, social: Record<strin
 // for CSS/design audit. Both serve distinct purposes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.get("/weblab/proxy", async (req: Request, res: Response): Promise<void> => {
-  const targetUrl = req.query.url as string;
-  if (!targetUrl) { res.status(400).json({ error: "url param required" }); return; }
-  try {
-    const r = await fetch(targetUrl, {
-      headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
-      signal: AbortSignal.timeout(14000),
-    });
-    const contentType = r.headers.get("content-type") || "text/html";
-    res.set("Content-Type", contentType);
-    res.set("Access-Control-Allow-Origin", "*");
-    const body = await r.text();
-    res.send(body);
-  } catch (e: any) { res.status(502).json({ error: e.message }); }
-});
+// (Eliminado /weblab/proxy: proxy abierto sin uso que servía HTML ajeno desde nuestro dominio.)
 
 router.post("/weblab/analyze", async (req: Request, res: Response): Promise<void> => {
   const { url: targetUrl, deep = true } = req.body as { url: string; deep?: boolean };
@@ -2883,7 +2869,7 @@ router.post("/weblab/analyze", async (req: Request, res: Response): Promise<void
 
     let html = "";
     try {
-      const r = await fetch(targetUrl, {
+      const r = await safeFetch(targetUrl, {
         headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,*/*" },
         signal: AbortSignal.timeout(14000),
       });
@@ -2996,18 +2982,11 @@ ${instructions || "Diseño moderno, premium, con efectos visuales avanzados. Man
 
 Genera el HTML COMPLETO ahora:`;
 
-    let baseURL: string | undefined;
-    let apiKey: string | undefined;
-    if (process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL && process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY) {
-      baseURL = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
-      apiKey  = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
-    } else {
-      apiKey = process.env.ANTHROPIC_API_KEY;
-    }
-    if (!apiKey) { send({ error: "API key de IA no configurada" }); res.end(); return; }
-
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = baseURL ? new Anthropic({ baseURL, apiKey }) : new Anthropic({ apiKey });
+    const { assertAiBudget } = await import("../lib/ai-budget.js");
+    await assertAiBudget();
+    const { getClaudeClient } = await import("../lib/claude.js");
+    const client = await getClaudeClient(0);
+    const { recordApiUsage, calcClaudeCost } = await import("../lib/api-usage.js");
 
     send({ status: "streaming" });
 
@@ -3031,7 +3010,14 @@ Genera el HTML COMPLETO ahora:`;
           send({ token: event.delta.text });
         }
       }
-      truncated = (await stream.finalMessage()).stop_reason === "max_tokens";
+      const final = await stream.finalMessage();
+      const inTok = final.usage?.input_tokens ?? 0;
+      const outTok = final.usage?.output_tokens ?? 0;
+      void recordApiUsage({
+        provider: "claude", operation: "weblab-improve", model: "claude-sonnet-4-5",
+        inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens", costUsd: calcClaudeCost("claude-sonnet-4-5", inTok, outTok),
+      });
+      truncated = final.stop_reason === "max_tokens";
       if (!truncated) break;
       messages.splice(1, messages.length - 1,
         { role: "assistant", content: generated.trimEnd() },
@@ -3734,7 +3720,7 @@ router.post("/web-lab/security-audit", async (req: Request, res: Response): Prom
       try {
         const ctrl = new AbortController();
         setTimeout(() => ctrl.abort(), 12000);
-        const r = await fetch(url, {
+        const r = await safeFetch(url, {
           signal: ctrl.signal,
           headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" }
         });
@@ -3744,7 +3730,7 @@ router.post("/web-lab/security-audit", async (req: Request, res: Response): Prom
         for (const src of scriptSrcs) {
           try {
             const absUrl = src.startsWith("http") ? src : new URL(src, url).href;
-            const rjs = await fetch(absUrl, { signal: ctrl.signal });
+            const rjs = await safeFetch(absUrl, { signal: ctrl.signal });
             const jsText = await rjs.text();
             content += "\n" + jsText.slice(0, 300_000); // max 300KB de JS
           } catch {}

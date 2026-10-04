@@ -6,6 +6,7 @@
  * POST /api/visme/generate       — SSE streaming custom effect generation
  * POST /api/visme/preview        — HTML preview with DNA applied
  */
+import { recordClaudeMessageUsage } from "../lib/api-usage.js";
 import { Router, type Request, type Response } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAdmin } from "../lib/auth.js";
@@ -312,7 +313,9 @@ PROMPT ADAPTADO PARA ${projectName.toUpperCase()}:`;
         }
       }
       // Si se cortó por max_tokens, se avisa en el evento final en vez de darlo por completo.
-      const truncated = (await stream.finalMessage()).stop_reason === "max_tokens";
+      const finalMsg = await stream.finalMessage();
+      recordClaudeMessageUsage("visme-adapt", "claude-haiku-4-5", finalMsg.usage);
+      const truncated = finalMsg.stop_reason === "max_tokens";
       if (truncated) logger.warn({ chars: fullText.length }, "visme/adapt: respuesta cortada por max_tokens");
       res.write(`data: ${JSON.stringify({ done: true, adapted: fullText, dna, truncated })}\n\n`);
     } finally {
@@ -456,6 +459,7 @@ REQUIREMENTS:
       label: "visme/compose",
       call: async (messages) => {
         const msg = await ant.messages.create({ model: "claude-sonnet-4-5", max_tokens: 8000, messages });
+        recordClaudeMessageUsage("visme-compose", "claude-sonnet-4-5", msg.usage);
         return { text: msg.content.map(b => (b.type === "text" ? b.text : "")).join(""), truncated: msg.stop_reason === "max_tokens" };
       },
     });

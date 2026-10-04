@@ -9,6 +9,7 @@
  * 5. Saving the output to ShopyBrain memory (optional)
  */
 
+import { recordClaudeMessageUsage } from "../lib/api-usage.js";
 import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, brandDnaTable } from "@workspace/db";
@@ -243,7 +244,9 @@ ${brandDnaContext}${brainCtx}`;
 
     // Si se cortó por max_tokens se dice en el evento final y no se aprende de un
     // resultado a medias.
-    const truncated = (await stream.finalMessage()).stop_reason === "max_tokens";
+    const finalMsg = await stream.finalMessage();
+    recordClaudeMessageUsage("prompt-exec", String(model), finalMsg.usage);
+    const truncated = finalMsg.stop_reason === "max_tokens";
     if (truncated) logger.warn({ opId, maxTokens, outputLength: fullResult.length }, "prompt-exec: salida cortada por max_tokens");
     res.write(`data: ${JSON.stringify({ type: "done", totalLength: fullResult.length, truncated })}\n\n`);
     res.end();

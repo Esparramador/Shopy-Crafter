@@ -24,7 +24,7 @@ let _aiProxy: GoogleGenAI | null = null;
 // actualizada desde el panel de API keys) en vez de quedarse con la del arranque.
 let _aiSig = "", _aiDirectSig = "", _aiProxySig = "";
 
-function getGeminiClient(): GoogleGenAI {
+export function getGeminiClient(): GoogleGenAI {
   const sig = `${process.env.GEMINI_API_KEY ?? ""}|${process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? ""}|${process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ?? ""}`;
   if (_ai && sig !== _aiSig) _ai = null;
   if (!_ai) {

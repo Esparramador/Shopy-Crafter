@@ -127,6 +127,18 @@ export function calcGroundingCost(queries: number): number {
   return Math.max(0, queries) * 0.014;
 }
 
+const OPENAI_PRICING: Record<string, { input: number; output: number }> = {
+  "gpt-4.1-nano": { input: 0.10, output: 0.40 },
+  "gpt-4.1-mini": { input: 0.40, output: 1.60 },
+  "gpt-4.1":      { input: 2.0,  output: 8.0  },
+};
+
+export function calcOpenAiCost(model: string, inputTokens: number, outputTokens: number): number {
+  const m = Object.keys(OPENAI_PRICING).sort((a, b) => b.length - a.length).find(k => model.includes(k)) ?? "gpt-4.1";
+  const p = OPENAI_PRICING[m];
+  return (inputTokens / 1_000_000) * p.input + (outputTokens / 1_000_000) * p.output;
+}
+
 export function calcClaudeCost(model: string, inputTokens: number, outputTokens: number): number {
   const m = Object.keys(CLAUDE_PRICING).sort((a, b) => b.length - a.length).find(k => model.includes(k)) ?? "claude-sonnet-4-6";
   const p = CLAUDE_PRICING[m];
@@ -142,4 +154,18 @@ export function calcGeminiCost(model: string, inputTokens: number, outputTokens:
 // ElevenLabs aprox: $0.30 por 1.000 caracteres (Creator tier)
 export function calcElevenLabsCost(chars: number): number {
   return (chars / 1000) * 0.30;
+}
+
+/** Registro de uso para código que llama al SDK de Anthropic directamente. */
+export function recordClaudeMessageUsage(operation: string, model: string, usage?: { input_tokens?: number; output_tokens?: number } | null): void {
+  const inTok = usage?.input_tokens ?? 0;
+  const outTok = usage?.output_tokens ?? 0;
+  void recordApiUsage({ provider: "claude", operation, model, inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens", costUsd: calcClaudeCost(model, inTok, outTok) });
+}
+
+/** Registro de uso para llamadas directas a Gemini (usageMetadata de la respuesta). */
+export function recordGeminiResponseUsage(operation: string, model: string, usage?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } | null): void {
+  const inTok = usage?.promptTokenCount ?? 0;
+  const outTok = (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0);
+  void recordApiUsage({ provider: "gemini", operation, model, inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens", costUsd: calcGeminiCost(model, inTok, outTok) });
 }
