@@ -150,6 +150,21 @@ function inviteEmailHtml(p: { name: string; storeName: string; shopDomain: strin
 </td></tr></table></td></tr></table></body></html>`;
 }
 
+/** Clientes con acceso al portal de este proyecto (para enviarles o renovar su enlace). */
+router.get("/projects/:projectId/clients", async (req, res): Promise<void> => {
+  try {
+    const projectId = Number(req.params["projectId"]);
+    if (!Number.isInteger(projectId) || projectId <= 0) { res.status(400).json({ error: "Proyecto inválido" }); return; }
+    const rows = await db.select({
+      id: usersTable.id, email: usersTable.email, name: usersTable.name,
+      isActive: usersTable.isActive, lastLogin: usersTable.lastLogin, inviteExpires: usersTable.inviteExpires,
+    }).from(usersTable).where(and(eq(usersTable.clientId, String(projectId)), eq(usersTable.role, "client")));
+    res.json({ clients: rows, portalUrl: `${publicAppUrl() ?? `${req.protocol}://${req.get("host")}`}/login` });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
 router.post("/projects/:projectId/invite", async (req, res): Promise<void> => {
   try {
     const projectId = Number(req.params["projectId"]);
