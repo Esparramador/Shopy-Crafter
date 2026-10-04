@@ -1,3 +1,4 @@
+import { AiBudgetExceededError } from "../lib/ai-budget.js";
 import clientStripeRouter from "./client-stripe.js";
 import { getPlatform } from "../lib/platform-capabilities.js";
 import { Router } from "express";
@@ -206,7 +207,8 @@ router.post("/approvals/:id/approve", async (req, res): Promise<void> => {
       .where(and(eq(approvalsTable.id, req.params["id"]!), eq(approvalsTable.status, "pending")))
       .returning({ id: approvalsTable.id });
     if (!updated) { res.status(409).json({ error: "Esta propuesta ya fue revisada" }); return; }
-    sendPushToAdmins("✅ Propuesta aprobada", `${req.session.name ?? "El cliente"} aprobó: ${item.title}`, "/admin/approvals").catch(() => {});
+    // Un rediseño aprobado se publica desde la pantalla de Rediseño del proyecto.
+    sendPushToAdmins("✅ Propuesta aprobada", `${req.session.name ?? "El cliente"} aprobó: ${item.title}`, item.type === "redesign" ? `/projects/${projectId}/redesign` : "/admin/clients").catch(() => {});
   
     await db.insert(auditLogTable).values({
       id: randomBytes(8).toString("hex"),
@@ -236,7 +238,7 @@ router.post("/approvals/:id/reject", async (req, res): Promise<void> => {
     }).where(and(eq(approvalsTable.id, req.params["id"]!), eq(approvalsTable.status, "pending")))
       .returning({ id: approvalsTable.id });
     if (!updated) { res.status(409).json({ error: "Esta propuesta ya fue revisada" }); return; }
-    sendPushToAdmins("❌ Propuesta rechazada", `${req.session.name ?? "El cliente"} rechazó: ${item.title}`, "/admin/approvals").catch(() => {});
+    sendPushToAdmins("❌ Propuesta rechazada", `${req.session.name ?? "El cliente"} rechazó: ${item.title}`, item.type === "redesign" ? `/projects/${projectId}/redesign` : "/admin/clients").catch(() => {});
   
     await db.insert(auditLogTable).values({
       id: randomBytes(8).toString("hex"),
@@ -983,6 +985,7 @@ REGLAS:
       replyLength: reply.length,
     });
   } catch (err: any) {
+    if (err instanceof AiBudgetExceededError) { res.status(402).json({ error: err.message, code: err.code }); return; }
     logger.error({ err: err.message }, "client ai-chat error");
     res.status(500).json({ error: "Error al procesar tu consulta. Por favor inténtalo de nuevo." });
   }
@@ -1182,9 +1185,12 @@ REGLAS: Máx 220 palabras. Termina con UNA acción concreta. Si el cliente compa
       });
     }
   } catch (err) {
-    logger.error({ err }, "client ai-chat/stream error");
-    if (!res.headersSent) res.status(500).json({ error: String(err) });
-    else { res.write(`data: ${JSON.stringify({ error: String(err), done: true })}\n\n`); res.end(); }
+    const budget = err instanceof AiBudgetExceededError;
+    if (!budget) logger.error({ err }, "client ai-chat/stream error");
+    // Al cliente no se le enseñan trazas internas: solo el aviso de tope o un mensaje genérico.
+    const message = budget ? err.message : "Error al procesar tu consulta. Por favor inténtalo de nuevo.";
+    if (!res.headersSent) res.status(budget ? 402 : 500).json({ error: message });
+    else { res.write(`data: ${JSON.stringify({ error: message, done: true })}\n\n`); res.end(); }
   }
 });
 

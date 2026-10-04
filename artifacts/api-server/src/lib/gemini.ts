@@ -12,6 +12,7 @@
  *  ✅ Overall research timeout 270s (safe margin under Replit 5-min proxy limit)
  */
 
+import { assertAiBudget } from "./ai-budget.js";
 import { GoogleGenAI } from "@google/genai";
 import { logger } from "./logger.js";
 
@@ -23,7 +24,7 @@ let _aiProxy: GoogleGenAI | null = null;
 // actualizada desde el panel de API keys) en vez de quedarse con la del arranque.
 let _aiSig = "", _aiDirectSig = "", _aiProxySig = "";
 
-function getGeminiClient(): GoogleGenAI {
+export function getGeminiClient(): GoogleGenAI {
   const sig = `${process.env.GEMINI_API_KEY ?? ""}|${process.env.AI_INTEGRATIONS_GEMINI_API_KEY ?? ""}|${process.env.AI_INTEGRATIONS_GEMINI_BASE_URL ?? ""}`;
   if (_ai && sig !== _aiSig) _ai = null;
   if (!_ai) {
@@ -233,6 +234,7 @@ async function withRetry<T>(
 
 // ─── Base generation (no search) ─────────────────────────────────────────────
 async function askGemini(prompt: string, systemInstruction?: string, useProModel = false): Promise<string> {
+  await assertAiBudget();
   if (isGeminiGenerationBlocked()) {
     logger.warn("[askGemini] Circuit breaker open — falling back to Claude");
     try {
@@ -271,7 +273,7 @@ async function askGemini(prompt: string, systemInstruction?: string, useProModel
       const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
       const usage = (response as any).usageMetadata ?? {};
       const inTok = Number(usage.promptTokenCount) || 0;
-      const outTok = Number(usage.candidatesTokenCount) || 0;
+      const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
       void recordApiUsage({
         provider: "gemini",
         operation: "askGemini",
@@ -309,6 +311,7 @@ export async function askGeminiChat(
   systemInstruction?: string,
   opts: { useProModel?: boolean; maxOutputTokens?: number; thinkingBudget?: number } = {},
 ): Promise<string> {
+  await assertAiBudget();
   const { useProModel = false, maxOutputTokens = 2048, thinkingBudget = 1024 } = opts;
 
   const contents = messages
@@ -352,7 +355,7 @@ export async function askGeminiChat(
       const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
       const usage = (response as any).usageMetadata ?? {};
       const inTok = Number(usage.promptTokenCount) || 0;
-      const outTok = Number(usage.candidatesTokenCount) || 0;
+      const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
       void recordApiUsage({
         provider: "gemini",
         operation: "askGeminiChat",
@@ -408,6 +411,7 @@ export async function askGeminiChat(
 
 // ─── JSON-structured generation ───────────────────────────────────────────────
 async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: string, useProModel = false): Promise<T> {
+  await assertAiBudget();
   const { client: ai, isProxy } = getGenerationClient();
   const model = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), isProxy);
 
@@ -436,7 +440,7 @@ async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: st
       const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
       const usage = (response as any).usageMetadata ?? {};
       const inTok = Number(usage.promptTokenCount) || 0;
-      const outTok = Number(usage.candidatesTokenCount) || 0;
+      const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
       void recordApiUsage({
         provider: "gemini",
         operation: "askGeminiJson",
@@ -657,6 +661,7 @@ export async function askGeminiWithSearch(
   systemInstruction?: string,
   urlsToRead?: string[],
 ): Promise<{ text: string; sources: string[]; queries: string[]; usage?: { inputTokens: number; outputTokens: number; costUsd: number; model: string } }> {
+  await assertAiBudget();
   const EMPTY = { text: "", sources: [] as string[], queries: [] as string[] };
 
   if (isGeminiSearchBlocked()) {
@@ -724,11 +729,12 @@ export async function askGeminiWithSearch(
 
       let callUsage: { inputTokens: number; outputTokens: number; costUsd: number; model: string } | undefined;
       try {
-        const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
+        const { recordApiUsage, calcGeminiCost, calcGroundingCost } = await import("./api-usage.js");
         const usageMeta = (response as any).usageMetadata ?? {};
         const inTok = Number(usageMeta.promptTokenCount) || 0;
-        const outTok = Number(usageMeta.candidatesTokenCount) || 0;
-        const cost = calcGeminiCost(geminiFast(), inTok, outTok);
+        const outTok = (Number(usageMeta.candidatesTokenCount) || 0) + (Number(usageMeta.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
+        // + búsquedas de Google facturadas aparte (Gemini 3: 14 $ por 1.000 consultas)
+        const cost = calcGeminiCost(geminiFast(), inTok, outTok) + calcGroundingCost((searchQueries ?? []).length || 1);
         callUsage = { inputTokens: inTok, outputTokens: outTok, costUsd: cost, model: geminiFast() };
         void recordApiUsage({
           provider: "gemini",
@@ -765,6 +771,7 @@ export async function askGeminiWithUrls(
   urls: string[],
   systemInstruction?: string,
 ): Promise<{ text: string; sources: string[] }> {
+  await assertAiBudget();
   const EMPTY = { text: "", sources: [] as string[] };
 
   if (isGeminiSearchBlocked()) {
@@ -808,7 +815,7 @@ export async function askGeminiWithUrls(
       const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
       const usage = (response as any).usageMetadata ?? {};
       const inTok = Number(usage.promptTokenCount) || 0;
-      const outTok = Number(usage.candidatesTokenCount) || 0;
+      const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
       void recordApiUsage({
         provider: "gemini",
         operation: "askGeminiWithUrls",
@@ -1089,6 +1096,7 @@ export async function askGeminiVisionJson<T = unknown>(
   systemInstruction?: string,
   opts?: { tier?: "smart" | "genius" | "vision"; thinkingBudget?: number },
 ): Promise<T> {
+  await assertAiBudget();
   const ai = getGeminiClient();
   const model = pickModelSync("gemini", opts?.tier ?? "vision");
 
@@ -1136,7 +1144,7 @@ export async function askGeminiVisionJson<T = unknown>(
     const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
     const usage = (response as any).usageMetadata ?? {};
     const inTok = Number(usage.promptTokenCount) || 0;
-    const outTok = Number(usage.candidatesTokenCount) || 0;
+    const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
     void recordApiUsage({
       provider: "gemini",
       operation: "askGeminiVisionJson",
@@ -1182,6 +1190,7 @@ export async function* askGeminiStream(
   systemInstruction?: string,
   opts: { useProModel?: boolean; thinkingBudget?: number; useSearch?: boolean } = {},
 ): AsyncGenerator<{ text?: string; done?: boolean; sources?: string[]; error?: string; usage?: GeminiStreamUsage }> {
+  await assertAiBudget();
   const { useProModel = false, thinkingBudget = 0, useSearch = false } = opts;
 
   const contents = messages
@@ -1269,7 +1278,7 @@ export async function* askGeminiStream(
     let usage: GeminiStreamUsage | undefined;
     if (lastUsageMeta) {
       const inTok  = Number(lastUsageMeta.promptTokenCount)     || 0;
-      const outTok = Number(lastUsageMeta.candidatesTokenCount) || 0;
+      const outTok = (Number(lastUsageMeta.candidatesTokenCount) || 0) + (Number(lastUsageMeta.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
       const thinkTok = Number(lastUsageMeta.thoughtsTokenCount) || 0;
       const totalTok = Number(lastUsageMeta.totalTokenCount)    || (inTok + outTok + thinkTok);
       try {
@@ -1313,6 +1322,7 @@ export async function askGeminiGenerateImage(
   prompt: string,
   modelOverride?: string,
 ): Promise<{ b64_json: string; mimeType: string; model: string }> {
+  await assertAiBudget();
   const ai = getGeminiClient();
   // Cadena de fallback verificada 2026-06-25 via GET /v1beta/models.
   // Sólo modelos con responseModalities IMAGE (los de texto/chat fallarían).
@@ -1356,6 +1366,7 @@ export async function askGeminiWithCode(
   prompt: string,
   systemInstruction?: string,
 ): Promise<{ text: string; code: string; output: string }> {
+  await assertAiBudget();
   const ai = getGeminiClient();
   const model = geminiPro();
 

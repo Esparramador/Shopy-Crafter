@@ -11,8 +11,9 @@
 import { Router, type Request, type Response } from "express";
 import {
   DESIGNER_TEMPLATES, streamHtml, stripFences,
-  getSession, saveSession, listSessions,
+  getSession, saveSession, listSessions, deleteSession,
 } from "../lib/web-designer.js";
+import { safeFetch } from "../lib/web-scraper.js";
 import { buildDnaFromProject } from "../lib/visme-effects.js";
 import { logger } from "../lib/logger.js";
 import { saveToVault } from "../lib/vault.js";
@@ -80,17 +81,36 @@ router.get("/web-designer/demo-html/:filename", async (req: Request, res: Respon
   }
 });
 
-router.get("/web-designer/sessions", (_req: Request, res: Response) => {
-  res.json(listSessions());
+router.get("/web-designer/sessions", async (_req: Request, res: Response): Promise<void> => {
+  try { res.json(await listSessions()); }
+  catch (err: any) { logger.error({ err }, "web-designer/sessions"); res.status(500).json({ error: "No se pudieron cargar los diseños" }); }
 });
 
-router.get("/web-designer/sessions/:id", (req: Request, res: Response) => {
-  res.json(getSession(String(req.params.id)));
+router.get("/web-designer/sessions/:id", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const s = await getSession(String(req.params.id));
+    if (!s) { res.status(404).json({ error: "Diseño no encontrado" }); return; }
+    res.json(s);
+  } catch (err: any) { logger.error({ err }, "web-designer/session"); res.status(500).json({ error: "Error" }); }
 });
 
-router.post("/web-designer/sessions/:id", (req: Request, res: Response) => {
-  const saved = saveSession({ ...req.body, id: req.params.id });
-  res.json(saved);
+router.post("/web-designer/sessions/:id", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { title, currentHtml, history, model, projectId } = req.body ?? {};
+    res.json(await saveSession({
+      id: String(req.params.id),
+      ...(typeof title === "string" ? { title } : {}),
+      ...(typeof currentHtml === "string" ? { currentHtml } : {}),
+      ...(Array.isArray(history) ? { history } : {}),
+      ...(typeof model === "string" ? { model } : {}),
+      ...(Number.isInteger(Number(projectId)) && Number(projectId) > 0 ? { projectId: Number(projectId) } : {}),
+    }));
+  } catch (err: any) { logger.error({ err }, "web-designer/save"); res.status(500).json({ error: "No se pudo guardar" }); }
+});
+
+router.delete("/web-designer/sessions/:id", async (req: Request, res: Response): Promise<void> => {
+  try { await deleteSession(String(req.params.id)); res.json({ ok: true }); }
+  catch (err: any) { logger.error({ err }, "web-designer/delete"); res.status(500).json({ error: "No se pudo borrar" }); }
 });
 
 router.post("/web-designer/generate", async (req: Request, res: Response): Promise<void> => {
@@ -120,34 +140,38 @@ router.post("/web-designer/generate", async (req: Request, res: Response): Promi
 
     const sid = sessionId ?? randomBytes(8).toString("hex");
     let fullHtml = "";
+    let finish: { truncated: boolean; costUsd: number } = { truncated: false, costUsd: 0 };
     const heartbeat = setInterval(() => {
       try { res.write(": ping\n\n"); } catch {}
     }, 20000);
 
     try {
-      for await (const chunk of streamHtml(prompt, currentHtml, model, history, dna)) {
+      const pid = projectId ? Number(projectId) : null;
+      for await (const chunk of streamHtml(prompt, currentHtml, model, history, dna, {
+        projectId: pid, onFinish: info => { finish = info; },
+      })) {
         fullHtml += chunk;
         res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
       }
       const cleanHtml = stripFences(fullHtml);
-      // Save session
-      const session = getSession(sid);
-      session.history.push({ role: "user", content: prompt });
-      session.history.push({ role: "assistant", content: cleanHtml.slice(0, 2000) + (cleanHtml.length > 2000 ? "…" : "") });
-      session.currentHtml = cleanHtml;
-      session.model = model;
-      if (projectId) session.projectId = projectId;
-      saveSession(session);
+      if (!/<html[\s>]/i.test(cleanHtml)) throw new Error("El modelo no devolvió una página HTML. Reformula la petición.");
+      const prev = await getSession(sid);
+      const history2 = [...(prev?.history ?? []),
+        { role: "user", content: prompt },
+        { role: "assistant", content: finish.truncated ? "Página generada (cortada por longitud)" : `Página generada (${cleanHtml.length} caracteres)` },
+      ];
+      await saveSession({ id: sid, currentHtml: cleanHtml, history: history2, model, projectId: pid });
 
-      res.write(`data: ${JSON.stringify({ done: true, html: cleanHtml, sessionId: sid })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true, html: cleanHtml, sessionId: sid, truncated: finish.truncated, costUsd: Number(finish.costUsd.toFixed(4)) })}\n\n`);
     } finally {
       clearInterval(heartbeat);
       res.end();
     }
   } catch (err: any) {
-    logger.error({ err }, "web-designer/generate error");
-    if (!res.headersSent) res.status(500).json({ error: err.message });
-    else { try { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); res.end(); } catch {} }
+    logger.error({ err: err?.message }, "web-designer/generate error");
+    const message = err?.status === 402 ? err.message : `No se pudo generar la página: ${err?.message ?? "error del proveedor de IA"}`;
+    if (!res.headersSent) res.status(err?.status === 402 ? 402 : 500).json({ error: message });
+    else { try { res.write(`data: ${JSON.stringify({ error: message })}\n\n`); res.end(); } catch {} }
   }
 });
 
@@ -155,7 +179,8 @@ router.post("/web-designer/import-url", async (req: Request, res: Response): Pro
   try {
     const { url } = req.body as { url: string };
     if (!url?.trim()) { res.status(400).json({ error: "url is required" }); return; }
-    const resp = await fetch(url, {
+    // safeFetch valida DNS y redirecciones: no se puede usar para leer la red interna.
+    const resp = await safeFetch(url.trim(), {
       signal: AbortSignal.timeout(15_000),
       headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopyCrafter/1.0 Web Designer)" },
     });

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, redesignsTable } from "@workspace/db";
-import { eq, and, lte, desc } from "drizzle-orm";
+import { eq, and, lte, desc, sql } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync, runAsyncJob } from "../lib/bulk-queue";
@@ -31,6 +31,87 @@ interface RedesignOutput {
   price_reasoning: string;
   category: string;
   metafields: MetafieldEntry[];
+}
+
+// ── Aprobación del cliente ─────────────────────────────────────────────────
+// Los planes prometen "cada cambio pasa por tus aprobaciones": un rediseño se
+// envía al portal del cliente y, en proyectos con cliente, no se publica en la
+// tienda hasta que lo aprueba.
+
+let approvalRefReady: Promise<void> | null = null;
+function ensureApprovalRefColumns(): Promise<void> {
+  approvalRefReady ??= db.execute(sql`
+    ALTER TABLE approvals ADD COLUMN IF NOT EXISTS ref_type TEXT;
+    ALTER TABLE approvals ADD COLUMN IF NOT EXISTS ref_id TEXT;
+  `).then(() => undefined).catch(err => { approvalRefReady = null; throw err; });
+  return approvalRefReady;
+}
+
+async function projectHasClient(projectId: number): Promise<boolean> {
+  const r = await db.execute(sql`SELECT 1 FROM users WHERE client_id = ${String(projectId)} LIMIT 1`);
+  return r.rows.length > 0;
+}
+
+async function redesignApproval(redesignId: number): Promise<{ id: string; status: string; client_comment: string | null } | null> {
+  await ensureApprovalRefColumns();
+  const r = await db.execute(sql`
+    SELECT id, status, client_comment FROM approvals
+    WHERE ref_type = 'redesign' AND ref_id = ${String(redesignId)}
+    ORDER BY created_at DESC LIMIT 1
+  `);
+  return (r.rows[0] as { id: string; status: string; client_comment: string | null } | undefined) ?? null;
+}
+
+function clip(text: string | null | undefined, n: number): string {
+  const t = (text ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n - 1) + "…" : t;
+}
+
+/** Guarda la propuesta de rediseño (la que luego se revisa y se aplica). */
+async function insertRedesign(
+  projectId: number,
+  shopifyProductId: string,
+  product: { title: string; price: string | null },
+  result: RedesignOutput,
+): Promise<void> {
+  await db.insert(redesignsTable).values({
+    projectId,
+    shopifyProductId,
+    originalTitle: product.title,
+    originalPrice: product.price,
+    newTitle: result.title,
+    newBodyHtml: result.body_html,
+    newShortDescription: result.short_description,
+    newPrice: result.price,
+    newCompareAtPrice: result.compare_at_price,
+    newTags: result.tags,
+    metaTitle: result.meta_title,
+    metaDescription: result.meta_description,
+    photoBrief: result.photo_brief,
+    priceReasoning: result.price_reasoning,
+    newCategory: result.category || null,
+    newMetafields: Array.isArray(result.metafields) ? result.metafields : null,
+  });
+}
+
+/**
+ * Cuota "productos optimizados al mes": el primer rediseño de un producto en el
+ * mes consume 1; regenerarlo ese mismo mes no vuelve a contar.
+ */
+async function claimProductQuota(projectId: number, shopifyProductId: string): Promise<{ allowed: boolean; counts: boolean; reason?: string }> {
+  const already = await db.execute(sql`
+    SELECT 1 FROM redesigns WHERE project_id = ${projectId} AND shopify_product_id = ${shopifyProductId}
+      AND created_at >= date_trunc('month', NOW()) LIMIT 1
+  `);
+  if (already.rows.length > 0) return { allowed: true, counts: false };
+  const { checkProductionLimit } = await import("../lib/plan-limits.js");
+  const check = await checkProductionLimit(projectId, "product", 1);
+  return check.allowed ? { allowed: true, counts: true } : { allowed: false, counts: false, reason: check.reason };
+}
+
+async function countProductQuota(projectId: number): Promise<void> {
+  const { recordUsage } = await import("../lib/plan-limits.js");
+  await recordUsage(projectId, "product", 1);
 }
 
 async function doRedesign(projectId: number, shopifyProductId: string): Promise<RedesignOutput> {
@@ -165,12 +246,18 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
       return;
     }
   
+    const quota = await claimProductQuota(projectId, shopifyProductId);
+    if (!quota.allowed) {
+      res.status(402).json({ error: quota.reason, code: "PRODUCT_QUOTA_EXCEEDED" });
+      return;
+    }
+
     let result: RedesignOutput;
     try {
       result = await doRedesign(projectId, shopifyProductId);
     } catch (err: any) {
       logger.error({ err, projectId, shopifyProductId }, "Redesign AI call failed");
-      res.status(500).json({ error: err.message || "Error en el rediseño IA" });
+      res.status(err?.status === 402 ? 402 : 500).json({ error: err.message || "Error en el rediseño IA" });
       return;
     }
   
@@ -197,24 +284,8 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
       }
     }
   
-    await db.insert(redesignsTable).values({
-      projectId,
-      shopifyProductId,
-      originalTitle: product.title,
-      originalPrice: product.price,
-      newTitle: result.title,
-      newBodyHtml: result.body_html,
-      newShortDescription: result.short_description,
-      newPrice: result.price,
-      newCompareAtPrice: result.compare_at_price,
-      newTags: result.tags,
-      metaTitle: result.meta_title,
-      metaDescription: result.meta_description,
-      photoBrief: result.photo_brief,
-      priceReasoning: result.price_reasoning,
-      newCategory: result.category || null,
-      newMetafields: Array.isArray(result.metafields) ? result.metafields : null,
-    });
+    await insertRedesign(projectId, shopifyProductId, product, result);
+    if (quota.counts) await countProductQuota(projectId);
   
     // ShopyBrain aprende del rediseño exitoso (fire-and-forget)
     const [redesignProj] = await db.select({ storeNiche: projectsTable.storeNiche }).from(projectsTable).where(eq(projectsTable.id, projectId)).catch(() => [null]);
@@ -298,6 +369,20 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
     if (!project || !redesign) {
       res.status(404).json({ error: "Proyecto o rediseño no encontrado" });
       return;
+    }
+    if (await projectHasClient(projectId)) {
+      const approval = await redesignApproval(redesign.id);
+      if (approval?.status !== "approved") {
+        res.status(409).json({
+          code: "APPROVAL_REQUIRED",
+          error: approval?.status === "rejected"
+            ? "El cliente rechazó este rediseño. Genera uno nuevo con sus comentarios."
+            : approval
+            ? "El cliente aún no ha aprobado este rediseño."
+            : "Envía el rediseño al cliente para que lo apruebe antes de publicarlo.",
+        });
+        return;
+      }
     }
   
     const connectorData: Record<string, unknown> = {};
@@ -519,7 +604,15 @@ router.post("/projects/:projectId/bulk-redesign", async (req, res): Promise<void
       let failed = 0;
       for (const product of products) {
         try {
-          await doRedesign(projectId, product.shopifyProductId);
+          const quota = await claimProductQuota(projectId, product.shopifyProductId);
+          if (!quota.allowed) {
+            // Cuota agotada: se para el lote en vez de seguir gastando IA.
+            await updateJobProgress(jobId, completed, failed, `■ Detenido: ${quota.reason}`);
+            break;
+          }
+          const result = await doRedesign(projectId, product.shopifyProductId);
+          await insertRedesign(projectId, product.shopifyProductId, product, result);
+          if (quota.counts) await countProductQuota(projectId);
           completed++;
           await updateJobProgress(jobId, completed, failed, `✓ ${product.title}`);
         } catch (err) {
@@ -534,6 +627,75 @@ router.post("/projects/:projectId/bulk-redesign", async (req, res): Promise<void
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
+  }
+});
+
+/** Últimas propuestas de rediseño por producto, con su estado de aprobación (incluye las del rediseño masivo). */
+router.get("/projects/:projectId/redesigns/latest", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(String(req.params.projectId), 10);
+    await ensureApprovalRefColumns();
+    const r = await db.execute(sql`
+      SELECT DISTINCT ON (r.shopify_product_id) r.*, a.status AS approval_status, a.client_comment
+      FROM redesigns r
+      LEFT JOIN LATERAL (
+        SELECT status, client_comment FROM approvals
+        WHERE ref_type = 'redesign' AND ref_id = r.id::text ORDER BY created_at DESC LIMIT 1
+      ) a ON TRUE
+      WHERE r.project_id = ${projectId}
+      ORDER BY r.shopify_product_id, r.created_at DESC
+    `);
+    res.json({ hasClient: await projectHasClient(projectId), redesigns: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+/** Envía el último rediseño del producto al portal del cliente para que lo apruebe. */
+router.post("/projects/:projectId/products/:productId/request-approval", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(String(req.params.projectId), 10);
+    const shopifyProductId = String(req.params.productId);
+    if (!(await projectHasClient(projectId))) {
+      res.status(400).json({ error: "Este proyecto no tiene un cliente vinculado que pueda aprobar." });
+      return;
+    }
+    const [redesign] = await db.select().from(redesignsTable)
+      .where(and(eq(redesignsTable.projectId, projectId), eq(redesignsTable.shopifyProductId, shopifyProductId)))
+      .orderBy(desc(redesignsTable.createdAt)).limit(1);
+    if (!redesign) { res.status(404).json({ error: "Genera primero un rediseño de este producto." }); return; }
+
+    const existing = await redesignApproval(redesign.id);
+    if (existing && existing.status === "pending") { res.json({ id: existing.id, status: "pending", alreadySent: true }); return; }
+    if (existing && existing.status === "approved") { res.json({ id: existing.id, status: "approved", alreadySent: true }); return; }
+
+    const before = [
+      `Título: ${redesign.originalTitle}`,
+      redesign.originalPrice ? `Precio: ${redesign.originalPrice} €` : "",
+    ].filter(Boolean).join("\n");
+    const after = [
+      `Título: ${redesign.newTitle}`,
+      redesign.newPrice ? `Precio: ${redesign.newPrice} €${redesign.newCompareAtPrice ? ` (antes ${redesign.newCompareAtPrice} €)` : ""}` : "",
+      redesign.metaTitle ? `Meta título: ${redesign.metaTitle}` : "",
+      redesign.metaDescription ? `Meta descripción: ${redesign.metaDescription}` : "",
+      redesign.newTags ? `Etiquetas: ${clip(redesign.newTags, 200)}` : "",
+      `Descripción: ${clip(redesign.newBodyHtml, 600)}`,
+    ].filter(Boolean).join("\n");
+
+    const { randomBytes } = await import("crypto");
+    const id = randomBytes(16).toString("hex");
+    await ensureApprovalRefColumns();
+    await db.execute(sql`
+      INSERT INTO approvals (id, project_id, type, title, description, before_value, after_value, reasoning, ref_type, ref_id)
+      VALUES (${id}, ${String(projectId)}, 'redesign', ${`Rediseño: ${clip(redesign.originalTitle, 80)}`},
+        ${"Nueva ficha de producto: título, descripción, SEO y precio. Si la apruebas, la publicamos en tu tienda."},
+        ${before}, ${after}, ${redesign.priceReasoning ?? null}, 'redesign', ${String(redesign.id)})
+    `);
+    const { sendPushToClientByProject } = await import("../lib/push-helper.js");
+    sendPushToClientByProject(String(projectId), "📋 Nueva propuesta para tu tienda", `Rediseño de "${clip(redesign.originalTitle, 60)}" — revísalo en Aprobaciones`, "/client/approvals").catch(() => {});
+    res.json({ id, status: "pending" });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
   }
 });
 

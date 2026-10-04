@@ -3,6 +3,7 @@
  * Routes requests to 20+ models with a unified interface.
  * Supports: Claude, GPT, Gemini, DeepSeek, Grok, Mistral, Groq/Llama
  */
+import { recordClaudeMessageUsage, recordGeminiResponseUsage } from "./api-usage.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import fetch from "node-fetch";
@@ -90,6 +91,7 @@ async function callClaude(messages: Array<{ role: string; content: string }>, mo
     system,
     messages: userMsgs,
   });
+  recordClaudeMessageUsage("amr", model, resp.usage);
   if (resp.stop_reason === "max_tokens") logger.warn({ model, maxTokens }, "AMR: respuesta de Claude cortada por max_tokens");
   // Todos los bloques de texto (antes solo el primero, que podía no ser de texto).
   return resp.content.map(b => (b.type === "text" ? b.text : "")).join("");
@@ -99,6 +101,7 @@ async function callGemini(messages: Array<{ role: string; content: string }>, mo
   const client = getGeminiClient();
   const userMsg = messages.filter(m => m.role !== "system").map(m => m.content).join("\n\n");
   const result = await client.models.generateContent({ model, contents: userMsg });
+  recordGeminiResponseUsage("amr", model, result.usageMetadata);
   return result.text ?? "";
 }
 
@@ -197,7 +200,9 @@ export async function streamAMR(
           sendChunk(event.delta.text);
         }
       }
-      if ((await stream.finalMessage()).stop_reason === "max_tokens") {
+      const finalMsg = await stream.finalMessage();
+      recordClaudeMessageUsage("amr-stream", model.apiModel, finalMsg.usage);
+      if (finalMsg.stop_reason === "max_tokens") {
         logger.warn({ model: model.apiModel }, "AMR stream: respuesta de Claude cortada por max_tokens");
         sendChunk("\n\n[Respuesta cortada por longitud — pide que continúe]");
       }
@@ -223,10 +228,15 @@ export async function streamAMR(
         body: JSON.stringify({ model: model.apiModel, messages, stream: true, max_tokens: 4096 }),
       });
       if (!resp.ok || !resp.body) throw new Error(`AMR stream error ${resp.status}`);
-      const reader = resp.body;
-      for await (const chunk of reader) {
-        const text = chunk.toString();
-        const lines = text.split("\n").filter((l: string) => l.startsWith("data: "));
+      // resp.body da Uint8Array: hay que decodificar y juntar líneas partidas entre trozos
+      // (antes chunk.toString() producía "60,100,…" y la respuesta llegaba vacía).
+      const decoder = new TextDecoder();
+      let pending = "";
+      for await (const chunk of resp.body as unknown as AsyncIterable<Uint8Array>) {
+        pending += decoder.decode(chunk, { stream: true });
+        const parts = pending.split("\n");
+        pending = parts.pop() ?? "";
+        const lines = parts.filter((l: string) => l.startsWith("data: "));
         for (const line of lines) {
           const raw = line.slice(6).trim();
           if (raw === "[DONE]") { sendDone(); return; }

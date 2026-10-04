@@ -76,8 +76,16 @@ export default function WebDesigner() {
 
   const { data: sessions = [], refetch: refetchSessions } = useQuery<DesignSession[]>({
     queryKey: ["web-designer-sessions"],
-    queryFn: () => fetch(`${API}/web-designer/sessions`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch(`${API}/web-designer/sessions`, { credentials: "include" })
+      .then(r => r.json()).then(d => (Array.isArray(d) ? d : [])),
   });
+
+  async function deleteSessionById(id: string) {
+    if (!window.confirm("¿Borrar este diseño?")) return;
+    await fetch(`${API}/web-designer/sessions/${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" });
+    if (id === sessionId) { setSessionId(""); setCurrentHtml(""); setHistory([]); updateIframe(""); }
+    void refetchSessions();
+  }
 
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects-list-designer"],
@@ -172,7 +180,10 @@ export default function WebDesigner() {
           projectId,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const j = await res.json().catch(() => null);
+        throw new Error(j?.error ?? `HTTP ${res.status}`);
+      }
       const reader = res.body!.getReader();
       const dec = new TextDecoder();
       let buf = "";
@@ -197,7 +208,13 @@ export default function WebDesigner() {
               updateIframe(ev.html);
               if (ev.sessionId) setSessionId(ev.sessionId);
               setStreamText("");
-              setHistory(h => [...h, { role: "assistant", content: "✓ Página generada (" + ev.html.length.toLocaleString() + " chars)" }]);
+              setHistory(h => [...h, {
+                role: "assistant",
+                content: ev.truncated
+                  ? "⚠️ Página generada pero cortada por longitud: pide \"continúa\" o simplifica secciones."
+                  : "✓ Página generada (" + ev.html.length.toLocaleString("es-ES") + " caracteres)",
+              }]);
+              if (ev.truncated) setError("La página salió cortada por longitud. Pide que la complete o reduce secciones.");
               void refetchSessions();
             }
             if (ev.error) setError(ev.error);
@@ -444,7 +461,13 @@ export default function WebDesigner() {
                     onMouseLeave={e => { if (s.id !== sessionId) e.currentTarget.style.background = "transparent"; }}
                   >
                     <div style={{ fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title || "Sin título"}</div>
-                    <div style={{ fontSize: 10, color: st.t3 }}>{new Date(s.updatedAt).toLocaleDateString("es-ES")}</div>
+                    <div style={{ fontSize: 10, color: st.t3, display: "flex", justifyContent: "space-between" }}>
+                      <span>{new Date(s.updatedAt).toLocaleDateString("es-ES")}</span>
+                      <span role="button" tabIndex={0} title="Borrar diseño"
+                        onClick={e => { e.stopPropagation(); void deleteSessionById(s.id); }}
+                        onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); void deleteSessionById(s.id); } }}
+                        style={{ color: st.t3, cursor: "pointer" }}>Borrar</span>
+                    </div>
                   </button>
                 ))}
               </div>

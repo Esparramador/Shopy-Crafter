@@ -460,6 +460,10 @@ export async function claudeMessagesJson<T>(
         },
         opts.timeoutMs ? { signal: AbortSignal.timeout(opts.timeoutMs) } : undefined,
       ).finalMessage();
+      try {
+        const { recordClaudeMessageUsage } = await import("./api-usage.js");
+        recordClaudeMessageUsage(opts.label, opts.model, res.usage);
+      } catch { /* el registro de coste nunca rompe la llamada */ }
       const text = res.content.map(b => (b.type === "text" ? b.text : "")).join("");
       return { text, truncated: res.stop_reason === "max_tokens" };
     },

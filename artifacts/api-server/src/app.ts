@@ -1,3 +1,4 @@
+import { aiContextMiddleware } from "./lib/ai-context.js";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { keepRawBodyForWebhooks } from "./lib/raw-body.js";
 import cors from "cors";
@@ -131,6 +132,39 @@ const publicAiLimiter = rateLimit({
   skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
 });
 
+// Llamada de voz pública (ElevenLabs ConvAI se factura por minuto) y formulario de
+// contacto (genera un informe con IA por envío): sin sesión, por IP y por hora.
+const publicVoiceLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new PgRateLimitStore("public_voice"),
+  message: { error: "Has alcanzado el máximo de llamadas por hora. Escríbenos desde el formulario.", code: "RATE_LIMITED" },
+  skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
+});
+
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new PgRateLimitStore("contact"),
+  message: { error: "Has enviado varias solicitudes seguidas. Te responderemos en breve.", code: "RATE_LIMITED" },
+  skip: (req) => req.method !== "POST" || process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
+});
+
+// Chat de la landing: además del límite por minuto, 80 mensajes al día por IP.
+const publicAiDailyLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 80,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new PgRateLimitStore("public_ai_day"),
+  message: { error: "Has alcanzado el máximo de mensajes de hoy. Escríbenos desde el formulario de contacto.", code: "RATE_LIMITED" },
+  skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
+});
+
 startRateLimitCleanup();
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
@@ -186,6 +220,8 @@ app.use(
 );
 // Sesiones de usuarios borrados/desactivados dejan de valer en la siguiente petición.
 app.use(revalidateSession);
+// Imputa el gasto de IA de cada petición a su proyecto (topes por plan en lib/ai-budget.ts).
+app.use("/api", aiContextMiddleware);
 
 // ── No-cache for all API responses (prevents stale data in production) ────────
 app.use("/api", (_req: Request, res: Response, next: NextFunction) => {
@@ -268,6 +304,9 @@ app.use("/api/msg-uploads", async (req: Request, res: Response, next: NextFuncti
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authLimiter);
 app.use("/api/public/landing-chat", publicAiLimiter);
+app.use("/api/public/landing-chat", publicAiDailyLimiter);
+app.use("/api/voice/public-call-url", publicVoiceLimiter);
+app.use("/api/contact", contactLimiter);
 // Tarjetas públicas por id secuencial: limita la enumeración masiva (un QR
 // real se abre unas pocas veces por minuto desde una misma IP).
 app.use("/api/public/qr", publicQrLimiter);

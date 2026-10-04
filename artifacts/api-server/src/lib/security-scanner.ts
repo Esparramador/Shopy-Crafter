@@ -15,6 +15,7 @@ import { validateUrlWithDnsCheck } from "./web-scraper.js";
 import { detectTechStack, type TechStack } from "./site-crawler.js";
 import { searchCybersecSkills } from "./cybersec-knowledge.js";
 import { logger } from "./logger.js";
+import { detectSecrets } from "./secret-detection.js";
 
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -296,18 +297,19 @@ function checkCookies(headers: Headers): SecurityFinding[] {
   return findings;
 }
 
-/** 4. Exposed sensitive paths (safe HEAD/GET probes on the target's own host) */
-const SENSITIVE_PATHS: Array<{ path: string; severity: Severity; label: string }> = [
-  { path: "/.env", severity: "critical", label: "Archivo .env expuesto" },
-  { path: "/.git/config", severity: "critical", label: "Repositorio .git expuesto" },
-  { path: "/wp-config.php.bak", severity: "critical", label: "Backup de configuración WordPress expuesto" },
-  { path: "/.aws/credentials", severity: "critical", label: "Credenciales AWS expuestas" },
-  { path: "/phpinfo.php", severity: "high", label: "phpinfo() expuesto" },
-  { path: "/.well-known/security.txt", severity: "info", label: "security.txt (positivo si existe)" },
-  { path: "/server-status", severity: "high", label: "Apache server-status expuesto" },
-  { path: "/.htaccess", severity: "medium", label: ".htaccess accesible" },
-  { path: "/config.json", severity: "medium", label: "config.json potencialmente expuesto" },
-  { path: "/backup.sql", severity: "critical", label: "Backup SQL expuesto" },
+/** 4. Exposed sensitive paths (safe GET probes on the target's own host) */
+// Cada ruta exige una firma de contenido: Shopify, SPAs y muchos CDNs responden 200
+// a cualquier ruta, y antes eso se informaba como ".env expuesto" (crítico).
+const SENSITIVE_PATHS: Array<{ path: string; severity: Severity; label: string; signature?: RegExp }> = [
+  { path: "/.env", severity: "critical", label: "Archivo .env expuesto", signature: /^\s*[A-Z][A-Z0-9_]{2,}\s*=\s*\S/m },
+  { path: "/.git/config", severity: "critical", label: "Repositorio .git expuesto", signature: /\[core\]|repositoryformatversion/ },
+  { path: "/wp-config.php.bak", severity: "critical", label: "Backup de configuración WordPress expuesto", signature: /DB_(?:PASSWORD|NAME|USER)/ },
+  { path: "/.aws/credentials", severity: "critical", label: "Credenciales AWS expuestas", signature: /aws_access_key_id/i },
+  { path: "/phpinfo.php", severity: "high", label: "phpinfo() expuesto", signature: /phpinfo\(\)|PHP Version/i },
+  { path: "/.well-known/security.txt", severity: "info", label: "security.txt (positivo si existe)", signature: /^\s*Contact:/im },
+  { path: "/server-status", severity: "high", label: "Apache server-status expuesto", signature: /Apache Server Status/i },
+  { path: "/.htaccess", severity: "medium", label: ".htaccess accesible", signature: /RewriteEngine|<IfModule|Deny from|Require all/i },
+  { path: "/backup.sql", severity: "critical", label: "Backup SQL expuesto", signature: /CREATE TABLE|INSERT INTO/i },
 ];
 
 async function checkExposedPaths(baseUrl: string): Promise<SecurityFinding[]> {
@@ -315,10 +317,15 @@ async function checkExposedPaths(baseUrl: string): Promise<SecurityFinding[]> {
   const results = await Promise.all(
     SENSITIVE_PATHS.map(async (entry) => {
       const resp = await safeFetch(baseUrl + entry.path, { method: "GET", redirect: "manual" });
-      return { entry, ok: resp && resp.status >= 200 && resp.status < 300 };
+      if (!resp || resp.status < 200 || resp.status >= 300) return { entry, ok: false };
+      const type = resp.headers.get("content-type") || "";
+      const body = (await resp.text().catch(() => "")).slice(0, 20_000);
+      // Una página HTML del propio sitio (soft 404) no es el fichero buscado.
+      const looksHtml = /text\/html/i.test(type) || /^\s*<(?:!doctype|html)/i.test(body);
+      const ok = !!entry.signature && entry.signature.test(body) && (!looksHtml || entry.path === "/phpinfo.php" || entry.path === "/server-status");
+      return { entry, ok };
     })
   );
-
   for (const { entry, ok } of results) {
     if (entry.path === "/.well-known/security.txt") {
       if (!ok) {
@@ -340,7 +347,7 @@ async function checkExposedPaths(baseUrl: string): Promise<SecurityFinding[]> {
         category: "exposure",
         severity: entry.severity,
         title: entry.label,
-        description: `La ruta ${entry.path} responde con un código 2xx y es accesible públicamente.`,
+        description: `La ruta ${entry.path} es accesible públicamente y su contenido coincide con el de ese fichero (no es una página genérica del sitio).`,
         evidence: baseUrl + entry.path,
         attackerPerspective: `Un atacante que descubra ${entry.path} obtiene acceso directo a información sensible (credenciales, configuración, historial de código) sin necesidad de explotar ninguna vulnerabilidad — es una puerta abierta.`,
         hardeningSteps: [
@@ -361,13 +368,40 @@ const OUTDATED_LIB_PATTERNS: Array<{ re: RegExp; name: string; safeBelow: string
   { re: /angular(?:js)?[.-](1\.[0-5])/i, name: "AngularJS", safeBelow: "1.6" },
 ];
 
-const SECRET_PATTERNS: Array<{ re: RegExp; label: string }> = [
-  { re: /AKIA[0-9A-Z]{16}/, label: "AWS Access Key ID" },
-  { re: /sk_live_[0-9a-zA-Z]{24,}/, label: "Stripe Secret Key (live)" },
-  { re: /AIza[0-9A-Za-z\-_]{35}/, label: "Google API Key" },
-  { re: /ghp_[0-9A-Za-z]{36}/, label: "GitHub Personal Access Token" },
-  { re: /xox[baprs]-[0-9A-Za-z-]{10,}/, label: "Slack Token" },
-];
+
+/** Credenciales en el HTML y en los JS propios (detector compartido con Web Lab). */
+function checkLeakedSecrets(sources: Array<{ label: string; content: string }>): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const seen = new Set<string>();
+  for (const src of sources) {
+    for (const d of detectSecrets(src.content)) {
+      if (d.severity === "info") continue; // públicas por diseño (pk_ de Stripe, anon de Supabase)
+      const key = `${d.ruleId}:${d.masked}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      findings.push(enrichFinding({
+        id: `leaked-secret-${d.ruleId}-${findings.length}`,
+        category: "secrets",
+        severity: d.severity,
+        title: d.publicByDesign
+          ? `Clave pública de ${d.service} sin verificar restricciones`
+          : `Credencial filtrada en el código: ${d.service} — ${d.type}`,
+        description: d.publicByDesign
+          ? `${d.service} publica esta clave en el navegador por diseño. Es un riesgo si no está restringida a tu dominio y a las APIs necesarias.`
+          : `Se encontró ${d.type} de ${d.service} en ${src.label}, código que cualquier visitante puede descargar.`,
+        evidence: `${d.masked} · ${src.label}, línea ${d.lineNumber}`,
+        attackerPerspective: d.publicByDesign
+          ? "Un tercero puede reutilizar la clave desde su propio sitio y consumir tu cuota o generar coste si no tiene restricción de referer."
+          : `Basta con ver el código fuente para copiar la credencial y usarla contra ${d.service}: acceso a datos o gasto a tu cargo, sin explotar nada.`,
+        hardeningSteps: [
+          d.recommendation,
+          ...(d.publicByDesign ? [] : ["Rotar la credencial (revocar la expuesta, no basta con borrarla del código)", "Revisar el historial de Git y los despliegues por si sigue publicada"]),
+        ],
+      }, `${d.service} secret exposure credential leakage`));
+    }
+  }
+  return findings;
+}
 
 function checkHtmlContent(html: string, ssl: boolean): SecurityFinding[] {
   const findings: SecurityFinding[] = [];
@@ -401,26 +435,6 @@ function checkHtmlContent(html: string, ssl: boolean): SecurityFinding[] {
         attackerPerspective: `Un atacante puede buscar el CVE público asociado a esta versión exacta de ${lib.name} y usar un exploit ya documentado en lugar de descubrir una falla nueva.`,
         hardeningSteps: [`Actualizar ${lib.name} a la última versión estable`, "Revisar el changelog de seguridad antes de actualizar en producción"],
       }, `${lib.name} outdated library known vulnerability`));
-    }
-  }
-
-  for (const secret of SECRET_PATTERNS) {
-    const m = html.match(secret.re);
-    if (m) {
-      findings.push(enrichFinding({
-        id: `leaked-secret-${secret.label.replace(/\s+/g, "-").toLowerCase()}`,
-        category: "secrets",
-        severity: "critical",
-        title: `Posible secreto filtrado en el código fuente: ${secret.label}`,
-        description: `Se encontró un patrón coincidente con ${secret.label} directamente en el HTML/JS servido al cliente.`,
-        evidence: m[0].slice(0, 6) + "••••••••",
-        attackerPerspective: `Cualquier visitante puede ver el código fuente y extraer esta credencial directamente — no requiere ningún ataque, solo "Ver código fuente". Con ${secret.label} comprometida, un atacante puede acceder a servicios de pago, infraestructura cloud o repos privados.`,
-        hardeningSteps: [
-          "Revocar y rotar la credencial inmediatamente",
-          "Mover todas las claves a variables de entorno del servidor, nunca al bundle del cliente",
-          "Auditar el historial de Git por si la clave quedó commiteada anteriormente",
-        ],
-      }, `${secret.label} secret exposure credential leakage`));
     }
   }
 
@@ -465,13 +479,66 @@ async function checkDirectoryListing(baseUrl: string): Promise<SecurityFinding[]
   return findings;
 }
 
+/** Sigue redirecciones validando cada salto contra la red interna (SSRF). */
+async function fetchFollowing(startUrl: string, maxHops = 5): Promise<{ resp: Response | null; finalUrl: string }> {
+  let current = startUrl;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    await validateUrlWithDnsCheck(current);
+    const resp = await safeFetch(current);
+    if (!resp) return { resp: null, finalUrl: current };
+    const location = resp.status >= 300 && resp.status < 400 ? resp.headers.get("location") : null;
+    if (!location) return { resp, finalUrl: current };
+    await resp.body?.cancel().catch(() => {});
+    current = new URL(location, current).toString();
+  }
+  return { resp: null, finalUrl: current };
+}
+
+/** ¿La versión http:// redirige a https://? (Comprobación real, no suposición.) */
+async function checkHttpRedirect(host: string): Promise<SecurityFinding[]> {
+  const resp = await safeFetch(`http://${host}/`);
+  if (!resp) return [];
+  const location = resp.headers.get("location") || "";
+  const redirectsToHttps = resp.status >= 300 && resp.status < 400 && /^https:\/\//i.test(new URL(location || "/", `http://${host}/`).toString());
+  await resp.body?.cancel().catch(() => {});
+  if (redirectsToHttps || resp.status >= 400) return [];
+  return [enrichFinding({
+    id: "tls-http-not-redirected",
+    category: "tls",
+    severity: "high",
+    title: "La versión http:// del sitio no redirige a HTTPS",
+    description: `http://${host}/ responde ${resp.status} sin redirigir a https://.`,
+    attackerPerspective: "Quien entra escribiendo el dominio sin https navega en claro: un atacante en la misma red puede leer y modificar la página y robar la sesión.",
+    hardeningSteps: ["Redirigir con 301 todo el tráfico http:// a https://", "Activar HSTS cuando la redirección esté en marcha"],
+  }, "transport security https enforcement")];
+}
+
+/** Descarga los JS del propio sitio (máx. 5) para buscar credenciales en el bundle. */
+async function fetchFirstPartyScripts(html: string, pageUrl: string): Promise<Array<{ label: string; content: string }>> {
+  const host = new URL(pageUrl).host;
+  const srcs = [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)]
+    .map(m => { try { return new URL(m[1], pageUrl); } catch { return null; } })
+    .filter((u): u is URL => !!u && u.host === host && /^https?:$/.test(u.protocol))
+    .slice(0, 5);
+  const out: Array<{ label: string; content: string }> = [];
+  for (const u of srcs) {
+    try {
+      await validateUrlWithDnsCheck(u.toString());
+      const r = await safeFetch(u.toString());
+      if (r && r.ok) out.push({ label: u.pathname, content: (await r.text()).slice(0, 1_500_000) });
+    } catch { /* script inaccesible: se omite */ }
+  }
+  return out;
+}
+
 export async function runSecurityScan(rawUrl: string): Promise<SecurityScanResult> {
-  const url = normalizeUrl(rawUrl);
-  await validateUrlWithDnsCheck(url);
+  const startUrl = normalizeUrl(rawUrl);
+  const { resp: mainResp, finalUrl } = await fetchFollowing(startUrl);
+  // Se analiza la página final (tras redirecciones), no la respuesta 301 intermedia.
+  const url = finalUrl;
   const parsed = new URL(url);
   const baseUrl = `${parsed.protocol}//${parsed.host}`;
 
-  const mainResp = await safeFetch(url);
   let html = "";
   let headers: Headers = new Headers();
   if (mainResp) {
@@ -483,11 +550,14 @@ export async function runSecurityScan(rawUrl: string): Promise<SecurityScanResul
     }
   }
 
-  const [tlsFindings, exposedFindings, dirFindings] = await Promise.all([
+  const [tlsFindings, exposedFindings, dirFindings, redirectFindings, scripts] = await Promise.all([
     checkTls(parsed),
     checkExposedPaths(baseUrl),
     checkDirectoryListing(baseUrl),
+    parsed.protocol === "https:" ? checkHttpRedirect(parsed.host) : Promise.resolve([]),
+    fetchFirstPartyScripts(html, url),
   ]);
+  const secretFindings = checkLeakedSecrets([{ label: "el HTML de la página", content: html }, ...scripts]);
 
   const headerFindings = checkSecurityHeaders(headers);
   const cookieFindings = checkCookies(headers);
@@ -504,6 +574,8 @@ export async function runSecurityScan(rawUrl: string): Promise<SecurityScanResul
 
   const findings = [
     ...tlsFindings,
+    ...redirectFindings,
+    ...secretFindings,
     ...headerFindings,
     ...cookieFindings,
     ...exposedFindings,

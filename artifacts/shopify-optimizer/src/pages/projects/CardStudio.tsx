@@ -386,7 +386,7 @@ export default function CardStudio() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-          <a href="/projects" style={{ padding: "12px 28px", background: "linear-gradient(135deg,#f59e0b,#e07b39)", border: "none", borderRadius: 10, color: "#000", fontWeight: 700, fontSize: 14, cursor: "pointer", textDecoration: "none" }}>
+          <a href={import.meta.env.BASE_URL.replace(/\/$/, "") + "/home"} style={{ padding: "12px 28px", background: "linear-gradient(135deg,#f59e0b,#e07b39)", border: "none", borderRadius: 10, color: "#000", fontWeight: 700, fontSize: 14, cursor: "pointer", textDecoration: "none" }}>
             Seleccionar Cliente
           </a>
         </div>

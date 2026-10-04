@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { apiUsageLogTable } from "@workspace/db/schema";
 import { logger } from "./logger.js";
 import { sql } from "drizzle-orm";
+import { currentAiContext, currentAiProjectId } from "./ai-context.js";
 
 const USD_TO_EUR = 0.92;
 
@@ -43,6 +44,7 @@ async function ensureSessionIdColumn(): Promise<void> {
       ALTER TABLE api_usage_log
       ADD COLUMN IF NOT EXISTS session_id TEXT
     `);
+    await db.execute(sql`ALTER TABLE api_usage_log ADD COLUMN IF NOT EXISTS actor TEXT`);
     _migrationDone = true;
   } catch (err) {
     logger.warn({ err: String(err) }, "ensureSessionIdColumn: migration warn (may already exist)");
@@ -58,6 +60,7 @@ ensureSessionIdColumn().catch(() => {});
  */
 export async function recordApiUsage(input: RecordApiUsageInput): Promise<void> {
   try {
+    await ensureSessionIdColumn();
     const costUsd = Number.isFinite(input.costUsd) ? Number(input.costUsd) : 0;
     const costEur = Number.isFinite(input.costEur)
       ? Number(input.costEur)
@@ -67,7 +70,7 @@ export async function recordApiUsage(input: RecordApiUsageInput): Promise<void> 
       provider: input.provider,
       operation: input.operation.slice(0, 80),
       model: input.model ?? null,
-      projectId: input.projectId ?? null,
+      projectId: input.projectId || currentAiProjectId() || null,
       inputUnits: input.inputUnits ?? 0,
       outputUnits: input.outputUnits ?? 0,
       unitsLabel: input.unitsLabel ?? null,
@@ -77,6 +80,7 @@ export async function recordApiUsage(input: RecordApiUsageInput): Promise<void> 
       errorMessage: input.errorMessage ?? null,
       metadata: input.metadata ? JSON.stringify(input.metadata).slice(0, 4000) : null,
       sessionId: input.sessionId ?? null,
+      actor: currentAiContext()?.actor ?? null,
     });
   } catch (err) {
     logger.warn({ err: String(err), provider: input.provider, op: input.operation }, "recordApiUsage: insert failed");
@@ -84,16 +88,19 @@ export async function recordApiUsage(input: RecordApiUsageInput): Promise<void> 
 }
 
 // ── Pricing helpers ──────────────────────────────────────────────────────────
-// Precios reales por proveedor a fecha 2026-06, USD por unidad.
+// Tarifas públicas en USD por 1M tokens, verificadas 2026-10 (docs.anthropic.com/pricing,
+// ai.google.dev/gemini-api/docs/pricing). La versión anterior infravaloraba Gemini 3.5
+// Flash ~20× (0,075/0,30 frente a 1,50/9) y Haiku 4.5 / Opus 4.5+.
 
 const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
-  // USD por 1M tokens (fuente: api.anthropic.com/v1/models, verificado 2026-06-10)
-  "claude-opus-4-8":           { input: 15.0, output: 75.0 },
-  "claude-opus-4-7":           { input: 15.0, output: 75.0 },
+  "claude-opus-4-8":           { input: 5.0,  output: 25.0 },
+  "claude-opus-4-7":           { input: 5.0,  output: 25.0 },
+  "claude-opus-4-6":           { input: 5.0,  output: 25.0 },
+  "claude-opus-4-5":           { input: 5.0,  output: 25.0 },
   "claude-fable-5":            { input: 15.0, output: 75.0 },
   "claude-sonnet-4-6":         { input: 3.0,  output: 15.0 },
-  "claude-haiku-4-5":          { input: 0.8,  output: 4.0  },
   "claude-sonnet-4-5":         { input: 3.0,  output: 15.0 },
+  "claude-haiku-4-5":          { input: 1.0,  output: 5.0  },
   "claude-opus-4-1":           { input: 15.0, output: 75.0 },
   "claude-sonnet-4-20250514":  { input: 3.0,  output: 15.0 },
   "claude-3-5-sonnet-20241022":{ input: 3.0,  output: 15.0 },
@@ -102,27 +109,44 @@ const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
 };
 
 const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
-  // USD por 1M tokens — June 2026 current + legacy
-  "gemini-3.5-flash":          { input: 0.075, output: 0.30 },
-  "gemini-3.1-pro-preview":    { input: 1.25,  output: 5.0  },
-  "gemini-3-pro-preview":      { input: 1.25,  output: 5.0  },
-  "gemini-3.1-flash-lite":     { input: 0.02,  output: 0.08 },
-  "gemini-2.5-pro":            { input: 1.25,  output: 5.0  },
-  "gemini-2.5-flash":          { input: 0.075, output: 0.30 },
-  "gemini-2.5-flash-preview":  { input: 0.075, output: 0.30 },
-  "gemini-2.0-flash":          { input: 0.075, output: 0.30 },
+  // Salida incluye tokens de razonamiento. Pro: tarifa de prompts ≤200k.
+  "gemini-3.5-flash":          { input: 1.50,  output: 9.0  },
+  "gemini-3.1-pro-preview":    { input: 2.0,   output: 12.0 },
+  "gemini-3-pro-preview":      { input: 2.0,   output: 12.0 },
+  "gemini-3.1-flash-lite":     { input: 0.25,  output: 1.50 },
+  "gemini-2.5-pro":            { input: 1.25,  output: 10.0 },
+  "gemini-2.5-flash-lite":     { input: 0.10,  output: 0.40 },
+  "gemini-2.5-flash":          { input: 0.30,  output: 2.50 },
+  "gemini-2.0-flash":          { input: 0.10,  output: 0.40 },
   "gemini-1.5-pro":            { input: 1.25,  output: 5.0  },
   "gemini-1.5-flash":          { input: 0.075, output: 0.30 },
 };
 
+/** Grounding con Google Search (Gemini 3): 14 $ por 1.000 consultas; se ignora la franja gratuita. */
+export function calcGroundingCost(queries: number): number {
+  return Math.max(0, queries) * 0.014;
+}
+
+const OPENAI_PRICING: Record<string, { input: number; output: number }> = {
+  "gpt-4.1-nano": { input: 0.10, output: 0.40 },
+  "gpt-4.1-mini": { input: 0.40, output: 1.60 },
+  "gpt-4.1":      { input: 2.0,  output: 8.0  },
+};
+
+export function calcOpenAiCost(model: string, inputTokens: number, outputTokens: number): number {
+  const m = Object.keys(OPENAI_PRICING).sort((a, b) => b.length - a.length).find(k => model.includes(k)) ?? "gpt-4.1";
+  const p = OPENAI_PRICING[m];
+  return (inputTokens / 1_000_000) * p.input + (outputTokens / 1_000_000) * p.output;
+}
+
 export function calcClaudeCost(model: string, inputTokens: number, outputTokens: number): number {
-  const m = Object.keys(CLAUDE_PRICING).find(k => model.includes(k)) ?? "claude-sonnet-4-6";
+  const m = Object.keys(CLAUDE_PRICING).sort((a, b) => b.length - a.length).find(k => model.includes(k)) ?? "claude-sonnet-4-6";
   const p = CLAUDE_PRICING[m];
   return (inputTokens / 1_000_000) * p.input + (outputTokens / 1_000_000) * p.output;
 }
 
 export function calcGeminiCost(model: string, inputTokens: number, outputTokens: number): number {
-  const m = Object.keys(GEMINI_PRICING).find(k => model.includes(k)) ?? "gemini-2.5-flash";
+  const m = Object.keys(GEMINI_PRICING).sort((a, b) => b.length - a.length).find(k => model.includes(k)) ?? "gemini-3.5-flash";
   const p = GEMINI_PRICING[m];
   return (inputTokens / 1_000_000) * p.input + (outputTokens / 1_000_000) * p.output;
 }
@@ -130,4 +154,18 @@ export function calcGeminiCost(model: string, inputTokens: number, outputTokens:
 // ElevenLabs aprox: $0.30 por 1.000 caracteres (Creator tier)
 export function calcElevenLabsCost(chars: number): number {
   return (chars / 1000) * 0.30;
+}
+
+/** Registro de uso para código que llama al SDK de Anthropic directamente. */
+export function recordClaudeMessageUsage(operation: string, model: string, usage?: { input_tokens?: number; output_tokens?: number } | null): void {
+  const inTok = usage?.input_tokens ?? 0;
+  const outTok = usage?.output_tokens ?? 0;
+  void recordApiUsage({ provider: "claude", operation, model, inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens", costUsd: calcClaudeCost(model, inTok, outTok) });
+}
+
+/** Registro de uso para llamadas directas a Gemini (usageMetadata de la respuesta). */
+export function recordGeminiResponseUsage(operation: string, model: string, usage?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } | null): void {
+  const inTok = usage?.promptTokenCount ?? 0;
+  const outTok = (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0);
+  void recordApiUsage({ provider: "gemini", operation, model, inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens", costUsd: calcGeminiCost(model, inTok, outTok) });
 }

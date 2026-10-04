@@ -1,3 +1,4 @@
+import { recordClaudeMessageUsage, recordGeminiResponseUsage } from "../lib/api-usage.js";
 import { Router } from "express";
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
@@ -92,6 +93,7 @@ ${original}
         contents: `${SYSTEM}\n\n${USER}`,
         config: { maxOutputTokens: 65536 },
       });
+      recordGeminiResponseUsage("studio-edit", "gemini-2.5-pro", resp.usageMetadata);
       // La salida es el archivo ENTERO: si se corta, sería un archivo roto.
       if (resp.candidates?.[0]?.finishReason === "MAX_TOKENS") {
         throw new AiTruncatedError("[studio/edit:gemini] El archivo modificado se cortó por longitud", { label: "studio/edit:gemini" });
@@ -132,6 +134,7 @@ ${original}
             system: SYSTEM,
             messages,
           });
+          recordClaudeMessageUsage("studio-edit", msg.model, msg.usage);
           return { text: msg.content.map(b => (b.type === "text" ? b.text : "")).join(""), truncated: msg.stop_reason === "max_tokens" };
         },
       });

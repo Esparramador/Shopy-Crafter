@@ -75,13 +75,13 @@ export const PLATFORM_MODULES: PlatformModule[] = [
   {
     id: "shopify-optimization",
     name: "OPTIMIZACIÓN SHOPIFY (los motores clásicos)",
-    description: "Conectas tu tienda Shopify (OAuth seguro, 5 minutos) y los motores trabajan 24/7:",
+    description: "Se conecta la tienda (Shopify, WooCommerce o PrestaShop) y el equipo trabaja el catálogo con estos motores; cada cambio pasa por la aprobación del cliente:",
     bullets: [
       "Motor SEO: keyword research, títulos, meta descripciones, schemas JSON-LD (Product/FAQ/Review/BreadcrumbList), alt texts, arquitectura URL, internal linking",
       "Motor Pricing: precios de mercado en tiempo real, price anchoring, elasticidad, compare_at_price automático, bundling, psicología de precios",
       "Motor Imágenes IA: fotos de producto profesionales (fondo blanco, lifestyle, banners), optimización de imágenes, alt texts SEO automáticos",
       "Motor Copywriting: descripciones con storytelling, AIDA/PAS, benefits-first, FAQ integrada, keywords long-tail",
-      "Motor A/B Testing: tests automáticos de precios, títulos e imágenes para maximizar conversión real",
+      "Motor A/B Testing (solo Shopify): tests de precio e imagen con medición real de conversión y significancia estadística",
       "Motor Email Marketing: flujos Klaviyo completos (bienvenida, carrito abandonado, post-compra, winback VIP) con HTML listo para importar",
       "Auditoría completa: score de optimización 0-100 (grado A/B/C/D/F) por producto con recomendaciones priorizadas",
     ],
@@ -294,7 +294,8 @@ export function buildPricingBlock(): string {
 
 /** Generates the full MÓDULOS block for chatbot system prompts. */
 export function buildModulesBlock(): string {
-  return PLATFORM_MODULES.map((mod, i) => {
+  const header = "== HERRAMIENTAS DE LA PLATAFORMA ==\nLas usa el equipo de Shopy Crafter para producir el trabajo de cada cliente. El cliente no recibe acceso directo a estos estudios: recibe el resultado (propuestas, imágenes, informes, webs) en su portal, dentro de las cuotas de su plan o de un servicio contratado.";
+  return header + "\n\n" + PLATFORM_MODULES.map((mod, i) => {
     const num = String(i + 1).padStart(2, " ");
     const header = `== MODULO ${num.trim()}: ${mod.name} ==`;
     const desc = mod.description ? `${mod.description}\n` : "";
