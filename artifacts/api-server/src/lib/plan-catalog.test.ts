@@ -52,3 +52,25 @@ describe("conocimiento del chatbot", () => {
     for (const r of CALC_RECURRING_SERVICES) expect(r.description).not.toMatch(/ilimitad|24\/7/i);
   });
 });
+
+describe("rentabilidad garantizada de cada plan", () => {
+  it("incluye al menos 3 imágenes por producto", async () => {
+    for (const p of PLAN_CATALOG) {
+      expect(p.imagesPerMonth).toBeGreaterThanOrEqual(p.productsPerMonth * 3);
+    }
+  });
+
+  it("el coste máximo del mes queda por debajo del ingreso (nunca se pierde dinero)", async () => {
+    const { planAiBudgetEur, IMAGE_UNIT_COST_EUR } = await import("./ai-budget");
+    // Coste de optimizar un producto (una llamada de texto): tope generoso.
+    const TEXT_COST_PER_PRODUCT_EUR = 0.2;
+    for (const p of PLAN_CATALOG) {
+      const ingresoMes = p.priceAnnual / 12; // el menor de los dos cobros
+      // Peor caso: el cliente agota su presupuesto de IA + todas sus imágenes +
+      // el texto de todos sus productos (el presupuesto de IA ya cubre el texto,
+      // así que sumarlo de nuevo es un margen extra de seguridad).
+      const costeMax = planAiBudgetEur(p.id) + p.imagesPerMonth * IMAGE_UNIT_COST_EUR + p.productsPerMonth * TEXT_COST_PER_PRODUCT_EUR;
+      expect(costeMax).toBeLessThan(ingresoMes);
+    }
+  });
+});

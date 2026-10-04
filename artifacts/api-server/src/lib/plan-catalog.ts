@@ -13,6 +13,11 @@
  *  - Agencias en España: mantenimiento 57–199 €/mes; SEO e-commerce 800–3.000 €/mes.
  *  - Coste de IA propio: ~0,04 $ por imagen (flux-1.1-pro) + céntimos de texto por producto.
  * El anual cobra 10 mensualidades (2 meses gratis).
+ *
+ * Regla de rentabilidad (lib/plan-catalog.test.ts lo verifica): cada plan
+ * incluye al menos 3 imágenes por producto, y el coste máximo del mes
+ * (IA al tope del plan + imágenes × coste unitario) se queda muy por debajo
+ * del ingreso, así que la cuota siempre se puede cumplir sin perder dinero.
  */
 
 export type CatalogPlanId = "emprendedor" | "starter" | "agency_pro" | "enterprise";
@@ -34,7 +39,7 @@ export interface CatalogPlan {
 export const PLAN_CATALOG: CatalogPlan[] = [
   {
     id: "emprendedor", name: "Emprendedor", priceMonthly: 19, priceAnnual: 190,
-    productsPerMonth: 5, imagesPerMonth: 10,
+    productsPerMonth: 5, imagesPerMonth: 15,
     summary: "Para empezar con una tienda pequeña.",
     featured: false, badge: null, ctaLabel: "Empezar", sortOrder: 0,
   },

@@ -30,10 +30,10 @@ export const PLAN_LIMITS: Record<PlanType, PlanConfig> = {
     maxImagesPerMonth: Infinity,
     label: "Admin (Sin límites)",
   },
-  enterprise: fromCatalog("enterprise", 6),
-  agency_pro: fromCatalog("agency_pro", 5),
+  enterprise: fromCatalog("enterprise", 3),
+  agency_pro: fromCatalog("agency_pro", 3),
   starter: fromCatalog("starter", 3),
-  emprendedor: fromCatalog("emprendedor", 2),
+  emprendedor: fromCatalog("emprendedor", 3),
   trial: {
     productsPerMonth: TRIAL.productsPerMonth,
     imagesPerProduct: 2,
