@@ -22,7 +22,9 @@ describe("presupuesto de IA por plan", () => {
       expect(b).toBeLessThan(p.priceMonthly);
     }
     expect(planAiBudgetEur("admin")).toBe(Infinity);
-    expect(planAiBudgetEur("trial")).toBe(1.5);
+    expect(planAiBudgetEur("trial")).toBe(3);
+    // Un cliente con "Gestión mensual" (490 €) recibe también su parte de presupuesto.
+    expect(planAiBudgetEur("starter", 0, 490)).toBeCloseTo(planAiBudgetEur("starter") + 147, 1);
   });
 
   it("bloquea al cliente que ya consumió su IA del mes", async () => {

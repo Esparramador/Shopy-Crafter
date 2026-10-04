@@ -10,12 +10,13 @@ import { logger } from "./logger.js";
  * cuota propia (créditos); aquí se cubre todo lo demás que se registra en
  * api_usage_log: rediseños, SEO, auditorías, asistente, webs…
  *
- * Presupuesto = AI_BUDGET_SHARE (30 % por defecto) del ingreso mensual del plan,
- * tomando el precio anual / 12 (el menor de los dos) + 1 € por crédito de
- * producto comprado en packs. Prueba: 1,50 €.
+ * Presupuesto = AI_BUDGET_SHARE (30 % por defecto) de lo que el cliente paga ese
+ * mes: plan (precio anual / 12, el menor de los dos) + servicios mensuales activos
+ * + servicios de pago único del mes; más 1 € por crédito de producto de packs.
+ * Prueba: 3 €.
  */
 const DEFAULT_SHARE = 0.3;
-const TRIAL_BUDGET_EUR = 1.5;
+const TRIAL_BUDGET_EUR = 3;
 const EUR_PER_PACK_PRODUCT = 1;
 
 export class AiBudgetExceededError extends Error {
@@ -32,13 +33,29 @@ function share(): number {
   return Number.isFinite(v) && v > 0 && v <= 1 ? v : DEFAULT_SHARE;
 }
 
-/** Presupuesto mensual de IA en € (Infinity = sin tope). */
-export function planAiBudgetEur(plan: string | null | undefined, creditsProducts = 0): number {
+/** Presupuesto mensual de IA en € (Infinity = sin tope). servicesEur = servicios pagados este mes. */
+export function planAiBudgetEur(plan: string | null | undefined, creditsProducts = 0, servicesEur = 0): number {
   if (plan === "admin") return Infinity;
-  const extra = Math.max(0, creditsProducts) * EUR_PER_PACK_PRODUCT;
-  if (plan === "trial") return TRIAL_BUDGET_EUR + extra;
+  const extra = Math.max(0, creditsProducts) * EUR_PER_PACK_PRODUCT + Math.max(0, servicesEur) * share();
+  if (plan === "trial") return Math.round((TRIAL_BUDGET_EUR + extra) * 100) / 100;
   const cat = catalogPlan(plan ?? "starter") ?? catalogPlan("starter")!;
-  return Math.round((cat.priceAnnual / 12) * share() * 100) / 100 + extra;
+  return Math.round(((cat.priceAnnual / 12) * share() + extra) * 100) / 100;
+}
+
+/** Servicios pagados por el proyecto este mes (mensuales activos + pagos únicos del mes), en €. */
+async function servicesRevenueEur(projectId: number): Promise<number> {
+  try {
+    const r = await db.execute(sql`
+      SELECT
+        (SELECT COALESCE(SUM(amount_cents), 0) FROM service_subscriptions
+          WHERE project_id = ${projectId} AND status IN ('active', 'past_due'))
+        + (SELECT COALESCE(SUM(amount_cents), 0) FROM service_orders
+          WHERE project_id = ${projectId} AND status = 'paid' AND created_at >= date_trunc('month', NOW())) AS cents
+    `);
+    return (Number((r.rows[0] as { cents?: number } | undefined)?.cents) || 0) / 100;
+  } catch {
+    return 0; // tablas aún sin crear (Stripe no configurado)
+  }
 }
 
 export interface ProjectAiSpend {
@@ -66,7 +83,7 @@ export async function getProjectAiSpend(projectId: number, fresh = false): Promi
   `);
   const row = r.rows[0] as { plan: string | null; credits_products: number; has_client: boolean; spent: number } | undefined;
   if (!row) return null;
-  const budgetEur = planAiBudgetEur(row.plan, row.credits_products);
+  const budgetEur = planAiBudgetEur(row.plan, row.credits_products, await servicesRevenueEur(projectId));
   const spentEur = Number(row.spent) || 0;
   const value: ProjectAiSpend = {
     projectId, plan: row.plan ?? "starter", hasClient: Boolean(row.has_client), budgetEur, spentEur,
@@ -135,7 +152,7 @@ export interface ProjectMargin {
   name: string;
   plan: string;
   clientEmail: string | null;
-  /** Ingreso mensual del plan pagado (anual / 12); 0 si no hay suscripción activa. */
+  /** Ingreso del mes: plan pagado (anual / 12) + servicios mensuales activos + pagos únicos del mes. */
   revenueEur: number;
   aiSpendEur: number;
   imagesUsed: number;
@@ -170,12 +187,13 @@ export async function projectMargins(): Promise<ProjectMargin[]> {
   for (const row of r.rows as Array<Record<string, unknown>>) {
     const cat = catalogPlan(String(row.sub_plan ?? ""));
     const paying = cat && row.stripe_subscription_id && ["active", "past_due"].includes(String(row.sub_status));
-    const revenueEur = paying ? (row.sub_interval === "year" ? cat.priceAnnual / 12 : cat.priceMonthly) : 0;
+    const servicesEur = await servicesRevenueEur(Number(row.id));
+    const revenueEur = (paying ? (row.sub_interval === "year" ? cat.priceAnnual / 12 : cat.priceMonthly) : 0) + servicesEur;
     const aiSpendEur = Number(row.ai_spend) || 0;
     const imagesUsed = Number(row.images_used) || 0;
     const imageCostEur = imagesUsed * IMAGE_UNIT_COST_EUR;
     const marginEur = revenueEur - aiSpendEur - imageCostEur;
-    const budget = planAiBudgetEur(String(row.plan ?? "starter"), Number(row.credits_products) || 0);
+    const budget = planAiBudgetEur(String(row.plan ?? "starter"), Number(row.credits_products) || 0, servicesEur);
     out.push({
       projectId: Number(row.id), name: String(row.name ?? ""), plan: String(row.plan ?? "starter"),
       clientEmail: (row.client_email as string | null) ?? null,
