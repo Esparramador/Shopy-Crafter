@@ -301,14 +301,16 @@ function SecurityPanel({ scan }: { scan: DeepScanResult }) {
       {s.exposedSecrets && s.exposedSecrets.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <h4 style={{ fontSize: 14, fontWeight: 700, color: "#ef4444", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-            🔑 Credenciales / API Keys expuestas ({s.exposedSecrets.length})
-            <span style={{ fontSize: 11, fontWeight: 400, color: "#fca5a5", background: "#4a0a0a", padding: "2px 8px", borderRadius: 4 }}>
-              ACCIÓN URGENTE REQUERIDA
-            </span>
+            🔑 Credenciales / API Keys en el código ({s.exposedSecrets.length})
+            {s.exposedSecrets.some(sec => sec.severity === "critical" || sec.severity === "high") && (
+              <span style={{ fontSize: 11, fontWeight: 400, color: "#fca5a5", background: "#4a0a0a", padding: "2px 8px", borderRadius: 4 }}>
+                ACCIÓN URGENTE REQUERIDA
+              </span>
+            )}
           </h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {s.exposedSecrets.map((sec, i) => (
-              <div key={i} style={{ padding: "14px 16px", background: "#0a0005", borderRadius: 10, border: `1px solid ${sec.severity === "critical" ? "#ef4444" : sec.severity === "high" ? "#f97316" : "#eab308"}44` }}>
+              <div key={i} style={{ padding: "14px 16px", background: "#0a0005", borderRadius: 10, border: `1px solid ${sec.severity === "critical" ? "#ef4444" : sec.severity === "high" ? "#f97316" : sec.severity === "info" ? "#60a5fa" : "#eab308"}44` }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -355,7 +357,7 @@ function SecurityPanel({ scan }: { scan: DeepScanResult }) {
 
 function SecretsScanPanel({ report, onDownload }: { report: SecretsReport; onDownload: () => void }) {
   const { summary, secrets } = report;
-  const sevC: Record<string, string> = { critical: "#ef4444", high: "#f97316", medium: "#eab308" };
+  const sevC: Record<string, string> = { critical: "#ef4444", high: "#f97316", medium: "#eab308", low: "#22c55e", info: "#60a5fa" };
   return (
     <div>
       {/* Summary banner */}
@@ -1260,7 +1262,7 @@ function WebLabInner({ projectId }: { projectId: number }) {
   const downloadSecretsReport = () => {
     if (!secretsReport) return;
     const { summary, secrets } = secretsReport;
-    const sevColor: Record<string, string> = { critical: "#ef4444", high: "#f97316", medium: "#eab308" };
+    const sevColor: Record<string, string> = { critical: "#ef4444", high: "#f97316", medium: "#eab308", low: "#22c55e", info: "#60a5fa" };
     const rows = secrets.map(s => `
       <tr style="border-bottom:1px solid #1a1a2e">
         <td style="padding:10px 12px"><span style="background:${sevColor[s.severity]||"#888"};color:#000;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">${s.severity.toUpperCase()}</span></td>

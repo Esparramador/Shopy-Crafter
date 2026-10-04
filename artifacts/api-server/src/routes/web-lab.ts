@@ -1,3 +1,4 @@
+import { detectSecrets } from "../lib/secret-detection.js";
 import { Router, type Request, type Response } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
@@ -1892,12 +1893,13 @@ REGLAS DURAS:
 interface ExposedSecret {
   type: string;
   service: string;
-  severity: "critical" | "high" | "medium";
+  severity: "critical" | "high" | "medium" | "low" | "info";
   masked: string;
-  raw: string;
+  /** Fragmento con el valor ya enmascarado (el valor completo nunca sale del servidor). */
   context: string;
   recommendation: string;
   lineNumber: number;
+  publicByDesign: boolean;
 }
 
 interface DeepScanResult {
@@ -2182,90 +2184,10 @@ function parseSeoFromHtml(html: string): DeepScanResult["seo"] {
 
 // ── Exposed Secrets Scanner ──────────────────────────────────────────────────
 function scanExposedSecrets(content: string): ExposedSecret[] {
-  const PATTERNS: Array<{
-    type: string; service: string; severity: "critical" | "high" | "medium";
-    regex: RegExp; recommendation: string;
-  }> = [
-    { type: "API Key — Live Secret Key", service: "Stripe", severity: "critical", regex: /sk_live_[0-9a-zA-Z]{24,}/g, recommendation: "Revocar inmediatamente en dashboard.stripe.com → Developers → API keys" },
-    { type: "API Key — Publishable Key Live", service: "Stripe", severity: "high", regex: /pk_live_[0-9a-zA-Z]{24,}/g, recommendation: "Rotar la clave live en Stripe Dashboard; nunca exponer sk_live en frontend" },
-    { type: "API Key — Test Secret Key", service: "Stripe", severity: "high", regex: /sk_test_[0-9a-zA-Z]{24,}/g, recommendation: "Mover a variable de entorno servidor; nunca en código frontend" },
-    { type: "API Key", service: "OpenAI", severity: "critical", regex: /sk-[A-Za-z0-9]{20,}T3BlbkFJ[A-Za-z0-9]{20,}|sk-proj-[A-Za-z0-9_-]{50,}/g, recommendation: "Revocar en platform.openai.com → API Keys. Crear nueva y usar solo en backend" },
-    { type: "API Key", service: "Anthropic (Claude)", severity: "critical", regex: /sk-ant-api\d{2}-[A-Za-z0-9_-]{80,}/g, recommendation: "Revocar en console.anthropic.com → API Keys. Usar solo en backend con variables de entorno" },
-    { type: "API Key", service: "Google (AI/Maps/Firebase)", severity: "critical", regex: /AIza[0-9A-Za-z_-]{35}/g, recommendation: "Restringir en Google Cloud Console → APIs → Credentials. Limitar por HTTP Referrer o IP" },
-    { type: "OAuth Token", service: "Google OAuth", severity: "critical", regex: /ya29\.[0-9A-Za-z\-_]{50,}/g, recommendation: "Revocar el token OAuth en myaccount.google.com → Security → Manage third-party access" },
-    { type: "Access Key ID", service: "AWS", severity: "critical", regex: /AKIA[0-9A-Z]{16}/g, recommendation: "Revocar en AWS IAM Console inmediatamente. Auditar accesos con AWS CloudTrail" },
-    { type: "Secret Access Key", service: "AWS", severity: "critical", regex: /(?<![A-Za-z0-9/+=])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])/g, recommendation: "Si es AWS Secret Key, revocar en IAM. Usar IAM Roles en lugar de claves estáticas" },
-    { type: "Personal Access Token", service: "GitHub", severity: "critical", regex: /ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{82,}/g, recommendation: "Revocar en github.com → Settings → Developer settings → Personal access tokens" },
-    { type: "App Token", service: "GitHub", severity: "high", regex: /ghs_[A-Za-z0-9]{36,}|gho_[A-Za-z0-9]{36,}/g, recommendation: "Revocar el OAuth/App token en GitHub Settings → Authorized OAuth Apps" },
-    { type: "Private App Token", service: "Shopify", severity: "critical", regex: /shppa_[A-Za-z0-9]{32,}|shpat_[A-Za-z0-9]{32,}|shpss_[A-Za-z0-9]{32,}/g, recommendation: "Revocar en Shopify Admin → Apps → Private apps. Nunca exponer access tokens en frontend" },
-    { type: "Storefront Token", service: "Shopify", severity: "high", regex: /[0-9a-fA-F]{32}(?=.*shopify|.*storefront)/g, recommendation: "El Storefront API token es público, pero limitar scopes a solo lectura en Shopify Admin" },
-    { type: "API Key", service: "SendGrid", severity: "critical", regex: /SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}/g, recommendation: "Revocar en app.sendgrid.com → Settings → API Keys. Usar solo en backend" },
-    { type: "API Key", service: "Twilio", severity: "critical", regex: /SK[0-9a-f]{32}/g, recommendation: "Revocar en console.twilio.com → Account → API Keys. Rotar AccountSid y AuthToken" },
-    { type: "Auth Token", service: "Twilio", severity: "critical", regex: /AC[0-9a-f]{32}/g, recommendation: "Este puede ser AccountSid de Twilio. Verificar y revocar AuthToken asociado si se expuso" },
-    { type: "API Key", service: "Mailchimp", severity: "high", regex: /[0-9a-f]{32}-us[0-9]{1,2}/g, recommendation: "Revocar en Mailchimp Account → Extras → API Keys" },
-    { type: "Server Key / Legacy", service: "Firebase", severity: "critical", regex: /AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}/g, recommendation: "Migrar a FCM v1 API con OAuth 2.0. Revocar Legacy Server Key en Firebase Console" },
-    { type: "API Key", service: "HubSpot", severity: "high", regex: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, recommendation: "Si es HubSpot API Key (UUID format), revocar en HubSpot → Settings → API Key" },
-    { type: "Secret Key", service: "Mailgun", severity: "critical", regex: /key-[0-9a-zA-Z]{32}/g, recommendation: "Revocar en app.mailgun.com → Settings → API Keys" },
-    { type: "Access Token", service: "Slack", severity: "critical", regex: /xox[baprs]-[0-9A-Za-z-]{10,}/g, recommendation: "Revocar en api.slack.com → Your Apps → OAuth & Permissions → Revoke All Tokens" },
-    { type: "Webhook URL (contiene token)", service: "Slack", severity: "high", regex: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]+/g, recommendation: "Regenerar Incoming Webhook en Slack App → Incoming Webhooks" },
-    { type: "Bot Token", service: "Telegram", severity: "critical", regex: /[0-9]{8,10}:[A-Za-z0-9_-]{35}/g, recommendation: "Revocar con /revoke en @BotFather de Telegram y generar nuevo token" },
-    { type: "Private Key", service: "RSA/PEM", severity: "critical", regex: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/g, recommendation: "Eliminar clave privada del código. Usar gestores de secretos (AWS Secrets Manager, Vault)" },
-    { type: "Password en URL", service: "Base de datos / Conexión", severity: "critical", regex: /(?:mysql|postgres|mongodb|redis|amqp):\/\/[^:]+:[^@]{4,}@/gi, recommendation: "Nunca incluir credenciales en URLs de conexión en código frontend o público" },
-    { type: "Contraseña hardcodeada", service: "Genérico", severity: "high", regex: /(?:password|passwd|secret|api_secret|client_secret)\s*[=:]\s*["'][^"']{6,}["']/gi, recommendation: "Mover contraseñas/secrets a variables de entorno del servidor. Nunca en código cliente" },
-    { type: "API Key genérica", service: "Genérico", severity: "medium", regex: /(?:api[_-]?key|apikey|access[_-]?token)\s*[=:]\s*["'][A-Za-z0-9_\-]{16,}["']/gi, recommendation: "Verificar si es una clave real. Si lo es, mover a variables de entorno del servidor" },
-    { type: "JWT Token", service: "Autenticación", severity: "high", regex: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, recommendation: "JWTs hardcodeados pueden revelar datos internos. Nunca incrustar tokens de sesión en código" },
-    { type: "Webhook Secret", service: "Shopify Webhook", severity: "high", regex: /[A-Fa-f0-9]{64}(?=.*webhook|.*hmac)/gi, recommendation: "Revocar el webhook secret en Shopify Admin → Settings → Notifications → Webhooks" },
-  ];
-
-  const lines = content.split("\n");
-  const found: ExposedSecret[] = [];
-  const seen = new Set<string>();
-
-  for (const pattern of PATTERNS) {
-    const matches = content.matchAll(new RegExp(pattern.regex.source, pattern.regex.flags.includes("g") ? pattern.regex.flags : pattern.regex.flags + "g"));
-    for (const match of matches) {
-      const raw = match[0];
-      const key = `${pattern.service}:${raw.slice(0, 12)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      // Find line number
-      let lineNumber = 1;
-      let pos = 0;
-      for (let i = 0; i < lines.length; i++) {
-        pos += lines[i].length + 1;
-        if (pos > (match.index ?? 0)) { lineNumber = i + 1; break; }
-      }
-
-      // Build context (surrounding 80 chars, sanitized)
-      const start = Math.max(0, (match.index ?? 0) - 40);
-      const end = Math.min(content.length, (match.index ?? 0) + raw.length + 40);
-      const ctx = content.slice(start, end).replace(/\n/g, " ").trim();
-
-      // Mask: show first 6 + *** + last 4 (if long enough)
-      const masked = raw.length > 12
-        ? raw.slice(0, 6) + "•".repeat(Math.min(raw.length - 10, 20)) + raw.slice(-4)
-        : raw.slice(0, 3) + "•".repeat(raw.length - 3);
-
-      // Skip very short AWS-style matches that are likely false positives
-      if (pattern.service === "AWS" && pattern.type.includes("Secret") && raw.length < 35) continue;
-
-      found.push({
-        type: pattern.type,
-        service: pattern.service,
-        severity: pattern.severity,
-        masked,
-        raw,
-        context: ctx,
-        recommendation: pattern.recommendation,
-        lineNumber,
-      });
-    }
-  }
-
-  // Sort by severity
-  const order: Record<string, number> = { critical: 0, high: 1, medium: 2 };
-  return found.sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
+  return detectSecrets(content).map(d => ({
+    type: d.type, service: d.service, severity: d.severity, masked: d.masked,
+    context: d.context, recommendation: d.recommendation, lineNumber: d.lineNumber, publicByDesign: d.publicByDesign,
+  }));
 }
 
 function parseSecurityFromHeaders(headers: Record<string, string>, url: string, html: string): DeepScanResult["security"] {
@@ -2339,6 +2261,7 @@ function parseSecurityFromHeaders(headers: Record<string, string>, url: string, 
 
   // Añadir vulnerabilidades de secretos expuestos al resumen
   for (const secret of exposedSecrets) {
+    if (secret.severity === "info") continue; // pública por diseño (p. ej. pk_ de Stripe): no es una fuga
     vulnerabilities.push({
       type: `🔑 Secreto expuesto: ${secret.service} — ${secret.type}`,
       severity: secret.severity,
@@ -3048,7 +2971,9 @@ router.post("/web-lab/scan-secrets", async (req: Request, res: Response): Promis
     const secrets = scanExposedSecrets(content);
 
     const summary = {
-      total: secrets.length,
+      // Las claves públicas por diseño se listan pero no cuentan como fuga.
+      total: secrets.filter(s => s.severity !== "info").length,
+      publicKeys: secrets.filter(s => s.severity === "info").length,
       critical: secrets.filter(s => s.severity === "critical").length,
       high: secrets.filter(s => s.severity === "high").length,
       medium: secrets.filter(s => s.severity === "medium").length,
@@ -3326,55 +3251,33 @@ function runFullSecurityAudit(content: string, url?: string): AuditFinding[] {
   function lineOf(idx: number): number { return findLineNumber(content, idx); }
 
   // ─── CATEGORÍA 1: SECRETOS / CREDENCIALES HARDCODEADAS ─────────────────────
-  const SECRET_PATTERNS: Array<{ re: RegExp; type: string; service: string; sev: AuditSeverity; cvss: number; fix: string; fixCode?: string }> = [
-    { re: /sk_live_[0-9a-zA-Z]{24,}/g, type: "API Key Live", service: "Stripe", sev: "critical", cvss: 9.8, fix: "Revocar en dashboard.stripe.com → Developers → API Keys. Usar variable de entorno STRIPE_SECRET_KEY en servidor.", fixCode: "// .env\nSTRIPE_SECRET_KEY=sk_live_...\n// código\nconst stripe = new Stripe(process.env.STRIPE_SECRET_KEY);" },
-    { re: /sk_test_[0-9a-zA-Z]{24,}/g, type: "API Key Test", service: "Stripe", sev: "high", cvss: 7.5, fix: "Mover a variable de entorno del servidor. Las test keys también permiten leer datos." },
-    { re: /pk_live_[0-9a-zA-Z]{24,}/g, type: "Publishable Key Live", service: "Stripe", sev: "high", cvss: 6.5, fix: "La pk_ live puede ser pública, pero nunca exponer junto a sk_. Restringir a dominios en Stripe Dashboard." },
-    { re: /sk-[A-Za-z0-9]{20,}T3BlbkFJ[A-Za-z0-9]{20,}|sk-proj-[A-Za-z0-9_-]{50,}/g, type: "API Key", service: "OpenAI", sev: "critical", cvss: 9.8, fix: "Revocar en platform.openai.com → API Keys. Crear nueva. Usar solo en backend con OPENAI_API_KEY.", fixCode: "// .env\nOPENAI_API_KEY=sk-proj-...\n// servidor\nconst openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });" },
-    { re: /sk-ant-api\d{2}-[A-Za-z0-9_-]{80,}/g, type: "API Key", service: "Anthropic", sev: "critical", cvss: 9.8, fix: "Revocar en console.anthropic.com → API Keys. ANTHROPIC_API_KEY solo en servidor." },
-    { re: /AIza[0-9A-Za-z_-]{35}/g, type: "API Key", service: "Google Cloud / Firebase", sev: "critical", cvss: 9.1, fix: "Restringir en Google Cloud Console → APIs → Credentials. Limitar por HTTP Referrer o IP." },
-    { re: /ya29\.[0-9A-Za-z\-_]{50,}/g, type: "OAuth Access Token", service: "Google OAuth", sev: "critical", cvss: 9.8, fix: "Revocar en myaccount.google.com → Security → Manage third-party access." },
-    { re: /AKIA[0-9A-Z]{16}/g, type: "Access Key ID", service: "AWS", sev: "critical", cvss: 9.8, fix: "Revocar en AWS IAM Console inmediatamente. Auditar con CloudTrail. Usar IAM Roles, no claves estáticas." },
-    { re: /ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{82,}/g, type: "Personal Access Token", service: "GitHub", sev: "critical", cvss: 9.8, fix: "Revocar en github.com → Settings → Developer settings → PATs. Usar GitHub Actions secrets." },
-    { re: /shppa_[A-Za-z0-9]{32,}|shpat_[A-Za-z0-9]{32,}|shpss_[A-Za-z0-9]{32,}/g, type: "Private App Token", service: "Shopify", sev: "critical", cvss: 9.5, fix: "Revocar en Shopify Admin → Apps → Private apps. Nunca exponer access tokens en frontend." },
-    { re: /SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}/g, type: "API Key", service: "SendGrid", sev: "critical", cvss: 9.1, fix: "Revocar en app.sendgrid.com → Settings → API Keys." },
-    { re: /xox[baprs]-[0-9A-Za-z-]{10,}/g, type: "Bot/User Token", service: "Slack", sev: "critical", cvss: 9.1, fix: "Revocar en api.slack.com → Your Apps → OAuth. Usar Slack App con permisos mínimos." },
-    { re: /[0-9]{8,10}:[A-Za-z0-9_-]{35}/g, type: "Bot Token", service: "Telegram", sev: "critical", cvss: 9.1, fix: "Usar /revoke en @BotFather de Telegram." },
-    { re: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, type: "Clave privada RSA/PEM/SSH", service: "Criptografía", sev: "critical", cvss: 10.0, fix: "Eliminar del código. Usar gestores de secretos (AWS Secrets Manager, HashiCorp Vault, Replit Secrets)." },
-    { re: /(?:mysql|postgres|postgresql|mongodb|redis|amqp|mssql):\/\/[^:@\s"']+:[^@\s"']{4,}@[^'"\s]{4,}/gi, type: "URL de conexión con credenciales", service: "Base de datos", sev: "critical", cvss: 9.8, fix: "Nunca hardcodear URLs de BD con usuario/contraseña. Usar DATABASE_URL en variables de entorno del servidor." },
-    { re: /(?:password|passwd|secret|client_secret|db_pass|database_password|db_password)\s*[=:]\s*["'][^"']{6,}["']/gi, type: "Contraseña hardcodeada", service: "Genérico", sev: "high", cvss: 8.1, fix: "Mover a variables de entorno. Usar .env + dotenv. Nunca en código fuente ni frontend.", fixCode: "// MAL\nconst password = 'mi_contraseña_123';\n// BIEN\nconst password = process.env.DB_PASSWORD;" },
-    { re: /(?:api[_-]?key|apikey)\s*[=:]\s*["'][A-Za-z0-9_\-]{20,}["']/gi, type: "API Key genérica", service: "Genérico", sev: "high", cvss: 7.5, fix: "Verificar si es clave real. Si lo es, mover a variable de entorno del servidor." },
-    { re: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, type: "JWT Token hardcodeado", service: "Autenticación", sev: "high", cvss: 8.1, fix: "Los JWT nunca deben estar hardcodeados. Pueden revelar la firma del servidor y permisos del usuario." },
-    { re: /AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}/g, type: "Legacy Server Key", service: "Firebase FCM", sev: "critical", cvss: 9.1, fix: "Migrar a FCM v1 con OAuth 2.0. Revocar Legacy Server Key en Firebase Console." },
-  ];
-  for (const p of SECRET_PATTERNS) {
-    for (const m of content.matchAll(new RegExp(p.re.source, p.re.flags.replace(/[^gimsuy]/g, "") + (p.re.flags.includes("g") ? "" : "g")))) {
-      const raw = m[0];
-      const idx = m.index ?? 0;
-      add({
-        id: `secret-${p.service.toLowerCase().replace(/\W/g, "-")}-${findings.length}`,
-        category: "🔑 Secretos & Credenciales",
-        type: p.type,
-        severity: p.sev,
-        title: `${p.service} — ${p.type} expuesto en el código`,
-        description: `Se detectó una credencial real de ${p.service} hardcodeada en el código fuente. Cualquier persona que acceda al bundle/código puede extraerla.`,
-        evidence: maskEvidence(raw),
-        lineNumber: lineOf(idx),
-        attackScenario: p.service === "Stripe"
-          ? `Un atacante con esta clave puede cargar tarjetas de tus clientes, crear cargos, acceder a toda la información de pagos y filtrar datos de clientes de Stripe.`
-          : p.service === "AWS"
-          ? `Con AKIA + Secret Key, el atacante puede lanzar instancias EC2, acceder a S3 (descargar/borrar datos), comprometer toda tu infraestructura en AWS.`
-          : p.service.includes("Base de datos")
-          ? `Con la URL de conexión, el atacante tiene acceso directo a tu base de datos: puede leer, modificar o borrar todos los registros, incluyendo usuarios, pedidos y datos sensibles.`
-          : `El atacante puede usar esta clave para acceder a ${p.service}, escalar privilegios, exfiltrar datos o incurrir en costes masivos en tu cuenta.`,
-        dbImpact: p.service.includes("Base de datos") || p.service === "AWS"
-          ? "RIESGO CRÍTICO DE BD: Acceso completo a los datos. El atacante puede volcar toda la base de datos, modificar registros, crear usuarios administradores o borrar todos los datos (ransomware)."
-          : undefined,
-        fix: p.fix,
-        fixCode: p.fixCode,
-        cvss: p.cvss,
-      });
-    }
+  // Mismo detector que el escáner de secretos (lib/secret-detection.ts).
+  for (const d of detectSecrets(content)) {
+    if (d.publicByDesign && d.severity === "info") continue;
+    add({
+      id: `secret-${d.ruleId}-${findings.length}`,
+      category: "🔑 Secretos & Credenciales",
+      type: d.type,
+      severity: d.severity === "info" ? "low" : d.severity,
+      title: `${d.service} — ${d.type}${d.publicByDesign ? " (pública por diseño, revisa restricciones)" : " expuesta en el código"}`,
+      description: d.publicByDesign
+        ? `Se detectó una clave de ${d.service} que se publica en el cliente por diseño. El riesgo depende de sus restricciones.`
+        : `Se detectó una credencial de ${d.service} en el código servido al navegador. Cualquiera que vea el código puede extraerla.`,
+      evidence: d.masked,
+      lineNumber: d.lineNumber,
+      attackScenario: d.service === "Stripe"
+        ? "Con la clave secreta, un atacante puede crear cargos y reembolsos y leer los datos de pago de tus clientes."
+        : d.service === "AWS"
+        ? "Con credenciales de AWS, el atacante puede leer o borrar datos de S3 y lanzar recursos a tu costa."
+        : d.service === "Base de datos"
+        ? "Con la URL de conexión, el atacante accede directamente a tu base de datos: leer, modificar o borrar registros."
+        : `El atacante puede usar esta credencial contra ${d.service}: acceso a datos o gasto a tu cargo.`,
+      dbImpact: d.service === "Base de datos" || d.ruleId === "jwt-service-role" || d.service === "AWS"
+        ? "RIESGO CRÍTICO DE BD: acceso completo a los datos (lectura, modificación y borrado)."
+        : undefined,
+      fix: d.recommendation,
+      cvss: d.cvss,
+    });
   }
 
   // ─── CATEGORÍA 2: VECTORES DE ATAQUE XSS ───────────────────────────────────
