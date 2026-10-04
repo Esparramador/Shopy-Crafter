@@ -114,6 +114,7 @@ const PluginsCatalog = lazy(() => import("@/pages/admin/PluginsCatalog"));
 const HyperFrames = lazy(() => import("@/pages/admin/HyperFrames"));
 const DeckBuilder = lazy(() => import("@/pages/admin/DeckBuilder"));
 const TiendaAdmin = lazy(() => import("@/pages/admin/TiendaAdmin"));
+const PortfolioAdmin = lazy(() => import("@/pages/admin/PortfolioAdmin"));
 const StripeManager = lazy(() => import("@/pages/admin/StripeManager"));
 const StripeMasterHub = lazy(() => import("@/pages/admin/StripeMasterHub"));
 const StripeProjectHub = lazy(() => import("@/pages/projects/StripeProjectHub"));
@@ -716,6 +717,9 @@ function Router() {
         </Route>
         <Route path="/admin/calendar">
           <RequireAdmin><AdminWrapper><AppLayout><S><AdminCalendar /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/portfolio">
+          <RequireAdmin><AdminWrapper><AppLayout><S><PortfolioAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/tienda">
           <RequireAdmin><AdminWrapper><AppLayout><S><TiendaAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>

@@ -8,6 +8,7 @@ import { db } from "@workspace/db";
 import { cmsContent, cmsVersions, cmsPages } from "@workspace/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { DEFAULT_CMS_CONTENT, CALC_RECURRING_SERVICES } from "../lib/cms-defaults.js";
+import { saveMedia, deleteMedia } from "../lib/media-store.js";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 import { askClaudeJsonValidated } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
@@ -356,12 +357,12 @@ router.post("/content/reset", async (_req: Request, res: Response) => {
 router.post("/media/upload", upload.single("file"), async (req: Request, res: Response) => {
   try {
     if (!req.file) { res.status(400).json({ error: "No file uploaded" }); return; }
-    const filename = `${uuidv4()}.webp`;
-    const filepath = path.join(MEDIA_DIR, filename);
-    await sharp(req.file.buffer).resize({ width: 2400, withoutEnlargement: true }).webp({ quality: 85 }).toFile(filepath);
-    const meta = await sharp(filepath).metadata();
-    broadcast("media_uploaded", { filename });
-    res.json({ url: `/media/${filename}`, width: meta.width, height: meta.height });
+    // En base de datos y servido por /api/media: el disco del API no es lo que
+    // sirve el frontend en producción (estático desde dist/public).
+    const out = await sharp(req.file.buffer).rotate().resize({ width: 2400, withoutEnlargement: true }).webp({ quality: 85 }).toBuffer({ resolveWithObject: true });
+    const { id, url } = await saveMedia(out.data, "image/webp", { width: out.info.width, height: out.info.height, originalName: req.file.originalname });
+    broadcast("media_uploaded", { filename: id });
+    res.json({ url, width: out.info.width, height: out.info.height });
   } catch (e) {
     res.status(500).json({ error: "Upload failed" });
   }
@@ -375,11 +376,9 @@ router.post("/media/upload-video", videoUpload.single("file"), async (req: Reque
     const ext = path.extname(req.file.originalname).toLowerCase();
     const allowed = [".mp4", ".webm", ".mov"];
     if (!allowed.includes(ext)) { res.status(400).json({ error: "Formato no soportado. Usa MP4, WebM o MOV." }); return; }
-    const filename = `${uuidv4()}${ext === ".mov" ? ".mp4" : ext}`;
-    const filepath = path.join(MEDIA_DIR, filename);
-    fs.writeFileSync(filepath, req.file.buffer);
-    broadcast("media_uploaded", { filename, type: "video" });
-    res.json({ url: `/media/${filename}`, size: req.file.size, originalName: req.file.originalname });
+    const { id, url } = await saveMedia(req.file.buffer, ext === ".webm" ? "video/webm" : "video/mp4", { originalName: req.file.originalname });
+    broadcast("media_uploaded", { filename: id, type: "video" });
+    res.json({ url, size: req.file.size, originalName: req.file.originalname });
   } catch (e) {
     res.status(500).json({ error: "Video upload failed" });
   }
@@ -389,6 +388,7 @@ router.delete("/media/:filename", async (req: Request, res: Response) => {
   try {
     const rawName = String(req.params.filename);
     const filename = path.basename(rawName);
+    if (/^[a-f0-9]{24}\.[a-z0-9]{2,4}$/.test(filename)) { await deleteMedia(filename); res.json({ success: true }); return; }
     if (filename !== rawName || filename.includes("..")) {
       res.status(400).json({ error: "Invalid filename" });
       return;

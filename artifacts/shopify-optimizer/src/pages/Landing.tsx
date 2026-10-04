@@ -1,3 +1,4 @@
+import ProjectsShowcase from "@/components/ProjectsShowcase";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -191,8 +192,8 @@ const LANDING_FALLBACK: CMSContent = {
   footer: { tagline: "Optimización IA para tiendas Shopify", columns: [], copyright: `© ${new Date().getFullYear()} Shopy Crafter`, badges: ["RGPD", "SSL", "Shopify Partner"] },
 };
 
-const FP_SECTION_IDS = ["fp-hero", "fp-services", "fp-platforms", "fp-portfolio", "fp-process", "fp-pricing", "fp-calculator", "fp-contact"];
-const DEFAULT_SECTION_NAV = ["Inicio", "Servicios", "Plataformas", "Portfolio", "Proceso", "Precios", "Calculadora", "Contactar"];
+const FP_SECTION_IDS = ["fp-hero", "fp-services", "fp-platforms", "fp-projects", "fp-portfolio", "fp-process", "fp-pricing", "fp-calculator", "fp-contact"];
+const DEFAULT_SECTION_NAV = ["Inicio", "Servicios", "Plataformas", "Proyectos", "Portfolio", "Proceso", "Precios", "Calculadora", "Contactar"];
 
 
 export default function Landing() {
@@ -416,7 +417,7 @@ export default function Landing() {
       contact: "fp-contact", contacto: "fp-contact", contacta: "fp-contact", contactar: "fp-contact",
       how: "fp-process", "fp-how": "fp-process", como: "fp-process", "cómo": "fp-process", proceso: "fp-process",
       planes: "fp-pricing", precios: "fp-pricing", pricing: "fp-pricing",
-      demo: "fp-portfolio", "fp-demo": "fp-portfolio", resultados: "fp-portfolio", results: "fp-portfolio", "fp-results": "fp-portfolio", portfolio: "fp-portfolio",
+      demo: "fp-portfolio", "fp-demo": "fp-portfolio", resultados: "fp-portfolio", results: "fp-portfolio", "fp-results": "fp-portfolio", portfolio: "fp-portfolio", proyectos: "fp-projects", projects: "fp-projects",
       motores: "fp-services", engines: "fp-services", "fp-engines": "fp-services", servicios: "fp-services", services: "fp-services",
       plataformas: "fp-platforms", platforms: "fp-platforms",
       calculadora: "fp-calculator", calculator: "fp-calculator",
@@ -880,6 +881,23 @@ export default function Landing() {
               ))}
             </div>
             <p className="lx-note">¿Otra plataforma? Auditamos cualquier web a partir de su URL pública.</p>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════
+            SECTION 03b — PROYECTOS REALIZADOS (Admin → Portfolio)
+        ══════════════════════════════════════ */}
+        <section className="fp-section" id="fp-projects" data-nav="Proyectos" data-effect={eff("results")}>
+          <div className="fp-bg-solid" />
+          <div className="fp-content lx-wrap">
+            <div className={`fp-section-header ${!isAnimated("fp-projects") ? "fp-animate" : "fp-animated"}`}>
+              <div className="l-pill">Proyectos realizados</div>
+              <h2 className="l-h2">No solo tiendas: <em>webs, apps, sistemas e IA.</em></h2>
+              <p className="l-sub lx-sub">Landings, aplicaciones, CRMs con asistente conversacional, TPV, plataformas de agentes, bots de trading y diseño 3D. Pulsa cada proyecto para ver las imágenes.</p>
+            </div>
+            <div className={!isAnimated("fp-projects") ? "fp-animate" : "fp-animated"} style={{ animationDelay: "0.1s" }}>
+              <ProjectsShowcase />
+            </div>
           </div>
         </section>
 

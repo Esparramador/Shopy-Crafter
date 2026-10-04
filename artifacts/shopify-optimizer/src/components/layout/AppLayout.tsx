@@ -86,6 +86,7 @@ const DEFAULT_ADMIN_NAV = [
   { label: "Revenue & CRM", icon: "💰", href: "/admin/revenue" },
   { label: "Facturación & Plan", icon: "💳", href: "/admin/billing" },
   { label: "Planes & Servicios", icon: "📦", href: "/admin/tienda" },
+  { label: "Portfolio (landing)", icon: "🖼️", href: "/admin/portfolio" },
   { label: "── GOD MODE ──", icon: "", href: "#", divider: true },
   { label: "Stripe Manager", icon: "💳", href: "/admin/stripe" },
   { label: "Stripe Master Hub", icon: "👑", href: "/admin/stripe-master" },
