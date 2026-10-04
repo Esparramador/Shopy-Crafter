@@ -40,6 +40,7 @@ import exportsRouter from "./exports.js";
 import scripttagRouter from "./scripttag.js";
 import automationsRouter from "./automations.js";
 import brainSyncRouter from "./brain-sync.js";
+import portfolioRouter from "./portfolio.js";
 import referenceImagesRouter from "./reference-images.js";
 import actionButtonsRouter from "./action-buttons.js";
 import auditRouter from "./audit.js";
@@ -115,6 +116,8 @@ router.use(contactRouter);
 router.use(apkRouter);
 router.use(publicQrRouter);
 router.use(publicChatRouter);
+// Portfolio (GET público) y medios subidos (/media/:id); la edición exige admin en cada ruta.
+router.use(portfolioRouter);
 
 router.get("/report-templates/:token", (req, res, next) => {
   if (/^[a-f0-9]{64}$/.test(req.params.token)) return next();

@@ -523,6 +523,108 @@ export default function SettingsPage() {
           </div>
         </div>
       </GlassCard>
+
+      <ClientAccessCard projectId={projectId} />
     </div>
+  );
+}
+
+interface ClientRow { id: string; email: string; name: string | null; isActive: number; lastLogin: string | null; inviteExpires: string | null }
+
+/** Acceso del cliente al portal: invitar, copiar el enlace y renovarlo. */
+function ClientAccessCard({ projectId }: { projectId: number }) {
+  const API = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const [clients, setClients] = useState<ClientRow[]>([]);
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [link, setLink] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const load = async () => {
+    try {
+      const r = await fetch(`${API}/api/admin/projects/${projectId}/clients`, { credentials: "include" });
+      if (r.ok) { const d = await r.json(); setClients(Array.isArray(d.clients) ? d.clients : []); }
+    } catch { /* sin clientes */ }
+  };
+  useEffect(() => { if (projectId) void load(); }, [projectId]);
+
+  const invite = async () => {
+    setBusy(true); setMsg(null); setLink(null);
+    try {
+      const r = await fetch(`${API}/api/admin/projects/${projectId}/invite`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), name: name.trim() }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? "No se pudo invitar");
+      setLink(d.inviteLink ?? null);
+      setMsg({ ok: true, text: d.emailSent ? `Invitación enviada por email a ${email}` : "Enlace generado: cópialo y envíaselo al cliente" });
+      setEmail(""); setName("");
+      void load();
+    } catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Error" }); }
+    finally { setBusy(false); }
+  };
+
+  const reinvite = async (c: ClientRow) => {
+    setName(c.name ?? ""); setEmail(c.email);
+    setBusy(true); setMsg(null); setLink(null);
+    try {
+      const r = await fetch(`${API}/api/admin/projects/${projectId}/invite`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: c.email, name: c.name ?? c.email }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? "No se pudo renovar");
+      setLink(d.inviteLink ?? null);
+      setMsg({ ok: true, text: "Enlace nuevo generado: cópialo y envíaselo al cliente" });
+    } catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Error" }); }
+    finally { setBusy(false); }
+  };
+
+  const copy = async () => { if (link) { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* sin portapapeles */ } } };
+
+  return (
+    <GlassCard className="p-6 mt-6">
+      <div className="flex items-center gap-2 mb-1">
+        <Shield className="w-4 h-4" style={{ color: "#c8a84b" }} />
+        <h3 className="text-base font-bold">Acceso del cliente</h3>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">Envía al cliente un enlace para que entre a su portal y vea solo este proyecto: informes, imágenes, aprobaciones y mensajes.</p>
+
+      {clients.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {clients.map(c => (
+            <div key={c.id} className="flex items-center justify-between gap-3 p-2 rounded-lg" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)" }}>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold truncate">{c.name || c.email}</div>
+                <div className="text-xs text-muted-foreground truncate">{c.email} · {c.isActive ? (c.lastLogin ? `último acceso ${new Date(c.lastLogin).toLocaleDateString("es-ES")}` : "activo") : "pendiente de entrar"}</div>
+              </div>
+              <button onClick={() => void reinvite(c)} disabled={busy} className="px-3 py-1.5 rounded-lg text-xs font-medium shrink-0" style={{ border: "1px solid rgba(255,255,255,.15)" }}>Renovar enlace</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-2 md:grid-cols-2 mb-2">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del cliente" className="px-3 py-2 rounded-lg text-sm" style={{ background: "#0d0d1a", border: "1px solid rgba(255,255,255,.12)", color: "#fff" }} />
+        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="email@cliente.com" type="email" className="px-3 py-2 rounded-lg text-sm" style={{ background: "#0d0d1a", border: "1px solid rgba(255,255,255,.12)", color: "#fff" }} />
+      </div>
+      <button onClick={() => void invite()} disabled={busy || !email.trim() || !name.trim()} className="px-4 py-2 rounded-xl font-bold text-sm text-black" style={{ background: "#c8a84b" }}>
+        {busy ? "..." : "Invitar y generar enlace"}
+      </button>
+
+      {msg && <div className="mt-3 text-xs" style={{ color: msg.ok ? "#2dd49f" : "#ef4444" }}>{msg.text}</div>}
+      {link && (
+        <div className="mt-2 flex items-center gap-2 p-2 rounded-lg" style={{ background: "rgba(200,168,75,.08)", border: "1px solid rgba(200,168,75,.25)" }}>
+          <code className="text-xs flex-1 truncate" style={{ color: "#c8a84b" }}>{link}</code>
+          <button onClick={() => void copy()} className="px-3 py-1.5 rounded-lg text-xs font-medium shrink-0 flex items-center gap-1" style={{ border: "1px solid rgba(255,255,255,.15)" }}>
+            <Copy className="w-3 h-3" />{copied ? "Copiado" : "Copiar"}
+          </button>
+        </div>
+      )}
+      <p className="mt-2 text-[11px] text-muted-foreground">El enlace caduca en 48 h. El cliente crea su contraseña al abrirlo.</p>
+    </GlassCard>
   );
 }

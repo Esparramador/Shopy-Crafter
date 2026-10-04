@@ -37,7 +37,7 @@ function plan(id: string, name: string, priceMonthly: number, products: number, 
 }
 
 export const CANONICAL_PLANS: CanonicalPlan[] = [
-  plan("emprendedor", "Emprendedor", 19, 5, 10),
+  plan("emprendedor", "Emprendedor", 19, 5, 15),
   plan("starter", "Starter", 49, 15, 45),
   plan("agency_pro", "Growth", 149, 60, 300, true, "Recomendado"),
   plan("enterprise", "Enterprise", 399, 200, 1200),
