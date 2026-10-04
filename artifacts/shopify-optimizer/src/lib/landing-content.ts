@@ -35,7 +35,7 @@ export const SERVICES: ServicePillar[] = [
     icon: "🛍️",
     title: "Tiendas online con IA",
     text: "Trabajamos sobre los datos reales de tu tienda: cada producto auditado, cada cambio propuesto y medido.",
-    items: ["Auditoría por producto", "Rediseño de fichas", "Imágenes de producto IA", "SEO técnico", "Precios con COGS real", "A/B testing", "Inventario y pedidos", "Competencia"],
+    items: ["Auditoría por producto", "Rediseño de fichas", "Imágenes de producto IA", "SEO técnico", "Precios con COGS real", "A/B testing (Shopify)", "Inventario y pedidos", "Competencia"],
     href: "/automatizacion-shopify-ia",
     cta: "Automatización de tiendas",
     accent: "var(--l-jade)",

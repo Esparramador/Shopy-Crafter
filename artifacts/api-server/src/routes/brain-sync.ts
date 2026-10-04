@@ -10,7 +10,9 @@ import {
   omnicoreCrossConnectionsTable,
   projectsTable,
 } from "@workspace/db";
-import { sql, count, eq } from "drizzle-orm";
+import { sql, count, eq, inArray } from "drizzle-orm";
+import { PLAN_CATALOG, INCLUDED_IN_ALL_PLANS, TRIAL } from "../lib/plan-catalog.js";
+import { SERVICE_CATALOG, priceDisplay } from "../lib/service-catalog.js";
 import { logger } from "../lib/logger.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import crypto from "crypto";
@@ -517,6 +519,31 @@ router.get("/admin/brain-stats", async (_req, res) => {
   }
 });
 
+/** Precios del catálogo real (plan-catalog / service-catalog), nunca copiados a mano. */
+function pricingKnowledge(): string {
+  const plans = PLAN_CATALOG.map(p =>
+    `${p.name} ${p.priceMonthly} €/mes + IVA (anual ${p.priceAnnual} €): ${p.productsPerMonth} productos y ${p.imagesPerMonth} imágenes IA al mes${p.featured ? " (recomendado)" : ""}`,
+  ).join("; ");
+  return `Planes (un plan por tienda): ${plans}. Todos incluyen: ${INCLUDED_IN_ALL_PLANS.join(", ")}. "A medida": varias tiendas, cuotas y diseño web/apps con presupuesto cerrado. Prueba de ${TRIAL.days} días con ${TRIAL.productsPerMonth} productos y ${TRIAL.imagesPerMonth} imágenes. Cobro con tarjeta vía Stripe, sin permanencia. No existen planes con SLA, API, marca blanca, soporte 24/7 ni cuotas ilimitadas.`;
+}
+
+function servicesKnowledge(): string {
+  return `Servicios: ${SERVICE_CATALOG.map(s => `${s.name} (${priceDisplay(s.priceEur, s.interval)})`).join(", ")}.`;
+}
+
+/** Ids de conocimiento con precios y promesas antiguas que ya no son ciertas. */
+const STALE_SELF_KNOWLEDGE_IDS = [
+  "self-pricing-photoshoot", "self-pricing-growth", "self-pricing-performance", "self-pricing-enterprise",
+  "self-calculator-services", "self-mem-pricing", "self-unique-differentiators", "self-mem-differentiators",
+];
+
+async function purgeStaleSelfKnowledge(): Promise<void> {
+  await db.delete(omnicoreInsightsTable).where(inArray(omnicoreInsightsTable.id, STALE_SELF_KNOWLEDGE_IDS));
+  await db.delete(omnicoreMemoriesTable).where(inArray(omnicoreMemoriesTable.id, STALE_SELF_KNOWLEDGE_IDS));
+}
+
+void purgeStaleSelfKnowledge().catch(err => logger.warn({ err }, "No se pudo purgar el conocimiento de precios antiguo"));
+
 function buildPlatformSelfKnowledge(): { insights: Record<string, unknown>[]; memories: Record<string, unknown>[] } {
   const insights: Record<string, unknown>[] = [
     {
@@ -538,47 +565,20 @@ function buildPlatformSelfKnowledge(): { insights: Record<string, unknown>[]; me
       impactScore: 1.0,
     },
     {
-      id: "self-pricing-photoshoot",
+      id: "self-pricing-plans-v2",
       domain: "platform_pricing",
       insightType: "self_knowledge",
-      title: "Plan Photoshoot Pro — €497 pago único",
-      insight: "Photoshoot Pro (€497 pago único, sin retainer): 120 imágenes IA (4 variantes × 30 SKUs), consistencia visual con guía de marca, iluminación cinematográfica 5:1 Rembrandt, semantic SEO audit de 30 fichas, 1 sesión de pricing financiero, entrega en 7 días laborables, soporte email 30 días. NO incluye A/B testing, auto-pilot ni acceso a futuros motores.",
+      title: "Planes y precios de Shopy Crafter",
+      insight: pricingKnowledge(),
       confidence: 0.99,
       impactScore: 0.95,
     },
     {
-      id: "self-pricing-growth",
+      id: "self-pricing-services-v2",
       domain: "platform_pricing",
       insightType: "self_knowledge",
-      title: "Plan Growth Studio — €297/mes + €197 setup",
-      insight: "Growth Studio (€297/mes + €197 setup único): imágenes ilimitadas, consistencia visual automática, A/B testing visual 3 productos simultáneos, pricing financiero con elasticidad, SEO técnico 100 URLs/mes, auto-pilot básico (ganadores A/B), dashboard analytics multicanal, soporte email/chat <24h, integraciones Shopify/GA/Meta Pixel. NO incluye A/B ilimitado, custom AI training ni soporte dedicado. Prueba gratuita de 14 días.",
-      confidence: 0.99,
-      impactScore: 0.95,
-    },
-    {
-      id: "self-pricing-performance",
-      domain: "platform_pricing",
-      insightType: "self_knowledge",
-      title: "Plan Performance Lab — €797/mes + €397 setup (MÁS POPULAR)",
-      insight: "Performance Lab (€797/mes + €397 setup, MÁS POPULAR): todo de Growth Studio + A/B testing visual ilimitado, auto-pilot avanzado 24/7 cross-producto, pricing predictivo con simulación, SEO ilimitado con crawling automático, recomendaciones semantic search, Algorithmic Schema Augmentation, custom AI fine-tuning, soporte prioritario chat/videollamada <4h, sesión mensual estrategia 60 min, acceso anticipado nuevos motores. NO incluye account manager dedicado.",
-      confidence: 0.99,
-      impactScore: 0.95,
-    },
-    {
-      id: "self-pricing-enterprise",
-      domain: "platform_pricing",
-      insightType: "self_knowledge",
-      title: "Plan Enterprise Omnicore — desde €2,497/mes",
-      insight: "Enterprise Omnicore (€personalizado, desde €2,497/mes, setup incluido): todo de Performance Lab + account manager con SLA, custom AI development, infraestructura dedicada no multi-tenant, API privada con webhooks, integración ERPs/PIMs, white-label completo, SSO enterprise (SAML/OAuth/AD), compliance GDPR/SOC2/ISO 27001, soporte 24/7 respuesta <1h, sesiones estratégicas semanales + QBRs, training ilimitado, features custom bajo demanda.",
-      confidence: 0.99,
-      impactScore: 0.95,
-    },
-    {
-      id: "self-calculator-services",
-      domain: "platform_pricing",
-      insightType: "self_knowledge",
-      title: "Servicios à la carte — Calculadora de precios",
-      insight: "Servicios pago único: Auditoría Completa €197/ud, Rediseño IA hasta 30 productos €147/ud, Pack 30 Imágenes IA €89/ud, Informe Precios y Márgenes €97/ud, Optimización SEO Completa €147/ud, Informe Competidores €97/ud, Investigación Proveedores €97/ud, Setup Email Marketing €197/ud, Informe Proyección Ventas €127/ud. Suscripciones mensuales: Mantenimiento Básico €49/mes, Gestión Activa €149/mes, Premium Ilimitado €399/mes.",
+      title: "Servicios contratables desde el portal",
+      insight: servicesKnowledge(),
       confidence: 0.99,
       impactScore: 0.9,
     },
@@ -601,11 +601,11 @@ function buildPlatformSelfKnowledge(): { insights: Record<string, unknown>[]; me
       impactScore: 0.9,
     },
     {
-      id: "self-unique-differentiators",
+      id: "self-unique-differentiators-v2",
       domain: "platform_identity",
       insightType: "self_knowledge",
       title: "Diferenciadores Únicos de Shopy Crafter",
-      insight: "1) SINGLE BRAIN: Un solo cerebro OmniCore centralizado — todas las llamadas IA pasan por él, inyectando contexto acumulado. 2) DUAL AI ENGINE: Claude + Gemini en paralelo con síntesis para output superior. 3) LEARNING LOOP: Cada operación enseña al sistema via learnFromOperation(), mejorando con cada uso. 4) 100/100 QUALITY STANDARD: Descripciones 800-1200 palabras, SEO Semrush-level, 16 criterios. 5) GOOGLE SEARCH GROUNDING: Precios reales de competidores via Gemini. 6) SELF-HEALING: El chatbot puede inspeccionar, diagnosticar y corregir su propio código. 7) VISUAL DNA: Consistencia de marca automática en todas las generaciones. 8) 79 ACCIONES: Desde crear productos hasta editar temas Liquid y generar flujos email. 9) FACTURACIÓN SHOPIFY: Sin Stripe, billing directo vía Shopify. 10) MULTI-TENANT: Admin + clientes con portales separados y permisos granulares.",
+      insight: "1) SINGLE BRAIN: Un solo cerebro OmniCore centralizado — todas las llamadas IA pasan por él, inyectando contexto acumulado. 2) DUAL AI ENGINE: Claude + Gemini en paralelo con síntesis para output superior. 3) LEARNING LOOP: Cada operación enseña al sistema via learnFromOperation(), mejorando con cada uso. 4) 100/100 QUALITY STANDARD: Descripciones 800-1200 palabras, SEO Semrush-level, 16 criterios. 5) GOOGLE SEARCH GROUNDING: Precios reales de competidores via Gemini. 6) SELF-HEALING: El chatbot puede inspeccionar, diagnosticar y corregir su propio código. 7) VISUAL DNA: Consistencia de marca automática en todas las generaciones. 8) 79 ACCIONES: Desde crear productos hasta editar temas Liquid y generar flujos email. 9) FACTURACIÓN: suscripciones con Stripe, factura en cada cobro y sin permanencia. 10) MULTI-TENANT: Admin + clientes con portales separados y permisos granulares.",
       confidence: 0.99,
       impactScore: 1.0,
     },
@@ -693,10 +693,10 @@ function buildPlatformSelfKnowledge(): { insights: Record<string, unknown>[]; me
       niche: null,
     },
     {
-      id: "self-mem-pricing",
+      id: "self-mem-pricing-v2",
       memoryType: "pricing_pattern",
       title: "Planes y Precios de Shopy Crafter",
-      content: "Planes: Photoshoot Pro €497 (pago único, 120 imgs + SEO audit + pricing session), Growth Studio €297/mes (+€197 setup, imgs ilimitadas + A/B 3 productos + SEO 100 URLs), Performance Lab €797/mes (+€397 setup, MÁS POPULAR, todo ilimitado + AI fine-tuning + soporte prioritario), Enterprise Omnicore desde €2,497/mes (dedicado, white-label, SLA, custom AI). Servicios à la carte desde €89 (imágenes) hasta €197 (auditoría/email). Facturación vía Shopify, no Stripe.",
+      content: `${pricingKnowledge()} ${servicesKnowledge()}`,
       confidence: 0.99,
       niche: null,
     },
@@ -709,10 +709,10 @@ function buildPlatformSelfKnowledge(): { insights: Record<string, unknown>[]; me
       niche: null,
     },
     {
-      id: "self-mem-differentiators",
+      id: "self-mem-differentiators-v2",
       memoryType: "general",
       title: "Por qué Shopy Crafter es diferente",
-      content: "Diferenciadores: 1) Un solo cerebro OmniCore con 46K+ insights. 2) IA dual Claude+Gemini con síntesis. 3) Learning loop retroactivo. 4) Calidad 100/100 con SEO Semrush-level. 5) Precios reales de competidores via Google Search. 6) Auto-healing del propio código. 7) Visual DNA para consistencia de marca. 8) 79 acciones automatizadas. 9) Facturación Shopify nativa. 10) Multi-tenant admin+clientes. Sin tarjeta de crédito, setup en 5 minutos, cancela cuando quieras, RGPD compliant.",
+      content: "Diferenciadores: 1) Un solo cerebro OmniCore con 46K+ insights. 2) IA dual Claude+Gemini con síntesis. 3) Learning loop retroactivo. 4) Calidad 100/100 con SEO Semrush-level. 5) Precios reales de competidores via Google Search. 6) Auto-healing del propio código. 7) Visual DNA para consistencia de marca. 8) 79 acciones automatizadas. 9) Suscripciones con Stripe, sin permanencia. 10) Multi-tenant admin+clientes. Sin tarjeta de crédito, setup en 5 minutos, cancela cuando quieras, RGPD compliant.",
       confidence: 0.99,
       niche: null,
     },
@@ -727,88 +727,18 @@ router.post("/admin/create-shopify-services", async (req, res) => {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    const serviceProducts = [
-      {
-        title: "Shopy Crafter — Photoshoot Pro (Pago Único)",
-        body_html: `<h2>Photoshoot Pro — €497</h2><p>Paquete completo de imágenes profesionales con IA para tu tienda Shopify.</p><ul><li>Generación de 120 imágenes de producto con IA (4 variantes x 30 SKUs)</li><li>Consistencia visual automática aplicando tu guía de marca</li><li>Motor de iluminación cinematográfica (5:1 Rembrandt ratio)</li><li>Semantic SEO audit de 30 fichas de producto</li><li>1 sesión estratégica de pricing financiero</li><li>Entrega en 7 días laborables</li><li>Soporte por email durante 30 días post-entrega</li></ul>`,
+    // Solo pagos únicos: las suscripciones mensuales se cobran con Stripe (recurrente real).
+    const escapeHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const serviceProducts = SERVICE_CATALOG
+      .filter(s => s.interval === "one_time" && s.priceEur !== null)
+      .map(s => ({
+        title: `Shopy Crafter — ${s.name}`,
+        body_html: `<h2>${escapeHtml(s.name)} — ${s.priceEur} € + IVA</h2><p>${escapeHtml(s.description)}</p><ul>${s.features.map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>`,
         product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, photoshoot-pro, pago-unico, imagenes-ia",
+        tags: `shopycrafter, servicio, ${s.key}, pago-unico`,
         status: "active",
-        variants: [{ title: "Photoshoot Pro", price: "497.00", requires_shipping: false, taxable: true, sku: "sc-photoshoot-pro" }],
-      },
-      {
-        title: "Shopy Crafter — Growth Studio (Mensual)",
-        body_html: `<h2>Growth Studio — €297/mes</h2><p>Suscripción mensual de optimización Shopify con IA. Setup único €197.</p><ul><li>Generación ilimitada de imágenes de producto con IA</li><li>Consistencia visual automática (brand guidelines encoding)</li><li>A/B testing visual automático en 3 productos simultáneos</li><li>Motor de pricing financiero: elasticidad precio-demanda</li><li>SEO técnico automático para hasta 100 URLs/mes</li><li>Auto-pilot básico: ejecución automática de ganadores A/B</li><li>Dashboard analytics con atribución multicanal</li><li>Soporte por email y chat (respuesta &lt;24h)</li></ul>`,
-        product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, growth-studio, suscripcion, mensual",
-        status: "active",
-        options: [{ name: "Tipo" }],
-        variants: [
-          { title: "Mensual", option1: "Mensual", price: "297.00", requires_shipping: false, taxable: true, sku: "sc-growth-monthly" },
-          { title: "Setup Único", option1: "Setup Único", price: "197.00", requires_shipping: false, taxable: true, sku: "sc-growth-setup" },
-        ],
-      },
-      {
-        title: "Shopy Crafter — Performance Lab (Mensual)",
-        body_html: `<h2>Performance Lab — €797/mes (MÁS POPULAR)</h2><p>Optimización Shopify completa con IA avanzada. Setup único €397.</p><ul><li>Todo lo incluido en Growth Studio</li><li>A/B testing visual ilimitado</li><li>Auto-pilot avanzado: optimización 24/7 cross-producto</li><li>Pricing financiero predictivo con simulación de escenarios</li><li>SEO técnico automático ilimitado</li><li>Custom AI model fine-tuning con tus datos</li><li>Soporte prioritario por chat y videollamada (&lt;4h)</li><li>Sesión mensual de estrategia (60 min)</li></ul>`,
-        product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, performance-lab, suscripcion, mensual, popular",
-        status: "active",
-        options: [{ name: "Tipo" }],
-        variants: [
-          { title: "Mensual", option1: "Mensual", price: "797.00", requires_shipping: false, taxable: true, sku: "sc-performance-monthly" },
-          { title: "Setup Único", option1: "Setup Único", price: "397.00", requires_shipping: false, taxable: true, sku: "sc-performance-setup" },
-        ],
-      },
-      {
-        title: "Shopy Crafter — Auditoría Completa",
-        body_html: `<h2>Auditoría Completa — €197</h2><p>Análisis exhaustivo de tu tienda Shopify: productos, SEO, COGS y plan de acción personalizado.</p>`,
-        product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, auditoria, pago-unico",
-        status: "active",
-        variants: [{ title: "Auditoría Completa", price: "197.00", requires_shipping: false, taxable: true, sku: "sc-audit" }],
-      },
-      {
-        title: "Shopy Crafter — Rediseño IA (30 Productos)",
-        body_html: `<h2>Rediseño IA — €147</h2><p>Títulos, descripciones y SEO optimizados con IA profesional para hasta 30 productos.</p>`,
-        product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, rediseno, ia, pago-unico",
-        status: "active",
-        variants: [{ title: "Rediseño IA 30 productos", price: "147.00", requires_shipping: false, taxable: true, sku: "sc-redesign-30" }],
-      },
-      {
-        title: "Shopy Crafter — Pack 30 Imágenes IA",
-        body_html: `<h2>Pack 30 Imágenes IA — €89</h2><p>Fotos profesionales de producto generadas con IA (Hero, Lifestyle, Detalle) para 30 productos.</p>`,
-        product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, imagenes, ia, pago-unico",
-        status: "active",
-        variants: [{ title: "Pack 30 Imágenes IA", price: "89.00", requires_shipping: false, taxable: true, sku: "sc-images-30" }],
-      },
-      {
-        title: "Shopy Crafter — Optimización SEO Completa",
-        body_html: `<h2>Optimización SEO — €147</h2><p>Meta tags, keywords, Schema JSON-LD, plan de contenido para tu tienda.</p>`,
-        product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, seo, pago-unico",
-        status: "active",
-        variants: [{ title: "Optimización SEO Completa", price: "147.00", requires_shipping: false, taxable: true, sku: "sc-seo" }],
-      },
-      {
-        title: "Shopy Crafter — Informe de Precios y Márgenes",
-        body_html: `<h2>Informe Pricing — €97</h2><p>COGS real, márgenes, precios competitivos, estrategia de pricing para tu tienda.</p>`,
-        product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, pricing, pago-unico",
-        status: "active",
-        variants: [{ title: "Informe Pricing", price: "97.00", requires_shipping: false, taxable: true, sku: "sc-pricing-report" }],
-      },
-      {
-        title: "Shopy Crafter — Setup Email Marketing",
-        body_html: `<h2>Setup Email Marketing — €197</h2><p>Plantillas profesionales, flujos automatizados y configuración completa.</p>`,
-        product_type: "Servicio Shopy Crafter",
-        tags: "shopycrafter, servicio, email, marketing, pago-unico",
-        status: "active",
-        variants: [{ title: "Setup Email Marketing", price: "197.00", requires_shipping: false, taxable: true, sku: "sc-email-setup" }],
-      },
-    ];
+        variants: [{ title: s.name, price: (s.priceEur as number).toFixed(2), requires_shipping: false, taxable: true, sku: `sc-${s.key}` }],
+      }));
 
     const created: Array<{ title: string; id: string; price: string; handle: string }> = [];
     const errors: string[] = [];

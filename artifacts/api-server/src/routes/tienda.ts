@@ -3,6 +3,9 @@ import { sql } from "drizzle-orm";
 import { createHmac, timingSafeEqual } from "crypto";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import { SERVICE_CATALOG, LEGACY_SEEDED_SERVICE_NAMES, priceDisplay } from "../lib/service-catalog.js";
+import { getStripe, createServiceCheckout, type SellableService } from "../lib/stripe-billing.js";
+import { publicAppUrl } from "../lib/account-tokens.js";
 
 const router = Router();
 
@@ -58,49 +61,33 @@ async function ensureTiendaTables(): Promise<void> {
       INSERT INTO tienda_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING
     `);
 
-    const cnt = await db.execute(sql`SELECT COUNT(*) as c FROM tienda_services`);
-    if (Number((cnt.rows[0] as any)?.c ?? 0) === 0) {
+    await db.execute(sql`ALTER TABLE tienda_services ADD COLUMN IF NOT EXISTS price_eur NUMERIC`);
+    await db.execute(sql`ALTER TABLE tienda_services ADD COLUMN IF NOT EXISTS billing_interval TEXT DEFAULT 'quote'`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`);
+
+    // v2: servicios con precio real y cobro por Stripe. Los sembrados en la v1
+    // prometían "monitorización 24/7", "account manager dedicado", "entrega en
+    // 48h"…: se ocultan (no se borran) y se siembra el catálogo nuevo. Los
+    // servicios que haya creado el admin no se tocan.
+    const ver = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'tienda_services_version'`);
+    if ((ver.rows[0] as { value?: string } | undefined)?.value !== "v2") {
+      for (const legacy of LEGACY_SEEDED_SERVICE_NAMES) {
+        await db.execute(sql`UPDATE tienda_services SET visible = FALSE, updated_at = NOW() WHERE name = ${legacy}`);
+      }
+      for (const svc of SERVICE_CATALOG) {
+        await db.execute(sql`
+          INSERT INTO tienda_services
+            (name, description, short_desc, icon, price_display, features, cta_label, badge, color_accent, sort_order, visible, price_eur, billing_interval)
+          VALUES (${svc.name}, ${svc.description}, ${svc.shortDesc}, ${svc.icon}, ${priceDisplay(svc.priceEur, svc.interval)},
+            ${JSON.stringify(svc.features)}::jsonb, ${svc.ctaLabel}, ${svc.badge}, ${svc.color}, ${svc.sortOrder}, TRUE,
+            ${svc.priceEur}, ${svc.interval})
+        `);
+      }
       await db.execute(sql`
-        INSERT INTO tienda_services
-          (name, description, short_desc, icon, price_display, features, cta_label, color_accent, sort_order)
-        VALUES
-          ('Auditoría Completa IA',
-           'Análisis exhaustivo de tu tienda Shopify con inteligencia artificial. Revisión de SEO, conversión, UX, pricing y competencia.',
-           'Análisis completo en 24h', '🔍', 'Desde €149',
-           '["Análisis SEO técnico","Auditoría de conversión","Análisis de competidores","Revisión de pricing","Informe ejecutivo IA","1 sesión de consultoría"]',
-           'Solicitar auditoría →', 'gold', 0),
-
-          ('Setup Express 48h',
-           'Configuración completa de todos los módulos IA de Shopy Crafter en tu tienda en menos de 48 horas.',
-           'Todo configurado en 2 días', '⚡', 'Desde €299',
-           '["Configuración de todos los módulos","Integración API Shopify","Configuración SEO inicial","Configuración chatbot IA","Formación de 1h incluida","Soporte 30 días post-setup"]',
-           'Solicitar setup →', 'jade', 1),
-
-          ('Pack 100 Imágenes IA',
-           '100 imágenes de producto profesionales generadas con IA. Diferentes ángulos, fondos y estilos adaptados a tu marca.',
-           '100 imágenes en 48h', '🖼️', 'Desde €199',
-           '["100 imágenes de producto","Múltiples ángulos y estilos","Fondos blancos y lifestyle","Adaptadas a tu marca","Formato WebP optimizado","Entrega en 48h"]',
-           'Solicitar pack →', 'gold', 2),
-
-          ('SEO Técnico Full Pack',
-           'Optimización SEO técnica completa de tu tienda. Schemas, meta tags, velocidad, Core Web Vitals y contenido optimizado.',
-           'Posiciona más alto en Google', '🔍', 'Desde €399',
-           '["Auditoría técnica completa","Optimización de schemas","Meta tags y títulos IA","Optimización de velocidad","Core Web Vitals","Contenido SEO optimizado","Informe mensual"]',
-           'Solicitar SEO →', 'jade', 3),
-
-          ('A/B Testing Pro',
-           'Diseño, configuración y análisis de tests A/B para aumentar tu tasa de conversión. Con IA para identificar las mejores variantes.',
-           'Aumenta tu conversión', '📊', 'Desde €249/mes',
-           '["Hasta 5 tests simultáneos","Análisis estadístico IA","Informes semanales","Recomendaciones automáticas","Implementación de ganadores","Gestión continua"]',
-           'Solicitar A/B →', 'gold', 4),
-
-          ('Gestión Mensual IA',
-           'Gestión y optimización continua de tu tienda Shopify con IA. Actualizaciones semanales, monitorización 24/7 y soporte dedicado.',
-           'Tu tienda siempre optimizada', '🤖', 'Desde €799/mes',
-           '["Optimización semanal","Monitorización 24/7","Actualizaciones de contenido","Gestión de pricing dinámico","Análisis de competidores","Account Manager dedicado","Reunión mensual de resultados"]',
-           'Solicitar gestión →', 'jade', 5)
+        INSERT INTO app_settings (key, value, updated_at) VALUES ('tienda_services_version', 'v2', NOW())
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
       `);
-      logger.info("🌱 Tienda services seeded");
+      logger.info("🌱 Tienda services v2 seeded (precios reales)");
     }
 
     logger.info("✅ Tienda tables ready");
@@ -214,26 +201,32 @@ router.post("/tienda/services", requireAdmin, async (req: Request, res: Response
     const {
       name, description, short_desc, icon, price_display,
       features, cta_label, cta_url, badge, color_accent, sort_order, visible,
+      price_eur, billing_interval,
     } = req.body ?? {};
     if (!name) { res.status(400).json({ error: "name requerido" }); return; }
+    const interval = ["one_time", "month", "quote"].includes(billing_interval) ? billing_interval : "quote";
+    const price = price_eur === null || price_eur === undefined || price_eur === "" ? null : Number(price_eur);
+    if (price !== null && !(price > 0)) { res.status(400).json({ error: "price_eur debe ser un número positivo" }); return; }
     const db = await getDb();
     const result = await db.execute(sql`
       INSERT INTO tienda_services
         (name, description, short_desc, icon, price_display, features, cta_label,
-         cta_url, badge, color_accent, sort_order, visible)
+         cta_url, badge, color_accent, sort_order, visible, price_eur, billing_interval)
       VALUES (
         ${name},
         ${description ?? null},
         ${short_desc ?? null},
         ${icon ?? "⚡"},
-        ${price_display ?? "Consultar precio"},
+        ${price_display ?? priceDisplay(price, interval)},
         ${JSON.stringify(features ?? [])}::jsonb,
         ${cta_label ?? "Solicitar →"},
         ${cta_url ?? null},
         ${badge ?? null},
         ${color_accent ?? "gold"},
         ${sort_order ?? 0},
-        ${visible !== false}
+        ${visible !== false},
+        ${price},
+        ${interval}
       )
       RETURNING *
     `);
@@ -250,7 +243,11 @@ router.put("/tienda/services/:id", requireAdmin, async (req: Request, res: Respo
     const {
       name, description, short_desc, icon, price_display,
       features, cta_label, cta_url, badge, color_accent, sort_order, visible,
+      price_eur, billing_interval,
     } = req.body ?? {};
+    const interval = ["one_time", "month", "quote"].includes(billing_interval) ? billing_interval : null;
+    const price = price_eur === undefined ? undefined : price_eur === null || price_eur === "" ? null : Number(price_eur);
+    if (typeof price === "number" && !(price > 0)) { res.status(400).json({ error: "price_eur debe ser un número positivo" }); return; }
     const db = await getDb();
     const featsJson = features !== undefined ? JSON.stringify(features) : null;
     await db.execute(sql`
@@ -267,6 +264,8 @@ router.put("/tienda/services/:id", requireAdmin, async (req: Request, res: Respo
         color_accent     = COALESCE(${color_accent ?? null}, color_accent),
         sort_order       = COALESCE(${sort_order !== undefined ? sort_order : null}, sort_order),
         visible          = COALESCE(${visible !== undefined ? visible : null}, visible),
+        price_eur        = ${price === undefined ? sql`price_eur` : price},
+        billing_interval = COALESCE(${interval}, billing_interval),
         updated_at       = NOW()
       WHERE id = ${Number(id)}
     `);
@@ -344,6 +343,38 @@ router.post("/tienda/create-checkout", requireAuth, async (req: Request, res: Re
   } catch (err: any) {
     logger.error({ err }, "POST /tienda/create-checkout error");
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── CLIENT: POST /tienda/services/:id/checkout — pago único o suscripción mensual (Stripe) ──
+router.post("/tienda/services/:id/checkout", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).session?.userId ?? "");
+    const clientId = (req as any).session?.clientId;
+    const stripe = getStripe();
+    if (!stripe) return void res.status(503).json({ error: "El pago con tarjeta no está disponible todavía. Escríbenos y te enviamos el enlace de pago." });
+    const db = await getDb();
+    const r = await db.execute(sql`
+      SELECT id, name, price_eur, billing_interval FROM tienda_services WHERE id = ${Number(req.params.id)} AND visible = TRUE
+    `);
+    const service = r.rows[0] as unknown as SellableService | undefined;
+    if (!service) return void res.status(404).json({ error: "Servicio no encontrado" });
+    const u = await db.execute(sql`SELECT email FROM users WHERE id = ${userId}`);
+    const s2 = await db.execute(sql`SELECT stripe_customer_id FROM subscriptions WHERE user_id = ${userId}`);
+    const APP = publicAppUrl() ?? "";
+    const url = await createServiceCheckout(stripe, {
+      userId,
+      email: (u.rows[0] as { email?: string } | undefined)?.email,
+      customerId: (s2.rows[0] as { stripe_customer_id?: string | null } | undefined)?.stripe_customer_id ?? null,
+      service,
+      projectId: clientId ? Number(clientId) : null,
+      successUrl: `${APP}/client/tienda?stripe=success`,
+      cancelUrl: `${APP}/client/tienda?stripe=cancelled`,
+    });
+    res.json({ url });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "POST /tienda/services/:id/checkout error");
+    res.status(400).json({ error: err instanceof Error ? err.message : "Error" });
   }
 });
 

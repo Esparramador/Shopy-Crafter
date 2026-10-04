@@ -230,3 +230,75 @@
 
 /* Logo de la app (moneda SC) en barra y pie */
 .lx-logo-img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(200,168,75,.35); }
+
+/* ── PRECIOS ───────────────────────────────────────────────────────── */
+#fp-pricing .lx-wrap .l-h2 { font-size: clamp(26px, 3vw, 40px) !important; margin-bottom: 10px !important; }
+#fp-pricing .lx-wrap .l-sub { font-size: 15px !important; margin: 0 auto !important; }
+#fp-pricing .lx-wrap .fp-section-header { margin-bottom: 18px !important; }
+.lx-billing {
+  display: flex; width: fit-content; margin: 0 auto 22px; padding: 4px; gap: 4px;
+  border-radius: 100px; background: rgba(255,255,255,.04); border: 1px solid rgba(200,168,75,.2);
+}
+.lx-billing button {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 20px; border-radius: 100px; border: 0; cursor: pointer;
+  background: transparent; color: var(--l-t2); font: 600 13px var(--l-fb);
+}
+.lx-billing button.on { background: rgba(200,168,75,.16); color: var(--l-gold2); box-shadow: inset 0 0 0 1px rgba(200,168,75,.4); }
+.lx-billing button span { font-size: 11px; font-weight: 700; color: var(--l-jade); }
+.lx-plans { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.lx-plan {
+  position: relative; display: flex; flex-direction: column;
+  padding: 22px 18px 18px; border-radius: 16px;
+  background: var(--l-ink3); border: 1px solid rgba(255,255,255,.07);
+}
+.lx-plan-featured { border-color: rgba(200,168,75,.5); background: linear-gradient(180deg, rgba(200,168,75,.09), var(--l-ink3) 45%); box-shadow: 0 18px 50px rgba(200,168,75,.12); }
+.lx-plan-badge {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  padding: 3px 12px; border-radius: 100px; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  color: #080810; background: linear-gradient(135deg, var(--l-gold2), var(--l-gold));
+}
+.lx-plan-name { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--l-t2); }
+.lx-plan-featured .lx-plan-name { color: var(--l-gold2); }
+.lx-plan-price { display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; }
+.lx-plan-amount { font-size: 34px; font-weight: 800; letter-spacing: -1px; color: var(--l-t); line-height: 1.05; }
+.lx-plan-quote { font-size: 26px; }
+.lx-plan-per { font-size: 12px; color: var(--l-t2); }
+.lx-plan-note { margin: 4px 0 14px; font-size: 11.5px; color: var(--l-t2); min-height: 16px; }
+.lx-plan-feats { list-style: none; margin: 0 0 16px; padding: 14px 0 0; border-top: 1px solid rgba(255,255,255,.07); display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.lx-plan-feats li { position: relative; padding-left: 18px; font-size: 13px; line-height: 1.45; color: var(--l-t); }
+.lx-plan-feats li::before { content: "✓"; position: absolute; left: 0; color: var(--l-jade); font-size: 12px; }
+.lx-plan-cta {
+  display: block; text-align: center; padding: 10px 12px; border-radius: 10px; text-decoration: none;
+  font-size: 13px; font-weight: 700; color: var(--l-gold2);
+  border: 1px solid rgba(200,168,75,.35); background: rgba(200,168,75,.06);
+  transition: background .2s, transform .2s;
+}
+.lx-plan-cta:hover { background: rgba(200,168,75,.14); transform: translateY(-1px); }
+.lx-plan-cta.gold { color: #080810; background: linear-gradient(135deg, var(--l-gold2), var(--l-gold)); border-color: transparent; }
+.lx-common {
+  margin-top: 18px; padding: 14px 18px; border-radius: 14px;
+  background: rgba(45,212,159,.05); border: 1px solid rgba(45,212,159,.16);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+}
+.lx-common-title { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--l-jade); }
+.lx-common ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.lx-common li { position: relative; padding-left: 16px; font-size: 12.5px; color: var(--l-t); opacity: .9; }
+.lx-common li::before { content: "✓"; position: absolute; left: 0; color: var(--l-jade); font-size: 11px; }
+@media (max-width: 1180px) { .lx-plans { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 22px; } }
+@media (min-width: 901px) and (max-height: 860px) {
+  .lx-plan { padding: 18px 14px 14px; }
+  .lx-plan-amount { font-size: 28px; }
+  .lx-common { margin-top: 12px; padding: 10px 14px; }
+}
+@media (max-width: 720px) { .lx-plans { grid-template-columns: 1fr; } .lx-plan, .lx-plan-name, .lx-common { text-align: left; } }
+
+/* Calculadora: títulos coherentes con el resto de secciones */
+#fp-calculator .l-h2 { font-family: var(--l-fb); font-weight: 700; font-size: clamp(26px, 3vw, 40px); line-height: 1.15; letter-spacing: -1px; color: var(--l-t); margin: 0 0 10px; }
+#fp-calculator .l-sub { font-size: 15px; line-height: 1.6; color: var(--l-t2); margin: 0 auto; }
+/* Las filas no se comprimen dentro de la lista con scroll (texto solapado en móvil) */
+#fp-calculator .fp-calc-items > .fp-calc-item { flex-shrink: 0; }
+@media (max-width: 720px) {
+  #fp-calculator .fp-calc-item { gap: 10px; padding: 12px; align-items: flex-start; }
+  #fp-calculator .fp-calc-item-price, #fp-calculator .fp-calc-item-check { margin-top: 2px; }
+}

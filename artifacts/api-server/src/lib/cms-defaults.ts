@@ -1,3 +1,18 @@
+import { PLAN_CATALOG } from "./plan-catalog.js";
+import { SERVICE_CATALOG } from "./service-catalog.js";
+
+/** Servicios recurrentes de la calculadora: los planes y servicios mensuales reales. */
+export const CALC_RECURRING_SERVICES = [
+  ...PLAN_CATALOG.map(p => ({
+    id: `calc-rec-${p.id}`, name: `Plan ${p.name}`,
+    description: `${p.productsPerMonth} productos y ${p.imagesPerMonth} imágenes IA al mes · 1 tienda · sin permanencia`,
+    price: p.priceMonthly, icon: "📈",
+  })),
+  ...SERVICE_CATALOG.filter(s => s.interval === "month" && s.priceEur !== null).map(s => ({
+    id: `calc-rec-${s.key}`, name: s.name, description: s.features[0], price: s.priceEur as number, icon: s.icon,
+  })),
+];
+
 export const DEFAULT_CMS_CONTENT = {
   meta: {
     lastUpdated: new Date().toISOString(),
@@ -127,7 +142,7 @@ export const DEFAULT_CMS_CONTENT = {
     emptyLabel: "Selecciona al menos un servicio para ver el precio",
     oneTimeServices: [
       { id: "calc-product-1", name: "Creación 1 Producto Completo", description: "Producto profesional desde cero: título SEO + descripción + imágenes IA + categoría + variantes", price: 47, icon: "📦" },
-      { id: "calc-redesign-1", name: "Rediseño Total 1 Producto", description: "Rediseño 100/100: título + descripción + SEO + imágenes + categoría + variantes + stock", price: 29, icon: "✏️" },
+      { id: "calc-redesign-1", name: "Rediseño Total 1 Producto", description: "Rediseño completo: título + descripción + SEO + imágenes + categoría + variantes", price: 29, icon: "✏️" },
       { id: "calc-redesign-partial", name: "Rediseño Parcial 1 Producto", description: "Solo título + descripción + SEO optimizado, sin imágenes nuevas", price: 14.90, icon: "📝" },
       { id: "calc-images-product", name: "3 Imágenes IA por Producto", description: "Hero, Lifestyle y Detalle profesionales generados con IA", price: 9.90, icon: "📸" },
       { id: "calc-seo-product", name: "SEO por Producto", description: "Meta title + meta description + alt texts + tags optimizados", price: 9.90, icon: "🔍" },
@@ -141,7 +156,7 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "calc-theme-section", name: "Sección Liquid Custom", description: "Desarrollo de sección personalizada para tu theme Shopify", price: 97, icon: "🧩" },
       { id: "calc-homepage", name: "Rediseño Homepage Completo", description: "Hero, secciones de producto, testimonios, footer optimizado", price: 347, icon: "🏠" },
       { id: "calc-product-page", name: "Diseño Página de Producto Custom", description: "Template de producto personalizado con secciones especiales", price: 197, icon: "🛒" },
-      { id: "calc-audit", name: "Auditoría Completa 360°", description: "Análisis de todos tus productos + SEO + COGS + tema + plan de acción", price: 197, icon: "📊" },
+      { id: "calc-audit", name: "Auditoría completa de tienda", description: "Puntuación de cada producto (título, descripción, SEO, imágenes y precio) + competencia + revisión por videollamada", price: 149, icon: "📊" },
       { id: "calc-seo-full", name: "Optimización SEO Completa", description: "Meta tags, keywords, Schema JSON-LD, alt texts, plan de contenido", price: 147, icon: "🔍" },
       { id: "calc-pricing-report", name: "Informe Pricing & Márgenes", description: "COGS real, márgenes, precios competitivos, estrategia de pricing", price: 97, icon: "💰" },
       { id: "calc-competitor", name: "Informe de Competidores", description: "Análisis estratégico de tu competencia directa con plan de acción", price: 97, icon: "🎯" },
@@ -167,14 +182,7 @@ export const DEFAULT_CMS_CONTENT = {
       { id: "calc-consistency", name: "Auditoría Consistencia Visual", description: "Análisis de coherencia visual entre todos los productos de la tienda", price: 97, icon: "🎯" },
       { id: "calc-inventory", name: "Gestión Inventario IA", description: "Predicción de stock, alertas de reposición, análisis de rotación", price: 97, icon: "📦" },
     ],
-    recurringServices: [
-      { id: "calc-rec-free", name: "Starter Free", description: "Auditoría básica + chatbot IA + 3 productos demo + dashboard", price: 0, icon: "🆓" },
-      { id: "calc-rec-emprendedor", name: "Plan Emprendedor", description: "10 productos/mes + 30 imágenes IA + SEO básico + 1 informe", price: 29, icon: "🚀" },
-      { id: "calc-rec-growth", name: "Growth Studio", description: "Productos e imágenes ilimitadas + SEO completo + A/B testing + 3 informes", price: 149, icon: "📈" },
-      { id: "calc-rec-performance", name: "Performance Lab", description: "Todo ilimitado + auto-pilot 24/7 + 6 informes Nivel 3 + Klaviyo", price: 397, icon: "⚡" },
-      { id: "calc-rec-mant-basico", name: "Mantenimiento Básico", description: "Monitorización + updates menores + soporte email mensual", price: 49, icon: "🔧" },
-      { id: "calc-rec-gestion", name: "Gestión Activa", description: "Optimización activa + nuevos productos + campañas mensuales", price: 149, icon: "🎯" },
-    ],
+    recurringServices: CALC_RECURRING_SERVICES,
     categories: [
       { key: "all", icon: "🔥", label: "Todos", ids: [] as string[] },
       { key: "products", icon: "📦", label: "Productos", ids: ["calc-product-1", "calc-redesign-1", "calc-redesign-partial", "calc-images-product", "calc-seo-product"] },
@@ -246,7 +254,7 @@ export const DEFAULT_CMS_CONTENT = {
     pill: "Empieza hoy",
     headline: "Tu tienda merece\nmás que esto.",
     headlineHighlight: "más que esto.",
-    subheadline: "14 días gratis. Sin tarjeta. Cancela cuando quieras.\nSetup completo en menos de 5 minutos.",
+    subheadline: "Cuéntanos tu caso y te preparamos una propuesta personalizada sin compromiso.",
     placeholder: "tu@agencia.com",
     buttonLabel: "Empezar →",
     finePrint: "Al registrarte aceptas nuestros Términos de Servicio y Política de Privacidad",

@@ -15,10 +15,10 @@ const FAQS = [
   {
     category: "Precios y planes",
     items: [
-      { q: "¿Puedo probar gratis?", a: "Sí. Al activar tu cuenta tienes 14 días de prueba con 1 tienda, 100 imágenes IA y auditoría básica." },
-      { q: "¿Puedo cancelar en cualquier momento?", a: "Sí. No hay permanencia ni penalización." },
-      { q: "¿Qué incluye cada plan?", a: "Los planes se diferencian en número de tiendas, productos optimizados e imágenes IA al mes, A/B testing, informes y nivel de soporte. Tienes el detalle actualizado en la sección de precios de la página principal." },
-      { q: "¿Los precios incluyen IVA?", a: "Los precios mostrados no incluyen IVA. El IVA se calcula según tu país de residencia en el momento de la facturación." },
+      { q: "¿Puedo probar gratis?", a: "Sí. Al activar tu cuenta tienes 14 días de prueba con 1 tienda conectada, 3 productos optimizados y 6 imágenes IA." },
+      { q: "¿Puedo cancelar en cualquier momento?", a: "Sí. No hay permanencia ni penalización: cancelas desde tu portal y el plan sigue activo hasta el final del periodo ya pagado." },
+      { q: "¿Qué incluye cada plan?", a: "Todos los planes incluyen las mismas funciones para 1 tienda (auditoría, SEO, pricing, A/B testing en Shopify, portal de cliente y asistente IA). Se diferencian en los productos optimizados y las imágenes IA al mes. Tienes el detalle en la sección de precios de la página principal." },
+      { q: "¿Los precios incluyen IVA?", a: "Los precios mostrados no incluyen IVA. El IVA aplicable se añade en la factura de cada cobro." },
     ],
   },
   {
