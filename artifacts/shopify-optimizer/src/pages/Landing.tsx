@@ -206,7 +206,6 @@ export default function Landing() {
   const [calcCategory, setCalcCategory] = useState("all");
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set(["fp-hero"]));
   const pricingRowRef = useRef<HTMLDivElement>(null);
-  const [pricingIdx, setPricingIdx] = useState(0);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
   // "loading" while the fetch is in flight; CanonicalPlan[] once resolved (may be empty)
   const [apiPlansState, setApiPlansState] = useState<CanonicalPlan[] | "loading">("loading");
@@ -271,6 +270,23 @@ export default function Landing() {
   const annualSavingPct = useMemo(() => Math.max(0, ...displayPlans
     .filter(p => p.priceMonthly > 0 && p.priceAnnual > 0)
     .map(p => Math.round((1 - p.priceAnnual / (p.priceMonthly * 12)) * 100))), [displayPlans]);
+  // Servicios mensuales reales (tienda_services con cobro mensual) para la calculadora.
+  const [monthlyServices, setMonthlyServices] = useState<{ id: number; name: string; icon?: string; short_desc?: string; price_eur: number | string }[]>([]);
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/tienda/services`)
+      .then(r => (r.ok ? r.json() : []))
+      .then((rows: any[]) => setMonthlyServices((Array.isArray(rows) ? rows : [])
+        .filter(r => r.billing_interval === "month" && Number(r.price_eur) > 0)))
+      .catch(() => {});
+  }, []);
+
+  // Lo que comparten todos los planes de pago se muestra una vez, bajo las tarjetas.
+  const commonFeatures = useMemo(() => {
+    const paid = displayPlans.filter(p => p.priceMonthly > 0);
+    if (paid.length < 2) return [] as string[];
+    const sets = paid.map(p => new Set(p.features.filter(f => f.included).map(f => f.text)));
+    return [...sets[0]].filter(t => sets.every(set => set.has(t)));
+  }, [displayPlans]);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "", suppliers: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -302,15 +318,6 @@ export default function Landing() {
   const toggleService = (s: string) =>
     setContactServices(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
 
-  const scrollPricing = useCallback((dir: 1 | -1) => {
-    const row = pricingRowRef.current;
-    if (!row) return;
-    const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card");
-    if (!cards.length) return;
-    const next = Math.max(0, Math.min(pricingIdx + dir, cards.length - 1));
-    cards[next].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-    setPricingIdx(next);
-  }, [pricingIdx]);
 
   const handleHeroMouseMove = useCallback((e: React.MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -323,31 +330,7 @@ export default function Landing() {
     setHeroTilt({ x: 0, y: 0 });
   }, []);
 
-  const handleCardMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const card = e.currentTarget;
-    card.style.transition = "transform 0.35s ease, box-shadow 0.35s ease";
-    card.style.transform = "";
-    card.style.boxShadow = "";
-  }, []);
 
-  useEffect(() => {
-    const row = pricingRowRef.current;
-    if (!row) return;
-    const applyScrollDepth = () => {
-      const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card");
-      if (!cards.length) return;
-      const rowCenter = row.getBoundingClientRect().left + row.getBoundingClientRect().width / 2;
-      let closest = 0, minDist = Infinity;
-      cards.forEach((c, i) => {
-        const dist = Math.abs(c.getBoundingClientRect().left + c.getBoundingClientRect().width / 2 - rowCenter);
-        if (dist < minDist) { minDist = dist; closest = i; }
-      });
-      setPricingIdx(closest);
-    };
-    applyScrollDepth();
-    row.addEventListener("scroll", applyScrollDepth, { passive: true });
-    return () => row.removeEventListener("scroll", applyScrollDepth);
-  }, [content]);
 
   const submitContact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -663,8 +646,20 @@ export default function Landing() {
 
   const calcDefaults = { pill: "Calcula tu precio", headline: "¿Cuánto cuesta optimizar tu tienda?", headlineHighlight: "optimizar tu tienda", subheadline: "Selecciona los servicios que necesitas.", disclaimer: "* Precios orientativos.", resultLabel: "Precio estimado", oneTimeLabel: "Pago único", recurringLabel: "Suscripción mensual", ctaLabel: "Solicitar presupuesto →", emptyLabel: "Selecciona al menos un servicio", oneTimeServices: [] as { id: string; name: string; description: string; price: number; icon: string }[], recurringServices: [] as { id: string; name: string; description: string; price: number; period: string; icon: string }[] };
   const calc = content.calculator ?? calcDefaults;
+  // Suscripciones de la calculadora = planes y servicios mensuales reales (los del
+  // CMS prometían "todo ilimitado", "auto-pilot 24/7" o un plan gratis que no existe).
+  const calcRecurring = [
+    ...displayPlans.filter(p => p.priceMonthly > 0).map(p => ({
+      id: `plan-${p.id}`, name: `Plan ${p.name}`, icon: "📦", price: p.priceMonthly, period: "/mes",
+      description: p.features.filter(f => f.included && !commonFeatures.includes(f.text)).map(f => f.text).join(" · "),
+    })),
+    ...monthlyServices.map(s => ({
+      id: `svc-${s.id}`, name: s.name, icon: s.icon || "⚡", price: Number(s.price_eur), period: "/mes",
+      description: s.short_desc ?? "",
+    })),
+  ];
   const calcOneTimeTotal = calc.oneTimeServices.reduce((sum, s) => sum + (Number(s.price) || 0) * (calcQuantities[s.id] || 0), 0);
-  const calcRecurringService = calcSelectedRecurring ? calc.recurringServices.find(s => s.id === calcSelectedRecurring) : null;
+  const calcRecurringService = calcSelectedRecurring ? calcRecurring.find(s => s.id === calcSelectedRecurring) : null;
   const calcRecurringTotal = calcRecurringService ? (Number(calcRecurringService.price) || 0) : 0;
   const calcActiveServices = calc.oneTimeServices.filter(s => (calcQuantities[s.id] || 0) > 0);
 
@@ -975,80 +970,55 @@ export default function Landing() {
         ══════════════════════════════════════ */}
         <section className="fp-section fp-section-dark" id="fp-pricing" data-nav="Precios" data-effect={eff("pricing")}>
           <div className="fp-bg-solid">{videoBg("pricing")}</div>
-          <div className="fp-content fp-pricing-layout">
-            <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill" {...cmsProps("pricing.pill")}>{content.pricing.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("pricing.headline")} {...cmsData("pricing.headline")}>{String(content.pricing.headline ?? "").split(".")[0]}. <em>{String(content.pricing.headline ?? "").split(".").slice(1).join(".")}</em></h2>
-              <p className="l-sub" {...cmsProps("pricing.subheadline")}>{content.pricing.subheadline}</p>
+          <div className="fp-content lx-wrap lx-pricing">
+            <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`}>
+              <div className="l-pill">Precios</div>
+              <h2 className="l-h2">Un plan por tienda, <em>sin permanencia.</em></h2>
+              <p className="l-sub lx-sub">Los planes se diferencian solo en cuántos productos e imágenes trabajamos cada mes. Precios sin IVA.</p>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 18 }}>
-              <div className="fp-billing-toggle" data-period={billingPeriod}>
-                <div className={`fp-bt-pill${billingPeriod === "annual" ? " fp-bt-pill-right" : ""}`} />
-                <button type="button" className={`fp-bt-btn${billingPeriod === "monthly" ? " active" : ""}`} onClick={() => { setBillingPeriod("monthly"); setPricingIdx(0); }}>
-                  Mensual
-                </button>
-                <button type="button" className={`fp-bt-btn${billingPeriod === "annual" ? " active" : ""}`} onClick={() => { setBillingPeriod("annual"); setPricingIdx(0); }}>
-                  Anual
-                </button>
-              </div>
-              {annualSavingPct > 0 && <span className={`fp-bt-save-ext${billingPeriod === "annual" ? " active" : ""}`} style={{ opacity: billingPeriod === "annual" ? 1 : 0.38 }}>🎁 Ahorra {annualSavingPct}% con el plan anual</span>}
+            <div className="lx-billing" role="group" aria-label="Periodo de facturación">
+              <button type="button" className={billingPeriod === "monthly" ? "on" : ""} onClick={() => setBillingPeriod("monthly")}>Mensual</button>
+              <button type="button" className={billingPeriod === "annual" ? "on" : ""} onClick={() => setBillingPeriod("annual")}>
+                Anual{annualSavingPct > 0 ? <span>−{annualSavingPct}%</span> : null}
+              </button>
             </div>
-            <div className="fp-pricing-carousel-wrap">
-              {pricingIdx > 0 && (
-                <button type="button" className="fp-pricing-arrow fp-pricing-arrow-left" onClick={() => scrollPricing(-1)} aria-label="Plan anterior">‹</button>
-              )}
-              <div ref={pricingRowRef} className={`fp-pricing-row ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-                {displayPlans.map((plan, planIdx) => (
-                  <div
-                    key={plan.id}
-                    className={`l-pricing-card fp-pricing-card${plan.featured ? " l-pricing-featured" : ""}`}
-                    onMouseLeave={handleCardMouseLeave}
-                  >
-                    <div className="l-pricing-body">
-                      <div className="pc-glare" />
-                      {plan.badge && <div className="l-pricing-badge" {...cmsProps(`pricing.plans.${planIdx}.badge`)}>{plan.badge}</div>}
-                      {plan.featured && <div className="pc-savings-tag">✨ MÁS POPULAR</div>}
-                      <div className="l-pricing-plan" style={{ position: "relative", zIndex: 2 }} {...cmsProps(`pricing.plans.${planIdx}.name`)}>{plan.name}</div>
-                      <div style={{ position: "relative", zIndex: 2 }}>
-                        <div className="l-pricing-price">{plan.priceMonthly === 0 ? <span style={{ fontSize: "0.55em", letterSpacing: "-1px" }}>A medida</span> : <>{plan.currency}{billingPeriod === "monthly" ? plan.priceMonthly : Math.round(plan.priceAnnual / 12)}</>}</div>
-                        <div className={`pc-annual-pill${billingPeriod === "annual" && plan.priceMonthly > 0 ? " visible" : ""}`}>
-                          {plan.priceMonthly * 12 > plan.priceAnnual && <span className="pc-annual-pill-pct">−{Math.round((1 - plan.priceAnnual / (plan.priceMonthly * 12)) * 100)}%</span>}
-                          <span className="pc-annual-pill-txt">{plan.currency}{plan.priceAnnual > 0 ? plan.priceAnnual : "—"}/año{plan.priceMonthly * 12 > plan.priceAnnual ? <> · ahorras {plan.currency}{plan.priceMonthly * 12 - plan.priceAnnual}</> : null}</span>
-                        </div>
-                      </div>
-                      <div className="l-pricing-period" style={{ position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "/mes · sin permanencia" : "/mes · facturado anual"}</div>
-                      <div className="l-pricing-divider" style={{ position: "relative", zIndex: 2 }}></div>
-                      <ul className="l-pricing-features" style={{ position: "relative", zIndex: 2 }}>
-                        {plan.features.map((f, fi) => (
-                          <li key={fi} className="l-pricing-feature">
-                            <div className={f.included ? "l-pricing-check" : "l-pricing-x"}>{f.included ? "✓" : "✕"}</div>
-                            <span style={f.included ? undefined : { color: "var(--l-t3)", fontSize: 12 }}>{f.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <a
-                        href="#fp-contact"
-                        className={`l-pricing-cta btn-jelly ${plan.cta.style}`}
-                        style={{ position: "relative", zIndex: 2 }}
-                        onClick={e => { e.preventDefault(); const idx = FP_SECTION_IDS.indexOf("fp-contact"); if (idx >= 0) goToSection(idx); setHashRobust("fp-contact"); }}
-                        {...cmsProps(`pricing.plans.${planIdx}.cta.label`)}
-                      >{plan.cta.label}</a>
-                      <p style={{ textAlign: "center", fontSize: 10.5, color: "rgba(255,255,255,0.3)", marginTop: 10, position: "relative", zIndex: 2 }}>{billingPeriod === "monthly" ? "Sin permanencia · Cancela cuando quieras" : "Renovación anual · Cancela antes del vencimiento"}</p>
+            <div ref={pricingRowRef} className={`lx-plans ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
+              {displayPlans.map(plan => {
+                const quote = !(plan.priceMonthly > 0);
+                const own = plan.features.filter(f => f.included && !commonFeatures.includes(f.text));
+                const annualMonthly = plan.priceAnnual > 0 ? Math.round((plan.priceAnnual / 12) * 100) / 100 : 0;
+                return (
+                  <article key={plan.id} className={`lx-plan${plan.featured ? " lx-plan-featured" : ""}`}>
+                    {plan.badge && <div className="lx-plan-badge">{plan.badge}</div>}
+                    <h3 className="lx-plan-name">{plan.name}</h3>
+                    <div className="lx-plan-price">
+                      {quote ? <span className="lx-plan-amount lx-plan-quote">A medida</span> : billingPeriod === "monthly" ? (
+                        <><span className="lx-plan-amount">{plan.priceMonthly}{plan.currency}</span><span className="lx-plan-per">/mes + IVA</span></>
+                      ) : (
+                        <><span className="lx-plan-amount">{annualMonthly.toLocaleString("es-ES")}{plan.currency}</span><span className="lx-plan-per">/mes + IVA</span></>
+                      )}
                     </div>
-                  </div>
-                ))}
+                    <div className="lx-plan-note">
+                      {quote ? "Presupuesto cerrado según alcance" : billingPeriod === "monthly" ? "Cobro mensual" : `${plan.priceAnnual.toLocaleString("es-ES")}${plan.currency} al año`}
+                    </div>
+                    <ul className="lx-plan-feats">
+                      {own.map(f => <li key={f.text}>{f.text}</li>)}
+                    </ul>
+                    <a
+                      href="#fp-contact"
+                      className={`lx-plan-cta${plan.featured ? " gold" : ""}`}
+                      onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); }}
+                    >{quote ? "Pedir presupuesto" : "Empezar"}</a>
+                  </article>
+                );
+              })}
+            </div>
+            {commonFeatures.length > 0 && (
+              <div className={`lx-common ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s" }}>
+                <span className="lx-common-title">Incluido en todos los planes</span>
+                <ul>{commonFeatures.map(f => <li key={f}>{f}</li>)}</ul>
               </div>
-              {pricingIdx < (displayPlans.length - 1) && (
-                <button type="button" className="fp-pricing-arrow fp-pricing-arrow-right" onClick={() => scrollPricing(1)} aria-label="Plan siguiente">›</button>
-              )}
-            </div>
-            <div className="fp-pricing-dots">
-              {displayPlans.map((plan, i) => (
-                <button key={plan.id} type="button" className={`fp-pricing-dot${i === pricingIdx ? " active" : ""}`}
-                  onClick={() => { const row = pricingRowRef.current; if (row) { const cards = row.querySelectorAll<HTMLElement>(".fp-pricing-card"); if (cards[i]) { cards[i].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" }); setPricingIdx(i); } } }}
-                  aria-label={plan.name} />
-              ))}
-            </div>
+            )}
           </div>
         </section>
 
@@ -1076,6 +1046,7 @@ export default function Landing() {
 
             <div className={`fp-calc-grid ${!isAnimated("fp-calculator") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
               <div className="fp-calc-services">
+                {calc.oneTimeServices.length > 0 && (
                 <div className="fp-calc-group">
                   <h3 className="fp-calc-group-title">{calc.oneTimeLabel}</h3>
                   <div className="fp-calc-tabs">
@@ -1117,11 +1088,12 @@ export default function Landing() {
                     })}
                   </div>
                 </div>
+                )}
 
                 <div className="fp-calc-group">
                   <h3 className="fp-calc-group-title">{calc.recurringLabel}</h3>
                   <div className="fp-calc-items">
-                    {calc.recurringServices.map(s => {
+                    {calcRecurring.map(s => {
                       const selected = calcSelectedRecurring === s.id;
                       return (
                         <button key={s.id} type="button" className={`fp-calc-item fp-calc-item-recurring${selected ? " selected" : ""}`} onClick={() => {
@@ -1132,7 +1104,7 @@ export default function Landing() {
                             <span className="fp-calc-item-name">{s.name}</span>
                             <span className="fp-calc-item-desc">{s.description}</span>
                           </div>
-                          <span className="fp-calc-item-price">{s.price}€<small>{s.period}</small></span>
+                          <span className="fp-calc-item-price">{s.price.toLocaleString("es-ES")}€<small>{s.period}</small></span>
                           <span className="fp-calc-item-check">{selected ? "✓" : "○"}</span>
                         </button>
                       );
@@ -1188,7 +1160,7 @@ export default function Landing() {
                     </>
                   )}
                   <a href="#fp-contact" className="l-btn-gold fp-calc-cta" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); }}>{calc.ctaLabel}</a>
-                  <p className="fp-calc-disclaimer">{calc.disclaimer}</p>
+                  <p className="fp-calc-disclaimer">{calc.disclaimer}{/IVA/.test(calc.disclaimer) ? "" : " Precios sin IVA."}</p>
                 </div>
               </div>
             </div>

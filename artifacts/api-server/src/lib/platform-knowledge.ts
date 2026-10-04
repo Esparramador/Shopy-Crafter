@@ -10,6 +10,9 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { PLAN_CATALOG, TRIAL, planFeatures } from "./plan-catalog.js";
+import { SERVICE_CATALOG, priceDisplay } from "./service-catalog.js";
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PLANS — edit here when prices, limits or features change
 // ══════════════════════════════════════════════════════════════════════════════
@@ -28,79 +31,17 @@ export interface PlatformPlan {
 }
 
 export const PLATFORM_PLANS: PlatformPlan[] = [
-  {
-    id: "emprendedor",
-    name: "Emprendedor",
-    priceMonthly: 14,
-    priceAnnual: 140,
+  ...PLAN_CATALOG.map((p): PlatformPlan => ({
+    id: p.id,
+    name: p.name,
+    priceMonthly: p.priceMonthly,
+    priceAnnual: p.priceAnnual,
     currency: "€",
-    productsPerMonth: 5,
-    imagesPerMonth: 10,
-    features: [
-      "5 productos/mes",
-      "10 imágenes IA/mes",
-      "Auditoría de tienda Shopify",
-      "Chatbot IA de atención al cliente",
-      "SEO básico automático",
-      "Soporte por email",
-    ],
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    priceMonthly: 37,
-    priceAnnual: 370,
-    currency: "€",
-    productsPerMonth: 15,
-    imagesPerMonth: 45,
-    features: [
-      "15 productos/mes",
-      "45 imágenes IA/mes",
-      "Todos los módulos de IA",
-      "SEO técnico automático",
-      "Pricing dinámico con IA",
-      "Soporte prioritario",
-    ],
-  },
-  {
-    id: "agency_pro",
-    name: "Growth",
-    priceMonthly: 112,
-    priceAnnual: 1120,
-    currency: "€",
-    popular: true,
-    productsPerMonth: 60,
-    imagesPerMonth: 300,
-    features: [
-      "60 productos/mes",
-      "300 imágenes IA/mes",
-      "Todos los módulos de IA",
-      "A/B Testing (hasta 10 activos)",
-      "Informes Pro mensuales",
-      "Análisis de competidores en vivo",
-      "API access + webhooks",
-      "Soporte prioritario 12h",
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    priceMonthly: 299,
-    priceAnnual: 2990,
-    currency: "€",
-    productsPerMonth: 200,
-    imagesPerMonth: 1200,
-    features: [
-      "200 productos/mes",
-      "1.200 imágenes IA/mes",
-      "A/B Testing ilimitado",
-      "Informes ejecutivos semanales",
-      "White-label y multi-tienda",
-      "Account Manager dedicado",
-      "API privada + acceso prioritario",
-      "Soporte 24/7 dedicado",
-    ],
-  },
+    popular: p.featured,
+    productsPerMonth: p.productsPerMonth,
+    imagesPerMonth: p.imagesPerMonth,
+    features: planFeatures(p).map(f => f.text),
+  })),
   {
     id: "personalizado",
     name: "A medida",
@@ -110,16 +51,12 @@ export const PLATFORM_PLANS: PlatformPlan[] = [
     productsPerMonth: null,
     imagesPerMonth: null,
     features: [
-      "Productos y tiendas ilimitadas",
-      "Imágenes IA ilimitadas",
-      "Integración personalizada",
-      "SLA contractual garantizado",
-      "Onboarding dedicado",
-      "Formación al equipo",
-      "Facturación flexible",
-      "Acceso prioritario a nuevos motores",
+      "Varias tiendas en una misma cuenta",
+      "Cuotas de productos e imágenes a medida",
+      "Diseño web y apps nativas",
+      "Presupuesto cerrado según alcance",
     ],
-    note: "Precio personalizado — contactar ventas",
+    note: "Presupuesto a medida — contactar",
   },
 ];
 
@@ -330,21 +267,26 @@ export const PLATFORM_MODULES: PlatformModule[] = [
 /** Generates the PLANES Y PRECIOS block for chatbot system prompts. */
 export function buildPricingBlock(): string {
   const lines: string[] = [
-    "== PLANES Y PRECIOS (NO hay plan gratuito permanente; todos son de pago) ==",
+    "== PLANES Y PRECIOS (NO hay plan gratuito permanente; un plan por tienda) ==",
   ];
 
   for (const plan of PLATFORM_PLANS) {
     const price =
       plan.priceMonthly !== null
-        ? `${plan.priceMonthly}${plan.currency}/mes`
+        ? `${plan.priceMonthly}${plan.currency}/mes + IVA (anual: ${plan.priceAnnual}${plan.currency})`
         : plan.note ?? "Precio a consultar";
-    const label = plan.popular ? `${plan.name} (${price}) — EL MÁS POPULAR` : `${plan.name} (${price})`;
+    const label = plan.popular ? `${plan.name} (${price}) — RECOMENDADO` : `${plan.name} (${price})`;
     const featStr = plan.features.join(", ");
     lines.push(`- ${label}: ${featStr}`);
   }
 
+  lines.push("== SERVICIOS CONTRATABLES DESDE EL PORTAL ==");
+  for (const s of SERVICE_CATALOG) {
+    lines.push(`- ${s.name} (${priceDisplay(s.priceEur, s.interval)}): ${s.features.join(", ")}`);
+  }
+
   lines.push(
-    "Sin permanencia — cancela cuando quieras. No hay prueba gratuita: los planes son de pago desde el primer día, pero puedes cancelar en cualquier momento sin penalización.",
+    `Prueba de ${TRIAL.days} días al activar la cuenta (${TRIAL.productsPerMonth} productos y ${TRIAL.imagesPerMonth} imágenes IA). Precios sin IVA. Pago con tarjeta vía Stripe, factura en cada cobro, sin permanencia: se cancela desde el portal y el plan sigue activo hasta el fin del periodo pagado. No prometas nada que no aparezca en esta lista (ni SLA, ni API, ni marca blanca, ni soporte 24/7, ni cuotas ilimitadas).`,
   );
 
   return lines.join("\n");

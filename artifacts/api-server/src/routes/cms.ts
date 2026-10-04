@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { db } from "@workspace/db";
 import { cmsContent, cmsVersions, cmsPages } from "@workspace/db/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { DEFAULT_CMS_CONTENT } from "../lib/cms-defaults.js";
+import { DEFAULT_CMS_CONTENT, CALC_RECURRING_SERVICES } from "../lib/cms-defaults.js";
 import { askClaudeWithBrain, learnFromOperation } from "../lib/claude.js";
 import { askClaudeJsonValidated } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
@@ -191,6 +191,32 @@ function applyRealisticPatch(content: Record<string, unknown>): { patched: Recor
   }
   if (typeof cta?.subheadline === "string" && cta.subheadline.includes("200 tiendas")) {
     cta.subheadline = "Cuéntanos tu caso y te preparamos una propuesta personalizada sin compromiso.";
+    changed = true;
+  }
+
+  // Parche 6: calculadora con los planes y servicios reales (sin "Starter Free", "ilimitado" ni "24/7")
+  const calc = c.calculator as any | undefined;
+  const rec = calc?.recurringServices;
+  if (Array.isArray(rec) && rec.some((r: any) =>
+    r?.id === "calc-rec-free" || /ilimitad|24\/7/i.test(String(r?.description ?? ""))
+  )) {
+    calc.recurringServices = CALC_RECURRING_SERVICES;
+    changed = true;
+  }
+  const oneTime = calc?.oneTimeServices;
+  if (Array.isArray(oneTime)) {
+    const defaults = (DEFAULT_CMS_CONTENT as any).calculator.oneTimeServices as any[];
+    for (const id of ["calc-audit", "calc-redesign-1"]) {
+      const item = oneTime.find((o: any) => o?.id === id);
+      const def = defaults.find(d => d.id === id);
+      if (item && def && (/100\/100|360°/.test(String(item.description) + String(item.name)) || (id === "calc-audit" && item.price === 197))) {
+        Object.assign(item, def);
+        changed = true;
+      }
+    }
+  }
+  if (typeof cta?.subheadline === "string" && /Sin tarjeta|5 minutos/.test(cta.subheadline)) {
+    cta.subheadline = (DEFAULT_CMS_CONTENT as any).cta.subheadline;
     changed = true;
   }
 

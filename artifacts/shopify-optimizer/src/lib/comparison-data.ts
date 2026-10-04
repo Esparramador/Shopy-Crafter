@@ -561,7 +561,7 @@ Necesitarás redirecciones 301 para TODAS las URLs de producto y categoría.</p>
 <li><strong>Cupones:</strong> consulta de los cupones activos y sus condiciones.</li>
 <li><strong>Inventario:</strong> stock por producto y variante, con alertas de rotura.</li>
 <li><strong>Informes de ventas:</strong> ingresos y pedidos por periodo.</li>
-<li><strong>Imágenes, SEO y pricing con IA:</strong> los mismos motores que en Shopify: imágenes de producto, SEO de fichas y precio con COGS real.</li>
+<li><strong>Imágenes, SEO y pricing con IA:</strong> imágenes de producto generadas con IA, textos SEO de cada ficha y precio con COGS real. El A/B testing automático está disponible solo para Shopify.</li>
 </ul>
 
 <h2>Ingresos contados una sola vez</h2>
@@ -591,7 +591,7 @@ Necesitarás redirecciones 301 para TODAS las URLs de producto y categoría.</p>
 <li><strong>Categorías:</strong> estructura del catálogo.</li>
 <li><strong>Pedidos:</strong> con los estados de PrestaShop (cancelado, reembolsado o error de pago no cuentan como venta).</li>
 <li><strong>Inventario:</strong> stock y alertas.</li>
-<li><strong>Imágenes y pricing con IA:</strong> imágenes de producto y precio con COGS real, igual que en el resto de plataformas.</li>
+<li><strong>Imágenes y pricing con IA:</strong> imágenes de producto generadas con IA y precio con COGS real. El A/B testing automático está disponible solo para Shopify.</li>
 </ul>
 
 <h2>Pensado para el mercado hispanohablante</h2>

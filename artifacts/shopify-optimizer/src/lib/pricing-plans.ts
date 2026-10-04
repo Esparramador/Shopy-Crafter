@@ -10,105 +10,45 @@ export interface CanonicalPlan {
   cta: { label: string; style: string; href: string };
 }
 
+/**
+ * Respaldo visual si el API no responde. Refleja el catálogo del servidor
+ * (artifacts/api-server/src/lib/plan-catalog.ts): mismos precios y cuotas.
+ */
+const COMMON = [
+  "1 tienda conectada: Shopify, WooCommerce o PrestaShop",
+  "Auditoría y rediseño de fichas con IA",
+  "SEO técnico de producto",
+  "Pricing con COGS y análisis de competencia",
+  "A/B testing de imagen y precio (tiendas Shopify)",
+  "Portal de cliente: aprobaciones, mensajes e informes",
+  "Asistente IA de tu tienda",
+].map(text => ({ text, included: true }));
+
+function plan(id: string, name: string, priceMonthly: number, products: number, images: number, featured = false, badge: string | null = null): CanonicalPlan {
+  return {
+    id, name, priceMonthly, priceAnnual: priceMonthly * 10, currency: "€", featured, badge,
+    features: [
+      { text: `${products.toLocaleString("es-ES")} productos optimizados al mes`, included: true },
+      { text: `${images.toLocaleString("es-ES")} imágenes IA al mes`, included: true },
+      ...COMMON,
+    ],
+    cta: { label: "Empezar", style: featured ? "gold" : "ghost", href: "#fp-contact" },
+  };
+}
+
 export const CANONICAL_PLANS: CanonicalPlan[] = [
+  plan("emprendedor", "Emprendedor", 19, 5, 10),
+  plan("starter", "Starter", 49, 15, 45),
+  plan("agency_pro", "Growth", 149, 60, 300, true, "Recomendado"),
+  plan("enterprise", "Enterprise", 399, 200, 1200),
   {
-    id: "emprendedor",
-    name: "Emprendedor",
-    priceMonthly: 14,
-    priceAnnual: 140,
-    currency: "€",
-    featured: false,
-    badge: null,
+    id: "personalizado", name: "A medida", priceMonthly: 0, priceAnnual: 0, currency: "€", featured: false, badge: null,
     features: [
-      { text: "5 productos/mes", included: true },
-      { text: "10 imágenes IA/mes", included: true },
-      { text: "Auditoría de tienda Shopify", included: true },
-      { text: "Chatbot IA de atención", included: true },
-      { text: "SEO básico automático", included: true },
-      { text: "Soporte por email", included: true },
-      { text: "A/B Testing", included: false },
-      { text: "API Access", included: false },
+      { text: "Varias tiendas en una misma cuenta", included: true },
+      { text: "Cuotas de productos e imágenes a medida", included: true },
+      { text: "Diseño web y apps nativas", included: true },
+      { text: "Presupuesto cerrado según alcance", included: true },
     ],
-    cta: { label: "Empezar →", style: "ghost", href: "#fp-contact" },
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    priceMonthly: 37,
-    priceAnnual: 370,
-    currency: "€",
-    featured: false,
-    badge: null,
-    features: [
-      { text: "15 productos/mes", included: true },
-      { text: "45 imágenes IA/mes", included: true },
-      { text: "Todos los módulos de IA", included: true },
-      { text: "SEO técnico automático", included: true },
-      { text: "Pricing dinámico con IA", included: true },
-      { text: "Soporte prioritario", included: true },
-      { text: "A/B Testing", included: false },
-      { text: "API Access", included: false },
-    ],
-    cta: { label: "Solicitar acceso →", style: "ghost", href: "#fp-contact" },
-  },
-  {
-    id: "agency_pro",
-    name: "Growth",
-    priceMonthly: 112,
-    priceAnnual: 1120,
-    currency: "€",
-    featured: true,
-    badge: "Más popular",
-    features: [
-      { text: "60 productos/mes", included: true },
-      { text: "300 imágenes IA/mes", included: true },
-      { text: "Todos los módulos de IA", included: true },
-      { text: "A/B Testing (hasta 10 activos)", included: true },
-      { text: "Informes Pro mensuales", included: true },
-      { text: "Análisis de competidores en vivo", included: true },
-      { text: "API Access + Webhooks", included: true },
-      { text: "Soporte prioritario 12h", included: true },
-    ],
-    cta: { label: "Empezar ahora →", style: "gold", href: "#fp-contact" },
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    priceMonthly: 299,
-    priceAnnual: 2990,
-    currency: "€",
-    featured: false,
-    badge: null,
-    features: [
-      { text: "200 productos/mes", included: true },
-      { text: "1.200 imágenes IA/mes", included: true },
-      { text: "A/B Testing ilimitado", included: true },
-      { text: "Informes ejecutivos semanales", included: true },
-      { text: "White-label & Multi-tienda", included: true },
-      { text: "Account Manager dedicado", included: true },
-      { text: "API privada + acceso prioritario", included: true },
-      { text: "Soporte 24/7 dedicado", included: true },
-    ],
-    cta: { label: "Hablar con ventas →", style: "ghost", href: "#fp-contact" },
-  },
-  {
-    id: "personalizado",
-    name: "A medida",
-    priceMonthly: 0,
-    priceAnnual: 0,
-    currency: "€",
-    featured: false,
-    badge: null,
-    features: [
-      { text: "Productos y tiendas ilimitadas", included: true },
-      { text: "Imágenes IA ilimitadas", included: true },
-      { text: "Integración personalizada", included: true },
-      { text: "SLA contractual garantizado", included: true },
-      { text: "Onboarding dedicado", included: true },
-      { text: "Formación al equipo", included: true },
-      { text: "Facturación flexible", included: true },
-      { text: "Acceso prioritario a nuevos motores", included: true },
-    ],
-    cta: { label: "Solicitar propuesta →", style: "ghost", href: "#fp-contact" },
+    cta: { label: "Pedir presupuesto", style: "ghost", href: "#fp-contact" },
   },
 ];

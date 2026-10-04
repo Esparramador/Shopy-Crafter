@@ -2,6 +2,7 @@ import { db } from "@workspace/db";
 import { projectsTable, planCreditPacksTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import type { PlanType } from "@workspace/db/schema";
+import { catalogPlan, TRIAL } from "./plan-catalog.js";
 
 export interface PlanConfig {
   productsPerMonth: number;
@@ -10,6 +11,18 @@ export interface PlanConfig {
   label: string;
 }
 
+function fromCatalog(id: "emprendedor" | "starter" | "agency_pro" | "enterprise", imagesPerProduct: number): PlanConfig {
+  const p = catalogPlan(id)!;
+  return {
+    productsPerMonth: p.productsPerMonth,
+    imagesPerProduct,
+    maxImagesPerMonth: p.imagesPerMonth,
+    label: `${p.name} €${p.priceMonthly}/mes`,
+  };
+}
+
+// Cuotas y etiquetas salen del catálogo único (lib/plan-catalog.ts): antes estas
+// etiquetas decían 19/49/149/399 € mientras la web cobraba 14/37/112/299 €.
 export const PLAN_LIMITS: Record<PlanType, PlanConfig> = {
   admin: {
     productsPerMonth: Infinity,
@@ -17,35 +30,15 @@ export const PLAN_LIMITS: Record<PlanType, PlanConfig> = {
     maxImagesPerMonth: Infinity,
     label: "Admin (Sin límites)",
   },
-  enterprise: {
-    productsPerMonth: 200,
-    imagesPerProduct: 6,
-    maxImagesPerMonth: 1200,
-    label: "Enterprise €399/mes",
-  },
-  agency_pro: {
-    productsPerMonth: 60,
-    imagesPerProduct: 5,
-    maxImagesPerMonth: 300,
-    label: "Growth €149/mes",
-  },
-  starter: {
-    productsPerMonth: 15,
-    imagesPerProduct: 3,
-    maxImagesPerMonth: 45,
-    label: "Starter €49/mes",
-  },
-  emprendedor: {
-    productsPerMonth: 5,
-    imagesPerProduct: 2,
-    maxImagesPerMonth: 10,
-    label: "Emprendedor €19/mes",
-  },
+  enterprise: fromCatalog("enterprise", 6),
+  agency_pro: fromCatalog("agency_pro", 5),
+  starter: fromCatalog("starter", 3),
+  emprendedor: fromCatalog("emprendedor", 2),
   trial: {
-    productsPerMonth: 3,
+    productsPerMonth: TRIAL.productsPerMonth,
     imagesPerProduct: 2,
-    maxImagesPerMonth: 6,
-    label: "Trial",
+    maxImagesPerMonth: TRIAL.imagesPerMonth,
+    label: "Prueba",
   },
 };
 

@@ -6,49 +6,39 @@ import { randomUUID } from "crypto";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import Stripe from "stripe";
+import { PLAN_CATALOG, planFeatures, TRIAL } from "../lib/plan-catalog.js";
+import {
+  STRIPE_API_VERSION, getStripe, activatePlan, createPlanCheckout, handleStripeEvent,
+  recurringRevenue, ensureStripeBillingSchema, type BillingInterval,
+} from "../lib/stripe-billing.js";
+import { publicAppUrl } from "../lib/account-tokens.js";
 
-// Misma versión que lib/stripe-tenant.ts y la que tipa el SDK instalado (stripe@22).
-// Aquí solo se usan Checkout Sessions (create/retrieve: payment_status, metadata),
-// que no cambian entre acacia y dahlia; la versión de los eventos del webhook la
-// fija el endpoint en el panel de Stripe, no este cliente.
-const STRIPE_API_VERSION = "2026-05-27.dahlia" as const;
 
 const router = Router();
 
-const PLANS: Record<string, {
-  name: string; price: number; storesLimit: number; imagesIncluded: number; features: string[];
+type BillingPlan = {
+  name: string; price: number; priceAnnual: number; storesLimit: number; imagesIncluded: number; features: string[];
   periodDays: number; visible?: boolean;
-}> = {
-  emprendedor: {
-    name: "Emprendedor", price: 14, storesLimit: 1, imagesIncluded: 10, periodDays: 30,
-    features: ["1 tienda", "5 productos/mes", "10 imágenes IA/mes", "Auditoría Shopify", "Chatbot IA", "SEO básico"],
-  },
-  starter: {
-    name: "Starter", price: 37, storesLimit: 3, imagesIncluded: 45, periodDays: 30,
-    features: ["3 tiendas", "15 productos/mes", "45 imágenes IA/mes", "Todos los módulos IA", "SEO técnico", "Pricing dinámico", "Soporte prioritario"],
-  },
-  agency_pro: {
-    name: "Growth", price: 112, storesLimit: 10, imagesIncluded: 300, periodDays: 30,
-    features: ["10 tiendas", "60 productos/mes", "300 imágenes IA/mes", "A/B Testing", "Informes Pro", "Análisis competidores", "API Access"],
-  },
-  enterprise: {
-    name: "Enterprise", price: 299, storesLimit: -1, imagesIncluded: 1200, periodDays: 30,
-    features: ["Tiendas ilimitadas", "200 productos/mes", "1.200 imágenes IA/mes", "A/B Testing ilimitado", "White-label", "Account Manager", "Soporte 24/7"],
-  },
-  trial: {
-    name: "Trial", price: 0, storesLimit: 1, imagesIncluded: 100, periodDays: 14,
-    features: ["1 tienda", "100 imágenes IA", "Auditoría básica"],
-    visible: false,
-  },
-  pro: {
-    name: "Pro (legado)", price: 297, storesLimit: 10, imagesIncluded: 2000, periodDays: 30,
-    features: ["Legado"], visible: false,
-  },
-  agency: {
-    name: "Agency (legado)", price: 697, storesLimit: -1, imagesIncluded: -1, periodDays: 30,
-    features: ["Legado"], visible: false,
-  },
 };
+
+// Planes de pago = catálogo único (lib/plan-catalog.ts). Cada plan es 1 tienda.
+const PLANS: Record<string, BillingPlan> = {
+  ...Object.fromEntries(PLAN_CATALOG.map(p => [p.id, {
+    name: p.name, price: p.priceMonthly, priceAnnual: p.priceAnnual, storesLimit: 1,
+    imagesIncluded: p.imagesPerMonth, periodDays: 30,
+    features: planFeatures(p).map(f => f.text),
+  } satisfies BillingPlan])),
+  trial: {
+    name: "Prueba", price: 0, priceAnnual: 0, storesLimit: 1, imagesIncluded: TRIAL.imagesPerMonth, periodDays: TRIAL.days,
+    features: [`${TRIAL.productsPerMonth} productos`, `${TRIAL.imagesPerMonth} imágenes IA`], visible: false,
+  },
+  // Legados: solo para mostrar suscripciones antiguas; no se venden.
+  pro: { name: "Pro (legado)", price: 297, priceAnnual: 0, storesLimit: 10, imagesIncluded: 2000, periodDays: 30, features: ["Legado"], visible: false },
+  agency: { name: "Agency (legado)", price: 697, priceAnnual: 0, storesLimit: -1, imagesIncluded: -1, periodDays: 30, features: ["Legado"], visible: false },
+};
+
+/** Planes que se pueden contratar (con precio y del catálogo). */
+const SELLABLE = new Set<string>(PLAN_CATALOG.map(p => p.id));
 
 router.get("/billing/subscription", async (req, res): Promise<void> => {
   try {
@@ -59,16 +49,16 @@ router.get("/billing/subscription", async (req, res): Promise<void> => {
 
     if (!sub) {
       const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 14);
+      trialEnd.setDate(trialEnd.getDate() + TRIAL.days);
       const [created] = await db.insert(subscriptionsTable).values({
         userId,
         plan: "trial",
         status: "trialing",
         trialEndsAt: trialEnd,
         storesLimit: 1,
-        imagesIncluded: 100,
+        imagesIncluded: TRIAL.imagesPerMonth,
       }).returning();
-      res.json({ subscription: created, plan: PLANS.trial, daysRemaining: 14 });
+      res.json({ subscription: created, plan: PLANS.trial, daysRemaining: TRIAL.days });
       return;
     }
 
@@ -129,96 +119,27 @@ async function ensureBillingPlansTable(): Promise<void> {
 }
 
 // ── Seed canonical plans once per deploy (idempotent via version tag) ─────────
-const CANONICAL_SEED_VERSION = "v12-canonical-5plans-2026-mid";
+// v13: precios, cuotas y textos del catálogo único (antes 14/37/112/299 € con
+// promesas que el sistema no cumplía: API Access, White-label, SLA, soporte 24/7…).
+const CANONICAL_SEED_VERSION = "v13-catalog-2026-09";
 const CANONICAL_BILLING_PLANS = [
+  ...PLAN_CATALOG.map(p => ({
+    id: p.id, name: p.name, price: p.priceMonthly, priceAnnual: p.priceAnnual,
+    currency: "€", featured: p.featured, badge: p.badge,
+    features: planFeatures(p),
+    ctaLabel: p.ctaLabel, ctaStyle: p.featured ? "gold" : "ghost", ctaHref: "#fp-contact",
+    storesLimit: 1, imagesIncluded: p.imagesPerMonth, sortOrder: p.sortOrder,
+  })),
   {
-    id: "emprendedor",
-    name: "Emprendedor",
-    price: 14, priceAnnual: 140,
+    id: "personalizado", name: "A medida", price: 0, priceAnnual: 0,
     currency: "€", featured: false, badge: null,
     features: [
-      { text: "5 productos/mes", included: true },
-      { text: "10 imágenes IA/mes", included: true },
-      { text: "Auditoría de tienda Shopify", included: true },
-      { text: "Chatbot IA de atención", included: true },
-      { text: "SEO básico automático", included: true },
-      { text: "Soporte por email", included: true },
-      { text: "A/B Testing", included: false },
-      { text: "API Access", included: false },
+      { text: "Varias tiendas en una misma cuenta", included: true },
+      { text: "Cuotas de productos e imágenes a medida", included: true },
+      { text: "Diseño web y apps nativas", included: true },
+      { text: "Presupuesto cerrado según alcance", included: true },
     ],
-    ctaLabel: "Empezar →", ctaStyle: "ghost", ctaHref: "#fp-contact",
-    storesLimit: 1, imagesIncluded: 10, sortOrder: 0,
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    price: 37, priceAnnual: 370,
-    currency: "€", featured: false, badge: null,
-    features: [
-      { text: "15 productos/mes", included: true },
-      { text: "45 imágenes IA/mes", included: true },
-      { text: "Todos los módulos de IA", included: true },
-      { text: "SEO técnico automático", included: true },
-      { text: "Pricing dinámico con IA", included: true },
-      { text: "Soporte prioritario", included: true },
-      { text: "A/B Testing", included: false },
-      { text: "API Access", included: false },
-    ],
-    ctaLabel: "Solicitar acceso →", ctaStyle: "ghost", ctaHref: "#fp-contact",
-    storesLimit: 3, imagesIncluded: 45, sortOrder: 1,
-  },
-  {
-    id: "agency_pro",
-    name: "Growth",
-    price: 112, priceAnnual: 1120,
-    currency: "€", featured: true, badge: "Más popular",
-    features: [
-      { text: "60 productos/mes", included: true },
-      { text: "300 imágenes IA/mes", included: true },
-      { text: "Todos los módulos de IA", included: true },
-      { text: "A/B Testing (hasta 10 activos)", included: true },
-      { text: "Informes Pro mensuales", included: true },
-      { text: "Análisis de competidores en vivo", included: true },
-      { text: "API Access + Webhooks", included: true },
-      { text: "Soporte prioritario 12h", included: true },
-    ],
-    ctaLabel: "Empezar ahora →", ctaStyle: "gold", ctaHref: "#fp-contact",
-    storesLimit: 10, imagesIncluded: 300, sortOrder: 2,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: 299, priceAnnual: 2990,
-    currency: "€", featured: false, badge: null,
-    features: [
-      { text: "200 productos/mes", included: true },
-      { text: "1.200 imágenes IA/mes", included: true },
-      { text: "A/B Testing ilimitado", included: true },
-      { text: "Informes ejecutivos semanales", included: true },
-      { text: "White-label & Multi-tienda", included: true },
-      { text: "Account Manager dedicado", included: true },
-      { text: "API privada + acceso prioritario", included: true },
-      { text: "Soporte 24/7 dedicado", included: true },
-    ],
-    ctaLabel: "Hablar con ventas →", ctaStyle: "ghost", ctaHref: "#fp-contact",
-    storesLimit: -1, imagesIncluded: 1200, sortOrder: 3,
-  },
-  {
-    id: "personalizado",
-    name: "A medida",
-    price: 0, priceAnnual: 0,
-    currency: "€", featured: false, badge: null,
-    features: [
-      { text: "Productos y tiendas ilimitadas", included: true },
-      { text: "Imágenes IA ilimitadas", included: true },
-      { text: "Integración personalizada", included: true },
-      { text: "SLA contractual garantizado", included: true },
-      { text: "Onboarding dedicado", included: true },
-      { text: "Formación al equipo", included: true },
-      { text: "Facturación flexible", included: true },
-      { text: "Acceso prioritario a nuevos motores", included: true },
-    ],
-    ctaLabel: "Solicitar propuesta →", ctaStyle: "ghost", ctaHref: "#fp-contact",
+    ctaLabel: "Pedir presupuesto", ctaStyle: "ghost", ctaHref: "#fp-contact",
     storesLimit: -1, imagesIncluded: -1, sortOrder: 4,
   },
 ];
@@ -266,6 +187,7 @@ async function seedCanonicalBillingPlans(): Promise<void> {
 // Seed DESPUÉS de crear la tabla (antes se lanzaban en paralelo: en una BD nueva
 // el seed podía correr sin billing_plans y no se sembraba nada hasta reiniciar).
 const billingPlansReady = ensureBillingPlansTable().then(seedCanonicalBillingPlans);
+void ensureStripeBillingSchema().catch(() => {});
 void billingPlansReady;
 
 function rowToPlan(row: any) {
@@ -413,40 +335,25 @@ router.post("/billing/upgrade", async (req, res): Promise<void> => {
       return;
     }
 
-    const APP_URL = process.env.APP_URL || `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
-
-    // ── Stripe Checkout (when STRIPE_SECRET_KEY is configured) ───────────────
-    const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
-    if (STRIPE_SECRET) {
-      const stripe = new Stripe(STRIPE_SECRET, { apiVersion: STRIPE_API_VERSION });
+    // ── Stripe Checkout (suscripción mensual o anual real) ───────────────────
+    const stripe = getStripe();
+    if (stripe && SELLABLE.has(planId)) {
+      const interval: BillingInterval = (req.body as { interval?: string }).interval === "year" ? "year" : "month";
+      const APP = publicAppUrl() ?? "";
       const [user] = await db.select({ email: usersTable.email })
         .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-      const session = await stripe.checkout.sessions.create({
-        mode: "subscription",
-        payment_method_types: ["card"],
-        line_items: [{
-          price_data: {
-            currency: "eur",
-            product_data: {
-              name: `Shopy Crafter — ${plan.name}`,
-              description: plan.features.slice(0, 3).join(" · "),
-            },
-            unit_amount: Math.round(plan.price * 100),
-            recurring: { interval: "month" },
-          },
-          quantity: 1,
-        }],
-        success_url: `${APP_URL}/admin/billing?stripe=success&plan=${planId}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${APP_URL}/admin/billing?stripe=cancelled`,
-        metadata: { userId, planId },
-        ...(user?.email ? { customer_email: user.email } : {}),
+      const url = await createPlanCheckout(stripe, {
+        userId, email: user?.email, planId, interval,
+        customerId: existingSub[0]?.stripeCustomerId ?? null,
+        successUrl: `${APP}/admin/billing?stripe=success&plan=${planId}&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${APP}/admin/billing?stripe=cancelled`,
       });
-      logger.info({ userId, planId, sessionId: session.id }, "💳 Stripe Checkout session creada");
+      logger.info({ userId, planId, interval }, "💳 Stripe Checkout de plan creado");
       res.json({
         requiresPayment: true,
-        confirmationUrl: session.url!,
+        confirmationUrl: url,
         plan,
-        message: `Redirigiendo a Stripe para confirmar el pago de ${plan.name} (€${plan.price}/mes)...`,
+        message: `Redirigiendo a Stripe para el pago de ${plan.name}...`,
       });
       return;
     }
@@ -523,30 +430,27 @@ router.post("/billing/affiliate/join", async (req, res): Promise<void> => {
   }
 });
 
+// Facturas reales de Stripe. Antes se inventaba una factura "pagada" por mes
+// transcurrido aunque no hubiera ningún cobro.
 router.get("/billing/invoices", async (req, res): Promise<void> => {
   try {
     const userId = (req.session as any).userId;
     if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
     const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId));
-    if (!sub) { res.json([]); return; }
+    const stripe = getStripe();
+    if (!sub?.stripeCustomerId || !stripe) { res.json([]); return; }
 
-    const plan = PLANS[sub.plan as keyof typeof PLANS] ?? PLANS.trial;
-    const invoices = [];
-    if (sub.status === "active" && sub.currentPeriodEnd) {
-      const months = Math.min(6, Math.max(1, Math.round((Date.now() - (sub.createdAt?.getTime?.() ?? Date.now())) / 2592000000) + 1));
-      for (let i = 0; i < months; i++) {
-        const date = new Date(Date.now() - i * 2592000000);
-        invoices.push({
-          id: `INV-${String(i + 1).padStart(3, "0")}`,
-          date: date.toISOString(),
-          amount: plan.price,
-          plan: plan.name,
-          status: "paid",
-        });
-      }
-    }
-    res.json(invoices);
+    const list = await stripe.invoices.list({ customer: sub.stripeCustomerId, limit: 24 });
+    res.json(list.data.map(inv => ({
+      id: inv.number ?? inv.id,
+      date: new Date((inv.created ?? 0) * 1000).toISOString(),
+      amount: (inv.amount_paid || inv.amount_due || 0) / 100,
+      currency: inv.currency,
+      status: inv.status,
+      pdfUrl: inv.invoice_pdf ?? null,
+      hostedUrl: inv.hosted_invoice_url ?? null,
+    })));
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
@@ -672,10 +576,8 @@ router.get("/billing/stripe/verify", async (req, res): Promise<void> => {
     const { session_id } = req.query as { session_id?: string };
     if (!session_id) { res.status(400).json({ error: "session_id requerido" }); return; }
 
-    const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
-    if (!STRIPE_SECRET) { res.status(400).json({ error: "Stripe no configurado en esta plataforma" }); return; }
-
-    const stripe = new Stripe(STRIPE_SECRET, { apiVersion: STRIPE_API_VERSION });
+    const stripe = getStripe();
+    if (!stripe) { res.status(400).json({ error: "Stripe no configurado en esta plataforma" }); return; }
     const session = await stripe.checkout.sessions.retrieve(session_id);
 
     if (session.payment_status !== "paid") {
@@ -692,27 +594,14 @@ router.get("/billing/stripe/verify", async (req, res): Promise<void> => {
     }
 
     const plan = PLANS[planId as keyof typeof PLANS];
-    if (!plan) { res.status(400).json({ error: `Plan desconocido: ${planId}` }); return; }
+    if (!plan || !SELLABLE.has(planId)) { res.status(400).json({ error: `Plan desconocido: ${planId}` }); return; }
 
-    const periodEnd = new Date();
-    periodEnd.setDate(periodEnd.getDate() + plan.periodDays);
-
-    const updates = {
-      plan: planId,
-      status: "active",
-      storesLimit: plan.storesLimit,
-      imagesIncluded: plan.imagesIncluded,
-      currentPeriodEnd: periodEnd,
-      trialEndsAt: null,
-      cancelAtPeriodEnd: 0,
-    };
-
-    const existing = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, String(userId)));
-    if (existing.length > 0) {
-      await db.update(subscriptionsTable).set(updates).where(eq(subscriptionsTable.userId, String(userId)));
-    } else {
-      await db.insert(subscriptionsTable).values({ userId: String(userId), ...updates });
-    }
+    const interval: BillingInterval = session.metadata?.interval === "year" ? "year" : "month";
+    await activatePlan(String(userId), planId, {
+      interval,
+      customerId: typeof session.customer === "string" ? session.customer : session.customer?.id ?? null,
+      subscriptionId: typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null,
+    });
 
     logger.info({ userId, planId, sessionId: session_id }, "✅ Stripe verify: suscripción activada");
     res.json({ success: true, plan: { ...plan, id: planId }, message: `¡Plan ${plan.name} activado correctamente!` });
@@ -752,46 +641,71 @@ router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
     res.status(400).json({ error: `Webhook error: ${err.message}` }); return;
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    if (session.payment_status !== "paid") { res.json({ received: true }); return; }
-
-    const metaUserId = session.metadata?.userId;
-    const planId = session.metadata?.planId;
-    const plan = PLANS[planId as keyof typeof PLANS];
-
-    if (!metaUserId || !plan) {
-      logger.warn({ metaUserId, planId }, "stripe webhook: missing metadata");
-      res.json({ received: true }); return;
-    }
-
-    const periodEnd = new Date();
-    periodEnd.setDate(periodEnd.getDate() + plan.periodDays);
-    const updates = {
-      plan: planId,
-      status: "active",
-      storesLimit: plan.storesLimit,
-      imagesIncluded: plan.imagesIncluded,
-      currentPeriodEnd: periodEnd,
-      trialEndsAt: null,
-      cancelAtPeriodEnd: 0,
-    };
-
-    try {
-      const existing = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, metaUserId));
-      if (existing.length > 0) {
-        await db.update(subscriptionsTable).set(updates).where(eq(subscriptionsTable.userId, metaUserId));
-      } else {
-        await db.insert(subscriptionsTable).values({ userId: metaUserId, ...updates });
-      }
-      logger.info({ metaUserId, planId, sessionId: session.id }, "✅ Stripe webhook: suscripción activada");
-    } catch (err: any) {
-      logger.error({ err: err.message }, "stripe webhook: DB error");
-      res.status(500).json({ error: "DB error" }); return;
-    }
+  try {
+    await handleStripeEvent(event);
+  } catch (err: any) {
+    // 500 → Stripe reintenta el evento más tarde (no se pierde un cobro).
+    logger.error({ err: err?.message, type: event.type }, "stripe webhook: error procesando evento");
+    res.status(500).json({ error: "Error procesando el evento" }); return;
   }
 
   res.json({ received: true });
+});
+
+// ── Checkout de plan para cualquier usuario autenticado (clientes incluidos) ──
+router.post("/billing/checkout", async (req, res): Promise<void> => {
+  try {
+    const userId = (req.session as any).userId as string | undefined;
+    if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    const { planId, interval: rawInterval, returnPath } = req.body as { planId?: string; interval?: string; returnPath?: string };
+    if (!planId || !SELLABLE.has(planId)) { res.status(400).json({ error: "Plan no válido" }); return; }
+    const stripe = getStripe();
+    if (!stripe) { res.status(503).json({ error: "El pago con tarjeta no está disponible todavía. Escríbenos y te enviamos el enlace de pago." }); return; }
+    const interval: BillingInterval = rawInterval === "year" ? "year" : "month";
+    const back = typeof returnPath === "string" && /^\/[a-z0-9/_-]*$/i.test(returnPath) ? returnPath : "/client/tienda";
+    const APP = publicAppUrl() ?? "";
+    const [user] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId));
+    const url = await createPlanCheckout(stripe, {
+      userId, email: user?.email, planId, interval, customerId: sub?.stripeCustomerId ?? null,
+      successUrl: `${APP}${back}?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${APP}${back}?stripe=cancelled`,
+    });
+    res.json({ url });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "billing/checkout error");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+// ── Portal de Stripe: cambiar tarjeta, ver facturas y cancelar la suscripción ──
+router.post("/billing/portal", async (req, res): Promise<void> => {
+  try {
+    const userId = (req.session as any).userId as string | undefined;
+    if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+    const stripe = getStripe();
+    const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId));
+    if (!stripe || !sub?.stripeCustomerId) { res.status(400).json({ error: "No hay una suscripción de pago asociada a tu cuenta" }); return; }
+    const back = (req.body as { returnPath?: string })?.returnPath;
+    const path = typeof back === "string" && /^\/[a-z0-9/_-]*$/i.test(back) ? back : "/client/tienda";
+    const session = await stripe.billingPortal.sessions.create({
+      customer: sub.stripeCustomerId,
+      return_url: `${publicAppUrl() ?? ""}${path}`,
+    });
+    res.json({ url: session.url });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "billing/portal error");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+// ── Admin: ingresos recurrentes mensuales (MRR) reales ──
+router.get("/billing/admin/mrr", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    res.json(await recurringRevenue());
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
 });
 
 router.get("/billing/admin/subscriptions", requireAdmin, async (_req, res): Promise<void> => {

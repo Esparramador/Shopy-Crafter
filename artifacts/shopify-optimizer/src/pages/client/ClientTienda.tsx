@@ -21,7 +21,28 @@ function planIcon(name: string) {
   return "✦";
 }
 
-// ── Shopify Checkout ──────────────────────────────────────────────────────────
+// ── Checkout: Stripe (suscripción mensual/anual real); Shopify como alternativa ──
+async function postJson(path: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+/** Devuelve un mensaje de error si no se pudo abrir el pago. */
+async function openPlanCheckout(planId: string, annual: boolean, fallbackUrl: string): Promise<string | null> {
+  try {
+    const r = await postJson("/api/billing/checkout", { planId, interval: annual ? "year" : "month", returnPath: "/client/tienda" });
+    if (r.ok && r.data?.url) { window.location.href = r.data.url; return null; }
+    if (r.status !== 503) return r.data?.error ?? "No se pudo iniciar el pago";
+  } catch { /* sin Stripe: checkout de Shopify */ }
+  if (annual) return "El pago anual solo está disponible con tarjeta. Escríbenos y te enviamos el enlace.";
+  await openShopifyCheckout(planId, fallbackUrl);
+  return null;
+}
+
 async function openShopifyCheckout(planId: string, fallbackUrl: string) {
   try {
     const res = await fetch(`${API_BASE}/api/tienda/create-checkout`, {
@@ -46,7 +67,7 @@ async function openShopifyCheckout(planId: string, fallbackUrl: string) {
 }
 
 // ── Plan Card ─────────────────────────────────────────────────────────────────
-function PlanCard({ plan, annual }: { plan: any; annual: boolean }) {
+function PlanCard({ plan, annual, onError }: { plan: any; annual: boolean; onError: (msg: string) => void }) {
   const tiltRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
 
@@ -75,14 +96,16 @@ function PlanCard({ plan, annual }: { plan: any; annual: boolean }) {
     ? Math.round((plan.price * 12 - (plan.price_annual ?? plan.price * 10)) / (plan.price * 12) * 100) : 0;
   const features = safeFeatures(plan.features);
   const isFeatured = !!plan.featured;
-  const hasShopify = !!plan.shopify_checkout_url;
-  const fallback = plan.shopify_checkout_url || plan.cta_href || "/client/messages";
+  const isQuote = !(Number(plan.price) > 0);
+  const fallback = plan.shopify_checkout_url || "/client/messages";
 
   async function handleBuy(e: React.MouseEvent) {
     e.preventDefault();
     if (loading) return;
+    if (isQuote) { window.location.href = "/client/messages"; return; }
     setLoading(true);
-    await openShopifyCheckout(plan.id, fallback);
+    const err = await openPlanCheckout(plan.id, annual, fallback);
+    if (err) onError(err);
     setLoading(false);
   }
 
@@ -92,14 +115,18 @@ function PlanCard({ plan, annual }: { plan: any; annual: boolean }) {
         <div className="ts-border-spin" />
         <div className="ts-card-body">
           <div className="ts-shine" />
-          {(plan.badge || isFeatured) && <div className="ts-badge-top">{plan.badge ?? "MÁS POPULAR"}</div>}
+          {plan.badge && <div className="ts-badge-top">{plan.badge}</div>}
           <div className="ts-card-icon">{planIcon(plan.name)}</div>
           <h3 className="ts-card-name">{plan.name}</h3>
-          <div className="ts-price-row">
-            <span className="ts-price-cur">{plan.currency ?? "€"}</span>
-            <span className="ts-price-amt">{price}</span>
-            <span className="ts-price-per">{period}</span>
-          </div>
+          {isQuote ? (
+            <div className="ts-price-row"><span className="ts-price-amt ts-price-quote">A medida</span></div>
+          ) : (
+            <div className="ts-price-row">
+              <span className="ts-price-cur">{plan.currency ?? "€"}</span>
+              <span className="ts-price-amt">{price}</span>
+              <span className="ts-price-per">{period} + IVA</span>
+            </div>
+          )}
           {annual && savings > 0 && <div className="ts-save-badge">✓ Ahorras {savings}% vs mensual</div>}
           <div className="ts-divider" />
           <ul className="ts-features">
@@ -114,9 +141,9 @@ function PlanCard({ plan, annual }: { plan: any; annual: boolean }) {
             disabled={loading}
             className={`ts-card-cta${isFeatured ? " ts-cta-gold" : " ts-cta-ghost"}${loading ? " ts-cta-loading" : ""}`}
           >
-            {loading ? "Redirigiendo…" : (hasShopify ? (plan.cta_label ?? "Comprar ahora →") : (plan.cta_label ?? "Contactar →"))}
+            {loading ? "Redirigiendo…" : isQuote ? "Pedir presupuesto" : (plan.cta_label ?? "Contratar")}
           </button>
-          {hasShopify && <p className="ts-secure-note">🔒 Pago seguro vía Shopify</p>}
+          {!isQuote && <p className="ts-secure-note">{annual ? "Cobro anual · renovación automática · cancela cuando quieras" : "Cobro mensual · sin permanencia"}</p>}
         </div>
       </div>
     </div>
@@ -124,21 +151,48 @@ function PlanCard({ plan, annual }: { plan: any; annual: boolean }) {
 }
 
 // ── Service Card ──────────────────────────────────────────────────────────────
-function ServiceCard({ svc }: { svc: any }) {
+function servicePrice(svc: any): string {
+  const price = Number(svc.price_eur);
+  if (!(price > 0) || svc.billing_interval === "quote" || !svc.billing_interval) return svc.price_display ?? "Presupuesto a medida";
+  const n = price.toLocaleString("es-ES");
+  return svc.billing_interval === "month" ? `${n} €/mes + IVA` : `${n} € + IVA`;
+}
+
+function ServiceCard({ svc, onError }: { svc: any; onError: (msg: string) => void }) {
   const feats = safeFeatures(svc.features);
   const isJade = svc.color_accent === "jade";
+  const [loading, setLoading] = useState(false);
+  const payable = Number(svc.price_eur) > 0 && (svc.billing_interval === "month" || svc.billing_interval === "one_time");
+
+  async function handleClick(e: React.MouseEvent) {
+    if (!payable) return;
+    e.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    try {
+      const r = await postJson(`/api/tienda/services/${svc.id}/checkout`, {});
+      if (r.ok && r.data?.url) { window.location.href = r.data.url; return; }
+      onError(r.data?.error ?? "No se pudo iniciar el pago");
+    } catch {
+      onError("No se pudo iniciar el pago");
+    }
+    setLoading(false);
+  }
   return (
     <div className={`ts-svc${isJade ? " ts-svc-jade" : ""}`}>
       <div className="ts-svc-icon">{svc.icon}</div>
       {svc.badge && <div className="ts-svc-badge">{svc.badge}</div>}
       <h3 className="ts-svc-name">{svc.name}</h3>
       <p className="ts-svc-short">{svc.short_desc || svc.description}</p>
-      <div className="ts-svc-price">{svc.price_display}</div>
+      <div className="ts-svc-price">{servicePrice(svc)}</div>
       <ul className="ts-svc-feats">
         {feats.slice(0, 5).map((f, i) => <li key={i}><span>✓</span>{f.text}</li>)}
         {feats.length > 5 && <li className="ts-svc-more">+{feats.length - 5} más incluido</li>}
       </ul>
-      <a href={svc.cta_url || "/client/messages"} className="ts-svc-cta">{svc.cta_label}</a>
+      <a href={payable ? "#" : (svc.cta_url || "/client/messages")} onClick={handleClick} className="ts-svc-cta">
+        {loading ? "Redirigiendo…" : svc.cta_label}
+      </a>
+      {payable && <p className="ts-secure-note">{svc.billing_interval === "month" ? "Cobro mensual · sin permanencia" : "Pago único"}</p>}
     </div>
   );
 }
@@ -155,8 +209,22 @@ export default function ClientTienda() {
   const [services, setServices] = useState<any[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [svcsLoading, setSvcsLoading] = useState(true);
+  const [sub, setSub] = useState<{ plan?: string; status?: string; stripeCustomerId?: string | null; currentPeriodEnd?: string | null; cancelAtPeriodEnd?: number } | null>(null);
+  const [notice, setNotice] = useState<{ type: "ok" | "err"; text: string } | null>(() => {
+    const q = new URLSearchParams(window.location.search).get("stripe");
+    if (q === "success") return { type: "ok", text: "Pago recibido. Tu contratación se activa en cuanto Stripe la confirma (normalmente al momento)." };
+    if (q === "cancelled") return { type: "err", text: "Pago cancelado. No se ha realizado ningún cargo." };
+    return null;
+  });
+  const [portalLoading, setPortalLoading] = useState(false);
+  const onError = useCallback((text: string) => setNotice({ type: "err", text }), []);
 
   useEffect(() => {
+    fetch(`${API_BASE}/api/billing/subscription`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.subscription) setSub(d.subscription); })
+      .catch(() => {});
+
     fetch(`${API_BASE}/api/tienda/plans`, { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
       .then(d => { setPlans(Array.isArray(d) ? d : []); setPlansLoading(false); })
@@ -184,7 +252,29 @@ export default function ClientTienda() {
           <a href="/client" className="ct-back-btn">← Volver al panel</a>
           <div className="ts-pill"><span className="ts-pill-dot" />PLANES Y SERVICIOS</div>
           <h1>Tu plan de<br /><span className="ts-gradient-text">crecimiento.</span></h1>
-          <p className="ts-hero-sub">Planes IA para tu tienda Shopify o servicios a medida. Sin permanencia. Actívalo hoy.</p>
+          <p className="ts-hero-sub">Planes para tu tienda Shopify, WooCommerce o PrestaShop y servicios que hacemos por ti. Sin permanencia.</p>
+          {sub?.stripeCustomerId && (
+            <div className="ct-sub-box">
+              <span>
+                Suscripción {sub.status === "active" ? "activa" : sub.status === "past_due" ? "con pago pendiente" : sub.status === "canceled" ? "cancelada" : sub.status}
+                {sub.currentPeriodEnd ? ` · ${sub.cancelAtPeriodEnd ? "termina" : "se renueva"} el ${new Date(sub.currentPeriodEnd).toLocaleDateString("es-ES")}` : ""}
+              </span>
+              <button
+                className="ct-sub-btn"
+                disabled={portalLoading}
+                onClick={async () => {
+                  setPortalLoading(true);
+                  try {
+                    const r = await postJson("/api/billing/portal", { returnPath: "/client/tienda" });
+                    if (r.ok && r.data?.url) { window.location.href = r.data.url; return; }
+                    onError(r.data?.error ?? "No se pudo abrir la gestión de la suscripción");
+                  } catch { onError("No se pudo abrir la gestión de la suscripción"); }
+                  setPortalLoading(false);
+                }}
+              >{portalLoading ? "Abriendo…" : "Facturas, tarjeta y cancelación →"}</button>
+            </div>
+          )}
+          {notice && <div className={`ct-notice ct-notice-${notice.type}`} role="status">{notice.text}</div>}
         </header>
 
         <nav className="ts-tabs" aria-label="Secciones">
@@ -200,13 +290,13 @@ export default function ClientTienda() {
                 <span className="ts-thumb" />
               </button>
               <span className={`ts-tog-label${annual ? " ts-tog-on" : ""}`}>Anual</span>
-              {annual && <span className="ts-save-pill">Ahorra hasta 17%</span>}
+              {annual && <span className="ts-save-pill">2 meses gratis</span>}
             </div>
             <div className="ts-plans-grid">
-              {plansLoading ? [1,2,3,4].map(i => <Skeleton key={i} />) : plans.map(p => <PlanCard key={p.id} plan={p} annual={annual} />)}
+              {plansLoading ? [1,2,3,4].map(i => <Skeleton key={i} />) : plans.map(p => <PlanCard key={p.id} plan={p} annual={annual} onError={onError} />)}
             </div>
             <div className="ts-trust-strip">
-              {["🔒 Pago seguro via Shopify","🔄 Sin permanencia","⚡ Activación en 48h","💬 Soporte dedicado"].map(t => (
+              {["🔒 Pago con tarjeta vía Stripe","🔄 Sin permanencia","🧾 Factura en cada cobro","Precios sin IVA"].map(t => (
                 <span key={t} className="ts-trust-item">{t}</span>
               ))}
             </div>
@@ -217,10 +307,10 @@ export default function ClientTienda() {
           <section className="ts-section">
             <div className="ts-svc-header">
               <h2 className="ts-svc-title">Servicios especializados</h2>
-              <p className="ts-svc-sub">Servicios puntuales para potenciar tu tienda cuando los necesitas.</p>
+              <p className="ts-svc-sub">Servicios que hace nuestro equipo: de pago único o mensuales, sin permanencia.</p>
             </div>
             <div className="ts-svcs-grid">
-              {svcsLoading ? [1,2,3,4,5,6].map(i => <Skeleton key={i} h={380} />) : services.map(s => <ServiceCard key={s.id} svc={s} />)}
+              {svcsLoading ? [1,2,3,4,5,6].map(i => <Skeleton key={i} h={380} />) : services.map(s => <ServiceCard key={s.id} svc={s} onError={onError} />)}
             </div>
           </section>
         )}
@@ -254,6 +344,13 @@ const CSS = `
   color: rgba(255,255,255,0.5); font-size: 12.5px; font-weight: 600;
   text-decoration: none; transition: all .2s; font-family: var(--fb,'Geist',sans-serif);
 }
+.ct-sub-box { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 16px; margin-top: 22px; padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(45,212,159,0.22); background: rgba(45,212,159,0.06); font-size: 13px; color: rgba(255,255,255,0.75); }
+.ct-sub-btn { padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(200,168,75,0.35); background: rgba(200,168,75,0.08); color: #d4a843; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.ct-sub-btn:disabled { opacity: .6; cursor: wait; }
+.ct-notice { max-width: 620px; margin: 16px auto 0; padding: 11px 16px; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+.ct-notice-ok { background: rgba(45,212,159,0.08); border: 1px solid rgba(45,212,159,0.3); color: #7ee8c4; }
+.ct-notice-err { background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.3); color: #fda4af; }
+.ts-price-quote { font-size: 34px !important; }
 .ct-back-btn:hover { border-color: rgba(200,168,75,0.3); color: rgba(200,168,75,0.9); background: rgba(200,168,75,0.06); }
 
 .ts-root { background: var(--ink,#0a0a0c); position: relative; overflow-x: hidden; }
