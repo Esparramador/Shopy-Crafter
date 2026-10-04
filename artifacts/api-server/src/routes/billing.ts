@@ -708,6 +708,28 @@ router.get("/billing/admin/mrr", requireAdmin, async (_req, res): Promise<void> 
   }
 });
 
+/** Margen real del mes por cliente: ingreso de la suscripción − IA registrada − imágenes. */
+router.get("/billing/admin/margins", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const { projectMargins } = await import("../lib/ai-budget.js");
+    const projects = await projectMargins();
+    const totals = projects.reduce((t, p) => ({
+      revenueEur: t.revenueEur + p.revenueEur,
+      costEur: t.costEur + p.aiSpendEur + p.imageCostEur,
+    }), { revenueEur: 0, costEur: 0 });
+    res.json({
+      projects,
+      totals: {
+        revenueEur: Math.round(totals.revenueEur * 100) / 100,
+        costEur: Math.round(totals.costEur * 100) / 100,
+        marginEur: Math.round((totals.revenueEur - totals.costEur) * 100) / 100,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
 router.get("/billing/admin/subscriptions", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const subs = await db.select({

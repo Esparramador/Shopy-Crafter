@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { askGeminiChat, askGeminiStream, askGeminiWithSearch, askGeminiWithUrls } from "../lib/gemini.js";
-import { MASTER_CATALOG } from "../lib/master-skills-injector.js";
 import { logger } from "../lib/logger.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { buildModulesBlock, buildPricingBlock } from "../lib/platform-knowledge.js";
@@ -296,7 +295,7 @@ function buildClientContextBlock(ctx: ClientContext, researchSummary: string): s
 - Cuando tengas 3+ hechos del negocio: ofrece un "Mini-diagnóstico gratuito" con:
   → Los 3 problemas más probables en su situación
   → Cómo los resuelve Shopy Crafter específicamente
-  → Estimación personalizada de impacto (ej: "+X% conversión en tienda de ${facts.niche ?? "su nicho"}")`;
+  → El siguiente paso: auditoría de su tienda para medir con sus datos reales`;
   }
 
   if (researchSummary) {
@@ -310,36 +309,24 @@ function buildClientContextBlock(ctx: ClientContext, researchSummary: string): s
 // DYNAMIC SYSTEM PROMPT
 // ══════════════════════════════════════════════════════════════════════════════
 
-const LANDING_SYSTEM_PROMPT_BASE = `Eres ShopyAdvisor, el asesor comercial de Shopy Crafter, una plataforma SaaS todo-en-uno de IA para ecommerce y creatividad digital.
+const LANDING_SYSTEM_PROMPT_BASE = `Eres ShopyAdvisor, el asesor comercial de Shopy Crafter: una plataforma de IA y un equipo que la opera para tiendas online (Shopify, WooCommerce y PrestaShop), además de diseño web y apps nativas a medida.
 
-REGLA ABSOLUTA: NUNCA digas que algo "no existe" o "no está disponible" si aparece en los módulos listados. Shopy Crafter tiene más de 14 módulos en producción.
-
-== QUE ES SHOPY CRAFTER ==
-Shopy Crafter es una plataforma SaaS impulsada por IA que combina:
-- Optimización completa de tiendas Shopify (SEO, precios, copywriting, email, A/B testing, imágenes)
-- Estudio creativo multimedia (imagen IA, video IA, 3D, diseño web, efectos)
-- Librería de prompts con más de 6.677 templates de marketing
-- Lab Web con análisis PageSpeed / Core Web Vitals / Lighthouse
-- Herramientas de agencia multi-cliente con white-label
+== REGLAS DE VERACIDAD (obligatorias, hay consecuencias legales) ==
+- Solo afirmas lo que aparece en los módulos, planes y servicios de abajo. Si algo no está, dilo y ofrece hablar con el equipo.
+- NUNCA inventes cifras de resultados (conversión, ingresos, ROI, % de mejora, número de clientes) ni prometas resultados concretos.
+- Si piden una estimación, explica que primero se hace una auditoría de su tienda y que los resultados se miden con sus propios datos.
+- No existen: marca blanca, SLA, API pública, soporte 24/7 ni cuotas ilimitadas. El A/B testing es solo para tiendas Shopify.
+- Contacto humano: formulario de contacto de la web o craftershopy@gmail.com.
 
 ${buildModulesBlock()}
 
 ${buildPricingBlock()}
 
-== RESULTADOS REALES ==
-- +234% incremento medio en conversión
-- +8.400€/mes de ingresos adicionales promedio
-- +22% aumento de revenue en 30 días
-- Score SEO hasta 88/100 (desde 42/100 de media)
-- Planes desde 19€/mes
-
 == TU COMPORTAMIENTO PRINCIPAL ==
-- Responde SIEMPRE en español, tono conversacional — como un consultor experto que habla con un amigo
-- Cuando tengas datos del negocio del visitante: ÚSALOS. Da consejos específicos para SU caso.
+- Responde SIEMPRE en español, tono conversacional y profesional
+- Cuando tengas datos del negocio del visitante: úsalos para explicar qué módulo o servicio le encaja y por qué
 - Cuando NO tengas datos: haz UNA pregunta para conocer su negocio (nicho, reto, plataforma actual)
-- Varía el inicio de tus respuestas — nunca empieces igual dos veces seguidas
-- Sé conciso: máximo 200 palabras por respuesta
-- Si preguntan por cualquier módulo (Lab Web, Fusion Studio Pro, Librería de Prompts, Tripo3D, etc.) CONFÍRMALO`;
+- Sé conciso: máximo 200 palabras por respuesta`;
 
 function buildDynamicSystemPrompt(
   intent: IntentResult,
@@ -351,7 +338,7 @@ function buildDynamicSystemPrompt(
 
   if (intent.needsHumanHandoff) {
     extra += `\n\n== HUMAN HANDOFF ==
-El usuario quiere hablar con una persona real. Responde con empatía y da el email: hola@shopycrafter.com (respuesta en menos de 24h hábiles). No sigas vendiendo.`;
+El usuario quiere hablar con una persona real. Responde con empatía y da el email: craftershopy@gmail.com o el formulario de contacto. No sigas vendiendo.`;
   }
 
   if (intent.intent === "greet" && stage.userMsgCount === 0) {
@@ -372,31 +359,28 @@ Despídete cálidamente y deja la puerta abierta. Menciona que pueden volver cua
 
   if (intent.intent === "deny" && stage.mentionedPricing) {
     extra += `\n\n== OBJECIÓN PRECIO ==
-Pregunta directamente: ¿qué te genera dudas? ¿el precio, la integración o algo más? Luego aborda esa objeción con datos concretos (ROI, planes flexibles, cancela cuando quieras).`;
+Pregunta directamente: ¿qué te genera dudas? ¿el precio, la integración o algo más? Luego aborda esa objeción con hechos (plan desde 19 €/mes, sin permanencia, se cancela desde el portal).`;
   }
 
   if (stage.stage === "considering") {
     extra += `\n\n== ESTADO: CONSIDERANDO ==
-Usa datos concretos: ROI (+8.400€/mes adicionales de media), sin permanencia, cancela cuando quiera.
+Recuerda los hechos: sin permanencia, se cancela desde el portal, primero se audita la tienda.
 ${ctx.facts.niche ? `Para una tienda de ${ctx.facts.niche}, da un ejemplo específico de cómo Shopy Crafter ayudaría.` : ""}`;
   }
 
   if (stage.stage === "converting" || intent.buyingIntent) {
     extra += `\n\n== LISTO PARA CONVERTIR ==
-Alta intención de compra. Guía directamente: "Para suscribirte y empezar hoy, haz clic en 'Empezar' arriba. Puedes cancelar cuando quieras." Sé conciso.`;
+Alta intención de compra. Guía directamente: "Para empezar, déjanos tus datos en el formulario de contacto y te activamos la cuenta. Sin permanencia." Sé conciso.`;
   }
 
   if (stage.hasFrustration) {
     extra += `\n\n== FRUSTRACIÓN DETECTADA ==
-Reconoce cómo se siente en 1 frase, luego da solución clara. Si el problema persiste: hola@shopycrafter.com.`;
+Reconoce cómo se siente en 1 frase, luego da solución clara. Si el problema persiste: craftershopy@gmail.com.`;
   }
 
   const clientBlock = buildClientContextBlock(ctx, researchSummary);
 
-  const megaBrain = `\n\n== MEGA CEREBRO DE LA PLATAFORMA ==
-${MASTER_CATALOG}`;
-
-  return LANDING_SYSTEM_PROMPT_BASE + extra + clientBlock + megaBrain;
+  return LANDING_SYSTEM_PROMPT_BASE + extra + clientBlock;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

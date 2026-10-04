@@ -181,6 +181,72 @@ interface AlertSettings {
   lastSent:     string | null;
 }
 
+interface MarginRow {
+  projectId: number; name: string; plan: string; clientEmail: string | null;
+  revenueEur: number; aiSpendEur: number; imagesUsed: number; imageCostEur: number;
+  productsUsed: number; budgetEur: number | null; marginEur: number; marginPct: number | null;
+}
+
+/** Margen real del mes por cliente: lo que paga frente a lo que cuesta su IA. */
+function MarginsCard() {
+  const [data, setData] = useState<{ projects: MarginRow[]; totals: { revenueEur: number; costEur: number; marginEur: number } } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/billing/admin/margins`, { credentials: "include" })
+      .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error ?? "Error"); setData(j); })
+      .catch(e => setError(e instanceof Error ? e.message : "Error"));
+  }, []);
+  const eur = (n: number) => `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, color: "var(--t3,#666)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" };
+  const td: React.CSSProperties = { padding: "8px 10px", fontSize: 13, color: "var(--t,#fff)", borderTop: "1px solid var(--border,rgba(255,255,255,0.06))" };
+  return (
+    <Card style={{ marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--t,#fff)" }}>Márgenes por cliente · este mes</h2>
+        {data && (
+          <span style={{ fontSize: 13, color: "var(--t3,#888)" }}>
+            Ingresos {eur(data.totals.revenueEur)} · Coste IA {eur(data.totals.costEur)} · <strong style={{ color: data.totals.marginEur >= 0 ? "var(--jade,#10b981)" : "var(--crim,#ef4444)" }}>Margen {eur(data.totals.marginEur)}</strong>
+          </span>
+        )}
+      </div>
+      <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--t3,#666)" }}>
+        Coste = IA registrada del proyecto + imágenes × 0,037 €. Al llegar al tope de IA del plan, las funciones de IA de ese cliente se pausan hasta el día 1.
+      </p>
+      {error && <div style={{ color: "var(--crim,#ef4444)", fontSize: 13 }}>{error}</div>}
+      {data && data.projects.length === 0 && <div style={{ color: "var(--t3,#666)", fontSize: 13 }}>Aún no hay proyectos con cliente vinculado.</div>}
+      {data && data.projects.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+            <thead><tr>
+              <th style={th}>Cliente</th><th style={th}>Plan</th><th style={th}>Ingreso</th><th style={th}>IA</th>
+              <th style={th}>Tope IA</th><th style={th}>Imágenes</th><th style={th}>Productos</th><th style={th}>Margen</th>
+            </tr></thead>
+            <tbody>
+              {data.projects.map(p => {
+                const overBudget = p.budgetEur !== null && p.aiSpendEur >= p.budgetEur;
+                return (
+                  <tr key={p.projectId}>
+                    <td style={td}>{p.name}<div style={{ fontSize: 11, color: "var(--t3,#666)" }}>{p.clientEmail ?? "—"}</div></td>
+                    <td style={td}>{p.plan}</td>
+                    <td style={td}>{p.revenueEur > 0 ? eur(p.revenueEur) : <span style={{ color: "var(--t3,#666)" }}>sin cobro</span>}</td>
+                    <td style={{ ...td, color: overBudget ? "var(--crim,#ef4444)" : td.color }}>{eur(p.aiSpendEur)}</td>
+                    <td style={td}>{p.budgetEur !== null ? eur(p.budgetEur) : "∞"}</td>
+                    <td style={td}>{p.imagesUsed} <span style={{ color: "var(--t3,#666)" }}>({eur(p.imageCostEur)})</span></td>
+                    <td style={td}>{p.productsUsed}</td>
+                    <td style={{ ...td, fontWeight: 700, color: p.marginEur >= 0 ? "var(--jade,#10b981)" : "var(--crim,#ef4444)" }}>
+                      {eur(p.marginEur)}{p.marginPct !== null ? ` · ${p.marginPct}%` : ""}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function ApiUsage() {
   const [from,     setFrom]     = useState(monthStart());
   const [to,       setTo]       = useState(today());
@@ -451,6 +517,8 @@ export default function ApiUsage() {
       </div>
 
       {/* Filters */}
+      <MarginsCard />
+
       <Card style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <label style={{ fontSize: 12, color: "var(--t3,#666)", fontWeight: 600 }}>DESDE</label>

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, redesignsTable } from "@workspace/db";
-import { eq, and, lte, desc } from "drizzle-orm";
+import { eq, and, lte, desc, sql } from "drizzle-orm";
 import { shopifyRequest } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation, SHOPIFY_EXPERT_SYSTEM } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, runAsync, runAsyncJob } from "../lib/bulk-queue";
@@ -31,6 +31,53 @@ interface RedesignOutput {
   price_reasoning: string;
   category: string;
   metafields: MetafieldEntry[];
+}
+
+/** Guarda la propuesta de rediseño (la que luego se revisa y se aplica). */
+async function insertRedesign(
+  projectId: number,
+  shopifyProductId: string,
+  product: { title: string; price: string | null },
+  result: RedesignOutput,
+): Promise<void> {
+  await db.insert(redesignsTable).values({
+    projectId,
+    shopifyProductId,
+    originalTitle: product.title,
+    originalPrice: product.price,
+    newTitle: result.title,
+    newBodyHtml: result.body_html,
+    newShortDescription: result.short_description,
+    newPrice: result.price,
+    newCompareAtPrice: result.compare_at_price,
+    newTags: result.tags,
+    metaTitle: result.meta_title,
+    metaDescription: result.meta_description,
+    photoBrief: result.photo_brief,
+    priceReasoning: result.price_reasoning,
+    newCategory: result.category || null,
+    newMetafields: Array.isArray(result.metafields) ? result.metafields : null,
+  });
+}
+
+/**
+ * Cuota "productos optimizados al mes": el primer rediseño de un producto en el
+ * mes consume 1; regenerarlo ese mismo mes no vuelve a contar.
+ */
+async function claimProductQuota(projectId: number, shopifyProductId: string): Promise<{ allowed: boolean; counts: boolean; reason?: string }> {
+  const already = await db.execute(sql`
+    SELECT 1 FROM redesigns WHERE project_id = ${projectId} AND shopify_product_id = ${shopifyProductId}
+      AND created_at >= date_trunc('month', NOW()) LIMIT 1
+  `);
+  if (already.rows.length > 0) return { allowed: true, counts: false };
+  const { checkProductionLimit } = await import("../lib/plan-limits.js");
+  const check = await checkProductionLimit(projectId, "product", 1);
+  return check.allowed ? { allowed: true, counts: true } : { allowed: false, counts: false, reason: check.reason };
+}
+
+async function countProductQuota(projectId: number): Promise<void> {
+  const { recordUsage } = await import("../lib/plan-limits.js");
+  await recordUsage(projectId, "product", 1);
 }
 
 async function doRedesign(projectId: number, shopifyProductId: string): Promise<RedesignOutput> {
@@ -165,12 +212,18 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
       return;
     }
   
+    const quota = await claimProductQuota(projectId, shopifyProductId);
+    if (!quota.allowed) {
+      res.status(402).json({ error: quota.reason, code: "PRODUCT_QUOTA_EXCEEDED" });
+      return;
+    }
+
     let result: RedesignOutput;
     try {
       result = await doRedesign(projectId, shopifyProductId);
     } catch (err: any) {
       logger.error({ err, projectId, shopifyProductId }, "Redesign AI call failed");
-      res.status(500).json({ error: err.message || "Error en el rediseño IA" });
+      res.status(err?.status === 402 ? 402 : 500).json({ error: err.message || "Error en el rediseño IA" });
       return;
     }
   
@@ -197,24 +250,8 @@ router.post("/projects/:projectId/products/:productId/redesign", async (req, res
       }
     }
   
-    await db.insert(redesignsTable).values({
-      projectId,
-      shopifyProductId,
-      originalTitle: product.title,
-      originalPrice: product.price,
-      newTitle: result.title,
-      newBodyHtml: result.body_html,
-      newShortDescription: result.short_description,
-      newPrice: result.price,
-      newCompareAtPrice: result.compare_at_price,
-      newTags: result.tags,
-      metaTitle: result.meta_title,
-      metaDescription: result.meta_description,
-      photoBrief: result.photo_brief,
-      priceReasoning: result.price_reasoning,
-      newCategory: result.category || null,
-      newMetafields: Array.isArray(result.metafields) ? result.metafields : null,
-    });
+    await insertRedesign(projectId, shopifyProductId, product, result);
+    if (quota.counts) await countProductQuota(projectId);
   
     // ShopyBrain aprende del rediseño exitoso (fire-and-forget)
     const [redesignProj] = await db.select({ storeNiche: projectsTable.storeNiche }).from(projectsTable).where(eq(projectsTable.id, projectId)).catch(() => [null]);
@@ -519,7 +556,15 @@ router.post("/projects/:projectId/bulk-redesign", async (req, res): Promise<void
       let failed = 0;
       for (const product of products) {
         try {
-          await doRedesign(projectId, product.shopifyProductId);
+          const quota = await claimProductQuota(projectId, product.shopifyProductId);
+          if (!quota.allowed) {
+            // Cuota agotada: se para el lote en vez de seguir gastando IA.
+            await updateJobProgress(jobId, completed, failed, `■ Detenido: ${quota.reason}`);
+            break;
+          }
+          const result = await doRedesign(projectId, product.shopifyProductId);
+          await insertRedesign(projectId, product.shopifyProductId, product, result);
+          if (quota.counts) await countProductQuota(projectId);
           completed++;
           await updateJobProgress(jobId, completed, failed, `✓ ${product.title}`);
         } catch (err) {

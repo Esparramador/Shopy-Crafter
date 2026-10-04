@@ -23,6 +23,8 @@ export const apiUsageLogTable = pgTable(
     errorMessage: text("error_message"),
     metadata: text("metadata"),
     sessionId: text("session_id"),
+    /** Quién disparó la llamada: client | admin | public (para topes de gasto). */
+    actor: text("actor"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({

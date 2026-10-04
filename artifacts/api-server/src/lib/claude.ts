@@ -51,16 +51,50 @@ function getDefaultClient(): Anthropic {
 }
 
 export async function getClaudeClient(projectId: number): Promise<Anthropic> {
-  const [project] = await db
-    .select({ anthropicApiKey: projectsTable.anthropicApiKey })
-    .from(projectsTable)
-    .where(eq(projectsTable.id, projectId));
+  return (await getClaudeClientInfo(projectId)).client;
+}
 
-  if (project?.anthropicApiKey) {
-    const plainKey = safeDecrypt(project.anthropicApiKey) || project.anthropicApiKey;
-    return new Anthropic({ apiKey: plainKey });
+/** Cliente de Claude del proyecto y si usa su propia API key (entonces el gasto es suyo). */
+async function getClaudeClientInfo(projectId: number): Promise<{ client: Anthropic; ownKey: boolean }> {
+  if (projectId > 0) {
+    const [project] = await db
+      .select({ anthropicApiKey: projectsTable.anthropicApiKey })
+      .from(projectsTable)
+      .where(eq(projectsTable.id, projectId));
+    if (project?.anthropicApiKey) {
+      const plainKey = safeDecrypt(project.anthropicApiKey) || project.anthropicApiKey;
+      return { client: new Anthropic({ apiKey: plainKey }), ownKey: true };
+    }
   }
-  return getDefaultClient();
+  return { client: getDefaultClient(), ownKey: false };
+}
+
+/** Antes de gastar IA de la plataforma: tope mensual del proyecto (lib/ai-budget.ts). */
+async function claudeClientWithinBudget(projectId: number): Promise<{ client: Anthropic; ownKey: boolean }> {
+  const info = await getClaudeClientInfo(projectId);
+  if (!info.ownKey) {
+    const { assertAiBudget } = await import("./ai-budget.js");
+    await assertAiBudget(projectId);
+  }
+  return info;
+}
+
+async function logClaudeUsage(operation: string, model: string, projectId: number, ownKey: boolean,
+  usage: { input_tokens?: number; output_tokens?: number } | undefined): Promise<number> {
+  const inTok = usage?.input_tokens ?? 0;
+  const outTok = usage?.output_tokens ?? 0;
+  try {
+    const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
+    const costUsd = calcClaudeCost(model, inTok, outTok);
+    void recordApiUsage({
+      provider: "claude", operation, model, projectId: projectId || null,
+      inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens",
+      // Con la key del propio cliente el coste no es de la plataforma.
+      costUsd: ownKey ? 0 : costUsd,
+      metadata: ownKey ? { ownKey: true, costUsdOnOwnKey: costUsd } : null,
+    });
+    return costUsd;
+  } catch { return 0; }
 }
 
 export const SHOPIFY_EXPERT_SYSTEM = `You are ShopifyAI Expert — world-class Shopify consultant AND senior payments strategist, expert in: product SEO, conversion copywriting, pricing psychology, Liquid templating, email marketing, UX/CRO, and the complete Stripe payment ecosystem.
@@ -178,9 +212,9 @@ export async function askClaudeDetailed(
   opts?: ClaudeCallOpts,
   operation = "askClaudeDetailed",
 ): Promise<ClaudeTextResult> {
+  const { client, ownKey } = await claudeClientWithinBudget(projectId);
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
-    const client = await getClaudeClient(projectId);
     const model = await resolveClaudeModel(opts);
 
     const stream = client.messages.stream(
@@ -196,22 +230,7 @@ export async function askClaudeDetailed(
 
     const inTok = response.usage?.input_tokens ?? 0;
     const outTok = response.usage?.output_tokens ?? 0;
-    let costUsd = 0;
-    // Track real cost (fire-and-forget, never blocks response)
-    try {
-      const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
-      costUsd = calcClaudeCost(model, inTok, outTok);
-      void recordApiUsage({
-        provider: "claude",
-        operation,
-        model,
-        projectId: projectId || null,
-        inputUnits: inTok,
-        outputUnits: outTok,
-        unitsLabel: "tokens",
-        costUsd,
-      });
-    } catch { /* nunca bloquea */ }
+    const costUsd = await logClaudeUsage(operation, model, projectId, ownKey, response.usage);
 
     const truncated = checkTruncation(response, { label: "Claude", maxTokens, model, failOnTruncation: opts?.failOnTruncation });
     return {
@@ -295,9 +314,9 @@ export async function askClaudeWithVision(
   timeoutMs = 300_000,
   opts?: ClaudeCallOpts,
 ): Promise<string> {
+  const { client, ownKey } = await claudeClientWithinBudget(projectId);
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
-    const client = await getClaudeClient(projectId);
     // Vision tier by default (resolves to a vision-capable Claude model — Sonnet 4.5).
     const model = await resolveClaudeModel({ tier: "vision", ...opts });
 
@@ -328,17 +347,7 @@ export async function askClaudeWithVision(
 
     checkTruncation(response, { label: "Claude Vision", maxTokens, model, failOnTruncation: opts?.failOnTruncation });
 
-    // Track real cost
-    try {
-      const { recordApiUsage, calcClaudeCost } = await import("./api-usage.js");
-      const inTok = response.usage?.input_tokens ?? 0;
-      const outTok = response.usage?.output_tokens ?? 0;
-      void recordApiUsage({
-        provider: "claude", operation: "askClaudeWithVision", model,
-        projectId: projectId || null, inputUnits: inTok, outputUnits: outTok,
-        unitsLabel: "tokens", costUsd: calcClaudeCost(model, inTok, outTok),
-      });
-    } catch { /* ignore */ }
+    await logClaudeUsage("askClaudeWithVision", model, projectId, ownKey, response.usage);
 
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
@@ -366,9 +375,9 @@ export async function askClaudeVisionWithBrain(
   const enrichedSystem = base + (brainContext || "") + (brandDna || "");
   const budget = enforcePromptBudget(enrichedSystem, prompt, maxTokens);
 
+  const { client, ownKey } = await claudeClientWithinBudget(projectId);
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
-    const client = await getClaudeClient(projectId);
     const imageBlocks: Anthropic.ImageBlockParam[] = images.map((img) => ({
       type: "image",
       source: { type: "base64", media_type: img.mediaType, data: img.base64 },
@@ -389,6 +398,7 @@ export async function askClaudeVisionWithBrain(
     const response = await stream.finalMessage();
 
     checkTruncation(response, { label: "Claude VisionBrain", maxTokens, model: CLAUDE_MODEL, failOnTruncation: opts?.failOnTruncation });
+    await logClaudeUsage("askClaudeVisionWithBrain", CLAUDE_MODEL, projectId, ownKey, response.usage);
 
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text Claude response");
@@ -397,6 +407,8 @@ export async function askClaudeVisionWithBrain(
 }
 
 export async function claude(prompt: string, maxTokens = 32000, opts?: Pick<ClaudeCallOpts, "failOnTruncation">): Promise<string> {
+  const { assertAiBudget } = await import("./ai-budget.js");
+  await assertAiBudget();
   const { withClaudeQueue } = await import("./claude-queue.js");
   return withClaudeQueue(async () => {
     const client = getDefaultClient();
@@ -411,6 +423,7 @@ export async function claude(prompt: string, maxTokens = 32000, opts?: Pick<Clau
     const response = await stream.finalMessage();
 
     checkTruncation(response, { label: "Claude", maxTokens, model: CLAUDE_MODEL, failOnTruncation: opts?.failOnTruncation });
+    await logClaudeUsage("claude", CLAUDE_MODEL, 0, false, response.usage);
 
     const content = response.content[0];
     if (content.type !== "text") throw new Error("Unexpected non-text response");

@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { projectsTable, planCreditPacksTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PlanType } from "@workspace/db/schema";
 import { catalogPlan, TRIAL } from "./plan-catalog.js";
 
@@ -143,13 +143,14 @@ export async function recordUsage(
 
   if (!project || project.plan === "admin") return;
 
+  // Incremento atómico: dos generaciones en paralelo no pueden contar una sola.
   if (type === "product") {
     await db.update(projectsTable)
-      .set({ productsUsedThisMonth: (project.productsUsedThisMonth ?? 0) + count })
+      .set({ productsUsedThisMonth: sql`COALESCE(${projectsTable.productsUsedThisMonth}, 0) + ${count}` })
       .where(eq(projectsTable.id, projectId));
   } else {
     await db.update(projectsTable)
-      .set({ imagesUsedThisMonth: (project.imagesUsedThisMonth ?? 0) + count })
+      .set({ imagesUsedThisMonth: sql`COALESCE(${projectsTable.imagesUsedThisMonth}, 0) + ${count}` })
       .where(eq(projectsTable.id, projectId));
   }
 }
