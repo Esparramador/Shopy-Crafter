@@ -3,6 +3,8 @@ import { useRoute } from "wouter";
 import { Loader2, AlertTriangle } from "lucide-react";
 import ABTestingModule from "./ab-testing/ABTesting";
 
+const API_ROOT_URL = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
 export default function ABTestingPage() {
   const [, params] = useRoute("/projects/:id/ab-testing");
   const routeProjectId = params?.id ? parseInt(params.id, 10) : null;
@@ -13,7 +15,7 @@ export default function ABTestingPage() {
     if (routeProjectId != null && !Number.isNaN(routeProjectId)) return;
     let cancelled = false;
     setIsLoading(true);
-    fetch("/api/projects", { credentials: "include" })
+    fetch(`${API_ROOT_URL}/projects`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => { if (!cancelled) setProjects(Array.isArray(data) ? data : []); })
       .catch(() => { if (!cancelled) setProjects([]); })

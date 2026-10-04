@@ -1,3 +1,4 @@
+import { useJobStatus } from "@/hooks/useJobStatus";
 import { useRoute } from "wouter";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import DOMPurify from "dompurify";
@@ -8,7 +9,6 @@ import {
   useRedesignProduct,
   useApplyRedesign,
   useBulkRedesign,
-  useGetGenerationJob,
   getGetProjectProductsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -41,6 +41,22 @@ type RedesignResult ={ title?: string;
   metaDescription?: string;
   photoBriefs?: string[]; };
 
+const API_ROOT = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
+type ApprovalState = "pending" | "approved" | "rejected" | null;
+
+/** Mensaje real del servidor (cuota agotada, aprobación pendiente…) en vez de un error genérico. */
+function serverMessage(err: unknown, fallback: string): string {
+  const data = (err as { data?: { error?: string } } | null)?.data;
+  return data?.error ?? fallback;
+}
+
+interface SavedRedesignRow {
+  shopify_product_id: string; new_title: string; new_body_html: string; new_short_description: string;
+  new_price: string; new_compare_at_price: string; new_tags: string; meta_title: string; meta_description: string;
+  photo_brief: string[] | null; approval_status: ApprovalState; client_comment: string | null;
+}
+
 function BulkProgressPoller({
   projectId,
   jobId,
@@ -50,21 +66,12 @@ function BulkProgressPoller({
   jobId: string;
   onComplete: (data: unknown) => void;
 }) {
-  const { data } = useGetGenerationJob(projectId, jobId, {
-    query: {
-      queryKey: ["generation-job", projectId, jobId],
-      refetchInterval: (query: { state: { data: unknown } }) => {
-        const status = (query.state.data as { status?: string } | undefined)?.status;
-        if (status === "completed" || status === "failed") return false;
-        return 2000;
-      },
-    },
-  });
+  const { data, error } = useJobStatus(projectId, jobId);
 
   useEffect(() => {
     const status = (data as { status?: string } | undefined)?.status;
-    if (status === "completed" || status === "failed") onComplete(data);
-  }, [data, onComplete]);
+    if (status === "completed" || status === "failed" || error) onComplete(data ?? { status: "failed", error: String(error) });
+  }, [data, error, onComplete]);
 
   const progress = data as {
     status?: string;
@@ -177,6 +184,51 @@ export default function RedesignPage() {
     briefs: string[];
   } | null>(null);
   const [partialConfig, setPartialConfig] = useState<Record<string, Set<string>>>({});
+  const [hasClient, setHasClient] = useState(false);
+  const [approvals, setApprovals] = useState<Record<string, { status: ApprovalState; comment: string | null }>>({});
+  const [sendingApproval, setSendingApproval] = useState<string | null>(null);
+
+  // Propuestas ya guardadas (incluidas las del rediseño masivo) y su estado de aprobación.
+  const loadSaved = async () => {
+    try {
+      const r = await fetch(`${API_ROOT}/projects/${projectId}/redesigns/latest`, { credentials: "include" });
+      if (!r.ok) return;
+      const d = await r.json() as { hasClient: boolean; redesigns: SavedRedesignRow[] };
+      setHasClient(d.hasClient);
+      const results: Record<string, RedesignResult> = {};
+      const states: Record<string, { status: ApprovalState; comment: string | null }> = {};
+      for (const row of d.redesigns) {
+        results[row.shopify_product_id] = {
+          title: row.new_title, bodyHtml: row.new_body_html, shortDescription: row.new_short_description,
+          price: Number(row.new_price) || undefined, compareAtPrice: Number(row.new_compare_at_price) || undefined,
+          tags: row.new_tags, metaTitle: row.meta_title, metaDescription: row.meta_description,
+          photoBriefs: row.photo_brief ?? [],
+        };
+        states[row.shopify_product_id] = { status: row.approval_status, comment: row.client_comment };
+      }
+      setRedesignResults(prev => ({ ...results, ...prev }));
+      setApprovals(states);
+    } catch { /* sin propuestas guardadas */ }
+  };
+
+  useEffect(() => { if (projectId) void loadSaved(); }, [projectId]);
+
+  const requestApproval = async (productId: string) => {
+    setSendingApproval(productId);
+    try {
+      const r = await fetch(`${API_ROOT}/projects/${projectId}/products/${encodeURIComponent(productId)}/request-approval`, {
+        method: "POST", credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? "No se pudo enviar");
+      setApprovals(prev => ({ ...prev, [productId]: { status: d.status, comment: null } }));
+      toast({ title: d.status === "approved" ? "Ya estaba aprobado" : "Enviado al portal del cliente" });
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : "Error", variant: "destructive" });
+    } finally {
+      setSendingApproval(null);
+    }
+  };
   const [showPartialFor, setShowPartialFor] = useState<string | null>(null);
 
   const REDESIGN_PARTS = [
@@ -216,12 +268,13 @@ export default function RedesignPage() {
       {
         onSuccess: (res) => {
           setRedesignResults((prev) => ({ ...prev, [productId]: res as unknown as RedesignResult }));
+          setApprovals(prev => ({ ...prev, [productId]: { status: null, comment: null } }));
           setActiveRedesign(null);
           toast({ title: "✓ Rediseño generado" });
         },
-        onError: () => {
+        onError: (err) => {
           setActiveRedesign(null);
-          toast({ title: "Error generando rediseño", variant: "destructive" });
+          toast({ title: serverMessage(err, "Error generando rediseño"), variant: "destructive" });
         },
       }
     );
@@ -249,7 +302,7 @@ export default function RedesignPage() {
           toast({ title: "✓ Cambios aplicados en tu tienda" });
           queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
         },
-        onError: () => toast({ title: "Error aplicando cambios", variant: "destructive" }),
+        onError: (err) => toast({ title: serverMessage(err, "Error aplicando cambios"), variant: "destructive" }),
       }
     );
   };
@@ -267,7 +320,7 @@ export default function RedesignPage() {
             });
           }
         },
-        onError: () => toast({ title: "Error al iniciar bulk", variant: "destructive" }),
+        onError: (err) => toast({ title: serverMessage(err, "Error al iniciar el rediseño masivo"), variant: "destructive" }),
       }
     );
   };
@@ -385,7 +438,8 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
           onComplete={(_d) => {
             setBulkJobId(null);
             queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
-            toast({ title: "✓ Rediseño masivo completado" });
+            void loadSaved();
+            toast({ title: "✓ Rediseño masivo completado: revisa las propuestas abajo" });
           }}
         />
       )}
@@ -605,11 +659,35 @@ ${redesignedProducts.length > 0 ? `<h2>Productos Rediseñados</h2>${redesignedPr
                         )}
                       </div>
 
+                      {hasClient && (() => {
+                        const st = approvals[product.id]?.status ?? null;
+                        const label = st === "approved" ? "✓ Aprobado por el cliente"
+                          : st === "pending" ? "⏳ Pendiente de aprobación del cliente"
+                          : st === "rejected" ? "✗ Rechazado por el cliente" : "Sin enviar al cliente";
+                        const color = st === "approved" ? "text-green-400" : st === "rejected" ? "text-red-400" : st === "pending" ? "text-yellow-400" : "text-muted-foreground";
+                        return (
+                          <div className={`text-xs mb-2 ${color}`}>
+                            {label}
+                            {st === "rejected" && approvals[product.id]?.comment ? ` — "${approvals[product.id]?.comment}"` : ""}
+                          </div>
+                        );
+                      })()}
                       <div className="flex flex-wrap gap-2">
+                        {hasClient && approvals[product.id]?.status !== "approved" && approvals[product.id]?.status !== "pending" && (
+                          <button
+                            onClick={() => void requestApproval(product.id)}
+                            disabled={sendingApproval === product.id}
+                            className="bg-primary text-black px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-all"
+                          >
+                            {sendingApproval === product.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                            Enviar al cliente
+                          </button>
+                        )}
                         <button
                           onClick={() => handleApply(product.id)}
-                          disabled={apply.isPending}
-                          className="bg-green-500 text-black px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-400 transition-all shadow-[0_0_15px_rgba(0,214,143,0.2)]"
+                          disabled={apply.isPending || (hasClient && approvals[product.id]?.status !== "approved")}
+                          title={hasClient && approvals[product.id]?.status !== "approved" ? "Necesita la aprobación del cliente" : undefined}
+                          className="bg-green-500 text-black px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-green-400 transition-all shadow-[0_0_15px_rgba(0,214,143,0.2)] disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {apply.isPending ? (
                             <Loader2 className="w-4 h-4 animate-spin" />

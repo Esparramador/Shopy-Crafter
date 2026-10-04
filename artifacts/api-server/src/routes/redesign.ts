@@ -33,6 +33,40 @@ interface RedesignOutput {
   metafields: MetafieldEntry[];
 }
 
+// ── Aprobación del cliente ─────────────────────────────────────────────────
+// Los planes prometen "cada cambio pasa por tus aprobaciones": un rediseño se
+// envía al portal del cliente y, en proyectos con cliente, no se publica en la
+// tienda hasta que lo aprueba.
+
+let approvalRefReady: Promise<void> | null = null;
+function ensureApprovalRefColumns(): Promise<void> {
+  approvalRefReady ??= db.execute(sql`
+    ALTER TABLE approvals ADD COLUMN IF NOT EXISTS ref_type TEXT;
+    ALTER TABLE approvals ADD COLUMN IF NOT EXISTS ref_id TEXT;
+  `).then(() => undefined).catch(err => { approvalRefReady = null; throw err; });
+  return approvalRefReady;
+}
+
+async function projectHasClient(projectId: number): Promise<boolean> {
+  const r = await db.execute(sql`SELECT 1 FROM users WHERE client_id = ${String(projectId)} LIMIT 1`);
+  return r.rows.length > 0;
+}
+
+async function redesignApproval(redesignId: number): Promise<{ id: string; status: string; client_comment: string | null } | null> {
+  await ensureApprovalRefColumns();
+  const r = await db.execute(sql`
+    SELECT id, status, client_comment FROM approvals
+    WHERE ref_type = 'redesign' AND ref_id = ${String(redesignId)}
+    ORDER BY created_at DESC LIMIT 1
+  `);
+  return (r.rows[0] as { id: string; status: string; client_comment: string | null } | undefined) ?? null;
+}
+
+function clip(text: string | null | undefined, n: number): string {
+  const t = (text ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n - 1) + "…" : t;
+}
+
 /** Guarda la propuesta de rediseño (la que luego se revisa y se aplica). */
 async function insertRedesign(
   projectId: number,
@@ -336,6 +370,20 @@ router.post("/projects/:projectId/products/:productId/apply-redesign", async (re
       res.status(404).json({ error: "Proyecto o rediseño no encontrado" });
       return;
     }
+    if (await projectHasClient(projectId)) {
+      const approval = await redesignApproval(redesign.id);
+      if (approval?.status !== "approved") {
+        res.status(409).json({
+          code: "APPROVAL_REQUIRED",
+          error: approval?.status === "rejected"
+            ? "El cliente rechazó este rediseño. Genera uno nuevo con sus comentarios."
+            : approval
+            ? "El cliente aún no ha aprobado este rediseño."
+            : "Envía el rediseño al cliente para que lo apruebe antes de publicarlo.",
+        });
+        return;
+      }
+    }
   
     const connectorData: Record<string, unknown> = {};
     const shopifyFallbackData: Record<string, unknown> = {};
@@ -579,6 +627,75 @@ router.post("/projects/:projectId/bulk-redesign", async (req, res): Promise<void
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
+  }
+});
+
+/** Últimas propuestas de rediseño por producto, con su estado de aprobación (incluye las del rediseño masivo). */
+router.get("/projects/:projectId/redesigns/latest", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(String(req.params.projectId), 10);
+    await ensureApprovalRefColumns();
+    const r = await db.execute(sql`
+      SELECT DISTINCT ON (r.shopify_product_id) r.*, a.status AS approval_status, a.client_comment
+      FROM redesigns r
+      LEFT JOIN LATERAL (
+        SELECT status, client_comment FROM approvals
+        WHERE ref_type = 'redesign' AND ref_id = r.id::text ORDER BY created_at DESC LIMIT 1
+      ) a ON TRUE
+      WHERE r.project_id = ${projectId}
+      ORDER BY r.shopify_product_id, r.created_at DESC
+    `);
+    res.json({ hasClient: await projectHasClient(projectId), redesigns: r.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+/** Envía el último rediseño del producto al portal del cliente para que lo apruebe. */
+router.post("/projects/:projectId/products/:productId/request-approval", async (req, res): Promise<void> => {
+  try {
+    const projectId = parseInt(String(req.params.projectId), 10);
+    const shopifyProductId = String(req.params.productId);
+    if (!(await projectHasClient(projectId))) {
+      res.status(400).json({ error: "Este proyecto no tiene un cliente vinculado que pueda aprobar." });
+      return;
+    }
+    const [redesign] = await db.select().from(redesignsTable)
+      .where(and(eq(redesignsTable.projectId, projectId), eq(redesignsTable.shopifyProductId, shopifyProductId)))
+      .orderBy(desc(redesignsTable.createdAt)).limit(1);
+    if (!redesign) { res.status(404).json({ error: "Genera primero un rediseño de este producto." }); return; }
+
+    const existing = await redesignApproval(redesign.id);
+    if (existing && existing.status === "pending") { res.json({ id: existing.id, status: "pending", alreadySent: true }); return; }
+    if (existing && existing.status === "approved") { res.json({ id: existing.id, status: "approved", alreadySent: true }); return; }
+
+    const before = [
+      `Título: ${redesign.originalTitle}`,
+      redesign.originalPrice ? `Precio: ${redesign.originalPrice} €` : "",
+    ].filter(Boolean).join("\n");
+    const after = [
+      `Título: ${redesign.newTitle}`,
+      redesign.newPrice ? `Precio: ${redesign.newPrice} €${redesign.newCompareAtPrice ? ` (antes ${redesign.newCompareAtPrice} €)` : ""}` : "",
+      redesign.metaTitle ? `Meta título: ${redesign.metaTitle}` : "",
+      redesign.metaDescription ? `Meta descripción: ${redesign.metaDescription}` : "",
+      redesign.newTags ? `Etiquetas: ${clip(redesign.newTags, 200)}` : "",
+      `Descripción: ${clip(redesign.newBodyHtml, 600)}`,
+    ].filter(Boolean).join("\n");
+
+    const { randomBytes } = await import("crypto");
+    const id = randomBytes(16).toString("hex");
+    await ensureApprovalRefColumns();
+    await db.execute(sql`
+      INSERT INTO approvals (id, project_id, type, title, description, before_value, after_value, reasoning, ref_type, ref_id)
+      VALUES (${id}, ${String(projectId)}, 'redesign', ${`Rediseño: ${clip(redesign.originalTitle, 80)}`},
+        ${"Nueva ficha de producto: título, descripción, SEO y precio. Si la apruebas, la publicamos en tu tienda."},
+        ${before}, ${after}, ${redesign.priceReasoning ?? null}, 'redesign', ${String(redesign.id)})
+    `);
+    const { sendPushToClientByProject } = await import("../lib/push-helper.js");
+    sendPushToClientByProject(String(projectId), "📋 Nueva propuesta para tu tienda", `Rediseño de "${clip(redesign.originalTitle, 60)}" — revísalo en Aprobaciones`, "/client/approvals").catch(() => {});
+    res.json({ id, status: "pending" });
+  } catch (err: any) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
   }
 });
 

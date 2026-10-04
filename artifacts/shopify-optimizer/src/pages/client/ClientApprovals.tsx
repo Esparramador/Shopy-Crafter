@@ -119,13 +119,13 @@ export default function ClientApprovals() {
                     {item.beforeValue && (
                       <div style={{ background: "rgba(220,53,69,0.05)", border: "1px solid rgba(220,53,69,0.15)", borderRadius: 10, padding: "10px 12px" }}>
                         <p style={{ fontSize: 10, color: "var(--crim)", fontWeight: 700, letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 5 }}>{t("before", "Antes")}</p>
-                        <p style={{ fontFamily: "var(--fm)", fontSize: 12.5 }}>{item.beforeValue}</p>
+                        <p style={{ fontFamily: "var(--fm)", fontSize: 12.5, whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{item.beforeValue}</p>
                       </div>
                     )}
                     {item.afterValue && (
                       <div style={{ background: "rgba(45,212,159,0.05)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 10, padding: "10px 12px" }}>
                         <p style={{ fontSize: 10, color: "var(--jade)", fontWeight: 700, letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 5 }}>{t("after", "Después")}</p>
-                        <p style={{ fontFamily: "var(--fm)", fontSize: 12.5 }}>{item.afterValue}</p>
+                        <p style={{ fontFamily: "var(--fm)", fontSize: 12.5, whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{item.afterValue}</p>
                       </div>
                     )}
                   </div>

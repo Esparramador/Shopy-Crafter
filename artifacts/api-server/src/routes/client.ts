@@ -207,7 +207,8 @@ router.post("/approvals/:id/approve", async (req, res): Promise<void> => {
       .where(and(eq(approvalsTable.id, req.params["id"]!), eq(approvalsTable.status, "pending")))
       .returning({ id: approvalsTable.id });
     if (!updated) { res.status(409).json({ error: "Esta propuesta ya fue revisada" }); return; }
-    sendPushToAdmins("✅ Propuesta aprobada", `${req.session.name ?? "El cliente"} aprobó: ${item.title}`, "/admin/approvals").catch(() => {});
+    // Un rediseño aprobado se publica desde la pantalla de Rediseño del proyecto.
+    sendPushToAdmins("✅ Propuesta aprobada", `${req.session.name ?? "El cliente"} aprobó: ${item.title}`, item.type === "redesign" ? `/projects/${projectId}/redesign` : "/admin/clients").catch(() => {});
   
     await db.insert(auditLogTable).values({
       id: randomBytes(8).toString("hex"),
@@ -237,7 +238,7 @@ router.post("/approvals/:id/reject", async (req, res): Promise<void> => {
     }).where(and(eq(approvalsTable.id, req.params["id"]!), eq(approvalsTable.status, "pending")))
       .returning({ id: approvalsTable.id });
     if (!updated) { res.status(409).json({ error: "Esta propuesta ya fue revisada" }); return; }
-    sendPushToAdmins("❌ Propuesta rechazada", `${req.session.name ?? "El cliente"} rechazó: ${item.title}`, "/admin/approvals").catch(() => {});
+    sendPushToAdmins("❌ Propuesta rechazada", `${req.session.name ?? "El cliente"} rechazó: ${item.title}`, item.type === "redesign" ? `/projects/${projectId}/redesign` : "/admin/clients").catch(() => {});
   
     await db.insert(auditLogTable).values({
       id: randomBytes(8).toString("hex"),

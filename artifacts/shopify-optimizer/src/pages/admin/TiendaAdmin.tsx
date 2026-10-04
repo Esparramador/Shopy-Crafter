@@ -735,8 +735,8 @@ export default function TiendaAdmin() {
             <h1 className="ta-title">🛍️ Gestión de Tienda</h1>
             <p className="ta-subtitle">Configura Shopify, gestiona planes y servicios de tu tienda pública</p>
           </div>
-          <a href="/tienda" target="_blank" className="ta-preview-btn">
-            👁️ Ver tienda pública ↗
+          <a href={import.meta.env.BASE_URL.replace(/\/$/, "") + "/#fp-pricing"} target="_blank" rel="noopener noreferrer" className="ta-preview-btn">
+            👁️ Ver precios públicos ↗
           </a>
         </div>
 

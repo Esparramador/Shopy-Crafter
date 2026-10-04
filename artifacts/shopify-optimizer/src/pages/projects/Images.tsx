@@ -1,3 +1,4 @@
+import { useJobStatus } from "@/hooks/useJobStatus";
 import { useRoute, Link } from "wouter";
 import { useModalLock } from "@/hooks/use-modal-lock";
 import { ModalOverlay } from "@/components/ModalOverlay";
@@ -9,7 +10,6 @@ import {
   useGenerateInfographic,
   useBulkGenerateImages,
   useBuildImagePrompt,
-  useGetGenerationJob,
   useListImageEngines,
   getGetProjectProductsQueryKey,
 } from "@workspace/api-client-react";
@@ -32,6 +32,8 @@ import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+
+const API_ROOT_URL = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 import{ useOnlineStatus }from "@/hooks/use-draft-persistence";
 
 const IMAGE_TYPES = [
@@ -61,23 +63,14 @@ function JobPoller({
   jobId: string;
   onComplete: (data: unknown) => void;
 }) {
-  const { data } = useGetGenerationJob(projectId, jobId, {
-    query: {
-      queryKey: ["generation-job", projectId, jobId],
-      refetchInterval: (query: { state: { data: unknown } }) => {
-        const status = (query.state.data as { status?: string } | undefined)?.status;
-        if (status === "completed" || status === "failed") return false;
-        return 2000;
-      },
-    },
-  });
+  const { data, error } = useJobStatus(projectId, jobId);
 
   useEffect(() => {
     const status = (data as { status?: string } | undefined)?.status;
-    if (status === "completed" || status === "failed") {
-      onComplete(data);
+    if (status === "completed" || status === "failed" || error) {
+      onComplete(data ?? { status: "failed", error: String(error) });
     }
-  }, [data, onComplete]);
+  }, [data, error, onComplete]);
 
   return null;
 }
@@ -291,7 +284,7 @@ function TryonModal({
       fd.append("scene", scene);
       fd.append("aspectRatio", aspectRatio);
       if (selectedProductImageUrl) fd.append("productImageUrl", selectedProductImageUrl);
-      const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/tryon-quick`, {
+      const resp = await fetch(`${API_ROOT_URL}/projects/${projectId}/products/${productId}/images/tryon-quick`, {
         method: "POST",
         credentials: "include",
         body: fd,
@@ -498,7 +491,7 @@ function InfographicPremiumModal({
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-infographic-premium`, {
+      const resp = await fetch(`${API_ROOT_URL}/projects/${projectId}/products/${productId}/images/generate-infographic-premium`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -875,7 +868,7 @@ export default function ImagesPage() {
       setJobs((prev) => ({ ...prev, [key]: { jobId: "infografia-premium", type: imageType } }));
       (async () => {
         try {
-          const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-infographic-premium`, {
+          const resp = await fetch(`${API_ROOT_URL}/projects/${projectId}/products/${productId}/images/generate-infographic-premium`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
@@ -913,7 +906,7 @@ export default function ImagesPage() {
       setJobs((prev) => ({ ...prev, [key]: { jobId: "explode-foto", type: imageType } }));
       (async () => {
         try {
-          const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-explode-photo`, {
+          const resp = await fetch(`${API_ROOT_URL}/projects/${projectId}/products/${productId}/images/generate-explode-photo`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
@@ -940,7 +933,7 @@ export default function ImagesPage() {
       setJobs((prev) => ({ ...prev, [key]: { jobId: "biografia-premium", type: imageType } }));
       (async () => {
         try {
-          const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-biography-premium`, {
+          const resp = await fetch(`${API_ROOT_URL}/projects/${projectId}/products/${productId}/images/generate-biography-premium`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
@@ -967,7 +960,7 @@ export default function ImagesPage() {
       setJobs((prev) => ({ ...prev, [key]: { jobId: "story-sheet", type: imageType } }));
       (async () => {
         try {
-          const resp = await fetch(`/api/projects/${projectId}/products/${productId}/images/generate-story-sheet`, {
+          const resp = await fetch(`${API_ROOT_URL}/projects/${projectId}/products/${productId}/images/generate-story-sheet`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },

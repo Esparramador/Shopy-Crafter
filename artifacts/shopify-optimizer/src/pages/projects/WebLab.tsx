@@ -1713,7 +1713,7 @@ ${body}
             {deepScanLoading ? "Escaneando…" : deepScan ? "✅ Re-escanear" : "🔍 Escaneo Profundo"}
           </button>
           <button
-            onClick={() => navigate("/admin/web-designer")}
+            onClick={() => navigate(projectId ? `/projects/${projectId}/web-designer` : "/web-designer")}
             title="Diseñador Web con IA — genera páginas completas con efectos 3D, GSAP, Three.js y más"
             style={{
               padding: "12px 16px",
