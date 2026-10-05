@@ -1894,8 +1894,10 @@ interface ExposedSecret {
   type: string;
   service: string;
   severity: "critical" | "high" | "medium" | "low" | "info";
+  /** Valor completo (solo respuestas solo-admin). */
+  value: string;
   masked: string;
-  /** Fragmento con el valor ya enmascarado (el valor completo nunca sale del servidor). */
+  /** Fragmento con el valor ya enmascarado. */
   context: string;
   recommendation: string;
   lineNumber: number;
@@ -2185,7 +2187,7 @@ function parseSeoFromHtml(html: string): DeepScanResult["seo"] {
 // ── Exposed Secrets Scanner ──────────────────────────────────────────────────
 function scanExposedSecrets(content: string): ExposedSecret[] {
   return detectSecrets(content).map(d => ({
-    type: d.type, service: d.service, severity: d.severity, masked: d.masked,
+    type: d.type, service: d.service, severity: d.severity, value: d.value, masked: d.masked,
     context: d.context, recommendation: d.recommendation, lineNumber: d.lineNumber, publicByDesign: d.publicByDesign,
   }));
 }
@@ -3185,6 +3187,7 @@ interface AuditFinding {
   title: string;
   description: string;
   evidence: string;       // extracto enmascarado del código
+  secretValue?: string;   // valor completo del secreto (solo respuesta al admin)
   lineNumber?: number;
   attackScenario: string; // "Qué haría un hacker con esto"
   dbImpact?: string;      // impacto en BD si procede
@@ -3264,6 +3267,7 @@ function runFullSecurityAudit(content: string, url?: string): AuditFinding[] {
         ? `Se detectó una clave de ${d.service} que se publica en el cliente por diseño. El riesgo depende de sus restricciones.`
         : `Se detectó una credencial de ${d.service} en el código servido al navegador. Cualquiera que vea el código puede extraerla.`,
       evidence: d.masked,
+      secretValue: d.value,
       lineNumber: d.lineNumber,
       attackScenario: d.service === "Stripe"
         ? "Con la clave secreta, un atacante puede crear cargos y reembolsos y leer los datos de pago de tus clientes."

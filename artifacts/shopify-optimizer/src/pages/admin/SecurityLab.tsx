@@ -1,4 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+
+import { useState as _useStateSL } from "react";
+/** Revela y copia el valor completo de un secreto filtrado (solo admin). */
+function SecretRevealSL({ value }: { value: string }) {
+  const [shown, setShown] = _useStateSL(false);
+  const [copied, setCopied] = _useStateSL(false);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 10.5, color: "#ffb4a0", background: "#1a0a08", border: "1px solid rgba(226,102,79,0.3)", borderRadius: 6, padding: "6px 10px", fontFamily: "monospace", overflowX: "auto" }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{shown ? value : "•••••• (oculto)"}</span>
+      <button type="button" onClick={() => setShown(v => !v)} style={{ fontSize: 10, border: "1px solid #ffffff22", background: "transparent", color: "#ddd", borderRadius: 5, padding: "2px 7px", cursor: "pointer" }}>{shown ? "Ocultar" : "Mostrar"}</button>
+      <button type="button" onClick={() => { void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} style={{ fontSize: 10, border: "1px solid #ffffff22", background: "transparent", color: "#ddd", borderRadius: 5, padding: "2px 7px", cursor: "pointer" }}>{copied ? "Copiado" : "Copiar"}</button>
+    </div>
+  );
+}
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Shield, Search, ChevronRight, Tag, Lock, Target, BookOpen, X, ExternalLink, AlertTriangle, Loader2, Grid3X3, List, ScanLine, Globe, ChevronDown, ChevronUp, Swords, ShieldCheck, History, RotateCw } from "lucide-react";
 
@@ -28,6 +42,7 @@ interface ScanFinding {
   title: string;
   description: string;
   evidence?: string;
+  secretValue?: string;
   attackerPerspective: string;
   hardeningSteps: string[];
   mitreAttack: string[];
@@ -105,6 +120,9 @@ function FindingCard({ finding }: { finding: ScanFinding }) {
             <div style={{ fontSize: 10.5, color: "#5db88a", background: "#09091a", border: "1px solid #1e1e2e", borderRadius: 6, padding: "6px 10px", fontFamily: "monospace", overflowX: "auto" }}>
               {finding.evidence}
             </div>
+          )}
+          {finding.secretValue && (
+            <SecretRevealSL value={finding.secretValue} />
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 6, background: "#1a0a08", border: "1px solid rgba(226,102,79,0.25)", borderRadius: 8, padding: "10px 12px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, fontWeight: 700, color: "#e2664f" }}>

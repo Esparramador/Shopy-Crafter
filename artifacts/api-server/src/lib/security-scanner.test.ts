@@ -52,8 +52,12 @@ describe("escáner de seguridad pasivo", () => {
     const r = await runSecurityScan("https://tienda.test");
     const ids = r.findings.map(f => f.id);
     expect(ids).toContain("exposed---env");
-    expect(ids.some(id => id.startsWith("leaked-secret-stripe-secret-live"))).toBe(true);
-    expect(JSON.stringify(r.findings)).not.toContain("sk_live_aB3dE5fG7hJ9kL2mN4pQ6rS8");
+    const leak = r.findings.find(f => f.id.startsWith("leaked-secret-stripe-secret-live"));
+    expect(leak).toBeDefined();
+    // El valor completo va en secretValue (solo lo ve el admin); la evidencia visible queda enmascarada.
+    const key = `sk_live_${"aB3dE5fG7hJ9kL2mN4pQ6rS8".slice(0, 26)}`;
+    expect(leak!.secretValue).toBe(key);
+    expect(leak!.evidence).not.toContain(key);
   });
 
   it("avisa si http:// no redirige a https://", async () => {
