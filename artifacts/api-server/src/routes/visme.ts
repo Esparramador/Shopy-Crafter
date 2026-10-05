@@ -18,6 +18,7 @@ import { streamHtmlClaude } from "../lib/web-designer.js";
 import { logger } from "../lib/logger.js";
 import { generateCompleteText } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { assertAiBudget } from "../lib/ai-budget.js";
 
 /** Same pattern as claude.ts getDefaultClient — prefers AI Integrations proxy */
 function makeAnthropicClient(): Anthropic {
@@ -173,6 +174,7 @@ router.post("/visme/generate", requireAdmin, async (req: Request, res: Response)
       includeSnippets?: boolean;
     };
     if (!prompt?.trim()) { res.status(400).json({ error: "prompt is required" }); return; }
+    await assertAiBudget(projectId ? Number(projectId) : null);
 
     let dna: DnaVars = DEFAULT_DNA;
     if (projectId) {
@@ -215,7 +217,7 @@ router.post("/visme/generate", requireAdmin, async (req: Request, res: Response)
     }
   } catch (err: any) {
     logger.error({ err }, "visme/generate error");
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(err?.status === 402 ? 402 : 500).json({ error: err.message });
     else { try { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); res.end(); } catch {} }
   }
 });
@@ -228,10 +230,11 @@ router.post("/visme/generate", requireAdmin, async (req: Request, res: Response)
  */
 router.post("/visme/adapt", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { prompt, projectId, outputType = "copy", clientContext = "" } = req.body as {
-      prompt: string; projectId?: number; outputType?: string; clientContext?: string;
+    const { prompt, projectId, outputType = "copy", clientContext = "", generate = false } = req.body as {
+      prompt: string; projectId?: number; outputType?: string; clientContext?: string; generate?: boolean;
     };
     if (!prompt?.trim()) { res.status(400).json({ error: "prompt is required" }); return; }
+    await assertAiBudget(projectId ? Number(projectId) : null);
 
     let dna: DnaVars = DEFAULT_DNA;
     let projectName = "tu marca";
@@ -281,7 +284,7 @@ REGLAS:
 - El output DEBE SER el prompt adaptado DIRECTAMENTE (no expliques, no añadas comentarios extra)
 - Escribe en español si el original está en español, en inglés si está en inglés`;
 
-    const userPrompt = `PROMPT ORIGINAL:
+    let userPrompt = `PROMPT ORIGINAL:
 ${prompt}
 
 ${dnaContext}
@@ -289,6 +292,29 @@ ${dnaContext}
 TAREA: ${instruction}
 
 PROMPT ADAPTADO PARA ${projectName.toUpperCase()}:`;
+    let system = systemPrompt;
+    let model = "claude-haiku-4-5";
+
+    // "Generar" en copy/social/email debe devolver el contenido final, no otro prompt
+    // (antes se ignoraba `generate` y el usuario recibía un prompt reescrito).
+    const FINAL_OUTPUT: Record<string, string> = {
+      copy: "el texto de marketing final",
+      social: "las publicaciones finales para redes sociales (texto, emojis con mesura y hashtags)",
+      email: "el email final: asunto, preheader y cuerpo con CTA",
+    };
+    if (generate && FINAL_OUTPUT[outputType]) {
+      model = "claude-sonnet-4-5";
+      system = `Eres un copywriter senior de marketing para e-commerce. Escribes textos listos para publicar,
+concretos y sin relleno. Nunca inventas datos (precios, cifras, premios, reseñas, porcentajes) que no estén
+en las instrucciones o en el ADN de marca: si hacen falta, escribe [DATO] para que el equipo lo complete.`;
+      userPrompt = `INSTRUCCIONES:
+${prompt}
+
+${dnaContext}
+
+Escribe ${FINAL_OUTPUT[outputType]} para ${projectName}, listo para publicar. Devuelve solo el contenido,
+sin explicaciones ni comentarios. Usa el idioma de las instrucciones.`;
+    }
 
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache");
@@ -301,9 +327,9 @@ PROMPT ADAPTADO PARA ${projectName.toUpperCase()}:`;
     try {
       const client = makeAnthropicClient();
       const stream = await client.messages.stream({
-        model: "claude-haiku-4-5",
+        model,
         max_tokens: 2048,
-        system: systemPrompt,
+        system,
         messages: [{ role: "user", content: userPrompt }],
       });
       for await (const event of stream) {
@@ -314,7 +340,7 @@ PROMPT ADAPTADO PARA ${projectName.toUpperCase()}:`;
       }
       // Si se cortó por max_tokens, se avisa en el evento final en vez de darlo por completo.
       const finalMsg = await stream.finalMessage();
-      recordClaudeMessageUsage("visme-adapt", "claude-haiku-4-5", finalMsg.usage);
+      recordClaudeMessageUsage(generate ? "visme-generate-text" : "visme-adapt", model, finalMsg.usage);
       const truncated = finalMsg.stop_reason === "max_tokens";
       if (truncated) logger.warn({ chars: fullText.length }, "visme/adapt: respuesta cortada por max_tokens");
       res.write(`data: ${JSON.stringify({ done: true, adapted: fullText, dna, truncated })}\n\n`);
@@ -324,7 +350,7 @@ PROMPT ADAPTADO PARA ${projectName.toUpperCase()}:`;
     }
   } catch (err: any) {
     logger.error({ err }, "visme/adapt error");
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(err?.status === 402 ? 402 : 500).json({ error: err.message });
     else { try { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); res.end(); } catch {} }
   }
 });
@@ -357,7 +383,7 @@ router.post("/visme/preview", requireAdmin, async (req: Request, res: Response):
       const previewCss = applyDna(css ?? "", dna);
       const previewJs = applyDna(js ?? "", dna);
       res.json({
-        html: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:${dna.bg};color:${dna.text};font-family:'${dna.font}',sans-serif;padding:40px}${previewCss}</style></head><body>${previewHtml}${previewJs ? `<script>${previewJs}</script>` : ""}</body></html>`,
+        html: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}html{background:${dna.bg}}body{background:transparent;color:${dna.text};font-family:'${dna.font}',sans-serif;padding:40px;min-height:100vh}${previewCss}</style></head><body>${previewHtml}${previewJs ? `<script>${previewJs}</script>` : ""}</body></html>`,
         dna,
       });
       return;
@@ -385,6 +411,7 @@ router.post("/visme/compose", requireAdmin, async (req: Request, res: Response):
     };
 
     if (!effect_ids?.length) { res.status(400).json({ error: "effect_ids is required" }); return; }
+    await assertAiBudget(projectId ? Number(projectId) : null);
     const ids = effect_ids.slice(0, 8);
 
     let dna: DnaVars = DEFAULT_DNA;
@@ -474,7 +501,7 @@ REQUIREMENTS:
   } catch (err: any) {
     logger.error({ err }, "visme/compose error");
     if (isAiOutputError(err)) { res.status(502).json({ ok: false, error: aiOutputErrorMessage(err), code: err.code }); return; }
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(err?.status === 402 ? 402 : 500).json({ ok: false, error: err.message });
   }
 });
 

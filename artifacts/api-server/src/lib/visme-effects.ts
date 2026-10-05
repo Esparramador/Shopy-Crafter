@@ -26,6 +26,8 @@ export interface DnaVars {
   usp1?: string;
   usp2?: string;
   usp3?: string;
+  /** Precio a mostrar (efectos de producto). */
+  price?: string;
 }
 
 export const DEFAULT_DNA: DnaVars = {
@@ -45,6 +47,7 @@ export const DEFAULT_DNA: DnaVars = {
   usp1: "Resultados reales",
   usp2: "Sin compromisos",
   usp3: "Setup en 5 minutos",
+  price: "49,00 €",
 };
 
 export function applyDna(code: string, dna: DnaVars = DEFAULT_DNA): string {
@@ -64,7 +67,10 @@ export function applyDna(code: string, dna: DnaVars = DEFAULT_DNA): string {
     .replace(/__ICON__/g, dna.icon ?? "🚀")
     .replace(/__USP_1__/g, dna.usp1 ?? "Resultados reales")
     .replace(/__USP_2__/g, dna.usp2 ?? "Sin compromisos")
-    .replace(/__USP_3__/g, dna.usp3 ?? "Setup en 5 minutos");
+    .replace(/__USP_3__/g, dna.usp3 ?? "Setup en 5 minutos")
+    .replace(/__PRICE__/g, dna.price ?? "49,00 €")
+    // Ningún marcador sin sustituir debe llegar a la vista.
+    .replace(/__[A-Z][A-Z0-9_]*__/g, "");
 }
 
 export function buildDnaFromProject(project: any): DnaVars {
@@ -211,10 +217,12 @@ export const EFFECT_SNIPPETS: EffectSnippet[] = [
     category: "logo_animations",
     description: "Dibujo SVG con trazo animado tipo 'dibujando en vivo' — CSS puro",
     libs: [],
-    html: '<svg class="fx-stroke" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg"><text x="0" y="50" font-size="48" font-family="__FONT__,sans-serif" fill="none" stroke="__PRIMARY__" stroke-width="1.5">__NAME__</text></svg>',
-    css: `.fx-stroke text{stroke-dasharray:600;stroke-dashoffset:600;animation:draw 2.5s ease forwards;}
+    html: '<svg class="fx-stroke" viewBox="0 0 600 80" xmlns="http://www.w3.org/2000/svg"><text x="0" y="62" font-size="64" font-weight="700" font-family="__FONT__,sans-serif" fill="none" stroke="__PRIMARY__" stroke-width="1.5">__NAME__</text></svg>',
+    css: `.fx-stroke{width:min(720px,90vw);height:auto;overflow:visible;}
+.fx-stroke text{stroke-dasharray:3000;stroke-dashoffset:3000;animation:draw 3s ease forwards;}
 @keyframes draw{to{stroke-dashoffset:0;}}`,
-    js: "",
+    // Ajusta el viewBox al texto real para que nombres largos no se corten.
+    js: "document.querySelectorAll('.fx-stroke').forEach(function(svg){var t=svg.querySelector('text');if(!t||!t.getBBox)return;var b=t.getBBox();svg.setAttribute('viewBox',(b.x-4)+' '+(b.y-4)+' '+(b.width+8)+' '+(b.height+8));});",
   },
   {
     id: "confetti_burst",
@@ -253,7 +261,7 @@ export const EFFECT_SNIPPETS: EffectSnippet[] = [
     description: "Placeholder shimmer para contenido cargando — CSS puro",
     libs: [],
     html: '<div class="fx-skeleton"><div class="fx-sk-line w-60"></div><div class="fx-sk-line w-90"></div><div class="fx-sk-line w-40"></div><div class="fx-sk-block"></div></div>',
-    css: ".fx-skeleton{padding:24px;}\n.fx-sk-line,.fx-sk-block{background:linear-gradient(90deg,__SURFACE__ 25%,rgba(255,255,255,.08) 50%,__SURFACE__ 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;margin-bottom:12px;height:14px;}\n.fx-sk-block{height:120px;}\n.w-60{width:60%;}\n.w-90{width:90%;}\n.w-40{width:40%;}\n@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}",
+    css: ".fx-skeleton{padding:24px;width:min(520px,90vw);}\n.fx-sk-line,.fx-sk-block{background:linear-gradient(90deg,__SURFACE__ 25%,rgba(255,255,255,.08) 50%,__SURFACE__ 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;margin-bottom:12px;height:14px;}\n.fx-sk-block{height:120px;}\n.w-60{width:60%;}\n.w-90{width:90%;}\n.w-40{width:40%;}\n@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}",
     js: "",
   },
   {
@@ -582,7 +590,7 @@ export const EFFECT_SNIPPETS: EffectSnippet[] = [
     libs: [],
     html: '<div class="fx-bokeh" id="fx-bokeh-wrap"></div>',
     css: `.fx-bokeh{position:fixed;inset:0;z-index:-1;overflow:hidden;}
-.fx-bk{position:absolute;border-radius:50%;filter:blur(40px);opacity:.12;animation:bk-float linear infinite;}
+.fx-bk{position:absolute;border-radius:50%;filter:blur(40px);opacity:.22;animation:bk-float linear infinite;}
 @keyframes bk-float{0%{transform:translateY(110vh) scale(.8);}100%{transform:translateY(-20vh) scale(1.2);}}`,
     js: `var wrap=document.getElementById('fx-bokeh-wrap');if(wrap){var colors=['__PRIMARY__','__SECONDARY__','#8b5cf6','#06b6d4'];for(var i=0;i<12;i++){var el=document.createElement('div');el.className='fx-bk';var size=80+Math.random()*200;el.style.cssText='width:'+size+'px;height:'+size+'px;left:'+(Math.random()*100)+'%;background:'+colors[Math.floor(Math.random()*colors.length)]+';animation-duration:'+(8+Math.random()*12)+'s;animation-delay:-('+Math.random()*15+')s;';wrap.appendChild(el);}}`,
   },
@@ -1029,12 +1037,12 @@ export const EFFECT_SNIPPETS: EffectSnippet[] = [
     category: "charts",
     description: "Fila de métricas que se activan al entrar en viewport — IntersectionObserver",
     libs: [],
-    html: '<div class="fx-metrics-row"><div class="fx-met"><span class="fx-met-n" data-end="12" data-suf="+"">0+</span><p>Años de experiencia</p></div><div class="fx-met"><span class="fx-met-n" data-end="2847" data-suf="+">0+</span><p>Proyectos entregados</p></div><div class="fx-met"><span class="fx-met-n" data-end="98" data-suf="%">0%</span><p>Clientes satisfechos</p></div><div class="fx-met"><span class="fx-met-n" data-end="4.9" data-suf="★">0★</span><p>Valoración media</p></div></div>',
+    html: '<div class="fx-metrics-row"><div class="fx-met"><span class="fx-met-n" data-end="12" data-suf="+">0+</span><p>Años de experiencia</p></div><div class="fx-met"><span class="fx-met-n" data-end="2847" data-suf="+">0+</span><p>Proyectos entregados</p></div><div class="fx-met"><span class="fx-met-n" data-end="98" data-suf="%">0%</span><p>Clientes satisfechos</p></div><div class="fx-met"><span class="fx-met-n" data-end="4.9" data-suf="★">0★</span><p>Valoración media</p></div></div>',
     css: `.fx-metrics-row{display:flex;flex-wrap:wrap;gap:48px;}
 .fx-met{min-width:100px;}
 .fx-met-n{font-family:__FONT__,sans-serif;font-size:3rem;font-weight:900;color:__PRIMARY__;display:block;}
 .fx-met p{color:rgba(255,255,255,.4);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin-top:4px;}`,
-    js: `var io2=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){var el=e.target;var end=parseFloat(el.dataset.end);var suf=el.dataset.suf||'';var isFloat=el.dataset.end.includes('.');var dur=1800;var start=null;(function frame(ts){if(!start)start=ts;var p=Math.min((ts-start)/dur,1);var v=end*(1-Math.pow(1-p,3));el.textContent=(isFloat?v.toFixed(1):Math.floor(v))+suf;if(p<1)requestAnimationFrame(frame);})();io2.unobserve(el);}});},{threshold:.5});document.querySelectorAll('.fx-met-n').forEach(function(el){io2.observe(el);});`,
+    js: `var io2=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting){var el=e.target;var end=parseFloat(el.dataset.end);var suf=el.dataset.suf||'';var isFloat=el.dataset.end.includes('.');var dur=1800;var start=null;requestAnimationFrame(function frame(ts){if(!start)start=ts;var p=Math.min((ts-start)/dur,1);var v=end*(1-Math.pow(1-p,3));el.textContent=(isFloat?v.toFixed(1):Math.floor(v))+suf;if(p<1)requestAnimationFrame(frame);});io2.unobserve(el);}});},{threshold:.5});document.querySelectorAll('.fx-met-n').forEach(function(el){io2.observe(el);});`,
   },
 
   // ── BATCH 9: Efectos Especiales ──────────────────────────────────────────
@@ -1104,12 +1112,14 @@ export const EFFECT_SNIPPETS: EffectSnippet[] = [
     description: "Gráfico de barras puro CSS con animación de entrada — CSS only",
     libs: [],
     html: '<div class="fx-bar-chart"><div class="fx-bc-row"><span class="fx-bc-label">Ene</span><div class="fx-bc-bar" style="--h:65%"><span>65%</span></div></div><div class="fx-bc-row"><span class="fx-bc-label">Feb</span><div class="fx-bc-bar" style="--h:80%"><span>80%</span></div></div><div class="fx-bc-row"><span class="fx-bc-label">Mar</span><div class="fx-bc-bar" style="--h:45%"><span>45%</span></div></div><div class="fx-bc-row"><span class="fx-bc-label">Abr</span><div class="fx-bc-bar" style="--h:92%"><span>92%</span></div></div><div class="fx-bc-row"><span class="fx-bc-label">May</span><div class="fx-bc-bar" style="--h:73%"><span>73%</span></div></div></div>',
-    css: `.fx-bar-chart{display:flex;align-items:flex-end;gap:12px;height:200px;padding:16px 0;}
-.fx-bc-row{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;}
+    css: `.fx-bar-chart{display:flex;align-items:stretch;gap:12px;height:220px;padding:24px 0 0;width:min(560px,90vw);}
+.fx-bc-row{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;flex:1;height:100%;}
+/* La barra crece dentro de una caja de altura fija (antes height:% sobre una fila sin altura = 0). */
+.fx-bc-row::before{content:"";flex:1;}
 .fx-bc-bar{width:100%;background:linear-gradient(to top,__PRIMARY__,__SECONDARY__);border-radius:6px 6px 0 0;position:relative;height:0;animation:bar-grow .8s cubic-bezier(.215,.61,.355,1) forwards;animation-delay:calc(var(--i,0)*.1s);}
 @keyframes bar-grow{to{height:var(--h);}}
 .fx-bc-bar span{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:.7rem;color:__PRIMARY__;font-weight:700;font-family:__FONT__,sans-serif;}
-.fx-bc-label{font-family:__FONT__,sans-serif;font-size:.75rem;color:rgba(255,255,255,.4);}`,
+.fx-bc-label{order:2;font-family:__FONT__,sans-serif;font-size:.75rem;color:rgba(255,255,255,.4);}`,
     js: `document.querySelectorAll('.fx-bc-bar').forEach(function(b,i){b.style.setProperty('--i',i);});`,
   },
   {
@@ -1668,7 +1678,8 @@ export function loadEffectsPrompts() {
 }
 
 export function buildEffectPreviewHtml(snippet: EffectSnippet, dna: DnaVars = DEFAULT_DNA): string {
-  const libs = snippet.libs.map(url =>
+  // Los ES modules (*.module.js) los importa el propio JS del efecto; como <script> clásico dan SyntaxError.
+  const libs = snippet.libs.filter(url => !url.endsWith(".module.js")).map(url =>
     url.endsWith(".js") ? `<script src="${url}"></script>` : `<link rel="stylesheet" href="${url}">`
   ).join("\n");
   const htmlWithDna = applyDna(snippet.html, dna);
@@ -1684,7 +1695,9 @@ export function buildEffectPreviewHtml(snippet: EffectSnippet, dna: DnaVars = DE
 ${libs}
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{background:${dna.bg};color:${dna.text};font-family:'${dna.font}',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px;}
+html{background:${dna.bg};}
+/* El fondo va solo en <html>: si el body lo pinta, tapa los fondos fixed con z-index:-1. */
+body{background:transparent;color:${dna.text};font-family:'${dna.font}',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px;}
 ${cssWithDna}
 </style>
 </head>

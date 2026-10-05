@@ -198,7 +198,7 @@ export default function CommandCenter() {
           }}
         >
           {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name} ({p.shopDomain})</option>
+            <option key={p.id} value={p.id}>{p.name}{p.shopDomain ? ` (${p.shopDomain})` : ""}</option>
           ))}
         </select>
       </div>
