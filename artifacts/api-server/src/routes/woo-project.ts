@@ -92,6 +92,16 @@ router.get(
         wcGet<any[]>("/products?per_page=50&stock_status=outofstock,onbackorder"),
       ]);
 
+      const settled = [salesResult, ordersResult, productsResult, stockResult];
+      const failures = settled
+        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+        .map(r => String(r.reason?.message ?? r.reason ?? "error"));
+      // Si no responde ninguna llamada, la tienda no es accesible: error explícito, no ceros.
+      if (failures.length === settled.length) {
+        res.status(502).json({ error: `No se pudo conectar con WooCommerce: ${failures[0]}` });
+        return;
+      }
+
       const sales     = salesResult.status    === "fulfilled" ? salesResult.value    : null;
       const orders    = ordersResult.status   === "fulfilled" ? ordersResult.value   : [];
       const prodTotals= productsResult.status === "fulfilled" ? productsResult.value : [];
@@ -110,6 +120,8 @@ router.get(
         totalProducts,
         lowStockCount: lowStock.length,
         currency:      sales?.currency ?? "EUR",
+        // Datos que WooCommerce no devolvió (las cifras afectadas no son fiables).
+        warnings:      failures,
         recentOrders:  (orders as any[]).map((o: any) => ({
           id:           o.id,
           number:       o.number,

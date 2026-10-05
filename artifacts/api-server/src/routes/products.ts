@@ -176,10 +176,12 @@ router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
   
     const statusCounts: Record<string, number> = { active: 0, draft: 0, archived: 0, unlisted: 0 };
     let publishedCount = 0;
+    let lowImageCount = 0;
     allProducts.forEach((p) => {
       const s = p.status ?? "active";
       statusCounts[s] = (statusCounts[s] ?? 0) + 1;
       if (p.publishedAt) publishedCount++;
+      if ((p.imageCount ?? 0) < 3) lowImageCount++;
     });
   
     res.json({
@@ -192,6 +194,8 @@ router.get("/projects/:projectId/products", async (req, res): Promise<void> => {
       statusCounts,
       publishedCount,
       unpublishedCount: allProducts.length - publishedCount,
+      // Productos con menos de 3 fotos (mínimo para una ficha que convierta).
+      lowImageCount,
     });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";

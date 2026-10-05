@@ -58,14 +58,33 @@ interface CharacterItem {
   refMimeType?: string | null;
 }
 
+interface AdProductInfo {
+  images?: Array<{ src: string; alt?: string | null }>;
+  price?: string | null;
+  bodyHtml?: string | null;
+  platformLabel?: string;
+}
+
 interface Props {
   projectId: number;
   productId: string;
   productTitle: string;
+  /** Ficha del producto tal como se envía al generador (solo para mostrarla). */
+  product?: AdProductInfo;
   onClose: () => void;
 }
 
-export default function CreateAdModal({ projectId, productId, productTitle, onClose }: Props) {
+function plainText(html: string | null | undefined): string {
+  return (html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function formatPrice(price: string | null | undefined): string | null {
+  const n = Number(price);
+  if (!price || !Number.isFinite(n) || n <= 0) return null;
+  return n.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
+}
+
+export default function CreateAdModal({ projectId, productId, productTitle, product, onClose }: Props) {
   const [tab, setTab] = useState<TabKey>("quick");
   const [language, setLanguage] = useState<Lang>("auto");
   const [voiceGender, setVoiceGender] = useState<VoiceGender>("auto");
@@ -448,6 +467,52 @@ export default function CreateAdModal({ projectId, productId, productTitle, onCl
         </div>
 
         <div className="p-5 space-y-4">
+          {product && (() => {
+            const imgs = product.images ?? [];
+            const priceLabel = formatPrice(product.price);
+            const desc = plainText(product.bodyHtml);
+            return (
+              <div className="rounded-xl border border-border bg-background/40 p-4">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    Datos del producto{product.platformLabel ? ` en ${product.platformLabel}` : ""}
+                  </span>
+                  {priceLabel && <span className="text-sm font-bold text-[var(--gold)]">{priceLabel}</span>}
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex gap-2 flex-shrink-0">
+                    {imgs.length > 0 ? imgs.slice(0, 4).map((im, i) => (
+                      <div key={im.src + i} className={`relative w-16 h-16 rounded-lg overflow-hidden border ${i === 0 ? "border-purple-400" : "border-border opacity-60"}`}>
+                        <img src={im.src} alt={im.alt || productTitle} className="w-full h-full object-cover" />
+                        {i === 0 && <span className="absolute bottom-0 inset-x-0 text-[9px] text-center bg-purple-600/90 text-white">Se usa</span>}
+                      </div>
+                    )) : (
+                      <div className="w-16 h-16 rounded-lg border border-dashed border-orange-500/50 flex items-center justify-center text-[10px] text-orange-300 text-center px-1">Sin foto</div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-4 min-w-0">
+                    {desc || "Sin descripción: el guion se escribirá solo con el título."}
+                  </p>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-3">
+                  {imgs.length > 0
+                    ? "El vídeo parte de la foto principal (el producto real se coloca en escena sin alterarlo). La descripción alimenta el guion y la voz."
+                    : "Sin foto, la IA tiene que imaginar el producto y el resultado no será fiel. Añade una foto en Editar antes de generar."}
+                  {" "}El precio no se dibuja con IA: si quieres que aparezca, ponlo en el CTA.
+                </p>
+                {priceLabel && !ctaText.includes(priceLabel) && (
+                  <button
+                    type="button"
+                    onClick={() => setCtaText(`Ya disponible por ${priceLabel}`)}
+                    className="mt-2 text-xs font-semibold text-purple-300 hover:text-purple-200 underline underline-offset-2"
+                  >
+                    Usar el precio en el CTA ({priceLabel})
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ── Common: language + voice gender + voice picker ── */}
           <div className="grid grid-cols-2 gap-3">
             <label className="block">

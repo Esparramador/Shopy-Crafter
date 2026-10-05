@@ -191,7 +191,7 @@ router.get("/voice/voices", async (req, res): Promise<void> => {
   } catch (err: any) {
     if (!res.headersSent) {
       const msg = err instanceof Error ? err.message : "Error obteniendo voces";
-      res.status(500).json({ error: msg });
+      res.status(/no configurad/i.test(msg) ? 503 : 500).json({ error: msg });
     }
   }
 });

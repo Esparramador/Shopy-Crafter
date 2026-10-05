@@ -146,6 +146,11 @@ function OverviewTab({ projectId }: { projectId: string }) {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:24 }}>
+      {Array.isArray(data.warnings) && data.warnings.length > 0 && (
+        <div style={{ padding:"12px 16px", color:"#fb923c", background:"rgba(251,146,60,0.08)", borderRadius:10, border:"1px solid rgba(251,146,60,0.25)", fontSize:13 }}>
+          ⚠️ WooCommerce no devolvió parte de los datos; algunas cifras pueden estar incompletas: {data.warnings[0]}
+        </div>
+      )}
       {/* KPIs */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:12 }}>
         <KpiCard label="Ingresos 30d" value={fmt(data.revenue30d, data.currency)} sub={`${data.orders30d} pedidos`} icon="💰" />

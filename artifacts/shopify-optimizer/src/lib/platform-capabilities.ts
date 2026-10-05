@@ -110,6 +110,8 @@ export const PLATFORMS: Record<PlatformKey, PlatformDefinition> = {
       { id: "vault",       label: "Repositorio",  icon: "🗄️" },
       { id: "tripo3d",     label: "Tripo 3D Studio", icon: "🧊" },
       { id: "meshy",       label: "Meshy Characters", icon: "🧊✨" },
+      // Mismos estudios creativos que el resto de tiendas (sin repetir Repositorio).
+      ...CREATIVE_MODULES.filter(m => m.id !== "vault"),
     ],
     clientNav: STORE_CLIENT_NAV,
     hiddenTabs: [],
@@ -123,7 +125,7 @@ export const PLATFORMS: Record<PlatformKey, PlatformDefinition> = {
     adminModules: [{ id: "woo-hub", label: "WooCommerce Hub", icon: "🟣" }, ...STORE_OPTIMIZATION_MODULES, ...CREATIVE_MODULES],
     clientNav: STORE_CLIENT_NAV,
     hiddenTabs: ["themes"],
-    usesStoreToken: true,
+    usesStoreToken: false, // Consumer Key/Secret: no caducan ni se "renuevan"
   },
   prestashop: {
     key: "prestashop", label: "PrestaShop", icon: "🔴", color: "#df0067",
@@ -133,7 +135,7 @@ export const PLATFORMS: Record<PlatformKey, PlatformDefinition> = {
     adminModules: [{ id: "ps-hub", label: "PrestaShop Hub", icon: "🔴" }, ...STORE_OPTIMIZATION_MODULES, ...CREATIVE_MODULES],
     clientNav: STORE_CLIENT_NAV,
     hiddenTabs: ["themes"],
-    usesStoreToken: true,
+    usesStoreToken: false, // clave del Webservice: no caduca
   },
   wordpress: {
     key: "wordpress", label: "WordPress", icon: "🔵", color: "#21759b",
@@ -147,7 +149,7 @@ export const PLATFORMS: Record<PlatformKey, PlatformDefinition> = {
     ],
     clientNav: STORE_CLIENT_NAV,
     hiddenTabs: ["products", "pricing", "redesign", "images", "inventory", "ab-testing", "themes", "collections"],
-    usesStoreToken: true,
+    usesStoreToken: false, // contraseña de aplicación
   },
   universal: {
     key: "universal", label: "Auditoría Web", icon: "🌐", color: "#5b9bd5",
