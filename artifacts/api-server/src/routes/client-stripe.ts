@@ -10,6 +10,7 @@ import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { getPlatform } from "../lib/platform-capabilities.js";
+import { monthlyAmount, type Interval } from "../lib/stripe-commerce.js";
 import {
   resolveStripeForProject,
   getStripeConnection,
@@ -55,19 +56,14 @@ function fail(res: Response, err: any, what: string) {
   res.status(status >= 400 && status < 600 ? status : 500).json({ error: err?.message ?? `Error cargando ${what}` });
 }
 
-const monthly = (sub: any): number => {
-  const item = (sub.items?.data ?? [])[0];
-  const price = item?.price;
-  if (!price?.unit_amount) return 0;
-  const qty = item?.quantity ?? 1;
-  const interval = price.recurring?.interval;
-  const count = price.recurring?.interval_count ?? 1;
-  const perPeriod = price.unit_amount * qty;
-  if (interval === "year") return perPeriod / (12 * count);
-  if (interval === "week") return (perPeriod * 52) / (12 * count);
-  if (interval === "day") return (perPeriod * 365) / (12 * count);
-  return perPeriod / count;
-};
+// Importe mensual equivalente de TODAS las líneas (cantidad y periodicidad normalizadas).
+const monthly = (sub: any): number =>
+  (sub.items?.data ?? []).reduce((acc: number, it: any) => acc + monthlyAmount({
+    unitAmount: it?.price?.unit_amount ?? null,
+    quantity: it?.quantity ?? 1,
+    interval: (it?.price?.recurring?.interval ?? null) as Interval | null,
+    intervalCount: it?.price?.recurring?.interval_count ?? null,
+  }), 0);
 
 // ── GET /client/stripe/connection ─────────────────────────────────────────────
 router.get("/connection", async (req, res): Promise<void> => {
@@ -136,7 +132,8 @@ router.get("/overview", async (req, res): Promise<void> => {
 
     const activeSubs = subs.filter(s => s.status === "active" || s.status === "trialing");
     const pastDue = subs.filter(s => s.status === "past_due" || s.status === "unpaid").length;
-    const mrr = activeSubs.reduce((s, sub) => s + monthly(sub), 0);
+    // MRR como Stripe: activas y con pago pendiente; las de prueba aún no facturan.
+    const mrr = Math.round(subs.filter(s => s.status === "active" || s.status === "past_due").reduce((s, sub) => s + monthly(sub), 0));
     const openInvoices = invoices.filter(i => i.status === "open");
     const openAmount = openInvoices.reduce((s, i) => s + (i.amount_due ?? 0), 0);
 

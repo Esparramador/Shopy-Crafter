@@ -1,17 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute } from "wouter";
+import { SP, SL, SA, fmt, fmtDate, intervalLabel, AssocBadge } from "@/components/stripe/shared";
+import CatalogTab from "@/components/stripe/CatalogTab";
+import PaymentLinksTab from "@/components/stripe/PaymentLinksTab";
+import CouponsTab from "@/components/stripe/CouponsTab";
+import PaymentsTab from "@/components/stripe/PaymentsTab";
+import { SubscriptionCreate, InvoiceCreate } from "@/components/stripe/BillingForms";
 
-type Tab = "overview" | "transactions" | "customers" | "subscriptions" | "products" | "invoices" | "payouts" | "acciones";
-
-const SP = "#635bff";
-const SL = "#897eff";
-const SA = "#a78bfa";
-
-const fmt = (amount: number, currency = "eur") =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: currency.toUpperCase(), minimumFractionDigits: 2 }).format(amount / 100);
-
-const fmtDate = (ts: number) =>
-  new Date(ts * 1000).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+type Tab = "overview" | "payments" | "links" | "products" | "coupons" | "customers" | "subscriptions" | "invoices" | "payouts";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; label: string }> = {
@@ -93,14 +89,15 @@ const S: Record<string, React.CSSProperties> = {
 };
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id:"overview",       label:"Overview",       icon:"📊" },
-  { id:"transactions",   label:"Transacciones",  icon:"⚡" },
-  { id:"customers",      label:"Clientes",       icon:"👥" },
-  { id:"subscriptions",  label:"Suscripciones",  icon:"🔁" },
-  { id:"products",       label:"Productos",      icon:"📦" },
-  { id:"invoices",       label:"Facturas",       icon:"📄" },
-  { id:"payouts",        label:"Payouts",        icon:"💸" },
-  { id:"acciones",       label:"Acciones",       icon:"🛠️" },
+  { id:"overview",       label:"Resumen",          icon:"📊" },
+  { id:"payments",       label:"Pagos",            icon:"💶" },
+  { id:"links",          label:"Enlaces de pago",  icon:"🔗" },
+  { id:"products",       label:"Productos",        icon:"📦" },
+  { id:"coupons",        label:"Cupones",          icon:"🏷️" },
+  { id:"customers",      label:"Clientes",         icon:"👥" },
+  { id:"subscriptions",  label:"Suscripciones",    icon:"🔁" },
+  { id:"invoices",       label:"Facturas",         icon:"📄" },
+  { id:"payouts",        label:"Transferencias",   icon:"🏦" },
 ];
 
 export default function StripeProjectHub() {
@@ -113,26 +110,21 @@ export default function StripeProjectHub() {
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [actionResult, setActionResult] = useState<any>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [linkPrice, setLinkPrice] = useState<string | null>(null);
 
   const [overview, setOverview] = useState<any>(null);
   const [connection, setConnection] = useState<any>(null);
   const [linkForm, setLinkForm] = useState({ secretKey: "", publishableKey: "" });
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
-  const [transactions, setTransactions] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [balance, setBalance] = useState<any>(null);
 
   const [customerForm, setCustomerForm] = useState({ email:"", name:"", phone:"", description:"" });
-  const [invoiceForm, setInvoiceForm] = useState({ customerId:"", description:"", amount:"", currency:"eur", daysUntilDue:"30", autoSend:false });
-  const [productForm, setProductForm] = useState({ name:"", description:"", amount:"", currency:"eur", interval:"" });
-  const [chargeForm, setChargeForm] = useState({ amount:"", currency:"eur", description:"", customerEmail:"" });
-  const [refundForm, setRefundForm] = useState({ chargeId:"", amount:"", reason:"requested_by_customer" });
 
   const apiFetch = useCallback((path: string, opts?: RequestInit) =>
     fetch(`${API}${path}`, { credentials:"include", ...opts }), [API]);
@@ -156,20 +148,22 @@ export default function StripeProjectHub() {
     setErr(""); setMsg("");
     setLoading(true);
     const base = `/admin/stripe/project/${projectId}`;
+    // Las pestañas con componente propio (pagos, enlaces, productos, cupones) cargan sus datos.
     const fetchers: Record<Tab, () => Promise<void>> = {
       overview: () => apiFetch(`${base}/overview`).then(readJson).then(d => { setOverview(d); if (d?.connection) setConnection(d.connection); }),
-      transactions: () => apiFetch(`${base}/transactions?limit=50`).then(readJson).then(d => setTransactions(d.data ?? [])),
-      customers: () => apiFetch(`${base}/customers?limit=50`).then(readJson).then(d => setCustomers(d.data ?? [])),
-      subscriptions: () => apiFetch(`${base}/subscriptions?limit=50`).then(readJson).then(d => setSubscriptions(d.data ?? [])),
-      products: () => apiFetch(`${base}/products`).then(readJson).then(d => setProducts(d.data ?? [])),
-      invoices: () => apiFetch(`${base}/invoices?limit=50`).then(readJson).then(d => setInvoices(d.data ?? [])),
+      payments: async () => {},
+      links: async () => {},
+      products: async () => {},
+      coupons: async () => {},
+      customers: () => apiFetch(`${base}/customers?limit=100`).then(readJson).then(d => setCustomers(d.data ?? [])),
+      subscriptions: () => apiFetch(`${base}/subscriptions?limit=100`).then(readJson).then(d => setSubscriptions(d.data ?? [])),
+      invoices: () => apiFetch(`${base}/invoices?limit=100`).then(readJson).then(d => setInvoices(d.data ?? [])),
       payouts: () => apiFetch(`${base}/payouts`).then(readJson).then(d => { setPayouts(d.data ?? []); setBalance(d.balance ?? null); }),
-      acciones: async () => {},
     };
     fetchers[tab]()
       .catch((e: any) => setErr(e?.message ? `Error cargando ${tab}: ${e.message}` : `Error cargando ${tab}`))
       .finally(() => setLoading(false));
-  }, [tab, projectId]);
+  }, [tab, projectId, reloadKey]);
 
   const isConnected = connection?.connected === true;
   const keyMode: "live" | "test" | null = connection?.keyMode ?? null;
@@ -212,70 +206,33 @@ export default function StripeProjectHub() {
 
   async function handleCreateCustomer() {
     if (!customerForm.email) { setErr("Email requerido"); return; }
-    setActionLoading(true); setErr(""); setActionResult(null);
+    setActionLoading(true); setErr("");
     try {
       const r = await apiFetch(`/admin/stripe/project/${projectId}/customers`, {
         method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(customerForm),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
-      setActionResult(d.customer);
       setMsg(`✓ Cliente creado: ${d.customer.email}`);
       setCustomerForm({ email:"", name:"", phone:"", description:"" });
     } catch(e:any) { setErr(e.message); }
     finally { setActionLoading(false); }
   }
 
-  async function handleCreateInvoice() {
-    if (!invoiceForm.customerId || !invoiceForm.amount) { setErr("Customer ID y Amount requeridos"); return; }
-    setActionLoading(true); setErr(""); setActionResult(null);
+  async function handleCancelAtPeriodEnd(subId: string, value: boolean) {
     try {
-      const r = await apiFetch(`/admin/stripe/project/${projectId}/invoices`, {
-        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(invoiceForm),
+      const r = await apiFetch(`/admin/stripe/project/${projectId}/subscriptions/${subId}`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ cancelAtPeriodEnd: value }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
-      setActionResult(d.invoice);
-      setMsg(`✓ Factura creada: ${d.invoice.number ?? d.invoice.id}`);
-      setInvoiceForm({ customerId:"", description:"", amount:"", currency:"eur", daysUntilDue:"30", autoSend:false });
+      setSubscriptions(prev => prev.map(s => s.id === subId ? { ...s, cancelAtPeriodEnd: value } : s));
+      setMsg(value ? "✓ Se cancelará al final del periodo pagado" : "✓ Cancelación programada anulada");
     } catch(e:any) { setErr(e.message); }
-    finally { setActionLoading(false); }
-  }
-
-  async function handleCreateProduct() {
-    if (!productForm.name || !productForm.amount) { setErr("Nombre y precio requeridos"); return; }
-    setActionLoading(true); setErr(""); setActionResult(null);
-    try {
-      const r = await apiFetch(`/admin/stripe/project/${projectId}/products`, {
-        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(productForm),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      setActionResult(d);
-      setMsg(`✓ Producto creado: ${d.product.name}`);
-      setProductForm({ name:"", description:"", amount:"", currency:"eur", interval:"" });
-    } catch(e:any) { setErr(e.message); }
-    finally { setActionLoading(false); }
-  }
-
-  async function handleRefund() {
-    if (!refundForm.chargeId) { setErr("Charge ID requerido"); return; }
-    setActionLoading(true); setErr(""); setActionResult(null);
-    try {
-      const r = await apiFetch(`/admin/stripe/project/${projectId}/refunds`, {
-        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(refundForm),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      setActionResult(d.refund);
-      setMsg(`✓ Devolución procesada: ${d.refund.id}`);
-      setRefundForm({ chargeId:"", amount:"", reason:"requested_by_customer" });
-    } catch(e:any) { setErr(e.message); }
-    finally { setActionLoading(false); }
   }
 
   async function handleCancelSub(subId: string) {
-    if (!confirm("¿Cancelar esta suscripción?")) return;
+    if (!confirm("¿Cancelar YA esta suscripción? Se corta el servicio inmediatamente y no se cobran más periodos.")) return;
     try {
       const r = await apiFetch(`/admin/stripe/project/${projectId}/subscriptions/${subId}`, { method:"DELETE" });
       const d = await r.json();
@@ -294,8 +251,19 @@ export default function StripeProjectHub() {
     } catch(e:any) { setErr((e as any).message); }
   }
 
+  async function handleDraftInvoice(invId: string, action: "finalize" | "delete") {
+    if (action === "delete" && !confirm("¿Borrar este borrador de factura?")) return;
+    try {
+      const r = await apiFetch(`/admin/stripe/project/${projectId}/invoices/${invId}${action === "finalize" ? "/finalize" : ""}`, { method: action === "finalize" ? "POST" : "DELETE" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      setMsg(action === "finalize" ? "✓ Factura emitida" : "✓ Borrador eliminado");
+      setReloadKey(k => k + 1);
+    } catch(e:any) { setErr(e.message); }
+  }
+
   async function handleVoidInvoice(invId: string) {
-    if (!confirm("¿Anular esta factura?")) return;
+    if (!confirm("¿Anular esta factura? Queda registrada como anulada y el cliente ya no podrá pagarla.")) return;
     try {
       const r = await apiFetch(`/admin/stripe/project/${projectId}/invoices/${invId}/void`, { method:"POST" });
       const d = await r.json();
@@ -352,7 +320,7 @@ export default function StripeProjectHub() {
               <button className="sh-btn" style={{ ...S.btn, ...S.btnG, ...S.btnSm, color:"#f43f5e" }} disabled={linkBusy} onClick={handleUnlink}>Desvincular</button>
             </>
           )}
-          <button className="sh-btn" style={{ ...S.btn, ...S.btnG, ...S.btnSm }} onClick={() => { setLoading(true); loadConnection(); setTab(t => t); }}>
+          <button className="sh-btn" style={{ ...S.btn, ...S.btnG, ...S.btnSm }} onClick={() => { loadConnection(); setReloadKey(k => k + 1); }}>
             ↻ Actualizar
           </button>
         </div>
@@ -402,13 +370,16 @@ export default function StripeProjectHub() {
       {/* ══ OVERVIEW ══════════════════════════════════════════════════════════ */}
       {!loading && tab === "overview" && overview && overview.connected !== false && (
         <div className="sh-card">
+          {Array.isArray(overview.warnings) && overview.warnings.length > 0 && (
+            <div style={S.err}>Stripe no devolvió parte de los datos; algunas cifras pueden estar incompletas: {overview.warnings[0]}</div>
+          )}
           {/* KPI Grid */}
           <div style={S.grid4}>
             {[
-              { label:"Volumen 30d",    value:fmt(overview.volume30 ?? 0, overview.balance?.currency), icon:"💰", color:SP, trend:overview.trend },
-              { label:"Transacciones",  value:String(overview.count30 ?? 0),                           icon:"⚡", color:SL },
-              { label:"Ticket Medio",   value:fmt(overview.aov ?? 0, overview.balance?.currency),      icon:"📊", color:SA },
-              { label:"Suscripciones",  value:String(overview.activeSubCount ?? 0),                    icon:"🔁", color:"#34d399" },
+              { label:"Ventas netas 30 días", value:fmt(overview.volume30 ?? 0, overview.balance?.currency), icon:"💰", color:SP, trend:overview.trend },
+              { label:"Cobros 30 días",       value:String(overview.count30 ?? 0),                           icon:"⚡", color:SL },
+              { label:"Ticket medio",         value:fmt(overview.aov ?? 0, overview.balance?.currency),      icon:"📊", color:SA },
+              { label:"Suscripciones vivas",  value:`${overview.activeSubCount ?? 0}${overview.trialingCount ? ` (${overview.trialingCount} en prueba)` : ""}`, icon:"🔁", color:"#34d399" },
             ].map(kpi => (
               <div key={kpi.label} className="sh-kcard" style={{ ...S.kcard }}>
                 <div style={{ fontSize:22, marginBottom:8 }}>{kpi.icon}</div>
@@ -433,7 +404,9 @@ export default function StripeProjectHub() {
                   {[
                     { label:"Disponible",  value:fmt(overview.balance.available, overview.balance.currency), color:"#34d399" },
                     { label:"Pendiente",   value:fmt(overview.balance.pending,   overview.balance.currency), color:"#fbbf24" },
-                    { label:"MRR (est.)",  value:fmt(overview.mrr ?? 0, overview.balance.currency),          color:SL },
+                    { label:"MRR (ingreso recurrente mensual)", value:fmt(overview.mrr ?? 0, overview.balance.currency), color:SL },
+                    { label:"Clientes",    value:`${overview.customerCount ?? 0}${overview.customerCountCapped ? "+" : ""}`, color:"#a5b4fc" },
+                    ...(overview.pastDueCount ? [{ label:"Suscripciones con pago pendiente", value:String(overview.pastDueCount), color:"#fb923c" }] : []),
                   ].map(row => (
                     <div key={row.label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 14px", background:"rgba(255,255,255,0.03)", borderRadius:9 }}>
                       <span style={{ fontSize:13, color:"rgba(240,237,230,0.6)" }}>{row.label}</span>
@@ -472,32 +445,11 @@ export default function StripeProjectHub() {
         </div>
       )}
 
-      {/* ══ TRANSACTIONS ══════════════════════════════════════════════════════ */}
-      {!loading && tab === "transactions" && (
-        <div className="sh-card" style={S.card}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-            <div style={{ fontWeight:700, fontSize:15 }}>⚡ Transacciones ({transactions.length})</div>
-          </div>
-          {transactions.length === 0 ? <div style={S.empty}>Sin transacciones</div> : (
-            <table style={{ width:"100%", borderCollapse:"collapse" as const }}>
-              <thead><tr>{["ID","Importe","Estado","Método","Descripción","Email","Fecha"].map(h => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
-              <tbody>
-                {transactions.map(c => (
-                  <tr key={c.id} className="sh-row">
-                    <td style={S.td}><code style={{ fontSize:11, color:"rgba(255,255,255,0.35)" }}>{c.id.slice(0,18)}…</code></td>
-                    <td style={{ ...S.td, fontWeight:800, color: c.refunded ? "#9ca3af" : SP }}>{fmt(c.amount, c.currency)}{c.refunded ? " ↩" : ""}</td>
-                    <td style={S.td}><StatusBadge status={c.status} /></td>
-                    <td style={{ ...S.td, fontSize:12, color:"rgba(255,255,255,0.45)" }}>{c.paymentMethod}</td>
-                    <td style={{ ...S.td, color:"rgba(240,237,230,0.6)" }}>{c.description ?? "—"}</td>
-                    <td style={{ ...S.td, fontSize:12, color:"rgba(240,237,230,0.5)" }}>{c.receiptEmail ?? "—"}</td>
-                    <td style={{ ...S.td, fontSize:12, color:"rgba(240,237,230,0.4)" }}>{fmtDate(c.created)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      {/* ══ PAGOS / ENLACES / PRODUCTOS / CUPONES ══════════════════════════════ */}
+      {tab === "payments" && isConnected && <PaymentsTab projectId={projectId} />}
+      {tab === "links" && isConnected && <PaymentLinksTab projectId={projectId} preselectPriceId={linkPrice} onPreselectUsed={() => setLinkPrice(null)} />}
+      {tab === "products" && isConnected && <CatalogTab projectId={projectId} onCreateLink={priceId => { setLinkPrice(priceId); setTab("links"); }} />}
+      {tab === "coupons" && isConnected && <CouponsTab projectId={projectId} />}
 
       {/* ══ CUSTOMERS ═════════════════════════════════════════════════════════ */}
       {!loading && tab === "customers" && (
@@ -553,6 +505,8 @@ export default function StripeProjectHub() {
 
       {/* ══ SUBSCRIPTIONS ═════════════════════════════════════════════════════ */}
       {!loading && tab === "subscriptions" && (
+        <div>
+        {isConnected && <SubscriptionCreate projectId={projectId} onCreated={() => setReloadKey(k => k + 1)} />}
         <div className="sh-card" style={S.card}>
           <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>🔁 Suscripciones ({subscriptions.length})</div>
           {subscriptions.length === 0 ? <div style={S.empty}>Sin suscripciones</div> : (
@@ -565,9 +519,13 @@ export default function StripeProjectHub() {
                       <div style={{ fontSize:13, color:"#a5b4fc" }}>{s.customer?.email ?? "—"}</div>
                       <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)" }}>{s.customer?.name ?? ""}</div>
                     </td>
-                    <td style={{ ...S.td, fontWeight:600 }}>{s.productName}</td>
+                    <td style={{ ...S.td, fontWeight:600 }}>
+                      {s.productName}{s.quantity > 1 ? ` × ${s.quantity}` : ""}
+                      <div style={{ marginTop:4 }}><AssocBadge metadata={s.metadata} /></div>
+                    </td>
                     <td style={{ ...S.td, color:SP, fontWeight:700 }}>
-                      {fmt(s.priceAmount, s.priceCurrency)} / {s.priceInterval}
+                      {fmt(s.priceAmount * (s.quantity ?? 1), s.priceCurrency)} {intervalLabel(s.priceInterval, s.priceIntervalCount)}
+                      {s.itemCount > 1 && <div style={{ fontSize:11, color:"rgba(240,237,230,0.45)", fontWeight:500 }}>+{s.itemCount - 1} plan(es) más</div>}
                     </td>
                     <td style={S.td}><StatusBadge status={s.status} /></td>
                     <td style={{ ...S.td, fontSize:12, color:"rgba(240,237,230,0.5)" }}>
@@ -577,9 +535,14 @@ export default function StripeProjectHub() {
                     </td>
                     <td style={S.td}>
                       {s.status !== "canceled" && (
-                        <button className="sh-btn" style={{ ...S.btn, ...S.btnD, ...S.btnSm }} onClick={() => handleCancelSub(s.id)}>
-                          Cancelar
-                        </button>
+                        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                          <button className="sh-btn" style={{ ...S.btn, ...S.btnG, ...S.btnSm }} onClick={() => handleCancelAtPeriodEnd(s.id, !s.cancelAtPeriodEnd)}>
+                            {s.cancelAtPeriodEnd ? "Mantener" : "Cancelar al renovar"}
+                          </button>
+                          <button className="sh-btn" style={{ ...S.btn, ...S.btnD, ...S.btnSm }} onClick={() => handleCancelSub(s.id)}>
+                            Cancelar ya
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -588,113 +551,13 @@ export default function StripeProjectHub() {
             </table>
           )}
         </div>
-      )}
-
-      {/* ══ PRODUCTS ══════════════════════════════════════════════════════════ */}
-      {!loading && tab === "products" && (
-        <div>
-          <div style={{ ...S.card, marginBottom:16 }}>
-            <div style={{ fontWeight:700, fontSize:14, marginBottom:14, color:SL }}>➕ Nuevo producto</div>
-            <div style={S.grid2}>
-              <div>
-                <label style={S.lbl}>Nombre *</label>
-                <input style={S.inp} value={productForm.name} onChange={e => setProductForm(p => ({ ...p, name:e.target.value }))} />
-              </div>
-              <div>
-                <label style={S.lbl}>Descripción</label>
-                <input style={S.inp} value={productForm.description} onChange={e => setProductForm(p => ({ ...p, description:e.target.value }))} />
-              </div>
-              <div>
-                <label style={S.lbl}>Precio * (ej: 29.99)</label>
-                <input type="number" style={S.inp} value={productForm.amount} onChange={e => setProductForm(p => ({ ...p, amount:e.target.value }))} />
-              </div>
-              <div>
-                <label style={S.lbl}>Moneda</label>
-                <select style={S.sel} value={productForm.currency} onChange={e => setProductForm(p => ({ ...p, currency:e.target.value }))}>
-                  {["eur","usd","gbp","mxn","cop","ars"].map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={S.lbl}>Recurrencia (vacío = pago único)</label>
-                <select style={S.sel} value={productForm.interval} onChange={e => setProductForm(p => ({ ...p, interval:e.target.value }))}>
-                  <option value="">Pago único</option>
-                  <option value="day">Diario</option>
-                  <option value="week">Semanal</option>
-                  <option value="month">Mensual</option>
-                  <option value="year">Anual</option>
-                </select>
-              </div>
-            </div>
-            <button className="sh-btn" style={{ ...S.btn, ...S.btnP, marginTop:14 }} onClick={handleCreateProduct} disabled={actionLoading}>
-              {actionLoading ? "Creando…" : "Crear producto"}
-            </button>
-          </div>
-
-          <div className="sh-card" style={S.card}>
-            <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>📦 Productos activos ({products.length})</div>
-            {products.length === 0 ? <div style={S.empty}>Sin productos</div> : (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                {products.map(p => (
-                  <div key={p.id} style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:12, padding:"14px 18px" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"start" }}>
-                      <div>
-                        <div style={{ fontWeight:700, fontSize:14 }}>{p.name}</div>
-                        {p.description && <div style={{ fontSize:12, color:"rgba(240,237,230,0.5)", marginTop:2 }}>{p.description}</div>}
-                      </div>
-                      <div style={{ display:"flex", gap:8, flexWrap:"wrap" as const }}>
-                        {(p.prices ?? []).map((pr: any) => (
-                          <span key={pr.id} style={{ fontSize:12, padding:"3px 10px", borderRadius:100, background:"rgba(99,91,255,0.12)", color:SL, fontWeight:700 }}>
-                            {fmt(pr.unitAmount, pr.currency)}{pr.interval ? ` / ${pr.interval}` : " único"}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{ marginTop:6, fontSize:11, color:"rgba(255,255,255,0.25)" }}>{p.id}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
 
       {/* ══ INVOICES ══════════════════════════════════════════════════════════ */}
       {!loading && tab === "invoices" && (
         <div>
-          <div style={{ ...S.card, marginBottom:16 }}>
-            <div style={{ fontWeight:700, fontSize:14, marginBottom:14, color:SL }}>➕ Nueva factura</div>
-            <div style={S.grid2}>
-              <div>
-                <label style={S.lbl}>Customer ID (cus_xxx) *</label>
-                <input style={S.inp} value={invoiceForm.customerId} onChange={e => setInvoiceForm(p => ({ ...p, customerId:e.target.value }))} placeholder="cus_…" />
-              </div>
-              <div>
-                <label style={S.lbl}>Descripción</label>
-                <input style={S.inp} value={invoiceForm.description} onChange={e => setInvoiceForm(p => ({ ...p, description:e.target.value }))} />
-              </div>
-              <div>
-                <label style={S.lbl}>Importe * (ej: 150.00)</label>
-                <input type="number" style={S.inp} value={invoiceForm.amount} onChange={e => setInvoiceForm(p => ({ ...p, amount:e.target.value }))} />
-              </div>
-              <div>
-                <label style={S.lbl}>Moneda</label>
-                <select style={S.sel} value={invoiceForm.currency} onChange={e => setInvoiceForm(p => ({ ...p, currency:e.target.value }))}>
-                  {["eur","usd","gbp","mxn"].map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={S.lbl}>Días hasta vencimiento</label>
-                <input type="number" style={S.inp} value={invoiceForm.daysUntilDue} onChange={e => setInvoiceForm(p => ({ ...p, daysUntilDue:e.target.value }))} />
-              </div>
-              <div style={{ display:"flex", alignItems:"center", gap:10, paddingTop:24 }}>
-                <input type="checkbox" id="auto-send" checked={invoiceForm.autoSend} onChange={e => setInvoiceForm(p => ({ ...p, autoSend:e.target.checked }))} />
-                <label htmlFor="auto-send" style={{ fontSize:13, color:"rgba(240,237,230,0.7)", cursor:"pointer" }}>Enviar automáticamente al cliente</label>
-              </div>
-            </div>
-            <button className="sh-btn" style={{ ...S.btn, ...S.btnP, marginTop:14 }} onClick={handleCreateInvoice} disabled={actionLoading}>
-              {actionLoading ? "Creando…" : "Crear factura"}
-            </button>
-          </div>
+          <InvoiceCreate projectId={projectId} onCreated={() => setReloadKey(k => k + 1)} />
 
           <div className="sh-card" style={S.card}>
             <div style={{ fontWeight:700, fontSize:15, marginBottom:14 }}>📄 Facturas ({invoices.length})</div>
@@ -721,7 +584,13 @@ export default function StripeProjectHub() {
                           {inv.status === "open" && (
                             <button className="sh-btn" style={{ ...S.btn, ...S.btnP, ...S.btnSm }} onClick={() => handleSendInvoice(inv.id)}>Enviar</button>
                           )}
-                          {(inv.status === "open" || inv.status === "draft") && (
+                          {inv.status === "draft" && (
+                            <>
+                              <button className="sh-btn" style={{ ...S.btn, ...S.btnP, ...S.btnSm }} onClick={() => handleDraftInvoice(inv.id, "finalize")}>Emitir</button>
+                              <button className="sh-btn" style={{ ...S.btn, ...S.btnD, ...S.btnSm }} onClick={() => handleDraftInvoice(inv.id, "delete")}>Borrar</button>
+                            </>
+                          )}
+                          {inv.status === "open" && (
                             <button className="sh-btn" style={{ ...S.btn, ...S.btnD, ...S.btnSm }} onClick={() => handleVoidInvoice(inv.id)}>Anular</button>
                           )}
                         </div>
@@ -772,90 +641,6 @@ export default function StripeProjectHub() {
               </table>
             )}
           </div>
-        </div>
-      )}
-
-      {/* ══ ACCIONES ══════════════════════════════════════════════════════════ */}
-      {!loading && tab === "acciones" && (
-        <div style={S.grid2}>
-          {/* Crear cargo / Payment Intent */}
-          <div style={S.card}>
-            <div style={{ fontWeight:700, fontSize:14, marginBottom:14, color:SL }}>⚡ Crear Payment Intent</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              <div>
-                <label style={S.lbl}>Importe * (ej: 99.00)</label>
-                <input type="number" style={S.inp} value={chargeForm.amount} onChange={e => setChargeForm(p => ({ ...p, amount:e.target.value }))} />
-              </div>
-              <div>
-                <label style={S.lbl}>Moneda</label>
-                <select style={S.sel} value={chargeForm.currency} onChange={e => setChargeForm(p => ({ ...p, currency:e.target.value }))}>
-                  {["eur","usd","gbp","mxn"].map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={S.lbl}>Descripción</label>
-                <input style={S.inp} value={chargeForm.description} onChange={e => setChargeForm(p => ({ ...p, description:e.target.value }))} />
-              </div>
-              <div>
-                <label style={S.lbl}>Email recibo</label>
-                <input type="email" style={S.inp} value={chargeForm.customerEmail} onChange={e => setChargeForm(p => ({ ...p, customerEmail:e.target.value }))} />
-              </div>
-              <button className="sh-btn" style={{ ...S.btn, ...S.btnP }} disabled={actionLoading}
-                onClick={async () => {
-                  if (!chargeForm.amount) { setErr("Importe requerido"); return; }
-                  setActionLoading(true); setErr(""); setActionResult(null);
-                  try {
-                    const r = await apiFetch(`/admin/stripe/project/${projectId}/charges`, {
-                      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(chargeForm),
-                    });
-                    const d = await r.json();
-                    if (!r.ok) throw new Error(d.error);
-                    setActionResult(d);
-                    setMsg(`✓ Payment Intent creado: ${d.paymentIntentId}`);
-                    setChargeForm({ amount:"", currency:"eur", description:"", customerEmail:"" });
-                  } catch(e:any) { setErr(e.message); }
-                  finally { setActionLoading(false); }
-                }}>
-                {actionLoading ? "Procesando…" : "Crear Payment Intent"}
-              </button>
-            </div>
-          </div>
-
-          {/* Devolución */}
-          <div style={S.card}>
-            <div style={{ fontWeight:700, fontSize:14, marginBottom:14, color:"#f87171" }}>↩ Procesar devolución</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              <div>
-                <label style={S.lbl}>Charge ID * (ch_xxx o pi_xxx)</label>
-                <input style={S.inp} value={refundForm.chargeId} onChange={e => setRefundForm(p => ({ ...p, chargeId:e.target.value }))} placeholder="ch_…" />
-              </div>
-              <div>
-                <label style={S.lbl}>Importe parcial (vacío = total)</label>
-                <input type="number" style={S.inp} value={refundForm.amount} onChange={e => setRefundForm(p => ({ ...p, amount:e.target.value }))} />
-              </div>
-              <div>
-                <label style={S.lbl}>Motivo</label>
-                <select style={S.sel} value={refundForm.reason} onChange={e => setRefundForm(p => ({ ...p, reason:e.target.value }))}>
-                  <option value="requested_by_customer">Solicitado por el cliente</option>
-                  <option value="duplicate">Duplicado</option>
-                  <option value="fraudulent">Fraudulento</option>
-                </select>
-              </div>
-              <button className="sh-btn" style={{ ...S.btn, ...S.btnD }} disabled={actionLoading} onClick={handleRefund}>
-                {actionLoading ? "Procesando…" : "Procesar devolución"}
-              </button>
-            </div>
-          </div>
-
-          {/* Action result */}
-          {actionResult && (
-            <div style={{ gridColumn:"1 / -1", ...S.card, borderColor:"rgba(99,91,255,0.3)" }}>
-              <div style={{ fontSize:12, fontWeight:700, color:SL, marginBottom:8 }}>Resultado</div>
-              <pre style={{ fontSize:11, color:"rgba(240,237,230,0.6)", overflowX:"auto" as const, margin:0 }}>
-                {JSON.stringify(actionResult, null, 2)}
-              </pre>
-            </div>
-          )}
         </div>
       )}
 

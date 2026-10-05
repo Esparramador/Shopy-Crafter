@@ -73,6 +73,22 @@ export class StripeKeyInvalidError extends Error {
 
 const STRIPE_API_VERSION = "2026-05-27.dahlia" as const;
 
+/**
+ * Solo para pruebas: STRIPE_API_BASE=http://localhost:12111 dirige el SDK a
+ * stripe-mock (servidor oficial de Stripe que valida cada petición contra su
+ * OpenAPI). Sin la variable se usa api.stripe.com.
+ */
+function stripeHostOptions(): { host?: string; port?: number; protocol?: "http" | "https" } {
+  const base = process.env.STRIPE_API_BASE;
+  if (!base) return {};
+  const u = new URL(base);
+  return {
+    host: u.hostname,
+    port: u.port ? Number(u.port) : undefined,
+    protocol: u.protocol === "http:" ? "http" : "https",
+  };
+}
+
 function getPlatformStripeKey(): string {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY no configurado en el entorno");
@@ -80,7 +96,7 @@ function getPlatformStripeKey(): string {
 }
 
 export function getPlatformStripe(): Stripe {
-  return new Stripe(getPlatformStripeKey(), { apiVersion: STRIPE_API_VERSION });
+  return new Stripe(getPlatformStripeKey(), { ...stripeHostOptions(), apiVersion: STRIPE_API_VERSION });
 }
 
 export function keyModeOf(secretKey: string): StripeKeyMode {
@@ -96,7 +112,7 @@ export async function verifyStripeSecretKey(secretKey: string): Promise<Stripe.A
   if (!/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/.test(key)) {
     throw new StripeKeyInvalidError("La clave debe ser una clave secreta de Stripe (sk_test_… o sk_live_…).");
   }
-  const tempStripe = new Stripe(key, { apiVersion: STRIPE_API_VERSION, maxNetworkRetries: 1, timeout: 15_000 });
+  const tempStripe = new Stripe(key, { ...stripeHostOptions(), apiVersion: STRIPE_API_VERSION, maxNetworkRetries: 1, timeout: 15_000 });
   try {
     return await (tempStripe.accounts as any).retrieve() as Stripe.Account;
   } catch (err: any) {
@@ -131,7 +147,7 @@ function clientFromRow(row: any): { stripe: Stripe; mode: StripeMode; accountId?
     const secretKey = safeDecrypt(row.stripe_key_enc);
     if (secretKey) {
       return {
-        stripe: new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION }),
+        stripe: new Stripe(secretKey, { ...stripeHostOptions(), apiVersion: STRIPE_API_VERSION }),
         mode: "direct",
         accountId: row.account_id,
       };
@@ -140,6 +156,7 @@ function clientFromRow(row: any): { stripe: Stripe; mode: StripeMode; accountId?
   if (row.account_type === "custom" && row.account_id) {
     return {
       stripe: new Stripe(getPlatformStripeKey(), {
+        ...stripeHostOptions(),
         apiVersion: STRIPE_API_VERSION,
         stripeAccount: row.account_id,
       } as any),
@@ -151,7 +168,7 @@ function clientFromRow(row: any): { stripe: Stripe; mode: StripeMode; accountId?
     const token = safeDecrypt(row.access_token_enc);
     if (token) {
       return {
-        stripe: new Stripe(token, { apiVersion: STRIPE_API_VERSION }),
+        stripe: new Stripe(token, { ...stripeHostOptions(), apiVersion: STRIPE_API_VERSION }),
         mode: "connect_oauth",
         accountId: row.account_id,
       };

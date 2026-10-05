@@ -16,6 +16,7 @@ import { sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
+import { monthlyAmount, sanitizeMetadata, type Interval } from "../lib/stripe-commerce.js";
 import { getPlatformStripe, saveDirectApiKey, resolveStripeForProject, getStripeConnection, unlinkStripeForProject } from "../lib/stripe-tenant.js";
 
 const router = Router();
@@ -343,54 +344,52 @@ router.get("/admin/stripe/project/:id/overview", requireAdmin, async (req: Reque
     }
     const { stripe, mode } = await resolveProject(pid);
 
-    const [balance, charges, customers, subs] = await Promise.allSettled([
-      stripe.balance.retrieve(),
-      stripe.charges.list({ limit: 50 }),
-      stripe.customers.list({ limit: 10 }),
-      stripe.subscriptions.list({ limit: 10 }),
-    ]);
-
-    const bal = balance.status === "fulfilled" ? balance.value : null;
-    const chList = charges.status === "fulfilled" ? charges.value.data : [];
-    const cuList = customers.status === "fulfilled" ? customers.value.data : [];
-    const suList = subs.status === "fulfilled" ? subs.value.data : [];
-
     const now = Math.floor(Date.now() / 1000);
     const d30 = now - 30 * 86400;
+    const d60 = d30 - 30 * 86400;
+    // Paginación completa (con tope) para que volumen y MRR no dependan de los 50 últimos objetos.
+    const [balance, charges, customers, subs] = await Promise.allSettled([
+      stripe.balance.retrieve(),
+      stripe.charges.list({ limit: 100, created: { gte: d60 } }).autoPagingToArray({ limit: 5000 }),
+      stripe.customers.list({ limit: 100 }).autoPagingToArray({ limit: 5000 }),
+      stripe.subscriptions.list({ limit: 100, status: "all" }).autoPagingToArray({ limit: 5000 }),
+    ]);
+    const warnings = [balance, charges, customers, subs]
+      .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+      .map(r => String(r.reason?.message ?? r.reason));
+
+    const bal = balance.status === "fulfilled" ? balance.value : null;
+    const chList = charges.status === "fulfilled" ? charges.value : [];
+    const cuList = customers.status === "fulfilled" ? customers.value : [];
+    const suList = subs.status === "fulfilled" ? subs.value : [];
+
+    // Ventas netas: cobros correctos menos lo devuelto.
+    const net = (c: Stripe.Charge) => c.amount - (c.amount_refunded ?? 0);
     const recent30 = chList.filter(c => c.created >= d30 && c.status === "succeeded");
-    const volume30 = recent30.reduce((s, c) => s + c.amount, 0);
+    const volume30 = recent30.reduce((s, c) => s + net(c), 0);
     const count30 = recent30.length;
     const aov = count30 > 0 ? volume30 / count30 : 0;
-
-    const prev30start = d30 - 30 * 86400;
-    const prevCharges = chList.filter(c => c.created >= prev30start && c.created < d30 && c.status === "succeeded");
-    const prevVol = prevCharges.reduce((s, c) => s + c.amount, 0);
+    const prevVol = chList.filter(c => c.created >= d60 && c.created < d30 && c.status === "succeeded").reduce((s, c) => s + net(c), 0);
     const trend = prevVol > 0 ? ((volume30 - prevVol) / prevVol) * 100 : 0;
 
     const dailyMap: Record<string, number> = {};
-    for (let i = 0; i < 30; i++) {
-      const d = new Date((d30 + i * 86400) * 1000);
-      const key = d.toISOString().slice(0, 10);
-      dailyMap[key] = 0;
-    }
+    for (let i = 0; i < 30; i++) dailyMap[new Date((d30 + i * 86400) * 1000).toISOString().slice(0, 10)] = 0;
     for (const c of recent30) {
       const key = new Date(c.created * 1000).toISOString().slice(0, 10);
-      if (key in dailyMap) dailyMap[key] += c.amount;
+      if (key in dailyMap) dailyMap[key] += net(c);
     }
     const dailyChart = Object.entries(dailyMap).map(([date, amount]) => ({ date, amount }));
 
-    const activeSubCount = suList.filter(s => s.status === "active" || s.status === "trialing").length;
-    const mrr = suList
-      .filter(s => s.status === "active" || s.status === "trialing")
-      .reduce((s, sub) => {
-        const item = (sub.items?.data ?? [])[0];
-        const price = item?.price;
-        if (!price || !price.unit_amount) return s;
-        const monthly = price.recurring?.interval === "year"
-          ? price.unit_amount / 12
-          : price.unit_amount;
-        return s + monthly;
-      }, 0);
+    // MRR como Stripe: suscripciones activas o con pago pendiente (no las de prueba),
+    // todas las líneas, con cantidad y periodicidad normalizadas a un mes.
+    const mrrSubs = suList.filter(s => s.status === "active" || s.status === "past_due");
+    const mrr = Math.round(mrrSubs.reduce((sum, sub) => sum + (sub.items?.data ?? []).reduce((acc, it) => acc + monthlyAmount({
+      unitAmount: it.price?.unit_amount ?? null,
+      quantity: it.quantity ?? 1,
+      interval: (it.price?.recurring?.interval ?? null) as Interval | null,
+      intervalCount: it.price?.recurring?.interval_count ?? null,
+    }), 0), 0));
+    const activeSubCount = suList.filter(s => s.status === "active" || s.status === "trialing" || s.status === "past_due").length;
 
     res.json({
       connected: true,
@@ -402,11 +401,15 @@ router.get("/admin/stripe/project/:id/overview", requireAdmin, async (req: Reque
         currency:  bal.available[0]?.currency ?? "eur",
       } : null,
       volume30, count30, aov, trend, mrr, activeSubCount,
+      trialingCount: suList.filter(s => s.status === "trialing").length,
+      pastDueCount: suList.filter(s => s.status === "past_due").length,
       customerCount: cuList.length,
+      customerCountCapped: cuList.length >= 5000,
       dailyChart,
-      recentCharges: chList.slice(0, 8).map(c => ({
+      warnings,
+      recentCharges: [...chList].sort((x, y) => y.created - x.created).slice(0, 8).map(c => ({
         id: c.id, amount: c.amount, currency: c.currency,
-        status: c.status, description: c.description,
+        status: c.refunded ? "refunded" : c.status, description: c.description,
         created: c.created, customer: c.customer,
         receiptEmail: c.receipt_email,
       })),
@@ -462,7 +465,7 @@ router.post("/admin/stripe/project/:id/customers", requireAdmin, async (req: Req
     const { email, name, phone, description, metadata } = req.body as any;
     if (!email) { res.status(400).json({ error: "email requerido" }); return; }
     const { stripe } = await resolveProject(pid);
-    const customer = await stripe.customers.create({ email, name, phone, description, metadata });
+    const customer = await stripe.customers.create({ email, name, phone, description, metadata: { ...sanitizeMetadata(metadata), sc_project_id: String(pid) } });
     res.json({ customer });
   } catch (err: any) {
     sendStripeError(res, err);
@@ -479,6 +482,13 @@ router.get("/admin/stripe/project/:id/subscriptions", requireAdmin, async (req: 
     const params: any = { limit, expand: ["data.customer", "data.default_payment_method"] };
     if (status && status !== "all") params.status = status;
     const subs = await stripe.subscriptions.list(params);
+    // price.product llega como id (expandirlo supera el límite de 4 niveles): nombres en una sola consulta.
+    const productIds = [...new Set(subs.data.flatMap(s => (s.items?.data ?? []).map(it => String(it.price?.product ?? "")).filter(Boolean)))];
+    const names = new Map<string, string>();
+    for (let i = 0; i < productIds.length; i += 100) {
+      const page = await stripe.products.list({ ids: productIds.slice(i, i + 100), limit: 100 });
+      for (const p of page.data) names.set(p.id, p.name);
+    }
     const data = subs.data.map(s => {
       const item = s.items?.data?.[0];
       const price = item?.price;
@@ -490,7 +500,11 @@ router.get("/admin/stripe/project/:id/subscriptions", requireAdmin, async (req: 
         priceAmount: price?.unit_amount ?? 0,
         priceCurrency: price?.currency ?? "eur",
         priceInterval: price?.recurring?.interval ?? "month",
-        productName: (price as any)?.product?.name ?? price?.nickname ?? "—",
+        productName: (s.items?.data ?? []).map(it => names.get(String(it.price?.product ?? "")) ?? it.price?.nickname ?? "—").join(" + "),
+        priceIntervalCount: price?.recurring?.interval_count ?? 1,
+        quantity: item?.quantity ?? 1,
+        itemCount: s.items?.data?.length ?? 0,
+        metadata: s.metadata,
         trialEnd: s.trial_end,
       };
     });
@@ -507,58 +521,6 @@ router.delete("/admin/stripe/project/:id/subscriptions/:subId", requireAdmin, as
     const { stripe } = await resolveProject(pid);
     const sub = await stripe.subscriptions.cancel(String(req.params.subId));
     res.json({ status: sub.status });
-  } catch (err: any) {
-    sendStripeError(res, err);
-  }
-});
-
-// GET /admin/stripe/project/:id/products ──────────────────────────────────────
-router.get("/admin/stripe/project/:id/products", requireAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const pid = parseInt(String(req.params.id), 10);
-    const { stripe } = await resolveProject(pid);
-    const [products, prices] = await Promise.all([
-      stripe.products.list({ limit: 100, active: true }),
-      stripe.prices.list({ limit: 100, active: true, expand: ["data.product"] }),
-    ]);
-    const pricesByProduct: Record<string, any[]> = {};
-    for (const price of prices.data) {
-      const pid2 = typeof price.product === "string" ? price.product : (price.product as any).id;
-      if (!pricesByProduct[pid2]) pricesByProduct[pid2] = [];
-      pricesByProduct[pid2].push({
-        id: price.id, unitAmount: price.unit_amount, currency: price.currency,
-        interval: price.recurring?.interval ?? null, type: price.type,
-        nickname: price.nickname,
-      });
-    }
-    const data = products.data.map(p => ({
-      id: p.id, name: p.name, description: p.description,
-      active: p.active, created: p.created,
-      images: p.images.slice(0, 1),
-      prices: pricesByProduct[p.id] ?? [],
-    }));
-    res.json({ data });
-  } catch (err: any) {
-    sendStripeError(res, err);
-  }
-});
-
-// POST /admin/stripe/project/:id/products ──────────────────────────────────────
-router.post("/admin/stripe/project/:id/products", requireAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const pid = parseInt(String(req.params.id), 10);
-    const { name, description, amount, currency = "eur", interval } = req.body as any;
-    if (!name || !amount) { res.status(400).json({ error: "name y amount requeridos" }); return; }
-    const { stripe } = await resolveProject(pid);
-    const product = await stripe.products.create({ name, description });
-    const priceParams: any = {
-      product: product.id,
-      unit_amount: Math.round(Number(amount) * 100),
-      currency,
-    };
-    if (interval) priceParams.recurring = { interval };
-    const price = await stripe.prices.create(priceParams);
-    res.json({ product, price });
   } catch (err: any) {
     sendStripeError(res, err);
   }
@@ -581,32 +543,6 @@ router.get("/admin/stripe/project/:id/invoices", requireAdmin, async (req: Reque
       pdfUrl: inv.invoice_pdf,
     }));
     res.json({ data, hasMore: invoices.has_more });
-  } catch (err: any) {
-    sendStripeError(res, err);
-  }
-});
-
-// POST /admin/stripe/project/:id/invoices ─────────────────────────────────────
-router.post("/admin/stripe/project/:id/invoices", requireAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const pid = parseInt(String(req.params.id), 10);
-    const { customerId, description, amount, currency = "eur", daysUntilDue = 30, autoSend = false } = req.body as any;
-    if (!customerId || !amount) { res.status(400).json({ error: "customerId y amount requeridos" }); return; }
-    const { stripe } = await resolveProject(pid);
-    await stripe.invoiceItems.create({
-      customer: customerId,
-      amount: Math.round(Number(amount) * 100),
-      currency,
-      description,
-    });
-    const invoice = await stripe.invoices.create({
-      customer: customerId,
-      days_until_due: Number(daysUntilDue),
-      collection_method: "send_invoice",
-    });
-    const finalized = await stripe.invoices.finalizeInvoice(invoice.id);
-    if (autoSend) await stripe.invoices.sendInvoice(finalized.id);
-    res.json({ invoice: finalized });
   } catch (err: any) {
     sendStripeError(res, err);
   }
@@ -664,39 +600,7 @@ router.get("/admin/stripe/project/:id/payouts", requireAdmin, async (req: Reques
   }
 });
 
-// POST /admin/stripe/project/:id/charges ──────────────────────────────────────
-router.post("/admin/stripe/project/:id/charges", requireAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const pid = parseInt(String(req.params.id), 10);
-    const { amount, currency = "eur", description, customerEmail } = req.body as any;
-    if (!amount) { res.status(400).json({ error: "amount requerido" }); return; }
-    const { stripe } = await resolveProject(pid);
-    const pi = await stripe.paymentIntents.create({
-      amount: Math.round(Number(amount) * 100),
-      currency, description,
-      receipt_email: customerEmail,
-      automatic_payment_methods: { enabled: true },
-    });
-    res.json({ clientSecret: pi.client_secret, paymentIntentId: pi.id });
-  } catch (err: any) {
-    sendStripeError(res, err);
-  }
-});
-
-// POST /admin/stripe/project/:id/refunds ──────────────────────────────────────
-router.post("/admin/stripe/project/:id/refunds", requireAdmin, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const pid = parseInt(String(req.params.id), 10);
-    const { chargeId, amount, reason = "requested_by_customer" } = req.body as any;
-    if (!chargeId) { res.status(400).json({ error: "chargeId requerido" }); return; }
-    const { stripe } = await resolveProject(pid);
-    const params: any = { charge: chargeId, reason };
-    if (amount) params.amount = Math.round(Number(amount) * 100);
-    const refund = await stripe.refunds.create(params);
-    res.json({ refund });
-  } catch (err: any) {
-    sendStripeError(res, err);
-  }
-});
+// Productos, precios, enlaces de pago, cupones, alta de suscripciones, facturas,
+// pagos y devoluciones del proyecto: routes/stripe-commerce.ts
 
 export default router;
