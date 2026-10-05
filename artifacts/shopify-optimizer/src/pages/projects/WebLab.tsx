@@ -1,4 +1,21 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+
+import { useState as _useStateSR } from "react";
+/** Muestra el secreto enmascarado con botón para revelar el valor completo y copiarlo. */
+function SecretReveal({ masked, value }: { masked: string; value?: string }) {
+  const [shown, setShown] = _useStateSR(false);
+  const [copied, setCopied] = _useStateSR(false);
+  const full = value ?? masked;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontFamily: "monospace", fontSize: 12, color: "#ef4444", background: "#0a0000", padding: "6px 10px", borderRadius: 6, marginBottom: 6, wordBreak: "break-all" }}>
+      <span style={{ flex: 1, minWidth: 0 }}>{shown ? full : masked}</span>
+      {value && (
+        <button type="button" onClick={() => setShown(v => !v)} style={{ fontSize: 10, border: "1px solid #ffffff22", background: "transparent", color: "#ddd", borderRadius: 5, padding: "2px 7px", cursor: "pointer" }}>{shown ? "Ocultar" : "Mostrar"}</button>
+      )}
+      <button type="button" onClick={() => { void navigator.clipboard?.writeText(full).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} style={{ fontSize: 10, border: "1px solid #ffffff22", background: "transparent", color: "#ddd", borderRadius: 5, padding: "2px 7px", cursor: "pointer" }}>{copied ? "Copiado" : "Copiar"}</button>
+    </div>
+  );
+}
 import { useRoute, useLocation } from "wouter";
 import { scoreColor } from "@/lib/utils";
 import { LiveOperation } from "@/components/LiveOperation";
@@ -90,7 +107,7 @@ interface HistoryItem {
 }
 
 interface ExposedSecret {
-  type: string; service: string; severity: string; masked: string; raw: string;
+  type: string; service: string; severity: string; masked: string; value?: string;
   context: string; recommendation: string; lineNumber: number;
 }
 interface SecretsReport {
@@ -319,9 +336,7 @@ function SecurityPanel({ scan }: { scan: DeepScanResult }) {
                       <span style={{ fontSize: 11, color: "#aaa" }}>— {sec.type}</span>
                       <span style={{ fontSize: 10, color: "#666" }}>línea {sec.lineNumber}</span>
                     </div>
-                    <div style={{ fontFamily: "monospace", fontSize: 12, color: "#ef4444", background: "#0a0000", padding: "6px 10px", borderRadius: 6, marginBottom: 6, wordBreak: "break-all" }}>
-                      {sec.masked}
-                    </div>
+                    <SecretReveal masked={sec.masked} value={sec.value} />
                     <p style={{ color: "#888", fontSize: 11, margin: "0 0 4px", fontStyle: "italic", wordBreak: "break-all" }}>
                       Contexto: …{sec.context.slice(0, 120)}…
                     </p>
@@ -411,9 +426,7 @@ function SecretsScanPanel({ report, onDownload }: { report: SecretsReport; onDow
                 <span style={{ fontSize: 11, color: "#aaa" }}>— {sec.type}</span>
                 <span style={{ fontSize: 10, color: "#666", marginLeft: "auto" }}>línea {sec.lineNumber}</span>
               </div>
-              <div style={{ fontFamily: "monospace", fontSize: 12, color: sevC[sec.severity] || "#ef4444", background: "#0a0000", padding: "6px 10px", borderRadius: 6, marginBottom: 6, wordBreak: "break-all" }}>
-                {sec.masked}
-              </div>
+              <SecretReveal masked={sec.masked} value={sec.value} />
               <p style={{ color: "#777", fontSize: 11, margin: "0 0 6px", wordBreak: "break-all", fontStyle: "italic" }}>
                 Contexto: …{sec.context.slice(0, 150)}…
               </p>

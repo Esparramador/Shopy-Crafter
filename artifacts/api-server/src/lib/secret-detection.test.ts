@@ -21,9 +21,11 @@ describe("detector de secretos", () => {
     const key = fake("sk_live_", 30);
     const [hit] = detectSecrets(`const stripe = Stripe("${key}");`);
     expect(hit.severity).toBe("critical");
+    // El valor completo va en `value` (para que el admin se lo enseñe al cliente);
+    // `masked` y `context` quedan enmascarados (es lo único que puede compartirse).
+    expect(hit.value).toBe(key);
     expect(hit.masked).not.toBe(key);
     expect(hit.context).not.toContain(key);
-    expect(JSON.stringify(hit)).not.toContain(key);
   });
 
   it("marca las claves públicas por diseño sin presentarlas como fuga", () => {

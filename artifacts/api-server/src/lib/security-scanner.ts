@@ -28,6 +28,8 @@ export interface SecurityFinding {
   title: string;
   description: string;
   evidence?: string;
+  /** Valor completo del secreto filtrado (solo respuesta al admin). */
+  secretValue?: string;
   attackerPerspective: string;
   hardeningSteps: string[];
   mitreAttack: string[];
@@ -390,6 +392,7 @@ function checkLeakedSecrets(sources: Array<{ label: string; content: string }>):
           ? `${d.service} publica esta clave en el navegador por diseño. Es un riesgo si no está restringida a tu dominio y a las APIs necesarias.`
           : `Se encontró ${d.type} de ${d.service} en ${src.label}, código que cualquier visitante puede descargar.`,
         evidence: `${d.masked} · ${src.label}, línea ${d.lineNumber}`,
+        secretValue: d.value,
         attackerPerspective: d.publicByDesign
           ? "Un tercero puede reutilizar la clave desde su propio sitio y consumir tu cuota o generar coste si no tiene restricción de referer."
           : `Basta con ver el código fuente para copiar la credencial y usarla contra ${d.service}: acceso a datos o gasto a tu cargo, sin explotar nada.`,

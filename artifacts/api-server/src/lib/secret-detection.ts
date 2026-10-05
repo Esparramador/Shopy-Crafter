@@ -33,6 +33,8 @@ export interface DetectedSecret {
   type: string;
   severity: SecretSeverity;
   cvss: number;
+  /** Valor completo. Solo para respuestas solo-admin; nunca en informes compartidos. */
+  value: string;
   masked: string;
   /** Fragmento alrededor del hallazgo con el valor ya enmascarado. */
   context: string;
@@ -121,7 +123,7 @@ export function detectSecrets(content: string): DetectedSecret[] {
     const context = content.slice(start, end).split(value).join(masked).replace(/\s+/g, " ").trim();
     out.push({
       ruleId: rule.id, service: rule.service, type: rule.type, severity: rule.severity, cvss: rule.cvss,
-      masked, context, lineNumber: lineOf(idx), recommendation: rule.fix, publicByDesign: Boolean(rule.publicByDesign),
+      value, masked, context, lineNumber: lineOf(idx), recommendation: rule.fix, publicByDesign: Boolean(rule.publicByDesign),
     });
   };
 
