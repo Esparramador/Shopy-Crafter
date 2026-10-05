@@ -177,10 +177,10 @@ function OverviewTab({ projectId }: { projectId: string }) {
 
       {/* KPIs */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(160px, 1fr))", gap:12 }}>
-        <KpiCard label="Productos" value={String(data.productCount)} sub="En catálogo" icon="📦" />
-        <KpiCard label="Categorías" value={String(data.categoryCount)} sub="En árbol" icon="🗂️" color={PL} />
-        <KpiCard label="Pedidos (recientes)" value={String(data.orderCount)} sub="Últimos cargados" icon="📋" color="#34d399" />
-        <KpiCard label="Revenue (recientes)" value={fmt(data.revenue30d)} sub="Suma pedidos cargados" icon="💰" color={PP} />
+        <KpiCard label="Productos" value={data.connected ? String(data.productCount) : "—"} sub="En catálogo" icon="📦" />
+        <KpiCard label="Categorías" value={data.connected ? String(data.categoryCount) : "—"} sub="En árbol" icon="🗂️" color={PL} />
+        <KpiCard label="Pedidos (recientes)" value={data.connected ? String(data.orderCount) : "—"} sub="Últimos cargados" icon="📋" color="#34d399" />
+        <KpiCard label="Ventas (recientes)" value={data.connected ? fmt(data.revenue30d) : "—"} sub="Suma pedidos cargados" icon="💰" color={PP} />
       </div>
 
       {/* Últimos pedidos */}

@@ -109,12 +109,13 @@ const DEFAULT_ADMIN_NAV = [
 
 // ─── Token Expired Banner ────────────────────────────────────────────────────
 function TokenExpiredBanner({
-  projectId, domain, tokenExpiresAt, onSettings,
+  projectId, domain, tokenExpiresAt, onSettings, platformLabel,
 }: {
   projectId: number;
   domain: string | null;
   tokenExpiresAt: string | null;
   onSettings: () => void;
+  platformLabel: string;
 }) {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
@@ -137,10 +138,10 @@ function TokenExpiredBanner({
       <span style={{ fontSize: 16, flexShrink: 0 }}>🔑</span>
       <span style={{ flex: 1, minWidth: 200 }}>
         <strong style={{ color: "#f87171" }}>
-          {isExpired ? `Token Shopify expirado${expiredSince ? ` (${expiredSince})` : ""}` : "Token Shopify no configurado"}
+          {isExpired ? `Token de ${platformLabel} caducado${expiredSince ? ` (${expiredSince})` : ""}` : `Token de ${platformLabel} no configurado`}
         </strong>
         {" — "}
-        Las acciones que requieren la API de Shopify están pausadas.
+        Las acciones que requieren la API de {platformLabel} están pausadas.
         {" "}
         <span style={{ color: "var(--t3)" }}>
           El asistente usará los datos cacheados del último escaneo para análisis e informes.
@@ -836,6 +837,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             domain={activeProject.shopDomain}
             tokenExpiresAt={activeProject.tokenExpiresAt ?? null}
             onSettings={() => navigate(`/projects/${activeProjectId}/settings`)}
+            platformLabel={activePlatformDef.label}
           />
         )}
 

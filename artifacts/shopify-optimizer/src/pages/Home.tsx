@@ -20,6 +20,8 @@ interface StoreSummary {
   totalAttributed: number;
   sparkline: number[];
   loading: boolean;
+  /** Hay snapshots de ventas sincronizados (hoy solo Shopify los genera). */
+  hasData: boolean;
 }
 
 const PLATFORM_COLORS_HOME: Record<string, string> = {
@@ -155,6 +157,10 @@ function StoreRevenueRow({ store, rank }: { store: StoreSummary; rank: number })
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         {store.loading ? (
           <div className="skeleton" style={{ width: 80, height: 18, borderRadius: 4, marginBottom: 4 }} />
+        ) : !store.hasData ? (
+          <p style={{ fontSize: 11, color: "var(--t4)" }}>
+            {store.platformType === "shopify" ? "Sin ventas sincronizadas" : "Ventas en su panel"}
+          </p>
         ) : (
           <>
             <p style={{ fontSize: 16, fontWeight: 800, color: "var(--t)", letterSpacing: "-0.3px" }}>
@@ -167,7 +173,7 @@ function StoreRevenueRow({ store, rank }: { store: StoreSummary; rank: number })
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
         <Sparkline data={store.sparkline} color={pColor} />
-        {!store.loading && <TrendBadge value={store.trend} />}
+        {!store.loading && store.hasData && <TrendBadge value={store.trend} />}
       </div>
     </div>
   );
@@ -236,7 +242,7 @@ export default function Home() {
       projectId: p.id, storeName: p.name, domain: p.shopDomain ?? "",
       niche: p.storeNiche ?? "", platformType: p.platformType ?? "shopify",
       revenue30: 0, orders30: 0, aov: 0,
-      trend: 0, totalAttributed: 0, sparkline: [], loading: true,
+      trend: 0, totalAttributed: 0, sparkline: [], loading: true, hasData: false,
     }));
     setStores(initial);
 
@@ -254,7 +260,7 @@ export default function Home() {
           ...s, storeName: d.storeName ?? p.name,
           revenue30: rev30, orders30: ord30, aov,
           trend: d.trend ?? 0, totalAttributed: d.totalAttributedRevenue ?? 0,
-          sparkline, loading: false,
+          sparkline, loading: false, hasData: snaps.length > 0,
         } : s));
       } catch {
         setStores(prev => prev.map(s => s.projectId === p.id ? { ...s, loading: false } : s));
@@ -268,7 +274,8 @@ export default function Home() {
   const syncAll = async () => {
     if (!projects || projects.length === 0) return;
     setSyncingAll(true);
-    await Promise.all(projects.map(async (p: any) => {
+    // La sincronización de ventas usa la API de pedidos de Shopify.
+    await Promise.all(projects.filter((p: any) => (p.platformType ?? "shopify") === "shopify").map(async (p: any) => {
       try {
         await fetch(`${API_BASE}/api/intelligence/sync-revenue`, {
           method: "POST", credentials: "include",
@@ -315,7 +322,7 @@ export default function Home() {
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 12, opacity: syncingAll ? 0.6 : 1 }}
           >
             <RefreshCw size={13} style={{ animation: syncingAll ? "spin 1s linear infinite" : "none" }} />
-            {syncingAll ? "Sincronizando..." : "Sincronizar Shopify"}
+            {syncingAll ? "Sincronizando..." : "Sincronizar ventas Shopify"}
           </button>
           <button onClick={() => navigate("/new-project")} className="btn-primary" style={{ padding: "8px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
             <Plus size={13} /> Nueva Tienda
@@ -598,7 +605,7 @@ export default function Home() {
                         <p style={{ fontSize: 10, color: "var(--t4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.shopDomain ?? "—"}</p>
                       </div>
                     </div>
-                    {storeData && !storeData.loading ? (
+                    {storeData && !storeData.loading && storeData.hasData ? (
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <p style={{ fontSize: 14, fontWeight: 800, color: "var(--t)" }}>€{storeData.revenue30.toLocaleString("es-ES", { maximumFractionDigits: 0 })}</p>

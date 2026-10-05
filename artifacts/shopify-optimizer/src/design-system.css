@@ -69,7 +69,11 @@
 }
 
 /* ── BASE ── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* En @layer base: fuera de capa anulaba todas las utilidades Tailwind de
+   padding/margin (px-4, mt-1…), que viven en @layer utilities. */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+}
 html {
   scroll-behavior: smooth;
   /* height:100% sin overflow:hidden — el admin AppLayout lo pone vía JS
@@ -1215,8 +1219,15 @@ body[data-modal-open] .floating-widget { visibility: hidden; pointer-events: non
   overscroll-behavior: contain;
 }
 
+/* ── Rejillas responsive (antes solo existían en móvil: en escritorio las tarjetas se apilaban) ── */
+.grid-r4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.grid-r3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.grid-r2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+
 /* ── TABLET (601–1024px) ─── */
 @media (min-width: 601px) and (max-width: 1024px) {
+  .grid-r4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-r3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ── MOBILE (≤ 600px) ─── */

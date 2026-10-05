@@ -3,12 +3,13 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { GradeBadge } from "@/components/ui/GradeBadge";
 import {
   useGetProjectProducts,
+  useListProjects,
   useSyncProducts,
   useGetCatalogOpportunities,
   getGetProjectProductsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import{ RefreshCw, Search, AlertCircle, TrendingUp, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff, Film, Box }from "lucide-react";
+import{ RefreshCw, Search, AlertCircle, Lightbulb, Package, ShoppingBag, DollarSign, CheckCircle2, Plus, X, Sparkles, Loader2, ExternalLink, Key, Edit3, Save, Eye, EyeOff, Film, Box, ImageOff }from "lucide-react";
 import CreateAdModal from "@/components/CreateAdModal";
 import { formatCurrency, getGradeColor } from "@/lib/utils";
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -16,6 +17,8 @@ import { motion } from "framer-motion";
 import SaveReportButton from "@/components/SaveReportButton";
 import { LiveOperation } from "@/components/LiveOperation";
 import { ModalOverlay } from "@/components/ModalOverlay";
+import { getPlatform } from "@/lib/platform-capabilities";
+import { Link } from "wouter";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -34,9 +37,10 @@ interface EditableProduct{ id: string;
   [key: string]: unknown;
 }
 
-function ProductEditModal({ projectId, product, onClose, onUpdated }: {
+function ProductEditModal({ projectId, product, platformKey, onClose, onUpdated }: {
   projectId: number;
   product: EditableProduct;
+  platformKey: string;
   onClose: () => void;
   onUpdated: () => void;
 }) {
@@ -249,9 +253,13 @@ function ProductEditModal({ projectId, product, onClose, onUpdated }: {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">URL Handle</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                {platformKey === "prestashop" ? "URL amigable" : platformKey === "woocommerce" ? "Slug del producto" : "URL Handle"}
+              </label>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">/products/</span>
+                {platformKey !== "prestashop" && (
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{platformKey === "woocommerce" ? "/product/" : "/products/"}</span>
+                )}
                 <input
                   value={handle}
                   onChange={(e) => setHandle(e.target.value)}
@@ -971,6 +979,12 @@ export default function AuditPage() {
   const [, params] = useRoute("/projects/:id/audit");
   const projectId = parseInt(params?.id || "0");
   const queryClient = useQueryClient();
+  // Cada plataforma se audita a su manera: Shopify/Woo/PrestaShop sincronizan catálogo;
+  // Stripe y las webs sin tienda solo tienen auditoría web (sus productos viven en otro sitio).
+  const { data: projectList } = useListProjects();
+  const projectRow = (projectList as Array<{ id: number; platformType?: string; shopDomain?: string }> | undefined)?.find(p => p.id === projectId);
+  const platform = getPlatform(projectRow?.platformType);
+  const catalogSync = ["shopify", "woocommerce", "prestashop", "tiendanube"].includes(platform.key);
 
   const [filterGrade, setFilterGrade] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
@@ -983,7 +997,7 @@ export default function AuditPage() {
   const [scanResult, setScanResult] = useState<string>("");
   const [tokenLoading, setTokenLoading] = useState(false);
   const [editProduct, setEditProduct] = useState<EditableProduct | null>(null);
-  const [adProduct, setAdProduct] = useState<{ id: string; title: string } | null>(null);
+  const [adProduct, setAdProduct] = useState<{ id: string; title: string; images?: Array<{ src: string; alt?: string | null }>; price?: string | null; bodyHtml?: string | null } | null>(null);
   const [model3dProduct, setModel3dProduct] = useState<Model3dProduct | null>(null);
   const [optimizingId, setOptimizingId] = useState<string | null>(null);
   const [bulkOptimizing, setBulkOptimizing] = useState(false);
@@ -1244,7 +1258,7 @@ export default function AuditPage() {
   const needImprovement =
     (data?.gradeCounts?.C || 0) + (data?.gradeCounts?.D || 0) + (data?.gradeCounts?.F || 0);
   const pctNeedImprovement = data?.total ? Math.round((needImprovement / data.total) * 100) : 0;
-  const revImpact = data?.avgScore ? Math.round((100 - data.avgScore) * 12.5) : 0;
+  const lowImageCount: number = (data as { lowImageCount?: number } | undefined)?.lowImageCount ?? 0;
 
   if (isLoading) {
     return (
@@ -1257,9 +1271,9 @@ export default function AuditPage() {
   return (
     <div className="space-y-8 pb-12">
       {/* Header */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">Auditoría del Catálogo</h1>
+      <div className="flex flex-col md:flex-row gap-4 items-start justify-between">
+        <div className="shrink-0">
+          <h1 className="text-3xl font-display font-bold text-foreground whitespace-nowrap">{catalogSync ? "Auditoría del Catálogo" : "Auditoría Web"}</h1>
           <p className="text-muted-foreground mt-1">
             {data?.total ? (
               <>
@@ -1274,10 +1288,14 @@ export default function AuditPage() {
                   </span>
                 )}
               </>
-            ) : "Escanea tu tienda para comenzar"}
+            ) : catalogSync
+              ? `Sincroniza el catálogo de ${platform.label} para empezar`
+              : platform.key === "stripe"
+                ? "Auditoría de la web asociada a tu cuenta Stripe"
+                : "Rendimiento, SEO y accesibilidad de tu web"}
           </p>
         </div>
-        <div className="flex gap-3 flex-wrap items-center">
+        <div className="flex gap-3 flex-wrap items-center md:justify-end">
           <SaveReportButton
             projectId={projectId}
             title="Auditoría del Catálogo"
@@ -1310,53 +1328,55 @@ ${products.slice(0, 100).map((p: any) => `<tr><td>${p.title}</td><td><strong>${p
 ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0, 20).map((o: any) => `<li><strong>${o.type}:</strong> ${o.title} — ${o.description || ""}</li>`).join("")}</ul>` : ""}`;
             }}
           />
-          <button
+          {catalogSync && <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-[var(--gold)] text-black px-5 py-3 rounded-xl font-semibold flex items-center gap-2 hover:brightness-110 transition-all shadow-[0_0_15px_rgba(200,168,75,0.3)]"
+            className="bg-[var(--gold)] text-black px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 hover:brightness-110 transition-all shadow-[0_0_15px_rgba(200,168,75,0.3)]"
           >
-            <Plus className="w-5 h-5" />
-            Crear Producto
-          </button>
+            <Plus className="w-4 h-4" />
+            Crear producto
+          </button>}
           <button
             onClick={runStoreAudit}
             disabled={storeAuditStatus === "running"}
             title="Auditoría completa de la tienda: PageSpeed + SEO + accesibilidad + recomendaciones"
-            className="border border-purple-500/40 text-purple-300 px-4 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-purple-500/10 transition-all disabled:opacity-60"
+            className="border border-purple-500/40 text-purple-300 px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-purple-500/10 transition-all disabled:opacity-60"
           >
             {storeAuditStatus === "running" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            {storeAuditStatus === "running" ? "Auditando tienda..." : "🔍 Auditoría Tienda"}
+            {storeAuditStatus === "running" ? "Auditando web..." : "Auditoría web"}
           </button>
-          <button
+          {platform.usesStoreToken && <button
             onClick={handleRegenerateToken}
             disabled={tokenLoading}
-            className="border border-[var(--gold)]/40 text-[var(--gold)] px-4 py-3 rounded-xl font-semibold flex items-center gap-2 hover:bg-[var(--gold)]/10 transition-all disabled:opacity-60"
+            title={`Renueva el token de acceso de ${platform.label}`}
+            className="border border-[var(--gold)]/40 text-[var(--gold)] px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-[var(--gold)]/10 transition-all disabled:opacity-60"
           >
             {tokenLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
-            Regenerar Token
-          </button>
-          <button
+            Renovar token
+          </button>}
+          {catalogSync && <button
             onClick={handleScan}
             disabled={isScanning}
-            className="bg-primary text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-70"
+            title={`Descarga los productos de ${platform.label} y calcula su puntuación`}
+            className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(91,78,255,0.3)] disabled:opacity-70"
           >
-            <RefreshCw className={`w-5 h-5 ${isScanning ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${isScanning ? "animate-spin" : ""}`} />
             {scanStatus === "syncing"
               ? "Sincronizando..."
               : scanStatus === "auditing"
               ? "Calculando scores..."
-              : "Escanear Tienda"}
-          </button>
+              : `Sincronizar ${platform.label}`}
+          </button>}
         </div>
       </div>
 
       {/* Progreso vivo del escaneo (sustituye al texto estático "Sincronizando...") */}
       <LiveOperation
         active={isScanning}
-        title={scanStatus === "syncing" ? "Sincronizando catálogo desde Shopify" : "Calculando scores de auditoría"}
+        title={scanStatus === "syncing" ? `Sincronizando catálogo desde ${platform.label}` : "Calculando scores de auditoría"}
         messages={
           scanStatus === "syncing"
             ? [
-                "Conectando con la API de Shopify...",
+                `Conectando con la API de ${platform.label}...`,
                 "Descargando productos del catálogo...",
                 "Procesando variantes e inventario...",
                 "Sincronizando imágenes y metadatos...",
@@ -1389,7 +1409,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
           handleRegenerateToken ya limpia scanError; aquí también ocultamos si scanError todavía existe pero el token está OK. */}
       <LiveOperation
         active={tokenLoading}
-        title="Regenerando token Shopify"
+        title={`Renovando token de ${platform.label}`}
         messages={["Solicitando nuevo token de acceso...", "Verificando permisos de la app..."]}
         estimatedSec={10}
       />
@@ -1415,6 +1435,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
         <ProductEditModal
           projectId={projectId}
           product={editProduct}
+          platformKey={platform.key}
           onClose={() => setEditProduct(null)}
           onUpdated={() => {
             queryClient.invalidateQueries({ queryKey: getGetProjectProductsQueryKey(projectId) });
@@ -1428,6 +1449,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
           projectId={projectId}
           productId={adProduct.id}
           productTitle={adProduct.title}
+          product={{ images: adProduct.images, price: adProduct.price, bodyHtml: adProduct.bodyHtml, platformLabel: platform.label }}
           onClose={() => setAdProduct(null)}
         />
       )}
@@ -1440,6 +1462,33 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
         />
       )}
 
+      {!catalogSync && (
+        <GlassCard className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-1">
+                {platform.key === "stripe" ? "Tus productos y precios están en Stripe" : "Esta web no tiene catálogo de tienda conectado"}
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-2xl">
+                {platform.key === "stripe"
+                  ? "Productos, precios, suscripciones y facturas se gestionan en Stripe Hub. Aquí auditas la web donde vendes: velocidad, SEO y accesibilidad."
+                  : "La auditoría web analiza velocidad (PageSpeed), SEO técnico y accesibilidad de tu sitio y te da recomendaciones priorizadas."}
+                {!projectRow?.shopDomain && " Añade la URL de tu web en Ajustes para poder auditarla."}
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {platform.key === "stripe" && (
+                <Link href={`/projects/${projectId}/stripe-hub`} className="bg-[#635bff] text-white px-4 py-2.5 rounded-xl text-sm font-semibold">Abrir Stripe Hub</Link>
+              )}
+              {!projectRow?.shopDomain && (
+                <Link href={`/projects/${projectId}/settings`} className="border border-border px-4 py-2.5 rounded-xl text-sm font-semibold text-foreground">Ir a Ajustes</Link>
+              )}
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
+      {catalogSync && (<>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <GlassCard delay={0.1} className="p-5">
@@ -1483,12 +1532,15 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
         </GlassCard>
         <GlassCard delay={0.4} className="p-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-green-400" />
+            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+              <ImageOff className="w-5 h-5 text-orange-400" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Revenue Potencial</p>
-              <h3 className="text-2xl font-bold text-[#00d68f]">+{formatCurrency(revImpact)}</h3>
+              <p className="text-xs text-muted-foreground font-medium">Con menos de 3 fotos</p>
+              <h3 className="text-2xl font-bold text-foreground">
+                {lowImageCount}
+                {data?.total ? <span className="text-sm text-muted-foreground font-normal ml-1">de {data.total}</span> : null}
+              </h3>
             </div>
           </div>
         </GlassCard>
@@ -1570,7 +1622,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
               "Cargando datos del producto y contexto de marca...",
               "Reescribiendo título y descripción con Claude...",
               "Generando metadatos SEO y palabras clave...",
-              "Aplicando cambios en Shopify...",
+              `Aplicando cambios en ${platform.label}...`,
             ]}
             estimatedSec={45}
           />
@@ -1581,7 +1633,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
               "Cargando catálogo y memoria de marca...",
               "Procesando productos en batch...",
               "Reescribiendo títulos, descripciones y SEO...",
-              "Aplicando cambios en Shopify uno a uno...",
+              `Aplicando cambios en ${platform.label} uno a uno...`,
               "Esto puede tardar varios minutos: no cierres la pestaña.",
             ]}
             estimatedSec={300}
@@ -1660,52 +1712,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
 
                 <div className="p-4 flex-1 flex flex-col justify-between min-w-0">
                   <div>
-                    <div className="flex items-start justify-between gap-2 mb-0.5">
-                      <h3 className="text-base font-bold text-foreground line-clamp-2">{product.title}</h3>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => optimizeProduct(String((product as any).shopifyProductId || product.id))}
-                          disabled={optimizingId === String((product as any).shopifyProductId || product.id) || bulkOptimizing}
-                          className="p-2.5 rounded-lg hover:bg-yellow-500/10 text-muted-foreground hover:text-yellow-400 transition-colors disabled:opacity-50 min-w-[36px] min-h-[36px] flex items-center justify-center"
-                          title="Optimizar con Shopy Crafter IA"
-                          aria-label="Optimizar producto con IA"
-                        >
-                          {optimizingId === String((product as any).shopifyProductId || product.id) ? <Loader2 className="w-5 h-5 animate-spin text-yellow-400" /> : <Sparkles className="w-5 h-5" />}
-                        </button>
-                        <button
-                          onClick={() => setAdProduct({ id: String((product as any).shopifyProductId || product.id), title: product.title })}
-                          className="p-2.5 rounded-lg hover:bg-purple-500/10 text-muted-foreground hover:text-purple-400 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
-                          title="Crear anuncio profesional"
-                          aria-label="Crear anuncio profesional con IA"
-                          data-testid={`btn-create-ad-${product.id}`}
-                        >
-                          <Film className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => setModel3dProduct({
-                            id: String((product as any).shopifyProductId || product.id),
-                            title: product.title,
-                            productType: (product as any).productType || "",
-                            bodyHtml: (product as any).bodyHtml || "",
-                            imageUrl: (product as any).images?.[0]?.src || undefined,
-                          })}
-                          className="p-2.5 rounded-lg hover:bg-cyan-500/10 text-muted-foreground hover:text-cyan-400 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
-                          title="Generar modelo 3D automático con Tripo3D AI"
-                          aria-label="Generar modelo 3D con IA"
-                          data-testid={`btn-model3d-${product.id}`}
-                        >
-                          <Box className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => setEditProduct(product as unknown as EditableProduct)}
-                          className="p-2.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
-                          title="Editar producto"
-                          aria-label="Editar producto"
-                        >
-                          <Edit3 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
+                    <h3 className="text-base font-bold text-foreground line-clamp-2 mb-1">{product.title}</h3>
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${
                         product.status === "active" ? "bg-green-500/10 text-green-400 border-green-500/20" :
@@ -1730,10 +1737,10 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                     <div className="grid grid-cols-5 gap-1.5">
                       {[
                         { label: "SEO", score: product.seoScore },
-                        { label: "Img", score: product.imageScore },
-                        { label: "Txt", score: product.descriptionScore },
-                        { label: "Tít", score: product.titleScore },
-                        { label: "Prc", score: product.priceScore },
+                        { label: "Imágenes", score: product.imageScore },
+                        { label: "Texto", score: product.descriptionScore },
+                        { label: "Título", score: product.titleScore },
+                        { label: "Precio", score: product.priceScore },
                       ].map((axis, i) => (
                         <div key={i} className="flex flex-col items-center gap-1">
                           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -1773,6 +1780,57 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
                       </div>
                     )}
                   </div>
+
+                  {(() => {
+                    const pid = String((product as any).shopifyProductId || product.id);
+                    const busy = optimizingId === pid;
+                    const btn = "min-w-0 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50";
+                    return (
+                      <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => optimizeProduct(pid)}
+                          disabled={busy || bulkOptimizing}
+                          className={`${btn} border-yellow-500/25 text-yellow-300 hover:bg-yellow-500/10`}
+                          title="Reescribe título, descripción y SEO con IA y lo guarda en la tienda"
+                        >
+                          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                          <span className="truncate">Optimizar</span>
+                        </button>
+                        <button
+                          onClick={() => setAdProduct({ id: pid, title: product.title, images: product.images ?? [], price: product.price ?? null, bodyHtml: (product as any).bodyHtml ?? null })}
+                          className={`${btn} border-purple-500/30 text-purple-300 hover:bg-purple-500/10`}
+                          title="Anuncio en vídeo a partir de las fotos, descripción y precio del producto"
+                          data-testid={`btn-create-ad-${product.id}`}
+                        >
+                          <Film className="w-4 h-4" />
+                          <span className="truncate">Vídeo anuncio</span>
+                        </button>
+                        <button
+                          onClick={() => setModel3dProduct({
+                            id: pid,
+                            title: product.title,
+                            productType: (product as any).productType || "",
+                            bodyHtml: (product as any).bodyHtml || "",
+                            imageUrl: (product as any).images?.[0]?.src || undefined,
+                          })}
+                          className={`${btn} border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/10`}
+                          title="Modelo 3D del producto con Tripo3D a partir de su foto"
+                          data-testid={`btn-model3d-${product.id}`}
+                        >
+                          <Box className="w-4 h-4" />
+                          <span className="truncate">3D</span>
+                        </button>
+                        <button
+                          onClick={() => setEditProduct(product as unknown as EditableProduct)}
+                          className={`${btn} border-white/10 text-foreground hover:bg-white/5`}
+                          title="Editar título, descripción, precio e imágenes"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                          <span className="truncate">Editar</span>
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </GlassCard>
               </div>
@@ -1781,7 +1839,7 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
               <div className="col-span-full py-20 text-center">
                 <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground">
-                  No hay productos. Haz clic en <strong>"Escanear Tienda"</strong> para sincronizar tu catálogo.
+                  No hay productos. Pulsa <strong>"Sincronizar {platform.label}"</strong> para traer tu catálogo.
                 </p>
               </div>
             )}
@@ -1900,6 +1958,8 @@ ${oppsData.length > 0 ? `<h2>Oportunidades Detectadas</h2><ul>${oppsData.slice(0
           )}
         </div>
       )}
+
+      </>)}
 
       {/* ─── Store Audit Modal ─── */}
       {showAuditModal && (
