@@ -274,12 +274,21 @@ export function AppLayout({ children }: AppLayoutProps) {
   const ap = cmsPanel ?? {};
 
   const pageLabels: Record<string, string> = {};
+  // Módulos de todas las plataformas primero (p. ej. un hub abierto por URL directa), luego los del proyecto activo.
+  Object.values(PLATFORMS).forEach(p => p.adminModules.forEach(m => { pageLabels[m.id] ??= m.label; }));
   moduleNav.forEach((m: any) => { pageLabels[m.id] = m.label; });
   pageLabels["settings"] = "Configuración";
 
   const standaloneModule = !match ? location.replace(/^\//, "").split("/")[0] : "";
   const currentPage = match ? ((params as Record<string, string> | null)?.["*"] ?? "") : standaloneModule;
-  const pageLabel = pageLabels[currentPage] ?? "Dashboard";
+  // Etiqueta del menú lateral cuyo href coincide con la ruta (coincidencia más larga);
+  // en /projects/:id/<modulo> se compara con "/<modulo>" (p. ej. web-designer).
+  const navItems = [...adminNav, ...shopybrainNav] as { href?: string; label?: string }[];
+  const labelForPath = (p: string) => navItems
+    .filter(n => n.href && (p === n.href || p.startsWith(n.href + "/")))
+    .sort((x, y) => (y.href?.length ?? 0) - (x.href?.length ?? 0))[0]?.label;
+  const navLabel = labelForPath(match ? `/${currentPage}` : location);
+  const pageLabel = pageLabels[currentPage] ?? navLabel ?? (location.startsWith("/admin") ? "Admin" : "Dashboard");
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
@@ -653,7 +662,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <span className="topbar-page">{pageLabel}</span>
               </>
             ) : (
-              <span className="topbar-client">Dashboard</span>
+              <span className="topbar-client">{navLabel ?? "Dashboard"}</span>
             )}
           </div>
           <div className="topbar-right">

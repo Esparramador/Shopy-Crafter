@@ -1094,7 +1094,7 @@ router.post("/mcp/install", async (req, res): Promise<void> => {
 
     try {
       const raw = execSync(`pnpm add -w "${npmPackage}" 2>&1`, {
-        cwd: "/home/runner/workspace",
+        cwd: path.resolve(process.cwd(), "../.."),
         timeout: 120_000,
         encoding: "utf8",
       });

@@ -401,9 +401,11 @@ function PlanesTab({ show }: { show: (msg: string, ok?: boolean) => void }) {
 
   const normFeats = (raw: any): string => {
     if (!raw) return "";
-    const arr: { text: string; included: boolean }[] = typeof raw === "string" ? JSON.parse(raw) : raw;
+    let arr: unknown;
+    try { arr = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return String(raw); }
     if (!Array.isArray(arr)) return "";
-    return arr.map(f => (f.included !== false ? f.text : `- ${f.text}`)).join("\n");
+    return arr.map((f: string | { text: string; included?: boolean }) =>
+      typeof f === "string" ? f : f.included !== false ? f.text : `- ${f.text}`).join("\n");
   };
 
   const load = useCallback(() => {

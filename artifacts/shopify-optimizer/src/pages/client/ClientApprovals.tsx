@@ -63,7 +63,7 @@ export default function ClientApprovals() {
 
   if (loading) {
     return (
-      <ClientLayout>
+      <ClientLayout padded>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 240 }}>
           <Loader2 size={26} style={{ color: "var(--gold)", animation: "spin 0.6s linear infinite" }} />
         </div>
@@ -72,7 +72,7 @@ export default function ClientApprovals() {
   }
 
   return (
-    <ClientLayout>
+    <ClientLayout padded>
       <div style={{ maxWidth: 760 }}>
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 24, fontWeight: 400, marginBottom: 4 }}>

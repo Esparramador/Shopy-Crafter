@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
+import { isEditorRoute, EDITOR_FLOAT_MIN_BOTTOM } from "@/lib/editor-routes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSafeTimeout } from "@/hooks/useSafeTimeout";
 import { useDraggable } from "@/hooks/use-draggable";
@@ -3633,7 +3634,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
           className="floating-widget"
           style={{
             position: "fixed",
-            bottom: dragPos.bottom,
+            bottom: isEditorRoute(location) ? Math.max(dragPos.bottom, EDITOR_FLOAT_MIN_BOTTOM) : dragPos.bottom,
             right: dragPos.right,
             zIndex: 9990,
             touchAction: "none",

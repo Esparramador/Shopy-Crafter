@@ -30,7 +30,7 @@ interface ClientCmsPanel {
   tooltips?: { logout?: string };
 }
 
-export function ClientLayout({ children }: { children: ReactNode }) {
+export function ClientLayout({ children, padded = false }: { children: ReactNode; padded?: boolean }) {
   const { user, logout } = useAuth();
   useNotifications();
   const [location, navigate] = useLocation();
@@ -392,7 +392,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
 
         {/* Page content */}
         <div className="main-content">
-          {children}
+          {padded ? <div className="page-inner">{children}</div> : children}
         </div>
       </div>
 

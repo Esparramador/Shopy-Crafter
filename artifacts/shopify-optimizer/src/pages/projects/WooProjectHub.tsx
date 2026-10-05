@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute } from "wouter";
+import { toast } from "@/hooks/use-toast";
 
 type Tab = "overview" | "orders" | "products" | "customers" | "coupons" | "inventory";
 
@@ -8,6 +9,15 @@ const WL = "#b97ab5";
 const WD = "#5b2d5f";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
+// Respuestas no-OK → error con el mensaje del API (antes se pintaban como datos: "NaN €", "undefined").
+async function okJson(r: Response) {
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d?.error ?? `HTTP ${r.status}`);
+  return d;
+}
+const loadError = (e: Error) => toast({ title: "Error cargando datos", description: e.message, variant: "destructive" });
+const saveError = (e: Error) => toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" });
 
 const fmt = (n: number, currency = "EUR") =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency, minimumFractionDigits: 2 }).format(n);
@@ -125,7 +135,7 @@ function OverviewTab({ projectId }: { projectId: string }) {
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/admin/woo/project/${projectId}/overview`, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setData(d); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [projectId]);
@@ -198,9 +208,9 @@ function OrdersTab({ projectId }: { projectId: string }) {
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (status) url += `&status=${status}`;
     fetch(url, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setOrders(d.orders ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId, page, search, status]);
 
   useEffect(() => { load(); }, [load]);
@@ -276,9 +286,9 @@ function ProductsTab({ projectId }: { projectId: string }) {
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (status) url += `&status=${status}`;
     fetch(url, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setProducts(d.products ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId, page, search, status]);
 
   useEffect(() => { load(); }, [load]);
@@ -287,14 +297,16 @@ function ProductsTab({ projectId }: { projectId: string }) {
   const saveProduct = async () => {
     if (!editing) return;
     setSaving(true);
-    await fetch(`${API}/admin/woo/project/${projectId}/products/${editing.id}`, {
-      method: "PUT", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editing.name, regular_price: String(editing.price), status: editing.status }),
-    });
-    setSaving(false);
-    setEditing(null);
-    load();
+    try {
+      await fetch(`${API}/admin/woo/project/${projectId}/products/${editing.id}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editing.name, regular_price: String(editing.price), status: editing.status }),
+      }).then(okJson);
+      setEditing(null);
+      load();
+    } catch (e) { saveError(e as Error); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -396,9 +408,9 @@ function CustomersTab({ projectId }: { projectId: string }) {
     let url = `${API}/admin/woo/project/${projectId}/customers?page=${page}&per_page=20`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     fetch(url, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setCustomers(d.customers ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId, page, search]);
 
   useEffect(() => { load(); }, [load]);
@@ -450,9 +462,9 @@ function CouponsTab({ projectId }: { projectId: string }) {
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/admin/woo/project/${projectId}/coupons`, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setCoupons(d.coupons ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId]);
 
   return (
@@ -504,9 +516,9 @@ function InventoryTab({ projectId }: { projectId: string }) {
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/admin/woo/project/${projectId}/inventory`, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setInv(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId]);
 
   if (loading) return <div style={{ textAlign:"center", padding:40, color:"rgba(255,255,255,0.4)" }}>Cargando inventario…</div>;

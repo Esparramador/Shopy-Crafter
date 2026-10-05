@@ -289,7 +289,7 @@ export default function ClientMessages() {
 
   return (
     <>
-    <ClientLayout>
+    <ClientLayout padded>
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontFamily: "var(--fh)", fontStyle: "italic", fontSize: 24, fontWeight: 400, marginBottom: 2 }}>
           {t("title", "Mensajes")}
