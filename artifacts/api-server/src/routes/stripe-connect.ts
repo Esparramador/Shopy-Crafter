@@ -6,6 +6,7 @@ import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
 import { resolveStripeForAccount } from "../lib/stripe-tenant.js";
+import { toMinorUnits } from "../lib/stripe-commerce.js";
 
 const router = Router();
 
@@ -247,7 +248,7 @@ router.get("/stripe/accounts", requireAuth, async (req: Request, res: Response):
 
 // ── GET /stripe/accounts/:accountId/overview ──────────────────────────────────
 // Dashboard financiero: balance + métricas (igual que leer productos Shopify)
-router.get("/stripe/accounts/:accountId/overview", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/stripe/accounts/:accountId/overview", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { accountId } = req.params;
     const db = await getDb();
@@ -316,7 +317,7 @@ router.get("/stripe/accounts/:accountId/overview", requireAuth, async (req: Requ
 });
 
 // ── GET /stripe/accounts/:accountId/transactions ─────────────────────────────
-router.get("/stripe/accounts/:accountId/transactions", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/stripe/accounts/:accountId/transactions", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { accountId } = req.params;
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
@@ -354,7 +355,7 @@ router.get("/stripe/accounts/:accountId/transactions", requireAuth, async (req: 
 });
 
 // ── GET /stripe/accounts/:accountId/customers ────────────────────────────────
-router.get("/stripe/accounts/:accountId/customers", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/stripe/accounts/:accountId/customers", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { accountId } = req.params;
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
@@ -386,7 +387,7 @@ router.get("/stripe/accounts/:accountId/customers", requireAuth, async (req: Req
 });
 
 // ── GET /stripe/accounts/:accountId/subscriptions ────────────────────────────
-router.get("/stripe/accounts/:accountId/subscriptions", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/stripe/accounts/:accountId/subscriptions", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { accountId } = req.params;
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
@@ -421,7 +422,7 @@ router.get("/stripe/accounts/:accountId/subscriptions", requireAuth, async (req:
 });
 
 // ── DELETE /stripe/accounts/:accountId/disconnect ─────────────────────────────
-router.delete("/stripe/accounts/:accountId/disconnect", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.delete("/stripe/accounts/:accountId/disconnect", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { accountId } = req.params;
     const db = await getDb();
@@ -447,7 +448,7 @@ router.delete("/stripe/accounts/:accountId/disconnect", requireAuth, async (req:
 });
 
 // ── POST /stripe/accounts/:accountId/sync ─────────────────────────────────────
-router.post("/stripe/accounts/:accountId/sync", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/accounts/:accountId/sync", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { accountId } = req.params;
     const db = await getDb();
@@ -569,7 +570,7 @@ async function getStripeForAccount(accountId: string | string[]): Promise<{ stri
 }
 
 // ── GET /stripe/accounts/:accountId/products ──────────────────────────────────
-router.get("/stripe/accounts/:accountId/products", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/stripe/accounts/:accountId/products", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
@@ -593,11 +594,11 @@ router.get("/stripe/accounts/:accountId/products", requireAuth, async (req: Requ
       })),
       has_more: products.has_more,
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── POST /stripe/accounts/:accountId/products ─────────────────────────────────
-router.post("/stripe/accounts/:accountId/products", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/accounts/:accountId/products", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const { name, description, price, currency = "eur", interval, images } = req.body as any;
@@ -607,18 +608,18 @@ router.post("/stripe/accounts/:accountId/products", requireAuth, async (req: Req
     if (price && Number(price) > 0) {
       const pd: Stripe.PriceCreateParams = {
         product: product.id,
-        unit_amount: Math.round(Number(price) * 100),
+        unit_amount: toMinorUnits(price, String(currency).toLowerCase()),
         currency: String(currency).toLowerCase(),
       };
       if (interval) pd.recurring = { interval };
       createdPrice = await stripe.prices.create(pd);
     }
     res.json({ product, price: createdPrice, message: `Producto "${name}" creado en Stripe` });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── PATCH /stripe/accounts/:accountId/products/:productId ─────────────────────
-router.patch("/stripe/accounts/:accountId/products/:productId", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.patch("/stripe/accounts/:accountId/products/:productId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const { name, description, active } = req.body as any;
@@ -628,21 +629,21 @@ router.patch("/stripe/accounts/:accountId/products/:productId", requireAuth, asy
       ...(active !== undefined ? { active } : {}),
     });
     res.json({ product: updated, message: "Producto actualizado" });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── DELETE /stripe/accounts/:accountId/products/:productId ────────────────────
 // Stripe no permite eliminar productos con precios — se archivan (active=false)
-router.delete("/stripe/accounts/:accountId/products/:productId", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.delete("/stripe/accounts/:accountId/products/:productId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     await stripe.products.update(req.params.productId as string, { active: false });
     res.json({ ok: true, message: "Producto archivado correctamente" });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── POST /stripe/accounts/:accountId/charges ──────────────────────────────────
-router.post("/stripe/accounts/:accountId/charges", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/accounts/:accountId/charges", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const { amount, currency = "eur", customerId, description, paymentMethodId, receiptEmail } = req.body as any;
@@ -658,11 +659,11 @@ router.post("/stripe/accounts/:accountId/charges", requireAuth, async (req: Requ
       automatic_payment_methods: paymentMethodId ? undefined : { enabled: true },
     });
     res.json({ paymentIntent: { id: pi.id, status: pi.status, clientSecret: pi.client_secret, amount: pi.amount, currency: pi.currency }, message: `PaymentIntent ${pi.id} creado (${pi.status})` });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── POST /stripe/accounts/:accountId/refunds ──────────────────────────────────
-router.post("/stripe/accounts/:accountId/refunds", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/accounts/:accountId/refunds", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const { chargeId, paymentIntentId, amount, reason = "requested_by_customer" } = req.body as any;
@@ -674,31 +675,31 @@ router.post("/stripe/accounts/:accountId/refunds", requireAuth, async (req: Requ
       reason: reason as any,
     });
     res.json({ refund: { id: refund.id, amount: refund.amount, status: refund.status, currency: refund.currency }, message: `Reembolso ${refund.id} — ${refund.status}` });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── POST /stripe/accounts/:accountId/customers ────────────────────────────────
-router.post("/stripe/accounts/:accountId/customers", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/accounts/:accountId/customers", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const { email, name, phone, description, metadata } = req.body as any;
     if (!email) { res.status(400).json({ error: "email requerido" }); return; }
     const customer = await stripe.customers.create({ email, name: name ?? undefined, phone: phone ?? undefined, description: description ?? undefined, metadata: metadata ?? undefined });
     res.json({ customer: { id: customer.id, email: customer.email, name: customer.name, created: customer.created }, message: `Cliente ${email} creado (${customer.id})` });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── GET /stripe/accounts/:accountId/customers/:customerId ─────────────────────
-router.get("/stripe/accounts/:accountId/customers/:customerId", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/stripe/accounts/:accountId/customers/:customerId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const customer = await stripe.customers.retrieve(req.params.customerId as string);
     res.json({ customer });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── GET /stripe/accounts/:accountId/invoices ──────────────────────────────────
-router.get("/stripe/accounts/:accountId/invoices", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/stripe/accounts/:accountId/invoices", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
@@ -717,58 +718,71 @@ router.get("/stripe/accounts/:accountId/invoices", requireAuth, async (req: Requ
       })),
       has_more: invoices.has_more,
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── POST /stripe/accounts/:accountId/invoices ─────────────────────────────────
-router.post("/stripe/accounts/:accountId/invoices", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/accounts/:accountId/invoices", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const { customerId, description, daysUntilDue = 30, lineItems, autoAdvance = false } = req.body as any;
     if (!customerId) { res.status(400).json({ error: "customerId requerido" }); return; }
-    if (lineItems?.length > 0) {
-      for (const item of lineItems) {
+    const items: Array<{ amount: number | string; currency?: string; description?: string }> = Array.isArray(lineItems) ? lineItems : [];
+    const currency = String(items[0]?.currency ?? "eur").toLowerCase();
+    if (items.some(i => String(i.currency ?? "eur").toLowerCase() !== currency)) {
+      res.status(400).json({ error: "Todas las líneas deben estar en la misma moneda" }); return;
+    }
+    // Primero la factura y después las líneas con `invoice`: desde la API 2022-08-01
+    // las líneas pendientes NO se incluyen al crear la factura (quedaba a 0 €).
+    const invoice = await stripe.invoices.create({
+      customer: customerId,
+      currency,
+      description: description ?? undefined,
+      days_until_due: Number(daysUntilDue),
+      collection_method: "send_invoice",
+      auto_advance: Boolean(autoAdvance),
+      pending_invoice_items_behavior: "exclude",
+    });
+    try {
+      for (const item of items) {
         await stripe.invoiceItems.create({
           customer: customerId,
-          amount: Math.round(Number(item.amount) * 100),
-          currency: String(item.currency ?? "eur").toLowerCase(),
+          invoice: invoice.id,
+          amount: toMinorUnits(item.amount, currency),
+          currency,
           description: item.description ?? "Servicio",
         });
       }
+    } catch (e) {
+      await stripe.invoices.del(invoice.id).catch(() => undefined);
+      throw e;
     }
-    const invoice = await stripe.invoices.create({
-      customer: customerId,
-      description: description ?? undefined,
-      days_until_due: daysUntilDue,
-      collection_method: "send_invoice",
-      auto_advance: autoAdvance,
-    });
     res.json({ invoice: { id: invoice.id, number: invoice.number, status: invoice.status, amountDue: invoice.amount_due, hostedUrl: invoice.hosted_invoice_url }, message: `Factura ${invoice.number ?? invoice.id} creada` });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── POST /stripe/accounts/:accountId/invoices/:invoiceId/send ─────────────────
-router.post("/stripe/accounts/:accountId/invoices/:invoiceId/send", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/accounts/:accountId/invoices/:invoiceId/send", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     let inv = await stripe.invoices.retrieve(req.params.invoiceId as string);
     if (inv.status === "draft") inv = await stripe.invoices.finalizeInvoice(req.params.invoiceId as string);
     const sent = await stripe.invoices.sendInvoice(req.params.invoiceId as string);
     res.json({ ok: true, status: sent.status, hostedUrl: sent.hosted_invoice_url, message: "Factura enviada al cliente" });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── POST /stripe/accounts/:accountId/invoices/:invoiceId/void ─────────────────
-router.post("/stripe/accounts/:accountId/invoices/:invoiceId/void", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post("/stripe/accounts/:accountId/invoices/:invoiceId/void", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const voided = await stripe.invoices.voidInvoice(req.params.invoiceId as string);
     res.json({ ok: true, status: voided.status, message: "Factura anulada" });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── GET /stripe/accounts/:accountId/payouts ───────────────────────────────────
-router.get("/stripe/accounts/:accountId/payouts", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get("/stripe/accounts/:accountId/payouts", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const limit = Math.min(parseInt(String(req.query.limit ?? "25"), 10), 100);
@@ -781,11 +795,11 @@ router.get("/stripe/accounts/:accountId/payouts", requireAuth, async (req: Reque
       })),
       has_more: payouts.has_more,
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── PATCH /stripe/accounts/:accountId/subscriptions/:subId ────────────────────
-router.patch("/stripe/accounts/:accountId/subscriptions/:subId", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.patch("/stripe/accounts/:accountId/subscriptions/:subId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const { cancelAtPeriodEnd, metadata, trialEnd } = req.body as any;
@@ -795,11 +809,11 @@ router.patch("/stripe/accounts/:accountId/subscriptions/:subId", requireAuth, as
       trial_end: trialEnd ?? undefined,
     });
     res.json({ subscription: { id: updated.id, status: updated.status, cancelAtPeriodEnd: updated.cancel_at_period_end }, message: `Suscripción ${req.params.subId} actualizada` });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── DELETE /stripe/accounts/:accountId/subscriptions/:subId ───────────────────
-router.delete("/stripe/accounts/:accountId/subscriptions/:subId", requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.delete("/stripe/accounts/:accountId/subscriptions/:subId", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { stripe } = await getStripeForAccount(req.params.accountId as string);
     const immediately = req.query.immediately === "true" || req.body?.immediately === true;
@@ -807,7 +821,7 @@ router.delete("/stripe/accounts/:accountId/subscriptions/:subId", requireAuth, a
       ? await stripe.subscriptions.cancel(req.params.subId as string)
       : await stripe.subscriptions.update(req.params.subId as string, { cancel_at_period_end: true });
     res.json({ ok: true, status: cancelled.status, cancelAtPeriodEnd: (cancelled as any).cancel_at_period_end, message: immediately ? "Suscripción cancelada inmediatamente" : "Suscripción se cancelará al final del período" });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { res.status(Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500).json({ error: err.message }); }
 });
 
 // ── GET /stripe/oauth/check ───────────────────────────────────────────────────
