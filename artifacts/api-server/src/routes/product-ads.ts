@@ -24,13 +24,15 @@ import { enableLongRunning } from "../lib/long-running.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { requireAdmin } from "../lib/auth.js";
 import { runAdCampaign, type AdCampaignInput } from "../lib/adstudio.js";
+import { resolveAdVideoProvider, effectiveDuration, adCredits, creditsForUsd } from "../lib/ad-video-providers.js";
+import { IMAGE_UNIT_COST_EUR } from "../lib/ai-budget.js";
 import { recommendVoiceForProduct, type VoiceLanguage, type VoiceGenderPref } from "../lib/voice-recommender.js";
 import {
   generateTryonVideo, type TryonProvider, type EffectStyle, type CharacterGender,
 } from "../lib/video-tryon.js";
 import { learnFromOperation } from "../lib/claude.js";
 import {
-  fetchToBuffer, generateTTS, composeAd, lipSyncVideoToAudio,
+  fetchToBuffer, generateTTS, composeAd, lipSyncVideoToAudio, VIDEO_MODELS, type VideoModel,
 } from "../lib/fusion-studio-pro.js";
 import { generateCinematicMultiShot, type CinematicAspect, type CinematicStyle } from "../lib/cinematic-multishot.js";
 import { askClaudeJsonWithBrain } from "../lib/claude.js";
@@ -111,15 +113,19 @@ router.post(
         return;
       }
 
-      const limit = await checkProductionLimit(projectId, "image", 1);
-      if (!limit.allowed) {
-        res.status(403).json({ error: "Límite de videos alcanzado para tu plan", planLimit: true });
+      // Proveedor verificado: el pedido, o Runway Gen-4 Turbo si hay clave, o Hailuo 2.3 Fast.
+      const quickProvider = resolveAdVideoProvider(
+        (body as { videoProvider?: string }).videoProvider
+          || (process.env.RUNWAY_API_KEY ? "runway-gen4-turbo" : "hailuo-2.3-fast"),
+      );
+      if (!quickProvider) {
+        res.status(400).json({ error: "Proveedor de vídeo no disponible", code: "BAD_VIDEO_PROVIDER" });
         return;
       }
 
       const language: VoiceLanguage = body.language || "auto";
       const aspect = (body.aspect || "9:16") as AdCampaignInput["aspect"];
-      // smart-quick uses Runway gen4-turbo single-clip → hard cap 10s.
+      // smart-quick: un solo clip → máximo 10 s.
       // For longer ads, the client must use /ads/smart-cinematic (multi-shot).
       // We tell the user explicitly instead of silently truncating their script
       // to fit a shorter video.
@@ -134,7 +140,14 @@ router.post(
         });
         return;
       }
-      const durationSec = requestedDuration;
+      const durationSec = effectiveDuration(quickProvider, requestedDuration);
+      // Créditos según el coste real del clip (vídeo + escena con la foto + voz/música).
+      const quickCredits = adCredits(quickProvider, durationSec, IMAGE_UNIT_COST_EUR, { images: 1 });
+      const limit = await checkProductionLimit(projectId, "image", quickCredits);
+      if (!limit.allowed) {
+        res.status(403).json({ error: limit.reason || "Límite de imágenes/vídeos del plan alcanzado", planLimit: true, creditsNeeded: quickCredits });
+        return;
+      }
 
       // 1) Voice recommendation (coherent with niche/product/language)
       const voice = await recommendVoiceForProduct({
@@ -163,7 +176,7 @@ router.post(
         objective: "conversion",
         targetAudience: undefined,
         aspect,
-        videoProvider: "runway-gen4-turbo",
+        videoProvider: quickProvider.key,
         videoDurationSec: durationSec,
         voiceId: finalVoiceId,
         voiceStability: voice.stability,
@@ -181,6 +194,8 @@ router.post(
           `Descripción producto (solo para guion / voz): ${stripHtml(product.bodyHtml).slice(0, 400)}`,
         ].filter(Boolean).join(". "),
         sourceImageUrl,
+        // Producto real colocado en escena (sin alterarlo); sin foto, la IA lo inventa y se marca.
+        heroMode: "scene",
         // Deterministic overlay (always-on by default in runAdCampaign)
         renderBrandOverlay: true,
         brandOverlayText: project.name || product.title || "",
@@ -197,7 +212,7 @@ router.post(
       // expose a stable URL the frontend can play/download.
       if (!v0 || !v0.assets.finalMp4Path) {
         res.status(503).json({
-          error: "No se pudo generar el anuncio rápido (todos los proveedores de video sin saldo o error).",
+          error: `No se pudo generar el anuncio rápido con ${quickProvider.label}.`,
           code: "AD_QUICK_FAILED",
           details: errors?.slice(0, 3),
         });
@@ -246,7 +261,7 @@ router.post(
         return;
       }
 
-      await recordUsage(projectId, "image", 1);
+      await recordUsage(projectId, "image", quickCredits);
       learnFromOperation({
         operationType: "smart_quick_ad",
         title: `Anuncio rápido generado: ${product.title}`,
@@ -301,9 +316,9 @@ router.post(
         res.status(404).json({ error: "Producto no encontrado" });
         return;
       }
-      const limit = await checkProductionLimit(projectId, "image", 1);
-      if (!limit.allowed) {
-        res.status(403).json({ error: "Límite de videos alcanzado para tu plan", planLimit: true });
+      const cineModel = (body.videoModel || "kling-3.0-turbo") as VideoModel;
+      if (!VIDEO_MODELS[cineModel]) {
+        res.status(400).json({ error: `Modelo de vídeo desconocido: ${body.videoModel}`, code: "BAD_VIDEO_MODEL" });
         return;
       }
 
@@ -364,6 +379,17 @@ router.post(
         ? Math.max(scenesCount * 3, Math.min(1800, Math.round(requestedDuration)))
         : scenesCount * 5;
 
+      // Créditos según coste real: clips de vídeo + un fotograma por escena + voz y música.
+      const cineCredits = creditsForUsd(
+        VIDEO_MODELS[cineModel].costPerSec * totalDurationSec + scenesCount * 0.04 + 0.12 + (totalDurationSec / 60) * 0.3,
+        IMAGE_UNIT_COST_EUR,
+      );
+      const limit = await checkProductionLimit(projectId, "image", cineCredits);
+      if (!limit.allowed) {
+        res.status(403).json({ error: limit.reason || "Límite de imágenes/vídeos del plan alcanzado", planLimit: true, creditsNeeded: cineCredits });
+        return;
+      }
+
       const productImageUrl = getFirstProductImageUrl(product);
       if (!productImageUrl) {
         res.status(400).json({ error: "El producto no tiene imagen — no se puede generar anuncio cinematográfico", code: "NO_PRODUCT_IMAGE" });
@@ -410,7 +436,7 @@ router.post(
         scenesCount,
         totalDurationSec,
         aspect: ((body.aspect === "4:5" ? "9:16" : (body.aspect || "9:16")) as CinematicAspect),
-        videoModel: (body.videoModel || "kling-3.0-turbo") as any,
+        videoModel: cineModel,
         style: "cinematic" as CinematicStyle,
         customBrief: [
           body.ctaText ? `CTA al final: "${body.ctaText}"` : "",
@@ -479,7 +505,7 @@ router.post(
         logger.warn({ err: (e as Error)?.message }, "smart-cinematic: no se pudo persistir en vault (no fatal)");
       }
 
-      await recordUsage(projectId, "image", 1);
+      await recordUsage(projectId, "image", cineCredits);
       learnFromOperation({
         operationType: "smart_cinematic_ad",
         title: `Anuncio cinematográfico generado: ${product.title}`,
@@ -577,9 +603,11 @@ router.post(
         return;
       }
 
-      const limit = await checkProductionLimit(projectId, "image", 1);
+      // Cota superior previa (Kling 3.0 Pro 10 s + imagen + voz); se cobra el coste real al acabar.
+      const tryonMaxCredits = creditsForUsd(10 * 0.168 + 0.04 + 0.12, IMAGE_UNIT_COST_EUR);
+      const limit = await checkProductionLimit(projectId, "image", tryonMaxCredits);
       if (!limit.allowed) {
-        res.status(403).json({ error: "Límite de videos alcanzado para tu plan", planLimit: true });
+        res.status(403).json({ error: limit.reason || "Límite de imágenes/vídeos del plan alcanzado", planLimit: true, creditsNeeded: tryonMaxCredits });
         return;
       }
 
@@ -809,7 +837,7 @@ router.post(
         logger.warn({ err: (e as Error)?.message }, "tryon-video: no se pudo guardar en vault (no fatal)");
       }
 
-      await recordUsage(projectId, "image", 1);
+      await recordUsage(projectId, "image", creditsForUsd(result.costEstimateUsd + 0.04 + (withVoiceover ? 0.12 : 0), IMAGE_UNIT_COST_EUR));
       learnFromOperation({
         operationType: "tryon_video",
         title: `Video Try-On: ${product.title}`,

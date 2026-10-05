@@ -61,8 +61,8 @@ export interface RunwayVideoResult {
 const COST_PER_SECOND: Record<RunwayModel, number> = {
   gen3a_turbo:     0.03,
   gen4_turbo:      0.05,
-  "gen4_5":        0.07,
-  "gen4_5_turbo":  0.05,
+  "gen4_5":        0.12,  // Gen-4.5: 12 créditos/s (API: "gen4.5")
+  "gen4_5_turbo":  0.12,  // no existe en la API → se envía como gen4.5
   seedance2:       0.10,
   seedance2_fast:  0.06,
   gen4_aleph:      0.08,
@@ -299,16 +299,25 @@ export async function generateVideoFromImage(
     throw new Error(`promptText excede ${MAX_PROMPT_LENGTH} caracteres`);
   }
 
-  const model: RunwayModel = req.model ?? "gen4_5_turbo";
+  const model: RunwayModel = req.model ?? "gen4_5";
   const duration: RunwayDuration = req.duration ?? 5;
-  const ratio: RunwayRatio = req.ratio ?? "1920:1080";
+  const ratio: RunwayRatio = req.ratio ?? "1280:768";
+  // IDs y ratios que acepta la API (docs.dev.runwayml.com): Gen-4.5 es "gen4.5";
+  // gen4 usa 1280:720 / 720:1280 / 1104:832 / 832:1104 / 960:960 / 1584:672.
+  const apiModel = model === "gen4_5" || model === "gen4_5_turbo" ? "gen4.5" : model;
+  const isGen4 = apiModel === "gen4.5" || apiModel === "gen4_turbo";
+  const GEN4_RATIO: Partial<Record<RunwayRatio, string>> = {
+    "1280:768": "1280:720", "1920:1080": "1280:720", "3840:2160": "1280:720",
+    "768:1280": "720:1280", "1080:1920": "720:1280", "2160:3840": "720:1280",
+  };
+  const apiRatio = isGen4 ? (GEN4_RATIO[ratio] ?? ratio) : ratio;
 
   const body: Record<string, unknown> = {
     promptImage: req.promptImage,
     promptText,
-    model,
+    model: apiModel,
     duration,
-    ratio,
+    ratio: apiRatio,
     ...(req.supportsAudio ? { supportsAudio: true } : {}),
     ...(req.motionBrushRegions ? { motion_brush_regions: req.motionBrushRegions } : {}),
   };

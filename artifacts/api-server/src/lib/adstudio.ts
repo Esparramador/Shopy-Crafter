@@ -18,8 +18,13 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { logger } from "./logger.js";
 import { generateNanoBanana } from "./nano-banana.js";
+import {
+  resolveAdVideoProvider, effectiveDuration, generationAspect, replicateInput,
+  centerCropFor, RUNWAY_RATIOS, type AdVideoProvider, type AdVideoProviderKey,
+} from "./ad-video-providers.js";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────
 
@@ -49,33 +54,12 @@ async function resolveFfmpegPath(): Promise<string> {
   return "ffmpeg";
 }
 
-// Pricing rough estimates (€ per unit) — conservative upper-bound for credit deduction
-export const AD_PRICING = {
-  copy: 0.02,           // Claude ~2 cents per variant set
-  image: 0.04,          // Nano Banana ~4 cents per image
-  voiceover: 0.08,      // ElevenLabs ~8 cents per 30s
-  sfx: 0.02,            // ElevenLabs SFX ~2 cents per clip
-  videoRunway: 0.50,    // Runway Gen-4 Turbo ~€0.50 for 5s
-  videoReplicate: 0.25, // Replicate Seedance fast ~€0.25 for 5s
-  compose: 0.01,        // FFmpeg local (~free, overhead)
-};
-
-// Credits charged per ad (covers video + image + voice + copy + sfx + compose)
-export const AD_CREDIT_COST = 6;
+// Coste y créditos por anuncio: ver ad-video-providers.ts (adCostUsd / adCredits).
 
 // ─── TYPES ───────────────────────────────────────────────────────────────
 
-export type VideoProvider =
-  | "runway-gen4.5"
-  | "runway-gen4-turbo"
-  | "replicate-seedance-pro"
-  | "replicate-seedance-fast"
-  | "replicate-seedance-lite"
-  | "replicate-kling-master"
-  | "replicate-kling-2.5-turbo"
-  | "replicate-kling"
-  | "replicate-hailuo"
-  | "replicate-wan-2.5";
+/** Clave del registro verificado (se aceptan alias antiguos, ver resolveAdVideoProvider). */
+export type VideoProvider = AdVideoProviderKey | (string & {});
 export type AdObjective = "awareness" | "conversion" | "retargeting" | "ugc" | "story";
 export type AdAspect = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -104,7 +88,12 @@ export interface AdCampaignInput {
   addMusic?: boolean;              // generate SFX/ambient
   variantsCount: number;           // 1-5
   customPrompt?: string;           // extra user instruction
-  sourceImageUrl?: string;         // base image for video/hero (optional: if absent, we generate with Nano Banana first)
+  sourceImageUrl?: string;         // foto REAL del producto (catálogo o URL)
+  /** Cómo se usa la foto real:
+   *  - "scene" (por defecto): Nano Banana coloca el producto, sin alterarlo, en una escena publicitaria.
+   *  - "photo": se usa la foto tal cual (encajada al formato con fondo desenfocado).
+   *  Sin foto real, la imagen la inventa la IA (el anuncio lo marca como producto no real). */
+  heroMode?: "scene" | "photo";
   /** Optional curated genre template (key from AD_TEMPLATES). Pre-loads
    *  copySystemAddon, heroStyle, cameraPreset, voiceProfile, musicBrief,
    *  transitionPreset, recommendLipSync, burnSubsByDefault. */
@@ -134,6 +123,25 @@ export interface AdCampaignInput {
 //      DejaVu Sans Bold so spelling is guaranteed and typography is crisp.
 
 const DEJAVU_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+const OVERLAY_FONT_FILE = "Outfit-Bold.ttf"; // OFL 1.1, incluida en src/data/fonts (cubre á, ñ, ¡, ¿, €)
+
+/** Fuente del overlay: la incluida en el build (dist/data/fonts), en dev src/data/fonts, o DejaVu del sistema. */
+async function resolveOverlayFont(): Promise<string> {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    process.env.AD_OVERLAY_FONT,
+    path.join(here, "data/fonts", OVERLAY_FONT_FILE),        // bundle: dist/index.mjs → dist/data
+    path.join(here, "../data/fonts", OVERLAY_FONT_FILE),     // src/lib → src/data
+    path.join(process.cwd(), "src/data/fonts", OVERLAY_FONT_FILE),
+    path.join(process.cwd(), "dist/data/fonts", OVERLAY_FONT_FILE),
+    DEJAVU_BOLD_PATH,
+  ].filter((p): p is string => !!p);
+  for (const c of candidates) {
+    try { await fs.access(c); return c; } catch { /* siguiente */ }
+  }
+  throw new Error(`No hay fuente para el texto del anuncio (buscado: ${candidates.join(", ")}). ` +
+    "Se rechaza publicar un anuncio sin marca ni CTA legibles.");
+}
 
 /** Strict instruction we append to every video-model prompt to suppress text
  *  hallucinations and design drift. */
@@ -260,8 +268,11 @@ export interface AdAssetPaths {
   overlayError?: string;
   /** Which provider generated the hero image: "gemini" (Google direct) or
    *  "replicate" (fallback via google/nano-banana on Replicate). Undefined
-   *  when sourceImageUrl was supplied (no AI generation). */
+   *  when the real product photo was used as-is. */
   heroImageProvider?: "gemini" | "replicate";
+  /** Origen de la imagen del producto: foto real tal cual, foto real en escena IA,
+   *  o producto inventado por la IA (no usar para anunciar un producto real). */
+  productSource?: "photo" | "scene" | "ai-generated";
   error?: string;
 }
 
@@ -323,18 +334,21 @@ async function fetchToBuffer(url: string, timeoutMs = 120_000, opts: { ssrfGuard
   }
 }
 
-const SUPPORTED_VIDEO_PROVIDERS = new Set([
-  "runway-gen4.5",
-  "runway-gen4-turbo",
-  "replicate-seedance-pro",
-  "replicate-seedance-fast",
-  "replicate-seedance-lite",
-  "replicate-kling-master",
-  "replicate-kling-2.5-turbo",
-  "replicate-kling",
-  "replicate-hailuo",
-  "replicate-wan-2.5",
-]);
+/** Tipo real de imagen por sus primeros bytes (la cabecera HTTP no es fiable). */
+export function sniffImageMime(buf: Buffer): string {
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  if (buf.length >= 12 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  if (buf.length >= 6 && buf.toString("ascii", 0, 3) === "GIF") return "image/gif";
+  return "image/jpeg";
+}
+
+/** Proveedor del registro verificado o error claro (nunca se cambia en silencio). */
+function providerOrThrow(key: string): AdVideoProvider {
+  const p = resolveAdVideoProvider(key);
+  if (!p) throw new Error(`Proveedor de vídeo no disponible: "${key}". Elige uno del catálogo actual.`);
+  return p;
+}
 
 // ─── STEP 1: COPY GENERATION (Claude, reuses existing askClaudeJsonWithBrain) ──
 
@@ -429,29 +443,52 @@ Each hook must STOP THE SCROLL. Avoid generic phrases like "check this out" or "
   return list.slice(0, variants);
 }
 
-// ─── STEP 2: HERO IMAGE via Nano Banana (Gemini 2.5 Flash Image) ───────────
+// ─── STEP 2: HERO IMAGE via Nano Banana ─────────────────────────────────────
 
+const ASPECT_HINT: Record<AdAspect, string> = {
+  "9:16": "vertical portrait (9:16 aspect)",
+  "16:9": "cinematic wide (16:9 aspect)",
+  "4:5": "portrait (4:5 aspect)",
+  "1:1": "square (1:1 aspect)",
+};
+
+/**
+ * Imagen inicial del anuncio.
+ *  - Con foto real (`productPhoto`): el producto se coloca SIN alterarlo en una
+ *    escena publicitaria (Nano Banana con la foto como referencia).
+ *  - Sin foto: la IA inventa el producto a partir del título (se marca como tal).
+ * `aspect` es el formato en el que el modelo de vídeo va a trabajar.
+ */
 export async function generateHeroImage(
   input: AdCampaignInput,
   copy: AdCopyVariant,
   projectReplicateToken?: string,
+  opts: { aspect?: AdAspect; productPhoto?: { buffer: Buffer; mimeType: string } } = {},
 ): Promise<{ buffer: Buffer; mimeType: string; provider: "gemini" | "replicate" }> {
   const { getTemplate } = await import("./ad-templates.js");
   const tpl = getTemplate(input.template);
-
-  const aspectHint = input.aspect === "9:16" ? "vertical portrait (9:16 aspect)"
-    : input.aspect === "16:9" ? "cinematic wide (16:9 aspect)"
-    : input.aspect === "4:5" ? "portrait (4:5 aspect)"
-    : "square (1:1 aspect)";
+  const aspect = opts.aspect ?? input.aspect;
   const styleLine = tpl ? `\nStyle (template "${tpl.label}"): ${tpl.heroStyle}` : "";
 
-  const prompt = `Ultra-premium product hero shot for advertising.
+  const prompt = opts.productPhoto
+    ? `Professional advertising photograph featuring the EXACT product shown in the reference image.
+
+PRODUCT FIDELITY (mandatory): keep the product identical to the reference — same shape, proportions,
+colors, materials, finish, print, label and logo placement. Do not redesign, recolor, add or remove parts.
+Only the setting, lighting and camera change.
+
+Scene: premium ${input.productCategory} commercial set that matches a "${copy.tone}" mood and brand tone
+"${input.brandTone || "premium modern"}". Soft cinematic key light with rim light, realistic shadows and
+reflections, shallow depth of field, clean composition with negative space. Photorealistic, magazine-grade.
+Aspect: ${ASPECT_HINT[aspect]}.${styleLine}
+No added text, no extra logos, no watermarks.`
+    : `Ultra-premium product hero shot for advertising.
 
 Product: ${input.productTitle}, ${input.productCategory}
 Brand tone: ${input.brandTone || "premium modern"}
 Campaign hook: "${copy.hook}"
 Mood: ${copy.tone}
-Aspect: ${aspectHint}${styleLine}
+Aspect: ${ASPECT_HINT[aspect]}${styleLine}
 
 Requirements:
 - Professional commercial photography quality
@@ -462,56 +499,52 @@ Requirements:
 - NO text, NO logos, NO watermarks in the image`;
 
   try {
-    const out = await generateNanoBanana(prompt, {
-      aspectRatio: input.aspect,
+    return await generateNanoBanana(prompt, {
+      aspectRatio: aspect,
       replicateToken: projectReplicateToken,
+      references: opts.productPhoto ? [opts.productPhoto] : undefined,
     });
-    return out;
   } catch (err: any) {
     logger.error({ err: err?.message || err }, "adstudio: Nano Banana hero image failed (all providers)");
     throw new Error(`Hero image generation failed: ${err.message}`);
   }
 }
 
-// ─── STEP 3: VIDEO (Runway Gen-4 Turbo or Replicate fallback) ──────────────
+/** Encaja una foto en el formato con fondo de la propia foto desenfocado (sin deformar ni recortar el producto). */
+export async function fitPhotoToAspect(photo: Buffer, aspect: AdAspect): Promise<Buffer> {
+  const ffmpeg = (await import("fluent-ffmpeg")).default;
+  ffmpeg.setFfmpegPath(await resolveFfmpegPath());
+  const [a, b] = aspect.split(":").map(Number);
+  const H = 1920;
+  const W = Math.round((H * a) / b / 2) * 2;
+  const tmp = await makeTmpDir("fit");
+  try {
+    const inPath = path.join(tmp, "in.img");
+    const outPath = path.join(tmp, "out.png");
+    await fs.writeFile(inPath, photo);
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(inPath)
+        .complexFilter([
+          `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},boxblur=40:2,eq=brightness=-0.08[bg]`,
+          `[0:v]scale=${W}:${H}:force_original_aspect_ratio=decrease[fg]`,
+          `[bg][fg]overlay=(W-w)/2:(H-h)/2[out]`,
+        ], ["out"])
+        .outputOptions(["-frames:v 1"])
+        .on("end", () => resolve())
+        .on("error", (e: Error) => reject(new Error(`No se pudo encajar la foto al formato ${aspect}: ${e.message}`)))
+        .save(outPath);
+    });
+    return await fs.readFile(outPath);
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  }
+}
 
-async function generateVideoRunway(
-  input: AdCampaignInput,
-  copy: AdCopyVariant,
-  imageBuffer: Buffer,
-  imageMime: string,
-): Promise<Buffer> {
+// ─── STEP 3: VIDEO (registro verificado: Runway / Kling / Hailuo) ──────────
+
+async function generateVideoRunway(p: AdVideoProvider, input: AdCampaignInput, prompt: string, imageBuffer: Buffer, imageMime: string): Promise<Buffer> {
   const apiKey = getRunwayKey();
-
-  // Runway requires image URL or data URI
   const dataUri = `data:${imageMime};base64,${imageBuffer.toString("base64")}`;
-
-  const model = input.videoProvider === "runway-gen4.5" ? "gen4_5_turbo" : "gen4_turbo";
-  // Per Runway 2024-11-06: ratio is a specific resolution string.
-  // Note: Runway does NOT support 4:5 aspect. We map 4:5 → 3:4 (832:1104) as closest.
-  const ratioMap: Record<string, string> = {
-    "16:9": "1280:720",
-    "9:16": "720:1280",
-    "4:3": "1104:832",
-    "3:4": "832:1104",
-    "4:5": "832:1104",  // Runway doesn't support 4:5, use closest 3:4
-    "1:1": "960:960",
-  };
-  const ratio = ratioMap[input.aspect] || "720:1280";
-
-  // Duration: Runway supports 5 or 10
-  const duration = input.videoDurationSec >= 8 ? 10 : 5;
-
-  const { getTemplate } = await import("./ad-templates.js");
-  const { CAMERA_PRESETS } = await import("./fusion-studio-pro.js");
-  const tpl = getTemplate(input.template);
-  const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
-  const cameraLine = camera ? ` ${camera.promptPrefix}` : "";
-  // Visual-only prompt: NEVER pass copy.body / brand / product name to the
-  // video model — it would try to render them as garbled text on screen.
-  const runwayPrompt = buildVisualVideoPrompt(input, copy, cameraLine);
-
-  // 1. Create task
   const createRes = await fetch(`${RUNWAY_BASE}/image_to_video`, {
     method: "POST",
     headers: {
@@ -520,11 +553,11 @@ async function generateVideoRunway(
       "X-Runway-Version": "2024-11-06",
     },
     body: JSON.stringify({
-      model,
+      model: p.modelId,
       promptImage: dataUri,
-      promptText: runwayPrompt.slice(0, 1000),
-      duration,
-      ratio,
+      promptText: prompt.slice(0, 1000),
+      duration: effectiveDuration(p, input.videoDurationSec),
+      ratio: RUNWAY_RATIOS[generationAspect(p, input.aspect)],
     }),
   });
   if (!createRes.ok) {
@@ -533,9 +566,7 @@ async function generateVideoRunway(
   }
   const { id: taskId } = await createRes.json() as { id: string };
 
-  // 2. Poll until complete (max 5 minutes)
-  const deadline = Date.now() + 5 * 60_000;
-  let videoUrl: string | null = null;
+  const deadline = Date.now() + 6 * 60_000;
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 6_000));
     const statusRes = await fetch(`${RUNWAY_BASE}/tasks/${taskId}`, {
@@ -543,78 +574,37 @@ async function generateVideoRunway(
     });
     if (!statusRes.ok) continue;
     const status = await statusRes.json() as { status: string; output?: string[]; failure?: string };
-    if (status.status === "SUCCEEDED" && status.output?.[0]) {
-      videoUrl = status.output[0];
-      break;
-    }
-    if (status.status === "FAILED") {
-      throw new Error(`Runway task failed: ${status.failure || "unknown"}`);
+    if (status.status === "SUCCEEDED" && status.output?.[0]) return await fetchToBuffer(status.output[0]);
+    if (status.status === "FAILED" || status.status === "CANCELLED") {
+      throw new Error(`Runway task failed: ${status.failure || status.status}`);
     }
   }
-  if (!videoUrl) throw new Error("Runway timed out after 5 minutes");
-
-  return await fetchToBuffer(videoUrl);
+  throw new Error("Runway timed out after 6 minutes");
 }
 
-async function generateVideoReplicate(
-  input: AdCampaignInput,
-  copy: AdCopyVariant,
-  imageBuffer: Buffer,
-  imageMime: string,
-  replicateToken: string,
-): Promise<Buffer> {
+async function generateVideoReplicate(p: AdVideoProvider, input: AdCampaignInput, prompt: string, imageBuffer: Buffer, imageMime: string, replicateToken: string): Promise<Buffer> {
   const Replicate = (await import("replicate")).default;
   const rep = new Replicate({ auth: replicateToken });
-
-  const dataUri = `data:${imageMime};base64,${imageBuffer.toString("base64")}`;
-
-  const modelMap: Record<string, string> = {
-    "replicate-seedance-pro":     "bytedance/seedance-1-pro",
-    "replicate-seedance-fast":    "bytedance/seedance-1-pro",
-    "replicate-seedance-lite":    "bytedance/seedance-1-lite",
-    "replicate-kling-master":     "kwaivgi/kling-v3-omni-video",
-    "replicate-kling-2.5-turbo":  "kwaivgi/kling-v3-video",
-    "replicate-kling":            "kwaivgi/kling-v3-video",
-    "replicate-hailuo":           "minimax/hailuo-02",
-    "replicate-wan-2.5":          "wan-video/wan-2.5-i2v",
-  };
-  const modelId = modelMap[input.videoProvider] || modelMap["replicate-seedance-lite"];
-
-  const { getTemplate } = await import("./ad-templates.js");
-  const { CAMERA_PRESETS } = await import("./fusion-studio-pro.js");
-  const tpl = getTemplate(input.template);
-  const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
-  const cameraLine = camera ? ` ${camera.promptPrefix}` : "";
-  // Visual-only prompt: NEVER pass copy.body / brand / product name to the
-  // video model — it would try to render them as garbled text on screen.
-  const prompt = buildVisualVideoPrompt(input, copy, cameraLine);
-  const negativePrompt = VIDEO_NEGATIVE_PROMPT;
-
-  const input_params: any = modelId.startsWith("bytedance/")
-    ? { prompt, image: dataUri, duration: input.videoDurationSec, resolution: "1080p" }
-    : modelId.startsWith("kwaivgi/")
-    ? { prompt, negative_prompt: negativePrompt, start_image: dataUri, duration: input.videoDurationSec, aspect_ratio: input.aspect }
-    : { prompt, prompt_optimizer: false, first_frame_image: dataUri, duration: input.videoDurationSec };
-
-  const output = await rep.run(modelId as `${string}/${string}`, { input: input_params });
+  const params = replicateInput(p, {
+    prompt,
+    negativePrompt: VIDEO_NEGATIVE_PROMPT,
+    imageDataUri: `data:${imageMime};base64,${imageBuffer.toString("base64")}`,
+    requestedSec: input.videoDurationSec,
+    aspect: input.aspect,
+  });
+  const output = await rep.run(p.modelId as `${string}/${string}`, { input: params });
   const raw = Array.isArray(output) ? output[0] : output;
   let videoUrl: string;
   if (typeof raw === "string") {
     videoUrl = raw;
   } else if (raw && typeof (raw as any).url === "function") {
-    const u = (raw as any).url();
-    videoUrl = typeof u === "string" ? u : (u && typeof u.toString === "function" ? u.toString() : String(u));
-  } else if (raw && typeof (raw as any).url === "string") {
-    videoUrl = (raw as any).url;
-  } else if (raw && (raw as any).url && typeof (raw as any).url.toString === "function") {
-    videoUrl = (raw as any).url.toString();
+    videoUrl = String((raw as any).url());
+  } else if (raw && (raw as any).url) {
+    videoUrl = String((raw as any).url);
   } else {
     throw new Error(`Replicate invalid output: ${String(raw).slice(0, 200)}`);
   }
-
-  if (!videoUrl || !videoUrl.startsWith("http")) {
-    throw new Error(`Replicate invalid URL: ${(videoUrl || "").slice(0, 200)}`);
-  }
+  if (!videoUrl.startsWith("http")) throw new Error(`Replicate invalid URL: ${videoUrl.slice(0, 200)}`);
   return await fetchToBuffer(videoUrl);
 }
 
@@ -625,14 +615,43 @@ export async function generateVideo(
   imageMime: string,
   projectReplicateToken?: string,
 ): Promise<Buffer> {
-  if (!SUPPORTED_VIDEO_PROVIDERS.has(input.videoProvider)) {
-    throw new Error(`Proveedor de video no soportado: "${input.videoProvider}". Disponibles: ${[...SUPPORTED_VIDEO_PROVIDERS].join(", ")}`);
+  const p = providerOrThrow(input.videoProvider);
+  const { getTemplate } = await import("./ad-templates.js");
+  const { CAMERA_PRESETS } = await import("./fusion-studio-pro.js");
+  const tpl = getTemplate(input.template);
+  const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
+  // Prompt solo visual: nunca marca, producto ni CTA (el modelo los escribiría mal).
+  const prompt = buildVisualVideoPrompt(input, copy, camera ? ` ${camera.promptPrefix}` : "");
+  if (p.vendor === "runway") return await generateVideoRunway(p, input, prompt, imageBuffer, imageMime);
+  if (!projectReplicateToken) throw new Error("REPLICATE_API_TOKEN requerido para este proveedor de vídeo");
+  return await generateVideoReplicate(p, input, prompt, imageBuffer, imageMime, projectReplicateToken);
+}
+
+/** Recorta al centro el vídeo si el modelo no genera el formato pedido (p. ej. 4:5). */
+export async function cropVideoToAspect(videoBuffer: Buffer, aspect: AdAspect): Promise<Buffer> {
+  const tmp = await makeTmpDir("crop");
+  try {
+    const inPath = path.join(tmp, "in.mp4");
+    const outPath = path.join(tmp, "out.mp4");
+    await fs.writeFile(inPath, videoBuffer);
+    const { width, height } = await probeVideoMeta(inPath);
+    const c = centerCropFor(width, height, aspect);
+    if (!c) return videoBuffer;
+    const ffmpeg = (await import("fluent-ffmpeg")).default;
+    ffmpeg.setFfmpegPath(await resolveFfmpegPath());
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(inPath)
+        .videoFilter(`crop=${c.w}:${c.h}:${c.x}:${c.y}`)
+        .videoCodec("libx264")
+        .outputOptions(["-preset medium", "-crf 18", "-pix_fmt yuv420p", "-an"])
+        .on("end", () => resolve())
+        .on("error", (e: Error) => reject(new Error(`Recorte a ${aspect} falló: ${e.message}`)))
+        .save(outPath);
+    });
+    return await fs.readFile(outPath);
+  } finally {
+    fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
-  if (input.videoProvider.startsWith("runway-")) {
-    return await generateVideoRunway(input, copy, imageBuffer, imageMime);
-  }
-  if (!projectReplicateToken) throw new Error("REPLICATE_API_TOKEN requerido para proveedor Replicate");
-  return await generateVideoReplicate(input, copy, imageBuffer, imageMime, projectReplicateToken);
 }
 
 // ─── STEP 4: VOICEOVER via ElevenLabs ────────────────────────────────────
@@ -796,19 +815,24 @@ export async function composeFinalAd(
         // [voice] twice without asplit is a hard FFmpeg error ("Invalid
         // argument", exit 234). amix `weights` must use a quoted string
         // ("2 1") in fluent-ffmpeg's array form.
+        // FIX 2026-10: loudnorm remuestrea a 192 kHz; con la música a 44,1 kHz el
+        // sidechain se desincronizaba y la pista terminaba al acabar la voz
+        // (el CTA final quedaba en silencio). Todo se lleva a 48 kHz estéreo.
+        // Colchón musical a 0,6 sin normalizar amix: con música masterizada
+        // (≈ -14 LUFS) queda ~15 dB bajo la voz al hablar y audible en el cierre.
         cmd.complexFilter([
           "[0:v]null[vpass]",
-          "[1:a]loudnorm=I=-16:LRA=11:TP=-1.5,volume=1.4,asplit=2[voice1][voice2]",
-          "[2:a]volume=0.18[musicraw]",
+          "[1:a]loudnorm=I=-16:LRA=11:TP=-1.5,aresample=48000,aformat=channel_layouts=stereo,volume=1.4,asplit=2[voice1][voice2]",
+          "[2:a]aresample=48000,aformat=channel_layouts=stereo,volume=0.6[musicraw]",
           "[musicraw][voice2]sidechaincompress=threshold=0.05:ratio=8:attack=5:release=300:makeup=1[musicducked]",
-          "[voice1][musicducked]amix=inputs=2:duration=first:dropout_transition=0:weights='2 1'[mixed]",
-          "[mixed]loudnorm=I=-14:LRA=9:TP=-1.0[aout]",
+          "[voice1][musicducked]amix=inputs=2:duration=first:dropout_transition=0:normalize=0:weights='1 1'[mixed]",
+          "[mixed]loudnorm=I=-14:LRA=9:TP=-1.0,aresample=48000[aout]",
         ], ["vpass", "aout"]);
       } else {
         // Voice only — still apply loudness normalization to hit social-media targets.
         cmd.complexFilter([
           "[0:v]null[vpass]",
-          "[1:a]loudnorm=I=-14:LRA=9:TP=-1.0[aout]",
+          "[1:a]loudnorm=I=-14:LRA=9:TP=-1.0,aresample=48000[aout]",
         ], ["vpass", "aout"]);
       }
 
@@ -894,21 +918,9 @@ export async function applyBrandOverlay(
   // If both empty, nothing to do — return original.
   if (!brand && !cta) return videoBuffer;
 
-  // Verify font exists. FAIL LOUD (not silent): publishing an ad without
-  // brand text is unacceptable — the user explicitly relies on this layer
-  // to deliver the brand name and CTA after we forbid the AI from rendering
-  // any text. If the font is missing the deployment is broken and must be
-  // fixed at the system level (apt install fonts-dejavu-core).
-  try {
-    await fs.access(DEJAVU_BOLD_PATH);
-  } catch {
-    logger.error({ path: DEJAVU_BOLD_PATH }, "adstudio: DejaVu Bold MISSING — cannot burn deterministic brand/CTA overlay");
-    throw new Error(
-      `Brand overlay font not installed: ${DEJAVU_BOLD_PATH}. ` +
-      `Install with: apt-get install -y fonts-dejavu-core. ` +
-      `Refusing to ship an ad without legible brand/CTA typography.`,
-    );
-  }
+  // Sin fuente no se publica: el modelo tiene prohibido escribir texto, así que
+  // sin este paso el anuncio saldría sin marca ni CTA.
+  const fontPath = await resolveOverlayFont();
 
   const tmp = await makeTmpDir("overlay");
   try {
@@ -924,7 +936,7 @@ export async function applyBrandOverlay(
     const safeW   = Math.max(100, width - 2 * margin);
 
     // Auto-shrink fontsize so the longest text always fits inside safeW.
-    // DejaVu Sans Bold average glyph width ≈ 0.70 × fontsize for mixed case
+    // Anchura media de glifo ≈ 0,70 × tamaño (medido con DejaVu Bold; Outfit es más estrecha → margen extra)
     // (empirically measured at 1088×1920 — leaves a small visual safety margin).
     const fitFontSize = (text: string, baseSize: number): number => {
       if (!text) return baseSize;
@@ -958,7 +970,7 @@ export async function applyBrandOverlay(
     // Helper: filter chunk for one drawtext layer (escaped path is required
     // because filter syntax uses : and , as separators).
     const escFilterPath = (p: string) => p.replace(/\\/g, "\\\\").replace(/:/g, "\\:");
-    const fontEsc = escFilterPath(DEJAVU_BOLD_PATH);
+    const fontEsc = escFilterPath(fontPath);
 
     // x is centered AND clamped so very long labels never run off-screen.
     const xCentered = `if(lt(text_w\\,w-2*${margin})\\,(w-text_w)/2\\,${margin})`;
@@ -1058,6 +1070,13 @@ export async function runAdCampaign(
   const errors: string[] = [];
   const variants: Array<{ copy: AdCopyVariant; assets: AdAssetPaths }> = [];
 
+  // Foto real del producto (una sola descarga para todas las variantes).
+  let productPhoto: { buffer: Buffer; mimeType: string } | null = null;
+  if (input.sourceImageUrl) {
+    const buf = await fetchToBuffer(input.sourceImageUrl, 120_000, { ssrfGuard: true });
+    productPhoto = { buffer: buf, mimeType: sniffImageMime(buf) };
+  }
+
   // STEP 1: copy generation (single batch for all variants)
   onProgress?.({ stage: "copy", message: "Generando ángulos publicitarios con Claude..." });
   let copies: AdCopyVariant[];
@@ -1073,21 +1092,32 @@ export async function runAdCampaign(
     const assets: AdAssetPaths = { copyVariantIndex: i };
 
     try {
-      // STEP 2: Hero image (or reuse sourceImageUrl)
-      onProgress?.({ stage: "image", variantIndex: i, message: `[${i + 1}/${copies.length}] Generando imagen hero con Nano Banana...` });
+      // STEP 2: imagen inicial. Con foto real del producto, el producto no se altera.
+      const provider = providerOrThrow(input.videoProvider);
+      const genAspect = generationAspect(provider, input.aspect);
       let imgBuf: Buffer; let imgMime: string;
-      if (input.sourceImageUrl) {
-        imgBuf = await fetchToBuffer(input.sourceImageUrl, 120_000, { ssrfGuard: true });
-        imgMime = "image/jpeg";
+      if (productPhoto && input.heroMode === "photo") {
+        onProgress?.({ stage: "image", variantIndex: i, message: `[${i + 1}/${copies.length}] Preparando la foto real del producto (${genAspect})...` });
+        imgBuf = await fitPhotoToAspect(productPhoto.buffer, genAspect);
+        imgMime = "image/png";
+        assets.productSource = "photo";
       } else {
-        const hero = await generateHeroImage(input, copy, projectReplicateToken);
+        onProgress?.({ stage: "image", variantIndex: i, message: productPhoto
+          ? `[${i + 1}/${copies.length}] Colocando tu producto real en una escena publicitaria (Nano Banana)...`
+          : `[${i + 1}/${copies.length}] Generando imagen del producto con IA (no hay foto real)...` });
+        const hero = await generateHeroImage(input, copy, projectReplicateToken, { aspect: genAspect, productPhoto: productPhoto ?? undefined });
         imgBuf = hero.buffer; imgMime = hero.mimeType;
         assets.heroImageProvider = hero.provider;
+        assets.productSource = productPhoto ? "scene" : "ai-generated";
       }
 
       // STEP 3: Video
-      onProgress?.({ stage: "video", variantIndex: i, message: `[${i + 1}/${copies.length}] Generando video con ${input.videoProvider}... (1-3 min)` });
-      const videoBuf = await generateVideo(input, copy, imgBuf, imgMime, projectReplicateToken);
+      onProgress?.({ stage: "video", variantIndex: i, message: `[${i + 1}/${copies.length}] Generando vídeo con ${provider.label} (${effectiveDuration(provider, input.videoDurationSec)} s, 1-4 min)...` });
+      let videoBuf = await generateVideo(input, copy, imgBuf, imgMime, projectReplicateToken);
+      if (genAspect !== input.aspect) {
+        onProgress?.({ stage: "video", variantIndex: i, message: `[${i + 1}/${copies.length}] Ajustando a formato ${input.aspect}...` });
+        videoBuf = await cropVideoToAspect(videoBuf, input.aspect);
+      }
 
       // STEP 4: Voiceover (parallel with SFX)
       onProgress?.({ stage: "voice", variantIndex: i, message: `[${i + 1}/${copies.length}] Generando voz con ElevenLabs...` });

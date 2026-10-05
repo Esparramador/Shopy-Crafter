@@ -14,7 +14,7 @@
  *  - "multishot_outfit_change": multi-pose changes (Kling-Master only)
  *  - "lifestyle_use": model uses the product (cosmetics applies makeup, etc.)
  */
-import { generateVideoFromImage, type VideoModel } from "./fusion-studio-pro.js";
+import { generateVideoFromImage, VIDEO_MODELS, type VideoModel } from "./fusion-studio-pro.js";
 import { logger } from "./logger.js";
 
 export type TryonProvider = "kling" | "hailuo" | "runway";
@@ -24,7 +24,7 @@ export type CharacterGender = "female" | "male" | "neutral";
 const PROVIDER_TO_MODEL: Record<TryonProvider, { primary: VideoModel; quality: VideoModel }> = {
   kling:  { primary: "kling-3.0-turbo",   quality: "kling-3.0-master" },
   hailuo: { primary: "hailuo-02",         quality: "hailuo-02" },
-  runway: { primary: "runway-gen4.5",     quality: "runway-seedance2" },
+  runway: { primary: "runway-gen4-turbo", quality: "runway-gen4.5" },
 };
 
 export interface TryonVideoInput {
@@ -130,12 +130,8 @@ export async function generateTryonVideo(input: TryonVideoInput): Promise<TryonV
   }
 
   // Cost estimate: very rough — providers vary
-  const costPerSec = chosenModel === "kling-3.0-master" || chosenModel === "kling-master" ? 0.22 :
-                     chosenModel === "kling-3.0-turbo" || chosenModel === "kling-2.5-turbo" || chosenModel === "kling-2.1" ? 0.14 :
-                     chosenModel === "hailuo-02" ? 0.05 :
-                     chosenModel === "runway-seedance2" ? 0.10 :
-                     chosenModel === "runway-gen4.5" ? 0.06 : 0.07;
-  const costEstimateUsd = +(costPerSec * duration).toFixed(3);
+  // Mismo precio por segundo que el motor de vídeo (cota superior verificada).
+  const costEstimateUsd = +(VIDEO_MODELS[chosenModel].costPerSec * duration).toFixed(3);
 
   return { buffer, model: chosenModel, prompt: fullPrompt, durationSec: duration, costEstimateUsd };
 }

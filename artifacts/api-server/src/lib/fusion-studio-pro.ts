@@ -1012,20 +1012,20 @@ export type VideoModel =
 export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate" | "gemini" | "xai" | "nvidia"; modelId?: string; description: string; costPerSec: number; quality: number; maxDuration: number }> = {
   "runway-gen4-turbo":  { provider: "runway",                                                description: "Runway Gen-4 — top quality, control fino, 5/10s",                costPerSec: 0.05, quality: 10, maxDuration: 10 },
   "runway-gen3-alpha":  { provider: "runway",                                                description: "Runway Gen-3 Alpha — legado, reemplazado por Gen-4.5 y Gen-5",    costPerSec: 0.03, quality: 6,  maxDuration: 10 },
-  "runway-gen4.5":       { provider: "runway",                                                description: "Runway Gen 4.5 — última generación Jun-2026, 4K, audio nativo, hasta 15s", costPerSec: 0.07,  quality: 10, maxDuration: 15 },
+  "runway-gen4.5":       { provider: "runway",                                                description: "Runway Gen-4.5 — máximo realismo de Runway, imagen→vídeo, 2-10 s (0,12 $/s)", costPerSec: 0.12,  quality: 10, maxDuration: 10 },
   "runway-gen4.5-turbo": { provider: "runway",                                                description: "Runway Gen 4.5 Turbo — rápido y eficiente, 1080p, audio nativo",           costPerSec: 0.05,  quality: 9,  maxDuration: 10 },
   "runway-seedance2":    { provider: "runway",                                                description: "Seedance 2 vía Runway — nueva generación, calidad cinematográfica",          costPerSec: 0.10,  quality: 10, maxDuration: 10 },
   "runway-seedance2-fast":{ provider: "runway",                                               description: "Seedance 2 Fast vía Runway — rápido y barato, calidad pro",                  costPerSec: 0.06,  quality: 8,  maxDuration: 10 },
-  "runway-gen5":           { provider: "runway",                                               description: "Runway Gen 5 — alias reservado (Gen 5 no lanzado aún → redirigido a Gen 4.5)", costPerSec: 0.07, quality: 10, maxDuration: 15 },
+  "runway-gen5":           { provider: "runway",                                               description: "Alias: no existe «Gen 5» en la API → se usa Runway Gen-4.5 (0,12 $/s)", costPerSec: 0.12, quality: 10, maxDuration: 10 },
   "veo-3.1":            { provider: "gemini",    modelId: "veo-3.1-generate-preview",       description: "Google Veo 3.1 — última gen + audio nativo, 16:9 / 9:16 (8s)",   costPerSec: 0.75, quality: 10, maxDuration: 8  },
   "veo-3.1-fast":       { provider: "gemini",    modelId: "veo-3.1-fast-generate-preview",  description: "Google Veo 3.1 Fast — rápido y barato + audio nativo",          costPerSec: 0.40, quality: 9,  maxDuration: 8  },
   "veo-3-fast":         { provider: "gemini",    modelId: "veo-3.1-fast-generate-preview",  description: "Google Veo 3 Fast → migrado a Veo 3.1 Fast (3.0 deprecado jun-2026)",  costPerSec: 0.40, quality: 9,  maxDuration: 8  },
   "veo-3":              { provider: "gemini",    modelId: "veo-3.1-generate-preview",       description: "Google Veo 3 → migrado a Veo 3.1 (3.0 deprecado y desactivado jun-2026)", costPerSec: 0.75, quality: 10, maxDuration: 8  },
   "veo-2":              { provider: "gemini",    modelId: "veo-3.1-lite-generate-preview",  description: "Google Veo 2 → migrado a Veo 3.1 Lite (más rápido y económico)",        costPerSec: 0.20, quality: 7,  maxDuration: 8  },
   "sora-2":             { provider: "replicate", modelId: "openai/sora-2",                  description: "OpenAI Sora 2 — narrativa cinematográfica, hasta 12s, T2V/I2V", costPerSec: 0.30, quality: 10, maxDuration: 12 },
-  "kling-master":       { provider: "replicate", modelId: "kwaivgi/kling-video-3.0-omni",    description: "Kling V3.0 Omni — máxima calidad, multimodal, audio nativo, hasta 15s", costPerSec: 0.22, quality: 10, maxDuration: 15 },
-  "kling-2.5-turbo":    { provider: "replicate", modelId: "kwaivgi/kling-video-3.0",         description: "Kling V3.0 — cinematic T2V+I2V, audio nativo, hasta 15s, 1080p", costPerSec: 0.14, quality: 10, maxDuration: 15 },
-  "kling-2.1":          { provider: "replicate", modelId: "kwaivgi/kling-video-3.0",         description: "Kling (alias legado) — redirigido a Kling V3.0 actual",          costPerSec: 0.14, quality: 10, maxDuration: 15 },
+  "kling-master":       { provider: "replicate", modelId: "kwaivgi/kling-v3-omni-video",    description: "Kling V3.0 Omni — máxima calidad, multimodal, audio nativo, hasta 15s", costPerSec: 0.22, quality: 10, maxDuration: 15 },
+  "kling-2.5-turbo":    { provider: "replicate", modelId: "kwaivgi/kling-v3-video",         description: "Kling V3.0 — cinematic T2V+I2V, audio nativo, hasta 15s, 1080p", costPerSec: 0.14, quality: 10, maxDuration: 15 },
+  "kling-2.1":          { provider: "replicate", modelId: "kwaivgi/kling-v3-video",         description: "Kling (alias legado) — redirigido a Kling V3.0 actual",          costPerSec: 0.14, quality: 10, maxDuration: 15 },
   "seedance-pro":       { provider: "replicate", modelId: "bytedance/seedance-1-pro",       description: "Seedance Pro — cinema-quality, multi-reference (9 imgs)",        costPerSec: 0.07, quality: 9,  maxDuration: 10 },
   "seedance-fast":      { provider: "replicate", modelId: "bytedance/seedance-1-pro-fast",  description: "Seedance Fast — rápido y barato, calidad pro",                   costPerSec: 0.05, quality: 7,  maxDuration: 10 },
   "hailuo-02-fast":     { provider: "replicate", modelId: "minimax/hailuo-02-fast",         description: "Hailuo 02 Fast — variante rápida y barata de MiniMax",           costPerSec: 0.03, quality: 7,  maxDuration: 6  },
@@ -1041,16 +1041,16 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "wan-2.5-fast":        { provider: "replicate", modelId: "wan-video/wan-2.5-i2v-fast",     description: "Wan 2.5 Fast — legado, reemplazado por Wan 2.6 (mejor calidad al mismo precio)", costPerSec: 0.018, quality: 5,  maxDuration: 5  },
   "wan-2.5-t2v":         { provider: "replicate", modelId: "wan-video/wan-2.5-t2v",          description: "Wan 2.5 Text-to-Video — T2V puro open-source, sin imagen origen",            costPerSec: 0.025, quality: 7,  maxDuration: 5  },
   "seedance-1-lite":     { provider: "replicate", modelId: "bytedance/seedance-1-lite",       description: "Seedance 1 Lite — versión económica de Seedance Pro",                        costPerSec: 0.03,  quality: 6,  maxDuration: 10 },
-  "kling-3.0-master":    { provider: "replicate", modelId: "kwaivgi/kling-video-3.0-omni",      description: "Kling V3.0 Omni — multimodal, máxima calidad, audio nativo, hasta 15s",     costPerSec: 0.22,  quality: 10, maxDuration: 15 },
-  "kling-3.0-turbo":     { provider: "replicate", modelId: "kwaivgi/kling-video-3.0",           description: "Kling V3.0 — cinematic T2V+I2V, audio nativo, hasta 15s, 1080p",            costPerSec: 0.14,  quality: 10, maxDuration: 15 },
-  "kling-3.0-omni":      { provider: "replicate", modelId: "kwaivgi/kling-video-3.0-omni",      description: "Kling V3.0 Omni — multimodal: texto+imagen+refs+audio, estilo transfer",     costPerSec: 0.22,  quality: 10, maxDuration: 15 },
+  "kling-3.0-master":    { provider: "replicate", modelId: "kwaivgi/kling-v3-video",           description: "Kling 3.0 Pro — 1080p, máxima calidad de Kling, hasta 15s (0,112–0,168 $/s)", costPerSec: 0.168, quality: 10, maxDuration: 15 },
+  "kling-3.0-turbo":     { provider: "replicate", modelId: "kwaivgi/kling-v3-video",           description: "Kling 3.0 Standard — 720p, T2V+I2V, hasta 15s (0,084–0,126 $/s)",           costPerSec: 0.126, quality: 9,  maxDuration: 15 },
+  "kling-3.0-omni":      { provider: "replicate", modelId: "kwaivgi/kling-v3-omni-video",      description: "Kling V3.0 Omni — multimodal: texto+imagen+refs+audio, estilo transfer",     costPerSec: 0.22,  quality: 10, maxDuration: 15 },
   "veo-4":               { provider: "gemini",    modelId: "veo-3.1-generate-preview",        description: "Google Veo 4 — no lanzado aún (jul 2026) → redirigido a Veo 3.1",           costPerSec: 0.75,  quality: 10, maxDuration: 8  },
   "veo-4-fast":          { provider: "gemini",    modelId: "veo-3.1-fast-generate-preview",   description: "Google Veo 4 Fast — no lanzado aún (jul 2026) → redirigido a Veo 3.1 Fast", costPerSec: 0.40,  quality: 9,  maxDuration: 8  },
   "minimax-video-01":    { provider: "replicate", modelId: "minimax/video-01",                description: "MiniMax Video-01 — modelo base de MiniMax (precursor de Hailuo)",            costPerSec: 0.05,  quality: 8,  maxDuration: 6  },
   "wan-2.6":             { provider: "replicate", modelId: "wan-video/wan-2.7-i2v",           description: "Wan 2.7 — última gen open-source, T2V+I2V+R2V, hasta 1080p y 15s (wan-2.6 redirigido)", costPerSec: 0.05, quality: 8,  maxDuration: 15 },
   "wan-2.7":             { provider: "replicate", modelId: "wan-video/wan-2.7-i2v",           description: "Wan 2.7 — última gen open-source wan-video, T2V+I2V+R2V, hasta 1080p y 15s",  costPerSec: 0.05,  quality: 8,  maxDuration: 15 },
-  "hailuo-2.3":          { provider: "replicate", modelId: "minimax/hailuo-2.3",              description: "MiniMax Hailuo 2.3 — última gen Hailuo, 1080p, T2V+I2V, mejora sobre hailuo-02", costPerSec: 0.06, quality: 8, maxDuration: 10 },
-  "hailuo-2.3-fast":     { provider: "replicate", modelId: "minimax/hailuo-2.3-fast",         description: "MiniMax Hailuo 2.3 Fast — variante rápida, I2V 1080p, latencia reducida",    costPerSec: 0.04, quality: 7, maxDuration: 10 },
+  "hailuo-2.3":          { provider: "replicate", modelId: "minimax/hailuo-2.3",              description: "MiniMax Hailuo 2.3 — 1080p en 6 s / 768p en 10 s, T2V+I2V (0,49 $ / 0,56 $ por clip)", costPerSec: 0.082, quality: 8, maxDuration: 10 },
+  "hailuo-2.3-fast":     { provider: "replicate", modelId: "minimax/hailuo-2.3-fast",         description: "MiniMax Hailuo 2.3 Fast — solo imagen→vídeo, 1080p en 6 s (0,33 $ / 0,32 $ por clip)", costPerSec: 0.055, quality: 7, maxDuration: 10 },
   "grok-video-1":        { provider: "xai", modelId: "grok-video-1",           description: "xAI Grok Video 1 — June 2026 flagship video, T2V/I2V, cinematic quality", costPerSec: 0.15, quality: 10, maxDuration: 15 },
   "grok-imagine-video":    { provider: "xai", modelId: "grok-imagine-video",           description: "xAI Grok Imagine Video — T2V/I2V, hasta 15s, 720p ($0.07/s)", costPerSec: 0.07, quality: 9,  maxDuration: 15 },
   "grok-imagine-video-1.5":{ provider: "xai", modelId: "grok-imagine-video-1.5",         description: "xAI Grok Imagine Video 1.5 — I2V 1080p, máxima calidad xAI ($0.14/s)", costPerSec: 0.14, quality: 10, maxDuration: 15 },
@@ -1312,15 +1312,16 @@ export async function generateVideoFromImage(
     };
     const ratio = ratioMap[opts.aspect || "9:16"] || (isGen3 ? "768:1280" : "720:1280");
     const runwayModel = isGen3 ? "gen3a_turbo"
-      : model === "runway-gen4.5" ? "gen4_5"
+      : model === "runway-gen4.5" ? "gen4.5"
       : model === "runway-gen4.5-turbo" ? "gen4_5_turbo"
       : model === "runway-seedance2" ? "seedance2"
       : model === "runway-seedance2-fast" ? "seedance2_fast"
-      : model === "runway-gen5" ? "gen4_5"
+      : model === "runway-gen5" ? "gen4.5"
       : model === "runway-aleph2" ? "aleph2"
       : model === "runway-happyhorse" ? "happyhorse_1_0"
       : "gen4_turbo";
-    const runwayDur = duration >= 8 ? 10 : 5;
+    // gen4.5 acepta 2-10 s; gen4_turbo 5 o 10.
+    const runwayDur = runwayModel === "gen4.5" ? Math.min(Math.max(Math.round(duration), 2), 10) : (duration >= 8 ? 10 : 5);
 
     const createRes = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
       method: "POST",
@@ -1415,14 +1416,21 @@ export async function generateVideoFromImage(
     input = { prompt, duration, resolution: "1080p", aspect_ratio: aspect };
     if (dataUri) input.image = dataUri;
   } else if (cfg.modelId.startsWith("kwaivgi/")) {
-    // Kling: start_image opcional, T2V puro soportado en v2.1
-    input = { prompt, duration, aspect_ratio: aspect };
+    // Kling solo genera 16:9, 9:16 y 1:1: el resto se lleva al más cercano.
+    const klingAspect = ["16:9", "9:16", "1:1"].includes(aspect) ? aspect
+      : aspect === "4:5" || aspect === "5:4" ? "1:1"
+      : aspect === "3:4" || aspect === "2:3" ? "9:16" : "16:9";
+    input = { prompt, duration, aspect_ratio: klingAspect };
+    // Kling 3.0: "pro" = 1080p, "standard" = 720p.
+    if (cfg.modelId === "kwaivgi/kling-v3-video") input.mode = model === "kling-3.0-master" ? "pro" : "standard";
     if (dataUri) input.start_image = dataUri;
     // Kling en Replicate acepta negative_prompt (los demás modelos de esta cascada no).
     if (opts.negativePrompt) input.negative_prompt = opts.negativePrompt;
   } else if (cfg.modelId.startsWith("minimax/")) {
-    // Hailuo: first_frame_image opcional
-    input = { prompt, duration };
+    // Hailuo: solo 6 o 10 s; 1080p solo en 6 s (02 y 2.3). first_frame_image opcional.
+    const hDur = duration <= 7 ? 6 : 10;
+    input = { prompt, duration: hDur };
+    if (cfg.modelId === "minimax/hailuo-02" || cfg.modelId.startsWith("minimax/hailuo-2.3")) input.resolution = hDur === 6 ? "1080p" : "768p";
     if (dataUri) input.first_frame_image = dataUri;
   } else if (cfg.modelId === "wan-video/wan-2.5-t2v") {
     // Wan 2.5 T2V: text-to-video puro, no requiere imagen

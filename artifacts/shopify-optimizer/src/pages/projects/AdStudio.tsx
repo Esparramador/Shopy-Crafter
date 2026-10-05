@@ -11,10 +11,23 @@ interface VideoProvider {
   key: string;
   label: string;
   tier: "economy" | "standard" | "premium";
-  costPerAd: number;
   quality: number;
   description: string;
+  durations: number[];
+  effectiveDurationSec: number;
+  costPerAdEur: number;
+  creditsPerAd: number;
 }
+
+interface CatalogProduct {
+  id: string;
+  title: string;
+  productType: string | null;
+  vendor: string | null;
+  images: Array<{ src: string; alt: string | null }>;
+}
+
+type HeroMode = "scene" | "photo";
 
 interface ElevenVoice {
   voice_id: string;
@@ -47,9 +60,9 @@ interface SavedVariant {
   overlayError?: string;
   /** Which Nano Banana provider rendered the hero. "replicate" means Gemini
    *  failed (quota/permission/5xx) and we transparently fell back to
-   *  Replicate's `google/nano-banana`. undefined when sourceImageUrl was
-   *  used (no AI hero). */
+   *  Replicate's `google/nano-banana`. undefined when the real photo was used as-is. */
   heroImageProvider?: "gemini" | "replicate";
+  productSource?: "photo" | "scene" | "ai-generated";
 }
 
 const OBJECTIVE_META: Record<Objective, { label: string; icon: React.ReactNode; desc: string }> = {
@@ -69,7 +82,21 @@ const ASPECT_META: Record<Aspect, { label: string; desc: string }> = {
 
 export default function AdStudio() {
   const [, params] = useRoute("/projects/:id/ad-studio");
-  const projectId = params?.id ? parseInt(params.id) : 0;
+  const routeProjectId = params?.id ? parseInt(params.id) : 0;
+  // En /ad-studio (sin proyecto en la URL) se elige el proyecto aquí.
+  const [pickedProjectId, setPickedProjectId] = useState(0);
+  const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([]);
+  const projectId = routeProjectId || pickedProjectId;
+  useEffect(() => {
+    if (routeProjectId) return;
+    fetch(`${API_BASE}/api/projects`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then((list: Array<{ id: number; name: string }>) => {
+        setProjects(Array.isArray(list) ? list : []);
+        if (Array.isArray(list) && list.length === 1) setPickedProjectId(list[0].id);
+      })
+      .catch(() => setProjects([]));
+  }, [routeProjectId]);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
@@ -82,19 +109,24 @@ export default function AdStudio() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [objective, setObjective] = useState<Objective>("conversion");
   const [aspect, setAspect] = useState<Aspect>("9:16");
-  const [videoProvider, setVideoProvider] = useState<string>("replicate-seedance-fast");
-  const [videoDurationSec, setVideoDurationSec] = useState(5);
+  const [videoProvider, setVideoProvider] = useState<string>("hailuo-2.3");
+  const [videoDurationSec, setVideoDurationSec] = useState(6);
   const [variantsCount, setVariantsCount] = useState(3);
   const [voiceId, setVoiceId] = useState<string>("");
   const [voiceStability, setVoiceStability] = useState(0.5);
   const [voiceStyle, setVoiceStyle] = useState(0.3);
   const [addMusic, setAddMusic] = useState(true);
   const [sourceImageUrl, setSourceImageUrl] = useState("");
+  const [heroMode, setHeroMode] = useState<HeroMode>("scene");
+  // Catálogo real del proyecto (Shopify/Woo/PrestaShop sincronizado)
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [pickedProduct, setPickedProduct] = useState<CatalogProduct | null>(null);
 
   // Catalogs
   const [providers, setProviders] = useState<VideoProvider[]>([]);
   const [voices, setVoices] = useState<ElevenVoice[]>([]);
-  const [creditCostPerAd, setCreditCostPerAd] = useState(6);
   const [templates, setTemplates] = useState<Array<{ key: string; label: string; description: string; defaultAspect?: string; defaultDurationSec?: number }>>([]);
   const [templateKey, setTemplateKey] = useState<string>("");
   const [burnSubs, setBurnSubs] = useState<boolean>(false);
@@ -115,18 +147,41 @@ export default function AdStudio() {
   const [globalError, setGlobalError] = useState<string>("");
   const abortRef = useRef<AbortController | null>(null);
 
+  // Proveedores con precio y créditos reales para la duración y el uso de la foto elegidos
+  const imageMode = sourceImageUrl ? heroMode : "ai";
+  useEffect(() => {
+    fetch(`${API_BASE}/api/ad-studio/providers?duration=${videoDurationSec}&imageMode=${imageMode}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.videoProviders) setProviders(d.videoProviders); })
+      .catch(() => {});
+  }, [videoDurationSec, imageMode]);
+
+  // Catálogo de productos del proyecto
+  useEffect(() => {
+    if (!projectId) { setCatalog([]); return; }
+    setCatalogLoading(true);
+    fetch(`${API_BASE}/api/projects/${projectId}/products?limit=200`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setCatalog(Array.isArray(d?.products) ? d.products : []))
+      .catch(() => setCatalog([]))
+      .finally(() => setCatalogLoading(false));
+  }, [projectId]);
+
+  const pickProduct = (p: CatalogProduct) => {
+    setPickedProduct(p);
+    setProductTitle(p.title || "");
+    if (p.productType) setProductCategory(p.productType);
+    if (p.vendor && !brandName) setBrandName(p.vendor);
+    setSourceImageUrl(p.images?.[0]?.src || "");
+  };
+
   // Load catalogs
   useEffect(() => {
     Promise.all([
-      fetch(`${API_BASE}/api/ad-studio/providers`, { credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch(`${API_BASE}/api/ad-studio/voices`, { credentials: "include" }).then(r => r.ok ? r.json() : null),
       fetch(`${API_BASE}/api/ad-studio/templates`, { credentials: "include" }).then(r => r.ok ? r.json() : null),
-    ]).then(([provData, voiceData, tplData]) => {
+    ]).then(([voiceData, tplData]) => {
       if (tplData?.templates) setTemplates(tplData.templates);
-      if (provData?.videoProviders) {
-        setProviders(provData.videoProviders);
-        setCreditCostPerAd(provData.creditCostPerAd || 6);
-      }
       if (voiceData?.voices) {
         setVoices(voiceData.voices);
         // Default to first Spanish voice if available
@@ -138,9 +193,12 @@ export default function AdStudio() {
     }).catch(() => {});
   }, []);
 
-  const totalCredits = creditCostPerAd * variantsCount;
+  const selectedProvider = providers.find(p => p.key === videoProvider);
+  const totalCredits = (selectedProvider?.creditsPerAd ?? 0) * variantsCount;
+  const totalCostEur = (selectedProvider?.costPerAdEur ?? 0) * variantsCount;
+  const effectiveDurationSec = selectedProvider?.effectiveDurationSec ?? videoDurationSec;
 
-  const canGenerate = productTitle.trim() && productCategory.trim() && objective && aspect && videoProvider;
+  const canGenerate = projectId > 0 && productTitle.trim() && productCategory.trim() && objective && aspect && selectedProvider;
 
   const generateCampaign = useCallback(async () => {
     if (!canGenerate) { setGlobalError("Completa título y categoría primero"); return; }
@@ -156,6 +214,7 @@ export default function AdStudio() {
       objective, aspect, videoProvider, videoDurationSec, variantsCount,
       voiceId: voiceId || undefined, voiceStability, voiceStyle, addMusic,
       sourceImageUrl: sourceImageUrl || undefined,
+      heroMode,
       template: templateKey || undefined,
       burnSubs: burnSubs || undefined,
       subsLanguage: burnSubs && subsLanguage !== "auto" ? subsLanguage : undefined,
@@ -222,7 +281,7 @@ export default function AdStudio() {
     } finally {
       abortRef.current = null;
     }
-  }, [projectId, productTitle, productCategory, brandName, brandTone, targetAudience, customPrompt, objective, aspect, videoProvider, videoDurationSec, variantsCount, voiceId, voiceStability, voiceStyle, addMusic, sourceImageUrl, canGenerate, templateKey, burnSubs, subsLanguage, renderBrandOverlay]);
+  }, [projectId, productTitle, productCategory, brandName, brandTone, targetAudience, customPrompt, objective, aspect, videoProvider, videoDurationSec, variantsCount, voiceId, voiceStability, voiceStyle, addMusic, sourceImageUrl, heroMode, canGenerate, templateKey, burnSubs, subsLanguage, renderBrandOverlay]);
 
   const cancel = () => {
     abortRef.current?.abort();
@@ -237,7 +296,7 @@ export default function AdStudio() {
           <Film size={28} /> Ad Studio Pro
         </h1>
         <p style={{ color: "var(--t2, #aaa)", fontSize: 14, maxWidth: 780 }}>
-          Genera anuncios publicitarios completos con IA: <strong style={{ color: "#fff" }}>copy + imagen hero (Nano Banana) + video (Runway/Replicate) + voiceover y música (ElevenLabs)</strong>, todo montado en un MP4 listo para Meta Ads / TikTok Ads / YouTube Shorts.
+          De tu producto real a un anuncio en vídeo: <strong style={{ color: "#fff" }}>guion + tu producto en escena (Nano Banana) + vídeo (Runway / Kling / Hailuo) + voz y música (ElevenLabs) + marca y CTA con tipografía real</strong>, montado en un MP4 listo para Meta Ads, TikTok Ads y YouTube Shorts.
         </p>
       </div>
 
@@ -340,35 +399,107 @@ export default function AdStudio() {
 
       {/* STEP 1 — Product */}
       {step === 1 && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <div>
-            <Field label="Producto *">
-              <input value={productTitle} onChange={e => setProductTitle(e.target.value)} placeholder="Collar de plata minimalista" style={inputStyle} />
+        <div>
+          {!routeProjectId && (
+            <Field label="Proyecto *">
+              <select value={pickedProjectId || ""} onChange={e => { setPickedProjectId(Number(e.target.value) || 0); setPickedProduct(null); }} style={inputStyle}>
+                <option value="">— Elige el proyecto —</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
             </Field>
-            <Field label="Categoría *">
-              <input value={productCategory} onChange={e => setProductCategory(e.target.value)} placeholder="joyería, ropa, cosmética..." style={inputStyle} />
-            </Field>
-            <Field label="Marca">
-              <input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Luna Silver" style={inputStyle} />
-            </Field>
-            <Field label="Tono de marca">
-              <input value={brandTone} onChange={e => setBrandTone(e.target.value)} placeholder="minimalista, elegante, joven..." style={inputStyle} />
-            </Field>
+          )}
+
+          <Section title="1 · Elige el producto de tu catálogo">
+            {!projectId ? (
+              <div style={{ fontSize: 12, color: "var(--t3)" }}>Elige un proyecto para ver su catálogo.</div>
+            ) : catalogLoading ? (
+              <div style={{ fontSize: 12, color: "var(--t3)", display: "flex", alignItems: "center", gap: 8 }}><Loader2 size={14} className="animate-spin" /> Cargando catálogo…</div>
+            ) : catalog.length === 0 ? (
+              <div style={{ fontSize: 12, color: "var(--t3)" }}>Este proyecto no tiene productos sincronizados. Rellena los datos a mano abajo y pega la URL de una foto real del producto.</div>
+            ) : (
+              <>
+                <input value={catalogQuery} onChange={e => setCatalogQuery(e.target.value)} placeholder={`Buscar entre ${catalog.length} productos…`} style={{ ...inputStyle, marginBottom: 10 }} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8, maxHeight: 300, overflowY: "auto", padding: 2 }}>
+                  {catalog
+                    .filter(p => !catalogQuery.trim() || p.title?.toLowerCase().includes(catalogQuery.trim().toLowerCase()))
+                    .slice(0, 120)
+                    .map(p => (
+                      <button key={p.id} onClick={() => pickProduct(p)} style={{ ...cardButton(pickedProduct?.id === p.id), padding: 6, textAlign: "left" }}>
+                        <div style={{ aspectRatio: "1", borderRadius: 6, overflow: "hidden", background: "var(--ink)", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {p.images?.[0]?.src
+                            ? <img src={p.images[0].src} alt={p.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : <span style={{ fontSize: 10, color: "var(--t4)" }}>Sin foto</span>}
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--t1)", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{p.title}</div>
+                      </button>
+                    ))}
+                </div>
+              </>
+            )}
+          </Section>
+
+          {pickedProduct && (pickedProduct.images?.length ?? 0) > 1 && (
+            <Section title="Foto que se usará">
+              <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+                {pickedProduct.images.slice(0, 12).map(img => (
+                  <button key={img.src} onClick={() => setSourceImageUrl(img.src)} style={{ ...cardButton(sourceImageUrl === img.src), padding: 3, flexShrink: 0 }}>
+                    <img src={img.src} alt={img.alt || ""} style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 6, display: "block" }} />
+                  </button>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+            <div>
+              <Field label="Producto *">
+                <input value={productTitle} onChange={e => setProductTitle(e.target.value)} placeholder="Collar de plata minimalista" style={inputStyle} />
+              </Field>
+              <Field label="Categoría *">
+                <input value={productCategory} onChange={e => setProductCategory(e.target.value)} placeholder="joyería, ropa, cosmética..." style={inputStyle} />
+              </Field>
+              <Field label="Marca (se escribe en el vídeo)">
+                <input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Luna Silver" style={inputStyle} />
+              </Field>
+              <Field label="Tono de marca">
+                <input value={brandTone} onChange={e => setBrandTone(e.target.value)} placeholder="minimalista, elegante, joven..." style={inputStyle} />
+              </Field>
+            </div>
+            <div>
+              <Field label="Público objetivo">
+                <textarea value={targetAudience} onChange={e => setTargetAudience(e.target.value)} placeholder="Mujeres 25-40, interés en joyería sostenible, ingresos medio-alto" style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} />
+              </Field>
+              <Field label="Contexto adicional">
+                <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder="Black Friday, nueva colección verano, lanzamiento..." style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} />
+              </Field>
+              <Field label="Foto real del producto (URL)">
+                <input value={sourceImageUrl} onChange={e => setSourceImageUrl(e.target.value)} placeholder="https://cdn.shopify.com/..." style={inputStyle} />
+              </Field>
+            </div>
           </div>
-          <div>
-            <Field label="Público objetivo">
-              <textarea value={targetAudience} onChange={e => setTargetAudience(e.target.value)} placeholder="Mujeres 25-40, interés en joyería sostenible, ingresos medio-alto" style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} />
-            </Field>
-            <Field label="Contexto adicional">
-              <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder="Black Friday, nueva colección verano, lanzamiento..." style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} />
-            </Field>
-            <Field label="URL imagen origen (opcional)">
-              <input value={sourceImageUrl} onChange={e => setSourceImageUrl(e.target.value)} placeholder="https://... (si vacío, Nano Banana genera hero shot)" style={inputStyle} />
-              <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 6 }}>Si dejas vacío, Gemini Nano Banana genera una imagen hero cinemática para cada variante.</p>
-            </Field>
-          </div>
-          <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-            <button onClick={() => setStep(2)} disabled={!productTitle.trim() || !productCategory.trim()} className="btn btn-gold">
+
+          <Section title="2 · Cómo aparece tu producto">
+            {sourceImageUrl ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 8 }}>
+                <button onClick={() => setHeroMode("scene")} style={{ ...cardButton(heroMode === "scene"), textAlign: "left", padding: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Tu producto en escena publicitaria <span style={{ fontSize: 10, color: "var(--gold)" }}>(recomendado)</span></div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.45 }}>Nano Banana coloca tu producto, sin cambiar forma, color ni logo, en un set con luz de estudio. Después se anima.</div>
+                </button>
+                <button onClick={() => setHeroMode("photo")} style={{ ...cardButton(heroMode === "photo"), textAlign: "left", padding: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Tu foto tal cual</div>
+                  <div style={{ fontSize: 11, color: "var(--t3)", lineHeight: 1.45 }}>Se anima la foto original, encajada al formato con su propio fondo desenfocado. Máxima fidelidad; menos espectacular si la foto es de catálogo.</div>
+                </button>
+              </div>
+            ) : (
+              <div style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.35)", color: "#fcd34d", fontSize: 12, lineHeight: 1.5, display: "flex", gap: 10 }}>
+                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>Sin foto real, la IA <strong>inventa</strong> el producto a partir del título. Sirve para conceptos o maquetas, <strong>no para anunciar un producto real</strong>: elige uno del catálogo o pega la URL de su foto.</span>
+              </div>
+            )}
+          </Section>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+            <button onClick={() => setStep(2)} disabled={!projectId || !productTitle.trim() || !productCategory.trim()} className="btn btn-gold">
               Siguiente → Estilo
             </button>
           </div>
@@ -434,7 +565,9 @@ export default function AdStudio() {
                     <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: p.tier === "premium" ? "rgba(200,168,75,0.15)" : p.tier === "standard" ? "rgba(99,102,241,0.15)" : "rgba(45,212,159,0.15)", color: p.tier === "premium" ? "var(--gold)" : p.tier === "standard" ? "#a5b4fc" : "#2dd49f", textTransform: "uppercase", fontWeight: 700 }}>{p.tier}</span>
                   </div>
                   <div style={{ fontSize: 10, color: "var(--t3)", marginBottom: 6 }}>{p.description}</div>
-                  <div style={{ fontSize: 10, color: "var(--t2)" }}>~€{p.costPerAd.toFixed(2)}/ad · Calidad {p.quality}/10</div>
+                  <div style={{ fontSize: 10, color: "var(--t2)" }}>
+                    {p.effectiveDurationSec} s · ≈ {p.costPerAdEur.toFixed(2)} € por anuncio · {p.creditsPerAd} créditos
+                  </div>
                 </button>
               ))}
             </div>
@@ -442,8 +575,13 @@ export default function AdStudio() {
 
           <Section title="Parámetros">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <Field label={`Duración: ${videoDurationSec}s`}>
-                <input type="range" min={3} max={10} step={1} value={videoDurationSec} onChange={e => setVideoDurationSec(parseInt(e.target.value))} style={{ width: "100%" }} />
+              <Field label={`Duración: ${effectiveDurationSec} s`}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {(selectedProvider?.durations ?? [5, 6, 8, 10]).map(d => (
+                    <button key={d} onClick={() => setVideoDurationSec(d)} style={{ ...cardButton(effectiveDurationSec === d), minWidth: 56 }}>{d} s</button>
+                  ))}
+                </div>
+                <p style={{ fontSize: 10, color: "var(--t3)", marginTop: 6 }}>Solo las duraciones que acepta el modelo elegido.</p>
               </Field>
               <Field label={`Variantes A/B: ${variantsCount}`}>
                 <input type="range" min={1} max={5} step={1} value={variantsCount} onChange={e => setVariantsCount(parseInt(e.target.value))} style={{ width: "100%" }} />
@@ -566,11 +704,12 @@ export default function AdStudio() {
                 <div><strong style={{ color: "var(--t1)" }}>Objetivo:</strong> {OBJECTIVE_META[objective].label}</div>
                 <div><strong style={{ color: "var(--t1)" }}>Formato:</strong> {aspect} ({ASPECT_META[aspect].desc})</div>
                 <div><strong style={{ color: "var(--t1)" }}>Video:</strong> {providers.find(p => p.key === videoProvider)?.label || videoProvider}</div>
-                <div><strong style={{ color: "var(--t1)" }}>Duración:</strong> {videoDurationSec}s</div>
+                <div><strong style={{ color: "var(--t1)" }}>Duración:</strong> {effectiveDurationSec} s</div>
+                <div><strong style={{ color: "var(--t1)" }}>Producto:</strong> {sourceImageUrl ? (heroMode === "photo" ? "foto real tal cual" : "foto real en escena") : <span style={{ color: "#fbbf24" }}>inventado por IA</span>}</div>
                 <div><strong style={{ color: "var(--t1)" }}>Variantes:</strong> {variantsCount}</div>
                 <div><strong style={{ color: "var(--t1)" }}>Música:</strong> {addMusic ? "Sí" : "No"}</div>
                 <div><strong style={{ color: "var(--t1)" }}>Texto marca/CTA nítido:</strong> {renderBrandOverlay ? <span style={{ color: "var(--gold)" }}>Sí (FFmpeg)</span> : <span style={{ color: "#e57373" }}>No (riesgo IA)</span>}</div>
-                <div><strong style={{ color: "var(--t1)" }}>Créditos a usar:</strong> {totalCredits}</div>
+                <div><strong style={{ color: "var(--t1)" }}>Créditos:</strong> {totalCredits} (≈ {totalCostEur.toFixed(2)} € de coste IA)</div>
               </div>
               <button onClick={generateCampaign} disabled={!canGenerate}
                 style={{ marginTop: 16, width: "100%", padding: "14px 20px", borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: canGenerate ? "pointer" : "not-allowed", background: "linear-gradient(135deg, #c8a84b, #a88b3a)", color: "#000", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, opacity: canGenerate ? 1 : 0.5 }}>
@@ -680,6 +819,16 @@ function VariantCard({ variant, projectId }: { variant: SavedVariant; projectId:
       {variant.overlayApplied === false && (
         <div style={{ marginTop: 8, fontSize: 10, color: "#fbbf24", display: "flex", alignItems: "center", gap: 4 }} title={variant.overlayError || ""}>
           <AlertCircle size={11} /> Overlay no aplicado — texto puede faltar o ser del modelo IA
+        </div>
+      )}
+      {variant.productSource === "ai-generated" && (
+        <div style={{ marginTop: 6, fontSize: 10, color: "#fbbf24", display: "flex", alignItems: "center", gap: 4 }}>
+          <AlertCircle size={11} /> Producto inventado por IA — no usar como anuncio de un producto real
+        </div>
+      )}
+      {(variant.productSource === "scene" || variant.productSource === "photo") && (
+        <div style={{ marginTop: 6, fontSize: 10, color: "#2dd49f", display: "flex", alignItems: "center", gap: 4 }}>
+          <CheckCircle2 size={11} /> {variant.productSource === "photo" ? "Foto real del producto" : "Producto real en escena (sin alterar)"}
         </div>
       )}
       {/* When Gemini direct API fails (quota/permission/5xx) we transparently
