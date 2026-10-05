@@ -1,6 +1,6 @@
 /**
  * Effects Studio — Unified Creative Library
- * Combines: 6,230 Master Prompts + 30 CSS/JS Effects + 594 Visme Templates
+ * Combina: librería maestra de prompts + 101 efectos CSS/JS + 594 plantillas de diseño (prompts propios por categoría)
  * Features: Brand DNA Adapter · AI Generator · Live Preview · Copy/Export
  */
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -42,11 +42,12 @@ interface StatsResponse {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SNIPPET_CAT_LABELS: Record<string, string> = {
-  particle_effects: "Partículas", background_effects: "Fondos", micro_interactions: "Micro-Interactions",
+  particle_effects: "Partículas", background_effects: "Fondos", micro_interactions: "Microinteracciones",
   text_effects: "Texto", cards: "Tarjetas", "3d_effects": "Efectos 3D", typography_effects: "Tipografía",
   logo_animations: "Logos", celebration_effects: "Celebración", animated_icons: "Iconos",
   loaders: "Loaders", scroll_indicators: "Scroll", charts: "Contadores",
   transition_effects: "Transiciones", interactive_effects: "Interactivo", parallax_effects: "Parallax",
+  forms_surveys: "Formularios", cards_banners: "Tarjetas y banners", navigation_menus: "Navegación",
 };
 const VISME_CAT_LABELS: Record<string, string> = {
   "3d_effects": "Efectos 3D", animated_characters: "Personajes", animated_icons: "Iconos",
@@ -491,7 +492,7 @@ export default function EffectsStudio() {
           {([
             { s: "prompts" as Source, label: `📚 Prompts`, count: totalTemplates.toLocaleString("es-ES") },
             { s: "effects" as Source, label: `⚡ Efectos`, count: stats?.builtinSnippets ?? 30 },
-            { s: "visme" as Source, label: `✦ Visme`, count: stats?.vismeTemplates ?? 594 },
+            { s: "visme" as Source, label: `✦ Plantillas`, count: stats?.vismeTemplates ?? 594 },
           ] as const).map(t => (
             <button key={t.s} onClick={() => switchSource(t.s)} style={{
               padding: "4px 12px", borderRadius: 6, border: "none",
@@ -515,7 +516,7 @@ export default function EffectsStudio() {
             ref={searchRef}
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
-            placeholder={source === "prompts" ? "Buscar en 6.2K prompts…" : source === "effects" ? "Buscar efectos…" : "Buscar templates Visme…"}
+            placeholder={source === "prompts" ? "Buscar en 6.2K prompts…" : source === "effects" ? "Buscar efectos…" : "Buscar plantillas de diseño…"}
             style={{ width: "100%", background: S.surf2, border: `1px solid ${S.bdr}`, borderRadius: 7, padding: "6px 10px 6px 28px", color: S.t1, fontSize: 11, outline: "none", boxSizing: "border-box" }}
           />
         </form>
@@ -528,7 +529,7 @@ export default function EffectsStudio() {
         {/* Stats pills */}
         <div style={{ display: "flex", gap: 5, marginLeft: 4 }}>
           {source === "prompts" && <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 20, background: "rgba(201,169,97,.08)", color: S.gold, border: "1px solid rgba(201,169,97,.2)", fontWeight: 700, whiteSpace: "nowrap" }}>{totalTemplates.toLocaleString("es-ES")} prompts</span>}
-          {source === "effects" && <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 20, background: "rgba(34,197,94,.08)", color: "#22c55e", border: "1px solid rgba(34,197,94,.2)", fontWeight: 700 }}>30 snippets CSS/JS</span>}
+          {source === "effects" && <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 20, background: "rgba(34,197,94,.08)", color: "#22c55e", border: "1px solid rgba(34,197,94,.2)", fontWeight: 700 }}>{stats?.builtinSnippets ?? 101} efectos CSS/JS</span>}
           {source === "visme" && <span style={{ fontSize: 10, padding: "3px 10px", borderRadius: 20, background: "rgba(99,102,241,.08)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.2)", fontWeight: 700 }}>594 templates</span>}
         </div>
 
@@ -664,7 +665,7 @@ export default function EffectsStudio() {
               <span>Todos</span>
             </span>
             <span style={{ fontSize: 10, background: "rgba(255,255,255,.05)", padding: "0 5px", borderRadius: 8, color: S.t4 }}>
-              {source === "prompts" ? totalTemplates.toLocaleString("es-ES") : source === "effects" ? (stats?.builtinSnippets ?? 30) : (stats?.vismeTemplates ?? 594)}
+              {source === "prompts" ? totalTemplates.toLocaleString("es-ES") : source === "effects" ? (stats?.builtinSnippets ?? 101) : (stats?.vismeTemplates ?? 594)}
             </span>
           </button>
 
@@ -700,7 +701,7 @@ export default function EffectsStudio() {
               <span style={{ fontSize: 13, fontWeight: 700 }}>
                 {search ? `"${search}"` : category
                   ? (source === "prompts" ? category.replace(/_/g, " ") : source === "effects" ? (SNIPPET_CAT_LABELS[category] ?? category) : (VISME_CAT_LABELS[category] ?? category.replace(/_/g, " ")))
-                  : source === "prompts" ? "Librería Maestra de Prompts" : source === "effects" ? "Efectos CSS/JS" : "Templates Visme"
+                  : source === "prompts" ? "Librería Maestra de Prompts" : source === "effects" ? "Efectos CSS/JS" : "Plantillas de diseño"
                 }
               </span>
               {totalCount > 0 && !showCategoryGrid && (
@@ -744,7 +745,7 @@ export default function EffectsStudio() {
                 {[
                   { icon: <BookOpen size={14} />, label: "Total prompts", value: `${totalTemplates.toLocaleString("es-ES")}`, color: S.gold },
                   { icon: <Zap size={14} />, label: "Effects snippets", value: `${stats?.builtinSnippets ?? 30} CSS/JS`, color: "#22c55e" },
-                  { icon: <Sparkles size={14} />, label: "Templates Visme", value: `${stats?.vismeTemplates ?? 594}`, color: "#a5b4fc" },
+                  { icon: <Sparkles size={14} />, label: "Plantillas de diseño", value: `${stats?.vismeTemplates ?? 594}`, color: "#a5b4fc" },
                   { icon: <Star size={14} />, label: "Motores IA", value: "Claude · GPT · Gemini · Flux", color: S.jade },
                   { icon: <Hash size={14} />, label: "Con DNA Adapter", value: "Cualquier cliente", color: "#f59e0b" },
                 ].map(item => (
@@ -851,7 +852,7 @@ export default function EffectsStudio() {
                           {item.source === "prompts" && <EngineTag engine={(item as MasterItem).engine} />}
                           {item.category && (
                             <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: "rgba(99,102,241,.1)", color: "#a5b4fc", fontWeight: 600 }}>
-                              {item.category.replace(/_/g, " ")}
+                              {SNIPPET_CAT_LABELS[item.category] ?? VISME_CAT_LABELS[item.category] ?? item.category.replace(/_/g, " ")}
                             </span>
                           )}
                         </div>
@@ -1067,7 +1068,7 @@ export default function EffectsStudio() {
                   </div>
                   {adaptedPrompt && (
                     <button onClick={() => void generateFromAdapted()} disabled={isGenerating} style={{ width: "100%", marginTop: 10, padding: "9px", background: isGenerating ? S.surf2 : "linear-gradient(135deg,#c9a961,#b8860b)", border: "none", borderRadius: 7, color: isGenerating ? S.t4 : "#000", fontWeight: 800, fontSize: 11, cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                      {isGenerating ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Generando…</> : <><Play size={12} /> Generar {OUTPUT_TYPES.find(o => o.key === outputType)?.label}</>}
+                      {isGenerating ? <><RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> Generando…</> : <><Play size={12} /> {outputType === "image" || outputType === "video" ? `Generar prompt de ${OUTPUT_TYPES.find(o => o.key === outputType)?.label?.toLowerCase()}` : `Generar ${OUTPUT_TYPES.find(o => o.key === outputType)?.label}`}</>}
                     </button>
                   )}
                 </div>
