@@ -207,7 +207,7 @@ function RequireClient({ children }: { children: React.ReactNode }) {
 function ExportCenterRoute() {
   const [location] = useLocation();
   const pid = Number(new URLSearchParams(location.split("?")[1] ?? "").get("project")) || 0;
-  return <S><ExportCenter projectId={pid} /></S>;
+  return <P><ExportCenter projectId={pid} /></P>;
 }
 
 function HomeRedirect() {
@@ -322,6 +322,10 @@ function RoutePersistence() {
 function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
+/** Como S, con el padding estándar de página (.page-inner) para páginas que no lo traen. */
+function P({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoader />}><div className="page-inner">{children}</div></Suspense>;
+}
 
 function SmartProjectRedirect({ id }: { id: string }) {
   const { data: projects } = useListProjects();
@@ -425,19 +429,19 @@ function Router() {
           <RequireAdmin><S><CMSEditor /></S></RequireAdmin>
         </Route>
         <Route path="/admin/intelligence">
-          <RequireAdmin><AdminWrapper><AppLayout><S><Intelligence /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><Intelligence /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/gemini-intel">
           <RequireAdmin><AdminWrapper><AppLayout><S><GeminiIntelligence /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/inventory">
-          <RequireAdmin><AdminWrapper><AppLayout><S><Inventory /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><Inventory /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/achievements">
-          <RequireAdmin><AdminWrapper><AppLayout><S><Achievements /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><Achievements /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/roadmap">
-          <RequireAdmin><AdminWrapper><AppLayout><S><Roadmap /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><Roadmap /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/command-center">
           <RequireAdmin><AdminWrapper><AppLayout><S><CommandCenter /></S></AppLayout></AdminWrapper></RequireAdmin>
@@ -446,16 +450,16 @@ function Router() {
           <RequireAdmin><AdminWrapper><AppLayout><S><ApkManager /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/competitors">
-          <RequireAdmin><AdminWrapper><AppLayout><S><Competitors /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><Competitors /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/revenue">
           <RequireAdmin><AdminWrapper><AppLayout><S><Revenue /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/forecast">
-          <RequireAdmin><AdminWrapper><AppLayout><S><Forecast /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><Forecast /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/system">
-          <RequireAdmin><AdminWrapper><AppLayout><S><SystemHealth /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><SystemHealth /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/ai-catalog">
           <RequireAdmin><AdminWrapper><AppLayout><S><AICatalog /></S></AppLayout></AdminWrapper></RequireAdmin>
@@ -509,19 +513,19 @@ function Router() {
           <RequireAdmin><AdminWrapper><AppLayout><S><AdminSettings /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/billing">
-          <RequireAdmin><AdminWrapper><AppLayout><S><Billing /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><Billing /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/brain-sync">
           <RequireAdmin><AdminWrapper><AppLayout><S><BrainSync /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/products">
-          <RequireAdmin><AdminWrapper><AppLayout><S><AdminProducts /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><AdminProducts /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/abtests">
-          <RequireAdmin><AdminWrapper><AppLayout><S><AdminABTests /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><AdminABTests /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/automations">
-          <RequireAdmin><AdminWrapper><AppLayout><S><AdminAutomations /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><AdminAutomations /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/api-usage">
           <RequireAdmin><AdminWrapper><AppLayout><S><ApiUsage /></S></AppLayout></AdminWrapper></RequireAdmin>
@@ -536,28 +540,28 @@ function Router() {
         </Route>
 
         <Route path="/projects/:id/audit">
-          <RequireAdmin><AdminWrapper><AppLayout><S><AuditPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><AuditPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/redesign">
-          <RequireAdmin><AdminWrapper><AppLayout><S><RedesignPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><RedesignPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/images">
-          <RequireAdmin><AdminWrapper><AppLayout><S><ImagesPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><ImagesPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/consistency">
-          <RequireAdmin><AdminWrapper><AppLayout><S><ConsistencyPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><ConsistencyPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/ab-testing">
-          <RequireAdmin><AdminWrapper><AppLayout><S><ABTestingPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><ABTestingPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/pricing">
-          <RequireAdmin><AdminWrapper><AppLayout><S><PricingPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><PricingPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/seo">
-          <RequireAdmin><AdminWrapper><AppLayout><S><SEOPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><SEOPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/projects/:id/settings">
-          <RequireAdmin><AdminWrapper><AppLayout><S><SettingsPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><SettingsPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
 
         <Route path="/projects/:id/vault">
@@ -568,7 +572,7 @@ function Router() {
           {(params: { id: string }) => (
             <RequireAdmin>
               <AdminWrapper>
-                <AppLayout><S><ExportCenter projectId={parseInt(params.id)} /></S></AppLayout>
+                <AppLayout><P><ExportCenter projectId={parseInt(params.id)} /></P></AppLayout>
               </AdminWrapper>
             </RequireAdmin>
           )}
@@ -633,25 +637,25 @@ function Router() {
         </Route>
         {/* Standalone module routes (sin proyecto) */}
         <Route path="/audit">
-          <RequireAdmin><AdminWrapper><AppLayout><S><AuditPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><AuditPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/redesign">
-          <RequireAdmin><AdminWrapper><AppLayout><S><RedesignPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><RedesignPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/images">
-          <RequireAdmin><AdminWrapper><AppLayout><S><ImagesPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><ImagesPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/consistency">
-          <RequireAdmin><AdminWrapper><AppLayout><S><ConsistencyPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><ConsistencyPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/ab-testing">
-          <RequireAdmin><AdminWrapper><AppLayout><S><ABTestingPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><ABTestingPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/pricing">
-          <RequireAdmin><AdminWrapper><AppLayout><S><PricingPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><PricingPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/seo">
-          <RequireAdmin><AdminWrapper><AppLayout><S><SEOPage /></S></AppLayout></AdminWrapper></RequireAdmin>
+          <RequireAdmin><AdminWrapper><AppLayout><P><SEOPage /></P></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/vault">
           <RequireAdmin><AdminWrapper><AppLayout><S><ProjectVault /></S></AppLayout></AdminWrapper></RequireAdmin>

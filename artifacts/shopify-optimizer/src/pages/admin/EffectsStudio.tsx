@@ -806,15 +806,19 @@ export default function EffectsStudio() {
                 const cardBg = composeMode
                   ? (isComposeSelected ? "rgba(99,102,241,.12)" : S.surf)
                   : (isSelected ? "rgba(201,169,97,.06)" : S.surf);
+                const onCardActivate = () => {
+                  if (composeMode && item.source === "effects" && itemId) {
+                    toggleComposeEffect(itemId);
+                  } else if (!composeMode) {
+                    void selectItem(item);
+                  }
+                };
                 return (
-                  <button key={`${item.source}-${(item as any).id ?? i}`}
-                    onClick={() => {
-                      if (composeMode && item.source === "effects" && itemId) {
-                        toggleComposeEffect(itemId);
-                      } else if (!composeMode) {
-                        void selectItem(item);
-                      }
-                    }}
+                  // div (no <button>): la tarjeta contiene botones "Copiar"/"Adaptar" y HTML no permite anidarlos.
+                  <div key={`${item.source}-${(item as any).id ?? i}`}
+                    role="button" tabIndex={0}
+                    onClick={() => onCardActivate()}
+                    onKeyDown={e => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onCardActivate(); } }}
                     style={{ background: cardBg, border: cardBorder, borderRadius: 12, padding: "13px 15px", cursor: "pointer", textAlign: "left", transition: "all .15s", position: "relative" }}
                     onMouseOver={e => { if (!isSelected && !isComposeSelected) e.currentTarget.style.borderColor = composeMode ? "rgba(99,102,241,.4)" : "rgba(201,169,97,.25)"; }}
                     onMouseOut={e => { if (!isSelected && !isComposeSelected) e.currentTarget.style.borderColor = S.bdr; }}>
@@ -880,7 +884,7 @@ export default function EffectsStudio() {
                         </button>
                       </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute } from "wouter";
+import { toast } from "@/hooks/use-toast";
 
 type Tab = "overview" | "orders" | "products" | "categories" | "inventory" | "seo";
 
@@ -8,6 +9,15 @@ const PL = "#ff4d8d";
 const PD = "#8a0040";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
+// Respuestas no-OK → error con el mensaje del API (antes se pintaban como datos: "NaN €", "undefined").
+async function okJson(r: Response) {
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d?.error ?? `HTTP ${r.status}`);
+  return d;
+}
+const loadError = (e: Error) => toast({ title: "Error cargando datos", description: e.message, variant: "destructive" });
+const saveError = (e: Error) => toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" });
 
 const fmt = (n: number, currency = "EUR") =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency, minimumFractionDigits: 2 }).format(n);
@@ -125,7 +135,7 @@ function OverviewTab({ projectId }: { projectId: string }) {
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/admin/ps/project/${projectId}/overview`, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => {
         if (d.error) { setError(d.error); setLoading(false); return; }
         setData(d); setLoading(false);
@@ -218,9 +228,9 @@ function OrdersTab({ projectId }: { projectId: string }) {
   const load = useCallback(() => {
     setLoading(true);
     fetch(`${API}/admin/ps/project/${projectId}/orders?page=${page}&limit=20`, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setOrders(d.orders ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId, page]);
 
   useEffect(() => { load(); }, [load]);
@@ -280,9 +290,9 @@ function ProductsTab({ projectId }: { projectId: string }) {
     let url = `${API}/admin/ps/project/${projectId}/products?page=${page}&limit=20`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     fetch(url, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setProducts(d.products ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId, page, search]);
 
   useEffect(() => { load(); }, [load]);
@@ -372,9 +382,9 @@ function CategoriesTab({ projectId }: { projectId: string }) {
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/admin/ps/project/${projectId}/categories`, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId]);
 
   if (loading) return <div style={{ textAlign:"center", padding:40, color:"rgba(255,255,255,0.4)" }}>Cargando árbol de categorías…</div>;
@@ -410,9 +420,9 @@ function InventoryTab({ projectId }: { projectId: string }) {
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/admin/ps/project/${projectId}/inventory`, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setInv(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId]);
 
   if (loading) return <div style={{ textAlign:"center", padding:40, color:"rgba(255,255,255,0.4)" }}>Cargando inventario PrestaShop…</div>;
@@ -483,9 +493,9 @@ function SeoTab({ projectId }: { projectId: string }) {
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/admin/ps/project/${projectId}/products?page=1&limit=30`, { credentials: "include" })
-      .then(r => r.json())
+      .then(okJson)
       .then(d => { setProducts(d.products ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e: Error) => { setLoading(false); loadError(e); });
   }, [projectId]);
 
   const loadSeo = async (platformId: string) => {
@@ -495,8 +505,9 @@ function SeoTab({ projectId }: { projectId: string }) {
       setEditingId(platformId);
       return;
     }
-    const r = await fetch(`${API}/admin/ps/project/${projectId}/seo/${platformId}`, { credentials: "include" });
-    const d = await r.json();
+    let d: any;
+    try { d = await fetch(`${API}/admin/ps/project/${projectId}/seo/${platformId}`, { credentials: "include" }).then(okJson); }
+    catch (e) { loadError(e as Error); return; }
     setSeoCache(prev => ({ ...prev, [platformId]: d.seo ?? {} }));
     setEditData({ metaTitle: d.seo?.metaTitle ?? "", metaDescription: d.seo?.metaDescription ?? "" });
     setEditingId(platformId);
@@ -505,14 +516,16 @@ function SeoTab({ projectId }: { projectId: string }) {
   const saveSeo = async () => {
     if (!editingId) return;
     setSaving(true);
-    await fetch(`${API}/admin/ps/project/${projectId}/seo/${editingId}`, {
-      method: "PUT", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editData),
-    });
-    setSeoCache(prev => ({ ...prev, [editingId]: editData }));
-    setSaving(false);
-    setEditingId(null);
+    try {
+      await fetch(`${API}/admin/ps/project/${projectId}/seo/${editingId}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editData),
+      }).then(okJson);
+      setSeoCache(prev => ({ ...prev, [editingId]: editData }));
+      setEditingId(null);
+    } catch (e) { saveError(e as Error); }
+    finally { setSaving(false); }
   };
 
   return (

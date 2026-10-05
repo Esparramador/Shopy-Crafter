@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, type CSSProperties } from "react";
+import { isEditorRoute } from "@/lib/editor-routes";
 import { ChevronDown, ChevronUp, CheckCircle, Circle, ExternalLink } from "lucide-react";
 import { useLocation, useRoute } from "wouter";
 import { useDraggable } from "@/hooks/use-draggable";
@@ -69,15 +70,25 @@ const DETAIL_COUNTS: Record<string, string> = {
   client_invited: "clientCount",
 };
 
+// Estado del widget recordado entre recargas: por defecto plegado (no tapa los
+// editores); "Cerrar" lo oculta 7 días.
+const LS_COLLAPSED = "shopycrafter_onboarding_collapsed";
+const LS_HIDDEN_UNTIL = "shopycrafter_onboarding_hidden_until";
+const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } };
+
 export function OnboardingWidget() {
   const [progress, setProgress] = useState<Record<string, number> | null>(null);
   const [details, setDetails] = useState<Record<string, any> | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(() => lsGet(LS_COLLAPSED) !== "0");
+  const [dismissed, setDismissedState] = useState(() => Number(lsGet(LS_HIDDEN_UNTIL) ?? 0) > Date.now());
+  const setCollapsed = (v: boolean | ((c: boolean) => boolean)) =>
+    setCollapsedState(c => { const n = typeof v === "function" ? v(c) : v; lsSet(LS_COLLAPSED, n ? "1" : "0"); return n; });
+  const hideForAWeek = () => { lsSet(LS_HIDDEN_UNTIL, String(Date.now() + 7 * 864e5)); setDismissedState(true); };
   const [isMobile, setIsMobile] = useState(false);
   const [location, navigate] = useLocation();
   const [routeMatch, routeParams] = useRoute("/projects/:id/*");
-  const { position: dragPos, dragHandlers: widgetDragHandlers } = useDraggable({ storageKey: "onboarding", defaultBottom: 16, defaultRight: 16, dragFromAnywhere: false });
+  const { position: dragPos, dragHandlers: widgetDragHandlers } = useDraggable({ storageKey: "onboarding", defaultBottom: 16, defaultRight: 104, dragFromAnywhere: false }) // a la izquierda del chatbot y el micro;
 
   // Auto-collapse and detect mobile (including landscape phones)
   useEffect(() => {
@@ -85,7 +96,7 @@ export function OnboardingWidget() {
       const isLandscapePhone = window.innerHeight < 560 && window.matchMedia("(orientation: landscape)").matches;
       const mobile = window.innerWidth < 640 || isLandscapePhone;
       setIsMobile(mobile);
-      if (mobile) setCollapsed(true);
+      if (mobile) setCollapsedState(true);
     };
     check();
     window.addEventListener("resize", check);
@@ -106,7 +117,7 @@ export function OnboardingWidget() {
         if (!d) return;
         setProgress(d.progress);
         setDetails(d.details ?? null);
-        if (d.progress?.onboardingCompleted === 1) setDismissed(true);
+        if (d.progress?.onboardingCompleted === 1) setDismissedState(true);
       })
       .catch(() => {});
   }, []);
@@ -117,7 +128,7 @@ export function OnboardingWidget() {
     return () => clearInterval(iv);
   }, [fetchProgress, urlProjectId]);
 
-  if (!progress || dismissed) return null;
+  if (!progress || dismissed || isEditorRoute(location)) return null;
 
   const completionPct = progress.completionPct ?? 0;
   if (completionPct === 100) return null;
@@ -180,9 +191,9 @@ export function OnboardingWidget() {
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0 }}>
           <button
-            onClick={e => { e.stopPropagation(); setDismissed(true); }}
+            onClick={e => { e.stopPropagation(); hideForAWeek(); }}
             style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t4, #666)", fontSize: 16, padding: "2px 4px", lineHeight: 1 }}
-            title="Cerrar"
+            title="Ocultar 7 días"
           >×</button>
           {collapsed
             ? <ChevronUp size={14} style={{ color: "var(--t3, #999)" }} />

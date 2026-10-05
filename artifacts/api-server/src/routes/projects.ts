@@ -11,6 +11,7 @@ import { recordAudit } from "../lib/audit.helper.js";
 import { getConnector, PlatformNotSupportedError } from "../lib/connectors/index";
 import { learnFromOperation } from "../lib/claude";
 import { cached, invalidateCache } from "../lib/cache.js";
+import { getPlatform } from "../lib/platform-capabilities.js";
 
 const router = Router();
 
@@ -469,7 +470,7 @@ router.post("/projects", async (req, res): Promise<void> => {
         userId: req.session.userId!,
         action: "project_create",
         projectId: String(refreshed.id),
-        details: `Created ${platformType} project "${name}" (${normalizedDomain}) — connection: ${wcConnectionResult.connected ? "OK" : "FAILED"}`,
+        details: `Proyecto ${getPlatform(platformType).label} creado: "${name}"${normalizedDomain ? ` (${normalizedDomain})` : ""} — conexión: ${wcConnectionResult.connected ? "OK" : "FALLIDA"}`,
         ipAddress: req.ip ?? "unknown",
       });
   
@@ -538,7 +539,7 @@ router.post("/projects", async (req, res): Promise<void> => {
       userId: req.session.userId!,
       action: "project_create",
       projectId: String(refreshed.id),
-      details: `Created ${platformType} project "${name}" (${normalizedDomain})`,
+      details: `Proyecto ${getPlatform(platformType).label} creado: "${name}"${normalizedDomain ? ` (${normalizedDomain})` : ""}`,
       ipAddress: req.ip ?? "unknown",
     });
   

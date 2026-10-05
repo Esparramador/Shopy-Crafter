@@ -8,7 +8,8 @@ import { AiTruncatedError, aiOutputErrorMessage, isAiOutputError } from "../lib/
 
 const router = Router();
 
-const STUDIO_ROOT = "/home/runner/workspace/artifacts/shopify-optimizer/src";
+// El API arranca desde artifacts/api-server (igual que lib/theme-css-writer.ts).
+const STUDIO_ROOT = path.resolve(process.cwd(), "../shopify-optimizer/src");
 
 function resolveSafe(filePath: string): string | null {
   const clean = filePath.replace(/\.\.\//g, "").replace(/^\//, "");

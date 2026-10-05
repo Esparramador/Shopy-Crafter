@@ -17,11 +17,24 @@ interface Plan {
   badge?: string | null;
   storesLimit: number;
   imagesIncluded: number;
-  features: string[];
+  features: PlanFeature[];
   ctaLabel?: string;
   ctaStyle?: string;
   ctaHref?: string;
 }
+
+// El catálogo guarda {text, included}; planes antiguos pueden traer strings.
+type PlanFeature = string | { text: string; included?: boolean };
+const featText = (f: PlanFeature) => (typeof f === "string" ? f : f.text);
+const featIncluded = (f: PlanFeature) => typeof f === "string" || f.included !== false;
+/** Editor: una feature por línea; "- " delante = no incluida. */
+const featuresToText = (fs: PlanFeature[] = []) =>
+  fs.map(f => (featIncluded(f) ? featText(f) : `- ${featText(f)}`)).join("\n");
+const textToFeatures = (t: string): PlanFeature[] =>
+  t.split("\n").map(s => s.trim()).filter(Boolean).map(s => {
+    const excluded = s.startsWith("-");
+    return { text: excluded ? s.slice(1).trim() : s, included: !excluded };
+  });
 
 interface Subscription {
   id: string | number;
@@ -347,10 +360,15 @@ export default function Billing() {
                     {plan.price != null && plan.price > 0 && <span style={{ fontSize: 12, color: "var(--t3)", fontWeight: 400 }}>/mes</span>}
                   </div>
                   <ul style={{ listStyle: "none", padding: 0, margin: "0 0 16px" }}>
-                    {plan.features.map(f => (
-                      <li key={f} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "var(--t2)", marginBottom: 6 }}>
+                    {plan.features.map(f => featIncluded(f) ? (
+                      <li key={featText(f)} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "var(--t2)", marginBottom: 6 }}>
                         <Check size={12} style={{ color: "var(--jade)", flexShrink: 0, marginTop: 2 }} />
-                        <span>{f}</span>
+                        <span>{featText(f)}</span>
+                      </li>
+                    ) : (
+                      <li key={featText(f)} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "var(--t4)", marginBottom: 6, textDecoration: "line-through" }}>
+                        <X size={12} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span>{featText(f)}</span>
                       </li>
                     ))}
                   </ul>
@@ -714,7 +732,7 @@ function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading:
       ctaStyle: p.ctaStyle ?? "ghost", ctaHref: p.ctaHref ?? "/contacto",
       storesLimit: String(p.storesLimit), imagesIncluded: String(p.imagesIncluded),
     });
-    setFeaturesText(p.features.join("\n")); setEditId(p.id); setShowForm(true); setError(null);
+    setFeaturesText(featuresToText(p.features)); setEditId(p.id); setShowForm(true); setError(null);
   };
 
   const handleSave = async () => {
@@ -727,7 +745,7 @@ function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading:
         priceAnnual: (form.priceAnnual === null || form.priceAnnual === "" as any) ? null : Number(form.priceAnnual),
         storesLimit: Number(form.storesLimit), imagesIncluded: Number(form.imagesIncluded),
         badge: form.badge || null,
-        features: featuresText.split("\n").map(s => s.trim()).filter(Boolean),
+        features: textToFeatures(featuresText),
       };
       if (editId) {
         await apiPut(`/api/billing/plans/${editId}`, payload);
@@ -814,7 +832,7 @@ function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading:
             </div>
           </div>
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Features (una por línea)</label>
+            <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Features (una por línea · empieza por "- " si NO está incluida)</label>
             <textarea
               value={featuresText}
               onChange={e => setFeaturesText(e.target.value)}
@@ -858,8 +876,8 @@ function PlanManagerTab({ plans, loading, onRefresh }: { plans: Plan[]; loading:
             {plan.priceAnnual != null && <div style={{ fontSize: 11, color: "var(--jade)" }}>€{plan.priceAnnual}/año</div>}
             <div style={{ marginTop: 10 }}>
               {plan.features.slice(0, 4).map(f => (
-                <div key={f} style={{ display: "flex", gap: 5, fontSize: 11, color: "var(--t2)", marginBottom: 4 }}>
-                  <span style={{ color: "var(--jade)" }}>✓</span> {f}
+                <div key={featText(f)} style={{ display: "flex", gap: 5, fontSize: 11, color: featIncluded(f) ? "var(--t2)" : "var(--t4)", marginBottom: 4 }}>
+                  <span style={{ color: featIncluded(f) ? "var(--jade)" : "var(--t4)" }}>{featIncluded(f) ? "✓" : "✗"}</span> {featText(f)}
                 </div>
               ))}
               {plan.features.length > 4 && <div style={{ fontSize: 10, color: "var(--t4)", marginTop: 2 }}>+{plan.features.length - 4} más</div>}

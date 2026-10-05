@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
+import { isEditorRoute, EDITOR_FLOAT_MIN_BOTTOM } from "@/lib/editor-routes";
 import { useDraggable } from "@/hooks/use-draggable";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -52,6 +53,8 @@ export function VoiceButton() {
   const locationRef = useRef(location);
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { position: dragPos, dragHandlers: voiceDragHandlers, wasDragged: voiceWasDragged } = useDraggable({ storageKey: "voicebtn", defaultBottom: 88, defaultRight: 24, dragFromAnywhere: true });
+  // En editores el micro va encima del chatbot elevado (no sobre el compositor).
+  const floatBottom = isEditorRoute(location) ? Math.max(dragPos.bottom, EDITOR_FLOAT_MIN_BOTTOM + 64) : dragPos.bottom;
 
   useEffect(() => { listeningRef.current = listening; }, [listening]);
   useEffect(() => { locationRef.current = location; }, [location]);
@@ -214,7 +217,7 @@ export function VoiceButton() {
         {...voiceDragHandlers}
         className="floating-widget"
         style={{
-          position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 900,
+          position: "fixed", bottom: floatBottom, right: dragPos.right, zIndex: 900,
           touchAction: "none", userSelect: "none",
         }}
       >
@@ -238,7 +241,7 @@ export function VoiceButton() {
         {...voiceDragHandlers}
         className="floating-widget"
         style={{
-          position: "fixed", bottom: dragPos.bottom, right: dragPos.right, zIndex: 900,
+          position: "fixed", bottom: floatBottom, right: dragPos.right, zIndex: 900,
           touchAction: "none", userSelect: "none",
         }}
       >
@@ -267,7 +270,7 @@ export function VoiceButton() {
 
       {showBubble && (
         <div className="floating-widget" style={{
-          position: "fixed", bottom: dragPos.bottom + 64, right: dragPos.right, zIndex: 901,
+          position: "fixed", bottom: floatBottom + 64, right: dragPos.right, zIndex: 901,
           background: "var(--ink2)", border: "1px solid var(--ink3)",
           borderRadius: 14, padding: "14px 18px",
           maxWidth: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",

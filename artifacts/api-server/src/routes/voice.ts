@@ -353,7 +353,7 @@ router.get("/voice/cloned", requireAdmin, async (_req, res): Promise<void> => {
     res.json({ voices });
   } catch (err: any) {
     logger.error({ err: err?.message }, "voice/cloned list failed");
-    res.status(500).json({ error: err?.message || "Error listando voces clonadas" });
+    res.status(/no configurad/i.test(String(err?.message)) ? 503 : 500).json({ error: err?.message || "Error listando voces clonadas" });
   }
 });
 

@@ -344,7 +344,7 @@ export default function ClientProducts() {
   }, {});
 
   return (
-    <ClientLayout>
+    <ClientLayout padded>
       <style>{`
         @keyframes prod-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
         .prod-grid .prod-item{animation:prod-in 0.35s ease both;}

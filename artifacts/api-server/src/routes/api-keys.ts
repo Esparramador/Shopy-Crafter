@@ -73,7 +73,8 @@ async function ensureApiKeysTable() {
     )
   `);
 }
-ensureApiKeysTable().catch(e => logger.error({ e }, "api-keys table init failed"));
+// Promesa compartida: injectDbApiKeys() espera a que la tabla exista (BD nueva).
+const apiKeysTableReady = ensureApiKeysTable().catch(e => logger.error({ e }, "api-keys table init failed"));
 
 function maskKey(k: string): string {
   if (!k) return "";
@@ -310,6 +311,7 @@ router.post("/admin/billing-config", requireAdmin, async (req: Request, res: Res
 // ── GET /api/admin/api-keys/startup-inject ──────────────────────────────────
 // Called at startup to inject DB keys into process.env
 export async function injectDbApiKeys() {
+  await apiKeysTableReady;
   try {
     const rows = await db.execute(sql`SELECT key_name, key_value FROM platform_api_keys WHERE is_active = TRUE`);
     const applied: string[] = [];
