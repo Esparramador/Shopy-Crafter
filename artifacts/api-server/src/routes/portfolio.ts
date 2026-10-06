@@ -17,32 +17,27 @@ import { sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { saveMedia, getMedia, deleteMedia, mediaIdFromUrl } from "../lib/media-store.js";
+import { SEED, SEED_VERSION, GENERIC_V1 } from "./portfolio-seed.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 12 } });
 
-export interface PortfolioImage { url: string; alt: string }
+export interface PortfolioImage { url: string; alt: string; w?: number; h?: number }
 export interface PortfolioProject {
   id: number; slug: string; title: string; client: string | null; category: string;
   summary: string; description: string; tech: string[]; liveUrl: string | null; appUrl: string | null;
   images: PortfolioImage[]; sortOrder: number; published: boolean;
+  /** Qué hace el proyecto, punto por punto (lo que la landing enseña como lista). */
+  features: string[];
+  /** Estado: «En producción», «Entregado», «En desarrollo»… */
+  status: string;
+  /** Versiones del proyecto para clientes distintos (carrusel lateral de la tarjeta). */
+  variants: PortfolioVariant[];
 }
-
-/**
- * Proyectos con los que arranca el portfolio. Los textos se limitan a lo que el
- * propio equipo describe (sin cifras ni resultados inventados); las imágenes se
- * suben desde el panel (Admin → Portfolio).
- */
-const SEED: Array<Omit<PortfolioProject, "id" | "images" | "published">> = [
-  { slug: "warriors-hardcore", title: "Warriors Hardcore", client: "Warriors Hardcore", category: "Web y app", summary: "Landing y aplicación propia de la marca.", description: "Diseño y desarrollo de la landing de la marca y de su aplicación.", tech: ["Landing", "App"], liveUrl: null, appUrl: null, sortOrder: 0 },
-  { slug: "crafter-eventos", title: "Crafter Eventos", client: "Crafter Eventos", category: "Web y app", summary: "Web y sistema para la gestión de eventos.", description: "Proyecto completo para Crafter Eventos.", tech: ["Web"], liveUrl: null, appUrl: null, sortOrder: 1 },
-  { slug: "brasas-y-paellas", title: "Sistema para brasas y paellas", client: null, category: "Sistema a medida", summary: "Asistente conversacional, registro de clientes y aplicación con CRM.", description: "Sistema completo para un negocio de brasas y paellas: asistente conversacional para atender a los clientes, registro y una aplicación con CRM para gestionarlos.", tech: ["Asistente IA", "CRM", "App"], liveUrl: null, appUrl: null, sortOrder: 2 },
-  { slug: "rastalo-tpv", title: "Rastalo TPV", client: "Rastalo", category: "Sistema a medida", summary: "Sistema TPV (punto de venta).", description: "Terminal punto de venta desarrollado a medida.", tech: ["TPV"], liveUrl: null, appUrl: null, sortOrder: 3 },
-  { slug: "agente-j-bond", title: "Agente J-Bond", client: null, category: "Plataforma IA", summary: "Plataforma con interfaz diseñada a medida.", description: "Plataforma del agente J-Bond con interfaz y flujos diseñados a medida.", tech: ["Agente IA", "Plataforma"], liveUrl: null, appUrl: null, sortOrder: 4 },
-  { slug: "bots-trading", title: "Bots de trading", client: null, category: "Automatización", summary: "Bots de trading automatizado.", description: "Desarrollo de bots que ejecutan estrategias de trading de forma automática.", tech: ["Automatización", "Trading"], liveUrl: null, appUrl: null, sortOrder: 5 },
-  { slug: "qr-artisticos-3d", title: "QR artísticos 3D", client: null, category: "Diseño", summary: "Códigos QR artísticos en 3D que siguen siendo escaneables.", description: "Diseño de códigos QR artísticos y en 3D para marcas.", tech: ["QR", "3D"], liveUrl: null, appUrl: null, sortOrder: 6 },
-  { slug: "pequenos-genios", title: "Pequeños Genios", client: null, category: "App", summary: "35 minijuegos educativos para niños de 4 a 12 años.", description: "Juegos de matemáticas, lengua, ciencias, historia, tecnología y destreza con dificultad adaptada a la edad, progreso guardado en el dispositivo y modo sin cuenta. App Android con Capacitor.", tech: ["React", "Capacitor", "Android"], liveUrl: null, appUrl: null, sortOrder: 7 },
-];
+export interface PortfolioVariant {
+  name: string; client: string; status: string; summary: string; description: string;
+  features: string[]; tech: string[]; images: PortfolioImage[];
+}
 
 let ready: Promise<void> | null = null;
 function ensureTable(): Promise<void> {
@@ -66,18 +61,74 @@ function ensureTable(): Promise<void> {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
-    const count = await db.execute(sql`SELECT COUNT(*)::int AS n FROM portfolio_projects`);
-    if (Number((count.rows[0] as { n: number }).n) === 0) {
-      for (const p of SEED) {
-        await db.execute(sql`
-          INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, live_url, app_url, sort_order)
-          VALUES (${p.slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${JSON.stringify(p.tech)}::jsonb, ${p.liveUrl}, ${p.appUrl}, ${p.sortOrder})
-          ON CONFLICT (slug) DO NOTHING
-        `);
-      }
-    }
+    await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS features JSONB NOT NULL DEFAULT '[]'::jsonb`);
+    await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS variants JSONB NOT NULL DEFAULT '[]'::jsonb`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS portfolio_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+    await applySeed();
   })().catch(err => { ready = null; throw err; });
   return ready;
+}
+
+/**
+ * Aplica la lista de proyectos reales UNA vez por versión (portfolio_meta.seed_version):
+ *  - proyecto que no existe → se crea;
+ *  - proyecto que sigue con el texto genérico de la versión 1 → se actualiza entero;
+ *  - proyecto editado desde el panel → no se toca (solo se le ponen imágenes si no tiene ninguna).
+ * Borrar un proyecto desde el panel es definitivo: la versión ya aplicada no lo vuelve a crear.
+ */
+async function applySeed(): Promise<void> {
+  const meta = await db.execute(sql`SELECT value FROM portfolio_meta WHERE key = 'seed_version'`);
+  const applied = Number((meta.rows[0] as { value?: string } | undefined)?.value ?? 0);
+  if (applied >= SEED_VERSION) return;
+  for (const p of SEED) {
+    const cur = await db.execute(sql`SELECT id, description, images FROM portfolio_projects WHERE slug = ${p.slug}`);
+    const row = cur.rows[0] as { id: number; description: string; images: unknown } | undefined;
+    const tech = JSON.stringify(p.tech), features = JSON.stringify(p.features), images = JSON.stringify(p.images);
+    const variants = JSON.stringify(p.variants);
+    if (!row) {
+      await db.execute(sql`
+        INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, variants, sort_order)
+        VALUES (${p.slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${tech}::jsonb, ${features}::jsonb, ${p.status},
+                ${p.liveUrl}, ${p.appUrl}, ${images}::jsonb, ${variants}::jsonb, ${p.sortOrder})
+        ON CONFLICT (slug) DO NOTHING
+      `);
+    } else if (GENERIC_V1[p.slug] !== undefined && row.description === GENERIC_V1[p.slug]) {
+      // Las imágenes que se subieron desde el panel mandan sobre las capturas de la lista.
+      const finalImages = Array.isArray(row.images) && row.images.length > 0 ? JSON.stringify(row.images) : images;
+      await db.execute(sql`
+        UPDATE portfolio_projects SET title = ${p.title}, client = ${p.client}, category = ${p.category}, summary = ${p.summary},
+          description = ${p.description}, tech = ${tech}::jsonb, features = ${features}::jsonb, status = ${p.status},
+          live_url = COALESCE(live_url, ${p.liveUrl}), app_url = COALESCE(app_url, ${p.appUrl}),
+          images = ${finalImages}::jsonb, variants = ${variants}::jsonb, sort_order = ${p.sortOrder}, updated_at = NOW()
+        WHERE id = ${row.id}
+      `);
+    } else if (!(Array.isArray(row.images) && row.images.length > 0) && p.images.length > 0) {
+      await db.execute(sql`UPDATE portfolio_projects SET images = ${images}::jsonb, updated_at = NOW() WHERE id = ${row.id}`);
+    }
+  }
+  await db.execute(sql`
+    INSERT INTO portfolio_meta (key, value) VALUES ('seed_version', ${String(SEED_VERSION)})
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+  `);
+  logger.info({ version: SEED_VERSION }, "portfolio: lista de proyectos aplicada");
+}
+
+function cleanList(v: unknown, maxItems: number, maxLen: number): string[] {
+  return Array.isArray(v) ? v.map(t => cleanText(t, maxLen)).filter(Boolean).slice(0, maxItems) : [];
+}
+
+/** Las versiones llegan del panel como JSON: se quedan solo los campos conocidos y las imágenes de la casa. */
+function cleanVariants(v: unknown): PortfolioVariant[] {
+  if (!Array.isArray(v)) return [];
+  return v.slice(0, 6).map((x: Record<string, unknown>) => ({
+    name: cleanText(x?.name, 60), client: cleanText(x?.client, 120), status: cleanText(x?.status, 40),
+    summary: cleanText(x?.summary, 300), description: cleanText(x?.description, 4000),
+    features: cleanList(x?.features, 12, 140), tech: cleanList(x?.tech, 12, 40),
+    images: (Array.isArray(x?.images) ? (x.images as PortfolioImage[]) : [])
+      .filter(im => typeof im?.url === "string" && /^\/(portfolio|api\/media)\//.test(im.url)).slice(0, 12)
+      .map(im => ({ url: im.url, alt: cleanText(im.alt, 160), ...(Number(im.w) > 0 && Number(im.h) > 0 ? { w: Number(im.w), h: Number(im.h) } : {}) })),
+  })).filter(x => x.name);
 }
 
 function toProject(r: Record<string, unknown>): PortfolioProject {
@@ -87,6 +138,8 @@ function toProject(r: Record<string, unknown>): PortfolioProject {
     tech: Array.isArray(r.tech) ? (r.tech as string[]) : [], liveUrl: (r.live_url as string | null) ?? null,
     appUrl: (r.app_url as string | null) ?? null, images: Array.isArray(r.images) ? (r.images as PortfolioImage[]) : [],
     sortOrder: Number(r.sort_order ?? 0), published: Boolean(r.published),
+    features: Array.isArray(r.features) ? (r.features as string[]) : [], status: String(r.status ?? ""),
+    variants: Array.isArray(r.variants) ? (r.variants as PortfolioVariant[]) : [],
   };
 }
 
@@ -155,10 +208,10 @@ router.post("/admin/portfolio", requireAdmin, async (req: Request, res: Response
     let slug = base; let i = 2;
     while (slugs.has(slug)) slug = `${base}-${i++}`;
     const r = await db.execute(sql`
-      INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, live_url, app_url, sort_order, published)
+      INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, sort_order, published)
       VALUES (${slug}, ${title}, ${cleanText(b.client, 120) || null}, ${cleanText(b.category, 60) || "Proyecto"},
         ${cleanText(b.summary, 300)}, ${cleanText(b.description, 4000)},
-        ${JSON.stringify(Array.isArray(b.tech) ? b.tech.map((t: unknown) => cleanText(t, 40)).filter(Boolean).slice(0, 12) : [])}::jsonb,
+        ${JSON.stringify(cleanList(b.tech, 12, 40))}::jsonb, ${JSON.stringify(cleanList(b.features, 12, 140))}::jsonb, ${cleanText(b.status, 40)},
         ${cleanUrl(b.liveUrl)}, ${cleanUrl(b.appUrl)},
         COALESCE((SELECT MAX(sort_order) + 1 FROM portfolio_projects), 0), ${b.published !== false})
       RETURNING *
@@ -179,7 +232,10 @@ router.put("/admin/portfolio/:id", requireAdmin, async (req: Request, res: Respo
     const p = toProject(cur.rows[0] as Record<string, unknown>);
     const images: PortfolioImage[] = Array.isArray(b.images)
       // Solo se permite reordenar/editar el texto alternativo de imágenes ya subidas.
-      ? (b.images as PortfolioImage[]).filter(im => p.images.some(x => x.url === im?.url)).map(im => ({ url: im.url, alt: cleanText(im.alt, 160) }))
+      ? (b.images as PortfolioImage[]).filter(im => p.images.some(x => x.url === im?.url)).map(im => {
+          const prev = p.images.find(x => x.url === im.url)!;      // el tamaño es el de la imagen guardada, no el que mande el navegador
+          return { url: im.url, alt: cleanText(im.alt, 160), ...(prev.w && prev.h ? { w: prev.w, h: prev.h } : {}) };
+        })
       : p.images;
     const r = await db.execute(sql`
       UPDATE portfolio_projects SET
@@ -188,7 +244,10 @@ router.put("/admin/portfolio/:id", requireAdmin, async (req: Request, res: Respo
         category = ${"category" in b ? cleanText(b.category, 60) || p.category : p.category},
         summary = ${"summary" in b ? cleanText(b.summary, 300) : p.summary},
         description = ${"description" in b ? cleanText(b.description, 4000) : p.description},
-        tech = ${JSON.stringify(Array.isArray(b.tech) ? b.tech.map((t: unknown) => cleanText(t, 40)).filter(Boolean).slice(0, 12) : p.tech)}::jsonb,
+        tech = ${JSON.stringify(Array.isArray(b.tech) ? cleanList(b.tech, 12, 40) : p.tech)}::jsonb,
+        features = ${JSON.stringify(Array.isArray(b.features) ? cleanList(b.features, 12, 140) : p.features)}::jsonb,
+        variants = ${JSON.stringify(Array.isArray(b.variants) ? cleanVariants(b.variants) : p.variants)}::jsonb,
+        status = ${"status" in b ? cleanText(b.status, 40) : p.status},
         live_url = ${"liveUrl" in b ? cleanUrl(b.liveUrl) : p.liveUrl},
         app_url = ${"appUrl" in b ? cleanUrl(b.appUrl) : p.appUrl},
         images = ${JSON.stringify(images)}::jsonb,
@@ -227,7 +286,7 @@ router.post("/admin/portfolio/:id/images", requireAdmin, upload.array("files", 1
       // Se normaliza a WebP de hasta 2000 px: pesa poco y carga rápido en la landing.
       const out = await sharp(f.buffer).rotate().resize({ width: 2000, withoutEnlargement: true }).webp({ quality: 84 }).toBuffer({ resolveWithObject: true });
       const { url } = await saveMedia(out.data, "image/webp", { width: out.info.width, height: out.info.height, originalName: f.originalname });
-      added.push({ url, alt: f.originalname.replace(/\.[^.]+$/, "").slice(0, 160) });
+      added.push({ url, alt: f.originalname.replace(/\.[^.]+$/, "").slice(0, 160), w: out.info.width, h: out.info.height });
     }
     if (!added.length) { res.status(400).json({ error: "Los archivos no son imágenes" }); return; }
     const r = await db.execute(sql`

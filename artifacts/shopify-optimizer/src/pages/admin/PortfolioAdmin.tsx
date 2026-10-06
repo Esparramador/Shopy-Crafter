@@ -5,7 +5,7 @@ const API_ROOT = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 type Project = PortfolioProject & { published: boolean; sortOrder: number };
 
-const EMPTY = { title: "", client: "", category: "", summary: "", description: "", tech: "", liveUrl: "", appUrl: "" };
+const EMPTY = { title: "", client: "", category: "", status: "", summary: "", description: "", features: "", tech: "", liveUrl: "", appUrl: "" };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${API_ROOT}${path}`, { credentials: "include", ...init });
@@ -40,13 +40,15 @@ export default function PortfolioAdmin() {
   const current = projects.find(p => p.id === selected) ?? null;
   useEffect(() => {
     setForm(current ? {
-      title: current.title, client: current.client ?? "", category: current.category, summary: current.summary,
-      description: current.description, tech: current.tech.join(", "), liveUrl: current.liveUrl ?? "", appUrl: current.appUrl ?? "",
+      title: current.title, client: current.client ?? "", category: current.category, status: current.status ?? "", summary: current.summary,
+      description: current.description, features: (current.features ?? []).join("\n"), tech: current.tech.join(", "),
+      liveUrl: current.liveUrl ?? "", appUrl: current.appUrl ?? "",
     } : EMPTY);
   }, [selected, current?.id]);
 
   const payload = () => ({
-    title: form.title, client: form.client, category: form.category, summary: form.summary, description: form.description,
+    title: form.title, client: form.client, category: form.category, status: form.status, summary: form.summary, description: form.description,
+    features: form.features.split("\n").map(t => t.trim()).filter(Boolean),
     tech: form.tech.split(",").map(t => t.trim()).filter(Boolean), liveUrl: form.liveUrl, appUrl: form.appUrl,
   });
 
@@ -157,10 +159,12 @@ export default function PortfolioAdmin() {
             {field("client", "Cliente (opcional)")}
             {field("category", "Categoría", { placeholder: "Web y app, Sistema a medida, Plataforma IA…" })}
             {field("tech", "Tecnologías / etiquetas (separadas por comas)")}
+            {field("status", "Estado (En producción, Entregado, En desarrollo…)")}
             {field("liveUrl", "URL de la web (opcional)", { placeholder: "https://…" })}
             {field("appUrl", "URL de la app / tienda de apps (opcional)", { placeholder: "https://…" })}
           </div>
           {field("summary", "Resumen (tarjeta)")}
+          {field("features", "Qué hace: una característica por línea (máx. 12; la tarjeta enseña las 4 primeras)", { area: true })}
           {field("description", "Descripción (al abrir el proyecto)", { area: true })}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" style={s.btn} disabled={busy || !form.title.trim()} onClick={() => void save()}>{busy ? "Guardando…" : current ? "Guardar cambios" : "Crear proyecto"}</button>
