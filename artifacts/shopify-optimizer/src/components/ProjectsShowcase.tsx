@@ -10,6 +10,12 @@ export interface PortfolioProject {
   images: PortfolioImage[];
   features?: string[];
   status?: string;
+  /** Versiones del proyecto para clientes distintos: la tarjeta las enseña en un carrusel lateral. */
+  variants?: PortfolioVariant[];
+}
+export interface PortfolioVariant {
+  name: string; client: string; status: string; summary: string; description: string;
+  features: string[]; tech: string[]; images: PortfolioImage[];
 }
 
 /** Las URLs de /api/media y las capturas de /portfolio vienen sin la base de la app: se prefijan para subrutas. */
@@ -30,7 +36,7 @@ const shapeOf = (im: PortfolioImage): Shape => {
 const isUpcoming = (status?: string) => /desarrollo|dise[ñn]o|pr[oó]xim/i.test(status ?? "");
 
 /** Las capturas del proyecto, colocadas según su forma: móviles en abanico, ventana de navegador o mosaico. */
-function ProjectMedia({ p }: { p: PortfolioProject }) {
+function ProjectMedia({ p }: { p: { title: string; images: PortfolioImage[] } }) {
   const phones = p.images.filter(im => shapeOf(im) === "phone");
   const wides = p.images.filter(im => shapeOf(im) === "wide");
   const squares = p.images.filter(im => shapeOf(im) === "square");
@@ -84,6 +90,71 @@ function ProjectMedia({ p }: { p: PortfolioProject }) {
   );
 }
 
+/**
+ * Un proyecto con varias versiones (la misma idea, hecha a medida para clientes distintos): un carrusel
+ * lateral con una ficha por versión. Se desliza con el dedo o el trackpad, con las pestañas o con las flechas;
+ * la pestaña activa sale de la posición real del carrusel, así nunca se desincroniza.
+ */
+function VariantDeck({ p, onOpen }: { p: PortfolioProject; onOpen: (v: PortfolioVariant) => void }) {
+  const vs = p.variants ?? [];
+  const track = useRef<HTMLDivElement>(null);
+  const [idx, setIdx] = useState(0);
+  const go = (i: number) => {
+    const el = track.current; if (!el) return;
+    const n = Math.max(0, Math.min(i, vs.length - 1));
+    const panel = el.children[n] as HTMLElement | undefined;
+    if (panel) el.scrollTo({ left: panel.offsetLeft - el.offsetLeft, behavior: "smooth" });
+  };
+  const onScroll = () => {
+    const el = track.current; if (!el) return;
+    const w = (el.children[0] as HTMLElement | undefined)?.offsetWidth || el.clientWidth;
+    const n = Math.round(el.scrollLeft / Math.max(1, w));
+    setIdx(prev => (prev === n ? prev : Math.max(0, Math.min(n, vs.length - 1))));
+  };
+  return (
+    <div className="lxp-deck">
+      <div className="lxp-deck-bar">
+        <div className="lxp-deck-tabs" role="tablist" aria-label={`Versiones de ${p.title}`}>
+          {vs.map((v, i) => (
+            <button key={v.name} type="button" role="tab" aria-selected={i === idx} className={i === idx ? "on" : ""} onClick={() => go(i)}>
+              <b aria-hidden="true">{String(i + 1).padStart(2, "0")}</b>{v.name}
+            </button>
+          ))}
+        </div>
+        <div className="lxp-deck-arrows">
+          <button type="button" onClick={() => go(idx - 1)} disabled={idx === 0} aria-label="Versión anterior">←</button>
+          <button type="button" onClick={() => go(idx + 1)} disabled={idx === vs.length - 1} aria-label="Versión siguiente">→</button>
+        </div>
+      </div>
+      <div className="lxp-deck-track" ref={track} onScroll={onScroll} tabIndex={0} aria-label="Desliza para ver cada versión">
+        {vs.map((v, i) => (
+          <section key={v.name} className={`lxp-deck-panel${i === idx ? " on" : ""}`} aria-label={v.name}>
+            <div className="lxp-deck-copy">
+              <div className="lxp-meta">
+                <span className="lxp-deck-name">{v.name}</span>
+                {v.status && <span className={`lxp-status${isUpcoming(v.status) ? " next" : ""}`}><i aria-hidden="true" />{v.status}</span>}
+              </div>
+              {v.client && <p className="lxp-client">{v.client}</p>}
+              <p className="lxp-summary">{v.summary}</p>
+              <ul className="lxp-feats">{v.features.slice(0, 4).map(f => <li key={f}>{f}</li>)}</ul>
+              <div className="lxp-actions">
+                <button type="button" className="lxp-btn" onClick={() => onOpen(v)}>Ver {v.name.split(" · ")[0]} al detalle</button>
+              </div>
+            </div>
+            <button type="button" className="lxp-visual" onClick={() => onOpen(v)} aria-label={`Ver las imágenes de ${v.name}`}>
+              <ProjectMedia p={{ title: v.name, images: v.images }} />
+            </button>
+          </section>
+        ))}
+      </div>
+      <div className="lxp-deck-dots" aria-hidden="true">
+        {vs.map((v, i) => <i key={v.name} className={i === idx ? "on" : ""} />)}
+        <span>Desliza para ver las {vs.length}</span>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   /** «Quiero algo así»: lleva al contacto con el proyecto ya anotado. */
   onContact?: (project: PortfolioProject | null) => void;
@@ -93,9 +164,12 @@ interface Props {
  * Proyectos reales del equipo (Admin → Portfolio).
  *
  * Escritorio: tarjetas grandes que se APILAN al hacer scroll. Cada una se queda fija arriba y, cuando
- * llega la siguiente, se encoge y se apaga un poco: el visitante avanza proyecto a proyecto. El avance
- * se calcula con la posición real del scroll (una variable CSS por tarjeta), sin librerías.
- * Móvil y «reducir movimiento»: lista normal, cada tarjeta aparece al entrar en pantalla.
+ * llega la siguiente, se encoge y se apaga un poco: el visitante avanza proyecto a proyecto.
+ * Móvil y tablet: las tarjetas son más altas que la pantalla y no se pueden apilar, así que el scroll las
+ * dirige de otra forma: cada una se levanta y se enfoca al entrar, sus capturas se abren en abanico y se
+ * apaga al salir por arriba, con una barra fija que dice por cuál vas.
+ * Todo sale de la posición real del scroll (variables CSS por tarjeta: --p, --v, --e, --x), sin librerías.
+ * «Reducir movimiento»: lista normal, sin transformaciones.
  */
 export default function ProjectsShowcase({ onContact }: Props) {
   const [projects, setProjects] = useState<PortfolioProject[] | null>(null);
@@ -139,6 +213,7 @@ export default function ProjectsShowcase({ onContact }: Props) {
       raf = 0;
       const stacked = window.innerWidth > 900 && window.innerHeight > 600 && !reduce.matches;
       stack.classList.toggle("is-stacked", stacked);
+      stack.classList.toggle("is-flow", !stacked && !reduce.matches);
       const vh = window.innerHeight;
       let current = 0;
       for (let i = 0; i < cards.length; i++) {
@@ -147,6 +222,11 @@ export default function ProjectsShowcase({ onContact }: Props) {
         // Dónde está la tarjeta en la pantalla (0 arriba, 1 abajo): mueve la captura un poco (paralaje).
         c.style.setProperty("--v", String(Math.max(0, Math.min(1, (r.top + r.height / 2) / vh))));
         if (r.top < vh * 0.55) current = i;
+        // --e: cuánto ha entrado ya (0 asoma por abajo → 1 colocada). --x: cuánto se ha ido por arriba.
+        const e = reduce.matches ? 1 : Math.max(0, Math.min(1, (vh - r.top) / (vh * 0.62)));
+        const x = reduce.matches ? 0 : Math.max(0, Math.min(1, (vh * 0.3 - r.bottom) / (vh * 0.3)));
+        c.style.setProperty("--e", e.toFixed(3));
+        c.style.setProperty("--x", x.toFixed(3));
         if (!stacked) { c.style.setProperty("--p", "0"); continue; }
         const next = cards[i + 1];
         if (!next) { c.style.setProperty("--p", "0"); continue; }
@@ -183,11 +263,23 @@ export default function ProjectsShowcase({ onContact }: Props) {
   }, [open, close]);
 
   const contact = (p: PortfolioProject | null) => { setOpen(null); onContact?.(p); };
+  /** Una versión se abre como un proyecto más: su nombre, su texto y sus capturas. */
+  const openVariant = (p: PortfolioProject, v: PortfolioVariant) => {
+    setOpen({ ...p, title: v.name, client: v.client || p.client, status: v.status, summary: v.summary, description: v.description,
+      features: v.features, tech: v.tech.length ? v.tech : p.tech, images: v.images, liveUrl: null, appUrl: null, variants: [] });
+    setImgIdx(0);
+  };
   const jumpTo = (i: number) => {
-    const card = stackRef.current?.querySelectorAll<HTMLElement>(".lxp-card")[i];
-    if (!card) return;
-    // Con las tarjetas apiladas, la posición «natural» de cada una es la del hueco que ocupa en el flujo.
-    const top = window.scrollY + card.parentElement!.getBoundingClientRect().top - 84;
+    const stack = stackRef.current;
+    const slot = stack?.querySelectorAll<HTMLElement>(".lxp-slot")[i];
+    if (!stack || !slot) return;
+    let top = window.scrollY + slot.getBoundingClientRect().top - 84;
+    if (stack.classList.contains("is-stacked")) {
+      // Apiladas, un hueco ya «pegado» arriba no dice dónde está de verdad: su sitio es el del flujo,
+      // i huecos (alto + margen) por debajo del principio de la lista.
+      const cs = getComputedStyle(slot);
+      top = window.scrollY + stack.getBoundingClientRect().top + i * (slot.offsetHeight + parseFloat(cs.marginBottom || "0")) - 84;
+    }
     window.scrollTo({ top, behavior: "smooth" });
   };
 
@@ -218,10 +310,37 @@ export default function ProjectsShowcase({ onContact }: Props) {
           </span>
         </nav>
 
+        {/* En móvil y tablet el carril es una barra fina, fija bajo la cabecera. */}
+        <div className="lxp-mbar" aria-hidden="true">
+          <span><b>{String(active + 1).padStart(2, "0")}</b> / {String(visible.length).padStart(2, "0")}</span>
+          <em>{visible[active]?.title.split(" · ")[0]}</em>
+          <i><u style={{ width: `${((active + 1) / visible.length) * 100}%` }} /></i>
+        </div>
+
         <ol className="lxp-stack" ref={stackRef} aria-label="Proyectos realizados">
           {visible.map((p, i) => {
             const feats = (p.features ?? []).slice(0, 4);
             const upcoming = isUpcoming(p.status);
+            if ((p.variants ?? []).length > 1) return (
+              <li key={p.id} className="lxp-slot" style={{ ["--i" as string]: i } as CSSProperties}>
+                <article className="lxp-card lxp-has-deck" data-slug={p.slug}>
+                  <div className="lxp-glow" aria-hidden="true" />
+                  <div className="lxp-copy lxp-deck-head">
+                    <div className="lxp-meta">
+                      <span className="lxp-num" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="lxp-cat">{p.category}</span>
+                      {p.status && <span className="lxp-status"><i aria-hidden="true" />{p.status}</span>}
+                    </div>
+                    <h3 className="lxp-title">{p.title}</h3>
+                    <p className="lxp-summary">{p.summary}</p>
+                    <div className="lxp-actions">
+                      <button type="button" className="lxp-btn lxp-btn-main" onClick={() => contact(p)}>Quiero algo así <span aria-hidden="true">→</span></button>
+                    </div>
+                  </div>
+                  <VariantDeck p={p} onOpen={v => openVariant(p, v)} />
+                </article>
+              </li>
+            );
             return (
               <li key={p.id} className="lxp-slot" style={{ ["--i" as string]: i } as CSSProperties}>
                 <article className={`lxp-card${upcoming ? " lxp-upcoming" : ""}`} data-slug={p.slug}>

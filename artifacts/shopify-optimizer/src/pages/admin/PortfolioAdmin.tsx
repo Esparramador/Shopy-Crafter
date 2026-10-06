@@ -164,7 +164,7 @@ export default function PortfolioAdmin() {
             {field("appUrl", "URL de la app / tienda de apps (opcional)", { placeholder: "https://…" })}
           </div>
           {field("summary", "Resumen (tarjeta)")}
-          {field("features", "Qué hace: una característica por línea (máx. 8; la tarjeta enseña las 4 primeras)", { area: true })}
+          {field("features", "Qué hace: una característica por línea (máx. 12; la tarjeta enseña las 4 primeras)", { area: true })}
           {field("description", "Descripción (al abrir el proyecto)", { area: true })}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" style={s.btn} disabled={busy || !form.title.trim()} onClick={() => void save()}>{busy ? "Guardando…" : current ? "Guardar cambios" : "Crear proyecto"}</button>

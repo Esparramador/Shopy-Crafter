@@ -31,6 +31,12 @@ export interface PortfolioProject {
   features: string[];
   /** Estado: «En producción», «Entregado», «En desarrollo»… */
   status: string;
+  /** Versiones del proyecto para clientes distintos (carrusel lateral de la tarjeta). */
+  variants: PortfolioVariant[];
+}
+export interface PortfolioVariant {
+  name: string; client: string; status: string; summary: string; description: string;
+  features: string[]; tech: string[]; images: PortfolioImage[];
 }
 
 let ready: Promise<void> | null = null;
@@ -57,6 +63,7 @@ function ensureTable(): Promise<void> {
     `);
     await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS features JSONB NOT NULL DEFAULT '[]'::jsonb`);
     await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT ''`);
+    await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS variants JSONB NOT NULL DEFAULT '[]'::jsonb`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS portfolio_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
     await applySeed();
   })().catch(err => { ready = null; throw err; });
@@ -78,11 +85,12 @@ async function applySeed(): Promise<void> {
     const cur = await db.execute(sql`SELECT id, description, images FROM portfolio_projects WHERE slug = ${p.slug}`);
     const row = cur.rows[0] as { id: number; description: string; images: unknown } | undefined;
     const tech = JSON.stringify(p.tech), features = JSON.stringify(p.features), images = JSON.stringify(p.images);
+    const variants = JSON.stringify(p.variants);
     if (!row) {
       await db.execute(sql`
-        INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, sort_order)
+        INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, variants, sort_order)
         VALUES (${p.slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${tech}::jsonb, ${features}::jsonb, ${p.status},
-                ${p.liveUrl}, ${p.appUrl}, ${images}::jsonb, ${p.sortOrder})
+                ${p.liveUrl}, ${p.appUrl}, ${images}::jsonb, ${variants}::jsonb, ${p.sortOrder})
         ON CONFLICT (slug) DO NOTHING
       `);
     } else if (GENERIC_V1[p.slug] !== undefined && row.description === GENERIC_V1[p.slug]) {
@@ -92,7 +100,7 @@ async function applySeed(): Promise<void> {
         UPDATE portfolio_projects SET title = ${p.title}, client = ${p.client}, category = ${p.category}, summary = ${p.summary},
           description = ${p.description}, tech = ${tech}::jsonb, features = ${features}::jsonb, status = ${p.status},
           live_url = COALESCE(live_url, ${p.liveUrl}), app_url = COALESCE(app_url, ${p.appUrl}),
-          images = ${finalImages}::jsonb, sort_order = ${p.sortOrder}, updated_at = NOW()
+          images = ${finalImages}::jsonb, variants = ${variants}::jsonb, sort_order = ${p.sortOrder}, updated_at = NOW()
         WHERE id = ${row.id}
       `);
     } else if (!(Array.isArray(row.images) && row.images.length > 0) && p.images.length > 0) {
@@ -110,6 +118,19 @@ function cleanList(v: unknown, maxItems: number, maxLen: number): string[] {
   return Array.isArray(v) ? v.map(t => cleanText(t, maxLen)).filter(Boolean).slice(0, maxItems) : [];
 }
 
+/** Las versiones llegan del panel como JSON: se quedan solo los campos conocidos y las imágenes de la casa. */
+function cleanVariants(v: unknown): PortfolioVariant[] {
+  if (!Array.isArray(v)) return [];
+  return v.slice(0, 6).map((x: Record<string, unknown>) => ({
+    name: cleanText(x?.name, 60), client: cleanText(x?.client, 120), status: cleanText(x?.status, 40),
+    summary: cleanText(x?.summary, 300), description: cleanText(x?.description, 4000),
+    features: cleanList(x?.features, 12, 140), tech: cleanList(x?.tech, 12, 40),
+    images: (Array.isArray(x?.images) ? (x.images as PortfolioImage[]) : [])
+      .filter(im => typeof im?.url === "string" && /^\/(portfolio|api\/media)\//.test(im.url)).slice(0, 12)
+      .map(im => ({ url: im.url, alt: cleanText(im.alt, 160), ...(Number(im.w) > 0 && Number(im.h) > 0 ? { w: Number(im.w), h: Number(im.h) } : {}) })),
+  })).filter(x => x.name);
+}
+
 function toProject(r: Record<string, unknown>): PortfolioProject {
   return {
     id: Number(r.id), slug: String(r.slug), title: String(r.title), client: (r.client as string | null) ?? null,
@@ -118,6 +139,7 @@ function toProject(r: Record<string, unknown>): PortfolioProject {
     appUrl: (r.app_url as string | null) ?? null, images: Array.isArray(r.images) ? (r.images as PortfolioImage[]) : [],
     sortOrder: Number(r.sort_order ?? 0), published: Boolean(r.published),
     features: Array.isArray(r.features) ? (r.features as string[]) : [], status: String(r.status ?? ""),
+    variants: Array.isArray(r.variants) ? (r.variants as PortfolioVariant[]) : [],
   };
 }
 
@@ -189,7 +211,7 @@ router.post("/admin/portfolio", requireAdmin, async (req: Request, res: Response
       INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, sort_order, published)
       VALUES (${slug}, ${title}, ${cleanText(b.client, 120) || null}, ${cleanText(b.category, 60) || "Proyecto"},
         ${cleanText(b.summary, 300)}, ${cleanText(b.description, 4000)},
-        ${JSON.stringify(cleanList(b.tech, 12, 40))}::jsonb, ${JSON.stringify(cleanList(b.features, 8, 140))}::jsonb, ${cleanText(b.status, 40)},
+        ${JSON.stringify(cleanList(b.tech, 12, 40))}::jsonb, ${JSON.stringify(cleanList(b.features, 12, 140))}::jsonb, ${cleanText(b.status, 40)},
         ${cleanUrl(b.liveUrl)}, ${cleanUrl(b.appUrl)},
         COALESCE((SELECT MAX(sort_order) + 1 FROM portfolio_projects), 0), ${b.published !== false})
       RETURNING *
@@ -223,7 +245,8 @@ router.put("/admin/portfolio/:id", requireAdmin, async (req: Request, res: Respo
         summary = ${"summary" in b ? cleanText(b.summary, 300) : p.summary},
         description = ${"description" in b ? cleanText(b.description, 4000) : p.description},
         tech = ${JSON.stringify(Array.isArray(b.tech) ? cleanList(b.tech, 12, 40) : p.tech)}::jsonb,
-        features = ${JSON.stringify(Array.isArray(b.features) ? cleanList(b.features, 8, 140) : p.features)}::jsonb,
+        features = ${JSON.stringify(Array.isArray(b.features) ? cleanList(b.features, 12, 140) : p.features)}::jsonb,
+        variants = ${JSON.stringify(Array.isArray(b.variants) ? cleanVariants(b.variants) : p.variants)}::jsonb,
         status = ${"status" in b ? cleanText(b.status, 40) : p.status},
         live_url = ${"liveUrl" in b ? cleanUrl(b.liveUrl) : p.liveUrl},
         app_url = ${"appUrl" in b ? cleanUrl(b.appUrl) : p.appUrl},
