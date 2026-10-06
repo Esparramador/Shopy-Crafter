@@ -451,7 +451,10 @@ export default function Landing() {
     const sections = [...document.querySelectorAll<HTMLElement>(".fp-section")];
     const obs = new IntersectionObserver(entries => {
       entries.forEach(e => {
-        if (e.isIntersecting) {
+        // Una sección mucho más alta que la pantalla (Proyectos, con sus tarjetas apiladas) nunca llega a
+        // tener el 15 % de SU altura a la vista: para esas vale con que ocupe un tercio de la pantalla.
+        const bastante = e.intersectionRatio >= 0.15 || e.intersectionRect.height >= window.innerHeight * 0.33;
+        if (e.isIntersecting && bastante) {
           const idx = sections.indexOf(e.target as HTMLElement);
           if (idx !== -1) {
             currentRef.current = idx;
@@ -460,7 +463,7 @@ export default function Landing() {
           }
         }
       });
-    }, { root: null, threshold: 0.15 });
+    }, { root: null, threshold: [0.01, 0.05, 0.15] });
 
     sections.forEach(s => obs.observe(s));
     return () => obs.disconnect();
@@ -500,10 +503,27 @@ export default function Landing() {
       setHashRobust(FP_SECTION_IDS[next]);
     };
 
+    // Una sección más alta que la pantalla se recorre con el scroll NORMAL hasta agotarla en ese
+    // sentido; solo entonces el siguiente gesto salta de sección. Sin esto, la rueda se saltaría de
+    // golpe todas las tarjetas de Proyectos.
+    const NAV_H = 64;
+    const insideTallSection = (dir: 1 | -1): boolean => {
+      const vh = window.innerHeight;
+      for (const sec of document.querySelectorAll<HTMLElement>(".fp-section")) {
+        const r = sec.getBoundingClientRect();
+        if (r.height <= vh * 1.25) continue;                       // solo las largas
+        if (r.top > vh * 0.5 || r.bottom < vh * 0.5) continue;     // y solo si es la que se está viendo
+        if (dir > 0 && r.bottom > vh + 8) return true;
+        if (dir < 0 && r.top < NAV_H - 8) return true;
+      }
+      return false;
+    };
+
     // Wheel — solo en desktop
     const onWheel = (e: WheelEvent) => {
       if (!isFullpageMode()) return;
       if (isInsideScrollable(e.target)) return;
+      if (insideTallSection(e.deltaY > 0 ? 1 : -1)) return;
       if (Math.abs(e.deltaY) < 30) return; // ignorar trackpad fino
       const delta = e.deltaY > 0 ? 1 : -1;
       const next = Math.max(0, Math.min(currentRef.current + delta, FP_SECTION_IDS.length - 1));
@@ -518,8 +538,11 @@ export default function Landing() {
     const onKey = (e: KeyboardEvent) => {
       if (!isFullpageMode()) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-      if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); navigate(1); }
-      if (e.key === "ArrowUp"   || e.key === "PageUp")                    { e.preventDefault(); navigate(-1); }
+      const down = e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ";
+      const up = e.key === "ArrowUp" || e.key === "PageUp";
+      if ((down && insideTallSection(1)) || (up && insideTallSection(-1))) return;   // scroll normal dentro de la sección larga
+      if (down) { e.preventDefault(); navigate(1); }
+      if (up)   { e.preventDefault(); navigate(-1); }
     };
 
     // Touch swipe — solo en desktop (tablets grandes > 900×600)
@@ -531,6 +554,7 @@ export default function Landing() {
       if (isInsideScrollable(e.target)) return;
       const dy = touchStartY - e.changedTouches[0].clientY;
       if (Math.abs(dy) < 50) return; // swipe mínimo de 50px
+      if (insideTallSection(dy > 0 ? 1 : -1)) return;
       navigate(dy > 0 ? 1 : -1);
     };
 
@@ -893,11 +917,15 @@ export default function Landing() {
             <div className={`fp-section-header ${!isAnimated("fp-projects") ? "fp-animate" : "fp-animated"}`}>
               <div className="l-pill">Proyectos realizados</div>
               <h2 className="l-h2">No solo tiendas: <em>webs, apps, sistemas e IA.</em></h2>
-              <p className="l-sub lx-sub">Landings, aplicaciones, CRMs con asistente conversacional, TPV, plataformas de agentes, bots de trading y diseño 3D. Pulsa cada proyecto para ver las imágenes.</p>
+              <p className="l-sub lx-sub">Sistemas para restaurantes, cartas digitales por QR, apps de redes con IA, galerías de eventos, plataformas de agentes y diseño 3D. Todo hecho por nosotros, de la idea a producción. Sigue bajando para verlos.</p>
             </div>
-            <div className={!isAnimated("fp-projects") ? "fp-animate" : "fp-animated"} style={{ animationDelay: "0.1s" }}>
-              <ProjectsShowcase />
-            </div>
+            {/* Las tarjetas se animan solas al entrar (el componente lleva su propio disparador de scroll). */}
+            <ProjectsShowcase onContact={(project) => {
+              if (project) setContactForm(f => (f.message ? f : { ...f, message: `Me interesa un proyecto como «${project.title}». ` }));
+              const idx = FP_SECTION_IDS.indexOf("fp-contact");
+              goToSection(idx);
+              setHashRobust("fp-contact");
+            }} />
           </div>
         </section>
 
