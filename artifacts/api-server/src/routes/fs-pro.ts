@@ -140,6 +140,7 @@ import {
   generateTalkingAvatar, generateProductAvatar, generateMimicMotion,
 } from "../lib/avatar-studio.js";
 import { planCampaign, type CampaignBudget, type ShotRequest } from "../lib/campaign-planner.js";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 const router = Router();
 
@@ -2616,7 +2617,7 @@ const concatUpload = multer({
   fileFilter: (_req, file, cb) => {
     const ok = /^video\/(mp4|quicktime|webm|x-matroska)$|^audio\/(mp3|mpeg|wav|ogg|x-m4a)$/i.test(file.mimetype);
     if (ok) cb(null, true);
-    else cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}`) as any, false);
+    else cb(uploadRejected(`Tipo de archivo no permitido: ${file.mimetype}`) as any, false);
   },
 });
 

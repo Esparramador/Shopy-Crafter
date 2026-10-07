@@ -26,6 +26,7 @@ import { claudeMessagesJson } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { z } from "zod";
 import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 const router = Router();
 
@@ -35,7 +36,7 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const allowed = /image\/(jpeg|jpg|png|gif|webp|bmp|svg)|video\/(mp4|webm|mov|avi|mkv)/i;
     if (allowed.test(file.mimetype)) cb(null, true);
-    else cb(new Error(`Tipo no soportado: ${file.mimetype}`));
+    else cb(uploadRejected(`Tipo no soportado: ${file.mimetype}`));
   },
 });
 

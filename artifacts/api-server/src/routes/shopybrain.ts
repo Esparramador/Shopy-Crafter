@@ -39,6 +39,7 @@ import multer from "multer";
 import { getPlatform } from "../lib/platform-capabilities.js";
 import * as fs from "fs";
 import * as path from "path";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 function handleRouteError(res: any, err: any): void {
   if (err instanceof ShopifyAuthError) {
@@ -90,7 +91,7 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const allowed = /\.(jpg|jpeg|png|gif|webp|svg|pdf|csv|xlsx|xls|json|txt|md|html|css|xml|zip)$/i;
     if (allowed.test(file.originalname)) cb(null, true);
-    else cb(new Error("Tipo de archivo no permitido"));
+    else cb(uploadRejected("Tipo de archivo no permitido"));
   },
 });
 

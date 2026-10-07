@@ -50,6 +50,7 @@ export type ExtraElement = {
   qrBg?: string;   // color fondo QR (hex)
   shapeType?: "rect" | "circle" | "triangle";
   fill?: string; stroke?: string; strokeWidth?: number;
+  opacity?: number;
 };
 export type LayoutOverrides = {
   front?: Record<string, ElementOverride>;
@@ -382,6 +383,77 @@ function addBleedGuide(canvas: fabric.Canvas): fabric.Rect {
   return guide;
 }
 
+// ── QR PNG con colores (1200px) ──────────────────────────────────────────────
+function qrPngUrl(apiBase: string, data: string, fg = "#000000", bg = "#ffffff"): string {
+  return `${apiBase}/api/qr.png?data=${encodeURIComponent(data)}&fg=${encodeURIComponent(fg)}&bg=${encodeURIComponent(bg)}&size=1200`;
+}
+
+// Bocadillo: rectángulo redondeado con cola, alto total = bh + tail.
+const BUBBLE_TAIL = 36;
+function bubblePath(bw: number, bh: number): string {
+  const tail = BUBBLE_TAIL;
+  return `M 20 0 L ${bw - 20} 0 Q ${bw} 0 ${bw} 20 L ${bw} ${bh - 20} Q ${bw} ${bh} ${bw - 20} ${bh} L 80 ${bh} L 54 ${bh + tail} L 44 ${bh} L 20 ${bh} Q 0 ${bh} 0 ${bh - 20} L 0 20 Q 0 0 20 0 Z`;
+}
+
+// ── Extra guardado → objeto Fabric con su tipo real (forma, bocadillo, QR, emoji…) ──
+async function extraToFabric(ex: ExtraElement, apiBase: string): Promise<fabric.FabricObject | null> {
+  const name = `extra-${ex.id}`;
+  const base: Record<string, unknown> = {
+    left: ex.x, top: ex.y, name,
+    data: { id: name, side: ex.side, type: ex.type, shapeType: ex.shapeType },
+  };
+  if (typeof ex.opacity === "number") base.opacity = ex.opacity;
+
+  switch (ex.type) {
+    case "text":
+      return new fabric.Textbox(ex.text ?? "", {
+        ...base, width: ex.width,
+        fontSize: ex.fontSize || 24, fontFamily: ex.fontFamily || "Inter",
+        fontWeight: String(ex.fontWeight || 400), fontStyle: ex.italic ? "italic" : "normal",
+        fill: ex.color || "#ffffff", textAlign: ex.align || "left",
+        editable: true, splitByGrapheme: false,
+      } as any);
+    case "emoji":
+      return new fabric.Textbox(ex.text ?? "", {
+        ...base, width: ex.width || 100, fontSize: ex.fontSize || 72,
+        fontFamily: "Arial", textAlign: "center", editable: false,
+      } as any);
+    case "line":
+      return new fabric.Rect({ ...base, width: ex.width, height: ex.height || 3, fill: ex.color || "rgba(212,175,55,0.7)" } as any);
+    case "shape": {
+      const paint = { fill: ex.fill ?? "rgba(212,175,55,0.18)", stroke: ex.stroke ?? "rgba(212,175,55,0.9)", strokeWidth: ex.strokeWidth ?? 2 };
+      const w = ex.width || 200, h = ex.height || 120;
+      if (ex.shapeType === "circle") return new fabric.Circle({ ...base, ...paint, radius: Math.min(w, h) / 2 } as any);
+      if (ex.shapeType === "triangle") return new fabric.Triangle({ ...base, ...paint, width: w, height: h } as any);
+      return new fabric.Rect({ ...base, ...paint, width: w, height: h, rx: 8, ry: 8 } as any);
+    }
+    case "bubble": {
+      const bw = ex.width || 320;
+      const bh = Math.max(40, (ex.height || 130 + BUBBLE_TAIL) - BUBBLE_TAIL);
+      return new fabric.Path(bubblePath(bw, bh), {
+        ...base, fill: ex.fill ?? "rgba(255,255,255,0.92)", stroke: ex.stroke ?? "#222", strokeWidth: ex.strokeWidth ?? 2,
+      } as any);
+    }
+    case "qr": {
+      const fg = ex.qrFg ?? "#000000", bg = ex.qrBg ?? "#ffffff";
+      const blobUrl = await fetchBlob(qrPngUrl(apiBase, ex.qrUrl || "https://shopycrafter.com", fg, bg));
+      const img = blobUrl ? await loadImage(blobUrl) : null;
+      const sq = Math.min(ex.width || 200, ex.height || ex.width || 200);
+      if (!img) {
+        return new fabric.Rect({ ...base, width: sq, height: sq, fill: "#ffffff", stroke: "#aaa", strokeWidth: 2, rx: 4, ry: 4 } as any);
+      }
+      const sw = img.width || 1200, sh = img.height || 1200;
+      img.set({
+        ...base, scaleX: sq / sw, scaleY: sq / sh, imageSmoothing: false,
+        data: { ...(base.data as object), srcW: sw, srcH: sh, qrFg: fg, qrBg: bg },
+      } as any);
+      return img;
+    }
+    default:
+      return null;
+  }
+}
+
 // ── Puebla canvas con elementos del backend (SIN ghost mode) ─────────────────
 async function populateCanvas(
   canvas: fabric.Canvas,
@@ -391,12 +463,15 @@ async function populateCanvas(
   guide: fabric.Rect | null,
   apiBase: string,
   cardId: number,
+  extras: ExtraElement[],
 ) {
   const toRemove = canvas.getObjects().filter((o: any) => o !== guide);
   canvas.remove(...toRemove);
 
   for (const el of elements) {
     if (el.hidden) continue;
+    // Los extras se reconstruyen desde los overrides con su tipo real (el backend los aplana a texto/línea).
+    if (el.id.startsWith("extra-")) continue;
 
     if (el.type === "text") {
       const displayText = el.textTransform === "uppercase"
@@ -477,6 +552,12 @@ async function populateCanvas(
     }
   }
 
+  for (const ex of extras) {
+    if (ex.side !== side) continue;
+    const obj = await extraToFabric(ex, apiBase);
+    if (obj) canvas.add(obj);
+  }
+
   if (guide) canvas.bringObjectToFront(guide);
   canvas.renderAll();
 }
@@ -500,6 +581,8 @@ export default function CardStudioEditor({
 
   const [canvasesReady, setCanvasesReady] = useState(false);
   const [overrides, setOverrides] = useState<LayoutOverrides>(initialOverrides || {});
+  const overridesRef = useRef(overrides);
+  overridesRef.current = overrides;
   const [frontElements, setFrontElements] = useState<ResolvedElement[]>([]);
   const [backElements, setBackElements] = useState<ResolvedElement[]>([]);
   const [loading, setLoading] = useState(false);
@@ -764,7 +847,7 @@ export default function CardStudioEditor({
   useEffect(() => {
     const fc = frontFabric.current;
     if (!canvasesReady || !fc || frontElements.length === 0) return;
-    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current, apiBase, cardId);
+    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current, apiBase, cardId, overridesRef.current.extras ?? []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasesReady, frontElements, logoUrl, cardId]);
 
@@ -772,7 +855,7 @@ export default function CardStudioEditor({
   useEffect(() => {
     const bc = backFabric.current;
     if (!canvasesReady || !bc || backElements.length === 0) return;
-    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current, apiBase, cardId);
+    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current, apiBase, cardId, overridesRef.current.extras ?? []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasesReady, backElements, logoUrl, cardId]);
 
@@ -900,7 +983,7 @@ export default function CardStudioEditor({
     const ex: ExtraElement = {
       id, side, type: "shape", shapeType,
       x: CANVAS_W / 2 - 100, y: CANVAS_H / 2 - 60,
-      width: 200, height: 120,
+      width: Math.round(shape.width ?? 200), height: Math.round(shape.height ?? 120),
       fill: defaultFill, stroke: defaultStroke, strokeWidth: 2,
     };
     setOverrides(prev => ({ ...prev, extras: [...(prev.extras || []), ex] }));
@@ -941,7 +1024,7 @@ export default function CardStudioEditor({
   // ── Añadir QR extra ──────────────────────────────────────────────────────
   // Construye la URL del QR con colores y tamaño
   const buildQrUrl = useCallback((dataUrl: string, fg = "#000000", bg = "#ffffff") => {
-    return `${apiBase}/api/qr.png?data=${encodeURIComponent(dataUrl)}&fg=${encodeURIComponent(fg)}&bg=${encodeURIComponent(bg)}&size=1200`;
+    return qrPngUrl(apiBase, dataUrl, fg, bg);
   }, [apiBase]);
 
   const addQr = useCallback(async (targetSide?: "front" | "back") => {
@@ -1035,9 +1118,9 @@ export default function CardStudioEditor({
     const id = `${Date.now()}`.slice(-7);
 
     // Bocadillo usando Path SVG
-    const bw = 320; const bh = 130; const tail = 36;
+    const bw = 320; const bh = 130; const tail = BUBBLE_TAIL;
     const path = new fabric.Path(
-      `M 20 0 L ${bw - 20} 0 Q ${bw} 0 ${bw} 20 L ${bw} ${bh - 20} Q ${bw} ${bh} ${bw - 20} ${bh} L 80 ${bh} L 54 ${bh + tail} L 44 ${bh} L 20 ${bh} Q 0 ${bh} 0 ${bh - 20} L 0 20 Q 0 0 20 0 Z`,
+      bubblePath(bw, bh),
       {
         left: CANVAS_W / 2 - bw / 2, top: CANVAS_H / 2 - (bh + tail) / 2,
         fill: "rgba(255,255,255,0.92)", stroke: "#222", strokeWidth: 2,
@@ -1065,7 +1148,7 @@ export default function CardStudioEditor({
       extras: [
         ...(prev.extras || []),
         { id: `${id}-shape`, side, type: "bubble", x: path.left!, y: path.top!, width: bw, height: bh + tail },
-        { id: textId, side, type: "text", x: tb.left!, y: tb.top!, width: bw - 36, text: "¡Escribe aquí!", fontSize: 22 },
+        { id: textId, side, type: "text", x: tb.left!, y: tb.top!, width: bw - 36, text: "¡Escribe aquí!", fontSize: 22, fontFamily: "Inter", color: "#222", align: "center" },
       ],
     }));
     if (guide) canvas.bringObjectToFront(guide);
@@ -1103,7 +1186,7 @@ export default function CardStudioEditor({
     const elements = side === "front" ? frontElements : backElements;
     const canvas = side === "front" ? frontFabric.current : backFabric.current;
     const guide = side === "front" ? frontGuide.current : backGuide.current;
-    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide, apiBase, cardId);
+    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide, apiBase, cardId, overridesRef.current.extras ?? []);
   }, [frontElements, backElements, logoUrl, apiBase, cardId]);
 
   // ── Guardar ───────────────────────────────────────────────────────────────
@@ -1206,8 +1289,9 @@ export default function CardStudioEditor({
   // ── Todos los elementos visibles (base + extras) ─────────────────────────
   const allFrontVisible = useMemo(() => {
     const frontOv = overrides.front ?? {};
+    // Los extras ya vienen del backend como "extra-<id>"; se listan desde overrides (valores vivos), no dos veces.
     const base = frontElements
-      .filter(e => !(frontOv[e.id]?.hidden))
+      .filter(e => !e.id.startsWith("extra-") && !(frontOv[e.id]?.hidden))
       .map(e => ({ ...e, ...(frontOv[e.id] ?? {}) }));
     const extFront = (overrides.extras ?? [])
       .filter(ex => ex.side === "front")
@@ -1218,7 +1302,7 @@ export default function CardStudioEditor({
   const allBackVisible = useMemo(() => {
     const backOv = overrides.back ?? {};
     const base = backElements
-      .filter(e => !(backOv[e.id]?.hidden))
+      .filter(e => !e.id.startsWith("extra-") && !(backOv[e.id]?.hidden))
       .map(e => ({ ...e, ...(backOv[e.id] ?? {}) }));
     const extBack = (overrides.extras ?? [])
       .filter(ex => ex.side === "back")
