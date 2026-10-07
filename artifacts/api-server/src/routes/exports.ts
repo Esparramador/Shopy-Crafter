@@ -5302,7 +5302,7 @@ router.get("/projects/:projectId/exports/cogs-xlsx", requireProjectAccess, async
     });
 
     const projectName = project.shopDomain || project.name || `Proyecto ${projectId}`;
-    const buf = generateCogsXlsx(cogsProducts, projectName);
+    const buf = await generateCogsXlsx(cogsProducts, projectName);
     const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="COGS_${safeName}.xlsx"`);
@@ -5343,7 +5343,7 @@ router.get("/projects/:projectId/exports/suppliers-xlsx", requireProjectAccess, 
     }));
 
     const projectName = project.shopDomain || project.name || `Proyecto ${projectId}`;
-    const buf = generateSupplierComparisonXlsx(suppliers, projectName);
+    const buf = await generateSupplierComparisonXlsx(suppliers, projectName);
     const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="Proveedores_${safeName}.xlsx"`);
@@ -5408,7 +5408,7 @@ router.get("/projects/:projectId/exports/financial-xlsx", requireProjectAccess, 
     if (lowMargin.length > 0) alerts.push(`${lowMargin.length} productos con margen < 15%`);
 
     const projectName = project.shopDomain || project.name || `Proyecto ${projectId}`;
-    const buf = generateFinancialSummaryXlsx({
+    const buf = await generateFinancialSummaryXlsx({
       projectName,
       domain: project.shopDomain || "—",
       totalRevenue: Math.round(totalRevenue * 100) / 100,

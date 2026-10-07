@@ -1036,7 +1036,7 @@ router.post("/ai-models", async (req, res) => {
 // aceptar cualquier nombre equivalía a ejecución remota de código.
 const MCP_PACKAGES = [
   "@modelcontextprotocol/server-filesystem", "@modelcontextprotocol/server-memory",
-  "@upstash/context7-mcp", "puppeteer-mcp-server", "@modelcontextprotocol/server-everything",
+  "@upstash/context7-mcp", "@modelcontextprotocol/server-everything",
   "@octokit/mcp-server", "@notionhq/notion-mcp-server", "@hubspot/mcp-server",
   "@sentry/mcp-server", "figma-mcp", "@playwright/mcp", "mcp-server-postgres", "@slack/mcp-server",
 ];

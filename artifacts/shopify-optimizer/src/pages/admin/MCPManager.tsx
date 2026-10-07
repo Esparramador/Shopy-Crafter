@@ -31,7 +31,7 @@ const MCP_SERVERS = [
     envRequired: [],
     category: "utility",
     color: "#f59e0b",
-    npmPackage: "@modelcontextprotocol/server-filesystem@2026.1.14",
+    npmPackage: "@modelcontextprotocol/server-filesystem@2026.8.31",
     docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
   },
   {
@@ -46,7 +46,7 @@ const MCP_SERVERS = [
     envRequired: [],
     category: "memory",
     color: "#ec4899",
-    npmPackage: "@modelcontextprotocol/server-memory@2026.1.26",
+    npmPackage: "@modelcontextprotocol/server-memory@2026.8.31",
     docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
   },
   {
@@ -61,23 +61,8 @@ const MCP_SERVERS = [
     envRequired: [],
     category: "docs",
     color: "#06b6d4",
-    npmPackage: "@upstash/context7-mcp@3.2.1",
+    npmPackage: "@upstash/context7-mcp@4.1.1",
     docs: "https://context7.com",
-  },
-  {
-    id: "puppeteer",
-    name: "Puppeteer MCP (Browser)",
-    icon: "🤖",
-    description: "Automatización de navegador: navegar URLs, screenshots, extracción de contenido, formularios, clicks. Para web scraping, auditorías visuales y análisis de páginas.",
-    capabilities: ["Screenshots de páginas", "Extracción de contenido", "Navegación web", "Relleno de formularios", "Análisis visual"],
-    source: "puppeteer-mcp-server",
-    license: "MIT",
-    command: "node node_modules/puppeteer-mcp-server/dist/index.js",
-    envRequired: [],
-    category: "browser",
-    color: "#10b981",
-    npmPackage: "puppeteer-mcp-server@0.7.2",
-    docs: "https://pptr.dev",
   },
   {
     id: "everything",
@@ -91,7 +76,7 @@ const MCP_SERVERS = [
     envRequired: [],
     category: "testing",
     color: "#f97316",
-    npmPackage: "@modelcontextprotocol/server-everything@2026.1.26",
+    npmPackage: "@modelcontextprotocol/server-everything@2026.8.31",
     docs: "https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
   },
 ];
@@ -328,7 +313,6 @@ export default function MCPManager() {
       filesystem: { command: "node", args: ["node_modules/@modelcontextprotocol/server-filesystem/dist/index.js", "/home/runner/workspace"] },
       memory: { command: "node", args: ["node_modules/@modelcontextprotocol/server-memory/dist/index.js"] },
       context7: { command: "node", args: ["node_modules/@upstash/context7-mcp/dist/index.js"] },
-      puppeteer: { command: "node", args: ["node_modules/puppeteer-mcp-server/dist/index.js"] },
     }
   }, null, 2);
 

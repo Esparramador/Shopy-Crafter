@@ -1,4 +1,12 @@
-import XLSX from "xlsx";
+/**
+ * Informes Excel (COGS, proveedores, resumen financiero) con exceljs.
+ * Sustituye a SheetJS "xlsx" 0.18.5, que en npm ya no recibe parches de seguridad
+ * (prototype pollution y ReDoS sin versión corregida en el registro).
+ * Los textos se escriben siempre como texto, nunca como fórmulas.
+ */
+import ExcelJS from "exceljs";
+
+type Cell = string | number | boolean | null | undefined;
 
 interface CogsProduct {
   title: string;
@@ -45,30 +53,42 @@ interface FinancialSummary {
   alerts: string[];
 }
 
-function applyHeaderStyle(ws: XLSX.WorkSheet, range: string): void {
-  if (!ws["!cols"]) ws["!cols"] = [];
-}
-
-function autoWidth(ws: XLSX.WorkSheet, data: any[][]): void {
-  const cols: XLSX.ColInfo[] = [];
-  if (data.length === 0) return;
-  const maxCols = Math.max(...data.map(r => r.length));
+/** Ancho de columna según el contenido (mín. 10, máx. 45 caracteres), como hacía el generador anterior. */
+function columnWidths(data: Cell[][]): number[] {
+  const maxCols = data.reduce((m, r) => Math.max(m, r.length), 0);
+  const widths: number[] = [];
   for (let c = 0; c < maxCols; c++) {
     let maxLen = 10;
     for (const row of data) {
       const val = row[c];
-      if (val != null) {
-        const len = String(val).length;
-        if (len > maxLen) maxLen = len;
-      }
+      if (val != null && String(val).length > maxLen) maxLen = String(val).length;
     }
-    cols.push({ wch: Math.min(maxLen + 2, 45) });
+    widths.push(Math.min(maxLen + 2, 45));
   }
-  ws["!cols"] = cols;
+  return widths;
 }
 
-export function generateCogsXlsx(products: CogsProduct[], projectName: string): Buffer {
-  const wb = XLSX.utils.book_new();
+/** Excel limita el nombre de hoja a 31 caracteres, sin \ / ? * [ ] : y sin repetirse. */
+function uniqueSheetName(wb: ExcelJS.Workbook, wanted: string): string {
+  const base = (wanted.replace(/[\\/?*[\]:]/g, "").trim() || "Hoja").slice(0, 31);
+  let name = base;
+  const taken = (n: string) => wb.worksheets.some(w => w.name.toLowerCase() === n.toLowerCase());
+  for (let i = 2; taken(name); i++) name = `${base.slice(0, 31 - String(i).length - 1)}_${i}`;
+  return name;
+}
+
+function addSheet(wb: ExcelJS.Workbook, name: string, data: Cell[][]): void {
+  const ws = wb.addWorksheet(uniqueSheetName(wb, name));
+  for (const row of data) ws.addRow(row.map(v => (v === undefined ? null : v)));
+  columnWidths(data).forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+}
+
+async function toBuffer(wb: ExcelJS.Workbook): Promise<Buffer> {
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+export async function generateCogsXlsx(products: CogsProduct[], projectName: string): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
 
   const methData = [
     [`ESTIMACIÓN COGS COMPLETA — ${projectName.toUpperCase()}`],
@@ -81,9 +101,7 @@ export function generateCogsXlsx(products: CogsProduct[], projectName: string): 
     ["5", "Calcular COGS total y Margen Bruto", "Suma de todos los costes variables", "Alta"],
     ["6", "Proyecciones de volumen y EBITDA", "Escenarios conservador / realista / optimista", "Media"],
   ];
-  const wsMeth = XLSX.utils.aoa_to_sheet(methData);
-  autoWidth(wsMeth, methData);
-  XLSX.utils.book_append_sheet(wb, wsMeth, "Metodología");
+  addSheet(wb, "Metodología", methData);
 
   const compHeader = [
     "Producto", "Precio Venta (€)", "Coste Unitario (€)", "Material (€)",
@@ -103,9 +121,7 @@ export function generateCogsXlsx(products: CogsProduct[], projectName: string): 
     compHeader,
     ...compRows,
   ];
-  const wsComp = XLSX.utils.aoa_to_sheet(compData);
-  autoWidth(wsComp, compData);
-  XLSX.utils.book_append_sheet(wb, wsComp, "Comparativa_Detallada");
+  addSheet(wb, "Comparativa_Detallada", compData);
 
   const totalRev = products.reduce((s, p) => s + p.price, 0);
   const totalCogs = products.reduce((s, p) => s + p.totalCogs, 0);
@@ -134,9 +150,7 @@ export function generateCogsXlsx(products: CogsProduct[], projectName: string): 
     [],
     ...costBreakdown,
   ];
-  const wsBreak = XLSX.utils.aoa_to_sheet(breakdownData);
-  autoWidth(wsBreak, breakdownData);
-  XLSX.utils.book_append_sheet(wb, wsBreak, "Desglose_Costes");
+  addSheet(wb, "Desglose_Costes", breakdownData);
 
   const sorted = [...products].sort((a, b) => b.marginPct - a.marginPct);
   const best = sorted[0];
@@ -153,19 +167,16 @@ export function generateCogsXlsx(products: CogsProduct[], projectName: string): 
     ["Peor Margen", worst ? `${worst.title} (${Math.round(worst.marginPct * 10) / 10}%)` : "N/A", "Producto a revisar"],
     ["Productos con margen < 20%", products.filter(p => p.marginPct < 20).length, "Riesgo de pérdida con devoluciones"],
   ];
-  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-  autoWidth(wsSummary, summaryData);
-  XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen_Ejecutivo");
+  addSheet(wb, "Resumen_Ejecutivo", summaryData);
 
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  return Buffer.from(buf);
+  return toBuffer(wb);
 }
 
-export function generateSupplierComparisonXlsx(
+export async function generateSupplierComparisonXlsx(
   suppliers: SupplierEntry[],
   projectName: string,
-): Buffer {
-  const wb = XLSX.utils.book_new();
+): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
 
   const methData = [
     [`ANÁLISIS Y COMPARATIVA DE PROVEEDORES — ${projectName.toUpperCase()}`],
@@ -177,9 +188,7 @@ export function generateSupplierComparisonXlsx(
     ["4", "Evaluar: Precio 40%, Calidad 30%, Servicio 30%", "Ponderación estándar", "Matriz de decisión"],
     ["5", "Calcular Coste Total de Propiedad (TCO)", "Precio + transporte + roturas + servicio", "Análisis financiero"],
   ];
-  const wsMeth = XLSX.utils.aoa_to_sheet(methData);
-  autoWidth(wsMeth, methData);
-  XLSX.utils.book_append_sheet(wb, wsMeth, "Metodología");
+  addSheet(wb, "Metodología", methData);
 
   const categories = [...new Set(suppliers.map(s => s.category))].sort();
 
@@ -201,10 +210,8 @@ export function generateSupplierComparisonXlsx(
       header,
       ...rows,
     ];
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    autoWidth(ws, sheetData);
     const sheetName = cat.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ ]/g, "").substring(0, 28);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName || "General");
+    addSheet(wb, sheetName || "General", sheetData);
   }
 
   const scoreRanking = [...suppliers].sort((a, b) => b.score - a.score);
@@ -216,16 +223,13 @@ export function generateSupplierComparisonXlsx(
       i + 1, s.name, s.category, s.country, s.score, s.priceMin, s.moq, s.leadDays,
     ]),
   ];
-  const wsRank = XLSX.utils.aoa_to_sheet(rankData);
-  autoWidth(wsRank, rankData);
-  XLSX.utils.book_append_sheet(wb, wsRank, "Ranking_Global");
+  addSheet(wb, "Ranking_Global", rankData);
 
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  return Buffer.from(buf);
+  return toBuffer(wb);
 }
 
-export function generateFinancialSummaryXlsx(summary: FinancialSummary): Buffer {
-  const wb = XLSX.utils.book_new();
+export async function generateFinancialSummaryXlsx(summary: FinancialSummary): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
 
   const dashData = [
     [`INFORME FINANCIERO — ${summary.projectName.toUpperCase()}`],
@@ -243,9 +247,7 @@ export function generateFinancialSummaryXlsx(summary: FinancialSummary): Buffer 
     ["ALERTAS FINANCIERAS"],
     ...summary.alerts.map(a => [a]),
   ];
-  const wsDash = XLSX.utils.aoa_to_sheet(dashData);
-  autoWidth(wsDash, dashData);
-  XLSX.utils.book_append_sheet(wb, wsDash, "Dashboard");
+  addSheet(wb, "Dashboard", dashData);
 
   if (summary.topProducts.length > 0) {
     const topData = [
@@ -254,9 +256,7 @@ export function generateFinancialSummaryXlsx(summary: FinancialSummary): Buffer 
       ["Producto", "Revenue (€)", "Margen (%)"],
       ...summary.topProducts.map(p => [p.title, p.revenue, Math.round(p.margin * 10) / 10]),
     ];
-    const wsTop = XLSX.utils.aoa_to_sheet(topData);
-    autoWidth(wsTop, topData);
-    XLSX.utils.book_append_sheet(wb, wsTop, "Top_Productos");
+    addSheet(wb, "Top_Productos", topData);
   }
 
   const scenarioData = [
@@ -288,10 +288,7 @@ export function generateFinancialSummaryXlsx(summary: FinancialSummary): Buffer 
       Math.round(((summary.totalRevenue * 1.4 - summary.totalCogs * 1.35) / (summary.totalRevenue * 1.4)) * 1000) / 10,
     ],
   ];
-  const wsScen = XLSX.utils.aoa_to_sheet(scenarioData);
-  autoWidth(wsScen, scenarioData);
-  XLSX.utils.book_append_sheet(wb, wsScen, "Escenarios");
+  addSheet(wb, "Escenarios", scenarioData);
 
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  return Buffer.from(buf);
+  return toBuffer(wb);
 }

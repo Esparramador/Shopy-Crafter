@@ -11,7 +11,7 @@ description: 6 MCP servers configured in mcp.json; 5 installed via npm at worksp
 | filesystem | @modelcontextprotocol/server-filesystem@2026.1.14 | mcp-server-filesystem | R/W workspace files |
 | memory | @modelcontextprotocol/server-memory@2026.1.26 | mcp-server-memory | Persistent knowledge graph |
 | context7 | @upstash/context7-mcp@3.2.1 | context7-mcp | npm package docs in context |
-| puppeteer | puppeteer-mcp-server@0.7.2 | mcp-server-puppeteer | Browser automation/screenshots |
+| ~~puppeteer~~ | (retirado: puppeteer-mcp-server abandonado con dependencias vulnerables; usar @playwright/mcp opcional) | — | — |
 | everything | @modelcontextprotocol/server-everything@2026.1.26 | mcp-server-everything | MCP protocol testing |
 
 ## Install pattern

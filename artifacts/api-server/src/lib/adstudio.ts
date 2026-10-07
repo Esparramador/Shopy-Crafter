@@ -39,7 +39,7 @@ const RUNWAY_BASE = "https://api.dev.runwayml.com/v1";
  * instead of the original `node_modules/ffmpeg-static/` directory.
  */
 let _resolvedFfmpegPath: string | null = null;
-async function resolveFfmpegPath(): Promise<string> {
+export async function resolveFfmpegPath(): Promise<string> {
   if (_resolvedFfmpegPath) return _resolvedFfmpegPath;
   try {
     const staticPath = (await import("ffmpeg-static")).default as unknown as string;
