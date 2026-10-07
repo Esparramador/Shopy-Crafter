@@ -32,6 +32,7 @@ import { listTemplates, getTemplate } from "../lib/card-templates.js";
 import { generateQrPng, generateQrSvg, buildVCard } from "../lib/card-qr.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { learnFromOperation } from "../lib/claude.js";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 /** Añade qr_type y qr_content_url si no existen (idempotente). */
 async function ensureCardQrColumns() {
@@ -59,7 +60,7 @@ const upload = multer({
     // forzar fetches a recursos externos/internos (SSRF) durante el render.
     // Solo aceptamos formatos rasterizados.
     if (/^image\/(png|jpe?g|webp)$/i.test(file.mimetype)) cb(null, true);
-    else cb(new Error(`Tipo no permitido: ${file.mimetype}. Solo PNG, JPG o WEBP.`) as any, false);
+    else cb(uploadRejected(`Tipo no permitido: ${file.mimetype}. Solo PNG, JPG o WEBP.`) as any, false);
   },
 });
 

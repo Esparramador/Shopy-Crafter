@@ -19,6 +19,7 @@ import { ObjectStorageService } from "../lib/objectStorage.js";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { learnFromOperation } from "../lib/claude.js";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 let _osCharacters: ObjectStorageService | null = null;
 function getStorageForCharacters(): ObjectStorageService {
@@ -33,7 +34,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (/^image\/(png|jpe?g|webp)$/i.test(file.mimetype)) cb(null, true);
-    else cb(new Error(`Tipo de imagen no permitido: ${file.mimetype}`) as any, false);
+    else cb(uploadRejected(`Tipo de imagen no permitido: ${file.mimetype}`) as any, false);
   },
 });
 

@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { fabric } from "fabric";
+import * as fabric from "fabric";
 import JSZip from "jszip";
 import {
   Type, RefreshCw, Save, Trash2, Loader2, Minus,
@@ -50,6 +50,7 @@ export type ExtraElement = {
   qrBg?: string;   // color fondo QR (hex)
   shapeType?: "rect" | "circle" | "triangle";
   fill?: string; stroke?: string; strokeWidth?: number;
+  opacity?: number;
 };
 export type LayoutOverrides = {
   front?: Record<string, ElementOverride>;
@@ -285,14 +286,16 @@ async function applyBackgroundDataUrl(dataUrl: string, canvas: fabric.Canvas | n
   return new Promise<void>((resolve) => {
     const imgEl = new Image();
     imgEl.onload = () => {
-      const fabricImg = new fabric.Image(imgEl as HTMLImageElement);
+      const fabricImg = new fabric.FabricImage(imgEl);
       const scale = Math.max(CANVAS_W / (imgEl.naturalWidth || CANVAS_W), CANVAS_H / (imgEl.naturalHeight || CANVAS_H));
       fabricImg.set({
         scaleX: scale, scaleY: scale, originX: "center", originY: "center",
         left: CANVAS_W / 2, top: CANVAS_H / 2,
         selectable: false, evented: false, hasBorders: false, hasControls: false,
       });
-      canvas.setBackgroundImage(fabricImg, () => { canvas.renderAll(); resolve(); });
+      canvas.backgroundImage = fabricImg;
+      canvas.requestRenderAll();
+      resolve();
     };
     imgEl.onerror = () => resolve();
     imgEl.src = dataUrl;
@@ -300,13 +303,19 @@ async function applyBackgroundDataUrl(dataUrl: string, canvas: fabric.Canvas | n
 }
 
 // ── Configuración global de controles Fabric ──────────────────────────────────
+// fabric 7 centra el origen por defecto; el editor y el render del servidor usan x/y como esquina superior izquierda.
 function configureFabricGlobals() {
-  (fabric.Object.prototype as any).set({
+  Object.assign(fabric.InteractiveFabricObject.ownDefaults, {
+    originX: "left", originY: "top",
     cornerStyle: "circle", cornerSize: 10,
     cornerColor: "#d4af37", borderColor: "#d4af37",
     cornerStrokeColor: "#0a0a0a", transparentCorners: false, padding: 6,
   });
-  fabric.Object.prototype.setControlsVisibility({ ml: false, mr: false, mt: false, mb: false });
+}
+
+// Sin tiradores laterales: solo esquinas (escalado proporcional) y rotación.
+function hideSideControls(obj: fabric.FabricObject) {
+  obj.setControlsVisibility({ ml: false, mr: false, mt: false, mb: false });
 }
 
 // ── Carga imagen con auth → blob URL ─────────────────────────────────────────
@@ -316,6 +325,17 @@ async function fetchBlob(url: string): Promise<string | null> {
     if (!res.ok) return null;
     return URL.createObjectURL(await res.blob());
   } catch { return null; }
+}
+
+// ── Blob URL → FabricImage (null si falla); libera siempre el blob ───────────
+async function loadImage(blobUrl: string): Promise<fabric.FabricImage | null> {
+  try {
+    return await fabric.FabricImage.fromURL(blobUrl, { crossOrigin: "anonymous" });
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
 }
 
 // ── Aplicar fondo como Fabric background image ────────────────────────────────
@@ -328,7 +348,7 @@ async function applyBackground(url: string, canvas: fabric.Canvas): Promise<void
       const w = imgEl.naturalWidth || imgEl.width;
       const h = imgEl.naturalHeight || imgEl.height;
       if (!w || !h) { URL.revokeObjectURL(blobUrl); resolve(); return; }
-      const fabricImg = new fabric.Image(imgEl as HTMLImageElement);
+      const fabricImg = new fabric.FabricImage(imgEl);
       URL.revokeObjectURL(blobUrl);
       const scale = Math.max(CANVAS_W / w, CANVAS_H / h);
       fabricImg.set({
@@ -338,7 +358,9 @@ async function applyBackground(url: string, canvas: fabric.Canvas): Promise<void
         selectable: false, evented: false,
         hasBorders: false, hasControls: false,
       });
-      canvas.setBackgroundImage(fabricImg, () => { canvas.renderAll(); resolve(); });
+      canvas.backgroundImage = fabricImg;
+      canvas.requestRenderAll();
+      resolve();
     };
     imgEl.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(); };
     imgEl.src = blobUrl;
@@ -357,8 +379,79 @@ function addBleedGuide(canvas: fabric.Canvas): fabric.Rect {
     hasBorders: false, hasControls: false,
   } as any);
   canvas.add(guide);
-  canvas.bringToFront(guide);
+  canvas.bringObjectToFront(guide);
   return guide;
+}
+
+// ── QR PNG con colores (1200px) ──────────────────────────────────────────────
+function qrPngUrl(apiBase: string, data: string, fg = "#000000", bg = "#ffffff"): string {
+  return `${apiBase}/api/qr.png?data=${encodeURIComponent(data)}&fg=${encodeURIComponent(fg)}&bg=${encodeURIComponent(bg)}&size=1200`;
+}
+
+// Bocadillo: rectángulo redondeado con cola, alto total = bh + tail.
+const BUBBLE_TAIL = 36;
+function bubblePath(bw: number, bh: number): string {
+  const tail = BUBBLE_TAIL;
+  return `M 20 0 L ${bw - 20} 0 Q ${bw} 0 ${bw} 20 L ${bw} ${bh - 20} Q ${bw} ${bh} ${bw - 20} ${bh} L 80 ${bh} L 54 ${bh + tail} L 44 ${bh} L 20 ${bh} Q 0 ${bh} 0 ${bh - 20} L 0 20 Q 0 0 20 0 Z`;
+}
+
+// ── Extra guardado → objeto Fabric con su tipo real (forma, bocadillo, QR, emoji…) ──
+async function extraToFabric(ex: ExtraElement, apiBase: string): Promise<fabric.FabricObject | null> {
+  const name = `extra-${ex.id}`;
+  const base: Record<string, unknown> = {
+    left: ex.x, top: ex.y, name,
+    data: { id: name, side: ex.side, type: ex.type, shapeType: ex.shapeType },
+  };
+  if (typeof ex.opacity === "number") base.opacity = ex.opacity;
+
+  switch (ex.type) {
+    case "text":
+      return new fabric.Textbox(ex.text ?? "", {
+        ...base, width: ex.width,
+        fontSize: ex.fontSize || 24, fontFamily: ex.fontFamily || "Inter",
+        fontWeight: String(ex.fontWeight || 400), fontStyle: ex.italic ? "italic" : "normal",
+        fill: ex.color || "#ffffff", textAlign: ex.align || "left",
+        editable: true, splitByGrapheme: false,
+      } as any);
+    case "emoji":
+      return new fabric.Textbox(ex.text ?? "", {
+        ...base, width: ex.width || 100, fontSize: ex.fontSize || 72,
+        fontFamily: "Arial", textAlign: "center", editable: false,
+      } as any);
+    case "line":
+      return new fabric.Rect({ ...base, width: ex.width, height: ex.height || 3, fill: ex.color || "rgba(212,175,55,0.7)" } as any);
+    case "shape": {
+      const paint = { fill: ex.fill ?? "rgba(212,175,55,0.18)", stroke: ex.stroke ?? "rgba(212,175,55,0.9)", strokeWidth: ex.strokeWidth ?? 2 };
+      const w = ex.width || 200, h = ex.height || 120;
+      if (ex.shapeType === "circle") return new fabric.Circle({ ...base, ...paint, radius: Math.min(w, h) / 2 } as any);
+      if (ex.shapeType === "triangle") return new fabric.Triangle({ ...base, ...paint, width: w, height: h } as any);
+      return new fabric.Rect({ ...base, ...paint, width: w, height: h, rx: 8, ry: 8 } as any);
+    }
+    case "bubble": {
+      const bw = ex.width || 320;
+      const bh = Math.max(40, (ex.height || 130 + BUBBLE_TAIL) - BUBBLE_TAIL);
+      return new fabric.Path(bubblePath(bw, bh), {
+        ...base, fill: ex.fill ?? "rgba(255,255,255,0.92)", stroke: ex.stroke ?? "#222", strokeWidth: ex.strokeWidth ?? 2,
+      } as any);
+    }
+    case "qr": {
+      const fg = ex.qrFg ?? "#000000", bg = ex.qrBg ?? "#ffffff";
+      const blobUrl = await fetchBlob(qrPngUrl(apiBase, ex.qrUrl || "https://shopycrafter.com", fg, bg));
+      const img = blobUrl ? await loadImage(blobUrl) : null;
+      const sq = Math.min(ex.width || 200, ex.height || ex.width || 200);
+      if (!img) {
+        return new fabric.Rect({ ...base, width: sq, height: sq, fill: "#ffffff", stroke: "#aaa", strokeWidth: 2, rx: 4, ry: 4 } as any);
+      }
+      const sw = img.width || 1200, sh = img.height || 1200;
+      img.set({
+        ...base, scaleX: sq / sw, scaleY: sq / sh, imageSmoothing: false,
+        data: { ...(base.data as object), srcW: sw, srcH: sh, qrFg: fg, qrBg: bg },
+      } as any);
+      return img;
+    }
+    default:
+      return null;
+  }
 }
 
 // ── Puebla canvas con elementos del backend (SIN ghost mode) ─────────────────
@@ -370,12 +463,15 @@ async function populateCanvas(
   guide: fabric.Rect | null,
   apiBase: string,
   cardId: number,
+  extras: ExtraElement[],
 ) {
   const toRemove = canvas.getObjects().filter((o: any) => o !== guide);
   canvas.remove(...toRemove);
 
   for (const el of elements) {
     if (el.hidden) continue;
+    // Los extras se reconstruyen desde los overrides con su tipo real (el backend los aplana a texto/línea).
+    if (el.id.startsWith("extra-")) continue;
 
     if (el.type === "text") {
       const displayText = el.textTransform === "uppercase"
@@ -400,23 +496,19 @@ async function populateCanvas(
     } else if (el.type === "logo" && logoUrl) {
       const blobUrl = await fetchBlob(logoUrl);
       if (blobUrl) {
-        await new Promise<void>((res) => {
-          fabric.Image.fromURL(blobUrl, (img: any) => {
-            URL.revokeObjectURL(blobUrl);
-            if (!img) { res(); return; }
-            const sw = img.width || 1;
-            const sh = img.height || 1;
-            img.set({
-              left: el.x, top: el.y,
-              scaleX: el.width / sw,
-              scaleY: el.height / sh,
-              data: { id: el.id, side, type: "logo", srcW: sw, srcH: sh },
-              name: el.id,
-            } as any);
-            canvas.add(img);
-            res();
-          }, { crossOrigin: "anonymous" });
-        });
+        const img = await loadImage(blobUrl);
+        if (img) {
+          const sw = img.width || 1;
+          const sh = img.height || 1;
+          img.set({
+            left: el.x, top: el.y,
+            scaleX: el.width / sw,
+            scaleY: el.height / sh,
+            data: { id: el.id, side, type: "logo", srcW: sw, srcH: sh },
+            name: el.id,
+          } as any);
+          canvas.add(img);
+        }
       }
     } else if (el.type === "line") {
       const rect = new fabric.Rect({
@@ -434,27 +526,20 @@ async function populateCanvas(
         ? `${apiBase}/api/qr.png?data=${encodeURIComponent(el.qrUrl)}&fg=${encodeURIComponent(qrFg)}&bg=${encodeURIComponent(qrBg)}&size=1200`
         : `${apiBase}/api/cards/${cardId}/qr.png`;
       const qrBlobUrl = await fetchBlob(qrSrc);
-      if (qrBlobUrl) {
-        await new Promise<void>((res) => {
-          fabric.Image.fromURL(qrBlobUrl, (img: any) => {
-            URL.revokeObjectURL(qrBlobUrl);
-            if (!img) { res(); return; }
-            const sw = img.width || 1200;
-            const sh = img.height || 1200;
-            const sq = Math.min(el.width, el.height);
-            img.set({
-              left: el.x, top: el.y,
-              scaleX: sq / sw,
-              scaleY: sq / sh,
-              lockUniScaling: true,
-              imageSmoothing: false,
-              data: { id: el.id, side, type: "qr", srcW: sw, srcH: sh, qrFg, qrBg },
-              name: el.id,
-            } as any);
-            canvas.add(img);
-            res();
-          }, { crossOrigin: "anonymous" });
-        });
+      const img = qrBlobUrl ? await loadImage(qrBlobUrl) : null;
+      if (img) {
+        const sw = img.width || 1200;
+        const sh = img.height || 1200;
+        const sq = Math.min(el.width, el.height);
+        img.set({
+          left: el.x, top: el.y,
+          scaleX: sq / sw,
+          scaleY: sq / sh,
+          imageSmoothing: false,
+          data: { id: el.id, side, type: "qr", srcW: sw, srcH: sh, qrFg, qrBg },
+          name: el.id,
+        } as any);
+        canvas.add(img);
       } else {
         // Placeholder si el QR no se puede cargar
         const ph = new fabric.Rect({
@@ -467,7 +552,13 @@ async function populateCanvas(
     }
   }
 
-  if (guide) canvas.bringToFront(guide);
+  for (const ex of extras) {
+    if (ex.side !== side) continue;
+    const obj = await extraToFabric(ex, apiBase);
+    if (obj) canvas.add(obj);
+  }
+
+  if (guide) canvas.bringObjectToFront(guide);
   canvas.renderAll();
 }
 
@@ -490,6 +581,8 @@ export default function CardStudioEditor({
 
   const [canvasesReady, setCanvasesReady] = useState(false);
   const [overrides, setOverrides] = useState<LayoutOverrides>(initialOverrides || {});
+  const overridesRef = useRef(overrides);
+  overridesRef.current = overrides;
   const [frontElements, setFrontElements] = useState<ResolvedElement[]>([]);
   const [backElements, setBackElements] = useState<ResolvedElement[]>([]);
   const [loading, setLoading] = useState(false);
@@ -555,7 +648,7 @@ export default function CardStudioEditor({
     configureFabricGlobals();
 
     const z = zoomRef.current;
-    const opts: fabric.ICanvasOptions = {
+    const opts: Partial<fabric.CanvasOptions> = {
       width: CANVAS_W * z, height: CANVAS_H * z,
       preserveObjectStacking: true, selection: true,
       enableRetinaScaling: true,   // Renderiza en DPR real → texto y gráficos nítidos en Retina
@@ -573,11 +666,11 @@ export default function CardStudioEditor({
 
     // ── Selección y eventos ──────────────────────────────────────────────
     const bindAll = (canvas: fabric.Canvas, side: "front" | "back") => {
-      const extract = (obj: fabric.Object | null) => {
+      const extract = (obj: fabric.FabricObject | null) => {
         if (!obj) { setSelId(null); setSelSide(null); setSelProps(null); return; }
         const data = (obj as any).data;
         setActiveCanvas(side);
-        setSelId(data?.id ?? obj.name ?? null);
+        setSelId(data?.id ?? (obj as any).name ?? null);
         setSelSide(side);
         const isTb = obj.type === "textbox";
         const isRect = obj.type === "rect";
@@ -601,6 +694,7 @@ export default function CardStudioEditor({
         });
       };
 
+      canvas.on("object:added", (e) => hideSideControls(e.target));
       canvas.on("selection:created", (e: any) => extract(e.selected?.[0] ?? null));
       canvas.on("selection:updated", (e: any) => extract(e.selected?.[0] ?? null));
       canvas.on("selection:cleared", () => { setSelId(null); setSelSide(null); setSelProps(null); });
@@ -693,7 +787,7 @@ export default function CardStudioEditor({
         if (!obj) continue;
         if ((obj as any).isEditing) continue;
         const data = (obj as any).data;
-        const id: string = data?.id ?? obj.name ?? "";
+        const id: string = data?.id ?? (obj as any).name ?? "";
         canvas.remove(obj);
         canvas.discardActiveObject();
         canvas.renderAll();
@@ -753,7 +847,7 @@ export default function CardStudioEditor({
   useEffect(() => {
     const fc = frontFabric.current;
     if (!canvasesReady || !fc || frontElements.length === 0) return;
-    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current, apiBase, cardId);
+    populateCanvas(fc, frontElements, "front", logoUrl, frontGuide.current, apiBase, cardId, overridesRef.current.extras ?? []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasesReady, frontElements, logoUrl, cardId]);
 
@@ -761,7 +855,7 @@ export default function CardStudioEditor({
   useEffect(() => {
     const bc = backFabric.current;
     if (!canvasesReady || !bc || backElements.length === 0) return;
-    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current, apiBase, cardId);
+    populateCanvas(bc, backElements, "back", logoUrl, backGuide.current, apiBase, cardId, overridesRef.current.extras ?? []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasesReady, backElements, logoUrl, cardId]);
 
@@ -793,7 +887,8 @@ export default function CardStudioEditor({
   const clearCanvasBg = useCallback((side: "front" | "back" | "both") => {
     const clear = (canvas: fabric.Canvas | null) => {
       if (!canvas) return;
-      (canvas as any).setBackgroundImage(null, () => { canvas.renderAll(); });
+      canvas.backgroundImage = undefined;
+      canvas.requestRenderAll();
     };
     if (side === "front" || side === "both") clear(frontFabric.current);
     if (side === "back" || side === "both") clear(backFabric.current);
@@ -833,7 +928,7 @@ export default function CardStudioEditor({
       data: { id: `extra-${id}`, side, type: "text" }, name: `extra-${id}`,
     } as any);
     canvas.add(tb);
-    if (guide) canvas.bringToFront(guide);
+    if (guide) canvas.bringObjectToFront(guide);
     canvas.setActiveObject(tb);
     canvas.renderAll();
   }, [activeCanvas]);
@@ -858,7 +953,7 @@ export default function CardStudioEditor({
       data: { id: `extra-${id}`, side, type: "line" }, name: `extra-${id}`,
     } as any);
     canvas.add(rect);
-    if (guide) canvas.bringToFront(guide);
+    if (guide) canvas.bringObjectToFront(guide);
     canvas.renderAll();
   }, [activeCanvas]);
 
@@ -871,7 +966,7 @@ export default function CardStudioEditor({
     const id = `${Date.now()}`.slice(-7);
     const defaultFill = "rgba(212,175,55,0.18)";
     const defaultStroke = "rgba(212,175,55,0.9)";
-    let shape: fabric.Object;
+    let shape: fabric.FabricObject;
     const commonProps: any = {
       left: CANVAS_W / 2 - 100, top: CANVAS_H / 2 - 60,
       fill: defaultFill, stroke: defaultStroke, strokeWidth: 2,
@@ -888,12 +983,12 @@ export default function CardStudioEditor({
     const ex: ExtraElement = {
       id, side, type: "shape", shapeType,
       x: CANVAS_W / 2 - 100, y: CANVAS_H / 2 - 60,
-      width: 200, height: 120,
+      width: Math.round(shape.width ?? 200), height: Math.round(shape.height ?? 120),
       fill: defaultFill, stroke: defaultStroke, strokeWidth: 2,
     };
     setOverrides(prev => ({ ...prev, extras: [...(prev.extras || []), ex] }));
     canvas.add(shape);
-    if (guide) canvas.bringToFront(guide);
+    if (guide) canvas.bringObjectToFront(guide);
     canvas.setActiveObject(shape);
     canvas.renderAll();
   }, [activeCanvas]);
@@ -920,7 +1015,7 @@ export default function CardStudioEditor({
       data: { id: `extra-${id}`, side, type: "emoji" }, name: `extra-${id}`,
     } as any);
     canvas.add(tb);
-    if (guide) canvas.bringToFront(guide);
+    if (guide) canvas.bringObjectToFront(guide);
     canvas.setActiveObject(tb);
     canvas.renderAll();
     setShowEmoji(false);
@@ -929,7 +1024,7 @@ export default function CardStudioEditor({
   // ── Añadir QR extra ──────────────────────────────────────────────────────
   // Construye la URL del QR con colores y tamaño
   const buildQrUrl = useCallback((dataUrl: string, fg = "#000000", bg = "#ffffff") => {
-    return `${apiBase}/api/qr.png?data=${encodeURIComponent(dataUrl)}&fg=${encodeURIComponent(fg)}&bg=${encodeURIComponent(bg)}&size=1200`;
+    return qrPngUrl(apiBase, dataUrl, fg, bg);
   }, [apiBase]);
 
   const addQr = useCallback(async (targetSide?: "front" | "back") => {
@@ -952,24 +1047,21 @@ export default function CardStudioEditor({
     }));
     const blobUrl = await fetchBlob(buildQrUrl(defaultUrl, defaultFg, defaultBg));
     if (blobUrl) {
-      fabric.Image.fromURL(blobUrl, (img: any) => {
-        URL.revokeObjectURL(blobUrl);
-        if (!img) return;
-        const sw = img.width || 1200;
-        const sh = img.height || 1200;
-        img.set({
-          left: CANVAS_W / 2 - size / 2, top: CANVAS_H / 2 - size / 2,
-          scaleX: size / sw, scaleY: size / sh,
-          lockUniScaling: true,
-          imageSmoothing: false,
-          data: { id: `extra-${id}`, side, type: "qr", srcW: sw, srcH: sh, qrFg: defaultFg, qrBg: defaultBg },
-          name: `extra-${id}`,
-        } as any);
-        canvas.add(img);
-        if (guide) canvas.bringToFront(guide);
-        canvas.setActiveObject(img);
-        canvas.renderAll();
-      }, { crossOrigin: "anonymous" });
+      const img = await loadImage(blobUrl);
+      if (!img) return;
+      const sw = img.width || 1200;
+      const sh = img.height || 1200;
+      img.set({
+        left: CANVAS_W / 2 - size / 2, top: CANVAS_H / 2 - size / 2,
+        scaleX: size / sw, scaleY: size / sh,
+        imageSmoothing: false,
+        data: { id: `extra-${id}`, side, type: "qr", srcW: sw, srcH: sh, qrFg: defaultFg, qrBg: defaultBg },
+        name: `extra-${id}`,
+      } as any);
+      canvas.add(img);
+      if (guide) canvas.bringObjectToFront(guide);
+      canvas.setActiveObject(img);
+      canvas.renderAll();
     } else {
       const ph = new fabric.Rect({
         left: CANVAS_W / 2 - size / 2, top: CANVAS_H / 2 - size / 2,
@@ -979,7 +1071,7 @@ export default function CardStudioEditor({
         name: `extra-${id}`,
       } as any);
       canvas.add(ph);
-      if (guide) canvas.bringToFront(guide);
+      if (guide) canvas.bringObjectToFront(guide);
       canvas.setActiveObject(ph);
       canvas.renderAll();
     }
@@ -990,7 +1082,7 @@ export default function CardStudioEditor({
     if (!selId?.startsWith("extra-")) return;
     const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
     if (!canvas) return;
-    const obj = canvas.getObjects().find((o: any) => o.name === selId) as fabric.Image | undefined;
+    const obj = canvas.getObjects().find((o: any) => o.name === selId) as fabric.FabricImage | undefined;
     if (!obj || obj.type !== "image") return;
     const srcW: number = (obj as any).data?.srcW ?? obj.width ?? 1200;
     const srcH: number = (obj as any).data?.srcH ?? obj.height ?? 1200;
@@ -999,18 +1091,22 @@ export default function CardStudioEditor({
     const useBg = bg ?? (obj as any).data?.qrBg ?? "#ffffff";
     const blobUrl = await fetchBlob(buildQrUrl(url, useFg, useBg));
     if (!blobUrl) return;
-    (obj as any).setSrc(blobUrl, () => {
+    try {
+      await obj.setSrc(blobUrl, { crossOrigin: "anonymous" });
+    } catch {
+      return;
+    } finally {
       URL.revokeObjectURL(blobUrl);
-      const newSrcW = obj.width || srcW;
-      const newSrcH = obj.height || srcH;
-      obj.set({
-        scaleX: sq / newSrcW,
-        scaleY: sq / newSrcH,
-        imageSmoothing: false,
-      });
-      (obj as any).data = { ...(obj as any).data, srcW: newSrcW, srcH: newSrcH, qrFg: useFg, qrBg: useBg };
-      canvas.renderAll();
-    }, { crossOrigin: "anonymous" });
+    }
+    const newSrcW = obj.width || srcW;
+    const newSrcH = obj.height || srcH;
+    obj.set({
+      scaleX: sq / newSrcW,
+      scaleY: sq / newSrcH,
+      imageSmoothing: false,
+    });
+    (obj as any).data = { ...(obj as any).data, srcW: newSrcW, srcH: newSrcH, qrFg: useFg, qrBg: useBg };
+    canvas.renderAll();
   }, [selId, selSide, apiBase, buildQrUrl]);
 
   // ── Añadir bocadillo de texto ─────────────────────────────────────────────
@@ -1022,9 +1118,9 @@ export default function CardStudioEditor({
     const id = `${Date.now()}`.slice(-7);
 
     // Bocadillo usando Path SVG
-    const bw = 320; const bh = 130; const tail = 36;
+    const bw = 320; const bh = 130; const tail = BUBBLE_TAIL;
     const path = new fabric.Path(
-      `M 20 0 L ${bw - 20} 0 Q ${bw} 0 ${bw} 20 L ${bw} ${bh - 20} Q ${bw} ${bh} ${bw - 20} ${bh} L 80 ${bh} L 54 ${bh + tail} L 44 ${bh} L 20 ${bh} Q 0 ${bh} 0 ${bh - 20} L 0 20 Q 0 0 20 0 Z`,
+      bubblePath(bw, bh),
       {
         left: CANVAS_W / 2 - bw / 2, top: CANVAS_H / 2 - (bh + tail) / 2,
         fill: "rgba(255,255,255,0.92)", stroke: "#222", strokeWidth: 2,
@@ -1052,10 +1148,10 @@ export default function CardStudioEditor({
       extras: [
         ...(prev.extras || []),
         { id: `${id}-shape`, side, type: "bubble", x: path.left!, y: path.top!, width: bw, height: bh + tail },
-        { id: textId, side, type: "text", x: tb.left!, y: tb.top!, width: bw - 36, text: "¡Escribe aquí!", fontSize: 22 },
+        { id: textId, side, type: "text", x: tb.left!, y: tb.top!, width: bw - 36, text: "¡Escribe aquí!", fontSize: 22, fontFamily: "Inter", color: "#222", align: "center" },
       ],
     }));
-    if (guide) canvas.bringToFront(guide);
+    if (guide) canvas.bringObjectToFront(guide);
     canvas.setActiveObject(tb);
     canvas.renderAll();
   }, [activeCanvas]);
@@ -1090,7 +1186,7 @@ export default function CardStudioEditor({
     const elements = side === "front" ? frontElements : backElements;
     const canvas = side === "front" ? frontFabric.current : backFabric.current;
     const guide = side === "front" ? frontGuide.current : backGuide.current;
-    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide, apiBase, cardId);
+    if (canvas) populateCanvas(canvas, elements, side, logoUrl, guide, apiBase, cardId, overridesRef.current.extras ?? []);
   }, [frontElements, backElements, logoUrl, apiBase, cardId]);
 
   // ── Guardar ───────────────────────────────────────────────────────────────
@@ -1193,8 +1289,9 @@ export default function CardStudioEditor({
   // ── Todos los elementos visibles (base + extras) ─────────────────────────
   const allFrontVisible = useMemo(() => {
     const frontOv = overrides.front ?? {};
+    // Los extras ya vienen del backend como "extra-<id>"; se listan desde overrides (valores vivos), no dos veces.
     const base = frontElements
-      .filter(e => !(frontOv[e.id]?.hidden))
+      .filter(e => !e.id.startsWith("extra-") && !(frontOv[e.id]?.hidden))
       .map(e => ({ ...e, ...(frontOv[e.id] ?? {}) }));
     const extFront = (overrides.extras ?? [])
       .filter(ex => ex.side === "front")
@@ -1205,7 +1302,7 @@ export default function CardStudioEditor({
   const allBackVisible = useMemo(() => {
     const backOv = overrides.back ?? {};
     const base = backElements
-      .filter(e => !(backOv[e.id]?.hidden))
+      .filter(e => !e.id.startsWith("extra-") && !(backOv[e.id]?.hidden))
       .map(e => ({ ...e, ...(backOv[e.id] ?? {}) }));
     const extBack = (overrides.extras ?? [])
       .filter(ex => ex.side === "back")

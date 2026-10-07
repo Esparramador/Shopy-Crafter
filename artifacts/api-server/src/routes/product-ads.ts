@@ -37,6 +37,7 @@ import {
 import { generateCinematicMultiShot, type CinematicAspect, type CinematicStyle } from "../lib/cinematic-multishot.js";
 import { askClaudeJsonWithBrain } from "../lib/claude.js";
 import { loadCharacter, buildIdentityLockPrompt } from "../lib/character-loader.js";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 const router = Router();
 
@@ -45,7 +46,7 @@ const tryonVideoUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (/^image\/(png|jpe?g|webp)$/i.test(file.mimetype)) cb(null, true);
-    else cb(new Error(`Tipo de imagen no permitido: ${file.mimetype}`) as any, false);
+    else cb(uploadRejected(`Tipo de imagen no permitido: ${file.mimetype}`) as any, false);
   },
 });
 

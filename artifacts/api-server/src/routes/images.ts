@@ -12,13 +12,14 @@ import { safeDecrypt as safeDecryptSync } from "../lib/crypto.js";
 import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 const tryonUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
-    else cb(new Error("Solo se aceptan imágenes"));
+    else cb(uploadRejected("Solo se aceptan imágenes"));
   },
 });
 

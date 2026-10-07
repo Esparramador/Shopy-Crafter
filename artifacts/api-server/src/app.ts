@@ -400,7 +400,9 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     return;
   }
 
-  const status = err.status || err.statusCode || 500;
+  // multer: campo inesperado, demasiados archivos… son errores del cliente (el tamaño excedido va a 413).
+  const multerStatus = err.name === "MulterError" ? (err.code === "LIMIT_FILE_SIZE" ? 413 : 400) : 0;
+  const status = multerStatus || err.status || err.statusCode || 500;
   const message = err.message || "Error interno del servidor";
 
   if (status >= 500) {

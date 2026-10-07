@@ -8,6 +8,7 @@ import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
 import { askClaudeWithBrain } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 const router = Router();
 
@@ -39,7 +40,7 @@ const upload = multer({
   limits: { fileSize: 30 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
-    else cb(new Error("Solo se aceptan imágenes"));
+    else cb(uploadRejected("Solo se aceptan imágenes"));
   },
 });
 
@@ -48,7 +49,7 @@ const multiUpload = multer({
   limits: { fileSize: 30 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
-    else cb(new Error("Solo se aceptan imágenes"));
+    else cb(uploadRejected("Solo se aceptan imágenes"));
   },
 });
 

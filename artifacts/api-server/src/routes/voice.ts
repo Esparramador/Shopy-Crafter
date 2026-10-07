@@ -24,7 +24,7 @@ const cloneUpload = multer({
     if (/^audio\//i.test(file.mimetype) || /\.(mp3|wav|m4a|ogg|flac|aac|webm)$/i.test(file.originalname)) {
       cb(null, true);
     } else {
-      cb(new Error("Solo se admiten archivos de audio (mp3, wav, m4a, ogg, flac)"));
+      cb(uploadRejected("Solo se admiten archivos de audio (mp3, wav, m4a, ogg, flac)"));
     }
   },
 });
@@ -36,13 +36,14 @@ const audioUpload = multer({
     if (/^(audio|video)\//i.test(file.mimetype) || /\.(mp3|wav|m4a|ogg|flac|aac|webm|mp4|mov|mkv)$/i.test(file.originalname)) {
       cb(null, true);
     } else {
-      cb(new Error("Solo se admiten archivos de audio o vídeo"));
+      cb(uploadRejected("Solo se admiten archivos de audio o vídeo"));
     }
   },
 });
 import { logger } from "../lib/logger.js";
 import { recommendVoiceForProduct, type VoiceGenderPref, type VoiceLanguage } from "../lib/voice-recommender.js";
 import { requireAdmin } from "../lib/auth.js";
+import { uploadRejected } from "../lib/upload-errors.js";
 
 const router = Router();
 

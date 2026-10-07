@@ -101,7 +101,9 @@ export async function renderCardSide(
   const page = await browser.newPage();
   try {
     await page.setViewport({ width: CARD_W, height: CARD_H, deviceScaleFactor: 1 });
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30_000 });
+    await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
+    // puppeteer 25: setContent ya no admite networkidle0; se espera a que no queden peticiones (fuentes, imágenes).
+    await page.waitForNetworkIdle({ idleTime: 500, timeout: 30_000 });
     // Espera fonts
     await page.evaluate(async () => {
       try {

@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { askAMR, streamAMR } from "../lib/amr.js";
 import { logger } from "../lib/logger.js";
+import { resolveFfmpegPath } from "../lib/adstudio.js";
 import { z } from "zod";
 import { askClaudeJsonValidated } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
@@ -27,7 +28,6 @@ router.post("/hyperframes/generate", async (req, res) => {
   try {
     const puppeteer = await import("puppeteer-core");
     const ffmpegModule = await import("fluent-ffmpeg");
-    const ffmpegStatic = await import("ffmpeg-static");
     const os = await import("os");
     const fs = await import("fs");
     const { promisify } = await import("util");
@@ -43,44 +43,49 @@ router.post("/hyperframes/generate", async (req, res) => {
       headless: true,
     });
 
-    const page = await browser.newPage();
-    await page.setViewport({ width, height });
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    // Capture frames
-    const totalFrames = Math.min(duration * fps, 300); // cap at 300 frames
     const frameFiles: string[] = [];
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width, height });
+      await page.setContent(html, { waitUntil: "load" });
+      // puppeteer 25: setContent ya no admite networkidle0; se espera a que no queden peticiones (fuentes, librerías).
+      await page.waitForNetworkIdle({ idleTime: 500, timeout: 30_000 });
 
-    for (let i = 0; i < totalFrames; i++) {
-      const frameFile = path.join(tmpDir, `frame-${String(i).padStart(6, "0")}.png`);
-      await page.screenshot({ path: frameFile as `${string}.png`, type: "png" });
-      frameFiles.push(frameFile);
+      // Capture frames
+      const totalFrames = Math.min(duration * fps, 300); // cap at 300 frames
 
-      // Advance animation time
-      await page.evaluate((frameIndex: number, totalFps: number) => {
-        const t = frameIndex / totalFps;
-        // Dispatch a custom event so HTML can react to frame time
-        (globalThis as unknown as { dispatchEvent: (e: Event) => void }).dispatchEvent(new CustomEvent("hyperframe-tick", { detail: { t, frame: frameIndex } }));
-      }, i, fps);
+      for (let i = 0; i < totalFrames; i++) {
+        const frameFile = path.join(tmpDir, `frame-${String(i).padStart(6, "0")}.png`);
+        await page.screenshot({ path: frameFile as `${string}.png`, type: "png" });
+        frameFiles.push(frameFile);
 
-      await new Promise(r => setTimeout(r, 1000 / fps));
+        // Advance animation time
+        await page.evaluate((frameIndex: number, totalFps: number) => {
+          const t = frameIndex / totalFps;
+          // Dispatch a custom event so HTML can react to frame time
+          (globalThis as unknown as { dispatchEvent: (e: Event) => void }).dispatchEvent(new CustomEvent("hyperframe-tick", { detail: { t, frame: frameIndex } }));
+        }, i, fps);
+
+        await new Promise(r => setTimeout(r, 1000 / fps));
+      }
+    } finally {
+      await browser.close().catch(() => {});
     }
-
-    await browser.close();
 
     // Build MP4 from frames
     const outputFile = path.join(tmpDir, "output.mp4");
-    const ffmpegPath = (ffmpegStatic as unknown as { default: string }).default ?? ffmpegStatic;
+    // En el bundle, ffmpeg-static apunta a dist/ffmpeg (no existe): resolveFfmpegPath cae al ffmpeg del sistema.
+    const ffmpegPath = await resolveFfmpegPath();
 
     await new Promise<void>((resolve, reject) => {
       const ff = ffmpegModule.default as typeof import("fluent-ffmpeg");
       (ff as unknown as (input: string) => import("fluent-ffmpeg").FfmpegCommand)(path.join(tmpDir, "frame-%06d.png"))
-        .setFfmpegPath(ffmpegPath as string)
+        .setFfmpegPath(ffmpegPath)
         .inputFPS(fps)
         .videoCodec("libx264")
         .outputOption("-crf 23")
         .outputOption("-pix_fmt yuv420p")
-        .outputOption(`-vf "scale=${width}:${height}"`)
+        .outputOptions(["-vf", `scale=${width}:${height}`])
         .fps(fps)
         .output(outputFile)
         .on("end", () => resolve())
