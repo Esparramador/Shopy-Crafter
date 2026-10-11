@@ -90,8 +90,8 @@ function publicQrUrl(req: Request, id: number): string {
 
 /** Destino del QR del reverso según su tipo; undefined = vCard con los datos de la tarjeta. */
 function cardQrTarget(row: CardRow, req: Request): string | undefined {
-  const qrType: string = (row as any).qrType || "vcard";
-  const qrContentUrl: string | null = (row as any).qrContentUrl || null;
+  const qrType: string = row.qrType || "vcard";
+  const qrContentUrl: string | null = row.qrContentUrl || null;
   if (qrType === "url" && qrContentUrl) return qrContentUrl;
   if (qrType === "vcard") return undefined;
   if (["video", "image", "animation"].includes(qrType)) return publicQrUrl(req, row.id);
@@ -141,6 +141,10 @@ function styleFromQuery(v: unknown): unknown | null {
 }
 
 const MAX_QR_DATA = 1800;
+const QR_TYPES = new Set(["vcard", "url", "video", "image", "animation"]);
+function isHttpUrl(v: string): boolean {
+  try { const u = new URL(v); return u.protocol === "https:" || u.protocol === "http:"; } catch { return false; }
+}
 
 const EXTRA_TYPES = new Set(["text", "line", "emoji", "shape", "bubble", "qr", "qr-image"]);
 const NUM_FIELDS = ["x", "y", "width", "height", "fontSize", "fontWeight", "letterSpacing", "lineHeight", "rotate", "opacity", "strokeWidth"] as const;
@@ -418,6 +422,9 @@ router.post("/projects/:projectId/cards", requireAdmin, async (req, res) => {
         socialHandle: s(req.body?.socialHandle),
         address: s(req.body?.address, 240),
         qrUrl: s(req.body?.qrUrl, 1024),
+        qrType: QR_TYPES.has(req.body?.qrType) ? req.body.qrType : "vcard",
+        qrContentUrl: typeof req.body?.qrContentUrl === "string" && isHttpUrl(req.body.qrContentUrl.trim())
+          ? req.body.qrContentUrl.trim().slice(0, MAX_QR_DATA) : null,
         palette,
         fonts,
         layout: s(req.body?.layout) || tpl.layout,
@@ -487,14 +494,19 @@ router.patch("/cards/:id", requireAdmin, async (req, res) => {
       patch.backgroundConfig = JSON.stringify(req.body.backgroundConfig);
     }
 
-    // Extra columns (qrType/qrContentUrl) — persisted via raw SQL since not in drizzle schema
-    const newQrType: string | undefined = typeof req.body?.qrType === "string" ? req.body.qrType : undefined;
-    const newQrContentUrl: string | null | undefined = req.body?.qrContentUrl === null ? null
-      : typeof req.body?.qrContentUrl === "string" ? (req.body.qrContentUrl.trim() || null) : undefined;
+    // Destino del QR
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "qrType")) {
+      if (!QR_TYPES.has(req.body.qrType)) { res.status(400).json({ error: "Tipo de QR no válido" }); return; }
+      patch.qrType = req.body.qrType;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "qrContentUrl")) {
+      const v = req.body.qrContentUrl;
+      if (v === null || (typeof v === "string" && !v.trim())) patch.qrContentUrl = null;
+      else if (typeof v === "string" && isHttpUrl(v.trim())) patch.qrContentUrl = v.trim().slice(0, MAX_QR_DATA);
+      else { res.status(400).json({ error: "La URL del QR debe empezar por http:// o https://" }); return; }
+    }
 
-    const hasExtra = newQrType !== undefined || newQrContentUrl !== undefined;
-
-    let updatedRow: any = existing;
+    let updatedRow: CardRow = existing;
     if (Object.keys(patch).length > 0) {
       const [r] = await db
         .update(businessCardsTable)
@@ -502,14 +514,6 @@ router.patch("/cards/:id", requireAdmin, async (req, res) => {
         .where(eq(businessCardsTable.id, id))
         .returning();
       updatedRow = r;
-    }
-    if (hasExtra) {
-      const qt = newQrType ?? (existing as any).qrType ?? "vcard";
-      const qcu = newQrContentUrl !== undefined ? newQrContentUrl : ((existing as any).qrContentUrl ?? null);
-      await db.execute(sql`
-        UPDATE business_cards SET qr_type = ${qt}, qr_content_url = ${qcu} WHERE id = ${id}
-      `);
-      updatedRow = { ...updatedRow, qrType: qt, qrContentUrl: qcu };
     }
     res.json(toCardDto(updatedRow));
   } catch (err: any) {
@@ -736,7 +740,7 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
       backgroundImageMime,
       overrides,
       qrStyle: (safeJson(row.metadata, {}) as any)?.qrStyle,
-      qrLabel: qrLabelFor((row as any).qrType),
+      qrLabel: qrLabelFor(row.qrType),
       sideBackgrounds: await loadSideBackgrounds(row),
       extraAssets: await resolveExtraAssets(
         row, overrides.extras,
@@ -908,7 +912,7 @@ router.get("/cards/:id/elements", requireAdmin, async (req: Request, res: Respon
 
     const defaults = side === "front"
       ? defaultFrontElements({ side: "front", layout, data, palette, fonts, isAiBg, logoDataUri: row.logoVaultFileId ? "x" : undefined })
-      : defaultBackElements ({ side: "back",  layout, data, palette, fonts, isAiBg, qrPngBase64, qrLabel: qrLabelFor((row as any).qrType) });
+      : defaultBackElements ({ side: "back",  layout, data, palette, fonts, isAiBg, qrPngBase64, qrLabel: qrLabelFor(row.qrType) });
     const sideOv = side === "front" ? overrides.front : overrides.back;
     const merged = applyOverrides(defaults, sideOv);
     const extras = extrasToRender(overrides.extras, side);

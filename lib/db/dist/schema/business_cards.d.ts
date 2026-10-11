@@ -257,6 +257,40 @@ export declare const businessCardsTable: import("drizzle-orm/pg-core").PgTableWi
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        qrType: import("drizzle-orm/pg-core").PgColumn<{
+            name: "qr_type";
+            tableName: "business_cards";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        qrContentUrl: import("drizzle-orm/pg-core").PgColumn<{
+            name: "qr_content_url";
+            tableName: "business_cards";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         palette: import("drizzle-orm/pg-core").PgColumn<{
             name: "palette";
             tableName: "business_cards";
@@ -548,6 +582,8 @@ export declare const insertBusinessCardSchema: z.ZodObject<{
     socialHandle: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     address: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     qrUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    qrType: z.ZodOptional<z.ZodString>;
+    qrContentUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     palette: z.ZodOptional<z.ZodString>;
     fonts: z.ZodOptional<z.ZodString>;
     layout: z.ZodOptional<z.ZodString>;

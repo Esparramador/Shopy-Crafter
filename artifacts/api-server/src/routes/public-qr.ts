@@ -190,8 +190,8 @@ router.get("/public/qr/:cardId", async (req: Request, res: Response) => {
       return;
     }
 
-    const qrType: string = (row as any).qrType || "vcard";
-    const contentUrl: string = (row as any).qrContentUrl || row.qrUrl || "";
+    const qrType: string = row.qrType || "vcard";
+    const contentUrl: string = row.qrContentUrl || row.qrUrl || "";
 
     let palette = { bg: "#0a0a0a", primary: "#1a1a1a", accent: "#d4af37", text: "#f0f0f0" };
     try {
@@ -199,7 +199,7 @@ router.get("/public/qr/:cardId", async (req: Request, res: Response) => {
       if (p.bg) palette = { ...palette, ...p };
     } catch {}
 
-    if (qrType === "url" && contentUrl) {
+    if (qrType === "url" && /^https?:\/\//i.test(contentUrl)) {
       res.redirect(302, contentUrl);
       return;
     }

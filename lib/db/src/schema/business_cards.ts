@@ -48,6 +48,10 @@ export const businessCardsTable = pgTable("business_cards", {
   socialHandle: text("social_handle"),
   address: text("address"),
   qrUrl: text("qr_url"),
+  // Destino del QR del reverso: vcard | url | video | image | animation (+ URL de contenido).
+  // Columnas creadas por ensureCardQrColumns() en routes/cards.ts.
+  qrType: text("qr_type").notNull().default("vcard"),
+  qrContentUrl: text("qr_content_url"),
 
   // ── Diseño (overrides del template) ──────────────────────────────────────
   palette: text("palette").notNull().default("{}"), // JSON {bg, primary, secondary, accent, text}
