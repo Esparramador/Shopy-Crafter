@@ -22,7 +22,7 @@ export const BLEED = 36;          // 3mm
 export const SAFE = 84;           // 7mm — margen interior para textos
 export const TRIM_INSET = 38;     // 3.2mm — desde sangrado al corte físico
 
-export type ElementType = "text" | "qr" | "logo" | "line" | "spacer";
+export type ElementType = "text" | "qr" | "logo" | "line" | "spacer" | "shape" | "bubble" | "image";
 export type Side = "front" | "back";
 export type TextAlign = "left" | "center" | "right";
 
@@ -49,7 +49,8 @@ export type ElementOverride = {
 export type ExtraElement = {
   id: string;
   side: Side;
-  type: "text" | "line";
+  /** "qr" = QR generado (qrUrl + qrStyle); "qr-image" = QR subido por el usuario (vault). */
+  type: "text" | "line" | "emoji" | "shape" | "bubble" | "qr" | "qr-image";
   x: number;
   y: number;
   width: number;
@@ -64,7 +65,24 @@ export type ExtraElement = {
   letterSpacing?: number;
   textTransform?: "none" | "uppercase";
   rotate?: number;
+  italic?: boolean;
+  opacity?: number;
   plate?: { color: string; opacity: number; padding: number; radius: number } | null;
+  // formas / bocadillo
+  shapeType?: "rect" | "circle" | "triangle";
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  // QR generado
+  qrUrl?: string;
+  qrFg?: string;
+  qrBg?: string;
+  qrStyle?: Record<string, unknown>;
+  // QR subido
+  vaultFileId?: number;
+  /** URL de vista previa (la fija el servidor al guardar). */
+  imageUrl?: string;
+  decodedText?: string | null;
 };
 
 export type LayoutOverrides = {
@@ -96,6 +114,14 @@ export type RenderElement = {
   qrSrc?: string;
   /** Para logo: data URI */
   logoSrc?: string;
+  /** Para image: data URI (QR extra generado o subido) */
+  imgSrc?: string;
+  shapeType?: "rect" | "circle" | "triangle";
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  italic?: boolean;
   hidden?: boolean;
 };
 
@@ -120,6 +146,8 @@ export type DefaultsContext = {
   isAiBg: boolean;
   qrPngBase64?: string;
   logoDataUri?: string;
+  /** Texto bajo el QR del reverso (según su destino). */
+  qrLabel?: string;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -364,6 +392,7 @@ export function defaultFrontElements(ctx: DefaultsContext): RenderElement[] {
  */
 export function defaultBackElements(ctx: DefaultsContext): RenderElement[] {
   const { data, palette, fonts, isAiBg, qrPngBase64 } = ctx;
+  const qrLabel = ctx.qrLabel ?? "ESCANEAR · vCard";
   // No plates automáticos — text-shadow del renderer garantiza legibilidad.
   const plate = null;
   const els: RenderElement[] = [];
@@ -380,7 +409,7 @@ export function defaultBackElements(ctx: DefaultsContext): RenderElement[] {
         x: SAFE, y: (CARD_H - QR_SIZE) / 2, width: QR_SIZE, height: QR_SIZE,
       });
       els.push({
-        id: "qrLabel", type: "text", text: "ESCANEAR · vCard",
+        id: "qrLabel", type: "text", text: qrLabel,
         x: SAFE, y: (CARD_H - QR_SIZE) / 2 + QR_SIZE + 14, width: QR_SIZE, height: 24,
         fontFamily: fonts.body, fontSize: 14, fontWeight: 500,
         color: palette.secondary, letterSpacing: 4, textTransform: "uppercase",
@@ -393,7 +422,7 @@ export function defaultBackElements(ctx: DefaultsContext): RenderElement[] {
         width: QR_SIZE, height: QR_SIZE,
       });
       els.push({
-        id: "qrLabel", type: "text", text: "ESCANEAR · vCard",
+        id: "qrLabel", type: "text", text: qrLabel,
         x: (CARD_W - QR_SIZE) / 2, y: (CARD_H - QR_SIZE) / 2 + QR_SIZE - 6, width: QR_SIZE, height: 24,
         fontFamily: fonts.body, fontSize: 14, fontWeight: 500,
         color: palette.secondary, letterSpacing: 4, textTransform: "uppercase",
@@ -482,24 +511,70 @@ export function applyOverrides(
   });
 }
 
-/** Convierte ExtraElement a RenderElement. */
-export function extrasToRender(extras: ExtraElement[] | undefined, side: Side): RenderElement[] {
+/** Texto bajo el QR del reverso según el destino configurado. */
+export function qrLabelFor(qrType: string | null | undefined): string {
+  switch (qrType) {
+    case "url": return "ESCANEAR · WEB";
+    case "video": return "ESCANEAR · VÍDEO";
+    case "image": return "ESCANEAR · IMAGEN";
+    case "animation": return "ESCANEAR · ANIMACIÓN";
+    default: return "ESCANEAR · vCard";
+  }
+}
+
+/**
+ * Convierte los extras del editor en elementos renderizables. Los QR (generados
+ * o subidos) necesitan su imagen ya resuelta en `assets` (clave "extra-<id>");
+ * sin ella se omiten para no imprimir un hueco.
+ */
+export function extrasToRender(
+  extras: ExtraElement[] | undefined,
+  side: Side,
+  assets: Record<string, string> = {},
+): RenderElement[] {
   if (!extras || extras.length === 0) return [];
-  return extras
-    .filter((e) => e.side === side)
-    .map((e): RenderElement => ({
-      id: `extra-${e.id}`,
-      type: e.type === "line" ? "line" : "text",
-      x: e.x, y: e.y, width: e.width, height: e.height ?? 40,
-      text: e.text,
-      fontFamily: e.fontFamily,
-      fontSize: e.fontSize,
-      fontWeight: e.fontWeight,
-      color: e.color,
-      align: e.align,
-      letterSpacing: e.letterSpacing,
-      textTransform: e.textTransform,
-      rotate: e.rotate,
-      plate: e.plate ?? null,
-    }));
+  const out: RenderElement[] = [];
+  for (const e of extras) {
+    if (e.side !== side) continue;
+    const id = `extra-${e.id}`;
+    const base = {
+      id, x: e.x, y: e.y, width: e.width, height: e.height ?? 40,
+      rotate: e.rotate, opacity: e.opacity,
+    };
+    switch (e.type) {
+      case "line":
+        out.push({ ...base, type: "line", color: e.color });
+        break;
+      case "shape":
+        out.push({
+          ...base, type: "shape", shapeType: e.shapeType ?? "rect",
+          height: e.height ?? e.width,
+          fill: e.fill, stroke: e.stroke, strokeWidth: e.strokeWidth,
+        });
+        break;
+      case "bubble":
+        out.push({ ...base, type: "bubble", height: e.height ?? 166, fill: e.fill, stroke: e.stroke, strokeWidth: e.strokeWidth });
+        break;
+      case "qr":
+      case "qr-image": {
+        const src = assets[id];
+        if (src) out.push({ ...base, type: "image", height: e.height ?? e.width, imgSrc: src });
+        break;
+      }
+      case "emoji":
+        out.push({
+          ...base, type: "text", text: e.text, height: e.height ?? e.width,
+          fontFamily: "Noto Color Emoji", fontSize: e.fontSize ?? 72, align: "center", lineHeight: 1,
+        });
+        break;
+      default:
+        out.push({
+          ...base, type: "text", text: e.text,
+          fontFamily: e.fontFamily, fontSize: e.fontSize, fontWeight: e.fontWeight,
+          color: e.color, align: e.align, letterSpacing: e.letterSpacing,
+          textTransform: e.textTransform, italic: e.italic, plate: e.plate ?? null,
+        });
+    }
+  }
+  return out;
 }

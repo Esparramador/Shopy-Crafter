@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as fabric from "fabric";
+import QrStyleDesigner, { type QrStyle } from "@/components/cards/QrStyleDesigner";
 import JSZip from "jszip";
 import {
   Type, RefreshCw, Save, Trash2, Loader2, Minus,
@@ -39,7 +40,7 @@ export type ElementOverride = {
   plate?: { color: string; opacity: number; padding: number; radius: number } | null;
 };
 export type ExtraElement = {
-  id: string; side: "front" | "back"; type: "text" | "line" | "qr" | "shape" | "emoji" | "bubble";
+  id: string; side: "front" | "back"; type: "text" | "line" | "qr" | "qr-image" | "shape" | "emoji" | "bubble";
   x: number; y: number; width: number; height?: number;
   text?: string; fontFamily?: string; fontSize?: number; fontWeight?: number;
   color?: string; align?: "left" | "center" | "right";
@@ -48,6 +49,11 @@ export type ExtraElement = {
   qrUrl?: string;
   qrFg?: string;   // color módulos QR (hex)
   qrBg?: string;   // color fondo QR (hex)
+  qrStyle?: Partial<QrStyle>;
+  /** QR subido: fichero del repositorio, su URL de vista previa y el contenido leído. */
+  vaultFileId?: number;
+  imageUrl?: string;
+  decodedText?: string | null;
   shapeType?: "rect" | "circle" | "triangle";
   fill?: string; stroke?: string; strokeWidth?: number;
   opacity?: number;
@@ -96,6 +102,10 @@ interface Props {
   onRegenerate: () => Promise<void>;
   onThemePrompt?: (prompt: string, side: "front" | "back" | "both") => Promise<void>;
   onQrDataChange?: (type: string, url: string | null) => void;
+  /** Cambia cuando cambian el estilo o el contenido del QR principal → se recarga en el lienzo. */
+  qrVersion?: string;
+  /** Guarda (blob) o quita (null) el fondo propio de una cara: se conserva al reabrir y en «Re-generar». */
+  onSideBackground?: (side: "front" | "back" | "both", png: Blob | null) => Promise<void>;
 }
 
 // ── Etiquetas ─────────────────────────────────────────────────────────────────
@@ -384,9 +394,24 @@ function addBleedGuide(canvas: fabric.Canvas): fabric.Rect {
 }
 
 // ── QR PNG con colores (1200px) ──────────────────────────────────────────────
-function qrPngUrl(apiBase: string, data: string, fg = "#000000", bg = "#ffffff"): string {
-  return `${apiBase}/api/qr.png?data=${encodeURIComponent(data)}&fg=${encodeURIComponent(fg)}&bg=${encodeURIComponent(bg)}&size=1200`;
+function qrPngUrl(
+  apiBase: string, data: string, fg = "#000000", bg = "#ffffff",
+  style?: Partial<QrStyle>, logoCard?: number, size = 1200,
+): string {
+  let u = `${apiBase}/api/qr.png?data=${encodeURIComponent(data)}&fg=${encodeURIComponent(fg)}&bg=${encodeURIComponent(bg)}&size=${size}`;
+  if (style) u += `&style=${encodeURIComponent(JSON.stringify(style))}`;
+  if (logoCard) u += `&logoCard=${logoCard}`;
+  return u;
 }
+
+/** Texto bajo el QR del reverso según su destino (igual que el servidor: qrLabelFor). */
+const QR_LABELS: Record<string, string> = {
+  vcard: "ESCANEAR · vCard", url: "ESCANEAR · WEB", video: "ESCANEAR · VÍDEO",
+  image: "ESCANEAR · IMAGEN", animation: "ESCANEAR · ANIMACIÓN",
+};
+
+/** Solo se cargan imágenes de QR subidos desde el repositorio del propio proyecto. */
+const VAULT_PREVIEW = /^\/api\/projects\/\d+\/vault\/\d+\/preview$/;
 
 // Bocadillo: rectángulo redondeado con cola, alto total = bh + tail.
 const BUBBLE_TAIL = 36;
@@ -396,7 +421,7 @@ function bubblePath(bw: number, bh: number): string {
 }
 
 // ── Extra guardado → objeto Fabric con su tipo real (forma, bocadillo, QR, emoji…) ──
-async function extraToFabric(ex: ExtraElement, apiBase: string): Promise<fabric.FabricObject | null> {
+async function extraToFabric(ex: ExtraElement, apiBase: string, cardId: number): Promise<fabric.FabricObject | null> {
   const name = `extra-${ex.id}`;
   const base: Record<string, unknown> = {
     left: ex.x, top: ex.y, name,
@@ -436,7 +461,7 @@ async function extraToFabric(ex: ExtraElement, apiBase: string): Promise<fabric.
     }
     case "qr": {
       const fg = ex.qrFg ?? "#000000", bg = ex.qrBg ?? "#ffffff";
-      const blobUrl = await fetchBlob(qrPngUrl(apiBase, ex.qrUrl || "https://shopycrafter.com", fg, bg));
+      const blobUrl = await fetchBlob(qrPngUrl(apiBase, ex.qrUrl || "https://shopycrafter.com", fg, bg, ex.qrStyle, cardId));
       const img = blobUrl ? await loadImage(blobUrl) : null;
       const sq = Math.min(ex.width || 200, ex.height || ex.width || 200);
       if (!img) {
@@ -446,6 +471,18 @@ async function extraToFabric(ex: ExtraElement, apiBase: string): Promise<fabric.
       img.set({
         ...base, scaleX: sq / sw, scaleY: sq / sh, imageSmoothing: false,
         data: { ...(base.data as object), srcW: sw, srcH: sh, qrFg: fg, qrBg: bg },
+      } as any);
+      return img;
+    }
+    case "qr-image": {
+      if (!ex.imageUrl || !VAULT_PREVIEW.test(ex.imageUrl)) return null;
+      const blobUrl = await fetchBlob(`${apiBase}${ex.imageUrl}`);
+      const img = blobUrl ? await loadImage(blobUrl) : null;
+      if (!img) return null;
+      const sw = img.width || 1, sh = img.height || 1;
+      img.set({
+        ...base, scaleX: ex.width / sw, scaleY: (ex.height ?? ex.width) / sh,
+        data: { ...(base.data as object), srcW: sw, srcH: sh, decodedText: ex.decodedText ?? null },
       } as any);
       return img;
     }
@@ -554,7 +591,7 @@ async function populateCanvas(
 
   for (const ex of extras) {
     if (ex.side !== side) continue;
-    const obj = await extraToFabric(ex, apiBase);
+    const obj = await extraToFabric(ex, apiBase, cardId);
     if (obj) canvas.add(obj);
   }
 
@@ -568,7 +605,7 @@ async function populateCanvas(
 export default function CardStudioEditor({
   apiBase, cardId, bgUrl, bgFrontUrl, bgBackUrl, frontUrl, backUrl, logoUrl,
   initialOverrides, generating,
-  qrType: qrTypeProp, qrContentUrl: qrContentUrlProp,
+  qrType: qrTypeProp, qrContentUrl: qrContentUrlProp, qrVersion, onSideBackground,
   onSaveOverrides, onRegenerate, onThemePrompt, onQrDataChange,
 }: Props) {
 
@@ -718,8 +755,8 @@ export default function CardStudioEditor({
           const srcW: number = data.srcW ?? obj.width ?? 400;
           const srcH: number = data.srcH ?? obj.height ?? 400;
           obj.set({ scaleX: sq / srcW, scaleY: sq / srcH, left: nx, top: ny });
-        } else if (data.type === "logo") {
-          // Logo: reaplica escala (fabric.Image no acepta width/height directos)
+        } else if (data.type === "logo" || data.type === "qr-image") {
+          // Logo / QR subido: reaplica escala (fabric.Image no acepta width/height directos)
           const srcW: number = data.srcW ?? obj.width ?? 1;
           const srcH: number = data.srcH ?? obj.height ?? 1;
           obj.set({ scaleX: nw / srcW, scaleY: nh / srcH, left: nx, top: ny });
@@ -882,9 +919,16 @@ export default function CardStudioEditor({
     if (!dataUrl) return;
     if (side === "front" || side === "both") await applyBackgroundDataUrl(dataUrl, frontFabric.current);
     if (side === "back" || side === "both") await applyBackgroundDataUrl(dataUrl, backFabric.current);
-  }, []);
+    if (onSideBackground) {
+      try {
+        await onSideBackground(side, await (await fetch(dataUrl)).blob());
+      } catch (e: any) {
+        setError(e?.message || "No se pudo guardar el fondo");
+      }
+    }
+  }, [onSideBackground]);
 
-  const clearCanvasBg = useCallback((side: "front" | "back" | "both") => {
+  const clearCanvasBg = useCallback(async (side: "front" | "back" | "both") => {
     const clear = (canvas: fabric.Canvas | null) => {
       if (!canvas) return;
       canvas.backgroundImage = undefined;
@@ -892,7 +936,10 @@ export default function CardStudioEditor({
     };
     if (side === "front" || side === "both") clear(frontFabric.current);
     if (side === "back" || side === "both") clear(backFabric.current);
-  }, []);
+    if (onSideBackground) {
+      try { await onSideBackground(side, null); } catch (e: any) { setError(e?.message || "No se pudo quitar el fondo"); }
+    }
+  }, [onSideBackground]);
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   const applyZoom = useCallback((nz: number) => {
@@ -1024,7 +1071,7 @@ export default function CardStudioEditor({
   // ── Añadir QR extra ──────────────────────────────────────────────────────
   // Construye la URL del QR con colores y tamaño
   const buildQrUrl = useCallback((dataUrl: string, fg = "#000000", bg = "#ffffff") => {
-    return qrPngUrl(apiBase, dataUrl, fg, bg);
+    return qrPngUrl(apiBase, dataUrl, fg, bg, undefined, cardId);
   }, [apiBase]);
 
   const addQr = useCallback(async (targetSide?: "front" | "back") => {
@@ -1078,7 +1125,7 @@ export default function CardStudioEditor({
   }, [activeCanvas, apiBase, buildQrUrl]);
 
   // ── Recargar imagen QR extra en canvas (con colores opcionales) ─────────
-  const reloadExtraQr = useCallback(async (url: string, fg?: string, bg?: string) => {
+  const reloadExtraQr = useCallback(async (url: string, fg?: string, bg?: string, style?: Partial<QrStyle> | null) => {
     if (!selId?.startsWith("extra-")) return;
     const canvas = selSide === "front" ? frontFabric.current : backFabric.current;
     if (!canvas) return;
@@ -1089,7 +1136,9 @@ export default function CardStudioEditor({
     const sq = Math.round((obj.width ?? srcW) * (obj.scaleX ?? 1));
     const useFg = fg ?? (obj as any).data?.qrFg ?? "#000000";
     const useBg = bg ?? (obj as any).data?.qrBg ?? "#ffffff";
-    const blobUrl = await fetchBlob(buildQrUrl(url, useFg, useBg));
+    // style === null → sin estilo (QR plano); undefined → conserva el que ya tenía el objeto
+    const useStyle = style === null ? undefined : (style ?? (obj as any).data?.qrStyle);
+    const blobUrl = await fetchBlob(qrPngUrl(apiBase, url || "https://shopycrafter.com", useFg, useBg, useStyle, cardId));
     if (!blobUrl) return;
     try {
       await obj.setSrc(blobUrl, { crossOrigin: "anonymous" });
@@ -1105,9 +1154,88 @@ export default function CardStudioEditor({
       scaleY: sq / newSrcH,
       imageSmoothing: false,
     });
-    (obj as any).data = { ...(obj as any).data, srcW: newSrcW, srcH: newSrcH, qrFg: useFg, qrBg: useBg };
+    (obj as any).data = { ...(obj as any).data, srcW: newSrcW, srcH: newSrcH, qrFg: useFg, qrBg: useBg, qrStyle: useStyle };
     canvas.renderAll();
-  }, [selId, selSide, apiBase, buildQrUrl]);
+  }, [selId, selSide, apiBase, cardId]);
+
+  // ── QR principal: al cambiar su estilo o contenido se recarga en el lienzo ──
+  const firstQrVersion = useRef(qrVersion);
+  useEffect(() => {
+    if (qrVersion === firstQrVersion.current) return; // la primera carga la hace populateCanvas
+    firstQrVersion.current = qrVersion;
+    let cancelled = false;
+    (async () => {
+      for (const canvas of [frontFabric.current, backFabric.current]) {
+        if (!canvas) continue;
+        const label = canvas.getObjects().find((o: any) => o.name === "qrLabel") as fabric.Textbox | undefined;
+        if (label && !(overridesRef.current.back?.qrLabel?.text)) {
+          label.set({ text: QR_LABELS[qrTypeProp || "vcard"] ?? QR_LABELS.vcard });
+        }
+        const obj = canvas.getObjects().find((o: any) => o.name === "qr") as fabric.FabricImage | undefined;
+        if (!obj || obj.type !== "image") { canvas.requestRenderAll(); continue; }
+        const sq = Math.round((obj.width ?? 400) * (obj.scaleX ?? 1));
+        const blobUrl = await fetchBlob(`${apiBase}/api/cards/${cardId}/qr.png?size=1024&v=${Date.now()}`);
+        if (!blobUrl || cancelled) continue;
+        try { await obj.setSrc(blobUrl); } catch { continue; } finally { URL.revokeObjectURL(blobUrl); }
+        obj.set({ scaleX: sq / (obj.width || sq), scaleY: sq / (obj.height || sq), imageSmoothing: false });
+        (obj as any).data = { ...(obj as any).data, srcW: obj.width, srcH: obj.height };
+        canvas.requestRenderAll();
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrVersion]);
+
+  // ── Subir un QR ya diseñado (el servidor lo lee para comprobar que funciona) ──
+  const qrFileRef = useRef<HTMLInputElement | null>(null);
+  const [qrUploading, setQrUploading] = useState(false);
+  const uploadQrImage = useCallback(async (file: File) => {
+    const side = activeCanvas ?? "back";
+    const canvas = side === "front" ? frontFabric.current : backFabric.current;
+    const guide = side === "front" ? frontGuide.current : backGuide.current;
+    if (!canvas) return;
+    setQrUploading(true); setError(null);
+    try {
+      const send = (force: boolean) => {
+        const fd = new FormData();
+        fd.append("qr", file);
+        if (force) fd.append("force", "1");
+        return fetch(`${apiBase}/api/cards/${cardId}/upload-qr`, { method: "POST", credentials: "include", body: fd });
+      };
+      let res = await send(false);
+      if (res.status === 422) {
+        const body = await res.json().catch(() => ({}));
+        if (!confirm(`${body?.error || "No se ha podido leer el QR."}\n\n¿Añadirlo igualmente?`)) return;
+        res = await send(true);
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || `Error ${res.status} subiendo el QR`);
+      }
+      const d = await res.json() as { vaultFileId: number; url: string; decoded: string | null; width?: number; height?: number };
+      const id = `${Date.now()}`.slice(-7);
+      const w = 220;
+      const h = d.width && d.height ? Math.round((w * d.height) / d.width) : w;
+      const ex: ExtraElement = {
+        id, side, type: "qr-image",
+        x: Math.round(CANVAS_W / 2 - w / 2), y: Math.round(CANVAS_H / 2 - h / 2), width: w, height: h,
+        vaultFileId: d.vaultFileId, imageUrl: d.url, decodedText: d.decoded,
+      };
+      setOverrides(prev => ({ ...prev, extras: [...(prev.extras || []), ex] }));
+      const obj = await extraToFabric(ex, apiBase, cardId);
+      if (obj) {
+        canvas.add(obj);
+        if (guide) canvas.bringObjectToFront(guide);
+        canvas.setActiveObject(obj);
+        canvas.renderAll();
+      }
+    } catch (e: any) {
+      setError(e?.message || "Error subiendo el QR");
+    } finally {
+      setQrUploading(false);
+      if (qrFileRef.current) qrFileRef.current.value = "";
+    }
+  }, [activeCanvas, apiBase, cardId]);
 
   // ── Añadir bocadillo de texto ─────────────────────────────────────────────
   const addBubble = useCallback((targetSide?: "front" | "back") => {
@@ -1424,6 +1552,11 @@ export default function CardStudioEditor({
           <button onClick={() => addQr()} style={btnTool} title="Añadir QR adicional con URL propia">
             <QrCode size={11}/> +QR
           </button>
+          <button onClick={() => qrFileRef.current?.click()} disabled={qrUploading} style={btnTool} title="Subir un QR ya diseñado (PNG, JPG o WEBP). Se comprueba que se puede leer.">
+            {qrUploading ? <Loader2 size={11} className="animate-spin"/> : <QrCode size={11}/>} Subir QR
+          </button>
+          <input ref={qrFileRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) void uploadQrImage(f); }} />
 
           <div style={{ flex: 1 }} />
 
@@ -1672,7 +1805,8 @@ export default function CardStudioEditor({
                     <button onClick={() => applyFillToSide({ type: fillType, color1: fillColor1, color2: fillColor2, angle: fillAngle }, bgSide)}
                       style={{ ...btnGold, flex: 2, fontSize: 11 }}>Aplicar</button>
                     <button onClick={() => clearCanvasBg(bgSide)}
-                      style={{ ...btnSecondary, flex: 1, fontSize: 10 }}>Limpiar</button>
+                      title="Quita el fondo propio de esta cara y vuelve al fondo general de la tarjeta"
+                      style={{ ...btnSecondary, flex: 1, fontSize: 10 }}>Quitar</button>
                   </div>
 
                   {/* Presets rápidos */}
@@ -1851,6 +1985,29 @@ export default function CardStudioEditor({
               </>
             )}
 
+            {/* QR subido por el usuario */}
+            {selProps.type === "qr-image" && (() => {
+              const ex = (overrides.extras ?? []).find(e => `extra-${e.id}` === selId);
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <QrCode size={12} style={{ color: "var(--gold)" }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--t1)" }}>QR subido</span>
+                  </div>
+                  {ex?.decodedText ? (
+                    <div style={{ fontSize: 10, color: "#22c55e", padding: "5px 7px", background: "rgba(34,197,94,0.08)", borderRadius: 4, border: "1px solid rgba(34,197,94,0.25)", wordBreak: "break-all" }}>
+                      ✓ Leído al subirlo. Abre: <span style={{ color: "var(--t1)" }}>{ex.decodedText.slice(0, 160)}</span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 10, color: "#ca8a04", padding: "5px 7px", background: "rgba(234,179,8,0.08)", borderRadius: 4, border: "1px solid rgba(234,179,8,0.3)" }}>
+                      ⚠ No se pudo leer automáticamente. Escanéalo con tu móvil antes de imprimir.
+                    </div>
+                  )}
+                  <div style={{ fontSize: 9, color: "var(--t3)" }}>Arrastra las esquinas para cambiar el tamaño sin deformarlo. Deja un margen claro alrededor para que se lea bien.</div>
+                </div>
+              );
+            })()}
+
             {/* Propiedades QR */}
             {selProps.type === "qr" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1898,63 +2055,32 @@ export default function CardStudioEditor({
                     />
                     <div style={{ fontSize: 9, color: "var(--t3)", marginBottom: 8 }}>Escanear el QR abre esta URL · Pulsa Enter o cambia de campo para aplicar</div>
 
-                    {/* ── Colores del QR ── */}
-                    <label style={{ fontSize: 10, color: "var(--t3)", marginBottom: 4, display: "block" }}>Color del QR</label>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
-                        <span style={{ fontSize: 9, color: "var(--t3)" }}>Módulos (fg)</span>
-                        <input type="color" value={extraQrFg}
-                          onChange={async e => {
-                            const v = e.target.value;
-                            setExtraQrFg(v);
-                            if (!selId?.startsWith("extra-")) return;
-                            const exId = selId.replace("extra-", "");
-                            setOverrides(prev => ({
-                              ...prev,
-                              extras: (prev.extras ?? []).map(ex =>
-                                ex.id === exId ? { ...ex, qrFg: v } : ex
-                              ),
-                            }));
-                            await reloadExtraQr(extraQrUrlInput, v, extraQrBg);
-                          }}
-                          style={{ width: "100%", height: 28, padding: 0, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", background: "none" }}
-                        />
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
-                        <span style={{ fontSize: 9, color: "var(--t3)" }}>Fondo (bg)</span>
-                        <input type="color" value={extraQrBg}
-                          onChange={async e => {
-                            const v = e.target.value;
-                            setExtraQrBg(v);
-                            if (!selId?.startsWith("extra-")) return;
-                            const exId = selId.replace("extra-", "");
-                            setOverrides(prev => ({
-                              ...prev,
-                              extras: (prev.extras ?? []).map(ex =>
-                                ex.id === exId ? { ...ex, qrBg: v } : ex
-                              ),
-                            }));
-                            await reloadExtraQr(extraQrUrlInput, extraQrFg, v);
-                          }}
-                          style={{ width: "100%", height: 28, padding: 0, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", background: "none" }}
-                        />
-                      </div>
-                    </div>
+                    {/* ── Estilo artístico (verificado en el servidor) ── */}
                     {(() => {
-                      // Contraste mínimo: diferencia de luminancia
-                      const hexL = (h: string) => {
-                        const r = parseInt(h.slice(1,3),16)/255, g = parseInt(h.slice(3,5),16)/255, b = parseInt(h.slice(5,7),16)/255;
-                        const t = (c: number) => c <= 0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
-                        return 0.2126*t(r)+0.7152*t(g)+0.0722*t(b);
-                      };
-                      const L1 = Math.max(hexL(extraQrFg), hexL(extraQrBg));
-                      const L2 = Math.min(hexL(extraQrFg), hexL(extraQrBg));
-                      const ratio = (L1+0.05)/(L2+0.05);
-                      return ratio < 3 ? (
-                        <div style={{ fontSize: 9, color: "#f5a623", padding: "4px 6px", background: "rgba(245,166,35,0.1)", borderRadius: 4, border: "1px solid rgba(245,166,35,0.3)" }}>
-                          ⚠️ Contraste bajo ({ratio.toFixed(1)}:1) — el QR podría no escanearse. Se recomienda &gt;3:1.
-                        </div>
-                      ) : null;
+                      const exId = selId.replace("extra-", "");
+                      const ex = (overrides.extras ?? []).find(e => e.id === exId);
+                      const patchEx = (p: Partial<ExtraElement>) => setOverrides(prev => ({
+                        ...prev,
+                        extras: (prev.extras ?? []).map(e => e.id === exId ? { ...e, ...p } : e),
+                      }));
+                      return (
+                        <QrStyleDesigner
+                          value={ex?.qrStyle ?? null}
+                          base={{ fg: ex?.qrFg ?? extraQrFg, fg2: ex?.qrFg ?? extraQrFg, bg: ex?.qrBg ?? extraQrBg, margin: 1 }}
+                          hasLogo={!!logoUrl}
+                          previewUrl={(st) => qrPngUrl(apiBase, extraQrUrlInput || ex?.qrUrl || "https://shopycrafter.com", "#000000", "#ffffff", st, cardId, 360)}
+                          onApply={async (st) => {
+                            const fg = st.fg, bg = st.bg === "transparent" ? (ex?.qrBg ?? "#ffffff") : st.bg;
+                            setExtraQrFg(fg); setExtraQrBg(bg);
+                            patchEx({ qrStyle: st, qrFg: fg, qrBg: bg });
+                            await reloadExtraQr(extraQrUrlInput || ex?.qrUrl || "", fg, bg, st);
+                          }}
+                          onReset={async () => {
+                            patchEx({ qrStyle: undefined });
+                            await reloadExtraQr(extraQrUrlInput || ex?.qrUrl || "", ex?.qrFg, ex?.qrBg, null);
+                          }}
+                        />
+                      );
                     })()}
                   </>
                 ) : (
@@ -2011,6 +2137,9 @@ export default function CardStudioEditor({
                         El QR abre la tarjeta animada premium en el navegador.
                       </div>
                     )}
+                    <div style={{ fontSize: 10, color: "var(--t3)", padding: "5px 7px", background: "rgba(212,175,55,0.06)", borderRadius: 4, border: "1px solid rgba(212,175,55,0.18)" }}>
+                      Formas, colores, degradados y logo del QR: panel «Estilo del QR» (columna Editor).
+                    </div>
                   </>
                 )}
               </div>

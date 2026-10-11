@@ -17,7 +17,8 @@ import {
   CARD_HEIGHT_PX,
 } from "./card-renderer.js";
 import type { CardData, LayoutOverrides } from "./card-elements.js";
-import { generateQrPng, buildVCard } from "./card-qr.js";
+import { buildVCard } from "./card-qr.js";
+import { renderVerifiedQr, sanitizeQrStyle } from "./card-qr-art.js";
 import { generateImage, type ImageGenModel } from "./fusion-studio-pro.js";
 import { generatePdfFromHtml } from "./pdf-generator.js";
 
@@ -51,6 +52,14 @@ export type GenerateCardInput = {
   replicateToken?: string;
   /** Overrides del editor visual (posiciones / extras) */
   overrides?: LayoutOverrides;
+  /** Estilo del QR principal (sin validar: se sanea aquí sobre los colores de la plantilla). */
+  qrStyle?: unknown;
+  /** Texto bajo el QR del reverso. */
+  qrLabel?: string;
+  /** Imágenes ya resueltas de los extras (QR generados/subidos), clave "extra-<id>". */
+  extraAssets?: Record<string, string>;
+  /** Fondo propio de cada cara (diseño o IA del editor); sustituye al fondo general en esa cara. */
+  sideBackgrounds?: { front?: Buffer; back?: Buffer };
 };
 
 export type GenerateCardResult = {
@@ -70,6 +79,9 @@ export type GenerateCardResult = {
     bgGenError?: string;
     qrSource: "url" | "vcard";
     qrData: string;
+    /** El QR del reverso se ha leído y coincide con su contenido. */
+    qrVerified: boolean;
+    qrWarnings: string[];
     width: number;
     height: number;
   };
@@ -175,45 +187,54 @@ export async function generateBusinessCard(
         address: input.data.address ?? undefined,
       });
 
-  const qrPng = await generateQrPng(qrData, {
-    fgColor: template.qrStyle.fgColor,
-    bgColor: template.qrStyle.bgColor,
-    margin: template.qrStyle.margin,
-    size: 760,
-    errorLevel: "H",
+  const qrStyle = sanitizeQrStyle(input.qrStyle, {
+    fg: template.qrStyle.fgColor, fg2: template.qrStyle.fgColor,
+    bg: template.qrStyle.bgColor, margin: template.qrStyle.margin,
   });
+  const qr = await renderVerifiedQr(qrData, qrStyle, { size: 760, logoDataUri });
+  const qrPng = qr.png;
   const qrPngBase64 = qrPng.toString("base64");
+
+  // ── Fondos por cara (editor) ────────────────────────────────────────
+  const toCardSize = (b: Buffer) => sharp(b).resize(CARD_WIDTH_PX, CARD_HEIGHT_PX, { fit: "cover", position: "center" }).png().toBuffer();
+  const sideBg = {
+    front: input.sideBackgrounds?.front?.length ? await toCardSize(input.sideBackgrounds.front) : null,
+    back: input.sideBackgrounds?.back?.length ? await toCardSize(input.sideBackgrounds.back) : null,
+  };
 
   // ── Renderizar capa de texto (transparente) ─────────────────────────
   const transparent = bgKindUsed === "ai-texture" || bgKindUsed === "custom-image";
   const isAiBackground = bgKindUsed === "ai-texture" || bgKindUsed === "custom-image";
   const frontTextLayer = await renderCardSide(template, input.data, {
     side: "front",
-    transparent,
+    transparent: transparent || !!sideBg.front,
     palette,
     fonts,
     logoDataUri,
     overrides: input.overrides,
-    isAiBackground,
+    isAiBackground: isAiBackground || !!sideBg.front,
+    extraAssets: input.extraAssets,
   });
   const backTextLayer = await renderCardSide(template, input.data, {
     side: "back",
-    transparent,
+    transparent: transparent || !!sideBg.back,
     palette,
     fonts,
     qrPngBase64,
     overrides: input.overrides,
-    isAiBackground,
+    isAiBackground: isAiBackground || !!sideBg.back,
+    qrLabel: input.qrLabel,
+    extraAssets: input.extraAssets,
   });
 
   // ── Composición Sharp ───────────────────────────────────────────────
-  const frontPng = transparent && backgroundPng
-    ? await composeOver(backgroundPng, frontTextLayer)
-    : frontTextLayer;
+  const frontPng = sideBg.front
+    ? await composeOver(sideBg.front, frontTextLayer)
+    : transparent && backgroundPng ? await composeOver(backgroundPng, frontTextLayer) : frontTextLayer;
 
-  const backPng = transparent && backgroundPng
-    ? await composeOver(backgroundPng, backTextLayer)
-    : backTextLayer;
+  const backPng = sideBg.back
+    ? await composeOver(sideBg.back, backTextLayer)
+    : transparent && backgroundPng ? await composeOver(backgroundPng, backTextLayer) : backTextLayer;
 
   return {
     frontPng,
@@ -229,6 +250,8 @@ export async function generateBusinessCard(
       bgGenError,
       qrSource: useUrl ? "url" : "vcard",
       qrData,
+      qrVerified: qr.verified,
+      qrWarnings: qr.warnings,
       width: CARD_WIDTH_PX,
       height: CARD_HEIGHT_PX,
     },
@@ -305,62 +328,40 @@ export async function generatePrintablePdf(
 ): Promise<Buffer> {
   const frontB64 = frontPng.toString("base64");
   const backB64 = backPng.toString("base64");
+  const safeTitle = String(title || "Tarjeta")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // Marcas de corte FUERA de la imagen, alineadas con la línea de corte (3 mm dentro del sangrado).
+  const marks = [
+    // [left, top, width, height] en mm relativos al marco de 91×61 mm
+    [-6, 3, 4.5, 0.25], [-6, 58, 4.5, 0.25], [92.5, 3, 4.5, 0.25], [92.5, 58, 4.5, 0.25],
+    [3, -6, 0.25, 4.5], [88, -6, 0.25, 4.5], [3, 62.5, 0.25, 4.5], [88, 62.5, 0.25, 4.5],
+  ].map(([l, t, w, h]) => `<span class="crop" style="left:${l}mm;top:${t}mm;width:${w}mm;height:${h}mm"></span>`).join("");
+  const block = (b64: string, label: string) => `
+    <div class="card-block">
+      <div class="card-frame">${marks}<img src="data:image/png;base64,${b64}" alt="${label}" /></div>
+      <div class="label">${label}</div>
+    </div>`;
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
 <style>
   @page { size: A4 landscape; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, sans-serif; }
-  .sheet { width: 297mm; height: 210mm; padding: 12mm; box-sizing: border-box; }
-  .row { display: flex; gap: 14mm; align-items: flex-start; justify-content: center; }
-  .card-block { display: flex; flex-direction: column; gap: 4mm; }
+  html, body { margin: 0; padding: 0; background: #ffffff; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .sheet { width: 297mm; height: 210mm; padding: 16mm 12mm; box-sizing: border-box; }
+  .doc-title { text-align: center; font-size: 14pt; color: #333; margin-bottom: 12mm; font-weight: 600; }
+  .row { display: flex; gap: 24mm; align-items: flex-start; justify-content: center; }
+  .card-block { display: flex; flex-direction: column; gap: 9mm; align-items: center; }
+  .card-frame { width: 91mm; height: 61mm; position: relative; }
+  .card-frame img { width: 91mm; height: 61mm; display: block; }
+  .crop { position: absolute; background: #000; }
   .label { font-size: 10pt; color: #666; letter-spacing: 1.2px; text-transform: uppercase; text-align: center; }
-  .card-frame {
-    width: 91mm; height: 61mm;
-    background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%);
-    background-size: 6px 6px;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  }
-  .card-frame img { width: 100%; height: 100%; display: block; object-fit: cover; }
-  .crop-mark { position: absolute; background: #000; }
-  .crop-tl-h { top: 0; left: -3mm; width: 3mm; height: 0.3mm; }
-  .crop-tl-v { top: -3mm; left: 0; width: 0.3mm; height: 3mm; }
-  .crop-tr-h { top: 0; right: -3mm; width: 3mm; height: 0.3mm; }
-  .crop-tr-v { top: -3mm; right: 0; width: 0.3mm; height: 3mm; }
-  .crop-bl-h { bottom: 0; left: -3mm; width: 3mm; height: 0.3mm; }
-  .crop-bl-v { bottom: -3mm; left: 0; width: 0.3mm; height: 3mm; }
-  .crop-br-h { bottom: 0; right: -3mm; width: 3mm; height: 0.3mm; }
-  .crop-br-v { bottom: -3mm; right: 0; width: 0.3mm; height: 3mm; }
-  .doc-title { text-align: center; font-size: 14pt; color: #333; margin-bottom: 8mm; font-weight: 600; }
-  .specs { font-size: 8pt; color: #999; text-align: center; margin-top: 6mm; }
+  .specs { font-size: 8pt; color: #888; text-align: center; margin-top: 12mm; line-height: 1.6; }
 </style></head><body>
 <div class="sheet">
-  <div class="doc-title">${title} — Print Sheet</div>
-  <div class="row">
-    <div class="card-block">
-      <div class="card-frame">
-        <span class="crop-mark crop-tl-h"></span><span class="crop-mark crop-tl-v"></span>
-        <span class="crop-mark crop-tr-h"></span><span class="crop-mark crop-tr-v"></span>
-        <span class="crop-mark crop-bl-h"></span><span class="crop-mark crop-bl-v"></span>
-        <span class="crop-mark crop-br-h"></span><span class="crop-mark crop-br-v"></span>
-        <img src="data:image/png;base64,${frontB64}" alt="Front" />
-      </div>
-      <div class="label">Frente</div>
-    </div>
-    <div class="card-block">
-      <div class="card-frame">
-        <span class="crop-mark crop-tl-h"></span><span class="crop-mark crop-tl-v"></span>
-        <span class="crop-mark crop-tr-h"></span><span class="crop-mark crop-tr-v"></span>
-        <span class="crop-mark crop-bl-h"></span><span class="crop-mark crop-bl-v"></span>
-        <span class="crop-mark crop-br-h"></span><span class="crop-mark crop-br-v"></span>
-        <img src="data:image/png;base64,${backB64}" alt="Back" />
-      </div>
-      <div class="label">Reverso</div>
-    </div>
-  </div>
+  <div class="doc-title">${safeTitle} — Hoja de impresión</div>
+  <div class="row">${block(frontB64, "Frente")}${block(backB64, "Reverso")}</div>
   <div class="specs">
-    Tamaño físico: 85×55mm · Sangrado: 3mm · 300 DPI · Listo para imprenta · CMYK opcional
+    Formato final 85×55 mm · Sangrado 3 mm por lado (archivo 91×61 mm) · 1080×720 px ≈ 300 ppp · RGB<br/>
+    Imprimir al 100 % (sin "ajustar a página"); cortar por las marcas.
   </div>
 </div>
 </body></html>`;
@@ -467,7 +468,7 @@ export async function generateCardBackground(
   bgModel?: ImageGenModel,
   replicateToken?: string,
 ): Promise<Buffer> {
-  const model: ImageGenModel = bgModel || "recraft-v3";
+  const model: ImageGenModel = bgModel || DEFAULT_BG_MODEL;
   const promptToUse = `${prompt.trim()}, ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO TYPOGRAPHY, NO LOGOS, NO WATERMARKS, pure background texture only, even lighting suitable for overlay text, photorealistic, 8k`;
   const out = await generateImage(model, promptToUse, {
     aspectRatio: "3:2",

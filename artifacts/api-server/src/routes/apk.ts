@@ -92,8 +92,11 @@ router.get("/apk/download", async (_req, res): Promise<void> => {
         res.status(404).json({ error: "No hay ningún APK publicado todavía. Lanza el primer build desde el panel admin." });
         return;
       }
-      const release = await releaseRes.json() as { assets?: Array<{ id: number; name: string; browser_download_url: string }> };
-      const asset = release.assets?.find(a => a.name.endsWith(".apk"));
+      const release = await releaseRes.json() as { assets?: Array<{ id: number; name: string; browser_download_url: string; updated_at?: string }> };
+      // La release puede conservar APKs de builds anteriores: se sirve siempre el más reciente.
+      const asset = (release.assets ?? [])
+        .filter(a => a.name.endsWith(".apk"))
+        .sort((a, b) => Date.parse(b.updated_at ?? "") - Date.parse(a.updated_at ?? ""))[0];
       if (!asset) {
         res.status(404).json({ error: "APK no encontrado en el release" });
         return;
