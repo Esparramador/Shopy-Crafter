@@ -58,6 +58,8 @@ export type GenerateCardInput = {
   qrLabel?: string;
   /** Imágenes ya resueltas de los extras (QR generados/subidos), clave "extra-<id>". */
   extraAssets?: Record<string, string>;
+  /** Fondo propio de cada cara (diseño o IA del editor); sustituye al fondo general en esa cara. */
+  sideBackgrounds?: { front?: Buffer; back?: Buffer };
 };
 
 export type GenerateCardResult = {
@@ -193,39 +195,46 @@ export async function generateBusinessCard(
   const qrPng = qr.png;
   const qrPngBase64 = qrPng.toString("base64");
 
+  // ── Fondos por cara (editor) ────────────────────────────────────────
+  const toCardSize = (b: Buffer) => sharp(b).resize(CARD_WIDTH_PX, CARD_HEIGHT_PX, { fit: "cover", position: "center" }).png().toBuffer();
+  const sideBg = {
+    front: input.sideBackgrounds?.front?.length ? await toCardSize(input.sideBackgrounds.front) : null,
+    back: input.sideBackgrounds?.back?.length ? await toCardSize(input.sideBackgrounds.back) : null,
+  };
+
   // ── Renderizar capa de texto (transparente) ─────────────────────────
   const transparent = bgKindUsed === "ai-texture" || bgKindUsed === "custom-image";
   const isAiBackground = bgKindUsed === "ai-texture" || bgKindUsed === "custom-image";
   const frontTextLayer = await renderCardSide(template, input.data, {
     side: "front",
-    transparent,
+    transparent: transparent || !!sideBg.front,
     palette,
     fonts,
     logoDataUri,
     overrides: input.overrides,
-    isAiBackground,
+    isAiBackground: isAiBackground || !!sideBg.front,
     extraAssets: input.extraAssets,
   });
   const backTextLayer = await renderCardSide(template, input.data, {
     side: "back",
-    transparent,
+    transparent: transparent || !!sideBg.back,
     palette,
     fonts,
     qrPngBase64,
     overrides: input.overrides,
-    isAiBackground,
+    isAiBackground: isAiBackground || !!sideBg.back,
     qrLabel: input.qrLabel,
     extraAssets: input.extraAssets,
   });
 
   // ── Composición Sharp ───────────────────────────────────────────────
-  const frontPng = transparent && backgroundPng
-    ? await composeOver(backgroundPng, frontTextLayer)
-    : frontTextLayer;
+  const frontPng = sideBg.front
+    ? await composeOver(sideBg.front, frontTextLayer)
+    : transparent && backgroundPng ? await composeOver(backgroundPng, frontTextLayer) : frontTextLayer;
 
-  const backPng = transparent && backgroundPng
-    ? await composeOver(backgroundPng, backTextLayer)
-    : backTextLayer;
+  const backPng = sideBg.back
+    ? await composeOver(sideBg.back, backTextLayer)
+    : transparent && backgroundPng ? await composeOver(backgroundPng, backTextLayer) : backTextLayer;
 
   return {
     frontPng,
@@ -459,7 +468,7 @@ export async function generateCardBackground(
   bgModel?: ImageGenModel,
   replicateToken?: string,
 ): Promise<Buffer> {
-  const model: ImageGenModel = bgModel || "recraft-v3";
+  const model: ImageGenModel = bgModel || DEFAULT_BG_MODEL;
   const promptToUse = `${prompt.trim()}, ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO TYPOGRAPHY, NO LOGOS, NO WATERMARKS, pure background texture only, even lighting suitable for overlay text, photorealistic, 8k`;
   const out = await generateImage(model, promptToUse, {
     aspectRatio: "3:2",

@@ -140,7 +140,72 @@ function styleFromQuery(v: unknown): unknown | null {
   try { return JSON.parse(v); } catch { return null; }
 }
 
-const MAX_QR_DATA = 1800; // por encima el QR (corrección H) es ilegible en tarjeta o no cabe
+const MAX_QR_DATA = 1800;
+
+const EXTRA_TYPES = new Set(["text", "line", "emoji", "shape", "bubble", "qr", "qr-image"]);
+const NUM_FIELDS = ["x", "y", "width", "height", "fontSize", "fontWeight", "letterSpacing", "lineHeight", "rotate", "opacity", "strokeWidth"] as const;
+const STR_FIELDS = ["text", "fontFamily", "color", "align", "textTransform", "shapeType", "fill", "stroke", "qrUrl", "qrFg", "qrBg", "decodedText"] as const;
+
+/** Copia solo campos conocidos: números finitos y textos acotados. */
+function cleanFields(src: Record<string, unknown>, out: Record<string, unknown>) {
+  for (const k of NUM_FIELDS) {
+    if (src[k] === undefined || src[k] === null) continue;
+    const n = Number(src[k]);
+    if (Number.isFinite(n)) out[k] = Math.max(-5000, Math.min(5000, n));
+  }
+  for (const k of STR_FIELDS) {
+    if (typeof src[k] === "string") out[k] = (src[k] as string).slice(0, k === "text" ? 600 : k === "qrUrl" ? MAX_QR_DATA : 200);
+  }
+  if (typeof src.hidden === "boolean") out.hidden = src.hidden;
+  if (typeof src.italic === "boolean") out.italic = src.italic;
+  if (src.plate === null || (src.plate && typeof src.plate === "object")) out.plate = src.plate;
+}
+
+/**
+ * Normaliza el diseño del editor antes de guardarlo: tipos y números válidos,
+ * textos acotados, estilo de QR saneado y QR subidos solo del propio proyecto
+ * (con su URL de vista previa canónica).
+ */
+async function normalizeOverrides(raw: any, projectId: number): Promise<LayoutOverrides> {
+  const out: LayoutOverrides = {};
+  for (const side of ["front", "back"] as const) {
+    const src = raw?.[side];
+    if (!src || typeof src !== "object") continue;
+    const sideOut: Record<string, any> = {};
+    for (const [id, ov] of Object.entries(src).slice(0, 80)) {
+      if (!/^[\w-]{1,40}$/.test(id) || !ov || typeof ov !== "object") continue;
+      const o: Record<string, unknown> = {};
+      cleanFields(ov as Record<string, unknown>, o);
+      sideOut[id] = o;
+    }
+    out[side] = sideOut;
+  }
+  const extras: ExtraElement[] = [];
+  const list = Array.isArray(raw?.extras) ? raw.extras.slice(0, 120) : [];
+  const vaultIds = list.filter((e: any) => e?.type === "qr-image" && Number.isInteger(e?.vaultFileId)).map((e: any) => e.vaultFileId as number);
+  const owned = new Set<number>();
+  if (vaultIds.length) {
+    const rows = await db.select({ id: projectFilesTable.id, projectId: projectFilesTable.projectId })
+      .from(projectFilesTable).where(inArray(projectFilesTable.id, vaultIds));
+    for (const r of rows) if (r.projectId === projectId) owned.add(r.id);
+  }
+  for (const e of list) {
+    if (!e || typeof e !== "object" || !EXTRA_TYPES.has(e.type)) continue;
+    if (typeof e.id !== "string" || !/^[\w-]{1,40}$/.test(e.id)) continue;
+    const x: Record<string, unknown> = { id: e.id, side: e.side === "back" ? "back" : "front", type: e.type };
+    cleanFields(e, x);
+    if (x.x === undefined || x.y === undefined || x.width === undefined) continue;
+    if (e.type === "qr" && e.qrStyle && typeof e.qrStyle === "object") x.qrStyle = sanitizeQrStyle(e.qrStyle);
+    if (e.type === "qr-image") {
+      if (!owned.has(e.vaultFileId)) continue;
+      x.vaultFileId = e.vaultFileId;
+      x.imageUrl = `/api/projects/${projectId}/vault/${e.vaultFileId}/preview`;
+    }
+    extras.push(x as unknown as ExtraElement);
+  }
+  out.extras = extras;
+  return out;
+} // por encima el QR (corrección H) es ilegible en tarjeta o no cabe
 
 /**
  * Imágenes de los extras QR para el render del servidor: QR generados (con su
@@ -168,6 +233,19 @@ async function resolveExtraAssets(row: CardRow, extras: ExtraElement[] | undefin
     }
   }
   return assets;
+}
+
+/** Fondos propios de cada cara guardados desde el editor (solo ficheros del mismo proyecto). */
+async function loadSideBackgrounds(row: CardRow): Promise<{ front?: Buffer; back?: Buffer }> {
+  const meta = safeJson(row.metadata, {}) as Record<string, any>;
+  const out: { front?: Buffer; back?: Buffer } = {};
+  for (const [side, key] of [["front", "bgFrontVaultFileId"], ["back", "bgBackVaultFileId"]] as const) {
+    const fid = Number(meta[key]);
+    if (!Number.isInteger(fid) || fid <= 0) continue;
+    const [f] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, fid));
+    if (f?.content && f.projectId === row.projectId) out[side] = Buffer.from(f.content, "base64");
+  }
+  return out;
 }
 
 function toCardDto(row: any) {
@@ -387,9 +465,10 @@ router.patch("/cards/:id", requireAdmin, async (req, res) => {
     if (req.body?.palette && typeof req.body.palette === "object") patch.palette = JSON.stringify(req.body.palette);
     if (req.body?.fonts && typeof req.body.fonts === "object") patch.fonts = JSON.stringify(req.body.fonts);
     if (req.body?.layoutOverrides && typeof req.body.layoutOverrides === "object") {
-      const json = JSON.stringify(req.body.layoutOverrides);
-      if (json.length > 400_000) { res.status(413).json({ error: "El diseño tiene demasiados elementos." }); return; }
-      patch.layoutOverrides = json;
+      if (JSON.stringify(req.body.layoutOverrides).length > 400_000) {
+        res.status(413).json({ error: "El diseño tiene demasiados elementos." }); return;
+      }
+      patch.layoutOverrides = JSON.stringify(await normalizeOverrides(req.body.layoutOverrides, existing.projectId));
     }
     // Estilo del QR principal (se guarda saneado en metadata.qrStyle; null = volver al de la plantilla)
     if (Object.prototype.hasOwnProperty.call(req.body || {}, "qrStyle")) {
@@ -658,6 +737,7 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
       overrides,
       qrStyle: (safeJson(row.metadata, {}) as any)?.qrStyle,
       qrLabel: qrLabelFor((row as any).qrType),
+      sideBackgrounds: await loadSideBackgrounds(row),
       extraAssets: await resolveExtraAssets(
         row, overrides.extras,
         logoBuffer ? `data:${logoMime || "image/png"};base64,${logoBuffer.toString("base64")}` : undefined,
@@ -956,6 +1036,58 @@ router.post("/cards/:id/export-pdf", requireAdmin, async (req: Request, res: Res
   }
 });
 
+// ─── Fondo propio de una cara (diseño del editor: sólido, degradado, metálico…) ──
+// multipart "background" + campo side=front|back|both. Se usa en el editor y en «Re-generar».
+router.post("/cards/:id/side-background", requireAdmin, upload.single("background"), async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+    if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+    if (!req.file) { res.status(400).json({ error: "Falta la imagen del fondo" }); return; }
+    const side = String(req.body?.side || "both");
+    if (!["front", "back", "both"].includes(side)) { res.status(400).json({ error: "side debe ser front, back o both" }); return; }
+    const png = await sharp(req.file.buffer).resize(1080, 720, { fit: "cover", position: "center" }).png().toBuffer();
+    const meta = safeJson(row.metadata, {}) as Record<string, any>;
+    for (const s of side === "both" ? ["front", "back"] as const : [side as "front" | "back"]) {
+      const vaultId = await saveToVault({
+        projectId: row.projectId, fileType: "card-background", category: "card_bg",
+        title: `${row.name} · Fondo ${s === "front" ? "Frente" : "Reverso"}`,
+        description: `Fondo diseñado en el editor (${s})`,
+        mimeType: "image/png", content: png.toString("base64"), fileSizeBytes: png.length,
+        generatedBy: "card-studio", metadata: { cardId: id, side: `bg-${s}`, source: "editor-fill" },
+      });
+      if (!vaultId) { res.status(500).json({ error: "No se pudo guardar el fondo" }); return; }
+      meta[s === "front" ? "bgFrontVaultFileId" : "bgBackVaultFileId"] = vaultId;
+    }
+    const [updated] = await db.update(businessCardsTable).set({ metadata: JSON.stringify(meta) })
+      .where(eq(businessCardsTable.id, id)).returning();
+    res.json(toCardDto(updated));
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "cards side-background failed");
+    res.status(500).json({ error: err?.message || "Error guardando el fondo" });
+  }
+});
+
+// Quita el fondo propio de una cara (vuelve al fondo general de la tarjeta).
+router.delete("/cards/:id/side-background", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+    if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+    const side = String(req.query.side || "both");
+    if (!["front", "back", "both"].includes(side)) { res.status(400).json({ error: "side debe ser front, back o both" }); return; }
+    const meta = safeJson(row.metadata, {}) as Record<string, any>;
+    if (side !== "back") delete meta.bgFrontVaultFileId;
+    if (side !== "front") delete meta.bgBackVaultFileId;
+    const [updated] = await db.update(businessCardsTable).set({ metadata: JSON.stringify(meta) })
+      .where(eq(businessCardsTable.id, id)).returning();
+    res.json(toCardDto(updated));
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "cards side-background delete failed");
+    res.status(500).json({ error: err?.message || "Error quitando el fondo" });
+  }
+});
+
 // ─── Generar fondo por cara (sin pipeline completo) ──────────────────────────
 router.post("/cards/:id/generate-bg", requireAdmin, async (req: Request, res: Response) => {
   enableLongRunning(res);
@@ -966,7 +1098,10 @@ router.post("/cards/:id/generate-bg", requireAdmin, async (req: Request, res: Re
     const { prompt, side, bgModel } = req.body as {
       prompt?: string; side?: "front" | "back" | "both"; bgModel?: string;
     };
-    if (!prompt) { res.status(400).json({ error: "Se requiere 'prompt'" }); return; }
+    if (!prompt || typeof prompt !== "string" || !prompt.trim()) { res.status(400).json({ error: "Se requiere 'prompt'" }); return; }
+    if (prompt.length > 1000) { res.status(400).json({ error: "La descripción del fondo es demasiado larga (máx. 1000 caracteres)." }); return; }
+    const { IMAGE_MODELS } = await import("../lib/fusion-studio-pro.js");
+    if (bgModel && !(bgModel in IMAGE_MODELS)) { res.status(400).json({ error: `Modelo de imagen desconocido: ${bgModel}` }); return; }
     const targetSide: "front" | "back" | "both" = (side === "front" || side === "back") ? side : "both";
 
     const bgBuf = await generateCardBackground(prompt, bgModel as any, undefined);

@@ -7,6 +7,7 @@
  *  3. Preview LIVE en CSS (derecha) + preview PNG generado + acciones
  */
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
+import QrStyleDesigner, { type QrStyle } from "@/components/cards/QrStyleDesigner";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { useRoute } from "wouter";
 import {
@@ -155,6 +156,8 @@ export default function CardStudio() {
   const [bgModel, setBgModel] = useState("grok-imagine-image");
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [bgWarning, setBgWarning] = useState<string | null>(null);
+  const [showQrStyle, setShowQrStyle] = useState(false);
+  const [qrStyleSaving, setQrStyleSaving] = useState(false);
 
   const selected = useMemo(() => cards.find((c) => c.id === selectedId) ?? null, [cards, selectedId]);
 
@@ -269,11 +272,13 @@ export default function CardStudio() {
       if (!res.ok) throw new Error((await res.json()).error || "Error generando");
       const data = await res.json();
       setCards((prev) => prev.map((c) => (c.id === id ? data.card : c)));
+      const notes: string[] = [];
       if (data.bgGenFailed) {
-        setBgWarning(`⚠️ El fondo IA no se pudo generar (${data.bgGenError || "error desconocido"}) — se usó fondo sólido. Prueba otro modelo.`);
-      } else {
-        setBgWarning(null);
+        notes.push(`⚠️ El fondo IA no se pudo generar (${data.bgGenError || "error desconocido"}) — se usó fondo sólido. Prueba otro modelo.`);
       }
+      if (data.qrVerified === false) notes.push("⚠️ No se ha podido verificar la lectura del QR: escanéalo con tu móvil antes de imprimir.");
+      for (const w of (data.qrWarnings ?? []) as string[]) notes.push(`QR: ${w}`);
+      setBgWarning(notes.length ? notes.join(" · ") : null);
       setSuccess(`✓ Tarjeta generada (coste: $${data.cost?.toFixed(4) || "0.00"})`);
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
@@ -619,6 +624,44 @@ export default function CardStudio() {
                 </div>
               )}
 
+                      {/* ── Estilo artístico del QR (verificado en el servidor) ── */}
+              <div style={{ border: "1px solid rgba(212,175,55,0.2)", borderRadius: 6, overflow: "hidden" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowQrStyle((v) => !v)}
+                  style={{ width: "100%", padding: "8px 10px", background: "rgba(212,175,55,0.06)", border: "none", color: "var(--gold)", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <QrCode size={12} /> Estilo del QR {selected.metadata?.qrStyle ? "· personalizado" : "· plantilla"}
+                  <span style={{ marginLeft: "auto" }}>{showQrStyle ? "▲" : "▼"}</span>
+                </button>
+                {showQrStyle && (() => {
+                  const tpl = templates.find((t) => t.id === selected.templateId);
+                  const base: Partial<QrStyle> | undefined = tpl
+                    ? { fg: tpl.qrStyle.fgColor, fg2: tpl.qrStyle.fgColor, bg: tpl.qrStyle.bgColor, margin: tpl.qrStyle.margin }
+                    : undefined;
+                  const saveStyle = async (qrStyle: QrStyle | null) => {
+                    setQrStyleSaving(true);
+                    try { await updateCard(selected.id, { qrStyle } as any); } finally { setQrStyleSaving(false); }
+                  };
+                  return (
+                    <div style={{ padding: 10 }}>
+                      <QrStyleDesigner
+                        value={selected.metadata?.qrStyle ?? null}
+                        base={base}
+                        hasLogo={!!selected.logoUrl}
+                        applying={qrStyleSaving}
+                        previewUrl={(st) => `${API_BASE}/api/cards/${selected.id}/qr.png?size=360&style=${encodeURIComponent(JSON.stringify(st))}`}
+                        onApply={(st) => saveStyle(st)}
+                        onReset={() => saveStyle(null)}
+                      />
+                      <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 8, lineHeight: 1.5 }}>
+                        Se aplica al QR del reverso en el editor, en «Re-generar» y en las descargas. Si un estilo no se pudiera leer, se simplifica automáticamente.
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
               {/* QR Download (only when generated) */}
               {selected.status === "ready" && (
                 <a href={`${API_BASE}/api/cards/${selected.id}/qr.svg`} download={`${selected.name}-qr.svg`} style={{ ...btnSmall, textDecoration: "none" }}>
@@ -842,14 +885,32 @@ export default function CardStudio() {
                   generating={false}
                   qrType={selected.qrType || "vcard"}
                   qrContentUrl={selected.qrContentUrl ?? null}
+                  qrVersion={JSON.stringify([
+                    selected.metadata?.qrStyle ?? null, selected.qrType, selected.qrContentUrl, selected.fullName, selected.jobTitle,
+                    selected.companyName, selected.email, selected.phone, selected.website, selected.address, selected.logoUrl,
+                  ])}
                   onSaveOverrides={async (ov) => { await updateCard(selected.id, { layoutOverrides: ov } as any); }}
                   onRegenerate={async () => { await generateCard(selected.id); }}
+                  onSideBackground={async (side, png) => {
+                    let res: Response;
+                    if (png) {
+                      const fd = new FormData();
+                      fd.append("background", png, "fondo.png");
+                      fd.append("side", side);
+                      res = await fetch(`${API_BASE}/api/cards/${selected.id}/side-background`, { method: "POST", credentials: "include", body: fd });
+                    } else {
+                      res = await fetch(`${API_BASE}/api/cards/${selected.id}/side-background?side=${side}`, { method: "DELETE", credentials: "include" });
+                    }
+                    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error || "Error guardando el fondo"); }
+                    const updated: BusinessCard = await res.json();
+                    setCards((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+                  }}
                   onThemePrompt={async (prompt, side) => {
                     const res = await fetch(`${API_BASE}/api/cards/${selected.id}/generate-bg`, {
                       method: "POST",
                       credentials: "include",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ prompt, side }),
+                      body: JSON.stringify({ prompt, side, bgModel }),
                     });
                     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error || "Error generando fondo"); }
                     const { results } = await res.json() as { results: { side: string; url: string }[] };

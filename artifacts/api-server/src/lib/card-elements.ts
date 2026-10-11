@@ -80,6 +80,8 @@ export type ExtraElement = {
   qrStyle?: Record<string, unknown>;
   // QR subido
   vaultFileId?: number;
+  /** URL de vista previa (la fija el servidor al guardar). */
+  imageUrl?: string;
   decodedText?: string | null;
 };
 

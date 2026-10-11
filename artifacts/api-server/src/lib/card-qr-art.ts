@@ -88,6 +88,16 @@ function contrast(a: string, b: string): number {
   return (l1 + 0.05) / (l2 + 0.05);
 }
 
+/** Contraste mínimo (WCAG) entre cualquier color del QR y su fondo para darlo por imprimible. */
+export const MIN_PRINT_CONTRAST = 2.5;
+
+/** El peor contraste entre los colores del QR y su fondo (∞ si el fondo es transparente). */
+export function qrMinContrast(style: QrStyle): number {
+  if (style.bg === "transparent") return Infinity;
+  const inks = [style.fg, style.gradient === "none" ? style.fg : style.fg2, style.eyeColor || style.fg];
+  return Math.min(...inks.map((c) => contrast(c, style.bg)));
+}
+
 /** Avisos de legibilidad que la decodificación automática no detecta (lectores de móvil). */
 export function qrStyleWarnings(style: QrStyle): string[] {
   const out: string[] = [];
@@ -311,14 +321,24 @@ export async function renderVerifiedQr(
 
   // El lector verifica sobre fondo blanco; un QR transparente se valida igual que impreso sobre claro.
   let last: { png: Buffer; svg: string; style: QrStyle } | null = null;
+  let lowContrast = false;
   for (const a of attempts) {
+    // Una imagen digital perfecta se lee aunque el contraste sea mínimo; impresa o en pantalla, no.
+    if (qrMinContrast(a.style) < MIN_PRINT_CONTRAST) { lowContrast = true; continue; }
     const svg = buildArtQrSvg(data, a.style, { size, logoDataUri: opts.logoDataUri });
     const png = await rasterize(svg, size);
     last = { png, svg, style: a.style };
     const decoded = await decodeQrImage(png);
     if (decoded === data) {
-      return { png, svg, verified: true, style: a.style, warnings: [...(a.note ? [a.note] : []), ...qrStyleWarnings(a.style)] };
+      const notes = lowContrast && a.style !== style
+        ? ["Los colores elegidos tenían muy poco contraste para imprimirse: se han sustituido por unos legibles."]
+        : a.note ? [a.note] : [];
+      return { png, svg, verified: true, style: a.style, warnings: [...notes, ...qrStyleWarnings(a.style)] };
     }
   }
-  return { ...last!, verified: false, warnings: ["No se ha podido verificar la lectura de este QR.", ...qrStyleWarnings(last!.style)] };
+  if (!last) {
+    // Todas las variantes tenían poco contraste salvo la última (blanco y negro), que nunca se salta.
+    throw new Error("No se pudo generar un QR legible");
+  }
+  return { ...last, verified: false, warnings: ["No se ha podido verificar la lectura de este QR.", ...qrStyleWarnings(last!.style)] };
 }
