@@ -140,8 +140,18 @@ jobs:
           ASSET_ID=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" \
-            | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); const a=d.find(x=>x.name.endsWith('.apk')); if(a) console.log(a.id); else process.exit(1);" 2>/dev/null || echo "")
+            | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); const a=d.find(x=>x.name==='app-debug.apk'); if(a) console.log(a.id); else process.exit(1);" 2>/dev/null || echo "")
           if [ -n "$ASSET_ID" ]; then
+            # Borra el ShopyBrain.apk de un build anterior: si existe, el renombrado falla por nombre duplicado.
+            OLD_ID=$(curl -s \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" \
+              | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); const a=d.find(x=>x.name==='ShopyBrain.apk' && String(x.id)!=='$ASSET_ID'); if(a) console.log(a.id);")
+            if [ -n "$OLD_ID" ]; then
+              curl -s -X DELETE \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                "https://api.github.com/repos/${{ github.repository }}/releases/assets/$OLD_ID" > /dev/null
+            fi
             curl -s -X PATCH \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Content-Type: application/json" \

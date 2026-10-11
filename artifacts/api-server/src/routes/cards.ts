@@ -29,7 +29,10 @@ import {
   type GenerateCardInput,
 } from "../lib/card-studio.js";
 import { listTemplates, getTemplate } from "../lib/card-templates.js";
-import { generateQrPng, generateQrSvg, buildVCard } from "../lib/card-qr.js";
+import { buildVCard } from "../lib/card-qr.js";
+import { renderVerifiedQr, sanitizeQrStyle, decodeQrImage, type QrStyle } from "../lib/card-qr-art.js";
+import { qrLabelFor, type ExtraElement, type LayoutOverrides } from "../lib/card-elements.js";
+import sharp from "sharp";
 import { enableLongRunning } from "../lib/long-running.js";
 import { learnFromOperation } from "../lib/claude.js";
 import { uploadRejected } from "../lib/upload-errors.js";
@@ -74,6 +77,97 @@ function s(v: unknown, max = 500): string | undefined {
 function safeJson<T>(v: unknown, fallback: T): T {
   if (typeof v !== "string" || !v.trim()) return fallback;
   try { return JSON.parse(v) as T; } catch { return fallback; }
+}
+
+type CardRow = typeof businessCardsTable.$inferSelect;
+
+/** URL pública del QR dinámico (vídeo / imagen / animación). */
+function publicQrUrl(req: Request, id: number): string {
+  const proto = (req.headers["x-forwarded-proto"] as string | undefined)?.split(",")[0]?.trim() || req.protocol || "https";
+  const host = req.get("host") || "localhost:8080";
+  return `${proto}://${host}/api/public/qr/${id}`;
+}
+
+/** Destino del QR del reverso según su tipo; undefined = vCard con los datos de la tarjeta. */
+function cardQrTarget(row: CardRow, req: Request): string | undefined {
+  const qrType: string = (row as any).qrType || "vcard";
+  const qrContentUrl: string | null = (row as any).qrContentUrl || null;
+  if (qrType === "url" && qrContentUrl) return qrContentUrl;
+  if (qrType === "vcard") return undefined;
+  if (["video", "image", "animation"].includes(qrType)) return publicQrUrl(req, row.id);
+  return row.qrUrl ?? undefined;
+}
+
+function cardQrData(row: CardRow, req: Request): string {
+  return cardQrTarget(row, req) ?? buildVCard({
+    fullName: row.fullName,
+    jobTitle: row.jobTitle ?? undefined,
+    organization: row.companyName ?? undefined,
+    email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
+    website: row.website ?? undefined,
+    address: row.address ?? undefined,
+  });
+}
+
+/** Estilo base del QR: colores y margen de la plantilla. */
+function qrStyleBase(templateId: string): Partial<QrStyle> {
+  const tpl = getTemplate(templateId);
+  const fg = tpl?.qrStyle.fgColor || "#000000";
+  return { fg, fg2: fg, bg: tpl?.qrStyle.bgColor || "#ffffff", margin: tpl?.qrStyle.margin ?? 1 };
+}
+
+/** Logo de la tarjeta como data URI (solo si pertenece al mismo proyecto). */
+async function cardLogoDataUri(row: CardRow): Promise<string | undefined> {
+  if (!row.logoVaultFileId) return undefined;
+  const [lf] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, row.logoVaultFileId));
+  if (!lf?.content || lf.projectId !== row.projectId) return undefined;
+  const mime = /^image\/(png|jpeg|webp|svg\+xml)$/i.test(lf.mimeType || "") ? lf.mimeType : "image/png";
+  return `data:${mime};base64,${lf.content}`;
+}
+
+function setQrHeaders(res: Response, r: { verified: boolean; warnings: string[]; style: QrStyle }) {
+  res.setHeader("X-Qr-Verified", r.verified ? "1" : "0");
+  res.setHeader("X-Qr-Warnings", encodeURIComponent(JSON.stringify(r.warnings)));
+  res.setHeader("X-Qr-Style", encodeURIComponent(JSON.stringify(r.style)));
+  res.setHeader("Cache-Control", "no-store");
+}
+
+/** Estilo pedido en ?style=<json>; null si viene mal formado. */
+function styleFromQuery(v: unknown): unknown | null {
+  if (typeof v !== "string" || !v) return undefined;
+  if (v.length > 2000) return null;
+  try { return JSON.parse(v); } catch { return null; }
+}
+
+const MAX_QR_DATA = 1800; // por encima el QR (corrección H) es ilegible en tarjeta o no cabe
+
+/**
+ * Imágenes de los extras QR para el render del servidor: QR generados (con su
+ * estilo, verificados) y QR subidos (solo del mismo proyecto).
+ */
+async function resolveExtraAssets(row: CardRow, extras: ExtraElement[] | undefined, logoDataUri?: string): Promise<Record<string, string>> {
+  const assets: Record<string, string> = {};
+  for (const ex of (extras ?? []).slice(0, 60)) {
+    try {
+      if (ex.type === "qr") {
+        const data = String(ex.qrUrl || "").trim() || "https://shopycrafter.com";
+        if (data.length > MAX_QR_DATA) continue;
+        const fg = /^#[0-9a-f]{6}$/i.test(ex.qrFg || "") ? ex.qrFg! : "#000000";
+        const bg = /^#[0-9a-f]{6}$/i.test(ex.qrBg || "") ? ex.qrBg! : "#ffffff";
+        const r = await renderVerifiedQr(data, sanitizeQrStyle(ex.qrStyle, { fg, fg2: fg, bg, margin: 1 }), { size: 800, logoDataUri });
+        assets[`extra-${ex.id}`] = `data:image/png;base64,${r.png.toString("base64")}`;
+      } else if (ex.type === "qr-image" && Number.isInteger(ex.vaultFileId)) {
+        const [f] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, ex.vaultFileId!));
+        if (f?.content && f.projectId === row.projectId && /^image\/(png|jpeg|webp)$/i.test(f.mimeType || "")) {
+          assets[`extra-${ex.id}`] = `data:${f.mimeType};base64,${f.content}`;
+        }
+      }
+    } catch (err: any) {
+      logger.warn({ err: err?.message, cardId: row.id, extra: ex.id }, "cards: extra QR no resuelto");
+    }
+  }
+  return assets;
 }
 
 function toCardDto(row: any) {
@@ -293,7 +387,19 @@ router.patch("/cards/:id", requireAdmin, async (req, res) => {
     if (req.body?.palette && typeof req.body.palette === "object") patch.palette = JSON.stringify(req.body.palette);
     if (req.body?.fonts && typeof req.body.fonts === "object") patch.fonts = JSON.stringify(req.body.fonts);
     if (req.body?.layoutOverrides && typeof req.body.layoutOverrides === "object") {
-      patch.layoutOverrides = JSON.stringify(req.body.layoutOverrides);
+      const json = JSON.stringify(req.body.layoutOverrides);
+      if (json.length > 400_000) { res.status(413).json({ error: "El diseño tiene demasiados elementos." }); return; }
+      patch.layoutOverrides = json;
+    }
+    // Estilo del QR principal (se guarda saneado en metadata.qrStyle; null = volver al de la plantilla)
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "qrStyle")) {
+      const meta = safeJson(existing.metadata, {}) as Record<string, unknown>;
+      if (req.body.qrStyle && typeof req.body.qrStyle === "object") {
+        meta.qrStyle = sanitizeQrStyle(req.body.qrStyle, qrStyleBase(String(req.body?.templateId || existing.templateId)));
+      } else {
+        delete meta.qrStyle;
+      }
+      patch.metadata = JSON.stringify(meta);
     }
     // Acepta tanto `background` como `backgroundConfig` (FE usa el segundo)
     if (req.body?.background && typeof req.body.background === "object") {
@@ -524,6 +630,7 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
     const palette = safeJson(row.palette, {}) as any;
     const fonts = safeJson(row.fonts, {}) as any;
     const background = safeJson(row.backgroundConfig, {}) as any;
+    const overrides = safeJson(row.layoutOverrides, {}) as LayoutOverrides;
 
     const input: GenerateCardInput = {
       templateId: row.templateId,
@@ -543,23 +650,18 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
       background: background && background.kind ? background : undefined,
       backgroundModel: (overrideBgModel as any) || undefined,
       layout: (row.layout === "centered" || row.layout === "left" || row.layout === "grid") ? row.layout : undefined,
-      qrUrl: (() => {
-        const qrType: string = (row as any).qrType || "vcard";
-        const qrContentUrl: string | null = (row as any).qrContentUrl || null;
-        if (qrType === "url" && qrContentUrl) return qrContentUrl;
-        if (qrType === "vcard") return undefined;
-        if (["video", "image", "animation"].includes(qrType)) {
-          const proto = (req.headers["x-forwarded-proto"] as string | undefined) || req.protocol || "https";
-          const host = req.get("host") || "localhost:8080";
-          return `${proto}://${host}/api/public/qr/${id}`;
-        }
-        return row.qrUrl ?? undefined;
-      })(),
+      qrUrl: cardQrTarget(row, req),
       logoBuffer,
       logoMime,
       backgroundImageBuffer,
       backgroundImageMime,
-      overrides: safeJson(row.layoutOverrides, {}) as any,
+      overrides,
+      qrStyle: (safeJson(row.metadata, {}) as any)?.qrStyle,
+      qrLabel: qrLabelFor((row as any).qrType),
+      extraAssets: await resolveExtraAssets(
+        row, overrides.extras,
+        logoBuffer ? `data:${logoMime || "image/png"};base64,${logoBuffer.toString("base64")}` : undefined,
+      ),
     };
 
     const result = await generateBusinessCard(input);
@@ -674,6 +776,8 @@ router.post("/cards/:id/generate", requireAdmin, async (req: Request, res: Respo
       card: toCardDto(updated),
       cost: result.cost,
       meta: result.meta,
+      qrVerified: result.meta.qrVerified,
+      qrWarnings: result.meta.qrWarnings,
       bgGenFailed: result.meta.bgGenFailed ?? false,
       bgGenError: result.meta.bgGenError ?? null,
     });
@@ -724,7 +828,7 @@ router.get("/cards/:id/elements", requireAdmin, async (req: Request, res: Respon
 
     const defaults = side === "front"
       ? defaultFrontElements({ side: "front", layout, data, palette, fonts, isAiBg, logoDataUri: row.logoVaultFileId ? "x" : undefined })
-      : defaultBackElements ({ side: "back",  layout, data, palette, fonts, isAiBg, qrPngBase64 });
+      : defaultBackElements ({ side: "back",  layout, data, palette, fonts, isAiBg, qrPngBase64, qrLabel: qrLabelFor((row as any).qrType) });
     const sideOv = side === "front" ? overrides.front : overrides.back;
     const merged = applyOverrides(defaults, sideOv);
     const extras = extrasToRender(overrides.extras, side);
@@ -740,91 +844,95 @@ router.get("/cards/:id/elements", requireAdmin, async (req: Request, res: Respon
   }
 });
 
-// ─── Export QR PNG (para el editor Fabric) ──────────────────────────────────
+// ─── QR del reverso (PNG) — siempre al momento, con el estilo y el destino actuales ──
+// ?style=<json> previsualiza un estilo sin guardarlo. Cabeceras X-Qr-Verified / X-Qr-Warnings.
 router.get("/cards/:id/qr.png", requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
-    if (!row) { res.status(404).send("not found"); return; }
-
-    // Si ya tenemos el QR guardado en vault, servirlo directamente
-    const meta = safeJson(row.metadata, {}) as any;
-    if (meta?.qrVaultFileId) {
-      const [bf] = await db.select().from(projectFilesTable).where(eq(projectFilesTable.id, meta.qrVaultFileId));
-      if (bf?.content) {
-        res.setHeader("Content-Type", "image/png");
-        res.setHeader("Cache-Control", "public, max-age=3600");
-        res.send(Buffer.from(bf.content, "base64"));
-        return;
-      }
-    }
-
-    // Fallback: generar QR on-the-fly
-    const tpl = getTemplate(row.templateId);
-    const qrType: string = (row as any).qrType || "vcard";
-    const qrContentUrl: string | null = (row as any).qrContentUrl || null;
-    let qrData: string;
-    if (qrType === "url" && qrContentUrl) {
-      qrData = qrContentUrl;
-    } else if (["video", "image", "animation"].includes(qrType)) {
-      const proto = (req.headers["x-forwarded-proto"] as string | undefined) || req.protocol || "https";
-      const host = req.get("host") || "localhost:8080";
-      qrData = `${proto}://${host}/api/public/qr/${id}`;
-    } else {
-      qrData = buildVCard({
-        fullName: row.fullName,
-        jobTitle: row.jobTitle ?? undefined,
-        organization: row.companyName ?? undefined,
-        email: row.email ?? undefined,
-        phone: row.phone ?? undefined,
-        website: row.website ?? undefined,
-        address: row.address ?? undefined,
-      });
-    }
-    const png = await generateQrPng(qrData, {
-      fgColor: tpl?.qrStyle.fgColor || "#000000",
-      bgColor: tpl?.qrStyle.bgColor || "#ffffff",
-      margin: tpl?.qrStyle.margin ?? 1,
-      size: 400,
-      errorLevel: "H",
-    });
+    if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+    const queryStyle = styleFromQuery(req.query.style);
+    if (queryStyle === null) { res.status(400).json({ error: "Parámetro style inválido" }); return; }
+    const style = sanitizeQrStyle(queryStyle ?? (safeJson(row.metadata, {}) as any)?.qrStyle, qrStyleBase(row.templateId));
+    const size = Math.max(128, Math.min(2048, parseInt(String(req.query.size || "1024"), 10) || 1024));
+    const r = await renderVerifiedQr(cardQrData(row, req), style, { size, logoDataUri: style.logo ? await cardLogoDataUri(row) : undefined });
+    setQrHeaders(res, r);
     res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    res.send(png);
+    res.send(r.png);
   } catch (err: any) {
     logger.error({ err: err?.message }, "cards qr.png failed");
-    res.status(500).send(err?.message || "error");
+    res.status(500).json({ error: err?.message || "Error generando QR" });
   }
 });
 
-// ─── Export SVG QR (vectorial) ──────────────────────────────────────────────
+// ─── QR del reverso (SVG vectorial para imprenta) ───────────────────────────
 router.get("/cards/:id/qr.svg", requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id), 10);
     const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
-    if (!row) { res.status(404).send("not found"); return; }
-    const tpl = getTemplate(row.templateId);
-    const data = (row.qrUrl && row.qrUrl.trim())
-      ? row.qrUrl.trim()
-      : buildVCard({
-          fullName: row.fullName,
-          jobTitle: row.jobTitle ?? undefined,
-          organization: row.companyName ?? undefined,
-          email: row.email ?? undefined,
-          phone: row.phone ?? undefined,
-          website: row.website ?? undefined,
-          address: row.address ?? undefined,
-        });
-    const svg = await generateQrSvg(data, {
-      fgColor: tpl?.qrStyle.fgColor || "#000",
-      bgColor: tpl?.qrStyle.bgColor || "#fff",
-      margin: tpl?.qrStyle.margin ?? 1,
-    });
+    if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+    const style = sanitizeQrStyle((safeJson(row.metadata, {}) as any)?.qrStyle, qrStyleBase(row.templateId));
+    const r = await renderVerifiedQr(cardQrData(row, req), style, { size: 1024, logoDataUri: style.logo ? await cardLogoDataUri(row) : undefined });
+    setQrHeaders(res, r);
+    const fname = (row.name || `tarjeta-${id}`).replace(/[^a-z0-9-_]+/gi, "_").slice(0, 60);
     res.setHeader("Content-Type", "image/svg+xml");
-    res.send(svg);
+    res.setHeader("Content-Disposition", `attachment; filename="qr-${fname}.svg"`);
+    res.send(r.svg);
   } catch (err: any) {
     logger.error({ err: err?.message }, "cards qr.svg failed");
-    res.status(500).send(err?.message || "error");
+    res.status(500).json({ error: err?.message || "Error generando QR" });
+  }
+});
+
+// ─── Subir un QR ya diseñado (se lee para comprobar que funciona) ─────────────
+// multipart "qr" + campo opcional force=1 para aceptarlo aunque no se pueda leer.
+router.post("/cards/:id/upload-qr", requireAdmin, upload.single("qr"), async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const [row] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, id));
+    if (!row) { res.status(404).json({ error: "Tarjeta no encontrada" }); return; }
+    if (!req.file) { res.status(400).json({ error: "Falta la imagen del QR" }); return; }
+
+    // PNG limpio (sin EXIF), orientado y con lado máximo 2048 px
+    const png = await sharp(req.file.buffer).rotate()
+      .resize(2048, 2048, { fit: "inside", withoutEnlargement: true })
+      .png().toBuffer();
+    const meta = await sharp(png).metadata();
+    const decoded = await decodeQrImage(png);
+    const force = ["1", "true"].includes(String(req.body?.force || ""));
+    if (!decoded && !force) {
+      res.status(422).json({
+        error: "No se ha encontrado un código QR legible en la imagen. Si es un QR artístico que tu móvil sí lee, puedes añadirlo igualmente.",
+        canForce: true,
+      });
+      return;
+    }
+
+    const vaultId = await saveToVault({
+      projectId: row.projectId,
+      fileType: "card-qr-custom",
+      category: "card_qr",
+      title: `QR propio · ${row.name}`,
+      description: decoded ? `QR subido — contenido: ${decoded.slice(0, 200)}` : "QR subido (no verificado)",
+      mimeType: "image/png",
+      content: png.toString("base64"),
+      fileSizeBytes: png.length,
+      generatedBy: "card-studio",
+      metadata: { cardId: id, decoded, verified: !!decoded },
+    });
+    if (!vaultId) { res.status(500).json({ error: "No se pudo guardar el QR" }); return; }
+
+    res.json({
+      vaultFileId: vaultId,
+      url: `/api/projects/${row.projectId}/vault/${vaultId}/preview`,
+      decoded,
+      verified: !!decoded,
+      width: meta.width,
+      height: meta.height,
+    });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "cards upload-qr failed");
+    res.status(500).json({ error: err?.message || "Error subiendo el QR" });
   }
 });
 
@@ -903,28 +1011,33 @@ router.post("/cards/:id/generate-bg", requireAdmin, async (req: Request, res: Re
   }
 });
 
-// ─── QR genérico (para elementos QR extra del editor) ───────────────────────
-// Parámetros: data=URL, fg=#RRGGBB, bg=#RRGGBB, size=N (px, 128–2048)
+// ─── QR genérico (elementos QR extra del editor) ────────────────────────────
+// data=texto/URL · fg/bg=#RRGGBB · size=128–2048 · style=<json QrStyle> · logoCard=<id tarjeta>
 router.get("/qr.png", async (req: Request, res: Response) => {
   try {
     const data = String(req.query.data || "").trim();
-    if (!data) { res.status(400).send("Missing 'data' param"); return; }
+    if (!data) { res.status(400).json({ error: "Falta el parámetro data" }); return; }
+    if (data.length > MAX_QR_DATA) { res.status(400).json({ error: `Contenido demasiado largo para un QR de tarjeta (máx. ${MAX_QR_DATA} caracteres)` }); return; }
     const fg = /^#[0-9a-f]{6}$/i.test(String(req.query.fg || "")) ? String(req.query.fg) : "#000000";
     const bg = /^#[0-9a-f]{6}$/i.test(String(req.query.bg || "")) ? String(req.query.bg) : "#ffffff";
     const size = Math.max(128, Math.min(2048, parseInt(String(req.query.size || "1200"), 10) || 1200));
-    const png = await generateQrPng(data, {
-      fgColor: fg,
-      bgColor: bg,
-      margin: 1,
-      size,
-      errorLevel: "H",
-    });
+    const queryStyle = styleFromQuery(req.query.style);
+    if (queryStyle === null) { res.status(400).json({ error: "Parámetro style inválido" }); return; }
+    const style = sanitizeQrStyle(queryStyle, { fg, fg2: fg, bg, margin: 1 });
+
+    let logoDataUri: string | undefined;
+    const logoCard = parseInt(String(req.query.logoCard || ""), 10);
+    if (style.logo && Number.isFinite(logoCard)) {
+      const [card] = await db.select().from(businessCardsTable).where(eq(businessCardsTable.id, logoCard));
+      if (card) logoDataUri = await cardLogoDataUri(card);
+    }
+    const r = await renderVerifiedQr(data, style, { size, logoDataUri });
+    setQrHeaders(res, r);
     res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "public, max-age=60");
-    res.send(png);
+    res.send(r.png);
   } catch (err: any) {
     logger.error({ err: err?.message }, "generic qr.png failed");
-    res.status(500).send(err?.message || "error");
+    res.status(500).json({ error: err?.message || "Error generando QR" });
   }
 });
 
