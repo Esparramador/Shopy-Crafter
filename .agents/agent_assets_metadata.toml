@@ -809,3 +809,17 @@ mtime_ms = 1790008895726
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/10d4bd46-f48a-4596-8283-5cb649d67d12/6156e138-0bc1-483b-aec0-0403a3731381"
 storage_version_token = "1790008903199225"
 content_type = "audio/mpeg"
+
+[[outputs]]
+id = "1NK3ad5Txl2bdociiHxEb"
+uri = "file://artifacts/shopify-optimizer/public/regalo/qr-regalo-3d.png"
+type = "image"
+title = "QR — Regalo 3D"
+description = "Escanea este código para abrir https://shopycrafter.com/regalo/ en el móvil."
+logical_id = "2c20b924-656c-4e55-8ee9-24ab7be810e9"
+content_hash = "sha256:c5c7be4d8d309e1cca746ce48e8408c38d1903f3ded5a1818bba8548a42e7213"
+size = 14401
+mtime_ms = 1793301826270
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/2c20b924-656c-4e55-8ee9-24ab7be810e9/d1d9f0f7-ddde-4cf0-b23a-98ef39bede4e"
+storage_version_token = "1793301845730312"
+content_type = "image/png"
