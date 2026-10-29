@@ -2,7 +2,7 @@ import { db, usersTable, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import Stripe from "stripe";
 import { logger } from "./logger.js";
-import { subscriptionBlocksDeletion } from "./user-deletion.js";
+import { deleteClientUser, subscriptionBlocksDeletion } from "./user-deletion.js";
 import { stripeSubscriptionDashboardUrl } from "./stripe-dashboard-url.js";
 
 export type CancelMode = "now" | "period_end";
@@ -99,15 +99,56 @@ export async function syncLocalSubscriptionFromStripeEvent(input: {
   stripeSubscriptionId: string | null | undefined;
   status: string | null | undefined;
   deleted: boolean;
-}): Promise<{ applied: boolean; reason: "no_id" | "still_billing" | "synced" }> {
+}): Promise<{ applied: boolean; reason: "no_id" | "still_billing" | "synced"; autoDeletedUserId?: string }> {
   const id = input.stripeSubscriptionId?.trim();
   if (!id) return { applied: false, reason: "no_id" };
   const remoteStatus = String(input.status ?? "").toLowerCase();
   if (!input.deleted && !STRIPE_NON_BILLING.has(remoteStatus)) return { applied: false, reason: "still_billing" };
+
+  // Preserve the period-end revocation facts before syncing the row: after the
+  // status change, only this exact path is allowed to trigger automatic deletion.
+  const [subscription] = await db.select({
+    userId: subscriptionsTable.userId,
+    cancelAtPeriodEnd: subscriptionsTable.cancelAtPeriodEnd,
+    currentPeriodEnd: subscriptionsTable.currentPeriodEnd,
+  }).from(subscriptionsTable).where(eq(subscriptionsTable.stripeSubscriptionId, id)).limit(1);
+  let autoDeleteUserId: string | undefined;
+  if (subscription?.userId && Number(subscription.cancelAtPeriodEnd) === 1) {
+    const [user] = await db.select({
+      id: usersTable.id,
+      isActive: usersTable.isActive,
+      role: usersTable.role,
+      email: usersTable.email,
+    }).from(usersTable).where(eq(usersTable.id, subscription.userId)).limit(1);
+    const periodEnd = subscription.currentPeriodEnd instanceof Date
+      ? subscription.currentPeriodEnd
+      : subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd as string | number) : null;
+    if (user?.role === "client" && Number(user.isActive) === 0 && periodEnd && Number.isFinite(periodEnd.getTime()) && periodEnd.getTime() <= Date.now()) {
+      autoDeleteUserId = user.id;
+    }
+  }
+
   await db.update(subscriptionsTable)
-    .set({ status: "canceled", cancelAtPeriodEnd: 0 })
+    .set({ status: "canceled", cancelAtPeriodEnd: autoDeleteUserId ? 1 : 0 })
     .where(eq(subscriptionsTable.stripeSubscriptionId, id));
   logger.info({ stripeSubscriptionId: id, remoteStatus: input.deleted ? "deleted" : remoteStatus }, "Stripe webhook: suscripción cancelada en Stripe → fila local marcada como canceled");
+
+  if (autoDeleteUserId) {
+    const deletion = await deleteClientUser(autoDeleteUserId, "system:stripe-webhook", {
+      audit: {
+        actorId: "system:stripe-webhook",
+        action: "delete_user",
+        details: `Deleted revoked user ${autoDeleteUserId} after Stripe subscription ${id} expired`,
+      },
+    });
+    if (!deletion.ok && deletion.status !== 404) {
+      throw new Error(`No se pudo borrar automáticamente al cliente ${autoDeleteUserId}: ${deletion.error}`);
+    }
+    if (deletion.ok) {
+      logger.info({ userId: autoDeleteUserId, stripeSubscriptionId: id }, "Stripe webhook: cliente revocado borrado tras expirar su suscripción");
+      return { applied: true, reason: "synced", autoDeletedUserId: autoDeleteUserId };
+    }
+  }
   return { applied: true, reason: "synced" };
 }
 

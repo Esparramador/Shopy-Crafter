@@ -1,13 +1,19 @@
 import {
-  db, usersTable, platformSettingsTable, onboardingProgressTable, achievementsTable, subscriptionsTable,
+  db, usersTable, platformSettingsTable, onboardingProgressTable, achievementsTable, subscriptionsTable, auditLogTable,
   affiliatesTable, referralTrackingTable, reportTemplatesTable, youtubeTokensTable,
 } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
 import { stripeSubscriptionDashboardUrl } from "./stripe-dashboard-url.js";
+import { randomBytes } from "crypto";
 
 export type DeleteUserResult =
   | { ok: true; deleted: { id: string; email: string } }
   | { ok: false; status: 400 | 403 | 404 | 409; error: string; subscription?: { plan: string | null; status: string | null; stripeSubscriptionId: string; stripeDashboardUrl: string } };
+
+export interface DeleteUserOptions {
+  /** Write this audit entry in the same transaction as the deletion. */
+  audit?: { actorId: string; action: string; details: string; ipAddress?: string };
+}
 
 // Estados de Stripe en los que la suscripción ya no cobra. Cualquier otro estado
 // con stripe_subscription_id significa que Stripe seguiría facturando tras borrar
@@ -26,7 +32,7 @@ export function subscriptionBlocksDeletion(sub: { stripeSubscriptionId: string |
  *  - no hay FKs hacia users en la BD, así que las filas que le pertenecen se
  *    limpian a mano en una transacción; el audit_log se conserva.
  */
-export async function deleteClientUser(targetId: string, actorId: string): Promise<DeleteUserResult> {
+export async function deleteClientUser(targetId: string, actorId: string, options: DeleteUserOptions = {}): Promise<DeleteUserResult> {
   if (targetId === actorId) return { ok: false, status: 400, error: "No puedes borrar tu propio usuario" };
 
   const [user] = await db.select({ id: usersTable.id, email: usersTable.email, role: usersTable.role })
@@ -76,6 +82,15 @@ export async function deleteClientUser(targetId: string, actorId: string): Promi
       await tx.execute(sql`DELETE FROM calendar_tokens WHERE user_id = ${targetId}`);
     }
     await tx.delete(usersTable).where(eq(usersTable.id, targetId));
+    if (options.audit) {
+      await tx.insert(auditLogTable).values({
+        id: randomBytes(16).toString("hex"),
+        userId: options.audit.actorId,
+        action: options.audit.action,
+        details: options.audit.details,
+        ipAddress: options.audit.ipAddress ?? null,
+      });
+    }
   });
 
   return { ok: true, deleted: { id: user.id, email: user.email } };

@@ -18,6 +18,7 @@ import { db, subscriptionsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger.js";
 import { catalogPlan } from "./plan-catalog.js";
+import { syncLocalSubscriptionFromStripeEvent } from "./subscription-cancel.js";
 
 export const STRIPE_API_VERSION = "2026-05-27.dahlia" as const;
 
@@ -356,9 +357,17 @@ async function onSubscriptionChanged(sub: Stripe.Subscription, deleted: boolean)
     `);
     return;
   }
-  await db.update(subscriptionsTable)
-    .set({ status, cancelAtPeriodEnd: cancelAtEnd ? 1 : 0 })
-    .where(eq(subscriptionsTable.stripeSubscriptionId, sub.id));
+  if (deleted || ["canceled", "incomplete_expired"].includes(String(status).toLowerCase())) {
+    await syncLocalSubscriptionFromStripeEvent({
+      stripeSubscriptionId: sub.id,
+      status: sub.status,
+      deleted,
+    });
+  } else {
+    await db.update(subscriptionsTable)
+      .set({ status, cancelAtPeriodEnd: cancelAtEnd ? 1 : 0 })
+      .where(eq(subscriptionsTable.stripeSubscriptionId, sub.id));
+  }
   if (deleted && m.userId) {
     // Baja efectiva: el proyecto vuelve a las cuotas de prueba.
     const projectId = await clientProjectId(m.userId);

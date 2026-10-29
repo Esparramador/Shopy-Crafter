@@ -9,6 +9,7 @@ const tables = {
 };
 let selectRows: Record<string, Row[]> = {};
 const txOps: string[] = [];
+const auditRows: Row[] = [];
 let transactionRan = false;
 
 const nameOf = (t: unknown) => (t as { __name: string }).__name;
@@ -28,6 +29,7 @@ vi.mock("@workspace/db", () => {
   return {
     usersTable: mk("users", ["id", "email", "role"]),
     subscriptionsTable: mk("subscriptions", ["userId", "stripeSubscriptionId", "status", "plan"]),
+    auditLogTable: mk("audit_log", ["id", "userId", "action", "details", "ipAddress"]),
     onboardingProgressTable: mk("onboarding_progress", ["userId"]),
     achievementsTable: mk("achievements", ["userId"]),
     platformSettingsTable: mk("platform_settings", ["key"]),
@@ -47,6 +49,7 @@ vi.mock("@workspace/db", () => {
           },
           delete: (t: unknown) => ({ where: async () => { txOps.push(`delete:${nameOf(t)}`); } }),
           update: (t: unknown) => ({ set: () => ({ where: async () => { txOps.push(`update:${nameOf(t)}`); } }) }),
+          insert: (t: unknown) => ({ values: async (row: Row) => { txOps.push(`insert:${nameOf(t)}`); auditRows.push(row); } }),
           select: () => selectChain(),
         };
         await cb(tx);
@@ -65,7 +68,7 @@ import { deleteClientUser, subscriptionBlocksDeletion } from "./user-deletion";
 
 const client = { id: "c1", email: "c1@e2e.invalid", role: "client" };
 
-beforeEach(() => { selectRows = {}; txOps.length = 0; transactionRan = false; });
+beforeEach(() => { selectRows = {}; txOps.length = 0; auditRows.length = 0; transactionRan = false; });
 
 describe("subscriptionBlocksDeletion", () => {
   it("no bloquea sin fila, sin id de Stripe, o con suscripción ya cancelada", () => {
@@ -130,5 +133,25 @@ describe("deleteClientUser", () => {
     // Los referidos del afiliado se borran ANTES que el afiliado, y el usuario al final.
     expect(txOps.indexOf("delete:referral_tracking")).toBeLessThan(txOps.indexOf("delete:affiliates"));
     expect(txOps.at(-1)).toBe("delete:users");
+  });
+
+  it("guarda la auditoría del borrado automático dentro de la misma transacción", async () => {
+    selectRows = { users: [client], subscriptions: [{ stripeSubscriptionId: "sub_old", status: "canceled", plan: "starter" }] };
+    const result = await deleteClientUser("c1", "system:stripe-webhook", {
+      audit: {
+        actorId: "system:stripe-webhook",
+        action: "delete_user",
+        details: "Deleted revoked client after subscription expiry",
+      },
+    });
+    expect(result).toMatchObject({ ok: true, deleted: { id: "c1" } });
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({
+      userId: "system:stripe-webhook",
+      action: "delete_user",
+      details: "Deleted revoked client after subscription expiry",
+      ipAddress: null,
+    });
+    expect(txOps.indexOf("insert:audit_log")).toBeGreaterThan(txOps.indexOf("delete:users"));
   });
 });

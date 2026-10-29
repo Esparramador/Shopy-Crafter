@@ -4,13 +4,14 @@ type Row = Record<string, unknown>;
 let selectRows: Record<string, Row[]> = {};
 const updates: Array<{ table: string; set: Row }> = [];
 const wheres: unknown[] = [];
+const deleteClientUserMock = vi.hoisted(() => vi.fn());
 
 const nameOf = (t: unknown) => (t as { __name: string }).__name;
 
 vi.mock("@workspace/db", () => {
   const mk = (name: string, cols: string[]) => Object.fromEntries([["__name", name], ...cols.map(c => [c, `${name}.${c}`])]);
   return {
-    usersTable: mk("users", ["id", "role", "isActive"]),
+    usersTable: mk("users", ["id", "role", "isActive", "email"]),
     subscriptionsTable: mk("subscriptions", ["userId", "stripeSubscriptionId", "status", "cancelAtPeriodEnd", "currentPeriodEnd"]),
     db: {
       select: () => ({
@@ -23,14 +24,24 @@ vi.mock("@workspace/db", () => {
 vi.mock("drizzle-orm", () => ({ eq: (a: unknown, b: unknown) => ({ eq: [a, b] }) }));
 vi.mock("./logger.js", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("stripe", () => ({ default: class { subscriptions = { retrieve: async () => { throw new Error("no debería llamarse en tests"); }, cancel: async () => { throw new Error("no debería llamarse en tests"); }, update: async () => { throw new Error("no debería llamarse en tests"); } }; } }));
+vi.mock("./user-deletion.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./user-deletion.js")>();
+  return { ...actual, deleteClientUser: deleteClientUserMock };
+});
 
 import { cancelClientSubscription, isStripeAlreadyCanceledError, syncLocalSubscriptionFromStripeEvent } from "./subscription-cancel";
+import { deleteClientUser } from "./user-deletion";
 import { stripeSubscriptionDashboardUrl } from "./stripe-dashboard-url";
 
 const client = { id: "c1", role: "client" };
 const activeSub = { stripeSubscriptionId: "sub_live", status: "active" };
 
-beforeEach(() => { selectRows = {}; updates.length = 0; wheres.length = 0; });
+beforeEach(() => {
+  selectRows = {};
+  updates.length = 0;
+  wheres.length = 0;
+  deleteClientUserMock.mockReset().mockResolvedValue({ ok: true, deleted: { id: "c1", email: "c1@example.com" } });
+});
 
 describe("stripeSubscriptionDashboardUrl", () => {
   it("apunta a modo test con clave sk_test_ o sin clave, y a live con sk_live_", () => {
@@ -313,6 +324,48 @@ describe("syncLocalSubscriptionFromStripeEvent (webhook customer.subscription.*)
       expect(await syncLocalSubscriptionFromStripeEvent({ stripeSubscriptionId: "sub_dash", status, deleted: false })).toEqual({ applied: false, reason: "still_billing" });
     }
     expect(updates).toEqual([]);
+  });
+
+  it("borra y audita solo al cliente revocado cuyo periodo ya terminó", async () => {
+    selectRows = {
+      subscriptions: [{
+        userId: "c1", cancelAtPeriodEnd: 1, currentPeriodEnd: new Date(Date.now() - 60_000),
+      }],
+      users: [{ id: "c1", role: "client", isActive: 0, email: "c1@example.com" }],
+    };
+    const r = await syncLocalSubscriptionFromStripeEvent({
+      stripeSubscriptionId: "sub_dash", status: "canceled", deleted: true,
+    });
+    expect(r).toEqual({ applied: true, reason: "synced", autoDeletedUserId: "c1" });
+    expect(updates).toEqual([{ table: "subscriptions", set: { status: "canceled", cancelAtPeriodEnd: 1 } }]);
+    expect(deleteClientUser).toHaveBeenCalledWith("c1", "system:stripe-webhook", {
+      audit: {
+        actorId: "system:stripe-webhook",
+        action: "delete_user",
+        details: "Deleted revoked user c1 after Stripe subscription sub_dash expired",
+      },
+    });
+  });
+
+  it("no borra a usuarios activos, no revocados, o con fecha de fin futura", async () => {
+    const base = { userId: "c1", cancelAtPeriodEnd: 1, currentPeriodEnd: new Date(Date.now() - 60_000) };
+    for (const candidate of [
+      { subscription: base, user: { id: "c1", role: "client", isActive: 1 } },
+      { subscription: { ...base, cancelAtPeriodEnd: 0 }, user: { id: "c1", role: "client", isActive: 0 } },
+      { subscription: base, user: { id: "c1", role: "admin", isActive: 0 } },
+    ]) {
+      deleteClientUserMock.mockClear();
+      selectRows = { subscriptions: [candidate.subscription], users: [candidate.user] };
+      await syncLocalSubscriptionFromStripeEvent({ stripeSubscriptionId: "sub_dash", status: "canceled", deleted: true });
+      expect(deleteClientUser).not.toHaveBeenCalled();
+    }
+    deleteClientUserMock.mockClear();
+    selectRows = {
+      subscriptions: [{ ...base, currentPeriodEnd: new Date(Date.now() + 60_000) }],
+      users: [{ id: "c1", role: "client", isActive: 0 }],
+    };
+    await syncLocalSubscriptionFromStripeEvent({ stripeSubscriptionId: "sub_dash", status: "canceled", deleted: true });
+    expect(deleteClientUser).not.toHaveBeenCalled();
   });
 
   it("sin id de suscripción no hace nada", async () => {

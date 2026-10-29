@@ -17,7 +17,11 @@ vi.mock("@workspace/db", () => {
     usersTable: table("users"),
     db: {
       execute: async (q: { __sql?: string }) => { if (q?.__sql) rawSql.push(q.__sql); return { rows: [] }; },
-      select: () => ({ from: () => ({ where: async () => [] }) }),
+      select: () => ({
+        from: () => ({
+          where: () => Object.assign([] as unknown[], { limit: async () => [] as unknown[] }),
+        }),
+      }),
       insert: () => ({ values: async (v: unknown) => { inserts.push(v); } }),
       update: () => ({ set: (v: unknown) => ({ where: async () => { dbUpdates.push(v); } }) }),
     },
