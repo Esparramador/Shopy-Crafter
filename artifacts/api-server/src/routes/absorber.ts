@@ -348,7 +348,7 @@ type ClaudeImageBlock =
 /** JSON validado con el modelo por defecto (imagen opcional); ver claudeMessagesJson. */
 function claudeJson<T>(
   client: ClaudeClient,
-  opts: { system: string; prompt: string; schema: z.ZodType<T, z.ZodTypeDef, unknown>; label: string; imageBlock?: ClaudeImageBlock; maxTokens?: number },
+  opts: { system: string; prompt: string; schema: z.ZodType<T>; label: string; imageBlock?: ClaudeImageBlock; maxTokens?: number },
 ): Promise<T> {
   return claudeMessagesJson<T>(client, {
     model: CLAUDE_MODEL,

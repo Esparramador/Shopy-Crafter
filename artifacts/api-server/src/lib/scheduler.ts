@@ -81,7 +81,7 @@ async function aiGenerateDetailed(opts: AiGenerateOpts): Promise<{ text: string;
  * (un newConfidence en texto guardaba NaN; un insight sin texto rompía el INSERT).
  * Ahora: extracción balanceada, esquema, un reintento y error tipado.
  */
-async function aiGenerateJson<T>(opts: AiGenerateOpts, schema: z.ZodType<T, z.ZodTypeDef, unknown>, label: string): Promise<T> {
+async function aiGenerateJson<T>(opts: AiGenerateOpts, schema: z.ZodType<T>, label: string): Promise<T> {
   return generateAiJson<T>({
     prompt: opts.prompt,
     maxTokens: opts.maxTokens,

@@ -803,7 +803,7 @@ router.post("/projects/:projectId/products/:productId/ai-estimate-cogs", async (
           askGeminiWithSearch(`packaging ecommerce caja envío España precio\n\nJSON: {"items":[{"item":"","pricePerUnit":0,"source":""}],"totalPackagingCost":0,"insight":""}`, "Packaging analyst. ONLY JSON."),
         ]);
 
-        const parseGemini = <T,>(r: PromiseSettledResult<{ text: string }>, schema: z.ZodType<T, z.ZodTypeDef, unknown>, label: string): T | null =>
+        const parseGemini = <T,>(r: PromiseSettledResult<{ text: string }>, schema: z.ZodType<T>, label: string): T | null =>
           r.status === "fulfilled" ? parseResearchJson(r.value.text, schema, `pricing/cogs:${label}`) : null;
         const mat = parseGemini(matResult, materialResearchSchema, "materiales");
         if (mat) materialResearch = { ...materialResearch, ...definedOnly(mat) };
