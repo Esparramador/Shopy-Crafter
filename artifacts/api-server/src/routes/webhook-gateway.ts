@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { businessYmd } from "../lib/tz.js";
+import { syncLocalSubscriptionFromStripeEvent } from "../lib/subscription-cancel.js";
 
 const router = Router();
 
@@ -453,9 +454,21 @@ router.post("/webhooks/stripe", async (req: Request, res: Response) => {
           logger.error({ activateErr, userId, planId }, "❌ Error activando plan SaaS tras Stripe Checkout");
         }
       }
-    } else if (eventType === "customer.subscription.deleted") {
+    } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
+      // Cancelación hecha fuera del panel (dashboard de Stripe, fin de periodo, impago agotado):
+      // la fila local con ese stripe_subscription_id pasa a "canceled" para que el borrado del
+      // usuario deje de devolver 409. `updated` solo actúa si el status ya no factura.
       const customerId = obj.customer ?? "";
-      logger.info({ customerId, connectedAccountId }, "Stripe suscripción cancelada");
+      const deleted = eventType === "customer.subscription.deleted";
+      try {
+        const r = await syncLocalSubscriptionFromStripeEvent({ stripeSubscriptionId: obj.id, status: obj.status, deleted });
+        logger.info({ eventType, subscriptionId: obj.id, status: obj.status, customerId, connectedAccountId, ...r }, deleted ? "Stripe suscripción cancelada" : "Stripe suscripción actualizada");
+      } catch (syncErr) {
+        // Si la BD falla, se responde 500 para que Stripe REINTENTE el evento: con un 200 el evento
+        // se perdería y la fila local seguiría en "active" (borrado bloqueado con 409).
+        logger.error({ syncErr, eventType, subscriptionId: obj.id }, "❌ Error sincronizando suscripción cancelada desde Stripe; se pide reintento a Stripe");
+        return void res.status(500).json({ received: false, error: "No se pudo sincronizar la suscripción; Stripe reintentará" });
+      }
     } else if (eventType === "charge.refunded") {
       const amount = (obj.amount_refunded ?? 0) / 100;
       logger.info({ amount, connectedAccountId }, "Stripe reembolso procesado");

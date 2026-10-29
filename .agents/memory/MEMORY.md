@@ -72,5 +72,5 @@
 - [E2E harness: voice flows, client chatbot layout, admin pages](e2e-voice-call-playwright.md) — testing subagent breaks on mic permission; use e2e:* node scripts; admin pages need CoachMarks dismissed via localStorage; hide #replit-dev-banner.
 - [ConvAI agent voice settings are flat tts.* fields](convai-tts-flat-fields.md) — nested tts.voice_settings is silently ignored by the Agents API; send stability/similarity_boost/speed flat; owner picked 0.5/0.8/1.2 by ear.
 - [Session revalidation](session-revalidation.md) — revoke via global revalidation (regenerate, never destroy); session.impersonating = client id; refuse user delete while Stripe still bills.
-- [Stripe resource_missing is not proof of "gone"](admin-stripe-cancel-on-delete.md) — fail closed on billing guards; retrieve→decide→mutate; revoking access must also void pending invites.
+- [Stripe resource_missing is not proof of "gone"](admin-stripe-cancel-on-delete.md) — fail closed on billing guards; retrieve→decide→mutate; both Stripe webhook endpoints must sync canceled rows.
 - [Admin modal overlay convention](admin-modal-overlay.md) — wrap admin modals in <ModalOverlay> (hook+.modal-overlay); FAB is z 9990 so z-index races lose; add new pages to e2e PAGES.

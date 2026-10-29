@@ -75,6 +75,42 @@ function stripeErrorInfo(err: unknown): { code?: string; message: string } {
   return { code: e?.code, message: err instanceof Error ? err.message : String(err) };
 }
 
+/**
+ * ¿Indica el error de Stripe que la suscripción YA estaba cancelada cuando intentamos mutarla?
+ * Stripe lo expresa de varias formas según endpoint/versión: "This subscription has already been
+ * canceled", "A canceled subscription can only update its cancellation_details", o directamente
+ * `resource_missing` (cancel sobre una suscripción cancelada). Solo sirve como PISTA: el estado
+ * se confirma siempre con un retrieve posterior antes de tocar la fila local.
+ */
+export function isStripeAlreadyCanceledError(err: unknown): boolean {
+  const { code, message } = stripeErrorInfo(err);
+  if (code === "resource_missing") return true;
+  return /already (?:been )?cancel+ed|canceled subscription can only update|subscription (?:is|was) (?:already )?cancel+ed/i.test(message);
+}
+
+/**
+ * Sincroniza la fila local `subscriptions` con un evento de Stripe
+ * (`customer.subscription.deleted` / `customer.subscription.updated`) recibido por webhook.
+ * Solo actúa cuando Stripe dice que la suscripción ha dejado de facturar (deleted, o status
+ * canceled/incomplete_expired): la fila con ese `stripe_subscription_id` pasa a "canceled" y así
+ * el guard de borrado de usuario deja de devolver 409. Devuelve si se aplicó el cambio.
+ */
+export async function syncLocalSubscriptionFromStripeEvent(input: {
+  stripeSubscriptionId: string | null | undefined;
+  status: string | null | undefined;
+  deleted: boolean;
+}): Promise<{ applied: boolean; reason: "no_id" | "still_billing" | "synced" }> {
+  const id = input.stripeSubscriptionId?.trim();
+  if (!id) return { applied: false, reason: "no_id" };
+  const remoteStatus = String(input.status ?? "").toLowerCase();
+  if (!input.deleted && !STRIPE_NON_BILLING.has(remoteStatus)) return { applied: false, reason: "still_billing" };
+  await db.update(subscriptionsTable)
+    .set({ status: "canceled", cancelAtPeriodEnd: 0 })
+    .where(eq(subscriptionsTable.stripeSubscriptionId, id));
+  logger.info({ stripeSubscriptionId: id, remoteStatus: input.deleted ? "deleted" : remoteStatus }, "Stripe webhook: suscripción cancelada en Stripe → fila local marcada como canceled");
+  return { applied: true, reason: "synced" };
+}
+
 export interface CancelSubscriptionOptions {
   /**
    * true → no se corta la facturación ya pagada: Stripe la cancela al final del periodo en curso
@@ -166,17 +202,38 @@ export async function cancelClientSubscription(
     return { ok: false, status: 502, stripeDashboardUrl, error: `Stripe no respondió correctamente: ${message}` };
   }
 
-  // 2a) Ya no factura en Stripe: sincronizamos la fila local como "canceled" sea cual sea el modo.
-  if (STRIPE_NON_BILLING.has(remote.status)) {
+  // Stripe ya no factura esta suscripción: la fila local pasa a "canceled" sea cual sea el modo.
+  const syncAlreadyCanceled = async (remoteStatus: string, via: "retrieve" | "already_canceled_error"): Promise<CancelSubscriptionResult> => {
     await db.update(subscriptionsTable)
       .set({ status: "canceled", cancelAtPeriodEnd: 0 })
       .where(eq(subscriptionsTable.userId, targetId));
     if (mode === "period_end") await deactivateUser();
-    logger.info({ targetId, actorId, stripeSubscriptionId, mode, remoteStatus: remote.status }, "Suscripción Stripe ya cancelada: fila local sincronizada por admin");
+    logger.info({ targetId, actorId, stripeSubscriptionId, mode, remoteStatus, via }, "Suscripción Stripe ya cancelada: fila local sincronizada por admin");
     return {
       ok: true, mode, alreadyCanceled: true, alreadyScheduled: false, localUpdated: true,
       userDeactivated: mode === "period_end", stripeSubscriptionId, status: "canceled", periodEnd: null,
     };
+  };
+
+  // Stripe rechazó la mutación diciendo que la suscripción ya estaba cancelada (p. ej. cancelada
+  // desde el dashboard entre nuestro retrieve y el cancel). Se trata como éxito SOLO si un retrieve
+  // posterior lo confirma; si no se puede confirmar, se devuelve null y el llamador falla cerrado.
+  const confirmCanceledAfterError = async (err: unknown): Promise<CancelSubscriptionResult | null> => {
+    if (!isStripeAlreadyCanceledError(err)) return null;
+    let check: StripeSubscriptionSnapshot;
+    try {
+      check = await stripe.retrieve(stripeSubscriptionId);
+    } catch (checkErr: unknown) {
+      logger.warn({ targetId, stripeSubscriptionId, mode, err: stripeErrorInfo(checkErr).message }, "Stripe: 'already canceled' no confirmable con retrieve; no se toca la fila local");
+      return null;
+    }
+    if (!STRIPE_NON_BILLING.has(check.status)) return null;
+    return syncAlreadyCanceled(check.status, "already_canceled_error");
+  };
+
+  // 2a) Ya no factura en Stripe según el retrieve.
+  if (STRIPE_NON_BILLING.has(remote.status)) {
+    return syncAlreadyCanceled(remote.status, "retrieve");
   }
 
   // 2b) Modo period_end: programar la cancelación (o confirmar que ya lo está) y revocar acceso.
@@ -186,6 +243,8 @@ export async function cancelClientSubscription(
       try {
         remote = await stripe.cancelAtPeriodEnd(stripeSubscriptionId);
       } catch (err: unknown) {
+        const confirmed = await confirmCanceledAfterError(err);
+        if (confirmed) return confirmed;
         const { message } = stripeErrorInfo(err);
         logger.error({ targetId, stripeSubscriptionId, err: message }, "Stripe: error programando la cancelación al final del periodo");
         return { ok: false, status: 502, stripeDashboardUrl, error: `Stripe rechazó programar la cancelación: ${message}` };
@@ -212,6 +271,8 @@ export async function cancelClientSubscription(
   try {
     remoteStatus = (await stripe.cancel(stripeSubscriptionId)).status;
   } catch (err: unknown) {
+    const confirmed = await confirmCanceledAfterError(err);
+    if (confirmed) return confirmed;
     const { message } = stripeErrorInfo(err);
     logger.error({ targetId, stripeSubscriptionId, err: message }, "Stripe: error cancelando suscripción");
     return { ok: false, status: 502, stripeDashboardUrl, error: `Stripe rechazó la cancelación: ${message}` };
