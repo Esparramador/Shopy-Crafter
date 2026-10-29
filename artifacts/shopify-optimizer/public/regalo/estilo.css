@@ -53,3 +53,25 @@ h1 em { font-style: italic; color: var(--oro); }
 .final .boton.si { opacity: 1; }
 .destello { position: fixed; inset: 0; background: radial-gradient(circle at 50% 55%, #fff8e6 0%, #ffe3a8 35%, rgba(255,227,168,0) 75%);
   opacity: 0; pointer-events: none; z-index: 15; transition: opacity 1s ease; }
+
+/* ---- modo 2D: el navegador no da WebGL; el regalo se abre en CSS */
+.regalo2d { display: none; }
+body.modo2d #escena { display: none; }
+body.modo2d { background: linear-gradient(to top, rgba(255,186,120,.35) 0%, rgba(255,186,120,0) 50%), radial-gradient(120% 90% at 50% 20%, #3d5583 0%, #26324f 50%, #131827 100%); }
+body.modo2d .regalo2d { display: block; position: fixed; left: 50%; top: 46%; width: 150px; height: 150px; transform: translate(-50%, -50%); z-index: 2; }
+.caja2d, .tapa2d { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 6px;
+  background: radial-gradient(circle at 30% 30%, rgba(242,207,134,.9) 0 3px, transparent 4px) 0 0/26px 26px, linear-gradient(135deg, #c21b49, #93102f); box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+.caja2d { bottom: 0; width: 130px; height: 104px; }
+.tapa2d { bottom: 100px; width: 146px; height: 32px; z-index: 2; transition: transform 1.1s cubic-bezier(.3,1.4,.5,1), opacity .8s ease .6s; }
+.caja2d i, .tapa2d i { position: absolute; left: 50%; top: 0; bottom: 0; width: 18px; transform: translateX(-50%); background: linear-gradient(90deg, #c99a4a, #f3d58f, #c99a4a); }
+.lazo2d { position: absolute; left: 50%; bottom: 128px; width: 70px; height: 38px; transform: translateX(-50%); z-index: 3; transition: transform .7s ease, opacity .5s ease; }
+.lazo2d::before, .lazo2d::after { content: ""; position: absolute; bottom: 0; width: 34px; height: 30px; border: 7px solid #ecc679; border-radius: 50% 50% 10% 50%; }
+.lazo2d::before { left: 0; transform: rotate(-20deg); } .lazo2d::after { right: 0; transform: scaleX(-1) rotate(-20deg); }
+.luz2d { position: absolute; left: 50%; bottom: 90px; width: 20px; height: 20px; transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(circle, #fff8e6 0%, #ffd889 40%, rgba(255,216,137,0) 70%); opacity: 0; transition: all 1.4s ease .9s; }
+body.modo2d .regalo2d { animation: agita 1.8s ease-in-out infinite; }
+.regalo2d.abierto { animation: none !important; }
+.regalo2d.abierto .lazo2d { transform: translate(-150%, -60px) rotate(-200deg) scale(.6); opacity: 0; }
+.regalo2d.abierto .tapa2d { transform: translate(40%, -150px) rotate(38deg); opacity: 0; }
+.regalo2d.abierto .luz2d { width: 520px; height: 520px; bottom: -120px; opacity: 1; }
+@keyframes agita { 0%, 70%, 100% { transform: translate(-50%, -50%) rotate(0); } 76% { transform: translate(-50%, -50%) rotate(-4deg); } 82% { transform: translate(-50%, -50%) rotate(4deg); } 88% { transform: translate(-50%, -50%) rotate(-2deg); } }
