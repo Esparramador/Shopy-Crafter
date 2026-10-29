@@ -12,9 +12,12 @@
 //   4. La fila del propio admin no aparece en la tabla (solo se listan clientes).
 //   5. Con una suscripción de Stripe activa (fila local sembrada vía psql con un id
 //      que NO existe en la cuenta Stripe configurada) el DELETE responde 409, el modal
-//      ofrece "Cancelar suscripción y borrar" con enlace al dashboard y pide confirmación
-//      extra. Al confirmar, el backend consulta Stripe, recibe resource_missing y FALLA
-//      CERRADO: muestra el aviso, no cancela, no borra y el DELETE sigue en 409.
+//      ofrece "Cancelar suscripción…" con enlace al dashboard y, al pulsarlo, dos opciones:
+//      "Cancelar ahora y borrar" y "Cancelar al final del periodo y revocar acceso".
+//      Con cualquiera de las dos el backend consulta Stripe, recibe resource_missing y FALLA
+//      CERRADO: muestra el aviso, no cancela, no desactiva, no borra y el DELETE sigue en 409.
+//   6. Un cliente con cancel_at_period_end=1 + current_period_end (sembrado) muestra en la
+//      lista la fecha de fin de periodo bajo su estado.
 //      (El camino feliz — cancelación confirmada por Stripe — se cubre en
 //      api-server/src/lib/subscription-cancel.test.ts; no se ejerce aquí para no tocar
 //      facturación real.) Requiere DATABASE_URL + psql; si faltan, se omite con aviso.
@@ -182,11 +185,15 @@ try {
     await page.screenshot({ path: path.join(SHOTS, "04-sub-block.png") });
 
     const cancelBtn = subBlock.locator('[data-testid="delete-client-cancel-sub-btn"]');
-    check(await cancelBtn.isVisible(), 'Se ofrece el botón "Cancelar suscripción y borrar"');
+    check(await cancelBtn.isVisible(), 'Se ofrece el botón "Cancelar suscripción…"');
     await cancelBtn.click();
     const confirmBox = subBlock.locator('[data-testid="delete-client-cancel-sub-confirm"]');
     await confirmBox.waitFor({ state: "visible", timeout: 5000 });
     check(/facturaci/i.test(await confirmBox.innerText()), "Pide confirmación explícita mencionando la facturación");
+    const nowBtn = confirmBox.locator('[data-testid="delete-client-cancel-sub-confirm-btn"]');
+    const periodEndBtn = confirmBox.locator('[data-testid="delete-client-cancel-sub-period-end-btn"]');
+    check(/Cancelar ahora y borrar/.test(await nowBtn.innerText()), 'Opción 1: "Cancelar ahora y borrar"');
+    check(/Cancelar al final del periodo y revocar acceso/.test(await periodEndBtn.innerText()), 'Opción 2: "Cancelar al final del periodo y revocar acceso"');
     // Volver atrás no cancela nada.
     await confirmBox.locator('[data-testid="delete-client-cancel-sub-back-btn"]').click();
     await confirmBox.waitFor({ state: "hidden", timeout: 5000 });
@@ -221,9 +228,41 @@ try {
     const subRow = execSync("psql \"$DATABASE_URL\" -tA -c " + JSON.stringify(`SELECT status FROM subscriptions WHERE user_id = '${billed.id}'`), { encoding: "utf8" }).trim();
     check(subRow === "active", `La suscripción local sigue en "active" (obtenido "${subRow}")`);
     await page.screenshot({ path: path.join(SHOTS, "06-sub-fail-closed.png") });
+    // Opción "al final del periodo": mismo fallo cerrado, y además el usuario NO se desactiva.
+    // (Tras el fallo anterior el panel de opciones sigue abierto para reintentar.)
+    await confirmBox.waitFor({ state: "visible", timeout: 5000 });
+    const [peResp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes(`/api/admin/users/${billed.id}/cancel-subscription`) && r.request().method() === "POST"),
+      periodEndBtn.click(),
+    ]);
+    check(peResp.status() === 409, `POST cancel-subscription {atPeriodEnd:true} también falla cerrado con 409 (obtenido ${peResp.status()})`);
+    check(JSON.parse(peResp.request().postData() || "{}").atPeriodEnd === true, "La opción 2 envía { atPeriodEnd: true }");
+    await cancelErr.waitFor({ state: "visible", timeout: 10000 });
+    check(await modal.isVisible(), "El modal permanece abierto tras el fallo de la opción 2");
+    const subRow2 = execSync("psql \"$DATABASE_URL\" -tA -c " + JSON.stringify(`SELECT status || '|' || cancel_at_period_end FROM subscriptions WHERE user_id = '${billed.id}'`), { encoding: "utf8" }).trim();
+    check(subRow2 === "active|0", `La fila local no queda programada (obtenido "${subRow2}")`);
+    const userRow = execSync("psql \"$DATABASE_URL\" -tA -c " + JSON.stringify(`SELECT is_active FROM users WHERE id = '${billed.id}'`), { encoding: "utf8" }).trim();
+    check(userRow === "1", `El usuario sigue activo al fallar cerrado (is_active=${userRow})`);
+    await page.screenshot({ path: path.join(SHOTS, "07-period-end-fail-closed.png") });
     await modal.getByRole("button", { name: "Cancelar", exact: true }).click();
     const users2 = await (await ctx.request.get(`${BASE}/api/admin/users`)).json();
     check(users2.some((u) => u.id === billed.id), "El usuario con suscripción sigue existiendo en el API");
+
+    // 6. Fecha de fin de periodo visible en la lista para una cancelación programada.
+    execSync("psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -c " + JSON.stringify(
+      `UPDATE subscriptions SET cancel_at_period_end = 1, current_period_end = '2030-02-15T10:00:00Z' WHERE user_id = '${billed.id}'`
+    ), { stdio: "pipe" });
+    execSync("psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -c " + JSON.stringify(`UPDATE users SET is_active = 0 WHERE id = '${billed.id}'`), { stdio: "pipe" });
+    const listed = (await (await ctx.request.get(`${BASE}/api/admin/users`)).json()).find((u) => u.id === billed.id);
+    check(listed?.subscriptionCancelAtPeriodEnd === 1 && typeof listed?.subscriptionPeriodEnd === "string", "GET /api/admin/users expone cancelAtPeriodEnd + periodEnd de la suscripción");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const periodCell = page.locator(`[data-testid="client-period-end-${billed.id}"]`);
+    await periodCell.waitFor({ state: "visible", timeout: 10000 });
+    const periodText = await periodCell.innerText();
+    check(/Fin periodo/.test(periodText) && /2030/.test(periodText), `La lista muestra la fecha de fin de periodo ("${periodText.trim()}")`);
+    const row = page.locator(`[data-testid="delete-client-btn-${billed.id}"]`).locator("xpath=ancestor::tr");
+    check(/Inactivo/.test(await row.innerText()), "El cliente aparece como Inactivo (acceso revocado)");
+    await page.screenshot({ path: path.join(SHOTS, "08-period-end-listed.png") });
   }
 
   check(errors.length === 0, `Sin errores JS en la página${errors.length ? `: ${errors.join(" | ")}` : ""}`);

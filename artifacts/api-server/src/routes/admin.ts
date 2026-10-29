@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { existsSync } from "fs";
 import path from "path";
 import { execSync } from "child_process";
-import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable } from "@workspace/db";
+import { db, usersTable, auditLogTable, approvalsTable, messagesTable, projectsTable, platformSettingsTable, productsTable, subscriptionsTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
@@ -53,7 +53,15 @@ router.get("/users", async (_req, res): Promise<void> => {
       avatarColor: usersTable.avatarColor,
       lastLogin: usersTable.lastLogin,
       createdAt: usersTable.createdAt,
-    }).from(usersTable).orderBy(desc(usersTable.createdAt));
+      // Suscripción SaaS (si existe): el panel muestra la fecha de fin de periodo
+      // cuando la cancelación está programada (cancel_at_period_end).
+      subscriptionPlan: subscriptionsTable.plan,
+      subscriptionStatus: subscriptionsTable.status,
+      subscriptionCancelAtPeriodEnd: subscriptionsTable.cancelAtPeriodEnd,
+      subscriptionPeriodEnd: subscriptionsTable.currentPeriodEnd,
+    }).from(usersTable)
+      .leftJoin(subscriptionsTable, eq(subscriptionsTable.userId, usersTable.id))
+      .orderBy(desc(usersTable.createdAt));
     res.json(users);
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
@@ -351,24 +359,50 @@ router.delete("/users/:userId", async (req, res): Promise<void> => {
   }
 });
 
-// Cancela en Stripe (inmediato) la suscripción que bloquea el borrado de un cliente.
+// Cancela en Stripe la suscripción que bloquea el borrado de un cliente.
+//   body {}                      → cancelación inmediata (sin reembolso); el usuario queda listo para borrarse.
+//   body { atPeriodEnd: true }   → cancel_at_period_end en Stripe (se respeta el periodo ya pagado) y el
+//                                  usuario se DESACTIVA ahora en vez de borrarse; se borra cuando expire.
 router.post("/users/:userId/cancel-subscription", async (req, res): Promise<void> => {
   try {
     const targetId = req.params["userId"]!;
-    const result = await cancelClientSubscription(targetId, req.session.userId!);
+    const atPeriodEnd = (req.body as { atPeriodEnd?: unknown } | undefined)?.atPeriodEnd === true;
+    const result = await cancelClientSubscription(targetId, req.session.userId!, undefined, { atPeriodEnd });
     if (!result.ok) {
       res.status(result.status).json({ error: result.error, stripeDashboardUrl: result.stripeDashboardUrl });
       return;
     }
     if (result.localUpdated) {
+      const what = result.alreadyCanceled
+        ? "Confirmed canceled"
+        : result.mode === "period_end"
+          ? `${result.alreadyScheduled ? "Confirmed scheduled" : "Scheduled"} cancel-at-period-end${result.periodEnd ? ` (${result.periodEnd.toISOString()})` : ""} for`
+          : "Canceled";
       await recordAudit({
         userId: req.session.userId!,
-        action: "cancel_subscription",
-        details: `${result.alreadyCanceled ? "Confirmed canceled" : "Canceled"} Stripe subscription ${result.stripeSubscriptionId} for user ${targetId}`,
+        action: result.mode === "period_end" ? "cancel_subscription_period_end" : "cancel_subscription",
+        details: `${what} Stripe subscription ${result.stripeSubscriptionId} for user ${targetId}`,
         ipAddress: req.ip ?? "unknown",
       });
     }
-    res.json({ success: true, alreadyCanceled: result.alreadyCanceled, stripeSubscriptionId: result.stripeSubscriptionId, status: result.status });
+    if (result.userDeactivated) {
+      await recordAudit({
+        userId: req.session.userId!,
+        action: "deactivate_user",
+        details: `Deactivated user ${targetId} (access revoked until subscription period ends)`,
+        ipAddress: req.ip ?? "unknown",
+      });
+    }
+    res.json({
+      success: true,
+      mode: result.mode,
+      alreadyCanceled: result.alreadyCanceled,
+      alreadyScheduled: result.alreadyScheduled,
+      userDeactivated: result.userDeactivated,
+      stripeSubscriptionId: result.stripeSubscriptionId,
+      status: result.status,
+      periodEnd: result.periodEnd ? result.periodEnd.toISOString() : null,
+    });
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });

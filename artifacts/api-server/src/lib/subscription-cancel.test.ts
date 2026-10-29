@@ -9,8 +9,8 @@ const nameOf = (t: unknown) => (t as { __name: string }).__name;
 vi.mock("@workspace/db", () => {
   const mk = (name: string, cols: string[]) => Object.fromEntries([["__name", name], ...cols.map(c => [c, `${name}.${c}`])]);
   return {
-    usersTable: mk("users", ["id", "role"]),
-    subscriptionsTable: mk("subscriptions", ["userId", "stripeSubscriptionId", "status", "cancelAtPeriodEnd"]),
+    usersTable: mk("users", ["id", "role", "isActive"]),
+    subscriptionsTable: mk("subscriptions", ["userId", "stripeSubscriptionId", "status", "cancelAtPeriodEnd", "currentPeriodEnd"]),
     db: {
       select: () => ({
         from: (t: unknown) => ({ where: () => ({ limit: async () => selectRows[nameOf(t)] ?? [] }) }),
@@ -21,7 +21,7 @@ vi.mock("@workspace/db", () => {
 });
 vi.mock("drizzle-orm", () => ({ eq: (a: unknown, b: unknown) => ({ eq: [a, b] }) }));
 vi.mock("./logger.js", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("stripe", () => ({ default: class { subscriptions = { retrieve: async () => { throw new Error("no debería llamarse en tests"); }, cancel: async () => { throw new Error("no debería llamarse en tests"); } }; } }));
+vi.mock("stripe", () => ({ default: class { subscriptions = { retrieve: async () => { throw new Error("no debería llamarse en tests"); }, cancel: async () => { throw new Error("no debería llamarse en tests"); }, update: async () => { throw new Error("no debería llamarse en tests"); } }; } }));
 
 import { cancelClientSubscription } from "./subscription-cancel";
 import { stripeSubscriptionDashboardUrl } from "./stripe-dashboard-url";
@@ -40,12 +40,19 @@ describe("stripeSubscriptionDashboardUrl", () => {
 });
 
 const missing = () => Object.assign(new Error("No such subscription: 'sub_live'"), { code: "resource_missing" });
-function fakeStripe(opts: { retrieve?: () => Promise<{ status: string }>; cancel?: () => Promise<{ status: string }> } = {}) {
+const PERIOD_END = new Date("2026-11-28T10:00:00.000Z");
+type Snap = { status: string; cancelAtPeriodEnd: boolean; periodEnd: Date | null };
+const snap = (status: string, extra: Partial<Snap> = {}): Snap => ({ status, cancelAtPeriodEnd: false, periodEnd: null, ...extra });
+function fakeStripe(opts: { retrieve?: () => Promise<Snap>; cancel?: () => Promise<Snap>; cancelAtPeriodEnd?: () => Promise<Snap> } = {}) {
   return {
-    retrieve: vi.fn(opts.retrieve ?? (async () => ({ status: "active" }))),
-    cancel: vi.fn(opts.cancel ?? (async () => ({ status: "canceled" }))),
+    retrieve: vi.fn(opts.retrieve ?? (async () => snap("active", { periodEnd: PERIOD_END }))),
+    cancel: vi.fn(opts.cancel ?? (async () => snap("canceled"))),
+    cancelAtPeriodEnd: vi.fn(opts.cancelAtPeriodEnd ?? (async () => snap("active", { cancelAtPeriodEnd: true, periodEnd: PERIOD_END }))),
   };
 }
+const AT_END = { atPeriodEnd: true };
+// Revocar = desactivar + anular invitación pendiente (el setup por invitación reactivaría al usuario).
+const REVOKE = { isActive: 0, inviteToken: null, inviteExpires: null };
 
 describe("cancelClientSubscription", () => {
   it("rechaza al propio actor, 404 sin usuario y 403 para admins, sin tocar Stripe ni la BD", async () => {
@@ -62,7 +69,7 @@ describe("cancelClientSubscription", () => {
   it("devuelve alreadyCanceled sin llamar a Stripe si la fila local ya no bloquea el borrado", async () => {
     const stripe = fakeStripe();
     selectRows = { users: [client], subscriptions: [{ stripeSubscriptionId: "sub_old", status: "canceled" }] };
-    expect(await cancelClientSubscription("c1", "a1", stripe)).toEqual({ ok: true, alreadyCanceled: true, localUpdated: false, stripeSubscriptionId: "sub_old", status: "canceled" });
+    expect(await cancelClientSubscription("c1", "a1", stripe)).toEqual({ ok: true, mode: "now", alreadyCanceled: true, alreadyScheduled: false, localUpdated: false, userDeactivated: false, stripeSubscriptionId: "sub_old", status: "canceled", periodEnd: null });
     selectRows = { users: [client] };
     expect(await cancelClientSubscription("c1", "a1", stripe)).toMatchObject({ ok: true, alreadyCanceled: true, stripeSubscriptionId: null });
     expect(stripe.retrieve).not.toHaveBeenCalled();
@@ -81,12 +88,12 @@ describe("cancelClientSubscription", () => {
     const r = await cancelClientSubscription("c1", "a1", stripe);
     expect(stripe.retrieve).toHaveBeenCalledWith("sub_live");
     expect(stripe.cancel).toHaveBeenCalledWith("sub_live");
-    expect(r).toEqual({ ok: true, alreadyCanceled: false, localUpdated: true, stripeSubscriptionId: "sub_live", status: "canceled" });
+    expect(r).toEqual({ ok: true, mode: "now", alreadyCanceled: false, alreadyScheduled: false, localUpdated: true, userDeactivated: false, stripeSubscriptionId: "sub_live", status: "canceled", periodEnd: null });
     expect(updates).toEqual([{ table: "subscriptions", set: { status: "canceled", cancelAtPeriodEnd: 0 } }]);
   });
 
   it("si Stripe confirma que ya está cancelada, sincroniza la fila local sin volver a cancelar", async () => {
-    const stripe = fakeStripe({ retrieve: async () => ({ status: "canceled" }) });
+    const stripe = fakeStripe({ retrieve: async () => snap("canceled") });
     selectRows = { users: [client], subscriptions: [activeSub] };
     expect(await cancelClientSubscription("c1", "a1", stripe)).toMatchObject({ ok: true, alreadyCanceled: true, localUpdated: true });
     expect(stripe.cancel).not.toHaveBeenCalled();
@@ -118,9 +125,85 @@ describe("cancelClientSubscription", () => {
   });
 
   it("502 si cancel() responde pero la suscripción sigue en un estado que factura", async () => {
-    const stripe = fakeStripe({ cancel: async () => ({ status: "active" }) });
+    const stripe = fakeStripe({ cancel: async () => snap("active") });
     selectRows = { users: [client], subscriptions: [activeSub] };
     expect(await cancelClientSubscription("c1", "a1", stripe)).toMatchObject({ ok: false, status: 502 });
+    expect(updates).toEqual([]);
+  });
+});
+
+describe("cancelClientSubscription — atPeriodEnd (cancelar al final del periodo + revocar acceso)", () => {
+  it("programa cancel_at_period_end en Stripe, marca la fila local y desactiva al usuario (no lo borra)", async () => {
+    const stripe = fakeStripe();
+    selectRows = { users: [client], subscriptions: [activeSub] };
+    const r = await cancelClientSubscription("c1", "a1", stripe, AT_END);
+    expect(stripe.retrieve).toHaveBeenCalledWith("sub_live");
+    expect(stripe.cancelAtPeriodEnd).toHaveBeenCalledWith("sub_live");
+    expect(stripe.cancel).not.toHaveBeenCalled();
+    expect(r).toEqual({ ok: true, mode: "period_end", alreadyCanceled: false, alreadyScheduled: false, localUpdated: true, userDeactivated: true, stripeSubscriptionId: "sub_live", status: "active", periodEnd: PERIOD_END });
+    expect(updates).toEqual([
+      { table: "subscriptions", set: { cancelAtPeriodEnd: 1, currentPeriodEnd: PERIOD_END } },
+      { table: "users", set: REVOKE },
+    ]);
+  });
+
+  it("si Stripe ya la tenía programada, no vuelve a llamar a update pero sincroniza la fila y desactiva", async () => {
+    const stripe = fakeStripe({ retrieve: async () => snap("active", { cancelAtPeriodEnd: true, periodEnd: PERIOD_END }) });
+    selectRows = { users: [client], subscriptions: [activeSub] };
+    const r = await cancelClientSubscription("c1", "a1", stripe, AT_END);
+    expect(stripe.cancelAtPeriodEnd).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ ok: true, mode: "period_end", alreadyScheduled: true, userDeactivated: true, periodEnd: PERIOD_END });
+    expect(updates.map(u => u.table)).toEqual(["subscriptions", "users"]);
+  });
+
+  it("si Stripe confirma que ya está cancelada, marca canceled (no programada) y desactiva", async () => {
+    const stripe = fakeStripe({ retrieve: async () => snap("canceled") });
+    selectRows = { users: [client], subscriptions: [activeSub] };
+    const r = await cancelClientSubscription("c1", "a1", stripe, AT_END);
+    expect(stripe.cancelAtPeriodEnd).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ ok: true, mode: "period_end", alreadyCanceled: true, userDeactivated: true, status: "canceled" });
+    expect(updates).toEqual([
+      { table: "subscriptions", set: { status: "canceled", cancelAtPeriodEnd: 0 } },
+      { table: "users", set: REVOKE },
+    ]);
+  });
+
+  it("sin suscripción que facture, solo revoca el acceso", async () => {
+    const stripe = fakeStripe();
+    selectRows = { users: [client] };
+    expect(await cancelClientSubscription("c1", "a1", stripe, AT_END)).toMatchObject({ ok: true, mode: "period_end", alreadyCanceled: true, userDeactivated: true, localUpdated: false });
+    expect(stripe.retrieve).not.toHaveBeenCalled();
+    expect(updates).toEqual([{ table: "users", set: REVOKE }]);
+  });
+
+  it("revocar anula la invitación pendiente: el enlace de invitación no puede reactivar al usuario", async () => {
+    const stripe = fakeStripe();
+    selectRows = { users: [client], subscriptions: [activeSub] };
+    await cancelClientSubscription("c1", "a1", stripe, AT_END);
+    const userUpdate = updates.find(u => u.table === "users");
+    expect(userUpdate?.set).toMatchObject({ isActive: 0, inviteToken: null, inviteExpires: null });
+  });
+
+  it("FAIL CLOSED: resource_missing → 409 sin programar nada ni desactivar al usuario", async () => {
+    const stripe = fakeStripe({ retrieve: async () => { throw missing(); } });
+    selectRows = { users: [client], subscriptions: [activeSub] };
+    expect(await cancelClientSubscription("c1", "a1", stripe, AT_END)).toMatchObject({ ok: false, status: 409, stripeDashboardUrl: expect.stringContaining("sub_live") });
+    expect(stripe.cancelAtPeriodEnd).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+  });
+
+  it("502 y sin cambios locales si update() falla o no deja cancel_at_period_end=true", async () => {
+    selectRows = { users: [client], subscriptions: [activeSub] };
+    const failing = fakeStripe({ cancelAtPeriodEnd: async () => { throw new Error("rate_limit"); } });
+    expect(await cancelClientSubscription("c1", "a1", failing, AT_END)).toMatchObject({ ok: false, status: 502, error: expect.stringContaining("rate_limit") });
+    const noop = fakeStripe({ cancelAtPeriodEnd: async () => snap("active") });
+    expect(await cancelClientSubscription("c1", "a1", noop, AT_END)).toMatchObject({ ok: false, status: 502 });
+    expect(updates).toEqual([]);
+  });
+
+  it("503 si Stripe no está configurado: no desactiva al usuario", async () => {
+    selectRows = { users: [client], subscriptions: [activeSub] };
+    expect(await cancelClientSubscription("c1", "a1", null, AT_END)).toMatchObject({ ok: false, status: 503 });
     expect(updates).toEqual([]);
   });
 });

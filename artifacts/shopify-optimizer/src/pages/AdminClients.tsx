@@ -17,7 +17,21 @@ interface User {
   avatarColor: string;
   lastLogin: string | null;
   createdAt: string;
+  // Suscripción SaaS (left join en GET /api/admin/users); null si no tiene.
+  subscriptionPlan?: string | null;
+  subscriptionStatus?: string | null;
+  subscriptionCancelAtPeriodEnd?: number | null;
+  subscriptionPeriodEnd?: string | null;
 }
+
+/** Fecha de fin de periodo si la suscripción está programada para cancelarse (cancel_at_period_end). */
+function scheduledCancelDate(u: User): Date | null {
+  if (!u.subscriptionCancelAtPeriodEnd || !u.subscriptionPeriodEnd) return null;
+  if ((u.subscriptionStatus ?? "").toLowerCase() === "canceled") return null;
+  const d = new Date(u.subscriptionPeriodEnd);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+const fmtDate = (d: Date) => d.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 
 interface Message {
   id: string;
@@ -1272,7 +1286,14 @@ function ProjectCostModal({ client, onClose }: ProjectCostModalProps) {
 }
 
 type BlockingSubscription = { plan: string | null; status: string | null; stripeSubscriptionId: string; stripeDashboardUrl?: string };
-function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClose: () => void; onDeleted: (id: string) => void }) {
+type CancelSubMode = "now" | "period_end";
+function DeleteClientModal({ client, onClose, onDeleted, onRevoked }: {
+  client: User;
+  onClose: () => void;
+  onDeleted: (id: string) => void;
+  /** Se canceló al final del periodo y se revocó el acceso (el usuario NO se borra). */
+  onRevoked: (id: string, periodEnd: string | null) => void;
+}) {
   useModalLock();
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -1280,7 +1301,8 @@ function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClo
   // Suscripción de Stripe que bloquea el borrado (409). Mientras exista, el modal ofrece cancelarla aquí mismo.
   const [blockingSub, setBlockingSub] = useState<BlockingSubscription | null>(null);
   const [confirmCancelSub, setConfirmCancelSub] = useState(false);
-  const [cancelingSub, setCancelingSub] = useState(false);
+  // Qué opción está en curso mientras se habla con Stripe ("now" borra después; "period_end" solo revoca).
+  const [cancelingSub, setCancelingSub] = useState<CancelSubMode | null>(null);
   const canDelete = confirmText.trim().toLowerCase() === client.email.trim().toLowerCase();
 
   // Devuelve true si el usuario quedó borrado; si el API responde 409 con suscripción, la guarda para ofrecer cancelarla.
@@ -1315,13 +1337,19 @@ function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClo
     }
   };
 
-  // Cancela la suscripción en Stripe y, si sale bien, reintenta el borrado automáticamente.
-  const cancelSubscriptionAndDelete = async () => {
+  // Cancela la suscripción en Stripe. Modo "now": cancelación inmediata y reintento del borrado.
+  // Modo "period_end": Stripe la cancela al terminar el periodo pagado y el usuario queda revocado (no se borra).
+  const cancelSubscription = async (mode: CancelSubMode) => {
     if (!blockingSub || cancelingSub || deleting) return;
-    setCancelingSub(true);
+    setCancelingSub(mode);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/api/admin/users/${client.id}/cancel-subscription`, { method: "POST", credentials: "include" });
+      const res = await fetch(`${API_BASE}/api/admin/users/${client.id}/cancel-subscription`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ atPeriodEnd: mode === "period_end" }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.error || `Error ${res.status} al cancelar la suscripción`);
@@ -1329,17 +1357,21 @@ function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClo
       }
       setBlockingSub(null);
       setConfirmCancelSub(false);
+      if (mode === "period_end") {
+        onRevoked(client.id, typeof data?.periodEnd === "string" ? data.periodEnd : null);
+        return;
+      }
       setDeleting(true);
       if (await requestDelete()) onDeleted(client.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de red al cancelar la suscripción");
     } finally {
-      setCancelingSub(false);
+      setCancelingSub(null);
       setDeleting(false);
     }
   };
 
-  const busy = deleting || cancelingSub;
+  const busy = deleting || !!cancelingSub;
 
   return (
     <div
@@ -1419,29 +1451,51 @@ function DeleteClientModal({ client, onClose, onDeleted }: { client: User; onClo
                     data-testid="delete-client-cancel-sub-btn"
                   >
                     <CreditCard size={14} />
-                    Cancelar suscripción y borrar
+                    Cancelar suscripción…
                   </button>
                 ) : (
-                  <div data-testid="delete-client-cancel-sub-confirm" style={{ padding: "10px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div data-testid="delete-client-cancel-sub-confirm" style={{ padding: "10px 12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 10 }}>
                     <p style={{ margin: 0, fontSize: 11.5, color: "var(--crim,#ef4444)", lineHeight: 1.6 }}>
-                      ⚠️ <b>Afecta a la facturación.</b> Se cancelará la suscripción <b>de inmediato</b> en Stripe (sin reembolso automático del periodo en curso) y acto seguido se borrará el usuario. ¿Confirmas?
+                      ⚠️ <b>Afecta a la facturación.</b> Elige cómo cerrar la suscripción en Stripe:
                     </p>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button type="button" onClick={() => setConfirmCancelSub(false)} disabled={busy} className="btn btn-ghost" style={{ flex: 1, justifyContent: "center" }} data-testid="delete-client-cancel-sub-back-btn">
-                        Volver
-                      </button>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <button
                         type="button"
-                        onClick={cancelSubscriptionAndDelete}
+                        onClick={() => cancelSubscription("now")}
                         disabled={busy}
                         className="btn btn-danger"
-                        style={{ flex: 1, justifyContent: "center" }}
+                        style={{ justifyContent: "center", width: "100%" }}
                         data-testid="delete-client-cancel-sub-confirm-btn"
                       >
-                        {busy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                        {cancelingSub ? "Cancelando en Stripe…" : deleting ? "Borrando…" : "Sí, cancelar y borrar"}
+                        {cancelingSub === "now" || deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        {cancelingSub === "now" ? "Cancelando en Stripe…" : deleting ? "Borrando…" : "Cancelar ahora y borrar"}
                       </button>
+                      <p style={{ margin: "0 2px", fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
+                        Se cancela <b>de inmediato</b> (sin reembolso automático del periodo en curso) y acto seguido se borra el usuario.
+                      </p>
                     </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => cancelSubscription("period_end")}
+                        disabled={busy}
+                        className="btn btn-ghost"
+                        style={{ justifyContent: "center", width: "100%", borderColor: "rgba(245,158,11,0.45)", color: "#f59e0b" }}
+                        data-testid="delete-client-cancel-sub-period-end-btn"
+                      >
+                        {cancelingSub === "period_end" ? <Loader2 size={14} className="animate-spin" /> : <UserX size={14} />}
+                        {cancelingSub === "period_end" ? "Programando en Stripe…" : "Cancelar al final del periodo y revocar acceso"}
+                      </button>
+                      <p style={{ margin: "0 2px", fontSize: 11, color: "var(--t3)", lineHeight: 1.5 }}>
+                        Stripe no vuelve a cobrar y respeta el periodo ya pagado. El usuario queda <b>Inactivo</b> desde ahora (no se borra); podrás borrarlo cuando la suscripción expire.
+                      </p>
+                    </div>
+
+                    <button type="button" onClick={() => setConfirmCancelSub(false)} disabled={busy} className="btn btn-ghost" style={{ justifyContent: "center", width: "100%" }} data-testid="delete-client-cancel-sub-back-btn">
+                      Volver
+                    </button>
                   </div>
                 )}
               </div>
@@ -1600,6 +1654,13 @@ export default function AdminClients() {
             setUsers((prev) => prev.filter((u) => u.id !== id));
             setDeleteClient(null);
           }}
+          onRevoked={(id, periodEnd) => {
+            setUsers((prev) => prev.map((u) => u.id === id
+              ? { ...u, isActive: 0, subscriptionCancelAtPeriodEnd: 1, subscriptionPeriodEnd: periodEnd ?? u.subscriptionPeriodEnd ?? null }
+              : u));
+            setDeleteClient(null);
+            load();
+          }}
         />
       )}
 
@@ -1704,6 +1765,23 @@ export default function AdminClients() {
                       <span className={`badge ${u.isActive ? "badge-jade" : "badge-crim"}`}>
                         {u.isActive ? "Activo" : "Inactivo"}
                       </span>
+                      {(() => {
+                        const end = scheduledCancelDate(u);
+                        if (!end) return null;
+                        const expired = end.getTime() < Date.now();
+                        return (
+                          <span
+                            data-testid={`client-period-end-${u.id}`}
+                            title={expired
+                              ? "La suscripción ya ha expirado en Stripe; el cliente se puede borrar."
+                              : "Suscripción cancelada al final del periodo pagado: Stripe deja de cobrar en esta fecha."}
+                            style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: 10.5, color: expired ? "var(--t3)" : "#f59e0b", whiteSpace: "nowrap" }}
+                          >
+                            <CreditCard size={10} />
+                            {expired ? "Expiró el " : "Fin periodo "}{fmtDate(end)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <div style={{ display: "flex", gap: 5, justifyContent: "flex-end", flexWrap: "wrap" }}>
