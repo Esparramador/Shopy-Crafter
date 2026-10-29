@@ -28,6 +28,14 @@ args = [ "pnpm", "--filter", "@workspace/shopify-optimizer", "run", "build" ]
 NODE_ENV = "production"
 
 [[services.production.rewrites]]
+from = "/regalo/"
+to = "/regalo/index.html"
+
+[[services.production.rewrites]]
+from = "/regalo"
+to = "/regalo/index.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

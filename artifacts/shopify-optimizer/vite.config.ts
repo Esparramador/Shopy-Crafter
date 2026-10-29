@@ -34,6 +34,24 @@ export default defineConfig({
     react(),
     tailwindcss(),
     {
+      name: "regalo-directory-index",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const requestUrl = new URL(req.url || "/", "http://localhost");
+          if (requestUrl.pathname === "/regalo") {
+            res.statusCode = 308;
+            res.setHeader("Location", `/regalo/${requestUrl.search}`);
+            res.end();
+            return;
+          }
+          if (requestUrl.pathname === "/regalo/") {
+            req.url = `/regalo/index.html${requestUrl.search}`;
+          }
+          next();
+        });
+      },
+    },
+    {
       // Non-blocking CSS: converts the main Vite-injected <link rel="stylesheet">
       // into a preload + onload swap pattern so it no longer blocks FCP.
       // A <noscript> fallback ensures non-JS environments still get styles.

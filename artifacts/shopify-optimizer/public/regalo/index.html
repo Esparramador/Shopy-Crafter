@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#151b2c">
+<title>Para Paula</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="escena"></canvas>
+
+<!-- inicio -->
+<section id="inicio" class="capa">
+  <div class="inicio-caja">
+    <p class="antetitulo">Un pequeño regalo</p>
+    <h1>Para <em>Paula</em></h1>
+    <div class="barra"><div id="progreso"></div></div>
+    <p id="estado" class="estado">Preparando…</p>
+    <button id="empezar" class="boton" disabled>Toca para empezar</button>
+  </div>
+</section>
+
+<!-- interfaz del juego -->
+<div id="pista" class="pista oculto">Toca el suelo para caminar hasta el regalo</div>
+<button id="abrir" class="boton boton-flotante oculto">Abrir el regalo</button>
+<button id="sonido" class="icono oculto" aria-label="Sonido">♪</button>
+
+<!-- secuencia de fotos y final -->
+<section id="recuerdos" class="capa oculto">
+  <canvas id="fotos"></canvas>
+  <div id="final" class="final">
+    <p id="mensaje" class="mensaje"></p>
+    <p id="firma" class="firma"></p>
+    <button id="otra" class="boton boton-claro">Volver a verlo</button>
+  </div>
+</section>
+<div id="destello" class="destello"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
