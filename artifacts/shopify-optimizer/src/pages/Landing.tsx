@@ -44,7 +44,10 @@ function SectionVideoBg({ src }: { src: string }) {
   );
 }
 
-function MagnetStoreButton() {
+/** Instagram de Shopy Crafter. */
+const INSTAGRAM_URL = "https://www.instagram.com/shopycrafter/";
+
+function MagnetInstagramButton() {
   const btnRef = useRef<HTMLAnchorElement>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [hovered, setHovered] = useState(false);
@@ -95,7 +98,8 @@ function MagnetStoreButton() {
   return (
     <a
       ref={btnRef}
-      href="https://comic-crafter.myshopify.com"
+      href={INSTAGRAM_URL}
+      aria-label="Visita nuestro Instagram @shopycrafter"
       target="_blank"
       rel="noopener noreferrer"
       style={{
@@ -128,10 +132,11 @@ function MagnetStoreButton() {
         whiteSpace: "nowrap",
       }}
       className="lx-magnet justify-start items-center text-center">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-        <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>Visitar Comic Crafter
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }} aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="2"/>
+        <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2"/>
+        <circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/>
+      </svg>Visita nuestro Instagram
             <span style={{
         display: "inline-block",
         width: 8, height: 8,
@@ -469,108 +474,9 @@ export default function Landing() {
     return () => obs.disconnect();
   }, [content]);
 
-  // ── WHEEL / KEYBOARD / TOUCH scroll entre secciones ──────────────────────
-  useEffect(() => {
-    if (!content) return;
-
-    const THROTTLE = 700; // ms entre saltos de sección
-    let lastNav = 0;
-
-    // Solo activar snap en desktop real: ancho > 900px Y alto > 600px.
-    // En landscape de phone (ej. Pixel ~915×412) el alto < 600, así que
-    // el scroll nativo funciona sin interferencia.
-    const isFullpageMode = () => window.innerWidth > 900 && window.innerHeight > 600;
-
-    // Comprueba si el elemento o algún ancestro es scrollable (excluyendo window/body)
-    const isInsideScrollable = (el: EventTarget | null): boolean => {
-      let node = el as HTMLElement | null;
-      while (node && node !== document.body) {
-        const st = window.getComputedStyle(node);
-        const oy = st.overflowY;
-        if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight + 2) return true;
-        node = node.parentElement;
-      }
-      return false;
-    };
-
-    const navigate = (delta: 1 | -1) => {
-      const now = Date.now();
-      if (now - lastNav < THROTTLE) return;
-      lastNav = now;
-      const next = Math.max(0, Math.min(currentRef.current + delta, FP_SECTION_IDS.length - 1));
-      if (next === currentRef.current) return;
-      goToSection(next);
-      setHashRobust(FP_SECTION_IDS[next]);
-    };
-
-    // Una sección más alta que la pantalla se recorre con el scroll NORMAL hasta agotarla en ese
-    // sentido; solo entonces el siguiente gesto salta de sección. Sin esto, la rueda se saltaría de
-    // golpe todas las tarjetas de Proyectos.
-    const NAV_H = 64;
-    const insideTallSection = (dir: 1 | -1): boolean => {
-      const vh = window.innerHeight;
-      for (const sec of document.querySelectorAll<HTMLElement>(".fp-section")) {
-        const r = sec.getBoundingClientRect();
-        if (r.height <= vh * 1.25) continue;                       // solo las largas
-        if (r.top > vh * 0.5 || r.bottom < vh * 0.5) continue;     // y solo si es la que se está viendo
-        if (dir > 0 && r.bottom > vh + 8) return true;
-        if (dir < 0 && r.top < NAV_H - 8) return true;
-      }
-      return false;
-    };
-
-    // Wheel — solo en desktop
-    const onWheel = (e: WheelEvent) => {
-      if (!isFullpageMode()) return;
-      if (isInsideScrollable(e.target)) return;
-      if (insideTallSection(e.deltaY > 0 ? 1 : -1)) return;
-      if (Math.abs(e.deltaY) < 30) return; // ignorar trackpad fino
-      const delta = e.deltaY > 0 ? 1 : -1;
-      const next = Math.max(0, Math.min(currentRef.current + delta, FP_SECTION_IDS.length - 1));
-      // En el límite (primera/última sección) dejamos el scroll nativo para
-      // que el usuario pueda llegar al footer sin que el fullpage lo bloquee.
-      if (next === currentRef.current) return;
-      e.preventDefault();
-      navigate(delta);
-    };
-
-    // Teclado — solo en desktop
-    const onKey = (e: KeyboardEvent) => {
-      if (!isFullpageMode()) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-      const down = e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ";
-      const up = e.key === "ArrowUp" || e.key === "PageUp";
-      if ((down && insideTallSection(1)) || (up && insideTallSection(-1))) return;   // scroll normal dentro de la sección larga
-      if (down) { e.preventDefault(); navigate(1); }
-      if (up)   { e.preventDefault(); navigate(-1); }
-    };
-
-    // Touch swipe — solo en desktop (tablets grandes > 900×600)
-    // En phone (portrait o landscape) el scroll nativo es libre.
-    let touchStartY = 0;
-    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
-    const onTouchEnd   = (e: TouchEvent) => {
-      if (!isFullpageMode()) return;
-      if (isInsideScrollable(e.target)) return;
-      const dy = touchStartY - e.changedTouches[0].clientY;
-      if (Math.abs(dy) < 50) return; // swipe mínimo de 50px
-      if (insideTallSection(dy > 0 ? 1 : -1)) return;
-      navigate(dy > 0 ? 1 : -1);
-    };
-
-    window.addEventListener("wheel",      onWheel,      { passive: false });
-    window.addEventListener("keydown",    onKey);
-    window.addEventListener("touchstart", onTouchStart, { passive: true  });
-    window.addEventListener("touchend",   onTouchEnd,   { passive: true  });
-
-    return () => {
-      window.removeEventListener("wheel",      onWheel);
-      window.removeEventListener("keydown",    onKey);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchend",   onTouchEnd);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content, goToSection, setHashRobust]);
+  // Scroll nativo del navegador: sin secuestrar rueda, teclado ni gestos (el salto de
+  // sección en sección chocaba con las tarjetas apiladas de Proyectos). La navegación
+  // superior y los botones siguen llevando a cada sección con scroll suave.
 
   useEffect(() => {
     if (!content) return;
@@ -839,7 +745,7 @@ export default function Landing() {
             </div>
           </div>
 
-          <MagnetStoreButton />
+          <MagnetInstagramButton />
 
           <div className="fp-scroll-hint">
             <div className="fp-scroll-hint-text">Desliza para explorar</div>
