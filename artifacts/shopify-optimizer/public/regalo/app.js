@@ -12,6 +12,9 @@ const CONFIG = {
   esperaAuto: 7,                // s sin tocar nada → camina sola hacia el regalo
 };
 const ES_MOVIL = matchMedia("(pointer: coarse)").matches;
+// Calidad 2 = ordenador, 1 = móvil, 0 = mínima. Si el móvil pierde el contexto WebGL, se recarga sola un escalón más abajo.
+const PARAM_Q = new URLSearchParams(location.search).get("q");
+const CALIDAD = PARAM_Q !== null && /^[0-2]$/.test(PARAM_Q) ? Number(PARAM_Q) : (ES_MOVIL ? 1 : 2);
 
 // ------------------------------------------------------------------ DOM
 const $ = (id) => document.getElementById(id);
@@ -40,25 +43,31 @@ addEventListener("unhandledrejection", (e) => avisa("promesa: " + (e.reason && (
 // ------------------------------------------------------------------ render
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: !ES_MOVIL, powerPreference: "high-performance" });
+  renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: CALIDAD >= 2, powerPreference: CALIDAD >= 2 ? "high-performance" : "default" });
 } catch (e) { avisa("WebGL no disponible: " + e.message); throw e; }
 renderer.debug.onShaderError = (gl, programa, vs, fs) => {
   avisa("shader: " + (gl.getProgramInfoLog(programa) || "") + " | " + (gl.getShaderInfoLog(vs) || "") + " | " + (gl.getShaderInfoLog(fs) || ""));
 };
-lienzo.addEventListener("webglcontextlost", (e) => { e.preventDefault(); avisa("contexto WebGL perdido (memoria del móvil)"); });
+lienzo.addEventListener("webglcontextlost", (e) => {
+  e.preventDefault();
+  if (CALIDAD > 0 && ui.recuerdos.classList.contains("oculto")) {
+    ui.estado.textContent = "Ajustando a tu móvil…";
+    location.replace(location.pathname + "?q=" + (CALIDAD - 1));
+  } else avisa("contexto WebGL perdido (calidad " + CALIDAD + ")");
+});
 renderer.setClearColor(0xefc29a, 1);            // si el cielo no se pinta, se ve la bruma dorada, nunca blanco ni negro
-renderer.setPixelRatio(Math.min(devicePixelRatio, ES_MOVIL ? 1.5 : 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, [1, 1.25, 2][CALIDAD]));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = ES_MOVIL ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = CALIDAD >= 1;
+renderer.shadowMap.type = CALIDAD >= 2 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 
 const escena = new THREE.Scene();
 const camara = new THREE.PerspectiveCamera(38, 1, 0.1, 220);
 
 // escenario: jardín al atardecer (cielo, colinas, césped, árboles, guirnalda, globos, luciérnagas)
-const ambiente = crearEscenario(escena, { movil: ES_MOVIL, posCaja: new THREE.Vector3(0.9, 0, 0.7) });
+const ambiente = crearEscenario(escena, { movil: ES_MOVIL, calidad: CALIDAD, posCaja: new THREE.Vector3(0.9, 0, 0.7) });
 const motaTex = ambiente.brilloTex;
 
 // ------------------------------------------------------------------ carga
@@ -92,12 +101,12 @@ const promesaPaula = cargador.loadAsync("assets/paula.glb").then((g) => {
   for (const n of ["Interact", "PickUp_Table"]) if (acciones[n]) { acciones[n].setLoop(THREE.LoopOnce); acciones[n].clampWhenFinished = true; }
   pon("Idle_Loop", 0);
 });
-const regalo = crearRegalo(escena, { movil: ES_MOVIL, brilloTex: motaTex, posicion: POS_CAJA, giro: 0.45 });
+const regalo = crearRegalo(escena, { movil: CALIDAD < 2, brilloTex: motaTex, posicion: POS_CAJA, giro: 0.45 });
 caja = regalo.grupo;
 const promesaCaja = Promise.resolve();
 
 Promise.all([promesaPaula, promesaCaja]).then(() => {
-  try { renderer.compile(escena, camara); } catch (e) { avisa("compilar: " + e.message); }
+  if (CALIDAD >= 2) { try { renderer.compile(escena, camara); } catch (e) { avisa("compilar: " + e.message); } }
   ui.estado.textContent = "Todo listo";
   ui.empezar.disabled = false;
 }).catch((e) => { console.error(e); ui.estado.textContent = "No se ha podido cargar. Prueba a recargar la página."; });
@@ -310,7 +319,7 @@ function encuadre(dt, inmediato = false) {
     const medio = tmp.set((p.x + POS_CAJA.x) / 2, 1.05, (p.z + POS_CAJA.z) / 2);
     const lejos = THREE.MathUtils.clamp(p.distanceTo(POS_CAJA), 1.5, 6);
     const dist = (vertical ? 4.2 + lejos * 0.55 : 3.6 + lejos * 0.35);
-    const deseada = new THREE.Vector3(medio.x + 0.9, 1.15 + dist * 0.11, medio.z + dist);
+    const deseada = new THREE.Vector3(medio.x + (vertical ? 0.25 : 0.9), 1.15 + dist * 0.11, medio.z + dist);
     if (inmediato) { objetivoCam.copy(medio); posCam.copy(deseada); }
     objetivoCam.lerp(medio, 1 - Math.exp(-dt * 3)); posCam.lerp(deseada, 1 - Math.exp(-dt * 1.8));
   }

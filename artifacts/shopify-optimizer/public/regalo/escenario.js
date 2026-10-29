@@ -22,14 +22,15 @@ export const PALETA = {
   cesped: "#7f9a45", sol: "#ffc690",
 };
 
-export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vector3(0.9, 0, 0.7), zonaLibre = { x: -0.25, z: -1.0, r: 3.4 } } = {}) {
+export function crearEscenario(escena, { movil = false, calidad = movil ? 1 : 2, posCaja = new THREE.Vector3(0.9, 0, 0.7), zonaLibre = { x: -0.25, z: -1.0, r: 3.4 } } = {}) {
   const rnd = azar(20261029);
+  const Q = (bajo, medio, alto) => (calidad <= 0 ? bajo : calidad === 1 ? medio : alto);
   const actualizables = [];
   const DIR_SOL = new THREE.Vector3(-0.32, 0.105, -1).normalize();        // sol bajo, detrás del regalo
 
   // ------------------------------------------------------------- cielo
   const cielo = new THREE.Mesh(new THREE.SphereGeometry(150, 48, 24), new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false, precision: "highp",
+    side: THREE.BackSide, depthWrite: false, fog: false, defines: { NUBES: calidad >= 2 ? 1 : 0 },
     uniforms: {
       cenit: { value: new THREE.Color(PALETA.cenit) }, medio: { value: new THREE.Color(PALETA.medio) },
       horizonte: { value: new THREE.Color(PALETA.horizonte) }, bruma: { value: new THREE.Color(PALETA.bruma) },
@@ -53,7 +54,12 @@ export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vect
         // nubes finas, más densas cerca del horizonte e iluminadas del lado del sol
         if (h > 0.02) {
           vec2 uv = d.xz / (h + 0.12) * 1.6 + vec2(tiempo * 0.004, 0.0);
-          float n = fbm(uv); float banda = smoothstep(0.02, 0.10, h) * (1.0 - smoothstep(0.35, 0.7, h));
+          #if NUBES
+          float n = fbm(uv);
+          #else
+          float n = ruido(uv) * 0.6 + ruido(uv * 2.03) * 0.3;
+          #endif
+          float banda = smoothstep(0.02, 0.10, h) * (1.0 - smoothstep(0.35, 0.7, h));
           float nube = smoothstep(0.52, 0.78, n) * banda;
           vec3 cn = mix(vec3(0.95, 0.62, 0.62), vec3(1.0, 0.86, 0.66), pow(s, 3.0));
           col = mix(col, cn, nube * 0.55);
@@ -72,8 +78,8 @@ export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vect
   const hemi = new THREE.HemisphereLight(0xa9c0e0, 0x5e6b35, 0.85); escena.add(hemi);
   const sol = new THREE.DirectionalLight(PALETA.sol, 2.7);
   sol.position.set(DIR_SOL.x * 14, 7.5, DIR_SOL.z * 14);           // misma dirección que el sol del cielo, más alto para sombras útiles
-  sol.castShadow = true;
-  sol.shadow.mapSize.set(movil ? 1024 : 2048, movil ? 1024 : 2048);
+  sol.castShadow = calidad >= 1;
+  sol.shadow.mapSize.set(Q(512, 1024, 2048), Q(512, 1024, 2048));
   Object.assign(sol.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 40 });
   sol.shadow.bias = -0.0005; sol.shadow.normalBias = 0.025;
   escena.add(sol); escena.add(sol.target);
@@ -90,7 +96,7 @@ export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vect
       g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
     }
   });
-  texCesped.wrapS = texCesped.wrapT = THREE.RepeatWrapping; texCesped.repeat.set(26, 26); texCesped.anisotropy = 8;
+  texCesped.wrapS = texCesped.wrapT = THREE.RepeatWrapping; texCesped.repeat.set(26, 26); texCesped.anisotropy = Q(1, 4, 8);
   const geoSuelo = new THREE.PlaneGeometry(160, 160, 96, 96);
   geoSuelo.rotateX(-Math.PI / 2);
   const colSuelo = [], cA = new THREE.Color("#8fa64f"), cB = new THREE.Color("#5f7d33"), cC = new THREE.Color("#b2a35a"), tmpC = new THREE.Color();
@@ -168,7 +174,7 @@ export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vect
       transformed.x += vaiven * 0.16 * position.y * position.y;
       transformed.z += vaiven * 0.06 * position.y * position.y;`);
   };
-  const N_HIERBA = movil ? 6000 : 11000;
+  const N_HIERBA = Q(0, 2500, 11000);
   const hierba = new THREE.InstancedMesh(brizna, matHierba, N_HIERBA);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v3 = new THREE.Vector3(), esc3 = new THREE.Vector3(), eY = new THREE.Euler();
   let k = 0;
@@ -181,10 +187,10 @@ export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vect
     eY.set((rnd() - 0.5) * 0.25, rnd() * Math.PI, (rnd() - 0.5) * 0.25); q.setFromEuler(eY);
     m4.compose(v3.set(x, 0, z), q, esc3.set(0.8 + rnd() * 0.6, alto, 1)); hierba.setMatrixAt(k++, m4);
   }
-  hierba.frustumCulled = false; escena.add(hierba);
+  hierba.frustumCulled = false; if (N_HIERBA) escena.add(hierba);
   actualizables.push((t) => { tiempoU.value = t; });
 
-  const N_FLOR = movil ? 360 : 650;
+  const N_FLOR = Q(0, 260, 650);
   const flores = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.034, 0), new THREE.MeshStandardMaterial({ roughness: 0.6, emissive: 0x221100, emissiveIntensity: 0.2 }), N_FLOR);
   const coloresFlor = ["#fff7ec", "#ffd36b", "#f4a6bd", "#e9e3ff"].map((c) => new THREE.Color(c));
   k = 0;
@@ -195,7 +201,7 @@ export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vect
     m4.compose(v3.set(x, 0.18 + rnd() * 0.22, z), q.identity(), esc3.setScalar(0.7 + rnd() * 0.7));
     flores.setMatrixAt(k, m4); flores.setColorAt(k, coloresFlor[k % coloresFlor.length]); k++;
   }
-  escena.add(flores);
+  if (N_FLOR) escena.add(flores);
 
   // ------------------------------------------------------------- guirnalda de bombillas entre dos postes
   const brilloTex = texturaCanvas(64, 64, (g, w) => {
@@ -249,7 +255,7 @@ export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vect
   const globos = [];
   const matCuerda = new THREE.LineBasicMaterial({ color: 0xf6efe6, transparent: true, opacity: 0.75 });
   coloresGlobo.forEach((c, i) => {
-    const mat = movil ? new THREE.MeshStandardMaterial({ color: c, roughness: 0.28, metalness: 0.15 })       // en móvil, material más ligero
+    const mat = calidad < 2 ? new THREE.MeshStandardMaterial({ color: c, roughness: 0.28, metalness: 0.15 })       // en móvil, material más ligero
       : new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.22, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.12, sheen: 0.5, sheenColor: new THREE.Color(0xffffff) });
     const g = new THREE.Mesh(geoGlobo, mat); g.scale.setScalar(0.12 + rnd() * 0.02); g.castShadow = true;
     const ang = -Math.PI * 0.85 + (i / (coloresGlobo.length - 1)) * Math.PI * 0.9;          // abanico detrás del regalo, hacia la derecha
@@ -277,7 +283,7 @@ export function crearEscenario(escena, { movil = false, posCaja = new THREE.Vect
   }
 
   // ------------------------------------------------------------- luciérnagas
-  const N_LUZ = movil ? 90 : 150;
+  const N_LUZ = Q(0, 60, 150);
   const posL = new Float32Array(N_LUZ * 3), semL = [];
   for (let i = 0; i < N_LUZ; i++) {
     const a = rnd() * Math.PI * 2, r = 2 + rnd() * 10;
