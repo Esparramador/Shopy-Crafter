@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRoute } from "wouter";
-import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare, Zap, RefreshCw, Copy, FileText, Scissors, Bot, BookOpen, Plus, Trash2, UploadCloud, PlayCircle } from "lucide-react";
+import { Sparkles, Wand2, Video, Mic, Volume2, Music, Layers, Download, Loader2, Palette, Maximize2, X, CheckCircle2, AlertCircle, Film, UserSquare, Zap, RefreshCw, Copy, FileText, Scissors, Bot, BookOpen, Plus, Trash2, UploadCloud, PlayCircle, RotateCcw } from "lucide-react";
 import { LiveOperation } from "@/components/LiveOperation";
 import VideoStudio from "./VideoStudio";
 
@@ -2332,10 +2332,13 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
   // Persistidos en el servidor (platform_settings_kv); la muestra usa la misma
   // voz y modelo que el agente ConvAI con los valores del formulario.
   type VoiceTuning = { stability: number; similarityBoost: number; speed: number };
+  type VoiceTuningHistory = {
+    id: string; changedAt: string; userId: string; userName: string; userEmail: string; settings: VoiceTuning;
+  };
   type VoiceTuningInfo = {
     settings: VoiceTuning; source: "db" | "default" | "mixed"; invalid: (keyof VoiceTuning)[];
     defaults: VoiceTuning; limits: Record<keyof VoiceTuning, { min: number; max: number; step: number }>;
-    voiceId: string; modelId: string; previewText: string;
+    voiceId: string; modelId: string; previewText: string; history: VoiceTuningHistory[];
   };
   const [tuningInfo, setTuningInfo] = useState<VoiceTuningInfo | null>(null);
   const [tuning, setTuning] = useState<VoiceTuning | null>(null);
@@ -2384,21 +2387,29 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
     finally { setTuningPreviewing(false); }
   }
 
-  async function saveTuning() {
-    if (!tuning) return;
+  async function persistTuning(settings: VoiceTuning, successMessage: string) {
     setTuningSaving(true); setTuningErr(null);
     try {
       const r = await fetch(`${API_BASE}/api/voice/convai/voice-settings`, {
         method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tuning),
+        body: JSON.stringify(settings),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Error guardando los ajustes de voz");
       setTuningInfo(j); setTuning(j.settings); setTuningSavedAt(Date.now());
-      onInfo("Voz de Arturo guardada. Se aplica en la próxima llamada (o pulsa Re-sincronizar para aplicarla ahora).");
+      onInfo(successMessage);
       await loadHealth(); // mostrará "drift" hasta que los agentes se re-sincronicen
     } catch (e: any) { setTuningErr(e.message); }
     finally { setTuningSaving(false); }
+  }
+
+  async function saveTuning() {
+    if (!tuning) return;
+    await persistTuning(tuning, "Voz de Arturo guardada. Se aplica en la próxima llamada (o pulsa Re-sincronizar para aplicarla ahora).");
+  }
+
+  async function restoreTuning(entry: VoiceTuningHistory) {
+    await persistTuning(entry.settings, "Ajuste anterior de la voz de Arturo restaurado mediante el guardado normal.");
   }
 
   const tuningDirty = !!tuningInfo && !!tuning && (
@@ -2738,6 +2749,44 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
               </button>
               {tuningDirty && <span style={{ fontSize: 10, color: "#fcd34d" }}>Cambios sin guardar</span>}
               {!tuningDirty && tuningSavedAt && <span style={{ fontSize: 10, color: "#86efac" }}>Guardado · se aplica en la próxima llamada o al re-sincronizar</span>}
+            </div>
+            <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }} data-testid="convai-voice-tuning-history">
+              <p style={{ fontSize: 11, color: "var(--t2)", fontWeight: 600, marginBottom: 8 }}>Últimos cambios</p>
+              {!tuningInfo?.history?.length ? (
+                <p style={{ fontSize: 11, color: "var(--t3)" }}>Todavía no hay cambios guardados.</p>
+              ) : (
+                <div style={{ display: "grid", gap: 7 }}>
+                  {tuningInfo.history.slice(0, 5).map(entry => (
+                    <div key={entry.id} data-testid={`convai-voice-history-${entry.id}`} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap",
+                      padding: "7px 9px", borderRadius: 6, background: "rgba(255,255,255,0.025)",
+                    }}>
+                      <div style={{ fontSize: 10, color: "var(--t3)", lineHeight: 1.5 }}>
+                        <div>
+                          <span style={{ color: "var(--t2)" }}>{entry.userName}</span>
+                          {entry.userEmail && <> · {entry.userEmail}</>}
+                          {" · "}{new Date(entry.changedAt).toLocaleString("es-ES")}
+                        </div>
+                        <div style={{ fontFamily: "monospace" }}>
+                          Estabilidad {entry.settings.stability.toFixed(2)} · Fidelidad {entry.settings.similarityBoost.toFixed(2)} · Velocidad {entry.settings.speed.toFixed(2)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => restoreTuning(entry)}
+                        disabled={tuningSaving || tuningPreviewing}
+                        className="btn"
+                        style={{ fontSize: 10, padding: "4px 8px" }}
+                        data-testid={`convai-voice-history-restore-${entry.id}`}
+                        title="Guarda estos valores usando la validación normal"
+                      >
+                        {tuningSaving ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+                        {" "}Volver a este ajuste
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

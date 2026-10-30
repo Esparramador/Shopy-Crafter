@@ -17,7 +17,7 @@ import {
 } from "../lib/convai-voice-check.js";
 import {
   CONVAI_TTS_DEFAULTS, CONVAI_TTS_KV_KEYS, CONVAI_TTS_LIMITS, CONVAI_TTS_PREVIEW_MAX_CHARS, CONVAI_TTS_PREVIEW_TEXT,
-  ConvAITtsSettingsError, normalizeConvAITtsSettings, parseStoredConvAITtsSettings,
+  ConvAITtsSettingsError, normalizeConvAITtsSettings, parseConvAITtsHistory, parseStoredConvAITtsSettings,
   type ConvAITtsSettings, type StoredConvAITtsSettings,
 } from "../lib/convai-voice-settings.js";
 import multer from "multer";
@@ -585,19 +585,52 @@ async function getConvAITtsSettings(): Promise<ConvAITtsSettings> {
   return (await getConvAITtsSettingsStored()).settings;
 }
 
-async function saveConvAITtsSettings(settings: ConvAITtsSettings): Promise<void> {
+async function ensureConvAITtsHistoryTable(): Promise<void> {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS convai_tts_settings_history (
+      id BIGSERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      user_id TEXT NOT NULL,
+      user_name TEXT,
+      user_email TEXT,
+      settings JSONB NOT NULL
+    )
+  `);
+}
+
+async function getConvAITtsHistory(): Promise<ReturnType<typeof parseConvAITtsHistory>> {
+  await ensureConvAITtsHistoryTable();
+  const result = await db.execute(sql`
+    SELECT id, created_at, user_id, user_name, user_email, settings
+    FROM convai_tts_settings_history
+    ORDER BY created_at DESC, id DESC
+    LIMIT 5
+  `);
+  const rows = ((result as any).rows ?? (Array.isArray(result) ? result : [])) as Parameters<typeof parseConvAITtsHistory>[0];
+  return parseConvAITtsHistory(rows);
+}
+
+async function saveConvAITtsSettingsWithHistory(
+  settings: ConvAITtsSettings,
+  actor: { userId: string; name: string; email: string },
+): Promise<void> {
   await ensurePlatformSettingsKV();
-  for (const key of Object.keys(CONVAI_TTS_KV_KEYS) as Array<keyof ConvAITtsSettings>) {
-    await db.execute(sql`
-      INSERT INTO platform_settings_kv (key, value, updated_at)
-      VALUES (${CONVAI_TTS_KV_KEYS[key]}, ${String(settings[key])}, NOW())
-      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+  await ensureConvAITtsHistoryTable();
+  await db.transaction(async (tx) => {
+    for (const key of Object.keys(CONVAI_TTS_KV_KEYS) as Array<keyof ConvAITtsSettings>) {
+      await tx.execute(sql`
+        INSERT INTO platform_settings_kv (key, value, updated_at)
+        VALUES (${CONVAI_TTS_KV_KEYS[key]}, ${String(settings[key])}, NOW())
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+      `);
+    }
+    await tx.execute(sql`
+      INSERT INTO convai_tts_settings_history (user_id, user_name, user_email, settings)
+      VALUES (${actor.userId}, ${actor.name}, ${actor.email}, ${JSON.stringify(settings)}::jsonb)
     `);
-  }
+  });
   _ttsSettingsCache = null;
-  // Los agentes en memoria se consideran "ya sincronizados"; con valores nuevos
-  // dejan de estarlo. Vaciar la caché obliga a re-sincronizar + verificar
-  // antes de la próxima URL firmada (igual que hace el health check en drift).
+  // Force the next voice call to sync the changed values to all ConvAI agents.
   for (const k of Object.keys(_agentIdCache)) delete _agentIdCache[k];
 }
 
@@ -1063,10 +1096,12 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
 // "Re-sincronizar") aplica y verifica los valores nuevos en ElevenLabs.
 async function respondTtsSettings(res: import("express").Response, extra: Record<string, unknown> = {}): Promise<void> {
   const stored = await getConvAITtsSettingsStored();
+  const history = await getConvAITtsHistory();
   res.json({
     settings: stored.settings,
     source: stored.source,
     invalid: stored.invalid,
+    history,
     defaults: CONVAI_TTS_DEFAULTS,
     limits: CONVAI_TTS_LIMITS,
     voiceId: await resolveSevillanoVoiceId(),
@@ -1099,7 +1134,11 @@ router.put("/voice/convai/voice-settings", requireAdmin, async (req, res): Promi
     return;
   }
   try {
-    await saveConvAITtsSettings(settings);
+    await saveConvAITtsSettingsWithHistory(settings, {
+      userId: req.session.userId!,
+      name: req.session.name || "Admin",
+      email: req.session.email || "",
+    });
     logger.info({ settings }, "ConvAI TTS settings saved from admin panel; agent cache invalidated");
     await respondTtsSettings(res, { saved: true });
   } catch (err: any) {

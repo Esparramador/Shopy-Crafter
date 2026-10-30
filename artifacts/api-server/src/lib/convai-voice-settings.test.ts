@@ -4,6 +4,7 @@ import {
   CONVAI_TTS_KV_KEYS,
   ConvAITtsSettingsError,
   normalizeConvAITtsSettings,
+  parseConvAITtsHistory,
   parseStoredConvAITtsSettings,
 } from "./convai-voice-settings";
 
@@ -37,6 +38,36 @@ describe("normalizeConvAITtsSettings (formulario de admin)", () => {
 
   it("rechaza texto que no es un número", () => {
     expect(() => normalizeConvAITtsSettings({ stability: "alta", similarityBoost: 0.8, speed: 1 })).toThrow(/stability es obligatorio/);
+  });
+});
+
+describe("parseConvAITtsHistory", () => {
+  it("normaliza los valores y conserva fecha e identidad del administrador", () => {
+    expect(parseConvAITtsHistory([{
+      id: 12,
+      created_at: new Date("2026-10-30T12:00:00.000Z"),
+      user_id: "admin-1",
+      user_name: "Ada Admin",
+      user_email: "ada@example.com",
+      settings: '{"stability":0.55,"similarityBoost":0.85,"speed":1.1}',
+    }])).toEqual([{
+      id: "12",
+      changedAt: "2026-10-30T12:00:00.000Z",
+      userId: "admin-1",
+      userName: "Ada Admin",
+      userEmail: "ada@example.com",
+      settings: { stability: 0.55, similarityBoost: 0.85, speed: 1.1 },
+    }]);
+  });
+
+  it("ignora filas inválidas sin descartar los cambios correctos", () => {
+    const parsed = parseConvAITtsHistory([
+      { id: 1, created_at: "not-a-date", user_id: "a", user_name: "A", user_email: "", settings: CONVAI_TTS_DEFAULTS },
+      { id: 2, created_at: "2026-10-30T12:00:00Z", user_id: "b", user_name: null, user_email: null, settings: CONVAI_TTS_DEFAULTS },
+    ]);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].userName).toBe("Admin");
+    expect(parsed[0].userEmail).toBe("");
   });
 });
 

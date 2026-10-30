@@ -17,6 +17,15 @@ export interface ConvAITtsSettings {
   speed: number;
 }
 
+export interface ConvAITtsHistoryEntry {
+  id: string;
+  changedAt: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  settings: ConvAITtsSettings;
+}
+
 export type ConvAITtsSettingKey = keyof ConvAITtsSettings;
 
 /**
@@ -132,6 +141,35 @@ export function parseStoredConvAITtsSettings(rows: Array<{ key: string; value: s
   }
   const source: StoredConvAITtsSettings["source"] = found === 0 ? "default" : found === 3 ? "db" : "mixed";
   return { settings, source, invalid };
+}
+
+/** Parses audit rows defensively so one malformed row cannot break the panel. */
+export function parseConvAITtsHistory(rows: Array<{
+  id: string | number;
+  created_at: string | Date;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  settings: unknown;
+}>): ConvAITtsHistoryEntry[] {
+  const history: ConvAITtsHistoryEntry[] = [];
+  for (const row of rows ?? []) {
+    try {
+      const settings = typeof row.settings === "string" ? JSON.parse(row.settings) : row.settings;
+      const changedAt = row.created_at instanceof Date ? row.created_at.toISOString() : new Date(row.created_at).toISOString();
+      history.push({
+        id: String(row.id),
+        changedAt,
+        userId: String(row.user_id),
+        userName: row.user_name?.trim() || "Admin",
+        userEmail: row.user_email?.trim() || "",
+        settings: normalizeConvAITtsSettings(settings),
+      });
+    } catch {
+      // Ignore malformed legacy/corrupted audit rows rather than hiding valid entries.
+    }
+  }
+  return history;
 }
 
 /** Texto corto de muestra para el botón "Escuchar" (misma voz y modelo que Arturo). */

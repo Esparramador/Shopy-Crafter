@@ -95,10 +95,24 @@ try {
   await page.getByTestId("convai-voice-tuning-save").click();
   const sr = await saveResp;
   assert(sr.status() === 200, `Guardar → HTTP ${sr.status()}`);
+  const savedResponse = await sr.json();
+  const history = savedResponse.history || [];
+  assert(history.length > 0, "Guardar registra un cambio en el historial");
+  assert(history[0].settings.speed === newSpeed, "El historial guarda los tres valores nuevos");
+  assert(history[0].userId && history[0].userName && history[0].userEmail === EMAIL, "El historial identifica al admin que guardó");
+  assert(Number.isFinite(Date.parse(history[0].changedAt)), "El historial guarda la fecha del cambio");
   const after = (await (await ctx.request.get(`${BASE}/api/voice/convai/voice-settings`)).json()).settings;
   assert(after.speed === newSpeed && after.stability === original.stability, `El servidor persistió speed=${after.speed}`);
   await page.getByTestId("convai-voice-tuning-source").filter({ hasText: "Guardado en el panel" }).waitFor({ timeout: 15_000 });
   ok("El badge de origen indica 'Guardado en el panel'");
+  const restoreButton = page.getByTestId(`convai-voice-history-restore-${history[0].id}`);
+  await restoreButton.waitFor({ state: "visible", timeout: 15_000 });
+  assert((await page.getByTestId("convai-voice-tuning-history").textContent()).includes("Volver a este ajuste"), "La tarjeta muestra el historial y su acción de restauración");
+  const restoreResp = page.waitForResponse(r => r.url().includes("/api/voice/convai/voice-settings") && r.request().method() === "PUT", { timeout: 30_000 });
+  await restoreButton.click();
+  const rr = await restoreResp;
+  assert(rr.status() === 200, `Restaurar usa el guardado validado → HTTP ${rr.status()}`);
+  assert(JSON.stringify((await rr.json()).settings) === JSON.stringify(history[0].settings), "La restauración guarda los valores seleccionados");
   // La salud debe reflejar deriva (los agentes aún llevan el valor antiguo)
   const health = await (await ctx.request.get(`${BASE}/api/voice/convai/health`)).json();
   const drifted = (health.agents || []).filter(a => a.status === "drift").length;
