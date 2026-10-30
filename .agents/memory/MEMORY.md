@@ -74,3 +74,4 @@
 - [Session revalidation](session-revalidation.md) — revoke via global revalidation (regenerate, never destroy); session.impersonating = client id; refuse user delete while Stripe still bills.
 - [Stripe resource_missing is not proof of "gone"](admin-stripe-cancel-on-delete.md) — fail closed on billing guards; retrieve→decide→mutate; both Stripe webhook endpoints must sync canceled rows.
 - [Admin modal overlay convention](admin-modal-overlay.md) — wrap admin modals in <ModalOverlay> (hook+.modal-overlay); FAB is z 9990 so z-index races lose; add new pages to e2e PAGES.
+- [Public offer requirements](public-offer-scope.md) — distinguish development projects, artistic QR vs animated gifts, normal scrolling and four packs including custom.
