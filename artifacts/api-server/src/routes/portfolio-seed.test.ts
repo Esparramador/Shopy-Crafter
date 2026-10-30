@@ -10,6 +10,7 @@ import {
 const migrationState = vi.hoisted(() => ({
   meta: {} as Record<string, string>,
   projects: [] as Array<Record<string, unknown>>,
+  deletedSlugs: new Set<string>(),
   writes: [] as string[],
 }));
 
@@ -22,6 +23,17 @@ vi.mock("@workspace/db", () => ({
         const key = text.includes("seed_version") ? "seed_version" : "patch_version";
         const value = migrationState.meta[key];
         return { rows: value === undefined ? [] : [{ value }] };
+      }
+      if (text.includes("SELECT slug FROM portfolio_deleted_projects")) {
+        return { rows: Array.from(migrationState.deletedSlugs, slug => ({ slug })) };
+      }
+      if (text.includes("WITH removed AS") && text.includes("DELETE FROM portfolio_projects")) {
+        const project = migrationState.projects.find(row => row.id === values[0]);
+        if (!project) return { rows: [] };
+        migrationState.projects = migrationState.projects.filter(row => row.id !== values[0]);
+        migrationState.deletedSlugs.add(String(project.slug));
+        migrationState.writes.push(text);
+        return { rows: [{ images: project.images }] };
       }
       if (text.includes("SELECT id") && text.includes("FROM portfolio_projects WHERE slug")) {
         const project = migrationState.projects.find(row => row.slug === values[0]);
@@ -93,6 +105,7 @@ describe("reaplicación de migraciones del portfolio", () => {
   function setRecordedVersion(key: "seed_version" | "patch_version", version: number) {
     migrationState.meta = { [key]: String(version) };
     migrationState.projects = [{ ...existingAdminEdit }];
+    migrationState.deletedSlugs = new Set();
     migrationState.writes = [];
   }
 
@@ -106,6 +119,44 @@ describe("reaplicación de migraciones del portfolio", () => {
     expect(migrationState.projects).toEqual(before);
     expect(migrationState.projects.some(project => project.slug === SEED[0].slug)).toBe(false);
     expect(migrationState.writes).toEqual([]);
+  });
+
+  it("registra una eliminación y evita reinsertar el proyecto en una versión seed posterior", async () => {
+    const deletedSlug = SEED[0].slug;
+    migrationState.meta = { seed_version: String(SEED_VERSION - 1) };
+    migrationState.projects = [{
+      id: 7,
+      slug: deletedSlug,
+      title: "Proyecto que se eliminará",
+      images: [{ url: "/portfolio/deleted.webp", alt: "Imagen" }],
+    }];
+    migrationState.deletedSlugs = new Set();
+    migrationState.writes = [];
+
+    const { deletePortfolioProject } = await import("./portfolio.js");
+    await expect(deletePortfolioProject(7)).resolves.toEqual([
+      { url: "/portfolio/deleted.webp", alt: "Imagen" },
+    ]);
+    expect(migrationState.projects).toEqual([]);
+    expect(migrationState.deletedSlugs.has(deletedSlug)).toBe(true);
+
+    await applySeed();
+
+    expect(migrationState.projects.some(project => project.slug === deletedSlug)).toBe(false);
+    expect(migrationState.projects.some(project => project.slug === SEED[1].slug)).toBe(true);
+  });
+
+  it("no vuelve a insertar en un patch un proyecto que ya había sido eliminado", async () => {
+    const deletedSlug = "taller-laser";
+    migrationState.meta = { patch_version: String(PATCH_VERSION - 1) };
+    migrationState.projects = [];
+    migrationState.deletedSlugs = new Set([deletedSlug]);
+    migrationState.writes = [];
+
+    await applyPatches();
+
+    expect(migrationState.projects.some(project => project.slug === deletedSlug)).toBe(false);
+    expect(migrationState.meta.patch_version).toBe(String(PATCH_VERSION));
   });
 
   it("no recrea proyectos borrados ni repone contenido retirado si el patch ya está aplicado", async () => {
