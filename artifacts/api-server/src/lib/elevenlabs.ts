@@ -25,6 +25,8 @@ export interface VoiceSettings {
   similarity_boost?: number;
   style?: number;
   use_speaker_boost?: boolean;
+  /** 0.7–1.2 (rango de ElevenLabs). Solo se envía si se indica. */
+  speed?: number;
 }
 
 export interface SynthesizeRequest {
@@ -256,12 +258,18 @@ export async function synthesizeSpeech(req: SynthesizeRequest): Promise<Synthesi
   // - stability 0.40 → variación humana sin descontrolarse
   // - similarity_boost 0.85 → cercano al timbre de la voz original
   // - style 0.40 → expresividad real (antes 0.0 = monótono robótico)
-  const voice_settings = {
+  const voice_settings: Record<string, unknown> = {
     stability: clamp01(req.voiceSettings?.stability, 0.40),
     similarity_boost: clamp01(req.voiceSettings?.similarity_boost, 0.85),
     style: clamp01(req.voiceSettings?.style, 0.40),
     use_speaker_boost: req.voiceSettings?.use_speaker_boost ?? true,
   };
+  // speed solo si el llamador lo pide (p. ej. la previsualización de la voz de
+  // Arturo): ElevenLabs acepta 0.7–1.2; fuera de rango responde 422.
+  const speedRaw = req.voiceSettings?.speed;
+  if (typeof speedRaw === "number" && Number.isFinite(speedRaw)) {
+    voice_settings.speed = Math.max(0.7, Math.min(1.2, speedRaw));
+  }
 
   const chunks = splitTextIntoChunks(text, MAX_TEXT_LENGTH);
   logger.info({ voiceId, modelId, chars: text.length, chunks: chunks.length, outputFormat }, "ElevenLabs: TTS request");

@@ -15,6 +15,11 @@ import {
   assertConvAIVoiceUsable, assertConvAIAgentConfigApplied, fetchElevenVoice, fetchElevenSubscription,
   isConvAIVoiceError, type ElevenSubscriptionInfo,
 } from "../lib/convai-voice-check.js";
+import {
+  CONVAI_TTS_DEFAULTS, CONVAI_TTS_KV_KEYS, CONVAI_TTS_LIMITS, CONVAI_TTS_PREVIEW_MAX_CHARS, CONVAI_TTS_PREVIEW_TEXT,
+  ConvAITtsSettingsError, normalizeConvAITtsSettings, parseStoredConvAITtsSettings,
+  type ConvAITtsSettings, type StoredConvAITtsSettings,
+} from "../lib/convai-voice-settings.js";
 import multer from "multer";
 
 const cloneUpload = multer({
@@ -545,11 +550,56 @@ const CONVAI_INPUT_FORMAT = "pcm_16000";
 // ── Ajustes de voz de Arturo ──────────────────────────────────────────────────
 // These are the fields ElevenLabs actually persists under conversation_config.tts
 // (flat, not inside a voice_settings block). Verified on the live API.
-// Values chosen by the owner after A/B listening (Sept 2026): the more stable
-// 0.5 / 0.8 pair was preferred over the expressive 0.18 / 0.92 one.
-const CONVAI_TTS_STABILITY = 0.5;        // Media → voz estable, sin altibajos
-const CONVAI_TTS_SIMILARITY_BOOST = 0.8; // Alta → fiel a la voz original
-const CONVAI_TTS_SPEED = 1.2;            // 20% más rápido que la velocidad por defecto
+// They live in platform_settings_kv (keys convai_tts_*) so the admin can tune
+// them from the panel; CONVAI_TTS_DEFAULTS (0.5 / 0.8 / 1.2, chosen by the
+// owner after A/B listening in Sept 2026) apply when nothing is stored.
+// Cached in-process and invalidated on save; a short TTL covers edits made
+// from another instance.
+const TTS_SETTINGS_TTL_MS = 60 * 1000;
+let _ttsSettingsCache: { at: number; value: StoredConvAITtsSettings } | null = null;
+
+async function getConvAITtsSettingsStored(): Promise<StoredConvAITtsSettings> {
+  if (_ttsSettingsCache && Date.now() - _ttsSettingsCache.at < TTS_SETTINGS_TTL_MS) return _ttsSettingsCache.value;
+  let rows: Array<{ key: string; value: string | null }> = [];
+  try {
+    await ensurePlatformSettingsKV();
+    const keys = Object.values(CONVAI_TTS_KV_KEYS);
+    const r = await db.execute(sql`
+      SELECT key, value FROM platform_settings_kv
+      WHERE key IN (${sql.join(keys.map(k => sql`${k}`), sql`, `)})
+    `);
+    rows = ((r as any).rows ?? (Array.isArray(r) ? r : [])) as Array<{ key: string; value: string | null }>;
+  } catch (e) {
+    // Sin BD seguimos con los defaults: una llamada de voz no debe caerse por esto.
+    logger.warn({ err: (e as Error)?.message }, "ConvAI: could not read TTS settings from DB; using defaults");
+  }
+  const parsed = parseStoredConvAITtsSettings(rows);
+  if (parsed.invalid.length) {
+    logger.warn({ invalid: parsed.invalid }, "ConvAI: ignoring invalid stored TTS settings (using defaults for those keys)");
+  }
+  _ttsSettingsCache = { at: Date.now(), value: parsed };
+  return parsed;
+}
+
+async function getConvAITtsSettings(): Promise<ConvAITtsSettings> {
+  return (await getConvAITtsSettingsStored()).settings;
+}
+
+async function saveConvAITtsSettings(settings: ConvAITtsSettings): Promise<void> {
+  await ensurePlatformSettingsKV();
+  for (const key of Object.keys(CONVAI_TTS_KV_KEYS) as Array<keyof ConvAITtsSettings>) {
+    await db.execute(sql`
+      INSERT INTO platform_settings_kv (key, value, updated_at)
+      VALUES (${CONVAI_TTS_KV_KEYS[key]}, ${String(settings[key])}, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+    `);
+  }
+  _ttsSettingsCache = null;
+  // Los agentes en memoria se consideran "ya sincronizados"; con valores nuevos
+  // dejan de estarlo. Vaciar la caché obliga a re-sincronizar + verificar
+  // antes de la próxima URL firmada (igual que hace el health check en drift).
+  for (const k of Object.keys(_agentIdCache)) delete _agentIdCache[k];
+}
 
 async function resolveSevillanoVoiceId(): Promise<string> {
   // An explicit ConvAI voice override is useful if the ElevenLabs plan changes.
@@ -603,20 +653,22 @@ async function resolveVerifiedConvAIVoiceId(): Promise<string> {
 async function verifyPersistedConvAIAgent(agentId: string, voiceId: string): Promise<void> {
   // Create/PATCH responses are not authoritative (create returns only the ID and
   // PATCH ignores unknown keys), so always read the agent back.
-  const persisted = await getConvAIAgent(agentId);
+  // The expected voice settings come from the DB (panel-tunable), so the
+  // post-sync verifier keeps detecting drift against what the admin saved.
+  const [persisted, tts] = await Promise.all([getConvAIAgent(agentId), getConvAITtsSettings()]);
   assertConvAIAgentConfigApplied(persisted, {
     voiceId,
     modelId: CONVAI_SPANISH_MODEL,
     outputFormat: CONVAI_OUTPUT_FORMAT,
     inputFormat: CONVAI_INPUT_FORMAT,
-    stability: CONVAI_TTS_STABILITY,
-    similarityBoost: CONVAI_TTS_SIMILARITY_BOOST,
-    speed: CONVAI_TTS_SPEED,
+    stability: tts.stability,
+    similarityBoost: tts.similarityBoost,
+    speed: tts.speed,
   });
 }
 
 async function syncConvAIAgentOrThrow(type: AgentType, agentId: string, voiceId: string): Promise<void> {
-  await updateConvAIAgent(agentId, agentConfigFor(type, voiceId));
+  await updateConvAIAgent(agentId, await agentConfigFor(type, voiceId));
   await verifyPersistedConvAIAgent(agentId, voiceId);
 }
 
@@ -645,7 +697,8 @@ async function ensurePlatformSettingsKV(): Promise<void> {
 
 type AgentType = "admin" | "client" | "landing";
 
-function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
+async function agentConfigFor(type: AgentType, voiceId: string): Promise<ConvAIAgentConfig> {
+  const ttsSettings = await getConvAITtsSettings();
   const names: Record<AgentType, string> = {
     admin:   "Arturo — Secretario del CEO de Shopy Crafter",
     client:  "Arturo — Secretario de Shopy Crafter",
@@ -662,7 +715,8 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
     landing: LANDING_AGENT_PROMPT,
   };
 
-  // Configuración de voz: ver constantes CONVAI_TTS_* (elegidas escuchando muestras)
+  // Configuración de voz: platform_settings_kv convai_tts_* (editable en el panel),
+  // con CONVAI_TTS_DEFAULTS si no hay nada guardado.
   type TtsConfig = NonNullable<NonNullable<ConvAIAgentConfig["conversation_config"]>["tts"]>;
   const tts: TtsConfig = {
     voice_id: voiceId,
@@ -677,9 +731,9 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
     // `tts.voice_settings{...}` block is silently ignored (verified live: the
     // agent kept stability 0.5 / similarity_boost 0.8 for months). `style` and
     // `use_speaker_boost` do not exist in the persisted agent schema at all.
-    stability: CONVAI_TTS_STABILITY,
-    similarity_boost: CONVAI_TTS_SIMILARITY_BOOST,
-    speed: CONVAI_TTS_SPEED,
+    stability: ttsSettings.stability,
+    similarity_boost: ttsSettings.similarityBoost,
+    speed: ttsSettings.speed,
   };
 
   return {
@@ -764,7 +818,7 @@ async function resolveConvAIAgentUncached(type: AgentType, cacheKey: string): Pr
   // 4. Auto-create — resolve and verify the voice first
   logger.info({ type }, "Auto-creating ConvAI agent in ElevenLabs...");
   const voiceId = await resolveVerifiedConvAIVoiceId();
-  const config = agentConfigFor(type, voiceId);
+  const config = await agentConfigFor(type, voiceId);
   const agent = await createConvAIAgent(config);
   const newId = agent.agent_id;
 
@@ -975,7 +1029,7 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
 
         // Re-create with latest config
         const voiceId = await resolveVerifiedConvAIVoiceId();
-        const config = agentConfigFor(type, voiceId);
+        const config = await agentConfigFor(type, voiceId);
         const agent = await createConvAIAgent(config);
         const newId = agent.agent_id;
         await db.execute(sql`
@@ -1000,6 +1054,101 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
   } catch (err: any) {
     logger.error({ err: err?.message, code: err?.code }, "reset-agents failed");
     respondCallUrlError(res, err, "Error reseteando agentes");
+  }
+});
+
+// ── Ajustes de voz de Arturo (stability / similarity_boost / speed) ───────────
+// Persistidos en platform_settings_kv para afinar la voz desde el panel sin
+// redesplegar. Guardar invalida la caché de agentes: la próxima llamada (o
+// "Re-sincronizar") aplica y verifica los valores nuevos en ElevenLabs.
+async function respondTtsSettings(res: import("express").Response, extra: Record<string, unknown> = {}): Promise<void> {
+  const stored = await getConvAITtsSettingsStored();
+  res.json({
+    settings: stored.settings,
+    source: stored.source,
+    invalid: stored.invalid,
+    defaults: CONVAI_TTS_DEFAULTS,
+    limits: CONVAI_TTS_LIMITS,
+    voiceId: await resolveSevillanoVoiceId(),
+    modelId: CONVAI_SPANISH_MODEL,
+    previewText: CONVAI_TTS_PREVIEW_TEXT,
+    ...extra,
+  });
+}
+
+router.get("/voice/convai/voice-settings", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    _ttsSettingsCache = null; // el panel debe ver lo que hay en BD ahora mismo
+    await respondTtsSettings(res);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/voice-settings read failed");
+    res.status(500).json({ error: err?.message || "Error leyendo los ajustes de voz" });
+  }
+});
+
+router.put("/voice/convai/voice-settings", requireAdmin, async (req, res): Promise<void> => {
+  let settings: ConvAITtsSettings;
+  try {
+    settings = normalizeConvAITtsSettings(req.body);
+  } catch (err: any) {
+    if (err instanceof ConvAITtsSettingsError) {
+      res.status(400).json({ error: err.message, field: err.field });
+      return;
+    }
+    res.status(400).json({ error: err?.message || "Ajustes de voz inválidos" });
+    return;
+  }
+  try {
+    await saveConvAITtsSettings(settings);
+    logger.info({ settings }, "ConvAI TTS settings saved from admin panel; agent cache invalidated");
+    await respondTtsSettings(res, { saved: true });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/voice-settings save failed");
+    res.status(500).json({ error: err?.message || "Error guardando los ajustes de voz" });
+  }
+});
+
+// Muestra corta con la MISMA voz y modelo que usa Arturo, con los valores del
+// formulario (sin guardarlos). Devuelve audio/mpeg.
+router.post("/voice/convai/voice-settings/preview", requireAdmin, async (req, res): Promise<void> => {
+  let settings: ConvAITtsSettings;
+  try {
+    settings = normalizeConvAITtsSettings(req.body);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || "Ajustes de voz inválidos", field: err?.field });
+    return;
+  }
+  const rawText = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  const text = rawText || CONVAI_TTS_PREVIEW_TEXT;
+  if (text.length > CONVAI_TTS_PREVIEW_MAX_CHARS) {
+    res.status(413).json({ error: `El texto de muestra no puede superar ${CONVAI_TTS_PREVIEW_MAX_CHARS} caracteres` });
+    return;
+  }
+  const userId = String((req.session as any)?.userId ?? "admin");
+  const quota = checkTtsQuota(userId, text.length);
+  if (!quota.ok) {
+    res.setHeader("Retry-After", String(quota.retryAfter));
+    res.status(429).json({ error: quota.reason });
+    return;
+  }
+  try {
+    const voiceId = await resolveSevillanoVoiceId();
+    const result = await synthesizeSpeech({
+      text,
+      voiceId,
+      modelId: CONVAI_SPANISH_MODEL,
+      outputFormat: "mp3_44100_64",
+      languageCode: "es",
+      // El agente ConvAI no tiene `style`: 0 deja el TTS lo más parecido posible.
+      voiceSettings: { stability: settings.stability, similarity_boost: settings.similarityBoost, speed: settings.speed, style: 0, use_speaker_boost: true },
+    });
+    res.setHeader("Content-Type", result.contentType);
+    res.setHeader("Content-Length", String(result.audio.length));
+    res.setHeader("Cache-Control", "no-store");
+    res.send(result.audio);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/voice-settings preview failed");
+    if (!res.headersSent) res.status(502).json({ error: err?.message || "No se pudo generar la muestra de voz" });
   }
 });
 
