@@ -851,3 +851,17 @@ mtime_ms = 1793383828518
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/9f7721e9-e8ca-41ad-87ba-d7c930d63c8b/74c3636f-83e5-43fa-a2e3-84c93a1982d5"
 storage_version_token = "1793383836102289"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "ShZxPzMaku9dswEAls6cS"
+uri = "file://generated-artifacts/shopify-crafter-cambios-con-sitemap-c0fb1c9e.zip"
+type = "unspecified"
+title = "Shopy Crafter con sitemap para Google"
+description = "Paquete actualizado: incluye los archivos modificados y artifacts/shopify-optimizer/public/sitemap.xml."
+logical_id = "f3bfc162-03b0-4dbd-9e01-fe16f8cd8049"
+content_hash = "sha256:edcce1f766b1fba9e00c6429d56f9d9c3b23a1e5ddd5a6d39d7f841df9e689bf"
+size = 129178
+mtime_ms = 1793388119738
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/f3bfc162-03b0-4dbd-9e01-fe16f8cd8049/e8c18990-c04c-4a43-917b-627fd7ab6887"
+storage_version_token = "1793388125318932"
+content_type = "application/octet-stream"
