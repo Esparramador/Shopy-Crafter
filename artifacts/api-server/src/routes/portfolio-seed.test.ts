@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { decodeQrImageAtNativeSize } from "../lib/card-qr-art.js";
 import {
   isRetiredQrPortfolioImage, mergeGenericSeedCopy, removeRetiredQrPortfolioImages,
-  PATCH_VERSION, SEED, SEED_VERSION,
+  PATCH_PREVIOUS, PATCH_VERSION, SEED, SEED_VERSION,
 } from "./portfolio-seed.js";
 
 const migrationState = vi.hoisted(() => ({
@@ -15,12 +15,49 @@ const migrationState = vi.hoisted(() => ({
 
 vi.mock("@workspace/db", () => ({
   db: {
-    execute: async (query: { text?: string }) => {
+    execute: async (query: { text?: string; values?: unknown[] }) => {
       const text = query.text ?? "";
+      const values = query.values ?? [];
       if (text.includes("SELECT value FROM portfolio_meta")) {
         const key = text.includes("seed_version") ? "seed_version" : "patch_version";
         const value = migrationState.meta[key];
         return { rows: value === undefined ? [] : [{ value }] };
+      }
+      if (text.includes("SELECT id") && text.includes("FROM portfolio_projects WHERE slug")) {
+        const project = migrationState.projects.find(row => row.slug === values[0]);
+        return { rows: project ? [project] : [] };
+      }
+      if (text.includes("INSERT INTO portfolio_projects")) {
+        const [slug, title, client, category, summary, description, tech, features, status, liveUrl, appUrl, images, variants, sortOrder] = values;
+        if (!migrationState.projects.some(row => row.slug === slug)) {
+          migrationState.projects.push({
+            id: migrationState.projects.length + 1,
+            slug, title, client, category, summary, description,
+            tech: JSON.parse(String(tech)), features: JSON.parse(String(features)), status, liveUrl, appUrl,
+            images: JSON.parse(String(images)), variants: JSON.parse(String(variants)), sortOrder,
+          });
+        }
+        migrationState.writes.push(text);
+        return { rows: [] };
+      }
+      if (text.includes("UPDATE portfolio_projects SET")) {
+        const [title, client, category, summary, description, status, features, tech, images, variants, id] = values;
+        const project = migrationState.projects.find(row => row.id === id);
+        if (!project) throw new Error(`Portfolio project not found for update: ${String(id)}`);
+        Object.assign(project, {
+          title, client, category, summary, description, status,
+          features: JSON.parse(String(features)), tech: JSON.parse(String(tech)),
+          images: JSON.parse(String(images)), variants: JSON.parse(String(variants)),
+        });
+        migrationState.writes.push(text);
+        return { rows: [] };
+      }
+      if (text.includes("INSERT INTO portfolio_meta")) {
+        const key = text.includes("patch_version") ? "patch_version" : "seed_version";
+        const value = values.at(-1);
+        migrationState.meta[key] = String(value);
+        migrationState.writes.push(text);
+        return { rows: [] };
       }
       migrationState.writes.push(text);
       throw new Error(`Unexpected portfolio migration write: ${text}`);
@@ -28,7 +65,10 @@ vi.mock("@workspace/db", () => ({
   },
 }));
 vi.mock("drizzle-orm", () => ({
-  sql: Object.assign((strings: TemplateStringsArray) => ({ text: strings.join("?") }), { raw: () => ({}) }),
+  sql: Object.assign(
+    (strings: TemplateStringsArray, ...values: unknown[]) => ({ text: strings.join("?"), values }),
+    { raw: () => ({}) },
+  ),
 }));
 vi.mock("../lib/auth.js", () => ({
   requireAdmin: (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -79,6 +119,65 @@ describe("reaplicación de migraciones del portfolio", () => {
     expect(migrationState.projects.some(project => project.slug === SEED[0].slug)).toBe(false);
     expect(migrationState.projects[0]).toEqual(existingAdminEdit);
     expect(migrationState.writes).toEqual([]);
+  });
+
+  it("aplica un patch nuevo solo sobre contenido intacto y conserva los cambios de administración", async () => {
+    const slug = "qr-artisticos-3d";
+    const seed = SEED.find(project => project.slug === slug)!;
+    const previous = PATCH_PREVIOUS[slug];
+    const adminImages = [
+      { url: "/api/media/admin-qr-upload", alt: "Foto añadida por administración" },
+      { url: "/portfolio/qr-artisticos-3d-6.webp", alt: "Muestra conservada" },
+    ];
+    const adminVariant = {
+      name: "Versión personalizada",
+      client: "Cliente editado",
+      status: "En pruebas",
+      summary: "Resumen de variante personalizado",
+      description: "Descripción de variante personalizada",
+      features: ["Función propia"],
+      tech: ["Herramienta propia"],
+      images: [{ url: "/api/media/admin-variant", alt: "Imagen personalizada de variante" }],
+    };
+    const project = {
+      id: 42,
+      slug,
+      title: previous.fields.title,
+      client: "Cliente personalizado",
+      category: "Categoría personalizada",
+      summary: previous.fields.summary,
+      description: "Descripción personalizada por administración",
+      status: "Estado personalizado",
+      features: [
+        "Función personalizada por administración",
+        "Escenas en 3D: escena retirada",
+        "Vídeo de la transformación QR",
+      ],
+      tech: ["Tecnología personalizada", "Three.js", "WebGL"],
+      images: [
+        { url: "/portfolio/qr-artisticos-3d-3.webp", alt: "Imagen retirada" },
+        ...adminImages,
+      ],
+      variants: [adminVariant],
+    };
+    migrationState.meta = { patch_version: String(PATCH_VERSION - 1) };
+    // apps-redes-ia fue borrado antes de esta versión; un patch solo actualiza filas existentes.
+    migrationState.projects = [project];
+    migrationState.writes = [];
+
+    await applyPatches();
+
+    expect(migrationState.projects.find(row => row.slug === slug)).toEqual({
+      ...project,
+      title: seed.title,
+      summary: seed.summary,
+      features: ["Función personalizada por administración"],
+      tech: ["Tecnología personalizada"],
+      images: adminImages,
+      variants: [adminVariant],
+    });
+    expect(migrationState.projects.some(row => row.slug === "apps-redes-ia")).toBe(false);
+    expect(migrationState.meta.patch_version).toBe(String(PATCH_VERSION));
   });
 });
 
