@@ -52,6 +52,13 @@ export function cleanSvg(raw: string | null | undefined): string {
   return String(DOMPurify.sanitize(String(raw), SVG_CONFIG));
 }
 
+/** Escapa texto para meterlo en HTML (antes de aplicar cualquier formato propio). */
+export function escapeHtml(raw: unknown): string {
+  return String(raw ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 export function cleanMarkdownLite(raw: string | null | undefined): string {
   if (!raw) return "";
   const text = String(raw)

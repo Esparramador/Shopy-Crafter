@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ClientLayout } from "./ClientLayout";
 import { useClientPreview } from "./ClientPreviewContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { escapeHtml } from "@/lib/sanitize";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -30,7 +31,8 @@ function fmtDate(iso: string): string {
 }
 
 function renderContent(text: string): string {
-  return text
+  // Lo escribe el cliente y lo ve también el admin en vista previa: primero se escapa.
+  return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
     .replace(/`([^`]+)`/g, "<code style=\"background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;font-size:0.92em\">$1</code>")

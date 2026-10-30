@@ -3,6 +3,7 @@ import { ClientLayout } from "./ClientLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClientPreview } from "./ClientPreviewContext";
 import { Loader2, X, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import { cleanHtml } from "@/lib/sanitize";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -202,7 +203,7 @@ function ProductModal({ p, onClose }: { p: Product; onClose: () => void }) {
               <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--t3)", fontWeight: 700, marginBottom: 10 }}>Descripción del producto</p>
               <div
                 className="product-html-body"
-                dangerouslySetInnerHTML={{ __html: p.bodyHtml }}
+                dangerouslySetInnerHTML={{ __html: cleanHtml(p.bodyHtml) }}
                 style={{ fontSize: 13, color: "var(--t2)", lineHeight: 1.7 }}
               />
             </div>

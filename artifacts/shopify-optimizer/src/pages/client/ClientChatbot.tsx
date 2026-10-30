@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClientPreview } from "./ClientPreviewContext";
+import { escapeHtml } from "@/lib/sanitize";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 // Base without /api: VoiceCallModal appends its own /api/voice/... path.
@@ -404,7 +405,7 @@ export function ClientChatbot() {
   function renderContent(content: string) {
     const lines = content.split("\n");
     return lines.map((line, i) => {
-      const bold = line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+      const bold = escapeHtml(line).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
       return (
         <span key={i}>
           {i > 0 && <br />}

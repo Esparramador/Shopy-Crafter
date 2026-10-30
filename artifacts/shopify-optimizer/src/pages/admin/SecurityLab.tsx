@@ -15,6 +15,7 @@ function SecretRevealSL({ value }: { value: string }) {
 }
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Shield, Search, ChevronRight, Tag, Lock, Target, BookOpen, X, ExternalLink, AlertTriangle, Loader2, Grid3X3, List, ScanLine, Globe, ChevronDown, ChevronUp, Swords, ShieldCheck, History, RotateCw } from "lucide-react";
+import { escapeHtml } from "@/lib/sanitize";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -371,7 +372,8 @@ function domainLabel(d: string) {
 
 // ─── Markdown renderer (minimal) ─────────────────────────────────────────────
 function MarkdownBlock({ md }: { md: string }) {
-  const html = md
+  // El texto viene de la IA analizando webs ajenas: se escapa antes de dar formato.
+  const html = escapeHtml(md)
     .replace(/^#{4}\s+(.+)$/gm, '<h4 style="color:#c8a84b;font-size:13px;margin:14px 0 5px">$1</h4>')
     .replace(/^#{3}\s+(.+)$/gm, '<h3 style="color:#c8a84b;font-size:14px;margin:16px 0 6px">$1</h3>')
     .replace(/^#{2}\s+(.+)$/gm, '<h2 style="color:#c8a84b;font-size:15px;margin:18px 0 8px;border-bottom:1px solid rgba(200,168,75,0.2);padding-bottom:4px">$1</h2>')
