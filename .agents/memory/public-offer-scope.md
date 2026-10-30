@@ -3,11 +3,11 @@ name: Public offer requirements
 description: User requirements for the public portfolio, packs and physical-product shop.
 ---
 
-The public offer must distinguish delivered client work from products still in development. The user explicitly wants Comic Crafter identified as being in development and creation.
+The public offer must distinguish delivered client work from products still in development. The user explicitly wants Comic Crafter's purpose explained while stating that it is “en producción y desarrollo” and “no está disponible aún”.
 
 **Why:** The user reported that the public presentation did not reflect the requested project status.
 
-**How to apply:** Check project cards and related descriptions for consistency rather than treating a development project as a completed customer success.
+**How to apply:** Keep the product description, but clearly mark its unavailable status. Check project cards and related descriptions for consistency rather than treating it as an available product or a completed customer success.
 
 The user wants artistic QR work presented without the “QR en 3D” offering. This does not mean removing the separate animated 3D gift/video service.
 
