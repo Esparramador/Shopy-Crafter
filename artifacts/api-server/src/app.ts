@@ -13,10 +13,12 @@ import { fileURLToPath } from "url";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "@workspace/db";
-import { msgUploadHeaders, parseMsgUploadName } from "./lib/msg-uploads.js";
+import { MSG_STORE_NS, msgUploadHeaders, parseMsgUploadName } from "./lib/msg-uploads.js";
+import { getFile } from "./lib/file-store.js";
 import { PgRateLimitStore, startRateLimitCleanup } from "./lib/pg-rate-limit-store.js";
 import { validateEncryptionKey } from "./lib/crypto.js";
 import { revalidateSession } from "./lib/auth.js";
+import { sandboxHtmlResponses } from "./lib/html-sandbox.js";
 
 // BE-8: validar ENCRYPTION_KEY ANTES de cualquier inicialización (fail-fast)
 validateEncryptionKey();
@@ -242,6 +244,9 @@ app.use(
 app.use(revalidateSession);
 // Imputa el gasto de IA de cada petición a su proyecto (topes por plan en lib/ai-budget.ts).
 app.use("/api", aiContextMiddleware);
+// HTML/SVG generado (informes, previews, exportaciones) se sirve aislado del panel.
+app.use("/api", sandboxHtmlResponses);
+app.use("/reports", sandboxHtmlResponses);
 
 // ── No-cache for all API responses (prevents stale data in production) ────────
 app.use("/api", (_req: Request, res: Response, next: NextFunction) => {
@@ -287,8 +292,18 @@ const reportAuth = async (req: Request, res: Response, next: NextFunction): Prom
   }
   next();
 };
-app.use("/api/reports", (req, res, next) => { void reportAuth(req, res, next); }, express.static(reportsDir));
-app.use("/reports", (req, res, next) => { void reportAuth(req, res, next); }, express.static(reportsDir));
+// Informes: primero el almacén persistente (los nuevos), después la carpeta del repo (los antiguos).
+const serveStoredReport = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  let name = "";
+  try { name = decodeURIComponent(req.path).replace(/^\/+/, ""); } catch { next(); return; }
+  if (!/^[A-Za-z0-9._-]{1,120}$/.test(name)) { next(); return; }
+  const f = await getFile("reports", name).catch(() => null);
+  if (!f) { next(); return; }
+  res.setHeader("Content-Type", f.mime);
+  res.end(f.bytes);
+};
+app.use("/api/reports", (req, res, next) => { void reportAuth(req, res, next); }, serveStoredReport, express.static(reportsDir));
+app.use("/reports", (req, res, next) => { void reportAuth(req, res, next); }, serveStoredReport, express.static(reportsDir));
 
 const msgUploadsDir = path.resolve(process.cwd(), "msg-uploads");
 app.use("/api/msg-uploads", async (req: Request, res: Response, next: NextFunction) => {
@@ -318,6 +333,23 @@ app.use("/api/msg-uploads", async (req: Request, res: Response, next: NextFuncti
   } catch (err) {
     logger.warn({ err }, "[msg-uploads] ownership check failed");
     res.status(500).end();
+  }
+}, async (req: Request, res: Response, next: NextFunction) => {
+  // Almacén persistente primero; la carpeta del disco queda para adjuntos antiguos.
+  let name = "";
+  try { name = decodeURIComponent(req.path.replace(/^\/+/, "")); } catch { next(); return; }
+  if (!parseMsgUploadName(name)) { next(); return; }
+  try {
+    const f = await getFile(MSG_STORE_NS, name);
+    if (!f) { next(); return; }
+    msgUploadHeaders(res, name);
+    res.setHeader("Content-Type", f.mime);
+    res.setHeader("Content-Length", String(f.size));
+    res.setHeader("Cache-Control", "private, max-age=86400");
+    res.end(f.bytes);
+  } catch (err) {
+    logger.warn({ err }, "[msg-uploads] lectura del almacén falló");
+    next();
   }
 }, express.static(msgUploadsDir, { setHeaders: (res, filePath) => msgUploadHeaders(res, filePath) }));
 

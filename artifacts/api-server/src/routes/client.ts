@@ -6,7 +6,7 @@ import { randomBytes } from "crypto";
 import { db, approvalsTable, messagesTable, productsTable, auditLogTable, projectFilesTable, projectsTable, brandDnaTable } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
-import { checkMessageAttachments, msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
+import { checkMessageAttachments, msgUpload, msgUploadMulti, persistMsgUploads } from "../lib/msg-uploads.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { businessYmd } from "../lib/tz.js";
@@ -326,7 +326,7 @@ router.get("/products", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/messages/upload", msgUpload.single("file"), async (req, res): Promise<void> => {
+router.post("/messages/upload", msgUpload.single("file"), persistMsgUploads, async (req, res): Promise<void> => {
   try {
     if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
     const { originalname, mimetype, size, filename } = req.file;
@@ -341,7 +341,7 @@ router.post("/messages/upload", msgUpload.single("file"), async (req, res): Prom
   }
 });
 
-router.post("/messages/upload-multi", msgUploadMulti.array("files", 20), async (req, res): Promise<void> => {
+router.post("/messages/upload-multi", msgUploadMulti.array("files", 10), persistMsgUploads, async (req, res): Promise<void> => {
   try {
     const files = req.files as Express.Multer.File[];
     if (!files?.length) { res.status(400).json({ error: "No files provided" }); return; }

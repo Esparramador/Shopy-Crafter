@@ -444,10 +444,14 @@ export default function ExportCenter({ projectId }: { projectId: number }) {
   }, [selectedTemplate]);
 
   const handlePrintReport = useCallback(() => {
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.print();
+    // El informe se sirve aislado (CSP sandbox): desde aquí no se puede llamar a su
+    // print(). Se abre en una pestaña propia, donde se imprime con el menú normal.
+    try {
+      iframeRef.current?.contentWindow?.print();
+    } catch {
+      window.open(viewerUrl, "_blank", "noopener");
     }
-  }, []);
+  }, [viewerUrl]);
 
   const handleDownloadFromViewer = useCallback(() => {
     const exp = exports.find(e => e.title === viewerTitle);

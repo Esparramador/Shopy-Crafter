@@ -11,6 +11,7 @@ import {
   SHOP_SEED, SHOP_SEED_VERSION, DEFAULT_SHIPPING,
   type ShopProduct, type PricedLine, type ShippingSettings,
 } from "./shop.js";
+import { ensureAppSettingsTable } from "./app-settings-table.js";
 
 let ready: Promise<void> | null = null;
 
@@ -77,7 +78,10 @@ export function ensureShopTables(): Promise<void> {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`);
+    // IP de quien sube (tope diario) e índice para la limpieza de huérfanas.
+    await db.execute(sql`ALTER TABLE shop_uploads ADD COLUMN IF NOT EXISTS ip TEXT`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS shop_uploads_orphan ON shop_uploads (created_at) WHERE order_id IS NULL`);
+    await ensureAppSettingsTable();
     await seedCatalog();
   })().catch(err => { ready = null; throw err; });
   return ready;
@@ -172,13 +176,37 @@ export function sniffMime(buf: Buffer): string | null {
   return null;
 }
 
-export async function saveUpload(buf: Buffer, mime: string, originalName: string): Promise<string> {
+export async function saveUpload(buf: Buffer, mime: string, originalName: string, ip: string | null = null): Promise<string> {
   await ensureShopTables();
   const id = randomBytes(16).toString("hex");
   await db.execute(sql`
-    INSERT INTO shop_uploads (id, mime, size, bytes, original_name) VALUES (${id}, ${mime}, ${buf.length}, ${buf}, ${originalName.slice(0, 200)})
+    INSERT INTO shop_uploads (id, mime, size, bytes, original_name, ip) VALUES (${id}, ${mime}, ${buf.length}, ${buf}, ${originalName.slice(0, 200)}, ${ip})
   `);
   return id;
+}
+
+/** Tope de bytes que una misma IP puede subir sin cuenta en 24 h. */
+export const SHOP_UPLOAD_DAILY_BYTES = 600 * 1024 * 1024;
+
+/** Bytes subidos por esta IP en las últimas 24 h. */
+export async function uploadedBytesLastDay(ip: string): Promise<number> {
+  await ensureShopTables();
+  const r = await db.execute(sql`
+    SELECT COALESCE(SUM(size), 0)::bigint AS total FROM shop_uploads
+    WHERE ip = ${ip} AND created_at > NOW() - INTERVAL '24 hours'
+  `);
+  return Number((r.rows[0] as { total: string | number } | undefined)?.total ?? 0);
+}
+
+/**
+ * Subidas que no acabaron en ningún pedido: se borran a los 3 días (el carrito
+ * del navegador avisa de que hay que volver a subirlas). Sin esto, la tabla
+ * crecía sin límite con archivos de visitantes anónimos.
+ */
+export async function purgeOrphanUploads(): Promise<number> {
+  await ensureShopTables();
+  const r = await db.execute(sql`DELETE FROM shop_uploads WHERE order_id IS NULL AND created_at < NOW() - INTERVAL '3 days'`);
+  return r.rowCount ?? 0;
 }
 
 export async function getUpload(id: string): Promise<{ mime: string; bytes: Buffer; name: string } | null> {

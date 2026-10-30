@@ -4652,10 +4652,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* ═══════════════════════════════════════════════════════════════════════════
    VISME-STYLE FORM FIELDS — Staggered reveal when character lands
-   Each row/field slides up + fades in sequentially after Alec settles
+   Each row/field slides up + fades in sequentially once the hero settles
    ═══════════════════════════════════════════════════════════════════════════ */
 
-@keyframes alec-field-rise {
+@keyframes contact-field-rise {
   0%   { opacity: 0; transform: translateY(28px) scale(0.97); }
   60%  { opacity: 1; transform: translateY(-3px) scale(1.005); }
   100% { opacity: 1; transform: translateY(0)    scale(1); }
@@ -4670,12 +4670,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* When fields-in fires, each child appears in sequence */
 
 
-.fp-contact-form-v2.fields-in > *:nth-child(9)  { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.64s forwards; }
-.fp-contact-form-v2.fields-in > *:nth-child(10) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.72s forwards; }
-.fp-contact-form-v2.fields-in > *:nth-child(11) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.80s forwards; }
-.fp-contact-form-v2.fields-in > *:nth-child(12) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.88s forwards; }
-.fp-contact-form-v2.fields-in > *:nth-child(13) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.96s forwards; }
-.fp-contact-form-v2.fields-in > *:nth-child(n+14) { animation: alec-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 1.04s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(9)  { animation: contact-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.64s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(10) { animation: contact-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.72s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(11) { animation: contact-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.80s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(12) { animation: contact-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.88s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(13) { animation: contact-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 0.96s forwards; }
+.fp-contact-form-v2.fields-in > *:nth-child(n+14) { animation: contact-field-rise 0.55s cubic-bezier(0.34,1.12,0.64,1) 1.04s forwards; }
 
 /* ── Golden entrance line that sweeps across the top of each field ── */
 .fp-contact-form-v2.fields-in .fp-contact-row,

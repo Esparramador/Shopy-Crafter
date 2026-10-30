@@ -20,8 +20,46 @@ import { execSync, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { getFile, putFile, isValidStoreKey } from "../lib/file-store.js";
+import { sharePublicly } from "../lib/public-share.js";
+import { publicAppUrl } from "../lib/account-tokens.js";
 
 const router = Router();
+
+// ── Studio "modelo": foto de referencia y vídeos generados ───────────────────
+// La foto es de una persona real: ya no está en la web pública (antes en
+// shopify-optimizer/public/images). Vive en el API y solo la ve el admin; a un
+// proveedor externo se le pasa un enlace temporal (lib/public-share.ts).
+const MODEL_PHOTO_PATH = path.resolve(process.cwd(), "assets/private/sevillano-model.png");
+const SEVILLANO_NS = "sevillano";
+
+async function modelPhotoPublicUrl(): Promise<string> {
+  if (!fs.existsSync(MODEL_PHOTO_PATH)) return "";
+  return (await sharePublicly(fs.readFileSync(MODEL_PHOTO_PATH), "image/png")) ?? "";
+}
+
+/** Guarda un resultado en el almacén persistente (antes en public/media/sevillano del disco). */
+async function saveSevillano(bytes: Buffer, filename: string, mime: string): Promise<void> {
+  await putFile(SEVILLANO_NS, filename, bytes, mime);
+}
+const sevillanoUrl = (filename: string) => `/api/youtube/media/${filename}`;
+
+router.get("/youtube/model-photo", requireAdmin, (_req, res) => {
+  if (!fs.existsSync(MODEL_PHOTO_PATH)) { res.status(404).json({ error: "Foto de referencia no encontrada" }); return; }
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  res.sendFile(MODEL_PHOTO_PATH);
+});
+
+router.get("/youtube/media/:name", requireAdmin, async (req, res) => {
+  const name = String(req.params.name);
+  if (!isValidStoreKey(name) || name.includes("/")) { res.status(404).end(); return; }
+  const f = await getFile(SEVILLANO_NS, name).catch(() => null);
+  if (!f) { res.status(404).json({ error: "Archivo no encontrado" }); return; }
+  res.setHeader("Content-Type", f.mime);
+  res.setHeader("Content-Length", String(f.size));
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.end(f.bytes);
+});
 
 const ffmpegBin: string = process.env.FFMPEG_PATH ||
   ["/nix/store/k28ypnisbhajg3x1kv5hy7h2vjbajkvy-replit-runtime-path/bin/ffmpeg",
@@ -650,25 +688,16 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
     logger.info(`TTS duration: ${exactDuration}s, mode: ${mode}`);
 
     // Paths to locate sevillano photo
-    const photoPath = path.join(process.cwd(), "..", "shopify-optimizer", "public", "images", "sevillano-model.png");
-    const altPhotoPath = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "images", "sevillano-model.png");
-    const photoSrc = fs.existsSync(photoPath) ? photoPath : altPhotoPath;
-    const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
-    const basePublicUrl = devDomain ? `https://${devDomain}` : "";
+    const photoSrc = MODEL_PHOTO_PATH;
+    // Replicate descarga la foto y el audio por URL: enlaces públicos temporales.
+    const basePublicUrl = publicAppUrl() ?? "";
 
     // ── PASO 3A: SadTalker — foto + audio → lip-sync real (modo por defecto) ──
     if ((mode === "sadtalker" || mode === "auto") && !clipBase64 && replicateToken && basePublicUrl) {
       try {
-        // Save TTS audio to public for URL access
-        const pubAudioDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
-        const altPubDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
-        const pubDir = fs.existsSync(pubAudioDir) ? pubAudioDir : altPubDir;
-        fs.mkdirSync(pubDir, { recursive: true });
-        const ttsFilename = `tts_${Date.now()}.mp3`;
-        fs.copyFileSync(audioPath, path.join(pubDir, ttsFilename));
-
-        const photoUrl = `${basePublicUrl}/images/sevillano-model.png`;
-        const audioUrl = `${basePublicUrl}/media/sevillano/${ttsFilename}`;
+        const photoUrl = await modelPhotoPublicUrl();
+        const audioUrl = await sharePublicly(fs.readFileSync(audioPath), "audio/mpeg");
+        if (!photoUrl || !audioUrl) throw new Error("Sin dominio público para compartir foto y audio");
 
         // SadTalker version
         const SADTALKER_VERSION = "85c698db7c0a66d5011435d0191db323034e1da04b912a6d365833141b6a285b";
@@ -696,8 +725,6 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
             if (dlRes.ok) {
               fs.writeFileSync(outPath, Buffer.from(await dlRes.arrayBuffer()));
               logger.info(`SadTalker succeeded: ${videoUrl}`);
-              // Clean up temp TTS public file
-              try { fs.unlinkSync(path.join(pubDir, ttsFilename)); } catch {}
               // Fall through to PASO 4
             }
           }
@@ -711,7 +738,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
     // ── PASO 3B: Seedance I2V → loop → merge TTS (fallback animado) ──
     if (!fs.existsSync(outPath) && !clipBase64 && replicateToken && basePublicUrl) {
       try {
-        const photoUrl = `${basePublicUrl}/images/sevillano-model.png`;
+        const photoUrl = await modelPhotoPublicUrl();
         const seedRes = await fetch("https://api.replicate.com/v1/models/bytedance/seedance-1-lite/predictions", {
           method: "POST",
           headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
@@ -763,24 +790,15 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
     }
 
     // ── PASO 4: Guardar permanentemente (TTS+vídeo ya sincronizados) ──
-    const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
-    const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
-    const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir :
-                         fs.existsSync(path.dirname(altSaveDir)) ? altSaveDir :
-                         path.join(os.tmpdir(), "modelo-saved");
-    fs.mkdirSync(permanentDir, { recursive: true });
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const savedFilename = `dubbed_${timestamp}.mp4`;
-    const permanentPath = path.join(permanentDir, savedFilename);
-    fs.copyFileSync(outPath, permanentPath);
-    logger.info(`Dubbed video saved permanently: ${permanentPath} (duration: ${exactDuration}s)`);
+    await saveSevillano(fs.readFileSync(outPath), savedFilename, "video/mp4");
+    logger.info(`Dubbed video saved permanently: ${savedFilename} (duration: ${exactDuration}s)`);
 
     const b64out = fs.readFileSync(outPath).toString("base64");
     fs.rmSync(tmpDir, { recursive: true, force: true });
 
-    const publicUrl = permanentPath.includes("shopify-optimizer")
-      ? `/media/sevillano/${savedFilename}`
-      : null;
+    const publicUrl = sevillanoUrl(savedFilename);
 
     return res.json({
       success: true,
@@ -855,8 +873,7 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req, res) => {
     logger.info(`comedian-gen: TTS duration=${exactDuration}s`);
 
     // ── PASO 3: Lanzar 3 clips Seedance I2V en PARALELO ──
-    const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
-    const photoUrl = customPhotoUrl || (devDomain ? `https://${devDomain}/images/sevillano-model.png` : "");
+    const photoUrl = customPhotoUrl || (await modelPhotoPublicUrl());
 
     // Prompts adaptativos con timeline de secciones (formato 0-Xs: descripción)
     // Cada prompt describe 15s de vídeo divididos en segmentos de efecto/movimiento
@@ -1037,19 +1054,12 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req, res) => {
     );
 
     // ── PASO 6: Guardar permanentemente ──
-    const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
-    const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
-    const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir :
-                         fs.existsSync(path.dirname(altSaveDir)) ? altSaveDir :
-                         path.join(os.tmpdir(), "modelo-saved");
-    fs.mkdirSync(permanentDir, { recursive: true });
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const savedFilename = `comedian_${timestamp}.mp4`;
-    const permanentPath = path.join(permanentDir, savedFilename);
-    fs.copyFileSync(outPath, permanentPath);
+    await saveSevillano(fs.readFileSync(outPath), savedFilename, "video/mp4");
     fs.rmSync(tmpDir, { recursive: true, force: true });
 
-    const publicUrl = permanentPath.includes("shopify-optimizer") ? `/media/sevillano/${savedFilename}` : null;
+    const publicUrl = sevillanoUrl(savedFilename);
     logger.info(`comedian-gen: saved permanently as ${savedFilename} (${successClips.length} clips, ${exactDuration}s)`);
 
     return res.json({ success: true, savedAs: savedFilename, publicUrl, audioDuration: parseFloat(exactDuration), clipsGenerated: successClips.length });
@@ -1170,8 +1180,7 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req, res)
     // ── PASO 5: Face-swap fotograma a fotograma (codeplugtech/face-swap via Replicate) ──
     let faceSwapApplied = false;
     if (doFaceSwap && replicateToken) {
-      const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
-      const facePhotoUrl = devDomain ? `https://${devDomain}/images/sevillano-model.png` : "";
+      const facePhotoUrl = await modelPhotoPublicUrl();
       const FACE_SWAP_VERSION = "278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34";
 
       const framesDir = path.join(tmpDir, "frames");
@@ -1242,19 +1251,12 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req, res)
     if (!fs.existsSync(outPath)) fs.copyFileSync(mergedPath, outPath);
 
     // ── PASO 6: Guardar permanentemente ──
-    const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
-    const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
-    const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir :
-                         fs.existsSync(path.dirname(altSaveDir)) ? altSaveDir :
-                         path.join(os.tmpdir(), "modelo-saved");
-    fs.mkdirSync(permanentDir, { recursive: true });
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const savedFilename = `reference_pipeline_${timestamp}.mp4`;
-    const permanentPath = path.join(permanentDir, savedFilename);
-    fs.copyFileSync(outPath, permanentPath);
+    await saveSevillano(fs.readFileSync(outPath), savedFilename, "video/mp4");
     fs.rmSync(tmpDir, { recursive: true, force: true });
 
-    const publicUrl = permanentPath.includes("shopify-optimizer") ? `/media/sevillano/${savedFilename}` : null;
+    const publicUrl = sevillanoUrl(savedFilename);
     logger.info(`reference-pipeline: saved ${savedFilename} (faceSwap=${faceSwapApplied}, duration=${exactDuration}s)`);
 
     return res.json({ success: true, savedAs: savedFilename, publicUrl, audioDuration: parseFloat(exactDuration), faceSwapApplied });
@@ -1342,8 +1344,7 @@ router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req, res) =
     let faceSwapApplied = false;
     const replicateToken = REPLICATE_TOKEN();
     if (doFaceSwap && replicateToken) {
-      const devDomain = process.env.REPLIT_DEV_DOMAIN || "";
-      const facePhotoUrl = devDomain ? `https://${devDomain}/images/sevillano-model.png` : "";
+      const facePhotoUrl = await modelPhotoPublicUrl();
       const FACE_SWAP_VERSION = "278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34";
       const framesDir = path.join(tmpDir, "frames");
       const swappedDir = path.join(tmpDir, "swapped");
@@ -1391,17 +1392,12 @@ router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req, res) =
     }
 
     // Guardar permanentemente
-    const saveDir = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
-    const altSaveDir = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
-    const permanentDir = fs.existsSync(path.dirname(saveDir)) ? saveDir : fs.existsSync(path.dirname(altSaveDir)) ? altSaveDir : path.join(os.tmpdir(), "modelo-saved");
-    fs.mkdirSync(permanentDir, { recursive: true });
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const savedFilename = `sts_dubbed_${timestamp}.mp4`;
-    const permanentPath = path.join(permanentDir, savedFilename);
-    fs.copyFileSync(outPath, permanentPath);
+    await saveSevillano(fs.readFileSync(outPath), savedFilename, "video/mp4");
     fs.rmSync(tmpDir, { recursive: true, force: true });
 
-    const publicUrl = permanentPath.includes("shopify-optimizer") ? `/media/sevillano/${savedFilename}` : null;
+    const publicUrl = sevillanoUrl(savedFilename);
     logger.info(`speech-to-speech: saved ${savedFilename} (${videoDuration}s, faceSwap=${faceSwapApplied})`);
     return res.json({ success: true, savedAs: savedFilename, publicUrl, videoDuration: parseFloat(videoDuration), faceSwapApplied, stsUsed: true });
   } catch (err: any) {
@@ -1462,16 +1458,12 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
             if (dlR.ok) {
               const outBuf = Buffer.from(await dlR.arrayBuffer());
               // Save permanently
-              const saveDir3 = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
-              const altDir3 = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
-              const permDir3 = fs.existsSync(path.dirname(saveDir3)) ? saveDir3 : altDir3;
-              fs.mkdirSync(permDir3, { recursive: true });
               const ts3 = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
               const fname3 = `faceswap_el_${ts3}.mp4`;
-              fs.writeFileSync(path.join(permDir3, fname3), outBuf);
+              await saveSevillano(outBuf, fname3, "video/mp4");
               fs.rmSync(tmpDir2, { recursive: true, force: true });
               logger.info(`ElevenLabs face-swap saved: ${fname3}`);
-              return res.json({ success: true, dubbingId: dubbingId2, provider: "elevenlabs", savedAs: fname3, publicUrl: `/media/sevillano/${fname3}`, outputUrl: `/media/sevillano/${fname3}` });
+              return res.json({ success: true, dubbingId: dubbingId2, provider: "elevenlabs", savedAs: fname3, publicUrl: sevillanoUrl(fname3), outputUrl: sevillanoUrl(fname3) });
             }
           }
         }
@@ -1536,15 +1528,11 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
       const dlFace = await fetch(outputUrl);
       if (dlFace.ok) {
         const faceBuf = Buffer.from(await dlFace.arrayBuffer());
-        const saveDir4 = path.join(process.cwd(), "..", "shopify-optimizer", "public", "media", "sevillano");
-        const altDir4 = path.join(__dirname, "..", "..", "..", "shopify-optimizer", "public", "media", "sevillano");
-        const permDir4 = fs.existsSync(path.dirname(saveDir4)) ? saveDir4 : altDir4;
-        fs.mkdirSync(permDir4, { recursive: true });
         const ts4 = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
         const fname4 = `faceswap_rep_${ts4}.mp4`;
-        fs.writeFileSync(path.join(permDir4, fname4), faceBuf);
+        await saveSevillano(faceBuf, fname4, "video/mp4");
         logger.info(`Replicate face-swap saved: ${fname4}`);
-        return res.json({ success: true, outputUrl: `/media/sevillano/${fname4}`, publicUrl: `/media/sevillano/${fname4}`, predictionId: pred.id, provider: "replicate", savedAs: fname4 });
+        return res.json({ success: true, outputUrl: sevillanoUrl(fname4), publicUrl: sevillanoUrl(fname4), predictionId: pred.id, provider: "replicate", savedAs: fname4 });
       }
     } catch {}
 

@@ -26,16 +26,7 @@ async function getDb() {
   return db;
 }
 
-// ── Ensure stripe_key_enc column exists ──────────────────────────────────────
-async function ensureVaultColumn(): Promise<void> {
-  try {
-    const db = await getDb();
-    await db.execute(sql`
-      ALTER TABLE stripe_accounts ADD COLUMN IF NOT EXISTS stripe_key_enc TEXT
-    `);
-  } catch (_) {}
-}
-ensureVaultColumn();
+// La columna stripe_key_enc la crea ensureStripeTables (routes/stripe-connect.ts).
 
 // ── GET /admin/stripe/master-overview ────────────────────────────────────────
 // Devuelve todos los proyectos con su estado Stripe
@@ -64,11 +55,8 @@ router.get("/admin/stripe/master-overview", requireAdmin, async (_req: Request, 
           WHEN sa.access_token_enc IS NOT NULL THEN 'connect_oauth'
           ELSE 'none'
         END AS stripe_mode,
-        CASE
-          WHEN sa.stripe_key_enc IS NOT NULL
-            THEN 'sk_' || SUBSTRING(sa.stripe_key_enc, 1, 8) || '••••••••'
-          ELSE NULL
-        END AS key_preview
+        -- Antes mostraba 8 caracteres del texto cifrado con prefijo "sk_" (no era la clave).
+        CASE WHEN sa.stripe_key_enc IS NOT NULL THEN 'sk_••••••••' ELSE NULL END AS key_preview
       FROM projects p
       LEFT JOIN stripe_accounts sa ON sa.project_id = p.id
       ORDER BY p.id DESC

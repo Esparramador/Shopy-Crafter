@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import { logger } from "./logger.js";
+import { isAllowedHeadlessUrl } from "./headless-guard.js";
 
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH
   || process.env.PUPPETEER_EXECUTABLE_PATH
@@ -70,7 +71,8 @@ export async function generatePdfFromHtml(
         logger.debug({ url }, "PDF: blocking external font");
         r.abort();
       } else {
-        r.continue();
+        // Imágenes/documentos: solo data: y URLs públicas (nada de localhost ni red interna).
+        void isAllowedHeadlessUrl(url).then(ok => (ok ? r.continue() : r.abort())).catch(() => {});
       }
     });
 

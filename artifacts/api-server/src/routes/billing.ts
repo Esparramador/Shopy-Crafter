@@ -17,6 +17,7 @@ import {
   recurringRevenue, ensureStripeBillingSchema, type BillingInterval,
 } from "../lib/stripe-billing.js";
 import { publicAppUrl } from "../lib/account-tokens.js";
+import { ensureAppSettingsTable } from "../lib/app-settings-table.js";
 
 
 const router = Router();
@@ -135,13 +136,7 @@ async function ensureBillingPlansTable(): Promise<void> {
     await db.execute(sql`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS shopify_checkout_url TEXT`);
     await db.execute(sql`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS user_id TEXT`);
     await db.execute(sql`ALTER TABLE billing_plans ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'stripe'`);
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS app_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
+    await ensureAppSettingsTable();
     await db.execute(sql`
       INSERT INTO app_settings (key, value) VALUES ('payment_method', 'stripe')
       ON CONFLICT (key) DO NOTHING

@@ -7,6 +7,7 @@ import { SERVICE_CATALOG, LEGACY_SEEDED_SERVICE_NAMES, priceDisplay } from "../l
 import { getStripe, createServiceCheckout, type SellableService } from "../lib/stripe-billing.js";
 import { publicAppUrl } from "../lib/account-tokens.js";
 import { catalogPlan, planPlatforms, PACK_PLATFORMS } from "../lib/plan-catalog.js";
+import { ensureAppSettingsTable } from "../lib/app-settings-table.js";
 
 const router = Router();
 
@@ -64,7 +65,7 @@ async function ensureTiendaTables(): Promise<void> {
 
     await db.execute(sql`ALTER TABLE tienda_services ADD COLUMN IF NOT EXISTS price_eur NUMERIC`);
     await db.execute(sql`ALTER TABLE tienda_services ADD COLUMN IF NOT EXISTS billing_interval TEXT DEFAULT 'quote'`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`);
+    await ensureAppSettingsTable();
 
     // v2: servicios con precio real y cobro por Stripe. Los sembrados en la v1
     // prometían "monitorización 24/7", "account manager dedicado", "entrega en

@@ -30,7 +30,7 @@ import {
   type CartItemInput, type PricedLine, type ShopProduct,
 } from "../lib/shop.js";
 import {
-  ensureShopTables, listProducts, productsBySlug, shippingSettings, sniffMime, saveUpload, getUpload,
+  ensureShopTables, listProducts, productsBySlug, shippingSettings, sniffMime, saveUpload, uploadedBytesLastDay, SHOP_UPLOAD_DAILY_BYTES, getUpload,
   assertUploadsUsable, createOrder, setOrderSession, orderByToken, toPublicOrder, markShopOrderPaid, rowToProduct,
 } from "../lib/shop-store.js";
 
@@ -79,11 +79,17 @@ router.post("/shop/uploads", customerUpload.array("files", 12), async (req: Requ
   try {
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
     if (files.length === 0) { res.status(400).json({ error: "Elige al menos un archivo" }); return; }
+    const ip = req.ip ?? "unknown";
+    const incoming = files.reduce((t, f) => t + f.size, 0);
+    if ((await uploadedBytesLastDay(ip)) + incoming > SHOP_UPLOAD_DAILY_BYTES) {
+      res.status(429).json({ error: "Has subido muchos archivos hoy. Escríbenos y te ayudamos con el envío." });
+      return;
+    }
     const out: Array<{ id: string; name: string; mime: string }> = [];
     for (const f of files) {
       const mime = sniffMime(f.buffer);
       if (!mime) { res.status(400).json({ error: `«${f.originalname}» no es JPG, PNG, WebP ni PDF` }); return; }
-      out.push({ id: await saveUpload(f.buffer, mime, f.originalname), name: f.originalname, mime });
+      out.push({ id: await saveUpload(f.buffer, mime, f.originalname, ip), name: f.originalname, mime });
     }
     res.json({ files: out });
   } catch (err) {

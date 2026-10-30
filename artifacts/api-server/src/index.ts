@@ -367,6 +367,17 @@ const server = app.listen(port, (err?: Error) => {
       .then(r => logger.info(r, "stripe webhook: revisión al arrancar"))
       .catch(err => logger.warn({ err: err instanceof Error ? err.message : err }, "stripe webhook: no se pudo revisar al arrancar"));
   });
+  // Limpieza periódica: subidas de la tienda sin pedido (3 días) y enlaces públicos caducados (24 h).
+  const purgeStale = () => {
+    import("./lib/shop-store.js").then(m => m.purgeOrphanUploads())
+      .then(n => { if (n) logger.info({ n }, "tienda: subidas huérfanas borradas"); })
+      .catch(err => logger.warn({ err }, "purgeOrphanUploads failed"));
+    import("./lib/public-share.js").then(m => m.purgeExpiredShares())
+      .catch(err => logger.warn({ err }, "purgeExpiredShares failed"));
+  };
+  setTimeout(purgeStale, 60_000).unref();
+  setInterval(purgeStale, 6 * 60 * 60 * 1000).unref();
+
   // Jobs masivos que estaban "running" murieron con el proceso anterior.
   import("./lib/bulk-queue.js").then(m => m.failStaleBulkJobs()).catch(err => logger.warn({ err }, "failStaleBulkJobs failed"));
 

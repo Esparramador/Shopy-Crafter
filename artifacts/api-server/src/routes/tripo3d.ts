@@ -1,9 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
-import { existsSync, readdirSync, createWriteStream } from "fs";
-import { mkdir, writeFile } from "fs/promises";
-import { join } from "path";
-import { pipeline } from "stream/promises";
+import { getFile, listFiles, putFile, isValidStoreKey } from "../lib/file-store.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
 import { askClaudeWithBrain } from "../lib/claude.js";
@@ -12,26 +9,19 @@ import { uploadRejected } from "../lib/upload-errors.js";
 
 const router = Router();
 
-const FRONTEND_PUBLIC = join(process.cwd(), "..", "..", "artifacts", "shopify-optimizer", "public");
-const TRIPO3D_LOCAL_DIR = join(FRONTEND_PUBLIC, "assets", "3d", "tripo3d");
-
-// Ensure directory exists
-if (!existsSync(TRIPO3D_LOCAL_DIR)) {
-  mkdir(TRIPO3D_LOCAL_DIR, { recursive: true }).catch(err => logger.error({ err }, "Error creating Tripo3D local dir"));
-}
+// Modelos generados: almacén persistente (antes en shopify-optimizer/public/assets/3d/tripo3d,
+// que en producción ni persiste ni se sirve). Se sirven por GET /tripo3d/files/:name.
+const TRIPO_NS = "tripo3d";
 
 async function downloadAndSaveTripoModel(taskId: string, glbUrl: string) {
   try {
-    const response = await fetch(glbUrl);
+    if (!/^[A-Za-z0-9-]{4,80}$/.test(taskId) || !/^https:\/\//i.test(glbUrl)) throw new Error("taskId o URL no válidos");
+    const response = await fetch(glbUrl, { signal: AbortSignal.timeout(180_000) });
     if (!response.ok) throw new Error(`Failed to download GLB: ${response.statusText}`);
-    const filePath = join(TRIPO3D_LOCAL_DIR, `${taskId}.glb`);
-    const fileStream = createWriteStream(filePath);
-    if (response.body) {
-      await pipeline(response.body as any, fileStream);
-      logger.info({ taskId, filePath }, "Tripo3D model saved locally");
-    }
+    await putFile(TRIPO_NS, `${taskId}.glb`, Buffer.from(await response.arrayBuffer()), "model/gltf-binary");
+    logger.info({ taskId }, "Tripo3D model saved");
   } catch (error) {
-    logger.error({ error, taskId, glbUrl }, "Error downloading/saving Tripo3D model");
+    logger.error({ error, taskId }, "Error downloading/saving Tripo3D model");
   }
 }
 
@@ -844,20 +834,26 @@ El modelo 3D debe representar visualmente el valor del producto/servicio de form
 /* GET /api/tripo3d/local-models — lista los GLBs guardados localmente */
 router.get("/tripo3d/local-models", async (_req, res) => {
   try {
-    if (!existsSync(TRIPO3D_LOCAL_DIR)) {
-      res.json({ models: [] });
-      return;
-    }
-    const files = readdirSync(TRIPO3D_LOCAL_DIR);
-    const glbs = files.filter(f => f.endsWith(".glb")).map(f => ({
-      taskId: f.replace(".glb", ""),
-      url: `/assets/3d/tripo3d/${f}`,
-      filename: f
+    const glbs = (await listFiles(TRIPO_NS)).filter(f => f.key.endsWith(".glb")).map(f => ({
+      taskId: f.key.replace(".glb", ""),
+      url: `/api/tripo3d/files/${f.key}`,
+      filename: f.key,
     }));
     res.json({ models: glbs });
   } catch (e: any) {
     res.status(400).json({ error: e.message });
   }
+});
+
+router.get("/tripo3d/files/:name", async (req, res) => {
+  const name = String(req.params.name);
+  if (!isValidStoreKey(name) || name.includes("/")) { res.status(404).end(); return; }
+  const f = await getFile(TRIPO_NS, name).catch(() => null);
+  if (!f) { res.status(404).json({ error: "Modelo no encontrado" }); return; }
+  res.setHeader("Content-Type", f.mime);
+  res.setHeader("Content-Length", String(f.size));
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  res.end(f.bytes);
 });
 
 /* POST /api/tripo3d/text-to-model-advanced — prompt, style, quality, seed, multiview */

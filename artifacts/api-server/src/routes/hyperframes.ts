@@ -7,6 +7,7 @@ import { resolveFfmpegPath } from "../lib/adstudio.js";
 import { z } from "zod";
 import { askClaudeJsonValidated } from "../lib/ai-json.js";
 import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
+import { guardHeadlessPage } from "../lib/headless-guard.js";
 
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,6 +47,7 @@ router.post("/hyperframes/generate", async (req, res) => {
     const frameFiles: string[] = [];
     try {
       const page = await browser.newPage();
+      await guardHeadlessPage(page);
       await page.setViewport({ width, height });
       await page.setContent(html, { waitUntil: "load" });
       // puppeteer 25: setContent ya no admite networkidle0; se espera a que no queden peticiones (fuentes, librerías).

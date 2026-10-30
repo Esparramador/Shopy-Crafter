@@ -125,6 +125,14 @@ export const FLOW_STAGE_LABELS: Record<FlowStage, { label: string; icon: string;
   success:  { label: "Éxito",       icon: "🎉", color: "#34d399" },
 };
 
+// ── Rutas de los .glb (almacén persistente del API) ──────────────────────────
+const MESHY_FILES = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/api/meshy/files`;
+export function meshyFile(rel: string): string {
+  return `${MESHY_FILES}/${rel}`;
+}
+
+const FULL_22_LIST = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","jump","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
+
 // ── Helper to build ModelAnimation array from filesystem ─────────────────────
 
 function anims(charId: string, names: string[]): ModelAnimation[] {
@@ -133,163 +141,71 @@ function anims(charId: string, names: string[]): ModelAnimation[] {
     return {
       name,
       label: def?.label ?? name,
-      glbPath: `/assets/3d/animations/${charId}/${name}.glb`,
+      glbPath: meshyFile(`animations/${charId}/${name}.glb`),
       looping: def?.looping ?? true,
     };
   });
 }
 
-// 134 animations — alec_monopoly (full catalog discovered via API probe)
-const FULL_134 = [
-  "walk","alert","arise","idle","idle_breath","wave","thumbs_up","clap","dance","point",
-  "think","victory","sit","look_around","kick","punch","crouch","celebrate","nod","shake_head","run","jump",
-  "funny_dancing_02","funny_dancing_03","agree_gesture","angry_stomp","big_heart_gesture","big_wave_hello","call_gesture","casual_walk",
-  "catching_breath","chair_sit_idle_f","chair_sit_idle_m","checkout_gesture","clapping_run","confused_scratch","discuss_while_moving","dozing_elderly",
-  "excited_walk_f","excited_walk_m","formal_bow","gentlemans_bow","handbag_walk","happy_jump_f","indoor_play","jump_rope",
-  "listening_gesture","mirror_viewing","motivational_cheer","phone_call_gesture",
-  "shouting_angrily","sit_to_stand_f","sit_to_stand_m","squat_stance","stage_walk","stand_and_chat","stand_to_sit_m","step_to_sit",
-  "victory_cheer","walk_to_sit","happy_jump_m","penguin_walk",
-  "arm_circle_shuffle","all_night_dance","bass_beats","boom_dance","bubble_dance","cherish_pop_dance","crystal_beads","cardio_dance",
-  "denim_pop_dance","dont_you_dare","fast_lightning","gangnam_groove","indoor_swing","love_you_pop_dance","magic_genie","not_your_mom",
-  "omg_groove","pop_dance_lsa2","pod_baby_groove","shake_it_off_dance","superlove_pop_dance","you_groove",
-  "axe_stance","basic_jump","boxing_practice","chest_pound_taunt","combat_stance","counterstrike","double_blade_spin","double_combo_attack",
-  "dodge_and_counter","flying_fist_kick","gun_hold_left_turn","kung_fu_punch","left_slash","run_and_shoot","reaping_swing","rightward_spin",
-  "sword_shout","sword_judgment","simple_kick","side_shot","triple_combo_attack",
-  "confident_walk","confident_strut","flirty_strut","groovy_walk","hello_run","injured_walk","monster_walk","mummy_stagger",
-  "proud_strut","quick_walk","run_to_walk","red_carpet_walk","skip_forward","slow_orc_walk","touch_and_run","thoughtful_walk",
-  "texting_walk","unsteady_walk","walking_with_phone",
-  "charged_spell_cast","charged_spell_cast_1","charged_ground_slam","heavy_hammer_swing",
-  "mage_spell_cast","mage_spell_cast_1","mage_spell_cast_2","mage_spell_cast_3","mage_spell_cast_4","mage_spell_cast_5",
-];
-// 22 animations (batman, chico_casual, chico_formal)
-const FULL_22 = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","jump","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
-// 21 animations (plim_plim, chica_ejecutiva and others)
-const FULL_21 = ["alert","arise","celebrate","clap","crouch","dance","idle","idle_breath","kick","look_around","nod","point","punch","run","shake_head","sit","think","thumbs_up","victory","walk","wave"];
-// Basic 3 (TED — plan limit hit)
-const BASIC_3 = ["jump","run","walk"];
+// 22 animaciones (personajes humanos completos)
+const FULL_22 = FULL_22_LIST;
+// 21 animaciones
+const FULL_21 = FULL_22_LIST.filter(a => a !== "jump");
 
-// ── Character definitions ─────────────────────────────────────────────────────
+// ── Personajes ───────────────────────────────────────────────────────────────
+// Solo personajes propios: nada de personajes, marcas ni personas reales con
+// derechos de terceros. Los .glb viven en el almacén persistente del API
+// (/api/meshy/files/...) y se recuperan desde Meshy con "Recuperar" si faltan.
 
 export const MESHY_CHARACTERS: MeshyCharacter[] = [
-  // ── Fully rigged with 22 animations ──
-  {
-    id: "alec_monopoly", name: "Alec Monopoly", emoji: "🎩", category: "cartoon",
-    description: "El artista urbano más icónico. 134 animaciones — catálogo completo de Meshy.",
-    tags: ["arte","urbano","cartoon","rigged","full","134-anims"],
-    glbPath: "/assets/3d/models/alec_monopoly.glb", rigStatus: "rigged",
-    rigTaskId: "019ebb36-4f0c-7d21-a268-2ff6198aca60",
-    regenPrompt: { prompt: "Alec Monopoly street artist cartoon character, male figure wearing top hat and suit with money symbols, graffiti art style, full body A-pose arms at 45 degrees, humanoid proportions, bold colorful style, game-ready 3D model", art_style: "cartoon" },
-    animations: anims("alec_monopoly", FULL_134),
-  },
-  {
-    id: "batman", name: "Batman", emoji: "🦇", category: "cartoon",
-    description: "El Caballero de la Noche. 22 animaciones completas.",
-    tags: ["superhéroe","dc","acción","rigged","full"],
-    glbPath: "/assets/3d/models/batman.glb", rigStatus: "rigged",
-    rigTaskId: "019ebb36-4f15-7f7e-af4e-3148857adbfe",
-    regenPrompt: { prompt: "Batman DC comics superhero, dark knight, full body A-pose arms at 45 degrees, black armored suit with bat symbol on chest, cowl with pointed ears, humanoid athletic proportions, detailed texture, game-ready 3D", art_style: "realistic" },
-    animations: anims("batman", FULL_22),
-  },
-  {
-    id: "spiderman", name: "Spider-Man", emoji: "🕷️", category: "cartoon",
-    description: "El superhéroe arácnido de Marvel. 22 animaciones.",
-    tags: ["marvel","superhéroe","acción","rigged","full"],
-    glbPath: "/assets/3d/models/spiderman.glb", rigStatus: "rigged",
-    regenPrompt: { prompt: "Spider-Man Marvel superhero, full body A-pose arms at 45 degrees, red and blue tight suit with web pattern, spider logo on chest, humanoid athletic build, full face mask, game-ready 3D model", art_style: "realistic" },
-    animations: anims("spiderman", FULL_22),
-  },
   {
     id: "chico_casual", name: "Hombre Casual Tech", emoji: "👨‍💻", category: "realistic",
     description: "Dev casual. 22 animaciones completas.",
     tags: ["humano","casual","tech","rigged","full"],
-    glbPath: "/assets/3d/models/chico_casual.glb", rigStatus: "rigged",
+    glbPath: meshyFile("models/chico_casual.glb"), rigStatus: "rigged",
     rigTaskId: "019ebb36-4f25-7f7f-b072-2ef66d123f7d",
-    regenPrompt: { prompt: "Young professional male developer, casual tech style, jeans and hoodie, full body A-pose arms at 45 degrees, realistic human proportions, clean facial features, mid-20s appearance, game-ready character", art_style: "realistic" },
+    regenPrompt: { prompt: "Young professional male developer, casual tech style, jeans and hoodie, full body A-pose arms at 45 degrees, realistic human proportions, clean facial features, mid-20s appearance", art_style: "realistic" },
     animations: anims("chico_casual", FULL_22),
   },
   {
     id: "chico_formal", name: "Hombre Traje Formal", emoji: "🤵", category: "realistic",
     description: "Ejecutivo con traje. 22 animaciones completas.",
     tags: ["humano","formal","corporativo","rigged","full"],
-    glbPath: "/assets/3d/models/chico_formal.glb", rigStatus: "rigged",
+    glbPath: meshyFile("models/chico_formal.glb"), rigStatus: "rigged",
     rigTaskId: "019ebb36-4eef-728c-87b1-6f3f022a9a2e",
-    regenPrompt: { prompt: "Professional businessman wearing formal dark suit and tie, full body A-pose arms at 45 degrees, realistic human proportions, clean professional appearance, mid-30s male, business executive look, game-ready 3D character", art_style: "realistic" },
+    regenPrompt: { prompt: "Professional businessman wearing formal dark suit and tie, full body A-pose arms at 45 degrees, realistic human proportions, clean professional appearance, mid-30s male", art_style: "realistic" },
     animations: anims("chico_formal", FULL_22),
-  },
-  // ── Newly generated and rigged ──
-  {
-    id: "mickey_mouse", name: "Mickey Mouse", emoji: "🐭", category: "cartoon",
-    description: "El personaje más icónico de Disney. 21 animaciones.",
-    tags: ["disney","cartoon","clásico","rigged"],
-    glbPath: "/assets/3d/models/mickey_mouse.glb", rigStatus: "rigged",
-    regenPrompt: { prompt: "Mickey Mouse Disney cartoon character, bipedal anthropomorphic mouse standing upright, full body A-pose arms at 45 degrees, round black ears, red shorts with white buttons, white gloves, yellow shoes, cheerful expression, humanoid proportions", art_style: "cartoon" },
-    animations: anims("mickey_mouse", FULL_21),
-  },
-  {
-    id: "minnie_mouse", name: "Minnie Mouse", emoji: "🎀", category: "cartoon",
-    description: "La ratoncita elegante de Disney. 21 animaciones.",
-    tags: ["disney","cartoon","clásico","rigged"],
-    glbPath: "/assets/3d/models/minnie_mouse.glb", rigStatus: "rigged",
-    regenPrompt: { prompt: "Minnie Mouse Disney cartoon character, bipedal anthropomorphic female mouse standing upright, full body A-pose arms at 45 degrees, round black ears with pink polka dot bow, pink polka dot dress, white gloves, red heels, humanoid proportions", art_style: "cartoon" },
-    animations: anims("minnie_mouse", FULL_21),
-  },
-  {
-    id: "bob_esponja", name: "Bob Esponja", emoji: "🧽", category: "cartoon",
-    description: "La esponja de Fondo de Bikini. 21 animaciones.",
-    tags: ["nickelodeon","cartoon","humor","rigged"],
-    glbPath: "/assets/3d/models/bob_esponja.glb", rigStatus: "rigged",
-    regenPrompt: { prompt: "SpongeBob SquarePants Nickelodeon cartoon character, bipedal yellow square sponge body, full body A-pose arms at 45 degrees, brown pants with a belt, white shirt, red tie, big blue eyes, buck teeth, humanoid proportions standing upright", art_style: "cartoon" },
-    animations: anims("bob_esponja", FULL_21),
-  },
-  {
-    id: "bugs_bunny", name: "Bugs Bunny", emoji: "🐰", category: "cartoon",
-    description: "El conejo de Looney Tunes. 21 animaciones.",
-    tags: ["warner","cartoon","clásico","rigged"],
-    glbPath: "/assets/3d/models/bugs_bunny.glb", rigStatus: "rigged",
-    regenPrompt: { prompt: "Bugs Bunny Looney Tunes cartoon character, bipedal grey rabbit standing upright, full body A-pose arms at 45 degrees, long ears pointing up, white face, big buck teeth, humanoid proportions, classic Looney Tunes cartoon style", art_style: "cartoon" },
-    animations: anims("bugs_bunny", FULL_21),
-  },
-  {
-    id: "payaso_plim_plim", name: "Plim Plim", emoji: "🤡", category: "cartoon",
-    description: "El payaso mágico para niños. 21 animaciones.",
-    tags: ["infantil","cartoon","latam","rigged"],
-    glbPath: "/assets/3d/models/payaso_plim_plim.glb", rigStatus: "rigged",
-    regenPrompt: { prompt: "Plim Plim magical clown character for children, colorful clown costume with ruffled collar, full body A-pose arms at 45 degrees, star-shaped makeup on face, vibrant colors, friendly child-safe clown, humanoid proportions, 3D cartoon style", art_style: "cartoon" },
-    animations: anims("payaso_plim_plim", FULL_21),
   },
   {
     id: "chica_ejecutiva", name: "Mujer Ejecutiva", emoji: "👩‍💼", category: "realistic",
     description: "Profesional corporativa. 21 animaciones.",
     tags: ["humano","ejecutiva","corporativo","rigged"],
-    glbPath: "/assets/3d/models/chica_ejecutiva.glb", rigStatus: "rigged",
-    regenPrompt: { prompt: "Professional businesswoman wearing executive pantsuit, full body A-pose arms at 45 degrees, realistic human female proportions, mid-30s appearance, confident professional look, clean business attire, game-ready 3D character", art_style: "realistic" },
+    glbPath: meshyFile("models/chica_ejecutiva.glb"), rigStatus: "rigged",
+    regenPrompt: { prompt: "Professional businesswoman wearing executive pantsuit, full body A-pose arms at 45 degrees, realistic human female proportions, mid-30s appearance, confident professional look", art_style: "realistic" },
     animations: anims("chica_ejecutiva", FULL_21),
   },
   {
     id: "chica_creativa", name: "Mujer Creativa", emoji: "👩‍🎨", category: "realistic",
     description: "Diseñadora de agencia. Modelo 3D listo, rig pendiente.",
     tags: ["humano","creativa","agencia"],
-    glbPath: "/assets/3d/models/chica_creativa.glb", rigStatus: "pending",
-    regenPrompt: { prompt: "Creative young woman designer, casual artistic clothing, colorful accessories, full body A-pose arms at 45 degrees, realistic human female proportions, late-20s appearance, artistic bohemian style, game-ready 3D character", art_style: "realistic" },
+    glbPath: meshyFile("models/chica_creativa.glb"), rigStatus: "pending",
+    regenPrompt: { prompt: "Creative young woman designer, casual artistic clothing, colorful accessories, full body A-pose arms at 45 degrees, realistic human female proportions, late-20s appearance", art_style: "realistic" },
     animations: [],
   },
-  // ── Plan limit (TED only has basic 3) ──
   {
-    id: "ted", name: "TED (Oso)", emoji: "🐻", category: "cartoon",
-    description: "El osito más famoso. 3 animaciones básicas.",
-    tags: ["oso","humor","cartoon","rigged"],
-    glbPath: "/assets/3d/models/ted.glb", rigStatus: "rigged",
-    rigTaskId: "019ebb36-4f56-728f-bb13-5654f37c1b41",
-    regenPrompt: { prompt: "TED teddy bear movie character, bipedal plush stuffed teddy bear standing upright, full body A-pose arms at 45 degrees, brown fur texture, soft plush toy appearance, humanoid proportions, expressive cartoon face", art_style: "cartoon" },
-    animations: anims("ted", BASIC_3),
+    id: "shopy_robot", name: "Robot Shopy", emoji: "🤖", category: "cartoon",
+    description: "Mascota propia de Shopy Crafter. Se genera con el botón Regenerar.",
+    tags: ["mascota","robot","cartoon","propio"],
+    glbPath: meshyFile("models/shopy_robot.glb"), rigStatus: "pending",
+    regenPrompt: { prompt: "Friendly cartoon robot mascot, rounded gold and black body with jade green glowing eyes, bipedal humanoid proportions, full body A-pose arms at 45 degrees, clear arm and leg separation, glossy toy-like finish, no text, no logos", art_style: "cartoon" },
+    animations: [],
   },
-  // ── Missing (rig failed — pose estimation) ──
   {
-    id: "pikachu", name: "Pikachu", emoji: "⚡", category: "cartoon",
-    description: "El Pokémon eléctrico. Rig pendiente.",
-    tags: ["pokemon","nintendo","cartoon"],
-    glbPath: "/assets/3d/models/pikachu.glb", rigStatus: "pending",
-    regenPrompt: { prompt: "Pikachu Pokemon character, yellow electric mouse standing bipedal upright, full body A-pose arms at 45 degrees, round chubby body, large pointy ears with black tips, red cheeks, lightning bolt tail, humanoid proportions, cute cartoon style", art_style: "cartoon" },
+    id: "zorro_artesano", name: "Zorro Artesano", emoji: "🦊", category: "cartoon",
+    description: "Mascota propia: un zorro con delantal de taller. Se genera con Regenerar.",
+    tags: ["mascota","animal","cartoon","propio"],
+    glbPath: meshyFile("models/zorro_artesano.glb"), rigStatus: "pending",
+    regenPrompt: { prompt: "Original cartoon fox craftsman character standing bipedal, wearing a small leather workshop apron, humanoid proportions, full body A-pose arms at 45 degrees, warm orange fur, friendly face, no text, no logos", art_style: "cartoon" },
     animations: [],
   },
 ];
@@ -334,10 +250,10 @@ export const CHARACTER_PROMPTS = [
   {
     id: "animal_bipedal",
     label: "🐻 Animal Bípedo",
-    subtitle: "Estilo TED / Mickey — bípedo con proporciones humanoides",
+    subtitle: "Bípedo con proporciones humanoides (estilo peluche o cartoon)",
     base_prompt: "full body bipedal animal cartoon character, humanoid standing pose, A-pose arms at 45 degrees, plush toy or cartoon aesthetic, round body with clear arm and leg separation, stubby humanoid limbs, no accessories blocking joints, symmetric",
     negative: "on all fours, quadruped pose, non-bipedal, merged legs, complex fur accessories, T-pose",
-    tip: "Clave: pose bípeda + proporciones humanoides. Mickey y TED funcionan bien con este prompt.",
+    tip: "Clave: pose bípeda + proporciones humanoides. Los peluches y los cartoon redondeados funcionan bien.",
     compatible_actions: [1,3,4,6,7,8,9,10,12,14,18,19,20],
     art_style: "realistic",
   },

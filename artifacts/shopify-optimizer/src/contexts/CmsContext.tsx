@@ -197,6 +197,8 @@ export function CmsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  // Tema del CMS (colores y fuentes) servido por el API; va después de los estilos del build.
+  useEffect(() => { loadSiteTheme(false); }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -204,6 +206,7 @@ export function CmsProvider({ children }: { children: ReactNode }) {
       esRef.current = new EventSource(`${API_BASE}/api/cms/events`);
       esRef.current.addEventListener("connected", () => { retriesRef.current = 0; });
       esRef.current.addEventListener("content_updated", () => { load(); });
+      esRef.current.addEventListener("theme_updated", () => { loadSiteTheme(true); });
       esRef.current.onerror = () => {
         esRef.current?.close();
         const delay = Math.min(1000 * Math.pow(2, retriesRef.current), 30000);
@@ -228,6 +231,20 @@ export function CmsProvider({ children }: { children: ReactNode }) {
       {children}
     </CmsContext.Provider>
   );
+}
+
+/** Carga (o recarga) /api/cms/theme.css al final del <head>. */
+function loadSiteTheme(bust: boolean): void {
+  if (typeof document === "undefined") return;
+  const href = `${API_BASE}/api/cms/theme.css${bust ? `?v=${Date.now()}` : ""}`;
+  let link = document.getElementById("cms-site-theme") as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement("link");
+    link.id = "cms-site-theme";
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+  }
+  if (bust || !link.href) link.href = href;
 }
 
 export function useCms() {

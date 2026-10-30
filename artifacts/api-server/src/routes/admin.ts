@@ -36,7 +36,7 @@ const aiSuggestionsSchema = z.object({
   })).min(1),
 });
 import { sendPushToClientByProject } from "../lib/push-helper.js";
-import { checkMessageAttachments, msgUpload, msgUploadMulti } from "../lib/msg-uploads.js";
+import { checkMessageAttachments, msgUpload, msgUploadMulti, persistMsgUploads } from "../lib/msg-uploads.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -611,7 +611,7 @@ router.get("/projects/:projectId/messages", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/projects/:projectId/messages/upload", msgUpload.single("file"), async (req, res): Promise<void> => {
+router.post("/projects/:projectId/messages/upload", msgUpload.single("file"), persistMsgUploads, async (req, res): Promise<void> => {
   try {
     if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
     const { originalname, mimetype, size, filename } = req.file;
@@ -626,7 +626,7 @@ router.post("/projects/:projectId/messages/upload", msgUpload.single("file"), as
   }
 });
 
-router.post("/projects/:projectId/messages/upload-multi", msgUploadMulti.array("files", 20), async (req, res): Promise<void> => {
+router.post("/projects/:projectId/messages/upload-multi", msgUploadMulti.array("files", 10), persistMsgUploads, async (req, res): Promise<void> => {
   try {
     const files = req.files as Express.Multer.File[];
     if (!files?.length) { res.status(400).json({ error: "No files provided" }); return; }

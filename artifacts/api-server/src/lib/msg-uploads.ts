@@ -4,12 +4,17 @@ import fs from "fs";
 import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import os from "os";
+import type { NextFunction, Request, Response } from "express";
 import { logger } from "./logger.js";
+import { FILE_STORE_MAX_BYTES, putFile } from "./file-store.js";
 
+/** Carpeta antigua: solo se lee (adjuntos subidos antes del almacén persistente). */
 export const MSG_UPLOADS_DIR = path.resolve(process.cwd(), "msg-uploads");
-if (!fs.existsSync(MSG_UPLOADS_DIR)) {
-  fs.mkdirSync(MSG_UPLOADS_DIR, { recursive: true });
-}
+/** Los adjuntos pasan por aquí (multer) y acaban en el almacén persistente (file-store). */
+const MSG_UPLOADS_TMP = path.join(os.tmpdir(), "sc-msg-uploads");
+fs.mkdirSync(MSG_UPLOADS_TMP, { recursive: true });
+export const MSG_STORE_NS = "msg";
 
 (async () => {
   try {
@@ -87,7 +92,7 @@ export function msgUploadHeaders(res: { setHeader: (k: string, v: string) => voi
 }
 
 const diskStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, MSG_UPLOADS_DIR),
+  destination: (_req, _file, cb) => cb(null, MSG_UPLOADS_TMP),
   filename: (req, file, cb) => {
     const rawExt = path.extname(file.originalname) || "";
     const ext = /^\.[A-Za-z0-9]{1,10}$/.test(rawExt) ? rawExt : "";
@@ -99,10 +104,31 @@ const diskStorage = multer.diskStorage({
 
 export const msgUpload = multer({
   storage: diskStorage,
-  limits: { fileSize: 500 * 1024 * 1024 },
+  limits: { fileSize: FILE_STORE_MAX_BYTES, files: 1 },
 });
 
 export const msgUploadMulti = multer({
   storage: diskStorage,
-  limits: { fileSize: 500 * 1024 * 1024, files: 20 },
+  limits: { fileSize: FILE_STORE_MAX_BYTES, files: 10 },
 });
+
+/**
+ * Tras multer: pasa cada adjunto del disco temporal al almacén persistente (uno a
+ * uno, para no tener varios archivos grandes en memoria) y borra el temporal.
+ */
+export async function persistMsgUploads(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const files: Express.Multer.File[] = req.file ? [req.file] : Array.isArray(req.files) ? req.files : [];
+  try {
+    for (const f of files) {
+      const bytes = await fs.promises.readFile(f.path);
+      const owner = parseMsgUploadName(f.filename)?.projectId ?? null;
+      await putFile(MSG_STORE_NS, f.filename, bytes, f.mimetype, { originalName: f.originalname, projectId: owner });
+    }
+    next();
+  } catch (err) {
+    logger.error({ err }, "[msg-uploads] no se pudo guardar el adjunto");
+    res.status(500).json({ error: "No se pudo guardar el adjunto" });
+  } finally {
+    await Promise.all(files.map(f => fs.promises.unlink(f.path).catch(() => {})));
+  }
+}

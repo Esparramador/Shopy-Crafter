@@ -1196,7 +1196,7 @@ PIPELINE COMPLETO (3 pasos):
 
 PERSONAJE SEVILLANO (el modelo principal configurado):
 • Nombre: El Sevillano / El Monologuista
-• Foto: guardada en /images/sevillano-model.png — chico joven, pelo rizado largo oscuro, barba, sonrisa natural, estilo andaluz
+• Foto: guardada en privado en el API (/api/youtube/model-photo, solo admin) — chico joven, pelo rizado largo oscuro, barba, sonrisa natural, estilo andaluz
 • Voz clonada en ElevenLabs: voice_id = 8m4O8qoFLrKBzbmsuL5T
 • Especialidad: monólogos de humor costumbrista andaluz, turistas en playas, costumbres sevillanas
 • Guión del primer monólogo: "¡Buenas noches Sevilla! Oye, que los turistas en la playa de Torremolinos son como los pulpos..." (41 segundos)

@@ -21,6 +21,7 @@ import { buildVCard } from "./card-qr.js";
 import { renderVerifiedQr, sanitizeQrStyle } from "./card-qr-art.js";
 import { generateImage, type ImageGenModel } from "./fusion-studio-pro.js";
 import { generatePdfFromHtml } from "./pdf-generator.js";
+import { guardHeadlessPage } from "./headless-guard.js";
 
 export type GenerateCardInput = {
   templateId: string;
@@ -379,6 +380,7 @@ export async function generatePrintablePdf(
   });
   try {
     const page = await browser.newPage();
+    await guardHeadlessPage(page);
     await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
     // puppeteer 25: setContent ya no admite networkidle0; se espera a que no queden peticiones (fuentes, imágenes).
     await page.waitForNetworkIdle({ idleTime: 500, timeout: 30_000 });

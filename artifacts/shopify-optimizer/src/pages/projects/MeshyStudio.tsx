@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import ModelViewer3D from "@/components/ModelViewer3D";
 import AnimationFlowPicker from "@/components/AnimationFlowPicker";
-import { MESHY_CHARACTERS, RIGGED_CHARACTERS, ANIM_CATEGORIES, type MeshyCharacter } from "@/lib/meshyModels";
+import { MESHY_CHARACTERS, RIGGED_CHARACTERS, ANIM_CATEGORIES, meshyFile, type MeshyCharacter } from "@/lib/meshyModels";
 
 const API = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -263,14 +263,13 @@ export default function MeshyStudio() {
       const upRes = await fetch(`${API}/api/meshy/upload-model`, { method: "POST", body: fd, credentials: "include" });
       if (!upRes.ok) throw new Error("Error subiendo archivo");
       const upData = await upRes.json();
-      const assetPath: string = upData.path;
-      const modelUrl = `${window.location.origin}${import.meta.env.BASE_URL ?? "/"}${assetPath}`.replace(/([^:])\/\/+/g, "$1/");
+      const uploadId: string = upData.upload_id;
 
       setCustomModel(prev => prev ? { ...prev, rigStatus: "rigging", rigProgress: 5 } : null);
 
       const cancel = streamSSE(
         `${API}/api/meshy/rig`,
-        JSON.stringify({ model_url: modelUrl }),
+        JSON.stringify({ upload_id: uploadId }),
         { "Content-Type": "application/json" },
         (e) => {
           if (e.event === "started") {
@@ -465,11 +464,16 @@ export default function MeshyStudio() {
     ? `📁 ${customModel.name}`
     : `${selectedChar.emoji} ${selectedChar.name}`;
 
+  // Modelo propio subido: se previsualiza con los clips del personaje de referencia
+  // (chico_casual) que ya están en el almacén.
+  const refChar = MESHY_CHARACTERS.find(c => c.id === "chico_casual");
   const browserAnims = customModel
-    ? apiClips.map(c => ({
-        id: c.id, label: c.label, category: c.category, looping: c.looping, action_id: c.action_id,
-        glbPath: `/assets/3d/animations/alec_monopoly/${c.id}.glb`,
-      }))
+    ? apiClips
+        .filter(c => refChar?.animations.some(a => a.name === c.id))
+        .map(c => ({
+          id: c.id, label: c.label, category: c.category, looping: c.looping, action_id: c.action_id,
+          glbPath: meshyFile(`animations/chico_casual/${c.id}.glb`),
+        }))
     : selectedChar.animations
         .filter(a => a.name !== "rigged")
         .map(a => {

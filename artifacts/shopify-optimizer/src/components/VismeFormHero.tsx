@@ -22,9 +22,9 @@
 import React, { useState, useRef, useEffect } from "react";
 
 const BASE_URL   = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-const VIDEO_SRC  = `${BASE_URL}/assets/videos/alec_landing.mp4`;
-const POSTER_SRC = `${BASE_URL}/assets/videos/alec_poster.jpg`;
-const TRIGGER_TIME = 4.5;  // seconds — umbrella fully closed
+// El formulario se "construye" poco después de que la sección se vea.
+// (Antes lo disparaba un vídeo de un personaje con derechos de terceros: se quitó.)
+const TRIGGER_DELAY_MS = 900;
 
 // ── TypewriterText ────────────────────────────────────────────────────────────
 function TypewriterText({ text, delay = 0, speed = 62 }: {
@@ -104,7 +104,6 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
   // Video / build state
   const [formReady,  setFormReady]  = useState(false);
   const [buildPhase, setBuildPhase] = useState(0);   // 0..5
-  const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef  = useRef<HTMLDivElement>(null);
 
   // Mensaje que llega de Proyectos o del configurador: se añade sin borrar lo escrito.
@@ -114,48 +113,19 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
     setStatus(st => (st === "sent" ? "idle" : st));
   }, [prefill?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // isActive prop — play/pause based on whether the landing section is active
+  // La sección activa (o visible) arranca la construcción del formulario.
+  const [seen, setSeen] = useState(false);
+  useEffect(() => { if (isActive) setSeen(true); }, [isActive]);
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (isActive) {
-      v.play().catch(() => {});
-    } else {
-      v.pause();
-    }
-  }, [isActive]);
-
-  // IntersectionObserver — fallback: play when visible, pause when hidden
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        const v = videoRef.current;
-        if (!v) return;
-        entry.isIntersecting ? v.play().catch(() => {}) : v.pause();
-      },
-      { threshold: 0.10 }
-    );
+    const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) setSeen(true); }, { threshold: 0.10 });
     if (rootRef.current) obs.observe(rootRef.current);
     return () => obs.disconnect();
   }, []);
-
-  // timeupdate — trigger form at t=4.5s
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onTime = () => { if (v.currentTime >= TRIGGER_TIME && !formReady) setFormReady(true); };
-    v.addEventListener("timeupdate", onTime);
-    return () => v.removeEventListener("timeupdate", onTime);
-  }, [formReady]);
-
-  // ended — freeze on last frame (seek back 0.05s before end)
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onEnded = () => { try { v.currentTime = Math.max(0, v.duration - 0.05); } catch {} };
-    v.addEventListener("ended", onEnded);
-    return () => v.removeEventListener("ended", onEnded);
-  }, []);
+    if (!seen || formReady) return;
+    const t = setTimeout(() => setFormReady(true), TRIGGER_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [seen, formReady]);
 
   // Build phases cascade (starts when formReady becomes true)
   useEffect(() => {
@@ -307,11 +277,22 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
           object-fit: cover;
           object-position: left center;
         }
-        @media (max-width: 780px) {
-          .vfh-video {
-            object-position: 15% center;
-          }
+        .vfh-aurora {
+          overflow: hidden;
+          background: radial-gradient(120% 90% at 20% 40%, #1a1408 0%, #0b0913 55%, #05030c 100%);
         }
+        .vfh-orb {
+          position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55;
+          animation: vfh-drift 16s ease-in-out infinite alternate;
+        }
+        .vfh-orb-a { width: 46vw; height: 46vw; left: -8vw; top: -6vw; background: radial-gradient(circle, rgba(201,169,97,.55), transparent 65%); }
+        .vfh-orb-b { width: 38vw; height: 38vw; left: 14vw; bottom: -12vw; background: radial-gradient(circle, rgba(42,122,75,.5), transparent 65%); animation-duration: 21s; }
+        .vfh-orb-c { width: 24vw; height: 24vw; left: 28vw; top: 18%; background: radial-gradient(circle, rgba(230,198,104,.35), transparent 65%); animation-duration: 12s; }
+        @keyframes vfh-drift {
+          from { transform: translate3d(0,0,0) scale(1); }
+          to   { transform: translate3d(4vw,3vw,0) scale(1.15); }
+        }
+        @media (prefers-reduced-motion: reduce) { .vfh-orb { animation: none; } }
 
         /* ────── Gradient overlay ────── */
         /* Keeps character visible on left, creates dark readable area on right */
@@ -431,16 +412,12 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
 
       <div ref={rootRef} className="vfh-root">
 
-        {/* ── VIDEO (full-section background) ──────────────────────────────── */}
-        <video
-          ref={videoRef}
-          className="vfh-video"
-          src={VIDEO_SRC}
-          poster={POSTER_SRC}
-          muted
-          playsInline
-          preload="metadata"
-        />
+        {/* ── Fondo animado propio (oro y jade de la marca) ─────────────────── */}
+        <div className="vfh-video vfh-aurora" aria-hidden="true">
+          <span className="vfh-orb vfh-orb-a" />
+          <span className="vfh-orb vfh-orb-b" />
+          <span className="vfh-orb vfh-orb-c" />
+        </div>
 
         {/* ── Gradient overlay ──────────────────────────────────────────────── */}
         <div className="vfh-gradient" />
@@ -482,7 +459,7 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
             </p>
           </div>
 
-          {/* ── WAITING HINT (before t=4.5s) ─────────────────────────────── */}
+          {/* ── Aviso breve mientras se prepara el formulario ────────────────── */}
           {!formReady && !isSuccess && (
             <div style={{
               display: "flex", flexDirection: "column",
@@ -490,9 +467,9 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
               gap: 10, padding: "20px 0", textAlign: "center",
               color: "rgba(200,168,75,.4)",
             }}>
-              <span style={{ fontSize: 28, animation: "vfhBob 2.2s ease-in-out infinite" }}>🎩</span>
+              <span style={{ fontSize: 28, animation: "vfhBob 2.2s ease-in-out infinite" }}>✨</span>
               <p style={{ margin: 0, fontSize: 12.5, fontStyle: "italic", lineHeight: 1.55 }}>
-                Observa cómo Alec<br />sale del cuadro…
+                Preparando tu formulario…
               </p>
             </div>
           )}

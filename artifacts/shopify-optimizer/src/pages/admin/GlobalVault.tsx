@@ -14,21 +14,14 @@ import {
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+// Solo personajes propios (los .glb están en el almacén del API: /api/meshy/files/...).
 const CHARACTERS_3D = [
-  { id: "alec_monopoly",    name: "Alec Monopoly",    emoji: "🎩", anims: 134, rigged: true,  textured: true,  size: "8.2MB", rigTaskId: "019ebb36-4f0c-7d21-a268-2ff6198aca60" },
-  { id: "batman",           name: "Batman",           emoji: "🦇", anims: 22,  rigged: true,  textured: true,  size: "5.1MB", rigTaskId: "019ebb36-4f15-7f7e-af4e-3148857adbfe" },
-  { id: "spiderman",        name: "Spider-Man",       emoji: "🕷️", anims: 22,  rigged: true,  textured: true,  size: "4.9MB", rigTaskId: null },
   { id: "chico_casual",     name: "Chico Casual",     emoji: "👕", anims: 22,  rigged: true,  textured: true,  size: "6.8MB", rigTaskId: "019ebb36-4f25-7f7f-b072-2ef66d123f7d" },
   { id: "chico_formal",     name: "Chico Formal",     emoji: "👔", anims: 22,  rigged: true,  textured: true,  size: "5.2MB", rigTaskId: "019ebb36-4eef-728c-87b1-6f3f022a9a2e" },
-  { id: "mickey_mouse",     name: "Mickey Mouse",     emoji: "🐭", anims: 21,  rigged: true,  textured: false, size: "2.1MB", rigTaskId: null },
-  { id: "minnie_mouse",     name: "Minnie Mouse",     emoji: "🎀", anims: 21,  rigged: true,  textured: false, size: "2.0MB", rigTaskId: null },
-  { id: "bob_esponja",      name: "Bob Esponja",      emoji: "🧽", anims: 21,  rigged: true,  textured: false, size: "1.8MB", rigTaskId: null },
-  { id: "bugs_bunny",       name: "Bugs Bunny",       emoji: "🐰", anims: 21,  rigged: true,  textured: false, size: "1.7MB", rigTaskId: null },
-  { id: "ted",              name: "Ted (Oso)",         emoji: "🧸", anims: 3,   rigged: true,  textured: true,  size: "7.3MB", rigTaskId: "019ebb36-4f56-728f-bb13-5654f37c1b41" },
-  { id: "payaso_plim_plim", name: "Payaso Plim Plim",  emoji: "🤡", anims: 21,  rigged: true,  textured: false, size: "1.5MB", rigTaskId: null },
-  { id: "pikachu",          name: "Pikachu",           emoji: "⚡", anims: 0,   rigged: false, textured: false, size: "1.2MB", rigTaskId: null },
-  { id: "chica_ejecutiva",  name: "Chica Ejecutiva",   emoji: "💼", anims: 21,  rigged: true,  textured: false, size: "1.4MB", rigTaskId: null },
-  { id: "chica_creativa",   name: "Chica Creativa",    emoji: "🎨", anims: 0,   rigged: false, textured: false, size: "1.3MB", rigTaskId: null },
+  { id: "chica_ejecutiva",  name: "Chica Ejecutiva",  emoji: "💼", anims: 21,  rigged: true,  textured: false, size: "1.4MB", rigTaskId: null },
+  { id: "chica_creativa",   name: "Chica Creativa",   emoji: "🎨", anims: 0,   rigged: false, textured: false, size: "1.3MB", rigTaskId: null },
+  { id: "shopy_robot",      name: "Robot Shopy",      emoji: "🤖", anims: 0,   rigged: false, textured: false, size: "—",     rigTaskId: null },
+  { id: "zorro_artesano",   name: "Zorro Artesano",   emoji: "🦊", anims: 0,   rigged: false, textured: false, size: "—",     rigTaskId: null },
 ];
 
 const FOLDER_META: Record<string, { label: string; icon: typeof Image; color: string; group: string; description: string }> = {
@@ -754,7 +747,7 @@ export default function GlobalVault() {
                 {/* ── Buttons ── */}
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <a
-                    href={`${API_BASE}/assets/3d/models/${char.id}.glb`}
+                    href={`${API_BASE}/api/meshy/files/models/${char.id}.glb`}
                     download={`${char.id}.glb`}
                     style={{
                       flex: 1, minWidth: 50,

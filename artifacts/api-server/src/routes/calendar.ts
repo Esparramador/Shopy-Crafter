@@ -218,6 +218,8 @@ router.get("/calendar/oauth/callback", async (req: Request, res: Response): Prom
     `);
 
     logger.info({ email }, "Google Calendar connected");
+    // Página propia (avisa a la ventana que la abrió): CSP explícita, sin acceso a nada más.
+    res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'");
     res.send(`<html><body style="font-family:sans-serif;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
       <div style="text-align:center">
         <div style="font-size:48px">📅</div>

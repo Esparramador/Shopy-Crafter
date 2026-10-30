@@ -207,7 +207,7 @@ export function ClientChatbot() {
     setUploading(true);
     try {
       const fd = new FormData();
-      Array.from(files).forEach(f => fd.append("files", f));
+      Array.from(files).slice(0, 10).forEach(f => fd.append("files", f)); // el servidor admite 10 por envío, 100 MB cada uno
       const r = await fetch(apid(`${API}/client/messages/upload-multi`), {
         method: "POST", credentials: "include", body: fd,
       });

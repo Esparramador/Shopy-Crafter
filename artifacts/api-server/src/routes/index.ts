@@ -94,10 +94,12 @@ import aiCatalogRouter from "./ai-catalog.js";
 import nvidiaNimRouter from "./nvidia-nim.js";
 
 import { requireAdmin, requireAuth, requireProjectAccess } from "../lib/auth.js";
+import shareRouter from "./share.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(shareRouter); // enlaces públicos temporales para proveedores externos
 router.use("/auth", authRouter);
 router.use("/admin", adminRouter);
 router.use("/client", clientRouter);
@@ -110,6 +112,7 @@ router.use("/cms", (req, res, next) => {
   //   GET /pages/:slug            → renderiza una página publicada
   if (req.method === "GET" && req.path === "/content") return next();
   if (req.method === "GET" && req.path === "/events") return next();
+  if (req.method === "GET" && req.path === "/theme.css") return next();
   if (req.method === "GET" && req.path === "/pages") return next();
   if (req.method === "GET" && /^\/pages\/[a-z0-9-]+$/i.test(req.path)) return next();
   return requireAdmin(req, res, next);

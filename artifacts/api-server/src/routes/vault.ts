@@ -16,6 +16,7 @@ import { readFile, stat, realpath } from "fs/promises";
 import path from "path";
 import os from "os";
 import sharp from "sharp";
+import { isAllowedHeadlessUrl } from "../lib/headless-guard.js";
 
 // Mismo directorio raíz que `vault.ts` usa para escribir los fallbacks.
 // MANTENER SINCRONIZADO con `lib/vault.ts::DISK_FALLBACK_DIR`.
@@ -1159,7 +1160,7 @@ router.get("/projects/:projectId/vault/:fileId/download/:format", requireAuth, a
             if (rtype === "script" || rtype === "xhr" || rtype === "fetch" || rtype === "websocket") {
               req.abort();
             } else {
-              req.continue();
+              void isAllowedHeadlessUrl(req.url()).then(ok => (ok ? req.continue() : req.abort())).catch(() => {});
             }
           });
           await page.setContent(htmlContent, { waitUntil: "domcontentloaded", timeout: 30000 });

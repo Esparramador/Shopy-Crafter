@@ -16,7 +16,7 @@ import { lenientArray } from "../lib/ai-schema.js";
 import { z } from "zod";
 import { cached, invalidateCache } from "../lib/cache.js";
 import { enableLongRunning } from "../lib/long-running.js";
-import { writeSiteThemeToCss, SiteTheme } from "../lib/theme-css-writer.js";
+import { buildSiteThemeCss, extractSiteTheme } from "../lib/site-theme.js";
 
 const router = Router();
 
@@ -289,15 +289,17 @@ router.get("/content", async (_req: Request, res: Response) => {
   }
 });
 
-function extractSiteTheme(content: Record<string, unknown>): SiteTheme {
-  const site = (content.site || {}) as Record<string, unknown>;
-  return {
-    primaryColor: site.primaryColor as string | undefined,
-    accentColor: site.accentColor as string | undefined,
-    font_heading: site.font_heading as string | undefined,
-    font_body: site.font_body as string | undefined,
-  };
-}
+// Tema del CMS servido como CSS (lo carga el panel; ver lib/site-theme.ts).
+router.get("/theme.css", async (_req: Request, res: Response) => {
+  try {
+    const row = await getOrInitContent();
+    res.setHeader("Content-Type", "text/css; charset=utf-8");
+    res.send(buildSiteThemeCss(extractSiteTheme(row.content as Record<string, unknown>)));
+  } catch {
+    res.setHeader("Content-Type", "text/css; charset=utf-8");
+    res.send("/* tema no disponible */\n");
+  }
+});
 
 router.patch("/content", async (req: Request, res: Response) => {
   try {
@@ -309,9 +311,7 @@ router.patch("/content", async (req: Request, res: Response) => {
     const newVersion = row.version + 1;
     await db.update(cmsContent).set({ content: newContent, version: newVersion, updatedAt: new Date() }).where(eq(cmsContent.id, row.id));
     broadcast("content_updated", { path: fieldPath, value, version: newVersion });
-    if (fieldPath.startsWith("site.")) {
-      writeSiteThemeToCss(extractSiteTheme(newContent));
-    }
+    if (fieldPath.startsWith("site.")) broadcast("theme_updated", { version: newVersion });
     res.json({ success: true, version: newVersion });
   } catch (e) {
     res.status(500).json({ error: "Failed to update content" });
@@ -331,9 +331,7 @@ router.post("/content/batch", async (req: Request, res: Response) => {
     const newVersion = row.version + 1;
     await db.update(cmsContent).set({ content: newContent, version: newVersion, updatedAt: new Date() }).where(eq(cmsContent.id, row.id));
     broadcast("content_updated", { batch: true, version: newVersion });
-    if (changes.some(c => c.path.startsWith("site."))) {
-      writeSiteThemeToCss(extractSiteTheme(newContent));
-    }
+    if (changes.some(c => c.path.startsWith("site."))) broadcast("theme_updated", { version: newVersion });
     res.json({ success: true, version: newVersion });
   } catch (e) {
     res.status(500).json({ error: "Failed to batch update" });
@@ -347,7 +345,7 @@ router.post("/content/reset", async (_req: Request, res: Response) => {
     await db.update(cmsContent).set({ content: DEFAULT_CMS_CONTENT, version: row.version + 1, updatedAt: new Date() }).where(eq(cmsContent.id, row.id));
     invalidateCache("cms-");
     broadcast("content_updated", { reset: true });
-    writeSiteThemeToCss(extractSiteTheme(DEFAULT_CMS_CONTENT as Record<string, unknown>));
+    broadcast("theme_updated", { reset: true });
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "Failed to reset" });

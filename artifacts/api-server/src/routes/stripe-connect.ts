@@ -54,6 +54,10 @@ async function ensureStripeTables(): Promise<void> {
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS stripe_accounts_project_id_idx ON stripe_accounts(project_id)
     `);
+    // Clave directa cifrada (The Vault). Va aquí, justo después de crear la tabla:
+    // stripe-master la añadía al importar el módulo, antes de que existiera la tabla,
+    // y en una base de datos nueva la columna no se creaba (overview → 500).
+    await db.execute(sql`ALTER TABLE stripe_accounts ADD COLUMN IF NOT EXISTS stripe_key_enc TEXT`);
     logger.info("✅ stripe_accounts table ready");
   } catch (err: any) {
     logger.warn({ err }, "stripe_accounts table setup warning (non-fatal)");

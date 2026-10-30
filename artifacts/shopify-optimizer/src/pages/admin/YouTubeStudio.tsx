@@ -205,13 +205,14 @@ export default function YouTubeStudio() {
   // ── Modelo IA — pre-load Sevillano photo on mount ────────────────────────
   useEffect(() => {
     // Auto-load the saved Sevillano model photo
-    fetch(`${BASE}/images/sevillano-model.png`)
+    // La foto ya no es pública: la sirve el API solo al admin.
+    fetch(`${BASE}/api/youtube/model-photo`, { credentials: "include" })
       .then(r => { if (!r.ok) return; return r.blob(); })
       .then(blob => {
         if (!blob) return;
         const file = new File([blob], "sevillano-model.png", { type: "image/png" });
         setModeloFaceFile(file);
-        setModeloFacePreview(`${BASE}/images/sevillano-model.png`);
+        setModeloFacePreview(URL.createObjectURL(blob));
       }).catch(() => {});
   }, []);
 

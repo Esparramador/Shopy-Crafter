@@ -1,9 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
-import { createWriteStream, existsSync, readdirSync, statSync } from "fs";
-import { unlink, writeFile, mkdir, readFile } from "fs/promises";
-import { join } from "path";
 import { randomUUID } from "crypto";
+import { getFile, listFiles, putFile, isValidStoreKey } from "../lib/file-store.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
 import { uploadRejected } from "../lib/upload-errors.js";
@@ -31,10 +29,16 @@ const MESHY_BASE_V2 = "https://api.meshy.ai/openapi/v2";
 const POLL_INTERVAL_MS = 4_000;
 const MAX_POLL_ATTEMPTS = 120; // 8 min max
 
-const FRONTEND_PUBLIC = join(process.cwd(), "..", "..", "artifacts", "shopify-optimizer", "public");
-const TEMP_DIR   = join(FRONTEND_PUBLIC, "assets", "3d", "temp");
-const MODELS_DIR = join(FRONTEND_PUBLIC, "assets", "3d", "models");
-const ANIMS_DIR  = join(FRONTEND_PUBLIC, "assets", "3d", "animations");
+// Los .glb se guardan en el almacén persistente (antes en shopify-optimizer/public,
+// que en producción ni persiste ni se sirve). Claves: models/<id>.glb,
+// animations/<id>/<anim>.glb, animations/<id>/meta.json, uploads/<uuid>.glb
+const MESHY_NS = "meshy";
+const GLB_MIME = "model/gltf-binary";
+const modelKey = (id: string) => `models/${id}.glb`;
+const animKey = (id: string, anim: string) => `animations/${id}/${anim}.glb`;
+const metaKey = (id: string) => `animations/${id}/meta.json`;
+/** URL con la que el panel carga el archivo (GET /api/meshy/files/<key>). */
+const fileUrl = (key: string) => `/api/meshy/files/${key}`;
 
 // ── Action ID → file name mapping (134 actions — full catalog) ───────────────
 const ACTION_MAP: Record<number, string> = {
@@ -245,36 +249,62 @@ async function meshyFetch(path: string, options: RequestInit = {}, base = MESHY_
   return res.json();
 }
 
-async function downloadToFile(url: string, dest: string): Promise<void> {
-  const { dirname } = await import("path");
-  await mkdir(dirname(dest), { recursive: true });
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Download error: HTTP ${res.status} for ${url}`);
+/** Descarga un resultado de Meshy (URL https de su CDN) y lo guarda en el almacén. */
+async function downloadToStore(url: string, key: string): Promise<void> {
+  if (!/^https:\/\//i.test(url)) throw new Error("URL de descarga no válida");
+  const res = await fetch(url, { signal: AbortSignal.timeout(180_000) });
+  if (!res.ok) throw new Error(`Download error: HTTP ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
-  await writeFile(dest, buf);
+  await putFile(MESHY_NS, key, buf, key.endsWith(".json") ? "application/json" : GLB_MIME);
+}
+
+async function saveMeta(charId: string, meta: Record<string, unknown>): Promise<void> {
+  await putFile(MESHY_NS, metaKey(charId), Buffer.from(JSON.stringify(meta, null, 2)), "application/json");
+}
+
+/** Imagen subida → data URI (Meshy acepta data: en image_url, hasta 20 MB). */
+function imageDataUri(file: Express.Multer.File): string {
+  return `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
 }
 
 function sseWrite(res: Response, payload: object) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-// Scan filesystem and return real animation status per character
-function getCharStatus(): Record<string, { animations: string[]; has_rig: boolean; model_exists: boolean }> {
-  const result: Record<string, { animations: string[]; has_rig: boolean; model_exists: boolean }> = {};
-  try {
-    const chars = readdirSync(ANIMS_DIR);
-    for (const char of chars) {
-      const charDir = join(ANIMS_DIR, char);
-      if (!statSync(charDir).isDirectory()) continue;
-      const files = readdirSync(charDir).filter(f => f.endsWith(".glb"));
-      const animations = files.filter(f => f !== "rigged.glb").map(f => f.replace(".glb", ""));
-      const hasRig = files.includes("rigged.glb");
-      const modelExists = existsSync(join(MODELS_DIR, `${char}.glb`));
-      result[char] = { animations, has_rig: hasRig, model_exists: modelExists };
-    }
-  } catch {}
+type CharStatus = { animations: string[]; has_rig: boolean; model_exists: boolean };
+
+// Estado real de cada personaje según lo que hay en el almacén.
+async function getCharStatus(): Promise<Record<string, CharStatus>> {
+  const result: Record<string, CharStatus> = {};
+  const [anims, models] = await Promise.all([listFiles(MESHY_NS, "animations/"), listFiles(MESHY_NS, "models/")]);
+  const modelIds = new Set(models.map(m => m.key.replace(/^models\//, "").replace(/\.glb$/, "")));
+  for (const { key } of anims) {
+    const m = /^animations\/([^/]+)\/([^/]+)\.glb$/.exec(key);
+    if (!m) continue;
+    const st = (result[m[1]] ??= { animations: [], has_rig: false, model_exists: modelIds.has(m[1]) });
+    if (m[2] === "rigged") st.has_rig = true; else st.animations.push(m[2]);
+  }
+  for (const id of modelIds) result[id] ??= { animations: [], has_rig: false, model_exists: true };
   return result;
 }
+
+// ── Archivos 3D guardados (los carga el visor del panel) ─────────────────────
+router.get("/meshy/files/*path", async (req: Request, res: Response) => {
+  const raw = (req.params as Record<string, unknown>).path;
+  const key = Array.isArray(raw) ? raw.join("/") : String(raw ?? "");
+  if (!isValidStoreKey(key)) { res.status(404).end(); return; }
+  try {
+    const f = await getFile(MESHY_NS, key);
+    if (!f) { res.status(404).json({ error: "Archivo 3D no encontrado" }); return; }
+    res.setHeader("Content-Type", f.mime);
+    res.setHeader("Content-Length", String(f.size));
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.end(f.bytes);
+  } catch (e: any) {
+    logger.error({ err: e, key }, "meshy/files error");
+    res.status(500).json({ error: "No se pudo leer el archivo" });
+  }
+});
 
 // ── Static catalog routes ─────────────────────────────────────────────────────
 
@@ -296,37 +326,36 @@ router.get("/meshy/animations", (_req, res) => {
   res.json({ categories, clips: ANIMATION_CATALOG, total: ANIMATION_CATALOG.length, note: "Soporte para Meshy v2.5 y endpoints actualizados (junio 2026)" });
 });
 
-router.get("/meshy/models-config", (_req, res) => {
-  const charStatus = getCharStatus();
-  const models = [
-    { id:"batman",          name:"Batman",              emoji:"🦇", category:"cartoon"   },
-    { id:"spiderman",       name:"Spider-Man",          emoji:"🕷️", category:"cartoon"   },
-    { id:"mickey_mouse",    name:"Mickey Mouse",        emoji:"🐭", category:"cartoon"   },
-    { id:"minnie_mouse",    name:"Minnie Mouse",        emoji:"🎀", category:"cartoon"   },
-    { id:"bugs_bunny",      name:"Bugs Bunny",          emoji:"🐰", category:"cartoon"   },
-    { id:"pikachu",         name:"Pikachu",             emoji:"⚡", category:"cartoon"   },
-    { id:"alec_monopoly",   name:"Alec Monopoly",       emoji:"🎩", category:"cartoon"   },
-    { id:"ted",             name:"TED (Oso)",            emoji:"🐻", category:"cartoon"   },
-    { id:"chico_casual",    name:"Hombre Casual Tech",   emoji:"👨‍💻", category:"realistic" },
-    { id:"chico_formal",    name:"Hombre Traje Formal",  emoji:"🤵", category:"realistic" },
-    { id:"payaso_plim_plim",name:"Payaso Plim Plim",    emoji:"🤡", category:"cartoon"   },
-    { id:"bob_esponja",     name:"Bob Esponja",          emoji:"🧽", category:"cartoon"   },
-    { id:"payaso_plim_plim",name:"Plim Plim",            emoji:"🤡", category:"cartoon"   },
-    { id:"chica_ejecutiva", name:"Mujer Ejecutiva",      emoji:"👩‍💼", category:"realistic" },
-    { id:"chica_creativa",  name:"Mujer Creativa",       emoji:"👩‍🎨", category:"realistic" },
-  ].map(m => {
-    const st = charStatus[m.id] ?? { animations: [], has_rig: false, model_exists: existsSync(join(MODELS_DIR, `${m.id}.glb`)) };
-    const rigStatus = st.has_rig && st.animations.length > 0 ? "rigged" : st.model_exists ? "pending" : "missing";
-    return {
-      ...m,
-      rig_status: rigStatus,
-      animation_count: st.animations.length,
-      animations: st.animations,
-      glb_path: st.model_exists ? `/assets/3d/models/${m.id}.glb` : null,
-      rigged_glb: st.has_rig ? `/assets/3d/animations/${m.id}/rigged.glb` : null,
-    };
-  });
-  res.json({ models, total: models.length, rigged: models.filter(m => m.rig_status === "rigged").length });
+// Personajes propios del catálogo (mismo listado que lib/meshyModels.ts del panel).
+const CATALOG_CHARACTERS = [
+  { id: "chico_casual",    name: "Hombre Casual Tech",  emoji: "👨‍💻", category: "realistic" },
+  { id: "chico_formal",    name: "Hombre Traje Formal", emoji: "🤵", category: "realistic" },
+  { id: "chica_ejecutiva", name: "Mujer Ejecutiva",     emoji: "👩‍💼", category: "realistic" },
+  { id: "chica_creativa",  name: "Mujer Creativa",      emoji: "👩‍🎨", category: "realistic" },
+  { id: "shopy_robot",     name: "Robot Shopy",         emoji: "🤖", category: "cartoon" },
+  { id: "zorro_artesano",  name: "Zorro Artesano",      emoji: "🦊", category: "cartoon" },
+];
+
+router.get("/meshy/models-config", async (_req, res) => {
+  try {
+    const charStatus = await getCharStatus();
+    const models = CATALOG_CHARACTERS.map(m => {
+      const st = charStatus[m.id] ?? { animations: [], has_rig: false, model_exists: false };
+      const rigStatus = st.has_rig && st.animations.length > 0 ? "rigged" : st.model_exists ? "pending" : "missing";
+      return {
+        ...m,
+        rig_status: rigStatus,
+        animation_count: st.animations.length,
+        animations: st.animations,
+        glb_path: st.model_exists ? fileUrl(modelKey(m.id)) : null,
+        rigged_glb: st.has_rig ? fileUrl(animKey(m.id, "rigged")) : null,
+      };
+    });
+    res.json({ models, total: models.length, rigged: models.filter(m => m.rig_status === "rigged").length });
+  } catch (e: any) {
+    logger.error({ err: e }, "meshy/models-config error");
+    res.status(500).json({ error: "No se pudo leer el estado de los modelos" });
+  }
 });
 
 router.get("/meshy/balance", async (_req, res) => {
@@ -348,10 +377,14 @@ router.get("/meshy/task/:type/:id", async (req, res) => {
 });
 
 // Real-time char status from filesystem
-router.get("/meshy/admin/char-status", (_req, res) => {
-  const status = getCharStatus();
-  const total_anims = Object.values(status).reduce((s, v) => s + v.animations.length, 0);
-  res.json({ chars: status, total_animations: total_anims, total_chars: Object.keys(status).length });
+router.get("/meshy/admin/char-status", async (_req, res) => {
+  try {
+    const status = await getCharStatus();
+    const total_anims = Object.values(status).reduce((s, v) => s + v.animations.length, 0);
+    res.json({ chars: status, total_animations: total_anims, total_chars: Object.keys(status).length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Text-to-3D ────────────────────────────────────────────────────────────────
@@ -461,9 +494,8 @@ router.post("/meshy/pipeline/text-rig", async (req: Request, res: Response) => {
     // Phase 2: Download model GLB
     const glbUrl: string = modelData.model_urls?.glb ?? "";
     if (glbUrl) {
-      await mkdir(MODELS_DIR, { recursive: true });
-      await downloadToFile(glbUrl, join(MODELS_DIR, `${char_id}.glb`));
-      sseWrite(res, { event: "progress", phase: "downloaded", char_id, glb_path: `/assets/3d/models/${char_id}.glb` });
+      await downloadToStore(glbUrl, modelKey(char_id));
+      sseWrite(res, { event: "progress", phase: "downloaded", char_id, glb_path: fileUrl(modelKey(char_id)) });
     }
 
     // Phase 3: Auto-rig
@@ -484,7 +516,7 @@ router.post("/meshy/pipeline/text-rig", async (req: Request, res: Response) => {
         // No rig but model saved — still report done
         sseWrite(res, {
           event: "done", char_id, task_id: taskId,
-          glb_path: `/assets/3d/models/${char_id}.glb`,
+          glb_path: fileUrl(modelKey(char_id)),
           thumbnail_url: modelData.thumbnail_url,
           rig_failed: true, rig_error: rd.task_error?.message,
         });
@@ -498,21 +530,17 @@ router.post("/meshy/pipeline/text-rig", async (req: Request, res: Response) => {
     if (rigData) {
       const riggedGlbUrl: string = rigData.result?.rigged_character_glb_url ?? "";
       if (riggedGlbUrl) {
-        const charAnimDir = join(ANIMS_DIR, char_id);
-        await mkdir(charAnimDir, { recursive: true });
-        riggedGlbPath = `/assets/3d/animations/${char_id}/rigged.glb`;
-        await downloadToFile(riggedGlbUrl, join(charAnimDir, "rigged.glb"));
+        await downloadToStore(riggedGlbUrl, animKey(char_id, "rigged"));
+        riggedGlbPath = fileUrl(animKey(char_id, "rigged"));
       }
 
-      // Save rig task ID for later animation use
-      const metaPath = join(ANIMS_DIR, char_id, "meta.json");
-      const meta = { char_id, rig_task_id: rigTaskId, t2d_task_id: taskId, created_at: new Date().toISOString() };
-      await writeFile(metaPath, JSON.stringify(meta, null, 2));
+      // Se guarda el rig_task_id para animar después
+      await saveMeta(char_id, { char_id, rig_task_id: rigTaskId, t2d_task_id: taskId, created_at: new Date().toISOString() });
     }
 
     sseWrite(res, {
       event: "done", char_id, task_id: taskId, rig_task_id: rigTaskId,
-      glb_path: `/assets/3d/models/${char_id}.glb`,
+      glb_path: fileUrl(modelKey(char_id)),
       rigged_glb_path: riggedGlbPath,
       thumbnail_url: modelData.thumbnail_url,
       model_urls: modelData.model_urls,
@@ -534,17 +562,11 @@ router.post("/meshy/image-to-3d", upload.single("image"), async (req: Request, r
   if (!req.file) { sseWrite(res, { event: "error", error: "image requerida" }); res.end(); return; }
 
   const { topology = "quad", target_polycount = 30000, should_remesh = "true" } = req.body ?? {};
-  let tempPath: string | null = null;
 
   try {
-    await mkdir(TEMP_DIR, { recursive: true });
-    const ext = req.file.mimetype.includes("png") ? "png" : "jpg";
-    const filename = `${randomUUID()}.${ext}`;
-    tempPath = join(TEMP_DIR, filename);
-    await writeFile(tempPath, req.file.buffer);
-
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:19080";
-    const imageUrl = `https://${devDomain}/assets/3d/temp/${filename}`;
+    // Antes: la imagen se publicaba en /assets/3d/temp del dominio de desarrollo para
+    // que Meshy la descargara (en producción esa URL no existe). Meshy acepta data URI.
+    const imageUrl = imageDataUri(req.file);
 
     const created = await meshyFetch("/image-to-3d", {
       method: "POST",
@@ -560,17 +582,17 @@ router.post("/meshy/image-to-3d", upload.single("image"), async (req: Request, r
       if (progress !== lastProgress) { sseWrite(res, { event: "progress", task_id: taskId, progress, status: data.status }); lastProgress = progress; }
       if (data.status === "SUCCEEDED") {
         sseWrite(res, { event: "done", task_id: taskId, output: data });
-        res.end(); if (tempPath) unlink(tempPath).catch(() => {}); return;
+        res.end(); return;
       }
       if (data.status === "FAILED" || data.status === "EXPIRED") {
         sseWrite(res, { event: "error", error: data.task_error?.message ?? data.status });
-        res.end(); if (tempPath) unlink(tempPath).catch(() => {}); return;
+        res.end(); return;
       }
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     }
-    sseWrite(res, { event: "timeout" }); res.end(); if (tempPath) unlink(tempPath).catch(() => {});
+    sseWrite(res, { event: "timeout" }); res.end();
   } catch (e: any) {
-    sseWrite(res, { event: "error", error: e.message }); res.end(); if (tempPath) unlink(tempPath).catch(() => {});
+    sseWrite(res, { event: "error", error: e.message }); res.end();
   }
 });
 
@@ -579,12 +601,10 @@ router.post("/meshy/image-to-3d", upload.single("image"), async (req: Request, r
 router.post("/meshy/upload-model", uploadGlb.single("file"), async (req: Request, res: Response) => {
   if (!req.file) { res.status(400).json({ error: "No se recibió archivo" }); return; }
   try {
-    await mkdir(TEMP_DIR, { recursive: true });
-    const ext = req.file.originalname.toLowerCase().endsWith(".gltf") ? ".gltf" : ".glb";
-    const filename = `${randomUUID()}${ext}`;
-    const dest = join(TEMP_DIR, filename);
-    await writeFile(dest, req.file.buffer);
-    res.json({ ok: true, filename, path: `assets/3d/temp/${filename}` });
+    const isGltf = req.file.originalname.toLowerCase().endsWith(".gltf");
+    const uploadId = `${randomUUID()}${isGltf ? ".gltf" : ".glb"}`;
+    await putFile(MESHY_NS, `uploads/${uploadId}`, req.file.buffer, isGltf ? "model/gltf+json" : GLB_MIME, { originalName: req.file.originalname });
+    res.json({ ok: true, upload_id: uploadId, url: fileUrl(`uploads/${uploadId}`) });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -597,10 +617,17 @@ router.post("/meshy/rig", async (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "no-cache");
   enableLongRunning(res);
 
-  const { input_task_id, model_url } = req.body ?? {};
-  if (!model_url) { sseWrite(res, { event: "error", error: "model_url es requerido" }); res.end(); return; }
+  const { input_task_id, upload_id } = req.body ?? {};
+  let { model_url } = req.body ?? {};
 
   try {
+    // Modelo subido al panel: se envía a Meshy como data URI (hasta 100 MB).
+    if (!model_url && typeof upload_id === "string") {
+      const f = isValidStoreKey(`uploads/${upload_id}`) ? await getFile(MESHY_NS, `uploads/${upload_id}`) : null;
+      if (!f) { sseWrite(res, { event: "error", error: "Modelo subido no encontrado" }); res.end(); return; }
+      model_url = `data:application/octet-stream;base64,${f.bytes.toString("base64")}`;
+    }
+    if (!model_url) { sseWrite(res, { event: "error", error: "model_url o upload_id es requerido" }); res.end(); return; }
     const rigBody: Record<string, any> = { model_url };
     if (input_task_id) rigBody.input_task_id = input_task_id;
     const created = await meshyFetch("/rigging", { method: "POST", body: JSON.stringify(rigBody) });
@@ -646,13 +673,10 @@ router.post("/meshy/animate", async (req: Request, res: Response) => {
         // FIX: correct result key is animation_glb_url
         const glbUrl: string = data.result?.animation_glb_url ?? data.result?.animated_character_glb_url ?? "";
         let savedPath: string | null = null;
-        if (save_to_disk && char_id && glbUrl) {
+        if (save_to_disk && char_id && /^[a-z0-9_]+$/i.test(String(char_id)) && glbUrl) {
           const animName = ACTION_MAP[Number(action_id)] ?? `action_${action_id}`;
-          const charAnimDir = join(ANIMS_DIR, char_id);
-          await mkdir(charAnimDir, { recursive: true });
-          const dest = join(charAnimDir, `${animName}.glb`);
-          await downloadToFile(glbUrl, dest);
-          savedPath = `/assets/3d/animations/${char_id}/${animName}.glb`;
+          await downloadToStore(glbUrl, animKey(char_id, animName));
+          savedPath = fileUrl(animKey(char_id, animName));
         }
         sseWrite(res, { event: "done", anim_task_id: animTaskId, action_id, animated_glb_url: glbUrl, saved_path: savedPath });
         res.end(); return;
@@ -675,17 +699,14 @@ router.post("/meshy/admin/bulk-animate", async (req: Request, res: Response) => 
 
   const { char_id, rig_task_id } = req.body ?? {};
   if (!char_id || !rig_task_id) { sseWrite(res, { event: "error", error: "char_id y rig_task_id requeridos" }); res.end(); return; }
+  if (!/^[a-z0-9_]+$/i.test(String(char_id))) { sseWrite(res, { event: "error", error: "char_id inválido" }); res.end(); return; }
 
-  const charAnimDir = join(ANIMS_DIR, char_id);
-  await mkdir(charAnimDir, { recursive: true });
-
-  // Find which action_ids are missing
-  const existing = new Set<string>();
-  try {
-    for (const f of readdirSync(charAnimDir)) {
-      if (f.endsWith(".glb") && f !== "rigged.glb") existing.add(f.replace(".glb", ""));
-    }
-  } catch {}
+  // Animaciones que ya están guardadas
+  const existing = new Set<string>(
+    (await listFiles(MESHY_NS, `animations/${char_id}/`))
+      .map(f => /\/([^/]+)\.glb$/.exec(f.key)?.[1])
+      .filter((n): n is string => !!n && n !== "rigged"),
+  );
 
   const missing = Object.entries(ACTION_MAP).filter(([, name]) => !existing.has(name));
   sseWrite(res, { event: "started", char_id, missing_count: missing.length, missing_ids: missing.map(([id]) => Number(id)) });
@@ -727,10 +748,9 @@ router.post("/meshy/admin/bulk-animate", async (req: Request, res: Response) => 
           if (data.status === "SUCCEEDED") {
             const glbUrl: string = data.result?.animation_glb_url ?? data.result?.animated_character_glb_url ?? "";
             if (glbUrl) {
-              const dest = join(charAnimDir, `${task.anim_name}.glb`);
-              await downloadToFile(glbUrl, dest);
+              await downloadToStore(glbUrl, animKey(char_id, task.anim_name));
               downloaded++;
-              sseWrite(res, { event: "animation_ready", char_id, action_id: task.action_id, anim_name: task.anim_name, glb_path: `/assets/3d/animations/${char_id}/${task.anim_name}.glb` });
+              sseWrite(res, { event: "animation_ready", char_id, action_id: task.action_id, anim_name: task.anim_name, glb_path: fileUrl(animKey(char_id, task.anim_name)) });
             }
           } else if (data.status === "FAILED" || data.status === "EXPIRED") {
             sseWrite(res, { event: "animation_failed", char_id, action_id: task.action_id, anim_name: task.anim_name });
@@ -762,19 +782,9 @@ router.post("/meshy/generate-character", upload.single("image"), async (req: Req
   const { characterId } = req.body ?? {};
   if (!characterId || !/^[a-z0-9_]+$/i.test(characterId)) { sseWrite(res, { event: "error", error: "characterId inválido" }); res.end(); return; }
 
-  let tempPath: string | null = null;
-
   try {
-    await mkdir(TEMP_DIR, { recursive: true });
-    await mkdir(MODELS_DIR, { recursive: true });
-    const ext = req.file.mimetype.includes("png") ? "png" : "jpg";
-    const filename = `tmp_${characterId}_${Date.now()}.${ext}`;
-    tempPath = join(TEMP_DIR, filename);
-    await writeFile(tempPath, req.file.buffer);
     sseWrite(res, { event: "progress", phase: "upload", message: "Imagen cargada, iniciando Meshy…", progress: 5 });
-
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:19080";
-    const imageUrl = `https://${devDomain}/assets/3d/temp/${filename}`;
+    const imageUrl = imageDataUri(req.file);
 
     // Phase 1: image-to-3d
     sseWrite(res, { event: "phase", phase: "image_to_3d", message: "Generando modelo 3D…" });
@@ -791,19 +801,17 @@ router.post("/meshy/generate-character", upload.single("image"), async (req: Req
       sseWrite(res, { event: "progress", task_id: taskId, progress: data.progress ?? 0, status: data.status, phase: "image_to_3d", character_id: characterId });
       if (data.status === "SUCCEEDED") { modelData = data; break; }
       if (data.status === "FAILED" || data.status === "EXPIRED") {
-        sseWrite(res, { event: "error", error: data.task_error?.message ?? data.status }); res.end();
-        if (tempPath) unlink(tempPath).catch(() => {}); return;
+        sseWrite(res, { event: "error", error: data.task_error?.message ?? data.status }); res.end(); return;
       }
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     }
-    if (!modelData) { sseWrite(res, { event: "timeout" }); res.end(); if (tempPath) unlink(tempPath).catch(() => {}); return; }
+    if (!modelData) { sseWrite(res, { event: "timeout" }); res.end(); return; }
 
     // Phase 2: Download GLB
     sseWrite(res, { event: "phase", phase: "downloading", message: "Descargando GLB…", progress: 100 });
     const glbUrl: string = modelData.model_urls?.glb ?? "";
     if (!glbUrl) throw new Error("No GLB URL en respuesta Meshy");
-    await downloadToFile(glbUrl, join(MODELS_DIR, `${characterId}.glb`));
-    if (tempPath) { unlink(tempPath).catch(() => {}); tempPath = null; }
+    await downloadToStore(glbUrl, modelKey(characterId));
 
     // Phase 3: Auto-rig
     sseWrite(res, { event: "phase", phase: "rigging", message: "Iniciando auto-rig…" });
@@ -819,19 +827,14 @@ router.post("/meshy/generate-character", upload.single("image"), async (req: Req
           const rigResult = rigData.result ?? {};
           // Download rigged GLB
           const riggedGlbUrl: string = rigResult.rigged_character_glb_url ?? "";
-          const charAnimDir = join(ANIMS_DIR, characterId);
-          await mkdir(charAnimDir, { recursive: true });
-          if (riggedGlbUrl) {
-            await downloadToFile(riggedGlbUrl, join(charAnimDir, "rigged.glb"));
-          }
-          // Save meta for bulk-animate
-          const meta = { char_id: characterId, rig_task_id: rigTaskId, i2d_task_id: taskId, created_at: new Date().toISOString() };
-          await writeFile(join(charAnimDir, "meta.json"), JSON.stringify(meta, null, 2));
+          if (riggedGlbUrl) await downloadToStore(riggedGlbUrl, animKey(characterId, "rigged"));
+          // meta para bulk-animate
+          await saveMeta(characterId, { char_id: characterId, rig_task_id: rigTaskId, i2d_task_id: taskId, created_at: new Date().toISOString() });
 
           sseWrite(res, {
             event: "done", task_id: taskId, rig_task_id: rigTaskId, character_id: characterId,
-            glb_path: `/assets/3d/models/${characterId}.glb`,
-            rigged_glb_path: `/assets/3d/animations/${characterId}/rigged.glb`,
+            glb_path: fileUrl(modelKey(characterId)),
+            rigged_glb_path: riggedGlbUrl ? fileUrl(animKey(characterId, "rigged")) : null,
             thumbnail_url: modelData.thumbnail_url, model_urls: modelData.model_urls,
             can_animate: true,
           });
@@ -845,7 +848,7 @@ router.post("/meshy/generate-character", upload.single("image"), async (req: Req
     // Done without rig
     sseWrite(res, {
       event: "done", task_id: taskId, character_id: characterId,
-      glb_path: `/assets/3d/models/${characterId}.glb`,
+      glb_path: fileUrl(modelKey(characterId)),
       thumbnail_url: modelData.thumbnail_url, model_urls: modelData.model_urls,
       rig_skipped: true, can_animate: false,
     });
@@ -854,23 +857,16 @@ router.post("/meshy/generate-character", upload.single("image"), async (req: Req
   } catch (e: any) {
     logger.error({ err: e }, "generate-character error");
     sseWrite(res, { event: "error", character_id: characterId, error: e.message }); res.end();
-    if (tempPath) unlink(tempPath).catch(() => {});
   }
 });
 
 // ── Text-to-Texture (apply PBR textures to existing untextured GLB) ──────────
 
 const CHARACTER_TEXTURE_PROMPTS: Record<string, { object_prompt: string; style_prompt: string }> = {
-  batman:           { object_prompt: "Batman DC superhero 3D character model",                             style_prompt: "dark knight iconic black suit, grey chest armor with bat symbol, black cowl with pointed ears, dark navy/black color scheme, sleek superhero design" },
-  spiderman:        { object_prompt: "Spider-Man Marvel superhero 3D model",                               style_prompt: "iconic red and blue spiderweb suit, Marvel comics style, bright red face mask with black eye lenses, detailed web pattern texture on suit, glossy superhero material" },
-  mickey_mouse:     { object_prompt: "Mickey Mouse Disney cartoon character 3D model",                     style_prompt: "classic Disney animation style, iconic black mouse with round ears, white gloves, red shorts with yellow buttons, cheerful iconic design" },
-  minnie_mouse:     { object_prompt: "Minnie Mouse Disney cartoon character 3D model",                     style_prompt: "classic Disney style, iconic mouse with polka dot red dress and matching bow, white gloves, cute feminine design, bright cheerful colors" },
-  bugs_bunny:       { object_prompt: "Bugs Bunny Looney Tunes cartoon character 3D model",                 style_prompt: "classic Warner Bros cartoon style, grey rabbit with white belly, long ears, casual relaxed pose, smooth clean cartoon textures" },
-  pikachu:          { object_prompt: "Pikachu Pokemon character 3D model",                                 style_prompt: "official Pokemon style, bright yellow body with red cheek circles, black ear tips, lightning bolt tail, cute big brown eyes, smooth clean cartoon texture" },
-  bob_esponja:      { object_prompt: "SpongeBob SquarePants cartoon character 3D model",                   style_prompt: "classic Nickelodeon cartoon style, bright yellow sponge texture with square body, big blue eyes, buck teeth smile, brown square pants, white shirt, red tie" },
-  payaso_plim_plim: { object_prompt: "Plim Plim clown children cartoon character 3D model",                style_prompt: "vibrant children TV cartoon style, colorful star-shaped clown costume with rainbow primary colors, happy painted clown face with star makeup around eyes, oversized red round nose, fluffy ruffled collar, bright star emblems on costume" },
   chica_creativa:   { object_prompt: "Creative young woman cartoon character 3D model",                    style_prompt: "vibrant artistic street fashion, colorful patterned outfit with warm orange and teal tones, warm realistic beige-brown skin tone, expressive dark brown eyes, curly or wavy hair, creative artistic clothing with patterns and layers" },
   chica_ejecutiva:  { object_prompt: "Professional executive businesswoman 3D character model",            style_prompt: "modern corporate fashion, elegant dark charcoal navy blazer with light blouse, realistic warm skin tone, smooth dark hair, polished professional attire, subtle natural makeup, business formal look" },
+  shopy_robot:      { object_prompt: "Friendly cartoon robot mascot 3D model",                             style_prompt: "glossy gold and matte black panels, jade green glowing eyes, clean toy-like PBR materials, no text, no logos" },
+  zorro_artesano:   { object_prompt: "Cartoon fox craftsman character 3D model",                           style_prompt: "warm orange fur with cream belly, brown leather workshop apron, soft stylized PBR textures, no text, no logos" },
 };
 
 router.post("/meshy/texturize", async (req: Request, res: Response) => {
@@ -883,13 +879,12 @@ router.post("/meshy/texturize", async (req: Request, res: Response) => {
     sseWrite(res, { event: "error", error: "char_id inválido o faltante" }); res.end(); return;
   }
 
-  const glbFilePath = join(MODELS_DIR, `${char_id}.glb`);
-  if (!existsSync(glbFilePath)) {
-    sseWrite(res, { event: "error", error: `Modelo ${char_id}.glb no encontrado en disco` }); res.end(); return;
+  const stored = await getFile(MESHY_NS, modelKey(char_id)).catch(() => null);
+  if (!stored) {
+    sseWrite(res, { event: "error", error: `Modelo ${char_id}.glb no encontrado` }); res.end(); return;
   }
-
-  const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:19080";
-  const modelPublicUrl = `https://${devDomain}/assets/3d/models/${char_id}.glb`;
+  // Meshy acepta el modelo como data URI (hasta 100 MB): no hace falta una URL pública.
+  const modelPublicUrl = `data:application/octet-stream;base64,${stored.bytes.toString("base64")}`;
 
   const prompts = CHARACTER_TEXTURE_PROMPTS[char_id] ?? {
     object_prompt: `${char_id.replace(/_/g, " ")} 3D character model`,
@@ -897,7 +892,7 @@ router.post("/meshy/texturize", async (req: Request, res: Response) => {
   };
 
   try {
-    sseWrite(res, { event: "phase", phase: "creating", message: `Iniciando texturización de ${char_id}…`, model_url: modelPublicUrl });
+    sseWrite(res, { event: "phase", phase: "creating", message: `Iniciando texturización de ${char_id}…` });
 
     const created = await meshyFetch("/text-to-texture", {
       method: "POST",
@@ -926,10 +921,10 @@ router.post("/meshy/texturize", async (req: Request, res: Response) => {
         const texturedGlbUrl: string = data.model_urls?.glb ?? "";
         if (texturedGlbUrl) {
           sseWrite(res, { event: "phase", phase: "downloading", message: "Descargando modelo texturizado…", progress: 100 });
-          await downloadToFile(texturedGlbUrl, glbFilePath);
+          await downloadToStore(texturedGlbUrl, modelKey(char_id));
           sseWrite(res, {
             event: "done", char_id, task_id: taskId,
-            glb_path: `/assets/3d/models/${char_id}.glb`,
+            glb_path: fileUrl(modelKey(char_id)),
             thumbnail_url: data.thumbnail_url,
             model_urls: data.model_urls,
           });
@@ -1084,21 +1079,18 @@ router.post("/meshy/recover-char", async (req: Request, res: Response) => {
     let riggedSaved = false;
 
     // 2. Download base model GLB
-    if (modelUrl) {
-      const dest = join(MODELS_DIR, `${char_id}.glb`);
-      await downloadToFile(modelUrl, dest);
+    if (modelUrl && /^https:\/\//i.test(modelUrl)) {
+      await downloadToStore(modelUrl, modelKey(char_id));
       modelSaved = true;
-      logger.info({ char_id, dest }, "Base model GLB recovered");
+      logger.info({ char_id }, "Base model GLB recovered");
     } else {
       logger.warn({ char_id, rig_task_id }, "No model_url in rig task — base GLB not recovered");
     }
 
     // 3. Download rigged GLB
-    const charAnimDir = join(ANIMS_DIR, char_id);
     if (riggedUrl) {
-      await downloadToFile(riggedUrl, join(charAnimDir, "rigged.glb"));
-      const meta = { char_id, rig_task_id, recovered_at: new Date().toISOString() };
-      await writeFile(join(charAnimDir, "meta.json"), JSON.stringify(meta, null, 2));
+      await downloadToStore(riggedUrl, animKey(char_id, "rigged"));
+      await saveMeta(char_id, { char_id, rig_task_id, recovered_at: new Date().toISOString() });
       riggedSaved = true;
       logger.info({ char_id }, "Rigged GLB recovered");
     }
@@ -1107,8 +1099,8 @@ router.post("/meshy/recover-char", async (req: Request, res: Response) => {
       ok: true, char_id,
       model_saved: modelSaved,
       rigged_saved: riggedSaved,
-      glb_path: modelSaved ? `/assets/3d/models/${char_id}.glb` : null,
-      rigged_path: riggedSaved ? `/assets/3d/animations/${char_id}/rigged.glb` : null,
+      glb_path: modelSaved ? fileUrl(modelKey(char_id)) : null,
+      rigged_path: riggedSaved ? fileUrl(animKey(char_id, "rigged")) : null,
       note: !modelUrl ? "model_url no disponible en la tarea — puede que el modelo original haya expirado" : undefined,
     });
   } catch (e: any) {

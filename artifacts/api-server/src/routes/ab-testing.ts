@@ -30,13 +30,9 @@ import { requireProjectAccess } from "../lib/access.js";
 import { generateNanoBanana } from "../lib/nano-banana.js";
 import { packQuotaGuard } from "../lib/pack-quotas.js";
 import { logger } from "../lib/logger.js";
-import { promises as fsp } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { putFile } from "../lib/file-store.js";
 
-const __abFilename = fileURLToPath(import.meta.url);
-const __abDirname = path.dirname(__abFilename);
-const AB_REPORTS_DIR = path.join(__abDirname, "..", "public", "reports");
+const REPORTS_NS = "reports";
 
 function escapeHtml(s: unknown): string {
   return String(s ?? "")
@@ -1710,8 +1706,6 @@ Reglas: nada de inventar cifras, no usar emojis, tono ejecutivo. Si los datos so
 
     const generatedAt = new Date();
     const fileName = `ab-test-${test.id}-${generatedAt.getTime()}.html`;
-    const filePath = path.join(AB_REPORTS_DIR, fileName);
-    await fsp.mkdir(AB_REPORTS_DIR, { recursive: true });
 
     const variantAImg = isImage && test.variantAUrl ? `<img src="${escapeHtml(test.variantAUrl)}" alt="Variante A" />` : "";
     const variantBImg = isImage && test.variantBUrl ? `<img src="${escapeHtml(test.variantBUrl)}" alt="Variante B" />` : "";
@@ -1850,7 +1844,8 @@ Reglas: nada de inventar cifras, no usar emojis, tono ejecutivo. Si los datos so
 </body>
 </html>`;
 
-    await fsp.writeFile(filePath, html, "utf8");
+    // Almacén persistente (el disco del despliegue no se conserva); se sirve en /api/reports/<nombre>.
+    await putFile(REPORTS_NS, fileName, Buffer.from(html, "utf8"), "text/html; charset=utf-8");
 
     // Registrar en Brain (no bloqueante)
     try {

@@ -3,8 +3,6 @@ import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-const VIDEO_SRC = `${API_BASE}/assets/videos/alec_landing.mp4`;
-const POSTER_SRC = `${API_BASE}/assets/videos/alec_poster.jpg`;
 
 const GOLD = "rgba(200,168,75,1)";
 const GOLD_BG = "rgba(200,168,75,0.10)";
@@ -62,6 +60,16 @@ const CSS = `
 }
 
 /* ─── VIDEO / OVERLAY — FIXED ─── */
+.ctc-aurora {
+  background:
+    radial-gradient(40vw 40vw at 12% 30%, rgba(201,169,97,.32), transparent 65%),
+    radial-gradient(34vw 34vw at 30% 85%, rgba(42,122,75,.28), transparent 65%),
+    radial-gradient(120% 90% at 20% 40%, #1a1408 0%, #0b0913 55%, #05030c 100%);
+  animation: ctc-aurora 18s ease-in-out infinite alternate;
+  background-size: 120% 120%;
+}
+@keyframes ctc-aurora { from { background-position: 0% 0%; } to { background-position: 100% 60%; } }
+@media (prefers-reduced-motion: reduce) { .ctc-aurora { animation: none; } }
 .ctc-video {
   position: fixed;
   inset: 0;
@@ -316,7 +324,7 @@ const CSS = `
   .ctc-card { padding: 12px 8px 10px; }
   .ctc-card-icon { font-size: 16px; margin-bottom: 4px; }
   /* ── Landscape: vídeo y overlay empiezan BAJO el nav (≈56px)
-       para que la cabeza de Alec no quede tapada por la barra de nav ── */
+       para que el fondo no quede tapado por la barra de nav ── */
   .ctc-video {
     top: 56px;
     height: calc(100dvh - 56px);
@@ -357,7 +365,6 @@ export default function Contacto() {
   const [cardPhase, setCardPhase] = useState(0);
   const [formReady, setFormReady] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const VIDEO_T1 = 0.5, VIDEO_T2 = 1.5, VIDEO_T3 = 2.5, VIDEO_TF = 4.0;
@@ -379,32 +386,6 @@ export default function Contacto() {
     const t3 = setTimeout(() => setCardPhase(p => Math.max(p, 3)), VIDEO_T3 * 1000);
     const tf = setTimeout(() => setFormReady(true), VIDEO_TF * 1000);
     return () => [t1,t2,t3,tf].forEach(clearTimeout);
-  }, []);
-
-  /* ── video timeupdate sync ── */
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onTime = () => {
-      const t = v.currentTime;
-      if (t >= VIDEO_T1) setCardPhase(p => Math.max(p, 1));
-      if (t >= VIDEO_T2) setCardPhase(p => Math.max(p, 2));
-      if (t >= VIDEO_T3) setCardPhase(p => Math.max(p, 3));
-      if (t >= VIDEO_TF) setFormReady(true);
-    };
-    v.addEventListener("timeupdate", onTime);
-    return () => v.removeEventListener("timeupdate", onTime);
-  }, []);
-
-  /* ── video ended → freeze on last frame (seek back 0.05s) ── */
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onEnded = () => {
-      try { v.currentTime = Math.max(0, v.duration - 0.05); } catch {}
-    };
-    v.addEventListener("ended", onEnded);
-    return () => v.removeEventListener("ended", onEnded);
   }, []);
 
   /* ── launch typewriter when form appears ── */
@@ -524,14 +505,8 @@ export default function Contacto() {
         <div className="ctc-root">
           <style>{CSS}</style>
 
-          <video
-            ref={videoRef}
-            className="ctc-video"
-            src={VIDEO_SRC}
-            poster={POSTER_SRC}
-            autoPlay muted playsInline
-            preload="metadata"
-          />
+          {/* Fondo propio (antes, un vídeo de un personaje con derechos de terceros). */}
+          <div className="ctc-video ctc-aurora" aria-hidden="true" />
           <div className="ctc-overlay" />
 
           {/* ─── MAIN LAYOUT ─── */}
