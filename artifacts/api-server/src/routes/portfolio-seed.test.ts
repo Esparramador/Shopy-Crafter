@@ -63,7 +63,8 @@ describe("lectura de los QR destacados después de redimensionar", () => {
     const original = await readFile(asset);
     const expected = await decodeQrImage(original);
     expect(Boolean(expected), "El original debe contener un QR legible").toBe(true);
-    for (const width of [128, 160, 192, 256, 320, 512]) {
+    // Display sizes first, then 300/600/900 px print checks (1/2/3 in at 300 DPI).
+    for (const width of [128, 160, 192, 256, 300, 320, 384, 512, 600, 768, 900]) {
       const resized = await sharp(original).resize(width, width, { fit: "inside" }).png().toBuffer();
       const decoded = await decodeQrImage(resized);
       // No se imprimen los destinos de los QR en los logs de las pruebas.
