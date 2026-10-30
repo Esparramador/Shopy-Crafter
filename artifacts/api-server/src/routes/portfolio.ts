@@ -151,11 +151,11 @@ async function applyPatches(): Promise<void> {
   for (const [slug, prev] of Object.entries(PATCH_PREVIOUS)) {
     const seed = SEED.find(p => p.slug === slug);
     if (!seed) continue;
-    const cur = await db.execute(sql`SELECT id, title, client, summary, description, status, images, variants FROM portfolio_projects WHERE slug = ${slug}`);
+    const cur = await db.execute(sql`SELECT id, title, client, category, summary, description, status, features, tech, images, variants FROM portfolio_projects WHERE slug = ${slug}`);
     const row = cur.rows[0] as Record<string, unknown> | undefined;
     if (!row) continue;
 
-    const next = (field: "title" | "client" | "summary" | "description" | "status"): string => {
+    const next = (field: "title" | "client" | "category" | "summary" | "description" | "status"): string => {
       const now = String(row[field] ?? "");
       const before = prev.fields[field];
       return before !== undefined && now === before ? String(seed[field] ?? "") : renamed(now);
@@ -170,11 +170,20 @@ async function applyPatches(): Promise<void> {
       }
       return renamedDeep(v);
     });
-    const images = renamedDeep(Array.isArray(row.images) ? row.images : []);
+    let images = renamedDeep(Array.isArray(row.images) ? row.images : []) as PortfolioImage[];
+    let features = Array.isArray(row.features) ? renamedDeep(row.features as string[]) : [];
+    let tech = Array.isArray(row.tech) ? renamedDeep(row.tech as string[]) : [];
+    if (slug === "qr-artisticos-3d") {
+      // El proyecto conserva solo muestras artísticas; las escenas QR en 3D no forman parte de esta ficha.
+      images = images.filter(im => !/^\/portfolio\/qr-artisticos-3d-[1-5]\.webp$/.test(im.url));
+      features = features.filter(f => !/^Escenas en 3D:|^Vídeo de la transformación/.test(f));
+      tech = tech.filter(t => t !== "Three.js" && t !== "WebGL");
+    }
 
     await db.execute(sql`
-      UPDATE portfolio_projects SET title = ${next("title")}, client = ${next("client")}, summary = ${next("summary")},
+      UPDATE portfolio_projects SET title = ${next("title")}, client = ${next("client")}, category = ${next("category")}, summary = ${next("summary")},
         description = ${next("description")}, status = ${next("status")},
+        features = ${JSON.stringify(features)}::jsonb, tech = ${JSON.stringify(tech)}::jsonb,
         images = ${JSON.stringify(images)}::jsonb, variants = ${JSON.stringify(variants)}::jsonb, updated_at = NOW()
       WHERE id = ${row.id as number}
     `);

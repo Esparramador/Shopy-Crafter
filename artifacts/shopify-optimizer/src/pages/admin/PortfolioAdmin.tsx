@@ -163,6 +163,11 @@ export default function PortfolioAdmin() {
             {field("liveUrl", "URL de la web (opcional)", { placeholder: "https://…" })}
             {field("appUrl", "URL de la app / tienda de apps (opcional)", { placeholder: "https://…" })}
           </div>
+          {current?.slug === "qr-artisticos-3d" && (
+            <p style={{ margin: "0 0 12px", padding: "10px 12px", borderRadius: 8, background: "rgba(201,169,97,0.08)", color: "#d6c89f", fontSize: 12 }}>
+              Esta ficha es solo para QR artísticos. Los regalos web y vídeos animados en 3D son servicios distintos; las placas y soportes físicos se gestionan en la tienda.
+            </p>
+          )}
           {field("summary", "Resumen (tarjeta)")}
           {field("features", "Qué hace: una característica por línea (máx. 12; la tarjeta enseña las 4 primeras)", { area: true })}
           {field("description", "Descripción (al abrir el proyecto)", { area: true })}
