@@ -130,6 +130,46 @@ try {
   // Restaurar un registro vuelve a guardar esos mismos valores ya aplicados.
   const health = await (await ctx.request.get(`${BASE}/api/voice/convai/health`)).json();
   assert(health.healthy === true, "La salud sigue operativa tras restaurar un registro con los mismos valores");
+
+  // 5. Guardar sin "aplicar" y comprobar que la siguiente llamada sincroniza
+  // el agente admin real antes de emitir la URL firmada.
+  await speedSlider.evaluate((el, v) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    setter.call(el, String(v));
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }, original.speed);
+  assert(!(await page.getByTestId("convai-voice-tuning-save").isDisabled()), "Guardar se habilita al preparar un cambio sin aplicar");
+  const saveOnlyResp = page.waitForResponse(r => r.url().includes("/api/voice/convai/voice-settings") && r.request().method() === "PUT", { timeout: 30_000 });
+  await page.getByTestId("convai-voice-tuning-save").click();
+  const savedOnly = await saveOnlyResp;
+  assert(savedOnly.status() === 200, `Guardar sin aplicar → HTTP ${savedOnly.status()}`);
+  const callSettings = (await savedOnly.json()).settings;
+  assert(callSettings.speed === original.speed && callSettings.stability === original.stability && callSettings.similarityBoost === original.similarityBoost, "La nueva configuración se guarda antes de llamar");
+  assert(callSettings.speed !== newSpeed, "El valor guardado para la llamada difiere del que ya estaba aplicado");
+
+  const callUrlResp = await ctx.request.get(`${BASE}/api/voice/convai/call-url`);
+  assert(callUrlResp.status() === 200, `La siguiente llamada de Arturo obtiene URL → HTTP ${callUrlResp.status()}`);
+  const callUrl = await callUrlResp.json();
+  assert(typeof callUrl.signed_url === "string" && callUrl.signed_url.length > 0, "La llamada recibe una URL firmada");
+  assert(typeof callUrl.agentId === "string" && callUrl.agentId.length > 0, "La llamada devuelve el ID del agente admin");
+  const pinnedAgentId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID?.trim();
+  if (pinnedAgentId) {
+    assert(callUrl.agentId === pinnedAgentId, "La llamada conserva el agente admin fijado por ELEVEN_CONVAI_DEFAULT_AGENT_ID");
+  }
+  const appliedAdminAgentId = applyResult.agents?.admin?.agentId;
+  if (appliedAdminAgentId) {
+    assert(callUrl.agentId === appliedAdminAgentId, "La llamada sincroniza el agente admin existente, sin sustituirlo");
+  }
+  const agentResp = await ctx.request.get(`${BASE}/api/voice/convai/agents/${encodeURIComponent(callUrl.agentId)}`);
+  assert(agentResp.status() === 200, `La API admin lee el agente devuelto por call-url → HTTP ${agentResp.status()}`);
+  const agent = (await agentResp.json()).agent;
+  const persistedTts = agent?.conversation_config?.tts;
+  const closeEnough = (actual, expected) => Number.isFinite(Number(actual)) && Math.abs(Number(actual) - expected) < 0.005;
+  assert(closeEnough(persistedTts?.stability, callSettings.stability), `ElevenLabs conserva stability=${persistedTts?.stability}`);
+  assert(closeEnough(persistedTts?.similarity_boost, callSettings.similarityBoost), `ElevenLabs conserva similarity_boost=${persistedTts?.similarity_boost}`);
+  assert(closeEnough(persistedTts?.speed, callSettings.speed), `ElevenLabs conserva speed=${persistedTts?.speed}`);
+
   await page.waitForTimeout(500);
   await card.screenshot({ path: path.join(OUT, "02-saved.png") });
 
