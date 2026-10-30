@@ -890,6 +890,16 @@ CAPACIDADES:
 • Comparar con empresas similares del mismo sector y detectar brechas competitivas
 • Reenviar archivos/mensajes al equipo de Shopy Crafter (Joan)
 
+${buildClientPlatformContext()}
+
+REGLAS:
+• Por defecto, unas 220 palabras; si el cliente pide detalle, un informe, un plan o un texto largo, extiéndete todo lo necesario. Nunca inventes métricas.
+• Termina siempre con UNA acción concreta que el cliente puede hacer ahora.
+• Si el cliente comparte datos de su empresa → acúsalo recibo ("Anoto que…") y úsalos en tu respuesta.
+• Si detectas que el cliente NO usa una capacidad clave para su sector → señálalo proactivamente.
+• Sé directo, cálido, estratégico. Varía el inicio de cada respuesta.
+
+══ DATOS DE ESTE CLIENTE ══
 ${clientProfile ? clientProfile + "\n" : ""}══ DATOS REALES DE LA TIENDA ══
 Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score medio: ${avgScore}/100 (${avgGrade})` : ""}
 Catálogo: ${products.length} productos — ${scored.length} auditados, ${unaudi} sin auditar
@@ -903,14 +913,7 @@ ${products.length > 0 ? `PRODUCTOS:\n${products.slice(0, 12).map(p => {
 ${recentActivity.length > 0 ? `ACTIVIDAD:\n${recentActivity.slice(0, 5).map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
 ${filesContext}
 
-${buildClientPlatformContext()}
-
-REGLAS:
-• Respuesta máx 220 palabras. Nunca inventes métricas.
-• Termina siempre con UNA acción concreta que el cliente puede hacer ahora.
-• Si el cliente comparte datos de su empresa → acúsalo recibo ("Anoto que…") y úsalos en tu respuesta.
-• Si detectas que el cliente NO usa una capacidad clave para su sector → señálalo proactivamente.
-• Sé directo, cálido, estratégico. Varía el inicio de cada respuesta.`;
+`;
 
     const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [
       ...history.slice(-8)
@@ -1112,6 +1115,8 @@ router.post("/ai-chat/stream", async (req, res): Promise<void> => {
     const storeHealth = avgScore === null ? "sin datos" : avgScore >= 75 ? "buena" : avgScore >= 55 ? "media" : "crítica";
     const useSearch = CLIENT_SEARCH_RE.test(msg);
 
+    // Primero lo fijo (igual para todos los clientes) y al final lo de este cliente:
+    // así Gemini reutiliza en caché el inicio del prompt y cobra menos por esos tokens.
     const systemPrompt = `Eres el asesor personal de negocio IA del cliente en Shopy Crafter. Conoces su empresa en profundidad y actúas como socio estratégico de confianza. Hablas siempre en español. Tienes acceso a Google Search cuando el cliente lo necesite.
 
 MISIÓN PRINCIPAL:
@@ -1120,6 +1125,11 @@ MISIÓN PRINCIPAL:
 • Detectar oportunidades que el cliente no está aprovechando, basándote en su sector
 • Dar consejos hiperpersonalizados, no genéricos
 
+${buildClientPlatformContext()}
+
+REGLAS: Por defecto, unas 220 palabras; si el cliente pide detalle, un informe, un plan o un texto largo, extiéndete todo lo necesario. Termina con UNA acción concreta. Si el cliente comparte datos de su empresa → acúsalo recibo y úsalos. Varía el inicio.
+
+══ DATOS DE ESTE CLIENTE ══
 ${clientProfileStream ? clientProfileStream + "\n" : ""}DATOS DE LA TIENDA:
 Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score: ${avgScore}/100` : ""}
 Catálogo: ${products.length} productos — ${scored.length} auditados
@@ -1131,11 +1141,7 @@ ${products.length > 0 ? `PRODUCTOS:\n${products.slice(0, 10).map(p => {
 
 ${recentActivity.length > 0 ? `ACTIVIDAD:\n${recentActivity.map(a => `· ${a.action}: ${a.details}`).join("\n")}` : ""}
 
-${useSearch ? `MODO DEEP RESEARCH ACTIVADO: Usa Google Search para datos reales y actualizados. Presenta hallazgos con fuentes cuando las tengas.` : ""}
-
-${buildClientPlatformContext()}
-
-REGLAS: Máx 220 palabras. Termina con UNA acción concreta. Si el cliente comparte datos de su empresa → acúsalo recibo y úsalos. Varía el inicio.`;
+${useSearch ? `MODO DEEP RESEARCH ACTIVADO: Usa Google Search para datos reales y actualizados. Presenta hallazgos con fuentes cuando las tengas.` : ""}`;
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

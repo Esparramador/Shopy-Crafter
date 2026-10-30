@@ -1,11 +1,11 @@
-import { PLAN_CATALOG } from "./plan-catalog.js";
+import { SELLABLE_PLANS, planQuotaLines } from "./plan-catalog.js";
 import { SERVICE_CATALOG } from "./service-catalog.js";
 
 /** Servicios recurrentes de la calculadora: los planes y servicios mensuales reales. */
 export const CALC_RECURRING_SERVICES = [
-  ...PLAN_CATALOG.map(p => ({
-    id: `calc-rec-${p.id}`, name: `Plan ${p.name}`,
-    description: `${p.productsPerMonth} productos y ${p.imagesPerMonth} imágenes IA al mes · 1 tienda · sin permanencia`,
+  ...SELLABLE_PLANS.map(p => ({
+    id: `calc-rec-${p.id}`, name: `Pack ${p.name}${p.family === "stripe" ? " (Stripe)" : ""}`,
+    description: `${planQuotaLines(p).slice(0, 2).join(" · ")} · sin permanencia`,
     price: p.priceMonthly, icon: "📈",
   })),
   ...SERVICE_CATALOG.filter(s => s.interval === "month" && s.priceEur !== null).map(s => ({

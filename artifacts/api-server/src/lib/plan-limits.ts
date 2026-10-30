@@ -2,7 +2,7 @@ import { db } from "@workspace/db";
 import { projectsTable, planCreditPacksTable } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
 import type { PlanType } from "@workspace/db/schema";
-import { catalogPlan, TRIAL } from "./plan-catalog.js";
+import { catalogPlan, TRIAL, type CatalogPlanId } from "./plan-catalog.js";
 
 export interface PlanConfig {
   productsPerMonth: number;
@@ -11,7 +11,7 @@ export interface PlanConfig {
   label: string;
 }
 
-function fromCatalog(id: "emprendedor" | "starter" | "agency_pro" | "enterprise", imagesPerProduct: number): PlanConfig {
+function fromCatalog(id: CatalogPlanId, imagesPerProduct: number): PlanConfig {
   const p = catalogPlan(id)!;
   return {
     productsPerMonth: p.productsPerMonth,
@@ -34,6 +34,10 @@ export const PLAN_LIMITS: Record<PlanType, PlanConfig> = {
   agency_pro: fromCatalog("agency_pro", 3),
   starter: fromCatalog("starter", 3),
   emprendedor: fromCatalog("emprendedor", 3),
+  // Packs de Stripe: no trabajan catálogo (0 productos e imágenes); sus cuotas van en pack-quotas.
+  stripe_starter: fromCatalog("stripe_starter", 0),
+  stripe_growth: fromCatalog("stripe_growth", 0),
+  stripe_enterprise: fromCatalog("stripe_enterprise", 0),
   trial: {
     productsPerMonth: TRIAL.productsPerMonth,
     imagesPerProduct: 2,

@@ -293,11 +293,77 @@
 }
 @media (max-width: 720px) { .lx-plans { grid-template-columns: 1fr; } .lx-plan, .lx-plan-name, .lx-common { text-align: left; } }
 
-/* Calculadora: títulos coherentes con el resto de secciones */
-#fp-calculator .l-h2 { font-family: var(--l-fb); font-weight: 700; font-size: clamp(26px, 3vw, 40px); line-height: 1.15; letter-spacing: -1px; color: var(--l-t); margin: 0 0 10px; }
-#fp-calculator .l-sub { font-size: 15px; line-height: 1.6; color: var(--l-t2); margin: 0 auto; }
-/* Las filas no se comprimen dentro de la lista con scroll (texto solapado en móvil) */
-#fp-calculator .fp-calc-items > .fp-calc-item { flex-shrink: 0; }
+/* ── Packs por plataforma y configurador (components/landing/Packs.tsx) ── */
+#fp-configurator .l-h2 { font-family: var(--l-fb); font-weight: 700; font-size: clamp(26px, 3vw, 40px); line-height: 1.15; letter-spacing: -1px; color: var(--l-t); margin: 0 0 10px; }
+.lxk-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 auto 16px; }
+.lxk-tabs button {
+  --lxk-brand: var(--l-gold);
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 100px; cursor: pointer;
+  font: 600 13.5px var(--l-fb); color: var(--l-t2); background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.09);
+  transition: color .2s, border-color .2s, background .2s;
+}
+.lxk-tabs button:hover { color: var(--l-t); border-color: rgba(255,255,255,.2); }
+.lxk-tabs button.on { color: var(--l-t); border-color: color-mix(in srgb, var(--lxk-brand) 70%, transparent); background: color-mix(in srgb, var(--lxk-brand) 14%, transparent); }
+.lxk-tabs button:focus-visible, .lxk-option:focus-visible, .lxk-extra:focus-within { outline: 2px solid var(--l-gold2); outline-offset: 2px; }
+.lxk-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lxk-brand); box-shadow: 0 0 10px var(--lxk-brand); }
+.lxk-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.lxk-plans .lx-plan-cta { cursor: pointer; font-family: var(--l-fb); width: 100%; }
+.lxk-custom { background: linear-gradient(180deg, rgba(45,212,159,.06), var(--l-ink3) 45%); border-color: rgba(45,212,159,.22); }
+.lxk-skeleton { height: 420px; border-radius: 16px; background: linear-gradient(90deg, rgba(255,255,255,.03), rgba(255,255,255,.07), rgba(255,255,255,.03)); background-size: 200% 100%; animation: lxk-shine 1.4s linear infinite; }
+@keyframes lxk-shine { to { background-position: -200% 0; } }
+.lxk-error { text-align: center; color: #f3a6a6; font-size: 14px; margin: 14px 0 0; }
+.lxk-muted { font-size: 12.5px; color: var(--l-t2); margin: 10px 0 0; }
+.lxk-muted a { color: var(--l-gold2); }
+
+.lxk-config { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 22px; align-items: start; text-align: left; }
+.lxk-steps { display: flex; flex-direction: column; gap: 16px; }
+.lxk-step { padding: 18px; border-radius: 16px; background: var(--l-ink3); border: 1px solid rgba(255,255,255,.07); }
+.lxk-step h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 16px; color: var(--l-t); }
+.lxk-step h3 span { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 13px; color: #080810; background: linear-gradient(135deg, var(--l-gold2), var(--l-gold)); }
+.lxk-step .lxk-tabs { justify-content: flex-start; margin: 0; }
+.lxk-step .lx-billing { margin: 0 0 14px; }
+.lxk-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.lxk-option { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 14px; border-radius: 12px; cursor: pointer; color: var(--l-t); background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.09); font-family: var(--l-fb); transition: border-color .2s, background .2s; }
+.lxk-option:hover { border-color: rgba(200,168,75,.35); }
+.lxk-option.on { border-color: var(--l-gold); background: rgba(200,168,75,.1); }
+.lxk-option-head { display: flex; justify-content: space-between; gap: 10px; }
+.lxk-option-head strong { font-size: 14px; }
+.lxk-option-head em { font-style: normal; font-size: 13px; color: var(--l-gold2); white-space: nowrap; }
+.lxk-option-text { font-size: 12px; line-height: 1.5; color: var(--l-t2); }
+.lxk-extras { display: flex; flex-direction: column; gap: 8px; }
+.lxk-extra { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.07); }
+.lxk-extra.on { border-color: rgba(45,212,159,.45); background: rgba(45,212,159,.07); }
+.lxk-extra input { accent-color: var(--l-jade); width: 16px; height: 16px; }
+.lxk-extra-ico { font-size: 18px; }
+.lxk-extra-body { display: flex; flex-direction: column; min-width: 0; }
+.lxk-extra-body strong { font-size: 13.5px; color: var(--l-t); }
+.lxk-extra-body small { font-size: 12px; color: var(--l-t2); }
+.lxk-extra-price { font-size: 13px; font-weight: 700; color: var(--l-gold2); white-space: nowrap; }
+.lxk-summary { position: sticky; top: 84px; padding: 20px; border-radius: 16px; background: linear-gradient(180deg, rgba(200,168,75,.08), var(--l-ink3) 40%); border: 1px solid rgba(200,168,75,.3); }
+.lxk-summary h3 { margin: 0 0 12px; font-size: 16px; color: var(--l-t); }
+.lxk-summary dl { margin: 0 0 14px; display: flex; flex-direction: column; gap: 8px; }
+.lxk-summary dl div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.lxk-summary dt { color: var(--l-t2); }
+.lxk-summary dd { margin: 0; color: var(--l-t); text-align: right; }
+.lxk-total { padding: 12px 0; margin-bottom: 14px; border-top: 1px solid rgba(255,255,255,.08); border-bottom: 1px solid rgba(255,255,255,.08); }
+.lxk-total div { display: flex; justify-content: space-between; align-items: baseline; }
+.lxk-total span { font-size: 13px; color: var(--l-t2); }
+.lxk-total strong { font-size: 22px; color: var(--l-t); }
+.lxk-total p { margin: 8px 0 0; font-size: 11.5px; color: var(--l-t2); }
+.lxk-summary .lx-plan-cta { width: 100%; cursor: pointer; font-family: var(--l-fb); }
+.lxk-summary .lx-plan-cta:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.lxk-nav-shop { margin-right: 4px; }
+@media (max-width: 1180px) { .lxk-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 22px; } }
+@media (max-width: 960px) { .lxk-config { grid-template-columns: 1fr; } .lxk-summary { position: static; } }
+@media (max-width: 720px) {
+  .lxk-plans, .lxk-options { grid-template-columns: 1fr; }
+  .lxk-tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .lxk-tabs button { justify-content: center; }
+  .lxk-extra { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .lxk-extra-ico { display: none; }
+  .lxk-nav-shop { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .lxk-skeleton { animation: none; } }
 @media (max-width: 720px) {
   #fp-calculator .fp-calc-item { gap: 10px; padding: 12px; align-items: flex-start; }
   #fp-calculator .fp-calc-item-price, #fp-calculator .fp-calc-item-check { margin-top: 2px; }
@@ -600,3 +666,10 @@
   .lxp-deck-panel { opacity: 1; transform: none; }
 }
 
+
+/* El resumen del configurador es «sticky»: con overflow:hidden la sección sería su contenedor de scroll y no se pegaría. */
+#fp-configurator.fp-section { overflow: clip; justify-content: flex-start; padding-top: 96px; padding-bottom: 72px; }
+#fp-pricing.fp-section { justify-content: flex-start; padding-top: 96px; padding-bottom: 72px; }
+@media (max-width: 720px) {
+  #fp-configurator.fp-section, #fp-pricing.fp-section { padding: 84px 16px 56px; }
+}

@@ -87,6 +87,7 @@ const PROVIDER_CATALOG = [
   { provider: "xai", key_name: "XAI_API_KEY", label: "xAI / Grok", icon: "⚡", category: "ai", description: "Grok 3, imágenes Aurora, vídeo xAI", docs: "https://console.x.ai" },
   { provider: "anthropic", key_name: "ANTHROPIC_API_KEY", label: "Anthropic (Claude)", icon: "🧠", category: "ai", description: "Claude Sonnet, Opus — guiones, copy, análisis", docs: "https://console.anthropic.com" },
   { provider: "gemini", key_name: "GEMINI_API_KEY", label: "Google Gemini", icon: "♊", category: "ai", description: "Gemini Flash/Pro, Imagen 4/5, Veo 3/4", docs: "https://aistudio.google.com" },
+  { provider: "google", key_name: "GOOGLE_PAGESPEED_API_KEY", label: "Google PageSpeed Insights", icon: "⚡", category: "seo", description: "Mediciones de velocidad de los packs. Opcional: sin ella se usa GOOGLE_API_KEY o la cuota anónima de Google", docs: "https://developers.google.com/speed/docs/insights/v5/get-started" },
   { provider: "replicate", key_name: "REPLICATE_API_TOKEN", label: "Replicate", icon: "🔵", category: "media", description: "Flux, Seedance, Kling, Hailuo, Wan, Sora", docs: "https://replicate.com/account/api-tokens" },
   { provider: "runway", key_name: "RUNWAY_API_KEY", label: "Runway ML", icon: "🏃", category: "media", description: "Gen4.5, Gen4.5 Turbo, Seedance2 — vídeo cinematográfico", docs: "https://app.runwayml.com/settings" },
   { provider: "elevenlabs", key_name: "ELEVENLABS_API_KEY", label: "ElevenLabs", icon: "🎙️", category: "audio", description: "TTS, clonado de voz, Dubbing Studio", docs: "https://elevenlabs.io/app/settings" },
@@ -307,6 +308,20 @@ router.post("/admin/billing-config", requireAdmin, async (req: Request, res: Res
     res.json({ success: true, provider });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
+
+/** Guarda (cifrada) y aplica al proceso una clave que genera la propia plataforma, p. ej. el secreto de un webhook. */
+export async function storeGeneratedApiKey(provider: string, keyName: string, value: string, description: string): Promise<void> {
+  if (!isAllowedKeyName(keyName)) throw new Error(`Nombre de clave no permitido: ${keyName}`);
+  await apiKeysTableReady;
+  await db.execute(sql`
+    INSERT INTO platform_api_keys (provider, key_name, key_value, description, category, updated_at)
+    VALUES (${provider}, ${keyName}, ${sealKey(value)}, ${description}, 'payments', NOW())
+    ON CONFLICT (provider, key_name) DO UPDATE SET
+      key_value = EXCLUDED.key_value, is_active = TRUE, description = EXCLUDED.description,
+      updated_at = NOW(), last_test_ok = NULL, last_test_error = NULL
+  `);
+  applyKey(keyName, value);
+}
 
 // ── GET /api/admin/api-keys/startup-inject ──────────────────────────────────
 // Called at startup to inject DB keys into process.env

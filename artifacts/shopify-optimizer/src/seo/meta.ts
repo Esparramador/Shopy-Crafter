@@ -50,6 +50,14 @@ export const STATIC_ROUTES: SeoRoute[] = [
     priority: 0.8, changefreq: "monthly", inSitemap: true,
   },
   {
+    path: "/tienda",
+    title: "Tienda: tarjetas de aluminio, placas QR, regalos 3D y webs — Shopy Crafter",
+    description: "Tarjetas de visita de aluminio grabadas con láser desde 0,35 €, placas QR para reseñas de Google, expositores, fotos grabadas en madera y aluminio, regalos web en 3D, landings y vídeo animado. Pago seguro con Stripe.",
+    h1: "Tienda de Shopy Crafter",
+    intro: "Productos del taller láser (tarjetas de aluminio, placas QR, expositores y fotos grabadas) y servicios digitales (webs, rediseños de tienda, regalos web en 3D y vídeo animado), con precio cerrado y pago con tarjeta.",
+    priority: 0.85, changefreq: "weekly", inSitemap: true,
+  },
+  {
     path: "/sobre-nosotros",
     title: "Sobre Nosotros — Shopy Crafter",
     description: "Conoce al equipo detrás de Shopy Crafter: ingenieros de IA y operadores de eCommerce que automatizamos el trabajo pesado para que tú crezcas.",
@@ -193,6 +201,7 @@ export const SITE_LINK_GROUPS: { title: string; links: { href: string; label: st
       { href: "/ecommerce-ia-automatizacion", label: "eCommerce con IA" },
       { href: "/agencia-shopify-ia", label: "Para agencias" },
       { href: "/portfolio", label: "Portfolio" },
+      { href: "/tienda", label: "Tienda" },
     ],
   },
   {

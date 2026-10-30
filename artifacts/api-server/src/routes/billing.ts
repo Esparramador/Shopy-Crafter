@@ -1,3 +1,4 @@
+import { billingWebhookSecrets, ensureBillingWebhook } from "../lib/stripe-webhook-setup.js";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { subscriptionsTable, affiliatesTable, referralTrackingTable, usersTable } from "@workspace/db";
@@ -6,7 +7,11 @@ import { randomUUID } from "crypto";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import Stripe from "stripe";
-import { PLAN_CATALOG, planFeatures, TRIAL } from "../lib/plan-catalog.js";
+import {
+  PLAN_CATALOG, SELLABLE_PLANS, planFeatures, planQuotaLines, abTestLine, planPlatforms, plansForPlatform, catalogPlan,
+  PACK_PLATFORMS, PLATFORM_EXTRAS, PLATFORM_LABELS, INCLUDED_IN_ALL_PLANS, INCLUDED_IN_STRIPE_PLANS, TRIAL,
+  type PackPlatform,
+} from "../lib/plan-catalog.js";
 import {
   STRIPE_API_VERSION, getStripe, activatePlan, createPlanCheckout, handleStripeEvent,
   recurringRevenue, ensureStripeBillingSchema, type BillingInterval,
@@ -21,12 +26,14 @@ type BillingPlan = {
   periodDays: number; visible?: boolean;
 };
 
-// Planes de pago = catálogo único (lib/plan-catalog.ts). Cada plan es 1 tienda.
+// Packs = catálogo único (lib/plan-catalog.ts). Cada pack es 1 tienda o 1 cuenta de Stripe.
+// Los heredados (Emprendedor) siguen aquí para mostrar su suscripción, pero no se venden.
 const PLANS: Record<string, BillingPlan> = {
   ...Object.fromEntries(PLAN_CATALOG.map(p => [p.id, {
     name: p.name, price: p.priceMonthly, priceAnnual: p.priceAnnual, storesLimit: 1,
     imagesIncluded: p.imagesPerMonth, periodDays: 30,
     features: planFeatures(p).map(f => f.text),
+    ...(p.sellable ? {} : { visible: false }),
   } satisfies BillingPlan])),
   trial: {
     name: "Prueba", price: 0, priceAnnual: 0, storesLimit: 1, imagesIncluded: TRIAL.imagesPerMonth, periodDays: TRIAL.days,
@@ -37,8 +44,34 @@ const PLANS: Record<string, BillingPlan> = {
   agency: { name: "Agency (legado)", price: 697, priceAnnual: 0, storesLimit: -1, imagesIncluded: -1, periodDays: 30, features: ["Legado"], visible: false },
 };
 
-/** Planes que se pueden contratar (con precio y del catálogo). */
-const SELLABLE = new Set<string>(PLAN_CATALOG.map(p => p.id));
+/** Packs que se pueden contratar (con precio y del catálogo). */
+const SELLABLE = new Set<string>(SELLABLE_PLANS.map(p => p.id));
+
+/** «A medida»: presupuesto cerrado, en las cuatro plataformas. */
+const CUSTOM_PACK_FEATURES = [
+  "Varias tiendas o plataformas en una misma cuenta",
+  "Cuotas y entregables a medida",
+  "Diseño web, apps nativas y producción del taller láser",
+  "Presupuesto cerrado según alcance",
+];
+
+/**
+ * Un pack de tienda no sirve para un proyecto de Stripe ni al revés (sus cuotas no se
+ * aplicarían). Devuelve el motivo si el pack no encaja con la plataforma del cliente.
+ */
+async function packMismatch(userId: string, planId: string): Promise<string | null> {
+  const cat = catalogPlan(planId);
+  if (!cat) return null;
+  const r = await db.execute(sql`
+    SELECT p.platform_type FROM users u JOIN projects p ON p.id::text = u.client_id WHERE u.id = ${userId} LIMIT 1
+  `);
+  const platform = (r.rows[0] as { platform_type?: string } | undefined)?.platform_type;
+  if (!platform) return null;
+  const isStripe = platform === "stripe";
+  if (isStripe && cat.family !== "stripe") return "Tu proyecto es de Stripe: elige uno de los packs de Stripe.";
+  if (!isStripe && cat.family === "stripe") return "Los packs de Stripe son para cuentas de Stripe: elige un pack de tienda.";
+  return null;
+}
 
 router.get("/billing/subscription", async (req, res): Promise<void> => {
   try {
@@ -119,11 +152,13 @@ async function ensureBillingPlansTable(): Promise<void> {
 }
 
 // ── Seed canonical plans once per deploy (idempotent via version tag) ─────────
-// v13: precios, cuotas y textos del catálogo único (antes 14/37/112/299 € con
-// promesas que el sistema no cumplía: API Access, White-label, SLA, soporte 24/7…).
-const CANONICAL_SEED_VERSION = "v13-catalog-2026-09";
+// v14: packs por plataforma (tienda y Stripe). Emprendedor deja de venderse (se oculta,
+// sus suscriptores siguen igual). Solo se ocultan los planes heredados del catálogo: los
+// planes que el admin haya creado a mano no se tocan.
+const CANONICAL_SEED_VERSION = "v14-packs-2026-10";
+const HIDDEN_CATALOG_IDS = PLAN_CATALOG.filter(p => !p.sellable).map(p => p.id);
 const CANONICAL_BILLING_PLANS = [
-  ...PLAN_CATALOG.map(p => ({
+  ...SELLABLE_PLANS.map(p => ({
     id: p.id, name: p.name, price: p.priceMonthly, priceAnnual: p.priceAnnual,
     currency: "€", featured: p.featured, badge: p.badge,
     features: planFeatures(p),
@@ -133,14 +168,9 @@ const CANONICAL_BILLING_PLANS = [
   {
     id: "personalizado", name: "A medida", price: 0, priceAnnual: 0,
     currency: "€", featured: false, badge: null,
-    features: [
-      { text: "Varias tiendas en una misma cuenta", included: true },
-      { text: "Cuotas de productos e imágenes a medida", included: true },
-      { text: "Diseño web y apps nativas", included: true },
-      { text: "Presupuesto cerrado según alcance", included: true },
-    ],
+    features: CUSTOM_PACK_FEATURES.map(text => ({ text, included: true })),
     ctaLabel: "Pedir presupuesto", ctaStyle: "ghost", ctaHref: "#fp-contact",
-    storesLimit: -1, imagesIncluded: -1, sortOrder: 4,
+    storesLimit: -1, imagesIncluded: -1, sortOrder: 20,
   },
 ];
 
@@ -155,7 +185,9 @@ async function seedCanonicalBillingPlans(): Promise<void> {
     if (versionRow.rows.length > 0) return;
 
     logger.info("🌱 Seeding canonical billing plans...");
-    await db.execute(sql`UPDATE billing_plans SET visible = FALSE`);
+    for (const id of HIDDEN_CATALOG_IDS) {
+      await db.execute(sql`UPDATE billing_plans SET visible = FALSE WHERE id = ${id}`);
+    }
     for (const p of CANONICAL_BILLING_PLANS) {
       await db.execute(sql`
         INSERT INTO billing_plans
@@ -190,9 +222,16 @@ const billingPlansReady = ensureBillingPlansTable().then(seedCanonicalBillingPla
 void ensureStripeBillingSchema().catch(() => {});
 void billingPlansReady;
 
+function rowPlatforms(id: string): PackPlatform[] {
+  const cat = catalogPlan(id);
+  return cat ? planPlatforms(cat) : [...PACK_PLATFORMS];
+}
+
 function rowToPlan(row: any) {
   return {
     id: row.id,
+    platforms: rowPlatforms(String(row.id)),
+    family: catalogPlan(String(row.id))?.family ?? "custom",
     name: row.name,
     price: Number(row.price),
     priceAnnual: Number(row.price_annual ?? row.price * 10),
@@ -226,6 +265,49 @@ router.get("/billing/plans", async (req, res): Promise<void> => {
     res.json(result.rows.map(rowToPlan));
   } catch {
     res.json([]);
+  }
+});
+
+/**
+ * Packs por plataforma para la landing y el configurador: precio vigente (billing_plans, que el
+ * admin puede editar) + lo que incluye cada pack según el catálogo, más «A medida».
+ */
+router.get("/billing/packs", async (_req, res): Promise<void> => {
+  try {
+    await billingPlansReady;
+    const rows = await db.execute(sql`SELECT id, price, price_annual, name, featured, badge FROM billing_plans WHERE visible = TRUE AND user_id IS NULL`)
+      .catch(() => ({ rows: [] as unknown[] }));
+    const live = new Map((rows.rows as Array<{ id: string; price: number; price_annual: number; name: string; featured: boolean; badge: string | null }>)
+      .map(r => [r.id, r]));
+    const custom = live.get("personalizado");
+    const platforms = PACK_PLATFORMS.map(platform => {
+      const plans = plansForPlatform(platform)
+        .filter(p => live.size === 0 || live.has(p.id))
+        .map(p => {
+          const row = live.get(p.id);
+          const priceMonthly = row && Number(row.price) > 0 ? Number(row.price) : p.priceMonthly;
+          const priceAnnual = row && Number(row.price_annual) > 0 ? Number(row.price_annual) : priceMonthly * 10;
+          const ab = platform === "shopify" ? abTestLine(p) : null;
+          const lines = planQuotaLines(p);
+          if (ab) lines.splice(lines.length - (p.callMinutes > 0 ? 2 : 1), 0, ab);
+          return {
+            id: p.id, name: row?.name || p.name, summary: p.summary, priceMonthly, priceAnnual,
+            featured: row ? !!row.featured : p.featured, badge: row ? row.badge : p.badge, lines,
+          };
+        });
+      return {
+        key: platform,
+        label: PLATFORM_LABELS[platform],
+        extras: platform === "stripe" ? [] : PLATFORM_EXTRAS[platform],
+        included: platform === "stripe" ? INCLUDED_IN_STRIPE_PLANS : INCLUDED_IN_ALL_PLANS,
+        plans,
+        custom: custom ? { id: "personalizado", name: custom.name || "A medida", lines: CUSTOM_PACK_FEATURES } : null,
+      };
+    });
+    res.json({ platforms, annualMonths: 10, taxNote: "Precios sin IVA" });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "billing/packs error");
+    res.status(500).json({ error: "No se pudieron cargar los packs" });
   }
 });
 
@@ -335,7 +417,11 @@ router.post("/billing/upgrade", async (req, res): Promise<void> => {
       return;
     }
 
+    if (!SELLABLE.has(planId)) { res.status(400).json({ error: "Este plan ya no se contrata: elige uno de los packs actuales." }); return; }
+
     // ── Stripe Checkout (suscripción mensual o anual real) ───────────────────
+    const mismatch = await packMismatch(userId, planId);
+    if (mismatch) { res.status(400).json({ error: mismatch }); return; }
     const stripe = getStripe();
     if (stripe && SELLABLE.has(planId)) {
       const interval: BillingInterval = (req.body as { interval?: string }).interval === "year" ? "year" : "month";
@@ -617,14 +703,14 @@ router.get("/billing/stripe/verify", async (req, res): Promise<void> => {
 // Requires STRIPE_WEBHOOK_SECRET from the Stripe Dashboard → Webhooks section.
 router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
   const sig = req.headers["stripe-signature"] as string | undefined;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secrets = billingWebhookSecrets();
 
   // SECURITY: fail-closed. Antes, sin secreto O sin cabecera stripe-signature se
   // aceptaba el payload tal cual: cualquiera podía enviar un checkout.session.completed
   // falso y activarse un plan de pago. Además rawBody no existía y constructEvent
   // fallaba siempre, así que la vía firmada nunca funcionó.
-  if (!webhookSecret) {
-    logger.error("stripe webhook: STRIPE_WEBHOOK_SECRET no configurado — petición rechazada");
+  if (secrets.length === 0) {
+    logger.error("stripe webhook: sin secreto de firma (STRIPE_BILLING_WEBHOOK_SECRET / STRIPE_WEBHOOK_SECRET) — petición rechazada");
     res.status(503).json({ error: "Webhook de Stripe no configurado" }); return;
   }
   const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
@@ -632,13 +718,17 @@ router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Falta la firma stripe-signature o el cuerpo original" }); return;
   }
 
-  let event: Stripe.Event;
-  try {
-    // Verificar la firma no necesita la API key (new Stripe("") lanza si falta).
-    event = Stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-  } catch (err: any) {
-    logger.warn({ err: err.message }, "stripe webhook signature error");
-    res.status(400).json({ error: `Webhook error: ${err.message}` }); return;
+  // Verificar la firma no necesita la API key. Vale cualquiera de los secretos conocidos:
+  // el del endpoint que crea la plataforma y el configurado a mano.
+  let event: Stripe.Event | null = null;
+  let lastError = "";
+  for (const secret of secrets) {
+    try { event = Stripe.webhooks.constructEvent(rawBody, sig, secret); break; }
+    catch (err) { lastError = err instanceof Error ? err.message : String(err); }
+  }
+  if (!event) {
+    logger.warn({ err: lastError }, "stripe webhook signature error");
+    res.status(400).json({ error: `Webhook error: ${lastError}` }); return;
   }
 
   try {
@@ -652,6 +742,17 @@ router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
   res.json({ received: true });
 });
 
+// ── Admin: revisa/crea el webhook de cobros en Stripe (lo mismo que se hace al arrancar en producción) ──
+router.post("/admin/billing/stripe-webhook/ensure", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    res.json(await ensureBillingWebhook());
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error";
+    logger.error({ err: msg }, "admin stripe-webhook ensure error");
+    res.status(502).json({ error: msg });
+  }
+});
+
 // ── Checkout de plan para cualquier usuario autenticado (clientes incluidos) ──
 router.post("/billing/checkout", async (req, res): Promise<void> => {
   try {
@@ -659,6 +760,8 @@ router.post("/billing/checkout", async (req, res): Promise<void> => {
     if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
     const { planId, interval: rawInterval, returnPath } = req.body as { planId?: string; interval?: string; returnPath?: string };
     if (!planId || !SELLABLE.has(planId)) { res.status(400).json({ error: "Plan no válido" }); return; }
+    const mismatch = await packMismatch(userId, planId);
+    if (mismatch) { res.status(400).json({ error: mismatch }); return; }
     const stripe = getStripe();
     if (!stripe) { res.status(503).json({ error: "El pago con tarjeta no está disponible todavía. Escríbenos y te enviamos el enlace de pago." }); return; }
     const interval: BillingInterval = rawInterval === "year" ? "year" : "month";

@@ -1,0 +1,55 @@
+:root {
+  --fondo: #151b2c;
+  --crema: #f6efe6;
+  --oro: #e6c07b;
+  --frambuesa: #c2264a;
+  --tinta: #1b1219;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--fondo); color: var(--crema);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+#escena { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.oculto { opacity: 0 !important; pointer-events: none !important; }
+.capa { position: fixed; inset: 0; display: grid; place-items: center; transition: opacity .9s ease; z-index: 10; }
+
+#inicio { background: linear-gradient(to top, rgba(255,186,120,.30) 0%, rgba(255,186,120,0) 45%), radial-gradient(120% 90% at 50% 20%, #3d5583 0%, #26324f 50%, #131827 100%); }
+.inicio-caja { text-align: center; padding: 24px; width: min(420px, 100%); }
+.antetitulo { letter-spacing: .32em; text-transform: uppercase; font-size: 12px; color: var(--oro); margin: 0 0 14px; }
+h1 { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 400; font-size: clamp(54px, 15vw, 88px); line-height: .95; margin: 0 0 36px; }
+h1 em { font-style: italic; color: var(--oro); }
+.barra { height: 2px; background: rgba(246,239,230,.14); border-radius: 2px; overflow: hidden; margin: 0 auto 12px; width: 70%; }
+#progreso { height: 100%; width: 0; background: linear-gradient(90deg, var(--oro), #fff3d6); transition: width .3s ease; }
+.estado { font-size: 12px; color: rgba(246,239,230,.6); margin: 0 0 30px; min-height: 1em; }
+
+.boton { font: 600 15px/1 "Inter", system-ui, sans-serif; letter-spacing: .04em; color: var(--tinta); background: var(--crema);
+  border: 0; border-radius: 999px; padding: 16px 30px; cursor: pointer; transition: transform .2s ease, opacity .5s ease, background .3s;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.boton:active { transform: scale(.96); }
+.boton:disabled { opacity: .35; cursor: default; }
+.boton-flotante { position: fixed; left: 50%; bottom: calc(34px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6;
+  background: linear-gradient(135deg, #fff6e2, var(--oro)); animation: latido 1.6s ease-in-out infinite; }
+.boton-flotante:active { transform: translateX(-50%) scale(.96); }
+@keyframes latido { 0%,100% { box-shadow: 0 0 0 0 rgba(230,192,123,.55), 0 10px 30px rgba(0,0,0,.35); } 50% { box-shadow: 0 0 0 14px rgba(230,192,123,0), 0 10px 30px rgba(0,0,0,.35); } }
+.boton-claro { background: transparent; color: var(--crema); border: 1px solid rgba(246,239,230,.35); box-shadow: none; margin-top: 34px; }
+
+.pista { position: fixed; left: 50%; top: calc(22px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 6;
+  font-size: 13px; padding: 10px 18px; border-radius: 999px; background: rgba(18,11,20,.55); backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(246,239,230,.15); transition: opacity .6s ease; white-space: nowrap; }
+.icono { position: fixed; right: calc(16px + env(safe-area-inset-right)); top: calc(16px + env(safe-area-inset-top)); z-index: 7;
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(246,239,230,.25); background: rgba(18,11,20,.5);
+  color: var(--crema); font-size: 17px; cursor: pointer; transition: opacity .5s; }
+.icono.mudo { text-decoration: line-through; opacity: .6; }
+
+#recuerdos { background: #000; z-index: 20; }
+#fotos { position: absolute; inset: 0; width: 100%; height: 100%; }
+.final { position: relative; text-align: center; padding: 28px; max-width: 560px; opacity: 0; transition: opacity 2s ease; }
+.final.visible { opacity: 1; }
+.mensaje { font-family: "Cormorant Garamond", Georgia, serif; font-size: clamp(25px, 6.6vw, 38px); line-height: 1.32; margin: 0; min-height: 3em; }
+.mensaje span { opacity: 0; transition: opacity .5s ease; }
+.mensaje span.si { opacity: 1; }
+.firma { margin: 26px 0 0; color: var(--oro); letter-spacing: .28em; text-transform: uppercase; font-size: 12px; opacity: 0; transition: opacity 1.4s ease; }
+.firma.si { opacity: 1; }
+.final .boton { opacity: 0; transition: opacity 1.2s ease; }
+.final .boton.si { opacity: 1; }
+.destello { position: fixed; inset: 0; background: radial-gradient(circle at 50% 55%, #fff8e6 0%, #ffe3a8 35%, rgba(255,227,168,0) 75%);
+  opacity: 0; pointer-events: none; z-index: 15; transition: opacity 1s ease; }

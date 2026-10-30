@@ -11,7 +11,7 @@ import {
   projectsTable,
 } from "@workspace/db";
 import { sql, count, eq, inArray } from "drizzle-orm";
-import { PLAN_CATALOG, INCLUDED_IN_ALL_PLANS, TRIAL } from "../lib/plan-catalog.js";
+import { SELLABLE_PLANS, INCLUDED_IN_ALL_PLANS, INCLUDED_IN_STRIPE_PLANS, TRIAL, planQuotaLines } from "../lib/plan-catalog.js";
 import { SERVICE_CATALOG, priceDisplay } from "../lib/service-catalog.js";
 import { logger } from "../lib/logger.js";
 import { shopifyRequest } from "../lib/shopify.js";
@@ -521,10 +521,10 @@ router.get("/admin/brain-stats", async (_req, res) => {
 
 /** Precios del catálogo real (plan-catalog / service-catalog), nunca copiados a mano. */
 function pricingKnowledge(): string {
-  const plans = PLAN_CATALOG.map(p =>
-    `${p.name} ${p.priceMonthly} €/mes + IVA (anual ${p.priceAnnual} €): ${p.productsPerMonth} productos y ${p.imagesPerMonth} imágenes IA al mes${p.featured ? " (recomendado)" : ""}`,
+  const plans = SELLABLE_PLANS.map(p =>
+    `${p.family === "stripe" ? "[Stripe] " : "[Tienda] "}${p.name} ${p.priceMonthly} €/mes + IVA (anual ${p.priceAnnual} €): ${planQuotaLines(p).join(", ")}${p.featured ? " (recomendado)" : ""}`,
   ).join("; ");
-  return `Planes (un plan por tienda): ${plans}. Todos incluyen: ${INCLUDED_IN_ALL_PLANS.join(", ")}. "A medida": varias tiendas, cuotas y diseño web/apps con presupuesto cerrado. Prueba de ${TRIAL.days} días con ${TRIAL.productsPerMonth} productos y ${TRIAL.imagesPerMonth} imágenes. Cobro con tarjeta vía Stripe, sin permanencia. No existen planes con SLA, API, marca blanca, soporte 24/7 ni cuotas ilimitadas.`;
+  return `Packs por plataforma (un pack por tienda o cuenta de Stripe; Shopify, WooCommerce y PrestaShop comparten packs): ${plans}. Los de tienda incluyen: ${INCLUDED_IN_ALL_PLANS.join(", ")}. Los de Stripe incluyen: ${INCLUDED_IN_STRIPE_PLANS.join(", ")}. "A medida": varias tiendas o plataformas, cuotas, diseño web/apps y taller láser con presupuesto cerrado. Prueba de ${TRIAL.days} días con ${TRIAL.productsPerMonth} productos y ${TRIAL.imagesPerMonth} imágenes. Cobro con tarjeta vía Stripe, sin permanencia. No existen planes con SLA, API, marca blanca, soporte 24/7 ni cuotas ilimitadas.`;
 }
 
 function servicesKnowledge(): string {

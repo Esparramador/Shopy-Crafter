@@ -184,28 +184,24 @@ function extractDiagnostics(audits: Record<string, PsiAudit>): PageSpeedDiagnost
   return out;
 }
 
-export async function runPageSpeedAudit(
-  url: string,
-  strategy: "mobile" | "desktop" = "mobile"
-): Promise<PageSpeedResult> {
-  const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY ?? "";
-  if (!apiKey) {
-    throw new Error("GOOGLE_PAGESPEED_API_KEY no configurada");
-  }
+/** Claves de Google con las que se intenta PageSpeed, en orden y sin repetir. */
+export function pageSpeedKeys(): string[] {
+  return [process.env.GOOGLE_PAGESPEED_API_KEY, process.env.GOOGLE_API_KEY]
+    .map(k => k?.trim() ?? "").filter((k, i, a) => k && a.indexOf(k) === i);
+}
 
-  const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=${strategy}&key=${apiKey}&category=PERFORMANCE&category=SEO&category=ACCESSIBILITY&category=BEST_PRACTICES`;
-
+/** Una petición a PageSpeed con un reintento ante 5xx o error de red. */
+async function fetchPsi(psiUrl: string, url: string): Promise<Response | null> {
   let resp: Response | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       resp = await fetch(psiUrl, { signal: AbortSignal.timeout(90_000) });
-      if (resp.ok) break;
       if (resp.status >= 500 && attempt === 0) {
         logger.warn({ status: resp.status, url, attempt }, "PageSpeed API 5xx — retrying in 3s");
         await new Promise(r => setTimeout(r, 3000));
         continue;
       }
-      break;
+      return resp;
     } catch (err) {
       if (attempt === 0) {
         logger.warn({ url, err: String(err) }, "PageSpeed fetch error — retrying in 3s");
@@ -214,6 +210,27 @@ export async function runPageSpeedAudit(
       }
       throw err;
     }
+  }
+  return resp;
+}
+
+export async function runPageSpeedAudit(
+  url: string,
+  strategy: "mobile" | "desktop" = "mobile"
+): Promise<PageSpeedResult> {
+  // Clave: la específica de PageSpeed, si no la general de Google Cloud que ya usa la plataforma.
+  // Sin clave (o si la clave no tiene la API de PageSpeed habilitada) Google permite llamadas
+  // anónimas con una cuota menor, así que la medición no se queda parada.
+  const keys = pageSpeedKeys();
+  const base = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=${strategy}&category=PERFORMANCE&category=SEO&category=ACCESSIBILITY&category=BEST_PRACTICES`;
+  const attempts = [...keys.map(k => `${base}&key=${encodeURIComponent(k)}`), base];
+
+  let resp: Response | null = null;
+  for (const psiUrl of attempts) {
+    resp = await fetchPsi(psiUrl, url);
+    if (resp?.ok) break;
+    // 400/403 con clave = clave no válida para PageSpeed → se prueba la siguiente o sin clave.
+    if (resp && resp.status !== 400 && resp.status !== 403) break;
   }
 
   if (!resp || !resp.ok) {

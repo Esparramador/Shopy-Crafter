@@ -109,3 +109,7 @@ exports/
 logs/
 screenshots/
 artifacts/shopify-optimizer/public/assets/3d/
+
+# Declaraciones generadas por tsc --build al hacer typecheck
+lib/integrations-anthropic-ai/dist/
+lib/integrations-gemini-ai/dist/

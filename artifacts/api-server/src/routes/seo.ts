@@ -11,6 +11,7 @@ import { saveToVault } from "../lib/vault.js";
 import { logger } from "../lib/logger.js";
 import { safeFetch } from "../lib/web-scraper.js";
 import { enableLongRunning } from "../lib/long-running.js";
+import { takePackQuota, releasePackQuota } from "../lib/pack-quotas.js";
 
 const router = Router();
 
@@ -668,10 +669,14 @@ router.post("/projects/:projectId/seo/blog-strategy", async (req, res): Promise<
 
 router.post("/projects/:projectId/seo/generate-blog-post", async (req, res): Promise<void> => {
   enableLongRunning(res);
+  let quotaPid = 0;
   try {
-    
+
     const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
     const { title, primaryKeyword, outline } = req.body as { title: string; primaryKeyword: string; outline?: object };
+    if (!title || !primaryKeyword) { res.status(400).json({ error: "title y primaryKeyword son obligatorios" }); return; }
+    if (!(await takePackQuota(res, projectId, "blog_posts"))) return;
+    quotaPid = projectId;
   
     const prompt = `Escribe un artículo de blog completo y optimizado para SEO.
   
@@ -701,6 +706,7 @@ router.post("/projects/:projectId/seo/generate-blog-post", async (req, res): Pro
   
     res.json(result);
   } catch (err: any) {
+    if (quotaPid) await releasePackQuota(quotaPid, "blog_posts");
     const msg = err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: msg });
   }
@@ -1202,6 +1208,7 @@ function buildSeoFullScanReport(opts: {
 // ── Escaneo SEO REAL en vivo: scrape de cada URL de producto + PageSpeed + SERP
 router.post("/projects/:projectId/seo/full-scan", async (req, res): Promise<void> => {
   enableLongRunning(res);
+  let quotaPid = 0;
   try {
     const projectId = parseInt(Array.isArray(req.params.projectId) ? req.params.projectId[0] : req.params.projectId, 10);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
@@ -1215,6 +1222,9 @@ router.post("/projects/:projectId/seo/full-scan", async (req, res): Promise<void
       res.json({ success: false, error: "No hay productos sincronizados. Sincroniza tu catálogo primero.", products: [], storeScore: 0 });
       return;
     }
+    // Cada escaneo completo es una de las auditorías SEO del pack del mes.
+    if (!(await takePackQuota(res, projectId, "seo_audits"))) return;
+    quotaPid = projectId;
 
     const BROWSER_UA = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
 
@@ -1338,6 +1348,7 @@ Return specific numbers and URLs you found in the search results.`,
       reportHtml,
     });
   } catch (err: any) {
+    if (quotaPid) await releasePackQuota(quotaPid, "seo_audits");
     const msg = err instanceof Error ? err.message : "Error en el escaneo";
     if (!res.headersSent) res.status(500).json({ error: msg });
     else try { res.end(JSON.stringify({ error: msg })); } catch {}

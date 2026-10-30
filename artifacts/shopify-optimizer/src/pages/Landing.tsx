@@ -1,10 +1,10 @@
 import ProjectsShowcase from "@/components/ProjectsShowcase";
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import PageMeta from "@/components/PageMeta";
-import { VismeFormHero } from "@/components/VismeFormHero";
-import { CANONICAL_PLANS, type CanonicalPlan } from "@/lib/pricing-plans";
+import { VismeFormHero, type ContactPrefill } from "@/components/VismeFormHero";
+import { PackPricing, PackConfigurator, usePacks, type PackPlan, type PlatformPacks, type ConfiguratorResult } from "@/components/landing/Packs";
 import ApkDownloadButton from "@/components/ApkDownloadButton";
 import SiteLinks from "@/components/SiteLinks";
 import { metaFor } from "@/components/PageMeta";
@@ -44,7 +44,10 @@ function SectionVideoBg({ src }: { src: string }) {
   );
 }
 
-function MagnetStoreButton() {
+/** Instagram de Shopy Crafter. */
+const INSTAGRAM_URL = "https://www.instagram.com/shopycrafter/";
+
+function MagnetInstagramButton() {
   const btnRef = useRef<HTMLAnchorElement>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [hovered, setHovered] = useState(false);
@@ -95,7 +98,8 @@ function MagnetStoreButton() {
   return (
     <a
       ref={btnRef}
-      href="https://comic-crafter.myshopify.com"
+      href={INSTAGRAM_URL}
+      aria-label="Visita nuestro Instagram @shopycrafter"
       target="_blank"
       rel="noopener noreferrer"
       style={{
@@ -128,10 +132,11 @@ function MagnetStoreButton() {
         whiteSpace: "nowrap",
       }}
       className="lx-magnet justify-start items-center text-center">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-        <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>Visitar Comic Crafter
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }} aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="2"/>
+        <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2"/>
+        <circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/>
+      </svg>Visita nuestro Instagram
             <span style={{
         display: "inline-block",
         width: 8, height: 8,
@@ -192,8 +197,8 @@ const LANDING_FALLBACK: CMSContent = {
   footer: { tagline: "Optimización IA para tiendas Shopify", columns: [], copyright: `© ${new Date().getFullYear()} Shopy Crafter`, badges: ["RGPD", "SSL", "Shopify Partner"] },
 };
 
-const FP_SECTION_IDS = ["fp-hero", "fp-services", "fp-platforms", "fp-projects", "fp-portfolio", "fp-process", "fp-pricing", "fp-calculator", "fp-contact"];
-const DEFAULT_SECTION_NAV = ["Inicio", "Servicios", "Plataformas", "Proyectos", "Portfolio", "Proceso", "Precios", "Calculadora", "Contactar"];
+const FP_SECTION_IDS = ["fp-hero", "fp-services", "fp-platforms", "fp-projects", "fp-portfolio", "fp-process", "fp-pricing", "fp-configurator", "fp-contact"];
+const DEFAULT_SECTION_NAV = ["Inicio", "Servicios", "Plataformas", "Proyectos", "Portfolio", "Proceso", "Precios", "Configurador", "Contactar"];
 
 
 export default function Landing() {
@@ -202,92 +207,12 @@ export default function Landing() {
   const isAdmin = !isPreview && user?.role === "admin";
   const [content, setContent] = useState<CMSContent>(LANDING_FALLBACK);
   const [currentSection, setCurrentSection] = useState(0);
-  const [calcQuantities, setCalcQuantities] = useState<Record<string, number>>({});
-  const [calcSelectedRecurring, setCalcSelectedRecurring] = useState<string | null>(null);
-  const [calcCategory, setCalcCategory] = useState("all");
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set(["fp-hero"]));
-  const pricingRowRef = useRef<HTMLDivElement>(null);
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
-  // "loading" while the fetch is in flight; CanonicalPlan[] once resolved (may be empty)
-  const [apiPlansState, setApiPlansState] = useState<CanonicalPlan[] | "loading">("loading");
+  const packs = usePacks();
+  const [contactPrefill, setContactPrefill] = useState<ContactPrefill | null>(null);
+  const [packNotice, setPackNotice] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
 
-  useEffect(() => {
-    const base = (import.meta.env.BASE_URL ?? "").replace(/\/$/, "");
-    fetch(`${base}/api/billing/plans`)
-      .then(r => r.ok ? r.json() : [])
-      .then((plans: any[]) => {
-        setApiPlansState(
-          Array.isArray(plans) && plans.length > 0
-            ? plans.map(p => ({
-                id: String(p.id),
-                name: String(p.name),
-                priceMonthly: Number(p.price ?? 0),
-                priceAnnual: Number(p.priceAnnual ?? (p.price ?? 0) * 10),
-                currency: p.currency ?? "€",
-                featured: !!p.featured,
-                badge: p.badge ?? null,
-                features: Array.isArray(p.features)
-                  ? p.features.map((f: any) => typeof f === "string" ? { text: f, included: true } : f)
-                  : [],
-                cta: { label: p.ctaLabel ?? "Contactar →", style: p.ctaStyle ?? "ghost", href: p.ctaHref ?? "#fp-contact" },
-              }))
-            : []
-        );
-      })
-      .catch(() => setApiPlansState([]));
-  }, []);
-
-  // Priority: API plans (admin-managed) → CMS plans → CANONICAL_PLANS
-  const displayPlans = useMemo<CanonicalPlan[]>(() => {
-    // While loading, show CANONICAL_PLANS so nothing flickers
-    if (apiPlansState === "loading") return CANONICAL_PLANS;
-    // Admin has plans configured in billing admin → use those exclusively
-    if (apiPlansState.length > 0) return apiPlansState;
-    // API is empty → try CMS plans
-    const cmsRaw = content?.pricing?.plans;
-    if (Array.isArray(cmsRaw) && cmsRaw.length > 0) {
-      return cmsRaw.map((p: any) => {
-        const monthly = Number(p.price ?? p.priceMonthly ?? 0);
-        return {
-          id: String(p.id ?? p.name),
-          name: String(p.name),
-          priceMonthly: monthly,
-          priceAnnual: Number(p.priceAnnual ?? monthly * 10),
-          currency: p.currency ?? "€",
-          featured: !!p.featured,
-          badge: p.badge ?? null,
-          features: Array.isArray(p.features)
-            ? p.features.map((f: any) => typeof f === "string" ? { text: f, included: true } : f)
-            : [],
-          cta: { label: p.cta?.label ?? "Contactar →", style: p.cta?.style ?? "ghost", href: p.cta?.href ?? "#fp-contact" },
-        } as CanonicalPlan;
-      });
-    }
-    // Final fallback
-    return CANONICAL_PLANS;
-  }, [apiPlansState, content?.pricing?.plans]);
-  // Ahorro anual real (antes "17%" fijo): el mayor de los planes de pago.
-  const annualSavingPct = useMemo(() => Math.max(0, ...displayPlans
-    .filter(p => p.priceMonthly > 0 && p.priceAnnual > 0)
-    .map(p => Math.round((1 - p.priceAnnual / (p.priceMonthly * 12)) * 100))), [displayPlans]);
-  // Servicios mensuales reales (tienda_services con cobro mensual) para la calculadora.
-  const [monthlyServices, setMonthlyServices] = useState<{ id: number; name: string; icon?: string; short_desc?: string; price_eur: number | string }[]>([]);
-  useEffect(() => {
-    fetch(`${BASE_URL}/api/tienda/services`)
-      .then(r => (r.ok ? r.json() : []))
-      .then((rows: any[]) => setMonthlyServices((Array.isArray(rows) ? rows : [])
-        .filter(r => r.billing_interval === "month" && Number(r.price_eur) > 0)))
-      .catch(() => {});
-  }, []);
-
-  // Lo que comparten todos los planes de pago se muestra una vez, bajo las tarjetas.
-  const commonFeatures = useMemo(() => {
-    const paid = displayPlans.filter(p => p.priceMonthly > 0);
-    if (paid.length < 2) return [] as string[];
-    const sets = paid.map(p => new Set(p.features.filter(f => f.included).map(f => f.text)));
-    return [...sets[0]].filter(t => sets.every(set => set.has(t)));
-  }, [displayPlans]);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", storeUrl: "", niche: "", customNiche: "", revenue: "", socialMedia: "", message: "", extraInfo: "", productImageUrl: "", suppliers: "" });
   const [contactServices, setContactServices] = useState<string[]>([]);
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -420,7 +345,7 @@ export default function Landing() {
       demo: "fp-portfolio", "fp-demo": "fp-portfolio", resultados: "fp-portfolio", results: "fp-portfolio", "fp-results": "fp-portfolio", portfolio: "fp-portfolio", proyectos: "fp-projects", projects: "fp-projects",
       motores: "fp-services", engines: "fp-services", "fp-engines": "fp-services", servicios: "fp-services", services: "fp-services",
       plataformas: "fp-platforms", platforms: "fp-platforms",
-      calculadora: "fp-calculator", calculator: "fp-calculator",
+      calculadora: "fp-configurator", calculator: "fp-configurator", configurador: "fp-configurator", "fp-calculator": "fp-configurator",
       inicio: "fp-hero", home: "fp-hero",
     };
     if (alias[id]) return alias[id];
@@ -469,108 +394,9 @@ export default function Landing() {
     return () => obs.disconnect();
   }, [content]);
 
-  // ── WHEEL / KEYBOARD / TOUCH scroll entre secciones ──────────────────────
-  useEffect(() => {
-    if (!content) return;
-
-    const THROTTLE = 700; // ms entre saltos de sección
-    let lastNav = 0;
-
-    // Solo activar snap en desktop real: ancho > 900px Y alto > 600px.
-    // En landscape de phone (ej. Pixel ~915×412) el alto < 600, así que
-    // el scroll nativo funciona sin interferencia.
-    const isFullpageMode = () => window.innerWidth > 900 && window.innerHeight > 600;
-
-    // Comprueba si el elemento o algún ancestro es scrollable (excluyendo window/body)
-    const isInsideScrollable = (el: EventTarget | null): boolean => {
-      let node = el as HTMLElement | null;
-      while (node && node !== document.body) {
-        const st = window.getComputedStyle(node);
-        const oy = st.overflowY;
-        if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight + 2) return true;
-        node = node.parentElement;
-      }
-      return false;
-    };
-
-    const navigate = (delta: 1 | -1) => {
-      const now = Date.now();
-      if (now - lastNav < THROTTLE) return;
-      lastNav = now;
-      const next = Math.max(0, Math.min(currentRef.current + delta, FP_SECTION_IDS.length - 1));
-      if (next === currentRef.current) return;
-      goToSection(next);
-      setHashRobust(FP_SECTION_IDS[next]);
-    };
-
-    // Una sección más alta que la pantalla se recorre con el scroll NORMAL hasta agotarla en ese
-    // sentido; solo entonces el siguiente gesto salta de sección. Sin esto, la rueda se saltaría de
-    // golpe todas las tarjetas de Proyectos.
-    const NAV_H = 64;
-    const insideTallSection = (dir: 1 | -1): boolean => {
-      const vh = window.innerHeight;
-      for (const sec of document.querySelectorAll<HTMLElement>(".fp-section")) {
-        const r = sec.getBoundingClientRect();
-        if (r.height <= vh * 1.25) continue;                       // solo las largas
-        if (r.top > vh * 0.5 || r.bottom < vh * 0.5) continue;     // y solo si es la que se está viendo
-        if (dir > 0 && r.bottom > vh + 8) return true;
-        if (dir < 0 && r.top < NAV_H - 8) return true;
-      }
-      return false;
-    };
-
-    // Wheel — solo en desktop
-    const onWheel = (e: WheelEvent) => {
-      if (!isFullpageMode()) return;
-      if (isInsideScrollable(e.target)) return;
-      if (insideTallSection(e.deltaY > 0 ? 1 : -1)) return;
-      if (Math.abs(e.deltaY) < 30) return; // ignorar trackpad fino
-      const delta = e.deltaY > 0 ? 1 : -1;
-      const next = Math.max(0, Math.min(currentRef.current + delta, FP_SECTION_IDS.length - 1));
-      // En el límite (primera/última sección) dejamos el scroll nativo para
-      // que el usuario pueda llegar al footer sin que el fullpage lo bloquee.
-      if (next === currentRef.current) return;
-      e.preventDefault();
-      navigate(delta);
-    };
-
-    // Teclado — solo en desktop
-    const onKey = (e: KeyboardEvent) => {
-      if (!isFullpageMode()) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-      const down = e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ";
-      const up = e.key === "ArrowUp" || e.key === "PageUp";
-      if ((down && insideTallSection(1)) || (up && insideTallSection(-1))) return;   // scroll normal dentro de la sección larga
-      if (down) { e.preventDefault(); navigate(1); }
-      if (up)   { e.preventDefault(); navigate(-1); }
-    };
-
-    // Touch swipe — solo en desktop (tablets grandes > 900×600)
-    // En phone (portrait o landscape) el scroll nativo es libre.
-    let touchStartY = 0;
-    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
-    const onTouchEnd   = (e: TouchEvent) => {
-      if (!isFullpageMode()) return;
-      if (isInsideScrollable(e.target)) return;
-      const dy = touchStartY - e.changedTouches[0].clientY;
-      if (Math.abs(dy) < 50) return; // swipe mínimo de 50px
-      if (insideTallSection(dy > 0 ? 1 : -1)) return;
-      navigate(dy > 0 ? 1 : -1);
-    };
-
-    window.addEventListener("wheel",      onWheel,      { passive: false });
-    window.addEventListener("keydown",    onKey);
-    window.addEventListener("touchstart", onTouchStart, { passive: true  });
-    window.addEventListener("touchend",   onTouchEnd,   { passive: true  });
-
-    return () => {
-      window.removeEventListener("wheel",      onWheel);
-      window.removeEventListener("keydown",    onKey);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchend",   onTouchEnd);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content, goToSection, setHashRobust]);
+  // Scroll nativo del navegador: sin secuestrar rueda, teclado ni gestos (el salto de
+  // sección en sección chocaba con las tarjetas apiladas de Proyectos). La navegación
+  // superior y los botones siguen llevando a cada sección con scroll suave.
 
   useEffect(() => {
     if (!content) return;
@@ -669,39 +495,47 @@ export default function Landing() {
     return <SectionVideoBg src={src} />;
   };
 
-  const calcDefaults = { pill: "Calcula tu precio", headline: "¿Cuánto cuesta optimizar tu tienda?", headlineHighlight: "optimizar tu tienda", subheadline: "Selecciona los servicios que necesitas.", disclaimer: "* Precios orientativos.", resultLabel: "Precio estimado", oneTimeLabel: "Pago único", recurringLabel: "Suscripción mensual", ctaLabel: "Solicitar presupuesto →", emptyLabel: "Selecciona al menos un servicio", oneTimeServices: [] as { id: string; name: string; description: string; price: number; icon: string }[], recurringServices: [] as { id: string; name: string; description: string; price: number; period: string; icon: string }[] };
-  const calc = content.calculator ?? calcDefaults;
-  // Suscripciones de la calculadora = planes y servicios mensuales reales (los del
-  // CMS prometían "todo ilimitado", "auto-pilot 24/7" o un plan gratis que no existe).
-  const calcRecurring = [
-    ...displayPlans.filter(p => p.priceMonthly > 0).map(p => ({
-      id: `plan-${p.id}`, name: `Plan ${p.name}`, icon: "📦", price: p.priceMonthly, period: "/mes",
-      description: p.features.filter(f => f.included && !commonFeatures.includes(f.text)).map(f => f.text).join(" · "),
-    })),
-    ...monthlyServices.map(s => ({
-      id: `svc-${s.id}`, name: s.name, icon: s.icon || "⚡", price: Number(s.price_eur), period: "/mes",
-      description: s.short_desc ?? "",
-    })),
-  ];
-  const calcOneTimeTotal = calc.oneTimeServices.reduce((sum, s) => sum + (Number(s.price) || 0) * (calcQuantities[s.id] || 0), 0);
-  const calcRecurringService = calcSelectedRecurring ? calcRecurring.find(s => s.id === calcSelectedRecurring) : null;
-  const calcRecurringTotal = calcRecurringService ? (Number(calcRecurringService.price) || 0) : 0;
-  const calcActiveServices = calc.oneTimeServices.filter(s => (calcQuantities[s.id] || 0) > 0);
+  /** Lleva al formulario de contacto con un mensaje ya escrito. */
+  const goToContactWith = (message: string) => {
+    setContactPrefill({ message, nonce: Date.now() });
+    goToSection(FP_SECTION_IDS.indexOf("fp-contact"));
+    setHashRobust("fp-contact");
+  };
 
-  const calcCategories: { key: string; label: string; icon: string; ids: string[] }[] = (calc as Record<string,unknown>).categories && Array.isArray((calc as Record<string,unknown>).categories) && ((calc as Record<string,unknown>).categories as unknown[]).length > 0
-    ? (calc as Record<string,unknown>).categories as { key: string; label: string; icon: string; ids: string[] }[]
-    : [
-    { key: "all", label: "Todos", icon: "🔥", ids: [] },
-    { key: "products", label: "Productos", icon: "📦", ids: ["calc-product-1", "calc-redesign-1", "calc-redesign-partial", "calc-images-product", "calc-seo-product"] },
-    { key: "packs", label: "Packs", icon: "🎁", ids: ["calc-pack-5", "calc-pack-10", "calc-pack-20", "calc-pack-30", "calc-images-30", "calc-photoshoot"] },
-    { key: "design", label: "Diseño", icon: "🎨", ids: ["calc-theme-css", "calc-theme-section", "calc-homepage", "calc-product-page", "calc-responsive", "calc-brand-kit", "calc-brand-guide", "calc-lab-web"] },
-    { key: "seo", label: "SEO", icon: "🔍", ids: ["calc-seo-full", "calc-blog-5"] },
-    { key: "reports", label: "Informes", icon: "📊", ids: ["calc-audit", "calc-pricing-report", "calc-competitor", "calc-projection", "calc-consistency", "calc-ab-testing"] },
-    { key: "tools", label: "Herramientas", icon: "🛠️", ids: ["calc-generator", "calc-inventory", "calc-email-setup", "calc-supplier", "calc-session", "calc-posts-30", "calc-app-install"] },
-  ];
-  const filteredOneTimeServices = calcCategory === "all"
-    ? calc.oneTimeServices
-    : calc.oneTimeServices.filter(s => calcCategories.find(c => c.key === calcCategory)?.ids.includes(s.id));
+  /**
+   * Elegir un pack: un cliente con sesión paga en Stripe; un visitante nos deja sus datos
+   * (las cuentas se crean al dar de alta el proyecto) con el pack ya escrito en el mensaje.
+   */
+  const checkoutPack = async (planId: string, annual: boolean): Promise<boolean> => {
+    setPackNotice(null);
+    try {
+      const r = await fetch(`${BASE_URL}/api/billing/checkout`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId, interval: annual ? "year" : "month", returnPath: "/client/tienda" }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.url) { window.location.assign(d.url); return true; }
+      setPackNotice(d.error ?? "No se pudo abrir el pago. Escríbenos y lo activamos.");
+    } catch {
+      setPackNotice("No se pudo abrir el pago. Escríbenos y lo activamos.");
+    }
+    return false;
+  };
+
+  const choosePack = (plan: PackPlan, platform: PlatformPacks, annual: boolean) => {
+    if (user?.role === "client") { void checkoutPack(plan.id, annual); return; }
+    goToContactWith(`Quiero el pack ${plan.name} de ${platform.label} (${annual ? "anual" : "mensual"}).`);
+  };
+
+  const quotePack = (platform: PlatformPacks) => {
+    goToContactWith(`Quiero un presupuesto a medida (${platform.label}).`);
+  };
+
+  const submitConfiguration = (r: ConfiguratorResult) => {
+    const onlyPack = r.plan && !r.custom && r.services.length === 0;
+    if (user?.role === "client" && onlyPack && r.plan) { void checkoutPack(r.plan.id, r.annual); return; }
+    goToContactWith(r.summary);
+  };
 
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
@@ -736,6 +570,7 @@ export default function Landing() {
           ))}
         </ul>
         <div className="l-nav-ctas">
+          <Link href="/tienda" className="l-btn-ghost lxk-nav-shop">Tienda</Link>
           {isAdmin ? (
             <Link href="/admin/clients" className="l-btn-gold">{content.adminBackLabel ?? "← Volver al panel"}</Link>
           ) : (
@@ -839,7 +674,7 @@ export default function Landing() {
             </div>
           </div>
 
-          <MagnetStoreButton />
+          <MagnetInstagramButton />
 
           <div className="fp-scroll-hint">
             <div className="fp-scroll-hint-text">Desliza para explorar</div>
@@ -921,10 +756,7 @@ export default function Landing() {
             </div>
             {/* Las tarjetas se animan solas al entrar (el componente lleva su propio disparador de scroll). */}
             <ProjectsShowcase onContact={(project) => {
-              if (project) setContactForm(f => (f.message ? f : { ...f, message: `Me interesa un proyecto como «${project.title}». ` }));
-              const idx = FP_SECTION_IDS.indexOf("fp-contact");
-              goToSection(idx);
-              setHashRobust("fp-contact");
+              goToContactWith(project ? `Me interesa un proyecto como «${project.title}».` : "");
             }} />
           </div>
         </section>
@@ -1012,203 +844,40 @@ export default function Landing() {
         </section>
 
         {/* ══════════════════════════════════════
-            SECTION 05 — PRICING (3 cards)
+            SECTION 05 — PRECIOS: 4 packs por plataforma
         ══════════════════════════════════════ */}
         <section className="fp-section fp-section-dark" id="fp-pricing" data-nav="Precios" data-effect={eff("pricing")}>
           <div className="fp-bg-solid">{videoBg("pricing")}</div>
           <div className="fp-content lx-wrap lx-pricing">
             <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`}>
               <div className="l-pill">Precios</div>
-              <h2 className="l-h2">Un plan por tienda, <em>sin permanencia.</em></h2>
-              <p className="l-sub lx-sub">Los planes se diferencian solo en cuántos productos e imágenes trabajamos cada mes. Precios sin IVA.</p>
+              <h2 className="l-h2">Un pack para tu plataforma, <em>sin permanencia.</em></h2>
+              <p className="l-sub lx-sub">Elige dónde vende tu negocio y mira qué hacemos cada mes: productos, imágenes, auditorías SEO, velocidad, informes y competencia. Precios sin IVA.</p>
             </div>
-            <div className="lx-billing" role="group" aria-label="Periodo de facturación">
-              <button type="button" className={billingPeriod === "monthly" ? "on" : ""} onClick={() => setBillingPeriod("monthly")}>Mensual</button>
-              <button type="button" className={billingPeriod === "annual" ? "on" : ""} onClick={() => setBillingPeriod("annual")}>
-                Anual{annualSavingPct > 0 ? <span>−{annualSavingPct}%</span> : null}
-              </button>
+            <div className={!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"} style={{ animationDelay: "0.1s" }}>
+              <PackPricing data={packs.data} error={packs.error} onChoose={choosePack} onQuote={quotePack} />
+              {packNotice && <p className="lxk-error" role="alert">{packNotice}</p>}
             </div>
-            <div ref={pricingRowRef} className={`lx-plans ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-              {displayPlans.map(plan => {
-                const quote = !(plan.priceMonthly > 0);
-                const own = plan.features.filter(f => f.included && !commonFeatures.includes(f.text));
-                const annualMonthly = plan.priceAnnual > 0 ? Math.round((plan.priceAnnual / 12) * 100) / 100 : 0;
-                return (
-                  <article key={plan.id} className={`lx-plan${plan.featured ? " lx-plan-featured" : ""}`}>
-                    {plan.badge && <div className="lx-plan-badge">{plan.badge}</div>}
-                    <h3 className="lx-plan-name">{plan.name}</h3>
-                    <div className="lx-plan-price">
-                      {quote ? <span className="lx-plan-amount lx-plan-quote">A medida</span> : billingPeriod === "monthly" ? (
-                        <><span className="lx-plan-amount">{plan.priceMonthly}{plan.currency}</span><span className="lx-plan-per">/mes + IVA</span></>
-                      ) : (
-                        <><span className="lx-plan-amount">{annualMonthly.toLocaleString("es-ES")}{plan.currency}</span><span className="lx-plan-per">/mes + IVA</span></>
-                      )}
-                    </div>
-                    <div className="lx-plan-note">
-                      {quote ? "Presupuesto cerrado según alcance" : billingPeriod === "monthly" ? "Cobro mensual" : `${plan.priceAnnual.toLocaleString("es-ES")}${plan.currency} al año`}
-                    </div>
-                    <ul className="lx-plan-feats">
-                      {own.map(f => <li key={f.text}>{f.text}</li>)}
-                    </ul>
-                    <a
-                      href="#fp-contact"
-                      className={`lx-plan-cta${plan.featured ? " gold" : ""}`}
-                      onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); }}
-                    >{quote ? "Pedir presupuesto" : "Empezar"}</a>
-                  </article>
-                );
-              })}
-            </div>
-            {commonFeatures.length > 0 && (
-              <div className={`lx-common ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.2s" }}>
-                <span className="lx-common-title">Incluido en todos los planes</span>
-                <ul>{commonFeatures.map(f => <li key={f}>{f}</li>)}</ul>
-              </div>
-            )}
           </div>
         </section>
 
         {/* ══════════════════════════════════════
-            SECTION 06 — CALCULADORA DE PRECIOS
+            SECTION 06 — CONFIGURADOR
         ══════════════════════════════════════ */}
-        <section className="fp-section" id="fp-calculator" data-nav="Calculadora" data-effect={eff("calculator")}>
+        <section className="fp-section" id="fp-configurator" data-nav="Configurador" data-effect={eff("calculator")}>
           <div className="fp-bg">
             {videoBg("calculator")}
             <div className="l-hero-grid" style={{ opacity: 0.2 }}></div>
           </div>
-          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.75)" }}></div>
-          <div className="fp-content" style={{ maxWidth: 1100, padding: "0 24px" }}>
-            <div className={`fp-section-header ${!isAnimated("fp-calculator") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0s" }}>
-              <div className="l-pill" {...cmsProps("calculator.pill")}>{calc.pill}</div>
-              <h2 className="l-h2" onClick={cmsClick("calculator.headline")} {...cmsData("calculator.headline")}>
-                {calc.headlineHighlight && String(calc.headline ?? "").includes(calc.headlineHighlight)
-                  ? String(calc.headline ?? "").split(calc.headlineHighlight).flatMap((p, i, arr) =>
-                      i < arr.length - 1 ? [p, <em key={i}>{calc.headlineHighlight}</em>] : [p]
-                    )
-                  : (calc.headline ?? "")}
-              </h2>
-              <p className="l-sub" {...cmsProps("calculator.subheadline")}>{calc.subheadline}</p>
+          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.8)" }}></div>
+          <div className="fp-content lx-wrap">
+            <div className={`fp-section-header ${!isAnimated("fp-configurator") ? "fp-animate" : "fp-animated"}`}>
+              <div className="l-pill">Configurador</div>
+              <h2 className="l-h2">Arma tu servicio <em>en tres pasos.</em></h2>
+              <p className="l-sub lx-sub">Plataforma, pack y extras. Ves el total al momento y nos lo envías, o lo pagas si ya eres cliente.</p>
             </div>
-
-            <div className={`fp-calc-grid ${!isAnimated("fp-calculator") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-              <div className="fp-calc-services">
-                {calc.oneTimeServices.length > 0 && (
-                <div className="fp-calc-group">
-                  <h3 className="fp-calc-group-title">{calc.oneTimeLabel}</h3>
-                  <div className="fp-calc-tabs">
-                    {calcCategories.map(cat => (
-                      <button key={cat.key} type="button" className={`fp-calc-tab${calcCategory === cat.key ? " active" : ""}`}
-                        onClick={() => setCalcCategory(cat.key)}>
-                        <span>{cat.icon}</span> {cat.label}
-                        {cat.key !== "all" && (() => {
-                          const count = cat.ids.reduce((n, id) => n + (calcQuantities[id] || 0), 0);
-                          return count > 0 ? <span className="fp-calc-tab-badge">{count}</span> : null;
-                        })()}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="fp-calc-items">
-                    {filteredOneTimeServices.map(s => {
-                      const qty = calcQuantities[s.id] || 0;
-                      return (
-                        <div key={s.id} className={`fp-calc-item${qty > 0 ? " selected" : ""}`}>
-                          <span className="fp-calc-item-icon">{s.icon}</span>
-                          <div className="fp-calc-item-info">
-                            <span className="fp-calc-item-name">{s.name}</span>
-                            <span className="fp-calc-item-desc">{s.description}</span>
-                          </div>
-                          <span className="fp-calc-item-price">{s.price}€<small>/ud</small></span>
-                          <div className="fp-calc-qty">
-                            <button type="button" className="fp-calc-qty-btn" onClick={() => setCalcQuantities(prev => {
-                              const n = Math.max(0, (prev[s.id] || 0) - 1);
-                              return { ...prev, [s.id]: n };
-                            })}>−</button>
-                            <span className="fp-calc-qty-val">{qty}</span>
-                            <button type="button" className="fp-calc-qty-btn" onClick={() => setCalcQuantities(prev => ({
-                              ...prev, [s.id]: Math.min(50, (prev[s.id] || 0) + 1)
-                            }))}>+</button>
-                          </div>
-                          {qty > 0 && <span className="fp-calc-line-total">{(Number(s.price) || 0) * qty}€</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                )}
-
-                <div className="fp-calc-group">
-                  <h3 className="fp-calc-group-title">{calc.recurringLabel}</h3>
-                  <div className="fp-calc-items">
-                    {calcRecurring.map(s => {
-                      const selected = calcSelectedRecurring === s.id;
-                      return (
-                        <button key={s.id} type="button" className={`fp-calc-item fp-calc-item-recurring${selected ? " selected" : ""}`} onClick={() => {
-                          setCalcSelectedRecurring(prev => prev === s.id ? null : s.id);
-                        }}>
-                          <span className="fp-calc-item-icon">{s.icon}</span>
-                          <div className="fp-calc-item-info">
-                            <span className="fp-calc-item-name">{s.name}</span>
-                            <span className="fp-calc-item-desc">{s.description}</span>
-                          </div>
-                          <span className="fp-calc-item-price">{s.price.toLocaleString("es-ES")}€<small>{s.period}</small></span>
-                          <span className="fp-calc-item-check">{selected ? "✓" : "○"}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="fp-calc-summary">
-                <div className="fp-calc-summary-inner">
-                  <h3 className="fp-calc-summary-title">{calc.resultLabel}</h3>
-                  {calcOneTimeTotal === 0 && !calcSelectedRecurring ? (
-                    <p className="fp-calc-empty">{calc.emptyLabel}</p>
-                  ) : (
-                    <>
-                      {calcActiveServices.length > 0 && (
-                        <div className="fp-calc-breakdown">
-                          <div className="fp-calc-breakdown-header">
-                            <span>Servicio</span><span>Cant.</span><span>Subtotal</span>
-                          </div>
-                          {calcActiveServices.map(s => (
-                            <div key={s.id} className="fp-calc-breakdown-row">
-                              <span className="fp-calc-breakdown-name">{s.icon} {s.name}</span>
-                              <span className="fp-calc-breakdown-qty">×{calcQuantities[s.id]}</span>
-                              <span className="fp-calc-breakdown-price">{(Number(s.price) || 0) * (calcQuantities[s.id] || 0)}€</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {calcOneTimeTotal > 0 && (
-                        <div className="fp-calc-total-row">
-                          <span className="fp-calc-total-label">{calc.oneTimeLabel}</span>
-                          <span className="fp-calc-total-value">{calcOneTimeTotal}€</span>
-                        </div>
-                      )}
-                      {calcRecurringTotal > 0 && (
-                        <div className="fp-calc-total-row fp-calc-total-recurring">
-                          <span className="fp-calc-total-label">{calc.recurringLabel}</span>
-                          <span className="fp-calc-total-value">{calcRecurringTotal}€<small>/mes</small></span>
-                        </div>
-                      )}
-                      <div className="fp-calc-divider" />
-                      <div className="fp-calc-total-row fp-calc-grand-total">
-                        <span className="fp-calc-total-label">Total</span>
-                        <div style={{ textAlign: "right" }}>
-                          {calcOneTimeTotal > 0 && <div className="fp-calc-grand-value">{calcOneTimeTotal}€ <small>pago único</small></div>}
-                          {calcRecurringTotal > 0 && <div className="fp-calc-grand-value fp-calc-grand-recurring">+ {calcRecurringTotal}€<small>/mes</small></div>}
-                        </div>
-                      </div>
-                      {calcActiveServices.length >= 3 && (
-                        <div className="fp-calc-discount-hint">💡 ¿Necesitas más de 3 servicios? Solicita presupuesto personalizado con descuento por volumen.</div>
-                      )}
-                    </>
-                  )}
-                  <a href="#fp-contact" className="l-btn-gold fp-calc-cta" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); }}>{calc.ctaLabel}</a>
-                  <p className="fp-calc-disclaimer">{calc.disclaimer}{/IVA/.test(calc.disclaimer) ? "" : " Precios sin IVA."}</p>
-                </div>
-              </div>
+            <div className={!isAnimated("fp-configurator") ? "fp-animate" : "fp-animated"} style={{ animationDelay: "0.1s" }}>
+              <PackConfigurator data={packs.data} error={packs.error} loggedInClient={user?.role === "client"} onSubmit={submitConfiguration} />
             </div>
           </div>
         </section>
@@ -1227,7 +896,7 @@ export default function Landing() {
           <div className="fp-content fp-contact-visme" style={{ position: "absolute", inset: 0, maxWidth: "none", padding: 0, overflow: "hidden auto" }}>
             {/* ── Video + form: fixed full-section height, footer scrolls below ── */}
             <div className="fp-contact-visme-wrapper" style={{ position: "relative", height: "calc(100dvh - 64px)", flexShrink: 0, overflow: "hidden" }}>
-              <VismeFormHero isActive={isAnimated("fp-contact")} />
+              <VismeFormHero isActive={isAnimated("fp-contact")} prefill={contactPrefill} />
             </div>
 
             {/* ── Legacy form (preserved, hidden) ── */}

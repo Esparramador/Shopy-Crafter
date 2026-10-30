@@ -17,7 +17,7 @@ import { sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { saveMedia, getMedia, deleteMedia, mediaIdFromUrl } from "../lib/media-store.js";
-import { SEED, SEED_VERSION, GENERIC_V1 } from "./portfolio-seed.js";
+import { SEED, SEED_VERSION, GENERIC_V1, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS } from "./portfolio-seed.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 12 } });
@@ -66,6 +66,7 @@ function ensureTable(): Promise<void> {
     await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS variants JSONB NOT NULL DEFAULT '[]'::jsonb`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS portfolio_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
     await applySeed();
+    await applyPatches();
   })().catch(err => { ready = null; throw err; });
   return ready;
 }
@@ -112,6 +113,77 @@ async function applySeed(): Promise<void> {
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
   `);
   logger.info({ version: SEED_VERSION }, "portfolio: lista de proyectos aplicada");
+}
+
+function renamed(text: string): string {
+  return PATCH_RENAMES.reduce((t, [from, to]) => t.split(from).join(to), text);
+}
+
+/** Recorre un valor JSON y aplica los renombres a todos sus textos. */
+function renamedDeep<T>(v: T): T {
+  if (typeof v === "string") return renamed(v) as T;
+  if (Array.isArray(v)) return v.map(renamedDeep) as T;
+  if (v && typeof v === "object") {
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, renamedDeep(x)])) as T;
+  }
+  return v;
+}
+
+/**
+ * Correcciones de PATCH_PREVIOUS sobre filas existentes, una vez por PATCH_VERSION.
+ * No crea filas: un proyecto borrado desde el panel sigue borrado.
+ */
+async function applyPatches(): Promise<void> {
+  const meta = await db.execute(sql`SELECT value FROM portfolio_meta WHERE key = 'patch_version'`);
+  const applied = Number((meta.rows[0] as { value?: string } | undefined)?.value ?? 0);
+  if (applied >= PATCH_VERSION) return;
+  for (const slug of PATCH_NEW_SLUGS) {
+    const p = SEED.find(x => x.slug === slug);
+    if (!p) continue;
+    await db.execute(sql`
+      INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, variants, sort_order)
+      VALUES (${p.slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${JSON.stringify(p.tech)}::jsonb,
+              ${JSON.stringify(p.features)}::jsonb, ${p.status}, ${p.liveUrl}, ${p.appUrl}, ${JSON.stringify(p.images)}::jsonb,
+              ${JSON.stringify(p.variants)}::jsonb, ${p.sortOrder})
+      ON CONFLICT (slug) DO NOTHING
+    `);
+  }
+  for (const [slug, prev] of Object.entries(PATCH_PREVIOUS)) {
+    const seed = SEED.find(p => p.slug === slug);
+    if (!seed) continue;
+    const cur = await db.execute(sql`SELECT id, title, client, summary, description, status, images, variants FROM portfolio_projects WHERE slug = ${slug}`);
+    const row = cur.rows[0] as Record<string, unknown> | undefined;
+    if (!row) continue;
+
+    const next = (field: "title" | "client" | "summary" | "description" | "status"): string => {
+      const now = String(row[field] ?? "");
+      const before = prev.fields[field];
+      return before !== undefined && now === before ? String(seed[field] ?? "") : renamed(now);
+    };
+
+    const rowVariants = Array.isArray(row.variants) ? (row.variants as PortfolioVariant[]) : [];
+    const variants = rowVariants.map(v => {
+      const old = prev.variants[v.name];
+      if (old && v.description === old.description) {
+        const fresh = seed.variants.find(s => s.name === old.newName);
+        if (fresh) return { ...fresh, images: Array.isArray(v.images) && v.images.length > 0 ? renamedDeep(v.images) : fresh.images };
+      }
+      return renamedDeep(v);
+    });
+    const images = renamedDeep(Array.isArray(row.images) ? row.images : []);
+
+    await db.execute(sql`
+      UPDATE portfolio_projects SET title = ${next("title")}, client = ${next("client")}, summary = ${next("summary")},
+        description = ${next("description")}, status = ${next("status")},
+        images = ${JSON.stringify(images)}::jsonb, variants = ${JSON.stringify(variants)}::jsonb, updated_at = NOW()
+      WHERE id = ${row.id as number}
+    `);
+  }
+  await db.execute(sql`
+    INSERT INTO portfolio_meta (key, value) VALUES ('patch_version', ${String(PATCH_VERSION)})
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+  `);
+  logger.info({ version: PATCH_VERSION }, "portfolio: correcciones aplicadas");
 }
 
 function cleanList(v: unknown, maxItems: number, maxLen: number): string[] {
