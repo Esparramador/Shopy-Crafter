@@ -866,7 +866,7 @@ export default function Contacto() {
                   <li><a href="/#fp-engines">Motores IA</a></li>
                   <li><a href="/#fp-pricing">Precios</a></li>
                   <li><a href="/#fp-demo">Demo</a></li>
-                  <li><a href="/#fp-calculator">Calculadora</a></li>
+                  <li><a href="/#fp-configurator">Configurador</a></li>
                 </ul>
               </div>
               <div>

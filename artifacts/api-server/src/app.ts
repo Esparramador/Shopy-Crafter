@@ -165,6 +165,26 @@ const publicAiDailyLimiter = rateLimit({
   skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
 });
 
+// Tienda: subidas y pagos sin cuenta, por IP.
+const shopUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new PgRateLimitStore("shop_upload"),
+  message: { error: "Has subido muchos archivos seguidos. Espera un poco o escríbenos.", code: "RATE_LIMITED" },
+  skip: (req) => req.method !== "POST" || process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
+});
+const shopCheckoutLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new PgRateLimitStore("shop_checkout"),
+  message: { error: "Demasiados intentos de pago seguidos. Espera un poco o escríbenos.", code: "RATE_LIMITED" },
+  skip: (req) => req.method !== "POST" || process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
+});
+
 startRateLimitCleanup();
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
@@ -307,6 +327,8 @@ app.use("/api/public/landing-chat", publicAiLimiter);
 app.use("/api/public/landing-chat", publicAiDailyLimiter);
 app.use("/api/voice/public-call-url", publicVoiceLimiter);
 app.use("/api/contact", contactLimiter);
+app.use("/api/shop/uploads", shopUploadLimiter);
+app.use("/api/shop/checkout", shopCheckoutLimiter);
 // Tarjetas públicas por id secuencial: limita la enumeración masiva (un QR
 // real se abre unas pocas veces por minuto desde una misma IP).
 app.use("/api/public/qr", publicQrLimiter);

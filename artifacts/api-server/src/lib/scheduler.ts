@@ -1346,6 +1346,9 @@ export function registerCronJobs() {
   // 8am diario — Compara gasto mensual vs umbral y envía email si lo supera
   cron.schedule("0 8 * * *", () => { runAiCostAlertCheck().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
 
+  // 9:15 diario — Trabajo de los packs: PageSpeed, informes al portal y avisos de Stripe.
+  cron.schedule("15 9 * * *", () => { runPackMonitoringJob().catch(e => logger.error({ job: "pack-monitoring" }, String(e))); }, { timezone: "Europe/Madrid" });
+
   // 4:30am diario — AI Model Intelligence: investiga nuevos modelos en todos los proveedores
   cron.schedule("30 4 * * *", () => {
     import("./ai-model-intelligence.js")
@@ -1354,7 +1357,7 @@ export function registerCronJobs() {
   }, { timezone: "Europe/Madrid" });
 
   log("scheduler", [
-    "✅ 15 jobs registrados:",
+    "✅ 16 jobs registrados:",
     "  🔑 Tokens Shopify    → cada 20h (renovación con 4h margen)",
     "  ⚡ Micro-learning    → cada 3h  (2 dominios × 3 insights)",
     "  🧠 Consolidación     → cada 6h  (insights → memorias)",
@@ -1367,6 +1370,7 @@ export function registerCronJobs() {
     "  📦 Inventario        → 7am     (sync + alertas stock)",
     "  🔔 Alerta presupuesto → 8am    (coste IA vs umbral mensual)",
     "  🤖 AI Model Research → 4:30am (investiga + actualiza catálogo modelos)",
+    "  📈 Packs             → 9:15am  (PageSpeed, informes y avisos de Stripe)",
     "  🚀 Mega-synthesis    → Dom 0am (síntesis estratégica semanal)",
     "  🔄 Retroanálisis     → Dom 3am (re-evaluar insights antiguos)",
     "  📊 Auto-evaluación   → 1º/mes  (informe mensual de rendimiento)",
@@ -1399,6 +1403,13 @@ export function isJobRunning(name: string): boolean {
 export const runRevenueSnapshots = singleFlight("runRevenueSnapshots", runRevenueSnapshotsImpl);
 export const runInventorySync = singleFlight("runInventorySync", runInventorySyncImpl);
 export const runCompetitorScans = singleFlight("runCompetitorScans", runCompetitorScansImpl);
+/** Trabajo de los packs (PageSpeed, informes y avisos de Stripe), una pasada a la vez. */
+export const runPackMonitoringJob = singleFlight("runPackMonitoring", async () => {
+  const { runPackMonitoring } = await import("./pack-monitoring.js");
+  const r = await runPackMonitoring();
+  log("pack-monitoring", `✅ ${r.actions} trabajos en ${r.projects} proyectos con pack`);
+  return r;
+});
 export const runOmnicoreRealDataIntegration = singleFlight("runOmnicoreRealDataIntegration", runOmnicoreRealDataIntegrationImpl);
 export const runOmniCoreMicroLearning = singleFlight("runOmniCoreMicroLearning", runOmniCoreMicroLearningImpl);
 export const runOmniCoreMemoryConsolidation = singleFlight("runOmniCoreMemoryConsolidation", runOmniCoreMemoryConsolidationImpl);

@@ -87,7 +87,10 @@ const btnBack: React.CSSProperties = {
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function VismeFormHero({ isActive = false }: { isActive?: boolean }) {
+/** Texto que otra sección quiere dejar escrito en el formulario (cambia `nonce` para aplicarlo). */
+export interface ContactPrefill { message: string; nonce: number }
+
+export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolean; prefill?: ContactPrefill | null }) {
 
   // Form
   const [step,     setStep]    = useState(0);
@@ -103,6 +106,13 @@ export function VismeFormHero({ isActive = false }: { isActive?: boolean }) {
   const [buildPhase, setBuildPhase] = useState(0);   // 0..5
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef  = useRef<HTMLDivElement>(null);
+
+  // Mensaje que llega de Proyectos o del configurador: se añade sin borrar lo escrito.
+  useEffect(() => {
+    if (!prefill?.message) return;
+    setForm(f => (f.message.includes(prefill.message) ? f : { ...f, message: f.message ? `${f.message}\n${prefill.message}` : prefill.message }));
+    setStatus(st => (st === "sent" ? "idle" : st));
+  }, [prefill?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // isActive prop — play/pause based on whether the landing section is active
   useEffect(() => {

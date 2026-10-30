@@ -6,6 +6,7 @@ import { logger } from "../lib/logger.js";
 import { SERVICE_CATALOG, LEGACY_SEEDED_SERVICE_NAMES, priceDisplay } from "../lib/service-catalog.js";
 import { getStripe, createServiceCheckout, type SellableService } from "../lib/stripe-billing.js";
 import { publicAppUrl } from "../lib/account-tokens.js";
+import { catalogPlan, planPlatforms, PACK_PLATFORMS } from "../lib/plan-catalog.js";
 
 const router = Router();
 
@@ -98,7 +99,7 @@ async function ensureTiendaTables(): Promise<void> {
 ensureTiendaTables();
 
 // ── PUBLIC: GET /tienda/plans ─────────────────────────────────────────────────
-router.get("/tienda/plans", async (_req: Request, res: Response) => {
+router.get("/tienda/plans", async (req: Request, res: Response) => {
   try {
     const db = await getDb();
     const result = await db.execute(sql`
@@ -106,10 +107,21 @@ router.get("/tienda/plans", async (_req: Request, res: Response) => {
              cta_label, cta_style, cta_href, shopify_checkout_url,
              stores_limit, images_included, sort_order
       FROM billing_plans
-      WHERE visible = TRUE
+      WHERE visible = TRUE AND user_id IS NULL
       ORDER BY sort_order ASC
     `);
-    res.json(result.rows);
+    // Un cliente solo ve los packs de su plataforma (tienda o Stripe) y «A medida».
+    const clientId = (req.session as { clientId?: string | number | null } | undefined)?.clientId;
+    let platform: string | null = null;
+    if (clientId) {
+      const pr = await db.execute(sql`SELECT platform_type FROM projects WHERE id::text = ${String(clientId)} LIMIT 1`);
+      platform = (pr.rows[0] as { platform_type?: string } | undefined)?.platform_type ?? null;
+    }
+    const rows = (result.rows as Array<Record<string, unknown>>).map(r => {
+      const cat = catalogPlan(String(r.id));
+      return { ...r, platforms: cat ? planPlatforms(cat) : [...PACK_PLATFORMS] };
+    });
+    res.json(platform ? rows.filter(r => (r.platforms as string[]).includes(platform === "stripe" ? "stripe" : "shopify")) : rows);
   } catch (err: any) {
     logger.error({ err }, "GET /tienda/plans error");
     res.status(500).json({ error: err.message });

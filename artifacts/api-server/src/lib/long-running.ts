@@ -95,6 +95,8 @@ function _applyLongRunning(res: Response): LongRunningHandle {
   (res as any).status = function patchedStatus(code: number) {
     if (res.headersSent) {
       lateStatus = code;
+      // Visible para otros middlewares (p. ej. devolver el cupo del pack si acaba en error).
+      res.locals.lateStatus = code;
       return res;
     }
     return originalStatus(code);

@@ -16,6 +16,7 @@ import { lenientArray, looseString, optionalLooseNumber, parseResearchJson } fro
 import net from "net";
 import { enableLongRunning } from "../lib/long-running.js";
 import { getReportShell } from "./exports.js";
+import { packQuotaGuard } from "../lib/pack-quotas.js";
 
 const router = Router();
 
@@ -142,7 +143,7 @@ router.get("/competitors/snapshots", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/competitors/scan", async (req, res): Promise<void> => {
+router.post("/competitors/scan", packQuotaGuard("competitor_scans", "body"), async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
@@ -299,7 +300,7 @@ router.post("/competitors/alerts/:id/dismiss", async (req, res): Promise<void> =
   }
 });
 
-router.post("/competitors/auto-discover", async (req, res): Promise<void> => {
+router.post("/competitors/auto-discover", packQuotaGuard("competitor_scans", "body"), async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
@@ -760,7 +761,7 @@ DEVUELVE SOLO un JSON válido:
 // ONE-CLICK: discovers new competitors via Google Search (3 randomised angles)
 // + scrapes + analyses each in parallel + extracts feature gaps.
 // Never repeats the same search — angles are randomised on every call.
-router.post("/competitors/auto-analyze", async (req, res): Promise<void> => {
+router.post("/competitors/auto-analyze", packQuotaGuard("competitor_scans", "body"), async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     const { projectId } = req.body;

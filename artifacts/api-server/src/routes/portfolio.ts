@@ -17,7 +17,7 @@ import { sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { saveMedia, getMedia, deleteMedia, mediaIdFromUrl } from "../lib/media-store.js";
-import { SEED, SEED_VERSION, GENERIC_V1, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS } from "./portfolio-seed.js";
+import { SEED, SEED_VERSION, GENERIC_V1, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS } from "./portfolio-seed.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 12 } });
@@ -137,6 +137,17 @@ async function applyPatches(): Promise<void> {
   const meta = await db.execute(sql`SELECT value FROM portfolio_meta WHERE key = 'patch_version'`);
   const applied = Number((meta.rows[0] as { value?: string } | undefined)?.value ?? 0);
   if (applied >= PATCH_VERSION) return;
+  for (const slug of PATCH_NEW_SLUGS) {
+    const p = SEED.find(x => x.slug === slug);
+    if (!p) continue;
+    await db.execute(sql`
+      INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, variants, sort_order)
+      VALUES (${p.slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${JSON.stringify(p.tech)}::jsonb,
+              ${JSON.stringify(p.features)}::jsonb, ${p.status}, ${p.liveUrl}, ${p.appUrl}, ${JSON.stringify(p.images)}::jsonb,
+              ${JSON.stringify(p.variants)}::jsonb, ${p.sortOrder})
+      ON CONFLICT (slug) DO NOTHING
+    `);
+  }
   for (const [slug, prev] of Object.entries(PATCH_PREVIOUS)) {
     const seed = SEED.find(p => p.slug === slug);
     if (!seed) continue;

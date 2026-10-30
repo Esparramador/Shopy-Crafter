@@ -351,7 +351,7 @@ export declare const projectsTable: import("drizzle-orm/pg-core").PgTableWithCol
             tableName: "projects";
             dataType: "string";
             columnType: "PgText";
-            data: "starter" | "admin" | "emprendedor" | "agency_pro" | "enterprise" | "trial";
+            data: "starter" | "admin" | "emprendedor" | "agency_pro" | "enterprise" | "stripe_starter" | "stripe_growth" | "stripe_enterprise" | "trial";
             driverParam: string;
             notNull: true;
             hasDefault: true;
@@ -363,7 +363,7 @@ export declare const projectsTable: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {
-            $type: "starter" | "admin" | "emprendedor" | "agency_pro" | "enterprise" | "trial";
+            $type: "starter" | "admin" | "emprendedor" | "agency_pro" | "enterprise" | "stripe_starter" | "stripe_growth" | "stripe_enterprise" | "trial";
         }>;
         productsUsedThisMonth: import("drizzle-orm/pg-core").PgColumn<{
             name: "products_used_this_month";
@@ -900,5 +900,5 @@ export declare const insertProjectSchema: z.ZodObject<{
 }>;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projectsTable.$inferSelect;
-export type PlanType = "admin" | "emprendedor" | "starter" | "agency_pro" | "enterprise" | "trial";
+export type PlanType = "admin" | "emprendedor" | "starter" | "agency_pro" | "enterprise" | "stripe_starter" | "stripe_growth" | "stripe_enterprise" | "trial";
 //# sourceMappingURL=projects.d.ts.map

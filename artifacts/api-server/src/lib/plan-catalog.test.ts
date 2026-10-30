@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@workspace/db", () => ({ db: {} }));
 vi.mock("@workspace/db/schema", () => ({ projectsTable: {}, planCreditPacksTable: {} }));
 
-const { PLAN_CATALOG, planFeatures } = await import("./plan-catalog");
+const { PLAN_CATALOG, SELLABLE_PLANS, planFeatures, plansForPlatform, quotaFor, PACK_PLATFORMS } = await import("./plan-catalog");
 const { PLAN_LIMITS } = await import("./plan-limits");
 
 describe("catálogo de planes", () => {
@@ -15,13 +15,40 @@ describe("catálogo de planes", () => {
     }
   });
 
-  it("el anual cobra 10 mensualidades y los precios suben con las cuotas", () => {
+  it("el anual cobra 10 mensualidades y, en cada plataforma, precio y cuotas suben con el pack", () => {
     for (const p of PLAN_CATALOG) expect(p.priceAnnual).toBe(p.priceMonthly * 10);
-    const sorted = [...PLAN_CATALOG].sort((a, b) => a.sortOrder - b.sortOrder);
-    for (let i = 1; i < sorted.length; i++) {
-      expect(sorted[i].priceMonthly).toBeGreaterThan(sorted[i - 1].priceMonthly);
-      expect(sorted[i].productsPerMonth).toBeGreaterThan(sorted[i - 1].productsPerMonth);
+    for (const platform of PACK_PLATFORMS) {
+      const packs = plansForPlatform(platform);
+      expect(packs).toHaveLength(3); // + «A medida» = 4 por plataforma
+      for (let i = 1; i < packs.length; i++) {
+        const a = packs[i - 1], b = packs[i];
+        expect(b.priceMonthly).toBeGreaterThan(a.priceMonthly);
+        if (a.family === "store" && b.family === "store") {
+          expect(b.productsPerMonth).toBeGreaterThan(a.productsPerMonth);
+          expect(b.quotas.seoAudits).toBeGreaterThanOrEqual(a.quotas.seoAudits);
+          expect(b.quotas.competitorAnalyses).toBeGreaterThan(a.quotas.competitorAnalyses);
+        }
+        if (a.family === "stripe" && b.family === "stripe") {
+          expect(b.quotas.invoices).toBeGreaterThan(a.quotas.invoices);
+          expect(b.quotas.coupons).toBeGreaterThan(a.quotas.coupons);
+        }
+      }
     }
+  });
+
+  it("Emprendedor ya no se vende pero conserva sus cuotas", () => {
+    expect(SELLABLE_PLANS.map(p => p.id)).not.toContain("emprendedor");
+    expect(PLAN_LIMITS.emprendedor.productsPerMonth).toBe(5);
+    expect(quotaFor("emprendedor", "seo_audits")).toBe(1);
+  });
+
+  it("cada métrica de cupo tiene tope en todos los packs (salvo admin)", () => {
+    for (const p of PLAN_CATALOG) {
+      for (const m of ["seo_audits", "competitor_scans", "ab_tests", "blog_posts", "stripe_invoices", "stripe_coupons", "stripe_subscriptions"] as const) {
+        expect(Number.isFinite(quotaFor(p.id, m))).toBe(true);
+      }
+    }
+    expect(quotaFor("admin", "seo_audits")).toBe(Infinity);
   });
 
   it("los textos solo prometen lo que el sistema aplica (sin SLA, API, white-label ni soporte 24/7)", () => {
@@ -36,11 +63,11 @@ describe("conocimiento del chatbot", () => {
   it("el bloque de precios usa los precios y cuotas del catálogo", async () => {
     const { buildPricingBlock, PLATFORM_PLANS } = await import("./platform-knowledge");
     const block = buildPricingBlock();
-    for (const p of PLAN_CATALOG) {
+    for (const p of SELLABLE_PLANS) {
       expect(block).toContain(`${p.name} (${p.priceMonthly}€/mes + IVA`);
-      expect(block).toContain(`${p.productsPerMonth} productos optimizados al mes`);
+      if (p.family === "store") expect(block).toContain(`${p.productsPerMonth} productos optimizados al mes`);
     }
-    expect(PLATFORM_PLANS.map(p => p.id)).toEqual([...PLAN_CATALOG.map(p => p.id), "personalizado"]);
+    expect(PLATFORM_PLANS.map(p => p.id)).toEqual([...SELLABLE_PLANS.map(p => p.id), "personalizado"]);
     for (const old of ["Growth Studio", "Performance Lab", "Photoshoot", "Starter Free"]) expect(block).not.toContain(old);
   });
 
@@ -48,7 +75,7 @@ describe("conocimiento del chatbot", () => {
     const { CALC_RECURRING_SERVICES } = await import("./cms-defaults");
     const { SERVICE_CATALOG } = await import("./service-catalog");
     const monthly = SERVICE_CATALOG.filter(s => s.interval === "month");
-    expect(CALC_RECURRING_SERVICES).toHaveLength(PLAN_CATALOG.length + monthly.length);
+    expect(CALC_RECURRING_SERVICES).toHaveLength(SELLABLE_PLANS.length + monthly.length);
     for (const r of CALC_RECURRING_SERVICES) expect(r.description).not.toMatch(/ilimitad|24\/7/i);
   });
 });

@@ -10,7 +10,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { PLAN_CATALOG, TRIAL, planFeatures } from "./plan-catalog.js";
+import { SELLABLE_PLANS, TRIAL, planFeatures, PLATFORM_EXTRAS } from "./plan-catalog.js";
 import { SERVICE_CATALOG, priceDisplay } from "./service-catalog.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -20,6 +20,8 @@ import { SERVICE_CATALOG, priceDisplay } from "./service-catalog.js";
 export interface PlatformPlan {
   id: string;
   name: string;
+  /** "store" = Shopify, WooCommerce y PrestaShop; "stripe" = cuentas de Stripe; "custom" = A medida. */
+  family: "store" | "stripe" | "custom";
   priceMonthly: number | null;
   priceAnnual: number | null;
   currency: string;
@@ -31,9 +33,10 @@ export interface PlatformPlan {
 }
 
 export const PLATFORM_PLANS: PlatformPlan[] = [
-  ...PLAN_CATALOG.map((p): PlatformPlan => ({
+  ...SELLABLE_PLANS.map((p): PlatformPlan => ({
     id: p.id,
     name: p.name,
+    family: p.family,
     priceMonthly: p.priceMonthly,
     priceAnnual: p.priceAnnual,
     currency: "€",
@@ -45,15 +48,16 @@ export const PLATFORM_PLANS: PlatformPlan[] = [
   {
     id: "personalizado",
     name: "A medida",
+    family: "custom",
     priceMonthly: null,
     priceAnnual: null,
     currency: "€",
     productsPerMonth: null,
     imagesPerMonth: null,
     features: [
-      "Varias tiendas en una misma cuenta",
-      "Cuotas de productos e imágenes a medida",
-      "Diseño web y apps nativas",
+      "Varias tiendas o plataformas en una misma cuenta",
+      "Cuotas y entregables a medida",
+      "Diseño web, apps nativas y producción del taller láser",
       "Presupuesto cerrado según alcance",
     ],
     note: "Presupuesto a medida — contactar",
@@ -267,7 +271,9 @@ export const PLATFORM_MODULES: PlatformModule[] = [
 /** Generates the PLANES Y PRECIOS block for chatbot system prompts. */
 export function buildPricingBlock(): string {
   const lines: string[] = [
-    "== PLANES Y PRECIOS (NO hay plan gratuito permanente; un plan por tienda) ==",
+    "== PACKS Y PRECIOS (NO hay plan gratuito permanente; un pack por tienda o cuenta de Stripe) ==",
+    "El cliente elige su plataforma. Shopify, WooCommerce y PrestaShop comparten packs y precio; Stripe tiene packs propios. Las cuatro tienen «A medida».",
+    `Extras sin coste por plataforma: Shopify (${PLATFORM_EXTRAS.shopify.join(", ")}); WooCommerce (${PLATFORM_EXTRAS.woocommerce.join(", ")}); PrestaShop (${PLATFORM_EXTRAS.prestashop.join(", ")}).`,
   ];
 
   for (const plan of PLATFORM_PLANS) {
@@ -275,7 +281,8 @@ export function buildPricingBlock(): string {
       plan.priceMonthly !== null
         ? `${plan.priceMonthly}${plan.currency}/mes + IVA (anual: ${plan.priceAnnual}${plan.currency})`
         : plan.note ?? "Precio a consultar";
-    const label = plan.popular ? `${plan.name} (${price}) — RECOMENDADO` : `${plan.name} (${price})`;
+    const fam = plan.family === "stripe" ? "Stripe" : plan.family === "store" ? "Tienda" : "Todas las plataformas";
+    const label = plan.popular ? `[${fam}] ${plan.name} (${price}) — RECOMENDADO` : `[${fam}] ${plan.name} (${price})`;
     const featStr = plan.features.join(", ");
     lines.push(`- ${label}: ${featStr}`);
   }

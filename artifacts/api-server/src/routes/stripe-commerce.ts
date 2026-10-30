@@ -19,6 +19,7 @@ import QRCode from "qrcode";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { resolveStripeForProject } from "../lib/stripe-tenant.js";
+import { packQuotaGuard } from "../lib/pack-quotas.js";
 import {
   StripeRuleError, normalizePrice, normalizeImages, sanitizeMetadata, associationMetadata,
   planPaymentLink, normalizeCoupon, normalizePromoCode, toMinorUnits,
@@ -350,7 +351,7 @@ function buildLinkParams(cfg: LinkConfigInput, mode: "payment" | "subscription",
   return params;
 }
 
-router.post(`${BASE}/payment-links`, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post(`${BASE}/payment-links`, requireAdmin, packQuotaGuard("stripe_invoices"), async (req: Request, res: Response): Promise<void> => {
   try {
     const projectId = pid(req);
     const body = req.body as LinkConfigInput & { association?: Assoc; metadata?: unknown };
@@ -367,7 +368,7 @@ router.post(`${BASE}/payment-links`, requireAdmin, async (req: Request, res: Res
 });
 
 // Cobro por importe libre: crea el producto en línea dentro del enlace.
-router.post(`${BASE}/quick-link`, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post(`${BASE}/quick-link`, requireAdmin, packQuotaGuard("stripe_invoices"), async (req: Request, res: Response): Promise<void> => {
   try {
     const projectId = pid(req);
     const body = req.body as { amount?: number | string; currency?: string; concept?: string; association?: Assoc; invoiceAfterPayment?: boolean; singleUse?: boolean };
@@ -590,7 +591,7 @@ router.get(`${BASE}/coupons`, requireAdmin, async (req: Request, res: Response):
   }
 });
 
-router.post(`${BASE}/coupons`, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post(`${BASE}/coupons`, requireAdmin, packQuotaGuard("stripe_coupons"), async (req: Request, res: Response): Promise<void> => {
   try {
     const projectId = pid(req);
     const body = req.body as CouponInput & { firstTimeOnly?: boolean; codeMaxRedemptions?: number | null; minimumAmount?: number | string | null };
@@ -672,7 +673,7 @@ router.delete(`${BASE}/coupons/:couponId`, requireAdmin, async (req: Request, re
 // SUSCRIPCIONES (alta desde el panel: Stripe envía la factura por email)
 // ════════════════════════════════════════════════════════════════════════════
 
-router.post(`${BASE}/subscriptions`, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post(`${BASE}/subscriptions`, requireAdmin, packQuotaGuard("stripe_subscriptions"), async (req: Request, res: Response): Promise<void> => {
   try {
     const projectId = pid(req);
     const body = req.body as {
@@ -725,7 +726,7 @@ router.post(`${BASE}/subscriptions`, requireAdmin, async (req: Request, res: Res
   }
 });
 
-router.patch(`${BASE}/subscriptions/:subId`, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.patch(`${BASE}/subscriptions/:subId`, requireAdmin, packQuotaGuard("stripe_subscriptions"), async (req: Request, res: Response): Promise<void> => {
   try {
     const body = req.body as { cancelAtPeriodEnd?: boolean };
     if (body.cancelAtPeriodEnd === undefined) throw new StripeRuleError("Nada que actualizar");
@@ -747,7 +748,7 @@ router.patch(`${BASE}/subscriptions/:subId`, requireAdmin, async (req: Request, 
 
 type InvoiceLine = { priceId?: string; quantity?: number; description?: string; amount?: number | string };
 
-router.post(`${BASE}/invoices`, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post(`${BASE}/invoices`, requireAdmin, packQuotaGuard("stripe_invoices"), async (req: Request, res: Response): Promise<void> => {
   let draftId: string | null = null;
   let stripe: Stripe | null = null;
   try {

@@ -35,6 +35,8 @@ import entityResearchRouter from "./entity-research.js";
 import contactRouter from "./contact.js";
 import apkRouter from "./apk.js";
 import tiendaRouter from "./tienda.js";
+import packsRouter from "./packs.js";
+import shopRouter from "./shop.js";
 import plansRouter from "./plans.js";
 import exportsRouter from "./exports.js";
 import scripttagRouter from "./scripttag.js";
@@ -136,6 +138,8 @@ router.get("/report-templates/:token", (req, res, next) => {
 
 router.use(billingRouter);
 router.use(tiendaRouter);
+router.use(packsRouter);
+router.use(shopRouter);
 router.use(webhookGatewayRouter);
 router.use(stripeConnectRouter);
 router.use(stripeMasterRouter);

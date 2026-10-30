@@ -28,6 +28,7 @@ import { enableLongRunning } from "../lib/long-running.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { requireProjectAccess } from "../lib/access.js";
 import { generateNanoBanana } from "../lib/nano-banana.js";
+import { packQuotaGuard } from "../lib/pack-quotas.js";
 import { logger } from "../lib/logger.js";
 import { promises as fsp } from "node:fs";
 import path from "node:path";
@@ -215,7 +216,7 @@ router.get("/projects/:projectId/ab-tests", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/projects/:projectId/ab-tests", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/ab-tests", packQuotaGuard("ab_tests"), async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
     
@@ -1491,9 +1492,9 @@ Reglas: matemática consistente (revenue = visitors × cvr × price; margin = vi
 });
 
 // ─────── CREATE (new shape) ───────
-router.post("/projects/:projectId/ab-tests/image", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/ab-tests/image", packQuotaGuard("ab_tests"), async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const cfg = req.body as {
       productId: string; hypothesis: string; primaryMetric: string;
       controlImageUrl: string; challengerImageUrl: string; challengerVariantId: string;
@@ -1527,9 +1528,9 @@ router.post("/projects/:projectId/ab-tests/image", async (req, res): Promise<voi
   }
 });
 
-router.post("/projects/:projectId/ab-tests/price", async (req, res): Promise<void> => {
+router.post("/projects/:projectId/ab-tests/price", packQuotaGuard("ab_tests"), async (req, res): Promise<void> => {
   try {
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = parseInt(String(req.params.projectId), 10);
     const cfg = req.body as {
       productId: string; hypothesis: string; primaryMetric: string;
       controlPrice: number; challengerPrice: number;

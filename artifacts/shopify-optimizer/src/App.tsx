@@ -115,6 +115,11 @@ const HyperFrames = lazy(() => import("@/pages/admin/HyperFrames"));
 const DeckBuilder = lazy(() => import("@/pages/admin/DeckBuilder"));
 const TiendaAdmin = lazy(() => import("@/pages/admin/TiendaAdmin"));
 const PortfolioAdmin = lazy(() => import("@/pages/admin/PortfolioAdmin"));
+const ShopAdmin = lazy(() => import("@/pages/admin/ShopAdmin"));
+const Shop = lazy(() => import("@/pages/shop/Shop"));
+const ShopProduct = lazy(() => import("@/pages/shop/ShopProduct"));
+const ShopCart = lazy(() => import("@/pages/shop/ShopCart"));
+const ShopThanks = lazy(() => import("@/pages/shop/ShopThanks"));
 const StripeManager = lazy(() => import("@/pages/admin/StripeManager"));
 const StripeMasterHub = lazy(() => import("@/pages/admin/StripeMasterHub"));
 const StripeProjectHub = lazy(() => import("@/pages/projects/StripeProjectHub"));
@@ -387,6 +392,10 @@ function Router() {
         <Route path="/diseno-web-profesional">{() => <S><ComparisonPage /></S>}</Route>
         <Route path="/desarrollo-apps-nativas">{() => <S><ComparisonPage /></S>}</Route>
         <Route path="/portfolio">{() => <S><PortfolioPage /></S>}</Route>
+        <Route path="/tienda">{() => <S><Shop /></S>}</Route>
+        <Route path="/tienda/carrito">{() => <S><ShopCart /></S>}</Route>
+        <Route path="/tienda/gracias">{() => <S><ShopThanks /></S>}</Route>
+        <Route path="/tienda/:slug">{() => <S><ShopProduct /></S>}</Route>
 
         {/* Root — redirects by role */}
         <Route path="/">
@@ -724,6 +733,9 @@ function Router() {
         </Route>
         <Route path="/admin/portfolio">
           <RequireAdmin><AdminWrapper><AppLayout><S><PortfolioAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/shop">
+          <RequireAdmin><AdminWrapper><AppLayout><S><ShopAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/tienda">
           <RequireAdmin><AdminWrapper><AppLayout><S><TiendaAdmin /></S></AppLayout></AdminWrapper></RequireAdmin>

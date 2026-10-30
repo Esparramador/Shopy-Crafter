@@ -17,7 +17,7 @@ import Stripe from "stripe";
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger.js";
-import { catalogPlan } from "./plan-catalog.js";
+import { catalogPlan, planQuotaLines } from "./plan-catalog.js";
 
 export const STRIPE_API_VERSION = "2026-05-27.dahlia" as const;
 
@@ -188,8 +188,8 @@ export async function createPlanCheckout(stripe: Stripe, p: {
       price_data: {
         currency: "eur",
         product_data: {
-          name: `Shopy Crafter — Plan ${price.name}`,
-          description: `${cat.productsPerMonth} productos y ${cat.imagesPerMonth} imágenes IA al mes`,
+          name: `Shopy Crafter — Pack ${price.name}${cat.family === "stripe" ? " (Stripe)" : ""}`,
+          description: planQuotaLines(cat).slice(0, 2).join(" · ").slice(0, 300),
         },
         unit_amount: price.cents,
         recurring: { interval: p.interval },
@@ -281,6 +281,12 @@ function invoicePeriodEnd(inv: Stripe.Invoice): Date | null {
 
 async function onCheckoutCompleted(s: Stripe.Checkout.Session): Promise<void> {
   const m = (s.metadata ?? {}) as Meta;
+  // Pedidos de la tienda pública: sin cuenta de usuario.
+  if (m.kind === "shop_order") {
+    const { markShopOrderPaid } = await import("./shop-store.js");
+    await markShopOrderPaid(s);
+    return;
+  }
   const kind = m.kind ?? (m.planId ? "plan" : undefined);
   if (s.mode === "subscription" && s.status !== "complete") return;
   if (s.mode === "payment" && s.payment_status !== "paid") return;
@@ -372,6 +378,14 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded":
       return onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+    case "checkout.session.expired": {
+      const s = event.data.object as Stripe.Checkout.Session;
+      if (s.metadata?.kind === "shop_order") {
+        const { markShopOrderExpired } = await import("./shop-store.js");
+        await markShopOrderExpired(s);
+      }
+      return;
+    }
     case "invoice.paid":
       return onInvoicePaid(event.data.object as Stripe.Invoice);
     case "invoice.payment_failed":
