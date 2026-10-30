@@ -837,3 +837,17 @@ mtime_ms = 1793371006682
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/6c2456a8-2915-47a5-8919-1685e73e41f2/bdac716f-3778-4b64-9d17-bccbc0ed4086"
 storage_version_token = "1793371129554584"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "9BwbXELP4hnK3RjIAqsHC"
+uri = "file://generated-artifacts/shopify-crafter-cambios-c0fb1c9e.zip"
+type = "unspecified"
+title = "Archivos modificados de Shopy Crafter"
+description = "ZIP con los 13 archivos modificados del commit c0fb1c9e, conservando las rutas originales; sin secretos ni compilaciones."
+logical_id = "9f7721e9-e8ca-41ad-87ba-d7c930d63c8b"
+content_hash = "sha256:41436e1e8316fb7a1e4f025dd16dca8619a3981ed00f2be6cf1ceb4195840068"
+size = 128387
+mtime_ms = 1793383828518
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/9f7721e9-e8ca-41ad-87ba-d7c930d63c8b/74c3636f-83e5-43fa-a2e3-84c93a1982d5"
+storage_version_token = "1793383836102289"
+content_type = "application/octet-stream"
