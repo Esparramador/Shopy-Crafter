@@ -865,3 +865,17 @@ mtime_ms = 1793388119738
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/f3bfc162-03b0-4dbd-9e01-fe16f8cd8049/e8c18990-c04c-4a43-917b-627fd7ab6887"
 storage_version_token = "1793388125318932"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "k0I2X2DuvMSDqEgXUo-Ux"
+uri = "file://artifacts/shopify-optimizer/public/sitemap.xml"
+type = "unspecified"
+title = "Descargar sitemap.xml"
+description = "Archivo sitemap.xml para Google; corresponde a artifacts/shopify-optimizer/public/sitemap.xml."
+logical_id = "163abff8-af63-4516-9d62-911a596f393d"
+content_hash = "sha256:ec597d184d176283bdfbb52b11e2c4f8148bb61d374eef7448fa2631711f8a43"
+size = 7473
+mtime_ms = 1793358661558
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/163abff8-af63-4516-9d62-911a596f393d/33c41729-8ff7-42db-84d2-99694c777d86"
+storage_version_token = "1793388274382838"
+content_type = "application/octet-stream"
