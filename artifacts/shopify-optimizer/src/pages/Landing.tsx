@@ -4,12 +4,10 @@ import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import PageMeta from "@/components/PageMeta";
 import { VismeFormHero, type ContactPrefill } from "@/components/VismeFormHero";
-import { PackPricing, PackConfigurator, usePacks, type PackPlan, type PlatformPacks, type ConfiguratorResult } from "@/components/landing/Packs";
-import ApkDownloadButton from "@/components/ApkDownloadButton";
+import { PackPricing, usePacks, type PackPlan, type PlatformPacks } from "@/components/landing/Packs";
 import SiteLinks from "@/components/SiteLinks";
 import { metaFor } from "@/components/PageMeta";
-import { HERO, SERVICES, PLATFORMS, PROCESS, PORTAL_FEATURES, FEATURED_DEMOS } from "@/lib/landing-content";
-import { WEB_DEMOS } from "@/lib/portfolio-data";
+import { HERO, SERVICES, PLATFORMS, PROCESS, PORTAL_FEATURES } from "@/lib/landing-content";
 import "./landing-2026.css";
 
 function SectionVideoBg({ src }: { src: string }) {
@@ -186,8 +184,8 @@ const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const LANDING_FALLBACK: CMSContent = {
   site: { name: "Shopy Crafter", tagline: "Optimización IA para tu tienda Shopify", logo: { type: "text", value: "SC", imageUrl: null }, primaryColor: "#c8a84b", accentColor: "#2dd49f", font_heading: "Instrument Serif", font_body: "Geist" },
-  nav: { links: [{ id: "n1", label: "Motores", href: "#fp-engines" }, { id: "n2", label: "Demo", href: "#fp-demo" }, { id: "n3", label: "Precios", href: "#fp-pricing" }, { id: "n4", label: "Contactar", href: "#fp-contact" }], ctaPrimary: { label: "Solicitar acceso →", href: "#fp-contact" }, ctaSecondary: { label: "Iniciar sesión", href: "/login" } },
-  hero: { pill: { text: "6 motores de IA · Shopy Crafter", visible: true }, headline: "Optimizamos tu tienda\nShopify con IA\npor ti", headlineHighlight: "con IA", subheadline: "Shopy Crafter gestiona, optimiza y potencia tiendas Shopify con inteligencia artificial. Imágenes profesionales, pricing inteligente, SEO técnico y tests A/B — sin intervención manual.", ctaPrimary: { label: "Descubre nuestros servicios →", href: "#fp-pricing" }, ctaSecondary: { label: "▶ Ver en acción", href: "#fp-demo" }, trustItems: ["Setup en menos de 48h", "IA real con API Shopify", "RGPD compliant"], imageUrl: null, scrollHint: "Desliza para explorar" },
+  nav: { links: [{ id: "n1", label: "Servicios", href: "#fp-services" }, { id: "n2", label: "Proyectos", href: "#fp-projects" }, { id: "n3", label: "Precios", href: "#fp-pricing" }, { id: "n4", label: "Contactar", href: "#fp-contact" }], ctaPrimary: { label: "Solicitar acceso →", href: "#fp-contact" }, ctaSecondary: { label: "Iniciar sesión", href: "/login" } },
+  hero: { pill: { text: "6 motores de IA · Shopy Crafter", visible: true }, headline: "Optimizamos tu tienda\nShopify con IA\npor ti", headlineHighlight: "con IA", subheadline: "Shopy Crafter gestiona, optimiza y potencia tiendas Shopify con inteligencia artificial. Imágenes profesionales, pricing inteligente, SEO técnico y tests A/B — sin intervención manual.", ctaPrimary: { label: "Descubre nuestros servicios →", href: "#fp-pricing" }, ctaSecondary: { label: "Ver proyectos →", href: "#fp-projects" }, trustItems: ["Setup en menos de 48h", "IA real con API Shopify", "RGPD compliant"], imageUrl: null, scrollHint: "Desliza para explorar" },
   features: { pill: "Motores IA", headline: "Seis motores. Una sola plataforma.", subheadline: "Cada motor trabaja de forma autónoma y coordinada para potenciar todos los aspectos de tu tienda.", items: [{ id: "f1", num: "M01", icon: "🖼️", iconBg: "rgba(45,212,159,0.1)", title: "Generación de Imágenes", description: "8 tipos de imagen profesional por producto usando flux-1.1-pro.", tags: ["flux-1.1-pro", "~€0.25/prod"], stats: [{ label: "Precisión", value: "94%" }] }, { id: "f2", num: "M02", icon: "🎨", iconBg: "rgba(200,168,75,0.1)", title: "Consistencia Visual", description: "Extrae el ADN visual de tu tienda y aplica StyleLock.", tags: ["StyleLock", "Visual DNA"], stats: [{ label: "Precisión", value: "97%" }] }, { id: "f3", num: "M03", icon: "⚗️", iconBg: "rgba(74,158,221,0.1)", title: "A/B Testing Automático", description: "Z-test estadístico al 95% de confianza, declaración automática de ganador.", tags: ["Z-test 95%", "Auto-winner"], stats: [{ label: "Confianza", value: "95%" }] }, { id: "f4", num: "M04", icon: "⚡", iconBg: "rgba(200,168,75,0.08)", title: "Auto-Pilot 24/7", description: "Webhook trigger en cada nuevo producto. Sin intervención manual.", tags: ["Webhook", "Cron jobs"], stats: [{ label: "Uptime", value: "99.9%" }] }, { id: "f5", num: "M05", icon: "📊", iconBg: "rgba(200,168,75,0.1)", title: "Pricing Financiero", description: "Motor COGS completo, análisis de competencia en tiempo real.", tags: ["COGS Engine", "P&L en vivo"], stats: [{ label: "Precisión", value: "92%" }] }, { id: "f6", num: "M06", icon: "🔍", iconBg: "rgba(45,212,159,0.08)", title: "SEO Técnico", description: "Schema JSON-LD, meta tags optimizados, Core Web Vitals y blog posts.", tags: ["Schema JSON-LD", "CWV"], stats: [{ label: "Precisión", value: "96%" }] }] },
   stats: [{ id: "s1", num: "3.4×", label: "Más conversión con 5+ imágenes" }, { id: "s2", num: "€0.25", label: "Coste por imagen generada con IA" }, { id: "s3", num: "95%", label: "Confianza estadística en A/B tests" }, { id: "s4", num: "24/7", label: "Auto-pilot autónomo" }],
   how: { pill: "Cómo funciona", headline: "De cero a piloto\nautomático", headlineHighlight: "piloto\nautomático", steps: [{ num: "01", title: "Conecta tu tienda", desc: "Vincula tu tienda Shopify en menos de 5 minutos." }, { num: "02", title: "Configura los motores", desc: "Activa los módulos que necesites según tu negocio." }, { num: "03", title: "Piloto automático", desc: "La IA trabaja 24/7 optimizando cada aspecto de tu tienda." }] },
@@ -197,8 +195,8 @@ const LANDING_FALLBACK: CMSContent = {
   footer: { tagline: "Optimización IA para tiendas Shopify", columns: [], copyright: `© ${new Date().getFullYear()} Shopy Crafter`, badges: ["RGPD", "SSL", "Shopify Partner"] },
 };
 
-const FP_SECTION_IDS = ["fp-hero", "fp-services", "fp-platforms", "fp-projects", "fp-portfolio", "fp-process", "fp-pricing", "fp-configurator", "fp-contact"];
-const DEFAULT_SECTION_NAV = ["Inicio", "Servicios", "Plataformas", "Proyectos", "Portfolio", "Proceso", "Precios", "Configurador", "Contactar"];
+const FP_SECTION_IDS = ["fp-hero", "fp-services", "fp-platforms", "fp-projects", "fp-process", "fp-pricing", "fp-contact"];
+const DEFAULT_SECTION_NAV = ["Inicio", "Servicios", "Plataformas", "Proyectos", "Proceso", "Precios", "Contactar"];
 
 
 export default function Landing() {
@@ -342,10 +340,10 @@ export default function Landing() {
       contact: "fp-contact", contacto: "fp-contact", contacta: "fp-contact", contactar: "fp-contact",
       how: "fp-process", "fp-how": "fp-process", como: "fp-process", "cómo": "fp-process", proceso: "fp-process",
       planes: "fp-pricing", precios: "fp-pricing", pricing: "fp-pricing",
-      demo: "fp-portfolio", "fp-demo": "fp-portfolio", resultados: "fp-portfolio", results: "fp-portfolio", "fp-results": "fp-portfolio", portfolio: "fp-portfolio", proyectos: "fp-projects", projects: "fp-projects",
+      demo: "fp-projects", "fp-demo": "fp-projects", "fp-portfolio": "fp-projects", resultados: "fp-projects", results: "fp-projects", "fp-results": "fp-projects", portfolio: "fp-projects", proyectos: "fp-projects", projects: "fp-projects",
       motores: "fp-services", engines: "fp-services", "fp-engines": "fp-services", servicios: "fp-services", services: "fp-services",
       plataformas: "fp-platforms", platforms: "fp-platforms",
-      calculadora: "fp-configurator", calculator: "fp-configurator", configurador: "fp-configurator", "fp-calculator": "fp-configurator",
+      calculadora: "fp-pricing", calculator: "fp-pricing", configurador: "fp-pricing", "fp-configurator": "fp-pricing", "fp-calculator": "fp-pricing",
       inicio: "fp-hero", home: "fp-hero",
     };
     if (alias[id]) return alias[id];
@@ -402,9 +400,10 @@ export default function Landing() {
     if (!content) return;
     const hash = window.location.hash;
     if (!hash) return;
-    const idx = FP_SECTIONS.findIndex(s => `#${s.id}` === hash);
+    const sectionId = resolveSectionId(hash);
+    const idx = sectionId ? FP_SECTION_IDS.indexOf(sectionId) : -1;
     if (idx >= 0) setTimeout(() => goToSection(idx), 350);
-  }, [content, goToSection]);
+  }, [content, goToSection, resolveSectionId]);
 
   useEffect(() => {
     if (!isPreview) return;
@@ -531,12 +530,6 @@ export default function Landing() {
     goToContactWith(`Quiero un presupuesto a medida (${platform.label}).`);
   };
 
-  const submitConfiguration = (r: ConfiguratorResult) => {
-    const onlyPack = r.plan && !r.custom && r.services.length === 0;
-    if (user?.role === "client" && onlyPack && r.plan) { void checkoutPack(r.plan.id, r.annual); return; }
-    goToContactWith(r.summary);
-  };
-
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
       {/* ── CURSOR GLOW SPOTLIGHT ── */}
@@ -651,7 +644,7 @@ export default function Landing() {
               <p className={`l-hero-sub ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.22s" }}>{HERO.sub}</p>
               <div className={`l-hero-ctas ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.34s" }}>
                 <a href="#fp-contact" className="l-btn-primary btn-jelly" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); }}>Solicitar propuesta →</a>
-                <a href="#fp-portfolio" className="l-btn-secondary btn-jelly" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-portfolio")); setHashRobust("fp-portfolio"); }}>Ver portfolio</a>
+                <a href="#fp-projects" className="l-btn-secondary btn-jelly" onClick={e => { e.preventDefault(); goToSection(FP_SECTION_IDS.indexOf("fp-projects")); setHashRobust("fp-projects"); }}>Ver proyectos</a>
               </div>
               <div className={`l-hero-trust ${!isAnimated("fp-hero") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.46s" }}>
                 {HERO.trust.map(item => (
@@ -762,47 +755,6 @@ export default function Landing() {
         </section>
 
         {/* ══════════════════════════════════════
-            SECTION 04 — PORTFOLIO
-        ══════════════════════════════════════ */}
-        <section className="fp-section fp-section-dark" id="fp-portfolio" data-nav="Portfolio" data-effect={eff("results")}>
-          <div className="fp-bg-solid">{videoBg("results")}</div>
-          <div className="fp-content lx-wrap">
-            <div className={`fp-section-header ${!isAnimated("fp-portfolio") ? "fp-animate" : "fp-animated"}`}>
-              <div className="l-pill">Portfolio</div>
-              <h2 className="l-h2">Lo que construimos, <em>abierto para que lo pruebes.</em></h2>
-              <p className="l-sub lx-sub">{WEB_DEMOS.length} demos web interactivas y nuestra propia app Android.</p>
-            </div>
-            <div className={`lx-portfolio ${!isAnimated("fp-portfolio") ? "fp-animate" : "fp-animated"}`} style={{ animationDelay: "0.1s" }}>
-              <ul className="lx-demos">
-                {FEATURED_DEMOS.map(i => WEB_DEMOS[i]).filter(Boolean).map(d => (
-                  <li key={d.file}>
-                    <a href={`/web-demos/${d.file}`} target="_blank" rel="noopener" className="lx-demo">
-                      <span className="lx-demo-num">{d.file.slice(0, 2)}</span>
-                      <span className="lx-demo-title">{d.title}</span>
-                      <span className="lx-demo-tags">{d.tags.join(" · ")}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-              <div className="lx-app">
-                <div className="lx-app-phone" aria-hidden="true">
-                  <div className="lx-app-notch" />
-                  <div className="lx-app-screen"><img src={APP_LOGO} alt="" width={46} height={46} /></div>
-                </div>
-                <div>
-                  <h3>App Android de Shopy Crafter</h3>
-                  <p>Construida con Capacitor sobre la misma base de código que la web. Así convertimos webs y tiendas en apps nativas.</p>
-                  <ApkDownloadButton labels={content.apkLabels} />
-                </div>
-              </div>
-            </div>
-            <div className="lx-center">
-              <Link href="/portfolio" className="l-btn-secondary btn-jelly">Ver las {WEB_DEMOS.length} demos →</Link>
-            </div>
-          </div>
-        </section>
-
-        {/* ══════════════════════════════════════
             SECTION 05 — PROCESO + PORTAL
         ══════════════════════════════════════ */}
         <section className="fp-section" id="fp-process" data-nav="Proceso" data-effect={eff("demo")}>
@@ -857,27 +809,6 @@ export default function Landing() {
             <div className={!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"} style={{ animationDelay: "0.1s" }}>
               <PackPricing data={packs.data} error={packs.error} onChoose={choosePack} onQuote={quotePack} />
               {packNotice && <p className="lxk-error" role="alert">{packNotice}</p>}
-            </div>
-          </div>
-        </section>
-
-        {/* ══════════════════════════════════════
-            SECTION 06 — CONFIGURADOR
-        ══════════════════════════════════════ */}
-        <section className="fp-section" id="fp-configurator" data-nav="Configurador" data-effect={eff("calculator")}>
-          <div className="fp-bg">
-            {videoBg("calculator")}
-            <div className="l-hero-grid" style={{ opacity: 0.2 }}></div>
-          </div>
-          <div className="fp-bg-overlay" style={{ background: "rgba(8,8,16,0.8)" }}></div>
-          <div className="fp-content lx-wrap">
-            <div className={`fp-section-header ${!isAnimated("fp-configurator") ? "fp-animate" : "fp-animated"}`}>
-              <div className="l-pill">Configurador</div>
-              <h2 className="l-h2">Arma tu servicio <em>en tres pasos.</em></h2>
-              <p className="l-sub lx-sub">Plataforma, pack y extras. Ves el total al momento y nos lo envías, o lo pagas si ya eres cliente.</p>
-            </div>
-            <div className={!isAnimated("fp-configurator") ? "fp-animate" : "fp-animated"} style={{ animationDelay: "0.1s" }}>
-              <PackConfigurator data={packs.data} error={packs.error} loggedInClient={user?.role === "client"} onSubmit={submitConfiguration} />
             </div>
           </div>
         </section>

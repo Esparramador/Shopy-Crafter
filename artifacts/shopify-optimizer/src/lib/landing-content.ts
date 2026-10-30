@@ -1,6 +1,6 @@
 /**
  * Contenido de la landing. Solo hechos comprobables en el propio producto:
- * conectores que existen, módulos que existen, demos publicadas y la app
+ * conectores que existen, módulos que existen y la app
  * Android real. Sin métricas de clientes ni porcentajes de resultado.
  */
 
@@ -12,7 +12,7 @@ export const HERO = {
   trust: ["Conexión nativa por API", "Tú apruebas cada cambio", "Portal privado por cliente", "RGPD"],
   facts: [
     { value: "4", label: "Conectores nativos", sub: "Shopify · WooCommerce · PrestaShop · Stripe" },
-    { value: "30", label: "Demos web publicadas", sub: "3D, animación y scroll inmersivo" },
+    { value: "A medida", label: "Webs con 3D y animación", sub: "Diseñadas para cada marca" },
     { value: "Android", label: "App nativa propia", sub: "Capacitor · descargable" },
     { value: "+6.800", label: "Prompts especializados", sub: "Biblioteca propia de IA" },
   ],
@@ -122,6 +122,3 @@ export const PORTAL_FEATURES = [
   { icon: "🗂️", title: "Archivos privados", text: "Solo tú ves los archivos de tu proyecto." },
   { icon: "🤖", title: "Asistente IA", text: "Pregunta sobre tu tienda cuando quieras." },
 ];
-
-/** Demos destacadas en la landing (índices de WEB_DEMOS). */
-export const FEATURED_DEMOS = [2, 10, 11, 17, 25, 29];

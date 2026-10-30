@@ -81,7 +81,6 @@ const TerminosPage = lazy(() => import("@/pages/public/Terminos"));
 const CookiesPage = lazy(() => import("@/pages/public/Cookies"));
 const ContactoPage = lazy(() => import("@/pages/public/Contacto"));
 const ComparisonPage = lazy(() => import("@/pages/public/ComparisonPage"));
-const PortfolioPage = lazy(() => import("@/pages/public/Portfolio"));
 
 const AuditPage = lazy(() => import("@/pages/projects/Audit"));
 const RedesignPage = lazy(() => import("@/pages/projects/Redesign"));
@@ -391,7 +390,7 @@ function Router() {
         <Route path="/gestion-stripe-ia">{() => <S><ComparisonPage /></S>}</Route>
         <Route path="/diseno-web-profesional">{() => <S><ComparisonPage /></S>}</Route>
         <Route path="/desarrollo-apps-nativas">{() => <S><ComparisonPage /></S>}</Route>
-        <Route path="/portfolio">{() => <S><PortfolioPage /></S>}</Route>
+        <Route path="/portfolio">{() => <Redirect to="/#fp-projects" />}</Route>
         <Route path="/tienda">{() => <S><Shop /></S>}</Route>
         <Route path="/tienda/carrito">{() => <S><ShopCart /></S>}</Route>
         <Route path="/tienda/gracias">{() => <S><ShopThanks /></S>}</Route>

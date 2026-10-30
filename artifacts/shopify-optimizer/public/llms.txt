@@ -7,7 +7,7 @@
 - **Automatización de tiendas con IA:** auditoría de catálogo (puntuación por producto de título, descripción, SEO, imágenes y precio), rediseño de fichas, imágenes de producto con IA y consistencia visual de marca, SEO técnico, pricing con COGS real, A/B testing de imagen y precio, inventario y pedidos.
 - **Plataformas con conexión nativa por API:** Shopify (API oficial), WooCommerce (REST API v3), PrestaShop (Webservice) y Stripe. Cualquier otra web se puede auditar por su URL.
 - **Stripe:** clientes, cobros, suscripciones, facturas, reembolsos, pagos a banco y balance; Stripe Connect.
-- **Diseño y desarrollo web:** webs y landings a medida con 3D (Three.js, React Three Fiber), animación (GSAP, Lenis) y diseño basado en el ADN de marca. 30 demos interactivas publicadas.
+- **Diseño y desarrollo web:** webs y landings a medida con 3D (Three.js, React Three Fiber), animación (GSAP, Lenis) y diseño basado en el ADN de marca.
 - **Apps nativas:** apps Android e iOS con Capacitor a partir de una sola base de código. App Android propia publicada.
 - **Portal de cliente:** cada cliente ve solo su proyecto: aprobaciones de cambios, mensajes, informes y archivos.
 
@@ -20,7 +20,7 @@
 - [Gestión de Stripe](https://shopycrafter.com/gestion-stripe-ia)
 - [Diseño web profesional](https://shopycrafter.com/diseno-web-profesional)
 - [Apps nativas Android e iOS](https://shopycrafter.com/desarrollo-apps-nativas)
-- [Portfolio](https://shopycrafter.com/portfolio)
+- [Proyectos](https://shopycrafter.com/#fp-projects)
 - [Blog](https://shopycrafter.com/blog)
 - [Preguntas frecuentes](https://shopycrafter.com/faq)
 - [Contacto](https://shopycrafter.com/contacto)

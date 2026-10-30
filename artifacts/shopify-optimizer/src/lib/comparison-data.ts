@@ -637,7 +637,7 @@ Necesitarás redirecciones 301 para TODAS las URLs de producto y categoría.</p>
     path: "/diseno-web-profesional",
     canonical: "https://shopycrafter.com/diseno-web-profesional",
     metaTitle: "Diseño web profesional con 3D, animación e IA — Shopy Crafter",
-    metaDescription: "Diseñamos y desarrollamos webs y landings a medida: 3D con Three.js, animaciones con GSAP, scroll inmersivo y diseño basado en el ADN de tu marca. Mira nuestras 30 demos interactivas.",
+    metaDescription: "Diseñamos y desarrollamos webs y landings a medida: 3D con Three.js, animaciones con GSAP y diseño basado en el ADN de tu marca.",
     badge: "Diseño web",
     tag: "Diseño y desarrollo web",
     h1: "Diseño y desarrollo web a medida, con 3D, animación e IA",
@@ -654,8 +654,8 @@ Necesitarás redirecciones 301 para TODAS las URLs de producto y categoría.</p>
 <li><strong>Componentes premium:</strong> bento grids, carruseles 3D, visualización de datos y secciones hero.</li>
 </ul>
 
-<h2>30 demos interactivas</h2>
-<p>Hemos publicado 30 demos que puedes abrir y probar en tu navegador: desde héroes con partículas hasta narrativas 3D con scroll. Míralas en nuestro <a href="/portfolio" style="color:#e6c668">portfolio</a>.</p>
+<h2>Proyectos reales</h2>
+<p>Diseñamos cada experiencia según la marca y el objetivo del proyecto. Puedes ver algunos de nuestros trabajos en la sección de <a href="/#fp-projects" style="color:#e6c668">proyectos realizados</a>.</p>
 
 <h2>Webs para tiendas online</h2>
 <p>Si tu web es una tienda, la combinamos con la optimización de catálogo con IA para <a href="/automatizacion-shopify-ia" style="color:#e6c668">Shopify</a>, <a href="/automatizacion-woocommerce-ia" style="color:#e6c668">WooCommerce</a> o <a href="/automatizacion-prestashop-ia" style="color:#e6c668">PrestaShop</a>.</p>

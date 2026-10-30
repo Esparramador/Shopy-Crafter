@@ -1,6 +1,6 @@
 # Shopy Crafter — robots.txt
-# Todo el contenido público es rastreable (páginas, blog, demos web, CSS/JS e
-# imágenes). Solo se excluyen las áreas privadas que requieren sesión.
+# Las demos antiguas se conservan para vistas internas y no forman parte del
+# contenido público del sitio.
 
 User-agent: *
 Allow: /
@@ -16,6 +16,6 @@ Disallow: /invite/
 Disallow: /reset-password
 Disallow: /oauth-success
 Disallow: /shopify/
-Disallow: /web-demos/test-failed-charizard.html
+Disallow: /web-demos/
 
 Sitemap: https://shopycrafter.com/sitemap.xml

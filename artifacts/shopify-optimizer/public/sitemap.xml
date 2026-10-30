@@ -55,12 +55,6 @@
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://shopycrafter.com/portfolio</loc>
-    <lastmod>2026-09-27</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.80</priority>
-  </url>
-  <url>
     <loc>https://shopycrafter.com/blog</loc>
     <lastmod>2026-09-27</lastmod>
     <changefreq>weekly</changefreq>

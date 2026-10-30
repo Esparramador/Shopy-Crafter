@@ -3499,13 +3499,6 @@ function DemoLibrary() {
               }}
             />
           </div>
-          <a
-            href={`${BASE}/web-demos/index.html`}
-            target="_blank" rel="noreferrer"
-            style={{ fontSize: 11, padding: "7px 14px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--t2, #aaa)", textDecoration: "none", whiteSpace: "nowrap" }}
-          >
-            ↗ Abrir galería completa
-          </a>
         </div>
       </div>
 

@@ -865,8 +865,8 @@ export default function Contacto() {
                 <ul className="ctc-footer-links">
                   <li><a href="/#fp-engines">Motores IA</a></li>
                   <li><a href="/#fp-pricing">Precios</a></li>
-                  <li><a href="/#fp-demo">Demo</a></li>
-                  <li><a href="/#fp-configurator">Configurador</a></li>
+                  <li><a href="/#fp-projects">Proyectos</a></li>
+                  <li><a href="/tienda">Tienda</a></li>
                 </ul>
               </div>
               <div>

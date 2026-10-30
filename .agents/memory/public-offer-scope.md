@@ -26,3 +26,9 @@ The user requests removing the old public showcase advertised as 30 demos.
 **Why:** The user says its effects are poor and the selection does not represent their newer effects.
 
 **How to apply:** Remove that public showcase and its promotional references. Do not interpret this as permission to delete internal effect libraries or the unrelated portfolio of real projects.
+
+The user approved removing the public pricing configurator/calculator in favor of the four platform packs and a clear custom-quote action.
+
+**Why:** The user preferred simplifying the offer over maintaining a second, confusing service calculator.
+
+**How to apply:** Keep pack selection and “A medida” quote flows; do not restore a separate public calculator unless the user asks for it.

@@ -15,7 +15,6 @@ import {
   getSeoRoutes, seoFor, canonicalUrl, SITE_URL, SITE_NAME, CONTACT_EMAIL,
   SITE_LINK_GROUPS, type SeoRoute,
 } from "./seo/routes";
-import { WEB_DEMOS } from "./lib/portfolio-data";
 
 const OG_IMAGE = `${SITE_URL}/opengraph.jpg`;
 
@@ -134,9 +133,6 @@ function linksHtml(): string {
 
 function extraForRoute(route: SeoRoute): string {
   if (route.bodyHtml) return `<article style="line-height:1.7;color:#c9c7e0">${route.bodyHtml}</article>`;
-  if (route.path === "/portfolio") {
-    return `<ul>${WEB_DEMOS.map(d => `<li><a href="/web-demos/${d.file}" style="color:#e6c668">${esc(d.title)}</a> — ${esc(d.description)}</li>`).join("")}</ul>`;
-  }
   if (route.path === "/") {
     return `<ul>${SERVICES.map(([name, path]) => `<li><a href="${path}" style="color:#e6c668">${esc(name)}</a></li>`).join("")}</ul>`;
   }
