@@ -101,17 +101,82 @@ function mapModelForProxy(model: string, isProxy: boolean): string {
   return "gemini-3-flash-preview";
 }
 
-// Picks which client a generation call (chat/json/stream — NOT search
-// grounding, which stays on the direct client) should use right now. Prefers
-// the direct key unless its circuit breaker is open, in which case it
-// switches to the Replit AI Integrations proxy (if configured) so the bot
-// keeps answering with real Gemini instead of degrading straight to Claude.
-function getGenerationClient(): { client: GoogleGenAI; isProxy: boolean } {
-  const proxy = getGeminiProxyClient();
-  if (isGeminiGenerationBlocked() && proxy) {
-    return { client: proxy, isProxy: true };
+// ─── Qué cliente usa cada generación (chat / JSON / stream / texto) ──────────
+// Por defecto va primero por Replit AI Integrations (se factura en créditos de
+// Replit, sin claves propias) y la clave directa GEMINI_API_KEY queda de reserva.
+// AI_PREFER_REPLIT=0 invierte el orden. Cada vía tiene su propio cortacircuitos:
+// si una falla (403, 429, 5xx, timeout…) se usa la otra y, solo si fallan las
+// dos, se recurre a Claude (que también va por Replit si está configurado).
+function preferReplit(): boolean {
+  return (process.env.AI_PREFER_REPLIT ?? "1").trim() !== "0";
+}
+
+interface GenClient { client: GoogleGenAI; isProxy: boolean }
+
+/** Clientes disponibles en orden de preferencia, sin los que tienen el cortacircuitos abierto. */
+function generationClients(opts: { needsSearch?: boolean } = {}): GenClient[] {
+  const proxy = isProxyBlocked() ? null : getGeminiProxyClient();
+  const direct = isGeminiGenerationBlocked() ? null : getGeminiDirectClient();
+  const list: GenClient[] = [];
+  // La búsqueda de Google (grounding) solo está garantizada con la clave directa.
+  const directFirst = !!direct && (opts.needsSearch || !preferReplit() || !proxy);
+  if (directFirst && direct) list.push({ client: direct, isProxy: false });
+  if (proxy) list.push({ client: proxy, isProxy: true });
+  if (!directFirst && direct) list.push({ client: direct, isProxy: false });
+  if (list.length === 0) {
+    // Las dos con el cortacircuitos abierto: se intenta igualmente la preferida.
+    const fallbackProxy = getGeminiProxyClient();
+    const fallbackDirect = getGeminiDirectClient();
+    if (preferReplit() && fallbackProxy) list.push({ client: fallbackProxy, isProxy: true });
+    else if (fallbackDirect) list.push({ client: fallbackDirect, isProxy: false });
+    else if (fallbackProxy) list.push({ client: fallbackProxy, isProxy: true });
   }
-  return { client: getGeminiClient(), isProxy: false };
+  return list;
+}
+
+/** Errores en los que tiene sentido probar la otra vía en vez de fallar. */
+function isRetryableGeminiError(err: unknown): boolean {
+  const s = String(err);
+  return isPermissionDenied(err)
+    || /\b(429|500|502|503|504|404)\b/.test(s)
+    || /RESOURCE_EXHAUSTED|UNAVAILABLE|INTERNAL|DEADLINE_EXCEEDED|NOT_FOUND|Timeout|timed out|fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up/i.test(s);
+}
+
+/** Marca como caída la vía que ha fallado (la otra se usará durante el enfriamiento). */
+function tripFor(c: GenClient, err: unknown): void {
+  if (c.isProxy) tripProxyCircuit(String(err));
+  else if (isPermissionDenied(err) || /\b429\b|RESOURCE_EXHAUSTED/.test(String(err))) tripGenerationCircuit();
+}
+
+export class GeminiUnavailableError extends Error {
+  constructor(public cause: unknown) { super(`Gemini no disponible por ninguna vía: ${String(cause)}`); }
+}
+
+/**
+ * generateContent con failover entre Replit AI Integrations y la clave directa.
+ * Devuelve la respuesta y el modelo/vía usados; lanza GeminiUnavailableError si
+ * fallan todas las vías por errores recuperables (el llamante decide si usa Claude).
+ */
+async function generateWithFailover(
+  label: string,
+  baseModel: string,
+  build: (model: string, isProxy: boolean) => Parameters<GoogleGenAI["models"]["generateContent"]>[0],
+): Promise<{ response: Awaited<ReturnType<GoogleGenAI["models"]["generateContent"]>>; model: string; isProxy: boolean }> {
+  const clients = generationClients();
+  let lastErr: unknown = new Error("Gemini no configurado");
+  for (const c of clients) {
+    const model = mapModelForProxy(baseModel, c.isProxy);
+    try {
+      const response = await withTimeout(c.client.models.generateContent(build(model, c.isProxy)), GEMINI_CALL_TIMEOUT_MS, `${label}(${model}${c.isProxy ? ",replit" : ",direct"})`);
+      return { response, model, isProxy: c.isProxy };
+    } catch (err) {
+      if (!isRetryableGeminiError(err)) throw err;
+      tripFor(c, err);
+      lastErr = err;
+      logger.warn({ label, via: c.isProxy ? "replit" : "direct", err: String(err).slice(0, 300) }, "[Gemini] vía caída — probando la siguiente");
+    }
+  }
+  throw new GeminiUnavailableError(lastErr);
 }
 
 export function isGeminiAvailable(): boolean {
@@ -131,6 +196,15 @@ export function isGeminiSearchBlocked(): boolean {
   return _searchCircuitOpen > 0 && Date.now() - _searchCircuitOpen < CIRCUIT_BREAKER_COOLDOWN_MS;
 }
 
+let _proxyCircuitOpen = 0;
+function isProxyBlocked(): boolean {
+  return _proxyCircuitOpen > 0 && Date.now() - _proxyCircuitOpen < CIRCUIT_BREAKER_COOLDOWN_MS;
+}
+function tripProxyCircuit(reason: string): void {
+  _proxyCircuitOpen = Date.now();
+  logger.error({ reason: reason.slice(0, 300) }, `[Gemini Circuit Breaker] Replit AI Integrations BLOCKED. Cooldown ${CIRCUIT_BREAKER_COOLDOWN_MS / 1000}s.`);
+}
+
 function isGeminiGenerationBlocked(): boolean {
   return _generationCircuitOpen > 0 && Date.now() - _generationCircuitOpen < CIRCUIT_BREAKER_COOLDOWN_MS;
 }
@@ -140,16 +214,20 @@ export function resetGeminiCircuitBreakers(): { search: boolean; generation: boo
   const genWasOpen = _generationCircuitOpen > 0;
   _searchCircuitOpen = 0;
   _generationCircuitOpen = 0;
+  _proxyCircuitOpen = 0;
   _ai = null;
   logger.info("[Gemini Circuit Breaker] RESET manual — search & generation desbloqueados, cliente recreado");
   return { search: searchWasOpen, generation: genWasOpen };
 }
 
-export function getGeminiStatus(): { configured: boolean; searchBlocked: boolean; generationBlocked: boolean; cooldownMs: number; searchBlockedSecsAgo: number; generationBlockedSecsAgo: number } {
+export function getGeminiStatus(): { configured: boolean; searchBlocked: boolean; generationBlocked: boolean; replitConfigured: boolean; replitBlocked: boolean; preferReplit: boolean; cooldownMs: number; searchBlockedSecsAgo: number; generationBlockedSecsAgo: number } {
   return {
     configured: Boolean(process.env.GEMINI_API_KEY || (process.env.AI_INTEGRATIONS_GEMINI_API_KEY && process.env.AI_INTEGRATIONS_GEMINI_BASE_URL)),
     searchBlocked: isGeminiSearchBlocked(),
     generationBlocked: isGeminiGenerationBlocked(),
+    replitConfigured: !!getGeminiProxyClient(),
+    replitBlocked: isProxyBlocked(),
+    preferReplit: preferReplit(),
     cooldownMs: CIRCUIT_BREAKER_COOLDOWN_MS,
     searchBlockedSecsAgo: _searchCircuitOpen > 0 ? Math.round((Date.now() - _searchCircuitOpen) / 1000) : 0,
     generationBlockedSecsAgo: _generationCircuitOpen > 0 ? Math.round((Date.now() - _generationCircuitOpen) / 1000) : 0,
@@ -232,11 +310,37 @@ async function withRetry<T>(
   throw new Error("unreachable");
 }
 
+function recordGeminiUsage(operation: string, model: string, response: unknown): void {
+  void import("./api-usage.js").then(({ recordApiUsage, calcGeminiCost }) => {
+    const usage = (response as { usageMetadata?: Record<string, unknown> } | null)?.usageMetadata ?? {};
+    const inTok = Number(usage.promptTokenCount) || 0;
+    const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
+    return recordApiUsage({ provider: "gemini", operation, model, inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens", costUsd: calcGeminiCost(model, inTok, outTok) });
+  }).catch(() => { /* nunca bloquea */ });
+}
+
 // ─── Base generation (no search) ─────────────────────────────────────────────
 async function askGemini(prompt: string, systemInstruction?: string, useProModel = false): Promise<string> {
   await assertAiBudget();
-  if (isGeminiGenerationBlocked()) {
-    logger.warn("[askGemini] Circuit breaker open — falling back to Claude");
+  const sys = systemInstruction ?? "You are a precise business intelligence analyst. Always respond with structured, actionable data. Be concise and factual.";
+  try {
+    const { response, model } = await generateWithFailover("askGemini", useProModel ? geminiPro() : geminiFast(), (model) => ({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: sys,
+        maxOutputTokens: 65_536,
+        ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
+      },
+    }));
+    if ((response.candidates?.[0] as { finishReason?: string } | undefined)?.finishReason === "MAX_TOKENS") {
+      logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
+    }
+    recordGeminiUsage("askGemini", model, response);
+    return response.text ?? "";
+  } catch (err) {
+    if (!(err instanceof GeminiUnavailableError)) throw err;
+    logger.warn("[askGemini] Gemini no disponible por ninguna vía — Claude");
     try {
       const { askClaudeWithBrain } = await import("./claude.js");
       return await askClaudeWithBrain(0, [{ role: "user" as const, content: prompt }], systemInstruction ?? "You are a precise business intelligence analyst.", "general");
@@ -244,58 +348,6 @@ async function askGemini(prompt: string, systemInstruction?: string, useProModel
       logger.error({ err: String(claudeErr) }, "[askGemini] Claude fallback also failed");
       return "";
     }
-  }
-
-  try {
-    const ai    = getGeminiClient();
-    const model = useProModel ? geminiPro() : geminiFast();
-
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with structured, actionable data. Be concise and factual.",
-          maxOutputTokens: 65_536,
-          ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
-        },
-      }),
-      GEMINI_CALL_TIMEOUT_MS,
-      `askGemini(${model})`
-    );
-
-    const candidate = response.candidates?.[0];
-    if ((candidate as any)?.finishReason === "MAX_TOKENS") {
-      logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
-    }
-
-    try {
-      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-      const usage = (response as any).usageMetadata ?? {};
-      const inTok = Number(usage.promptTokenCount) || 0;
-      const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
-      void recordApiUsage({
-        provider: "gemini",
-        operation: "askGemini",
-        model,
-        inputUnits: inTok,
-        outputUnits: outTok,
-        unitsLabel: "tokens",
-        costUsd: calcGeminiCost(model, inTok, outTok),
-      });
-    } catch { /* nunca bloquea */ }
-
-    return response.text ?? "";
-  } catch (err) {
-    if (isPermissionDenied(err)) {
-      tripGenerationCircuit();
-      logger.warn("[askGemini] 403 detected — falling back to Claude");
-      try {
-        const { askClaudeWithBrain } = await import("./claude.js");
-        return await askClaudeWithBrain(0, [{ role: "user" as const, content: prompt }], systemInstruction ?? "You are a precise business intelligence analyst.", "general");
-      } catch { return ""; }
-    }
-    throw err;
   }
 }
 
@@ -328,184 +380,71 @@ export async function askGeminiChat(
     return askClaudeWithBrain(0, claudeMsgs, systemInstruction ?? "Eres un asistente útil.", "general");
   };
 
-  const { client: ai, isProxy } = getGenerationClient();
-  const model = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), isProxy);
-
   try {
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          ...(systemInstruction ? { systemInstruction } : {}),
-          maxOutputTokens,
-          ...(thinkingBudget != null ? { thinkingConfig: { thinkingBudget } } : {}),
-        },
-      }),
-      GEMINI_CALL_TIMEOUT_MS,
-      `askGeminiChat(${model}${isProxy ? ",proxy" : ""})`,
-    );
-
-    const candidate = response.candidates?.[0];
-    if ((candidate as any)?.finishReason === "MAX_TOKENS") {
+    const { response, model } = await generateWithFailover("askGeminiChat", useProModel ? geminiPro() : geminiFast(), (model) => ({
+      model,
+      contents,
+      config: {
+        ...(systemInstruction ? { systemInstruction } : {}),
+        maxOutputTokens,
+        ...(thinkingBudget != null ? { thinkingConfig: { thinkingBudget } } : {}),
+      },
+    }));
+    if ((response.candidates?.[0] as { finishReason?: string } | undefined)?.finishReason === "MAX_TOKENS") {
       logger.warn({ model, maxOutputTokens }, "[Gemini Chat] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
     }
-
-    try {
-      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-      const usage = (response as any).usageMetadata ?? {};
-      const inTok = Number(usage.promptTokenCount) || 0;
-      const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
-      void recordApiUsage({
-        provider: "gemini",
-        operation: "askGeminiChat",
-        model,
-        inputUnits: inTok,
-        outputUnits: outTok,
-        unitsLabel: "tokens",
-        costUsd: calcGeminiCost(model, inTok, outTok),
-      });
-    } catch { /* nunca bloquea */ }
-
+    recordGeminiUsage("askGeminiChat", model, response);
     const text = response.text ?? "";
     if (text.trim()) return text;
-
-    // Empty body (e.g. thinking consumed budget) → try Claude rather than returning blank
+    // Cuerpo vacío (p. ej. el razonamiento agotó el presupuesto) → Claude antes que devolver nada
     logger.warn("[askGeminiChat] Empty Gemini response — falling back to Claude");
     try { return await claudeFallback(); } catch { return ""; }
   } catch (err) {
-    if (isPermissionDenied(err)) {
-      if (!isProxy) {
-        tripGenerationCircuit();
-        const proxy = getGeminiProxyClient();
-        if (proxy) {
-          logger.warn("[askGeminiChat] 403 on direct key — retrying via Replit AI Integrations proxy");
-          try {
-            const proxyModel = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), true);
-            const response = await withTimeout(
-              proxy.models.generateContent({
-                model: proxyModel,
-                contents,
-                config: {
-                  ...(systemInstruction ? { systemInstruction } : {}),
-                  maxOutputTokens,
-                  ...(thinkingBudget != null ? { thinkingConfig: { thinkingBudget } } : {}),
-                },
-              }),
-              GEMINI_CALL_TIMEOUT_MS,
-              `askGeminiChat(${proxyModel},proxy-retry)`,
-            );
-            const text = response.text ?? "";
-            if (text.trim()) return text;
-          } catch (proxyErr) {
-            logger.error({ err: String(proxyErr) }, "[askGeminiChat] Proxy retry also failed — falling back to Claude");
-          }
-        }
-      }
-      logger.warn("[askGeminiChat] Gemini unavailable — falling back to Claude");
-      try { return await claudeFallback(); } catch { return ""; }
-    }
-    throw err;
+    if (!(err instanceof GeminiUnavailableError)) throw err;
+    logger.warn("[askGeminiChat] Gemini no disponible por ninguna vía — Claude");
+    try { return await claudeFallback(); } catch { return ""; }
   }
 }
 
 // ─── JSON-structured generation ───────────────────────────────────────────────
 async function askGeminiJson<T = unknown>(prompt: string, systemInstruction?: string, useProModel = false): Promise<T> {
   await assertAiBudget();
-  const { client: ai, isProxy } = getGenerationClient();
-  const model = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), isProxy);
-
+  const sys = systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.";
+  let text: string;
   try {
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.",
-          responseMimeType: "application/json",
-          maxOutputTokens: 65_536,
-          ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
-        },
-      }),
-      GEMINI_CALL_TIMEOUT_MS,
-      `askGeminiJson(${model}${isProxy ? ",proxy" : ""})`
-    );
-
-    const jsonCandidate = response.candidates?.[0];
-    if ((jsonCandidate as any)?.finishReason === "MAX_TOKENS") {
+    const { response, model } = await generateWithFailover("askGeminiJson", useProModel ? geminiPro() : geminiFast(), (model) => ({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: sys,
+        responseMimeType: "application/json",
+        maxOutputTokens: 65_536,
+        ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
+      },
+    }));
+    if ((response.candidates?.[0] as { finishReason?: string } | undefined)?.finishReason === "MAX_TOKENS") {
       logger.warn({ model, maxOutputTokens: 65536 }, "[Gemini JSON] ⚠️ RESPONSE TRUNCATED — hit maxOutputTokens limit");
     }
-
-    try {
-      const { recordApiUsage, calcGeminiCost } = await import("./api-usage.js");
-      const usage = (response as any).usageMetadata ?? {};
-      const inTok = Number(usage.promptTokenCount) || 0;
-      const outTok = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
-      void recordApiUsage({
-        provider: "gemini",
-        operation: "askGeminiJson",
-        model,
-        inputUnits: inTok,
-        outputUnits: outTok,
-        unitsLabel: "tokens",
-        costUsd: calcGeminiCost(model, inTok, outTok),
-      });
-    } catch { /* nunca bloquea */ }
-
-    const text = response.text ?? "{}";
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      try {
-        const match = text.match(/```json\s*([\s\S]*?)```/);
-        return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
-      } catch {
-        logger.error({ textPreview: text.slice(0, 300) }, "[Gemini JSON] Double parse failure");
-        throw new Error("Gemini returned invalid JSON even after cleanup");
-      }
-    }
+    recordGeminiUsage("askGeminiJson", model, response);
+    text = response.text ?? "{}";
   } catch (err) {
-    if (isPermissionDenied(err)) {
-      if (!isProxy) {
-        tripGenerationCircuit();
-        const proxy = getGeminiProxyClient();
-        if (proxy) {
-          logger.warn("[askGeminiJson] 403 on direct key — retrying via Replit AI Integrations proxy");
-          try {
-            const proxyModel = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), true);
-            const response = await withTimeout(
-              proxy.models.generateContent({
-                model: proxyModel,
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                config: {
-                  systemInstruction: systemInstruction ?? "You are a precise business intelligence analyst. Always respond with valid JSON only, no markdown.",
-                  responseMimeType: "application/json",
-                  maxOutputTokens: 65_536,
-                  ...(useProModel ? { thinkingConfig: { thinkingBudget: 10_000 } } : {}),
-                },
-              }),
-              GEMINI_CALL_TIMEOUT_MS,
-              `askGeminiJson(${proxyModel},proxy-retry)`,
-            );
-            const text = response.text ?? "{}";
-            try {
-              return JSON.parse(text) as T;
-            } catch {
-              const match = text.match(/```json\s*([\s\S]*?)```/);
-              return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
-            }
-          } catch (proxyErr) {
-            logger.error({ err: String(proxyErr) }, "[askGeminiJson] Proxy retry also failed — falling back to Claude");
-          }
-        }
-      }
-      logger.warn("[askGeminiJson] Gemini unavailable — falling back to Claude");
-      try {
-        const { askClaudeJson } = await import("./claude.js");
-        return await askClaudeJson<T>(0, prompt, systemInstruction ?? "You are a precise business intelligence analyst.");
-      } catch { return {} as T; }
+    if (!(err instanceof GeminiUnavailableError)) throw err;
+    logger.warn("[askGeminiJson] Gemini no disponible por ninguna vía — Claude");
+    try {
+      const { askClaudeJson } = await import("./claude.js");
+      return await askClaudeJson<T>(0, prompt, systemInstruction ?? "You are a precise business intelligence analyst.");
+    } catch { return {} as T; }
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    try {
+      const match = text.match(/```json\s*([\s\S]*?)```/);
+      return JSON.parse(match ? match[1] : text.replace(/```[\s\S]*?```/g, "").trim()) as T;
+    } catch {
+      logger.error({ textPreview: text.slice(0, 300) }, "[Gemini JSON] Double parse failure");
+      throw new Error("Gemini returned invalid JSON even after cleanup");
     }
-    throw err;
   }
 }
 
@@ -1215,104 +1154,74 @@ export async function* askGeminiStream(
     yield { done: true };
   };
 
-  const { client: ai, isProxy } = getGenerationClient();
-  const model = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), isProxy);
+  // Replit AI Integrations primero; con búsqueda, la clave directa (el grounding solo va por ahí).
+  const clients = generationClients({ needsSearch: useSearch });
+  let lastErr: unknown = null;
 
-  const config: Record<string, unknown> = { maxOutputTokens: 65_536 };
-  if (systemInstruction) config.systemInstruction = systemInstruction;
-  if (thinkingBudget > 0) config.thinkingConfig = { thinkingBudget };
-  if (useSearch && !isProxy) {
-    // Google Search grounding is not guaranteed via the AI Integrations proxy;
-    // only attach it on the direct client.
-    config.tools = [{ googleSearch: { dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.0 } } }];
-  }
-
-  // Retries the same streamed request via the Replit AI Integrations proxy
-  // instead of jumping straight to Claude when the direct key gets a 403.
-  const proxyStreamRetry = async function* (): AsyncGenerator<{ text?: string; done?: boolean; sources?: string[]; error?: string; usage?: GeminiStreamUsage }> {
-    const proxy = getGeminiProxyClient();
-    if (!proxy) { yield* claudeStreamFallback(); return; }
-    logger.warn("[askGeminiStream] 403 on direct key — retrying via Replit AI Integrations proxy");
-    const proxyModel = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), true);
-    const proxyConfig: Record<string, unknown> = { maxOutputTokens: 65_536 };
-    if (systemInstruction) proxyConfig.systemInstruction = systemInstruction;
-    if (thinkingBudget > 0) proxyConfig.thinkingConfig = { thinkingBudget };
+  for (const c of clients) {
+    const model = mapModelForProxy(useProModel ? geminiPro() : geminiFast(), c.isProxy);
+    const config: Record<string, unknown> = { maxOutputTokens: 65_536 };
+    if (systemInstruction) config.systemInstruction = systemInstruction;
+    if (thinkingBudget > 0) config.thinkingConfig = { thinkingBudget };
+    if (useSearch && !c.isProxy) {
+      config.tools = [{ googleSearch: { dynamicRetrievalConfig: { dynamicRetrievalThreshold: 0.0 } } }];
+    }
+    let emitted = false;
     try {
-      const stream = await proxy.models.generateContentStream({ model: proxyModel, contents, config: proxyConfig });
-      let got = false;
+      const stream = await c.client.models.generateContentStream({ model, contents, config });
+      const allSources: string[] = [];
+      let lastUsageMeta: Record<string, unknown> | null = null;
+
       for await (const chunk of stream) {
         const text = chunk.text;
-        if (text) { got = true; yield { text }; }
+        if (text) { emitted = true; yield { text }; }
+
+        // El último chunk trae los totales de uso definitivos
+        const um = (chunk as { usageMetadata?: Record<string, unknown> }).usageMetadata;
+        if (um) lastUsageMeta = um;
+
+        // Fuentes del grounding, si las hay
+        const cand = (chunk as { candidates?: Array<{ groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string } }> } }> }).candidates?.[0];
+        for (const g of cand?.groundingMetadata?.groundingChunks ?? []) { if (g.web?.uri) allSources.push(g.web.uri); }
       }
-      yield { done: true };
-      if (!got) logger.warn("[askGeminiStream] Proxy retry returned empty stream");
-    } catch (proxyErr) {
-      logger.error({ err: String(proxyErr) }, "[askGeminiStream] Proxy retry also failed — falling back to Claude");
-      yield* claudeStreamFallback();
-    }
-  };
 
-  try {
-    const stream = await ai.models.generateContentStream({ model, contents, config });
-    const allSources: string[] = [];
-    let lastUsageMeta: Record<string, unknown> | null = null;
-
-    for await (const chunk of stream) {
-      const text = chunk.text;
-      if (text) yield { text };
-
-      // Acumular usage metadata (el último chunk tiene los totales definitivos)
-      const um = (chunk as any).usageMetadata as Record<string, unknown> | undefined;
-      if (um) lastUsageMeta = um;
-
-      // Extraer sources de grounding si hay
-      const cand = (chunk as any).candidates?.[0];
-      const gm = cand?.groundingMetadata as Record<string, unknown> | undefined;
-      const groundChunks = gm?.groundingChunks as Array<{ web?: { uri?: string } }> | undefined;
-      if (groundChunks) {
-        for (const c of groundChunks) { if (c.web?.uri) allSources.push(c.web.uri); }
+      let usage: GeminiStreamUsage | undefined;
+      if (lastUsageMeta) {
+        const inTok  = Number(lastUsageMeta.promptTokenCount)     || 0;
+        const outTok = (Number(lastUsageMeta.candidatesTokenCount) || 0) + (Number(lastUsageMeta.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
+        const thinkTok = Number(lastUsageMeta.thoughtsTokenCount) || 0;
+        const totalTok = Number(lastUsageMeta.totalTokenCount)    || (inTok + outTok + thinkTok);
+        try {
+          const { calcGeminiCost, recordApiUsage } = await import("./api-usage.js");
+          const costUsd = calcGeminiCost(model, inTok, outTok);
+          usage = { inputTokens: inTok, outputTokens: outTok, thinkingTokens: thinkTok, totalTokens: totalTok, costUsd, model };
+          void recordApiUsage({ provider: "gemini", operation: "chatbot-stream", model, inputUnits: inTok, outputUnits: outTok, unitsLabel: "tokens", costUsd });
+        } catch { /* nunca bloquea el stream */ }
       }
-    }
 
-    // Construir y emitir usage en el evento done
-    let usage: GeminiStreamUsage | undefined;
-    if (lastUsageMeta) {
-      const inTok  = Number(lastUsageMeta.promptTokenCount)     || 0;
-      const outTok = (Number(lastUsageMeta.candidatesTokenCount) || 0) + (Number(lastUsageMeta.thoughtsTokenCount) || 0); // el razonamiento se factura como salida
-      const thinkTok = Number(lastUsageMeta.thoughtsTokenCount) || 0;
-      const totalTok = Number(lastUsageMeta.totalTokenCount)    || (inTok + outTok + thinkTok);
-      try {
-        const { calcGeminiCost, recordApiUsage } = await import("./api-usage.js");
-        const costUsd = calcGeminiCost(model, inTok, outTok);
-        usage = { inputTokens: inTok, outputTokens: outTok, thinkingTokens: thinkTok, totalTokens: totalTok, costUsd, model };
-        void recordApiUsage({
-          provider: "gemini",
-          operation: "chatbot-stream",
-          model,
-          inputUnits: inTok,
-          outputUnits: outTok,
-          unitsLabel: "tokens",
-          costUsd,
-        });
-      } catch { /* never blocks the stream */ }
-    }
-
-    yield { done: true, sources: [...new Set(allSources)], ...(usage ? { usage } : {}) };
-  } catch (err) {
-    logger.error({ err: String(err) }, "[askGeminiStream] Error");
-    if (isPermissionDenied(err)) {
-      if (!isProxy) {
-        tripGenerationCircuit();
-        yield* proxyStreamRetry();
+      if (!emitted) {
+        // Respuesta vacía: se prueba la siguiente vía (o Claude) en vez de dejar al usuario sin nada.
+        logger.warn({ via: c.isProxy ? "replit" : "direct" }, "[askGeminiStream] Respuesta vacía — siguiente vía");
+        lastErr = new Error("empty stream");
+        continue;
+      }
+      yield { done: true, sources: [...new Set(allSources)], ...(usage ? { usage } : {}) };
+      return;
+    } catch (err) {
+      logger.error({ err: String(err).slice(0, 300), via: c.isProxy ? "replit" : "direct" }, "[askGeminiStream] Error");
+      if (emitted || !isRetryableGeminiError(err)) {
+        // Ya se ha enviado texto (no se puede repetir) o el error no es de la vía: se informa.
+        yield { error: String(err) };
+        yield { done: true };
         return;
       }
-      logger.warn("[askGeminiStream] 403 on proxy too — falling back to Claude");
-      yield* claudeStreamFallback();
-      return;
+      tripFor(c, err);
+      lastErr = err;
     }
-    yield { error: String(err) };
-    yield { done: true };
   }
+
+  logger.warn({ err: String(lastErr).slice(0, 300) }, "[askGeminiStream] Gemini no disponible por ninguna vía — Claude");
+  yield* claudeStreamFallback();
 }
 
 // ─── GENERACIÓN DE IMÁGENES NATIVA GEMINI ─────────────────────────────────────
