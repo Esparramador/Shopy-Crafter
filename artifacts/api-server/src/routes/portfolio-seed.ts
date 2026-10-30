@@ -12,6 +12,11 @@
 export const SEED_VERSION = 3;
 
 export interface SeedImage { url: string; alt: string; w?: number; h?: number }
+
+/** Muestras retiradas: antiguas escenas 3D y un grabado cuya lectura no es fiable al redimensionar. */
+export function isRetiredQrPortfolioImage(url: string): boolean {
+  return /^\/portfolio\/qr-artisticos-3d-(?:[1-5]|9)\.webp$/.test(url);
+}
 export interface SeedVariant {
   name: string; client: string; status: string; summary: string; description: string;
   features: string[]; tech: string[]; images: SeedImage[];
@@ -58,7 +63,6 @@ export const SEED: SeedProject[] = [
       {"url": "/portfolio/qr-artisticos-3d-6.webp", "alt": "QR artístico con un bosque ilustrado visto desde el aire", "w": 768, "h": 768},
       {"url": "/portfolio/qr-artisticos-3d-7.webp", "alt": "Código QR integrado con un personaje ilustrado", "w": 1100, "h": 1100},
       {"url": "/portfolio/qr-artisticos-3d-8.webp", "alt": "Código QR integrado en una composición ilustrada", "w": 1100, "h": 1100},
-      {"url": "/portfolio/qr-artisticos-3d-9.webp", "alt": "Código QR artístico con acabado de grabado", "w": 768, "h": 768},
       {"url": "/portfolio/qr-artisticos-3d-10.webp", "alt": "Código QR artístico con los colores de la marca", "w": 1100, "h": 1100}
     ],
     "variants": [],
@@ -87,7 +91,7 @@ export const GENERIC_V1: Record<string, string> = {
  *  - campo que sigue exactamente con el texto anterior → pasa al texto nuevo de SEED;
  *  - campo editado desde el panel → solo se cambian los nombres de PATCH_RENAMES.
  */
-export const PATCH_VERSION = 4; // 1–3: cambios anteriores · 4: portfolio de QR artísticos (todo idempotente)
+export const PATCH_VERSION = 5; // 4: solo QR artísticos · 5: retirar la muestra de grabado de lectura poco fiable
 
 /** Proyectos nuevos que se añaden una vez a una BD ya sembrada (no recrea los borrados después). */
 export const PATCH_NEW_SLUGS: string[] = ["taller-laser"];

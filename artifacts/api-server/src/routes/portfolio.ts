@@ -17,7 +17,7 @@ import { sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { saveMedia, getMedia, deleteMedia, mediaIdFromUrl } from "../lib/media-store.js";
-import { SEED, SEED_VERSION, GENERIC_V1, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS } from "./portfolio-seed.js";
+import { SEED, SEED_VERSION, GENERIC_V1, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS, isRetiredQrPortfolioImage } from "./portfolio-seed.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 12 } });
@@ -175,7 +175,7 @@ async function applyPatches(): Promise<void> {
     let tech = Array.isArray(row.tech) ? renamedDeep(row.tech as string[]) : [];
     if (slug === "qr-artisticos-3d") {
       // El proyecto conserva solo muestras artísticas; las escenas QR en 3D no forman parte de esta ficha.
-      images = images.filter(im => !/^\/portfolio\/qr-artisticos-3d-[1-5]\.webp$/.test(im.url));
+      images = images.filter(im => !isRetiredQrPortfolioImage(im.url));
       features = features.filter(f => !/^Escenas en 3D:|^Vídeo de la transformación/.test(f));
       tech = tech.filter(t => t !== "Three.js" && t !== "WebGL");
     }
