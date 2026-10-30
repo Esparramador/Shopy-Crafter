@@ -4,8 +4,8 @@
 // Comprueba, con sesión real de admin y contra ElevenLabs:
 //   1. La tarjeta carga los valores actuales del servidor (sliders + badge de origen).
 //   2. "Escuchar muestra" obtiene audio/mpeg del endpoint de previsualización.
-//   3. Mover un slider habilita "Guardar"; al guardar, el servidor persiste el valor
-//      y la tarjeta de salud pasa a "drift" (la próxima llamada lo aplica).
+//   3. Mover un slider habilita "Guardar y aplicar ahora"; el servidor persiste
+//      el valor y aplica/verifica los tres agentes existentes sin recrearlos.
 //   4. Se restauran los valores anteriores al terminar (siempre, también si falla).
 //
 // Uso: ADMIN_PASSWORD=… node e2e/convai-voice-tuning.e2e.mjs
@@ -67,6 +67,7 @@ try {
   };
   assert(JSON.stringify(shown) === JSON.stringify(original), `Los sliders muestran los valores del servidor (${JSON.stringify(shown)})`);
   assert(await page.getByTestId("convai-voice-tuning-save").isDisabled(), "Guardar está deshabilitado sin cambios");
+  assert(await page.getByTestId("convai-voice-tuning-save-apply").isDisabled(), "Guardar y aplicar está deshabilitado sin cambios");
   await card.screenshot({ path: path.join(OUT, "01-loaded.png") });
 
   // 2. Escuchar muestra → audio/mpeg
@@ -90,9 +91,10 @@ try {
     el.dispatchEvent(new Event("change", { bubbles: true }));
   }, newSpeed);
   assert((await page.getByTestId("convai-voice-tuning-speed-value").textContent()).startsWith(newSpeed.toFixed(2)), `El valor mostrado cambia a ${newSpeed.toFixed(2)}`);
-  assert(!(await page.getByTestId("convai-voice-tuning-save").isDisabled()), "Guardar se habilita al cambiar un slider");
+  assert(!(await page.getByTestId("convai-voice-tuning-save-apply").isDisabled()), "Guardar y aplicar se habilita al cambiar un slider");
   const saveResp = page.waitForResponse(r => r.url().includes("/api/voice/convai/voice-settings") && r.request().method() === "PUT", { timeout: 30_000 });
-  await page.getByTestId("convai-voice-tuning-save").click();
+  const applyResp = page.waitForResponse(r => r.url().includes("/api/voice/convai/voice-settings/apply") && r.request().method() === "POST", { timeout: 60_000 });
+  await page.getByTestId("convai-voice-tuning-save-apply").click();
   const sr = await saveResp;
   assert(sr.status() === 200, `Guardar → HTTP ${sr.status()}`);
   const savedResponse = await sr.json();
@@ -101,10 +103,22 @@ try {
   assert(history[0].settings.speed === newSpeed, "El historial guarda los tres valores nuevos");
   assert(history[0].userId && history[0].userName && history[0].userEmail === EMAIL, "El historial identifica al admin que guardó");
   assert(Number.isFinite(Date.parse(history[0].changedAt)), "El historial guarda la fecha del cambio");
+  const ar = await applyResp;
+  assert(ar.status() === 200, `Aplicar agentes en sitio → HTTP ${ar.status()}`);
+  const applyResult = await ar.json();
+  assert(applyResult.success === true, "Guardar y aplicar devuelve éxito");
+  assert(Object.keys(applyResult.agents || {}).length === 3, "La aplicación informa del estado de admin, cliente y landing");
+  assert(Object.values(applyResult.agents).every(a => a.status === "applied" || a.status === "not_created"), "Los agentes existentes se sincronizan en sitio y los no creados no se crean");
   const after = (await (await ctx.request.get(`${BASE}/api/voice/convai/voice-settings`)).json()).settings;
   assert(after.speed === newSpeed && after.stability === original.stability, `El servidor persistió speed=${after.speed}`);
   await page.getByTestId("convai-voice-tuning-source").filter({ hasText: "Guardado en el panel" }).waitFor({ timeout: 15_000 });
   ok("El badge de origen indica 'Guardado en el panel'");
+  await page.getByText("Llamadas de voz operativas", { exact: true }).waitFor({ timeout: 30_000 });
+  const appliedHealth = await (await ctx.request.get(`${BASE}/api/voice/convai/health`)).json();
+  assert(appliedHealth.healthy === true, "La salud queda operativa sin esperar a otra llamada");
+  assert((appliedHealth.agents || []).every(a => a.status === "ok" || a.status === "not_created"), "La salud confirma que no queda deriva");
+  await page.getByTestId("convai-voice-tuning-save-apply").filter({ hasText: "Guardar y aplicar ahora" }).waitFor({ state: "visible" });
+  await page.getByText("Guardado y aplicado", { exact: true }).waitFor({ timeout: 15_000 });
   const restoreButton = page.getByTestId(`convai-voice-history-restore-${history[0].id}`);
   await restoreButton.waitFor({ state: "visible", timeout: 15_000 });
   assert((await page.getByTestId("convai-voice-tuning-history").textContent()).includes("Volver a este ajuste"), "La tarjeta muestra el historial y su acción de restauración");
@@ -113,10 +127,9 @@ try {
   const rr = await restoreResp;
   assert(rr.status() === 200, `Restaurar usa el guardado validado → HTTP ${rr.status()}`);
   assert(JSON.stringify((await rr.json()).settings) === JSON.stringify(history[0].settings), "La restauración guarda los valores seleccionados");
-  // La salud debe reflejar deriva (los agentes aún llevan el valor antiguo)
+  // Restaurar un registro vuelve a guardar esos mismos valores ya aplicados.
   const health = await (await ctx.request.get(`${BASE}/api/voice/convai/health`)).json();
-  const drifted = (health.agents || []).filter(a => a.status === "drift").length;
-  assert(drifted > 0 || (health.agents || []).every(a => a.status === "not_created"), `La salud detecta la deriva tras guardar (${drifted} agentes en drift)`);
+  assert(health.healthy === true, "La salud sigue operativa tras restaurar un registro con los mismos valores");
   await page.waitForTimeout(500);
   await card.screenshot({ path: path.join(OUT, "02-saved.png") });
 
@@ -126,11 +139,16 @@ try {
   exitCode = 1;
   console.error(`✗ ${err?.message || err}`);
 } finally {
-  // 4. Restaurar siempre los valores anteriores y re-sincronizar el agente admin.
+  // 4. Restaurar siempre los valores anteriores y aplicarlos en sitio.
   if (original) {
     const restore = await ctx.request.put(`${BASE}/api/voice/convai/voice-settings`, { data: original });
     console.log(restore.ok() ? `✓ Valores restaurados: ${JSON.stringify(original)}` : `✗ No se pudieron restaurar los valores (${restore.status()})`);
     if (!restore.ok()) exitCode = 1;
+    else {
+      const apply = await ctx.request.post(`${BASE}/api/voice/convai/voice-settings/apply`);
+      console.log(apply.ok() ? "✓ Valores originales aplicados a los agentes existentes" : `✗ No se pudieron aplicar los valores originales (${apply.status()})`);
+      if (!apply.ok()) exitCode = 1;
+    }
   }
   await browser.close();
   process.exit(exitCode);

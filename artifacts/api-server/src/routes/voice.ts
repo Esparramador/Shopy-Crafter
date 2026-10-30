@@ -1092,8 +1092,8 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
 
 // ── Ajustes de voz de Arturo (stability / similarity_boost / speed) ───────────
 // Persistidos en platform_settings_kv para afinar la voz desde el panel sin
-// redesplegar. Guardar invalida la caché de agentes: la próxima llamada (o
-// "Re-sincronizar") aplica y verifica los valores nuevos en ElevenLabs.
+// redesplegar. Guardar invalida la caché; "Guardar y aplicar ahora" sincroniza
+// los agentes existentes en sitio y verifica lo persistido en ElevenLabs.
 async function respondTtsSettings(res: import("express").Response, extra: Record<string, unknown> = {}): Promise<void> {
   const stored = await getConvAITtsSettingsStored();
   const history = await getConvAITtsHistory();
@@ -1145,6 +1145,75 @@ router.put("/voice/convai/voice-settings", requireAdmin, async (req, res): Promi
     logger.error({ err: err?.message }, "convai/voice-settings save failed");
     res.status(500).json({ error: err?.message || "Error guardando los ajustes de voz" });
   }
+});
+
+// Aplica los ajustes guardados a los agentes que ya existen, sin recrearlos.
+// Las llamadas en curso comparten el mismo single-flight para evitar carreras.
+router.post("/voice/convai/voice-settings/apply", requireAdmin, async (_req, res): Promise<void> => {
+  const types: AgentType[] = ["admin", "client", "landing"];
+  const agents: Partial<Record<AgentType, { agentId: string | null; status: "applied" | "not_created" | "error"; error?: string }>> = {};
+  let failed = false;
+
+  for (const type of types) {
+    const inFlight = _agentResolveInFlight[type];
+    if (inFlight) await inFlight.catch(() => undefined);
+
+    const cacheKey = `convai_${type}_agent_id`;
+    let resolvedAgentId: string | null = null;
+    try {
+      const agentId = await findExistingConvAIAgentId(type);
+      if (!agentId) {
+        agents[type] = { agentId: null, status: "not_created" };
+        continue;
+      }
+      resolvedAgentId = agentId;
+
+      const voiceId = await resolveVerifiedConvAIVoiceId();
+      let appliedAgentId: string | null = null;
+      while (!appliedAgentId) {
+        const concurrent = _agentResolveInFlight[type];
+        if (concurrent) {
+          await concurrent.catch(() => undefined);
+          const latestAgentId = await findExistingConvAIAgentId(type);
+          if (!latestAgentId) {
+            agents[type] = { agentId: null, status: "not_created" };
+            break;
+          }
+          resolvedAgentId = latestAgentId;
+          continue;
+        }
+
+        const work = (async (): Promise<string> => {
+          await syncConvAIAgentOrThrow(type, resolvedAgentId!, voiceId);
+          _agentIdCache[cacheKey] = resolvedAgentId!;
+          return resolvedAgentId!;
+        })();
+        _agentResolveInFlight[type] = work;
+        try {
+          appliedAgentId = await work;
+        } finally {
+          if (_agentResolveInFlight[type] === work) delete _agentResolveInFlight[type];
+        }
+      }
+      if (appliedAgentId) agents[type] = { agentId: appliedAgentId, status: "applied" };
+    } catch (err: any) {
+      failed = true;
+      agents[type] = {
+        agentId: type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID
+          ? process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID
+          : resolvedAgentId ?? _agentIdCache[cacheKey] ?? null,
+        status: "error",
+        error: err?.message || "No se pudo aplicar la configuración",
+      };
+      logger.error({ type, err: err?.message, code: err?.code }, "ConvAI voice settings apply failed");
+    }
+  }
+
+  if (failed) {
+    res.status(502).json({ success: false, error: "No se pudieron aplicar los ajustes a todos los agentes.", agents });
+    return;
+  }
+  res.json({ success: true, agents });
 });
 
 // Muestra corta con la MISMA voz y modelo que usa Arturo, con los valores del

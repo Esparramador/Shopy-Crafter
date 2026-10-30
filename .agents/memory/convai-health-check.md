@@ -7,4 +7,6 @@ description: Why GET /voice/convai/health is read-only with a "drift" state, and
 
 **Why:** a first version ran sync+verify inside the GET; the reviewer flagged that opening a tab silently PATCHed three provider agents and could overwrite dashboard edits. Verify-only alone gave false reds (a cold call would have repaired the drift), hence the three-way status.
 
-**How to apply:** any explicit repair belongs to `POST /voice/convai/reset-agents`. That route must (1) await `_agentResolveInFlight[type]` and publish its own work there so concurrent calls wait instead of auto-creating duplicates, and (2) sync the `ELEVEN_CONVAI_DEFAULT_AGENT_ID` admin agent in place — deleting it leaves startup pointing at a dead ID.
+**How to apply:** keep health GET read-only. For saved voice-tuning changes, use the non-destructive apply action: it PATCHes and verifies existing admin/client/landing agents in place, shares `_agentResolveInFlight[type]`, and preserves the `ELEVEN_CONVAI_DEFAULT_AGENT_ID` admin agent. Use `POST /voice/convai/reset-agents` only when recreation is explicitly intended; it must also respect single-flight and keep the env-pinned admin agent in place.
+
+**Why:** changing TTS values does not require replacing agents; recreation risks changing IDs or leaving startup pointed at a deleted admin agent.
