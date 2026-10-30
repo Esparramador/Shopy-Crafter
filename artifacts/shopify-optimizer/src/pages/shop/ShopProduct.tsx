@@ -3,7 +3,8 @@ import { Link, useLocation, useParams } from "wouter";
 import gsap from "gsap";
 import PageMeta from "@/components/PageMeta";
 import ShopLayout from "./ShopLayout";
-import { API, apiJson, assetUrl, cart, coverOf, euros, minQty, unitPrice, type Field, type Media, type Product } from "./shop-api";
+import { API, apiJson, assetUrl, cart, coverOf, euros, fromPrice, loadCatalog, minQty, suggestions, unitPrice, type Field, type Media, type Product } from "./shop-api";
+import { bindMagnetic, burst, flyToCart, openCartDrawer, prefersReduced, pulse, useTweened } from "./shop-motion";
 import { SITE_URL } from "@/seo/meta";
 import type { PreviewShape } from "@/components/shop/Shop3D";
 
@@ -26,10 +27,16 @@ function Gallery({ media, name, preview }: { media: Media[]; name: string; previ
   const slides = preview ? ["3d", ...media.map((_, i) => i)] : media.map((_, i) => i);
   const [i, setI] = useState(0);
   const cur = slides[i];
+  const stage = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = stage.current?.firstElementChild;
+    if (!el || prefersReduced()) return;
+    gsap.fromTo(el, { opacity: 0, scale: 1.06, filter: "blur(8px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.6, ease: "power3.out" });
+  }, [i]);
   if (slides.length === 0) return <div className="shop-gallery-main shop-card-noimg"><span>{name}</span></div>;
   return (
     <div className="shop-gallery">
-      <div className="shop-gallery-main">
+      <div ref={stage} className="shop-gallery-main" data-fly-source>
         {cur === "3d" ? preview : (() => {
           const m = media[cur as number];
           return m.type === "video"
@@ -119,7 +126,13 @@ export default function ShopProduct() {
   const [files, setFiles] = useState<Record<string, Uploaded[]>>({});
   const [formErr, setFormErr] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [related, setRelated] = useState<Product[]>([]);
+  const [barOn, setBarOn] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const priceEl = useRef<HTMLElement>(null);
+  const actions = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setP(null); setError(null);
@@ -134,18 +147,49 @@ export default function ShopProduct() {
   }, [slug]);
 
   useEffect(() => {
-    if (!p || !root.current || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (!p || !root.current) return;
+    const unMag = bindMagnetic(root.current);
+    if (prefersReduced()) return unMag;
     const ctx = gsap.context(() => {
-      gsap.from(".shop-pd-info > *", { y: 24, opacity: 0, duration: 0.7, stagger: 0.05, ease: "power3.out" });
-      gsap.from(".shop-gallery", { scale: 0.96, opacity: 0, duration: 0.9, ease: "power3.out" });
+      gsap.from(".shop-pd-info > *", { y: 30, opacity: 0, duration: 0.8, stagger: 0.06, ease: "power3.out" });
+      gsap.from(".shop-gallery", { scale: 0.9, opacity: 0, rotateY: -12, transformPerspective: 1200, duration: 1.1, ease: "expo.out" });
+      gsap.from(".shop-pd-details > *, .shop-related", { y: 40, opacity: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: ".shop-pd-details", start: "top 85%", once: true } });
     }, root);
-    return () => ctx.revert();
+    return () => { ctx.revert(); unMag(); };
   }, [p]);
+
+  // «Combina con»: otros productos del catálogo.
+  useEffect(() => {
+    if (!p) return;
+    loadCatalog().then(c => setRelated(suggestions(c.products.filter(x => x.category === p.category).concat(c.products), [p.slug], 3))).catch(() => {});
+  }, [p]);
+
+  // Barra fija de compra cuando los botones principales salen de la pantalla.
+  useEffect(() => {
+    const el = actions.current;
+    if (!el) return;
+    // Se mira la posición real en cada scroll (también tras saltos o cambios de altura de la página).
+    let raf = 0;
+    const check = () => { raf = 0; setBarOn(el.getBoundingClientRect().bottom < 0); };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(check); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    check();
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); cancelAnimationFrame(raf); };
+  }, [p]);
+  useEffect(() => {
+    if (!bar.current) return;
+    if (prefersReduced()) { bar.current.style.transform = barOn ? "none" : "translateY(120%)"; return; }
+    gsap.to(bar.current, { y: barOn ? 0 : bar.current.offsetHeight + 24, duration: 0.5, ease: barOn ? "back.out(1.4)" : "power2.in" });
+  }, [barOn]);
 
   const v = p?.variants.find(x => x.key === variant) ?? p?.variants[0];
   const unit = p && v ? unitPrice(v, qty) : 0;
   const addonTotal = p ? p.addons.filter(a => addons.includes(a.key)).reduce((s, a) => s + (a.perUnit ? a.cents * qty : a.cents), 0) : 0;
   const total = unit * qty + addonTotal;
+
+  const shown = useTweened(total);
+  useEffect(() => { pulse(priceEl.current); }, [total]);
 
   const previewCfg = p ? PREVIEW[p.slug] : undefined;
   const previewImg = previewCfg ? (files[previewCfg.field]?.find(u => u.preview)?.preview ?? assetUrl(previewCfg.sample)) : null;
@@ -177,12 +221,26 @@ export default function ShopProduct() {
         if (ups.length) { fields[f.key] = ups.map(u => u.id); ups.forEach(u => { names[u.id] = u.name; }); }
       } else if ((values[f.key] ?? "").trim()) fields[f.key] = values[f.key].trim();
     }
-    cart.add({
+    const item = cart.add({
       slug: p.slug, name: p.name, image: coverOf(p), kind: p.kind, variant: v.key, variantName: v.name, qty,
       addons, fields, files: names, estimateCents: total,
     });
-    if (goToCart) navigate("/tienda/carrito");
-    else { setAdded(true); setTimeout(() => setAdded(false), 2500); }
+    setBusy(true);
+    void flyToCart(document.querySelector("[data-fly-source]"), item.image).then(() => {
+      setBusy(false);
+      if (goToCart) { navigate("/tienda/carrito"); return; }
+      setAdded(true);
+      setTimeout(() => setAdded(false), 2500);
+      openCartDrawer(item);
+    });
+  };
+
+  const pop = (e: React.MouseEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+    if (prefersReduced()) return;
+    gsap.fromTo(el, { scale: 0.94 }, { scale: 1, duration: 0.5, ease: "back.out(3)" });
+    const r = el.getBoundingClientRect();
+    burst(r.left + r.width / 2, r.top + r.height / 2, 8);
   };
 
   if (error) return <ShopLayout><div className="shop-wrap shop-empty"><h1>No encontramos este producto</h1><p>{error}</p><Link href="/tienda" className="shop-btn shop-btn-gold">Volver a la tienda</Link></div></ShopLayout>;
@@ -208,7 +266,7 @@ export default function ShopProduct() {
             ) : (
               <form className="shop-pd-form" onSubmit={e => { e.preventDefault(); addToCart(true); }} noValidate>
                 <div className="shop-price" aria-live="polite">
-                  <strong>{euros(total)}</strong>
+                  <strong ref={priceEl}>{euros(shown)}</strong>
                   {qty > 1 && <span>{euros(unit)} / ud. · {qty} unidades</span>}
                   <small>IVA incluido{p.kind === "physical" ? " · envío aparte, gratis desde 60 €" : ""}</small>
                 </div>
@@ -218,7 +276,7 @@ export default function ShopProduct() {
                     <legend>Opción</legend>
                     <div className="shop-seg">
                       {p.variants.map(x => (
-                        <label key={x.key} className={x.key === v.key ? "on" : ""}>
+                        <label key={x.key} className={x.key === v.key ? "on" : ""} onClick={x.key === v.key ? undefined : pop}>
                           <input type="radio" name="variant" value={x.key} checked={x.key === v.key}
                             onChange={() => { setVariant(x.key); setQty(q => Math.max(q, minQty(p, x))); }} />
                           <span>{x.name}</span><em>{euros(x.tiers[0].unitCents)}</em>
@@ -234,7 +292,7 @@ export default function ShopProduct() {
                     {qtyChoices.length ? (
                       <div className="shop-seg shop-seg-qty">
                         {qtyChoices.map(n => (
-                          <label key={n} className={n === qty ? "on" : ""}>
+                          <label key={n} className={n === qty ? "on" : ""} onClick={n === qty ? undefined : pop}>
                             <input type="radio" name="qty" value={n} checked={n === qty} onChange={() => setQty(n)} />
                             <span>{n} uds.</span><em>{euros(unitPrice(v, n))}/ud.</em>
                           </label>
@@ -293,10 +351,15 @@ export default function ShopProduct() {
                 )}
 
                 {formErr && <p className="shop-error" role="alert">{formErr}</p>}
-                <div className="shop-pd-actions">
-                  <button type="submit" className="shop-btn shop-btn-gold">Añadir y pagar</button>
-                  <button type="button" className="shop-btn shop-btn-ghost" onClick={() => addToCart(false)}>{added ? "Añadido ✓" : "Añadir al carrito"}</button>
+                <div ref={actions} className="shop-pd-actions">
+                  <button type="submit" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine" disabled={busy}>Comprar ahora · {euros(total)}</button>
+                  <button type="button" className={`shop-btn shop-btn-ghost shop-btn-lg${added ? " is-added" : ""}`} disabled={busy} onClick={() => addToCart(false)}>{added ? "¡Añadido! ✓" : "Añadir al carrito"}</button>
                 </div>
+                <ul className="shop-trust">
+                  <li>🔒 Pago seguro con Stripe</li>
+                  <li>✓ Prueba antes de producir</li>
+                  <li>{p.kind === "physical" ? "🚚 Envío gratis desde 60 €" : "⚡ Entrega digital"}</li>
+                </ul>
                 <p className="shop-pd-lead">{p.kind === "physical" ? `Producción en ${p.leadDays} días laborables tras aprobar la prueba.` : `Entrega en ${p.leadDays} días laborables tras recibir tu material.`}</p>
               </form>
             )}
@@ -318,7 +381,37 @@ export default function ShopProduct() {
             </div>
           )}
         </section>
+
+        {related.length > 0 && (
+          <section className="shop-related" aria-labelledby="rel-h">
+            <h2 id="rel-h">Combina con</h2>
+            <div className="shop-related-grid">
+              {related.map(r => {
+                const cover = coverOf(r);
+                const fp = fromPrice(r);
+                return (
+                  <Link key={r.slug} href={`/tienda/${r.slug}`} className="shop-related-card">
+                    {cover ? <img src={cover} alt="" loading="lazy" /> : <span className="shop-card-noimg" />}
+                    <span><b>{r.name}</b><small>{r.kind === "quote" ? "Presupuesto" : `${fp.perUnit ? "Desde " : ""}${euros(fp.cents)}${fp.perUnit ? " / ud." : ""}`}</small></span>
+                    <em>Ver →</em>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
+
+      {p.kind !== "quote" && (
+        <div ref={bar} className="shop-buybar" style={{ transform: "translateY(130%)" }} aria-hidden={!barOn}>
+          <div className="shop-wrap shop-buybar-in">
+            <span className="shop-buybar-name">{p.name}<small>{v.name}{qty > 1 ? ` · ${qty} uds.` : ""}</small></span>
+            <strong>{euros(total)}</strong>
+            <button type="button" className="shop-btn shop-btn-ghost" tabIndex={barOn ? 0 : -1} disabled={busy} onClick={() => addToCart(false)}>Añadir</button>
+            <button type="button" className="shop-btn shop-btn-gold shop-btn-shine" tabIndex={barOn ? 0 : -1} disabled={busy} onClick={() => addToCart(true)}>Comprar</button>
+          </div>
+        </div>
+      )}
     </ShopLayout>
   );
 }

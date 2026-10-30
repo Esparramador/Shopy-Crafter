@@ -265,7 +265,7 @@ export function PackConfigurator({ data, error, loggedInClient, onSubmit }: {
               })}
             </div>
           )}
-          <p className="lxk-muted">¿Tarjetas metálicas, placas QR o regalos 3D? Están en la <Link href="/tienda">tienda</Link>.</p>
+          <p className="lxk-muted">¿Tarjetas de aluminio, placas QR o regalos 3D? Están en la <Link href="/tienda">tienda</Link>.</p>
         </section>
       </div>
 

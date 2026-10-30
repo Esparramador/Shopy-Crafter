@@ -4,6 +4,7 @@ import PageMeta from "@/components/PageMeta";
 import { SITE_URL } from "@/seo/meta";
 import ShopLayout from "./ShopLayout";
 import { apiJson, cart, euros } from "./shop-api";
+import { confetti } from "./shop-motion";
 
 interface Order {
   token: string; status: string; totalCents: number; shippingCents: number; hasPhysical: boolean; email: string | null;
@@ -22,7 +23,10 @@ export default function ShopThanks() {
     if (!token) { setError("Falta el número de pedido."); return; }
     const path = session ? `/shop/checkout/verify?session_id=${encodeURIComponent(session)}&pedido=${encodeURIComponent(token)}` : `/shop/orders/${encodeURIComponent(token)}`;
     apiJson<Order>(path)
-      .then(o => { setOrder(o); if (o.status !== "pending" && o.status !== "expired") cart.clear(); })
+      .then(o => {
+        setOrder(o);
+        if (o.status !== "pending" && o.status !== "expired" && o.status !== "cancelled") { cart.clear(); confetti(); }
+      })
       .catch(e => setError(e instanceof Error ? e.message : "Error"));
   }, [token, session]);
 
@@ -49,6 +53,7 @@ export default function ShopThanks() {
             </ul>
             <div className="shop-hero-ctas">
               <Link href="/tienda" className="shop-btn shop-btn-gold">Volver a la tienda</Link>
+              {paid && <a href="https://www.instagram.com/shopycrafter/" target="_blank" rel="noopener noreferrer" className="shop-btn shop-btn-ghost">Síguenos en Instagram</a>}
               {!paid && <Link href="/tienda/carrito" className="shop-btn shop-btn-ghost">Ir al carrito</Link>}
             </div>
           </>

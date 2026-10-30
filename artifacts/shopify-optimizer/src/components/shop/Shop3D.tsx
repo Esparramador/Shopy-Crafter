@@ -1,6 +1,6 @@
 /**
  * 3D de la tienda (React Three Fiber). Se carga aparte (lazy) para no pesar en el resto de la web.
- *  - ShopHero3D: tarjeta metálica y placa de madera flotando; el scroll de la portada las gira (GSAP).
+ *  - ShopHero3D: tarjeta de aluminio y placa de madera flotando; el scroll de la portada las gira (GSAP).
  *  - ProductPreview3D: la pieza con la imagen del cliente, tratada como quedaría grabada.
  * Sin entornos HDR remotos: la luz es local (Lightformer), así no depende de ningún CDN.
  */
@@ -97,7 +97,7 @@ function HeroPieces({ progress }: { progress: React.MutableRefObject<number> }) 
 
 export function ShopHero3D({ progress }: { progress: React.MutableRefObject<number> }) {
   const [ok] = useState(() => typeof window !== "undefined" && webglAvailable());
-  const fallback = <img className="shop-hero-fallback" src={assetUrl("/tienda-media/tarjeta-shopycrafter-delante.webp")} alt="Tarjeta metálica de Shopy Crafter" />;
+  const fallback = <img className="shop-hero-fallback" src={assetUrl("/tienda-media/tarjeta-shopycrafter-delante.webp")} alt="Tarjeta de aluminio de Shopy Crafter" />;
   if (!ok) return fallback;
   return (
     <GLBoundary fallback={fallback}>
@@ -106,7 +106,7 @@ export function ShopHero3D({ progress }: { progress: React.MutableRefObject<numb
         camera={{ position: [0, 0, 24], fov: 35 }}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
         frameloop={prefersReduced() ? "demand" : "always"}
-        aria-label="Tarjeta metálica y placa de madera en 3D"
+        aria-label="Tarjeta de aluminio y placa de madera en 3D"
       >
         <ambientLight intensity={0.35} />
         <directionalLight position={[5, 8, 6]} intensity={1.2} castShadow />

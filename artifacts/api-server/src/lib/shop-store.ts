@@ -96,6 +96,18 @@ async function seedCatalog(): Promise<void> {
               ${p.minQty}, ${p.maxQty}, ${p.leadDays}, ${p.demoUrl}, ${p.featured}, ${p.visible}, ${p.sortOrder})
       ON CONFLICT (slug) DO NOTHING
     `);
+    // Un producto que nadie ha tocado desde el panel (updated_at = created_at) sigue al catálogo:
+    // así llegan los cambios de precio o texto de una versión nueva sin pisar lo editado a mano.
+    await db.execute(sql`
+      UPDATE shop_products SET
+        kind = ${p.kind}, category = ${p.category}, name = ${p.name}, tagline = ${p.tagline}, description = ${p.description},
+        features = ${JSON.stringify(p.features)}::jsonb, media = ${JSON.stringify(p.media)}::jsonb,
+        variants = ${JSON.stringify(p.variants)}::jsonb, addons = ${JSON.stringify(p.addons)}::jsonb,
+        fields = ${JSON.stringify(p.fields)}::jsonb, qty_options = ${JSON.stringify(p.qtyOptions)}::jsonb,
+        min_qty = ${p.minQty}, max_qty = ${p.maxQty}, lead_days = ${p.leadDays}, demo_url = ${p.demoUrl},
+        featured = ${p.featured}, visible = ${p.visible}, sort_order = ${p.sortOrder}
+      WHERE slug = ${p.slug} AND updated_at = created_at
+    `);
   }
   await db.execute(sql`
     INSERT INTO app_settings (key, value) VALUES ('shop_catalog_version', ${SHOP_SEED_VERSION})

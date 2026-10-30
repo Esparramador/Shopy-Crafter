@@ -49,6 +49,28 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   return d as T;
 }
 
+let catalogPromise: Promise<Catalog> | null = null;
+/** Catálogo público, una sola petición por visita (la tienda, la ficha y el carrito lo comparten). */
+export function loadCatalog(): Promise<Catalog> {
+  if (!catalogPromise) catalogPromise = apiJson<Catalog>("/shop/products").catch(e => { catalogPromise = null; throw e; });
+  return catalogPromise;
+}
+
+let settingsPromise: Promise<ShopSettings> | null = null;
+export function loadSettings(): Promise<ShopSettings> {
+  if (!settingsPromise) settingsPromise = apiJson<ShopSettings>("/shop/settings").catch(e => { settingsPromise = null; throw e; });
+  return settingsPromise;
+}
+
+/** Productos para sugerir: destacados primero, sin los que ya están en el carrito ni el actual. */
+export function suggestions(products: Product[], exclude: string[], n: number): Product[] {
+  const skip = new Set(exclude);
+  return products
+    .filter(p => !skip.has(p.slug) && p.kind !== "quote")
+    .sort((a, b) => Number(b.featured) - Number(a.featured) || a.sortOrder - b.sortOrder)
+    .slice(0, n);
+}
+
 export function unitPrice(v: Variant, qty: number): number {
   const tiers = [...v.tiers].sort((a, b) => a.min - b.min);
   let unit = tiers[0]?.unitCents ?? 0;
@@ -109,7 +131,11 @@ function write(items: CartItem[]) {
 
 export const cart = {
   items: read,
-  add(item: Omit<CartItem, "id">) { write([...read(), { ...item, id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}` }]); },
+  add(item: Omit<CartItem, "id">): CartItem {
+    const full = { ...item, id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}` };
+    write([...read(), full]);
+    return full;
+  },
   remove(id: string) { write(read().filter(i => i.id !== id)); },
   clear() { write([]); },
   subscribe(l: () => void) { listeners.add(l); return () => { listeners.delete(l); }; },

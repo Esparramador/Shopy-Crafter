@@ -216,7 +216,6 @@ async function previousScore(projectId: number, url: string, strategy: string): 
 export async function runPageSpeedFor(p: MonitoredProject, plan: StorePlan): Promise<{ measured: number; drops: string[] }> {
   const cfg = plan.quotas.pagespeed;
   if (!cfg) return { measured: 0, drops: [] };
-  if (!process.env.GOOGLE_PAGESPEED_API_KEY) throw new Error("GOOGLE_PAGESPEED_API_KEY no configurada");
   const { runPageSpeedAudit } = await import("./pagespeed.js");
   const urls = await pagesToMeasure(p, cfg.urls);
   const drops: string[] = [];

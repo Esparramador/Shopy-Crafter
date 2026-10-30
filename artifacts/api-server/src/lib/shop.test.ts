@@ -18,15 +18,27 @@ describe("catálogo de la tienda", () => {
     }
   });
 
-  it("tarjetas: precio por tramo y solo en packs", () => {
+  it("tarjetas de aluminio: 0,45 € doble cara y 0,35 € una cara, mínimo 100 y sin bajar de ahí", () => {
     const p = bySlug("tarjetas-metalicas");
     const fields = { nombre: "Joan" };
-    expect(priceLine(p, { slug: p.slug, variant: "aluminio-negro", qty: 25, fields }).totalCents).toBe(8000);
-    expect(priceLine(p, { slug: p.slug, variant: "aluminio-negro", qty: 100, fields }).totalCents).toBe(17000);
-    expect(priceLine(p, { slug: p.slug, variant: "aluminio-negro", qty: 250, fields }).totalCents).toBe(31250);
-    expect(() => priceLine(p, { slug: p.slug, variant: "aluminio-negro", qty: 30, fields })).toThrow(ShopValidationError);
-    const conExtras = priceLine(p, { slug: p.slug, variant: "aluminio-negro", qty: 50, addons: ["diseno-a-medida", "tarjeta-digital"], fields });
-    expect(conExtras.totalCents).toBe(12000 + 3900 + 1500);
+    expect(priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 100, fields }).totalCents).toBe(4500);
+    expect(priceLine(p, { slug: p.slug, variant: "una-cara", qty: 100, fields }).totalCents).toBe(3500);
+    expect(priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 1000, fields }).unitCents).toBe(45);
+    expect(priceLine(p, { slug: p.slug, variant: "una-cara", qty: 1000, fields }).unitCents).toBe(35);
+    for (const v of p.variants) for (const t of v.tiers) expect(t.unitCents).toBeGreaterThanOrEqual(v.key === "una-cara" ? 35 : 45);
+    expect(() => priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 50, fields })).toThrow(ShopValidationError);
+    expect(() => priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 150, fields })).toThrow(ShopValidationError);
+    const conExtras = priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 250, addons: ["diseno-a-medida", "tarjeta-digital"], fields });
+    expect(conExtras.totalCents).toBe(11250 + 1900 + 1500);
+  });
+
+  it("los kits salen más baratos que por separado", () => {
+    const doble100 = 45 * 100;
+    const placa = bySlug("placa-qr-madera").variants.find(v => v.key === "115x115")!.tiers[0].unitCents;
+    const expositor = bySlug("expositor-tarjetas").variants[0].tiers[0].unitCents;
+    const digital = bySlug("tarjetas-metalicas").addons.find(a => a.key === "tarjeta-digital")!.cents;
+    expect(bySlug("kit-resenas").variants[0].tiers[0].unitCents).toBeLessThan(placa + expositor + doble100 + digital);
+    expect(bySlug("kit-expositor-tarjetas").variants[0].tiers[0].unitCents).toBeLessThan(expositor + doble100);
   });
 
   it("placas: descuento desde 3 y NFC por unidad", () => {
@@ -60,8 +72,10 @@ describe("catálogo de la tienda", () => {
     const web = priceLine(bySlug("regalo-web-3d"), { slug: "regalo-web-3d", variant: "fotos-mensaje", qty: 1, fields: { para: "Ana", mensaje: "Feliz día", fotos: [UP] } });
     expect(shippingFor([placa])).toBe(490);
     expect(shippingFor([web])).toBe(0);
-    const tarjetas = priceLine(bySlug("tarjetas-metalicas"), { slug: "tarjetas-metalicas", variant: "aluminio-negro", qty: 25, fields: { nombre: "A" } });
-    expect(shippingFor([tarjetas])).toBe(0);
+    const tarjetas = priceLine(bySlug("tarjetas-metalicas"), { slug: "tarjetas-metalicas", variant: "una-cara", qty: 100, fields: { nombre: "A" } });
+    expect(shippingFor([tarjetas])).toBe(490);
+    const muchas = priceLine(bySlug("tarjetas-metalicas"), { slug: "tarjetas-metalicas", variant: "doble-cara", qty: 250, fields: { nombre: "A" } });
+    expect(shippingFor([muchas])).toBe(0);
   });
 
   it("tramo mayor que no supera la cantidad", () => {

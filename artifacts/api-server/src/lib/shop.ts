@@ -13,7 +13,7 @@ import { z } from "zod";
 export type ShopKind = "physical" | "digital" | "quote";
 
 export const SHOP_CATEGORIES: Record<string, string> = {
-  tarjetas: "Tarjetas metálicas",
+  tarjetas: "Tarjetas de aluminio",
   "placas-qr": "Placas QR",
   expositores: "Expositores",
   kits: "Kits para negocios",
@@ -186,8 +186,8 @@ export function shippingFor(lines: PricedLine[], s: ShippingSettings = DEFAULT_S
 }
 
 // ── Catálogo inicial ─────────────────────────────────────────────────────────
-// Se siembra una vez por versión (app_settings.shop_catalog_version): crea los productos que
-// falten por slug y nunca pisa uno que ya exista (lo editado desde el admin se respeta).
+// Se aplica una vez por versión (app_settings.shop_catalog_version): crea los productos que
+// falten por slug y actualiza los que nadie ha editado desde el admin; lo editado se respeta.
 
 type SeedProduct = Omit<ShopProduct, "id">;
 
@@ -199,7 +199,7 @@ const CARD_FIELDS: ShopField[] = [
   { key: "telefono", label: "Teléfono", type: "tel", required: false, max: 30 },
   { key: "email", label: "Email", type: "email", required: false, max: 120 },
   { key: "web", label: "Web", type: "text", required: false, max: 120 },
-  { key: "qr", label: "Enlace del QR", type: "url", required: false, max: 400, help: "A dónde lleva el QR del reverso: tu web, Instagram, WhatsApp, reseñas…" },
+  { key: "qr", label: "Enlace del QR", type: "url", required: false, max: 400, help: "A dónde lleva el QR: tu web, Instagram, WhatsApp, reseñas…" },
   { key: "notas", label: "Indicaciones", type: "textarea", required: false, max: 1000 },
 ];
 
@@ -216,32 +216,36 @@ const img = (file: string, alt: string): ShopMedia => ({ type: "image", url: `/t
 const vid = (file: string, alt: string): ShopMedia => ({ type: "video", url: `/tienda-media/${file}.mp4`, alt, poster: `/tienda-media/${file}-poster.webp` });
 const pimg = (file: string, alt: string): ShopMedia => ({ type: "image", url: `/portfolio/${file}.webp`, alt });
 
-export const SHOP_SEED_VERSION = "v1-2026-10";
+export const SHOP_SEED_VERSION = "v2-2026-10";
 
 export const SHOP_SEED: SeedProduct[] = [
   {
     slug: "tarjetas-metalicas", kind: "physical", category: "tarjetas", featured: true, visible: true, sortOrder: 0,
-    name: "Tarjetas de visita metálicas",
-    tagline: "Aluminio anodizado grabado con láser. Tu logo o una ilustración delante, tus datos y un QR detrás.",
-    description: "Tarjetas de 85 × 55 mm en aluminio anodizado de 0,2 mm, grabadas una a una con el láser infrarrojo de nuestra xTool F2. El grabado no es tinta: es el propio metal, así que no se borra ni se despega.\n\nDelante va tu logo, una ilustración o una foto; detrás, tus datos y un QR que lleva a donde tú quieras. Con el pedido incluimos el diseño básico a partir de tu logo y te enviamos la prueba antes de grabar. Cuantas más tarjetas, menos cuesta cada una.",
-    features: ["Aluminio anodizado negro, 85 × 55 × 0,2 mm", "Grabado láser por las dos caras", "QR a tu web, Instagram, WhatsApp o reseñas", "Diseño básico y prueba antes de grabar incluidos", "Envío en 3 a 5 días laborables"],
+    name: "Tarjetas de visita de aluminio",
+    tagline: "Aluminio anodizado grabado con láser, desde 0,35 € la tarjeta. A una cara o a doble cara con tu QR.",
+    description: "Tarjetas de 85 × 55 mm en aluminio anodizado de 0,2 mm, grabadas una a una con el láser infrarrojo de nuestra xTool F2. El grabado no es tinta: es el propio metal, así que no se borra ni se despega.\n\nA una cara llevan tu logo, tus datos y el QR en el mismo lado. A doble cara, delante va tu logo, una ilustración o una foto y detrás tus datos y un QR que lleva a donde tú quieras. Se piden a partir de 100 tarjetas: 0,35 € cada una a una cara y 0,45 € a doble cara. Incluimos el diseño básico a partir de tu logo y te enviamos la prueba antes de grabar.",
+    features: ["Aluminio anodizado negro, 85 × 55 × 0,2 mm", "A una cara (0,35 €/ud.) o a doble cara (0,45 €/ud.)", "Pedido mínimo: 100 tarjetas", "QR a tu web, Instagram, WhatsApp o reseñas", "Diseño básico y prueba antes de grabar incluidos", "Envío en 3 a 5 días laborables"],
     media: [
       vid("taller-grabado-tarjeta", "Tarjeta grabándose en la xTool F2"),
-      img("tarjeta-warriors-ultra-pump", "Tarjeta metálica de Warriors Hardcore: Ultra Pump"),
+      img("tarjeta-warriors-ultra-pump", "Tarjeta de aluminio de Warriors Hardcore: Ultra Pump"),
       img("tarjeta-shopycrafter-delante", "Tarjeta de Shopy Crafter, cara delantera"),
       img("tarjeta-shopycrafter-detras", "Tarjeta de Shopy Crafter, reverso con QR"),
       img("tarjeta-lazy-lizard", "Tarjetas de Lazy Lizard, delante y detrás"),
-      img("tarjeta-warriors-anabolic", "Tarjeta metálica de Warriors Hardcore: Anabolic"),
-      img("tarjeta-warriors-isolate", "Tarjeta metálica de Warriors Hardcore: Isolate"),
+      img("tarjeta-warriors-anabolic", "Tarjeta de aluminio de Warriors Hardcore: Anabolic"),
+      img("tarjeta-warriors-isolate", "Tarjeta de aluminio de Warriors Hardcore: Isolate"),
       vid("taller-tarjeta-hardcore", "Grabado de una tarjeta de Warriors Hardcore"),
     ],
-    variants: [{ key: "aluminio-negro", name: "Aluminio anodizado negro", tiers: tiers([25, 320], [50, 240], [100, 170], [250, 125]) }],
+    // 0,35 € y 0,45 € por tarjeta son el precio mínimo: no hay tramos por debajo.
+    variants: [
+      { key: "doble-cara", name: "Doble cara", tiers: tiers([100, 45]) },
+      { key: "una-cara", name: "Una cara", tiers: tiers([100, 35]) },
+    ],
     addons: [
-      { key: "diseno-a-medida", name: "Diseño a medida desde cero", cents: 3900, perUnit: false, description: "Diseñamos la tarjeta completa aunque no tengas logo." },
+      { key: "diseno-a-medida", name: "Diseño a medida desde cero", cents: 1900, perUnit: false, description: "Diseñamos la tarjeta completa aunque no tengas logo." },
       { key: "tarjeta-digital", name: "QR a tarjeta digital con estadísticas", cents: 1500, perUnit: false, description: "Tu tarjeta de contacto online, editable sin reimprimir, con conteo de escaneos." },
     ],
     fields: CARD_FIELDS,
-    qtyOptions: [25, 50, 100, 250], minQty: 25, maxQty: 250, leadDays: 5, demoUrl: null,
+    qtyOptions: [100, 250, 500, 1000], minQty: 100, maxQty: 1000, leadDays: 5, demoUrl: null,
   },
   {
     slug: "placa-qr-madera", kind: "physical", category: "placas-qr", featured: true, visible: true, sortOrder: 1,
@@ -298,9 +302,9 @@ export const SHOP_SEED: SeedProduct[] = [
   {
     slug: "kit-resenas", kind: "physical", category: "kits", featured: true, visible: true, sortOrder: 3,
     name: "Kit Reseñas para tu negocio",
-    tagline: "Placa QR de reseñas, expositor y 100 tarjetas metálicas con el mismo diseño.",
-    description: "Todo lo que necesita un mostrador para pedir reseñas y repartir tarjetas, con una sola imagen de marca: la placa cuadrada de reseñas de Google con soporte, el expositor con tu logo y 100 tarjetas metálicas con QR, más tu tarjeta digital con estadísticas de escaneos.\n\nPor separado serían 234,80 €.",
-    features: ["Placa QR de reseñas 115 × 115 mm con soporte", "Expositor de tarjetas con tu logo", "100 tarjetas metálicas grabadas por las dos caras", "Tarjeta digital con estadísticas de escaneos", "Mismo diseño en las tres piezas"],
+    tagline: "Placa QR de reseñas, expositor y 100 tarjetas de aluminio con el mismo diseño.",
+    description: "Todo lo que necesita un mostrador para pedir reseñas y repartir tarjetas, con una sola imagen de marca: la placa cuadrada de reseñas de Google con soporte, el expositor con tu logo y 100 tarjetas de aluminio a doble cara con QR, más tu tarjeta digital con estadísticas de escaneos.\n\nPor separado serían 109,80 €.",
+    features: ["Placa QR de reseñas 115 × 115 mm con soporte", "Expositor de tarjetas con tu logo", "100 tarjetas de aluminio grabadas a doble cara", "Tarjeta digital con estadísticas de escaneos", "Mismo diseño en las tres piezas"],
     media: [
       img("placa-qr-hanakaze", "Placas QR de madera con soporte"),
       vid("taller-coleccion", "Placas y tarjetas del taller"),
@@ -308,7 +312,7 @@ export const SHOP_SEED: SeedProduct[] = [
       img("tarjeta-shopycrafter-detras", "Reverso de tarjeta con QR"),
       img("expositor-tarjetas-vertical", "Expositor de tarjetas"),
     ],
-    variants: [{ key: "kit", name: "Kit completo", tiers: tiers([1, 19900]) }],
+    variants: [{ key: "kit", name: "Kit completo", tiers: tiers([1, 9490]) }],
     addons: [],
     fields: [
       { key: "enlace", label: "Enlace para dejar reseña en Google", type: "url", required: true, max: 400 },
@@ -319,14 +323,14 @@ export const SHOP_SEED: SeedProduct[] = [
   },
   {
     slug: "kit-expositor-tarjetas", kind: "physical", category: "kits", featured: false, visible: true, sortOrder: 4,
-    name: "Expositor + 100 tarjetas metálicas",
+    name: "Expositor + 100 tarjetas de aluminio",
     tagline: "El expositor con tu logo y 100 tarjetas a juego.",
-    description: "El expositor de mostrador con tu logo grabado y 100 tarjetas metálicas con tus datos y QR. Por separado serían 189,90 €.",
-    features: ["Expositor de contrachapado con tu logo", "100 tarjetas metálicas grabadas por las dos caras", "Diseño básico y prueba antes de grabar incluidos"],
-    media: [img("expositor-tarjetas-vertical", "Expositor de tarjetas"), img("tarjeta-shopycrafter-delante", "Tarjeta metálica")],
+    description: "El expositor de mostrador con tu logo grabado y 100 tarjetas de aluminio a doble cara con tus datos y QR. Por separado serían 64,90 €.",
+    features: ["Expositor de contrachapado con tu logo", "100 tarjetas de aluminio grabadas a doble cara", "Diseño básico y prueba antes de grabar incluidos"],
+    media: [img("expositor-tarjetas-vertical", "Expositor de tarjetas"), img("tarjeta-shopycrafter-delante", "Tarjeta de aluminio")],
     variants: [
-      { key: "horizontal", name: "Expositor horizontal", tiers: tiers([1, 17900]) },
-      { key: "vertical", name: "Expositor vertical", tiers: tiers([1, 17900]) },
+      { key: "horizontal", name: "Expositor horizontal", tiers: tiers([1, 5690]) },
+      { key: "vertical", name: "Expositor vertical", tiers: tiers([1, 5690]) },
     ],
     addons: [],
     fields: CARD_FIELDS,
