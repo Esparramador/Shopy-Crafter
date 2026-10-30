@@ -284,6 +284,60 @@ export async function decodeQrImage(input: Buffer): Promise<string | null> {
   return null;
 }
 
+/** Decodifica sin agrandar la imagen: los checks pequeños deben medir la legibilidad real. */
+async function decodeQrImageAtNativeSize(input: Buffer): Promise<string | null> {
+  const png = await sharp(input).flatten({ background: "#ffffff" }).png().toBuffer();
+  try {
+    await ensureZxing();
+    const results = await readBarcodes(new Uint8Array(png), {
+      formats: ["QRCode"], tryHarder: true, tryInvert: true, tryRotate: true, tryDownscale: true, maxNumberOfSymbols: 1,
+    });
+    const hit = results.find(result => result.isValid && result.text);
+    if (hit) return hit.text;
+  } catch (err: any) {
+    logger.warn({ err: err?.message }, "card-qr-art: ZXing no disponible; check estricto con jsQR");
+  }
+
+  for (const transform of [
+    (image: Sharp) => image,
+    (image: Sharp) => image.greyscale().normalise().threshold(128),
+  ]) {
+    const { data, info } = await transform(sharp(png)).raw().toBuffer({ resolveWithObject: true });
+    const hit = jsQR(toRgba(data, info.width, info.height, info.channels), info.width, info.height, { inversionAttempts: "attemptBoth" });
+    if (hit?.data) return hit.data;
+  }
+  return null;
+}
+
+export const QR_ARTWORK_DISPLAY_SIZES = [320, 256, 192, 160, 128] as const;
+export type QrArtworkSizeCheck = { sizePx: number; passed: boolean };
+
+/** Comprueba que el mismo QR siga leyéndose en las versiones WebP que se mostrarán en la landing. */
+export async function checkQrArtworkAtDisplaySizes(input: Buffer): Promise<QrArtworkSizeCheck[]> {
+  const metadata = await sharp(input).metadata();
+  const maxEdge = Math.max(metadata.width ?? 0, metadata.height ?? 0);
+  if (!maxEdge) throw new Error("No se pudo determinar el tamaño de la imagen");
+
+  const sizes = [...new Set(QR_ARTWORK_DISPLAY_SIZES.map(size => Math.min(size, maxEdge)))];
+  const originalPayload = await decodeQrImage(input);
+  const checks: QrArtworkSizeCheck[] = [];
+
+  for (const sizePx of sizes) {
+    const resized = await sharp(input)
+      .rotate()
+      .resize({ width: sizePx, height: sizePx, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 84 })
+      .toBuffer();
+    const payload = await decodeQrImageAtNativeSize(resized);
+    checks.push({
+      sizePx,
+      passed: sizePx >= 128 && Boolean(originalPayload) && payload === originalPayload,
+    });
+  }
+
+  return checks;
+}
+
 // ── PNG verificado ───────────────────────────────────────────────────────────
 
 export type ArtQrResult = {

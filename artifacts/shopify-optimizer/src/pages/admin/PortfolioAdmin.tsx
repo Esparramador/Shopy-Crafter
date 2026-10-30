@@ -4,14 +4,36 @@ import { mediaSrc, type PortfolioProject } from "@/components/ProjectsShowcase";
 const API_ROOT = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 type Project = PortfolioProject & { published: boolean; sortOrder: number };
+type QrImageCheck = { sizePx: number; passed: boolean };
+type QrFileReport = { filename: string; checks: QrImageCheck[]; passed: boolean; reason?: string };
+class ApiError extends Error {
+  constructor(message: string, readonly body: unknown) { super(message); }
+}
 
 const EMPTY = { title: "", client: "", category: "", status: "", summary: "", description: "", features: "", tech: "", liveUrl: "", appUrl: "" };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${API_ROOT}${path}`, { credentials: "include", ...init });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((d as { error?: string }).error ?? `HTTP ${r.status}`);
+  const d: unknown = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const message = d && typeof d === "object" && "error" in d && typeof d.error === "string" ? d.error : `HTTP ${r.status}`;
+    throw new ApiError(message, d);
+  }
   return d as T;
+}
+
+function readQrReports(value: unknown): QrFileReport[] | null {
+  if (!value || typeof value !== "object" || !("qrChecks" in value) || !Array.isArray(value.qrChecks)) return null;
+  return value.qrChecks.filter((item): item is QrFileReport =>
+    !!item && typeof item === "object" &&
+    typeof item.filename === "string" && typeof item.passed === "boolean" &&
+    Array.isArray(item.checks) &&
+    item.checks.every((check: unknown) =>
+      !!check && typeof check === "object" &&
+      "sizePx" in check && typeof check.sizePx === "number" &&
+      "passed" in check && typeof check.passed === "boolean"
+    )
+  );
 }
 
 const s = {
@@ -29,6 +51,8 @@ export default function PortfolioAdmin() {
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [qrArtwork, setQrArtwork] = useState(false);
+  const [qrReports, setQrReports] = useState<QrFileReport[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
@@ -44,6 +68,8 @@ export default function PortfolioAdmin() {
       description: current.description, features: (current.features ?? []).join("\n"), tech: current.tech.join(", "),
       liveUrl: current.liveUrl ?? "", appUrl: current.appUrl ?? "",
     } : EMPTY);
+    setQrArtwork(false);
+    setQrReports(null);
   }, [selected, current?.id]);
 
   const payload = () => ({
@@ -55,7 +81,13 @@ export default function PortfolioAdmin() {
   const run = async (fn: () => Promise<void>, ok: string) => {
     setBusy(true); setMsg(null);
     try { await fn(); setMsg({ ok: true, text: ok }); await load(); }
-    catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Error" }); }
+    catch (e) {
+      if (e instanceof ApiError) {
+        const reports = readQrReports(e.body);
+        if (reports) setQrReports(reports);
+      }
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Error" });
+    }
     finally { setBusy(false); }
   };
 
@@ -69,9 +101,16 @@ export default function PortfolioAdmin() {
 
   const upload = (files: FileList | null) => {
     if (!current || !files?.length) return;
+    const checkAsQrArtwork = qrArtwork;
     const fd = new FormData();
     Array.from(files).slice(0, 12).forEach(f => fd.append("files", f));
-    void run(async () => { await api(`/admin/portfolio/${current.id}/images`, { method: "POST", body: fd }); }, "Imágenes subidas");
+    if (checkAsQrArtwork) fd.append("qrArtwork", "true");
+    setQrReports(null);
+    void run(async () => {
+      const response = await api<unknown>(`/admin/portfolio/${current.id}/images`, { method: "POST", body: fd });
+      const reports = readQrReports(response);
+      if (checkAsQrArtwork && reports) setQrReports(reports);
+    }, checkAsQrArtwork ? "QR verificado y añadido" : "Imágenes subidas");
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -191,8 +230,46 @@ export default function PortfolioAdmin() {
                 ))}
               </div>
               <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => upload(e.target.files)} />
-              <button type="button" style={s.btn} disabled={busy} onClick={() => fileRef.current?.click()}>Subir imágenes (hasta 12)</button>
-              <p style={{ fontSize: 12, color: "#9896ba", margin: "8px 0 0" }}>JPG, PNG o WebP hasta 15 MB. Se optimizan a WebP de 2000 px.</p>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                <button type="button" style={s.btn} disabled={busy} onClick={() => fileRef.current?.click()}>
+                  {qrArtwork ? "Comprobar y subir QR" : "Subir imágenes (hasta 12)"}
+                </button>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, color: "#e8e0d0", cursor: busy ? "default" : "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={qrArtwork}
+                    disabled={busy}
+                    onChange={e => { setQrArtwork(e.target.checked); setQrReports(null); setMsg(null); }}
+                  />
+                  Verificar como QR artístico
+                </label>
+              </div>
+              <p style={{ fontSize: 12, color: "#9896ba", margin: "8px 0 0" }}>
+                Actívalo solo si todas las imágenes elegidas son QR. Se revisan en JPG, PNG o WebP hasta 15 MB a 320, 256, 192, 160 y 128 px; si alguna falla, no se sube ninguna.
+              </p>
+              {qrReports && (
+                <section aria-live="polite" role="status" style={{ marginTop: 12, padding: 12, borderRadius: 8, background: "#0d0d1a", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <h3 style={{ margin: "0 0 10px", fontSize: 13 }}>Resultado de lectura QR</h3>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {qrReports.map((report, index) => (
+                      <div key={`${report.filename}-${index}`} style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 8 }}>
+                        <strong style={{ fontSize: 12, overflowWrap: "anywhere" }}>
+                          {report.filename} · {report.passed ? "Apto y subido" : "No publicado"}
+                        </strong>
+                        {report.reason && <p style={{ margin: "4px 0", color: "#fca5a5", fontSize: 12 }}>{report.reason}</p>}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                          {report.checks.map(check => (
+                            <span key={check.sizePx} style={{ padding: "4px 7px", borderRadius: 6, background: check.passed ? "rgba(45,212,159,.12)" : "rgba(239,68,68,.12)", color: check.passed ? "#6ee7b7" : "#fca5a5", fontSize: 11 }}>
+                              {check.sizePx}px: {check.passed ? "legible" : "no legible"}
+                            </span>
+                          ))}
+                          {report.checks.length === 0 && <span style={{ color: "#fca5a5", fontSize: 11 }}>Sin tamaños comprobables</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
           )}
         </div>

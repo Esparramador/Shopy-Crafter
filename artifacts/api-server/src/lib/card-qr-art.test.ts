@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import sharp from "sharp";
 import {
   QR_DOT_STYLES, QR_EYE_FRAMES, QR_EYE_BALLS,
-  buildArtQrSvg, decodeQrImage, qrMinContrast, renderVerifiedQr, sanitizeQrStyle,
+  buildArtQrSvg, checkQrArtworkAtDisplaySizes, decodeQrImage, qrMinContrast, renderVerifiedQr, sanitizeQrStyle,
 } from "./card-qr-art.js";
 
 const URL_DATA = "https://shopycrafter.com/r/abc123";
@@ -62,6 +62,26 @@ describe("renderVerifiedQr", () => {
     expect(qrMinContrast(r.style)).toBeGreaterThanOrEqual(2.5);
     expect(r.warnings.join(" ")).toMatch(/poco contraste/);
   }, 60_000);
+});
+
+describe("checkQrArtworkAtDisplaySizes", () => {
+  it("confirma el mismo destino en cada tamaño WebP público", async () => {
+    const qr = await renderVerifiedQr(URL_DATA, sanitizeQrStyle({ dots: "square", fg: "#000000", bg: "#ffffff" }), { size: 760 });
+    const checks = await checkQrArtworkAtDisplaySizes(qr.png);
+    expect(checks.map(check => check.sizePx)).toEqual([320, 256, 192, 160, 128]);
+    expect(checks.every(check => check.passed)).toBe(true);
+  });
+
+  it("rechaza una imagen sin QR y una imagen demasiado pequeña", async () => {
+    const blank = await sharp({ create: { width: 500, height: 500, channels: 3, background: "#ffffff" } }).png().toBuffer();
+    const checks = await checkQrArtworkAtDisplaySizes(blank);
+    expect(checks.map(check => check.sizePx)).toEqual([320, 256, 192, 160, 128]);
+    expect(checks.every(check => !check.passed)).toBe(true);
+
+    const tiny = await sharp({ create: { width: 96, height: 96, channels: 3, background: "#ffffff" } }).png().toBuffer();
+    const tinyChecks = await checkQrArtworkAtDisplaySizes(tiny);
+    expect(tinyChecks).toEqual([{ sizePx: 96, passed: false }]);
+  });
 });
 
 describe("decodeQrImage", () => {

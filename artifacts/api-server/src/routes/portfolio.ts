@@ -17,10 +17,24 @@ import { sql } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { saveMedia, getMedia, deleteMedia, mediaIdFromUrl } from "../lib/media-store.js";
+import { checkQrArtworkAtDisplaySizes, type QrArtworkSizeCheck } from "../lib/card-qr-art.js";
 import { SEED, SEED_VERSION, GENERIC_V1, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS, removeRetiredQrPortfolioImages } from "./portfolio-seed.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 12 } });
+const QR_UPLOAD_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+type QrArtworkFileCheck = {
+  filename: string;
+  checks: QrArtworkSizeCheck[];
+  passed: boolean;
+  reason?: string;
+};
+
+function safeUploadName(name: string): string {
+  const basename = name.replace(/\\/g, "/").split("/").pop() ?? "imagen";
+  return basename.replace(/[\u0000-\u001f\u007f]/g, "_").slice(0, 100) || "imagen";
+}
 
 export interface PortfolioImage { url: string; alt: string; w?: number; h?: number }
 export interface PortfolioProject {
@@ -361,13 +375,66 @@ router.post("/admin/portfolio/:id/images", requireAdmin, upload.array("files", 1
     const id = Number(req.params.id);
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
     if (!files.length) { res.status(400).json({ error: "Sube al menos una imagen" }); return; }
+    const existing = await db.execute(sql`SELECT id FROM portfolio_projects WHERE id = ${id}`);
+    if (!existing.rows[0]) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+
+    const qrArtworkValue: unknown = req.body?.qrArtwork;
+    if (qrArtworkValue !== undefined && qrArtworkValue !== "true" && qrArtworkValue !== "false") {
+      res.status(400).json({ error: "El valor de verificación QR no es válido" });
+      return;
+    }
+    const qrArtwork = qrArtworkValue === "true";
+    const qrChecks: QrArtworkFileCheck[] = [];
+    const preparedQrFiles = new Map<Express.Multer.File, { data: Buffer; width: number; height: number }>();
+    if (qrArtwork) {
+      for (const file of files) {
+        const filename = safeUploadName(file.originalname);
+        if (!QR_UPLOAD_MIMES.has(file.mimetype)) {
+          qrChecks.push({ filename, checks: [], passed: false, reason: "Usa una imagen PNG, JPG o WebP." });
+          continue;
+        }
+        try {
+          const metadata = await sharp(file.buffer).metadata();
+          if (!metadata.format || !["jpeg", "png", "webp"].includes(metadata.format)) {
+            qrChecks.push({ filename, checks: [], passed: false, reason: "El contenido no es un PNG, JPG o WebP válido." });
+            continue;
+          }
+          // Verifica exactamente el WebP optimizado que se guardará y se servirá en el portfolio.
+          const optimized = await sharp(file.buffer).rotate().resize({ width: 2000, withoutEnlargement: true }).webp({ quality: 84 }).toBuffer({ resolveWithObject: true });
+          const prepared = { data: optimized.data, width: optimized.info.width, height: optimized.info.height };
+          preparedQrFiles.set(file, prepared);
+          const checks = await checkQrArtworkAtDisplaySizes(prepared.data);
+          const passed = checks.length > 0 && checks.every(check => check.passed);
+          qrChecks.push({
+            filename,
+            checks,
+            passed,
+            ...(passed ? {} : { reason: "El mismo QR debe poder leerse en todos los tamaños indicados." }),
+          });
+        } catch {
+          qrChecks.push({ filename, checks: [], passed: false, reason: "No se pudo analizar la imagen." });
+        }
+      }
+      if (qrChecks.some(check => !check.passed)) {
+        res.status(422).json({
+          error: "No se subió ninguna imagen: al menos un QR no supera la comprobación. Revisa los tamaños y vuelve a intentarlo.",
+          qrChecks,
+        });
+        return;
+      }
+    }
+
     const added: PortfolioImage[] = [];
     for (const f of files) {
       if (!/^image\//.test(f.mimetype)) continue;
       // Se normaliza a WebP de hasta 2000 px: pesa poco y carga rápido en la landing.
-      const out = await sharp(f.buffer).rotate().resize({ width: 2000, withoutEnlargement: true }).webp({ quality: 84 }).toBuffer({ resolveWithObject: true });
-      const { url } = await saveMedia(out.data, "image/webp", { width: out.info.width, height: out.info.height, originalName: f.originalname });
-      added.push({ url, alt: f.originalname.replace(/\.[^.]+$/, "").slice(0, 160), w: out.info.width, h: out.info.height });
+      let out = preparedQrFiles.get(f);
+      if (!out) {
+        const optimized = await sharp(f.buffer).rotate().resize({ width: 2000, withoutEnlargement: true }).webp({ quality: 84 }).toBuffer({ resolveWithObject: true });
+        out = { data: optimized.data, width: optimized.info.width, height: optimized.info.height };
+      }
+      const { url } = await saveMedia(out.data, "image/webp", { width: out.width, height: out.height, originalName: f.originalname });
+      added.push({ url, alt: safeUploadName(f.originalname).replace(/\.[^.]+$/, "").slice(0, 160), w: out.width, h: out.height });
     }
     if (!added.length) { res.status(400).json({ error: "Los archivos no son imágenes" }); return; }
     const r = await db.execute(sql`
@@ -375,7 +442,8 @@ router.post("/admin/portfolio/:id/images", requireAdmin, upload.array("files", 1
       WHERE id = ${id} RETURNING *
     `);
     if (!r.rows[0]) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
-    res.json(toProject(r.rows[0] as Record<string, unknown>));
+    const project = toProject(r.rows[0] as Record<string, unknown>);
+    res.json(qrArtwork ? { project, qrChecks } : project);
   } catch (err) {
     logger.error({ err }, "portfolio upload");
     res.status(500).json({ error: err instanceof Error ? err.message : "Error subiendo imágenes" });
