@@ -54,7 +54,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </div>
       </nav>
 
-      <main style={{ flex: 1 }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         {children}
       </main>
 

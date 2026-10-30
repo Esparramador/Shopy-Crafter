@@ -56,7 +56,9 @@ const CSS = `
   position: relative;
   width: 100%;
   background: #05030c;
-  min-height: 100dvh;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ─── VIDEO / OVERLAY — FIXED ─── */
@@ -96,7 +98,8 @@ const CSS = `
 .ctc-layout {
   position: relative;
   z-index: 5;
-  min-height: 100dvh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: stretch;
 }
@@ -145,7 +148,7 @@ const CSS = `
    no afecta al layout). Así el footer es alcanzable sin bounce ni trampa. */
 .ctc-panel {
   width: min(44%, 520px);
-  min-height: 100dvh;
+  min-height: 0;
   padding: 56px 36px 56px 24px;
   display: flex; flex-direction: column; justify-content: center;
 }
@@ -281,51 +284,6 @@ const CSS = `
 }
 .ctc-demo-cta:hover { color: rgba(200,168,75,1); }
 
-/* ─── FOOTER inside ctc-root ─── */
-.ctc-footer {
-  position: relative; z-index: 6;
-  background: rgba(5,3,12,.97);
-  border-top: 1px solid rgba(200,168,75,.10);
-  padding: 40px 40px 24px;
-}
-.ctc-footer-inner {
-  max-width: 1100px; margin: 0 auto;
-  display: grid; grid-template-columns: 1.5fr repeat(3,1fr);
-  gap: 28px; margin-bottom: 28px;
-}
-.ctc-footer-brand-name {
-  font-size: 15px; font-weight: 800; color: #eee;
-  letter-spacing: .2px; margin-bottom: 8px;
-}
-.ctc-footer-tagline {
-  font-size: 12px; color: rgba(255,255,255,.35); line-height: 1.55; margin: 0;
-}
-.ctc-footer-col-title {
-  font-size: 10.5px; font-weight: 800; letter-spacing: 1px;
-  text-transform: uppercase; color: rgba(200,168,75,.7);
-  margin-bottom: 12px;
-}
-.ctc-footer-links { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.ctc-footer-links a,
-.ctc-footer-links span {
-  font-size: 13px; color: rgba(255,255,255,.35); text-decoration: none;
-  transition: color .15s;
-}
-.ctc-footer-links a:hover { color: rgba(200,168,75,.9); }
-.ctc-footer-bottom {
-  border-top: 1px solid rgba(255,255,255,.04);
-  padding-top: 18px;
-  display: flex; justify-content: space-between; align-items: center;
-  flex-wrap: wrap; gap: 10px;
-}
-.ctc-footer-copy { font-size: 11.5px; color: rgba(255,255,255,.22); }
-.ctc-footer-badges { display: flex; gap: 7px; flex-wrap: wrap; }
-.ctc-footer-badge {
-  font-size: 10px; padding: 3px 8px; border-radius: 4px;
-  background: rgba(200,168,75,.06); color: rgba(200,168,75,.5);
-  border: 1px solid rgba(200,168,75,.12);
-}
-
 /* ─── TABLET / MOBILE ─── */
 @media (max-width: 900px) {
   .ctc-layout { flex-direction: column; }
@@ -348,11 +306,10 @@ const CSS = `
         rgba(5,3,12,.97) 55%, rgba(5,3,12,.99) 100%
       );
   }
-  .ctc-footer-inner { grid-template-columns: 1fr 1fr; }
 }
 @media (max-height: 560px) and (orientation: landscape) {
-  .ctc-layout { flex-direction: row; min-height: 100dvh; }
-  .ctc-panel { width: 55%; min-height: 100dvh; padding: 12px 20px 12px 16px; justify-content: flex-start; overflow-y: auto; }
+  .ctc-layout { flex-direction: row; }
+  .ctc-panel { width: 55%; padding: 12px 20px 12px 16px; justify-content: flex-start; overflow-y: auto; }
   .ctc-left { width: 45%; padding: 0 12px 24px; align-items: flex-end; }
   .ctc-building { padding: 16px 16px; }
   .ctc-build-orb { width: 48px; height: 48px; font-size: 18px; margin-bottom: 14px; }
@@ -389,8 +346,6 @@ const CSS = `
   .ctc-cards-row { flex-direction: column; gap: 8px; }
   .ctc-card { padding: 14px 16px; text-align: left; flex-direction: row; align-items: center; gap: 12px; }
   .ctc-card-icon { font-size: 22px; flex-shrink: 0; margin-bottom: 0; }
-  .ctc-footer-inner { grid-template-columns: 1fr; gap: 20px; }
-  .ctc-footer { padding: 28px 20px 18px; }
 }
 `;
 
@@ -849,54 +804,6 @@ export default function Contacto() {
               )}
             </div>
           </div>
-
-          {/* ─── FOOTER (dentro de ctc-root para estar sobre el video fixed) ─── */}
-          <footer className="ctc-footer">
-            <div className="ctc-footer-inner">
-              <div>
-                <div className="ctc-footer-brand-name">Shopy Crafter</div>
-                <p className="ctc-footer-tagline">
-                  Optimizamos tiendas Shopify con inteligencia artificial.<br />
-                  SEO, imágenes, pricing y A/B testing en piloto automático.
-                </p>
-              </div>
-              <div>
-                <div className="ctc-footer-col-title">Producto</div>
-                <ul className="ctc-footer-links">
-                  <li><a href="/#fp-engines">Motores IA</a></li>
-                  <li><a href="/#fp-pricing">Precios</a></li>
-                  <li><a href="/#fp-projects">Proyectos</a></li>
-                  <li><a href="/tienda">Tienda</a></li>
-                </ul>
-              </div>
-              <div>
-                <div className="ctc-footer-col-title">Empresa</div>
-                <ul className="ctc-footer-links">
-                  <li><a href="/sobre-nosotros">Sobre nosotros</a></li>
-                  <li><a href="/casos-de-exito">Casos de éxito</a></li>
-                  <li><a href="/programa-de-afiliados">Afiliados</a></li>
-                  <li><a href="/contacto">Contacto</a></li>
-                </ul>
-              </div>
-              <div>
-                <div className="ctc-footer-col-title">Legal</div>
-                <ul className="ctc-footer-links">
-                  <li><a href="/privacidad">Privacidad</a></li>
-                  <li><a href="/terminos">Términos de uso</a></li>
-                  <li><a href="/cookies">Cookies</a></li>
-                  <li><a href="mailto:craftershopy@gmail.com">craftershopy@gmail.com</a></li>
-                </ul>
-              </div>
-            </div>
-            <div className="ctc-footer-bottom">
-              <span className="ctc-footer-copy">© {new Date().getFullYear()} Shopy Crafter · Todos los derechos reservados</span>
-              <div className="ctc-footer-badges">
-                <span className="ctc-footer-badge">RGPD</span>
-                <span className="ctc-footer-badge">SSL</span>
-                <span className="ctc-footer-badge">IA Verificada</span>
-              </div>
-            </div>
-          </footer>
 
         </div>
       </PublicLayout>
