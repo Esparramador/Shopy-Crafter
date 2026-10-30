@@ -3532,7 +3532,7 @@ function DemoLibrary() {
           return (
             <a
               key={d.num}
-              href={`${BASE}/web-demos/${d.file}`}
+              href={`${BASE}/api/web-designer/demo-page/${encodeURIComponent(d.file)}`}
               target="_blank" rel="noreferrer"
               onMouseEnter={() => setHoveredDemo(d.num)}
               onMouseLeave={() => setHoveredDemo(null)}

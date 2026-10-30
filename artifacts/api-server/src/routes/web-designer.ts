@@ -1,7 +1,8 @@
 /**
  * AI Web Designer Routes
  * GET  /api/web-designer/templates            — 14+ design templates
- * GET  /api/web-designer/demos                — 26 reference demos list
+ * GET  /api/web-designer/demos                — 30 reference demos list
+ * GET  /api/web-designer/demo-page/:filename  — admin-only demo preview
  * GET  /api/web-designer/sessions             — list sessions
  * GET  /api/web-designer/sessions/:id         — get session
  * POST /api/web-designer/sessions/:id         — save/update session
@@ -9,10 +10,14 @@
  * POST /api/web-designer/deploy               — deploy HTML to project vault
  */
 import { Router, type Request, type Response } from "express";
+import { readFile } from "fs/promises";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import {
   DESIGNER_TEMPLATES, streamHtml, stripFences,
   getSession, saveSession, listSessions, deleteSession,
 } from "../lib/web-designer.js";
+import { requireAdmin } from "../lib/auth.js";
 import { safeFetch } from "../lib/web-scraper.js";
 import { buildDnaFromProject } from "../lib/visme-effects.js";
 import { logger } from "../lib/logger.js";
@@ -20,6 +25,7 @@ import { saveToVault } from "../lib/vault.js";
 import { randomBytes } from "crypto";
 
 const router = Router();
+const DEMO_DIRECTORY = resolve(dirname(fileURLToPath(import.meta.url)), "data/web-demos");
 
 const DEMOS = [
   { id: "01", name: "Particle SaaS", category: "3d", file: "01-particle-saas.html" },
@@ -53,6 +59,7 @@ const DEMOS = [
   { id: "29", name: "Medical Canvas 2D + Counters", category: "effects", file: "29-medical-canvas2d-counters.html" },
   { id: "30", name: "Ferrari GLB Lerp + Snap Scroll", category: "3d", file: "30-ferrari-glb-lerp-snap.html" },
 ];
+const DEMO_FILES = new Set(DEMOS.map(({ file }) => file));
 
 router.get("/web-designer/templates", (_req: Request, res: Response) => {
   res.json(DESIGNER_TEMPLATES);
@@ -62,22 +69,36 @@ router.get("/web-designer/demos", (_req: Request, res: Response) => {
   res.json(DEMOS);
 });
 
-router.get("/web-designer/demo-html/:filename", async (req: Request, res: Response): Promise<void> => {
+router.get("/web-designer/demo-html/:filename", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   const filename = String(req.params.filename);
-  if (!/^[\w-]+\.html$/.test(filename)) {
-    res.status(400).json({ error: "Invalid filename" });
+  if (!/^[\w-]+\.html$/.test(filename) || !DEMO_FILES.has(filename)) {
+    res.status(404).json({ error: "Demo not found", filename });
     return;
   }
   try {
-    const { readFileSync } = await import("fs");
-    const { resolve, dirname } = await import("path");
-    const { fileURLToPath } = await import("url");
-    const __dir = dirname(fileURLToPath(import.meta.url as string));
-    const demoPath = resolve(__dir, "../../../../shopify-optimizer/public/web-demos", filename);
-    const html = readFileSync(demoPath, "utf-8");
+    const html = await readFile(resolve(DEMO_DIRECTORY, filename), "utf-8");
     res.json({ ok: true, html, filename, chars: html.length });
   } catch {
     res.status(404).json({ error: "Demo not found", filename });
+  }
+});
+
+router.get("/web-designer/demo-page/:filename", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const filename = String(req.params.filename);
+  if (!/^[\w-]+\.html$/.test(filename) || !DEMO_FILES.has(filename)) {
+    res.status(404).type("text").send("Demo not found");
+    return;
+  }
+
+  try {
+    const html = await readFile(resolve(DEMO_DIRECTORY, filename), "utf-8");
+    res
+      .type("html")
+      .set("X-Robots-Tag", "noindex, nofollow, noarchive")
+      .set("Cache-Control", "private, no-store")
+      .send(html);
+  } catch {
+    res.status(404).type("text").send("Demo not found");
   }
 });
 

@@ -1,6 +1,5 @@
 # Shopy Crafter — robots.txt
-# Las demos antiguas se conservan para vistas internas y no forman parte del
-# contenido público del sitio.
+# Las demos antiguas se sirven únicamente mediante una ruta autenticada de admin.
 
 User-agent: *
 Allow: /
@@ -17,5 +16,6 @@ Disallow: /reset-password
 Disallow: /oauth-success
 Disallow: /shopify/
 Disallow: /web-demos/
+Disallow: /api/web-designer/demo-page/
 
 Sitemap: https://shopycrafter.com/sitemap.xml
