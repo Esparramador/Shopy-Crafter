@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
 import { decodeQrImageAtNativeSize } from "../lib/card-qr-art.js";
-import { isRetiredQrPortfolioImage, removeRetiredQrPortfolioImages, SEED } from "./portfolio-seed.js";
+import { isRetiredQrPortfolioImage, mergeGenericSeedCopy, removeRetiredQrPortfolioImages, SEED } from "./portfolio-seed.js";
 
 // El slug y los nombres de archivo antiguos son identificadores estables, no texto promocional.
 const qr = SEED.find(project => project.slug === "qr-artisticos-3d")!;
@@ -54,6 +54,44 @@ describe("migración de imágenes QR retiradas", () => {
       currentImages[2],
       currentImages[3],
     ]);
+  });
+});
+
+describe("actualización de texto genérico del portfolio", () => {
+  const previous = {
+    title: "Título genérico anterior",
+    summary: "Resumen genérico anterior",
+    description: "Descripción genérica anterior",
+  };
+  const nextSeed = {
+    title: "Título actualizado",
+    summary: "Resumen actualizado",
+    description: "Descripción actualizada",
+    images: [{ url: "/portfolio/nueva.webp", alt: "Imagen nueva" }],
+  };
+
+  it("actualiza los textos que todavía coinciden con la versión genérica anterior", () => {
+    expect(mergeGenericSeedCopy({
+      ...previous,
+      images: [],
+    }, nextSeed, previous)).toEqual({
+      ...nextSeed,
+    });
+  });
+
+  it("conserva por separado el texto e imágenes editados desde administración", () => {
+    const adminImages = [{ url: "/api/media/admin-upload", alt: "Imagen personalizada" }];
+    expect(mergeGenericSeedCopy({
+      title: "Título escrito por administración",
+      summary: "Resumen escrito por administración",
+      description: "Descripción escrita por administración",
+      images: adminImages,
+    }, nextSeed, previous)).toEqual({
+      title: "Título escrito por administración",
+      summary: "Resumen escrito por administración",
+      description: "Descripción escrita por administración",
+      images: adminImages,
+    });
   });
 });
 

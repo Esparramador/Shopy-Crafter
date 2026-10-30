@@ -91,6 +91,76 @@ export const GENERIC_V1: Record<string, string> = {
 };
 
 /**
+ * Copy from the original starter entries. Keep this snapshot when updating SEED so each field
+ * can be refreshed independently; an admin edit to one field must not freeze or replace the rest.
+ */
+export const GENERIC_V1_COPY: Record<string, { title: string; summary: string }> = {
+  "warriors-hardcore": {
+    title: "Warriors Hardcore · web de lanzamiento",
+    summary: "Web de lanzamiento de una línea de suplementación deportiva, en cuatro idiomas, con el producto girando en 3D y una versión cinematográfica guiada por el scroll.",
+  },
+  "crafter-eventos": {
+    title: "Crafter Eventos · galería de fotos por QR",
+    summary: "Los invitados escanean el QR de la mesa y suben sus fotos y vídeos sin instalar nada. La organizadora lo ve en directo y entrega todo en calidad original.",
+  },
+  "brasas-y-paellas": {
+    title: "Brasa y Paellas · sistema integral del restaurante",
+    summary: "El restaurante entero en un solo sistema hecho a medida: carta digital por QR con IA, TPV de sala, pantalla de cocina, panel de gestión y facturación preparada para VeriFactu.",
+  },
+  "rastalo-tpv": {
+    title: "RastaLo TPV · un Jarvis para llevar el negocio",
+    summary: "Un TPV a medida con Antonia dentro: una asistente tipo Jarvis a la que se le habla y hace el trabajo de verdad. Cobra, agenda, busca clientas, saca informes y maneja el ordenador.",
+  },
+  "agente-j-bond": {
+    title: "Agente J.Bond · agentes de IA a medida y la plataforma que los dirige",
+    summary: "Diseñamos agentes de IA personalizados para cualquier trabajo y equipos de agentes que trabajan al unísono. Y la plataforma que los dirige, por CLI, por MCP o por API, según lo que pida cada cliente.",
+  },
+  "bots-trading": {
+    title: "Bots de trading a medida y su terminal",
+    summary: "Automatizamos la estrategia que nos traiga el cliente, sea la que sea. Y si no tiene ninguna, la diseñamos, la probamos con datos reales y la ajustamos a su perfil antes de que opere.",
+  },
+  "qr-artisticos-3d": {
+    title: "QR artísticos y en 3D",
+    summary: "Códigos QR que son una pieza de marca: con arte, dentro del dibujo del cliente o como una escena en 3D que se resuelve en el código. Y todos se leen.",
+  },
+  "pequenos-genios": {
+    title: "Pequeños Genios · aprender jugando",
+    summary: "Una app de juegos educativos para niños de 4 a 12 años: 35 juegos de matemáticas, lengua, ciencia, historia y tecnología, un tutor con IA y retos en familia. Sin anuncios y sin compras.",
+  },
+};
+
+export interface GenericSeedCopyRow {
+  title: string;
+  summary: string;
+  description: string;
+  images: unknown;
+}
+
+export interface GenericSeedCopyUpdate {
+  title: string;
+  summary: string;
+  description: string;
+  images: SeedImage[];
+}
+
+/** Update only untouched default copy; any non-empty image set is treated as an admin choice. */
+export function mergeGenericSeedCopy(
+  row: GenericSeedCopyRow,
+  seed: Pick<SeedProject, "title" | "summary" | "description" | "images">,
+  previous: { title: string; summary: string; description: string },
+): GenericSeedCopyUpdate {
+  const images = Array.isArray(row.images) && row.images.length > 0
+    ? row.images as SeedImage[]
+    : seed.images;
+  return {
+    title: row.title === previous.title ? seed.title : row.title,
+    summary: row.summary === previous.summary ? seed.summary : row.summary,
+    description: row.description === previous.description ? seed.description : row.description,
+    images,
+  };
+}
+
+/**
  * Correcciones puntuales sobre filas YA sembradas (la lista de arriba solo crea las que faltan).
  * Se aplican una vez por PATCH_VERSION (portfolio_meta.patch_version), sin volver a crear
  * proyectos borrados desde el panel:

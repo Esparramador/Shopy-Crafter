@@ -18,7 +18,7 @@ import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { saveMedia, getMedia, deleteMedia, mediaIdFromUrl } from "../lib/media-store.js";
 import { checkQrArtworkAtDisplaySizes, type QrArtworkSizeCheck } from "../lib/card-qr-art.js";
-import { SEED, SEED_VERSION, GENERIC_V1, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS, removeRetiredQrPortfolioImages } from "./portfolio-seed.js";
+import { SEED, SEED_VERSION, GENERIC_V1, GENERIC_V1_COPY, mergeGenericSeedCopy, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS, removeRetiredQrPortfolioImages } from "./portfolio-seed.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 12 } });
@@ -88,8 +88,8 @@ function ensureTable(): Promise<void> {
 /**
  * Aplica la lista de proyectos reales UNA vez por versión (portfolio_meta.seed_version):
  *  - proyecto que no existe → se crea;
- *  - proyecto que sigue con el texto genérico de la versión 1 → se actualiza entero;
- *  - proyecto editado desde el panel → no se toca (solo se le ponen imágenes si no tiene ninguna).
+ *  - textos genéricos de la versión 1 → se actualizan campo a campo si siguen intactos;
+ *  - textos e imágenes editados desde el panel → se conservan.
  * Borrar un proyecto desde el panel es definitivo: la versión ya aplicada no lo vuelve a crear.
  */
 async function applySeed(): Promise<void> {
@@ -97,8 +97,8 @@ async function applySeed(): Promise<void> {
   const applied = Number((meta.rows[0] as { value?: string } | undefined)?.value ?? 0);
   if (applied >= SEED_VERSION) return;
   for (const p of SEED) {
-    const cur = await db.execute(sql`SELECT id, description, images FROM portfolio_projects WHERE slug = ${p.slug}`);
-    const row = cur.rows[0] as { id: number; description: string; images: unknown } | undefined;
+    const cur = await db.execute(sql`SELECT id, title, summary, description, images FROM portfolio_projects WHERE slug = ${p.slug}`);
+    const row = cur.rows[0] as { id: number; title: string; summary: string; description: string; images: unknown } | undefined;
     const tech = JSON.stringify(p.tech), features = JSON.stringify(p.features), images = JSON.stringify(p.images);
     const variants = JSON.stringify(p.variants);
     if (!row) {
@@ -108,14 +108,18 @@ async function applySeed(): Promise<void> {
                 ${p.liveUrl}, ${p.appUrl}, ${images}::jsonb, ${variants}::jsonb, ${p.sortOrder})
         ON CONFLICT (slug) DO NOTHING
       `);
-    } else if (GENERIC_V1[p.slug] !== undefined && row.description === GENERIC_V1[p.slug]) {
-      // Las imágenes que se subieron desde el panel mandan sobre las capturas de la lista.
-      const finalImages = Array.isArray(row.images) && row.images.length > 0 ? JSON.stringify(row.images) : images;
+    } else if (GENERIC_V1[p.slug] !== undefined) {
+      const previousCopy = GENERIC_V1_COPY[p.slug];
+      if (!previousCopy) throw new Error(`Missing previous generic copy snapshot for portfolio seed: ${p.slug}`);
+      const copy = mergeGenericSeedCopy(row, p, {
+        ...previousCopy,
+        description: GENERIC_V1[p.slug],
+      });
       await db.execute(sql`
-        UPDATE portfolio_projects SET title = ${p.title}, client = ${p.client}, category = ${p.category}, summary = ${p.summary},
-          description = ${p.description}, tech = ${tech}::jsonb, features = ${features}::jsonb, status = ${p.status},
+        UPDATE portfolio_projects SET title = ${copy.title}, client = ${p.client}, category = ${p.category}, summary = ${copy.summary},
+          description = ${copy.description}, tech = ${tech}::jsonb, features = ${features}::jsonb, status = ${p.status},
           live_url = COALESCE(live_url, ${p.liveUrl}), app_url = COALESCE(app_url, ${p.appUrl}),
-          images = ${finalImages}::jsonb, variants = ${variants}::jsonb, sort_order = ${p.sortOrder}, updated_at = NOW()
+          images = ${JSON.stringify(copy.images)}::jsonb, variants = ${variants}::jsonb, sort_order = ${p.sortOrder}, updated_at = NOW()
         WHERE id = ${row.id}
       `);
     } else if (!(Array.isArray(row.images) && row.images.length > 0) && p.images.length > 0) {
