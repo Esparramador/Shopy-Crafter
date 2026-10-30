@@ -17,6 +17,12 @@ export interface SeedImage { url: string; alt: string; w?: number; h?: number }
 export function isRetiredQrPortfolioImage(url: string): boolean {
   return /^\/portfolio\/qr-artisticos-3d-(?:[1-5]|9)\.webp$/.test(url);
 }
+
+/** Retires only the old bundled QR scene samples; admin media URLs remain untouched. */
+export function removeRetiredQrPortfolioImages<T extends { url: string }>(images: T[]): T[] {
+  return images.filter(image => !isRetiredQrPortfolioImage(image.url));
+}
+
 export interface SeedVariant {
   name: string; client: string; status: string; summary: string; description: string;
   features: string[]; tech: string[]; images: SeedImage[];
