@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
-import { decodeQrImage } from "../lib/card-qr-art.js";
+import { decodeQrImageAtNativeSize } from "../lib/card-qr-art.js";
 import { isRetiredQrPortfolioImage, removeRetiredQrPortfolioImages, SEED } from "./portfolio-seed.js";
 
 // El slug y los nombres de archivo antiguos son identificadores estables, no texto promocional.
@@ -61,12 +61,13 @@ describe("lectura de los QR destacados después de redimensionar", () => {
   it.each(qr.images)("$alt", async image => {
     const asset = new URL(`../../../shopify-optimizer/public${image.url}`, import.meta.url);
     const original = await readFile(asset);
-    const expected = await decodeQrImage(original);
+    const expected = await decodeQrImageAtNativeSize(original);
     expect(Boolean(expected), "El original debe contener un QR legible").toBe(true);
-    // Display sizes first, then 300/600/900 px print checks (1/2/3 in at 300 DPI).
-    for (const width of [128, 160, 192, 256, 300, 320, 384, 512, 600, 768, 900]) {
+    // Raster sizes represent digital display plus 2/3/3.5/4.5 cm at 300 DPI.
+    // The decoder receives each exact raster; it must not enlarge small samples.
+    for (const width of [128, 160, 192, 236, 256, 295, 300, 320, 354, 384, 413, 512, 531, 600, 768, 900]) {
       const resized = await sharp(original).resize(width, width, { fit: "inside" }).png().toBuffer();
-      const decoded = await decodeQrImage(resized);
+      const decoded = await decodeQrImageAtNativeSize(resized);
       // No se imprimen los destinos de los QR en los logs de las pruebas.
       expect(Boolean(decoded) && decoded === expected, `Lectura fiel a ${width}px`).toBe(true);
     }

@@ -285,7 +285,7 @@ export async function decodeQrImage(input: Buffer): Promise<string | null> {
 }
 
 /** Decodifica sin agrandar la imagen: los checks pequeños deben medir la legibilidad real. */
-async function decodeQrImageAtNativeSize(input: Buffer): Promise<string | null> {
+export async function decodeQrImageAtNativeSize(input: Buffer): Promise<string | null> {
   const png = await sharp(input).flatten({ background: "#ffffff" }).png().toBuffer();
   try {
     await ensureZxing();

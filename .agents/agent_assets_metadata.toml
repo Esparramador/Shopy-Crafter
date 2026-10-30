@@ -823,3 +823,17 @@ mtime_ms = 1793301826270
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/2c20b924-656c-4e55-8ee9-24ab7be810e9/d1d9f0f7-ddde-4cf0-b23a-98ef39bede4e"
 storage_version_token = "1793301845730312"
 content_type = "image/png"
+
+[[outputs]]
+id = "EK3oMkkNqGkc_l74AMDIz"
+uri = "file://exports/qr-artisticos-print-proof.pdf"
+type = "pdf"
+title = "Hoja de prueba impresa — QR artísticos"
+description = "PDF A4 a escala real con los cuatro diseños destacados en muestras de 45, 35 y 25 mm a 300 ppp, regla de calibración de 100 mm y hoja para registrar dos teléfonos. Los escaneos físicos están pendientes."
+logical_id = "6c2456a8-2915-47a5-8919-1685e73e41f2"
+content_hash = "sha256:32c41cd9fd70406fb4a5e7fb34e49fe393ec8686b98465726a48794c70f9f547"
+size = 2947149
+mtime_ms = 1793371006682
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/6c2456a8-2915-47a5-8919-1685e73e41f2/bdac716f-3778-4b64-9d17-bccbc0ed4086"
+storage_version_token = "1793371129554584"
+content_type = "application/pdf"
