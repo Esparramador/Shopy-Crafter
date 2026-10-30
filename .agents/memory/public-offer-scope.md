@@ -20,3 +20,9 @@ The user requests normal page scrolling, four packs including a custom option, a
 **Why:** These were explicit requirements repeated in the user's review of the earlier work.
 
 **How to apply:** Plan improvements around the existing product rather than introducing scroll-dependent navigation or treating the shop as a separate unrelated product.
+
+The user requests removing the old public showcase advertised as 30 demos.
+
+**Why:** The user says its effects are poor and the selection does not represent their newer effects.
+
+**How to apply:** Remove that public showcase and its promotional references. Do not interpret this as permission to delete internal effect libraries or the unrelated portfolio of real projects.
