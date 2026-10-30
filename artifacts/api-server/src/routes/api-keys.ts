@@ -308,6 +308,20 @@ router.post("/admin/billing-config", requireAdmin, async (req: Request, res: Res
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+/** Guarda (cifrada) y aplica al proceso una clave que genera la propia plataforma, p. ej. el secreto de un webhook. */
+export async function storeGeneratedApiKey(provider: string, keyName: string, value: string, description: string): Promise<void> {
+  if (!isAllowedKeyName(keyName)) throw new Error(`Nombre de clave no permitido: ${keyName}`);
+  await apiKeysTableReady;
+  await db.execute(sql`
+    INSERT INTO platform_api_keys (provider, key_name, key_value, description, category, updated_at)
+    VALUES (${provider}, ${keyName}, ${sealKey(value)}, ${description}, 'payments', NOW())
+    ON CONFLICT (provider, key_name) DO UPDATE SET
+      key_value = EXCLUDED.key_value, is_active = TRUE, description = EXCLUDED.description,
+      updated_at = NOW(), last_test_ok = NULL, last_test_error = NULL
+  `);
+  applyKey(keyName, value);
+}
+
 // ── GET /api/admin/api-keys/startup-inject ──────────────────────────────────
 // Called at startup to inject DB keys into process.env
 export async function injectDbApiKeys() {

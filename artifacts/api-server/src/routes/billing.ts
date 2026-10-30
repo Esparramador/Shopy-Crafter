@@ -1,3 +1,4 @@
+import { billingWebhookSecrets, ensureBillingWebhook } from "../lib/stripe-webhook-setup.js";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { subscriptionsTable, affiliatesTable, referralTrackingTable, usersTable } from "@workspace/db";
@@ -702,14 +703,14 @@ router.get("/billing/stripe/verify", async (req, res): Promise<void> => {
 // Requires STRIPE_WEBHOOK_SECRET from the Stripe Dashboard → Webhooks section.
 router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
   const sig = req.headers["stripe-signature"] as string | undefined;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secrets = billingWebhookSecrets();
 
   // SECURITY: fail-closed. Antes, sin secreto O sin cabecera stripe-signature se
   // aceptaba el payload tal cual: cualquiera podía enviar un checkout.session.completed
   // falso y activarse un plan de pago. Además rawBody no existía y constructEvent
   // fallaba siempre, así que la vía firmada nunca funcionó.
-  if (!webhookSecret) {
-    logger.error("stripe webhook: STRIPE_WEBHOOK_SECRET no configurado — petición rechazada");
+  if (secrets.length === 0) {
+    logger.error("stripe webhook: sin secreto de firma (STRIPE_BILLING_WEBHOOK_SECRET / STRIPE_WEBHOOK_SECRET) — petición rechazada");
     res.status(503).json({ error: "Webhook de Stripe no configurado" }); return;
   }
   const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
@@ -717,13 +718,17 @@ router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Falta la firma stripe-signature o el cuerpo original" }); return;
   }
 
-  let event: Stripe.Event;
-  try {
-    // Verificar la firma no necesita la API key (new Stripe("") lanza si falta).
-    event = Stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-  } catch (err: any) {
-    logger.warn({ err: err.message }, "stripe webhook signature error");
-    res.status(400).json({ error: `Webhook error: ${err.message}` }); return;
+  // Verificar la firma no necesita la API key. Vale cualquiera de los secretos conocidos:
+  // el del endpoint que crea la plataforma y el configurado a mano.
+  let event: Stripe.Event | null = null;
+  let lastError = "";
+  for (const secret of secrets) {
+    try { event = Stripe.webhooks.constructEvent(rawBody, sig, secret); break; }
+    catch (err) { lastError = err instanceof Error ? err.message : String(err); }
+  }
+  if (!event) {
+    logger.warn({ err: lastError }, "stripe webhook signature error");
+    res.status(400).json({ error: `Webhook error: ${lastError}` }); return;
   }
 
   try {
@@ -735,6 +740,17 @@ router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
   }
 
   res.json({ received: true });
+});
+
+// ── Admin: revisa/crea el webhook de cobros en Stripe (lo mismo que se hace al arrancar en producción) ──
+router.post("/admin/billing/stripe-webhook/ensure", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    res.json(await ensureBillingWebhook());
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error";
+    logger.error({ err: msg }, "admin stripe-webhook ensure error");
+    res.status(502).json({ error: msg });
+  }
 });
 
 // ── Checkout de plan para cualquier usuario autenticado (clientes incluidos) ──

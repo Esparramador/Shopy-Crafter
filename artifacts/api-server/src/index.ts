@@ -359,7 +359,14 @@ const server = app.listen(port, (err?: Error) => {
   logger.info({ port }, "Server listening");
 
   // Inject DB-stored API keys into process.env (non-blocking)
-  injectDbApiKeys().catch(() => {});
+  injectDbApiKeys().catch(() => {}).then(() => {
+    // Solo en el despliegue: en local la URL pública no es la de producción.
+    if (process.env.REPLIT_DEPLOYMENT !== "1") return;
+    import("./lib/stripe-webhook-setup.js")
+      .then(m => m.ensureBillingWebhook())
+      .then(r => logger.info(r, "stripe webhook: revisión al arrancar"))
+      .catch(err => logger.warn({ err: err instanceof Error ? err.message : err }, "stripe webhook: no se pudo revisar al arrancar"));
+  });
   // Jobs masivos que estaban "running" murieron con el proceso anterior.
   import("./lib/bulk-queue.js").then(m => m.failStaleBulkJobs()).catch(err => logger.warn({ err }, "failStaleBulkJobs failed"));
 
