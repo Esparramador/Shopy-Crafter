@@ -92,7 +92,7 @@ function ensureTable(): Promise<void> {
  *  - textos e imágenes editados desde el panel → se conservan.
  * Borrar un proyecto desde el panel es definitivo: la versión ya aplicada no lo vuelve a crear.
  */
-async function applySeed(): Promise<void> {
+export async function applySeed(): Promise<void> {
   const meta = await db.execute(sql`SELECT value FROM portfolio_meta WHERE key = 'seed_version'`);
   const applied = Number((meta.rows[0] as { value?: string } | undefined)?.value ?? 0);
   if (applied >= SEED_VERSION) return;
@@ -151,7 +151,7 @@ function renamedDeep<T>(v: T): T {
  * Correcciones de PATCH_PREVIOUS sobre filas existentes, una vez por PATCH_VERSION.
  * No crea filas: un proyecto borrado desde el panel sigue borrado.
  */
-async function applyPatches(): Promise<void> {
+export async function applyPatches(): Promise<void> {
   const meta = await db.execute(sql`SELECT value FROM portfolio_meta WHERE key = 'patch_version'`);
   const applied = Number((meta.rows[0] as { value?: string } | undefined)?.value ?? 0);
   if (applied >= PATCH_VERSION) return;

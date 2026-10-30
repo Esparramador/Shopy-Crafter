@@ -1,8 +1,86 @@
 import { readFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { decodeQrImageAtNativeSize } from "../lib/card-qr-art.js";
-import { isRetiredQrPortfolioImage, mergeGenericSeedCopy, removeRetiredQrPortfolioImages, SEED } from "./portfolio-seed.js";
+import {
+  isRetiredQrPortfolioImage, mergeGenericSeedCopy, removeRetiredQrPortfolioImages,
+  PATCH_VERSION, SEED, SEED_VERSION,
+} from "./portfolio-seed.js";
+
+const migrationState = vi.hoisted(() => ({
+  meta: {} as Record<string, string>,
+  projects: [] as Array<Record<string, unknown>>,
+  writes: [] as string[],
+}));
+
+vi.mock("@workspace/db", () => ({
+  db: {
+    execute: async (query: { text?: string }) => {
+      const text = query.text ?? "";
+      if (text.includes("SELECT value FROM portfolio_meta")) {
+        const key = text.includes("seed_version") ? "seed_version" : "patch_version";
+        const value = migrationState.meta[key];
+        return { rows: value === undefined ? [] : [{ value }] };
+      }
+      migrationState.writes.push(text);
+      throw new Error(`Unexpected portfolio migration write: ${text}`);
+    },
+  },
+}));
+vi.mock("drizzle-orm", () => ({
+  sql: Object.assign((strings: TemplateStringsArray) => ({ text: strings.join("?") }), { raw: () => ({}) }),
+}));
+vi.mock("../lib/auth.js", () => ({
+  requireAdmin: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+vi.mock("../lib/logger.js", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+vi.mock("../lib/media-store.js", () => ({
+  saveMedia: vi.fn(), getMedia: vi.fn(), deleteMedia: vi.fn(), mediaIdFromUrl: vi.fn(),
+}));
+
+const { applySeed, applyPatches } = await import("./portfolio.js");
+
+describe("reaplicación de migraciones del portfolio", () => {
+  const existingAdminEdit = {
+    slug: "proyecto-editado",
+    title: "Título personalizado",
+    images: [],
+    features: ["Contenido retirado por administración"],
+  };
+
+  function setRecordedVersion(key: "seed_version" | "patch_version", version: number) {
+    migrationState.meta = { [key]: String(version) };
+    migrationState.projects = [{ ...existingAdminEdit }];
+    migrationState.writes = [];
+  }
+
+  it("no recrea proyectos borrados ni modifica datos si la versión seed ya está aplicada", async () => {
+    setRecordedVersion("seed_version", SEED_VERSION);
+    const before = structuredClone(migrationState.projects);
+
+    await applySeed();
+    await applySeed();
+
+    expect(migrationState.projects).toEqual(before);
+    expect(migrationState.projects.some(project => project.slug === SEED[0].slug)).toBe(false);
+    expect(migrationState.writes).toEqual([]);
+  });
+
+  it("no recrea proyectos borrados ni repone contenido retirado si el patch ya está aplicado", async () => {
+    setRecordedVersion("patch_version", PATCH_VERSION);
+    const before = structuredClone(migrationState.projects);
+
+    await applyPatches();
+    await applyPatches();
+
+    expect(migrationState.projects).toEqual(before);
+    expect(migrationState.projects.some(project => project.slug === SEED[0].slug)).toBe(false);
+    expect(migrationState.projects[0]).toEqual(existingAdminEdit);
+    expect(migrationState.writes).toEqual([]);
+  });
+});
 
 // El slug y los nombres de archivo antiguos son identificadores estables, no texto promocional.
 const qr = SEED.find(project => project.slug === "qr-artisticos-3d")!;
