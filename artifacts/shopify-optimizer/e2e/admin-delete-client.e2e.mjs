@@ -3,8 +3,9 @@
 // Uso:  pnpm --filter @workspace/shopify-optimizer run e2e:admin-delete-client
 // Env:  ADMIN_PASSWORD (obligatoria), E2E_ADMIN_EMAIL, E2E_BASE_URL (por defecto
 //       https://$REPLIT_DEV_DOMAIN), E2E_CHROMIUM (por defecto `which chromium`).
+//       E2E_STRIPE_SECRET_KEY (opcional; sk_test_ disponible también para el API Server).
 //
-// Crea dos clientes desechables (@e2e.invalid) vía POST /api/admin/users y verifica:
+// Crea clientes desechables (@e2e.invalid) vía POST /api/admin/users y verifica:
 //   1. La fila del cliente muestra "Borrar"; el modal enseña nombre + email + aviso
 //      irreversible; el botón de confirmar está deshabilitado hasta escribir el email.
 //   2. Al confirmar, la fila desaparece sin recargar la página y el API devuelve 404.
@@ -16,11 +17,10 @@
 //      "Cancelar ahora y borrar" y "Cancelar al final del periodo y revocar acceso".
 //      Con cualquiera de las dos el backend consulta Stripe, recibe resource_missing y FALLA
 //      CERRADO: muestra el aviso, no cancela, no desactiva, no borra y el DELETE sigue en 409.
-//   6. Un cliente con cancel_at_period_end=1 + current_period_end (sembrado) muestra en la
-//      lista la fecha de fin de periodo bajo su estado.
-//      (El camino feliz — cancelación confirmada por Stripe — se cubre en
-//      api-server/src/lib/subscription-cancel.test.ts; no se ejerce aquí para no tocar
-//      facturación real.) Requiere DATABASE_URL + psql; si faltan, se omite con aviso.
+//   6. Un cliente con cancel_at_period_end=1 + current_period_end (sembrado) muestra la fecha.
+//   7. Con E2E_STRIPE_SECRET_KEY crea una suscripción pagada de test, la cancela al final
+//      del periodo desde el panel, y compara la respuesta, DB, lista y cancel_at de Stripe.
+//      Requiere DATABASE_URL + psql.
 import { chromium } from "playwright";
 import { nanoid } from "nanoid";
 import { execSync } from "node:child_process";
@@ -31,8 +31,12 @@ const BASE = (process.env.E2E_BASE_URL || `https://${process.env.REPLIT_DEV_DOMA
 const EMAIL = process.env.E2E_ADMIN_EMAIL || "craftershopy@gmail.com";
 const PASSWORD = process.env.ADMIN_PASSWORD;
 const SHOTS = process.env.E2E_SCREENSHOT_DIR || "/tmp/admin-delete-client";
+const TEST_STRIPE_SECRET = process.env.E2E_STRIPE_SECRET_KEY?.trim();
 
 if (!PASSWORD) fail("ADMIN_PASSWORD no está definido en el entorno");
+if (TEST_STRIPE_SECRET && !TEST_STRIPE_SECRET.startsWith("sk_test_")) {
+  fail("E2E_STRIPE_SECRET_KEY debe empezar por sk_test_; no se usará una clave de producción");
+}
 mkdirSync(SHOTS, { recursive: true });
 
 function fail(msg) { console.error(`✗ ${msg}`); process.exit(1); }
@@ -47,6 +51,39 @@ function chromiumPath() {
 const browser = await chromium.launch({ executablePath: chromiumPath(), headless: true, args: ["--no-sandbox"] });
 const ctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 800 } });
 const created = [];
+let stripeTestCustomerId = null;
+let stripeTestSubscriptionId = null;
+let stripeTestUserId = null;
+let stripeTestSubscriptionLinkedLocally = false;
+
+async function stripeTestRequest(method, resource, values = {}) {
+  const response = await fetch(`https://api.stripe.com/v1/${resource}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${TEST_STRIPE_SECRET}`,
+      ...(method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+    },
+    ...(method === "POST" ? { body: new URLSearchParams(values) } : {}),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Stripe test API ${method} ${resource} devolvió ${response.status}: ${body?.error?.message || "error desconocido"}`);
+  }
+  return body;
+}
+
+function psql(query) {
+  return execSync("psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -tA -c " + JSON.stringify(query), { encoding: "utf8" }).trim();
+}
+
+function stripePeriodEndEpoch(subscription) {
+  const itemEnds = (subscription?.items?.data || [])
+    .map((item) => item.current_period_end)
+    .filter((end) => Number.isInteger(end) && end > 0);
+  return Number.isInteger(subscription?.cancel_at) && subscription.cancel_at > 0
+    ? subscription.cancel_at
+    : itemEnds.length ? Math.max(...itemEnds) : null;
+}
 
 async function createClient(label) {
   const tag = nanoid(8).toLowerCase();
@@ -265,8 +302,148 @@ try {
     await page.screenshot({ path: path.join(SHOTS, "08-period-end-listed.png") });
   }
 
+  // 7. Camino feliz completo con una suscripción cobrada en una cuenta Stripe de test.
+  if (TEST_STRIPE_SECRET) {
+    if (!process.env.DATABASE_URL) {
+      check(false, "El escenario real de Stripe requiere DATABASE_URL para sembrar y verificar la fila local");
+    } else {
+      const paid = await createClient("stripe-period-end");
+      stripeTestUserId = paid.id;
+
+      const customer = await stripeTestRequest("POST", "customers", {
+        email: paid.email,
+        name: paid.name,
+        source: "tok_visa",
+        "metadata[e2e_user_id]": paid.id,
+      });
+      stripeTestCustomerId = customer.id;
+
+      const subscription = await stripeTestRequest("POST", "subscriptions", {
+        customer: stripeTestCustomerId,
+        collection_method: "charge_automatically",
+        payment_behavior: "error_if_incomplete",
+        "items[0][price_data][currency]": "usd",
+        "items[0][price_data][unit_amount]": "100",
+        "items[0][price_data][recurring][interval]": "month",
+        "items[0][price_data][product_data][name]": `E2E period-end ${paid.id}`,
+        "metadata[e2e_user_id]": paid.id,
+      });
+      stripeTestSubscriptionId = subscription.id;
+      check(subscription.status === "active", `Stripe creó una suscripción activa de test (obtenido "${subscription.status}")`);
+
+      const firstPeriodEnd = stripePeriodEndEpoch(subscription);
+      check(Number.isInteger(firstPeriodEnd), "Stripe devuelve el fin del periodo pagado");
+      if (!Number.isInteger(firstPeriodEnd)) throw new Error("Stripe no devolvió current_period_end para la suscripción de test");
+
+      const latestInvoiceId = typeof subscription.latest_invoice === "string"
+        ? subscription.latest_invoice
+        : subscription.latest_invoice?.id;
+      const paidInvoice = latestInvoiceId
+        ? await stripeTestRequest("GET", `invoices/${latestInvoiceId}`)
+        : null;
+      check(paidInvoice?.status === "paid" && Number(paidInvoice?.amount_paid) > 0,
+        `La primera factura de test se cobró correctamente (status=${paidInvoice?.status ?? "sin factura"}, amount_paid=${paidInvoice?.amount_paid ?? 0})`);
+
+      psql(
+        `INSERT INTO subscriptions (user_id, plan, status, stripe_customer_id, stripe_subscription_id, current_period_end, cancel_at_period_end, stores_limit, images_included)
+         VALUES ('${paid.id}', 'starter', 'active', '${stripeTestCustomerId}', '${stripeTestSubscriptionId}', to_timestamp(${firstPeriodEnd}), 0, 3, 45)
+         ON CONFLICT (user_id) DO UPDATE SET plan = EXCLUDED.plan, status = EXCLUDED.status,
+           stripe_customer_id = EXCLUDED.stripe_customer_id, stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+           current_period_end = EXCLUDED.current_period_end, cancel_at_period_end = 0`
+      );
+      stripeTestSubscriptionLinkedLocally = true;
+
+      const paidRow = page.locator("tr", { hasText: paid.email });
+      await paidRow.waitFor({ state: "visible", timeout: 10000 });
+      await page.locator(`[data-testid="delete-client-btn-${paid.id}"]`).click();
+      await modal.waitFor({ state: "visible", timeout: 10000 });
+      await modal.locator('[data-testid="delete-client-confirm-input"]').fill(paid.email);
+      const [paidDeleteResponse] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/api/admin/users/${paid.id}`) && r.request().method() === "DELETE"),
+        modal.locator('[data-testid="delete-client-confirm-btn"]').click(),
+      ]);
+      check(paidDeleteResponse.status() === 409, `La fila real de Stripe bloquea el borrado (obtenido ${paidDeleteResponse.status()})`);
+
+      const paidSubBlock = modal.locator('[data-testid="delete-client-subscription-block"]');
+      await paidSubBlock.waitFor({ state: "visible", timeout: 10000 });
+      await paidSubBlock.locator('[data-testid="delete-client-cancel-sub-btn"]').click();
+      const paidConfirm = paidSubBlock.locator('[data-testid="delete-client-cancel-sub-confirm"]');
+      await paidConfirm.waitFor({ state: "visible", timeout: 5000 });
+      const [periodEndResponse] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/api/admin/users/${paid.id}/cancel-subscription`) && r.request().method() === "POST"),
+        paidConfirm.locator('[data-testid="delete-client-cancel-sub-period-end-btn"]').click(),
+      ]);
+      const periodEndBody = await periodEndResponse.json().catch(() => ({}));
+      check(periodEndResponse.status() === 200, `Cancelar al final del periodo devuelve 200 (obtenido ${periodEndResponse.status()})`);
+      check(JSON.parse(periodEndResponse.request().postData() || "{}").atPeriodEnd === true,
+        "El botón del panel envía { atPeriodEnd: true }");
+      check(periodEndBody?.success === true && periodEndBody?.userDeactivated === true,
+        "La respuesta confirma la cancelación programada y la revocación de acceso");
+      check(periodEndBody?.stripeSubscriptionId === stripeTestSubscriptionId && periodEndBody?.status === "active",
+        "La respuesta corresponde a la suscripción real, que sigue activa hasta fin de periodo");
+      check(typeof periodEndBody?.periodEnd === "string", "La respuesta incluye periodEnd");
+
+      const remoteAfterCancel = await stripeTestRequest("GET", `subscriptions/${stripeTestSubscriptionId}`);
+      check(remoteAfterCancel.cancel_at_period_end === true, "Stripe confirma cancel_at_period_end=true");
+      check(Number.isInteger(remoteAfterCancel.cancel_at), "Stripe devuelve cancel_at para el fin del periodo programado");
+      if (Number.isInteger(remoteAfterCancel.cancel_at) && typeof periodEndBody?.periodEnd === "string") {
+        const stripeCancelAt = new Date(remoteAfterCancel.cancel_at * 1000).toISOString();
+        check(periodEndBody.periodEnd === stripeCancelAt,
+          `periodEnd de la respuesta coincide exactamente con Stripe cancel_at (${stripeCancelAt})`);
+      }
+
+      const localCancelAtEnd = psql(`SELECT cancel_at_period_end FROM subscriptions WHERE user_id = '${paid.id}'`);
+      const localActive = psql(`SELECT is_active FROM users WHERE id = '${paid.id}'`);
+      const localPeriodEnd = psql(`SELECT floor(extract(epoch FROM current_period_end))::bigint FROM subscriptions WHERE user_id = '${paid.id}'`);
+      check(localCancelAtEnd === "1", `La fila local guarda cancel_at_period_end=1 (obtenido "${localCancelAtEnd}")`);
+      check(localActive === "0", `El usuario queda inactivo en la base de datos (is_active=${localActive})`);
+      check(Number(localPeriodEnd) === remoteAfterCancel.cancel_at,
+        `La fecha local coincide con Stripe cancel_at (${localPeriodEnd} vs ${remoteAfterCancel.cancel_at})`);
+
+      await modal.waitFor({ state: "hidden", timeout: 10000 });
+      const listedPaid = (await (await ctx.request.get(`${BASE}/api/admin/users`)).json()).find((u) => u.id === paid.id);
+      check(listedPaid?.subscriptionCancelAtPeriodEnd === 1 && listedPaid?.subscriptionPeriodEnd === periodEndBody.periodEnd,
+        "El listado del API expone la fecha programada exacta de Stripe");
+      await page.reload({ waitUntil: "domcontentloaded" });
+      const paidPeriodCell = page.locator(`[data-testid="client-period-end-${paid.id}"]`);
+      await paidPeriodCell.waitFor({ state: "visible", timeout: 10000 });
+      const displayedPeriod = await paidPeriodCell.innerText();
+      const expectedDateLabel = new Date(remoteAfterCancel.cancel_at * 1000)
+        .toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+      check(displayedPeriod.includes("Fin periodo") && displayedPeriod.includes(expectedDateLabel),
+        `El panel muestra "Fin periodo ${expectedDateLabel}" (obtenido "${displayedPeriod.trim()}")`);
+      const paidListedRow = page.locator(`[data-testid="delete-client-btn-${paid.id}"]`).locator("xpath=ancestor::tr");
+      check(/Inactivo/.test(await paidListedRow.innerText()), "El cliente de Stripe aparece como Inactivo en la lista");
+      await page.screenshot({ path: path.join(SHOTS, "09-stripe-period-end.png") });
+    }
+  } else {
+    console.warn("  ! E2E_STRIPE_SECRET_KEY no definido; se omite el escenario real de Stripe (solo se aceptan claves sk_test_)");
+  }
+
   check(errors.length === 0, `Sin errores JS en la página${errors.length ? `: ${errors.join(" | ")}` : ""}`);
 } finally {
+  // Cancelar y limpiar primero la suscripción Stripe de test. Si Stripe no confirma
+  // la cancelación, se conserva la fila local para que la limpieza del usuario falle cerrada.
+  if (TEST_STRIPE_SECRET && stripeTestSubscriptionId) {
+    try {
+      const cancelled = await stripeTestRequest("DELETE", `subscriptions/${stripeTestSubscriptionId}`);
+      if (cancelled.status !== "canceled") throw new Error(`status=${cancelled.status}`);
+      if (stripeTestSubscriptionLinkedLocally && stripeTestUserId && process.env.DATABASE_URL) {
+        psql(`UPDATE subscriptions SET status = 'canceled', cancel_at_period_end = 0 WHERE user_id = '${stripeTestUserId}'`);
+      }
+      ok(`Suscripción Stripe de test cancelada para limpieza (${stripeTestSubscriptionId})`);
+    } catch (e) {
+      console.warn(`  ! No se pudo confirmar la cancelación de limpieza de Stripe; se conserva la protección local: ${String(e.message || e)}`);
+      failures.push("No se pudo confirmar la cancelación de la suscripción Stripe de test durante la limpieza");
+    }
+  }
+  if (TEST_STRIPE_SECRET && stripeTestCustomerId) {
+    try { await stripeTestRequest("DELETE", `customers/${stripeTestCustomerId}`); }
+    catch (e) {
+      console.warn(`  ! No se pudo limpiar el cliente Stripe de test: ${String(e.message || e)}`);
+      failures.push("No se pudo eliminar el cliente Stripe de test durante la limpieza");
+    }
+  }
   // Si el escenario 5 quedó a medias, la fila de suscripción sembrada bloquearía la limpieza.
   if (process.env.DATABASE_URL) {
     try { execSync("psql \"$DATABASE_URL\" -c " + JSON.stringify(`DELETE FROM subscriptions WHERE stripe_subscription_id LIKE 'sub_e2e_%'`), { stdio: "pipe" }); } catch {}
@@ -274,7 +451,10 @@ try {
   // Limpieza: cualquier usuario de prueba que quede.
   for (const u of created) {
     const r = await ctx.request.delete(`${BASE}/api/admin/users/${u.id}`).catch(() => null);
-    if (r && !r.ok() && r.status() !== 404) console.warn(`  ! no se pudo limpiar ${u.email} → ${r.status()}`);
+    if (r && !r.ok() && r.status() !== 404) {
+      console.warn(`  ! no se pudo limpiar ${u.email} → ${r.status()}`);
+      if (u.id === stripeTestUserId) failures.push("No se pudo borrar el usuario asociado a la suscripción Stripe de test");
+    }
   }
   await browser.close();
 }

@@ -59,7 +59,14 @@ function toSnapshot(s: Stripe.Subscription): StripeSubscriptionSnapshot {
 }
 
 function defaultStripeClient(): StripeSubscriptionClient | null {
-  const secret = process.env.STRIPE_SECRET_KEY;
+  // The interactive E2E scenario creates a real test-mode subscription separately
+  // from the billing key. Never let that test key override the production client.
+  const e2eSecret = process.env.E2E_STRIPE_SECRET_KEY?.trim();
+  const useE2eSecret = process.env.NODE_ENV !== "production" && Boolean(e2eSecret);
+  if (useE2eSecret && !e2eSecret!.startsWith("sk_test_")) {
+    throw new Error("E2E_STRIPE_SECRET_KEY must be a Stripe test-mode secret key");
+  }
+  const secret = useE2eSecret ? e2eSecret : process.env.STRIPE_SECRET_KEY;
   if (!secret) return null;
   // Sin apiVersion explícita: se usa la versión que el SDK instalado tipa y soporta.
   const stripe = new Stripe(secret);
