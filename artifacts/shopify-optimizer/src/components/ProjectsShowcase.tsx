@@ -321,6 +321,7 @@ export default function ProjectsShowcase({ onContact }: Props) {
           {visible.map((p, i) => {
             const feats = (p.features ?? []).slice(0, 4);
             const upcoming = isUpcoming(p.status);
+            const canRequestSimilar = p.slug !== "comic-crafter";
             if ((p.variants ?? []).length > 1) return (
               <li key={p.id} className="lxp-slot" style={{ ["--i" as string]: i } as CSSProperties}>
                 <article className="lxp-card lxp-has-deck" data-slug={p.slug}>
@@ -333,9 +334,9 @@ export default function ProjectsShowcase({ onContact }: Props) {
                     </div>
                     <h3 className="lxp-title">{p.title}</h3>
                     <p className="lxp-summary">{p.summary}</p>
-                    <div className="lxp-actions">
+                    {canRequestSimilar && <div className="lxp-actions">
                       <button type="button" className="lxp-btn lxp-btn-main" onClick={() => contact(p)}>Quiero algo así <span aria-hidden="true">→</span></button>
-                    </div>
+                    </div>}
                   </div>
                   <VariantDeck p={p} onOpen={v => openVariant(p, v)} />
                 </article>
@@ -361,7 +362,7 @@ export default function ProjectsShowcase({ onContact }: Props) {
                     )}
                     {p.tech.length > 0 && <div className="lxp-tech">{p.tech.slice(0, 6).map(t => <span key={t}>{t}</span>)}</div>}
                     <div className="lxp-actions">
-                      <button type="button" className="lxp-btn lxp-btn-main" onClick={() => contact(p)}>Quiero algo así <span aria-hidden="true">→</span></button>
+                      {canRequestSimilar && <button type="button" className="lxp-btn lxp-btn-main" onClick={() => contact(p)}>Quiero algo así <span aria-hidden="true">→</span></button>}
                       <button type="button" className="lxp-btn" onClick={() => { setOpen(p); setImgIdx(0); }}>
                         Ver el proyecto{p.images.length > 1 ? ` · ${p.images.length} imágenes` : ""}
                       </button>
@@ -410,7 +411,7 @@ export default function ProjectsShowcase({ onContact }: Props) {
               {(open.features ?? []).length > 0 && <ul className="lxp-feats lxp-feats-all">{(open.features ?? []).map(f => <li key={f}>{f}</li>)}</ul>}
               {open.tech.length > 0 && <div className="lx-project-tech">{open.tech.map(t => <span key={t}>{t}</span>)}</div>}
               <div className="lx-project-links">
-                <button type="button" className="l-btn-gold" onClick={() => contact(open)}>Quiero algo así →</button>
+                {open.slug !== "comic-crafter" && <button type="button" className="l-btn-gold" onClick={() => contact(open)}>Quiero algo así →</button>}
                 {open.liveUrl && <a href={open.liveUrl} target="_blank" rel="noopener noreferrer" className="l-btn-secondary">Verlo en vivo ↗</a>}
                 {open.appUrl && <a href={open.appUrl} target="_blank" rel="noopener noreferrer" className="l-btn-secondary">Ver la app ↗</a>}
               </div>

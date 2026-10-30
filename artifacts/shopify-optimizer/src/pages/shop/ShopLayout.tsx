@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import SiteLinks from "@/components/SiteLinks";
@@ -14,9 +14,26 @@ gsap.registerPlugin(ScrollTrigger);
 export default function ShopLayout({ children }: { children: ReactNode }) {
   const items = useCart();
   const count = items.length;
+  const [path, navigate] = useLocation();
   const cartBtn = useRef<HTMLAnchorElement>(null);
   const progress = useRef<HTMLDivElement>(null);
   useEffect(() => { window.scrollTo(0, 0); }, []);
+
+  const goBack = () => {
+    const referrer = document.referrer;
+    if (referrer) {
+      try {
+        if (new URL(referrer).origin === window.location.origin) {
+          window.history.back();
+          return;
+        }
+      } catch {
+        // A malformed referrer should use the in-site fallback below.
+      }
+    }
+    const currentPath = path.split("?")[0].replace(/\/+$/, "") || "/";
+    navigate(currentPath === "/tienda" ? "/" : "/tienda");
+  };
 
   // El carrito rebota y su contador salta cuando llega un producto.
   useEffect(() => {
@@ -58,6 +75,10 @@ export default function ShopLayout({ children }: { children: ReactNode }) {
           <img src={assetUrl("/images/logo-sc-default.png")} alt="" width={30} height={30} />
           <span>Shopy Crafter</span>
         </Link>
+        <nav className="shop-nav-controls" aria-label="Navegación de la tienda">
+          <button type="button" className="shop-nav-control" onClick={goBack}>← Atrás</button>
+          <Link href="/" className="shop-nav-control">Inicio</Link>
+        </nav>
         <nav className="shop-nav-links" aria-label="Tienda">
           <Link href="/tienda">Tienda</Link>
           <a href="/#fp-pricing">Packs</a>

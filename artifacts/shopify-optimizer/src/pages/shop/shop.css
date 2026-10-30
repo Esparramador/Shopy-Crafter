@@ -18,6 +18,9 @@
 .shop-nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 20px; padding: 12px 24px; background: rgba(13,13,26,.86); backdrop-filter: blur(14px); border-bottom: 1px solid var(--s-line); }
 .shop-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; letter-spacing: -.2px; }
 .shop-brand img { border-radius: 50%; box-shadow: 0 0 0 1px rgba(201,169,97,.35); }
+.shop-nav-controls { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.shop-nav-control { display: inline-flex; align-items: center; justify-content: center; padding: 8px 11px; border: 1px solid var(--s-line); border-radius: 999px; background: rgba(255,255,255,.035); color: var(--s-t) !important; font: 600 13px var(--s-fb); line-height: 1; text-decoration: none; white-space: nowrap; cursor: pointer; transition: border-color .2s, color .2s, background .2s; }
+.shop-nav-control:hover { border-color: rgba(201,169,97,.5); color: var(--s-gold2) !important; background: rgba(201,169,97,.08); }
 .shop-nav-links { display: flex; gap: 18px; margin-left: auto; font-size: 14px; }
 .shop-nav-links a { text-decoration: none; color: var(--s-t2); transition: color .2s; }
 .shop-nav-links a:hover { color: var(--s-t); }
@@ -66,6 +69,7 @@
 .shop-chips button { padding: 8px 14px; border-radius: 100px; border: 1px solid var(--s-line); background: rgba(255,255,255,.03); color: var(--s-t2); font: 600 13px var(--s-fb); cursor: pointer; }
 .shop-chips button.on { background: rgba(201,169,97,.15); border-color: rgba(201,169,97,.5); color: var(--s-gold2); }
 .shop-group-title { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--s-t3); margin: 28px 0 14px; font-weight: 700; }
+.shop-group-intro { max-width: 760px; margin: -6px 0 18px; color: var(--s-t2); font-size: 14px; line-height: 1.65; }
 .shop-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; perspective: 1200px; }
 .shop-card { display: flex; flex-direction: column; text-decoration: none; border-radius: 18px; overflow: hidden; background: var(--s-ink2); border: 1px solid var(--s-line); transition: transform .35s cubic-bezier(.2,.7,.2,1), border-color .3s, box-shadow .35s; }
 .shop-card:hover { transform: translateY(-5px); border-color: rgba(201,169,97,.45); box-shadow: 0 30px 60px -28px rgba(201,169,97,.35); }
@@ -75,6 +79,9 @@
 .shop-card:hover .shop-card-media video { opacity: 1; }
 .shop-card:hover .shop-card-media img { transform: scale(1.05); }
 .shop-card-noimg { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(circle at 30% 30%, rgba(201,169,97,.2), transparent 60%), linear-gradient(135deg, #2a1f12, #120d08); color: var(--s-gold2); font-size: 13px; font-weight: 600; text-align: center; padding: 16px; }
+.shop-card-service-art { align-content: center; gap: 10px; background: radial-gradient(circle at 75% 24%, rgba(69,179,122,.2), transparent 38%), radial-gradient(circle at 20% 80%, rgba(201,169,97,.18), transparent 45%), linear-gradient(135deg, #171b25, #0d0d1a 72%); }
+.shop-card-service-art strong { font: 600 clamp(28px, 4vw, 42px)/1 var(--s-fh); letter-spacing: .04em; color: var(--s-gold2); }
+.shop-card-service-art span { max-width: 80%; color: var(--s-t2); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
 .shop-badge { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; background: var(--s-gold); color: #000; }
 .shop-badge-digital { left: auto; right: 12px; background: var(--s-jade); color: #fff; }
 .shop-card-body { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 18px; flex: 1; }
@@ -315,7 +322,9 @@
 }
 @media (max-width: 640px) {
   .shop-wrap { padding: 0 16px; }
-  .shop-nav { padding: 10px 16px; gap: 10px; }
+  .shop-nav { padding: 10px 12px; gap: 8px; }
+  .shop-nav-controls { gap: 6px; }
+  .shop-nav-control { padding: 8px 9px; font-size: 12px; }
   .shop-nav-links { display: none; }
   .shop-cart-btn { margin-left: auto; }
   .shop-brand span { display: none; }

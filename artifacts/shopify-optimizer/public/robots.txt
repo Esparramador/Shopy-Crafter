@@ -5,6 +5,7 @@ User-agent: *
 Allow: /
 
 Disallow: /api/
+Allow: /api/shop/products-sitemap.xml
 Disallow: /admin
 Disallow: /client
 Disallow: /project/
@@ -19,3 +20,4 @@ Disallow: /web-demos/
 Disallow: /api/web-designer/demo-page/
 
 Sitemap: https://shopycrafter.com/sitemap.xml
+Sitemap: https://shopycrafter.com/api/shop/products-sitemap.xml

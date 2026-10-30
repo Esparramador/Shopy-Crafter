@@ -2172,7 +2172,7 @@ export default function YouTubeStudio() {
                     style={{ border: `2px dashed ${modeloFaceFile ? "var(--jade)" : "var(--ink4)"}`, borderRadius: 8, padding: 14, cursor: "pointer", textAlign: "center",
                       background: modeloFaceFile ? "rgba(16,185,129,0.05)" : "var(--ink3)", display: "flex", alignItems: "center", gap: 10 }}>
                     {modeloFacePreview
-                      ? <img src={modeloFacePreview} style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover" }} />
+                      ? <img src={modeloFacePreview} alt="Vista previa de la foto seleccionada para el reemplazo facial" style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover" }} />
                       : <UserSquare size={32} style={{ opacity: 0.25 }} />}
                     <div style={{ textAlign: "left" }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: modeloFaceFile ? "var(--jade)" : "var(--t)" }}>
@@ -2308,7 +2308,7 @@ export default function YouTubeStudio() {
                         <div key={r.videoId} onClick={() => setModeloSelectedVideo(r)}
                           style={{ display: "flex", gap: 8, padding: 8, borderRadius: 8, cursor: "pointer", marginBottom: 4, border: `1px solid ${modeloSelectedVideo?.videoId === r.videoId ? "var(--gold)" : "transparent"}`,
                             background: modeloSelectedVideo?.videoId === r.videoId ? "rgba(251,191,36,0.08)" : "var(--ink3)" }}>
-                          {r.thumbnail && <img src={r.thumbnail} style={{ width: 72, height: 50, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />}
+                          {r.thumbnail && <img src={r.thumbnail} alt={`Miniatura del vídeo ${r.title} de ${r.channelTitle}`} style={{ width: 72, height: 50, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />}
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 11, fontWeight: 600, color: modeloSelectedVideo?.videoId === r.videoId ? "var(--gold)" : "var(--t)", lineClamp: 2, overflow: "hidden" }}>{r.title}</div>
                             <div style={{ fontSize: 10, color: "var(--t3)" }}>{r.channelTitle}</div>
