@@ -48,7 +48,13 @@ try {
   if (!Array.isArray(projects) || !projects.length) fail("no hay proyectos para abrir Fusion Studio Pro");
   const page = await ctx.newPage();
   const errors = [];
+  let voiceTuningPutCount = 0;
   page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("request", request => {
+    if (request.url().includes("/api/voice/convai/voice-settings") && request.method() === "PUT") {
+      voiceTuningPutCount++;
+    }
+  });
   await page.addInitScript(() => localStorage.setItem("shopycrafter_coach_dismissed", "1"));
   await page.goto(`${BASE}/projects/${projects[0].id}/fusion-studio-pro`, { waitUntil: "domcontentloaded" });
   await page.addStyleTag({ content: "#replit-dev-banner{display:none!important}" });
@@ -109,10 +115,27 @@ try {
   assert(applyResult.success === true, "Guardar y aplicar devuelve éxito");
   assert(Object.keys(applyResult.agents || {}).length === 3, "La aplicación informa del estado de admin, cliente y landing");
   assert(Object.values(applyResult.agents).every(a => a.status === "applied" || a.status === "not_created"), "Los agentes existentes se sincronizan en sitio y los no creados no se crean");
+  const adminOnlyApply = await ctx.request.post(`${BASE}/api/voice/convai/voice-settings/apply`, { data: { agentTypes: ["admin"] } });
+  const adminOnlyResult = await adminOnlyApply.json();
+  assert(adminOnlyApply.ok(), `Reintentar un tipo concreto → HTTP ${adminOnlyApply.status()}`);
+  assert(Object.keys(adminOnlyResult.agents || {}).join(",") === "admin", "El servidor solo procesa los agentes indicados para el reintento");
   const after = (await (await ctx.request.get(`${BASE}/api/voice/convai/voice-settings`)).json()).settings;
   assert(after.speed === newSpeed && after.stability === original.stability, `El servidor persistió speed=${after.speed}`);
   await page.getByTestId("convai-voice-tuning-source").filter({ hasText: "Guardado en el panel" }).waitFor({ timeout: 15_000 });
   ok("El badge de origen indica 'Guardado en el panel'");
+  assert(!(await page.getByTestId("convai-voice-tuning-save-apply").isEnabled()), "Guardar y aplicar queda deshabilitado sin cambios en los controles");
+  assert(await page.getByTestId("convai-voice-tuning-apply-saved").isEnabled(), "Se puede volver a aplicar la configuración guardada sin cambios en los controles");
+  const putsBeforeSavedApply = voiceTuningPutCount;
+  const savedApplyResp = page.waitForResponse(r => r.url().includes("/api/voice/convai/voice-settings/apply") && r.request().method() === "POST", { timeout: 60_000 });
+  await page.getByTestId("convai-voice-tuning-apply-saved").click();
+  const savedApplyResponse = await savedApplyResp;
+  assert(savedApplyResponse.status() === 200, `Reaplicar valores guardados → HTTP ${savedApplyResponse.status()}`);
+  const savedApplyResult = await savedApplyResponse.json();
+  assert(Object.keys(savedApplyResult.agents || {}).length === 3, "La reaplicación muestra el resultado de cada tipo de agente");
+  assert(await page.getByTestId("convai-voice-tuning-apply-results").isVisible(), "El panel muestra el detalle de la aplicación por agente");
+  assert((await page.getByTestId("convai-voice-tuning-apply-results").textContent()).includes("Actualizado") || (await page.getByTestId("convai-voice-tuning-apply-results").textContent()).includes("Sin crear"), "El panel distingue agentes actualizados y no creados");
+  const putsAfterSavedApply = voiceTuningPutCount;
+  assert(putsAfterSavedApply === putsBeforeSavedApply, "Reaplicar no vuelve a guardar los controles");
   await page.getByText("Llamadas de voz operativas", { exact: true }).waitFor({ timeout: 30_000 });
   const appliedHealth = await (await ctx.request.get(`${BASE}/api/voice/convai/health`)).json();
   assert(appliedHealth.healthy === true, "La salud queda operativa sin esperar a otra llamada");

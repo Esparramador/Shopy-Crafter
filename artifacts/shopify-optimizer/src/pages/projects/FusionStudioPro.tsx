@@ -2335,6 +2335,17 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
   type VoiceTuningHistory = {
     id: string; changedAt: string; userId: string; userName: string; userEmail: string; settings: VoiceTuning;
   };
+  type VoiceAgentType = "admin" | "client" | "landing";
+  const voiceAgentLabel: Record<VoiceAgentType, string> = {
+    admin: "Panel admin",
+    client: "Panel cliente",
+    landing: "Landing pública",
+  };
+  type VoiceApplyResult = {
+    agentId: string | null;
+    status: "applied" | "not_created" | "error";
+    error?: string;
+  };
   type VoiceTuningInfo = {
     settings: VoiceTuning; source: "db" | "default" | "mixed"; invalid: (keyof VoiceTuning)[];
     defaults: VoiceTuning; limits: Record<keyof VoiceTuning, { min: number; max: number; step: number }>;
@@ -2345,9 +2356,11 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
   const [tuningBusy, setTuningBusy] = useState(false);
   const [tuningSaving, setTuningSaving] = useState(false);
   const [tuningPreviewing, setTuningPreviewing] = useState(false);
+  const [tuningApplying, setTuningApplying] = useState(false);
   const [tuningErr, setTuningErr] = useState<string | null>(null);
   const [tuningSavedAt, setTuningSavedAt] = useState<number | null>(null);
   const [tuningApplied, setTuningApplied] = useState(false);
+  const [tuningApplyResults, setTuningApplyResults] = useState<Partial<Record<VoiceAgentType, VoiceApplyResult>>>({});
   const tuningAudioRef = useRef<HTMLAudioElement | null>(null);
   const tuningAudioUrlRef = useRef<string | null>(null);
 
@@ -2388,6 +2401,40 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
     finally { setTuningPreviewing(false); }
   }
 
+  async function applySavedTuning(agentTypes?: VoiceAgentType[], notify = true): Promise<boolean> {
+    setTuningApplying(true);
+    setTuningErr(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/convai/voice-settings/apply`, {
+        method: "POST",
+        credentials: "include",
+        headers: agentTypes ? { "Content-Type": "application/json" } : undefined,
+        body: agentTypes ? JSON.stringify({ agentTypes }) : undefined,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.agents && typeof j.agents === "object") {
+        setTuningApplyResults(previous => agentTypes ? { ...previous, ...j.agents } : j.agents);
+      }
+      if (!r.ok) {
+        setTuningApplied(false);
+        setTuningErr(j.error || "No se pudieron aplicar los ajustes a todos los agentes.");
+        await loadHealth();
+        return false;
+      }
+      setTuningApplied(true);
+      if (notify) onInfo("Ajustes guardados aplicados a los agentes existentes.");
+      await loadHealth();
+      return true;
+    } catch (e: any) {
+      setTuningApplied(false);
+      setTuningErr(e.message || "No se pudieron aplicar los ajustes guardados.");
+      await loadHealth();
+      return false;
+    } finally {
+      setTuningApplying(false);
+    }
+  }
+
   async function persistTuning(settings: VoiceTuning, successMessage: string, applyNow = false) {
     setTuningSaving(true); setTuningErr(null);
     let saved = false;
@@ -2401,16 +2448,12 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
       saved = true;
       setTuningInfo(j); setTuning(j.settings); setTuningSavedAt(Date.now());
       setTuningApplied(false);
+      setTuningApplyResults({});
       if (applyNow) {
-        const applyResponse = await fetch(`${API_BASE}/api/voice/convai/voice-settings/apply`, {
-          method: "POST", credentials: "include",
-        });
-        const applyResult = await applyResponse.json().catch(() => ({}));
-        if (!applyResponse.ok) throw new Error(applyResult.error || "La voz se guardó, pero no se pudo aplicar a todos los agentes");
-        setTuningApplied(true);
+        const applied = await applySavedTuning(undefined, false);
+        if (!applied) return;
       }
       onInfo(successMessage);
-      await loadHealth();
     } catch (e: any) {
       setTuningErr(e.message);
       if (saved) await loadHealth();
@@ -2427,6 +2470,10 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
     if (!tuning) return;
     await persistTuning(tuning, "Voz de Arturo guardada y aplicada a los agentes existentes.", true);
   }
+
+  const failedVoiceAgents = (Object.entries(tuningApplyResults) as [VoiceAgentType, VoiceApplyResult][])
+    .filter(([, result]) => result.status === "error")
+    .map(([type]) => type);
 
   async function restoreTuning(entry: VoiceTuningHistory) {
     await persistTuning(entry.settings, "Ajuste anterior de la voz de Arturo restaurado mediante el guardado normal.");
@@ -2739,7 +2786,7 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
                         id={`convai-tuning-${f.key}`}
                         data-testid={`convai-voice-tuning-${f.key}`}
                         type="range" min={lim.min} max={lim.max} step={lim.step} value={value}
-                        disabled={tuningSaving || tuningPreviewing}
+                        disabled={tuningSaving || tuningPreviewing || tuningApplying}
                         aria-label={`${f.title} (${lim.min} a ${lim.max})`}
                         onChange={e => setTuning(p => p ? { ...p, [f.key]: Math.round(Number(e.target.value) * 100) / 100 } : p)}
                         style={{ width: "100%", accentColor: "var(--gold)" }}
@@ -2756,23 +2803,69 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
             {tuningErr && <p style={{ fontSize: 11, color: "#fca5a5", marginTop: 10 }} data-testid="convai-voice-tuning-error">{tuningErr}</p>}
 
             <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
-              <button onClick={previewTuning} disabled={!tuning || tuningPreviewing || tuningSaving} className="btn" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-voice-tuning-preview"
+              <button onClick={previewTuning} disabled={!tuning || tuningPreviewing || tuningSaving || tuningApplying} className="btn" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-voice-tuning-preview"
                 title="Genera una frase corta con la misma voz y modelo que Arturo usando los valores actuales del formulario (no guarda nada)">
                 {tuningPreviewing ? <Loader2 size={12} className="animate-spin" /> : <PlayCircle size={12} />} {tuningPreviewing ? "Generando muestra…" : "Escuchar muestra"}
               </button>
-              <button onClick={saveTuning} disabled={!tuning || !tuningDirty || tuningSaving || tuningPreviewing} className="btn btn-gold" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-voice-tuning-save">
+              <button onClick={saveTuning} disabled={!tuning || !tuningDirty || tuningSaving || tuningPreviewing || tuningApplying} className="btn btn-gold" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-voice-tuning-save">
                 {tuningSaving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Guardar
               </button>
-              <button onClick={saveAndApplyTuning} disabled={!tuning || !tuningDirty || tuningSaving || tuningPreviewing} className="btn" style={{ fontSize: 11, padding: "4px 10px", borderColor: "rgba(200,168,75,0.4)", color: "var(--gold)" }} data-testid="convai-voice-tuning-save-apply">
+              <button onClick={saveAndApplyTuning} disabled={!tuning || !tuningDirty || tuningSaving || tuningPreviewing || tuningApplying} className="btn" style={{ fontSize: 11, padding: "4px 10px", borderColor: "rgba(200,168,75,0.4)", color: "var(--gold)" }} data-testid="convai-voice-tuning-save-apply">
                 {tuningSaving ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Guardar y aplicar ahora
               </button>
-              <button onClick={() => tuningInfo && setTuning({ ...tuningInfo.defaults })} disabled={!tuningInfo || tuningSaving || tuningPreviewing} className="btn" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-voice-tuning-defaults"
+              {!tuningDirty && (
+                <button
+                  onClick={() => applySavedTuning()}
+                  disabled={!tuningInfo || tuningSaving || tuningPreviewing || tuningApplying}
+                  className="btn"
+                  style={{ fontSize: 11, padding: "4px 10px", borderColor: "rgba(200,168,75,0.4)", color: "var(--gold)" }}
+                  data-testid="convai-voice-tuning-apply-saved"
+                  title="Aplica los valores guardados a los agentes existentes, sin volver a guardarlos ni recrearlos"
+                >
+                  {tuningApplying ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  {tuningApplying ? "Aplicando…" : "Aplicar ajustes guardados"}
+                </button>
+              )}
+              {failedVoiceAgents.length > 0 && !tuningDirty && (
+                <button
+                  onClick={() => applySavedTuning(failedVoiceAgents)}
+                  disabled={tuningSaving || tuningPreviewing || tuningApplying}
+                  className="btn"
+                  style={{ fontSize: 11, padding: "4px 10px", borderColor: "rgba(239,68,68,0.45)", color: "#fca5a5" }}
+                  data-testid="convai-voice-tuning-retry-failed"
+                  title={`Reintenta solo: ${failedVoiceAgents.map(type => voiceAgentLabel[type]).join(", ")}`}
+                >
+                  {tuningApplying ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  Reintentar fallidos ({failedVoiceAgents.length})
+                </button>
+              )}
+              <button onClick={() => tuningInfo && setTuning({ ...tuningInfo.defaults })} disabled={!tuningInfo || tuningSaving || tuningPreviewing || tuningApplying} className="btn" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-voice-tuning-defaults"
                 title="Vuelve a los valores por defecto en el formulario (no guarda hasta que pulses Guardar)">
                 <RefreshCw size={12} /> Valores por defecto
               </button>
-              {tuningDirty && <span style={{ fontSize: 10, color: "#fcd34d" }}>Cambios sin guardar</span>}
+              {tuningDirty && <span style={{ fontSize: 10, color: "#fcd34d" }}>Cambios sin guardar · guarda antes de aplicar estos controles</span>}
               {!tuningDirty && tuningSavedAt && <span style={{ fontSize: 10, color: tuningApplied ? "#86efac" : "var(--t3)" }}>{tuningApplied ? "Guardado y aplicado" : "Guardado · pendiente de aplicar en los agentes"}</span>}
             </div>
+            {Object.keys(tuningApplyResults).length > 0 && (
+              <div style={{ display: "grid", gap: 5, marginTop: 10 }} data-testid="convai-voice-tuning-apply-results" aria-live="polite">
+                {(Object.entries(tuningApplyResults) as [VoiceAgentType, VoiceApplyResult][]).map(([type, result]) => {
+                  const statusText = result.status === "applied" ? "Actualizado"
+                    : result.status === "error" ? "Falló"
+                    : "Sin crear · se aplicará al crearlo";
+                  const statusColor = result.status === "applied" ? "#86efac"
+                    : result.status === "error" ? "#fca5a5"
+                    : "var(--t3)";
+                  return (
+                    <div key={type} data-testid={`convai-voice-tuning-apply-${type}`} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11 }}>
+                      <span style={{ color: statusColor, fontWeight: 600 }}>{statusText}</span>
+                      <span style={{ color: "var(--t2)" }}>{voiceAgentLabel[type]}</span>
+                      {result.agentId && <span style={{ color: "var(--t3)", fontFamily: "monospace" }}>{result.agentId}</span>}
+                      {result.error && <span style={{ color: "#fca5a5" }}>{result.error}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }} data-testid="convai-voice-tuning-history">
               <p style={{ fontSize: 11, color: "var(--t2)", fontWeight: 600, marginBottom: 8 }}>Últimos cambios</p>
               {!tuningInfo?.history?.length ? (

@@ -1149,8 +1149,20 @@ router.put("/voice/convai/voice-settings", requireAdmin, async (req, res): Promi
 
 // Aplica los ajustes guardados a los agentes que ya existen, sin recrearlos.
 // Las llamadas en curso comparten el mismo single-flight para evitar carreras.
-router.post("/voice/convai/voice-settings/apply", requireAdmin, async (_req, res): Promise<void> => {
-  const types: AgentType[] = ["admin", "client", "landing"];
+router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res): Promise<void> => {
+  const allTypes: AgentType[] = ["admin", "client", "landing"];
+  const requestedTypes = req.body?.agentTypes;
+  if (
+    requestedTypes !== undefined
+    && (!Array.isArray(requestedTypes)
+      || requestedTypes.length === 0
+      || requestedTypes.some((type: unknown) => !allTypes.includes(type as AgentType))
+      || new Set(requestedTypes).size !== requestedTypes.length)
+  ) {
+    res.status(400).json({ error: "agentTypes debe ser una lista no vacía de tipos de agente válidos, sin duplicados." });
+    return;
+  }
+  const types: AgentType[] = requestedTypes ?? allTypes;
   const agents: Partial<Record<AgentType, { agentId: string | null; status: "applied" | "not_created" | "error"; error?: string }>> = {};
   let failed = false;
 
