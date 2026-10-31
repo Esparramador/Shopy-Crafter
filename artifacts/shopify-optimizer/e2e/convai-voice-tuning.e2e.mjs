@@ -86,6 +86,12 @@ try {
   // expone, así que se usa Content-Length (lo fija el servidor).
   const previewBytes = Number(pr.headers()["content-length"] || 0);
   assert(previewBytes > 5_000, `Muestra con audio real (${previewBytes} bytes)`);
+  // El servidor responde antes de que Audio.play() termine y el botón vuelva
+  // a habilitarse; espera a que acabe la previsualización antes de editar.
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid="convai-voice-tuning-preview"]');
+    return button && !button.disabled;
+  }, null, { timeout: 15_000 });
 
   // 3. Cambiar velocidad y guardar
   const newSpeed = original.speed >= 1.0 ? Math.round((original.speed - 0.1) * 100) / 100 : Math.round((original.speed + 0.1) * 100) / 100;
@@ -171,27 +177,42 @@ try {
   assert(callSettings.speed === original.speed && callSettings.stability === original.stability && callSettings.similarityBoost === original.similarityBoost, "La nueva configuración se guarda antes de llamar");
   assert(callSettings.speed !== newSpeed, "El valor guardado para la llamada difiere del que ya estaba aplicado");
 
-  const callUrlResp = await ctx.request.get(`${BASE}/api/voice/convai/call-url`);
-  assert(callUrlResp.status() === 200, `La siguiente llamada de Arturo obtiene URL → HTTP ${callUrlResp.status()}`);
+  // Start a real admin call first (this causes a cold sync after the PUT
+  // invalidates the ID cache), then start "apply" while ElevenLabs is still
+  // handling that request. Both paths must consume the same single-flight.
+  const callStartedAt = Date.now();
+  const callUrlPromise = ctx.request.get(`${BASE}/api/voice/convai/call-url`);
+  await new Promise(resolve => setTimeout(resolve, 2));
+  const concurrentApplyPromise = ctx.request.post(`${BASE}/api/voice/convai/voice-settings/apply`, {
+    data: { agentTypes: ["admin"] },
+  });
+  const [callUrlResp, concurrentApplyResp] = await Promise.all([callUrlPromise, concurrentApplyPromise]);
+  assert(callUrlResp.status() === 200, `La llamada concurrente obtiene URL → HTTP ${callUrlResp.status()}`);
+  assert(concurrentApplyResp.status() === 200, `Aplicar durante el inicio de llamada → HTTP ${concurrentApplyResp.status()}`);
   const callUrl = await callUrlResp.json();
+  const concurrentApply = await concurrentApplyResp.json();
   assert(typeof callUrl.signed_url === "string" && callUrl.signed_url.length > 0, "La llamada recibe una URL firmada");
   assert(typeof callUrl.agentId === "string" && callUrl.agentId.length > 0, "La llamada devuelve el ID del agente admin");
   const pinnedAgentId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID?.trim();
   if (pinnedAgentId) {
     assert(callUrl.agentId === pinnedAgentId, "La llamada conserva el agente admin fijado por ELEVEN_CONVAI_DEFAULT_AGENT_ID");
+  } else {
+    ok("ELEVEN_CONVAI_DEFAULT_AGENT_ID no está configurado en este entorno; se comprueba el mismo ID entre llamada y aplicación");
   }
-  const appliedAdminAgentId = applyResult.agents?.admin?.agentId;
-  if (appliedAdminAgentId) {
-    assert(callUrl.agentId === appliedAdminAgentId, "La llamada sincroniza el agente admin existente, sin sustituirlo");
-  }
+  const concurrentAdmin = concurrentApply.agents?.admin;
+  assert(concurrentApply.success === true, "La aplicación concurrente termina correctamente");
+  assert(concurrentAdmin?.status === "applied", "La aplicación concurrente informa el agente admin como aplicado");
+  assert(concurrentAdmin.sharedFlight === true, "La aplicación reutiliza el mismo trabajo de sincronización de la llamada");
+  assert(concurrentAdmin.agentId === callUrl.agentId, "La llamada y la aplicación conservan el mismo ID de agente fijado");
+  assert(Date.now() - callStartedAt < 60_000, "La llamada y la aplicación concurrentes terminan dentro del límite");
   const agentResp = await ctx.request.get(`${BASE}/api/voice/convai/agents/${encodeURIComponent(callUrl.agentId)}`);
   assert(agentResp.status() === 200, `La API admin lee el agente devuelto por call-url → HTTP ${agentResp.status()}`);
   const agent = (await agentResp.json()).agent;
   const persistedTts = agent?.conversation_config?.tts;
   const closeEnough = (actual, expected) => Number.isFinite(Number(actual)) && Math.abs(Number(actual) - expected) < 0.005;
-  assert(closeEnough(persistedTts?.stability, callSettings.stability), `ElevenLabs conserva stability=${persistedTts?.stability}`);
-  assert(closeEnough(persistedTts?.similarity_boost, callSettings.similarityBoost), `ElevenLabs conserva similarity_boost=${persistedTts?.similarity_boost}`);
-  assert(closeEnough(persistedTts?.speed, callSettings.speed), `ElevenLabs conserva speed=${persistedTts?.speed}`);
+  assert(closeEnough(persistedTts?.stability, callSettings.stability), `ElevenLabs conserva stability=${persistedTts?.stability} y no una configuración obsoleta`);
+  assert(closeEnough(persistedTts?.similarity_boost, callSettings.similarityBoost), `ElevenLabs conserva similarity_boost=${persistedTts?.similarity_boost} y no una configuración obsoleta`);
+  assert(closeEnough(persistedTts?.speed, callSettings.speed), `ElevenLabs conserva speed=${persistedTts?.speed} y no una configuración obsoleta`);
 
   await page.waitForTimeout(500);
   await card.screenshot({ path: path.join(OUT, "02-saved.png") });

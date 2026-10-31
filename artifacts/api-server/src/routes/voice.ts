@@ -795,14 +795,18 @@ const _agentResolveInFlight: Partial<Record<AgentType, Promise<string>>> = {};
 async function getOrCreateConvAIAgent(type: AgentType): Promise<string> {
   const cacheKey = `convai_${type}_agent_id`;
 
-  // 1. In-memory cache — the config was already synced once in this process.
-  if (_agentIdCache[cacheKey]) return _agentIdCache[cacheKey];
-
+  // A voice-apply may be syncing a cached agent right now. Check the shared
+  // work before the ID cache, otherwise a call can receive a URL for the old
+  // config while that PATCH + verification is still in progress.
   const inFlight = _agentResolveInFlight[type];
   if (inFlight) return inFlight;
 
-  const pending = resolveConvAIAgentUncached(type, cacheKey).finally(() => {
-    delete _agentResolveInFlight[type];
+  // 1. In-memory cache — the config was already synced once in this process.
+  if (_agentIdCache[cacheKey]) return _agentIdCache[cacheKey];
+
+  let pending: Promise<string>;
+  pending = resolveConvAIAgentUncached(type, cacheKey).finally(() => {
+    if (_agentResolveInFlight[type] === pending) delete _agentResolveInFlight[type];
   });
   _agentResolveInFlight[type] = pending;
   return pending;
@@ -1163,12 +1167,28 @@ router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res)
     return;
   }
   const types: AgentType[] = requestedTypes ?? allTypes;
-  const agents: Partial<Record<AgentType, { agentId: string | null; status: "applied" | "not_created" | "error"; error?: string }>> = {};
+  const agents: Partial<Record<AgentType, {
+    agentId: string | null;
+    status: "applied" | "not_created" | "error";
+    error?: string;
+    sharedFlight?: boolean;
+  }>> = {};
   let failed = false;
 
   for (const type of types) {
     const inFlight = _agentResolveInFlight[type];
-    if (inFlight) await inFlight.catch(() => undefined);
+    if (inFlight) {
+      try {
+        // A call already owns the sync+verify for this agent. Reuse that
+        // result instead of issuing a second PATCH/verification immediately.
+        const agentId = await inFlight;
+        agents[type] = { agentId, status: "applied", sharedFlight: true };
+        continue;
+      } catch {
+        // A call may have raced a settings save and correctly failed stale
+        // verification. Resolve the existing ID and retry with current settings.
+      }
+    }
 
     const cacheKey = `convai_${type}_agent_id`;
     let resolvedAgentId: string | null = null;
@@ -1182,10 +1202,18 @@ router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res)
 
       const voiceId = await resolveVerifiedConvAIVoiceId();
       let appliedAgentId: string | null = null;
+      let sharedFlight = false;
       while (!appliedAgentId) {
         const concurrent = _agentResolveInFlight[type];
         if (concurrent) {
-          await concurrent.catch(() => undefined);
+          try {
+            appliedAgentId = await concurrent;
+            sharedFlight = true;
+            break;
+          } catch {
+            // Retry below with the latest settings; do not accept a failed
+            // or stale in-flight verification as an applied result.
+          }
           const latestAgentId = await findExistingConvAIAgentId(type);
           if (!latestAgentId) {
             agents[type] = { agentId: null, status: "not_created" };
@@ -1207,7 +1235,7 @@ router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res)
           if (_agentResolveInFlight[type] === work) delete _agentResolveInFlight[type];
         }
       }
-      if (appliedAgentId) agents[type] = { agentId: appliedAgentId, status: "applied" };
+      if (appliedAgentId) agents[type] = { agentId: appliedAgentId, status: "applied", ...(sharedFlight ? { sharedFlight: true } : {}) };
     } catch (err: any) {
       failed = true;
       agents[type] = {
