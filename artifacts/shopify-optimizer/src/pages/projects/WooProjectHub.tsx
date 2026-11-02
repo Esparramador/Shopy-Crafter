@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRoute } from "wouter";
 import { toast } from "@/hooks/use-toast";
+import { okJson, fmt, fmtDate, fmtDateShort, StatusBadge, type StatusStyle, KpiCard as HubKpiCard, SearchBar, Table, Pagination } from "@/components/commerce/hub-kit";
 
 type Tab = "overview" | "orders" | "products" | "customers" | "coupons" | "inventory";
 
@@ -10,121 +11,31 @@ const WD = "#5b2d5f";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
-// Respuestas no-OK → error con el mensaje del API (antes se pintaban como datos: "NaN €", "undefined").
-async function okJson(r: Response) {
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d?.error ?? `HTTP ${r.status}`);
-  return d;
-}
 const loadError = (e: Error) => toast({ title: "Error cargando datos", description: e.message, variant: "destructive" });
 const saveError = (e: Error) => toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" });
 
-const fmt = (n: number, currency = "EUR") =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency, minimumFractionDigits: 2 }).format(n);
+const STATUS: Record<string, StatusStyle> = {
+  processing:    { bg: "rgba(251,191,36,0.12)",  c: "#fbbf24", label: "⚙ Procesando" },
+  pending:       { bg: "rgba(251,191,36,0.12)",  c: "#fbbf24", label: "⏳ Pendiente" },
+  "on-hold":     { bg: "rgba(251,146,60,0.12)",  c: "#fb923c", label: "⏸ En espera" },
+  completed:     { bg: "rgba(52,211,153,0.12)",  c: "#34d399", label: "✓ Completado" },
+  cancelled:     { bg: "rgba(244,63,94,0.12)",   c: "#f43f5e", label: "✗ Cancelado" },
+  refunded:      { bg: "rgba(156,163,175,0.12)", c: "#9ca3af", label: "↩ Devuelto" },
+  failed:        { bg: "rgba(244,63,94,0.12)",   c: "#f43f5e", label: "✗ Fallido" },
+  trash:         { bg: "rgba(244,63,94,0.12)",   c: "#f43f5e", label: "🗑 Papelera" },
+  publish:       { bg: "rgba(52,211,153,0.12)",  c: "#34d399", label: "✓ Publicado" },
+  draft:         { bg: "rgba(251,191,36,0.12)",  c: "#fbbf24", label: "📝 Borrador" },
+  private:       { bg: "rgba(99,91,255,0.15)",   c: "#897eff", label: "🔒 Privado" },
+  instock:       { bg: "rgba(52,211,153,0.12)",  c: "#34d399", label: "✓ En stock" },
+  outofstock:    { bg: "rgba(244,63,94,0.12)",   c: "#f43f5e", label: "✗ Sin stock" },
+  onbackorder:   { bg: "rgba(251,146,60,0.12)",  c: "#fb923c", label: "⚠ Bajo pedido" },
+  percent:       { bg: "rgba(150,88,138,0.15)",  c: WL,        label: "%" },
+  fixed_cart:    { bg: "rgba(150,88,138,0.15)",  c: WL,        label: "€ Fijo" },
+  fixed_product: { bg: "rgba(150,88,138,0.15)",  c: WL,        label: "€ Producto" },
+};
+const Badge = ({ status }: { status: string }) => <StatusBadge status={status} map={STATUS} />;
 
-const fmtDate = (d: string) =>
-  d ? new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
-const fmtDateShort = (d: string) =>
-  d ? new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) : "—";
-
-function Badge({ status }: { status: string }) {
-  const m: Record<string, { bg: string; c: string; label: string }> = {
-    processing:    { bg: "rgba(251,191,36,0.12)",  c: "#fbbf24", label: "⚙ Procesando" },
-    pending:       { bg: "rgba(251,191,36,0.12)",  c: "#fbbf24", label: "⏳ Pendiente" },
-    "on-hold":     { bg: "rgba(251,146,60,0.12)",  c: "#fb923c", label: "⏸ En espera" },
-    completed:     { bg: "rgba(52,211,153,0.12)",  c: "#34d399", label: "✓ Completado" },
-    cancelled:     { bg: "rgba(244,63,94,0.12)",   c: "#f43f5e", label: "✗ Cancelado" },
-    refunded:      { bg: "rgba(156,163,175,0.12)", c: "#9ca3af", label: "↩ Devuelto" },
-    failed:        { bg: "rgba(244,63,94,0.12)",   c: "#f43f5e", label: "✗ Fallido" },
-    trash:         { bg: "rgba(244,63,94,0.12)",   c: "#f43f5e", label: "🗑 Papelera" },
-    publish:       { bg: "rgba(52,211,153,0.12)",  c: "#34d399", label: "✓ Publicado" },
-    draft:         { bg: "rgba(251,191,36,0.12)",  c: "#fbbf24", label: "📝 Borrador" },
-    private:       { bg: "rgba(99,91,255,0.15)",   c: "#897eff", label: "🔒 Privado" },
-    instock:       { bg: "rgba(52,211,153,0.12)",  c: "#34d399", label: "✓ En stock" },
-    outofstock:    { bg: "rgba(244,63,94,0.12)",   c: "#f43f5e", label: "✗ Sin stock" },
-    onbackorder:   { bg: "rgba(251,146,60,0.12)",  c: "#fb923c", label: "⚠ Bajo pedido" },
-    percent:       { bg: "rgba(150,88,138,0.15)",  c: WL,        label: "%" },
-    fixed_cart:    { bg: "rgba(150,88,138,0.15)",  c: WL,        label: "€ Fijo" },
-    fixed_product: { bg: "rgba(150,88,138,0.15)",  c: WL,        label: "€ Producto" },
-  };
-  const s = m[status] ?? { bg: "rgba(255,255,255,0.06)", c: "rgba(255,255,255,0.5)", label: status };
-  return (
-    <span style={{ display:"inline-block", padding:"2px 10px", borderRadius:100, fontSize:11, fontWeight:700, background:s.bg, color:s.c, whiteSpace:"nowrap" }}>
-      {s.label}
-    </span>
-  );
-}
-
-function KpiCard({ label, value, sub, icon, color = WP }: { label: string; value: string; sub?: string; icon: string; color?: string }) {
-  return (
-    <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <span style={{ fontSize:22 }}>{icon}</span>
-        <span style={{ fontSize:11, color:"rgba(255,255,255,0.35)", fontWeight:600, textTransform:"uppercase", letterSpacing:0.5 }}>{label}</span>
-      </div>
-      <div style={{ fontSize:28, fontWeight:800, color, marginTop:4 }}>{value}</div>
-      {sub && <div style={{ fontSize:12, color:"rgba(255,255,255,0.4)" }}>{sub}</div>}
-    </div>
-  );
-}
-
-function SearchBar({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
-  return (
-    <input
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:8, padding:"8px 14px", color:"#fff", fontSize:13, outline:"none", width:260 }}
-    />
-  );
-}
-
-function Table({ cols, rows, emptyMsg }: { cols: string[]; rows: React.ReactNode[][]; emptyMsg: string }) {
-  if (!rows.length) return (
-    <div style={{ textAlign:"center", padding:"48px 0", color:"rgba(255,255,255,0.3)", fontSize:13 }}>
-      {emptyMsg}
-    </div>
-  );
-  return (
-    <div style={{ overflowX:"auto" }}>
-      <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-        <thead>
-          <tr>
-            {cols.map(c => (
-              <th key={c} style={{ padding:"10px 14px", textAlign:"left", color:"rgba(255,255,255,0.4)", fontWeight:600, fontSize:11, textTransform:"uppercase", letterSpacing:0.5, borderBottom:"1px solid rgba(255,255,255,0.08)", whiteSpace:"nowrap" }}>{c}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
-              {row.map((cell, j) => (
-                <td key={j} style={{ padding:"12px 14px", color:"rgba(255,255,255,0.85)", verticalAlign:"middle" }}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function Pagination({ page, onPage, hasMore }: { page: number; onPage: (p: number) => void; hasMore: boolean }) {
-  return (
-    <div style={{ display:"flex", gap:8, alignItems:"center", justifyContent:"center", padding:"16px 0" }}>
-      <button onClick={() => onPage(page - 1)} disabled={page <= 1}
-        style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:6, padding:"6px 14px", color: page <= 1 ? "rgba(255,255,255,0.2)" : "#fff", cursor: page <= 1 ? "not-allowed" : "pointer", fontSize:13 }}>
-        ← Anterior
-      </button>
-      <span style={{ color:"rgba(255,255,255,0.4)", fontSize:13 }}>Página {page}</span>
-      <button onClick={() => onPage(page + 1)} disabled={!hasMore}
-        style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:6, padding:"6px 14px", color: !hasMore ? "rgba(255,255,255,0.2)" : "#fff", cursor: !hasMore ? "not-allowed" : "pointer", fontSize:13 }}>
-        Siguiente →
-      </button>
-    </div>
-  );
-}
+const KpiCard = (p: { label: string; value: string; sub?: string; icon: string; color?: string }) => <HubKpiCard {...p} color={p.color ?? WP} />;
 
 // ─── TAB: Overview ────────────────────────────────────────────────────────────
 function OverviewTab({ projectId }: { projectId: string }) {

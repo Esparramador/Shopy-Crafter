@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { Send, Loader2, MessageSquare, Search, Paperclip, X, Download, Video, VideoOff, Users } from "lucide-react";
+import { formatBytes } from "@/lib/format";
+import { fmtRelativeShort as fmtTime } from "@/lib/format";
 
 function renderMsgContent(content: string, isAdmin: boolean, onProductNav?: (handle: string) => void) {
   const parts = content.split(/(\[Producto: [^\]]+\]\([^)]+\)|\[Producto: [^\]]+\])/g);
@@ -46,23 +48,6 @@ interface Msg {
   filesJson?: FileRef[] | null;
 }
 interface PendingFile { fileUrl: string; fileName: string; fileType: string; fileSize: number; previewUrl?: string; }
-
-function fmtTime(d: string) {
-  const dt = new Date(d);
-  const now = new Date();
-  const diffMin = Math.floor((now.getTime() - dt.getTime()) / 60000);
-  if (diffMin < 1) return "ahora";
-  if (diffMin < 60) return `${diffMin}m`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}h`;
-  return dt.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
-}
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function fileIcon(fileType: string, fileName: string) {
   const ext = fileName?.split(".").pop()?.toLowerCase() ?? "";

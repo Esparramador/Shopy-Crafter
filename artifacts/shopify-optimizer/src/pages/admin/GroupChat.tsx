@@ -2,22 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { Send, Loader2, Plus, X, Users, Trash2, UserPlus, MessageSquare } from "lucide-react";
+import { fmtRelativeShort as fmtTime } from "@/lib/format";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 interface ChatGroup { id: number; name: string; description?: string; members: { projectId: number }[] | null; unread_count: number; created_at: string; }
 interface Project { id: number; name: string; shopDomain: string; }
 interface GroupMsg { id: string; group_id: number; project_id?: string; from_role: "admin" | "client"; from_name: string; content: string; created_at: string; }
-
-function fmtTime(d: string) {
-  const dt = new Date(d);
-  const now = new Date();
-  const diffMin = Math.floor((now.getTime() - dt.getTime()) / 60000);
-  if (diffMin < 1) return "ahora";
-  if (diffMin < 60) return `${diffMin}m`;
-  if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h`;
-  return dt.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
-}
 
 export default function GroupChat() {
   const [groups, setGroups] = useState<ChatGroup[]>([]);

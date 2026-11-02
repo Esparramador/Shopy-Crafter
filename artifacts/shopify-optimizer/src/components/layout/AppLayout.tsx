@@ -10,103 +10,14 @@ interface AppLayoutProps {
 }
 
 import { PLATFORMS, getPlatform } from "@/lib/platform-capabilities";
+import { buildAdminNav, sectionForPath } from "./admin-nav";
 
 const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 // Los módulos por plataforma viven en el registro central (src/lib/platform-capabilities.ts)
 const DEFAULT_MODULE_NAV = PLATFORMS.shopify.adminModules;
 
-const DEFAULT_SHOPYBRAIN_NAV = [
-  { label: "Centro Shopy Crafter", icon: "🧠", href: "/admin/shopybrain" },
-  { label: "Centro de Comando", icon: "⚡", href: "/admin/command-center" },
-  { label: "Memorias", icon: "💾", href: "/admin/shopybrain/memories" },
-  { label: "Knowledge Domains", icon: "🔬", href: "/admin/shopybrain/insights" },
-  { label: "Brain Sync", icon: "🔄", href: "/admin/brain-sync" },
-  { label: "Sesiones Estudio", icon: "📚", href: "/admin/shopybrain/study" },
-  { label: "Mi Pricing CFO", icon: "💰", href: "/admin/my-pricing" },
-  { label: "Email Marketing", icon: "📧", href: "/admin/emails" },
-  { label: "Flujos de Email", icon: "🔁", href: "/admin/email-flows" },
-  { label: "CMS Editor", icon: "✏️", href: "/admin/cms" },
-  { label: "Librería de Prompts", icon: "🏛", href: "/admin/prompt-library" },
-
-  { label: "Lab Web IA", icon: "🔬", href: "/web-lab" },
-  { label: "AI Web Designer", icon: "🎨", href: "/web-designer" },
-  { label: "Effects Studio", icon: "✦", href: "/effects-studio" },
-
-  { label: "Studio Fotografía IA", icon: "🧬", href: "/fusion-studio" },
-  { label: "Studio Multimedia Pro", icon: "⚡", href: "/fusion-studio-pro" },
-  { label: "Studio de Anuncios", icon: "📺", href: "/ad-studio" },
-  { label: "Studio de Cards", icon: "💳", href: "/cards" },
-  { label: "Kit de Campañas", icon: "🎬", href: "/campaign-kit" },
-  { label: "Vista Explosionada", icon: "💥", href: "/exploded-view" },
-
-  { label: "Generador IA", icon: "✨", href: "/generator" },
-  { label: "Exportar", icon: "📥", href: "/exports" },
-  { label: "Proveedores", icon: "🏭", href: "/suppliers" },
-
-  { label: "Bóveda Global", icon: "🏦", href: "/admin/vault" },
-  { label: "Buscador Universal", icon: "🔎", href: "/admin/search" },
-  { label: "Template Studio", icon: "🎨", href: "/admin/template-studio" },
-  { label: "Avatar Studio", icon: "🎬", href: "/admin/avatar-studio" },
-  { label: "YouTube Studio", icon: "▶️", href: "/admin/youtube-studio" },
-  { label: "Calendario CRM", icon: "📅", href: "/admin/calendar" },
-  { label: "Meshy Character Lab", icon: "🧊", href: "/admin/meshy-studio" },
-  { label: "Tripo3D Studio", icon: "🧊✨", href: "/tripo3d" },
-  { label: "MCP Manager", icon: "🔌", href: "/admin/mcp-manager" },
-  { label: "Security Lab", icon: "🔐", href: "/admin/security-lab" },
-
-  { label: "── STUDIO IA ──", icon: "", href: "#", divider: true },
-  { label: "AMR Studio", icon: "🤖", href: "/admin/amr-studio" },
-  { label: "Librería de Skills", icon: "📚", href: "/admin/skills-library" },
-  { label: "Design Systems", icon: "🎨", href: "/admin/design-systems" },
-  { label: "Catálogo de Plugins", icon: "🔌", href: "/admin/plugins-catalog" },
-  { label: "HyperFrames Studio", icon: "🖼", href: "/admin/hyperframes" },
-  { label: "Deck Builder", icon: "📊", href: "/admin/deck-builder" },
-];
-
-const DEFAULT_ADMIN_NAV = [
-  { label: "Home / Inicio", icon: "🏠", href: "/home" },
-  { label: "── MÓDULOS ──", icon: "", href: "#", divider: true },
-  { label: "Auditoría Web", icon: "📊", href: "/audit" },
-  { label: "Rediseño IA", icon: "✏️", href: "/redesign" },
-  { label: "Imágenes IA", icon: "🖼", href: "/images" },
-  { label: "Consistencia", icon: "🎨", href: "/consistency" },
-  { label: "A/B Testing", icon: "📈", href: "/ab-testing" },
-  { label: "Pricing Engine", icon: "💰", href: "/pricing" },
-  { label: "SEO Engine", icon: "🔍", href: "/seo" },
-  { label: "Repositorio", icon: "🗄️", href: "/vault" },
-  { label: "── CRM & ADMIN ──", icon: "", href: "#", divider: true },
-  { label: "Panel Cliente", icon: "👤", href: "/client" },
-  { label: "CRM Clientes", icon: "👥", href: "/admin/clients" },
-  { label: "Mensajes Clientes", icon: "💬", href: "/admin/messages" },
-  { label: "Chat Grupal", icon: "👥", href: "/admin/group-chat" },
-  { label: "Productos Global", icon: "📦", href: "/admin/products" },
-  { label: "A/B Tests Global", icon: "📈", href: "/admin/abtests" },
-  { label: "Automaciones", icon: "⚡", href: "/admin/automations" },
-  { label: "Revenue & CRM", icon: "💰", href: "/admin/revenue" },
-  { label: "Facturación & Plan", icon: "💳", href: "/admin/billing" },
-  { label: "Planes & Servicios", icon: "📦", href: "/admin/tienda" },
-  { label: "Portfolio (landing)", icon: "🖼️", href: "/admin/portfolio" },
-  { label: "Tienda: pedidos y productos", icon: "🛍️", href: "/admin/shop" },
-  { label: "── GOD MODE ──", icon: "", href: "#", divider: true },
-  { label: "Stripe Manager", icon: "💳", href: "/admin/stripe" },
-  { label: "Stripe Master Hub", icon: "👑", href: "/admin/stripe-master" },
-  { label: "API Keys Manager", icon: "🔑", href: "/admin/api-keys" },
-  { label: "Facturación de Agencia", icon: "📄", href: "/admin/agency-billing" },
-  { label: "Revenue Intel", icon: "📊", href: "/admin/intelligence" },
-  { label: "Gemini Research", icon: "🔬", href: "/admin/gemini-intel" },
-  { label: "M7 Inventario", icon: "🗄", href: "/admin/inventory" },
-  { label: "Competitor Intel", icon: "🎯", href: "/admin/competitors" },
-  { label: "Predicciones ML", icon: "🔮", href: "/admin/forecast" },
-  { label: "Logros", icon: "🏆", href: "/admin/achievements" },
-  { label: "Plan 30-60-90", icon: "🗺", href: "/admin/roadmap" },
-  { label: "APK Android", icon: "📱", href: "/admin/apk" },
-  { label: "Tienda / Store", icon: "🛒", href: "/tienda" },
-  { label: "Catálogo IA AMIS", icon: "🧠", href: "/admin/ai-catalog" },
-  { label: "Costes IA por sesión", icon: "💸", href: "/admin/api-usage" },
-  { label: "System Health", icon: "🖥", href: "/admin/system" },
-  { label: "Conexiones / Integraciones", icon: "🔗", href: "/help/connections" },
-];
+// El menú del panel (áreas y enlaces) vive en ./admin-nav.ts.
 
 // ─── Token Expired Banner ────────────────────────────────────────────────────
 function TokenExpiredBanner({
@@ -184,6 +95,24 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [darkMode, setDarkMode] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Áreas del menú plegadas (se recuerda por navegador). Por defecto solo se abren Inicio y el área actual.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("sc-nav-collapsed");
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch { /* sin almacenamiento */ }
+    return new Set(["cerebro", "tienda", "web", "estudios", "clientes", "ventas", "inteligencia", "sistema", "mas"]);
+  });
+  const toggleSection = useCallback((id: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem("sc-nav-collapsed", JSON.stringify([...next])); } catch { /* sin almacenamiento */ }
+      return next;
+    });
+  }, []);
+  // Gasto real de IA del mes (api_usage_log), en lugar de una barra fija.
+  const [aiSpend, setAiSpend] = useState<{ month: number; prev: number } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const prevUnreadRef = useRef(-1);
   const [adminToast, setAdminToast] = useState<string | null>(null);
@@ -244,12 +173,6 @@ export function AppLayout({ children }: AppLayoutProps) {
    * - Si el CMS está vacío: usa los DEFAULTs completos.
    * Así el CMS SIEMPRE controla el sidebar; el código nunca se impone.
    */
-  function mergeByHref(dbItems: any[], defaults: any[]): any[] {
-    if (!Array.isArray(dbItems) || dbItems.length === 0) return defaults;
-    const existing = new Set(dbItems.map((i: any) => i.href).filter(Boolean));
-    const missing = defaults.filter((d: any) => d.href && !existing.has(d.href));
-    return [...dbItems, ...missing];
-  }
   function mergeById(dbItems: any[], defaults: any[]): any[] {
     if (!Array.isArray(dbItems) || dbItems.length === 0) return defaults;
     const existing = new Set(dbItems.map((i: any) => i.id).filter(Boolean));
@@ -270,8 +193,8 @@ export function AppLayout({ children }: AppLayoutProps) {
           const cms = (cmsNav?.modules ?? []).find((c: any) => c.id === m.id);
           return cms ? { ...m, label: cms.label ?? m.label, icon: cms.icon ?? m.icon } : m;
         });
-  const shopybrainNav = mergeByHref(cmsNav?.shopybrain ?? [], DEFAULT_SHOPYBRAIN_NAV);
-  const adminNav: any[] = mergeByHref(cmsNav?.admin ?? [], DEFAULT_ADMIN_NAV);
+  const navSections = buildAdminNav([cmsNav?.shopybrain, cmsNav?.admin]);
+  const activeSection = sectionForPath(navSections, location);
   const firstProjectId: number | null = projects?.[0]?.id ?? null;
   const ap = cmsPanel ?? {};
 
@@ -285,7 +208,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const currentPage = match ? ((params as Record<string, string> | null)?.["*"] ?? "") : standaloneModule;
   // Etiqueta del menú lateral cuyo href coincide con la ruta (coincidencia más larga);
   // en /projects/:id/<modulo> se compara con "/<modulo>" (p. ej. web-designer).
-  const navItems = [...adminNav, ...shopybrainNav] as { href?: string; label?: string }[];
+  const navItems = navSections.flatMap(sec => sec.items);
   const labelForPath = (p: string) => navItems
     .filter(n => n.href && (p === n.href || p.startsWith(n.href + "/")))
     .sort((x, y) => (y.href?.length ?? 0) - (x.href?.length ?? 0))[0]?.label;
@@ -295,6 +218,18 @@ export function AppLayout({ children }: AppLayoutProps) {
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
   const API_BASE = BASE_URL;
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    let alive = true;
+    fetch(`${API_BASE}/api/api-usage/stats`, { credentials: "include" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!alive || !d?.totals) return;
+        setAiSpend({ month: Number(d.totals.current?.costEur) || 0, prev: Number(d.totals.previousMonth?.costEur) || 0 });
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [user?.role, API_BASE]);
   useEffect(() => {
     if (user?.role !== "admin") return;
     const poll = () => {
@@ -448,64 +383,51 @@ export function AppLayout({ children }: AppLayoutProps) {
           </Link>
         </div>
 
-        {/* Shopy Brain nav */}
+        {/* Menú del panel por áreas (admin-nav.ts) */}
         <div className="sidebar-nav">
           <span className="sidebar-label" style={{ color: "var(--gold)", display: "flex", alignItems: "center", gap: 5 }}>
             🧠 {siteName}
           </span>
-          {shopybrainNav.map((item: any) => (
-            item.divider ? (
-              <div key={item.label} style={{ padding: "10px 14px 4px", fontSize: 9, fontWeight: 800, color: "var(--t4)", textTransform: "uppercase", letterSpacing: "0.12em", pointerEvents: "none" }}>
-                {item.label.replace(/^──\s*|\s*──$/g, "").trim()}
-              </div>
-            ) : (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={`nav-item${location.startsWith(item.href) && (item.href !== "/admin/shopybrain" || location === "/admin/shopybrain") ? " active" : ""}`}
-                  role="button"
-                  aria-current={location === item.href ? "page" : undefined}
+          {navSections.map(sec => {
+            const open = !collapsed.has(sec.id) || sec.id === activeSection;
+            return (
+              <div key={sec.id}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(sec.id)}
+                  aria-expanded={open}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 6, padding: "10px 14px 4px", background: "none", border: "none", cursor: "pointer", fontSize: 9, fontWeight: 800, color: sec.id === activeSection ? "var(--gold2)" : "var(--t4)", textTransform: "uppercase", letterSpacing: "0.12em", textAlign: "left" }}
                 >
-                  <span className="nav-icon">{item.icon}</span>
-                  {item.label}
-                </div>
-              </Link>
-            )
-          ))}
-        </div>
-
-        {/* Admin nav */}
-        <div className="sidebar-nav">
-          <span className="sidebar-label">{ap.sidebarLabels?.admin ?? "Administración"}</span>
-
-          {adminNav.map(item => (
-            item.divider || item.href === "#" ? (
-              <div key={`div-${item.label}`} style={{ padding: "10px 14px 4px", fontSize: 9, fontWeight: 800, color: "var(--t4)", textTransform: "uppercase", letterSpacing: "0.12em", pointerEvents: "none" }}>
-                {String(item.label).replace(/^──\s*|\s*──$/g, "").trim()}
+                  <span style={{ fontSize: 11 }}>{sec.icon}</span>
+                  <span style={{ flex: 1 }}>{sec.title}</span>
+                  <span style={{ fontSize: 9 }}>{open ? "▾" : "▸"}</span>
+                </button>
+                {open && sec.items.map(item => (
+                  <Link key={item.href} href={item.href}>
+                    <div
+                      className={`nav-item${location === item.href || (location.startsWith(item.href + "/") && item.href !== "/admin/shopybrain") ? " active" : ""}`}
+                      role="button"
+                      aria-current={location === item.href ? "page" : undefined}
+                      style={{ position: "relative" }}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      {item.label}
+                      {(item.href === "/admin/clients" || item.href === "/admin/messages") && unreadCount > 0 && (
+                        <span style={{
+                          marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 9,
+                          background: "var(--crim)", color: "#fff", fontSize: 10, fontWeight: 700,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          padding: "0 5px", lineHeight: 1, flexShrink: 0,
+                        }}>
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                ))}
               </div>
-            ) : (
-            <Link key={item.href} href={item.href}>
-              <div
-                className={`nav-item${location === item.href ? " active" : ""}`}
-                role="button"
-                aria-current={location === item.href ? "page" : undefined}
-                style={{ position: "relative" }}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                {item.label}
-                {(item.href === "/admin/clients" || item.href === "/admin/messages") && unreadCount > 0 && (
-                  <span style={{
-                    marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 9,
-                    background: "var(--crim)", color: "#fff", fontSize: 10, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    padding: "0 5px", lineHeight: 1, flexShrink: 0,
-                  }}>
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-              </div>
-            </Link>
-            )
-          ))}
+            );
+          })}
 
           {activeProject && (
             <Link href={`/projects/${activeProject.id}/settings`}>
@@ -563,13 +485,17 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Bottom — credits + user */}
         <div className="sidebar-bottom">
-          <div className="credits-bar-label">
-            <span>IA Credits</span>
-            <span style={{ color: "var(--jade)" }}>∞ {ap.user?.unlimited ?? "Ilimitados"}</span>
-          </div>
-          <div className="credits-bar">
-            <div className="credits-bar-fill" style={{ width: "78%" }} />
-          </div>
+          <Link href="/admin/api-usage">
+            <div className="credits-bar-label" style={{ cursor: "pointer" }} title="Gasto de IA registrado este mes">
+              <span>Gasto IA este mes</span>
+              <span style={{ color: "var(--jade)" }}>{aiSpend ? `${aiSpend.month.toFixed(2)} €` : "—"}</span>
+            </div>
+          </Link>
+          {aiSpend && aiSpend.prev > 0 && (
+            <div className="credits-bar" title={`Mes anterior: ${aiSpend.prev.toFixed(2)} €`}>
+              <div className="credits-bar-fill" style={{ width: `${Math.min(100, Math.round((aiSpend.month / aiSpend.prev) * 100))}%` }} />
+            </div>
+          )}
 
           {user && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>

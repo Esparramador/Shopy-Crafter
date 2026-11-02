@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
 import { useClientPreview } from "./ClientPreviewContext";
 import { Send, Loader2, Paperclip, X, Download, Package, Search, ExternalLink, Video } from "lucide-react";
+import { formatBytes } from "@/lib/format";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -72,12 +73,6 @@ interface PendingFile {
 function formatTime(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function fileIcon(fileType: string, fileName: string) {

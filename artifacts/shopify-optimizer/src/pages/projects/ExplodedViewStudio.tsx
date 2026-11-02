@@ -5,6 +5,7 @@ import {
   Loader2, Settings, Play, Zap, Shield, Film, Monitor, Sparkles,
   LayoutGrid, Box, AlertTriangle, Info, Star,
 } from "lucide-react";
+import { CopyBtn } from "@/components/CopyBtn";
 
 const API = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -54,18 +55,6 @@ interface QualityRule {
 }
 
 type Tab = "platforms" | "sequences" | "presets" | "architecture" | "generate";
-
-function CopyBtn({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
-  }, [text]);
-  return (
-    <button onClick={copy} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors" title="Copiar al portapapeles">
-      {copied ? <><Check size={12} className="text-emerald-400" /> Copiado</> : <><Copy size={12} /> Copiar</>}
-    </button>
-  );
-}
 
 function RatingBadge({ rating }: { rating: number }) {
   const color = rating >= 90 ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" : rating >= 85 ? "text-amber-400 border-amber-500/30 bg-amber-500/10" : "text-zinc-400 border-zinc-500/30 bg-zinc-500/10";

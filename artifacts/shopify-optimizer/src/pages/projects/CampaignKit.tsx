@@ -5,6 +5,7 @@ import {
   Palette, Clapperboard, ListChecks, Lightbulb, Monitor, Wand2, Loader2,
   Download, Users, Sparkles, LayoutGrid, Timer, FileText, Layers,
 } from "lucide-react";
+import { CopyBtn } from "@/components/CopyBtn";
 
 const API = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -34,18 +35,6 @@ interface AdaptedVideo { index: number; title: string; headline?: string; prompt
 interface AdaptedCampaign { brandName: string; characterDescription?: string; videos?: AdaptedVideo[]; }
 
 type Tab = "videos" | "ugc" | "timeline" | "storyboard" | "tools" | "adapt";
-
-function CopyBtn({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
-  }, [text]);
-  return (
-    <button onClick={copy} className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors" title="Copiar al portapapeles">
-      {copied ? <><Check size={12} className="text-emerald-400" /> Copiado</> : <><Copy size={12} /> Copiar</>}
-    </button>
-  );
-}
 
 export default function CampaignKit() {
   const [, params] = useRoute("/projects/:id/campaign-kit");

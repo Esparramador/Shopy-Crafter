@@ -3,6 +3,7 @@ import {
   Upload, X, Brain, Loader2, ImageIcon, Video,
   ChevronDown, ChevronUp, Sparkles, AlertCircle,
 } from "lucide-react";
+import { formatBytes } from "@/lib/format";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -25,12 +26,6 @@ interface ReferenceMediaPanelProps {
 
 const MAX_SIZE_MB = 4;
 const MAX_IMAGES = 5;
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export default function ReferenceMediaPanel({
   projectId,

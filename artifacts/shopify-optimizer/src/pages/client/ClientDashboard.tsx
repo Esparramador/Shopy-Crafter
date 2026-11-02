@@ -5,8 +5,7 @@ import { ClientLayout } from "./ClientLayout";
 import { useClientPreview, withPreviewPid } from "./ClientPreviewContext";
 import { Link } from "wouter";
 import { timeSince } from "@/lib/utils";
-import WooCommerceDashboard from "./WooCommerceDashboard";
-import PrestaShopDashboard from "./PrestaShopDashboard";
+import StoreDashboard, { WOO_THEME, PRESTA_THEME } from "./StoreDashboard";
 import StripeDashboard from "./StripeDashboard";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -153,7 +152,7 @@ export default function ClientDashboard() {
     return (
       <ClientLayout>
         <div style={{ maxWidth: 1020 }}>
-          <WooCommerceDashboard apid={apid} />
+          <StoreDashboard apid={apid} theme={WOO_THEME} />
         </div>
       </ClientLayout>
     );
@@ -162,7 +161,7 @@ export default function ClientDashboard() {
     return (
       <ClientLayout>
         <div style={{ maxWidth: 1020 }}>
-          <PrestaShopDashboard apid={apid} />
+          <StoreDashboard apid={apid} theme={PRESTA_THEME} />
         </div>
       </ClientLayout>
     );
