@@ -433,6 +433,9 @@ router.post("/projects", async (req, res): Promise<void> => {
         ...project,
         clientSecret: "••••••••",
         accessToken: undefined,
+        // Claves de IA del proyecto: nunca se devuelven (ni cifradas).
+        anthropicApiKey: project.anthropicApiKey ? "••••••••" : null,
+        replicateApiToken: project.replicateApiToken ? "••••••••" : null,
         hasAccessToken: false,
         tokenExpiresAt: null,
         createdAt: project.createdAt.toISOString(),
@@ -498,6 +501,9 @@ router.post("/projects", async (req, res): Promise<void> => {
         ...refreshed,
         clientSecret: "••••••••",
         accessToken: undefined,
+        // Claves de IA del proyecto: nunca se devuelven (ni cifradas).
+        anthropicApiKey: refreshed.anthropicApiKey ? "••••••••" : null,
+        replicateApiToken: refreshed.replicateApiToken ? "••••••••" : null,
         hasAccessToken: !!refreshed.accessToken,
         tokenExpiresAt: refreshed.tokenExpiresAt?.toISOString() ?? null,
         createdAt: refreshed.createdAt.toISOString(),
@@ -558,6 +564,9 @@ router.post("/projects", async (req, res): Promise<void> => {
       ...refreshed,
       clientSecret: "••••••••",
       accessToken: undefined,
+      // Claves de IA del proyecto: nunca se devuelven (ni cifradas).
+      anthropicApiKey: refreshed.anthropicApiKey ? "••••••••" : null,
+      replicateApiToken: refreshed.replicateApiToken ? "••••••••" : null,
       hasAccessToken: !!refreshed.accessToken,
       tokenExpiresAt: refreshed.tokenExpiresAt?.toISOString() ?? null,
       createdAt: refreshed.createdAt.toISOString(),
@@ -582,6 +591,9 @@ router.get("/projects/:projectId", async (req, res): Promise<void> => {
       ...project,
       clientSecret: "••••••••",
       accessToken: undefined,
+      // Claves de IA del proyecto: nunca se devuelven (ni cifradas).
+      anthropicApiKey: project.anthropicApiKey ? "••••••••" : null,
+      replicateApiToken: project.replicateApiToken ? "••••••••" : null,
       hasAccessToken: !!project.accessToken,
       tokenExpiresAt: project.tokenExpiresAt?.toISOString() ?? null,
       createdAt: project.createdAt.toISOString(),
@@ -658,6 +670,9 @@ router.put("/projects/:projectId", async (req, res): Promise<void> => {
       ...updated,
       clientSecret: "••••••••",
       accessToken: undefined,
+      // Claves de IA del proyecto: nunca se devuelven (ni cifradas).
+      anthropicApiKey: updated.anthropicApiKey ? "••••••••" : null,
+      replicateApiToken: updated.replicateApiToken ? "••••••••" : null,
       hasAccessToken: !!updated.accessToken,
       tokenExpiresAt: updated.tokenExpiresAt?.toISOString() ?? null,
       createdAt: updated.createdAt.toISOString(),

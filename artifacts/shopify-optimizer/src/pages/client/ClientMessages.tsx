@@ -212,7 +212,7 @@ export default function ClientMessages() {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files).slice(0, 10); // hasta 10 por envío
     setUploading(true);
     try {
       const uploaded = await Promise.all(
@@ -574,7 +574,7 @@ export default function ClientMessages() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              title="Adjuntar archivos (máx. 20, ZIP hasta 500MB)"
+              title="Adjuntar archivos (hasta 10 por envío, 100 MB cada uno)"
               style={{
                 width: 36, height: 36, borderRadius: 9, border: "1px solid var(--bdr)",
                 background: pendingFiles.length > 0 ? "rgba(201,169,97,0.12)" : "rgba(255,255,255,0.04)",

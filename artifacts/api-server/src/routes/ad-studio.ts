@@ -25,7 +25,8 @@ const router = Router();
 router.get("/ad-studio/voices", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) { res.status(503).json({ error: "ELEVENLABS_API_KEY not configured" }); return; }
+    // Sin clave no es un error del servidor: el panel muestra "configura ElevenLabs".
+    if (!apiKey) { res.json({ voices: [], configured: false, error: "ElevenLabs no está configurado (ELEVENLABS_API_KEY)" }); return; }
 
     const r = await fetch("https://api.elevenlabs.io/v1/voices", {
       headers: { "xi-api-key": apiKey },

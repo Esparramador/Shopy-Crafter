@@ -28,6 +28,7 @@ import { runDualPageSpeed, formatPageSpeedForPrompt } from "../lib/pagespeed.js"
 import { randomUUID } from "crypto";
 import { eq, desc, sql } from "drizzle-orm";
 import { saveToVault } from "../lib/vault.js";
+import { safeFetch as guardedFetch } from "../lib/web-scraper.js";
 
 const router = Router();
 
@@ -75,7 +76,7 @@ async function extractEntityName(input: string): Promise<{ name: string; url?: s
 // quick metadata extraction (title, og:description) when needed as fallback
 async function safeFetch(url: string): Promise<{ text: string; title: string }> {
   try {
-    const res = await fetch(url, {
+    const res = await guardedFetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; ShopyBrainBot/1.0; +https://shopybrain.ai)" },
       signal: AbortSignal.timeout(25_000),  // 25s — generous for slow servers
     });

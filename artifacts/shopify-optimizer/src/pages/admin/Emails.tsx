@@ -622,7 +622,7 @@ export default function Emails() {
                             <div style={{ background: "#111", padding: "7px 12px", fontSize: 10, color: "#555", borderBottom: "1px solid #222" }}>
                               Vista previa — las variables Klaviyo se sustituyen al enviar
                             </div>
-                            <iframe srcDoc={form.html_content} style={{ width: "100%", height: 440, border: "none" }} title="Email preview" />
+                            <iframe srcDoc={form.html_content} sandbox="allow-popups" style={{ width: "100%", height: 440, border: "none" }} title="Email preview" />
                           </div>
                         )}
 

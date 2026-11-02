@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 /**
  * Helpers críticos para shopybrain.ts (CRIT-1, CRIT-2, CRIT-3, CRIT-4, CRIT-5, CRIT-6)
  *
@@ -168,6 +169,8 @@ export interface ConfirmationResult {
   action: string;
   preview: ConfirmationPreview;
   message: string;
+  /** Token de un solo uso: el panel lo devuelve solo tras un clic de una persona. */
+  confirmToken?: string;
 }
 
 /** El usuario ha confirmado explícitamente la acción (`"confirmed": true` en params). */
@@ -175,23 +178,55 @@ export function isConfirmed(params: Record<string, unknown> | undefined): boolea
   return params?.confirmed === true || params?.confirmed === "true";
 }
 
+/** Sesión donde se guardan los tokens de confirmación pendientes (express-session). */
+export interface ConfirmSession {
+  confirmTokens?: Record<string, { action: string; exp: number }>;
+}
+
+const CONFIRM_TTL_MS = 10 * 60 * 1000;
+
+function issueConfirmToken(session: ConfirmSession, action: string): string {
+  const now = Date.now();
+  const tokens = Object.fromEntries(Object.entries(session.confirmTokens ?? {}).filter(([, v]) => v.exp > now));
+  const token = randomBytes(18).toString("hex");
+  tokens[token] = { action, exp: now + CONFIRM_TTL_MS };
+  session.confirmTokens = tokens;
+  return token;
+}
+
+function consumeConfirmToken(session: ConfirmSession, action: string, token: unknown): boolean {
+  if (typeof token !== "string") return false;
+  const entry = session.confirmTokens?.[token];
+  if (!entry) return false;
+  delete session.confirmTokens![token];
+  return entry.action === action && entry.exp > Date.now();
+}
+
+/**
+ * Acciones destructivas: hace falta `confirmed: true` Y un token emitido en la
+ * respuesta anterior. La IA puede escribir `confirmed: true` por su cuenta (o porque
+ * se lo pide un texto inyectado); el token solo vuelve cuando una persona pulsa
+ * "Aceptar" en el panel (lib/brain-action.ts del frontend).
+ */
 export function requireConfirmation(
   params: Record<string, unknown> | undefined,
   action: string,
   preview: ConfirmationPreview,
+  session?: ConfirmSession,
 ): ConfirmationResult | null {
   if (!DESTRUCTIVE_ACTIONS.has(action)) return null;
-  if (isConfirmed(params)) return null;
+  if (isConfirmed(params) && (!session || consumeConfirmToken(session, action, params?.confirmToken))) return null;
 
   return {
     requiresConfirmation: true,
     action,
     preview,
+    confirmToken: session ? issueConfirmToken(session, action) : undefined,
     message:
       `⚠️ **Confirmación requerida para \`${action}\`**\n\n` +
       `${preview.summary}\n` +
       (preview.estimatedCost ? `\n💰 **Coste:** ${preview.estimatedCost}\n` : "") +
-      `\nRe-envía la acción añadiendo \`"confirmed": true\` en los parámetros.`,
+      `\nConfírmalo en el aviso del panel para aplicarlo.`,
   };
 }
 

@@ -13,6 +13,7 @@ import { getProjectConnector } from "../lib/platform-helper.js";
 import { fetchOrdersInWindow, isCountableOrder } from "../lib/orders.js";
 import { z } from "zod";
 import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
+import { safeFetch } from "../lib/web-scraper.js";
 
 const router = Router();
 
@@ -216,7 +217,7 @@ async function fetchRealCompetitorData(url: string): Promise<{
   htmlSnippet: string | null;
 }> {
   try {
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { isEditorRoute, EDITOR_FLOAT_MIN_BOTTOM } from "@/lib/editor-routes";
 import { useDraggable } from "@/hooks/use-draggable";
+import { fetchBrainAction } from "@/lib/brain-action";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -145,7 +146,7 @@ export function VoiceButton() {
 
   const executeAction = async (actionType: string, params: Record<string, unknown>): Promise<string> => {
     try {
-      const res = await fetch(`${API_BASE}/api/shopybrain/execute-action`, {
+      const res = await fetchBrainAction(`${API_BASE}/api/shopybrain/execute-action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

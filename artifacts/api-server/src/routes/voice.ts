@@ -62,44 +62,50 @@ const ALLOWED_OUTPUT_FORMATS: ElevenOutputFormat[] = [
   "mp3_22050_32",
 ];
 
-// FIX HIGH: rate limit + metering por usuario en memoria (in-process, OK para single-instance dev)
-// En producción multi-instancia, considerar mover a Redis/PG.
+// Cuota de TTS por usuario en PostgreSQL (antes en memoria: se reiniciaba con cada
+// despliegue y cada instancia de autoscale llevaba su propia cuenta).
 const TTS_WINDOW_MS = 60 * 1000;
 const TTS_MAX_REQUESTS_PER_MIN = 10;
 const TTS_MAX_CHARS_PER_HOUR = 50_000;
 const HOUR_MS = 60 * 60 * 1000;
 
-interface TtsBucket {
-  windowStart: number;
-  count: number;
-  hourStart: number;
-  charsHour: number;
+let ttsQuotaReady: Promise<unknown> | null = null;
+function ensureTtsQuotaTable(): Promise<unknown> {
+  ttsQuotaReady ??= db.execute(sql`
+    CREATE TABLE IF NOT EXISTS tts_quota (
+      user_key TEXT PRIMARY KEY,
+      window_start TIMESTAMPTZ NOT NULL,
+      count INTEGER NOT NULL,
+      hour_start TIMESTAMPTZ NOT NULL,
+      chars_hour INTEGER NOT NULL
+    )
+  `).catch(err => { ttsQuotaReady = null; throw err; });
+  return ttsQuotaReady;
 }
-const ttsBuckets = new Map<string, TtsBucket>();
 
-export function checkTtsQuota(userId: string, chars: number): { ok: true } | { ok: false; reason: string; retryAfter: number } {
-  const now = Date.now();
-  let b = ttsBuckets.get(userId);
-  if (!b) {
-    b = { windowStart: now, count: 0, hourStart: now, charsHour: 0 };
-    ttsBuckets.set(userId, b);
+export async function checkTtsQuota(userId: string, chars: number): Promise<{ ok: true } | { ok: false; reason: string; retryAfter: number }> {
+  await ensureTtsQuotaTable();
+  // Una sola sentencia atómica: reinicia ventanas caducadas y suma solo si cabe.
+  const r = await db.execute(sql`
+    INSERT INTO tts_quota (user_key, window_start, count, hour_start, chars_hour)
+    VALUES (${userId}, NOW(), 0, NOW(), 0)
+    ON CONFLICT (user_key) DO UPDATE SET
+      window_start = CASE WHEN tts_quota.window_start < NOW() - ${`${TTS_WINDOW_MS} milliseconds`}::interval THEN NOW() ELSE tts_quota.window_start END,
+      count        = CASE WHEN tts_quota.window_start < NOW() - ${`${TTS_WINDOW_MS} milliseconds`}::interval THEN 0 ELSE tts_quota.count END,
+      hour_start   = CASE WHEN tts_quota.hour_start < NOW() - ${`${HOUR_MS} milliseconds`}::interval THEN NOW() ELSE tts_quota.hour_start END,
+      chars_hour   = CASE WHEN tts_quota.hour_start < NOW() - ${`${HOUR_MS} milliseconds`}::interval THEN 0 ELSE tts_quota.chars_hour END
+    RETURNING count, chars_hour,
+      EXTRACT(EPOCH FROM (window_start + ${`${TTS_WINDOW_MS} milliseconds`}::interval - NOW())) AS win_left,
+      EXTRACT(EPOCH FROM (hour_start + ${`${HOUR_MS} milliseconds`}::interval - NOW())) AS hour_left
+  `);
+  const row = r.rows[0] as { count: number; chars_hour: number; win_left: string; hour_left: string };
+  if (Number(row.count) >= TTS_MAX_REQUESTS_PER_MIN) {
+    return { ok: false, reason: "Demasiadas peticiones de voz. Espera un momento.", retryAfter: Math.max(1, Math.ceil(Number(row.win_left))) };
   }
-  if (now - b.windowStart > TTS_WINDOW_MS) {
-    b.windowStart = now;
-    b.count = 0;
+  if (Number(row.chars_hour) + chars > TTS_MAX_CHARS_PER_HOUR) {
+    return { ok: false, reason: `Cuota horaria de TTS excedida (${TTS_MAX_CHARS_PER_HOUR} caracteres/hora).`, retryAfter: Math.max(1, Math.ceil(Number(row.hour_left))) };
   }
-  if (now - b.hourStart > HOUR_MS) {
-    b.hourStart = now;
-    b.charsHour = 0;
-  }
-  if (b.count >= TTS_MAX_REQUESTS_PER_MIN) {
-    return { ok: false, reason: "Demasiadas peticiones de voz. Espera un momento.", retryAfter: Math.ceil((TTS_WINDOW_MS - (now - b.windowStart)) / 1000) };
-  }
-  if (b.charsHour + chars > TTS_MAX_CHARS_PER_HOUR) {
-    return { ok: false, reason: `Cuota horaria de TTS excedida (${TTS_MAX_CHARS_PER_HOUR} caracteres/hora).`, retryAfter: Math.ceil((HOUR_MS - (now - b.hourStart)) / 1000) };
-  }
-  b.count += 1;
-  b.charsHour += chars;
+  await db.execute(sql`UPDATE tts_quota SET count = count + 1, chars_hour = chars_hour + ${chars} WHERE user_key = ${userId}`);
   return { ok: true };
 }
 
@@ -123,7 +129,7 @@ router.post("/voice/tts", async (req, res): Promise<void> => {
     }
 
     // FIX HIGH: rate limit + metering por usuario
-    const quota = checkTtsQuota(String(userId), text.length);
+    const quota = await checkTtsQuota(String(userId), text.length);
     if (!quota.ok) {
       res.setHeader("Retry-After", String(quota.retryAfter));
       res.status(429).json({ error: quota.reason });
@@ -353,8 +359,12 @@ router.get("/voice/cloned", requireAdmin, async (_req, res): Promise<void> => {
     const voices = await listClonedVoices();
     res.json({ voices });
   } catch (err: any) {
+    if (/no configurad/i.test(String(err?.message))) {
+      res.json({ voices: [], configured: false, error: err.message });
+      return;
+    }
     logger.error({ err: err?.message }, "voice/cloned list failed");
-    res.status(/no configurad/i.test(String(err?.message)) ? 503 : 500).json({ error: err?.message || "Error listando voces clonadas" });
+    res.status(500).json({ error: err?.message || "Error listando voces clonadas" });
   }
 });
 
@@ -1214,7 +1224,7 @@ router.post("/voice/gemini-tts", async (req, res): Promise<void> => {
     }
     const cleaned = text.trim().slice(0, 700);
 
-    const quota = checkTtsQuota(String(userId) + ":gemini", cleaned.length);
+    const quota = await checkTtsQuota(String(userId) + ":gemini", cleaned.length);
     if (!quota.ok) {
       res.setHeader("Retry-After", String(quota.retryAfter));
       res.status(429).json({ error: quota.reason }); return;

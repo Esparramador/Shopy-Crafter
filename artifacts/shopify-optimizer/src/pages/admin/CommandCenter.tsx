@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { fetchBrainAction } from "@/lib/brain-action";
 import{ Zap, Package, ShoppingCart, Key, Shield, Plus, Search, CheckCircle, AlertTriangle, Loader2, Eye, Send }from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -57,7 +58,7 @@ export default function CommandCenter() {
           if (!params.projectId && selectedProject) {
             params.projectId = selectedProject;
           }
-          const actionRes = await fetch(`${API}/api/shopybrain/execute-action`, {
+          const actionRes = await fetchBrainAction(`${API}/api/shopybrain/execute-action`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: data.detectedAction.action, params }),
@@ -67,7 +68,7 @@ export default function CommandCenter() {
         }
         setResults(r => ({ ...r, custom: result }));
       } else {
-        const res = await fetch(`${API}/api/shopybrain/execute-action`, {
+        const res = await fetchBrainAction(`${API}/api/shopybrain/execute-action`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, params: { projectId: selectedProject, ...params } }),

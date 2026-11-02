@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useSearch, useLocation } from "wouter";
 import { ModalOverlay } from "@/components/ModalOverlay";
+import { openSandboxedHtml } from "@/lib/sanitize";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -524,7 +525,7 @@ export default function WebDesigner() {
               ))}
             </div>
             {currentHtml && (
-              <button onClick={() => { const w = window.open(); if (w) { w.document.write(currentHtml); w.document.close(); } }} style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 6, border: `1px solid ${st.border}`, background: "transparent", color: st.t2, fontSize: 11, cursor: "pointer" }}>
+              <button onClick={() => { openSandboxedHtml(currentHtml, { title: "AI Web Designer" }); }} style={{ marginLeft: "auto", padding: "4px 10px", borderRadius: 6, border: `1px solid ${st.border}`, background: "transparent", color: st.t2, fontSize: 11, cursor: "pointer" }}>
                 ↗ Abrir
               </button>
             )}
@@ -534,7 +535,7 @@ export default function WebDesigner() {
             {currentHtml || streamText ? (
               <iframe
                 ref={iframeRef}
-                sandbox="allow-scripts allow-same-origin allow-forms"
+                sandbox="allow-scripts allow-forms"
                 style={{ width: VIEWPORT_WIDTHS[viewport], height: "100%", border: "none", transition: "width .3s ease", background: "#fff" }}
                 title="AI Web Designer Preview"
               />

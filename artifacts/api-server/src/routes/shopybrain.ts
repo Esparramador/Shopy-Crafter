@@ -31,6 +31,7 @@ import {
   getSessionProjectId,
   fetchImageWithSizeLimit,
   requireConfirmation,
+  type ConfirmSession,
   isConfirmed,
   validateFixCodePath,
   normalizeListDirectory,
@@ -2593,6 +2594,15 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
     }
   }
 
+    // Muchas acciones meten ids en la ruta de llamadas internas (localhost + cookie del
+    // admin). Un id con "/", "?", "#", "%" o ".." podía llevar a OTRO endpoint de admin.
+    const badId = Object.entries(params ?? {}).find(([k, v]) =>
+      /(^id$|Id$|Ids?$|^slug$|^handle$)/.test(k) && typeof v === "string" && /[\/?#%\\]|\.\./.test(v));
+    if (badId) {
+      res.status(400).json({ error: `Parámetro no válido: ${badId[0]}` });
+      return;
+    }
+
     if (params?.projectId && isNaN(parseInt(String(params.projectId)))) {
       const allProjects = await db.select({ id: projectsTable.id, shopDomain: projectsTable.shopDomain }).from(projectsTable).limit(10);
       if (allProjects.length === 1) {
@@ -2624,7 +2634,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
           (params?.collectionId ? `, colección ${params.collectionId}` : "") +
           (params?.userId ? `, usuario ${params.userId}` : "") +
           ". Esta operación es destructiva o de gran alcance y no se puede deshacer fácilmente.",
-      });
+      }, req.session as unknown as ConfirmSession);
       if (confirmationGuard) {
         res.json(confirmationGuard);
         return;

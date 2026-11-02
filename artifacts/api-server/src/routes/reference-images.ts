@@ -10,6 +10,7 @@ import { Buffer } from "node:buffer";
 import multer from "multer";
 import { enableLongRunning } from "../lib/long-running.js";
 import { uploadRejected } from "../lib/upload-errors.js";
+import { safeFetch } from "../lib/web-scraper.js";
 
 const router = Router();
 
@@ -212,7 +213,7 @@ function validateImageUrl(url: string): void {
 
 async function downloadImageToBuffer(url: string): Promise<Buffer> {
   validateImageUrl(url);
-  const resp = await fetch(url, { signal: AbortSignal.timeout(30000) });
+  const resp = await safeFetch(url, { signal: AbortSignal.timeout(30000) });
   if (!resp.ok) throw new Error(`No se pudo descargar imagen: ${resp.status}`);
   return Buffer.from(await resp.arrayBuffer());
 }

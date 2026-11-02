@@ -27,6 +27,7 @@ import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { z } from "zod";
 import { lenientArray, looseNumber, looseString, optionalLooseNumber, parseResearchJson } from "../lib/ai-schema.js";
 import { uploadRejected } from "../lib/upload-errors.js";
+import { safeFetch } from "../lib/web-scraper.js";
 
 const router = Router();
 
@@ -211,7 +212,7 @@ async function fetchUrlContent(url: string): Promise<{ text: string; title: stri
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   };
   
-  const res = await fetch(url, { headers, redirect: "manual", signal: AbortSignal.timeout(30_000) });
+  const res = await safeFetch(url, { headers, redirect: "manual", signal: AbortSignal.timeout(30_000) });
   const html = await res.text();
   
   // Extract title

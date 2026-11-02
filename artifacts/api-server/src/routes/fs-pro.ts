@@ -159,7 +159,9 @@ const explodeClipPromptsSchema = z.object({
 });
 // 500MB — admite vídeo 4K vertical hasta ~2min con CRF 14. Multer usa memoryStorage,
 // así que mantenemos el techo razonable para evitar OOM (admin-only, pero protege accidentes).
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+// Subidas que antes iban con multer() sin límites (en memoria: un archivo enorme tumbaba la instancia).
+const boundedUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 60 * 1024 * 1024, files: 4 } });
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 
@@ -1922,7 +1924,7 @@ router.post("/fs-pro/image/clarity-upscale", requireAdmin, upload.single("image"
 });
 
 // ─── IMAGE: FACE SWAP ──────────────────────────────────────────────────────
-router.post("/fs-pro/image/face-swap", requireAdmin, multer().fields([{ name: "face", maxCount: 1 }, { name: "target", maxCount: 1 }]), async (req, res) => {
+router.post("/fs-pro/image/face-swap", requireAdmin, boundedUpload.fields([{ name: "face", maxCount: 1 }, { name: "target", maxCount: 1 }]), async (req, res) => {
   enableLongRunning(res);
   try {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -2022,7 +2024,7 @@ router.post("/fs-pro/image/outpaint", requireAdmin, upload.single("image"), asyn
 });
 
 // ─── IMAGE: INPAINT ────────────────────────────────────────────────────────
-router.post("/fs-pro/image/inpaint", requireAdmin, multer().fields([{ name: "image", maxCount: 1 }, { name: "mask", maxCount: 1 }]), async (req, res) => {
+router.post("/fs-pro/image/inpaint", requireAdmin, boundedUpload.fields([{ name: "image", maxCount: 1 }, { name: "mask", maxCount: 1 }]), async (req, res) => {
   enableLongRunning(res);
   try {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -2370,7 +2372,7 @@ router.post("/fs-pro/tts", requireAdmin, async (req, res) => {
     const userId = (req.session as any)?.userId;
     if (!userId) { res.status(401).json({ error: "No autenticado" }); return; }
     if (typeof text !== "string" || text.length > 5000) { res.status(413).json({ error: "text excede 5000 caracteres" }); return; }
-    const quota = checkTtsQuota(String(userId), text.length);
+    const quota = await checkTtsQuota(String(userId), text.length);
     if (!quota.ok) {
       res.setHeader("Retry-After", String(quota.retryAfter));
       res.status(429).json({ error: quota.reason });
@@ -3682,7 +3684,7 @@ router.post(
 router.post(
   "/fs-pro/audio/mix",
   requireAdmin,
-  multer().fields([{ name: "tts", maxCount: 1 }, { name: "music", maxCount: 1 }]),
+  boundedUpload.fields([{ name: "tts", maxCount: 1 }, { name: "music", maxCount: 1 }]),
   async (req, res) => {
     try {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };

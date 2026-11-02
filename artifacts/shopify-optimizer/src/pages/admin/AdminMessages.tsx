@@ -191,7 +191,7 @@ export default function AdminMessages() {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selected || !e.target.files?.length) return;
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files).slice(0, 10); // hasta 10 por envío
     setUploading(true);
     try {
       const uploaded = await Promise.all(
@@ -461,7 +461,7 @@ export default function AdminMessages() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  title="Adjuntar archivos (máx. 20, ZIP hasta 500MB)"
+                  title="Adjuntar archivos (hasta 10 por envío, 100 MB cada uno)"
                   style={{ width: 38, height: 38, borderRadius: 9, border: "1px solid rgba(255,255,255,0.1)", background: pendingFiles.length > 0 ? "rgba(201,169,97,0.12)" : "rgba(255,255,255,0.04)", color: pendingFiles.length > 0 ? "var(--gold)" : "var(--t3)", cursor: uploading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s", position: "relative" }}>
                   {uploading ? <Loader2 size={14} style={{ animation: "spin 0.6s linear infinite" }} /> : <Paperclip size={14} />}
                   {pendingFiles.length > 0 && (

@@ -8,6 +8,7 @@
  */
 
 import { logger } from "./logger.js";
+import { safeFetch } from "./web-scraper.js";
 
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 const FETCH_OPTS = { headers: { "User-Agent": BROWSER_UA, "Accept": "text/html,application/xhtml+xml,*/*;q=0.9" }, signal: AbortSignal.timeout(15_000) };
@@ -444,7 +445,7 @@ export async function crawlSiteFromSitemap(
 
   const crawlResults = await Promise.allSettled(
     urlsToCrawl.map(async (url): Promise<CrawledPage> => {
-      const res = await fetch(url, { ...FETCH_OPTS, signal: AbortSignal.timeout(15_000) });
+      const res = await safeFetch(url, { ...FETCH_OPTS, signal: AbortSignal.timeout(15_000) });
       const html = await res.text();
 
       const isHomepage = url === baseUrl || url === `${baseUrl}/`;

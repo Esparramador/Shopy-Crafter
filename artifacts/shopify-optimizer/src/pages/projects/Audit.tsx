@@ -19,6 +19,7 @@ import { LiveOperation } from "@/components/LiveOperation";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { getPlatform } from "@/lib/platform-capabilities";
 import { Link } from "wouter";
+import { fetchBrainAction } from "@/lib/brain-action";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -1186,7 +1187,7 @@ export default function AuditPage() {
     // limpiamos para que no coexistan banners contradictorios (bug visible).
     setScanError("");
     try {
-      const res = await fetch(`${API}/api/shopybrain/execute-action`, {
+      const res = await fetchBrainAction(`${API}/api/shopybrain/execute-action`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1211,7 +1212,7 @@ export default function AuditPage() {
     // El feedback en vivo lo muestra <LiveOperation> (timer + mensajes rotativos).
     setOptimizeMsg(null);
     try {
-      const res = await fetch(`${API}/api/shopybrain/execute-action`, {
+      const res = await fetchBrainAction(`${API}/api/shopybrain/execute-action`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1232,7 +1233,7 @@ export default function AuditPage() {
     setBulkOptimizing(true);
     setOptimizeMsg(null); // el feedback lo lleva <LiveOperation>
     try {
-      const res = await fetch(`${API}/api/shopybrain/execute-action`, {
+      const res = await fetchBrainAction(`${API}/api/shopybrain/execute-action`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

@@ -16,6 +16,7 @@ import { SERVICE_CATALOG, priceDisplay } from "../lib/service-catalog.js";
 import { logger } from "../lib/logger.js";
 import { shopifyRequest } from "../lib/shopify.js";
 import crypto from "crypto";
+import { safeFetch } from "../lib/web-scraper.js";
 
 const router = Router();
 
@@ -328,7 +329,7 @@ export async function syncFromExternalBrain(url: string, apiKey?: string, source
     while (page <= 200) {
       try {
         const pageUrl = `${url.replace(/\/+$/, "")}${endpoints[0]}?page=${page}&limit=${limit}`;
-        const pageResp = await fetch(pageUrl, { headers });
+        const pageResp = await safeFetch(pageUrl, { headers });
         if (!pageResp.ok) break;
         const pageData = await pageResp.json() as Record<string, unknown>;
         const pageMems = (pageData.memories || pageData.entries || []) as Record<string, unknown>[];

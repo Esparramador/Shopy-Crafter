@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { logger } from "./logger.js";
+import { safeFetch } from "./web-scraper.js";
 
 export type NanoBananaResult = {
   buffer: Buffer;
@@ -79,7 +80,7 @@ async function fetchToBuffer(url: string, timeoutMs = 60_000): Promise<{ buffer:
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
+    const r = await safeFetch(url, { signal: ctrl.signal, redirect: "follow" });
     if (!r.ok) throw new Error(`fetch ${r.status}`);
     const ct = r.headers.get("content-type") || "image/png";
     return { buffer: Buffer.from(await r.arrayBuffer()), mimeType: ct.split(";")[0].trim() };

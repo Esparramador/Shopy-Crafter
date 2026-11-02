@@ -439,6 +439,24 @@ export async function claude(prompt: string, maxTokens = 32000, opts?: Pick<Clau
  * The brain is bidirectional: every analysis enriches it, and every generation
  * benefits from everything the brain has learned.
  */
+/**
+ * Memorias que nacen de texto escrito por visitantes anónimos o clientes (chat de la
+ * landing, chat del cliente, formulario de contacto). Se guardan para estadísticas,
+ * pero NUNCA se meten en los prompts: serían una vía para colar instrucciones al
+ * cerebro del admin (que tiene herramientas con efectos).
+ */
+export const UNTRUSTED_MEMORY_SOURCES = [
+  "auto_landing_chat_insight",
+  "auto_client_chat_insight",
+  "auto_lead_prereport",
+  "auto_lead_business_intel",
+  "auto_lead_market_intel",
+  "auto_lead_seo_intel",
+  "auto_lead_social_intel",
+];
+const trustedMemory = () =>
+  sql`coalesce(${omnicoreMemoriesTable.sourceType}, '') NOT IN (${sql.join(UNTRUSTED_MEMORY_SOURCES.map(x => sql`${x}`), sql`, `)})`;
+
 export async function buildShopyBrainContext(
   niche?: string,
   useCase?: BrainUseCase,
@@ -461,7 +479,7 @@ export async function buildShopyBrainContext(
           title: omnicoreMemoriesTable.title,
         })
         .from(omnicoreMemoriesTable)
-        .where(gte(omnicoreMemoriesTable.confidence, minConfidence))
+        .where(and(gte(omnicoreMemoriesTable.confidence, minConfidence), trustedMemory()))
         .orderBy(desc(omnicoreMemoriesTable.confidence))
         .limit(15),
 
@@ -837,6 +855,7 @@ export async function buildSmartBrainContext(
         FROM omnicore_memories 
         WHERE to_tsvector('spanish', coalesce(title,'') || ' ' || coalesce(content,'')) 
               @@ to_tsquery('spanish', ${searchTerms})
+          AND coalesce(source_type, '') NOT IN (${sql.join(UNTRUSTED_MEMORY_SOURCES.map(x => sql`${x}`), sql`, `)})
         ORDER BY rank DESC, confidence DESC
         LIMIT 15
       `).catch(() => ({ rows: [] })),
@@ -852,7 +871,7 @@ export async function buildSmartBrainContext(
 
       niche ? db.select()
         .from(omnicoreMemoriesTable)
-        .where(sql`lower(${omnicoreMemoriesTable.niche}) LIKE ${'%' + niche.toLowerCase() + '%'}`)
+        .where(and(sql`lower(${omnicoreMemoriesTable.niche}) LIKE ${'%' + niche.toLowerCase() + '%'}`, trustedMemory()))
         .orderBy(desc(omnicoreMemoriesTable.confidence))
         .limit(5) : Promise.resolve([]),
     ]);

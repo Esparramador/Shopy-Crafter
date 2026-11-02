@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Globe, Download, Code2, Loader2, AlertCircle, Copy, Check, Eye, Zap, RefreshCw } from "lucide-react";
+import { openSandboxedHtml } from "@/lib/sanitize";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -100,11 +101,7 @@ export default function HyperFrames() {
         download(new Blob([generatedHtml], { type: "text/html" }), "html");
       } else if (format === "pdf") {
         // PDF desde el navegador (Guardar como PDF) sobre el HTML generado.
-        const w = window.open("", "_blank");
-        if (!w) throw new Error("El navegador bloqueó la ventana de impresión");
-        w.document.write(generatedHtml);
-        w.document.close();
-        w.onload = () => w.print();
+        if (!openSandboxedHtml(generatedHtml, { autoPrint: true, title: "HyperFrames" })) throw new Error("El navegador bloqueó la ventana de impresión");
       } else {
         // MP4: render real en el servidor (Chromium + ffmpeg).
         const r = await fetch(`${API_BASE}/api/hyperframes/generate`, {

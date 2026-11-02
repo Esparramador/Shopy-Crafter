@@ -25,6 +25,7 @@ import {
   planPaymentLink, normalizeCoupon, normalizePromoCode, toMinorUnits,
   type PriceInput, type LinkConfigInput, type LinkPrice, type CouponInput, type Interval,
 } from "../lib/stripe-commerce.js";
+import { safeFetch } from "../lib/web-scraper.js";
 
 const router = Router();
 const BASE = "/admin/stripe/project/:id";
@@ -490,7 +491,7 @@ async function imageAsDataUri(url: string): Promise<string | null> {
   try {
     const u = new URL(url);
     if (u.protocol !== "https:") return null;
-    const r = await fetch(u, { signal: AbortSignal.timeout(8000) });
+    const r = await safeFetch(u.toString(), { signal: AbortSignal.timeout(8000) });
     if (!r.ok) return null;
     const type = r.headers.get("content-type") ?? "";
     if (!/^image\/(png|jpe?g|webp|gif)/.test(type)) return null;

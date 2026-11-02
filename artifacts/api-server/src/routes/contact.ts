@@ -907,7 +907,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
 
     if (research.seo && research.seo.length > 100) {
       learnFromOperation({
-        operationType: "seo",
+        operationType: "lead_seo_intel",
         niche: lead.niche || undefined,
         title: `SEO audit (Claude): ${entityName} (${lead.storeUrl || "sin URL"})`,
         content: research.seo.slice(0, 6000),

@@ -892,6 +892,7 @@ export default function EmailTemplates() {
                 <div style={{ border: "1px solid var(--bdr)", borderRadius: 12, overflow: "hidden", background: "#0a0a0f", display: "flex", justifyContent: "center" }}>
                   <iframe
                     srcDoc={form.html_content}
+                    sandbox="allow-popups"
                     style={{
                       width: previewDevice === "mobile" ? 375 : "100%",
                       height: 600, border: "none",

@@ -17,6 +17,7 @@ import { useSafeTimeout } from "@/hooks/useSafeTimeout";
 import { useDraggable } from "@/hooks/use-draggable";
 import { getModelShortName } from "@/lib/model-aliases";
 import VoiceCallModal from "@/components/VoiceCallModal";
+import { fetchBrainAction } from "@/lib/brain-action";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -1807,7 +1808,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       const actionController = new AbortController();
       const isHeavy = HEAVY_VIDEO_ACTIONS.has(action);
       const actionTimeout = setTimeout(() => actionController.abort(), isHeavy ? 1500000 : 180000);
-      const res = await fetch(`${API}/api/shopybrain/execute-action`, {
+      const res = await fetchBrainAction(`${API}/api/shopybrain/execute-action`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, params }),

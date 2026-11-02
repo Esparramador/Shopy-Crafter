@@ -17,6 +17,7 @@ import path from "path";
 import os from "os";
 import sharp from "sharp";
 import { isAllowedHeadlessUrl } from "../lib/headless-guard.js";
+import { safeFetch } from "../lib/web-scraper.js";
 
 // Mismo directorio raíz que `vault.ts` usa para escribir los fallbacks.
 // MANTENER SINCRONIZADO con `lib/vault.ts::DISK_FALLBACK_DIR`.
@@ -1443,7 +1444,7 @@ const B = {
 async function fetchImageAsDataUrl(url: string | null | undefined): Promise<string | null> {
   if (!url || !/^https?:\/\//i.test(url)) return null;
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const r = await safeFetch(url, { signal: AbortSignal.timeout(10000) });
     if (!r.ok) return null;
     const ct = r.headers.get("content-type") || "image/jpeg";
     const buf = Buffer.from(await r.arrayBuffer());

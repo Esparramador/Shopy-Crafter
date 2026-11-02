@@ -69,3 +69,23 @@ export function cleanMarkdownLite(raw: string | null | undefined): string {
     .replace(/\n/g, "<br/>");
   return cleanHtml(text);
 }
+
+/**
+ * Abre HTML generado por IA en una pestaña nueva SIN darle el origen del panel:
+ * la pestaña solo contiene un iframe sandbox (sin allow-same-origin). Escribir el
+ * HTML directamente con document.write lo ejecutaba con la sesión del admin.
+ */
+export function openSandboxedHtml(html: string, opts: { autoPrint?: boolean; title?: string } = {}): boolean {
+  const w = window.open("", "_blank");
+  if (!w) return false;
+  const doc = opts.autoPrint
+    ? html.replace(/<\/body>/i, "<script>window.addEventListener('load',()=>setTimeout(()=>print(),300))</script></body>")
+    : html;
+  w.document.write(
+    `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(opts.title ?? "Vista previa")}</title>` +
+    `<style>html,body{margin:0;height:100%;background:#fff}iframe{border:0;width:100%;height:100%}</style></head>` +
+    `<body><iframe sandbox="allow-scripts allow-popups allow-modals allow-downloads" srcdoc="${escapeHtml(doc)}"></iframe></body></html>`,
+  );
+  w.document.close();
+  return true;
+}

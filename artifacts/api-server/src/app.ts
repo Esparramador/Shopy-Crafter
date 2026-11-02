@@ -192,18 +192,19 @@ startRateLimitCleanup();
 // ── Body parsing ──────────────────────────────────────────────────────────────
 // 50mb to support up to 5 base64-encoded high-res images in reference analysis
 // Las rutas de webhook necesitan el cuerpo exacto para verificar la firma.
+// Rutas sin sesión (tienda, chat público, contacto, login, webhooks públicos): 1 MB.
+// Antes aceptaban 50 MB como el panel, y cualquiera podía mandar cuerpos enormes.
+// Un parser que ya leyó el cuerpo deja pasar al siguiente sin volver a leerlo.
+const PUBLIC_BODY_PREFIXES = ["/api/public", "/api/shop", "/api/auth", "/api/contact", "/api/tienda", "/api/store", "/api/packs", "/api/voice/public-call-url"];
+app.use(PUBLIC_BODY_PREFIXES, express.json({ limit: "1mb", verify: keepRawBodyForWebhooks }));
+app.use(PUBLIC_BODY_PREFIXES, express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(express.json({ limit: "50mb", verify: keepRawBodyForWebhooks }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ── Global input sanitization — strips prototype pollution on all POST/PUT ──
 app.use((req: Request, _res: Response, next: NextFunction) => {
   if (req.body && typeof req.body === "object") {
-    const bodyStr = JSON.stringify(req.body);
-    if (bodyStr.length > 50_000_000) {
-      const err: any = new Error("Request body too large");
-      err.status = 413;
-      return next(err);
-    }
+    // El tamaño ya lo limita el parser (1 MB público / 50 MB panel): sin JSON.stringify extra.
     const sanitize = (obj: any): any => {
       if (obj === null || typeof obj !== "object") return obj;
       if (Array.isArray(obj)) return obj.map(sanitize);

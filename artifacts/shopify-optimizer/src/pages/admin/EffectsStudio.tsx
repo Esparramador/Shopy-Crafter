@@ -938,7 +938,7 @@ export default function EffectsStudio() {
                   </div>
                 </div>
                 {customOutputType === "html" && outputMode === "preview"
-                  ? <iframe srcDoc={customOutput} sandbox="allow-scripts allow-same-origin" style={{ width: "100%", height: 300, border: "none" }} title="Preview" />
+                  ? <iframe srcDoc={customOutput} sandbox="allow-scripts" style={{ width: "100%", height: 300, border: "none" }} title="Preview" />
                   : <pre style={{ margin: 0, padding: 12, background: S.surf3, color: "#a8b4d8", fontSize: 10, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 300, overflowY: "auto", lineHeight: 1.6 }}>{customOutput}</pre>
                 }
               </div>
@@ -979,7 +979,7 @@ export default function EffectsStudio() {
                   {snippetDetail?.previewHtml && (
                     <>
                       <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: S.t4, padding: "10px 14px 4px" }}>PREVIEW EN VIVO</div>
-                      <iframe srcDoc={snippetDetail.previewHtml} sandbox="allow-scripts allow-same-origin" style={{ width: "100%", height: 200, border: "none", borderBottom: `1px solid ${S.bdr}` }} title="Effect preview" />
+                      <iframe srcDoc={snippetDetail.previewHtml} sandbox="allow-scripts" style={{ width: "100%", height: 200, border: "none", borderBottom: `1px solid ${S.bdr}` }} title="Effect preview" />
                     </>
                   )}
                   {snippetDetail && (
@@ -1088,7 +1088,7 @@ export default function EffectsStudio() {
                   </div>
                   <div style={{ border: `1px solid rgba(34,197,94,.2)`, borderRadius: 8, overflow: "hidden" }}>
                     {outputType === "html" && outputMode === "preview"
-                      ? <iframe srcDoc={generatedOutput} sandbox="allow-scripts allow-same-origin" style={{ width: "100%", height: 260, border: "none" }} title="Generated preview" />
+                      ? <iframe srcDoc={generatedOutput} sandbox="allow-scripts" style={{ width: "100%", height: 260, border: "none" }} title="Generated preview" />
                       : <pre style={{ margin: 0, padding: 10, background: S.surf3, color: "#a8b4d8", fontSize: 9.5, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 260, overflowY: "auto", lineHeight: 1.5 }}>{generatedOutput}</pre>
                     }
                   </div>
@@ -1167,7 +1167,7 @@ export default function EffectsStudio() {
           </div>
           {/* Preview body */}
           {composePrevMode === "preview"
-            ? <iframe srcDoc={composeHtml} sandbox="allow-scripts allow-same-origin" style={{ flex: 1, border: "none", width: "100%", background: "#fff" }} title="Compose preview" />
+            ? <iframe srcDoc={composeHtml} sandbox="allow-scripts" style={{ flex: 1, border: "none", width: "100%", background: "#fff" }} title="Compose preview" />
             : <pre style={{ flex: 1, margin: 0, padding: 20, background: S.surf3, color: "#a8b4d8", fontSize: 11, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", overflowY: "auto", lineHeight: 1.6 }}>{composeHtml}</pre>
           }
         </ModalOverlay>

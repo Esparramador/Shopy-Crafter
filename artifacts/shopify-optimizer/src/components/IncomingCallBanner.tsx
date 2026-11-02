@@ -103,9 +103,13 @@ export default function IncomingCallBanner() {
       } catch {}
     };
 
-    poll();
-    const t = setInterval(poll, 3000);
-    return () => { mounted = false; clearInterval(t); };
+    // Solo con la pestaña visible (antes: cada 3 s en todas las pestañas abiertas,
+    // ~1.200 peticiones por hora y pestaña). Al volver a la pestaña se consulta al momento.
+    const tick = () => { if (document.visibilityState === "visible") void poll(); };
+    tick();
+    const t = setInterval(tick, 4000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { mounted = false; clearInterval(t); document.removeEventListener("visibilitychange", tick); };
   }, [user]);
 
   useEffect(() => {

@@ -6,6 +6,7 @@ import { logger } from "../lib/logger.js";
 import { askClaudeWithBrain } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
 import { uploadRejected } from "../lib/upload-errors.js";
+import { safeFetch } from "../lib/web-scraper.js";
 
 const router = Router();
 
@@ -225,6 +226,7 @@ router.get("/tripo3d/animations", async (_req, res) => {
 
 /* GET /api/tripo3d/balance — saldo Tripo3D */
 router.get("/tripo3d/balance", async (_req, res) => {
+  if (!process.env.TRIPO_API_KEY) { res.json({ configured: false, error: "Tripo3D no está configurado (TRIPO_API_KEY)" }); return; }
   try {
     const data = await tripoFetch("/user/balance");
     res.json(data);
@@ -702,7 +704,7 @@ router.post("/tripo3d/auto-generate", async (req: Request, res: Response) => {
       // ── Modo imagen: descargar del CDN del producto y enviar a Tripo3D ─────
       send({ event: "status", message: "Descargando imagen del producto..." });
 
-      const imgRes = await fetch(imageUrl);
+      const imgRes = await safeFetch(imageUrl);
       if (!imgRes.ok) throw new Error(`No se pudo descargar la imagen: HTTP ${imgRes.status}`);
       const contentType = imgRes.headers.get("content-type") || "image/jpeg";
       const imgBuffer = Buffer.from(await imgRes.arrayBuffer());

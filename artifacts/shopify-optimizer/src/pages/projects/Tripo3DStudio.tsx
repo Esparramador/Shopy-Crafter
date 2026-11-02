@@ -314,7 +314,7 @@ export default function Tripo3DStudio() {
 
   // Gallery
   const [gallery, setGallery] = useState<(TaskResult & { label?: string })[]>([]);
-  const [balance, setBalance] = useState<{ balance?: number; frozen?: number } | null>(null);
+  const [balance, setBalance] = useState<{ balance?: number; frozen?: number; configured?: boolean; error?: string } | null>(null);
 
   // Load animations & model-viewer script & balance
   useEffect(() => {
@@ -644,7 +644,8 @@ export default function Tripo3DStudio() {
       {balance !== null && (
         <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 9, background: "rgba(59,128,228,0.07)", border: "1px solid rgba(59,128,228,0.2)" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#3b80e4", marginBottom: 4 }}>💰 Créditos Tripo3D</div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--t)" }}>{balance.balance ?? "—"} <span style={{ fontSize: 11, fontWeight: 400, color: "var(--t3)" }}>disponibles</span></div>
+          {balance.configured === false && <div style={{ fontSize: 11, color: "var(--t3)" }}>Falta la clave de Tripo3D: añádela en Ajustes → Claves API.</div>}
+          {balance.configured !== false && <div style={{ fontSize: 14, fontWeight: 800, color: "var(--t)" }}>{balance.balance ?? "—"} <span style={{ fontSize: 11, fontWeight: 400, color: "var(--t3)" }}>disponibles</span></div>}
           {balance.frozen != null && <div style={{ fontSize: 11, color: "var(--t3)" }}>{balance.frozen} en uso ahora</div>}
         </div>
       )}
