@@ -8,9 +8,11 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   get: vi.fn(),
   create: vi.fn(),
+  delete: vi.fn(),
   signedUrl: vi.fn(),
   verify: vi.fn(),
   execute: vi.fn(),
+  rows: new Map<string, string>(),
 }));
 
 vi.mock("@workspace/db", () => ({
@@ -36,6 +38,7 @@ vi.mock("../lib/elevenlabs.js", () => ({
   updateConvAIAgent: mocks.update,
   getConvAIAgent: mocks.get,
   createConvAIAgent: mocks.create,
+  deleteConvAIAgent: mocks.delete,
   getConvAISignedUrl: mocks.signedUrl,
 }));
 vi.mock("../lib/convai-voice-check.js", () => ({
@@ -61,21 +64,27 @@ describe("ConvAI call/apply single-flight with an environment-pinned admin", () 
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
+    mocks.rows.clear();
     vi.stubEnv("ELEVEN_CONVAI_DEFAULT_AGENT_ID", pinnedId);
     vi.stubEnv("ELEVEN_CONVAI_VOICE_ID", "test-voice");
     mocks.update.mockResolvedValue({});
     mocks.get.mockResolvedValue({});
     mocks.signedUrl.mockResolvedValue("wss://example.invalid/test-call");
     mocks.verify.mockImplementation(() => undefined);
-    const rows = new Map<string, string>();
     mocks.execute.mockImplementation(async query => {
       const { sql, params } = new PgDialect().sqlToQuery(query);
       if (sql.includes("INSERT INTO platform_settings_kv")) {
-        rows.set(String(params[0]), String(params[1]));
+        mocks.rows.set(String(params[0]), String(params[1]));
+      } else if (sql.includes("DELETE FROM platform_settings_kv")) {
+        mocks.rows.delete(String(params[0]));
+      }
+      if (sql.includes("SELECT value FROM platform_settings_kv")) {
+        const value = mocks.rows.get(String(params[0]));
+        return { rows: value ? [{ value }] : [] };
       }
       return {
         rows: sql.includes("SELECT key, value FROM platform_settings_kv")
-          ? Array.from(rows, ([key, value]) => ({ key, value }))
+          ? Array.from(mocks.rows, ([key, value]) => ({ key, value }))
           : [],
       };
     });
@@ -113,6 +122,140 @@ describe("ConvAI call/apply single-flight with an environment-pinned admin", () 
       body: JSON.stringify({ agentTypes: ["admin"] }),
     });
   }
+
+  it.each(["call", "apply"] as const)(
+    "a concurrent %s waits while reset verifies the env-pinned admin without deleting or recreating it",
+    async competitor => {
+      const verification = deferred();
+      const verificationStarted = deferred();
+      mocks.create.mockImplementation(async ({ name }: { name: string }) => ({
+        agent_id: `created-${name.includes("CEO") ? "admin" : "agent"}`,
+      }));
+      mocks.delete.mockResolvedValue({});
+      mocks.get.mockImplementationOnce(async () => {
+        verificationStarted.resolve();
+        await verification.promise;
+        return {};
+      });
+
+      const resetting = fetch(`${base}/voice/convai/reset-agents`, { method: "POST" });
+      await verificationStarted.promise;
+      const arrived = once(
+        requests,
+        competitor === "call" ? "GET /voice/convai/call-url" : "POST /voice/convai/voice-settings/apply",
+      );
+      const competing = competitor === "call" ? call() : apply();
+      let competitorSettled = false;
+      void competing.then(() => { competitorSettled = true; });
+      await arrived;
+
+      expect(competitorSettled).toBe(false);
+      expect(mocks.signedUrl).not.toHaveBeenCalled();
+      expect(mocks.delete).not.toHaveBeenCalledWith(pinnedId);
+      expect(mocks.create.mock.calls.some(([config]) => config?.name?.includes("CEO"))).toBe(false);
+
+      verification.resolve();
+      const [resetResponse, competitorResponse] = await Promise.all([resetting, competing]);
+      expect(resetResponse.status).toBe(200);
+      expect(competitorResponse.status).toBe(200);
+      if (competitor === "call") {
+        expect(mocks.verify).toHaveBeenCalled();
+        expect(mocks.signedUrl).toHaveBeenCalledExactlyOnceWith(pinnedId);
+      } else {
+        expect(mocks.signedUrl).not.toHaveBeenCalled();
+      }
+      expect(mocks.delete).not.toHaveBeenCalledWith(pinnedId);
+      expect(mocks.create.mock.calls.some(([config]) => config?.name?.includes("CEO"))).toBe(false);
+    },
+  );
+
+  it.each(["call", "apply"] as const)(
+    "a concurrent %s waits for reset to recreate and verify an unpinned admin",
+    async competitor => {
+      vi.stubEnv("ELEVEN_CONVAI_DEFAULT_AGENT_ID", "");
+      const oldId = "deleted-admin-agent";
+      const newId = "verified-new-admin";
+      mocks.rows.set("convai_admin_agent_id", oldId);
+      mocks.create.mockImplementation(async () => ({ agent_id: newId }));
+      mocks.delete.mockResolvedValue({});
+      const verification = deferred();
+      const verificationStarted = deferred();
+      mocks.get.mockImplementationOnce(async () => {
+        verificationStarted.resolve();
+        await verification.promise;
+        return {};
+      });
+
+      const resetting = fetch(`${base}/voice/convai/reset-agents`, { method: "POST" });
+      await verificationStarted.promise;
+      const arrived = once(
+        requests,
+        competitor === "call" ? "GET /voice/convai/call-url" : "POST /voice/convai/voice-settings/apply",
+      );
+      const competing = competitor === "call" ? call() : apply();
+      let competitorSettled = false;
+      void competing.then(() => { competitorSettled = true; });
+      await arrived;
+
+      expect(competitorSettled).toBe(false);
+      expect(mocks.delete).toHaveBeenCalledWith(oldId);
+      expect(mocks.signedUrl).not.toHaveBeenCalled();
+      expect(mocks.signedUrl).not.toHaveBeenCalledWith(oldId);
+
+      verification.resolve();
+      const [resetResponse, competitorResponse] = await Promise.all([resetting, competing]);
+      expect(resetResponse.status).toBe(200);
+      expect(competitorResponse.status).toBe(200);
+      if (competitor === "call") {
+        expect(mocks.verify).toHaveBeenCalled();
+        expect(mocks.signedUrl).toHaveBeenCalledExactlyOnceWith(newId);
+      } else {
+        expect(mocks.signedUrl).not.toHaveBeenCalled();
+      }
+      expect(mocks.signedUrl).not.toHaveBeenCalledWith(oldId);
+      expect(mocks.delete).toHaveBeenCalledWith(oldId);
+    },
+  );
+
+  it.each(["pinned", "recreated"] as const)(
+    "never returns a call URL when reset verification fails for a %s admin",
+    async mode => {
+      const oldId = "deleted-admin-agent";
+      if (mode === "recreated") {
+        vi.stubEnv("ELEVEN_CONVAI_DEFAULT_AGENT_ID", "");
+        mocks.rows.set("convai_admin_agent_id", oldId);
+        mocks.create.mockResolvedValue({ agent_id: "unverified-new-admin" });
+        mocks.delete.mockResolvedValue({});
+      }
+      const verification = deferred();
+      const verificationStarted = deferred();
+      mocks.get.mockImplementationOnce(async () => {
+        verificationStarted.resolve();
+        await verification.promise;
+        return {};
+      });
+      mocks.verify.mockImplementationOnce(() => { throw new Error("verification failed"); });
+
+      const resetting = fetch(`${base}/voice/convai/reset-agents`, { method: "POST" });
+      await verificationStarted.promise;
+      const callArrived = once(requests, "GET /voice/convai/call-url");
+      const calling = call();
+      await callArrived;
+      expect(mocks.signedUrl).not.toHaveBeenCalled();
+
+      verification.resolve();
+      const [resetResponse, callResponse] = await Promise.all([resetting, calling]);
+      expect(resetResponse.status).toBe(500);
+      expect(callResponse.status).not.toBe(200);
+      expect(mocks.signedUrl).not.toHaveBeenCalled();
+      expect(mocks.verify).toHaveBeenCalled();
+      if (mode === "recreated") expect(mocks.delete).toHaveBeenCalledWith(oldId);
+      else {
+        expect(mocks.delete).not.toHaveBeenCalledWith(pinnedId);
+        expect(mocks.create).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it("apply joins the call's pending PATCH and verification without creating another agent", async () => {
     const patch = deferred();

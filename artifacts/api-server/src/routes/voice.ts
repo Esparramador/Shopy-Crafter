@@ -1091,64 +1091,59 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
     for (const type of types) {
       const cacheKey = `convai_${type}_agent_id`;
 
-      // No pisar una resolución de llamada en curso para este tipo.
-      const inFlight = _agentResolveInFlight[type];
-      if (inFlight) await inFlight.catch(() => undefined);
+      // Publicar el reset antes de esperar cualquier trabajo previo. Así, tanto
+      // llamadas como voice-settings/apply que lleguen durante el reinicio esperan
+      // también a la verificación del agente, incluido el admin fijado por entorno.
+      const previous = _agentResolveInFlight[type];
+      const work = Promise.resolve().then(async (): Promise<string> => {
+        if (previous) await previous.catch(() => undefined);
 
-      // El agente admin fijado por ELEVEN_CONVAI_DEFAULT_AGENT_ID es inmutable para
-      // nosotros: borrarlo y crear otro dejaría al arranque apuntando a un ID muerto.
-      // Se sincroniza y verifica en sitio.
-      if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
-        const envId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
-        results[type] = await withConvAIAgentLock(type, async () => {
+        return withConvAIAgentLock(type, async (): Promise<string> => {
+          if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
+            const envId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
+            delete _agentIdCache[cacheKey];
+            const voiceId = await resolveVerifiedConvAIVoiceId();
+            await syncConvAIAgentOrThrow(type, envId, voiceId);
+            _agentIdCache[cacheKey] = envId;
+            logger.info({ type, agentId: envId, voiceId }, "ConvAI env-pinned agent re-synced in place");
+            return envId;
+          }
+          // Delete old agent if we have its ID cached
+          const oldId = _agentIdCache[cacheKey];
           delete _agentIdCache[cacheKey];
+          if (!oldId) {
+            // Try DB
+            try {
+              const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
+              const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
+              const dbId: string | undefined = rowArr[0]?.value;
+              if (dbId) {
+                try { await deleteConvAIAgent(dbId); } catch { /* ignore if already gone */ }
+              }
+            } catch { /* ignore */ }
+          } else {
+            try { await deleteConvAIAgent(oldId); } catch { /* ignore if already gone */ }
+          }
+
+          // Clear DB entry so getOrCreateConvAIAgent recreates
+          await db.execute(sql`DELETE FROM platform_settings_kv WHERE key = ${cacheKey}`);
+
+          // Re-create with latest config
           const voiceId = await resolveVerifiedConvAIVoiceId();
-          await syncConvAIAgentOrThrow(type, envId, voiceId);
-          _agentIdCache[cacheKey] = envId;
-          logger.info({ type, agentId: envId, voiceId }, "ConvAI env-pinned agent re-synced in place");
-          return envId;
+          const createdRevision = _ttsSettingsRevision;
+          const config = await agentConfigFor(type, voiceId);
+          const agent = await createConvAIAgent(config);
+          const newId = agent.agent_id;
+          await db.execute(sql`
+            INSERT INTO platform_settings_kv (key, value, updated_at)
+            VALUES (${cacheKey}, ${newId}, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+          `);
+          await verifyCreatedConvAIAgent(type, newId, voiceId, createdRevision);
+          _agentIdCache[cacheKey] = newId;
+          logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
+          return newId;
         });
-        continue;
-      }
-
-      // Publicar el trabajo como resolución en curso: cualquier llamada que llegue
-      // mientras borramos/recreamos espera y recibe el ID nuevo (sin duplicar agentes).
-      const work = withConvAIAgentLock(type, async (): Promise<string> => {
-        // Delete old agent if we have its ID cached
-        const oldId = _agentIdCache[cacheKey];
-        delete _agentIdCache[cacheKey];
-        if (!oldId) {
-          // Try DB
-          try {
-            const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
-            const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
-            const dbId: string | undefined = rowArr[0]?.value;
-            if (dbId) {
-              try { await deleteConvAIAgent(dbId); } catch { /* ignore if already gone */ }
-            }
-          } catch { /* ignore */ }
-        } else {
-          try { await deleteConvAIAgent(oldId); } catch { /* ignore if already gone */ }
-        }
-
-        // Clear DB entry so getOrCreateConvAIAgent recreates
-        await db.execute(sql`DELETE FROM platform_settings_kv WHERE key = ${cacheKey}`);
-
-        // Re-create with latest config
-        const voiceId = await resolveVerifiedConvAIVoiceId();
-        const createdRevision = _ttsSettingsRevision;
-        const config = await agentConfigFor(type, voiceId);
-        const agent = await createConvAIAgent(config);
-        const newId = agent.agent_id;
-        await db.execute(sql`
-          INSERT INTO platform_settings_kv (key, value, updated_at)
-          VALUES (${cacheKey}, ${newId}, NOW())
-          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-        `);
-        await verifyCreatedConvAIAgent(type, newId, voiceId, createdRevision);
-        _agentIdCache[cacheKey] = newId;
-        logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
-        return newId;
       });
       _agentResolveInFlight[type] = work;
       try {
