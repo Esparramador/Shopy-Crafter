@@ -559,6 +559,22 @@ const TTS_SETTINGS_TTL_MS = 60 * 1000;
 let _ttsSettingsCache: { at: number; value: StoredConvAITtsSettings } | null = null;
 let _ttsSettingsRevision = 0;
 const _agentSyncedRevision: Partial<Record<AgentType, number>> = {};
+const _agentSyncedDatabaseRevision: Partial<Record<AgentType, string>> = {};
+
+async function getConvAIDatabaseRevision(type: AgentType): Promise<string> {
+  const keys = [...Object.values(CONVAI_TTS_KV_KEYS), `convai_${type}_agent_id`];
+  const result = await db.execute(sql`
+    SELECT md5(COALESCE(string_agg(
+      key || ':' || COALESCE(value, '') || ':' || COALESCE(updated_at::text, ''),
+      '|' ORDER BY key
+    ), '')) AS revision
+    FROM platform_settings_kv
+    WHERE key IN (${sql.join(keys.map(key => sql`${key}`), sql`, `)})
+  `);
+  const revision = (result as any).rows?.[0]?.revision;
+  if (typeof revision !== "string") throw new Error("No se pudo comprobar la versión compartida de la voz.");
+  return revision;
+}
 
 async function getConvAITtsSettingsStored(): Promise<StoredConvAITtsSettings> {
   if (_ttsSettingsCache && Date.now() - _ttsSettingsCache.at < TTS_SETTINGS_TTL_MS) return _ttsSettingsCache.value;
@@ -622,6 +638,7 @@ async function saveConvAITtsSettingsWithHistory(
   await ensurePlatformSettingsKV();
   await ensureConvAITtsHistoryTable();
   await db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL lock_timeout = '75000ms'`);
     // A settings save participates in the same cross-instance locks as agent
     // sync. This makes the save and a provider PATCH/readback serializable.
     for (const type of ["admin", "client", "landing"] as const) {
@@ -725,6 +742,7 @@ async function syncConvAIAgentOrThrow(type: AgentType, agentId: string, voiceId:
     }
     if (revision !== _ttsSettingsRevision) continue;
     _agentSyncedRevision[type] = revision;
+    _agentSyncedDatabaseRevision[type] = await getConvAIDatabaseRevision(type);
     return;
   }
 }
@@ -741,10 +759,12 @@ async function verifyCreatedConvAIAgent(
     await syncConvAIAgentOrThrow(type, agentId, voiceId);
   } else {
     _agentSyncedRevision[type] = createdRevision;
+    _agentSyncedDatabaseRevision[type] = await getConvAIDatabaseRevision(type);
   }
 }
 
 async function withConvAIAgentLock<T>(type: AgentType, action: () => Promise<T>): Promise<T> {
+  await ensurePlatformSettingsKV();
   return db.transaction(async (tx) => {
     // If another process dies, Postgres rolls back its transaction and releases
     // the advisory lock. Waiting requests fail explicitly rather than hanging
@@ -859,16 +879,15 @@ async function getOrCreateConvAIAgent(type: AgentType): Promise<string> {
       continue;
     }
 
-    // The ID alone is insufficient: it must be verified for the current save.
-    if (_agentIdCache[cacheKey] && _agentSyncedRevision[type] === _ttsSettingsRevision) {
-      return _agentIdCache[cacheKey];
-    }
-
     let pending: Promise<string>;
     pending = withConvAIAgentLock(type, async () => {
-      if (_agentIdCache[cacheKey] && _agentSyncedRevision[type] === _ttsSettingsRevision) {
+      // Check shared state under the lock even for a warm local cache: another
+      // worker may have saved settings or replaced the persisted agent ID.
+      if (_agentIdCache[cacheKey] && _agentSyncedRevision[type] === _ttsSettingsRevision
+        && _agentSyncedDatabaseRevision[type] === await getConvAIDatabaseRevision(type)) {
         return _agentIdCache[cacheKey];
       }
+      delete _agentIdCache[cacheKey];
       return resolveConvAIAgentUncached(type, cacheKey);
     }).finally(() => {
       if (_agentResolveInFlight[type] === pending) delete _agentResolveInFlight[type];
@@ -1297,8 +1316,10 @@ router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res)
         const work = withConvAIAgentLock(type, async (): Promise<string> => {
           // A reset in another process may have changed the ID while this
           // request was waiting for the cross-instance lock.
+          delete _agentIdCache[cacheKey];
           const latestAgentId = await findExistingConvAIAgentId(type);
-          if (latestAgentId) resolvedAgentId = latestAgentId;
+          if (!latestAgentId) throw new Error("El agente cambió mientras se esperaba; vuelve a aplicar los ajustes.");
+          resolvedAgentId = latestAgentId;
           await syncConvAIAgentOrThrow(type, resolvedAgentId!, voiceId);
           _agentIdCache[cacheKey] = resolvedAgentId!;
           return resolvedAgentId!;
