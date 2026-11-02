@@ -7,6 +7,7 @@ import { askClaudeWithBrain } from "../lib/claude.js";
 import { saveToVault } from "../lib/vault.js";
 import { uploadRejected } from "../lib/upload-errors.js";
 import { safeFetch } from "../lib/web-scraper.js";
+import { meterCredits } from "../lib/provider-meter.js";
 
 const router = Router();
 
@@ -193,9 +194,11 @@ async function tripoUploadFile(buffer: Buffer, mimeType: string, filename: strin
 }
 
 async function tripoCreateTask(input: Record<string, any>): Promise<string> {
-  const data = await tripoFetch("/task", {
-    method: "POST",
-    body: JSON.stringify(input),
+  // Tripo reserva los créditos al crear la tarea: se mide el saldo antes y después.
+  const data = await meterCredits({
+    provider: "tripo3d", operation: String(input.type ?? "task"), model: input.model_version ? String(input.model_version) : null,
+    readBalance: async () => { const b = await tripoFetch("/user/balance"); return Number(b?.balance); },
+    run: () => tripoFetch("/task", { method: "POST", body: JSON.stringify(input) }),
   });
   return data.task_id as string;
 }

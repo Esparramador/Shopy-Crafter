@@ -14,6 +14,7 @@
 
 import { Router } from "express";
 import { logger } from "../lib/logger.js";
+import { meterRequest } from "../lib/provider-meter.js";
 
 const router = Router();
 
@@ -62,8 +63,12 @@ async function callStitchMCP(method: string, params: Record<string, unknown> = {
   return json.result;
 }
 
+// Herramientas que generan con IA (las de lectura no se registran).
+const STITCH_BILLABLE = new Set(["generate_screen_from_text", "edit_screens", "generate_variants"]);
+
 async function callStitchTool(toolName: string, toolArgs: Record<string, unknown> = {}) {
-  return callStitchMCP("tools/call", { name: toolName, arguments: toolArgs });
+  const run = () => callStitchMCP("tools/call", { name: toolName, arguments: toolArgs });
+  return STITCH_BILLABLE.has(toolName) ? meterRequest({ provider: "stitch", operation: toolName, run }) : run();
 }
 
 router.get("/stitch/status", (req, res) => {

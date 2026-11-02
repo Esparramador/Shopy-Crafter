@@ -1,5 +1,7 @@
 import { logger } from "./logger.js";
 
+import { meteredFetch } from "./provider-meter.js";
+
 const ELEVEN_BASE = "https://api.elevenlabs.io/v1";
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_TEXT_LENGTH = 5000;
@@ -433,7 +435,7 @@ export async function transcribeAudio(
   if (options?.diarize !== undefined) form.append("diarize", String(options.diarize));
   if (options?.timestamps_granularity) form.append("timestamps_granularity", options.timestamps_granularity);
 
-  const res = await fetch(`${ELEVEN_BASE}/speech-to-text`, {
+  const res = await meteredFetch(`${ELEVEN_BASE}/speech-to-text`, {
     method: "POST",
     headers: { "xi-api-key": apiKey },
     body: form,
@@ -472,7 +474,7 @@ export async function isolateAudio(
   const blob = new Blob([audioBuffer as unknown as ArrayBuffer], { type: mimeType || "audio/mpeg" });
   form.append("audio", blob, filename);
 
-  const res = await fetch(`${ELEVEN_BASE}/audio-isolation`, {
+  const res = await meteredFetch(`${ELEVEN_BASE}/audio-isolation`, {
     method: "POST",
     headers: { "xi-api-key": apiKey },
     body: form,
@@ -826,7 +828,7 @@ export async function generateSoundEffect(
     body.prompt_influence = Math.max(0, Math.min(1, promptInfluence));
   }
 
-  const res = await fetch(`${ELEVEN_BASE}/sound-generation`, {
+  const res = await meteredFetch(`${ELEVEN_BASE}/sound-generation`, {
     method: "POST",
     headers: { "xi-api-key": key, "Content-Type": "application/json", "Accept": "audio/mpeg" },
     body: JSON.stringify(body),

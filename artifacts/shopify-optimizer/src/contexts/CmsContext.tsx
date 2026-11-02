@@ -105,6 +105,8 @@ function injectCmsCustomCss(content: Record<string, any>) {
   el.textContent = css;
 }
 
+let appliedCssVars = new Set<string>();
+
 function injectCmsTheme(content: Record<string, any>) {
   const site = content?.site ?? {};
   const root = document.documentElement;
@@ -112,6 +114,9 @@ function injectCmsTheme(content: Record<string, any>) {
   // ── Variables CSS nombradas (mapa libre de --var: value) ──────────────────
   // Permite sobreescribir CUALQUIER variable de design-system.css desde la BD
   const cssVars: Record<string, string> = site.cssVars ?? {};
+  // Quita las variables que ya no están en el CMS (p. ej. "volver al valor por defecto").
+  for (const key of appliedCssVars) if (!(key in cssVars)) root.style.removeProperty(key);
+  appliedCssVars = new Set(Object.keys(cssVars).filter(k => k.startsWith("--")));
   Object.entries(cssVars).forEach(([key, value]) => {
     if (key.startsWith("--") && typeof value === "string" && value.trim()) {
       root.style.setProperty(key, value.trim());

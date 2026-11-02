@@ -455,22 +455,22 @@ function GenerateTab({ caps, health, projectId, onSuccess, onError, onCreditErro
               {
                 label: "⌚ Watch Character Sheet",
                 prompt: `Technical luxury watch character design sheet, wide horizontal board 16:9, cream off-white background, fine serif typography labels.
-Layout — CENTER: 1 large hero shot of Rolex Datejust 41 two-tone Rolesor, 3/4 view, dramatic studio lighting, champagne diamond dial, 18k yellow gold fluted bezel.
-LEFT COLUMN: 3 component close-ups — (1) fluted 18k gold bezel extreme macro, 72 ridges catching studio light; (2) Five-link Jubilee bracelet showing polished gold + brushed steel; (3) Oyster crown with Rolex crown logo in relief.
-RIGHT COLUMN: 3 component close-ups — (1) champagne sunray dial macro with 10 diamond indices; (2) Calibre 3235 movement exposed from caseback — rotor, blue Parachrom hairspring, Chronergy escapement; (3) Oystersteel 904L case profile showing polished lugs + brushed flanks.
-BOTTOM ROW: 5 views — dial face, case side profile, caseback (Oyster screwback), bezel top-down showing 72 ridges, Jubilee clasp open showing Easylink system.
-ANNOTATIONS: fine thin serif labels — "72-ridge 18k fluted bezel", "Chromalight indices", "Calibre 3235 — 28,800 vph — 31 rubies", "Oystersteel 904L", "Jubilee Ref 62613", "2.5x Cyclops sapphire crystal", "Oysterclasp + Easylink".
-Style: luxury editorial technical illustration, 8K precision, photorealistic. No watermarks. Watch model: Rolex Datejust 41 Ref 126333`,
+Layout — CENTER: 1 large hero shot of luxury 41mm two-tone automatic watch, 3/4 view, dramatic studio lighting, champagne diamond dial, 18k yellow gold fluted bezel.
+LEFT COLUMN: 3 component close-ups — (1) fluted 18k gold bezel extreme macro, 72 ridges catching studio light; (2) Five-link five-link bracelet showing polished gold + brushed steel; (3) screw-down crown with original brand monogram in relief.
+RIGHT COLUMN: 3 component close-ups — (1) champagne sunray dial macro with 10 diamond indices; (2) automatic calibre movement exposed from caseback — rotor, blue paramagnetic hairspring, high-efficiency escapement; (3) steel 904L case profile showing polished lugs + brushed flanks.
+BOTTOM ROW: 5 views — dial face, case side profile, caseback (screw-down caseback), bezel top-down showing 72 ridges, bracelet clasp open showing comfort-extension system.
+ANNOTATIONS: fine thin serif labels — "72-ridge 18k fluted bezel", "luminescent indices", "automatic calibre — 28,800 vph — 31 rubies", "steel 904L", "five-link", "2.5x date-magnifier sapphire crystal", "folding clasp + comfort-extension".
+Style: luxury editorial technical illustration, 8K precision, photorealistic. No watermarks. Watch model: original luxury 41mm automatic, no real brand `,
               },
               {
                 label: "⌚ Watch Storyboard 6P",
-                prompt: `Production storyboard for Rolex Datejust 41 explode view video. Exactly 6 panels in 3-column × 2-row grid. Each panel has caption strip with panel number, camera note, timestamp, and action title. Style: luxury cinematic storyboard, clean detailed illustration, black marker on cream paper aesthetic.
-P01 [100mm macro / 45° iso / 00:00-02s / HERO ASSEMBLED]: Rolex Datejust 41 fully assembled rotating on matte black pedestal. Champagne diamond dial, gold fluted bezel.
+                prompt: `Production storyboard for luxury 41mm automatic watch explode view video. Exactly 6 panels in 3-column × 2-row grid. Each panel has caption strip with panel number, camera note, timestamp, and action title. Style: luxury cinematic storyboard, clean detailed illustration, black marker on cream paper aesthetic.
+P01 [100mm macro / 45° iso / 00:00-02s / HERO ASSEMBLED]: luxury 41mm automatic watch fully assembled rotating on matte black pedestal. Champagne diamond dial, gold fluted bezel.
 P02 [Extreme macro / 200mm / 02-04s / BEZEL REVEAL]: 18k gold fluted bezel extreme close-up — 72 ridges, alternating light/shadow, each facet visible.
 P03 [45° iso / Slow-mo 0.3x / 04-08s / DISASSEMBLY BEGINS]: Fluted bezel lifts, sapphire crystal rises, three gold hands separate radially. Case body remains center anchor.
-P04 [90° overhead / 08-13s / FULL EXPLODE]: All components floating in perfect formation — dial, bezel, crystal, hands, bracelet links cascading. Oysterclasp unfolded.
-P05 [Tight 3/4 / movement visible / 13-18s / CALIBRE 3235]: Caseback open, movement exposed — blue Parachrom hairspring, tungsten rotor, Chronergy escapement, 31 ruby jewels.
-P06 [Hero / 100mm / 18-25s / REASSEMBLY + CTA]: All components magnetically snap back. Watch assembled, 3/4 rotation. Rolex crown logo sharp. Fade to black.
+P04 [90° overhead / 08-13s / FULL EXPLODE]: All components floating in perfect formation — dial, bezel, crystal, hands, bracelet links cascading. folding clasp unfolded.
+P05 [Tight 3/4 / movement visible / 13-18s / MANUFACTURE CALIBRE]: Caseback open, movement exposed — blue paramagnetic hairspring, tungsten rotor, high-efficiency escapement, 31 ruby jewels.
+P06 [Hero / 100mm / 18-25s / REASSEMBLY + CTA]: All components magnetically snap back. Watch assembled, 3/4 rotation. original brand monogram sharp. Fade to black.
 No extra panels, no watermarks.`,
               },
               {
@@ -491,11 +491,11 @@ No extra panels, no watermarks.`,
               },
               {
                 label: "⌚ Reloj Lujo Explode",
-                prompt: "Cinematic exploded view of a luxury mechanical watch, individual components floating symmetrically in precise 3D space on matte black background. Separated components visible: fluted 18k gold bezel (72 ridges, mirror-polished facets), flat sapphire crystal with cyclops magnifier lens, champagne sunray brushed dial with brilliant-cut diamond hour indices in gold bezels, applied gold crown logo at 12, gold baton hands (Chromalight luminescent fill), Oystersteel 904L case body (41mm, polished lugs), screw-down 18k gold crown with logo engraving, five-link Jubilee bracelet links separating in cascade (polished gold center links + brushed steel outer links), Oysterclasp butterfly clasp open, mechanical movement exposed showing oscillating rotor, blue Parachrom hairspring coils, Chronergy escapement wheel, 31 ruby jewels. Soft diffused studio boxes, warm specular on 18k gold, prismatic light from diamond indices. Ultra-sharp 8K macro photography. Brand: ",
+                prompt: "Cinematic exploded view of a luxury mechanical watch, individual components floating symmetrically in precise 3D space on matte black background. Separated components visible: fluted 18k gold bezel (72 ridges, mirror-polished facets), flat sapphire crystal with date magnifier lens, champagne sunray brushed dial with brilliant-cut diamond hour indices in gold bezels, applied gold crown logo at 12, gold baton hands (luminescent fill), steel 904L case body (41mm, polished lugs), screw-down 18k gold crown with logo engraving, five-link five-link bracelet links separating in cascade (polished gold center links + brushed steel outer links), folding clasp butterfly clasp open, mechanical movement exposed showing oscillating rotor, blue paramagnetic hairspring coils, high-efficiency escapement wheel, 31 ruby jewels. Soft diffused studio boxes, warm specular on 18k gold, prismatic light from diamond indices. Ultra-sharp 8K macro photography. Brand: ",
               },
               {
                 label: "⌚ Mecanismo Calibre",
-                prompt: "Ultra-close-up technical exploded view of a Swiss mechanical watch movement floating on dark background. Components separated in precise formation: main plate with perlage decoration, barrel bridge with Côtes de Genève stripes, mainspring barrel (open showing coiled spring), center wheel, third wheel, Chronergy escape wheel (nickel-phosphorus), pallet fork lever with two ruby pallet stones, GLUCYDUR beryllium-bronze balance wheel, blue Parachrom hairspring (8 spiral coils), Paraflex shock absorbers, tungsten perpetual rotor (semi-circular oscillating weight), 31 ruby jewels highlighted in gold settings, white date disc with star wheel jumper. All 201 components organized in technical isometric layout. Studio lighting, ultra-sharp 8K macro. Movement caliber: ",
+                prompt: "Ultra-close-up technical exploded view of a Swiss mechanical watch movement floating on dark background. Components separated in precise formation: main plate with perlage decoration, barrel bridge with Côtes de Genève stripes, mainspring barrel (open showing coiled spring), center wheel, third wheel, high-efficiency escape wheel (nickel-phosphorus), pallet fork lever with two ruby pallet stones, beryllium-bronze beryllium-bronze balance wheel, blue paramagnetic hairspring (8 spiral coils), Paraflex shock absorbers, tungsten perpetual rotor (semi-circular oscillating weight), 31 ruby jewels highlighted in gold settings, white date disc with star wheel jumper. All 201 components organized in technical isometric layout. Studio lighting, ultra-sharp 8K macro. Movement caliber: ",
               },
             ].map(t => (
               <button
@@ -1005,10 +1005,10 @@ const WATCH_EXPLODE_CLIPS: {
     chainMethodNote: "No necesita imagen origen. Guarda el ÚLTIMO FRAME para el Clip 2.",
     tip: "⏱ 10s · 4 timestamps · Modo T2V → guarda último frame para Clip 2",
     prompt: `CAMERA: Static locked-off 45° isometric, 100mm macro equivalent. Zero camera movement. STYLE: Luxury watch product film, photorealistic, ARRI Alexa Mini LF, matte black background, soft diffused studio boxes, warm specular on 18k yellow gold.
-[0-1.5s] Rolex Datejust 41 two-tone Rolesor fully assembled, rotating slowly 360° on matte black pedestal. Champagne sunray diamond dial, 18k yellow gold fluted bezel (72 ridges) catching studio specular highlights. Jubilee bracelet two-tone links glinting.
-[1.5-3.5s] Watch stops rotating, faces dial directly to lens. EXTREME CLOSE-UP. 72 fluted gold ridges create alternating specular highlights and deep shadows. 10 brilliant-cut diamond hour indices catch prismatic light. Applied Rolex crown logo at 12 o'clock razor sharp.
-[3.5-6s] DISASSEMBLY BEGINS — SLOW MOTION 0.3x. The 18k yellow gold fluted bezel lifts vertically away from case. Flat sapphire crystal rises above dial. Three gold hands (hour baton / minute baton / slim seconds) separate radially outward simultaneously, each rotating to reveal Chromalight blue luminescent fill.
-[6-8s] Champagne sunray dial detaches and floats upward, revealing empty case interior. Oystersteel 904L case body (41mm, polished lugs) remains as anchor center. 18k gold Oyster screw-down crown slides out to the right. Case back unseals and descends below. All components simultaneously rotating to show all surfaces.`,
+[0-1.5s] luxury 41mm two-tone automatic watch fully assembled, rotating slowly 360° on matte black pedestal. Champagne sunray diamond dial, 18k yellow gold fluted bezel (72 ridges) catching studio specular highlights. five-link bracelet two-tone links glinting.
+[1.5-3.5s] Watch stops rotating, faces dial directly to lens. EXTREME CLOSE-UP. 72 fluted gold ridges create alternating specular highlights and deep shadows. 10 brilliant-cut diamond hour indices catch prismatic light. Applied original brand monogram at 12 o'clock razor sharp.
+[3.5-6s] DISASSEMBLY BEGINS — SLOW MOTION 0.3x. The 18k yellow gold fluted bezel lifts vertically away from case. Flat sapphire crystal rises above dial. Three gold hands (hour baton / minute baton / slim seconds) separate radially outward simultaneously, each rotating to reveal luminescent blue luminescent fill.
+[6-8s] Champagne sunray dial detaches and floats upward, revealing empty case interior. steel 904L case body (41mm, polished lugs) remains as anchor center. 18k gold screw-down crown slides out to the right. Case back unseals and descends below. All components simultaneously rotating to show all surfaces.`,
   },
   {
     id: "clip2",
@@ -1020,10 +1020,10 @@ const WATCH_EXPLODE_CLIPS: {
     chainMethodNote: "Usa el ÚLTIMO FRAME del Clip 1 como imagen origen (@Image1). Modo I2V.",
     tip: "⏱ 15s · I2V desde último frame Clip 1 · Puede extenderse +2-10s adicionales",
     prompt: `@Image1 Continuing from previous frame — all exterior watch components now in full 3D exploded formation floating in matte black space. SLOW MOTION. Studio boxes warm specular on gold.
-[0-4s] Five-link Jubilee bracelet (Ref 62613) links cascade apart sequentially from Oysterclasp clasp toward case — each link group separates revealing 3 polished 18k gold center links + 2 brushed Oystersteel outer links. Butterfly Oysterclasp unfolds showing Easylink 5mm extension mechanism in detail. Each bracelet link rotates 360° showing both polished gold and brushed steel surfaces.
+[0-4s] Five-link five-link bracelet links cascade apart sequentially from folding clasp clasp toward case — each link group separates revealing 3 polished 18k gold center links + 2 brushed steel outer links. Butterfly folding clasp unfolds showing comfort-extension 5mm extension mechanism in detail. Each bracelet link rotates 360° showing both polished gold and brushed steel surfaces.
 [4s transition] Smash cut to overhead 90° top view.
-[4-9s] ALL EXTERIOR COMPONENTS in perfect exploded formation from above: fluted bezel, sapphire crystal, champagne diamond dial (sunray lines visible from above), 3 gold hands, Oystersteel case body, gold crown, caseback, all 22 Jubilee bracelet link groups arranged in arc. Every component slowly rotating. Prismatic diamond light refractions visible. Camera orbits slowly 45° around the formation.
-[9-15s] Camera tilts to 3/4 view revealing inside of case — CALIBRE 3235 MOVEMENT exposed from below through open caseback. Tungsten perpetual rotor (semi-circular oscillating weight) sweeps slowly. Blue Parachrom hairspring (8 coils, oxidized niobium-zirconium) oscillates at 4Hz. Chronergy escape wheel (nickel-phosphorus) advances rhythmically. 31 ruby jewels glow in their gold settings. Perlage decoration on main plate visible. Côtes de Genève stripes on barrel bridge. EXTREME MACRO detail.`,
+[4-9s] ALL EXTERIOR COMPONENTS in perfect exploded formation from above: fluted bezel, sapphire crystal, champagne diamond dial (sunray lines visible from above), 3 gold hands, steel case body, gold crown, caseback, all 22 five-link bracelet link groups arranged in arc. Every component slowly rotating. Prismatic diamond light refractions visible. Camera orbits slowly 45° around the formation.
+[9-15s] Camera tilts to 3/4 view revealing inside of case — MANUFACTURE CALIBRE MOVEMENT exposed from below through open caseback. Tungsten perpetual rotor (semi-circular oscillating weight) sweeps slowly. Blue paramagnetic hairspring (8 coils, oxidized niobium-zirconium) oscillates at 4Hz. high-efficiency escape wheel (nickel-phosphorus) advances rhythmically. 31 ruby jewels glow in their gold settings. Perlage decoration on main plate visible. Côtes de Genève stripes on barrel bridge. EXTREME MACRO detail.`,
   },
   {
     id: "clip3",
@@ -1034,21 +1034,21 @@ const WATCH_EXPLODE_CLIPS: {
     chainMethod: "I2V (imagen → vídeo)",
     chainMethodNote: "Usa el ÚLTIMO FRAME del Clip 2 como imagen origen. Modo I2V. Runway Gen-4.5 (15s máx).",
     tip: "⏱ 15s · I2V desde último frame Clip 2 · 4K nativo · Audio nativo activado",
-    prompt: `Continuing from previous frame — Calibre 3235 movement fully exposed in exploded view.
-[0-5s] EXTREME MACRO orbit around floating Calibre 3235 components: GLUCYDUR beryllium-bronze balance wheel oscillating, blue Parachrom hairspring (8 spiral coils) flexing rhythmically, Chronergy escape wheel advancing tooth by tooth, pallet fork lever clicking with two ruby stones, mainspring barrel (open showing coiled NIVAFLEX spring), barrel bridge (Côtes de Genève stripes), main plate (perlage decoration), 31 ruby jewels highlighted in gold polished settings. All 201 components in technical floating formation. Slow camera dolly through the movement components.
-[5-8s] 18k gold Oyster crown with Rolex five-point crown logo engraving orbits into foreground extreme macro. Logo crisp and sharp. Then caseback with Oyster engraving rises into frame. SFX: single precise watch tick at 7s.
-[8-13s] REVERSE ASSEMBLY — magnetic attraction. All components begin converging inward simultaneously: caseback seals first (rising from below), movement drops into case, Jubilee bracelet links reconnect sequentially (cascade in reverse, link by link snapping together with satisfying click sounds), champagne dial descends onto case, hands return to 10:10:31 position, sapphire crystal seals, fluted 18k bezel locks onto case with audible snap. SLOW MOTION → REAL SPEED transition at 11s.
-[13-15s] Fully assembled Rolex Datejust 41 in hero 3/4 position, slow 30° rotation. Rolex crown logo at 12 o'clock razor sharp in foreground. Diamond indices catching light. FADE TO MATTE BLACK. Text on screen: elegant thin white serif — "DATEJUST 41 · CALIBRE 3235".`,
+    prompt: `Continuing from previous frame — automatic calibre movement fully exposed in exploded view.
+[0-5s] EXTREME MACRO orbit around floating automatic calibre components: beryllium-bronze beryllium-bronze balance wheel oscillating, blue paramagnetic hairspring (8 spiral coils) flexing rhythmically, high-efficiency escape wheel advancing tooth by tooth, pallet fork lever clicking with two ruby stones, mainspring barrel (open showing coiled NIVAFLEX spring), barrel bridge (Côtes de Genève stripes), main plate (perlage decoration), 31 ruby jewels highlighted in gold polished settings. All 201 components in technical floating formation. Slow camera dolly through the movement components.
+[5-8s] 18k gold screw-down crown with original brand monogram engraving orbits into foreground extreme macro. Logo crisp and sharp. Then caseback with engraved caseback rises into frame. SFX: single precise watch tick at 7s.
+[8-13s] REVERSE ASSEMBLY — magnetic attraction. All components begin converging inward simultaneously: caseback seals first (rising from below), movement drops into case, five-link bracelet links reconnect sequentially (cascade in reverse, link by link snapping together with satisfying click sounds), champagne dial descends onto case, hands return to 10:10:31 position, sapphire crystal seals, fluted 18k bezel locks onto case with audible snap. SLOW MOTION → REAL SPEED transition at 11s.
+[13-15s] Fully assembled luxury 41mm automatic watch in hero 3/4 position, slow 30° rotation. original brand monogram at 12 o'clock razor sharp in foreground. Diamond indices catching light. FADE TO MATTE BLACK. Text on screen: elegant thin white serif — "AUTOMATIC 41 · MANUFACTURE CALIBRE".`,
   },
 ];
 
 // ─── Generic Explode View Sequence Generator (SSE, 35 s, Grok Aurora) ────────
 function ExplodeViewSequenceGenerator({ projectId }: { projectId: number }) {
   const [open, setOpen] = React.useState(false);
-  const [objectName, setObjectName] = React.useState("Rolex Datejust 41");
-  const [objectDescription, setObjectDescription] = React.useState("Swiss luxury automatic watch. Oystersteel 904L case 41mm, sapphire crystal, Calibre 3235 movement with 201 parts and 31 jewels, 70h power reserve, 18k gold fluted bezel with 72 grooves, Jubilee bracelet Ref 62613.");
-  const [materials, setMaterials] = React.useState("Oystersteel 904L, 18k yellow gold, sapphire crystal, rhodium-plated gold");
-  const [components, setComponents] = React.useState("Oystersteel case, sapphire crystal, dial with date window, Calibre 3235 movement, rotor, mainspring, 31 jewels, 18k fluted bezel, Jubilee bracelet, Oysterlock clasp");
+  const [objectName, setObjectName] = React.useState("luxury 41mm automatic watch");
+  const [objectDescription, setObjectDescription] = React.useState("Swiss luxury automatic watch. steel 904L case 41mm, sapphire crystal, automatic calibre movement with 201 parts and 31 jewels, 70h power reserve, 18k gold fluted bezel with 72 grooves, five-link bracelet.");
+  const [materials, setMaterials] = React.useState("steel 904L, 18k yellow gold, sapphire crystal, rhodium-plated gold");
+  const [components, setComponents] = React.useState("steel case, sapphire crystal, dial with date window, automatic calibre movement, rotor, mainspring, 31 jewels, 18k fluted bezel, five-link bracelet, safety-lock clasp clasp");
   const [style, setStyle] = React.useState("ultra-luxury cinematic, black studio background, dramatic volumetric lighting, macro lens, 4K");
   const [aspect, setAspect] = React.useState("9:16");
   const [running, setRunning] = React.useState(false);
@@ -1158,7 +1158,7 @@ function ExplodeViewSequenceGenerator({ projectId }: { projectId: number }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div>
               <label style={labelStyle}>Nombre del objeto *</label>
-              <input value={objectName} onChange={e => setObjectName(e.target.value)} placeholder="Rolex Datejust 41" style={inputStyle2} disabled={running} />
+              <input value={objectName} onChange={e => setObjectName(e.target.value)} placeholder="luxury 41mm automatic watch" style={inputStyle2} disabled={running} />
             </div>
             <div>
               <label style={labelStyle}>Estilo visual</label>
@@ -1187,7 +1187,7 @@ function ExplodeViewSequenceGenerator({ projectId }: { projectId: number }) {
 
           <div>
             <label style={labelStyle}>Materiales (separados por coma)</label>
-            <input value={materials} onChange={e => setMaterials(e.target.value)} placeholder="Oystersteel 904L, 18k yellow gold, sapphire crystal" style={inputStyle2} disabled={running} />
+            <input value={materials} onChange={e => setMaterials(e.target.value)} placeholder="steel 904L, 18k yellow gold, sapphire crystal" style={inputStyle2} disabled={running} />
           </div>
 
           <div>
@@ -1321,7 +1321,7 @@ function WatchExplodeSequenceBuilder({ setPrompt, setMode }: { setPrompt: (p: st
       <button
         onClick={() => setOpen(v => !v)}
         style={{ width: "100%", background: "linear-gradient(135deg, rgba(180,140,60,0.15), rgba(251,191,36,0.08))", border: "1px solid rgba(251,191,36,0.35)", borderRadius: 8, padding: "10px 14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", color: "var(--gold)" }}>
-        <span style={{ fontSize: 11, fontWeight: 700 }}>⌚ Rolex Explode View — Secuencia 3 Clips (40s total)</span>
+        <span style={{ fontSize: 11, fontWeight: 700 }}>⌚ Watch Explode View — Secuencia 3 Clips (40s total)</span>
         <span style={{ fontSize: 10 }}>{open ? "▲ Cerrar" : "▼ Ver secuencia"}</span>
       </button>
       {open && (
@@ -5394,7 +5394,7 @@ function CinematicTemplatesTab({ projectId, onSuccess, onInfo, onError, onCredit
                 <div>
                   <label style={{ fontSize: 11, color: "var(--t3)", display: "block", marginBottom: 4 }}>Marca *</label>
                   <input type="text" value={brand} onChange={e => setBrand(e.target.value)}
-                    placeholder={requiresPhysicalProduct ? "Ej. Rolex" : "Ej. Tu nombre o marca personal"}
+                    placeholder={requiresPhysicalProduct ? "Ej. Tu marca de relojes" : "Ej. Tu nombre o marca personal"}
                     style={inputStyle} />
                 </div>
                 {wants("PRODUCT_MATERIALS") && (

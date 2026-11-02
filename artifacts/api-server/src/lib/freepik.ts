@@ -15,6 +15,8 @@
  * vía getFreepikEngines() y actualiza el catálogo dinámicamente.
  */
 
+import { meterRequest } from "./provider-meter.js";
+
 const BASE = "https://api.freepik.com/v1";
 
 function getKey(): string {
@@ -96,7 +98,7 @@ function resolveSize(opts: Pick<FreepikImageOptions, "width" | "height" | "aspec
 
 // ─── GENERACIÓN DE IMAGEN T2I ────────────────────────────────────────────────
 
-export async function generateFreepikImage(opts: FreepikImageOptions): Promise<FreepikImageResult[]> {
+async function generateFreepikImageRaw(opts: FreepikImageOptions): Promise<FreepikImageResult[]> {
   const key = getKey();
   const { width, height } = resolveSize(opts);
 
@@ -145,7 +147,7 @@ export async function generateFreepikImage(opts: FreepikImageOptions): Promise<F
 
 // ─── IMAGEN A IMAGEN ──────────────────────────────────────────────────────────
 
-export async function freepikImageToImage(opts: FreepikImageOptions & { imageBase64: string }): Promise<FreepikImageResult[]> {
+async function freepikImageToImageRaw(opts: FreepikImageOptions & { imageBase64: string }): Promise<FreepikImageResult[]> {
   const key = getKey();
   const { width, height } = resolveSize(opts);
 
@@ -171,7 +173,7 @@ export async function freepikImageToImage(opts: FreepikImageOptions & { imageBas
 
 // ─── UPSCALER 4× ─────────────────────────────────────────────────────────────
 
-export async function upscaleFreepikImage(imageBase64: string, mimeType = "image/jpeg"): Promise<string> {
+async function upscaleFreepikImageRaw(imageBase64: string, mimeType = "image/jpeg"): Promise<string> {
   const key = getKey();
   const ext = mimeType.split("/")[1] ?? "jpg";
   const binary = Buffer.from(imageBase64, "base64");
@@ -192,7 +194,7 @@ export async function upscaleFreepikImage(imageBase64: string, mimeType = "image
 
 // ─── RECOLOR ──────────────────────────────────────────────────────────────────
 
-export async function recolorFreepikImage(imageBase64: string, prompt: string): Promise<FreepikImageResult[]> {
+async function recolorFreepikImageRaw(imageBase64: string, prompt: string): Promise<FreepikImageResult[]> {
   const key = getKey();
   const body = { prompt, image: { base64: imageBase64 } };
 
@@ -209,7 +211,7 @@ export async function recolorFreepikImage(imageBase64: string, prompt: string): 
 
 // ─── ELIMINAR FONDO ───────────────────────────────────────────────────────────
 
-export async function removeFreepikBackground(imageBase64: string, mimeType = "image/jpeg"): Promise<string> {
+async function removeFreepikBackgroundRaw(imageBase64: string, mimeType = "image/jpeg"): Promise<string> {
   const key = getKey();
   const ext = mimeType.split("/")[1] ?? "jpg";
   const binary = Buffer.from(imageBase64, "base64");
@@ -230,7 +232,7 @@ export async function removeFreepikBackground(imageBase64: string, mimeType = "i
 
 // ─── EXPAND / OUTPAINTING ─────────────────────────────────────────────────────
 
-export async function expandFreepikImage(opts: {
+async function expandFreepikImageRaw(opts: {
   imageBase64: string;
   prompt?: string;
   width: number;
@@ -264,7 +266,7 @@ export async function expandFreepikImage(opts: {
 
 // ─── MODELO VIRTUAL (fashion / avatar) ───────────────────────────────────────
 
-export async function freepikVirtualModel(opts: {
+async function freepikVirtualModelRaw(opts: {
   faceImageBase64: string;
   garmentImageBase64?: string;
   prompt: string;
@@ -309,7 +311,7 @@ const FREEPIK_ENGINE_ENDPOINT: Record<string, string> = {
 // Track taskId → endpoint path for correct polling (model-specific poll URL)
 const _freepikTaskPollPath = new Map<string, string>();
 
-export async function generateFreepikVideoTask(opts: FreepikVideoOptions): Promise<string> {
+async function generateFreepikVideoTaskRaw(opts: FreepikVideoOptions): Promise<string> {
   const key = getKey();
 
   const specificPath = opts.engine ? FREEPIK_ENGINE_ENDPOINT[opts.engine] : undefined;
@@ -452,3 +454,23 @@ export async function getFreepikEngines(): Promise<FreepikEngine[]> {
 export function isFreepikAvailable(): boolean {
   return !!process.env.FREEPIK_API_KEY;
 }
+
+// ── Registro de coste (api_usage_log) y tope de IA del proyecto ───────────────
+// Cada llamada facturable pasa por meterRequest. Precio por petición configurable con
+// PROVIDER_EUR_PER_REQUEST_FREEPIK[_<OPERACION>] (Freepik cobra en créditos según motor).
+export const generateFreepikImage = (...args: Parameters<typeof generateFreepikImageRaw>) =>
+  meterRequest({ provider: "freepik", operation: "text-to-image", run: () => generateFreepikImageRaw(...args) });
+export const freepikImageToImage = (...args: Parameters<typeof freepikImageToImageRaw>) =>
+  meterRequest({ provider: "freepik", operation: "image-to-image", run: () => freepikImageToImageRaw(...args) });
+export const upscaleFreepikImage = (...args: Parameters<typeof upscaleFreepikImageRaw>) =>
+  meterRequest({ provider: "freepik", operation: "upscale", run: () => upscaleFreepikImageRaw(...args) });
+export const recolorFreepikImage = (...args: Parameters<typeof recolorFreepikImageRaw>) =>
+  meterRequest({ provider: "freepik", operation: "recolor", run: () => recolorFreepikImageRaw(...args) });
+export const removeFreepikBackground = (...args: Parameters<typeof removeFreepikBackgroundRaw>) =>
+  meterRequest({ provider: "freepik", operation: "remove-background", run: () => removeFreepikBackgroundRaw(...args) });
+export const expandFreepikImage = (...args: Parameters<typeof expandFreepikImageRaw>) =>
+  meterRequest({ provider: "freepik", operation: "expand", run: () => expandFreepikImageRaw(...args) });
+export const freepikVirtualModel = (...args: Parameters<typeof freepikVirtualModelRaw>) =>
+  meterRequest({ provider: "freepik", operation: "virtual-model", run: () => freepikVirtualModelRaw(...args) });
+export const generateFreepikVideoTask = (...args: Parameters<typeof generateFreepikVideoTaskRaw>) =>
+  meterRequest({ provider: "freepik", operation: "video", run: () => generateFreepikVideoTaskRaw(...args) });

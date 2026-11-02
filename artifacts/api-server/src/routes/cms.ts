@@ -20,8 +20,8 @@ import { buildSiteThemeCss, extractSiteTheme } from "../lib/site-theme.js";
 
 const router = Router();
 
+// Carpeta antigua de medios (solo para borrar archivos subidos antes de guardarlos en BD).
 const MEDIA_DIR = path.join(process.cwd(), "../../artifacts/shopify-optimizer/public/media");
-if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
@@ -422,6 +422,8 @@ router.post("/versions/:id/restore", async (req: Request, res: Response) => {
     await db.update(cmsContent).set({ content: ver.content as Record<string, unknown>, version: row.version + 1, updatedAt: new Date() }).where(eq(cmsContent.id, row.id));
     invalidateCache("cms-");
     broadcast("version_restored", { id, version: ver.version });
+    broadcast("content_updated", { restored: id, version: row.version + 1 });
+    broadcast("theme_updated", { version: row.version + 1 });
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "Restore failed" });

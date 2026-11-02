@@ -32,6 +32,7 @@ export async function makeTmpDir(prefix = "fs-pro"): Promise<string> {
 }
 
 import { validateImageUrlAsync, generateVideoFromImage as runwayGenerateVideo } from "./runway.js";
+import { meteredFetch } from "./provider-meter.js";
 
 export async function fetchToBuffer(url: string, timeoutMs = 180_000): Promise<Buffer> {
   // SECURITY (HIGH): SSRF guard with DNS resolution — rejects URLs pointing to
@@ -780,7 +781,7 @@ export interface TTSOptions {
 
 export async function generateTTS(text: string, opts: TTSOptions): Promise<Buffer> {
   const apiKey = getElevenKey();
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${opts.voiceId}`, {
+  const res = await meteredFetch(`https://api.elevenlabs.io/v1/text-to-speech/${opts.voiceId}`, {
     method: "POST",
     headers: { "xi-api-key": apiKey, "Content-Type": "application/json", "Accept": "audio/mpeg" },
     body: JSON.stringify({
@@ -810,7 +811,7 @@ export async function generateSFX(
   prompt: string, durationSec = 5, promptInfluence = 0.5,
 ): Promise<Buffer> {
   const apiKey = getElevenKey();
-  const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
+  const res = await meteredFetch("https://api.elevenlabs.io/v1/sound-generation", {
     method: "POST",
     headers: { "xi-api-key": apiKey, "Content-Type": "application/json", "Accept": "audio/mpeg" },
     body: JSON.stringify({

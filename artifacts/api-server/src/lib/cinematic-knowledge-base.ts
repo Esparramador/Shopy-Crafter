@@ -844,7 +844,7 @@ export function getFullKnowledgeBase() {
  * anywhere (templates, ad-hoc compositions, REST endpoint).
  *
  * The returned fragment is meant to be CONCATENATED to a base subject prompt
- * (e.g. "Rolex Datejust 41mm in champagne with diamond hour markers") — it
+ * (e.g. "41mm automatic watch in champagne with diamond hour markers") — it
  * provides only the cinematic layer (lens, lighting, grade, motion).
  */
 export function composeProfessionalPromptFragment(opts: {

@@ -101,6 +101,7 @@ export default function ClientDashboard() {
   const [data, setData] = useState<DashData | null>(null);
   const [vault, setVault] = useState<VaultFile[]>([]);
   const [brandDna, setBrandDna] = useState<BrandDnaData | null | undefined>(undefined);
+  const [packUsage, setPackUsage] = useState<Array<{ metric: string; label: string; used: number; limit: number | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"activity" | "engines" | "reports">("activity");
   const [greeting, setGreeting] = useState("Hola");
@@ -116,7 +117,9 @@ export default function ClientDashboard() {
       fetch(apid(`${API}/client/dashboard`), { credentials: "include" }).then(r => r.json()),
       fetch(apid(`${API}/client/vault-files`), { credentials: "include" }).then(r => r.json()).catch(() => []),
       fetch(apid(`${API}/client/brand-dna`), { credentials: "include" }).then(r => r.json()).catch(() => ({ ok: false })),
-    ]).then(([d, v, bdna]) => {
+      fetch(apid(`${API}/client/pack-usage`), { credentials: "include" }).then(r => r.ok ? r.json() : { usage: [] }).catch(() => ({ usage: [] })),
+    ]).then(([d, v, bdna, pu]) => {
+      setPackUsage(Array.isArray(pu?.usage) ? pu.usage : []);
       setData(d?.totalProducts !== undefined ? d : null);
       setVault(Array.isArray(v) ? v : []);
       setBrandDna(bdna?.ok && bdna.brandDna ? bdna.brandDna : null);
@@ -272,6 +275,35 @@ export default function ClientDashboard() {
             </div>
           ))}
         </div>
+
+        {/* ═══ USO DEL PLAN ESTE MES ═══ */}
+        {packUsage.length > 0 && (
+          <div style={{ background: "var(--srf)", borderRadius: 16, padding: "16px 18px", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--t)" }}>📦 Tu plan este mes</span>
+              <span style={{ fontSize: 10.5, color: "var(--t3)" }}>Se renueva el día 1</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 12 }}>
+              {packUsage.map(u => {
+                const pct = u.limit ? Math.min(100, Math.round((u.used / u.limit) * 100)) : 0;
+                const color = pct >= 100 ? "var(--crim)" : pct >= 80 ? "#f59e0b" : "var(--jade)";
+                return (
+                  <div key={u.metric}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 5, gap: 6 }}>
+                      <span style={{ color: "var(--t2)" }}>{u.label}</span>
+                      <span style={{ color: "var(--t)", fontWeight: 600, whiteSpace: "nowrap" }}>{u.used}{u.limit === null ? " · ilimitado" : ` / ${u.limit}`}</span>
+                    </div>
+                    {u.limit !== null && (
+                      <div style={{ height: 5, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width .4s" }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ═══ BRAND DNA CARD ═══ */}
         {!loading && brandDna && (

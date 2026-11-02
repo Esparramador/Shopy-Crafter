@@ -44,6 +44,7 @@ import { logger } from "../lib/logger.js";
 import { recommendVoiceForProduct, type VoiceGenderPref, type VoiceLanguage } from "../lib/voice-recommender.js";
 import { requireAdmin } from "../lib/auth.js";
 import { uploadRejected } from "../lib/upload-errors.js";
+import { recordGeminiResponseUsage } from "../lib/api-usage.js";
 
 const router = Router();
 
@@ -1248,6 +1249,7 @@ router.post("/voice/gemini-tts", async (req, res): Promise<void> => {
       },
     });
 
+    recordGeminiResponseUsage("voice-gemini-tts", "gemini-2.5-flash-preview-tts", response?.usageMetadata);
     const part = response?.candidates?.[0]?.content?.parts?.[0];
     if (!part?.inlineData?.data) {
       res.status(502).json({ error: "Gemini TTS no devolvió audio" }); return;

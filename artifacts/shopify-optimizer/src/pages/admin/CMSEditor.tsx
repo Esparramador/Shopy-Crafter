@@ -2,14 +2,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   Monitor, Tablet, Smartphone, Save, Loader2,
-  ArrowLeft, RefreshCw, RotateCcw, ExternalLink,
+  ArrowLeft, RefreshCw, RotateCcw, ExternalLink, History,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type DeviceMode = "desktop" | "tablet" | "mobile";
-type ActiveTab = "Fondos" | "Gold" | "Jade" | "Estados" | "Texto" | "CSS Libre";
+type ActiveTab = "Fondos" | "Gold" | "Jade" | "Estados" | "Texto" | "CSS Libre" | "Historial";
+interface CmsVersion { id: number; version: number; savedAt: string; savedBy: string | null; label: string | null }
 
 const CSS_VAR_DEFS: { group: ActiveTab; vars: { name: string; label: string; hint: string }[] }[] = [
   {
@@ -59,43 +60,20 @@ const CSS_VAR_DEFS: { group: ActiveTab; vars: { name: string; label: string; hin
   },
 ];
 
-const ALL_TABS: ActiveTab[] = ["Fondos", "Gold", "Jade", "Estados", "Texto", "CSS Libre"];
+const ALL_TABS: ActiveTab[] = ["Fondos", "Gold", "Jade", "Estados", "Texto", "CSS Libre", "Historial"];
+const ALL_VAR_NAMES = CSS_VAR_DEFS.flatMap(g => g.vars.map(v => v.name));
 
-function parseCssVarsFromRoot(css: string): Record<string, string> {
-  const vars: Record<string, string> = {};
-  const rootMatch = css.match(/:root\s*\{([^}]*)\}/);
-  if (!rootMatch) return vars;
-  const matches = [...rootMatch[1].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)];
-  for (const [, name, value] of matches) {
-    vars[name.trim()] = value.trim();
-  }
-  return vars;
-}
-
-function parseCustomCss(css: string): string {
-  const marker = "/* ── CMS CUSTOM CSS ── */";
-  const idx = css.indexOf(marker);
-  if (idx === -1) return "";
-  return css.slice(idx + marker.length).trim();
-}
-
-function rebuildCss(original: string, cssVars: Record<string, string>, customCss: string): string {
-  const rootBlock = `:root {\n${Object.entries(cssVars).map(([k, v]) => `  ${k}: ${v};`).join("\n")}\n}`;
-  let updated = original.replace(/:root\s*\{[^}]*\}/, rootBlock);
-  const marker = "/* ── CMS CUSTOM CSS ── */";
-  updated = updated.replace(new RegExp(`\\/\\* ── CMS CUSTOM CSS ── \\*\\/[\\s\\S]*$`), "").trimEnd();
-  if (customCss.trim()) {
-    updated += `\n\n${marker}\n${customCss}`;
-  }
-  return updated;
-}
-
+// El tema se guarda en el CMS (BD): site.cssVars y customCss. Antes se escribía
+// design-system.css en el disco del servidor: en producción la web es el build
+// compilado, así que el cambio no llegaba nunca. CmsContext aplica ambos campos
+// en todas las páginas y se actualiza al momento por SSE.
 export default function CMSEditor() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const [originalCss, setOriginalCss] = useState<string | null>(null);
+  const [savedVars, setSavedVars] = useState<Record<string, string>>({});
+  const [savedCustomCss, setSavedCustomCss] = useState("");
   const [cssVars, setCssVars] = useState<Record<string, string>>({});
   const [customCss, setCustomCss] = useState("");
   const [device, setDevice] = useState<DeviceMode>("desktop");
@@ -104,26 +82,60 @@ export default function CMSEditor() {
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
+  const [versions, setVersions] = useState<CmsVersion[] | null>(null);
+  const [restoring, setRestoring] = useState<number | null>(null);
 
   const loadCss = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/studio/file?path=design-system.css`, {
-        credentials: "include",
-      });
+      const res = await fetch(`${BASE_URL}/api/cms/content`, { credentials: "include" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { content: string };
-      setOriginalCss(data.content);
-      setCssVars(parseCssVarsFromRoot(data.content));
-      setCustomCss(parseCustomCss(data.content));
+      const content = await res.json() as { site?: { cssVars?: Record<string, string> }; customCss?: string };
+      const overrides = content.site?.cssVars ?? {};
+      setSavedVars(overrides);
+      setCssVars(overrides);
+      setSavedCustomCss(content.customCss ?? "");
+      setCustomCss(content.customCss ?? "");
+      setDirty(false);
     } catch (e: any) {
-      toast({ title: "Error cargando design-system.css", description: e.message, variant: "destructive" });
+      toast({ title: "Error cargando el tema", description: e.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
   useEffect(() => { loadCss(); }, [loadCss]);
+
+  const loadVersions = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/cms/versions`, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setVersions(await res.json() as CmsVersion[]);
+    } catch (e: any) {
+      setVersions([]);
+      toast({ title: "Error cargando el historial", description: e.message, variant: "destructive" });
+    }
+  }, [toast]);
+
+  useEffect(() => { if (activeTab === "Historial" && versions === null) loadVersions(); }, [activeTab, versions, loadVersions]);
+
+  async function restoreVersion(v: CmsVersion) {
+    if (!confirm(`¿Restaurar la versión ${v.label ?? v.version}? Se guarda antes una copia del estado actual.`)) return;
+    setRestoring(v.id);
+    try {
+      const res = await fetch(`${BASE_URL}/api/cms/versions/${v.id}/restore`, { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      for (const n of ALL_VAR_NAMES) document.documentElement.style.removeProperty(n);
+      await loadCss();
+      await loadVersions();
+      setIframeKey(k => k + 1);
+      toast({ title: "Versión restaurada" });
+    } catch (e: any) {
+      toast({ title: "No se pudo restaurar", description: e.message, variant: "destructive" });
+    } finally {
+      setRestoring(null);
+    }
+  }
 
   function applyVarChange(varName: string, value: string) {
     setCssVars(prev => ({ ...prev, [varName]: value }));
@@ -132,21 +144,25 @@ export default function CMSEditor() {
   }
 
   async function save() {
-    if (!dirty || originalCss === null) return;
+    if (!dirty) return;
     setSaving(true);
     try {
-      const updated = rebuildCss(originalCss, cssVars, customCss);
-      const res = await fetch(`${BASE_URL}/api/studio/file`, {
+      const res = await fetch(`${BASE_URL}/api/cms/content/batch`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: "design-system.css", content: updated }),
+        body: JSON.stringify({ changes: [
+          { path: "site.cssVars", value: cssVars },
+          { path: "customCss", value: customCss },
+        ] }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setOriginalCss(updated);
+      setSavedVars(cssVars);
+      setSavedCustomCss(customCss);
       setDirty(false);
+      setVersions(null);
       setIframeKey(k => k + 1);
-      toast({ title: "✅ design-system.css guardado", description: "Vite recargará la preview automáticamente." });
+      toast({ title: "✅ Tema guardado", description: "Se aplica al momento en toda la web." });
     } catch (e: any) {
       toast({ title: "Error al guardar", description: e.message, variant: "destructive" });
     } finally {
@@ -154,18 +170,23 @@ export default function CMSEditor() {
     }
   }
 
-  async function resetToOriginal() {
-    if (!confirm("¿Restaurar design-system.css al estado cargado? Perderás los cambios sin guardar.")) return;
-    const reloaded = originalCss;
-    if (!reloaded) return;
-    setCssVars(parseCssVarsFromRoot(reloaded));
-    setCustomCss(parseCustomCss(reloaded));
-    const parsed = parseCssVarsFromRoot(reloaded);
-    for (const [k, v] of Object.entries(parsed)) {
-      document.documentElement.style.removeProperty(k);
+  function resetToOriginal() {
+    if (!confirm("¿Descartar los cambios sin guardar?")) return;
+    for (const n of ALL_VAR_NAMES) {
+      if (savedVars[n]) document.documentElement.style.setProperty(n, savedVars[n]);
+      else document.documentElement.style.removeProperty(n);
     }
+    setCssVars(savedVars);
+    setCustomCss(savedCustomCss);
     setDirty(false);
     toast({ title: "Cambios descartados" });
+  }
+
+  async function clearOverride(name: string) {
+    const next = { ...cssVars }; delete next[name];
+    setCssVars(next);
+    document.documentElement.style.removeProperty(name);
+    setDirty(true);
   }
 
   function varValue(name: string): string {
@@ -181,7 +202,7 @@ export default function CMSEditor() {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", flexDirection: "column", gap: 12, background: "var(--ink)" }}>
         <Loader2 size={28} className="animate-spin" style={{ color: "var(--gold)" }} />
-        <p style={{ fontSize: 13, color: "var(--t3)" }}>Cargando design-system.css…</p>
+        <p style={{ fontSize: 13, color: "var(--t3)" }}>Cargando tema…</p>
       </div>
     );
   }
@@ -206,7 +227,6 @@ export default function CMSEditor() {
 
           <div style={{ width: 32, height: 32, borderRadius: 10, background: "linear-gradient(135deg,var(--gold),#e6c668)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🎨</div>
           <span style={{ fontWeight: 700, fontSize: 15, color: "var(--t)", whiteSpace: "nowrap" }}>CMS — Design System</span>
-          <span style={{ fontSize: 10, color: "var(--t4)", fontFamily: "monospace", whiteSpace: "nowrap", display: "none" }}>design-system.css</span>
 
           {dirty && (
             <span style={{ fontSize: 11, background: "rgba(200,168,75,.12)", color: "var(--gold)", padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(200,168,75,.25)", whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -253,7 +273,7 @@ export default function CMSEditor() {
               display: "flex", alignItems: "center", gap: 6, transition: "all .2s",
             }}>
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-            {saving ? "Guardando…" : "Guardar al disco"}
+            {saving ? "Guardando…" : "Guardar"}
           </button>
         </div>
       </div>
@@ -279,10 +299,33 @@ export default function CMSEditor() {
           {/* Content area */}
           <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
 
-            {activeTab === "CSS Libre" ? (
+            {activeTab === "Historial" ? (
               <div>
                 <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 10, lineHeight: 1.6 }}>
-                  CSS adicional inyectado al final de <code style={{ color: "var(--gold)", fontSize: 10 }}>design-system.css</code>. Máxima prioridad — puede sobreescribir cualquier regla.
+                  Últimas 30 versiones del contenido del CMS (textos y tema). Restaurar guarda antes una copia del estado actual.
+                </p>
+                {versions === null ? (
+                  <Loader2 size={16} className="animate-spin" style={{ color: "var(--gold)" }} />
+                ) : versions.length === 0 ? (
+                  <p style={{ fontSize: 11, color: "var(--t4)" }}>Sin versiones guardadas todavía.</p>
+                ) : versions.map(v => (
+                  <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ink2)", border: "1px solid var(--bdr)", borderRadius: 10, padding: "8px 10px", marginBottom: 6 }}>
+                    <History size={13} style={{ color: "var(--t3)", flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--t)" }}>{v.label ?? `v${v.version}`}</div>
+                      <div style={{ fontSize: 10, color: "var(--t4)" }}>{new Date(v.savedAt).toLocaleString("es-ES")}</div>
+                    </div>
+                    <button onClick={() => restoreVersion(v)} disabled={restoring !== null}
+                      style={{ padding: "4px 9px", fontSize: 11, background: "var(--ink3)", border: "1px solid var(--bdr2)", borderRadius: 8, color: "var(--gold)", cursor: restoring !== null ? "default" : "pointer" }}>
+                      {restoring === v.id ? "…" : "Restaurar"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : activeTab === "CSS Libre" ? (
+              <div>
+                <p style={{ fontSize: 11, color: "var(--t3)", marginBottom: 10, lineHeight: 1.6 }}>
+                  CSS adicional que se carga después de todos los estilos de la web. Máxima prioridad: puede sobreescribir cualquier regla.
                 </p>
                 <textarea
                   value={customCss}
@@ -301,7 +344,7 @@ export default function CMSEditor() {
                   onBlur={e => (e.currentTarget.style.borderColor = "var(--bdr2)")}
                 />
                 <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 8 }}>
-                  Los cambios se guardan en disco al pulsar <strong style={{ color: "var(--gold)" }}>Guardar al disco</strong>.
+                  Se aplica a toda la web al pulsar <strong style={{ color: "var(--gold)" }}>Guardar</strong>.
                 </p>
               </div>
             ) : (
@@ -329,6 +372,12 @@ export default function CMSEditor() {
                             <div style={{ fontSize: 10, color: "var(--t4)", fontFamily: "monospace", marginTop: 2 }}>{v.name}</div>
                             <div style={{ fontSize: 10, color: "var(--t3)", marginTop: 1 }}>{isHex ? current.trim() : v.hint}</div>
                           </div>
+                          {cssVars[v.name] && (
+                            <button type="button" title="Volver al valor por defecto" onClick={e => { e.preventDefault(); clearOverride(v.name); }}
+                              style={{ background: "none", border: "none", color: "var(--t3)", cursor: "pointer", padding: 2, flexShrink: 0 }}>
+                              <RotateCcw size={12} />
+                            </button>
+                          )}
                           {/* Live preview swatch */}
                           <div style={{ width: 14, height: 14, borderRadius: 4, background: isHex ? current.trim() : v.hint, flexShrink: 0, border: "1px solid rgba(255,255,255,0.08)" }} />
                         </label>
@@ -337,7 +386,7 @@ export default function CMSEditor() {
                   </div>
                 ))}
                 <p style={{ fontSize: 10, color: "var(--t4)", marginTop: 8, lineHeight: 1.6 }}>
-                  Los colores se aplican al DOM <strong style={{ color: "var(--jade)" }}>en tiempo real</strong>. Pulsa <strong style={{ color: "var(--gold)" }}>Guardar al disco</strong> para persistirlos en <code style={{ fontSize: 9 }}>design-system.css</code>.
+                  Los colores se ven <strong style={{ color: "var(--jade)" }}>en tiempo real</strong>. Pulsa <strong style={{ color: "var(--gold)" }}>Guardar</strong> para aplicarlos a toda la web.
                 </p>
               </>
             )}

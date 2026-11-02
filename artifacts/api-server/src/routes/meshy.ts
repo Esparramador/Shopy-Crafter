@@ -5,6 +5,7 @@ import { getFile, listFiles, putFile, isValidStoreKey } from "../lib/file-store.
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
 import { uploadRejected } from "../lib/upload-errors.js";
+import { meterCredits } from "../lib/provider-meter.js";
 
 const router = Router();
 
@@ -233,6 +234,19 @@ function getMeshyKey(): string {
 }
 
 async function meshyFetch(path: string, options: RequestInit = {}, base = MESHY_BASE_V1): Promise<any> {
+  // Toda llamada POST a Meshy crea una tarea que gasta créditos: se mide y se registra.
+  if ((options.method ?? "GET").toUpperCase() === "POST") {
+    const operation = path.replace(/^\//, "").split(/[/?]/)[0] || "task";
+    return meterCredits({
+      provider: "meshy", operation,
+      readBalance: async () => { const b = await meshyRequest("/balance"); return Number(b?.balance); },
+      run: () => meshyRequest(path, options, base),
+    });
+  }
+  return meshyRequest(path, options, base);
+}
+
+async function meshyRequest(path: string, options: RequestInit = {}, base = MESHY_BASE_V1): Promise<any> {
   const key = getMeshyKey();
   const res = await fetch(`${base}${path}`, {
     ...options,
@@ -360,7 +374,7 @@ router.get("/meshy/models-config", async (_req, res) => {
 
 router.get("/meshy/balance", async (_req, res) => {
   try {
-    const data = await meshyFetch("/credits");
+    const data = await meshyFetch("/balance");
     res.json(data);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });

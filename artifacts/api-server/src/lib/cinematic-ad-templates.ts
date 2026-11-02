@@ -135,7 +135,7 @@ const TPL_ANATOMY: CinematicAdTemplate = {
   longDescription: "Guion técnico de nivel masterpiece. El producto se desintegra elegantemente, revela su mecanismo interno, se vuelve a ensamblar con destellos y termina con el producto en uso por una persona real. Diseñado para concatenarse perfectamente sin saltos visuales. Inspirado en comerciales de Rolex, Patek Philippe y Apple.",
   conceptName: "La Anatomía del {{PRODUCT_NAME}}",
   totalDurationSec: 20,
-  inspirationReference: "Rolex Datejust 41mm (champagne diamond + Rolesor)",
+  inspirationReference: "Reloj automático de lujo 41mm (esfera champagne + bicolor)",
   estimatedCreditsHint: 14,
   segments: [
     {
@@ -496,10 +496,10 @@ const TPL_PRESENTER_HYBRID: CinematicAdTemplate = {
   category: "presenter_hybrid",
   name: "🎙️ Presentador Híbrido — Luxury Watch (22s)",
   shortDescription: "5 segmentos: presentador medio → B-roll deconstrucción → B-roll construcción → presentador detalle/try-on → primer plano CTA. Inspirado en Omneky / Apple keynote / Rolex.",
-  longDescription: "Formato Tier-1 para anuncios de relojería de lujo. Combina la autoridad de un presentador (host avatar) hablando a cámara con B-roll técnico cinematográfico del producto. Cada segmento tiene su voiceoverLine sincronizado con el motor TTS de ElevenLabs. El character lock se aplica SOLO a las escenas de presentador (idx 1, 4, 5); las B-roll (idx 2, 3) son producto puro sin la cara del host. Diseñado para Rolex Datejust 41mm pero parametrizado por variables Shopify.",
+  longDescription: "Formato Tier-1 para anuncios de relojería de lujo. Combina la autoridad de un presentador (host avatar) hablando a cámara con B-roll técnico cinematográfico del producto. Cada segmento tiene su voiceoverLine sincronizado con el motor TTS de ElevenLabs. El character lock se aplica SOLO a las escenas de presentador (idx 1, 4, 5); las B-roll (idx 2, 3) son producto puro sin la cara del host. Diseñado para luxury 41mm automatic watchmm pero parametrizado por variables Shopify.",
   conceptName: "{{PRODUCT_NAME}} — Presentado por {{BRAND}}",
   totalDurationSec: 22,
-  inspirationReference: "Rolex Datejust 41mm Presenter Hybrid (Omneky/Apple keynote style)",
+  inspirationReference: "Luxury 41mm watch Presenter Hybrid (Omneky/Apple keynote style)",
   estimatedCreditsHint: 17,
   segments: [
     {

@@ -1,4 +1,5 @@
 import { logger } from "./logger.js";
+import { meteredFetch } from "./provider-meter.js";
 
 export interface ProcessedFile {
   type: string;
@@ -111,7 +112,7 @@ async function transcribeAudio(buffer: Buffer, filename: string, mimeType: strin
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
   try {
-    const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+    const res = await meteredFetch("https://api.elevenlabs.io/v1/speech-to-text", {
       method: "POST",
       headers: { "xi-api-key": apiKey },
       body: form,

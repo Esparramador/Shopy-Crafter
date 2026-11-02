@@ -28,7 +28,6 @@ const HelpConnections = lazy(() => import("@/pages/HelpConnections"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const AdminClients = lazy(() => import("@/pages/AdminClients"));
 
-const RolexAd = lazy(() => import("@/pages/admin/RolexStorySheet"));
 
 const CMSEditor = lazy(() => import("@/pages/admin/CMSEditor"));
 const Intelligence = lazy(() => import("@/pages/admin/Intelligence"));
@@ -358,7 +357,6 @@ function Router() {
         {/* Landing */}
         <Route path="/landing">{() => <S><Landing /></S>}</Route>
 
-        <Route path="/admin/rolex-ad">{() => <S><RolexAd /></S>}</Route>
 
         {/* Public pages */}
         <Route path="/sobre-nosotros">{() => <S><SobreNosotros /></S>}</Route>

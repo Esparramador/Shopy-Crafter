@@ -23,6 +23,7 @@ import os from "os";
 import { getFile, putFile, isValidStoreKey } from "../lib/file-store.js";
 import { sharePublicly } from "../lib/public-share.js";
 import { publicAppUrl } from "../lib/account-tokens.js";
+import { meteredFetch } from "../lib/provider-meter.js";
 
 const router = Router();
 
@@ -661,7 +662,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
     const outPath   = path.join(tmpDir, "dubbed.mp4");
 
     // ── PASO 1: TTS naturalizado con ElevenLabs ──
-    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    const ttsRes = await meteredFetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: { "xi-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -701,7 +702,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
 
         // SadTalker version
         const SADTALKER_VERSION = "85c698db7c0a66d5011435d0191db323034e1da04b912a6d365833141b6a285b";
-        const predRes = await fetch("https://api.replicate.com/v1/predictions", {
+        const predRes = await meteredFetch("https://api.replicate.com/v1/predictions", {
           method: "POST",
           headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -715,7 +716,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
           let attempts = 0;
           while (!["succeeded","failed","canceled"].includes(pred.status) && attempts < 40) {
             await new Promise(r => setTimeout(r, 8000));
-            const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } });
+            const pollRes = await meteredFetch(`https://api.replicate.com/v1/predictions/${pred.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } });
             pred = await pollRes.json() as any;
             attempts++;
           }
@@ -739,7 +740,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
     if (!fs.existsSync(outPath) && !clipBase64 && replicateToken && basePublicUrl) {
       try {
         const photoUrl = await modelPhotoPublicUrl();
-        const seedRes = await fetch("https://api.replicate.com/v1/models/bytedance/seedance-1-lite/predictions", {
+        const seedRes = await meteredFetch("https://api.replicate.com/v1/models/bytedance/seedance-1-lite/predictions", {
           method: "POST",
           headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
           body: JSON.stringify({ input: { image: photoUrl, prompt: "Man speaking expressively to camera, natural head and hand movements, realistic talking, warm studio lighting", duration: 10, resolution: "720p", aspect_ratio: "9:16" } }),
@@ -748,7 +749,7 @@ router.post("/youtube/modelo/dub", requireAdmin, async (req, res) => {
         let sat = 0;
         while (!["succeeded","failed","canceled"].includes(seed.status) && sat < 20) {
           await new Promise(r => setTimeout(r, 8000));
-          const sp = await fetch(`https://api.replicate.com/v1/predictions/${seed.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } });
+          const sp = await meteredFetch(`https://api.replicate.com/v1/predictions/${seed.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } });
           seed = await sp.json() as any; sat++;
         }
         if (seed.status === "succeeded" && seed.output) {
@@ -846,7 +847,7 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req, res) => {
     };
 
     // ── PASO 1: TTS con la voz y ajustes elegidos ──
-    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    const ttsRes = await meteredFetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: { "xi-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -983,7 +984,7 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req, res) => {
 
     logger.info("comedian-gen: launching 3 Seedance I2V clips in parallel...");
     const seedancePreds = await Promise.all(comedyPrompts.map(async (prompt, i) => {
-      const r = await fetch("https://api.replicate.com/v1/models/bytedance/seedance-1-lite/predictions", {
+      const r = await meteredFetch("https://api.replicate.com/v1/models/bytedance/seedance-1-lite/predictions", {
         method: "POST",
         headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1004,7 +1005,7 @@ router.post("/youtube/modelo/comedian-gen", requireAdmin, async (req, res) => {
       await Promise.all([...pending].map(async (i) => {
         const p = results[i];
         if (!p.id) { pending.delete(i); return; }
-        const d = await fetch(`https://api.replicate.com/v1/predictions/${p.id}`, {
+        const d = await meteredFetch(`https://api.replicate.com/v1/predictions/${p.id}`, {
           headers: { Authorization: `Bearer ${replicateToken}` },
         }).then(r => r.json()) as any;
         if (d.status === "succeeded" && d.output) {
@@ -1131,7 +1132,7 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req, res)
       formData.append("model_id", "eleven_multilingual_sts_v2");
       formData.append("voice_settings", JSON.stringify(vs));
 
-      const stsRes = await fetch(`https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}`, {
+      const stsRes = await meteredFetch(`https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}`, {
         method: "POST",
         headers: { "xi-api-key": key },
         body: formData,
@@ -1147,7 +1148,7 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req, res)
     } else {
       // ── MODO TTS: Genera audio desde el script ──
       logger.info(`reference-pipeline: TTS mode — generating audio from script...`);
-      const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      const ttsRes = await meteredFetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: "POST",
         headers: { "xi-api-key": key, "Content-Type": "application/json" },
         body: JSON.stringify({ text: script, model_id: "eleven_v3", voice_settings: vs }),
@@ -1205,7 +1206,7 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req, res)
           const swappedPath = path.join(swappedDir, fname);
           try {
             const frameB64 = fs.readFileSync(framePath).toString("base64");
-            let pred = await fetch("https://api.replicate.com/v1/predictions", {
+            let pred = await meteredFetch("https://api.replicate.com/v1/predictions", {
               method: "POST",
               headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1217,7 +1218,7 @@ router.post("/youtube/modelo/reference-pipeline", requireAdmin, async (req, res)
             let att = 0;
             while (!["succeeded","failed","canceled"].includes(pred.status) && att < 18) {
               await new Promise(r => setTimeout(r, 2500));
-              pred = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
+              pred = await meteredFetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
                 headers: { Authorization: `Bearer ${replicateToken}` },
               }).then(r => r.json()) as any;
               att++;
@@ -1319,7 +1320,7 @@ router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req, res) =
     stsFormData.append("model_id", "eleven_multilingual_sts_v2");
     stsFormData.append("voice_settings", JSON.stringify(vs));
 
-    const stsRes = await fetch(`https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}`, {
+    const stsRes = await meteredFetch(`https://api.elevenlabs.io/v1/speech-to-speech/${voiceId}`, {
       method: "POST",
       headers: { "xi-api-key": key },
       body: stsFormData,
@@ -1361,7 +1362,7 @@ router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req, res) =
           const swappedPath = path.join(swappedDir, fname);
           try {
             const frameB64 = fs.readFileSync(framePath).toString("base64");
-            let pred = await fetch("https://api.replicate.com/v1/predictions", {
+            let pred = await meteredFetch("https://api.replicate.com/v1/predictions", {
               method: "POST",
               headers: { Authorization: `Bearer ${replicateToken}`, "Content-Type": "application/json" },
               body: JSON.stringify({ version: FACE_SWAP_VERSION, input: { swap_image: facePhotoUrl, input_image: `data:image/jpeg;base64,${frameB64}` } }),
@@ -1369,7 +1370,7 @@ router.post("/youtube/modelo/speech-to-speech", requireAdmin, async (req, res) =
             let att = 0;
             while (!["succeeded","failed","canceled"].includes(pred.status) && att < 18) {
               await new Promise(r => setTimeout(r, 2500));
-              pred = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } }).then(r => r.json()) as any;
+              pred = await meteredFetch(`https://api.replicate.com/v1/predictions/${pred.id}`, { headers: { Authorization: `Bearer ${replicateToken}` } }).then(r => r.json()) as any;
               att++;
             }
             if (pred.status === "succeeded" && pred.output) {
@@ -1437,7 +1438,7 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
         if (script) form2.append("script", script);
         form2.append("reference_face_image", faceFile.buffer, { filename: faceFile.originalname, contentType: faceFile.mimetype });
 
-        const dubRes = await fetch("https://api.elevenlabs.io/v1/dubbing", {
+        const dubRes = await meteredFetch("https://api.elevenlabs.io/v1/dubbing", {
           method: "POST",
           headers: { "xi-api-key": key, ...form2.getHeaders() },
           body: form2 as any,
@@ -1450,11 +1451,11 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
           let st2 = "in_progress"; let att2 = 0;
           while (st2 === "in_progress" && att2 < 36) {
             await new Promise(r => setTimeout(r, 5000));
-            const sr = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId2}`, { headers: { "xi-api-key": key } });
+            const sr = await meteredFetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId2}`, { headers: { "xi-api-key": key } });
             st2 = (await sr.json() as any).status; att2++;
           }
           if (st2 === "dubbed") {
-            const dlR = await fetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId2}/audio/${targetLang}`, { headers: { "xi-api-key": key } });
+            const dlR = await meteredFetch(`https://api.elevenlabs.io/v1/dubbing/${dubbingId2}/audio/${targetLang}`, { headers: { "xi-api-key": key } });
             if (dlR.ok) {
               const outBuf = Buffer.from(await dlR.arrayBuffer());
               // Save permanently
@@ -1479,7 +1480,7 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
     if (!token) return res.status(500).json({ error: "REPLICATE_API_TOKEN no configurada" });
 
     // Upload face image to Replicate Files API
-    const faceUpload = await fetch("https://api.replicate.com/v1/files", {
+    const faceUpload = await meteredFetch("https://api.replicate.com/v1/files", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": faceFile.mimetype },
       body: faceFile.buffer as unknown as BodyInit,
@@ -1490,7 +1491,7 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
 
     // Upload video to Replicate Files API
     const vidBuf = Buffer.from(videoBase64, "base64");
-    const vidUpload = await fetch("https://api.replicate.com/v1/files", {
+    const vidUpload = await meteredFetch("https://api.replicate.com/v1/files", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "video/mp4" },
       body: vidBuf,
@@ -1500,7 +1501,7 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
     if (!vidUrl) return res.status(500).json({ error: "No se pudo subir el vídeo" });
 
     // Run face-swap model (akhaliq/facefusion or deepinsight/insightface)
-    const predRes = await fetch("https://api.replicate.com/v1/models/yan-ops/face-swap/predictions", {
+    const predRes = await meteredFetch("https://api.replicate.com/v1/models/yan-ops/face-swap/predictions", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=60" },
       body: JSON.stringify({ input: { target_video: vidUrl, source_image: faceUrl } }),
@@ -1511,7 +1512,7 @@ router.post("/youtube/modelo/face-swap", requireAdmin, uploadModel.fields([
     let pollAttempts = 0;
     while (pred.status && !["succeeded", "failed", "canceled"].includes(pred.status) && pollAttempts < 60) {
       await new Promise(r => setTimeout(r, 5000));
-      const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
+      const pollRes = await meteredFetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       pred = await pollRes.json() as any;
@@ -1548,7 +1549,7 @@ router.get("/youtube/modelo/voices", requireAdmin, async (req, res) => {
   try {
     const key = ELEVEN_KEY();
     if (!key) return res.json({ voices: [] });
-    const r = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": key } });
+    const r = await meteredFetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": key } });
     const d = await r.json() as any;
     const voices = (d.voices || []).map((v: any) => ({
       voice_id: v.voice_id,
@@ -1580,7 +1581,7 @@ router.post("/youtube/modelo/generate-reference", requireAdmin, async (req, res)
 
     const finalPrompt = prompt || defaultPrompts[contentType] || defaultPrompts.monologo;
 
-    const predRes = await fetch("https://api.replicate.com/v1/models/kwaivgi/kling-v2.1-standard/predictions", {
+    const predRes = await meteredFetch("https://api.replicate.com/v1/models/kwaivgi/kling-v2.1-standard/predictions", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=60" },
       body: JSON.stringify({ input: { prompt: finalPrompt, duration: durationSec, aspect_ratio: "16:9" } }),
@@ -1591,7 +1592,7 @@ router.post("/youtube/modelo/generate-reference", requireAdmin, async (req, res)
     let attempts = 0;
     while (pred.status && !["succeeded", "failed", "canceled"].includes(pred.status) && attempts < 36) {
       await new Promise(r => setTimeout(r, 5000));
-      const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
+      const pollRes = await meteredFetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       pred = await pollRes.json() as any;

@@ -17,6 +17,10 @@ export type ApiProvider =
   | "shopify"
   | "openai"
   | "grok"
+  | "meshy"
+  | "tripo3d"
+  | "freepik"
+  | "stitch"
   | "other";
 
 export interface RecordApiUsageInput {
@@ -116,6 +120,7 @@ const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
   "gemini-3.1-flash-lite":     { input: 0.25,  output: 1.50 },
   "gemini-2.5-pro":            { input: 1.25,  output: 10.0 },
   "gemini-2.5-flash-lite":     { input: 0.10,  output: 0.40 },
+  "gemini-2.5-flash-preview-tts": { input: 0.50, output: 10.0 }, // salida = audio
   "gemini-2.5-flash":          { input: 0.30,  output: 2.50 },
   "gemini-2.0-flash":          { input: 0.10,  output: 0.40 },
   "gemini-1.5-pro":            { input: 1.25,  output: 5.0  },
