@@ -20,7 +20,7 @@ import {
   runRevenueSnapshots,
   runInventorySync,
 } from "./lib/scheduler.js";
-import { ensureAllKnowledgeDomains } from "./routes/shopybrain.js";
+import { ensureAllKnowledgeDomains } from "./routes/shopybrain/shared.js";
 import { injectDbApiKeys } from "./routes/api-keys.js";
 import { db, usersTable, projectsTable, productsTable, omnicoreMemoriesTable, seoDataTable } from "@workspace/db";
 import { eq, sql, isNull, or, and } from "drizzle-orm";

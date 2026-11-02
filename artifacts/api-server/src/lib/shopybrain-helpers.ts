@@ -158,6 +158,13 @@ export const DESTRUCTIVE_ACTIONS = new Set<string>([
   "edit_theme_settings",
   "create_theme_section",
   "sync_store_theme",
+  // Mueven dinero o escriben a clientes reales
+  "stripe_create_charge",
+  "stripe_create_refund",
+  "stripe_cancel_subscription",
+  "stripe_send_invoice",
+  "send_restock_email",
+  "platform_delete_product",
 ]);
 
 export interface ConfirmationPreview {
