@@ -27,3 +27,8 @@ export function ClientPreviewProvider({ children }: { children: ReactNode }) {
 export function useClientPreview(): PreviewCtx {
   return useContext(ClientPreviewCtx);
 }
+
+/** Añade ?pid= a una URL del API cuando el admin está viendo el portal de un cliente. */
+export function withPreviewPid(url: string, isAdmin: boolean, previewPid: string): string {
+  return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url;
+}

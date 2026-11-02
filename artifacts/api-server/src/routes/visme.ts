@@ -34,7 +34,8 @@ function makeAnthropicClient(): Anthropic {
 const router = Router();
 
 // ── Effects prompts endpoint (used by Web Designer → Effects tab) ────────────
-router.get("/prompts/effects", (_req: Request, res: Response) => {
+// Solo admin (antes público: cualquiera podía descargar la librería de prompts).
+router.get("/prompts/effects", requireAdmin, (_req: Request, res: Response) => {
   try {
     const data = loadEffectsPrompts();
     res.json({ templates: data, count: data.length });
@@ -44,17 +45,7 @@ router.get("/prompts/effects", (_req: Request, res: Response) => {
   }
 });
 
-// ── Alias: /api/designer/effects (fallback from Claude Designer HTML) ─────────
-router.get("/designer/effects", (_req: Request, res: Response) => {
-  try {
-    const data = loadEffectsPrompts();
-    res.json({ templates: data, count: data.length });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get("/visme/stats", (_req: Request, res: Response) => {
+router.get("/visme/stats", requireAdmin, (_req: Request, res: Response) => {
   const templates = loadVismeTemplates();
   const cats = new Set(templates.map(t => t.category));
   res.json({

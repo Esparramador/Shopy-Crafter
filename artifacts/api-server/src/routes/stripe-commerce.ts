@@ -26,6 +26,7 @@ import {
   type PriceInput, type LinkConfigInput, type LinkPrice, type CouponInput, type Interval,
 } from "../lib/stripe-commerce.js";
 import { safeFetch } from "../lib/web-scraper.js";
+import { sanitizeHtml as esc } from "../lib/html-escape.js";
 
 const router = Router();
 const BASE = "/admin/stripe/project/:id";
@@ -453,9 +454,6 @@ router.get(`${BASE}/payment-links/:linkId/sales`, requireAdmin, async (req: Requ
 });
 
 // ── Tarjeta compartible (SVG con imagen, precio y QR incrustados) ─────────────
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
 
 function wrap(text: string, maxChars: number, maxLines: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);

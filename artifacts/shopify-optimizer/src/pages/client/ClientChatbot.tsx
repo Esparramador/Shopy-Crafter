@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useClientPreview } from "./ClientPreviewContext";
+import { useClientPreview, withPreviewPid } from "./ClientPreviewContext";
 import { escapeHtml } from "@/lib/sanitize";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
@@ -103,7 +103,7 @@ export function ClientChatbot() {
   const { user } = useAuth();
   const { previewPid } = useClientPreview();
   const isAdmin = user?.role === "admin";
-  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
+  function apid(url: string) { return withPreviewPid(url, isAdmin, previewPid); }
   const [open, setOpen]             = useState(false);
   const [msgs, setMsgs]             = useState<ChatMsg[]>([]);
   const [input, setInput]           = useState("");

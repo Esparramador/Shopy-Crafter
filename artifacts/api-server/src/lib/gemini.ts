@@ -250,6 +250,7 @@ function tripGenerationCircuit(): void {
 // hard default, so admins can swap models live from the admin UI / chatbot
 // (`set_ai_model`) without redeploys.
 import { pickModelSync, pickModel } from "./ai-models.js";
+import { withTimeout } from "./with-timeout.js";
 
 /** Fast tier (default Gemini 2.5 Flash). Sync — uses ENV/defaults only. */
 function geminiFast(): string { return pickModelSync("gemini", "fast"); }
@@ -270,14 +271,6 @@ const OVERALL_RESEARCH_TIMEOUT = 270_000;  // 270s total for full entity researc
 const GEMINI_URL_CTX_TIMEOUT   = 180_000;  // 180s for URL context deep-dive (SDK handles URL fetching internally)
 
 // ─── Utility: race a promise against a timeout ────────────────────────────────
-function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`⏱ Timeout: ${label} exceeded ${ms}ms`)), ms)
-    ),
-  ]);
-}
 
 // ─── Utility: retry with rate-limit-aware backoff ──────────────────────────────
 async function withRetry<T>(

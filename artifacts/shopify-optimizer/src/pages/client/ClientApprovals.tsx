@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ClientLayout } from "./ClientLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
-import { useClientPreview } from "./ClientPreviewContext";
+import { useClientPreview, withPreviewPid } from "./ClientPreviewContext";
 import { CheckCircle, XCircle, Clock, AlertTriangle, Loader2, MessageSquare } from "lucide-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -26,7 +26,7 @@ export default function ClientApprovals() {
   const { user } = useAuth();
   const { previewPid } = useClientPreview();
   const isAdmin = user?.role === "admin";
-  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
+  function apid(url: string) { return withPreviewPid(url, isAdmin, previewPid); }
   const { t } = useCmsSection("labels.clientApprovals");
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(true);

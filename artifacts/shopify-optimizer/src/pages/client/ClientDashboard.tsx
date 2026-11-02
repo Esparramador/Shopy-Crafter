@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCms } from "@/contexts/CmsContext";
 import { ClientLayout } from "./ClientLayout";
-import { useClientPreview } from "./ClientPreviewContext";
+import { useClientPreview, withPreviewPid } from "./ClientPreviewContext";
 import { Link } from "wouter";
 import { timeSince } from "@/lib/utils";
 import WooCommerceDashboard from "./WooCommerceDashboard";
@@ -97,7 +97,7 @@ export default function ClientDashboard() {
   const cmsGreetingName: string | undefined = (cmsContent?.clientPanel as any)?.greetingName;
   const { previewPid } = useClientPreview();
   const isAdmin = user?.role === "admin";
-  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
+  function apid(url: string) { return withPreviewPid(url, isAdmin, previewPid); }
   const [data, setData] = useState<DashData | null>(null);
   const [vault, setVault] = useState<VaultFile[]>([]);
   const [brandDna, setBrandDna] = useState<BrandDnaData | null | undefined>(undefined);

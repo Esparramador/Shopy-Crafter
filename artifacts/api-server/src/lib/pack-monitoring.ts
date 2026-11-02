@@ -16,6 +16,7 @@ import type Stripe from "stripe";
 import { logger } from "./logger.js";
 import { catalogPlan, isStorePlan, isStripePlan, CADENCE_LABEL, type Cadence, type StorePlan, type StripePlan } from "./plan-catalog.js";
 import { packUsageSummary } from "./pack-quotas.js";
+import { sanitizeHtml as esc } from "./html-escape.js";
 
 const HOUR = 3600_000;
 /** Margen para que el cron diario no se salte un día por unos minutos. */
@@ -106,9 +107,6 @@ function isDue(last: Date | null, cadence: Cadence, now = new Date()): boolean {
   return !last || now.getTime() - last.getTime() >= DUE_AFTER[cadence];
 }
 
-function esc(s: unknown): string {
-  return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-}
 
 function eur(cents: number): string {
   return (cents / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" });

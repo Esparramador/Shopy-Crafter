@@ -13,6 +13,7 @@ import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { logger } from "../lib/logger.js";
 import { uploadRejected } from "../lib/upload-errors.js";
+import { withTimeout } from "../lib/with-timeout.js";
 
 const tryonUpload = multer({
   storage: multer.memoryStorage(),
@@ -130,12 +131,6 @@ const FETCH_IMAGE_TIMEOUT_MS = 30_000;
  * Wraps a promise with a maximum timeout.
  * Rejects with a descriptive Error if the operation exceeds the limit.
  */
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Operation timed out after ${ms / 1000}s: ${label}`)), ms)
-  );
-  return Promise.race([promise, timeout]);
-}
 
 function normalizeText(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");

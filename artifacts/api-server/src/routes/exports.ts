@@ -1953,9 +1953,6 @@ export function getReportShell(template: ReportTemplate | CustomReportTemplate =
   return (t, s, b, d, c) => reportShell(t, s, b, d, c);
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
 
 const HEX_VALID = /^#[0-9a-fA-F]{3,8}$/;
 function safeHex(v: string | null | undefined, fb: string): string {
@@ -5252,6 +5249,7 @@ import { generateCogsXlsx, generateSupplierComparisonXlsx, generateFinancialSumm
 import { generateExecutivePptx } from "../lib/pptx-generator.js";
 import { generateExecutiveDocx } from "../lib/docx-generator.js";
 import { analyzeDeadCosts } from "../lib/dead-costs.js";
+import { sanitizeHtml as esc } from "../lib/html-escape.js";
 
 router.get("/projects/:projectId/exports/cogs-xlsx", requireProjectAccess, async (req, res) => {
   try {

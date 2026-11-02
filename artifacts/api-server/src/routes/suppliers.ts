@@ -12,16 +12,11 @@ import { recordApiUsage } from "../lib/api-usage.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { requireProjectAccess } from "../lib/access.js";
 import { getReportShell } from "./exports.js";
+import { sanitizeHtml as esc } from "../lib/html-escape.js";
 
 const router = Router();
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-function esc(s: string | null | undefined): string {
-  if (!s) return "";
-  return String(s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
 
 function safeHttpUrl(raw: string | null | undefined): string | null {
   if (!raw || typeof raw !== "string") return null;

@@ -18,6 +18,7 @@ import { checkProductionLimit, recordUsage } from "../lib/plan-limits.js";
 import { setupZipStream } from "../lib/zip-stream.js";
 import archiver from "archiver";
 import { searchCybersecSkills } from "../lib/cybersec-knowledge.js";
+import { sanitizeHtml as escapeHtml } from "../lib/html-escape.js";
 
 const router = Router();
 
@@ -1672,14 +1673,6 @@ function buildReportBody(
   return html;
 }
 
-function escapeHtml(text: unknown): string {
-  return String(text ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 // ─── Manual edit save: persist user-edited HTML/CSS as a NEW vault version ──
 // El frontend pasa html y css editados; los guardamos como nueva entrada con

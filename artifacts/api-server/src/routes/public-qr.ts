@@ -14,17 +14,10 @@ import { Router, type Request, type Response } from "express";
 import { db, businessCardsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { sanitizeHtml as escHtml } from "../lib/html-escape.js";
 
 const router = Router();
 
-function escHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
 
 function getYoutubeId(url: string): string | null {
   const m = url.match(

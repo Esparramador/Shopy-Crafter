@@ -20,18 +20,13 @@ import {
   modelSupportsTextToVideo,
   type VideoModel as FSPVideoModel,
 } from "../lib/fusion-studio-pro.js";
+import { withTimeout } from "../lib/with-timeout.js";
 
 const REPLICATE_TIMEOUT_MS = 5 * 60_000;
 const TRYON_MODES = new Set(["tryon-front", "tryon-back", "tryon-lifestyle"]);
 const TRYON_MODEL_COST = 0.04;
 const TRYON_GARMENT_COST = 0.05;
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Timeout ${ms / 1000}s: ${label}`)), ms)
-  );
-  return Promise.race([promise, timeout]);
-}
 
 const FUSION_MODEL_MAP: Record<string, string> = {
   "hero": "black-forest-labs/flux-1.1-pro",

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { ClientLayout } from "./ClientLayout";
-import { useClientPreview } from "./ClientPreviewContext";
+import { useClientPreview, withPreviewPid } from "./ClientPreviewContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { escapeHtml } from "@/lib/sanitize";
 
@@ -43,7 +43,7 @@ export default function ClientNotebook() {
   const { user } = useAuth();
   const { previewPid } = useClientPreview();
   const isAdmin = user?.role === "admin";
-  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
+  function apid(url: string) { return withPreviewPid(url, isAdmin, previewPid); }
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);

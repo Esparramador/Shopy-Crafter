@@ -1,4 +1,5 @@
 import { LOGO_CORPORATE_B64, LOGO_PRESTIGE_B64 } from "./report-logos.js";
+import { sanitizeHtml as escHtml } from "./html-escape.js";
 
 export type CoverTemplate = "classic" | "elegance" | "prestige";
 
@@ -19,13 +20,6 @@ export interface CoverPageOptions {
 }
 
 // FIX: HTML escape to prevent XSS in PDF cover pages
-function escHtml(s: string): string {
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 export function buildCoverPage(opts: CoverPageOptions): string {
   const { template = "prestige", includeBackCover = true } = opts;

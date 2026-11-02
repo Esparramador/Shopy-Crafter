@@ -11,6 +11,8 @@ import { randomBytes } from "crypto";
 
 import type { Request } from "express";
 import path from "path";
+import { sanitizeHtml as escHtml } from "./html-escape.js";
+export { sanitizeHtml as escHtml } from "./html-escape.js";
 
 // ─── CRIT-2, CRIT-3: projectId sin hardcoded fallback ────────────────────────
 
@@ -311,10 +313,3 @@ export function normalizeListDirectory(
 
 // ─── HTML escape utility ─────────────────────────────────────────────────────
 
-export function escHtml(s: string): string {
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}

@@ -19,13 +19,6 @@ export interface ProviderHealth {
 
 const TIMEOUT_MS = 6000;
 
-async function withTimeout<T>(p: Promise<T>, ms = TIMEOUT_MS): Promise<T> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await p;
-  } finally { clearTimeout(t); }
-}
 
 async function checkReplicate(): Promise<ProviderHealth> {
   const key = process.env.REPLICATE_API_TOKEN;

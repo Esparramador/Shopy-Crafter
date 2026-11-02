@@ -21,7 +21,6 @@ import competitorsRouter from "./competitors.js";
 import suppliersRouter from "./suppliers.js";
 import emailsRouter from "./emails.js";
 import emailTemplatesRouter from "./email-templates.js";
-import storeRouter from "./store.js";
 import voiceRouter from "./voice.js";
 import pushRouter, { pushUserRouter } from "./push.js";
 import shopybrainRouter from "./shopybrain.js";
@@ -117,7 +116,6 @@ router.use("/cms", (req, res, next) => {
   if (req.method === "GET" && /^\/pages\/[a-z0-9-]+$/i.test(req.path)) return next();
   return requireAdmin(req, res, next);
 }, cmsRouter);
-router.use(storeRouter);
 router.use(contactRouter);
 router.use(apkRouter);
 router.use(publicQrRouter);

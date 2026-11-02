@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ClientLayout } from "./ClientLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { useClientPreview } from "./ClientPreviewContext";
+import { useClientPreview, withPreviewPid } from "./ClientPreviewContext";
 import { Loader2, X, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { cleanHtml } from "@/lib/sanitize";
 
@@ -310,7 +310,7 @@ export default function ClientProducts() {
   const { user } = useAuth();
   const { previewPid } = useClientPreview();
   const isAdmin = user?.role === "admin";
-  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
+  function apid(url: string) { return withPreviewPid(url, isAdmin, previewPid); }
 
   const [products, setProducts]           = useState<Product[]>([]);
   const [loading, setLoading]             = useState(true);

@@ -16,6 +16,7 @@ import {
   applyOverrides, extrasToRender,
   type CardData, type LayoutOverrides, type RenderElement,
 } from "./card-elements.js";
+import { sanitizeHtml as escapeHtml } from "./html-escape.js";
 
 const CHROMIUM_PATH =
   process.env.CHROMIUM_PATH ||
@@ -415,12 +416,6 @@ function sanitizeElement(el: RenderElement): RenderElement {
   };
 }
 
-function escapeHtml(s: string | null | undefined): string {
-  if (!s) return "";
-  return String(s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
 function escapeAttr(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }

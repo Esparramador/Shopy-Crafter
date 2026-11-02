@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ClientLayout } from "./ClientLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { useClientPreview } from "./ClientPreviewContext";
+import { useClientPreview, withPreviewPid } from "./ClientPreviewContext";
 import { Download, FileText, TrendingUp, Package, Image, Search, Loader2, Calendar, BarChart3, ArrowUpRight } from "lucide-react";
 import { timeSince } from "@/lib/utils";
 
@@ -35,7 +35,7 @@ export default function ClientReports() {
   const { user } = useAuth();
   const { previewPid } = useClientPreview();
   const isAdmin = user?.role === "admin";
-  function apid(url: string) { return isAdmin && previewPid ? `${url}${url.includes("?") ? "&" : "?"}pid=${encodeURIComponent(previewPid)}` : url; }
+  function apid(url: string) { return withPreviewPid(url, isAdmin, previewPid); }
   const [data, setData] = useState<ReportsData | null>(null);
   const [vault, setVault] = useState<VaultFile[]>([]);
   const [loading, setLoading] = useState(true);
