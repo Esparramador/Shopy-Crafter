@@ -622,6 +622,11 @@ async function saveConvAITtsSettingsWithHistory(
   await ensurePlatformSettingsKV();
   await ensureConvAITtsHistoryTable();
   await db.transaction(async (tx) => {
+    // A settings save participates in the same cross-instance locks as agent
+    // sync. This makes the save and a provider PATCH/readback serializable.
+    for (const type of ["admin", "client", "landing"] as const) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"convai-agent-sync:" + type}, 0))`);
+    }
     for (const key of Object.keys(CONVAI_TTS_KV_KEYS) as Array<keyof ConvAITtsSettings>) {
       await tx.execute(sql`
         INSERT INTO platform_settings_kv (key, value, updated_at)
@@ -739,6 +744,20 @@ async function verifyCreatedConvAIAgent(
   }
 }
 
+async function withConvAIAgentLock<T>(type: AgentType, action: () => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    // If another process dies, Postgres rolls back its transaction and releases
+    // the advisory lock. Waiting requests fail explicitly rather than hanging
+    // forever if a live owner stops making progress.
+    await tx.execute(sql`SET LOCAL lock_timeout = '75000ms'`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"convai-agent-sync:" + type}, 0))`);
+    // Another API instance may have saved settings while this process's cache
+    // was warm. Refresh only after owning the lock.
+    _ttsSettingsCache = null;
+    return action();
+  });
+}
+
 function respondCallUrlError(res: import("express").Response, err: unknown, fallback: string): void {
   const message = (err as Error)?.message || fallback;
   if (isConvAIVoiceError(err)) {
@@ -846,7 +865,12 @@ async function getOrCreateConvAIAgent(type: AgentType): Promise<string> {
     }
 
     let pending: Promise<string>;
-    pending = resolveConvAIAgentUncached(type, cacheKey).finally(() => {
+    pending = withConvAIAgentLock(type, async () => {
+      if (_agentIdCache[cacheKey] && _agentSyncedRevision[type] === _ttsSettingsRevision) {
+        return _agentIdCache[cacheKey];
+      }
+      return resolveConvAIAgentUncached(type, cacheKey);
+    }).finally(() => {
       if (_agentResolveInFlight[type] === pending) delete _agentResolveInFlight[type];
     });
     _agentResolveInFlight[type] = pending;
@@ -1076,18 +1100,20 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
       // Se sincroniza y verifica en sitio.
       if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
         const envId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
-        delete _agentIdCache[cacheKey];
-        const voiceId = await resolveVerifiedConvAIVoiceId();
-        await syncConvAIAgentOrThrow(type, envId, voiceId);
-        _agentIdCache[cacheKey] = envId;
-        results[type] = envId;
-        logger.info({ type, agentId: envId, voiceId }, "ConvAI env-pinned agent re-synced in place");
+        results[type] = await withConvAIAgentLock(type, async () => {
+          delete _agentIdCache[cacheKey];
+          const voiceId = await resolveVerifiedConvAIVoiceId();
+          await syncConvAIAgentOrThrow(type, envId, voiceId);
+          _agentIdCache[cacheKey] = envId;
+          logger.info({ type, agentId: envId, voiceId }, "ConvAI env-pinned agent re-synced in place");
+          return envId;
+        });
         continue;
       }
 
       // Publicar el trabajo como resolución en curso: cualquier llamada que llegue
       // mientras borramos/recreamos espera y recibe el ID nuevo (sin duplicar agentes).
-      const work = (async (): Promise<string> => {
+      const work = withConvAIAgentLock(type, async (): Promise<string> => {
         // Delete old agent if we have its ID cached
         const oldId = _agentIdCache[cacheKey];
         delete _agentIdCache[cacheKey];
@@ -1123,7 +1149,7 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
         _agentIdCache[cacheKey] = newId;
         logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
         return newId;
-      })();
+      });
       _agentResolveInFlight[type] = work;
       try {
         results[type] = await work;
@@ -1273,11 +1299,15 @@ router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res)
           continue;
         }
 
-        const work = (async (): Promise<string> => {
+        const work = withConvAIAgentLock(type, async (): Promise<string> => {
+          // A reset in another process may have changed the ID while this
+          // request was waiting for the cross-instance lock.
+          const latestAgentId = await findExistingConvAIAgentId(type);
+          if (latestAgentId) resolvedAgentId = latestAgentId;
           await syncConvAIAgentOrThrow(type, resolvedAgentId!, voiceId);
           _agentIdCache[cacheKey] = resolvedAgentId!;
           return resolvedAgentId!;
-        })();
+        });
         _agentResolveInFlight[type] = work;
         try {
           const syncedId = await work;
