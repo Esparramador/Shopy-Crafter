@@ -8,6 +8,20 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
 
+# /instagram/ (escena 3D del QR CEO-IG): la URL es la carpeta, no "*.html",
+# así que el bloque de arriba no la cubre. Nunca cachear la página; app.js y
+# arranque.js no llevan hash en el nombre (van con ?v=huella): caché corta.
+/instagram/
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+/instagram/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+/instagram/*.js
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
 # Service worker: no cache (always must fetch latest SW)
 /sw.js
   Cache-Control: public, max-age=0, must-revalidate

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<!--
+  /instagram/ — la escena «caída»: el logo de Instagram cae del cielo y se clava en
+  el suelo, y a los 9,8 s se va a https://www.instagram.com/shopycrafter/.
+  Es la página a la que apunta el QR «CEO-IG» de las tarjetas (03/11/2026).
+
+  Página ESTÁTICA (misma estructura que `intro.js` del Worker de QR, sin nonce):
+    · app.js      = copia byte a byte de `intro_caida.js` (kurosawa-cine). No se toca aquí.
+    · arranque.js = monta la escena con las opciones de abajo y la red de seguridad.
+  LA REGLA: nunca bloquear al que escanea. Sin JS → <noscript> refresh a 0 s.
+  Sin WebGL, sin three (red) o si algo lanza → la escena se va al destino en el
+  acto; si ni siquiera llega app.js, arranque.js se va a segundos + espera_s + 6.
+  CSP por <meta>: three solo de jsDelivr, fuente de Google, sin eval, sin red propia.
+-->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#06070b">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Shopy Crafter en Instagram: @shopycrafter.">
+<meta property="og:title" content="Shopy Crafter · Instagram">
+<meta property="og:description" content="Shopy Crafter en Instagram: @shopycrafter.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://shopycrafter.com/instagram/">
+<title>Shopy Crafter · Instagram</title>
+<noscript><meta http-equiv="refresh" content="0;url=https://www.instagram.com/shopycrafter/"></noscript>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" crossorigin>
+<style>
+:root{--fondo:hsl(228 28% 4%);--tinta:hsl(220 20% 96%);--tinta-2:hsl(220 12% 70%);--linea:hsl(220 20% 100% / .16)}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--fondo);color:var(--tinta);overflow:hidden;
+  font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#intro3d{position:fixed;inset:0;z-index:1}
+#intro3d canvas{display:block;width:100%;height:100%}
+.ir{position:fixed;z-index:2;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);
+  padding:11px 18px;border-radius:999px;border:1px solid var(--linea);background:hsl(228 28% 8% / .55);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:var(--tinta-2);text-decoration:none;
+  font-size:14px;letter-spacing:.01em;white-space:nowrap;transition:color .2s,border-color .2s}
+.ir:hover,.ir:focus-visible{color:var(--tinta);border-color:hsl(220 20% 100% / .4);outline:none}
+/* Montada la escena, ella trae su «Saltar» y su botón: el mío se aparta. */
+#intro3d:not(:empty)~.ir{display:none}
+</style>
+</head><body>
+<div id="intro3d" aria-hidden="true"></div>
+<a class="ir" id="ir" href="https://www.instagram.com/shopycrafter/">Ir a instagram.com &rarr;</a>
+<!-- ?v= es la huella FNV-1a de app.js (la misma que usa el Worker): cámbiala si cambia app.js. -->
+<script src="app.js?v=1dsuiw1"></script>
+<script src="arranque.js?v=1dsuiw1"></script>
+</body></html>
