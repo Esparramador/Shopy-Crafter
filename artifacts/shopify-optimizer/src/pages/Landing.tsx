@@ -800,7 +800,7 @@ export default function Landing() {
             <div className={`fp-section-header ${!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"}`}>
               <div className="l-pill">Precios</div>
               <h2 className="l-h2">Un pack para tu plataforma, <em>sin permanencia.</em></h2>
-              <p className="l-sub lx-sub">Elige dónde vende tu negocio y mira qué hacemos cada mes: productos, imágenes, auditorías SEO, velocidad, informes y competencia. Precios sin IVA.</p>
+              <p className="l-sub lx-sub">Elige dónde vende tu negocio y mira qué hacemos cada mes: productos, imágenes, auditorías SEO, velocidad, informes y competencia. Cada pack son dos partes: una puesta en marcha inicial (pago único, siempre «desde») y la mensualidad. Precios sin IVA.</p>
             </div>
             <div className={!isAnimated("fp-pricing") ? "fp-animate" : "fp-animated"} style={{ animationDelay: "0.1s" }}>
               <PackPricing data={packs.data} error={packs.error} onChoose={choosePack} onQuote={quotePack} />

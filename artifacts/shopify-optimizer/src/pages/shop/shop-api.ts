@@ -84,6 +84,26 @@ export function minQty(p: Product, v: Variant): number {
 }
 
 /** Precio «desde» de un producto: el más bajo por unidad de cualquier opción y cantidad. */
+/** Marca grande de la tarjeta de un servicio sin foto. */
+export function serviceMark(slug: string): string {
+  if (slug === "auditoria-seo") return "SEO";
+  if (slug === "optimizacion-pagespeed") return "CWV";
+  if (slug === "informes-mensuales") return "INFORME";
+  if (slug === "ficha-google-maps") return "MAPS";
+  if (slug === "resenas-google") return "★★★★★";
+  if (slug === "google-calendar-reservas") return "AGENDA";
+  if (slug === "pack-google-local") return "GOOGLE";
+  return "WEB";
+}
+
+/** Texto del precio de un producto: los servicios de diseño y web siempre «a partir de», nunca cerrados. */
+export function priceLabel(p: Product): { prefix: string; cents: number; suffix: string } | null {
+  const fp = fromPrice(p);
+  if (p.kind === "quote") return fp.cents > 0 ? { prefix: "A partir de ", cents: fp.cents, suffix: "" } : null;
+  if (p.kind === "digital") return { prefix: "Desde ", cents: fp.cents, suffix: "" };
+  return { prefix: fp.perUnit ? "Desde " : "", cents: fp.cents, suffix: fp.perUnit ? " / ud." : "" };
+}
+
 export function fromPrice(p: Product): { cents: number; perUnit: boolean } {
   let best = Infinity, perUnit = false;
   for (const v of p.variants) {

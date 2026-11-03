@@ -21,6 +21,7 @@ export const SHOP_CATEGORIES: Record<string, string> = {
   "regalos-3d": "Regalos 3D",
   "servicios-web": "Webs y diseño",
   "servicios-video": "Vídeo y animación 3D",
+  "google-local": "Google y reseñas",
 };
 
 const tierSchema = z.object({ min: z.number().int().min(1).max(10000), unitCents: z.number().int().min(0).max(10_000_000) });
@@ -216,7 +217,7 @@ const img = (file: string, alt: string): ShopMedia => ({ type: "image", url: `/t
 const vid = (file: string, alt: string): ShopMedia => ({ type: "video", url: `/tienda-media/${file}.mp4`, alt, poster: `/tienda-media/${file}-poster.webp` });
 const pimg = (file: string, alt: string): ShopMedia => ({ type: "image", url: `/portfolio/${file}.webp`, alt });
 
-export const SHOP_SEED_VERSION = "v3-2026-10";
+export const SHOP_SEED_VERSION = "v4-2026-11";
 
 export const SHOP_SEED: SeedProduct[] = [
   {
@@ -225,7 +226,8 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Aluminio anodizado grabado con láser, desde 0,35 € la tarjeta. A una cara o a doble cara con tu QR.",
     description: "Tarjetas de 85 × 55 mm en aluminio anodizado de 0,2 mm, grabadas una a una con el láser infrarrojo de nuestra xTool F2. El grabado no es tinta: es el propio metal, así que no se borra ni se despega.\n\nA una cara llevan tu logo, tus datos y el QR en el mismo lado. A doble cara, delante va tu logo, una ilustración o una foto y detrás tus datos y un QR que lleva a donde tú quieras. Se piden a partir de 100 tarjetas: 0,35 € cada una a una cara y 0,45 € a doble cara. Incluimos el diseño básico a partir de tu logo y te enviamos la prueba antes de grabar.",
     features: ["Aluminio anodizado negro, 85 × 55 × 0,2 mm", "A una cara (0,35 €/ud.) o a doble cara (0,45 €/ud.)", "Pedido mínimo: 100 tarjetas", "QR a tu web, Instagram, WhatsApp o reseñas", "Diseño básico y prueba antes de grabar incluidos", "Envío en 3 a 5 días laborables"],
-    media: [
+    media: [vid("3d-tarjetas-metalicas", "Giro 3D de la tarjeta de aluminio grabada"),
+      
       vid("taller-grabado-tarjeta", "Tarjeta grabándose en la xTool F2"),
       img("tarjeta-warriors-ultra-pump", "Tarjeta de aluminio de Warriors Hardcore: Ultra Pump"),
       img("tarjeta-shopycrafter-delante", "Tarjeta de Shopy Crafter, cara delantera"),
@@ -253,12 +255,12 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Para reseñas de Google, Instagram, la wifi, la carta o el pago. Grabada y cortada en contrachapado.",
     description: "Placa de contrachapado de 3 mm grabada y cortada con láser, con su soporte de pie. Lleva tu logo, un titular y el QR al enlace que elijas. Es el modo más fácil de conseguir reseñas en Google: el cliente la ve en el mostrador, escanea y deja sus estrellas.\n\nComprobamos que el QR se lee con varios móviles antes de enviarla. Con el chip NFC opcional, basta con acercar el móvil.",
     features: ["Contrachapado de 3 mm grabado y cortado con láser", "Soporte de pie incluido", "Tu logo, un titular y el QR a tu enlace", "QR comprobado con varios móviles antes del envío", "Chip NFC opcional: se abre al acercar el móvil"],
-    media: [
+    media: [vid("3d-placa-qr-madera", "Giro 3D de la placa QR de madera con soporte"),
+      
       img("placa-qr-hanakaze", "Placas QR de madera con soporte para Hanakaze Serigraphy"),
       img("placa-resenas-madera", "Placa de reseñas de Google en madera para RastaLo Barcelona"),
       img("placa-resenas-madera-grabada", "Vista del grabado de la placa de reseñas"),
       img("soportes-placa-qr", "Modelos de soporte para la placa"),
-      vid("taller-coleccion", "Placas y tarjetas grabadas en el taller"),
     ],
     variants: [
       { key: "90x110", name: "Pequeña · 90 × 110 mm", tiers: tiers([1, 2490], [3, 2117]) },
@@ -285,7 +287,6 @@ export const SHOP_SEED: SeedProduct[] = [
       img("expositor-tarjetas-vertical", "Expositor vertical de tarjetas montado"),
       img("placa-qr-hanakaze", "Piezas de contrachapado con soporte montado a presión"),
       img("soportes-placa-qr", "Piezas y modelos de soportes"),
-      vid("taller-coleccion", "Piezas del taller"),
     ],
     variants: [
       { key: "horizontal", name: "Horizontal (tarjeta apaisada)", tiers: tiers([1, 1990], [3, 1690]) },
@@ -307,7 +308,6 @@ export const SHOP_SEED: SeedProduct[] = [
     features: ["Placa QR de reseñas 115 × 115 mm con soporte", "Expositor de tarjetas con tu logo", "100 tarjetas de aluminio grabadas a doble cara", "Tarjeta digital con estadísticas de escaneos", "Mismo diseño en las tres piezas"],
     media: [
       img("placa-qr-hanakaze", "Placas QR de madera con soporte"),
-      vid("taller-coleccion", "Placas y tarjetas del taller"),
       img("placa-resenas-madera", "Placa de reseñas de Google"),
       img("tarjeta-shopycrafter-detras", "Reverso de tarjeta con QR"),
       img("expositor-tarjetas-vertical", "Expositor de tarjetas"),
@@ -342,7 +342,8 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Una foto que cabe en la cartera y no se borra.",
     description: "Tu foto grabada con láser en una tarjeta de aluminio anodizado de 85 × 55 mm. Preparamos la imagen para el metal (contraste, encuadre y trama) y te enseñamos cómo quedará antes de grabarla. Detrás, si quieres, una fecha o una frase.",
     features: ["Aluminio anodizado de 85 × 55 mm", "Foto preparada para el metal y revisada antes de grabar", "Texto opcional en el reverso", "Tres por 34,89 €"],
-    media: [img("tarjeta-foto-aluminio-paisaje", "Tarjeta de aluminio con una ilustración grabada")],
+    media: [vid("3d-tarjeta-foto-aluminio", "Giro 3D de la foto grabada en tarjeta de aluminio"),
+      img("tarjeta-foto-aluminio-paisaje", "Tarjeta de aluminio con una ilustración grabada")],
     variants: [{ key: "tarjeta", name: "Tarjeta 85 × 55 mm", tiers: tiers([1, 1490], [3, 1163]) }],
     addons: [],
     fields: PHOTO_FIELDS,
@@ -354,7 +355,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "109 × 141 mm, lista para la mesa o la estantería.",
     description: "Tu foto grabada en madera de 109 × 141 mm con una peana para que se sostenga de pie. Ajustamos la foto para la madera y te mandamos la prueba antes de grabarla.",
     features: ["Madera de 109 × 141 mm", "Peana incluida", "Prueba antes de grabar", "Texto opcional"],
-    media: [],
+    media: [vid("3d-foto-madera-peana", "Giro 3D de la foto grabada en madera con peana")],
     variants: [{ key: "109x141", name: "109 × 141 mm con peana", tiers: tiers([1, 2990]) }],
     addons: [],
     fields: PHOTO_FIELDS,
@@ -366,7 +367,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "La foto grabada en la madera y su marco, cortado a juego.",
     description: "La foto grabada en una lámina de madera y un marco cortado con láser a juego, con un texto o una fecha si quieres. Un regalo para bodas, aniversarios o nacimientos.",
     features: ["Foto grabada en madera", "Marco cortado a juego", "Texto o fecha opcional", "Prueba antes de grabar"],
-    media: [],
+    media: [vid("3d-marco-madera-foto", "Giro 3D del marco de madera con foto grabada")],
     variants: [{ key: "marco", name: "Marco 115 × 115 mm", tiers: tiers([1, 3490]) }],
     addons: [],
     fields: PHOTO_FIELDS,
@@ -378,7 +379,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "400 × 115 mm: paisajes, grupos y fotos alargadas.",
     description: "Una foto panorámica grabada en una tabla de madera de 400 × 115 mm con la extensión de la F2. Para paisajes, fotos de grupo o un skyline. Te enviamos la prueba antes de grabar.",
     features: ["Madera de 400 × 115 mm", "Ideal para fotos de grupo y paisajes", "Prueba antes de grabar", "Texto opcional"],
-    media: [],
+    media: [vid("3d-panoramica-madera", "Giro 3D de la panorámica grabada en madera")],
     variants: [{ key: "400x115", name: "400 × 115 mm", tiers: tiers([1, 4990]) }],
     addons: [],
     fields: PHOTO_FIELDS,
@@ -440,12 +441,12 @@ export const SHOP_SEED: SeedProduct[] = [
     qtyOptions: [], minQty: 1, maxQty: 10, leadDays: 3, demoUrl: null,
   },
   {
-    slug: "landing-3d", kind: "digital", category: "servicios-web", featured: true, visible: true, sortOrder: 12,
+    slug: "landing-3d", kind: "quote", category: "servicios-web", featured: true, visible: true, sortOrder: 12,
     name: "Landing con 3D y animación",
     tagline: "Una página de venta de una sola URL, con 3D en tiempo real y animación con el scroll.",
-    description: "Diseñamos y programamos una landing de hasta 6 secciones a partir de tu marca: 3D en tiempo real, animación al hacer scroll y formulario o botón de compra. Adaptada a móvil, rápida y publicada en tu dominio.\n\nIncluye dos rondas de cambios. Mira nuestras demos para ver el tipo de trabajo.",
+    description: "Diseñamos y programamos una landing de hasta 6 secciones a partir de tu marca: 3D en tiempo real, animación al hacer scroll y formulario o botón de compra. Adaptada a móvil, rápida y publicada en tu dominio.\n\nEl precio de partida cubre una landing de hasta 6 secciones con dos rondas de cambios; el importe final depende de las secciones, las escenas 3D, los idiomas y los rediseños que pidas, y lo cerramos por escrito antes de empezar. Mira nuestras demos para ver el tipo de trabajo.",
     features: ["Hasta 6 secciones a partir de tu marca", "3D en tiempo real y animación con el scroll", "Adaptada a móvil y optimizada para PageSpeed", "Publicada en tu dominio", "Dos rondas de cambios"],
-    media: [pimg("warriors-hardcore-1", "Landing de Warriors Hardcore"), pimg("warriors-hardcore-2", "Landing de Warriors Hardcore"), pimg("warriors-hardcore-3", "Landing de Warriors Hardcore")],
+    media: [vid("servicio-landing-3d", "Recorrido por la landing 3D de Warriors Hardcore"), pimg("warriors-hardcore-1", "Landing de Warriors Hardcore"), pimg("warriors-hardcore-2", "Landing de Warriors Hardcore"), pimg("warriors-hardcore-3", "Landing de Warriors Hardcore")],
     variants: [{ key: "landing", name: "Landing de hasta 6 secciones", tiers: tiers([1, 69000]) }],
     addons: [{ key: "idiomas", name: "Segundo idioma", cents: 15000, perUnit: false }],
     fields: [
@@ -457,12 +458,12 @@ export const SHOP_SEED: SeedProduct[] = [
     qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 15, demoUrl: "/portfolio",
   },
   {
-    slug: "web-corporativa", kind: "digital", category: "servicios-web", featured: false, visible: true, sortOrder: 13,
+    slug: "web-corporativa", kind: "quote", category: "servicios-web", featured: false, visible: true, sortOrder: 13,
     name: "Web corporativa",
     tagline: "Hasta 5 páginas con tu marca, animación y formulario de contacto.",
-    description: "Una web de hasta 5 páginas (inicio, servicios, quiénes somos, contacto y la que necesites) diseñada a partir de tu marca, con animación, formulario de contacto y SEO técnico de base. Adaptada a móvil y publicada en tu dominio. Incluye dos rondas de cambios.",
+    description: "Una web de hasta 5 páginas (inicio, servicios, quiénes somos, contacto y la que necesites) diseñada a partir de tu marca, con animación, formulario de contacto y SEO técnico de base. Adaptada a móvil y publicada en tu dominio. El precio de partida incluye dos rondas de cambios; páginas extra, tienda, idiomas o rediseños se presupuestan aparte, siempre por escrito y antes de empezar.",
     features: ["Hasta 5 páginas", "Diseño a partir de tu marca", "Formulario de contacto", "SEO técnico de base y optimización de velocidad", "Dos rondas de cambios"],
-    media: [pimg("brasas-y-paellas-1", "Web de Brasa y Paellas"), pimg("crafter-eventos-1", "Web de Crafter Eventos")],
+    media: [vid("servicio-web-corporativa", "Recorrido por la web de Shopy Crafter"), pimg("brasas-y-paellas-1", "Web de Brasa y Paellas"), pimg("crafter-eventos-1", "Web de Crafter Eventos")],
     variants: [{ key: "web", name: "Web de hasta 5 páginas", tiers: tiers([1, 149000]) }],
     addons: [{ key: "idiomas", name: "Segundo idioma", cents: 25000, perUnit: false }],
     fields: [
@@ -473,12 +474,12 @@ export const SHOP_SEED: SeedProduct[] = [
     qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 25, demoUrl: "/portfolio",
   },
   {
-    slug: "rediseno-tienda", kind: "digital", category: "servicios-web", featured: true, visible: true, sortOrder: 14,
+    slug: "rediseno-tienda", kind: "quote", category: "servicios-web", featured: true, visible: true, sortOrder: 14,
     name: "Rediseño de tienda online",
     tagline: "Shopify, WooCommerce o PrestaShop: portada, colección y ficha de producto rediseñadas.",
-    description: "Rediseñamos las tres páginas que más venden de tu tienda: la portada, la página de colección y la ficha de producto, a partir de tu marca y de una auditoría de lo que hoy frena la compra. Trabajamos sobre tu propia tienda, sin migrarla. Incluye dos rondas de cambios.",
+    description: "Rediseñamos las tres páginas que más venden de tu tienda: la portada, la página de colección y la ficha de producto, a partir de tu marca y de una auditoría de lo que hoy frena la compra. Trabajamos sobre tu propia tienda, sin migrarla. El precio de partida cubre esas tres páginas con dos rondas de cambios; más plantillas, colecciones o productos a rediseñar se presupuestan según el trabajo real, por escrito y antes de empezar.",
     features: ["Portada, colección y ficha de producto", "Auditoría previa de lo que frena la compra", "Sobre tu tienda actual, sin migraciones", "Adaptado a móvil y optimizado para PageSpeed", "Dos rondas de cambios"],
-    media: [vid("servicio-rediseno-tienda", "Rediseño de la tienda de Muscle Factory")],
+    media: [vid("servicio-rediseno-tienda-v2", "Maqueta de rediseño de la tienda de Muscle Factory")],
     variants: [{ key: "rediseno", name: "Portada + colección + ficha", tiers: tiers([1, 129000]) }],
     addons: [],
     fields: [
@@ -489,10 +490,10 @@ export const SHOP_SEED: SeedProduct[] = [
     qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 20, demoUrl: null,
   },
   {
-    slug: "video-3d-marca", kind: "digital", category: "servicios-video", featured: true, visible: true, sortOrder: 15,
+    slug: "video-3d-marca", kind: "quote", category: "servicios-video", featured: true, visible: true, sortOrder: 15,
     name: "Vídeo animado 3D de marca",
     tagline: "De 30 a 60 segundos, con personaje o producto en 3D, para web y redes.",
-    description: "Un vídeo de presentación animado en 3D: tu producto, tu local o un personaje de marca, con textos, música y voz si la quieres. Lo entregamos en vertical para redes y en horizontal para la web. Incluye guion, una ronda de cambios sobre el guion y otra sobre el vídeo.",
+    description: "Un vídeo de presentación animado en 3D: tu producto, tu local o un personaje de marca, con textos, música y voz si la quieres. Lo entregamos en vertical para redes y en horizontal para la web. Incluye guion, una ronda de cambios sobre el guion y otra sobre el vídeo. El precio de partida es para el vídeo más corto con un personaje o producto; más escenas, personajes o versiones se presupuestan según el trabajo.",
     features: ["De 30 a 60 segundos", "Producto, local o personaje de marca en 3D", "Vertical 9:16 y horizontal 16:9", "Guion incluido", "Una ronda de cambios en guion y otra en vídeo"],
     media: [vid("servicio-video-3d", "Vídeo 3D de presentación para Lazy Lizard")],
     variants: [
@@ -563,5 +564,45 @@ export const SHOP_SEED: SeedProduct[] = [
       { key: "objetivo", label: "¿Qué métricas o informes necesitas?", type: "textarea", required: false, max: 1200 },
     ],
     qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 0, demoUrl: null,
+  },
+  {
+    slug: "ficha-google-maps", kind: "quote", category: "google-local", featured: true, visible: true, sortOrder: 20,
+    name: "Ficha de Google Maps optimizada",
+    tagline: "Tu negocio bien presentado donde te buscan: Google Maps y el buscador.",
+    description: "Ponemos a punto tu Perfil de empresa de Google (la ficha que sale en Google Maps y en el buscador): alta o recuperación de la ficha, categorías y servicios, horarios con festivos, fotos y portada, descripción pensada para cómo te busca la gente, enlace de reseñas con su QR y las primeras publicaciones. Trabajamos desde nuestro panel Crafter Mando, sin pedirte tu contraseña de Google: tú nos das acceso de gestor a la ficha.\n\nLa verificación de la ficha y la posición en Google las decide Google: no prometemos un puesto concreto. Prometemos una ficha completa, coherente y bien cuidada. El precio de partida es para una ficha de un solo local; varios locales, sesión de fotos o idiomas se presupuestan según el trabajo.",
+    features: ["Alta o recuperación de la ficha y ayuda con la verificación", "Categorías, servicios, atributos y horarios con festivos", "Fotos, portada y descripción optimizada", "Enlace y QR para pedir reseñas", "Primeras publicaciones y preguntas frecuentes", "Presupuesto por escrito antes de empezar"],
+    media: [img("google-ficha-mando", "Panel Crafter Mando con la ficha de Google: métricas, reseñas y publicaciones (datos de ejemplo)"), vid("servicio-google-mando", "Respuestas a reseñas propuestas desde Crafter Mando (datos de ejemplo)")],
+    variants: [{ key: "ficha", name: "Una ficha (un local)", tiers: tiers([1, 19000]) }],
+    addons: [], fields: [], qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 7, demoUrl: null,
+  },
+  {
+    slug: "resenas-google", kind: "quote", category: "google-local", featured: true, visible: true, sortOrder: 21,
+    name: "Gestión de reseñas de Google",
+    tagline: "Más reseñas y todas respondidas, con tu visto bueno. Puesta en marcha + cuota mensual.",
+    description: "Montamos el sistema para que tus clientes dejen reseña con un gesto (enlace corto, QR y, si quieres, la placa de madera grabada de la Tienda) y nos ocupamos de que ninguna se quede sin respuesta: te avisamos de cada reseña nueva y te dejamos la respuesta redactada en tu tono para que la apruebes. Nada se publica sin tu visto bueno.\n\nSe paga en dos partes: una puesta en marcha inicial, de pago único, y una cuota mensual por la gestión. El precio de partida es para una ficha; varios locales o varios idiomas se presupuestan según el trabajo. Cumplimos las normas de Google: no compramos reseñas, no las filtramos ni ofrecemos regalos a cambio de ellas.",
+    features: ["Enlace corto y QR para pedir la reseña", "Aviso de cada reseña nueva", "Respuesta redactada en tu tono, tú la apruebas", "Informe mensual de reseñas y nota media", "Combina con la Placa QR de reseñas de la Tienda", "Puesta en marcha (pago único) + cuota mensual, siempre por escrito"],
+    media: [vid("servicio-google-mando", "Respuestas a reseñas propuestas desde Crafter Mando (datos de ejemplo)"), img("google-resenas-mando", "Reseñas con la respuesta lista para aprobar en Crafter Mando (datos de ejemplo)"), img("placa-resenas-madera", "Placa de reseñas de Google en madera para RastaLo Barcelona")],
+    variants: [{ key: "resenas", name: "Puesta en marcha (una ficha)", tiers: tiers([1, 9000]) }],
+    addons: [], fields: [], qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 5, demoUrl: null,
+  },
+  {
+    slug: "google-calendar-reservas", kind: "quote", category: "google-local", featured: false, visible: true, sortOrder: 22,
+    name: "Reservas y agenda con Google Calendar",
+    tagline: "Tus clientes reservan en tu web y la cita cae en tu Google Calendar.",
+    description: "Una página de reservas con la imagen de tu negocio, conectada a tu Google Calendar: el cliente elige servicio y hueco, el sistema comprueba que esté libre, la cita aparece en tu calendario y el cliente recibe su confirmación por email. Duraciones, horarios, festivos y descansos a tu medida.\n\nLo construimos a medida de cómo trabajas tú. El precio de partida es para un calendario y un tipo de servicio; varios profesionales, pagos con señal, recordatorios por WhatsApp o idiomas se presupuestan según el trabajo, por escrito y antes de empezar.",
+    features: ["Página de reservas con tu marca, en tu dominio", "Sincronizada con tu Google Calendar", "Comprueba huecos libres antes de confirmar", "Confirmación por email al cliente", "Horarios, festivos y descansos a tu medida", "Presupuesto por escrito antes de empezar"],
+    media: [],
+    variants: [{ key: "agenda", name: "Un calendario, un servicio", tiers: tiers([1, 29000]) }],
+    addons: [], fields: [], qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 12, demoUrl: null,
+  },
+  {
+    slug: "pack-google-local", kind: "quote", category: "google-local", featured: true, visible: true, sortOrder: 23,
+    name: "Pack Presencia en Google",
+    tagline: "Ficha, reseñas y reservas juntas, con un solo diseño y un solo responsable.",
+    description: "Reunimos los tres servicios en un solo encargo: ficha de Google Maps optimizada, sistema de reseñas con su QR y reservas conectadas a tu Google Calendar, con la misma imagen en todo. Pagas una puesta en marcha inicial y, si quieres que gestionemos tus reseñas cada mes, una cuota mensual aparte.\n\nEl precio de partida es para un solo local; el importe final lo cerramos por escrito antes de empezar, según lo que haya que montar.",
+    features: ["Ficha de Google Maps optimizada", "Sistema de reseñas con enlace y QR", "Reservas conectadas a Google Calendar", "Misma imagen en las tres piezas", "Puesta en marcha (pago único) + cuota mensual opcional", "Presupuesto por escrito antes de empezar"],
+    media: [img("google-ficha-mando", "Panel Crafter Mando con la ficha de Google (datos de ejemplo)"), img("google-resenas-mando", "Reseñas con respuesta lista para aprobar (datos de ejemplo)"), img("placa-resenas-madera", "Placa de reseñas de Google en madera")],
+    variants: [{ key: "pack", name: "Pack completo (un local)", tiers: tiers([1, 39000]) }],
+    addons: [], fields: [], qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 15, demoUrl: null,
   },
 ];

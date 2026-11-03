@@ -14,13 +14,17 @@ export type PackPlatform = "shopify" | "woocommerce" | "prestashop" | "stripe";
 export interface PackPlan {
   id: string; name: string; summary: string; priceMonthly: number; priceAnnual: number;
   featured: boolean; badge: string | null; lines: string[];
+  /** Puesta en marcha inicial, pago único «desde» (€ sin IVA); aparte de la mensualidad. */
+  setupFromEur: number;
 }
 export interface PlatformPacks {
   key: PackPlatform; label: string; extras: string[]; included: string[];
   plans: PackPlan[];
+  /** Recargo mensual de la plataforma ya incluido en el precio de sus packs (€). */
+  surchargeMonthly?: number;
   custom: { id: string; name: string; lines: string[] } | null;
 }
-export interface PacksData { platforms: PlatformPacks[]; annualMonths: number; taxNote: string }
+export interface PacksData { platforms: PlatformPacks[]; annualMonths: number; taxNote: string; setupNote?: string }
 
 const BRAND: Record<PackPlatform, string> = {
   shopify: "#95bf47", woocommerce: "#96588a", prestashop: "#df0067", stripe: "#635bff",
@@ -114,6 +118,7 @@ export function PackPricing({ data, error, onChoose, onQuote }: {
               <span className="lx-plan-per">/mes + IVA</span>
             </div>
             <div className="lx-plan-note">{annual ? `${eur(plan.priceAnnual)} al año` : plan.summary}</div>
+            <div className="lx-plan-setup"><b>Puesta en marcha desde {eur(plan.setupFromEur)}</b><span>pago único + IVA, aparte de la mensualidad</span></div>
             <ul className="lx-plan-feats">{plan.lines.map(l => <li key={l}>{l}</li>)}</ul>
             <button type="button" className={`lx-plan-cta${plan.featured ? " gold" : ""}`} onClick={() => onChoose(plan, current, annual)}>
               Elegir {plan.name}
@@ -124,12 +129,16 @@ export function PackPricing({ data, error, onChoose, onQuote }: {
           <article className="lx-plan lxk-custom">
             <h3 className="lx-plan-name">{current.custom.name}</h3>
             <div className="lx-plan-price"><span className="lx-plan-amount lx-plan-quote">A medida</span></div>
-            <div className="lx-plan-note">Presupuesto cerrado según alcance</div>
+            <div className="lx-plan-note">Presupuesto según alcance, puesta en marcha y mensualidad por separado</div>
             <ul className="lx-plan-feats">{current.custom.lines.map(l => <li key={l}>{l}</li>)}</ul>
             <button type="button" className="lx-plan-cta" onClick={() => onQuote(current)}>Pedir presupuesto</button>
           </article>
         )}
       </div>
+      <p className="lxk-setup-note">
+        <strong>Cómo se paga:</strong> {data.setupNote ?? "Cada pack lleva una puesta en marcha inicial de pago único y la mensualidad."}
+        {current.surchargeMonthly ? ` En ${current.label} la mensualidad incluye ${eur(current.surchargeMonthly)}/mes más que en Shopify: plugins o módulos propios, actualizaciones y copias que revisamos cada mes.` : ""}
+      </p>
       <div className="lx-common">
         <span className="lx-common-title">Incluido en todos los packs de {current.label}</span>
         <ul>{[...current.included, ...current.extras].map(f => <li key={f}>{f}</li>)}</ul>
@@ -198,7 +207,7 @@ export function PackConfigurator({ data, error, loggedInClient, onSubmit }: {
 
   const summaryText = () => {
     const lines = [`Configurador · Plataforma: ${current.label}`];
-    if (plan) lines.push(`Pack ${plan.name} (${annual ? "anual" : "mensual"}): ${eur(monthlyOf(plan, annual))}/mes + IVA`);
+    if (plan) lines.push(`Pack ${plan.name} (${annual ? "anual" : "mensual"}): ${eur(monthlyOf(plan, annual))}/mes + IVA, más puesta en marcha desde ${eur(plan.setupFromEur)} (pago único + IVA)`);
     if (custom) lines.push("Pack A medida: quiero presupuesto");
     for (const s of chosenServices) {
       lines.push(`Extra: ${s.name}${priced(s) ? ` (${eur(Number(s.price_eur))}${s.billing_interval === "month" ? "/mes" : ""} + IVA)` : " (presupuesto)"}`);
@@ -280,9 +289,10 @@ export function PackConfigurator({ data, error, loggedInClient, onSubmit }: {
         </dl>
         <div className="lxk-total">
           <div><span>Mensual</span><strong>{eur(totals.monthly)}</strong></div>
-          <div><span>Pago único</span><strong>{eur(totals.oneTime)}</strong></div>
+          {plan && <div><span>Puesta en marcha del pack</span><strong>desde {eur(plan.setupFromEur)}</strong></div>}
+          {totals.oneTime > 0 && <div><span>Extras de pago único</span><strong>{eur(totals.oneTime)}</strong></div>}
           {annual && plan && <p>Pack anual: {eur(plan.priceAnnual)} en un solo cobro.</p>}
-          <p>{data.taxNote}. {hasQuote ? "Lo marcado como presupuesto te lo cerramos antes de empezar." : ""}</p>
+          <p>{data.taxNote}. La puesta en marcha es siempre «desde»: se cierra por escrito antes de empezar. {hasQuote ? "Lo marcado como presupuesto te lo cerramos antes de empezar." : ""}</p>
         </div>
         <button type="button" className="lx-plan-cta gold" disabled={!canSubmit}
           onClick={() => onSubmit({ platform: current, plan, custom, annual, services: chosenServices, ...totals, summary: summaryText() })}>

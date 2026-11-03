@@ -5,7 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Flip } from "gsap/Flip";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import ShopLayout from "./ShopLayout";
-import { assetUrl, coverOf, euros, fromPrice, loadCatalog, type Catalog, type Product } from "./shop-api";
+import { assetUrl, coverOf, euros, fromPrice, loadCatalog, priceLabel, serviceMark, type Catalog, type Product } from "./shop-api";
 import { bindMagnetic, bindTilt, prefersReduced } from "./shop-motion";
 
 gsap.registerPlugin(ScrollTrigger, Flip);
@@ -18,13 +18,13 @@ function Words({ text }: { text: string }) {
   return <>{words.map((w, i) => <Fragment key={i}><span className="shop-w"><span>{w}</span></span>{i < words.length - 1 ? " " : null}</Fragment>)}</>;
 }
 
-const MARQUEE = ["Grabado láser en Barcelona", "Tarjetas de aluminio desde 0,35 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Web, SEO, PageSpeed e informes"];
+const MARQUEE = ["Grabado láser en Barcelona", "Tarjetas de aluminio desde 0,35 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Webs, Google y reseñas · precios a partir de"];
 
 function ProductCard({ p }: { p: Product }) {
   const cover = coverOf(p);
   const video = p.media.find(m => m.type === "video");
   const vref = useRef<HTMLVideoElement>(null);
-  const price = fromPrice(p);
+  const label = priceLabel(p);
   return (
     <Link
       href={`/tienda/${p.slug}`} className="shop-card" data-flip-id={p.slug}
@@ -34,7 +34,7 @@ function ProductCard({ p }: { p: Product }) {
       <div className="shop-card-media">
         {cover ? <img src={cover} alt={p.media[0]?.alt || p.name} loading="lazy" decoding="async" /> : p.kind === "quote"
           ? <div className="shop-card-noimg shop-card-service-art" aria-hidden="true">
-              <strong>{p.slug === "auditoria-seo" ? "SEO" : p.slug === "optimizacion-pagespeed" ? "CWV" : p.slug === "informes-mensuales" ? "INFORME" : "WEB"}</strong>
+              <strong>{serviceMark(p.slug)}</strong>
               <span>{p.categoryLabel}</span>
             </div>
           : <div className="shop-card-noimg" aria-hidden="true"><span>{p.name}</span></div>}
@@ -49,9 +49,9 @@ function ProductCard({ p }: { p: Product }) {
         <h3>{p.name}</h3>
         <p>{p.tagline}</p>
         <div className="shop-card-foot">
-          {p.kind === "quote"
-            ? <strong>Presupuesto</strong>
-            : <strong>{price.perUnit ? "Desde " : ""}{euros(price.cents)}{price.perUnit ? <small> / ud.</small> : null}</strong>}
+          {label
+            ? <strong>{label.prefix}{euros(label.cents)}{label.suffix ? <small>{label.suffix}</small> : null}</strong>
+            : <strong>Presupuesto</strong>}
           <span className="shop-card-go" aria-hidden="true">→</span>
         </div>
       </div>
@@ -185,7 +185,8 @@ export default function Shop() {
   const digital = products.filter(p => p.kind !== "physical");
   const webServices = digital.filter(p => p.category === "servicios-web");
   const videoServices = digital.filter(p => p.category === "servicios-video");
-  const otherDigital = digital.filter(p => p.category !== "servicios-web" && p.category !== "servicios-video");
+  const googleServices = digital.filter(p => p.category === "google-local");
+  const otherDigital = digital.filter(p => p.category !== "servicios-web" && p.category !== "servicios-video" && p.category !== "google-local");
 
   return (
     <ShopLayout>
@@ -197,7 +198,7 @@ export default function Shop() {
             <div className="shop-hero-copy">
               <span className="shop-eyebrow">Taller láser · Estudio digital</span>
               <h1><Words text="Lo que hacemos," /> <em><Words text="listo para pedir." /></em></h1>
-              <p>Tarjetas de aluminio, placas QR, expositores y fotos grabadas con nuestra xTool F2. También hacemos webs, rediseño de tiendas, auditorías SEO, optimización PageSpeed, informes mensuales y vídeo animado en 3D.</p>
+              <p>Tarjetas de aluminio, placas QR, expositores y fotos grabadas con nuestra xTool F2. También hacemos webs, rediseño de tiendas, ficha de Google Maps y reseñas, auditorías SEO, optimización PageSpeed, informes mensuales y vídeo animado en 3D.</p>
               <div className="shop-hero-ctas">
                 <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas desde {euros(cardFrom)} →</Link>
                 <a href="#catalogo" className="shop-btn shop-btn-ghost shop-btn-lg">Ver todo el catálogo</a>
@@ -288,7 +289,7 @@ export default function Shop() {
           {webServices.length > 0 && (
             <>
               <h3 className="shop-group-title">Web, SEO y rendimiento</h3>
-              <p className="shop-group-intro">Landing pages, tiendas online, auditorías SEO, optimización de PageSpeed e informes mensuales. Los servicios a medida se presupuestan antes de empezar.</p>
+              <p className="shop-group-intro">Landing pages, tiendas online, auditorías SEO, optimización de PageSpeed e informes mensuales. Los precios son «a partir de»: dependen de las páginas, los productos y los rediseños, y los cerramos por escrito antes de empezar.</p>
               <div className="shop-grid">{webServices.map(p => <ProductCard key={p.slug} p={p} />)}</div>
             </>
           )}
@@ -297,6 +298,13 @@ export default function Shop() {
               <h3 className="shop-group-title">Vídeo y animación 3D</h3>
               <p className="shop-group-intro">Piezas animadas para presentar tu marca, producto o local en web y redes.</p>
               <div className="shop-grid">{videoServices.map(p => <ProductCard key={p.slug} p={p} />)}</div>
+            </>
+          )}
+          {googleServices.length > 0 && (
+            <>
+              <h3 className="shop-group-title">Google, reseñas y reservas</h3>
+              <p className="shop-group-intro">Tu ficha de Google Maps, tus reseñas y tus reservas con Google Calendar, gestionadas con nuestro panel Crafter Mando. Precios «a partir de»: el importe final se cierra por escrito según el trabajo.</p>
+              <div className="shop-grid">{googleServices.map(p => <ProductCard key={p.slug} p={p} />)}</div>
             </>
           )}
           {otherDigital.length > 0 && (
@@ -312,7 +320,7 @@ export default function Shop() {
             <div>
               <span className="shop-eyebrow">¿Algo que no está aquí?</span>
               <h2 id="medida-h">Lo diseñamos y lo grabamos a medida.</h2>
-              <p>Cuéntanos qué necesitas y te preparamos un presupuesto cerrado en 24 horas laborables.</p>
+              <p>Cuéntanos qué necesitas y te preparamos un presupuesto por escrito en 24 horas laborables, antes de empezar.</p>
             </div>
             <div className="shop-hero-ctas">
               <Link href="/contacto" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Pedir presupuesto →</Link>

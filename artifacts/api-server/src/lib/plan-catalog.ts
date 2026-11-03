@@ -76,6 +76,13 @@ interface CatalogPlanBase {
   callMinutes: number;
   /** Plazo de respuesta en el portal, en horas laborables. */
   responseHours: number;
+  /**
+   * Puesta en marcha inicial (pago único, sin IVA), siempre «desde»: conectar la tienda, configurar
+   * los motores, importar el catálogo y formar al cliente. Se presupuesta en la propuesta según lo que
+   * haya que montar y se factura aparte de la mensualidad (no entra en el cobro de Stripe del pack).
+   * Cifras pendientes del OK del dueño (ver Agente/TARIFAS.md).
+   */
+  setupFromEur: number;
 }
 
 export interface StorePlan extends CatalogPlanBase {
@@ -99,7 +106,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "emprendedor", family: "store", name: "Emprendedor", priceMonthly: 19, priceAnnual: 190,
     productsPerMonth: 5, imagesPerMonth: 15,
     quotas: { seoAudits: 1, competitorAnalyses: 5, abTests: 0, blogPosts: 0, pagespeed: { cadence: "monthly", urls: 1 }, report: "monthly" },
-    callMinutes: 0, responseHours: 48,
+    callMinutes: 0, responseHours: 48, setupFromEur: 90,
     summary: "Plan heredado para tiendas pequeñas.",
     featured: false, badge: null, ctaLabel: "Empezar", sortOrder: 0, sellable: false,
   },
@@ -107,7 +114,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "starter", family: "store", name: "Starter", priceMonthly: 49, priceAnnual: 490,
     productsPerMonth: 15, imagesPerMonth: 45,
     quotas: { seoAudits: 1, competitorAnalyses: 10, abTests: 1, blogPosts: 0, pagespeed: { cadence: "monthly", urls: 3 }, report: "monthly" },
-    callMinutes: 0, responseHours: 48,
+    callMinutes: 0, responseHours: 48, setupFromEur: 150,
     summary: "Para catálogos que crecen cada mes.",
     featured: false, badge: null, ctaLabel: "Elegir Starter", sortOrder: 1, sellable: true,
   },
@@ -115,7 +122,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "agency_pro", family: "store", name: "Growth", priceMonthly: 149, priceAnnual: 1490,
     productsPerMonth: 60, imagesPerMonth: 300,
     quotas: { seoAudits: 2, competitorAnalyses: 30, abTests: 3, blogPosts: 2, pagespeed: { cadence: "weekly", urls: 10 }, report: "biweekly" },
-    callMinutes: 30, responseHours: 24,
+    callMinutes: 30, responseHours: 24, setupFromEur: 350,
     summary: "Para tiendas con rotación de producto constante.",
     featured: true, badge: "Recomendado", ctaLabel: "Elegir Growth", sortOrder: 2, sellable: true,
   },
@@ -123,7 +130,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "enterprise", family: "store", name: "Enterprise", priceMonthly: 399, priceAnnual: 3990,
     productsPerMonth: 200, imagesPerMonth: 1200,
     quotas: { seoAudits: 4, competitorAnalyses: 100, abTests: 8, blogPosts: 6, pagespeed: { cadence: "daily", urls: 25 }, report: "weekly" },
-    callMinutes: 60, responseHours: 8,
+    callMinutes: 60, responseHours: 8, setupFromEur: 750,
     summary: "Para catálogos grandes.",
     featured: false, badge: null, ctaLabel: "Elegir Enterprise", sortOrder: 3, sellable: true,
   },
@@ -131,7 +138,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "stripe_starter", family: "stripe", name: "Starter", priceMonthly: 39, priceAnnual: 390,
     productsPerMonth: 0, imagesPerMonth: 0,
     quotas: { invoices: 20, coupons: 2, subscriptionChanges: 0, report: "monthly", payouts: null },
-    callMinutes: 0, responseHours: 48,
+    callMinutes: 0, responseHours: 48, setupFromEur: 90,
     summary: "Tus cobros vigilados y un informe al mes.",
     featured: false, badge: null, ctaLabel: "Elegir Starter", sortOrder: 11, sellable: true,
   },
@@ -139,7 +146,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "stripe_growth", family: "stripe", name: "Growth", priceMonthly: 99, priceAnnual: 990,
     productsPerMonth: 0, imagesPerMonth: 0,
     quotas: { invoices: 100, coupons: 10, subscriptionChanges: 50, report: "biweekly", payouts: "monthly" },
-    callMinutes: 30, responseHours: 24,
+    callMinutes: 30, responseHours: 24, setupFromEur: 190,
     summary: "Llevamos tu facturación y tus suscripciones.",
     featured: true, badge: "Recomendado", ctaLabel: "Elegir Growth", sortOrder: 12, sellable: true,
   },
@@ -147,7 +154,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "stripe_enterprise", family: "stripe", name: "Enterprise", priceMonthly: 249, priceAnnual: 2490,
     productsPerMonth: 0, imagesPerMonth: 0,
     quotas: { invoices: 400, coupons: 40, subscriptionChanges: 300, report: "weekly", payouts: "weekly" },
-    callMinutes: 60, responseHours: 8,
+    callMinutes: 60, responseHours: 8, setupFromEur: 390,
     summary: "Para negocios con mucho volumen de cobros.",
     featured: false, badge: null, ctaLabel: "Elegir Enterprise", sortOrder: 13, sellable: true,
   },
@@ -184,6 +191,18 @@ export const PLATFORM_EXTRAS: Record<StorePlatform, string[]> = {
 export const PLATFORM_LABELS: Record<PackPlatform, string> = {
   shopify: "Shopify", woocommerce: "WooCommerce", prestashop: "PrestaShop", stripe: "Stripe",
 };
+
+/**
+ * Recargo mensual por plataforma (€/mes, sin IVA; el anual suma 10 meses de recargo, como el pack).
+ * WooCommerce y PrestaShop llevan plugins o módulos de pago y de SEO que actualizamos y probamos cada
+ * mes, y copias que restauramos si algo se rompe; en Shopify la plataforma se encarga de todo eso. Es la diferencia de la banda de mensualidad de Agente/TARIFAS.md (49–99 € frente a 59–129 €).
+ */
+export const PLATFORM_SURCHARGE_EUR: Record<PackPlatform, number> = { shopify: 0, woocommerce: 10, prestashop: 10, stripe: 0 };
+
+export function platformSurcharge(platform: string | null | undefined, interval: "month" | "year" = "month"): number {
+  const m = PLATFORM_SURCHARGE_EUR[platform as PackPlatform] ?? 0;
+  return interval === "year" ? m * 10 : m;
+}
 
 /** Periodo de prueba al activar la cuenta. */
 export const TRIAL = { days: 14, productsPerMonth: 3, imagesPerMonth: 6 };
