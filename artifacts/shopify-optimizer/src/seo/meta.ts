@@ -52,9 +52,9 @@ export const STATIC_ROUTES: SeoRoute[] = [
   {
     path: "/tienda",
     title: "Tienda: tarjetas de aluminio, placas QR, regalos 3D y webs — Shopy Crafter",
-    description: "Tarjetas de visita de aluminio grabadas con láser desde 0,35 €, placas QR para reseñas de Google, expositores, fotos grabadas en madera y aluminio, regalos web en 3D, landings y vídeo animado. Pago seguro con Stripe.",
+    description: "Tarjetas, placas QR y regalos personalizados; webs y tiendas online, auditoría SEO, PageSpeed, informes mensuales y vídeo 3D. Pago seguro con Stripe.",
     h1: "Tienda de Shopy Crafter",
-    intro: "Productos del taller láser (tarjetas de aluminio, placas QR, expositores y fotos grabadas) y servicios digitales (webs, rediseños de tienda, regalos web en 3D y vídeo animado), con precio cerrado y pago con tarjeta.",
+    intro: "Productos del taller láser y servicios digitales: webs, rediseño de tiendas, auditorías SEO, optimización de PageSpeed, informes mensuales y vídeo 3D. Los servicios a medida se presupuestan antes de empezar.",
     priority: 0.85, changefreq: "weekly", inSitemap: true,
   },
   {

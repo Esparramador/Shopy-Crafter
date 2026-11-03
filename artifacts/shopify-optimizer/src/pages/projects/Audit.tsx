@@ -870,7 +870,7 @@ function Tripo3DAutoModal({
         <div className="mb-4 flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-400">
           {hasImage ? (
             <>
-              <img src={product.imageUrl} className="w-8 h-8 rounded object-cover flex-shrink-0" />
+            <img src={product.imageUrl} alt={`Imagen del producto ${product.title}`} className="w-8 h-8 rounded object-cover flex-shrink-0" />
               <span>Usando imagen del producto → <span className="text-cyan-400">image-to-model</span></span>
             </>
           ) : (

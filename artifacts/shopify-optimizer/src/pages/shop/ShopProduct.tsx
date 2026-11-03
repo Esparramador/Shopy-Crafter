@@ -23,7 +23,20 @@ const PREVIEW: Record<string, { shape: PreviewShape; field: string; sample: stri
 
 interface Uploaded { id: string; name: string; preview: string | null }
 
-function Gallery({ media, name, preview }: { media: Media[]; name: string; preview: React.ReactNode | null }) {
+function productMetaDescription(product: Product): string {
+  const text = (product.description || product.tagline).replace(/\s+/g, " ").trim();
+  if (text.length <= 160) return text;
+  const shortened = text.slice(0, 157);
+  const boundary = shortened.lastIndexOf(" ");
+  return `${shortened.slice(0, boundary > 120 ? boundary : 157).trimEnd()}…`;
+}
+
+function Gallery({ media, name, preview, serviceArt }: {
+  media: Media[];
+  name: string;
+  preview: React.ReactNode | null;
+  serviceArt?: { mark: string; label: string };
+}) {
   const slides = preview ? ["3d", ...media.map((_, i) => i)] : media.map((_, i) => i);
   const [i, setI] = useState(0);
   const cur = slides[i];
@@ -33,7 +46,13 @@ function Gallery({ media, name, preview }: { media: Media[]; name: string; previ
     if (!el || prefersReduced()) return;
     gsap.fromTo(el, { opacity: 0, scale: 1.06, filter: "blur(8px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.6, ease: "power3.out" });
   }, [i]);
-  if (slides.length === 0) return <div className="shop-gallery-main shop-card-noimg"><span>{name}</span></div>;
+  if (slides.length === 0) {
+    return (
+      <div className={`shop-gallery-main shop-card-noimg${serviceArt ? " shop-card-service-art" : ""}`} aria-hidden="true">
+        {serviceArt ? <><strong>{serviceArt.mark}</strong><span>{serviceArt.label}</span></> : <span>{name}</span>}
+      </div>
+    );
+  }
   return (
     <div className="shop-gallery">
       <div ref={stage} className="shop-gallery-main" data-fly-source>
@@ -152,7 +171,9 @@ export default function ShopProduct() {
     if (prefersReduced()) return unMag;
     const ctx = gsap.context(() => {
       gsap.from(".shop-pd-info > *", { y: 30, opacity: 0, duration: 0.8, stagger: 0.06, ease: "power3.out" });
-      gsap.from(".shop-gallery", { scale: 0.9, opacity: 0, rotateY: -12, transformPerspective: 1200, duration: 1.1, ease: "expo.out" });
+      if (root.current?.querySelector(".shop-gallery")) {
+        gsap.from(".shop-gallery", { scale: 0.9, opacity: 0, rotateY: -12, transformPerspective: 1200, duration: 1.1, ease: "expo.out" });
+      }
       gsap.from(".shop-pd-details > *, .shop-related", { y: 40, opacity: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: ".shop-pd-details", start: "top 85%", once: true } });
     }, root);
     return () => { ctx.revert(); unMag(); };
@@ -249,11 +270,19 @@ export default function ShopProduct() {
   const min = minQty(p, v);
   return (
     <ShopLayout>
-      <PageMeta title={`${p.name} — Tienda Shopy Crafter`} description={p.tagline} canonical={`${SITE_URL}/tienda/${p.slug}`} />
+      <PageMeta title={`${p.name} — Tienda Shopy Crafter`} description={productMetaDescription(p)} canonical={`${SITE_URL}/tienda/${p.slug}`} />
       <div ref={root} className="shop-wrap">
         <nav className="shop-crumbs" aria-label="Migas de pan"><Link href="/tienda">Tienda</Link> / <span>{p.categoryLabel}</span></nav>
         <div className="shop-pd">
-          <Gallery media={p.media} name={p.name} preview={preview} />
+          <Gallery
+            media={p.media}
+            name={p.name}
+            preview={preview}
+            serviceArt={p.kind === "quote" ? {
+              mark: p.slug === "auditoria-seo" ? "SEO" : p.slug === "optimizacion-pagespeed" ? "CWV" : p.slug === "informes-mensuales" ? "INFORME" : "WEB",
+              label: p.categoryLabel,
+            } : undefined}
+          />
           <div className="shop-pd-info">
             <span className="shop-card-cat">{p.categoryLabel}</span>
             <h1>{p.name}</h1>

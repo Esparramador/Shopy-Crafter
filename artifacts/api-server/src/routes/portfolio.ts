@@ -79,6 +79,12 @@ function ensureTable(): Promise<void> {
     await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT ''`);
     await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS variants JSONB NOT NULL DEFAULT '[]'::jsonb`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS portfolio_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS portfolio_deleted_projects (
+        slug TEXT PRIMARY KEY,
+        deleted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
     await applySeed();
     await applyPatches();
   })().catch(err => { ready = null; throw err; });
@@ -90,13 +96,16 @@ function ensureTable(): Promise<void> {
  *  - proyecto que no existe → se crea;
  *  - textos genéricos de la versión 1 → se actualizan campo a campo si siguen intactos;
  *  - textos e imágenes editados desde el panel → se conservan.
- * Borrar un proyecto desde el panel es definitivo: la versión ya aplicada no lo vuelve a crear.
+ * Los proyectos borrados desde el panel quedan registrados y no se recrean en versiones posteriores.
  */
-async function applySeed(): Promise<void> {
+export async function applySeed(): Promise<void> {
   const meta = await db.execute(sql`SELECT value FROM portfolio_meta WHERE key = 'seed_version'`);
   const applied = Number((meta.rows[0] as { value?: string } | undefined)?.value ?? 0);
   if (applied >= SEED_VERSION) return;
+  const deletedRows = await db.execute(sql`SELECT slug FROM portfolio_deleted_projects`);
+  const deletedSlugs = new Set((deletedRows.rows as { slug: string }[]).map(row => row.slug));
   for (const p of SEED) {
+    if (deletedSlugs.has(p.slug)) continue;
     const cur = await db.execute(sql`SELECT id, title, summary, description, images FROM portfolio_projects WHERE slug = ${p.slug}`);
     const row = cur.rows[0] as { id: number; title: string; summary: string; description: string; images: unknown } | undefined;
     const tech = JSON.stringify(p.tech), features = JSON.stringify(p.features), images = JSON.stringify(p.images);
@@ -151,11 +160,14 @@ function renamedDeep<T>(v: T): T {
  * Correcciones de PATCH_PREVIOUS sobre filas existentes, una vez por PATCH_VERSION.
  * No crea filas: un proyecto borrado desde el panel sigue borrado.
  */
-async function applyPatches(): Promise<void> {
+export async function applyPatches(): Promise<void> {
   const meta = await db.execute(sql`SELECT value FROM portfolio_meta WHERE key = 'patch_version'`);
   const applied = Number((meta.rows[0] as { value?: string } | undefined)?.value ?? 0);
   if (applied >= PATCH_VERSION) return;
+  const deletedRows = await db.execute(sql`SELECT slug FROM portfolio_deleted_projects`);
+  const deletedSlugs = new Set((deletedRows.rows as { slug: string }[]).map(row => row.slug));
   for (const slug of PATCH_NEW_SLUGS) {
+    if (deletedSlugs.has(slug)) continue;
     const p = SEED.find(x => x.slug === slug);
     if (!p) continue;
     await db.execute(sql`
@@ -253,6 +265,21 @@ function cleanUrl(v: unknown): string | null {
 
 function cleanText(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
+}
+
+/** Borra el proyecto y registra su slug de forma atómica para protegerlo de futuras semillas. */
+export async function deletePortfolioProject(id: number): Promise<PortfolioImage[]> {
+  const result = await db.execute(sql`
+    WITH removed AS (
+      DELETE FROM portfolio_projects WHERE id = ${id} RETURNING slug, images
+    ), recorded AS (
+      INSERT INTO portfolio_deleted_projects (slug)
+      SELECT slug FROM removed
+      ON CONFLICT (slug) DO NOTHING
+    )
+    SELECT images FROM removed
+  `);
+  return ((result.rows[0] as { images?: PortfolioImage[] } | undefined)?.images) ?? [];
 }
 
 // ── Público ───────────────────────────────────────────────────────────────────
@@ -364,8 +391,7 @@ router.put("/admin/portfolio/:id", requireAdmin, async (req: Request, res: Respo
 router.delete("/admin/portfolio/:id", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     await ensureTable();
-    const r = await db.execute(sql`DELETE FROM portfolio_projects WHERE id = ${Number(req.params.id)} RETURNING images`);
-    const images = ((r.rows[0] as { images?: PortfolioImage[] } | undefined)?.images) ?? [];
+    const images = await deletePortfolioProject(Number(req.params.id));
     for (const im of images) { const mid = mediaIdFromUrl(im.url); if (mid) await deleteMedia(mid).catch(() => {}); }
     res.json({ ok: true });
   } catch (err) {

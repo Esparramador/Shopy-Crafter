@@ -68,9 +68,9 @@
 - [Vault file type & audit fixes (July 2026)](vault-fixes-2026-07.md) — fs-pro-*/ad-studio-* types missing from ProjectVault FOLDER_CONFIG; video audit backend + button; entity sort by latestDate.
 - [voiceRouter must be pre-gate](voice-router-pre-gate.md) — voiceRouter mixes public (/public-call-url), session-auth (/client-call-url), and requireAdmin routes — must mount BEFORE global requireAdmin gate like fsProRouter.
 - [Platform registry + strict Stripe tenancy](platform-registry-stripe.md) — mirrored platform-capabilities.ts (both artifacts); Stripe projects 409 not Master fallback; unlink clears client_secret too; legacy /stripe/accounts guarded.
-- [ConvAI health check semantics](convai-health-check.md) — GET health is read-only with ok/drift/error; repair only via reset-agents, which must use single-flight and sync the env-pinned admin agent in place.
+- [ConvAI health check semantics](convai-health-check.md) — health GET stays read-only; voice tuning applies by PATCHing existing agents under single-flight, while reset is only for intentional recreation.
 - [E2E harness: voice flows, client chatbot layout, admin pages](e2e-voice-call-playwright.md) — testing subagent breaks on mic permission; use e2e:* node scripts; admin pages need CoachMarks dismissed via localStorage; hide #replit-dev-banner.
-- [ConvAI agent voice settings are flat tts.* fields](convai-tts-flat-fields.md) — nested tts.voice_settings is silently ignored by the Agents API; send stability/similarity_boost/speed flat; owner picked 0.5/0.8/1.2 by ear.
+- [ConvAI agent voice settings are flat tts.* fields](convai-tts-flat-fields.md) — nested tts.voice_settings is ignored; send flat TTS values and apply tuning in place rather than recreating agents.
 - [Session revalidation](session-revalidation.md) — revoke via global revalidation (regenerate, never destroy); session.impersonating = client id; refuse user delete while Stripe still bills.
 - [Stripe resource_missing is not proof of "gone"](admin-stripe-cancel-on-delete.md) — fail closed on billing guards; retrieve→decide→mutate; both Stripe webhook endpoints must sync canceled rows.
 - [Admin modal overlay convention](admin-modal-overlay.md) — wrap admin modals in <ModalOverlay> (hook+.modal-overlay); FAB is z 9990 so z-index races lose; add new pages to e2e PAGES.

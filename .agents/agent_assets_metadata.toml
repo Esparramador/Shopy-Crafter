@@ -837,3 +837,45 @@ mtime_ms = 1793371006682
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/6c2456a8-2915-47a5-8919-1685e73e41f2/bdac716f-3778-4b64-9d17-bccbc0ed4086"
 storage_version_token = "1793371129554584"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "9BwbXELP4hnK3RjIAqsHC"
+uri = "file://generated-artifacts/shopify-crafter-cambios-c0fb1c9e.zip"
+type = "unspecified"
+title = "Archivos modificados de Shopy Crafter"
+description = "ZIP con los 13 archivos modificados del commit c0fb1c9e, conservando las rutas originales; sin secretos ni compilaciones."
+logical_id = "9f7721e9-e8ca-41ad-87ba-d7c930d63c8b"
+content_hash = "sha256:41436e1e8316fb7a1e4f025dd16dca8619a3981ed00f2be6cf1ceb4195840068"
+size = 128387
+mtime_ms = 1793383828518
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/9f7721e9-e8ca-41ad-87ba-d7c930d63c8b/74c3636f-83e5-43fa-a2e3-84c93a1982d5"
+storage_version_token = "1793383836102289"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "ShZxPzMaku9dswEAls6cS"
+uri = "file://generated-artifacts/shopify-crafter-cambios-con-sitemap-c0fb1c9e.zip"
+type = "unspecified"
+title = "Shopy Crafter con sitemap para Google"
+description = "Paquete actualizado: incluye los archivos modificados y artifacts/shopify-optimizer/public/sitemap.xml."
+logical_id = "f3bfc162-03b0-4dbd-9e01-fe16f8cd8049"
+content_hash = "sha256:edcce1f766b1fba9e00c6429d56f9d9c3b23a1e5ddd5a6d39d7f841df9e689bf"
+size = 129178
+mtime_ms = 1793388119738
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/f3bfc162-03b0-4dbd-9e01-fe16f8cd8049/e8c18990-c04c-4a43-917b-627fd7ab6887"
+storage_version_token = "1793388125318932"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "k0I2X2DuvMSDqEgXUo-Ux"
+uri = "file://artifacts/shopify-optimizer/public/sitemap.xml"
+type = "unspecified"
+title = "Descargar sitemap.xml"
+description = "Archivo sitemap.xml para Google; corresponde a artifacts/shopify-optimizer/public/sitemap.xml."
+logical_id = "163abff8-af63-4516-9d62-911a596f393d"
+content_hash = "sha256:ec597d184d176283bdfbb52b11e2c4f8148bb61d374eef7448fa2631711f8a43"
+size = 7473
+mtime_ms = 1793358661558
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/163abff8-af63-4516-9d62-911a596f393d/33c41729-8ff7-42db-84d2-99694c777d86"
+storage_version_token = "1793388274382838"
+content_type = "application/octet-stream"

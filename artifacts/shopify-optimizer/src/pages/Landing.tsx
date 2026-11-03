@@ -669,10 +669,6 @@ export default function Landing() {
 
           <MagnetInstagramButton />
 
-          <div className="fp-scroll-hint">
-            <div className="fp-scroll-hint-text">Desliza para explorar</div>
-            <div className="fp-scroll-hint-arrow">↓</div>
-          </div>
         </section>
 
         {/* ══════════════════════════════════════

@@ -1,6 +1,6 @@
 ---
 name: ConvAI agent voice settings are flat tts.* fields
-description: Agents API ignores nested tts.voice_settings; only flat stability/similarity_boost/speed persist; owner chose 0.5/0.8/1.2 after listening.
+description: Agents API ignores nested tts.voice_settings; only flat stability/similarity_boost/speed persist; values now live in platform_settings_kv (panel-tunable), defaults 0.5/0.8/1.2.
 ---
 **Rule:** In `conversation_config.tts` of a ConvAI agent, voice settings MUST be sent flat
 (`tts.stability`, `tts.similarity_boost`, `tts.speed`). A nested `tts.voice_settings{...}`
@@ -17,5 +17,14 @@ compares the flat values (with float tolerance) so a regression throws
 the owner preferred the stable pair stability 0.5 / similarity 0.8 (speed 1.2) over the
 "expressive" 0.18 / 0.92. Do not swing back to low stability without asking.
 
-**How to apply:** change the CONVAI_TTS_* constants in routes/voice.ts only; the verifier
-picks them up automatically. Never reintroduce a `voice_settings` key on the agent config.
+**Where the values live:** `platform_settings_kv` keys `convai_tts_*`, edited from the admin
+panel (Fusion Studio Pro → Audio AI Tools → ConvAI → "Voz de Arturo", with an "Escuchar
+muestra" TTS preview). The code defaults (0.5/0.8/1.2) apply only when nothing is stored.
+Saving invalidates the in-memory agent cache, so health can report `drift` until a call
+syncs the settings or the admin uses "Guardar y aplicar ahora". That action PATCHes and
+verifies existing agents in place; do not use the delete/recreate reset for a voice-tuning
+change. ElevenLabs rejects speed outside 0.7–1.2 (422), hence the limits.
+
+**How to apply:** never reintroduce a `voice_settings` key on the agent config. To change
+the defaults, edit the defaults constant in the voice-settings lib; to change and apply
+live values, use the panel's save-and-apply action — not code or agent recreation.

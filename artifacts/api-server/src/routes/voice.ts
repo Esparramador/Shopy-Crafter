@@ -15,6 +15,11 @@ import {
   assertConvAIVoiceUsable, assertConvAIAgentConfigApplied, fetchElevenVoice, fetchElevenSubscription,
   isConvAIVoiceError, type ElevenSubscriptionInfo,
 } from "../lib/convai-voice-check.js";
+import {
+  CONVAI_TTS_DEFAULTS, CONVAI_TTS_KV_KEYS, CONVAI_TTS_LIMITS, CONVAI_TTS_PREVIEW_MAX_CHARS, CONVAI_TTS_PREVIEW_TEXT,
+  ConvAITtsSettingsError, normalizeConvAITtsSettings, parseConvAITtsHistory, parseStoredConvAITtsSettings,
+  type ConvAITtsSettings, type StoredConvAITtsSettings,
+} from "../lib/convai-voice-settings.js";
 import multer from "multer";
 
 const cloneUpload = multer({
@@ -556,11 +561,117 @@ const CONVAI_INPUT_FORMAT = "pcm_16000";
 // ── Ajustes de voz de Arturo ──────────────────────────────────────────────────
 // These are the fields ElevenLabs actually persists under conversation_config.tts
 // (flat, not inside a voice_settings block). Verified on the live API.
-// Values chosen by the owner after A/B listening (Sept 2026): the more stable
-// 0.5 / 0.8 pair was preferred over the expressive 0.18 / 0.92 one.
-const CONVAI_TTS_STABILITY = 0.5;        // Media → voz estable, sin altibajos
-const CONVAI_TTS_SIMILARITY_BOOST = 0.8; // Alta → fiel a la voz original
-const CONVAI_TTS_SPEED = 1.2;            // 20% más rápido que la velocidad por defecto
+// They live in platform_settings_kv (keys convai_tts_*) so the admin can tune
+// them from the panel; CONVAI_TTS_DEFAULTS (0.5 / 0.8 / 1.2, chosen by the
+// owner after A/B listening in Sept 2026) apply when nothing is stored.
+// Cached in-process and invalidated on save; a short TTL covers edits made
+// from another instance.
+const TTS_SETTINGS_TTL_MS = 60 * 1000;
+let _ttsSettingsCache: { at: number; value: StoredConvAITtsSettings } | null = null;
+let _ttsSettingsRevision = 0;
+const _agentSyncedRevision: Partial<Record<AgentType, number>> = {};
+const _agentSyncedDatabaseRevision: Partial<Record<AgentType, string>> = {};
+
+async function getConvAIDatabaseRevision(type: AgentType): Promise<string> {
+  const keys = [...Object.values(CONVAI_TTS_KV_KEYS), `convai_${type}_agent_id`];
+  const result = await db.execute(sql`
+    SELECT md5(COALESCE(string_agg(
+      key || ':' || COALESCE(value, '') || ':' || COALESCE(updated_at::text, ''),
+      '|' ORDER BY key
+    ), '')) AS revision
+    FROM platform_settings_kv
+    WHERE key IN (${sql.join(keys.map(key => sql`${key}`), sql`, `)})
+  `);
+  const revision = (result as any).rows?.[0]?.revision;
+  if (typeof revision !== "string") throw new Error("No se pudo comprobar la versión compartida de la voz.");
+  return revision;
+}
+
+async function getConvAITtsSettingsStored(): Promise<StoredConvAITtsSettings> {
+  if (_ttsSettingsCache && Date.now() - _ttsSettingsCache.at < TTS_SETTINGS_TTL_MS) return _ttsSettingsCache.value;
+  const revision = _ttsSettingsRevision;
+  let rows: Array<{ key: string; value: string | null }> = [];
+  try {
+    await ensurePlatformSettingsKV();
+    const keys = Object.values(CONVAI_TTS_KV_KEYS);
+    const r = await db.execute(sql`
+      SELECT key, value FROM platform_settings_kv
+      WHERE key IN (${sql.join(keys.map(k => sql`${k}`), sql`, `)})
+    `);
+    rows = ((r as any).rows ?? (Array.isArray(r) ? r : [])) as Array<{ key: string; value: string | null }>;
+  } catch (e) {
+    // Sin BD seguimos con los defaults: una llamada de voz no debe caerse por esto.
+    logger.warn({ err: (e as Error)?.message }, "ConvAI: could not read TTS settings from DB; using defaults");
+  }
+  const parsed = parseStoredConvAITtsSettings(rows);
+  // A DB read started before a save must not repopulate the cache with old rows.
+  if (revision !== _ttsSettingsRevision) return getConvAITtsSettingsStored();
+  if (parsed.invalid.length) {
+    logger.warn({ invalid: parsed.invalid }, "ConvAI: ignoring invalid stored TTS settings (using defaults for those keys)");
+  }
+  _ttsSettingsCache = { at: Date.now(), value: parsed };
+  return parsed;
+}
+
+async function getConvAITtsSettings(): Promise<ConvAITtsSettings> {
+  return (await getConvAITtsSettingsStored()).settings;
+}
+
+async function ensureConvAITtsHistoryTable(): Promise<void> {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS convai_tts_settings_history (
+      id BIGSERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      user_id TEXT NOT NULL,
+      user_name TEXT,
+      user_email TEXT,
+      settings JSONB NOT NULL
+    )
+  `);
+}
+
+async function getConvAITtsHistory(): Promise<ReturnType<typeof parseConvAITtsHistory>> {
+  await ensureConvAITtsHistoryTable();
+  const result = await db.execute(sql`
+    SELECT id, created_at, user_id, user_name, user_email, settings
+    FROM convai_tts_settings_history
+    ORDER BY created_at DESC, id DESC
+    LIMIT 5
+  `);
+  const rows = ((result as any).rows ?? (Array.isArray(result) ? result : [])) as Parameters<typeof parseConvAITtsHistory>[0];
+  return parseConvAITtsHistory(rows);
+}
+
+async function saveConvAITtsSettingsWithHistory(
+  settings: ConvAITtsSettings,
+  actor: { userId: string; name: string; email: string },
+): Promise<void> {
+  await ensurePlatformSettingsKV();
+  await ensureConvAITtsHistoryTable();
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL lock_timeout = '75000ms'`);
+    // A settings save participates in the same cross-instance locks as agent
+    // sync. This makes the save and a provider PATCH/readback serializable.
+    for (const type of ["admin", "client", "landing"] as const) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"convai-agent-sync:" + type}, 0))`);
+    }
+    for (const key of Object.keys(CONVAI_TTS_KV_KEYS) as Array<keyof ConvAITtsSettings>) {
+      await tx.execute(sql`
+        INSERT INTO platform_settings_kv (key, value, updated_at)
+        VALUES (${CONVAI_TTS_KV_KEYS[key]}, ${String(settings[key])}, NOW())
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+      `);
+    }
+    await tx.execute(sql`
+      INSERT INTO convai_tts_settings_history (user_id, user_name, user_email, settings)
+      VALUES (${actor.userId}, ${actor.name}, ${actor.email}, ${JSON.stringify(settings)}::jsonb)
+    `);
+  });
+  _ttsSettingsRevision++;
+  _ttsSettingsCache = null;
+  // Force the next voice call to sync the changed values to all ConvAI agents.
+  for (const k of Object.keys(_agentIdCache)) delete _agentIdCache[k];
+}
 
 async function resolveSevillanoVoiceId(): Promise<string> {
   // An explicit ConvAI voice override is useful if the ElevenLabs plan changes.
@@ -614,21 +725,68 @@ async function resolveVerifiedConvAIVoiceId(): Promise<string> {
 async function verifyPersistedConvAIAgent(agentId: string, voiceId: string): Promise<void> {
   // Create/PATCH responses are not authoritative (create returns only the ID and
   // PATCH ignores unknown keys), so always read the agent back.
-  const persisted = await getConvAIAgent(agentId);
+  // The expected voice settings come from the DB (panel-tunable), so the
+  // post-sync verifier keeps detecting drift against what the admin saved.
+  const [persisted, tts] = await Promise.all([getConvAIAgent(agentId), getConvAITtsSettings()]);
   assertConvAIAgentConfigApplied(persisted, {
     voiceId,
     modelId: CONVAI_SPANISH_MODEL,
     outputFormat: CONVAI_OUTPUT_FORMAT,
     inputFormat: CONVAI_INPUT_FORMAT,
-    stability: CONVAI_TTS_STABILITY,
-    similarityBoost: CONVAI_TTS_SIMILARITY_BOOST,
-    speed: CONVAI_TTS_SPEED,
+    stability: tts.stability,
+    similarityBoost: tts.similarityBoost,
+    speed: tts.speed,
   });
 }
 
 async function syncConvAIAgentOrThrow(type: AgentType, agentId: string, voiceId: string): Promise<void> {
-  await updateConvAIAgent(agentId, agentConfigFor(type, voiceId));
-  await verifyPersistedConvAIAgent(agentId, voiceId);
+  // Keep ownership of the same flight while catching up with saves. Readback
+  // can succeed against old settings if it started before the save committed.
+  for (;;) {
+    const revision = _ttsSettingsRevision;
+    try {
+      await updateConvAIAgent(agentId, await agentConfigFor(type, voiceId));
+      await verifyPersistedConvAIAgent(agentId, voiceId);
+    } catch (err) {
+      if (revision !== _ttsSettingsRevision) continue;
+      throw err;
+    }
+    if (revision !== _ttsSettingsRevision) continue;
+    _agentSyncedRevision[type] = revision;
+    _agentSyncedDatabaseRevision[type] = await getConvAIDatabaseRevision(type);
+    return;
+  }
+}
+
+async function verifyCreatedConvAIAgent(
+  type: AgentType, agentId: string, voiceId: string, createdRevision: number,
+): Promise<void> {
+  try {
+    await verifyPersistedConvAIAgent(agentId, voiceId);
+  } catch (err) {
+    if (createdRevision === _ttsSettingsRevision) throw err;
+  }
+  if (createdRevision !== _ttsSettingsRevision) {
+    await syncConvAIAgentOrThrow(type, agentId, voiceId);
+  } else {
+    _agentSyncedRevision[type] = createdRevision;
+    _agentSyncedDatabaseRevision[type] = await getConvAIDatabaseRevision(type);
+  }
+}
+
+async function withConvAIAgentLock<T>(type: AgentType, action: () => Promise<T>): Promise<T> {
+  await ensurePlatformSettingsKV();
+  return db.transaction(async (tx) => {
+    // If another process dies, Postgres rolls back its transaction and releases
+    // the advisory lock. Waiting requests fail explicitly rather than hanging
+    // forever if a live owner stops making progress.
+    await tx.execute(sql`SET LOCAL lock_timeout = '75000ms'`);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"convai-agent-sync:" + type}, 0))`);
+    // Another API instance may have saved settings while this process's cache
+    // was warm. Refresh only after owning the lock.
+    _ttsSettingsCache = null;
+    return action();
+  });
 }
 
 function respondCallUrlError(res: import("express").Response, err: unknown, fallback: string): void {
@@ -656,7 +814,8 @@ async function ensurePlatformSettingsKV(): Promise<void> {
 
 type AgentType = "admin" | "client" | "landing";
 
-function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
+async function agentConfigFor(type: AgentType, voiceId: string): Promise<ConvAIAgentConfig> {
+  const ttsSettings = await getConvAITtsSettings();
   const names: Record<AgentType, string> = {
     admin:   "Arturo — Secretario del CEO de Shopy Crafter",
     client:  "Arturo — Secretario de Shopy Crafter",
@@ -673,7 +832,8 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
     landing: LANDING_AGENT_PROMPT,
   };
 
-  // Configuración de voz: ver constantes CONVAI_TTS_* (elegidas escuchando muestras)
+  // Configuración de voz: platform_settings_kv convai_tts_* (editable en el panel),
+  // con CONVAI_TTS_DEFAULTS si no hay nada guardado.
   type TtsConfig = NonNullable<NonNullable<ConvAIAgentConfig["conversation_config"]>["tts"]>;
   const tts: TtsConfig = {
     voice_id: voiceId,
@@ -688,9 +848,9 @@ function agentConfigFor(type: AgentType, voiceId: string): ConvAIAgentConfig {
     // `tts.voice_settings{...}` block is silently ignored (verified live: the
     // agent kept stability 0.5 / similarity_boost 0.8 for months). `style` and
     // `use_speaker_boost` do not exist in the persisted agent schema at all.
-    stability: CONVAI_TTS_STABILITY,
-    similarity_boost: CONVAI_TTS_SIMILARITY_BOOST,
-    speed: CONVAI_TTS_SPEED,
+    stability: ttsSettings.stability,
+    similarity_boost: ttsSettings.similarityBoost,
+    speed: ttsSettings.speed,
   };
 
   return {
@@ -719,17 +879,34 @@ const _agentResolveInFlight: Partial<Record<AgentType, Promise<string>>> = {};
 async function getOrCreateConvAIAgent(type: AgentType): Promise<string> {
   const cacheKey = `convai_${type}_agent_id`;
 
-  // 1. In-memory cache — the config was already synced once in this process.
-  if (_agentIdCache[cacheKey]) return _agentIdCache[cacheKey];
+  // A voice-apply may be syncing a cached agent right now. Check the shared
+  // work before the ID cache, otherwise a call can receive a URL for the old
+  // config while that PATCH + verification is still in progress.
+  for (;;) {
+    const inFlight = _agentResolveInFlight[type];
+    if (inFlight) {
+      const agentId = await inFlight;
+      if (_agentSyncedRevision[type] === _ttsSettingsRevision) return agentId;
+      continue;
+    }
 
-  const inFlight = _agentResolveInFlight[type];
-  if (inFlight) return inFlight;
-
-  const pending = resolveConvAIAgentUncached(type, cacheKey).finally(() => {
-    delete _agentResolveInFlight[type];
-  });
-  _agentResolveInFlight[type] = pending;
-  return pending;
+    let pending: Promise<string>;
+    pending = withConvAIAgentLock(type, async () => {
+      // Check shared state under the lock even for a warm local cache: another
+      // worker may have saved settings or replaced the persisted agent ID.
+      if (_agentIdCache[cacheKey] && _agentSyncedRevision[type] === _ttsSettingsRevision
+        && _agentSyncedDatabaseRevision[type] === await getConvAIDatabaseRevision(type)) {
+        return _agentIdCache[cacheKey];
+      }
+      delete _agentIdCache[cacheKey];
+      return resolveConvAIAgentUncached(type, cacheKey);
+    }).finally(() => {
+      if (_agentResolveInFlight[type] === pending) delete _agentResolveInFlight[type];
+    });
+    _agentResolveInFlight[type] = pending;
+    const agentId = await pending;
+    if (_agentSyncedRevision[type] === _ttsSettingsRevision) return agentId;
+  }
 }
 
 async function resolveConvAIAgentUncached(type: AgentType, cacheKey: string): Promise<string> {
@@ -775,7 +952,8 @@ async function resolveConvAIAgentUncached(type: AgentType, cacheKey: string): Pr
   // 4. Auto-create — resolve and verify the voice first
   logger.info({ type }, "Auto-creating ConvAI agent in ElevenLabs...");
   const voiceId = await resolveVerifiedConvAIVoiceId();
-  const config = agentConfigFor(type, voiceId);
+  const createdRevision = _ttsSettingsRevision;
+  const config = await agentConfigFor(type, voiceId);
   const agent = await createConvAIAgent(config);
   const newId = agent.agent_id;
 
@@ -791,7 +969,7 @@ async function resolveConvAIAgentUncached(type: AgentType, cacheKey: string): Pr
     logger.warn({ err: (e as Error)?.message }, "Could not persist ConvAI agent ID to DB");
   }
 
-  await verifyPersistedConvAIAgent(newId, voiceId);
+  await verifyCreatedConvAIAgent(type, newId, voiceId, createdRevision);
   _agentIdCache[cacheKey] = newId;
   logger.info({ type, agentId: newId, voiceId }, "ConvAI agent auto-created");
   return newId;
@@ -943,62 +1121,60 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
     for (const type of types) {
       const cacheKey = `convai_${type}_agent_id`;
 
-      // No pisar una resolución de llamada en curso para este tipo.
-      const inFlight = _agentResolveInFlight[type];
-      if (inFlight) await inFlight.catch(() => undefined);
+      // Publicar el reset antes de esperar cualquier trabajo previo. Así, tanto
+      // llamadas como voice-settings/apply que lleguen durante el reinicio esperan
+      // también a la verificación del agente, incluido el admin fijado por entorno.
+      const previous = _agentResolveInFlight[type];
+      const work = Promise.resolve().then(async (): Promise<string> => {
+        if (previous) await previous.catch(() => undefined);
 
-      // El agente admin fijado por ELEVEN_CONVAI_DEFAULT_AGENT_ID es inmutable para
-      // nosotros: borrarlo y crear otro dejaría al arranque apuntando a un ID muerto.
-      // Se sincroniza y verifica en sitio.
-      if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
-        const envId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
-        delete _agentIdCache[cacheKey];
-        const voiceId = await resolveVerifiedConvAIVoiceId();
-        await syncConvAIAgentOrThrow(type, envId, voiceId);
-        _agentIdCache[cacheKey] = envId;
-        results[type] = envId;
-        logger.info({ type, agentId: envId, voiceId }, "ConvAI env-pinned agent re-synced in place");
-        continue;
-      }
+        return withConvAIAgentLock(type, async (): Promise<string> => {
+          if (type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID) {
+            const envId = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID;
+            delete _agentIdCache[cacheKey];
+            const voiceId = await resolveVerifiedConvAIVoiceId();
+            await syncConvAIAgentOrThrow(type, envId, voiceId);
+            _agentIdCache[cacheKey] = envId;
+            logger.info({ type, agentId: envId, voiceId }, "ConvAI env-pinned agent re-synced in place");
+            return envId;
+          }
+          // Delete old agent if we have its ID cached
+          const oldId = _agentIdCache[cacheKey];
+          delete _agentIdCache[cacheKey];
+          if (!oldId) {
+            // Try DB
+            try {
+              const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
+              const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
+              const dbId: string | undefined = rowArr[0]?.value;
+              if (dbId) {
+                try { await deleteConvAIAgent(dbId); } catch { /* ignore if already gone */ }
+              }
+            } catch { /* ignore */ }
+          } else {
+            try { await deleteConvAIAgent(oldId); } catch { /* ignore if already gone */ }
+          }
 
-      // Publicar el trabajo como resolución en curso: cualquier llamada que llegue
-      // mientras borramos/recreamos espera y recibe el ID nuevo (sin duplicar agentes).
-      const work = (async (): Promise<string> => {
-        // Delete old agent if we have its ID cached
-        const oldId = _agentIdCache[cacheKey];
-        delete _agentIdCache[cacheKey];
-        if (!oldId) {
-          // Try DB
-          try {
-            const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${cacheKey}`);
-            const rowArr = (rows as any).rows ?? (Array.isArray(rows) ? rows : []);
-            const dbId: string | undefined = rowArr[0]?.value;
-            if (dbId) {
-              try { await deleteConvAIAgent(dbId); } catch { /* ignore if already gone */ }
-            }
-          } catch { /* ignore */ }
-        } else {
-          try { await deleteConvAIAgent(oldId); } catch { /* ignore if already gone */ }
-        }
+          // Clear DB entry so getOrCreateConvAIAgent recreates
+          await db.execute(sql`DELETE FROM platform_settings_kv WHERE key = ${cacheKey}`);
 
-        // Clear DB entry so getOrCreateConvAIAgent recreates
-        await db.execute(sql`DELETE FROM platform_settings_kv WHERE key = ${cacheKey}`);
-
-        // Re-create with latest config
-        const voiceId = await resolveVerifiedConvAIVoiceId();
-        const config = agentConfigFor(type, voiceId);
-        const agent = await createConvAIAgent(config);
-        const newId = agent.agent_id;
-        await db.execute(sql`
-          INSERT INTO platform_settings_kv (key, value, updated_at)
-          VALUES (${cacheKey}, ${newId}, NOW())
-          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-        `);
-        await verifyPersistedConvAIAgent(newId, voiceId);
-        _agentIdCache[cacheKey] = newId;
-        logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
-        return newId;
-      })();
+          // Re-create with latest config
+          const voiceId = await resolveVerifiedConvAIVoiceId();
+          const createdRevision = _ttsSettingsRevision;
+          const config = await agentConfigFor(type, voiceId);
+          const agent = await createConvAIAgent(config);
+          const newId = agent.agent_id;
+          await db.execute(sql`
+            INSERT INTO platform_settings_kv (key, value, updated_at)
+            VALUES (${cacheKey}, ${newId}, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+          `);
+          await verifyCreatedConvAIAgent(type, newId, voiceId, createdRevision);
+          _agentIdCache[cacheKey] = newId;
+          logger.info({ type, agentId: newId, voiceId }, "ConvAI agent reset+recreated");
+          return newId;
+        });
+      });
       _agentResolveInFlight[type] = work;
       try {
         results[type] = await work;
@@ -1011,6 +1187,224 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promi
   } catch (err: any) {
     logger.error({ err: err?.message, code: err?.code }, "reset-agents failed");
     respondCallUrlError(res, err, "Error reseteando agentes");
+  }
+});
+
+// ── Ajustes de voz de Arturo (stability / similarity_boost / speed) ───────────
+// Persistidos en platform_settings_kv para afinar la voz desde el panel sin
+// redesplegar. Guardar invalida la caché; "Guardar y aplicar ahora" sincroniza
+// los agentes existentes en sitio y verifica lo persistido en ElevenLabs.
+async function respondTtsSettings(res: import("express").Response, extra: Record<string, unknown> = {}): Promise<void> {
+  const stored = await getConvAITtsSettingsStored();
+  const history = await getConvAITtsHistory();
+  res.json({
+    settings: stored.settings,
+    source: stored.source,
+    invalid: stored.invalid,
+    history,
+    defaults: CONVAI_TTS_DEFAULTS,
+    limits: CONVAI_TTS_LIMITS,
+    voiceId: await resolveSevillanoVoiceId(),
+    modelId: CONVAI_SPANISH_MODEL,
+    previewText: CONVAI_TTS_PREVIEW_TEXT,
+    ...extra,
+  });
+}
+
+router.get("/voice/convai/voice-settings", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    _ttsSettingsCache = null; // el panel debe ver lo que hay en BD ahora mismo
+    await respondTtsSettings(res);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/voice-settings read failed");
+    res.status(500).json({ error: err?.message || "Error leyendo los ajustes de voz" });
+  }
+});
+
+router.put("/voice/convai/voice-settings", requireAdmin, async (req, res): Promise<void> => {
+  let settings: ConvAITtsSettings;
+  try {
+    settings = normalizeConvAITtsSettings(req.body);
+  } catch (err: any) {
+    if (err instanceof ConvAITtsSettingsError) {
+      res.status(400).json({ error: err.message, field: err.field });
+      return;
+    }
+    res.status(400).json({ error: err?.message || "Ajustes de voz inválidos" });
+    return;
+  }
+  try {
+    await saveConvAITtsSettingsWithHistory(settings, {
+      userId: req.session.userId!,
+      name: req.session.name || "Admin",
+      email: req.session.email || "",
+    });
+    logger.info({ settings }, "ConvAI TTS settings saved from admin panel; agent cache invalidated");
+    await respondTtsSettings(res, { saved: true });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/voice-settings save failed");
+    res.status(500).json({ error: err?.message || "Error guardando los ajustes de voz" });
+  }
+});
+
+// Aplica los ajustes guardados a los agentes que ya existen, sin recrearlos.
+// Las llamadas en curso comparten el mismo single-flight para evitar carreras.
+router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res): Promise<void> => {
+  const allTypes: AgentType[] = ["admin", "client", "landing"];
+  const requestedTypes = req.body?.agentTypes;
+  if (
+    requestedTypes !== undefined
+    && (!Array.isArray(requestedTypes)
+      || requestedTypes.length === 0
+      || requestedTypes.some((type: unknown) => !allTypes.includes(type as AgentType))
+      || new Set(requestedTypes).size !== requestedTypes.length)
+  ) {
+    res.status(400).json({ error: "agentTypes debe ser una lista no vacía de tipos de agente válidos, sin duplicados." });
+    return;
+  }
+  const types: AgentType[] = requestedTypes ?? allTypes;
+  const agents: Partial<Record<AgentType, {
+    agentId: string | null;
+    status: "applied" | "not_created" | "error";
+    error?: string;
+    sharedFlight?: boolean;
+  }>> = {};
+  let failed = false;
+
+  for (const type of types) {
+    const inFlight = _agentResolveInFlight[type];
+    if (inFlight) {
+      try {
+        // A call already owns the sync+verify for this agent. Reuse that
+        // result instead of issuing a second PATCH/verification immediately.
+        const agentId = await inFlight;
+        if (_agentSyncedRevision[type] === _ttsSettingsRevision) {
+          agents[type] = { agentId, status: "applied", sharedFlight: true };
+          continue;
+        }
+      } catch {
+        // A call may have raced a settings save and correctly failed stale
+        // verification. Resolve the existing ID and retry with current settings.
+      }
+    }
+
+    const cacheKey = `convai_${type}_agent_id`;
+    let resolvedAgentId: string | null = null;
+    try {
+      const agentId = await findExistingConvAIAgentId(type);
+      if (!agentId) {
+        agents[type] = { agentId: null, status: "not_created" };
+        continue;
+      }
+      resolvedAgentId = agentId;
+
+      const voiceId = await resolveVerifiedConvAIVoiceId();
+      let appliedAgentId: string | null = null;
+      let sharedFlight = false;
+      while (!appliedAgentId) {
+        const concurrent = _agentResolveInFlight[type];
+        if (concurrent) {
+          try {
+            const concurrentId = await concurrent;
+            if (_agentSyncedRevision[type] === _ttsSettingsRevision) {
+              appliedAgentId = concurrentId;
+              sharedFlight = true;
+              break;
+            }
+          } catch {
+            // Retry below with the latest settings; do not accept a failed
+            // or stale in-flight verification as an applied result.
+          }
+          const latestAgentId = await findExistingConvAIAgentId(type);
+          if (!latestAgentId) {
+            agents[type] = { agentId: null, status: "not_created" };
+            break;
+          }
+          resolvedAgentId = latestAgentId;
+          continue;
+        }
+
+        const work = withConvAIAgentLock(type, async (): Promise<string> => {
+          // A reset in another process may have changed the ID while this
+          // request was waiting for the cross-instance lock.
+          delete _agentIdCache[cacheKey];
+          const latestAgentId = await findExistingConvAIAgentId(type);
+          if (!latestAgentId) throw new Error("El agente cambió mientras se esperaba; vuelve a aplicar los ajustes.");
+          resolvedAgentId = latestAgentId;
+          await syncConvAIAgentOrThrow(type, resolvedAgentId!, voiceId);
+          _agentIdCache[cacheKey] = resolvedAgentId!;
+          return resolvedAgentId!;
+        });
+        _agentResolveInFlight[type] = work;
+        try {
+          const syncedId = await work;
+          if (_agentSyncedRevision[type] === _ttsSettingsRevision) appliedAgentId = syncedId;
+        } finally {
+          if (_agentResolveInFlight[type] === work) delete _agentResolveInFlight[type];
+        }
+      }
+      if (appliedAgentId) agents[type] = { agentId: appliedAgentId, status: "applied", ...(sharedFlight ? { sharedFlight: true } : {}) };
+    } catch (err: any) {
+      failed = true;
+      agents[type] = {
+        agentId: type === "admin" && process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID
+          ? process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID
+          : resolvedAgentId ?? _agentIdCache[cacheKey] ?? null,
+        status: "error",
+        error: err?.message || "No se pudo aplicar la configuración",
+      };
+      logger.error({ type, err: err?.message, code: err?.code }, "ConvAI voice settings apply failed");
+    }
+  }
+
+  if (failed) {
+    res.status(502).json({ success: false, error: "No se pudieron aplicar los ajustes a todos los agentes.", agents });
+    return;
+  }
+  res.json({ success: true, agents });
+});
+
+// Muestra corta con la MISMA voz y modelo que usa Arturo, con los valores del
+// formulario (sin guardarlos). Devuelve audio/mpeg.
+router.post("/voice/convai/voice-settings/preview", requireAdmin, async (req, res): Promise<void> => {
+  let settings: ConvAITtsSettings;
+  try {
+    settings = normalizeConvAITtsSettings(req.body);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || "Ajustes de voz inválidos", field: err?.field });
+    return;
+  }
+  const rawText = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  const text = rawText || CONVAI_TTS_PREVIEW_TEXT;
+  if (text.length > CONVAI_TTS_PREVIEW_MAX_CHARS) {
+    res.status(413).json({ error: `El texto de muestra no puede superar ${CONVAI_TTS_PREVIEW_MAX_CHARS} caracteres` });
+    return;
+  }
+  const userId = String((req.session as any)?.userId ?? "admin");
+  const quota = await checkTtsQuota(userId, text.length);
+  if (!quota.ok) {
+    res.setHeader("Retry-After", String(quota.retryAfter));
+    res.status(429).json({ error: quota.reason });
+    return;
+  }
+  try {
+    const voiceId = await resolveSevillanoVoiceId();
+    const result = await synthesizeSpeech({
+      text,
+      voiceId,
+      modelId: CONVAI_SPANISH_MODEL,
+      outputFormat: "mp3_44100_64",
+      languageCode: "es",
+      // El agente ConvAI no tiene `style`: 0 deja el TTS lo más parecido posible.
+      voiceSettings: { stability: settings.stability, similarity_boost: settings.similarityBoost, speed: settings.speed, style: 0, use_speaker_boost: true },
+    });
+    res.setHeader("Content-Type", result.contentType);
+    res.setHeader("Content-Length", String(result.audio.length));
+    res.setHeader("Cache-Control", "no-store");
+    res.send(result.audio);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/voice-settings preview failed");
+    if (!res.headersSent) res.status(502).json({ error: err?.message || "No se pudo generar la muestra de voz" });
   }
 });
 

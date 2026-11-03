@@ -216,7 +216,7 @@ const img = (file: string, alt: string): ShopMedia => ({ type: "image", url: `/t
 const vid = (file: string, alt: string): ShopMedia => ({ type: "video", url: `/tienda-media/${file}.mp4`, alt, poster: `/tienda-media/${file}-poster.webp` });
 const pimg = (file: string, alt: string): ShopMedia => ({ type: "image", url: `/portfolio/${file}.webp`, alt });
 
-export const SHOP_SEED_VERSION = "v2-2026-10";
+export const SHOP_SEED_VERSION = "v3-2026-10";
 
 export const SHOP_SEED: SeedProduct[] = [
   {
@@ -517,6 +517,51 @@ export const SHOP_SEED: SeedProduct[] = [
     variants: [{ key: "app", name: "Presupuesto", tiers: tiers([1, 0]) }],
     addons: [],
     fields: [],
+    qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 0, demoUrl: null,
+  },
+  {
+    slug: "auditoria-seo", kind: "quote", category: "servicios-web", featured: false, visible: true, sortOrder: 17,
+    name: "Auditoría SEO y plan de acción",
+    tagline: "Detectamos problemas de rastreo, contenido y estructura, con prioridades claras para mejorar.",
+    description: "Revisamos la indexación, los metadatos, la estructura de páginas, los enlaces internos y los problemas técnicos que afectan a tu visibilidad. Recibes un informe priorizado con acciones concretas y una propuesta de alcance antes de empezar. La auditoría no garantiza posiciones concretas en Google.",
+    features: ["Revisión técnica y de contenido", "Problemas ordenados por impacto", "Informe con acciones recomendadas", "Presupuesto cerrado antes de empezar"],
+    media: [],
+    variants: [{ key: "audit", name: "Auditoría SEO", tiers: tiers([1, 0]) }],
+    addons: [],
+    fields: [
+      { key: "web", label: "URL de tu web", type: "url", required: true, max: 300 },
+      { key: "objetivo", label: "¿Qué te gustaría mejorar?", type: "textarea", required: false, max: 1000 },
+    ],
+    qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 0, demoUrl: null,
+  },
+  {
+    slug: "optimizacion-pagespeed", kind: "quote", category: "servicios-web", featured: false, visible: true, sortOrder: 18,
+    name: "Optimización PageSpeed y Core Web Vitals",
+    tagline: "Analizamos la velocidad móvil y de escritorio y proponemos mejoras para tu web.",
+    description: "Medimos carga, interacción y estabilidad visual; revisamos imágenes, recursos y código para definir un plan de optimización que encaje con tu plataforma. El alcance y el precio se confirman antes de tocar la web. La puntuación final depende del dispositivo, la red y los servicios externos, por lo que no se garantiza un 100/100.",
+    features: ["Diagnóstico móvil y escritorio", "Revisión de LCP, INP y CLS", "Plan priorizado de mejoras", "Presupuesto y alcance acordados antes de empezar"],
+    media: [],
+    variants: [{ key: "speed", name: "Optimización PageSpeed", tiers: tiers([1, 0]) }],
+    addons: [],
+    fields: [
+      { key: "web", label: "URL de tu web", type: "url", required: true, max: 300 },
+      { key: "objetivo", label: "¿Qué página o problema priorizamos?", type: "textarea", required: false, max: 1000 },
+    ],
+    qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 0, demoUrl: null,
+  },
+  {
+    slug: "informes-mensuales", kind: "quote", category: "servicios-web", featured: false, visible: true, sortOrder: 19,
+    name: "Informes mensuales de web y tienda",
+    tagline: "Un resumen de resultados, incidencias y próximos pasos, basado en los datos disponibles.",
+    description: "Preparamos un informe mensual sobre las métricas de tienda y web que nos facilites o a las que nos autorices a acceder: ventas, conversión, visibilidad orgánica, velocidad y acciones realizadas. Acordamos primero las fuentes, la frecuencia y el alcance; no solicitamos contraseñas ni garantizamos resultados comerciales.",
+    features: ["Métricas acordadas según tus fuentes de datos", "Resumen de avances e incidencias", "Recomendaciones priorizadas para el siguiente mes", "Presupuesto mensual a medida"],
+    media: [],
+    variants: [{ key: "monthly", name: "Informe mensual", tiers: tiers([1, 0]) }],
+    addons: [],
+    fields: [
+      { key: "web", label: "URL de tu web o tienda", type: "url", required: true, max: 300 },
+      { key: "objetivo", label: "¿Qué métricas o informes necesitas?", type: "textarea", required: false, max: 1200 },
+    ],
     qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 0, demoUrl: null,
   },
 ];

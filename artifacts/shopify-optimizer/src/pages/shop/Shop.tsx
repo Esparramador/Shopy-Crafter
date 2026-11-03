@@ -18,7 +18,7 @@ function Words({ text }: { text: string }) {
   return <>{words.map((w, i) => <Fragment key={i}><span className="shop-w"><span>{w}</span></span>{i < words.length - 1 ? " " : null}</Fragment>)}</>;
 }
 
-const MARQUEE = ["Grabado láser en Barcelona", "Tarjetas de aluminio desde 0,35 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Webs y vídeo 3D a medida"];
+const MARQUEE = ["Grabado láser en Barcelona", "Tarjetas de aluminio desde 0,35 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Web, SEO, PageSpeed e informes"];
 
 function ProductCard({ p }: { p: Product }) {
   const cover = coverOf(p);
@@ -32,7 +32,12 @@ function ProductCard({ p }: { p: Product }) {
       onMouseLeave={() => { const v = vref.current; if (v) { v.pause(); v.currentTime = 0; } }}
     >
       <div className="shop-card-media">
-        {cover ? <img src={cover} alt={p.media[0]?.alt || p.name} loading="lazy" decoding="async" /> : <div className="shop-card-noimg" aria-hidden="true"><span>Vista previa 3D con tu foto</span></div>}
+        {cover ? <img src={cover} alt={p.media[0]?.alt || p.name} loading="lazy" decoding="async" /> : p.kind === "quote"
+          ? <div className="shop-card-noimg shop-card-service-art" aria-hidden="true">
+              <strong>{p.slug === "auditoria-seo" ? "SEO" : p.slug === "optimizacion-pagespeed" ? "CWV" : p.slug === "informes-mensuales" ? "INFORME" : "WEB"}</strong>
+              <span>{p.categoryLabel}</span>
+            </div>
+          : <div className="shop-card-noimg" aria-hidden="true"><span>{p.name}</span></div>}
         {video && cover && <video ref={vref} src={assetUrl(video.url)} muted loop playsInline preload="none" aria-hidden="true" />}
         {p.featured && <span className="shop-badge">Destacado</span>}
         {p.kind === "digital" && <span className="shop-badge shop-badge-digital">Digital</span>}
@@ -58,6 +63,7 @@ export default function Shop() {
   const [data, setData] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cat, setCat] = useState<string>("todo");
+  const [hero3DReady, setHero3DReady] = useState(false);
   const heroRef = useRef<HTMLElement>(null);
   const progress = useRef(0);
   const root = useRef<HTMLDivElement>(null);
@@ -66,6 +72,20 @@ export default function Shop() {
 
   useEffect(() => {
     loadCatalog().then(setData).catch(e => setError(e instanceof Error ? e.message : "Error"));
+  }, []);
+
+  // Retrasa el módulo 3D hasta que la página ya haya pintado el contenido principal.
+  useEffect(() => {
+    const idleWindow = window as unknown as {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (idleWindow.requestIdleCallback) {
+      const handle = idleWindow.requestIdleCallback(() => setHero3DReady(true), { timeout: 1800 });
+      return () => idleWindow.cancelIdleCallback?.(handle);
+    }
+    const handle = window.setTimeout(() => setHero3DReady(true), 700);
+    return () => window.clearTimeout(handle);
   }, []);
 
   const kit = data?.products.find(p => p.slug === "kit-resenas");
@@ -163,6 +183,9 @@ export default function Shop() {
   const products = useMemo(() => (data?.products ?? []).filter(p => cat === "todo" || p.category === cat), [data, cat]);
   const physical = products.filter(p => p.kind === "physical");
   const digital = products.filter(p => p.kind !== "physical");
+  const webServices = digital.filter(p => p.category === "servicios-web");
+  const videoServices = digital.filter(p => p.category === "servicios-video");
+  const otherDigital = digital.filter(p => p.category !== "servicios-web" && p.category !== "servicios-video");
 
   return (
     <ShopLayout>
@@ -174,7 +197,7 @@ export default function Shop() {
             <div className="shop-hero-copy">
               <span className="shop-eyebrow">Taller láser · Estudio digital</span>
               <h1><Words text="Lo que hacemos," /> <em><Words text="listo para pedir." /></em></h1>
-              <p>Tarjetas de aluminio, placas QR, expositores y fotos grabadas con nuestra xTool F2. Y también webs, rediseños de tienda y vídeo animado en 3D. Personalizas, pagas y te enviamos la prueba antes de producir.</p>
+              <p>Tarjetas de aluminio, placas QR, expositores y fotos grabadas con nuestra xTool F2. También hacemos webs, rediseño de tiendas, auditorías SEO, optimización PageSpeed, informes mensuales y vídeo animado en 3D.</p>
               <div className="shop-hero-ctas">
                 <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas desde {euros(cardFrom)} →</Link>
                 <a href="#catalogo" className="shop-btn shop-btn-ghost shop-btn-lg">Ver todo el catálogo</a>
@@ -187,7 +210,7 @@ export default function Shop() {
             </div>
             <div className="shop-hero-stage">
               <Suspense fallback={<div className="shop-hero-canvas" aria-hidden="true" />}>
-                <ShopHero3D progress={progress} />
+                {hero3DReady ? <ShopHero3D progress={progress} /> : <div className="shop-hero-canvas" aria-hidden="true" />}
               </Suspense>
             </div>
           </div>
@@ -262,10 +285,24 @@ export default function Shop() {
               <Link href="/tienda/kit-resenas" className="shop-btn shop-btn-gold">Quiero el Kit Reseñas →</Link>
             </div>
           )}
-          {digital.length > 0 && (
+          {webServices.length > 0 && (
             <>
-              <h3 className="shop-group-title">Servicios digitales</h3>
-              <div className="shop-grid">{digital.map(p => <ProductCard key={p.slug} p={p} />)}</div>
+              <h3 className="shop-group-title">Web, SEO y rendimiento</h3>
+              <p className="shop-group-intro">Landing pages, tiendas online, auditorías SEO, optimización de PageSpeed e informes mensuales. Los servicios a medida se presupuestan antes de empezar.</p>
+              <div className="shop-grid">{webServices.map(p => <ProductCard key={p.slug} p={p} />)}</div>
+            </>
+          )}
+          {videoServices.length > 0 && (
+            <>
+              <h3 className="shop-group-title">Vídeo y animación 3D</h3>
+              <p className="shop-group-intro">Piezas animadas para presentar tu marca, producto o local en web y redes.</p>
+              <div className="shop-grid">{videoServices.map(p => <ProductCard key={p.slug} p={p} />)}</div>
+            </>
+          )}
+          {otherDigital.length > 0 && (
+            <>
+              <h3 className="shop-group-title">Otros servicios digitales</h3>
+              <div className="shop-grid">{otherDigital.map(p => <ProductCard key={p.slug} p={p} />)}</div>
             </>
           )}
         </section>

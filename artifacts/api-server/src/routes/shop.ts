@@ -56,6 +56,36 @@ router.get("/shop/products", async (_req: Request, res: Response): Promise<void>
   }
 });
 
+const SITEMAP_SITE_URL = "https://shopycrafter.com";
+const escapeXml = (value: string) => value.replace(/[<>&'"]/g, char => {
+  switch (char) {
+    case "<": return "&lt;";
+    case ">": return "&gt;";
+    case "&": return "&amp;";
+    case "'": return "&apos;";
+    case '"': return "&quot;";
+    default: return char;
+  }
+});
+
+router.get("/shop/products-sitemap.xml", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const products = (await listProducts()).filter(product => product.visible && product.slug);
+    const entries = products.map(product => {
+      const url = `${SITEMAP_SITE_URL}/tienda/${encodeURIComponent(product.slug)}`;
+      return `<url><loc>${escapeXml(url)}</loc></url>`;
+    }).join("");
+    res
+      .status(200)
+      .set("Content-Type", "application/xml; charset=utf-8")
+      .set("Cache-Control", "public, max-age=3600, s-maxage=3600")
+      .send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries}</urlset>`);
+  } catch (err) {
+    logger.error({ err }, "GET /shop/products-sitemap.xml");
+    res.status(500).type("text/plain").send("No se pudo generar el sitemap de productos");
+  }
+});
+
 router.get("/shop/products/:slug", async (req: Request, res: Response): Promise<void> => {
   try {
     const p = (await productsBySlug([String(req.params.slug)])).get(String(req.params.slug));
