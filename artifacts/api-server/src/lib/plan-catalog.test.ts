@@ -103,12 +103,12 @@ describe("rentabilidad garantizada de cada plan", () => {
 });
 
 describe("recargo por plataforma y puesta en marcha", () => {
-  it("WooCommerce y PrestaShop suman 10 €/mes (100 € al año); Shopify y Stripe, nada", () => {
-    expect(platformSurcharge("woocommerce", "month")).toBe(10);
-    expect(platformSurcharge("prestashop", "month")).toBe(10);
-    expect(platformSurcharge("woocommerce", "year")).toBe(100);
-    expect(platformSurcharge("shopify", "month")).toBe(0);
-    expect(platformSurcharge("stripe", "year")).toBe(0);
+  it("WooCommerce y PrestaShop suman 20/30/50 €/mes según el pack (×10 al año); Shopify y Stripe, nada", () => {
+    expect(platformSurcharge("woocommerce", "month", "starter")).toBe(20);
+    expect(platformSurcharge("prestashop", "month", "agency_pro")).toBe(30);
+    expect(platformSurcharge("woocommerce", "year", "enterprise")).toBe(500);
+    expect(platformSurcharge("shopify", "month", "starter")).toBe(0);
+    expect(platformSurcharge("stripe", "year", "stripe_growth")).toBe(0);
     expect(platformSurcharge(null)).toBe(0);
   });
 

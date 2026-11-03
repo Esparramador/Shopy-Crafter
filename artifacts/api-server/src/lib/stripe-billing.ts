@@ -103,7 +103,7 @@ export async function planPriceCents(planId: string, interval: BillingInterval, 
     }
   } catch { /* sin tabla: catálogo */ }
   // Solo packs de tienda: el recargo de WooCommerce/PrestaShop se suma al precio vigente.
-  const amount = (interval === "year" ? annual : monthly) + (cat.family === "store" ? platformSurcharge(platform, interval) : 0);
+  const amount = (interval === "year" ? annual : monthly) + (cat.family === "store" ? platformSurcharge(platform, interval, planId) : 0);
   return amount > 0 ? { cents: Math.round(amount * 100), name } : null;
 }
 

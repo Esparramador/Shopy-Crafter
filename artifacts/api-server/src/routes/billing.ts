@@ -9,7 +9,7 @@ import { logger } from "../lib/logger.js";
 import Stripe from "stripe";
 import {
   PLAN_CATALOG, SELLABLE_PLANS, planFeatures, planQuotaLines, abTestLine, planPlatforms, plansForPlatform, catalogPlan,
-  PACK_PLATFORMS, PLATFORM_EXTRAS, platformSurcharge, PLATFORM_LABELS, INCLUDED_IN_ALL_PLANS, INCLUDED_IN_STRIPE_PLANS, TRIAL,
+  PACK_PLATFORMS, PLATFORM_EXTRAS, platformSurcharge, SETUP_SURCHARGE_EUR, SETUP_LINES, PLATFORM_LABELS, INCLUDED_IN_ALL_PLANS, INCLUDED_IN_STRIPE_PLANS, TRIAL,
   type PackPlatform,
 } from "../lib/plan-catalog.js";
 import {
@@ -290,14 +290,14 @@ router.get("/billing/packs", async (_req, res): Promise<void> => {
           const row = live.get(p.id);
           const baseMonthly = row && Number(row.price) > 0 ? Number(row.price) : p.priceMonthly;
           const baseAnnual = row && Number(row.price_annual) > 0 ? Number(row.price_annual) : baseMonthly * 10;
-          // WooCommerce y PrestaShop: +10 €/mes por hosting, módulos y actualizaciones propias (plan-catalog.ts).
-          const priceMonthly = baseMonthly + platformSurcharge(platform, "month");
-          const priceAnnual = baseAnnual + platformSurcharge(platform, "year");
+          // WooCommerce y PrestaShop: recargo por nivel (20/30/50 €/mes) por plugins, módulos y copias (plan-catalog.ts).
+          const priceMonthly = baseMonthly + platformSurcharge(platform, "month", p.id);
+          const priceAnnual = baseAnnual + platformSurcharge(platform, "year", p.id);
           const ab = platform === "shopify" ? abTestLine(p) : null;
           const lines = planQuotaLines(p);
           if (ab) lines.splice(lines.length - (p.callMinutes > 0 ? 2 : 1), 0, ab);
           return {
-            id: p.id, name: row?.name || p.name, summary: p.summary, priceMonthly, priceAnnual, setupFromEur: p.setupFromEur,
+            id: p.id, name: row?.name || p.name, summary: p.summary, priceMonthly, priceAnnual, setupFromEur: p.setupFromEur + SETUP_SURCHARGE_EUR[platform],
             featured: row ? !!row.featured : p.featured, badge: row ? row.badge : p.badge, lines,
           };
         });
@@ -307,13 +307,15 @@ router.get("/billing/packs", async (_req, res): Promise<void> => {
         extras: platform === "stripe" ? [] : PLATFORM_EXTRAS[platform],
         included: platform === "stripe" ? INCLUDED_IN_STRIPE_PLANS : INCLUDED_IN_ALL_PLANS,
         plans,
-        surchargeMonthly: platformSurcharge(platform, "month"),
+        surchargeMonthly: platformSurcharge(platform, "month", "starter"),
+        surchargeMonthlyMax: platformSurcharge(platform, "month", "enterprise"),
+        setupSurchargeEur: SETUP_SURCHARGE_EUR[platform],
         custom: custom ? { id: "personalizado", name: custom.name || "A medida", lines: CUSTOM_PACK_FEATURES } : null,
       };
     });
     res.json({
-      platforms, annualMonths: 10, taxNote: "Precios sin IVA",
-      setupNote: "Cada pack lleva una puesta en marcha inicial, de pago único y aparte de la mensualidad: conectar tu tienda, configurar los motores, importar el catálogo y formarte. Siempre «desde»: el importe final depende de cuántos productos, rediseños e idiomas haya que montar, y lo ves por escrito antes de empezar.",
+      platforms, annualMonths: 10, taxNote: "Precios sin IVA", setupLines: SETUP_LINES,
+      setupNote: "Tu precio son dos partes: la puesta en marcha (pago único) y la mensualidad del pack. La puesta en marcha depende del servicio que hagamos de primeras (conectar y configurar, cargar el catálogo, rediseñar la tienda…) y siempre es «desde»: la ves por escrito antes de empezar. La mensualidad depende del pack: configuración, capacidades y horas de soporte que incluye.",
     });
   } catch (err: any) {
     logger.error({ err: err?.message }, "billing/packs error");

@@ -22,9 +22,11 @@ export interface PlatformPacks {
   plans: PackPlan[];
   /** Recargo mensual de la plataforma ya incluido en el precio de sus packs (€). */
   surchargeMonthly?: number;
+  surchargeMonthlyMax?: number;
+  setupSurchargeEur?: number;
   custom: { id: string; name: string; lines: string[] } | null;
 }
-export interface PacksData { platforms: PlatformPacks[]; annualMonths: number; taxNote: string; setupNote?: string }
+export interface PacksData { platforms: PlatformPacks[]; annualMonths: number; taxNote: string; setupNote?: string; setupLines?: { key: string; name: string; fromEur: number | null; note: string }[] }
 
 const BRAND: Record<PackPlatform, string> = {
   shopify: "#95bf47", woocommerce: "#96588a", prestashop: "#df0067", stripe: "#635bff",
@@ -135,10 +137,17 @@ export function PackPricing({ data, error, onChoose, onQuote }: {
           </article>
         )}
       </div>
-      <p className="lxk-setup-note">
-        <strong>Cómo se paga:</strong> {data.setupNote ?? "Cada pack lleva una puesta en marcha inicial de pago único y la mensualidad."}
-        {current.surchargeMonthly ? ` En ${current.label} la mensualidad incluye ${eur(current.surchargeMonthly)}/mes más que en Shopify: plugins o módulos propios, actualizaciones y copias que revisamos cada mes.` : ""}
-      </p>
+      <div className="lxk-setup-note">
+        <p><strong>Cómo se paga:</strong> {data.setupNote ?? "Cada pack lleva una puesta en marcha inicial de pago único y la mensualidad."}
+          {current.surchargeMonthly ? ` En ${current.label} la mensualidad suma de ${eur(current.surchargeMonthly)} a ${eur(current.surchargeMonthlyMax ?? current.surchargeMonthly)} al mes según el pack, y la puesta en marcha ${eur(current.setupSurchargeEur ?? 0)}: plugins o módulos propios, actualizaciones, copias y pruebas de compra que revisamos cada mes.` : ""}</p>
+        {data.setupLines && current.key !== "stripe" && (
+          <ul className="lxk-setup-lines" aria-label="De qué depende tu puesta en marcha">
+            {data.setupLines.map(l => (
+              <li key={l.key}><b>{l.name}{l.fromEur ? ` · desde ${eur(l.fromEur)}` : ""}</b><span>{l.note}</span></li>
+            ))}
+          </ul>
+        )}
+      </div>
       <div className="lx-common">
         <span className="lx-common-title">Incluido en todos los packs de {current.label}</span>
         <ul>{[...current.included, ...current.extras].map(f => <li key={f}>{f}</li>)}</ul>

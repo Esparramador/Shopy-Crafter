@@ -222,8 +222,12 @@
 .lx-plan-setup { display: flex; flex-direction: column; gap: 2px; margin: 0 0 14px; padding: 9px 12px; border-radius: 12px; border: 1px dashed rgba(200,168,75,.4); background: rgba(200,168,75,.06); }
 .lx-plan-setup b { font-size: 13px; color: var(--l-gold2, #d9bb62); font-weight: 700; }
 .lx-plan-setup span { font-size: 11px; color: var(--l-t2); }
-.lxk-setup-note { margin: 18px auto 0; max-width: 860px; font-size: 13px; line-height: 1.6; color: var(--l-t2); text-align: center; }
+.lxk-setup-note { margin: 18px auto 0; max-width: 980px; font-size: 13px; line-height: 1.6; color: var(--l-t2); text-align: center; }
 .lxk-setup-note strong { color: var(--l-t); }
+.lxk-setup-lines { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; text-align: left; }
+.lxk-setup-lines li { padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.025); display: flex; flex-direction: column; gap: 3px; }
+.lxk-setup-lines b { font-size: 12.5px; color: var(--l-t); }
+.lxk-setup-lines span { font-size: 11.5px; line-height: 1.5; color: var(--l-t2); }
 .lx-plan-feats { list-style: none; margin: 0 0 16px; padding: 14px 0 0; border-top: 1px solid rgba(255,255,255,.07); display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .lx-plan-feats li { position: relative; padding-left: 18px; font-size: 13px; line-height: 1.45; color: var(--l-t); }
 .lx-plan-feats li::before { content: "✓"; position: absolute; left: 0; color: var(--l-jade); font-size: 12px; }

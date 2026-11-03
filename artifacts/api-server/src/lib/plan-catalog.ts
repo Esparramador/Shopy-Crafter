@@ -193,16 +193,41 @@ export const PLATFORM_LABELS: Record<PackPlatform, string> = {
 };
 
 /**
- * Recargo mensual por plataforma (€/mes, sin IVA; el anual suma 10 meses de recargo, como el pack).
+ * Recargo por plataforma, por nivel de pack (€/mes sin IVA; el anual suma 10 meses de recargo).
  * WooCommerce y PrestaShop llevan plugins o módulos de pago y de SEO que actualizamos y probamos cada
- * mes, y copias que restauramos si algo se rompe; en Shopify la plataforma se encarga de todo eso. Es la diferencia de la banda de mensualidad de Agente/TARIFAS.md (49–99 € frente a 59–129 €).
+ * mes, y copias que restauramos si algo se rompe; en Shopify la plataforma se encarga de todo eso, así
+ * que el recargo sube con las horas de soporte que cada nivel incluye (Starter 20, Growth 30, Enterprise 50).
+ * Mercado (03/11/2026, tarifas publicadas en España): mantenimiento Shopify 39–159 €/mes frente a
+ * WooCommerce/PrestaShop 59–199 €/mes; la diferencia entre plataformas en la misma agencia es de 20 a 75 €.
  */
-export const PLATFORM_SURCHARGE_EUR: Record<PackPlatform, number> = { shopify: 0, woocommerce: 10, prestashop: 10, stripe: 0 };
+export const PLATFORM_SURCHARGE_EUR: Record<string, Record<PackPlatform, number>> = {
+  starter:    { shopify: 0, woocommerce: 20, prestashop: 20, stripe: 0 },
+  agency_pro: { shopify: 0, woocommerce: 30, prestashop: 30, stripe: 0 },
+  enterprise: { shopify: 0, woocommerce: 50, prestashop: 50, stripe: 0 },
+};
 
-export function platformSurcharge(platform: string | null | undefined, interval: "month" | "year" = "month"): number {
-  const m = PLATFORM_SURCHARGE_EUR[platform as PackPlatform] ?? 0;
+export function platformSurcharge(platform: string | null | undefined, interval: "month" | "year" = "month", planId?: string | null): number {
+  const m = PLATFORM_SURCHARGE_EUR[planId ?? ""]?.[platform as PackPlatform] ?? 0;
   return interval === "year" ? m * 10 : m;
 }
+
+/** Recargo de la puesta en marcha en WooCommerce/PrestaShop: conector, módulos, copias y pruebas de compra. */
+export const SETUP_SURCHARGE_EUR: Record<PackPlatform, number> = { shopify: 0, woocommerce: 100, prestashop: 100, stripe: 0 };
+
+/**
+ * La puesta en marcha NO es una cifra fija: depende del servicio que se haga de primeras. Cada línea es
+ * «desde» y se cierra por escrito. Los multiplicadores son los de Agente/TARIFAS.md §3.
+ */
+export interface SetupLine { key: string; name: string; fromEur: number | null; note: string }
+export const SETUP_LINES: SetupLine[] = [
+  { key: "conexion", name: "Conexión y configuración de los motores", fromEur: null, note: "Va en el «desde» de tu pack: conectar la tienda, activar los motores, formación y primera revisión." },
+  { key: "catalogo", name: "Carga y optimización inicial del catálogo", fromEur: 150, note: "Desde 150 € por cada 100 productos. Con más de 500 referencias o datos sucios, la limpieza se presupuesta antes." },
+  { key: "rediseno", name: "Rediseño de portada, colección y ficha de producto", fromEur: 1490, note: "Es el servicio de la Tienda. Depende de las plantillas, las colecciones y los rediseños que haya que hacer." },
+  { key: "marca", name: "Identidad de marca (si no tienes)", fromEur: 300, note: "De 300 a 800 €: hay que crearla antes de poder diseñar nada." },
+  { key: "idioma", name: "Idioma adicional", fromEur: null, note: "+10 % sobre la puesta en marcha (en una tienda, también cada ficha de producto)." },
+  { key: "integracion", name: "Integración con un sistema que ya tienes", fromEur: null, note: "De +20 % a +50 %: el riesgo lo pone tu software." },
+  { key: "urgencia", name: "Urgencia (menos de 10 días)", fromEur: null, note: "+25 %: reordena el trabajo de los demás." },
+];
 
 /** Periodo de prueba al activar la cuenta. */
 export const TRIAL = { days: 14, productsPerMonth: 3, imagesPerMonth: 6 };
