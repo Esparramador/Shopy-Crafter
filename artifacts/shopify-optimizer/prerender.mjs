@@ -12,7 +12,7 @@
  * React then replaces the shell with the full app on the client.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
@@ -49,6 +49,23 @@ function buildSitemap(routeList) {
 // ── Fallback SSR shell (used if entry-server.js is unavailable) ─────────────
 function fallbackShell() {
   return `<div id="sc-ssr-shell" style="background:#080810;min-height:100vh;display:flex;align-items:center;justify-content:center"><div style="color:#c8a84b;font-family:Geist,sans-serif;font-size:14px">Shopy Crafter</div></div>`;
+}
+
+const htmlFileFor = route => `${route.slice(1).replace(/\//g, '__')}.html`;
+
+/**
+ * Reescrituras de cada ruta en artifact.toml (entre marcadores, antes del comodín). El despliegue lee
+ * el TOML antes de compilar, así que se generan en el workspace y se commitean; en despliegue solo se avisa.
+ */
+function syncRewrites(routes) {
+  const file = join(__dirname, '.replit-artifact/artifact.toml');
+  const toml = readFileSync(file, 'utf-8');
+  const block = routes.filter(r => r !== '/').flatMap(r => [r, `${r}/`]).map(from =>
+    `[[services.production.rewrites]]\nfrom = "${from}"\nto = "/${htmlFileFor(from.replace(/\/$/, ''))}"\n`).join('\n');
+  const next = toml.replace(/(# rewrites:auto:start\n)[\s\S]*?(# rewrites:auto:end)/, `$1${block}$2`);
+  if (next === toml) return;
+  if (process.env.REPLIT_DEPLOYMENT === '1') console.error('✗ artifact.toml no tiene las reescrituras al día: ejecuta el build en el workspace y commitea');
+  else { writeFileSync(file, next, 'utf-8'); console.log('✓ artifact.toml: reescrituras actualizadas'); }
 }
 
 async function main() {
@@ -133,12 +150,9 @@ async function main() {
       if (route === '/') {
         writeFileSync(join(DIST, 'index.html'), finalHtml, 'utf-8');
       } else {
-        const routePath = route.slice(1); // strip leading /
-        const segments  = routePath.split('/');
-        const fileName  = segments.pop();
-        const fileDir   = join(DIST, ...segments);
-        mkdirSync(fileDir, { recursive: true });
-        writeFileSync(join(fileDir, `${fileName}.html`), finalHtml, 'utf-8');
+        // HTML plano: el hosting de Replit no traduce /ruta a /ruta.html, y una carpeta con el
+        // nombre de la ruta provoca un 301 a /ruta/. Cada ruta llega a su archivo por una reescritura.
+        writeFileSync(join(DIST, htmlFileFor(route)), finalHtml, 'utf-8');
       }
 
       if (hasBody) {
@@ -157,6 +171,8 @@ async function main() {
   console.log(
     `\nPrerendered ${ROUTES.length} routes (${fullBody} with full body content, ${metadataOnly} metadata-only).`
   );
+
+  if (routeList) syncRewrites(ROUTES);
 
   // 4. sitemap.xml generado del mismo registro (todas las rutas indexables)
   if (routeList) {

@@ -1,3 +1,4 @@
+import "@/lib/admin-fonts";
 /**
  * CardStudioEditor — Estudio Gráfico Profesional con Fabric.js
  *

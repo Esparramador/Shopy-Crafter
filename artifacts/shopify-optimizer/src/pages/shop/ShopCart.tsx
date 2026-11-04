@@ -25,6 +25,7 @@ export default function ShopCart() {
   const root = useRef<HTMLDivElement>(null);
   const cancelled = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("cancelado");
 
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     setQuote(null); setError(null);
     if (items.length === 0) return;
@@ -33,7 +34,7 @@ export default function ShopCart() {
       .then(q => { if (alive) setQuote(q); })
       .catch(e => { if (alive) setError(e instanceof Error ? e.message : "Error"); });
     return () => { alive = false; };
-  }, [items]);
+  }, [items, attempt]);
 
   useEffect(() => { loadSettings().then(setSettings).catch(() => {}); }, []);
   useEffect(() => {
@@ -126,7 +127,7 @@ export default function ShopCart() {
                 <div className="shop-total"><dt>Total</dt><dd>{quote ? <Money cents={quote.totalCents} /> : "…"}</dd></div>
               </dl>
               <p className="shop-muted">IVA incluido. Pagas con tarjeta en Stripe y recibes la factura por email.</p>
-              {error && <p className="shop-error" role="alert">{error}</p>}
+              {error && <p className="shop-error" role="alert">{error} <button type="button" className="shop-btn shop-btn-ghost" onClick={() => setAttempt(a => a + 1)}>Reintentar</button></p>}
               <button type="button" className="shop-btn shop-btn-gold shop-btn-block shop-btn-lg shop-btn-shine" disabled={!quote || paying} onClick={() => void pay()}>
                 {paying ? "Abriendo el pago…" : `Pagar ${quote ? euros(quote.totalCents) : ""} con tarjeta →`}
               </button>

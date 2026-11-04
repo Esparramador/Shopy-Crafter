@@ -47,7 +47,6 @@ const INSTAGRAM_URL = "https://www.instagram.com/shopycrafter/";
 
 function MagnetInstagramButton() {
   const btnRef = useRef<HTMLAnchorElement>(null);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [hovered, setHovered] = useState(false);
   const animRef = useRef<number>(0);
   const targetRef = useRef({ x: 0, y: 0 });
@@ -81,7 +80,8 @@ function MagnetInstagramButton() {
       const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
       currentRef.current.x = lerp(currentRef.current.x, targetRef.current.x, 0.14);
       currentRef.current.y = lerp(currentRef.current.y, targetRef.current.y, 0.14);
-      setOffset({ x: currentRef.current.x, y: currentRef.current.y });
+      el.style.setProperty("--mx", `${currentRef.current.x}px`);
+      el.style.setProperty("--my", `${currentRef.current.y}px`);
       animRef.current = requestAnimationFrame(loop);
     };
 
@@ -121,7 +121,7 @@ function MagnetInstagramButton() {
         boxShadow: hovered
           ? "0 0 0 4px rgba(212,168,67,0.35), 0 0 40px 12px rgba(212,168,67,0.55), 0 8px 32px rgba(0,0,0,0.5)"
           : "0 0 0 2px rgba(212,168,67,0.2), 0 0 24px 6px rgba(212,168,67,0.35), 0 6px 24px rgba(0,0,0,0.4)",
-        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        transform: "translate(var(--mx, 0px), var(--my, 0px))",
         transition: "background 0.2s, box-shadow 0.2s",
         cursor: "pointer",
         animation: "magnetBlink 2.4s ease-in-out infinite",
@@ -547,6 +547,8 @@ export default function Landing() {
           const move = (e: MouseEvent) => {
             el.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%))`;
           };
+          // React llama a este ref en cada render: sin esto se acumulan listeners.
+          (el as any).__cleanup?.();
           window.addEventListener("mousemove", move, { passive: true });
           (el as any).__cleanup = () => window.removeEventListener("mousemove", move);
         }}
@@ -570,7 +572,7 @@ export default function Landing() {
           ))}
         </ul>
         <div className="l-nav-ctas">
-          <Link href="/tienda" className="l-btn-ghost lxk-nav-shop">Tienda</Link>
+          <Link href="/tienda" className="lxk-nav-shop"><span className="lxk-shop-dot" aria-hidden="true" />Tienda</Link>
           {isAdmin ? (
             <Link href="/admin/clients" className="l-btn-gold">{content.adminBackLabel ?? "← Volver al panel"}</Link>
           ) : (
@@ -584,13 +586,13 @@ export default function Landing() {
           </button>
         </div>
         {menuOpen && (
-          <div id="lxk-menu" className="lxk-menu" role="menu">
-            <Link href="/tienda" className="lxk-menu-shop" role="menuitem" onClick={() => setMenuOpen(false)}>Tienda <small>tarjetas, placas QR, webs y Google</small></Link>
+          <div id="lxk-menu" className="lxk-menu">
+            <Link href="/tienda" className="lxk-menu-shop" onClick={() => setMenuOpen(false)}>Tienda <small>tarjetas, placas QR, webs y Google</small></Link>
             {FP_SECTIONS.map((sec, i) => (
-              <a key={sec.id} href={`#${sec.id}`} role="menuitem" className={currentSection === i ? "on" : ""}
+              <a key={sec.id} href={`#${sec.id}`} className={currentSection === i ? "on" : ""}
                 onClick={e => { e.preventDefault(); setMenuOpen(false); goToSection(i); setHashRobust(sec.id); }}>{sec.nav}</a>
             ))}
-            {!isAdmin && <Link href="/login" role="menuitem" onClick={() => setMenuOpen(false)}>Iniciar sesión</Link>}
+            {!isAdmin && <Link href="/login" onClick={() => setMenuOpen(false)}>Iniciar sesión</Link>}
           </div>
         )}
       </nav>

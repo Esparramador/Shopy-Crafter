@@ -30,4 +30,3 @@ Disallow: /*?session_id=
 Disallow: /api/web-designer/demo-page/
 
 Sitemap: https://shopycrafter.com/sitemap.xml
-Sitemap: https://shopycrafter.com/api/shop/products-sitemap.xml

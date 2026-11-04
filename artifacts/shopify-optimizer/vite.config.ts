@@ -127,6 +127,9 @@ export default defineConfig({
 
         // Manual chunks: keep heavy vendor libs in separate cacheable files
         manualChunks(id) {
+          // El helper de precarga va con React: si cae en vendor-drei, la entrada arrastra three a la portada.
+          if (id.includes("vite/preload-helper") || id.includes("commonjsHelpers")) return "vendor-react";
+          if (["three-stdlib","three-mesh-bvh","troika-","maath","camera-controls","meshline","@monogrid/gainmap-js","stats-gl","stats.js","detect-gpu","hls.js","glsl-noise","@mediapipe","tunnel-rat"].some(p => id.includes(`node_modules/${p}`))) return "vendor-three-extras";
           // React core — changes very rarely.
           // CRITICAL: scheduler + react runtime deps MUST live in the SAME chunk as
           // react/react-dom. If scheduler lands in vendor-misc, vendor-react imports it

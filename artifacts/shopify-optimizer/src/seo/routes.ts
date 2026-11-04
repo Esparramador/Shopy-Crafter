@@ -29,11 +29,14 @@ export function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** Recorta en palabra completa para que el buscador no lo corte a su manera. */
+const clamp = (t: string, n: number) => (t.length <= n ? t : `${t.slice(0, n - 1).replace(/\s+\S*$/, "")}…`);
+
 function keywordRoutes(): SeoRoute[] {
   return Object.values(COMPARISON_DATA).map(p => ({
     path: p.path,
-    title: p.metaTitle,
-    description: p.metaDescription,
+    title: clamp(p.metaTitle, 60),
+    description: clamp(p.metaDescription, 158),
     h1: p.h1,
     intro: p.subtitle,
     bodyHtml: p.body,
@@ -46,8 +49,8 @@ function keywordRoutes(): SeoRoute[] {
 function blogRoutes(): SeoRoute[] {
   return POSTS.map(post => ({
     path: `/blog/${post.slug}`,
-    title: `${post.title} — Blog de Shopy Crafter`,
-    description: post.excerpt,
+    title: clamp(post.title, 60),
+    description: clamp(post.excerpt, 158),
     h1: post.title,
     intro: post.excerpt,
     bodyHtml: post.body,
@@ -63,8 +66,8 @@ function blogRoutes(): SeoRoute[] {
 function changelogRoutes(): SeoRoute[] {
   return RELEASES.map(r => ({
     path: `/changelog/${r.version}`,
-    title: `Shopy Crafter v${r.version} — ${r.title}`,
-    description: r.description ?? r.changes.slice(0, 3).join(". "),
+    title: clamp(`v${r.version}: ${r.title}`, 60),
+    description: clamp(r.description ?? r.changes.slice(0, 3).join(". "), 158),
     h1: `v${r.version} — ${r.title}`,
     intro: r.description ?? r.changes.join(". "),
     priority: 0.3,

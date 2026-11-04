@@ -22,12 +22,17 @@ export default function ShopThanks() {
   useEffect(() => {
     if (!token) { setError("Falta el número de pedido."); return; }
     const path = session ? `/shop/checkout/verify?session_id=${encodeURIComponent(session)}&pedido=${encodeURIComponent(token)}` : `/shop/orders/${encodeURIComponent(token)}`;
-    apiJson<Order>(path)
+    let tries = 0, timer: ReturnType<typeof setTimeout> | undefined;
+    const check = () => apiJson<Order>(path)
       .then(o => {
         setOrder(o);
+        // Stripe tarda unos segundos en confirmar: se vuelve a mirar sin pedir al cliente que recargue.
+        if (o.status === "pending" && ++tries < 15) timer = setTimeout(() => void check(), 2000);
         if (o.status !== "pending" && o.status !== "expired" && o.status !== "cancelled") { cart.clear(); confetti(); }
       })
       .catch(e => setError(e instanceof Error ? e.message : "Error"));
+    void check();
+    return () => { if (timer) clearTimeout(timer); };
   }, [token, session]);
 
   const paid = order && !["pending", "expired", "cancelled"].includes(order.status);

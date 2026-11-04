@@ -217,7 +217,7 @@ const img = (file: string, alt: string): ShopMedia => ({ type: "image", url: `/t
 const vid = (file: string, alt: string): ShopMedia => ({ type: "video", url: `/tienda-media/${file}.mp4`, alt, poster: `/tienda-media/${file}-poster.webp` });
 const pimg = (file: string, alt: string): ShopMedia => ({ type: "image", url: `/portfolio/${file}.webp`, alt });
 
-export const SHOP_SEED_VERSION = "v4-2026-11";
+export const SHOP_SEED_VERSION = "v5-2026-11";
 
 export const SHOP_SEED: SeedProduct[] = [
   {
@@ -226,17 +226,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Aluminio anodizado grabado con láser, desde 0,35 € la tarjeta. A una cara o a doble cara con tu QR.",
     description: "Tarjetas de 85 × 55 mm en aluminio anodizado de 0,2 mm, grabadas una a una con el láser infrarrojo de nuestra xTool F2. El grabado no es tinta: es el propio metal, así que no se borra ni se despega.\n\nA una cara llevan tu logo, tus datos y el QR en el mismo lado. A doble cara, delante va tu logo, una ilustración o una foto y detrás tus datos y un QR que lleva a donde tú quieras. Se piden a partir de 100 tarjetas: 0,35 € cada una a una cara y 0,45 € a doble cara. Incluimos el diseño básico a partir de tu logo y te enviamos la prueba antes de grabar.",
     features: ["Aluminio anodizado negro, 85 × 55 × 0,2 mm", "A una cara (0,35 €/ud.) o a doble cara (0,45 €/ud.)", "Pedido mínimo: 100 tarjetas", "QR a tu web, Instagram, WhatsApp o reseñas", "Diseño básico y prueba antes de grabar incluidos", "Envío en 3 a 5 días laborables"],
-    media: [vid("3d-tarjetas-metalicas", "Giro 3D de la tarjeta de aluminio grabada"),
-      
-      vid("taller-grabado-tarjeta", "Tarjeta grabándose en la xTool F2"),
-      img("tarjeta-warriors-ultra-pump", "Tarjeta de aluminio de Warriors Hardcore: Ultra Pump"),
-      img("tarjeta-shopycrafter-delante", "Tarjeta de Shopy Crafter, cara delantera"),
-      img("tarjeta-shopycrafter-detras", "Tarjeta de Shopy Crafter, reverso con QR"),
-      img("tarjeta-lazy-lizard", "Tarjetas de Lazy Lizard, delante y detrás"),
-      img("tarjeta-warriors-anabolic", "Tarjeta de aluminio de Warriors Hardcore: Anabolic"),
-      img("tarjeta-warriors-isolate", "Tarjeta de aluminio de Warriors Hardcore: Isolate"),
-      vid("taller-tarjeta-hardcore", "Grabado de una tarjeta de Warriors Hardcore"),
-    ],
+    media: [vid("3d-tarjetas-metalicas", "Giro 3D de la tarjeta de aluminio grabada"), img("tarjeta-ceo-v5", "Tarjeta de aluminio de Shopy Crafter (simulación del grabado)"), vid("taller-grabado-tarjeta", "Tarjeta grabándose en la xTool F2"), img("tarjeta-warriors-ultra-pump", "Tarjeta de aluminio de Warriors Hardcore: Ultra Pump"), img("tarjeta-warriors-wpc80", "Tarjeta de aluminio de Warriors Hardcore: WPC80"), img("tarjeta-warriors-creatine", "Tarjeta de aluminio de Warriors Hardcore: Creatine"), img("tarjeta-shopycrafter-delante", "Tarjeta de Shopy Crafter, cara delantera"), img("tarjeta-shopycrafter-detras", "Tarjeta de Shopy Crafter, reverso con QR"), img("tarjeta-lazy-lizard", "Tarjetas de Lazy Lizard, delante y detrás"), vid("taller-tarjeta-hardcore", "Grabado de una tarjeta de Warriors Hardcore")],
     // 0,35 € y 0,45 € por tarjeta son el precio mínimo: no hay tramos por debajo.
     variants: [
       { key: "doble-cara", name: "Doble cara", tiers: tiers([100, 45]) },
@@ -255,13 +245,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Para reseñas de Google, Instagram, la wifi, la carta o el pago. Grabada y cortada en contrachapado.",
     description: "Placa de contrachapado de 3 mm grabada y cortada con láser, con su soporte de pie. Lleva tu logo, un titular y el QR al enlace que elijas. Es el modo más fácil de conseguir reseñas en Google: el cliente la ve en el mostrador, escanea y deja sus estrellas.\n\nComprobamos que el QR se lee con varios móviles antes de enviarla. Con el chip NFC opcional, basta con acercar el móvil.",
     features: ["Contrachapado de 3 mm grabado y cortado con láser", "Soporte de pie incluido", "Tu logo, un titular y el QR a tu enlace", "QR comprobado con varios móviles antes del envío", "Chip NFC opcional: se abre al acercar el móvil"],
-    media: [vid("3d-placa-qr-madera", "Giro 3D de la placa QR de madera con soporte"),
-      
-      img("placa-qr-hanakaze", "Placas QR de madera con soporte para Hanakaze Serigraphy"),
-      img("placa-resenas-madera", "Placa de reseñas de Google en madera para RastaLo Barcelona"),
-      img("placa-resenas-madera-grabada", "Vista del grabado de la placa de reseñas"),
-      img("soportes-placa-qr", "Modelos de soporte para la placa"),
-    ],
+    media: [vid("3d-placa-qr-madera", "Giro 3D de la placa QR de madera con soporte"), img("placa-qr-hanakaze", "Placas QR de madera con soporte para Hanakaze Serigraphy"), img("placa-resenas-madera", "Placa de reseñas de Google en madera para RastaLo Barcelona"), img("pies-cartel-render", "Pies de contrachapado para el cartel (simulación del corte)")],
     variants: [
       { key: "90x110", name: "Pequeña · 90 × 110 mm", tiers: tiers([1, 2490], [3, 2117]) },
       { key: "115x115", name: "Cuadrada · 115 × 115 mm", tiers: tiers([1, 2990], [3, 2542]) },
@@ -283,11 +267,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Para el mostrador: guarda unas 40 tarjetas y lleva tu logo grabado.",
     description: "Expositor de contrachapado de 3 mm, cortado a medida para tarjetas de 85 × 55 mm y montado sin cola, a presión. Elige si las tarjetas van apaisadas o de pie. Grabamos tu logo o tu nombre en el frontal.",
     features: ["Contrachapado de 3 mm cortado con láser", "Hueco para unas 40 tarjetas de 85 × 55 mm", "Horizontal o vertical", "Logo o nombre grabado en el frontal"],
-    media: [
-      img("expositor-tarjetas-vertical", "Expositor vertical de tarjetas montado"),
-      img("placa-qr-hanakaze", "Piezas de contrachapado con soporte montado a presión"),
-      img("soportes-placa-qr", "Piezas y modelos de soportes"),
-    ],
+    media: [img("placa-qr-hanakaze", "Piezas de contrachapado con soporte montado a presión"), img("pies-cartel-render", "Piezas cortadas en contrachapado (simulación del corte)"), img("expositor-tarjetas-vertical", "Dibujo del expositor vertical")],
     variants: [
       { key: "horizontal", name: "Horizontal (tarjeta apaisada)", tiers: tiers([1, 1990], [3, 1690]) },
       { key: "vertical", name: "Vertical (tarjeta de pie)", tiers: tiers([1, 1990], [3, 1690]) },
@@ -306,12 +286,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Placa QR de reseñas, expositor y 100 tarjetas de aluminio con el mismo diseño.",
     description: "Todo lo que necesita un mostrador para pedir reseñas y repartir tarjetas, con una sola imagen de marca: la placa cuadrada de reseñas de Google con soporte, el expositor con tu logo y 100 tarjetas de aluminio a doble cara con QR, más tu tarjeta digital con estadísticas de escaneos.\n\nPor separado serían 109,80 €.",
     features: ["Placa QR de reseñas 115 × 115 mm con soporte", "Expositor de tarjetas con tu logo", "100 tarjetas de aluminio grabadas a doble cara", "Tarjeta digital con estadísticas de escaneos", "Mismo diseño en las tres piezas"],
-    media: [
-      img("placa-qr-hanakaze", "Placas QR de madera con soporte"),
-      img("placa-resenas-madera", "Placa de reseñas de Google"),
-      img("tarjeta-shopycrafter-detras", "Reverso de tarjeta con QR"),
-      img("expositor-tarjetas-vertical", "Expositor de tarjetas"),
-    ],
+    media: [img("placa-qr-hanakaze", "Placas QR de madera con soporte"), img("placa-resenas-madera", "Placa de reseñas de Google"), img("tarjeta-shopycrafter-detras", "Reverso de tarjeta con QR"), img("expositor-tarjetas-vertical", "Dibujo del expositor")],
     variants: [{ key: "kit", name: "Kit completo", tiers: tiers([1, 9490]) }],
     addons: [],
     fields: [
@@ -327,7 +302,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "El expositor con tu logo y 100 tarjetas a juego.",
     description: "El expositor de mostrador con tu logo grabado y 100 tarjetas de aluminio a doble cara con tus datos y QR. Por separado serían 64,90 €.",
     features: ["Expositor de contrachapado con tu logo", "100 tarjetas de aluminio grabadas a doble cara", "Diseño básico y prueba antes de grabar incluidos"],
-    media: [img("expositor-tarjetas-vertical", "Expositor de tarjetas"), img("tarjeta-shopycrafter-delante", "Tarjeta de aluminio")],
+    media: [img("tarjeta-shopycrafter-delante", "Tarjeta de aluminio"), img("expositor-tarjetas-vertical", "Dibujo del expositor")],
     variants: [
       { key: "horizontal", name: "Expositor horizontal", tiers: tiers([1, 5690]) },
       { key: "vertical", name: "Expositor vertical", tiers: tiers([1, 5690]) },
@@ -342,8 +317,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Una foto que cabe en la cartera y no se borra.",
     description: "Tu foto grabada con láser en una tarjeta de aluminio anodizado de 85 × 55 mm. Preparamos la imagen para el metal (contraste, encuadre y trama) y te enseñamos cómo quedará antes de grabarla. Detrás, si quieres, una fecha o una frase.",
     features: ["Aluminio anodizado de 85 × 55 mm", "Foto preparada para el metal y revisada antes de grabar", "Texto opcional en el reverso", "Tres por 34,89 €"],
-    media: [vid("3d-tarjeta-foto-aluminio", "Giro 3D de la foto grabada en tarjeta de aluminio"),
-      img("tarjeta-foto-aluminio-paisaje", "Tarjeta de aluminio con una ilustración grabada")],
+    media: [vid("3d-tarjeta-foto-aluminio", "Giro 3D de la foto grabada en tarjeta de aluminio")],
     variants: [{ key: "tarjeta", name: "Tarjeta 85 × 55 mm", tiers: tiers([1, 1490], [3, 1163]) }],
     addons: [],
     fields: PHOTO_FIELDS,
@@ -391,7 +365,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Una pequeña web que se abre como un regalo: escena 3D, vuestras fotos y tu mensaje.",
     description: "Le mandas un enlace y, al abrirlo, encuentra una escena en 3D con un regalo esperándole. Lo abre, pasan vuestras fotos y aparece tu mensaje letra a letra, con música. Funciona en el móvil y en el ordenador, sin instalar nada.\n\nPrueba la demo: así es la experiencia, con fotos de ejemplo. En el tuyo van tus fotos y tu texto, y con la opción de personaje, la persona que lo recibe aparece en 3D.",
     features: ["Escena 3D interactiva en el navegador", "Hasta 12 fotos y tu mensaje", "Se abre con un enlace, en móvil u ordenador", "Opción con personaje 3D de la persona", "Entrega en 3 días laborables"],
-    media: [img("regalo-demo-1", "Demo del regalo web: la escena 3D"), img("regalo-demo-2", "Demo del regalo web: el mensaje final")],
+    media: [vid("regalo-robot", "El regalo web en marcha: el robot abre la caja, pasan las fotos y aparece el mensaje"), img("regalo-demo-1", "Demo del regalo web: la escena 3D")],
     variants: [
       { key: "fotos-mensaje", name: "Con fotos y mensaje", tiers: tiers([1, 7900]) },
       { key: "personaje-3d", name: "Con personaje 3D de la persona", tiers: tiers([1, 14900]) },
@@ -412,7 +386,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Una tarjeta de aluminio con su foto y un QR que abre su regalo web.",
     description: "El regalo web 3D con vuestras fotos y tu mensaje, y una tarjeta de aluminio con una de las fotos grabada y, detrás, el QR que lo abre. Se entrega en mano y se descubre escaneando.",
     features: ["Regalo web 3D con fotos y mensaje", "Tarjeta de aluminio con su foto grabada", "QR detrás que abre el regalo", "Envío de la tarjeta en 3 a 5 días laborables"],
-    media: [img("regalo-demo-1", "Demo del regalo web"), img("tarjeta-foto-aluminio-paisaje", "Tarjeta de aluminio grabada")],
+    media: [vid("regalo-robot", "El regalo web en marcha: el robot abre la caja, pasan las fotos y aparece el mensaje"), img("regalo-demo-1", "Demo del regalo web")],
     variants: [{ key: "completo", name: "Tarjeta + regalo web", tiers: tiers([1, 9900]) }],
     addons: [{ key: "video-vertical", name: "Vídeo vertical 9:16 del regalo", cents: 2900, perUnit: false }],
     fields: [
@@ -463,7 +437,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Hasta 5 páginas con tu marca, animación y formulario de contacto.",
     description: "Una web de hasta 5 páginas (inicio, servicios, quiénes somos, contacto y la que necesites) diseñada a partir de tu marca, con animación, formulario de contacto y SEO técnico de base. Adaptada a móvil y publicada en tu dominio. El precio de partida incluye dos rondas de cambios; páginas extra, tienda, idiomas o rediseños se presupuestan aparte, siempre por escrito y antes de empezar.",
     features: ["Hasta 5 páginas", "Diseño a partir de tu marca", "Formulario de contacto", "SEO técnico de base y optimización de velocidad", "Dos rondas de cambios"],
-    media: [vid("servicio-web-corporativa", "Recorrido por la web de Shopy Crafter"), pimg("brasas-y-paellas-1", "Web de Brasa y Paellas"), pimg("crafter-eventos-1", "Web de Crafter Eventos")],
+    media: [vid("servicio-web-corporativa", "Recorrido por la web de Shopy Crafter"), pimg("brasas-y-paellas-1", "Web de Brasa y Paellas")],
     variants: [{ key: "web", name: "Web de hasta 5 páginas", tiers: tiers([1, 169000]) }],
     addons: [{ key: "idiomas", name: "Segundo idioma", cents: 25000, perUnit: false }],
     fields: [
@@ -495,7 +469,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "De 30 a 60 segundos, con personaje o producto en 3D, para web y redes.",
     description: "Un vídeo de presentación animado en 3D: tu producto, tu local o un personaje de marca, con textos, música y voz si la quieres. Lo entregamos en vertical para redes y en horizontal para la web. Incluye guion, una ronda de cambios sobre el guion y otra sobre el vídeo. El precio de partida es para el vídeo más corto con un personaje o producto; más escenas, personajes o versiones se presupuestan según el trabajo.",
     features: ["De 30 a 60 segundos", "Producto, local o personaje de marca en 3D", "Vertical 9:16 y horizontal 16:9", "Guion incluido", "Una ronda de cambios en guion y otra en vídeo"],
-    media: [vid("servicio-video-3d", "Vídeo 3D de presentación para Lazy Lizard")],
+    media: [{ ...vid("servicio-video-3d", "Vídeo 3D de presentación para Lazy Lizard"), poster: "/tienda-media/servicio-video-3d-poster-16x9.webp" }],
     variants: [
       { key: "30s", name: "Hasta 30 segundos", tiers: tiers([1, 89000]) },
       { key: "60s", name: "Hasta 60 segundos", tiers: tiers([1, 149000]) },
@@ -514,7 +488,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Tu web, tu tienda o tu idea como app, con una sola base de código.",
     description: "Convertimos tu web o tu tienda en app para Android e iOS, o desarrollamos la app desde cero, con notificaciones push y publicación en las tiendas. Presupuesto cerrado antes de empezar.",
     features: ["Android e iOS con una sola base de código", "Notificaciones push", "Publicación en Google Play y App Store", "Presupuesto cerrado"],
-    media: [pimg("pequenos-genios-1", "App Pequeños Genios"), pimg("crafter-eventos-2", "App Crafter Eventos"), pimg("redes-del-grupo-2", "App Redes del Grupo")],
+    media: [img("servicio-app-nativa", "Apps reales de Shopy Crafter en el móvil")],
     variants: [{ key: "app", name: "Presupuesto", tiers: tiers([1, 0]) }],
     addons: [],
     fields: [],
@@ -526,7 +500,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Detectamos problemas de rastreo, contenido y estructura, con prioridades claras para mejorar.",
     description: "Revisamos la indexación, los metadatos, la estructura de páginas, los enlaces internos y los problemas técnicos que afectan a tu visibilidad. Recibes un informe priorizado con acciones concretas y una propuesta de alcance antes de empezar. La auditoría no garantiza posiciones concretas en Google.",
     features: ["Revisión técnica y de contenido", "Problemas ordenados por impacto", "Informe con acciones recomendadas", "Presupuesto cerrado antes de empezar"],
-    media: [],
+    media: [img("servicio-auditoria-seo", "Ejemplo de auditoría SEO")],
     variants: [{ key: "audit", name: "Auditoría SEO", tiers: tiers([1, 0]) }],
     addons: [],
     fields: [
@@ -541,7 +515,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Analizamos la velocidad móvil y de escritorio y proponemos mejoras para tu web.",
     description: "Medimos carga, interacción y estabilidad visual; revisamos imágenes, recursos y código para definir un plan de optimización que encaje con tu plataforma. El alcance y el precio se confirman antes de tocar la web. La puntuación final depende del dispositivo, la red y los servicios externos, por lo que no se garantiza un 100/100.",
     features: ["Diagnóstico móvil y escritorio", "Revisión de LCP, INP y CLS", "Plan priorizado de mejoras", "Presupuesto y alcance acordados antes de empezar"],
-    media: [],
+    media: [img("servicio-pagespeed", "Ejemplo de optimización de velocidad")],
     variants: [{ key: "speed", name: "Optimización PageSpeed", tiers: tiers([1, 0]) }],
     addons: [],
     fields: [
@@ -556,7 +530,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Un resumen de resultados, incidencias y próximos pasos, basado en los datos disponibles.",
     description: "Preparamos un informe mensual sobre las métricas de tienda y web que nos facilites o a las que nos autorices a acceder: ventas, conversión, visibilidad orgánica, velocidad y acciones realizadas. Acordamos primero las fuentes, la frecuencia y el alcance; no solicitamos contraseñas ni garantizamos resultados comerciales.",
     features: ["Métricas acordadas según tus fuentes de datos", "Resumen de avances e incidencias", "Recomendaciones priorizadas para el siguiente mes", "Presupuesto mensual a medida"],
-    media: [],
+    media: [img("servicio-informes", "Ejemplo de informe mensual")],
     variants: [{ key: "monthly", name: "Informe mensual", tiers: tiers([1, 0]) }],
     addons: [],
     fields: [
@@ -591,7 +565,7 @@ export const SHOP_SEED: SeedProduct[] = [
     tagline: "Tus clientes reservan en tu web y la cita cae en tu Google Calendar.",
     description: "Una página de reservas con la imagen de tu negocio, conectada a tu Google Calendar: el cliente elige servicio y hueco, el sistema comprueba que esté libre, la cita aparece en tu calendario y el cliente recibe su confirmación por email. Duraciones, horarios, festivos y descansos a tu medida.\n\nLo construimos a medida de cómo trabajas tú. El precio de partida es para un calendario y un tipo de servicio; varios profesionales, pagos con señal, recordatorios por WhatsApp o idiomas se presupuestan según el trabajo, por escrito y antes de empezar.",
     features: ["Página de reservas con tu marca, en tu dominio", "Sincronizada con tu Google Calendar", "Comprueba huecos libres antes de confirmar", "Confirmación por email al cliente", "Horarios, festivos y descansos a tu medida", "Presupuesto por escrito antes de empezar"],
-    media: [],
+    media: [img("servicio-calendar", "Ejemplo de citas en Google Calendar")],
     variants: [{ key: "agenda", name: "Un calendario, un servicio", tiers: tiers([1, 39000]) }],
     addons: [], fields: [], qtyOptions: [], minQty: 1, maxQty: 1, leadDays: 12, demoUrl: null,
   },

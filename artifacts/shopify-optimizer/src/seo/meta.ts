@@ -32,7 +32,7 @@ export interface SeoRoute {
   product?: { name: string; kind: "physical" | "digital" | "quote"; fromCents: number; category: string; images: string[] };
 }
 
-export const HOME_TITLE = "Shopy Crafter — IA para Shopify, WooCommerce, PrestaShop y Stripe · Diseño web y apps";
+export const HOME_TITLE = "Shopy Crafter: IA para Shopify, WooCommerce y PrestaShop";
 export const HOME_DESCRIPTION =
   "Automatizamos tiendas Shopify, WooCommerce y PrestaShop con IA: auditoría, SEO, imágenes de producto, precios con COGS real e inventario. Gestión de Stripe, diseño web 3D y apps nativas.";
 

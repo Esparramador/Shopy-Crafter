@@ -14,10 +14,10 @@ const ProductPreview3D = lazy(() => import("@/components/shop/Shop3D").then(m =>
 const PREVIEW: Record<string, { shape: PreviewShape; field: string; sample: string }> = {
   "tarjetas-metalicas": { shape: "card-metal", field: "logo", sample: "/tienda-media/tarjeta-shopycrafter-delante.webp" },
   "kit-expositor-tarjetas": { shape: "card-metal", field: "logo", sample: "/tienda-media/tarjeta-shopycrafter-delante.webp" },
-  "tarjeta-foto-aluminio": { shape: "card-metal", field: "foto", sample: "/tienda-media/tarjeta-foto-aluminio-paisaje.webp" },
-  "foto-madera-peana": { shape: "wood-photo", field: "foto", sample: "/tienda-media/tarjeta-foto-aluminio-paisaje.webp" },
-  "marco-madera-foto": { shape: "wood-frame", field: "foto", sample: "/tienda-media/tarjeta-foto-aluminio-paisaje.webp" },
-  "panoramica-madera": { shape: "wood-pano", field: "foto", sample: "/tienda-media/tarjeta-foto-aluminio-paisaje.webp" },
+  "tarjeta-foto-aluminio": { shape: "card-metal", field: "foto", sample: "/tienda-media/muestra-foto-grabado.webp" },
+  "foto-madera-peana": { shape: "wood-photo", field: "foto", sample: "/tienda-media/muestra-foto-grabado.webp" },
+  "marco-madera-foto": { shape: "wood-frame", field: "foto", sample: "/tienda-media/muestra-foto-grabado.webp" },
+  "panoramica-madera": { shape: "wood-pano", field: "foto", sample: "/tienda-media/muestra-foto-grabado.webp" },
   "placa-qr-madera": { shape: "wood-plaque", field: "logo", sample: "/tienda-media/placa-resenas-madera.webp" },
 };
 
@@ -394,7 +394,7 @@ export default function ShopProduct() {
               </form>
             )}
             {p.demoUrl && (
-              <a className="shop-demo" href={assetUrl(p.demoUrl)} target="_blank" rel="noopener">Ver un ejemplo →</a>
+              <a className="shop-btn shop-btn-lg shop-btn-shine shop-demo-btn" href={assetUrl(p.demoUrl)} target="_blank" rel="noopener"><span aria-hidden="true">▶</span> Ver la demo en vivo</a>
             )}
           </div>
         </div>

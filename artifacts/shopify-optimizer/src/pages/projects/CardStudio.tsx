@@ -1,3 +1,4 @@
+import "@/lib/admin-fonts";
 /**
  * Card Studio — UI para crear tarjetas de presentación profesionales.
  *

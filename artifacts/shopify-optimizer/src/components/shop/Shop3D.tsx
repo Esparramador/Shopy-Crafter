@@ -124,9 +124,9 @@ export function ShopHero3D({ progress }: { progress: React.MutableRefObject<numb
 
 export type PreviewShape = "card-metal" | "wood-photo" | "wood-frame" | "wood-pano" | "wood-plaque";
 
-const SHAPES: Record<PreviewShape, { w: number; h: number; d: number; wood: boolean; frame?: boolean }> = {
+const SHAPES: Record<PreviewShape, { w: number; h: number; d: number; wood: boolean; frame?: boolean; stand?: boolean }> = {
   "card-metal": { w: 8.5, h: 5.5, d: 0.12, wood: false },
-  "wood-photo": { w: 10.9, h: 14.1, d: 0.4, wood: true },
+  "wood-photo": { w: 10.9, h: 14.1, d: 0.4, wood: true, stand: true },
   "wood-frame": { w: 11.5, h: 11.5, d: 0.4, wood: true, frame: true },
   "wood-pano": { w: 20, h: 5.75, d: 0.4, wood: true },
   "wood-plaque": { w: 9, h: 11, d: 0.3, wood: true },
@@ -168,7 +168,7 @@ function Piece({ shape, image }: { shape: PreviewShape; image: string | null }) 
   useFrame((_, dt) => { if (ref.current && !prefersReduced()) ref.current.rotation.y += dt * 0.12; });
   const scale = 9 / Math.max(s.w, s.h * 0.9);
   return (
-    <group ref={ref} scale={scale} rotation={[0, -0.4, 0]}>
+    <group ref={ref} scale={scale} position={[0, s.stand ? 0.5 : 0, 0]} rotation={[0, -0.4, 0]}>
       <RoundedBox args={[s.w, s.h, s.d]} radius={Math.min(0.12, s.d / 2.2)} smoothness={4}>
         <meshStandardMaterial color={s.wood ? "#c99a62" : "#121214"} metalness={s.wood ? 0 : 0.85} roughness={s.wood ? 0.78 : 0.32} />
       </RoundedBox>
@@ -177,6 +177,16 @@ function Piece({ shape, image }: { shape: PreviewShape; image: string | null }) 
           <planeGeometry args={[s.frame ? s.w - 2 : s.w - 0.2, s.frame ? s.h - 2 : s.h - 0.2]} />
           <meshStandardMaterial map={tex} metalness={s.wood ? 0 : 0.55} roughness={s.wood ? 0.85 : 0.35} />
         </mesh>
+      )}
+      {s.stand && (
+        // Peana: base maciza con la ranura donde encaja la foto; la pieza se ve de pie, no flotando
+        <group position={[0, -s.h / 2, 0]}>
+          <RoundedBox args={[s.w + 1.6, 0.9, 3.4]} radius={0.1} smoothness={4} position={[0, -0.25, 0]}>
+            <meshStandardMaterial color="#a8763f" roughness={0.72} metalness={0} />
+          </RoundedBox>
+          <mesh position={[0, 0.21, 0.32]}><boxGeometry args={[s.w + 0.2, 0.04, 0.2]} /><meshStandardMaterial color="#5e3f1f" roughness={0.9} /></mesh>
+          <mesh position={[0, 0.21, -0.32]}><boxGeometry args={[s.w + 0.2, 0.04, 0.2]} /><meshStandardMaterial color="#5e3f1f" roughness={0.9} /></mesh>
+        </group>
       )}
       {s.frame && (
         <group position={[0, 0, s.d / 2 + 0.2]}>
