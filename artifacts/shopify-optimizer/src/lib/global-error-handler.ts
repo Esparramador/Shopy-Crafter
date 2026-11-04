@@ -24,13 +24,16 @@ function shouldIgnore(msg: string): boolean {
   return IGNORED_ERRORS.some(pattern => msg.includes(pattern));
 }
 
+/** Los mensajes técnicos solo los ve quien trabaja en el panel, nunca un visitante. */
+const isPrivateArea = () => /^\/(home|admin|client|project)/.test(window.location.pathname);
+
 export function initGlobalErrorHandlers(): void {
   if (initialized) return;
   initialized = true;
 
   window.onerror = (message, _source, _lineno, _colno, _error) => {
     const msg = typeof message === "string" ? message : "Error inesperado";
-    if (shouldIgnore(msg)) return;
+    if (shouldIgnore(msg) || !isPrivateArea()) return;
     toast({
       title: "Error",
       description: msg.length > 120 ? msg.slice(0, 120) + "..." : msg,
@@ -46,7 +49,7 @@ export function initGlobalErrorHandlers(): void {
     } else if (typeof reason === "string") {
       msg = reason;
     }
-    if (shouldIgnore(msg)) return;
+    if (shouldIgnore(msg) || !isPrivateArea()) return;
     toast({
       title: "Error",
       description: msg.length > 120 ? msg.slice(0, 120) + "..." : msg,

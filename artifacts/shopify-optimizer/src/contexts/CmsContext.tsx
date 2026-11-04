@@ -201,12 +201,17 @@ export function CmsProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Las páginas públicas no usan useCms: ni contenido ni conexión permanente por visitante.
+  const path = typeof window !== "undefined" ? window.location.pathname : "";
+  const preview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  const needsCms = preview || /^\/(home|admin|client|project|new-project|login|invite|reset-password|forgot-password|help)/.test(path);
+  const needsSse = preview || /^\/(home|admin)/.test(path);
+  useEffect(() => { if (needsCms) load(); }, [load, needsCms]);
   // Tema del CMS (colores y fuentes) servido por el API; va después de los estilos del build.
-  useEffect(() => { loadSiteTheme(false); }, []);
+  useEffect(() => { if (needsCms) loadSiteTheme(false); }, [needsCms]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !needsSse) return;
     function connectSSE() {
       esRef.current = new EventSource(`${API_BASE}/api/cms/events`);
       esRef.current.addEventListener("connected", () => { retriesRef.current = 0; });
@@ -224,7 +229,7 @@ export function CmsProvider({ children }: { children: ReactNode }) {
       esRef.current?.close();
       if (retryRef.current) clearTimeout(retryRef.current);
     };
-  }, [load, ready]);
+  }, [load, ready, needsSse]);
 
   const t = useCallback(
     (path: string, fallback: string): string => getNestedString(content, path) ?? fallback,

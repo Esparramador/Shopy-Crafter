@@ -8,6 +8,7 @@ export default function SCCursor() {
   useEffect(() => {
     const isTouchDevice = () => "ontouchstart" in window || navigator.maxTouchPoints > 0;
     if (isTouchDevice()) return;
+    document.documentElement.classList.add("sc-cursor-on");
 
     const move = (e: MouseEvent) => {
       mx.current = e.clientX;
@@ -32,14 +33,12 @@ export default function SCCursor() {
     let raf: number;
     const anim = () => {
       if (dotRef.current) {
-        dotRef.current.style.left = (mx.current - 14) + "px";
-        dotRef.current.style.top = (my.current - 14) + "px";
+        dotRef.current.style.transform = `translate3d(${mx.current - 14}px, ${my.current - 14}px, 0)`;
       }
       if (ringRef.current) {
         rx.current += (mx.current - rx.current) * 0.12;
         ry.current += (my.current - ry.current) * 0.12;
-        ringRef.current.style.left = (rx.current - 22) + "px";
-        ringRef.current.style.top = (ry.current - 22) + "px";
+        ringRef.current.style.transform = `translate3d(${rx.current - 22}px, ${ry.current - 22}px, 0)`;
       }
       raf = requestAnimationFrame(anim);
     };

@@ -63,12 +63,12 @@ export default function ShopLayout({ children }: { children: ReactNode }) {
   return (
     <div className="shop-root">
       <a href="#shop-main" className="shop-skip">Saltar al contenido</a>
-      <Link href="/tienda/tarjetas-metalicas" className="shop-promo">
+      {!/\/tienda\/(carrito|gracias)/.test(typeof window !== "undefined" ? window.location.pathname : "") && <Link href="/tienda/tarjetas-metalicas" className="shop-promo">
         <span>✦ Tarjetas de visita de aluminio desde <b>0,35 €</b></span>
         <span className="shop-promo-sep" aria-hidden="true">·</span>
         <span>Envío gratis desde 60 €</span>
         <span className="shop-promo-go">Pedir ahora →</span>
-      </Link>
+      </Link>}
       <header className="shop-nav">
         <div ref={progress} className="shop-progress" aria-hidden="true" />
         <Link href="/" className="shop-brand" aria-label="Shopy Crafter, inicio">

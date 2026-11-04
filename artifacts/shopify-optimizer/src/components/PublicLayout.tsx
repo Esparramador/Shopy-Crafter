@@ -5,11 +5,6 @@ import "@/pages/public/public-pages.css";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
-type FooterData = {
-  site: { name: string; logo: { value: string; imageUrl: string | null } };
-  footer: { tagline: string; columns: { title: string; links: { label: string; href: string }[] }[]; copyright: string; badges: string[] };
-};
-
 const NAV = [
   { href: "/tienda", label: "Tienda", highlight: true },
   { href: "/automatizacion-shopify-ia", label: "Servicios" },
@@ -21,16 +16,8 @@ const NAV = [
 
 /** Marco común de las páginas públicas: cabecera con menú móvil, contenido y pie con enlazado interno. */
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
-  const [footer, setFooter] = useState<FooterData | null>(null);
   const [open, setOpen] = useState(false);
   const [location] = useLocation();
-
-  useEffect(() => {
-    fetch(`${API_BASE}/api/cms/content`, { credentials: "include" })
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d?.site && d?.footer) setFooter({ site: d.site, footer: d.footer }); })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => { window.scrollTo(0, 0); setOpen(false); }, [location]);
   useEffect(() => {
@@ -40,10 +27,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const name = footer?.site.name ?? "Shopy Crafter";
-  const logo = footer?.site.logo.imageUrl
-    ? <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt="" width={30} height={30} className="pp-logo" />
-    : <img src={`${API_BASE}/images/logo-sc-default.png`} alt="" width={30} height={30} className="pp-logo" />;
+  const name = "Shopy Crafter";
+  const logo = <img src={`${API_BASE}/images/logo-sc-default.png`} alt="" width={30} height={30} className="pp-logo" />;
 
   return (
     <div className="pp-shell">
@@ -80,7 +65,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           <SiteLinks />
         </div>
         <div className="pp-footer-bar">
-          <span>{footer?.footer.copyright ?? `© ${new Date().getFullYear()} Shopy Crafter`}</span>
+          <span>© {new Date().getFullYear()} Shopy Crafter</span>
           <a href="mailto:craftershopy@gmail.com">craftershopy@gmail.com</a>
         </div>
       </footer>

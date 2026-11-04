@@ -39,6 +39,7 @@ function ProductCard({ p }: { p: Product }) {
             </div>
           : <div className="shop-card-noimg" aria-hidden="true"><span>{p.name}</span></div>}
         {video && cover && <video ref={vref} src={assetUrl(video.url)} muted loop playsInline preload="none" aria-hidden="true" />}
+        {p.demoUrl && <span className="shop-card-demo">▶ Demo en vivo</span>}
         {p.featured && <span className="shop-badge">Destacado</span>}
         {p.kind === "digital" && <span className="shop-badge shop-badge-digital">Digital</span>}
         <span className="shop-card-cta" aria-hidden="true">{p.kind === "quote" ? "Pedir presupuesto" : "Personalizar y pedir"} →</span>
@@ -225,7 +226,7 @@ export default function Shop() {
 
         <section className="shop-wrap shop-offer shop-reveal" aria-labelledby="oferta-h">
           <div className="shop-offer-media">
-            <img src={assetUrl("/tienda-media/tarjeta-warriors-ultra-pump.webp")} alt="Tarjeta de aluminio grabada para Warriors Hardcore" loading="lazy" />
+            <img src={assetUrl("/tienda-media/tarjeta-shopycrafter-delante.webp")} alt="Tarjeta de aluminio grabada de Shopy Crafter" loading="lazy" />
           </div>
           <div className="shop-offer-copy">
             <span className="shop-eyebrow">Tarjetas de visita de aluminio</span>
@@ -244,7 +245,7 @@ export default function Shop() {
 
         <section className="shop-wrap shop-workshop shop-reveal" aria-labelledby="taller-h">
           <div className="shop-workshop-video">
-            <video src={assetUrl("/tienda-media/taller-grabado-tarjeta.mp4")} poster={assetUrl("/tienda-media/taller-grabado-tarjeta-poster.webp")} autoPlay={!prefersReduced()} muted loop playsInline preload="metadata" aria-label="Una tarjeta grabándose en la xTool F2" />
+            <video src={assetUrl("/tienda-media/taller-grabado-tarjeta.mp4")} poster={assetUrl("/tienda-media/taller-grabado-tarjeta-poster.webp")} ref={el => { if (!el || prefersReduced()) return; new IntersectionObserver(([en]) => { if (en.isIntersecting) el.play().catch(() => {}); else el.pause(); }, { threshold: 0.4 }).observe(el); }} muted loop playsInline preload="none" aria-label="Una tarjeta grabándose en la xTool F2" />
           </div>
           <div>
             <span className="shop-eyebrow">Del taller a tu mostrador</span>

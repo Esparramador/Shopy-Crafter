@@ -45,6 +45,672 @@ to = "/instagram/index.html"
 from = "/instagram"
 to = "/instagram/index.html"
 
+# rewrites:auto:start
+[[services.production.rewrites]]
+from = "/portfolio"
+to = "/portfolio.html"
+
+[[services.production.rewrites]]
+from = "/portfolio/"
+to = "/portfolio.html"
+
+[[services.production.rewrites]]
+from = "/tienda"
+to = "/tienda.html"
+
+[[services.production.rewrites]]
+from = "/tienda/"
+to = "/tienda.html"
+
+[[services.production.rewrites]]
+from = "/sobre-nosotros"
+to = "/sobre-nosotros.html"
+
+[[services.production.rewrites]]
+from = "/sobre-nosotros/"
+to = "/sobre-nosotros.html"
+
+[[services.production.rewrites]]
+from = "/faq"
+to = "/faq.html"
+
+[[services.production.rewrites]]
+from = "/faq/"
+to = "/faq.html"
+
+[[services.production.rewrites]]
+from = "/preguntas-frecuentes"
+to = "/preguntas-frecuentes.html"
+
+[[services.production.rewrites]]
+from = "/preguntas-frecuentes/"
+to = "/preguntas-frecuentes.html"
+
+[[services.production.rewrites]]
+from = "/blog"
+to = "/blog.html"
+
+[[services.production.rewrites]]
+from = "/blog/"
+to = "/blog.html"
+
+[[services.production.rewrites]]
+from = "/changelog"
+to = "/changelog.html"
+
+[[services.production.rewrites]]
+from = "/changelog/"
+to = "/changelog.html"
+
+[[services.production.rewrites]]
+from = "/contacto"
+to = "/contacto.html"
+
+[[services.production.rewrites]]
+from = "/contacto/"
+to = "/contacto.html"
+
+[[services.production.rewrites]]
+from = "/programa-de-afiliados"
+to = "/programa-de-afiliados.html"
+
+[[services.production.rewrites]]
+from = "/programa-de-afiliados/"
+to = "/programa-de-afiliados.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito"
+to = "/casos-de-exito.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/"
+to = "/casos-de-exito.html"
+
+[[services.production.rewrites]]
+from = "/privacidad"
+to = "/privacidad.html"
+
+[[services.production.rewrites]]
+from = "/privacidad/"
+to = "/privacidad.html"
+
+[[services.production.rewrites]]
+from = "/terminos"
+to = "/terminos.html"
+
+[[services.production.rewrites]]
+from = "/terminos/"
+to = "/terminos.html"
+
+[[services.production.rewrites]]
+from = "/cookies"
+to = "/cookies.html"
+
+[[services.production.rewrites]]
+from = "/cookies/"
+to = "/cookies.html"
+
+[[services.production.rewrites]]
+from = "/landing"
+to = "/landing.html"
+
+[[services.production.rewrites]]
+from = "/landing/"
+to = "/landing.html"
+
+[[services.production.rewrites]]
+from = "/login"
+to = "/login.html"
+
+[[services.production.rewrites]]
+from = "/login/"
+to = "/login.html"
+
+[[services.production.rewrites]]
+from = "/forgot-password"
+to = "/forgot-password.html"
+
+[[services.production.rewrites]]
+from = "/forgot-password/"
+to = "/forgot-password.html"
+
+[[services.production.rewrites]]
+from = "/shopify-vs-woocommerce"
+to = "/shopify-vs-woocommerce.html"
+
+[[services.production.rewrites]]
+from = "/shopify-vs-woocommerce/"
+to = "/shopify-vs-woocommerce.html"
+
+[[services.production.rewrites]]
+from = "/shopify-vs-prestashop"
+to = "/shopify-vs-prestashop.html"
+
+[[services.production.rewrites]]
+from = "/shopify-vs-prestashop/"
+to = "/shopify-vs-prestashop.html"
+
+[[services.production.rewrites]]
+from = "/migrar-woocommerce-shopify"
+to = "/migrar-woocommerce-shopify.html"
+
+[[services.production.rewrites]]
+from = "/migrar-woocommerce-shopify/"
+to = "/migrar-woocommerce-shopify.html"
+
+[[services.production.rewrites]]
+from = "/migrar-prestashop-shopify"
+to = "/migrar-prestashop-shopify.html"
+
+[[services.production.rewrites]]
+from = "/migrar-prestashop-shopify/"
+to = "/migrar-prestashop-shopify.html"
+
+[[services.production.rewrites]]
+from = "/shopify-stripe-pagos"
+to = "/shopify-stripe-pagos.html"
+
+[[services.production.rewrites]]
+from = "/shopify-stripe-pagos/"
+to = "/shopify-stripe-pagos.html"
+
+[[services.production.rewrites]]
+from = "/agencia-shopify-ia"
+to = "/agencia-shopify-ia.html"
+
+[[services.production.rewrites]]
+from = "/agencia-shopify-ia/"
+to = "/agencia-shopify-ia.html"
+
+[[services.production.rewrites]]
+from = "/ecommerce-ia-automatizacion"
+to = "/ecommerce-ia-automatizacion.html"
+
+[[services.production.rewrites]]
+from = "/ecommerce-ia-automatizacion/"
+to = "/ecommerce-ia-automatizacion.html"
+
+[[services.production.rewrites]]
+from = "/automatizacion-shopify-ia"
+to = "/automatizacion-shopify-ia.html"
+
+[[services.production.rewrites]]
+from = "/automatizacion-shopify-ia/"
+to = "/automatizacion-shopify-ia.html"
+
+[[services.production.rewrites]]
+from = "/automatizacion-woocommerce-ia"
+to = "/automatizacion-woocommerce-ia.html"
+
+[[services.production.rewrites]]
+from = "/automatizacion-woocommerce-ia/"
+to = "/automatizacion-woocommerce-ia.html"
+
+[[services.production.rewrites]]
+from = "/automatizacion-prestashop-ia"
+to = "/automatizacion-prestashop-ia.html"
+
+[[services.production.rewrites]]
+from = "/automatizacion-prestashop-ia/"
+to = "/automatizacion-prestashop-ia.html"
+
+[[services.production.rewrites]]
+from = "/gestion-stripe-ia"
+to = "/gestion-stripe-ia.html"
+
+[[services.production.rewrites]]
+from = "/gestion-stripe-ia/"
+to = "/gestion-stripe-ia.html"
+
+[[services.production.rewrites]]
+from = "/diseno-web-profesional"
+to = "/diseno-web-profesional.html"
+
+[[services.production.rewrites]]
+from = "/diseno-web-profesional/"
+to = "/diseno-web-profesional.html"
+
+[[services.production.rewrites]]
+from = "/desarrollo-apps-nativas"
+to = "/desarrollo-apps-nativas.html"
+
+[[services.production.rewrites]]
+from = "/desarrollo-apps-nativas/"
+to = "/desarrollo-apps-nativas.html"
+
+[[services.production.rewrites]]
+from = "/blog/shopify-vs-woocommerce-2026"
+to = "/blog__shopify-vs-woocommerce-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/shopify-vs-woocommerce-2026/"
+to = "/blog__shopify-vs-woocommerce-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/shopify-vs-prestashop-2026"
+to = "/blog__shopify-vs-prestashop-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/shopify-vs-prestashop-2026/"
+to = "/blog__shopify-vs-prestashop-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/migrar-woocommerce-shopify-ia"
+to = "/blog__migrar-woocommerce-shopify-ia.html"
+
+[[services.production.rewrites]]
+from = "/blog/migrar-woocommerce-shopify-ia/"
+to = "/blog__migrar-woocommerce-shopify-ia.html"
+
+[[services.production.rewrites]]
+from = "/blog/stripe-shopify-guia-pagos-2026"
+to = "/blog__stripe-shopify-guia-pagos-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/stripe-shopify-guia-pagos-2026/"
+to = "/blog__stripe-shopify-guia-pagos-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/mejor-plataforma-ecommerce-2026"
+to = "/blog__mejor-plataforma-ecommerce-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/mejor-plataforma-ecommerce-2026/"
+to = "/blog__mejor-plataforma-ecommerce-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/shopify-ia-automatizacion-2026"
+to = "/blog__shopify-ia-automatizacion-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/shopify-ia-automatizacion-2026/"
+to = "/blog__shopify-ia-automatizacion-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/optimizar-fichas-google-shopping-2026"
+to = "/blog__optimizar-fichas-google-shopping-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/optimizar-fichas-google-shopping-2026/"
+to = "/blog__optimizar-fichas-google-shopping-2026.html"
+
+[[services.production.rewrites]]
+from = "/blog/claude-vs-gemini-ecommerce"
+to = "/blog__claude-vs-gemini-ecommerce.html"
+
+[[services.production.rewrites]]
+from = "/blog/claude-vs-gemini-ecommerce/"
+to = "/blog__claude-vs-gemini-ecommerce.html"
+
+[[services.production.rewrites]]
+from = "/blog/guia-cogs-tiendas-online"
+to = "/blog__guia-cogs-tiendas-online.html"
+
+[[services.production.rewrites]]
+from = "/blog/guia-cogs-tiendas-online/"
+to = "/blog__guia-cogs-tiendas-online.html"
+
+[[services.production.rewrites]]
+from = "/blog/ab-testing-automatizado-ia"
+to = "/blog__ab-testing-automatizado-ia.html"
+
+[[services.production.rewrites]]
+from = "/blog/ab-testing-automatizado-ia/"
+to = "/blog__ab-testing-automatizado-ia.html"
+
+[[services.production.rewrites]]
+from = "/blog/17-motores-ia-ecommerce"
+to = "/blog__17-motores-ia-ecommerce.html"
+
+[[services.production.rewrites]]
+from = "/blog/17-motores-ia-ecommerce/"
+to = "/blog__17-motores-ia-ecommerce.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.8.0"
+to = "/changelog__3.8.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.8.0/"
+to = "/changelog__3.8.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.7.0"
+to = "/changelog__3.7.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.7.0/"
+to = "/changelog__3.7.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.6.0"
+to = "/changelog__3.6.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.6.0/"
+to = "/changelog__3.6.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.5.0"
+to = "/changelog__3.5.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.5.0/"
+to = "/changelog__3.5.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.4.0"
+to = "/changelog__3.4.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.4.0/"
+to = "/changelog__3.4.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.3.0"
+to = "/changelog__3.3.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.3.0/"
+to = "/changelog__3.3.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.2.0"
+to = "/changelog__3.2.0.html"
+
+[[services.production.rewrites]]
+from = "/changelog/3.2.0/"
+to = "/changelog__3.2.0.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/brasas-y-paellas"
+to = "/casos-de-exito__brasas-y-paellas.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/brasas-y-paellas/"
+to = "/casos-de-exito__brasas-y-paellas.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/brasas-caller"
+to = "/casos-de-exito__brasas-caller.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/brasas-caller/"
+to = "/casos-de-exito__brasas-caller.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/smart-menu-qr"
+to = "/casos-de-exito__smart-menu-qr.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/smart-menu-qr/"
+to = "/casos-de-exito__smart-menu-qr.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/rastalo-tpv"
+to = "/casos-de-exito__rastalo-tpv.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/rastalo-tpv/"
+to = "/casos-de-exito__rastalo-tpv.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/crafter-eventos"
+to = "/casos-de-exito__crafter-eventos.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/crafter-eventos/"
+to = "/casos-de-exito__crafter-eventos.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/apps-redes-ia"
+to = "/casos-de-exito__apps-redes-ia.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/apps-redes-ia/"
+to = "/casos-de-exito__apps-redes-ia.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/warriors-hardcore"
+to = "/casos-de-exito__warriors-hardcore.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/warriors-hardcore/"
+to = "/casos-de-exito__warriors-hardcore.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/taller-laser"
+to = "/casos-de-exito__taller-laser.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/taller-laser/"
+to = "/casos-de-exito__taller-laser.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/qr-artisticos-3d"
+to = "/casos-de-exito__qr-artisticos-3d.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/qr-artisticos-3d/"
+to = "/casos-de-exito__qr-artisticos-3d.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/agente-j-bond"
+to = "/casos-de-exito__agente-j-bond.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/agente-j-bond/"
+to = "/casos-de-exito__agente-j-bond.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/pequenos-genios"
+to = "/casos-de-exito__pequenos-genios.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/pequenos-genios/"
+to = "/casos-de-exito__pequenos-genios.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/comic-crafter"
+to = "/casos-de-exito__comic-crafter.html"
+
+[[services.production.rewrites]]
+from = "/casos-de-exito/comic-crafter/"
+to = "/casos-de-exito__comic-crafter.html"
+
+[[services.production.rewrites]]
+from = "/tienda/tarjetas-metalicas"
+to = "/tienda__tarjetas-metalicas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/tarjetas-metalicas/"
+to = "/tienda__tarjetas-metalicas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/placa-qr-madera"
+to = "/tienda__placa-qr-madera.html"
+
+[[services.production.rewrites]]
+from = "/tienda/placa-qr-madera/"
+to = "/tienda__placa-qr-madera.html"
+
+[[services.production.rewrites]]
+from = "/tienda/expositor-tarjetas"
+to = "/tienda__expositor-tarjetas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/expositor-tarjetas/"
+to = "/tienda__expositor-tarjetas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/kit-resenas"
+to = "/tienda__kit-resenas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/kit-resenas/"
+to = "/tienda__kit-resenas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/kit-expositor-tarjetas"
+to = "/tienda__kit-expositor-tarjetas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/kit-expositor-tarjetas/"
+to = "/tienda__kit-expositor-tarjetas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/tarjeta-foto-aluminio"
+to = "/tienda__tarjeta-foto-aluminio.html"
+
+[[services.production.rewrites]]
+from = "/tienda/tarjeta-foto-aluminio/"
+to = "/tienda__tarjeta-foto-aluminio.html"
+
+[[services.production.rewrites]]
+from = "/tienda/foto-madera-peana"
+to = "/tienda__foto-madera-peana.html"
+
+[[services.production.rewrites]]
+from = "/tienda/foto-madera-peana/"
+to = "/tienda__foto-madera-peana.html"
+
+[[services.production.rewrites]]
+from = "/tienda/marco-madera-foto"
+to = "/tienda__marco-madera-foto.html"
+
+[[services.production.rewrites]]
+from = "/tienda/marco-madera-foto/"
+to = "/tienda__marco-madera-foto.html"
+
+[[services.production.rewrites]]
+from = "/tienda/panoramica-madera"
+to = "/tienda__panoramica-madera.html"
+
+[[services.production.rewrites]]
+from = "/tienda/panoramica-madera/"
+to = "/tienda__panoramica-madera.html"
+
+[[services.production.rewrites]]
+from = "/tienda/regalo-web-3d"
+to = "/tienda__regalo-web-3d.html"
+
+[[services.production.rewrites]]
+from = "/tienda/regalo-web-3d/"
+to = "/tienda__regalo-web-3d.html"
+
+[[services.production.rewrites]]
+from = "/tienda/regalo-completo"
+to = "/tienda__regalo-completo.html"
+
+[[services.production.rewrites]]
+from = "/tienda/regalo-completo/"
+to = "/tienda__regalo-completo.html"
+
+[[services.production.rewrites]]
+from = "/tienda/qr-artistico"
+to = "/tienda__qr-artistico.html"
+
+[[services.production.rewrites]]
+from = "/tienda/qr-artistico/"
+to = "/tienda__qr-artistico.html"
+
+[[services.production.rewrites]]
+from = "/tienda/landing-3d"
+to = "/tienda__landing-3d.html"
+
+[[services.production.rewrites]]
+from = "/tienda/landing-3d/"
+to = "/tienda__landing-3d.html"
+
+[[services.production.rewrites]]
+from = "/tienda/web-corporativa"
+to = "/tienda__web-corporativa.html"
+
+[[services.production.rewrites]]
+from = "/tienda/web-corporativa/"
+to = "/tienda__web-corporativa.html"
+
+[[services.production.rewrites]]
+from = "/tienda/rediseno-tienda"
+to = "/tienda__rediseno-tienda.html"
+
+[[services.production.rewrites]]
+from = "/tienda/rediseno-tienda/"
+to = "/tienda__rediseno-tienda.html"
+
+[[services.production.rewrites]]
+from = "/tienda/video-3d-marca"
+to = "/tienda__video-3d-marca.html"
+
+[[services.production.rewrites]]
+from = "/tienda/video-3d-marca/"
+to = "/tienda__video-3d-marca.html"
+
+[[services.production.rewrites]]
+from = "/tienda/app-nativa"
+to = "/tienda__app-nativa.html"
+
+[[services.production.rewrites]]
+from = "/tienda/app-nativa/"
+to = "/tienda__app-nativa.html"
+
+[[services.production.rewrites]]
+from = "/tienda/auditoria-seo"
+to = "/tienda__auditoria-seo.html"
+
+[[services.production.rewrites]]
+from = "/tienda/auditoria-seo/"
+to = "/tienda__auditoria-seo.html"
+
+[[services.production.rewrites]]
+from = "/tienda/optimizacion-pagespeed"
+to = "/tienda__optimizacion-pagespeed.html"
+
+[[services.production.rewrites]]
+from = "/tienda/optimizacion-pagespeed/"
+to = "/tienda__optimizacion-pagespeed.html"
+
+[[services.production.rewrites]]
+from = "/tienda/informes-mensuales"
+to = "/tienda__informes-mensuales.html"
+
+[[services.production.rewrites]]
+from = "/tienda/informes-mensuales/"
+to = "/tienda__informes-mensuales.html"
+
+[[services.production.rewrites]]
+from = "/tienda/ficha-google-maps"
+to = "/tienda__ficha-google-maps.html"
+
+[[services.production.rewrites]]
+from = "/tienda/ficha-google-maps/"
+to = "/tienda__ficha-google-maps.html"
+
+[[services.production.rewrites]]
+from = "/tienda/resenas-google"
+to = "/tienda__resenas-google.html"
+
+[[services.production.rewrites]]
+from = "/tienda/resenas-google/"
+to = "/tienda__resenas-google.html"
+
+[[services.production.rewrites]]
+from = "/tienda/google-calendar-reservas"
+to = "/tienda__google-calendar-reservas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/google-calendar-reservas/"
+to = "/tienda__google-calendar-reservas.html"
+
+[[services.production.rewrites]]
+from = "/tienda/pack-google-local"
+to = "/tienda__pack-google-local.html"
+
+[[services.production.rewrites]]
+from = "/tienda/pack-google-local/"
+to = "/tienda__pack-google-local.html"
+# rewrites:auto:end
+
 [[services.production.rewrites]]
 from = "/*"
 to = "/index.html"

@@ -36,6 +36,9 @@ export function assetUrl(u: string): string {
 
 /** Primera imagen o póster del producto. */
 export function coverOf(p: Product): string | null {
+  // Si el producto empieza por un vídeo, su póster es la portada (y el vídeo se reproduce al pasar el ratón).
+  const first = p.media[0];
+  if (first?.type === "video" && first.poster) return assetUrl(first.poster);
   const img = p.media.find(m => m.type === "image");
   if (img) return assetUrl(img.url);
   const vid = p.media.find(m => m.type === "video" && m.poster);
@@ -44,8 +47,10 @@ export function coverOf(p: Product): string | null {
 
 export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${API}${path}`, { credentials: "include", ...init });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((d as { error?: string }).error ?? `Error ${r.status}`);
+  const isJson = (r.headers.get("content-type") ?? "").includes("application/json");
+  const d = isJson ? await r.json().catch(() => null) : null;
+  if (!r.ok) throw new Error((d as { error?: string } | null)?.error ?? `Error ${r.status}`);
+  if (d === null) throw new Error("No hemos podido cargar la tienda. Inténtalo de nuevo.");
   return d as T;
 }
 

@@ -1,3 +1,4 @@
+import "@/lib/admin-fonts";
 import { useState, useEffect, useRef } from "react";
 import { Palette, Save, Trash2, Share2, Sparkles, Plus, Eye, Loader2, ArrowLeft } from "lucide-react";
 

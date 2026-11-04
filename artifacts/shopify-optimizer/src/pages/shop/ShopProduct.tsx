@@ -14,10 +14,10 @@ const ProductPreview3D = lazy(() => import("@/components/shop/Shop3D").then(m =>
 const PREVIEW: Record<string, { shape: PreviewShape; field: string; sample: string }> = {
   "tarjetas-metalicas": { shape: "card-metal", field: "logo", sample: "/tienda-media/tarjeta-shopycrafter-delante.webp" },
   "kit-expositor-tarjetas": { shape: "card-metal", field: "logo", sample: "/tienda-media/tarjeta-shopycrafter-delante.webp" },
-  "tarjeta-foto-aluminio": { shape: "card-metal", field: "foto", sample: "/tienda-media/tarjeta-foto-aluminio-paisaje.webp" },
-  "foto-madera-peana": { shape: "wood-photo", field: "foto", sample: "/tienda-media/tarjeta-foto-aluminio-paisaje.webp" },
-  "marco-madera-foto": { shape: "wood-frame", field: "foto", sample: "/tienda-media/tarjeta-foto-aluminio-paisaje.webp" },
-  "panoramica-madera": { shape: "wood-pano", field: "foto", sample: "/tienda-media/tarjeta-foto-aluminio-paisaje.webp" },
+  "tarjeta-foto-aluminio": { shape: "card-metal", field: "foto", sample: "/tienda-media/muestra-foto-grabado.webp" },
+  "foto-madera-peana": { shape: "wood-photo", field: "foto", sample: "/tienda-media/muestra-foto-grabado.webp" },
+  "marco-madera-foto": { shape: "wood-frame", field: "foto", sample: "/tienda-media/muestra-foto-grabado.webp" },
+  "panoramica-madera": { shape: "wood-pano", field: "foto", sample: "/tienda-media/muestra-foto-grabado.webp" },
   "placa-qr-madera": { shape: "wood-plaque", field: "logo", sample: "/tienda-media/placa-resenas-madera.webp" },
 };
 
@@ -287,6 +287,9 @@ export default function ShopProduct() {
             <span className="shop-card-cat">{p.categoryLabel}</span>
             <h1>{p.name}</h1>
             <p className="shop-pd-tag">{p.tagline}</p>
+            {p.demoUrl && (
+              <a className="shop-btn shop-btn-lg shop-btn-shine shop-demo-btn" href={assetUrl(p.demoUrl)} target="_blank" rel="noopener"><span aria-hidden="true">▶</span> Ver la demo en vivo</a>
+            )}
             {p.kind === "quote" ? (
               <div className="shop-pd-quote">
                 {priceLabel(p) && <div className="shop-price"><strong>A partir de {euros(priceLabel(p)!.cents)}</strong><small>IVA incluido · es el precio de partida, no el final</small></div>}
@@ -392,9 +395,6 @@ export default function ShopProduct() {
                 </ul>
                 <p className="shop-pd-lead">{p.kind === "physical" ? `Producción en ${p.leadDays} días laborables tras aprobar la prueba.` : `Entrega en ${p.leadDays} días laborables tras recibir tu material.`}</p>
               </form>
-            )}
-            {p.demoUrl && (
-              <a className="shop-demo" href={assetUrl(p.demoUrl)} target="_blank" rel="noopener">Ver un ejemplo →</a>
             )}
           </div>
         </div>
