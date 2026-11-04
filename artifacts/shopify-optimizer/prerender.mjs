@@ -78,6 +78,20 @@ async function main() {
     process.exit(0);
   }
 
+  // Contenido de la portada dentro del HTML: el visitante no hace ninguna petición al CMS.
+  // Si el API no responde durante el build, la portada lo pide ella misma como antes.
+  // Un cambio en el panel llega a la portada al volver a publicar.
+  let landingScript = '';
+  try {
+    const r = await fetch(`${SITE_URL}/api/cms/content`, { signal: AbortSignal.timeout(15000) });
+    const cms = await r.json();
+    if (!r.ok || !cms?.hero) throw new Error(`HTTP ${r.status}`);
+    landingScript = `<script>window.__SC_LANDING__=${JSON.stringify(cms).replace(/</g, '\\u003c')}</script>`;
+    console.log('✓ contenido de la portada incluido en el HTML');
+  } catch (err) {
+    console.error(`⚠️  Sin contenido del CMS en el HTML (${err.message})`);
+  }
+
   // Ensure the SSR injection point exists; add it if missing
   if (!template.includes('<!--app-html-->')) {
     template = template.replace('<div id="root">', '<div id="root"><!--app-html-->');
@@ -148,7 +162,7 @@ async function main() {
 
       // Write HTML file
       if (route === '/') {
-        writeFileSync(join(DIST, 'index.html'), finalHtml, 'utf-8');
+        writeFileSync(join(DIST, 'index.html'), finalHtml.replace('</head>', () => `${landingScript}</head>`), 'utf-8');
       } else {
         // HTML plano: el hosting de Replit no traduce /ruta a /ruta.html, y una carpeta con el
         // nombre de la ruta provoca un 301 a /ruta/. Cada ruta llega a su archivo por una reescritura.

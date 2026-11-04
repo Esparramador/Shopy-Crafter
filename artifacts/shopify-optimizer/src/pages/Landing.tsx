@@ -297,6 +297,13 @@ export default function Landing() {
 
   useEffect(() => {
     let mounted = true;
+    // Publicada, la portada ya trae su contenido en el HTML (prerender.mjs): sin petición por visitante.
+    // Solo se pide al API en la vista previa del panel o si el build no pudo traerlo.
+    const baked = (window as unknown as { __SC_LANDING__?: Partial<CMSContent> }).__SC_LANDING__;
+    if (baked && !new URLSearchParams(window.location.search).has("preview")) {
+      setContent({ ...LANDING_FALLBACK, ...baked });
+      return;
+    }
     const load = (attempt = 1) => {
       fetch(`${BASE_URL}/api/cms/content`, { credentials: "include" })
         .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })

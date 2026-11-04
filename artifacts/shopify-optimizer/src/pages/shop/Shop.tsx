@@ -226,7 +226,7 @@ export default function Shop() {
 
         <section className="shop-wrap shop-offer shop-reveal" aria-labelledby="oferta-h">
           <div className="shop-offer-media">
-            <img src={assetUrl("/tienda-media/tarjeta-warriors-ultra-pump.webp")} alt="Tarjeta de aluminio grabada para Warriors Hardcore" loading="lazy" />
+            <img src={assetUrl("/tienda-media/tarjeta-shopycrafter-delante.webp")} alt="Tarjeta de aluminio grabada de Shopy Crafter" loading="lazy" />
           </div>
           <div className="shop-offer-copy">
             <span className="shop-eyebrow">Tarjetas de visita de aluminio</span>
