@@ -1111,10 +1111,23 @@ router.get("/voice/client-call-url", async (req, res): Promise<void> => {
 });
 
 // ── Reset + re-create ConvAI agents (apply new voice/prompts) ─────────────────
-router.post("/voice/convai/reset-agents", requireAdmin, async (_req, res): Promise<void> => {
+router.post("/voice/convai/reset-agents", requireAdmin, async (req, res): Promise<void> => {
+  const allTypes: AgentType[] = ["admin", "client", "landing"];
+  const requestedTypes = req.body?.agentTypes;
+  if (
+    requestedTypes !== undefined
+    && (!Array.isArray(requestedTypes)
+      || requestedTypes.length === 0
+      || requestedTypes.some((type: unknown) => !allTypes.includes(type as AgentType))
+      || new Set(requestedTypes).size !== requestedTypes.length)
+  ) {
+    res.status(400).json({ error: "agentTypes debe ser una lista no vacía de tipos de agente válidos, sin duplicados." });
+    return;
+  }
+  const types: AgentType[] = requestedTypes ?? allTypes;
+
   try {
     await ensurePlatformSettingsKV();
-    const types: AgentType[] = ["admin", "client", "landing"];
     const results: Record<string, string> = {};
     _sevillanoVoiceIdCache = null; // Force re-resolve voice
 

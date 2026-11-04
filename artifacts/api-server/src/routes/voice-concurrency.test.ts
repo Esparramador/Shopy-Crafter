@@ -175,6 +175,49 @@ describe("ConvAI call/apply single-flight with an environment-pinned admin", () 
     },
   );
 
+  it("resets only the requested agent and leaves unselected agents untouched", async () => {
+    mocks.rows.set("convai_admin_agent_id", "existing-admin");
+    mocks.rows.set("convai_client_agent_id", "existing-client");
+    mocks.create.mockResolvedValue({ agent_id: "new-landing" });
+    mocks.delete.mockResolvedValue({});
+
+    const response = await fetch(`${base}/voice/convai/reset-agents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ agentTypes: ["landing"] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      agents: { landing: "new-landing" },
+    });
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(mocks.delete).not.toHaveBeenCalled();
+    expect(mocks.rows.get("convai_admin_agent_id")).toBe("existing-admin");
+    expect(mocks.rows.get("convai_client_agent_id")).toBe("existing-client");
+    expect(mocks.rows.get("convai_landing_agent_id")).toBe("new-landing");
+    expect(mocks.verify).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { agentTypes: [] },
+    { agentTypes: ["unknown"] },
+    { agentTypes: ["admin", "admin"] },
+    { agentTypes: "admin" },
+  ])("rejects invalid reset selections without changing agents: %j", async body => {
+    const response = await fetch(`${base}/voice/convai/reset-agents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(400);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
+    expect(mocks.verify).not.toHaveBeenCalled();
+  });
+
   it.each(["call", "apply"] as const)(
     "a concurrent %s waits for reset to recreate and verify an unpinned admin",
     async competitor => {

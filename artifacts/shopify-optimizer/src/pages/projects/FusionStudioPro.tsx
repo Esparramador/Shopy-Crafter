@@ -2298,10 +2298,23 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
     voice: { voiceId: string | null; ok: boolean; code?: string; error?: string };
     agents: { type: "admin" | "client" | "landing"; agentId: string | null; status: "ok" | "drift" | "error" | "not_created"; code?: string; error?: string }[];
   };
+  type VoiceAgentType = "admin" | "client" | "landing";
+  const voiceAgentLabel: Record<VoiceAgentType, string> = {
+    admin: "Panel admin",
+    client: "Panel cliente",
+    landing: "Landing pública",
+  };
   const [health, setHealth] = useState<ConvAIHealth | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
   const [healthErr, setHealthErr] = useState<string | null>(null);
   const [resyncBusy, setResyncBusy] = useState(false);
+  const [resetAgentTypes, setResetAgentTypes] = useState<VoiceAgentType[]>(["admin", "client", "landing"]);
+
+  function toggleResetAgentType(type: VoiceAgentType) {
+    setResetAgentTypes(previous => previous.includes(type)
+      ? previous.filter(selected => selected !== type)
+      : [...previous, type]);
+  }
 
   async function loadHealth() {
     setHealthBusy(true); setHealthErr(null);
@@ -2315,12 +2328,20 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
   }
 
   async function resyncAgents() {
+    if (resetAgentTypes.length === 0) return;
     setResyncBusy(true);
     try {
-      const r = await fetch(`${API_BASE}/api/voice/convai/reset-agents`, { method: "POST", credentials: "include" });
+      const selectedTypes = [...resetAgentTypes];
+      const r = await fetch(`${API_BASE}/api/voice/convai/reset-agents`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentTypes: selectedTypes }),
+      });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Error re-sincronizando agentes");
-      onInfo("Agentes ConvAI re-creados con la configuración actual");
+      const selectedLabels = selectedTypes.map(type => voiceAgentLabel[type]).join(", ");
+      onInfo(`Agentes re-creados con la configuración actual: ${selectedLabels}`);
       await Promise.all([loadHealth(), loadAgents()]);
     } catch (e: any) { onError(e.message); await loadHealth(); }
     finally { setResyncBusy(false); }
@@ -2334,12 +2355,6 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
   type VoiceTuning = { stability: number; similarityBoost: number; speed: number };
   type VoiceTuningHistory = {
     id: string; changedAt: string; userId: string; userName: string; userEmail: string; settings: VoiceTuning;
-  };
-  type VoiceAgentType = "admin" | "client" | "landing";
-  const voiceAgentLabel: Record<VoiceAgentType, string> = {
-    admin: "Panel admin",
-    client: "Panel cliente",
-    landing: "Landing pública",
   };
   type VoiceApplyResult = {
     agentId: string | null;
@@ -2700,13 +2715,28 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
                         : "Salud de las llamadas de voz (Arturo)"}
                     </p>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                     <button onClick={loadHealth} disabled={healthBusy || resyncBusy} className="btn" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-health-refresh">
                       <RefreshCw size={12} className={healthBusy ? "animate-spin" : ""} /> Comprobar
                     </button>
-                    <button onClick={resyncAgents} disabled={healthBusy || resyncBusy} className="btn btn-gold" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-health-resync"
-                      title="Borra y vuelve a crear los 3 agentes en ElevenLabs con la voz y configuración actuales">
-                      {resyncBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Re-sincronizar
+                    <div aria-label="Agentes que se van a reiniciar" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      {(["admin", "client", "landing"] as VoiceAgentType[]).map(type => (
+                        <label key={type} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--t2)", cursor: resyncBusy ? "not-allowed" : "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={resetAgentTypes.includes(type)}
+                            onChange={() => toggleResetAgentType(type)}
+                            disabled={resyncBusy}
+                            data-testid={`convai-reset-agent-${type}`}
+                          />
+                          {voiceAgentLabel[type]}
+                        </label>
+                      ))}
+                    </div>
+                    <button onClick={resyncAgents} disabled={healthBusy || resyncBusy || resetAgentTypes.length === 0} className="btn btn-gold" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-health-resync"
+                      title={`Elimina y vuelve a crear solo los agentes seleccionados: ${resetAgentTypes.map(type => voiceAgentLabel[type]).join(", ") || "ninguno"}`}>
+                      {resyncBusy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                      {resetAgentTypes.length === 3 ? "Re-sincronizar todos" : "Re-sincronizar seleccionados"}
                     </button>
                   </div>
                 </div>
