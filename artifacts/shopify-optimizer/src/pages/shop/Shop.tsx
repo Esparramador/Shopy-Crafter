@@ -18,7 +18,7 @@ function Words({ text }: { text: string }) {
   return <>{words.map((w, i) => <Fragment key={i}><span className="shop-w"><span>{w}</span></span>{i < words.length - 1 ? " " : null}</Fragment>)}</>;
 }
 
-const MARQUEE = ["Grabado láser en Barcelona", "Tarjetas de aluminio desde 0,35 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Webs, Google y reseñas · precios a partir de"];
+const MARQUEE = ["Stands con QR para reseñas, wifi o carta", "Tarjetas con foto y mensaje", "Grabado láser en Barcelona", "Tarjetas de aluminio desde 0,35 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Webs, Google y reseñas · precios a partir de"];
 
 function ProductCard({ p }: { p: Product }) {
   const cover = coverOf(p);
@@ -182,8 +182,10 @@ export default function Shop() {
     return Object.entries(data.categories).filter(([k]) => used.has(k));
   }, [data]);
   const products = useMemo(() => (data?.products ?? []).filter(p => cat === "todo" || p.category === cat), [data, cat]);
-  const physical = products.filter(p => p.kind === "physical");
-  const digital = products.filter(p => p.kind !== "physical");
+  const isGift = (p: Product) => ["tarjetas-regalo", "fotos-grabadas", "regalos-3d"].includes(p.category);
+  const gifts = products.filter(isGift);
+  const physical = products.filter(p => p.kind === "physical" && !isGift(p));
+  const digital = products.filter(p => p.kind !== "physical" && !isGift(p));
   const webServices = digital.filter(p => p.category === "servicios-web");
   const videoServices = digital.filter(p => p.category === "servicios-video");
   const googleServices = digital.filter(p => p.category === "google-local");
@@ -199,7 +201,7 @@ export default function Shop() {
             <div className="shop-hero-copy">
               <span className="shop-eyebrow">Taller láser · Estudio digital</span>
               <h1><Words text="Lo que hacemos," /> <em><Words text="listo para pedir." /></em></h1>
-              <p>Tarjetas de aluminio, placas QR, expositores y fotos grabadas con nuestra xTool F2. También hacemos webs, rediseño de tiendas, ficha de Google Maps y reseñas, auditorías SEO, optimización PageSpeed, informes mensuales y vídeo animado en 3D.</p>
+              <p>Stands de madera con QR, tarjetas de aluminio con tu mensaje, expositores y fotos grabadas con nuestra xTool F2. También hacemos webs, rediseño de tiendas, ficha de Google Maps y reseñas, auditorías SEO, optimización PageSpeed, informes mensuales y vídeo animado en 3D.</p>
               <div className="shop-hero-ctas">
                 <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas desde {euros(cardFrom)} →</Link>
                 <a href="#catalogo" className="shop-btn shop-btn-ghost shop-btn-lg">Ver todo el catálogo</a>
@@ -275,9 +277,21 @@ export default function Shop() {
           </div>
           {error && <p className="shop-error" role="alert">{error}</p>}
           {!data && !error && <div className="shop-grid">{Array.from({ length: 6 }, (_, i) => <div key={i} className="shop-card shop-skel" />)}</div>}
+          {cat === "todo" && (
+            <div className="shop-doors">
+              <a className="shop-door" href="#para-regalar"><strong>Para regalar</strong><span>Tarjetas con foto y mensaje, series de recuerdos, fotos grabadas y regalos web en 3D.</span></a>
+              <a className="shop-door" href="#para-negocio"><strong>Para tu negocio</strong><span>Stands con QR para reseñas, Instagram, wifi, pago o carta, y tarjetas de visita de aluminio.</span></a>
+            </div>
+          )}
+          {gifts.length > 0 && (
+            <>
+              <h3 id="para-regalar" className="shop-group-title">Para regalar</h3>
+              <div className="shop-grid">{gifts.map(p => <ProductCard key={p.slug} p={p} />)}</div>
+            </>
+          )}
           {physical.length > 0 && (
             <>
-              <h3 className="shop-group-title">Hecho en el taller</h3>
+              <h3 id="para-negocio" className="shop-group-title">Para tu negocio: hecho en el taller</h3>
               <div className="shop-grid">{physical.map(p => <ProductCard key={p.slug} p={p} />)}</div>
             </>
           )}

@@ -34,20 +34,20 @@ describe("catálogo de la tienda", () => {
 
   it("los kits salen más baratos que por separado", () => {
     const doble100 = 45 * 100;
-    const placa = bySlug("placa-qr-madera").variants.find(v => v.key === "115x115")!.tiers[0].unitCents;
+    const placa = bySlug("placa-qr-madera").variants.find(v => v.key === "110x110")!.tiers[0].unitCents;
     const expositor = bySlug("expositor-tarjetas").variants[0].tiers[0].unitCents;
     const digital = bySlug("tarjetas-metalicas").addons.find(a => a.key === "tarjeta-digital")!.cents;
     expect(bySlug("kit-resenas").variants[0].tiers[0].unitCents).toBeLessThan(placa + expositor + doble100 + digital);
     expect(bySlug("kit-expositor-tarjetas").variants[0].tiers[0].unitCents).toBeLessThan(expositor + doble100);
   });
 
-  it("placas: descuento desde 3 y NFC por unidad", () => {
+  it("placas: descuento desde 3", () => {
     const p = bySlug("placa-qr-madera");
     const fields = { uso: "Reseñas de Google", enlace: "https://g.page/r/abc/review" };
-    expect(priceLine(p, { slug: p.slug, variant: "115x115", qty: 1, fields }).totalCents).toBe(2990);
-    const tres = priceLine(p, { slug: p.slug, variant: "115x115", qty: 3, addons: ["nfc"], fields });
+    expect(priceLine(p, { slug: p.slug, variant: "110x110", qty: 1, fields }).totalCents).toBe(2990);
+    const tres = priceLine(p, { slug: p.slug, variant: "110x110", qty: 3, fields });
     expect(tres.unitCents).toBe(2542);
-    expect(tres.totalCents).toBe(2542 * 3 + 500 * 3);
+    expect(tres.totalCents).toBe(2542 * 3);
   });
 
   it("valida la personalización", () => {

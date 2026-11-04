@@ -130,7 +130,8 @@ body::after {
   letter-spacing: 0.3px;
   mix-blend-mode: normal;
   opacity: 0.95;
-  transition: transform 0.15s ease;
+  left: 0; top: 0; /* se mueve con transform: sin esto se queda donde caiga en el flujo, fuera de pantalla */
+  transition: scale 0.15s ease;
 }
 .sc-cursor-ring {
   width: 44px; height: 44px;
@@ -139,14 +140,15 @@ body::after {
   position: fixed;
   pointer-events: none;
   z-index: 10001;
-  transition: transform 0.12s ease, border-color 0.12s ease, width 0.2s ease, height 0.2s ease;
+  left: 0; top: 0;
+  transition: scale 0.12s ease, border-color 0.12s ease, width 0.2s ease, height 0.2s ease;
 }
 .sc-ring-hover {
-  transform: scale(1.6);
+  scale: 1.6;
   border-color: rgba(200,168,75,0.7);
 }
 .sc-cursor-hover {
-  transform: scale(1.15);
+  scale: 1.15;
 }
 
 /* ── APP SHELL ── */
