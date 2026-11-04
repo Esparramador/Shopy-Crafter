@@ -1,6 +1,7 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import SiteLinks from "./SiteLinks";
+import "@/pages/public/public-pages.css";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -9,8 +10,20 @@ type FooterData = {
   footer: { tagline: string; columns: { title: string; links: { label: string; href: string }[] }[]; copyright: string; badges: string[] };
 };
 
+const NAV = [
+  { href: "/tienda", label: "Tienda", highlight: true },
+  { href: "/automatizacion-shopify-ia", label: "Servicios" },
+  { href: "/blog", label: "Blog" },
+  { href: "/casos-de-exito", label: "Casos" },
+  { href: "/faq", label: "Preguntas" },
+  { href: "/contacto", label: "Contacto" },
+];
+
+/** Marco común de las páginas públicas: cabecera con menú móvil, contenido y pie con enlazado interno. */
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const [footer, setFooter] = useState<FooterData | null>(null);
+  const [open, setOpen] = useState(false);
+  const [location] = useLocation();
 
   useEffect(() => {
     fetch(`${API_BASE}/api/cms/content`, { credentials: "include" })
@@ -19,67 +32,57 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       .catch(() => {});
   }, []);
 
+  useEffect(() => { window.scrollTo(0, 0); setOpen(false); }, [location]);
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const name = footer?.site.name ?? "Shopy Crafter";
+  const logo = footer?.site.logo.imageUrl
+    ? <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt="" width={30} height={30} className="pp-logo" />
+    : <img src={`${API_BASE}/images/logo-sc-default.png`} alt="" width={30} height={30} className="pp-logo" />;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--ink, #0a0a0c)", color: "var(--t, #eee)", display: "flex", flexDirection: "column" }}>
-      <nav style={{
-        position: "sticky", top: 0, zIndex: 100,
-        background: "rgba(10,10,12,0.92)", backdropFilter: "blur(12px)",
-        borderBottom: "1px solid var(--ink3, #1e1e22)",
-        padding: "14px 24px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "var(--t, #eee)" }}>
-          {footer?.site.logo.imageUrl ? (
-            <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt={footer.site.name} style={{ height: 26, borderRadius: 6 }} />
-          ) : (
-            <img src={`${API_BASE}/images/logo-sc-default.png`} alt="" width={30} height={30} style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", flexShrink: 0, boxShadow: "0 0 0 1px rgba(200,168,75,.35)" }} />
-          )}
-          <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.3 }}>{footer?.site.name ?? "Shopy Crafter"}</span>
-        </Link>
-        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-          <Link href="/" style={{ fontSize: 13, color: "var(--t3, #999)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
-            ← Volver al inicio
-          </Link>
-          <Link href="/login" style={{
-            fontSize: 13, fontWeight: 600, color: "#000",
-            background: "linear-gradient(135deg, #d4a843, #b8860b)",
-            padding: "8px 18px", borderRadius: 8, textDecoration: "none",
-          }}>
-            Iniciar sesión
-          </Link>
+    <div className="pp-shell">
+      <a href="#pp-main" className="pp-skip">Saltar al contenido</a>
+      <header className="pp-nav">
+        <div className="pp-nav-in">
+          <Link href="/" className="pp-brand" aria-label={`${name}, inicio`}>{logo}<span>{name}</span></Link>
+          <nav className="pp-links" aria-label="Principal">
+            {NAV.map(n => (
+              <Link key={n.href} href={n.href} className={`${n.highlight ? "hl " : ""}${location === n.href || (n.href !== "/" && location.startsWith(n.href + "/")) ? "on" : ""}`}>{n.label}</Link>
+            ))}
+          </nav>
+          <div className="pp-nav-end">
+            <Link href="/login" className="pp-login">Iniciar sesión</Link>
+            <button type="button" className="pp-burger" aria-label={open ? "Cerrar el menú" : "Abrir el menú"} aria-expanded={open} aria-controls="pp-menu" onClick={() => setOpen(o => !o)}><span aria-hidden="true" /></button>
+          </div>
         </div>
-      </nav>
+        {open && (
+          <nav id="pp-menu" className="pp-menu" aria-label="Menú">
+            {NAV.map(n => <Link key={n.href} href={n.href} className={n.highlight ? "hl" : ""}>{n.label}</Link>)}
+            <Link href="/login">Iniciar sesión</Link>
+          </nav>
+        )}
+      </header>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {children}
-      </main>
+      <main id="pp-main" className="pp-main">{children}</main>
 
-      <footer style={{ borderTop: "1px solid var(--ink3, #1e1e22)", padding: "48px 24px 24px", background: "var(--ink2, #111113)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(200px, 1fr) 3fr", gap: 32, marginBottom: 32 }} className="pl-footer-grid">
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              {footer?.site.logo.imageUrl ? (
-                <img src={`${API_BASE}${footer.site.logo.imageUrl}`} alt={footer.site.name} style={{ height: 22, borderRadius: 4 }} />
-              ) : (
-                <img src={`${API_BASE}/images/logo-sc-default.png`} alt="" width={26} height={26} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-              )}
-              <span style={{ fontSize: 14, fontWeight: 700 }}>{footer?.site.name ?? "Shopy Crafter"}</span>
-            </div>
-            <p style={{ fontSize: 12, color: "var(--t4, #666)", lineHeight: 1.5, margin: 0 }}>
-              IA para tiendas Shopify, WooCommerce y PrestaShop, gestión de Stripe, diseño web y apps nativas.
-            </p>
+      <footer className="pp-footer">
+        <div className="pp-footer-in">
+          <div className="pp-footer-brand">
+            <Link href="/" className="pp-brand">{logo}<span>{name}</span></Link>
+            <p>IA para tiendas Shopify, WooCommerce y PrestaShop, gestión de Stripe, diseño web y apps nativas.</p>
           </div>
           <SiteLinks />
         </div>
-        <div style={{ maxWidth: 1100, margin: "0 auto", borderTop: "1px solid var(--ink3, #1e1e22)", paddingTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ fontSize: 12, color: "var(--t4, #555)" }}>{footer?.footer.copyright ?? `© ${new Date().getFullYear()} Shopy Crafter`}</div>
-          <a href="mailto:craftershopy@gmail.com" style={{ fontSize: 12, color: "var(--t3, #999)", textDecoration: "none" }}>craftershopy@gmail.com</a>
+        <div className="pp-footer-bar">
+          <span>{footer?.footer.copyright ?? `© ${new Date().getFullYear()} Shopy Crafter`}</span>
+          <a href="mailto:craftershopy@gmail.com">craftershopy@gmail.com</a>
         </div>
-        <style>{`@media (max-width: 720px) { .pl-footer-grid { grid-template-columns: 1fr !important; } }`}</style>
       </footer>
     </div>
   );
