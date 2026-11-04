@@ -222,7 +222,7 @@ const OCASION: ShopField = { key: "ocasion", label: "Ocasión", type: "select", 
 
 /** Stand de madera por uso: misma pieza, otro destino y otro texto. */
 function stand(slug: string, sortOrder: number, featured: boolean, name: string, tagline: string, description: string, linkKey: string, linkLabel: string,
-  sizes: Array<[string, string, number, number]> = [["90x110", "90 × 110 mm", 2490, 2117], ["ilustrado", "90 × 110 mm con ilustración", 3490, 2967]], extra: ShopField[] = []): SeedProduct {
+  sizes: Array<[string, string, number, number]> = [["90x110", "90 × 110 mm", 2490, 2190], ["ilustrado", "90 × 110 mm con ilustración", 3490, 2967]], extra: ShopField[] = []): SeedProduct {
   return {
     slug, kind: "physical", category: "placas-qr", featured, visible: true, sortOrder, name, tagline, description,
     features: ["Contrachapado de 3 mm grabado y cortado con láser", "Base de pie incluida", "Tu logo, un titular y el QR", "Lectura comprobada con varios móviles antes del envío"],
@@ -352,7 +352,7 @@ export const SHOP_SEED: SeedProduct[] = [
     description: "Tu foto grabada en madera de 109 × 141 mm con una peana para que se sostenga de pie. Ajustamos la foto para la madera y te mandamos la prueba antes de grabarla.",
     features: ["Madera de 109 × 141 mm", "Peana incluida", "Prueba antes de grabar", "Texto opcional"],
     media: [vid("3d-foto-madera-peana", "Giro 3D de la foto grabada en madera con peana")],
-    variants: [{ key: "109x141", name: "109 × 141 mm con peana", tiers: tiers([1, 2990]) }],
+    variants: [{ key: "109x141", name: "109 × 141 mm con peana", tiers: tiers([1, 2490]) }],
     addons: [],
     fields: PHOTO_FIELDS,
     qtyOptions: [], minQty: 1, maxQty: 10, leadDays: 5, demoUrl: null,
@@ -364,7 +364,7 @@ export const SHOP_SEED: SeedProduct[] = [
     description: "La foto grabada en una lámina de madera y un marco cortado con láser a juego, con un texto o una fecha si quieres. Un regalo para bodas, aniversarios o nacimientos.",
     features: ["Foto grabada en madera", "Marco cortado a juego", "Texto o fecha opcional", "Prueba antes de grabar"],
     media: [vid("3d-marco-madera-foto", "Giro 3D del marco de madera con foto grabada")],
-    variants: [{ key: "marco", name: "Marco 110 × 110 mm", tiers: tiers([1, 3490]) }],
+    variants: [{ key: "marco", name: "Marco 110 × 110 mm", tiers: tiers([1, 2790]) }],
     addons: [],
     fields: PHOTO_FIELDS,
     qtyOptions: [], minQty: 1, maxQty: 10, leadDays: 6, demoUrl: null,
@@ -621,7 +621,7 @@ export const SHOP_SEED: SeedProduct[] = [
     description: "Escanean y el móvil se conecta a tu wifi, sin dictar contraseñas. El QR guarda los datos de la red: si un día cambias la contraseña, hay que grabar uno nuevo. Probamos la lectura con varios móviles antes de enviarlo.",
     features: ["Contrachapado de 3 mm grabado y cortado con láser", "90 × 110 mm con base de pie", "Se conecta al escanear", "Si cambias la contraseña, hace falta un stand nuevo"],
     media: [img("demo-stand-qr-wifi-1", "Stand de wifi con QR (imagen de demostración)")],
-    variants: [{ key: "90x110", name: "90 × 110 mm", tiers: tiers([1, 2490], [3, 2117]) }],
+    variants: [{ key: "90x110", name: "90 × 110 mm", tiers: tiers([1, 2290], [3, 1990]) }],
     addons: [],
     fields: [
       { key: "red", label: "Nombre de la red wifi", type: "text", required: true, max: 60 },
@@ -634,7 +634,7 @@ export const SHOP_SEED: SeedProduct[] = [
   },
   stand("stand-doble-qr", 35, false, "Stand con dos QR", "Dos destinos en un solo panel: reseñas e Instagram, carta y wifi…",
     "Para mostradores con poco espacio: dos QR rotulados en el mismo panel. Los grabamos a un tamaño que se lea bien con cualquier móvil.",
-    "enlace", "Primer enlace", [["unico", "90 × 110 mm", 3490, 3490]], [{ key: "enlace2", label: "Segundo enlace", type: "url", required: true, max: 400 }, { key: "rotulos", label: "Rótulo de cada QR", type: "text", required: false, max: 80 }]),
+    "enlace", "Primer enlace", [["unico", "90 × 110 mm", 3790, 3790]], [{ key: "enlace2", label: "Segundo enlace", type: "url", required: true, max: 400 }, { key: "rotulos", label: "Rótulo de cada QR", type: "text", required: false, max: 80 }]),
   {
     slug: "stands-qr-mesa", kind: "physical", category: "placas-qr", featured: false, visible: true, sortOrder: 36,
     name: "Stands de carta o reservas por mesa",
@@ -642,7 +642,7 @@ export const SHOP_SEED: SeedProduct[] = [
     description: "Un stand por mesa con su número y su QR a la carta o a las reservas. Nos pasas la lista de mesas y grabamos cada uno a juego con tu marca. Encaja con nuestra carta digital si aún no tienes una.",
     features: ["Contrachapado de 3 mm con base de pie", "Numerados uno a uno", "Cada stand con su enlace", "Mismo diseño en todas las mesas"],
     media: [img("demo-stands-qr-mesa-1", "Stands numerados por mesa (imagen de demostración)")],
-    variants: [{ key: "90x110", name: "90 × 110 mm, por unidad", tiers: tiers([5, 2290], [10, 1990], [20, 1790]) }],
+    variants: [{ key: "90x110", name: "90 × 110 mm, por unidad", tiers: tiers([5, 1990], [10, 1690], [20, 1490]) }],
     addons: [],
     fields: [
       { key: "enlace", label: "Enlace de la carta o reservas", type: "url", required: true, max: 400 },
@@ -659,7 +659,7 @@ export const SHOP_SEED: SeedProduct[] = [
     description: "Una pieza pequeña de contrachapado con tu QR, para donde no cabe un stand: junto a la caja, en un escaparate o pegada a la mesa. No lleva base. Probamos la lectura antes de enviarla.",
     features: ["Contrachapado de 3 mm, 50 × 50 mm", "Sin base", "QR a tu enlace", "Lectura comprobada antes del envío"],
     media: [img("demo-mini-qr-madera-50-1", "QR mini de madera (imagen de demostración)")],
-    variants: [{ key: "50x50", name: "50 × 50 mm", tiers: tiers([1, 990], [5, 790], [20, 650]) }],
+    variants: [{ key: "50x50", name: "50 × 50 mm", tiers: tiers([1, 990], [5, 690], [20, 490]) }],
     addons: [],
     fields: [
       { key: "enlace", label: "Enlace del QR", type: "url", required: true, max: 400 },
@@ -676,7 +676,7 @@ export const SHOP_SEED: SeedProduct[] = [
     media: [img("demo-set-mostrador-qr-1", "Set de stands a juego (imagen de demostración)")],
     variants: [
       { key: "dos", name: "2 stands", tiers: tiers([1, 4490]) },
-      { key: "tres", name: "3 stands", tiers: tiers([1, 5990]) },
+      { key: "tres", name: "3 stands", tiers: tiers([1, 6490]) },
       { key: "dos-tarjetas", name: "2 stands + 100 tarjetas", tiers: tiers([1, 8490]) },
     ],
     addons: [],
