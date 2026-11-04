@@ -29,6 +29,11 @@ function xmlEsc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function imagesXml(r) {
+  return (r.images ?? []).slice(0, 8).map(i =>
+    `\n    <image:image><image:loc>${xmlEsc(SITE_URL + i.path)}</image:loc>${i.title ? `<image:title>${xmlEsc(i.title)}</image:title>` : ''}</image:image>`).join('');
+}
+
 function buildSitemap(routeList) {
   const today = new Date().toISOString().slice(0, 10);
   const urls = routeList
@@ -36,9 +41,9 @@ function buildSitemap(routeList) {
     .sort((a, b) => b.priority - a.priority)
     .map(r => {
       const loc = r.path === '/' ? `${SITE_URL}/` : `${SITE_URL}${r.path}`;
-      return `  <url>\n    <loc>${xmlEsc(loc)}</loc>\n    <lastmod>${r.lastmod ?? today}</lastmod>\n    <changefreq>${r.changefreq}</changefreq>\n    <priority>${r.priority.toFixed(2)}</priority>\n  </url>`;
+      return `  <url>\n    <loc>${xmlEsc(loc)}</loc>\n    <lastmod>${r.lastmod ?? today}</lastmod>\n    <changefreq>${r.changefreq}</changefreq>\n    <priority>${r.priority.toFixed(2)}</priority>${imagesXml(r)}\n  </url>`;
     });
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urls.join('\n')}\n</urlset>\n`;
 }
 
 // ── Fallback SSR shell (used if entry-server.js is unavailable) ─────────────

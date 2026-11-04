@@ -26,6 +26,10 @@ export interface SeoRoute {
   noindex?: boolean;
   /** Canonical distinta de la propia ruta (duplicados como /landing o /preguntas-frecuentes). */
   canonicalPath?: string;
+  /** Imágenes de la página (rutas absolutas desde la raíz) para el sitemap de imágenes. */
+  images?: { path: string; title?: string }[];
+  /** Producto o servicio de la Tienda: genera el JSON-LD Product/Service con su precio «desde». */
+  product?: { name: string; kind: "physical" | "digital" | "quote"; fromCents: number; category: string; images: string[] };
 }
 
 export const HOME_TITLE = "Shopy Crafter — IA para Shopify, WooCommerce, PrestaShop y Stripe · Diseño web y apps";
@@ -202,6 +206,17 @@ export const SITE_LINK_GROUPS: { title: string; links: { href: string; label: st
       { href: "/agencia-shopify-ia", label: "Para agencias" },
       { href: "/#fp-projects", label: "Proyectos" },
       { href: "/tienda", label: "Tienda" },
+    ],
+  },
+  {
+    title: "Tienda",
+    links: [
+      { href: "/tienda/tarjetas-metalicas", label: "Tarjetas de aluminio" },
+      { href: "/tienda/placa-qr-madera", label: "Placas QR de madera" },
+      { href: "/tienda/kit-resenas", label: "Kit Reseñas" },
+      { href: "/tienda/ficha-google-maps", label: "Ficha de Google Maps" },
+      { href: "/tienda/resenas-google", label: "Gestión de reseñas" },
+      { href: "/tienda/landing-3d", label: "Landing con 3D" },
     ],
   },
   {
