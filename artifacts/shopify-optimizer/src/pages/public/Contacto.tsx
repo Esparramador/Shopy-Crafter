@@ -1,10 +1,34 @@
-import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { useState, useEffect, useRef, useCallback } from "react";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
-import "./contacto.css";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+const GOLD = "rgba(200,168,75,1)";
+const GOLD_BG = "rgba(200,168,75,0.10)";
+const GOLD_BORDER = "rgba(200,168,75,0.22)";
+
+const INFO_CARDS = [
+  {
+    icon: "✉️", label: "Email directo", value: "craftershopy@gmail.com",
+    href: "mailto:craftershopy@gmail.com",
+    accent: GOLD, bg: "linear-gradient(135deg,rgba(200,168,75,.14),rgba(200,168,75,.04))", border: GOLD_BORDER,
+  },
+  {
+    icon: "⚡", label: "Tiempo de respuesta", value: "Te respondemos con una propuesta por escrito", href: null,
+    accent: "#2dd49f", bg: "linear-gradient(135deg,rgba(45,212,159,.14),rgba(45,212,159,.04))", border: "rgba(45,212,159,.22)",
+  },
+  {
+    icon: "🌍", label: "Ubicación", value: "España · Remoto", href: null,
+    accent: "#60a5fa", bg: "linear-gradient(135deg,rgba(96,165,250,.14),rgba(96,165,250,.04))", border: "rgba(96,165,250,.22)",
+  },
+];
+
+const BUILD_STEPS = [
+  { icon: "🔍", text: "Escaneando tu perfil…" },
+  { icon: "🧠", text: "Activando motores IA…" },
+  { icon: "✨", text: "Preparando formulario…" },
+];
 
 const nicheOptions = ["Moda y ropa","Electrónica y gadgets","Hogar y decoración","Belleza y cosmética","Deporte y fitness","Alimentación y gourmet","Arte y coleccionismo","Mascotas","Joyería y accesorios","Otro"];
 const revenueOptions = ["Menos de €1.000","€1.000 – €5.000","€5.000 – €15.000","€15.000 – €50.000","Más de €50.000"];
@@ -13,6 +37,325 @@ const serviceOptions = ["Auditoría completa","Generación de imágenes IA","SEO
 const EMPTY_FORM = { name:"", email:"", phone:"", storeUrl:"", niche:"", customNiche:"", revenue:"", socialMedia:"", message:"" };
 
 type FormKey = keyof typeof EMPTY_FORM;
+
+const DEMO_SEQUENCE: { field: FormKey | "__niche" | "__revenue"; value: string; speed?: number }[] = [
+  { field: "name",        value: "María García Sánchez",           speed: 45 },
+  { field: "email",       value: "maria@modabarcelona.com",         speed: 38 },
+  { field: "storeUrl",    value: "modabarcelona.myshopify.com",     speed: 38 },
+  { field: "__niche",     value: "Moda y ropa",                     speed: 0  },
+  { field: "__revenue",   value: "€5.000 – €15.000",               speed: 0  },
+  { field: "socialMedia", value: "@modabarcelona_shop",             speed: 42 },
+  { field: "message",     value: "Quiero optimizar mis fichas de producto con IA y duplicar la conversión este trimestre. Tenemos 180 referencias activas.", speed: 28 },
+];
+
+const CSS = `
+/* ─── ROOT ─── */
+.ctc-root {
+  position: relative;
+  width: 100%;
+  background: #05030c;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── VIDEO / OVERLAY — FIXED ─── */
+.ctc-aurora {
+  background:
+    radial-gradient(40vw 40vw at 12% 30%, rgba(201,169,97,.32), transparent 65%),
+    radial-gradient(34vw 34vw at 30% 85%, rgba(42,122,75,.28), transparent 65%),
+    radial-gradient(120% 90% at 20% 40%, #1a1408 0%, #0b0913 55%, #05030c 100%);
+  animation: ctc-aurora 18s ease-in-out infinite alternate;
+  background-size: 120% 120%;
+}
+@keyframes ctc-aurora { from { background-position: 0% 0%; } to { background-position: 100% 60%; } }
+@media (prefers-reduced-motion: reduce) { .ctc-aurora { animation: none; } }
+.ctc-video {
+  position: fixed;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: left center;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.ctc-overlay {
+  position: fixed; inset: 0; z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg,
+      rgba(5,3,12,.06) 0%,
+      rgba(5,3,12,.06) 36%,
+      rgba(5,3,12,.65) 54%,
+      rgba(5,3,12,.97) 70%,
+      rgba(5,3,12,.99) 100%
+    ),
+    linear-gradient(180deg,
+      rgba(5,3,12,.52) 0%,
+      transparent 14%,
+      transparent 76%,
+      rgba(5,3,12,.6) 100%
+    );
+}
+
+/* ─── MAIN LAYOUT ─── */
+.ctc-layout {
+  position: relative;
+  z-index: 5;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* ─── LEFT AREA ─── */
+.ctc-left {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 16px 48px;
+}
+
+/* ─── INFO CARDS ─── */
+.ctc-cards-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+}
+.ctc-card {
+  flex: 1 1 130px; max-width: 190px;
+  padding: 20px 14px 18px;
+  border-radius: 18px; border: 1px solid;
+  text-align: center; backdrop-filter: blur(16px);
+  opacity: 0; transform: translateY(32px) scale(.95);
+  transition: opacity 0.6s cubic-bezier(.22,1,.36,1), transform 0.6s cubic-bezier(.22,1,.36,1);
+}
+.ctc-card-in { opacity: 1; transform: translateY(0) scale(1); }
+.ctc-card:nth-child(1) { transition-delay: 0ms; }
+.ctc-card:nth-child(2) { transition-delay: 90ms; }
+.ctc-card:nth-child(3) { transition-delay: 180ms; }
+.ctc-card-icon { display: block; font-size: 24px; margin-bottom: 10px; }
+.ctc-card-label {
+  display: block; font-size: 9px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 7px;
+}
+.ctc-card-value {
+  display: block; font-size: 12px; font-weight: 700; color: #ccc;
+  text-decoration: none; word-break: break-word;
+}
+.ctc-card-value:hover { text-decoration: underline; }
+
+/* ─── RIGHT FORM PANEL ─── */
+/* Sin overflow-y:auto — la página scroll entera (el vídeo es position:fixed,
+   no afecta al layout). Así el footer es alcanzable sin bounce ni trampa. */
+.ctc-panel {
+  width: min(44%, 520px);
+  min-height: 0;
+  padding: 56px 36px 56px 24px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+
+/* ─── BUILD ANIMATION ─── */
+.ctc-building {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 52px 24px; gap: 4px;
+}
+.ctc-build-orb {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,168,75,.28) 0%, transparent 70%);
+  border: 2px solid rgba(200,168,75,.45);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin-bottom: 28px;
+  animation: ctcOrb 2.2s ease-in-out infinite;
+}
+@keyframes ctcOrb {
+  0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(200,168,75,0); }
+  50% { transform: scale(1.07); box-shadow: 0 0 0 12px rgba(200,168,75,.06), 0 0 40px rgba(200,168,75,.18); }
+}
+.ctc-build-rail {
+  width: 100%; height: 3px; background: rgba(200,168,75,.08);
+  border-radius: 99px; overflow: hidden; position: relative; margin-bottom: 28px;
+}
+.ctc-build-beam {
+  position: absolute; top: 0; left: -55%; width: 55%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(200,168,75,.9), rgba(45,212,159,.5), transparent);
+  animation: ctcBeam 1.3s ease-in-out infinite;
+}
+@keyframes ctcBeam { to { left: 105%; } }
+.ctc-build-step {
+  width: 100%; display: flex; align-items: center; gap: 14px;
+  padding: 13px 6px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  opacity: 0; transform: translateX(-18px);
+  transition: opacity .55s cubic-bezier(.22,1,.36,1), transform .55s cubic-bezier(.22,1,.36,1);
+}
+.ctc-build-step.ctc-step-on { opacity: 1; transform: translateX(0); }
+.ctc-step-dot {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(200,168,75,.08); border: 1.5px solid rgba(200,168,75,.22);
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+  transition: all .4s cubic-bezier(.34,1.56,.64,1) .25s;
+}
+.ctc-build-step.ctc-step-on .ctc-step-dot {
+  background: rgba(45,212,159,.12); border-color: rgba(45,212,159,.4);
+}
+.ctc-step-text {
+  flex: 1; font-size: 13.5px; color: rgba(255,255,255,.55); font-weight: 500;
+  transition: color .4s .15s;
+}
+.ctc-build-step.ctc-step-on .ctc-step-text { color: rgba(255,255,255,.82); }
+.ctc-step-check {
+  font-size: 16px; opacity: 0; transform: scale(0);
+  transition: all .4s cubic-bezier(.34,1.56,.64,1) .35s;
+}
+.ctc-build-step.ctc-step-on .ctc-step-check { opacity: 1; transform: scale(1); }
+.ctc-build-ready {
+  margin-top: 20px; font-size: 11px; font-weight: 800; letter-spacing: 2px;
+  color: rgba(200,168,75,.5); text-transform: uppercase;
+  opacity: 0; transform: scale(.9);
+  transition: all .5s cubic-bezier(.22,1,.36,1);
+}
+.ctc-build-ready.ctc-ready-on { opacity: 1; transform: scale(1); color: rgba(200,168,75,.9); }
+
+/* ─── FORM FIELDS ─── */
+.ctc-form-wrap { display: flex; flex-direction: column; gap: 18px; }
+.ctc-field { opacity: 0; transform: translateY(16px); }
+.ctc-form-ready .ctc-field { animation: ctcFieldIn 0.52s cubic-bezier(.22,1,.36,1) forwards; }
+.ctc-form-ready .ctc-field:nth-child(1) { animation-delay: 0ms; }
+.ctc-form-ready .ctc-field:nth-child(2) { animation-delay: 60ms; }
+.ctc-form-ready .ctc-field:nth-child(3) { animation-delay: 120ms; }
+.ctc-form-ready .ctc-field:nth-child(4) { animation-delay: 180ms; }
+.ctc-form-ready .ctc-field:nth-child(5) { animation-delay: 240ms; }
+.ctc-form-ready .ctc-field:nth-child(6) { animation-delay: 300ms; }
+.ctc-form-ready .ctc-field:nth-child(7) { animation-delay: 360ms; }
+.ctc-form-ready .ctc-field:nth-child(8) { animation-delay: 420ms; }
+.ctc-form-ready .ctc-field:nth-child(n+9) { animation-delay: 480ms; }
+@keyframes ctcFieldIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ctc-input {
+  width: 100%; padding: 12px 15px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(200,168,75,0.17);
+  border-radius: 10px; color: #eee; font-size: 13.5px;
+  outline: none; box-sizing: border-box;
+  transition: border-color .2s, box-shadow .2s;
+  font-family: inherit;
+}
+.ctc-input:focus {
+  border-color: rgba(200,168,75,.45);
+  box-shadow: 0 0 0 3px rgba(200,168,75,.07);
+}
+/* Demo typing highlight */
+.ctc-input.ctc-typing {
+  border-color: rgba(45,212,159,.5);
+  box-shadow: 0 0 0 3px rgba(45,212,159,.07);
+  color: #adf7e0;
+}
+.ctc-label {
+  display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .7px;
+  color: rgba(200,168,75,.82); text-transform: uppercase; margin-bottom: 7px;
+}
+.ctc-row { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(190px,100%),1fr)); gap: 14px; }
+.ctc-service-btn {
+  padding: 8px 14px; border-radius: 99px; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+
+/* ─── DEMO BADGE ─── */
+.ctc-demo-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 12px; border-radius: 99px;
+  background: rgba(45,212,159,.10); border: 1px solid rgba(45,212,159,.25);
+  color: #2dd49f; font-size: 10px; font-weight: 800; letter-spacing: .8px;
+  text-transform: uppercase; margin-bottom: 14px;
+}
+.ctc-demo-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #2dd49f;
+  animation: ctcPulse 1s ease-in-out infinite;
+}
+@keyframes ctcPulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .4; transform: scale(.75); }
+}
+.ctc-demo-cta {
+  margin-top: 6px; text-align: center; font-size: 12px; color: rgba(200,168,75,.7);
+  animation: ctcFieldIn .4s ease forwards;
+  cursor: pointer; text-decoration: underline dotted;
+}
+.ctc-demo-cta:hover { color: rgba(200,168,75,1); }
+
+/* ─── TABLET / MOBILE ─── */
+@media (max-width: 900px) {
+  .ctc-layout { flex-direction: column; }
+  /* En vertical: primero el formulario, luego las info cards debajo */
+  .ctc-panel {
+    order: -1;
+    width: 100%; min-height: auto;
+    padding: 72px 20px 32px; justify-content: flex-start; overflow-y: visible;
+  }
+  .ctc-left { order: 1; align-items: center; justify-content: center; padding: 8px 16px 48px; }
+  .ctc-card { flex: 1 1 120px; max-width: 160px; padding: 16px 10px 14px; }
+  .ctc-card-icon { font-size: 20px; margin-bottom: 6px; }
+  .ctc-card-label { font-size: 8px; }
+  .ctc-card-value { font-size: 11px; }
+  .ctc-build-orb { width: 60px; height: 60px; font-size: 22px; margin-bottom: 22px; }
+  .ctc-overlay {
+    background:
+      linear-gradient(180deg,
+        rgba(5,3,12,.65) 0%, rgba(5,3,12,.82) 35%,
+        rgba(5,3,12,.97) 55%, rgba(5,3,12,.99) 100%
+      );
+  }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .ctc-layout { flex-direction: row; }
+  .ctc-panel { width: 55%; padding: 12px 20px 12px 16px; justify-content: flex-start; overflow-y: auto; }
+  .ctc-left { width: 45%; padding: 0 12px 24px; align-items: flex-end; }
+  .ctc-building { padding: 16px 16px; }
+  .ctc-build-orb { width: 48px; height: 48px; font-size: 18px; margin-bottom: 14px; }
+  .ctc-card { padding: 12px 8px 10px; }
+  .ctc-card-icon { font-size: 16px; margin-bottom: 4px; }
+  /* ── Landscape: vídeo y overlay empiezan BAJO el nav (≈56px)
+       para que el fondo no quede tapado por la barra de nav ── */
+  .ctc-video {
+    top: 56px;
+    height: calc(100dvh - 56px);
+    object-position: left top;
+  }
+  .ctc-overlay {
+    top: 56px;
+    height: calc(100dvh - 56px);
+    background:
+      linear-gradient(90deg,
+        transparent 0%,
+        transparent 32%,
+        rgba(5,3,12,.50) 50%,
+        rgba(5,3,12,.94) 67%,
+        rgba(5,3,12,.99) 100%
+      ),
+      linear-gradient(180deg,
+        transparent 0%,
+        transparent 68%,
+        rgba(5,3,12,.55) 100%
+      );
+  }
+}
+@media (max-width: 480px) {
+  .ctc-panel { padding: 56px 14px 24px; }
+  .ctc-card { flex: 1 1 100%; max-width: none; }
+  .ctc-cards-row { flex-direction: column; gap: 8px; }
+  .ctc-card { padding: 14px 16px; text-align: left; flex-direction: row; align-items: center; gap: 12px; }
+  .ctc-card-icon { font-size: 22px; flex-shrink: 0; margin-bottom: 0; }
+}
+`;
 
 export default function Contacto() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -25,6 +368,98 @@ export default function Contacto() {
     const asunto = new URLSearchParams(window.location.search).get("asunto")?.trim().slice(0, 120);
     if (asunto) setForm(f => (f.message ? f : { ...f, message: `Me interesa: ${asunto}. ` }));
   }, []);
+  const [cardPhase, setCardPhase] = useState(0);
+  const [formReady, setFormReady] = useState(false);
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const VIDEO_T1 = 0.5, VIDEO_T2 = 1.5, VIDEO_T3 = 2.5, VIDEO_TF = 4.0;
+
+  /* ── typewriter state ── */
+  const [demoActive, setDemoActive] = useState(false);
+  const [demoStep, setDemoStep]  = useState(0);
+  const [demoChar, setDemoChar]  = useState(0);
+  const [demoForm, setDemoForm]  = useState({ ...EMPTY_FORM });
+  const [demoNiche,   setDemoNiche]   = useState("");
+  const [demoRevenue, setDemoRevenue] = useState("");
+  const [demoDone, setDemoDone] = useState(false);
+  const demoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ── build animation timers ── */
+  useEffect(() => {
+    const t1 = setTimeout(() => setCardPhase(p => Math.max(p, 1)), VIDEO_T1 * 1000);
+    const t2 = setTimeout(() => setCardPhase(p => Math.max(p, 2)), VIDEO_T2 * 1000);
+    const t3 = setTimeout(() => setCardPhase(p => Math.max(p, 3)), VIDEO_T3 * 1000);
+    const tf = setTimeout(() => setFormReady(true), VIDEO_TF * 1000);
+    return () => [t1,t2,t3,tf].forEach(clearTimeout);
+  }, []);
+
+  /* ── launch typewriter when form appears ── */
+  useEffect(() => {
+    if (!formReady || demoActive || demoDone) return;
+    const t = setTimeout(() => setDemoActive(true), 500);
+    return () => clearTimeout(t);
+  }, [formReady, demoActive, demoDone]);
+
+  /* ── typewriter tick ── */
+  const advanceDemo = useCallback(() => {
+    if (!demoActive || demoStep >= DEMO_SEQUENCE.length) return;
+
+    const step = DEMO_SEQUENCE[demoStep];
+
+    if (step.field === "__niche") {
+      setDemoNiche(step.value);
+      timerRef.current = setTimeout(() => {
+        setDemoStep(s => s + 1);
+        setDemoChar(0);
+      }, 500);
+      return;
+    }
+    if (step.field === "__revenue") {
+      setDemoRevenue(step.value);
+      timerRef.current = setTimeout(() => {
+        setDemoStep(s => s + 1);
+        setDemoChar(0);
+      }, 500);
+      return;
+    }
+
+    const target = step.value;
+    const speed  = step.speed ?? 45;
+
+    if (demoChar < target.length) {
+      setDemoForm(f => ({ ...f, [step.field]: target.slice(0, demoChar + 1) }));
+      timerRef.current = setTimeout(() => setDemoChar(c => c + 1), speed);
+    } else {
+      timerRef.current = setTimeout(() => {
+        setDemoStep(s => s + 1);
+        setDemoChar(0);
+      }, 360);
+    }
+  }, [demoActive, demoStep, demoChar]);
+
+  useEffect(() => {
+    if (!demoActive) return;
+    if (demoStep >= DEMO_SEQUENCE.length) {
+      setDemoActive(false);
+      setDemoDone(true);
+      return;
+    }
+    advanceDemo();
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [demoActive, demoStep, demoChar, advanceDemo]);
+
+  const skipDemo = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (demoRef.current) clearTimeout(demoRef.current);
+    setDemoActive(false);
+    setDemoDone(true);
+    setDemoForm({ ...EMPTY_FORM });
+    setDemoNiche("");
+    setDemoRevenue("");
+  };
+
+  const activeField = demoActive && demoStep < DEMO_SEQUENCE.length ? DEMO_SEQUENCE[demoStep].field : null;
 
   const CF = (field: FormKey) =>
     (e: React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>) =>
@@ -52,136 +487,305 @@ export default function Contacto() {
     }
   };
 
+  const cards = INFO_CARDS.map((card, i) => (
+    <div
+      key={card.label}
+      className={`ctc-card${cardPhase > i ? " ctc-card-in" : ""}`}
+      style={{ background: card.bg, borderColor: card.border }}
+    >
+      <span className="ctc-card-icon">{card.icon}</span>
+      <span className="ctc-card-label" style={{ color: card.accent }}>{card.label}</span>
+      {card.href
+        ? <a href={card.href} className="ctc-card-value" style={{ color: card.accent }}>{card.value}</a>
+        : <span className="ctc-card-value">{card.value}</span>
+      }
+    </div>
+  ));
+
+  const isTyping = (field: FormKey | "__niche" | "__revenue") => activeField === field;
+
   return (
     <>
       <PageMeta {...metaFor("/contacto")} />
       <PublicLayout>
-        <header className="pp-hero ct-hero">
-          <div className="pp-wrap">
-            <span className="pp-eyebrow">Contacto</span>
-            <h1 className="pp-h1">Cuéntanos qué necesitas y lo vemos juntos</h1>
-            <p className="pp-lead">Una tienda que optimizar, una web nueva, una app o una idea sin definir: escríbenos con lo que tengas y te respondemos por email.</p>
-          </div>
-        </header>
+        <div className="ctc-root">
+          <style>{CSS}</style>
 
-        <div className="pp-wrap ct-grid">
-          <aside className="ct-side" aria-label="Datos de contacto">
-            <div className="ct-box">
-              <h2>Datos</h2>
-              <div className="ct-line"><div><b>Email directo</b><a href="mailto:craftershopy@gmail.com">craftershopy@gmail.com</a></div></div>
-              <div className="ct-line"><div><b>Ubicación</b><span>España · trabajo remoto</span></div></div>
-            </div>
-            <div className="ct-box">
-              <h2>Qué pasa después</h2>
-              <ol className="ct-steps">
-                <li><strong>Leemos tu mensaje</strong>Y miramos tu web o tu tienda si nos has dado la dirección.</li>
-                <li><strong>Te respondemos por email</strong>Con preguntas, o directamente con una propuesta.</li>
-                <li><strong>Presupuesto por escrito</strong>Con alcance y precio, antes de empezar nada.</li>
-              </ol>
-            </div>
-            <div className="ct-box">
-              <h2>Mientras tanto</h2>
-              <div className="ct-links">
-                <Link href="/tienda">Tienda</Link>
-                <a href="/#fp-pricing">Packs y precios</a>
-                <Link href="/faq">Preguntas frecuentes</Link>
-                <Link href="/casos-de-exito">Casos de éxito</Link>
-              </div>
-            </div>
-          </aside>
+          {/* Fondo propio (antes, un vídeo de un personaje con derechos de terceros). */}
+          <div className="ctc-video ctc-aurora" aria-hidden="true" />
+          <div className="ctc-overlay" />
 
-          <section className="ct-form-card" aria-labelledby="ct-title">
-            {status === "sent" ? (
-              <div className="ct-sent" role="status">
-                <div className="ct-sent-mark" aria-hidden="true">✓</div>
-                <h2>Solicitud recibida</h2>
-                <p>Gracias. Hemos recibido tu mensaje y te escribiremos al email que nos has indicado.</p>
-                <div className="pp-actions" style={{ justifyContent: "center" }}>
-                  <Link href="/tienda" className="pp-btn">Ver la Tienda</Link>
-                  <Link href="/" className="pp-btn">Volver al inicio</Link>
+          {/* ─── MAIN LAYOUT ─── */}
+          <div className="ctc-layout">
+
+            {/* LEFT: info cards */}
+            <div className="ctc-left">
+              <div className="ctc-cards-row">{cards}</div>
+            </div>
+
+            {/* RIGHT: form panel */}
+            <div className="ctc-panel">
+
+              {!formReady ? (
+                /* ── BUILD ANIMATION ── */
+                <div className="ctc-building">
+                  <div className="ctc-build-orb">🤖</div>
+                  <div className="ctc-build-rail">
+                    <div className="ctc-build-beam" />
+                  </div>
+                  {BUILD_STEPS.map((step, i) => (
+                    <div key={i} className={`ctc-build-step${cardPhase > i ? " ctc-step-on" : ""}`}>
+                      <div className="ctc-step-dot">{step.icon}</div>
+                      <span className="ctc-step-text">{step.text}</span>
+                      <span className="ctc-step-check">✓</span>
+                    </div>
+                  ))}
+                  <div className={`ctc-build-ready${cardPhase >= 3 ? " ctc-ready-on" : ""}`}>
+                    ✦ Formulario listo ✦
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                <h2 id="ct-title">Cuéntanos sobre tu negocio</h2>
-                <p>Solo nombre y email son obligatorios. Cuanto más nos cuentes, mejor será nuestra respuesta.</p>
 
-                <form onSubmit={submit} className="ct-form" aria-describedby={status === "error" ? "ct-err" : undefined}>
-                  <div className="ct-row">
-                    <div>
-                      <label className="ct-label" htmlFor="ct-name">Nombre completo <i aria-hidden="true">*</i></label>
-                      <input id="ct-name" name="name" type="text" required autoComplete="name" className="ct-input" value={form.name} onChange={CF("name")} placeholder="Tu nombre y apellidos" />
-                    </div>
-                    <div>
-                      <label className="ct-label" htmlFor="ct-email">Email de contacto <i aria-hidden="true">*</i></label>
-                      <input id="ct-email" name="email" type="email" required autoComplete="email" className="ct-input" value={form.email} onChange={CF("email")} placeholder="tu@email.com" />
-                    </div>
+              ) : status === "sent" ? (
+                /* ── SUCCESS ── */
+                <div style={{ textAlign:"center", padding:"40px 20px" }}>
+                  <div style={{ fontSize:52, marginBottom:18 }}>✅</div>
+                  <h3 style={{ fontSize:24, fontWeight:800, color:"#2dd49f", marginBottom:12 }}>¡Solicitud recibida!</h3>
+                  <p style={{ color:"#888", fontSize:14, lineHeight:1.7, marginBottom:8 }}>
+                    Hemos recibido tu solicitud.
+                  </p>
+                  <p style={{ color:"#555", fontSize:12 }}>Te contactaremos con una propuesta por escrito antes de empezar.</p>
+                </div>
+
+              ) : (
+                /* ── FORM ── */
+                <div className={`ctc-form-wrap${formReady ? " ctc-form-ready" : ""}`}>
+
+                  {/* Header */}
+                  <div className="ctc-field" style={{ marginBottom:6 }}>
+                    {demoActive && (
+                      <div className="ctc-demo-badge">
+                        <div className="ctc-demo-dot" />
+                        IA rellenando ejemplo en vivo
+                      </div>
+                    )}
+                    {demoDone && !demoActive && (
+                      <span style={{
+                        display:"inline-block", padding:"5px 14px", borderRadius:999,
+                        background:GOLD_BG, color:GOLD, border:`1px solid ${GOLD_BORDER}`,
+                        fontSize:10, fontWeight:700, letterSpacing:"1px", textTransform:"uppercase",
+                        marginBottom:14,
+                      }}>Trabaja con nosotros</span>
+                    )}
+                    {!demoActive && !demoDone && (
+                      <span style={{
+                        display:"inline-block", padding:"5px 14px", borderRadius:999,
+                        background:GOLD_BG, color:GOLD, border:`1px solid ${GOLD_BORDER}`,
+                        fontSize:10, fontWeight:700, letterSpacing:"1px", textTransform:"uppercase",
+                        marginBottom:14,
+                      }}>Trabaja con nosotros</span>
+                    )}
+                    <h2 style={{ fontSize:"clamp(22px,3.2vw,34px)", fontWeight:800, color:"#eee", lineHeight:1.15, marginBottom:10 }}>
+                      {demoActive ? <>Viendo cómo funciona…</> : <>Cuéntanos sobre<br />tu negocio.</>}
+                    </h2>
+                    <p style={{ fontSize:13.5, color:"#777", lineHeight:1.65 }}>
+                      {demoActive
+                        ? "La IA rellena un ejemplo real. El formulario es tuyo cuando acabe."
+                        : <>Te respondemos con una propuesta por escrito,<br />sin compromiso.</>
+                      }
+                    </p>
                   </div>
 
-                  <div className="ct-row">
-                    <div>
-                      <label className="ct-label" htmlFor="ct-phone">Teléfono <em>(opcional)</em></label>
-                      <input id="ct-phone" name="phone" type="tel" autoComplete="tel" className="ct-input" value={form.phone} onChange={CF("phone")} placeholder="+34 600 000 000" />
-                    </div>
-                    <div>
-                      <label className="ct-label" htmlFor="ct-url">Web o tienda <em>(opcional)</em></label>
-                      <input id="ct-url" name="storeUrl" type="text" inputMode="url" autoComplete="url" className="ct-input" value={form.storeUrl} onChange={CF("storeUrl")} placeholder="mitienda.com" />
-                    </div>
-                  </div>
+                  <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-                  <div className="ct-row">
-                    <div>
-                      <label className="ct-label" htmlFor="ct-niche">Sector <em>(opcional)</em></label>
-                      <select id="ct-niche" name="niche" className="ct-input" value={form.niche} onChange={CF("niche")}>
-                        <option value="">Selecciona tu sector</option>
-                        {nicheOptions.map(o => <option key={o}>{o}</option>)}
-                      </select>
-                      {form.niche === "Otro" && (
-                        <input type="text" aria-label="Describe tu sector" value={form.customNiche} onChange={CF("customNiche")} placeholder="Describe tu sector…" className="ct-input" style={{ marginTop: 8 }} />
+                    {/* Nombre + Email */}
+                    <div className="ctc-field">
+                      <div className="ctc-row">
+                        <div>
+                          <label className="ctc-label">Nombre completo *</label>
+                          <input
+                            type="text" required
+                            className={`ctc-input${isTyping("name") ? " ctc-typing" : ""}`}
+                            value={demoActive ? demoForm.name + (isTyping("name") ? "|" : "") : form.name}
+                            onChange={demoActive ? undefined : CF("name")}
+                            readOnly={demoActive}
+                            placeholder={demoActive ? "" : "Tu nombre y apellidos"}
+                          />
+                        </div>
+                        <div>
+                          <label className="ctc-label">Email de contacto *</label>
+                          <input
+                            type="email" required
+                            className={`ctc-input${isTyping("email") ? " ctc-typing" : ""}`}
+                            value={demoActive ? demoForm.email + (isTyping("email") ? "|" : "") : form.email}
+                            onChange={demoActive ? undefined : CF("email")}
+                            readOnly={demoActive}
+                            placeholder={demoActive ? "" : "tu@email.com"}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Teléfono + URL */}
+                    <div className="ctc-field">
+                      <div className="ctc-row">
+                        <div>
+                          <label className="ctc-label">Teléfono</label>
+                          <input
+                            type="tel"
+                            className="ctc-input"
+                            value={form.phone}
+                            onChange={CF("phone")}
+                            placeholder="+34 600 000 000"
+                          />
+                        </div>
+                        <div>
+                          <label className="ctc-label">URL de tu tienda</label>
+                          <input
+                            type="text"
+                            className={`ctc-input${isTyping("storeUrl") ? " ctc-typing" : ""}`}
+                            value={demoActive ? demoForm.storeUrl + (isTyping("storeUrl") ? "|" : "") : form.storeUrl}
+                            onChange={demoActive ? undefined : CF("storeUrl")}
+                            readOnly={demoActive}
+                            placeholder={demoActive ? "" : "mitienda.com"}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Nicho + Facturación */}
+                    <div className="ctc-field">
+                      <div className="ctc-row">
+                        <div>
+                          <label className="ctc-label">Nicho / tipo de productos</label>
+                          <select
+                            className={`ctc-input${isTyping("__niche") ? " ctc-typing" : ""}`}
+                            value={demoActive ? demoNiche : form.niche}
+                            onChange={demoActive ? undefined : CF("niche")}
+                            style={{ cursor:"pointer" }}
+                          >
+                            <option value="">Selecciona tu nicho</option>
+                            {nicheOptions.map(o => <option key={o}>{o}</option>)}
+                          </select>
+                          {form.niche === "Otro" && !demoActive && (
+                            <input type="text" value={form.customNiche} onChange={CF("customNiche")} placeholder="Describe tu nicho..." className="ctc-input" style={{ marginTop:8 }} />
+                          )}
+                        </div>
+                        <div>
+                          <label className="ctc-label">Facturación mensual aprox.</label>
+                          <select
+                            className={`ctc-input${isTyping("__revenue") ? " ctc-typing" : ""}`}
+                            value={demoActive ? demoRevenue : form.revenue}
+                            onChange={demoActive ? undefined : CF("revenue")}
+                            style={{ cursor:"pointer" }}
+                          >
+                            <option value="">Selecciona rango</option>
+                            {revenueOptions.map(o => <option key={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Redes sociales */}
+                    <div className="ctc-field">
+                      <label className="ctc-label">Redes sociales / Instagram</label>
+                      <input
+                        type="text"
+                        className={`ctc-input${isTyping("socialMedia") ? " ctc-typing" : ""}`}
+                        value={demoActive ? demoForm.socialMedia + (isTyping("socialMedia") ? "|" : "") : form.socialMedia}
+                        onChange={demoActive ? undefined : CF("socialMedia")}
+                        readOnly={demoActive}
+                        placeholder={demoActive ? "" : "@tu_cuenta o URL"}
+                      />
+                    </div>
+
+                    {/* Servicios */}
+                    <div className="ctc-field">
+                      <label className="ctc-label">¿Qué servicios te interesan?</label>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:7, marginTop:4 }}>
+                        {serviceOptions.map(s => (
+                          <button key={s} type="button"
+                            onClick={() => !demoActive && toggleService(s)}
+                            className="ctc-service-btn"
+                            style={{
+                              border:`1px solid ${services.includes(s) ? GOLD_BORDER : "rgba(255,255,255,0.09)"}`,
+                              background: services.includes(s) ? GOLD_BG : "transparent",
+                              color: services.includes(s) ? GOLD : "#777",
+                              opacity: demoActive ? .55 : 1,
+                            }}>{s}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Mensaje */}
+                    <div className="ctc-field">
+                      <label className="ctc-label">Mensaje</label>
+                      <textarea
+                        rows={4}
+                        className={`ctc-input${isTyping("message") ? " ctc-typing" : ""}`}
+                        value={demoActive ? demoForm.message + (isTyping("message") ? "|" : "") : form.message}
+                        onChange={demoActive ? undefined : CF("message")}
+                        readOnly={demoActive}
+                        placeholder={demoActive ? "" : "Cuéntanos sobre tu tienda, tus retos actuales o lo que quieres conseguir…"}
+                        style={{ resize:"vertical", minHeight:100 }}
+                      />
+                    </div>
+
+                    {/* Error */}
+                    {status === "error" && !demoActive && (
+                      <div className="ctc-field" style={{
+                        padding:"11px 15px", background:"rgba(232,69,88,.08)",
+                        border:"1px solid rgba(232,69,88,.25)", borderRadius:10, color:"#e84558", fontSize:13,
+                      }}>{error}</div>
+                    )}
+
+                    {/* Privacy */}
+                    <div className="ctc-field" style={{
+                      padding:"11px 15px", background:"rgba(200,168,75,.04)",
+                      border:`1px solid ${GOLD_BORDER}`, borderRadius:10,
+                      display:"flex", gap:9, alignItems:"flex-start",
+                    }}>
+                      <span style={{ fontSize:15, flexShrink:0, marginTop:1 }}>🔒</span>
+                      <p style={{ margin:0, fontSize:11.5, color:"#585858", lineHeight:1.6 }}>
+                        Tus datos se usan exclusivamente para contactarte sobre tu proyecto. Sin spam, nunca.
+                      </p>
+                    </div>
+
+                    {/* Submit / Demo CTA */}
+                    <div className="ctc-field" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
+                      {demoActive ? (
+                        <button type="button" onClick={skipDemo} style={{
+                          padding:"13px 28px", fontSize:13.5, borderRadius:12, border:"1px solid rgba(45,212,159,.3)",
+                          background:"rgba(45,212,159,.08)", color:"#2dd49f", cursor:"pointer", fontWeight:700,
+                          width:"100%", transition:"all .2s",
+                        }}>
+                          ↩ Saltar demo y rellenar yo mismo
+                        </button>
+                      ) : (
+                        <>
+                          <p style={{ fontSize:11.5, color:"#4a4a4a", flex:1, margin:0 }}>
+                            Propuesta por escrito y sin compromiso.
+                          </p>
+                          <button type="submit" disabled={status === "sending"} style={{
+                            opacity: status === "sending" ? .68 : 1,
+                            minWidth:200, padding:"13px 28px", fontSize:13.5,
+                            borderRadius:12, border:"none", cursor:"pointer", fontWeight:800,
+                            background:"linear-gradient(135deg,#d4a843,#b8860b)",
+                            color:"#000", letterSpacing:".5px",
+                            boxShadow:"0 4px 20px rgba(200,168,75,.22)",
+                            transition:"opacity .2s",
+                          }}>
+                            {status === "sending" ? "Enviando…" : "ENVIAR SOLICITUD →"}
+                          </button>
+                        </>
                       )}
                     </div>
-                    <div>
-                      <label className="ct-label" htmlFor="ct-revenue">Facturación mensual aprox. <em>(opcional)</em></label>
-                      <select id="ct-revenue" name="revenue" className="ct-input" value={form.revenue} onChange={CF("revenue")}>
-                        <option value="">Selecciona un rango</option>
-                        {revenueOptions.map(o => <option key={o}>{o}</option>)}
-                      </select>
-                    </div>
-                  </div>
 
-                  <div>
-                    <label className="ct-label" htmlFor="ct-social">Redes sociales o Instagram <em>(opcional)</em></label>
-                    <input id="ct-social" name="socialMedia" type="text" className="ct-input" value={form.socialMedia} onChange={CF("socialMedia")} placeholder="@tu_cuenta o enlace" />
-                  </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
 
-                  <fieldset className="ct-fieldset">
-                    <legend>¿Qué te interesa? <em style={{ fontStyle: "normal", fontWeight: 400, color: "var(--pp-muted)" }}>(puedes marcar varios)</em></legend>
-                    <div className="ct-chips">
-                      {serviceOptions.map(s => (
-                        <button key={s} type="button" className="ct-chip" aria-pressed={services.includes(s)} onClick={() => toggleService(s)}>{s}</button>
-                      ))}
-                    </div>
-                  </fieldset>
-
-                  <div>
-                    <label className="ct-label" htmlFor="ct-msg">Mensaje <em>(opcional)</em></label>
-                    <textarea id="ct-msg" name="message" rows={5} className="ct-input" value={form.message} onChange={CF("message")} placeholder="Cuéntanos sobre tu proyecto, tus retos actuales o lo que quieres conseguir…" />
-                  </div>
-
-                  <div aria-live="polite">
-                    {status === "error" && <div id="ct-err" className="ct-error" role="alert">{error}</div>}
-                  </div>
-
-                  <div className="ct-foot">
-                    <p className="ct-legal">Usamos tus datos solo para responderte sobre tu proyecto. Más en la <Link href="/privacidad">política de privacidad</Link>.</p>
-                    <button type="submit" disabled={status === "sending"} className="pp-btn pp-btn-gold ct-submit">
-                      {status === "sending" ? "Enviando…" : "Enviar solicitud →"}
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
-          </section>
         </div>
       </PublicLayout>
     </>
