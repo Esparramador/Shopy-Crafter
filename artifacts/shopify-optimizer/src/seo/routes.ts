@@ -8,6 +8,7 @@ import { POSTS } from "@/lib/blog-data";
 import { COMPARISON_DATA } from "@/lib/comparison-data";
 import { RELEASES } from "@/lib/changelog-data";
 import { CASES } from "@/lib/casos-data";
+import { SHOP_SEED, SHOP_CATEGORIES } from "../../../api-server/src/lib/shop";
 import { STATIC_ROUTES, type SeoRoute } from "./meta";
 
 export * from "./meta";
@@ -87,10 +88,34 @@ function caseRoutes(): SeoRoute[] {
   }));
 }
 
+/** Productos y servicios de la Tienda: una página rastreable por producto, con su precio «desde» y sus imágenes. */
+function shopRoutes(): SeoRoute[] {
+  return SHOP_SEED.filter(p => p.visible).map(p => {
+    const text = [p.description.replace(/\s+/g, " ").trim()];
+    const desc = text[0].length <= 158 ? text[0] : `${text[0].slice(0, 155).replace(/\s+\S*$/, "")}…`;
+    const fromCents = Math.min(...p.variants.flatMap(v => v.tiers.map(t => t.unitCents)));
+    const images = p.media.map(m => (m.type === "video" ? m.poster : m.url)).filter((u): u is string => !!u);
+    const priceNote = p.kind === "quote" && fromCents > 0 ? ` A partir de ${(fromCents / 100).toLocaleString("es-ES")} € (IVA incluido).` : "";
+    return {
+      path: `/tienda/${p.slug}`,
+      title: `${p.name} — Tienda Shopy Crafter`,
+      description: desc,
+      h1: p.name,
+      intro: `${p.tagline}${priceNote}`,
+      bodyHtml: `<p>${p.description.split("\n\n").map(x => x.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("</p><p>")}</p><ul>${p.features.map(f => `<li>${f.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</li>`).join("")}</ul><p><a href="/tienda">Ver toda la tienda</a> · <a href="/contacto">Contacto</a></p>`,
+      priority: p.featured ? 0.8 : 0.7,
+      changefreq: "weekly" as const,
+      inSitemap: true,
+      images: images.map(path => ({ path, title: p.name })),
+      product: { name: p.name, kind: p.kind, fromCents, category: SHOP_CATEGORIES[p.category] ?? p.category, images },
+    };
+  });
+}
+
 let _all: SeoRoute[] | null = null;
 
 export function getSeoRoutes(): SeoRoute[] {
-  if (!_all) _all = [...STATIC_ROUTES, ...keywordRoutes(), ...blogRoutes(), ...changelogRoutes(), ...caseRoutes()];
+  if (!_all) _all = [...STATIC_ROUTES, ...keywordRoutes(), ...blogRoutes(), ...changelogRoutes(), ...caseRoutes(), ...shopRoutes()];
   return _all;
 }
 

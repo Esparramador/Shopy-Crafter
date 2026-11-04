@@ -26,6 +26,10 @@ export interface SeoRoute {
   noindex?: boolean;
   /** Canonical distinta de la propia ruta (duplicados como /landing o /preguntas-frecuentes). */
   canonicalPath?: string;
+  /** Imágenes de la página (rutas absolutas desde la raíz) para el sitemap de imágenes. */
+  images?: { path: string; title?: string }[];
+  /** Producto o servicio de la Tienda: genera el JSON-LD Product/Service con su precio «desde». */
+  product?: { name: string; kind: "physical" | "digital" | "quote"; fromCents: number; category: string; images: string[] };
 }
 
 export const HOME_TITLE = "Shopy Crafter — IA para Shopify, WooCommerce, PrestaShop y Stripe · Diseño web y apps";
@@ -60,7 +64,7 @@ export const STATIC_ROUTES: SeoRoute[] = [
   {
     path: "/sobre-nosotros",
     title: "Sobre Nosotros — Shopy Crafter",
-    description: "Conoce al equipo detrás de Shopy Crafter: ingenieros de IA y operadores de eCommerce que automatizamos el trabajo pesado para que tú crezcas.",
+    description: "Quiénes somos y cómo trabajamos: webs, software con IA y un taller láser. Presupuesto por escrito antes de empezar y nada se publica sin tu visto bueno.",
     h1: "Sobre Shopy Crafter",
     intro: "Quiénes somos y cómo trabajamos con tiendas online y marcas.",
     priority: 0.6, changefreq: "monthly", inSitemap: true,
@@ -108,19 +112,19 @@ export const STATIC_ROUTES: SeoRoute[] = [
   {
     path: "/programa-de-afiliados",
     title: "Programa de Afiliados — Shopy Crafter",
-    description: "Recomienda Shopy Crafter y gana comisión recurrente. Para agencias, freelancers y consultores de eCommerce.",
+    description: "Recomienda Shopy Crafter a otras tiendas y agencias. Las condiciones del programa se acuerdan por escrito.",
     h1: "Programa de afiliados",
     intro: "Recomienda Shopy Crafter a otras tiendas y agencias.",
     priority: 0.4, changefreq: "monthly", inSitemap: true,
   },
   {
     path: "/casos-de-exito",
-    title: "Casos de Éxito — Shopy Crafter",
-    description: "Casos de tiendas que trabajan con Shopy Crafter.",
-    h1: "Casos de éxito",
-    intro: "Casos de tiendas que trabajan con Shopy Crafter.",
-    // Cifras sin verificar: fuera del índice hasta que el propietario las confirme.
-    priority: 0.1, changefreq: "monthly", inSitemap: false, noindex: true,
+    title: "Proyectos y casos reales — Shopy Crafter",
+    description: "Webs, tiendas, apps y sistemas con IA que hemos hecho: capturas reales y qué hace cada proyecto, sin cifras inventadas.",
+    h1: "Proyectos y casos reales",
+    intro: "Webs, tiendas, apps y sistemas con IA que hemos hecho, con capturas reales y qué hace cada uno.",
+    // Ya sin cifras ni testimonios inventados: es contenido verificable y se indexa.
+    priority: 0.6, changefreq: "monthly", inSitemap: true,
   },
   {
     path: "/privacidad",
@@ -202,6 +206,17 @@ export const SITE_LINK_GROUPS: { title: string; links: { href: string; label: st
       { href: "/agencia-shopify-ia", label: "Para agencias" },
       { href: "/#fp-projects", label: "Proyectos" },
       { href: "/tienda", label: "Tienda" },
+    ],
+  },
+  {
+    title: "Tienda",
+    links: [
+      { href: "/tienda/tarjetas-metalicas", label: "Tarjetas de aluminio" },
+      { href: "/tienda/placa-qr-madera", label: "Placas QR de madera" },
+      { href: "/tienda/kit-resenas", label: "Kit Reseñas" },
+      { href: "/tienda/ficha-google-maps", label: "Ficha de Google Maps" },
+      { href: "/tienda/resenas-google", label: "Gestión de reseñas" },
+      { href: "/tienda/landing-3d", label: "Landing con 3D" },
     ],
   },
   {

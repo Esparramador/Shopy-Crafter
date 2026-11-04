@@ -9,6 +9,7 @@
 - **Stripe:** clientes, cobros, suscripciones, facturas, reembolsos, pagos a banco y balance; Stripe Connect.
 - **Diseño y desarrollo web:** webs y landings a medida con 3D (Three.js, React Three Fiber), animación (GSAP, Lenis) y diseño basado en el ADN de marca.
 - **Apps nativas:** apps Android e iOS con Capacitor a partir de una sola base de código. App Android propia publicada.
+- **Tienda y taller láser:** tarjetas de visita de aluminio grabadas con láser, placas QR de madera, kits de reseñas y regalos web 3D, además de servicios de ficha de Google Maps, reseñas y reservas con Google Calendar. Los servicios de diseño y web se presupuestan «a partir de» según el trabajo.
 - **Portal de cliente:** cada cliente ve solo su proyecto: aprobaciones de cambios, mensajes, informes y archivos.
 
 ## Páginas principales
@@ -21,6 +22,11 @@
 - [Diseño web profesional](https://shopycrafter.com/diseno-web-profesional)
 - [Apps nativas Android e iOS](https://shopycrafter.com/desarrollo-apps-nativas)
 - [Proyectos](https://shopycrafter.com/#fp-projects)
+- [Tienda: tarjetas de aluminio, placas QR, kits de reseñas, regalos 3D, webs y servicios de Google](https://shopycrafter.com/tienda)
+- [Ficha de Google Maps optimizada](https://shopycrafter.com/tienda/ficha-google-maps)
+- [Gestión de reseñas de Google](https://shopycrafter.com/tienda/resenas-google)
+- [Reservas con Google Calendar](https://shopycrafter.com/tienda/google-calendar-reservas)
+- [Landing con 3D y animación](https://shopycrafter.com/tienda/landing-3d)
 - [Blog](https://shopycrafter.com/blog)
 - [Preguntas frecuentes](https://shopycrafter.com/faq)
 - [Contacto](https://shopycrafter.com/contacto)

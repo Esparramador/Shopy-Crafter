@@ -11,6 +11,7 @@
  *
  * Sin imports de navegador: solo datos puros.
  */
+import { FAQ_FLAT } from "./lib/faq-data";
 import {
   getSeoRoutes, seoFor, canonicalUrl, SITE_URL, SITE_NAME, CONTACT_EMAIL,
   SITE_LINK_GROUPS, type SeoRoute,
@@ -82,6 +83,62 @@ function structuredData(route: SeoRoute): string {
       image: OG_IMAGE,
     });
   }
+  if (route.product) {
+    const pr = route.product;
+    const price = (pr.fromCents / 100).toFixed(2);
+    const offers = pr.fromCents > 0
+      ? { "@type": "AggregateOffer", priceCurrency: "EUR", lowPrice: price, offerCount: 1, availability: "https://schema.org/InStock", url }
+      : undefined;
+    const common = {
+      "@type": pr.kind === "quote" || pr.kind === "digital" ? "Service" : "Product",
+      "@id": `${url}#item`,
+      name: pr.name,
+      description: route.description,
+      url,
+      image: pr.images.map(i => `${SITE_URL}${i}`),
+      category: pr.category,
+      ...(pr.kind === "physical"
+        ? { brand: { "@type": "Brand", name: SITE_NAME }, ...(offers ? { offers: { ...offers, "@type": "Offer", price } } : {}) }
+        : { provider: { "@id": `${SITE_URL}/#organization` }, areaServed: "ES", ...(offers ? { offers } : {}) }),
+    };
+    return jsonLd({
+      "@context": "https://schema.org",
+      "@graph": [
+        common,
+        { "@type": "BreadcrumbList", itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: `${SITE_URL}/` },
+          { "@type": "ListItem", position: 2, name: "Tienda", item: `${SITE_URL}/tienda` },
+          { "@type": "ListItem", position: 3, name: pr.name, item: url },
+        ] },
+      ],
+    });
+  }
+  if (route.path === "/faq") {
+    return jsonLd({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "FAQPage", "@id": `${url}#faq`, inLanguage: "es", mainEntity: FAQ_FLAT.map(f => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
+        { "@type": "BreadcrumbList", itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: `${SITE_URL}/` },
+          { "@type": "ListItem", position: 2, name: "Preguntas frecuentes", item: url },
+        ] },
+      ],
+    });
+  }
+  if (route.path === "/tienda") {
+    const items = getSeoRoutes().filter(r => r.product).map((r, i) => ({ "@type": "ListItem", position: i + 1, name: r.h1, url: canonicalUrl(r) }));
+    return jsonLd({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "CollectionPage", "@id": `${url}#page`, name: route.title, url, description: route.description, inLanguage: "es", isPartOf: { "@id": `${SITE_URL}/#website` } },
+        { "@type": "ItemList", itemListElement: items },
+        { "@type": "BreadcrumbList", itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: `${SITE_URL}/` },
+          { "@type": "ListItem", position: 2, name: "Tienda", item: url },
+        ] },
+      ],
+    });
+  }
   return jsonLd({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -112,13 +169,13 @@ export function renderHead(url: string): string {
     `<meta property="og:url" content="${canonical}" />`,
     `<meta property="og:title" content="${t}" />`,
     `<meta property="og:description" content="${d}" />`,
-    `<meta property="og:image" content="${OG_IMAGE}" />`,
+    `<meta property="og:image" content="${route.product?.images[0] ? `${SITE_URL}${route.product.images[0]}` : OG_IMAGE}" />`,
     `<meta property="og:image:width" content="1200" />`,
     `<meta property="og:image:height" content="630" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${t}" />`,
     `<meta name="twitter:description" content="${d}" />`,
-    `<meta name="twitter:image" content="${OG_IMAGE}" />`,
+    `<meta name="twitter:image" content="${route.product?.images[0] ? `${SITE_URL}${route.product.images[0]}` : OG_IMAGE}" />`,
     structuredData(route),
   ].join("\n    ");
 }
@@ -132,6 +189,7 @@ function linksHtml(): string {
 }
 
 function extraForRoute(route: SeoRoute): string {
+  if (route.path === "/faq") return `<article>${FAQ_FLAT.map(f => `<h2>${esc(f.q)}</h2><p>${esc(f.a)}</p>`).join("")}</article>`;
   if (route.bodyHtml) return `<article style="line-height:1.7;color:#c9c7e0">${route.bodyHtml}</article>`;
   if (route.path === "/") {
     return `<ul>${SERVICES.map(([name, path]) => `<li><a href="${path}" style="color:#e6c668">${esc(name)}</a></li>`).join("")}</ul>`;
@@ -162,6 +220,6 @@ ${extraForRoute(route)}
 }
 
 /** Rutas a prerenderizar y sus datos de sitemap. */
-export function routes(): { path: string; inSitemap: boolean; priority: number; changefreq: string; lastmod?: string }[] {
-  return getSeoRoutes().map(r => ({ path: r.path, inSitemap: r.inSitemap && !r.noindex, priority: r.priority, changefreq: r.changefreq, lastmod: r.lastmod }));
+export function routes(): { path: string; inSitemap: boolean; priority: number; changefreq: string; lastmod?: string; images?: { path: string; title?: string }[] }[] {
+  return getSeoRoutes().map(r => ({ path: r.path, inSitemap: r.inSitemap && !r.noindex, priority: r.priority, changefreq: r.changefreq, lastmod: r.lastmod, images: r.images }));
 }

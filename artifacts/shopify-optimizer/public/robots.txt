@@ -17,6 +17,16 @@ Disallow: /reset-password
 Disallow: /oauth-success
 Disallow: /shopify/
 Disallow: /web-demos/
+Disallow: /informes/
+Disallow: /informe-profesional.html
+Disallow: /monologuista-preview.html
+Disallow: /regalo-demo/
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /tienda/carrito
+Disallow: /tienda/gracias
+Disallow: /*?asunto=
+Disallow: /*?session_id=
 Disallow: /api/web-designer/demo-page/
 
 Sitemap: https://shopycrafter.com/sitemap.xml

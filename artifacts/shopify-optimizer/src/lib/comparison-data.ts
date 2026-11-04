@@ -1,692 +1,903 @@
+/**
+ * Páginas por palabra clave (comparativas, guías de migración y páginas de servicio).
+ *
+ * Contenido ESTRUCTURADO (no HTML): lo pinta `ComparisonPage.tsx`. Texto en línea admite
+ * `**negrita**`, `` `código` `` y `[texto](/ruta)`.
+ *
+ * Regla de contenido: solo afirmaciones que se puedan comprobar en el código de la plataforma
+ * (platform-capabilities, plan-catalog, shop) o que sean criterio técnico sin cifras. Nada de cifras de
+ * resultados, garantías ni comparativas con competidores sin fuente. Precios siempre «desde».
+ */
+
+export interface Item { t: string; d: string }
+export interface Faq { q: string; a: string }
+export interface Related { href: string; label: string; desc: string }
+export interface Section {
+  id: string;
+  h: string;
+  /** Párrafo de entrada, antes del contenido. */
+  intro?: string;
+  paras?: string[];
+  /** Tarjetas (idea corta + explicación). */
+  cards?: Item[];
+  /** Lista de comprobación o pasos numerados. */
+  steps?: Item[];
+  /** Lista con viñetas simples. */
+  bullets?: string[];
+  /** Aviso al pie de la sección. */
+  note?: string;
+}
+export interface CompareTable {
+  caption: string;
+  head: [string, string, string];
+  rows: [string, string, string][];
+  note?: string;
+}
+
+export type PackSet = "store" | "stripe" | "none";
+
 export interface ComparisonPage {
   path: string;
   canonical: string;
   metaTitle: string;
   metaDescription: string;
+  /** Etiqueta sobre el titular. */
   badge: string;
+  /** Familia, para las migas de pan y el enlazado. */
+  group: "Comparativas" | "Migración" | "Servicios" | "Guías";
   tag: string;
   h1: string;
   subtitle: string;
+  /** Tres ideas clave, justo debajo del hero. */
+  points: Item[];
+  table?: CompareTable;
+  sections: Section[];
+  packs: PackSet;
+  faqs: Faq[];
+  related: Related[];
+  cta: { title: string; text: string; asunto: string };
+  /** HTML plano generado a partir de lo anterior; lo consume el prerender (src/seo/routes.ts). */
   body: string;
-  schema?: Record<string, unknown>;
 }
+type PageSource = Omit<ComparisonPage, "body">;
 
-const COMPARISON_PAGES: ComparisonPage[] = [
+/* ── Packs (fuente: api-server/src/lib/plan-catalog.ts; precios sin IVA, siempre «desde») ── */
+export const STORE_PACKS = [
+  { name: "Starter", monthly: 49, setup: 150, surcharge: 20, line: "15 productos y 45 imágenes al mes", extra: "1 auditoría SEO y 1 test A/B al mes (Shopify)" },
+  { name: "Growth", monthly: 149, setup: 350, surcharge: 30, line: "60 productos y 300 imágenes al mes", extra: "Llamada de seguimiento de 30 min al mes", featured: true },
+  { name: "Enterprise", monthly: 399, setup: 750, surcharge: 50, line: "200 productos y 1.200 imágenes al mes", extra: "Llamada de seguimiento de 60 min al mes" },
+];
+export const STRIPE_PACKS = [
+  { name: "Starter", monthly: 39, setup: 90, line: "Hasta 20 facturas o enlaces de pago al mes", extra: "Informe mensual" },
+  { name: "Growth", monthly: 99, setup: 190, line: "Hasta 100 facturas y 50 cambios de suscripción al mes", extra: "Informe quincenal y conciliación mensual de payouts", featured: true },
+  { name: "Enterprise", monthly: 249, setup: 390, line: "Hasta 400 facturas y 300 cambios de suscripción al mes", extra: "Informe semanal y conciliación semanal de payouts" },
+];
+
+const STORE_CTA = { title: "¿Quieres ver qué haría la IA en tu tienda?", text: "Cuéntanos tu plataforma y tu catálogo y te proponemos un pack con el alcance y el precio de partida. Sin compromiso.", asunto: "Automatización de tienda con IA" };
+
+const PAGE_SOURCES: PageSource[] = [
+  /* ───────────────────────── Shopify vs WooCommerce ───────────────────────── */
   {
     path: "/shopify-vs-woocommerce",
     canonical: "https://shopycrafter.com/shopify-vs-woocommerce",
-    metaTitle: "Shopify vs WooCommerce 2026: Comparativa completa — Shopy Crafter",
-    metaDescription: "¿Shopify o WooCommerce? Comparamos costes reales, SEO, facilidad de uso, escalabilidad y capacidad de automatización con IA. Con tabla de decisión por tipo de negocio.",
-    badge: "Comparativa 2026",
+    metaTitle: "Shopify vs WooCommerce: comparativa para elegir plataforma — Shopy Crafter",
+    metaDescription: "¿Shopify o WooCommerce? Comparamos coste, mantenimiento, SEO, flexibilidad y automatización con IA, con criterios de decisión según el tipo de negocio. Trabajamos con las dos.",
+    badge: "Comparativa",
+    group: "Comparativas",
     tag: "Shopify vs WooCommerce",
-    h1: "Shopify vs WooCommerce: ¿cuál elegir en 2026?",
-    subtitle: "Comparamos las dos plataformas líderes en 12 criterios reales: coste total, SEO, escalabilidad y automatización con IA. Sin sesgos, con datos.",
-    body: `
-<h2>Resumen ejecutivo</h2>
-<p>Para la mayoría de tiendas online en 2026, Shopify gana en facilidad, mantenimiento y capacidad de automatización con IA. WooCommerce sigue siendo la mejor opción para empresas con equipo técnico PHP dedicado y requisitos de customización extrema. A continuación, la comparativa detallada.</p>
-
-<h2>Comparativa en los 7 criterios clave</h2>
-
-<div style="overflow-x:auto;margin:32px 0">
-<table style="width:100%;border-collapse:collapse;font-size:14px">
-<thead>
-<tr style="background:rgba(200,168,75,0.1);border-bottom:2px solid rgba(200,168,75,0.3)">
-<th style="padding:12px 16px;text-align:left;color:#e6c668;font-weight:700">Criterio</th>
-<th style="padding:12px 16px;text-align:center;color:#e6c668;font-weight:700">Shopify</th>
-<th style="padding:12px 16px;text-align:center;color:#e6c668;font-weight:700">WooCommerce</th>
-</tr>
-</thead>
-<tbody>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Facilidad de uso</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">★★★★★ Sin conocimientos técnicos</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">★★★☆☆ Requiere WordPress + PHP</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Coste mensual real (tienda media)</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">29-299 €/mes todo incluido</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">60-300 €/mes (hosting + plugins + mant.)</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">SEO técnico</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">★★★★☆ Excelente de fábrica</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">★★★★★ Control total del servidor</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Escalabilidad</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">★★★★★ Sin límites técnicos</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">★★★☆☆ Requiere inversión técnica</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Apps / plugins</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">8.000+ apps verificadas</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">55.000+ plugins (calidad variable)</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Automatización con IA</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">★★★★★ API moderna + webhooks</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">★★★☆☆ API limitada, desarrollo propio</td>
-</tr>
-<tr>
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Mantenimiento técnico</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">★★★★★ Gestionado por Shopify</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">★★☆☆☆ Actualizaciones manuales constantes</td>
-</tr>
-</tbody>
-</table>
-</div>
-
-<h2>Coste total de propiedad: la sorpresa de WooCommerce</h2>
-<p>WooCommerce es "gratis" como plugin, pero el coste real incluye: hosting WordPress de calidad (15-60 €/mes), plugins premium imprescindibles (300-800 €/año), SSL/CDN/backups (100-200 €/año), y mantenimiento técnico (si lo subcontratas: 800-2.500 €/año). El TCO real de WooCommerce para una tienda media es de 1.500-4.000 €/año vs 350-1.000 €/año de Shopify.</p>
-
-<h2>La diferencia decisiva en 2026: automatización con IA</h2>
-<p>La API de Shopify (REST + GraphQL + webhooks en tiempo real) permite automatización profunda que WooCommerce no puede igualar sin desarrollo a medida costoso. Herramientas como Shopy Crafter usan webhooks de Shopify para activar automáticamente la generación de imágenes IA, optimización SEO y tests A/B cada vez que se añade un nuevo producto. En WooCommerce, implementar algo similar requeriría un equipo de desarrollo dedicado.</p>
-
-<h2>¿Cuándo elegir cada una?</h2>
-<p><strong>Elige Shopify si:</strong> quieres lanzar rápido, no tienes equipo técnico, planeas usar automatización IA, o quieres escalar sin sorpresas técnicas.</p>
-<p><strong>Elige WooCommerce si:</strong> tienes equipo PHP interno, ya tienes un WordPress consolidado con mucho contenido, o necesitas customización extrema que el ecosistema Shopify no permite.</p>
-
-<h2>¿Estás en WooCommerce y consideras migrar?</h2>
-<p>La migración de WooCommerce a Shopify, bien planificada, no solo es posible — puede dejarte con una tienda mejor optimizada que la original. Con Shopy Crafter, puedes aprovechar el cambio de plataforma para optimizar automáticamente todo el catálogo (imágenes IA, SEO técnico, pricing) en las primeras 48 horas.</p>
-    `.trim(),
+    h1: "Shopify vs WooCommerce: cuál elegir según tu negocio",
+    subtitle: "Una comparación de criterio, no de marketing: qué te da cada plataforma, qué te exige y para quién encaja mejor. Trabajamos con las dos, así que no tenemos una favorita que vender.",
+    points: [
+      { t: "Shopify: menos mantenimiento", d: "Alojamiento, seguridad y actualizaciones de la plataforma van incluidos en la cuota. Encaja si quieres vender y no gestionar servidores." },
+      { t: "WooCommerce: más control", d: "Es código abierto sobre WordPress: flexibilidad total a cambio de que alguien se ocupe de hosting, plugins y copias." },
+      { t: "La IA funciona en las dos", d: "Conectamos Shopify y WooCommerce por API oficial. La diferencia está en qué puede automatizarse (p. ej., los tests A/B son solo de Shopify)." },
+    ],
+    table: {
+      caption: "Shopify frente a WooCommerce, criterio a criterio",
+      head: ["Criterio", "Shopify", "WooCommerce"],
+      rows: [
+        ["Modelo", "Plataforma como servicio: cuota mensual, todo alojado", "Plugin de código abierto sobre WordPress: alojamiento propio"],
+        ["Puesta en marcha", "Rápida: tema, productos y pagos desde el panel", "Más pasos: WordPress, tema, plugins, hosting y seguridad"],
+        ["Mantenimiento técnico", "Lo gestiona Shopify", "Lo gestionas tú o un tercero: actualizaciones, copias y compatibilidad de plugins"],
+        ["Coste", "Cuota de plataforma + apps de pago + comisiones si no usas Shopify Payments", "Sin cuota de plataforma, pero con hosting, plugins premium y mantenimiento"],
+        ["Flexibilidad", "Alta dentro de su ecosistema; el checkout está más cerrado", "Muy alta: puedes tocar casi cualquier parte"],
+        ["SEO", "Buena base técnica de fábrica; URLs con estructura fija", "Control total de URLs y servidor; depende de cómo lo configures"],
+        ["Automatización con IA", "API moderna con webhooks; es donde más podemos automatizar", "API REST v3 con webhooks; cubrimos catálogo, pedidos e inventario"],
+      ],
+      note: "Valoración de criterio técnico, no medición. Las tarifas de Shopify, hosting y plugins cambian: contrástalas con los proveedores antes de decidir.",
+    },
+    sections: [
+      {
+        id: "coste", h: "El coste real no es la cuota",
+        intro: "Compara el coste total, no la primera cifra que ves.",
+        cards: [
+          { t: "En Shopify", d: "Cuota mensual de plataforma, las apps de pago que añadas y las comisiones por transacción si usas una pasarela distinta de Shopify Payments." },
+          { t: "En WooCommerce", d: "El plugin es gratuito, pero necesitas hosting de calidad, plugins premium (pagos, SEO, envíos), certificado y copias, y a alguien que mantenga todo actualizado." },
+        ],
+        note: "Si lo que se compara es trabajo del equipo, WooCommerce suele costar más horas; si se compara cuota, Shopify cuesta más cada mes. Depende de quién tenga el conocimiento técnico en casa.",
+      },
+      {
+        id: "ia", h: "Qué cambia a la hora de automatizar con IA",
+        paras: [
+          "Las dos plataformas exponen API y webhooks, y en las dos podemos auditar fichas, reescribir títulos y descripciones, generar imágenes de producto, calcular precios con coste real y vigilar inventario y pedidos.",
+          "La diferencia concreta que verificamos en nuestra plataforma: en Shopify además gestionamos colecciones y temas y lanzamos tests A/B de imagen y precio; en WooCommerce sumamos cupones, clientes e informes de ventas.",
+        ],
+      },
+      {
+        id: "elegir", h: "Cuándo elegir cada una",
+        cards: [
+          { t: "Elige Shopify si…", d: "quieres lanzar pronto, no tienes equipo técnico, prefieres una cuota previsible y valoras que la plataforma se mantenga sola." },
+          { t: "Elige WooCommerce si…", d: "ya tienes un WordPress con contenido y tráfico, necesitas personalizaciones que Shopify no permite o tienes quien lo mantenga." },
+        ],
+      },
+      {
+        id: "migrar", h: "¿Estás en WooCommerce y te planteas cambiar?",
+        paras: ["Migrar es viable si se planifica, y las redirecciones 301 son la pieza que protege el posicionamiento. Tienes la [guía de migración WooCommerce → Shopify](/migrar-woocommerce-shopify). Si prefieres quedarte, [automatizamos WooCommerce](/automatizacion-woocommerce-ia) sin cambiar de plataforma."],
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Es Shopify mejor que WooCommerce?", a: "Ninguna es mejor en abstracto. Shopify reduce el mantenimiento; WooCommerce da más control a cambio de más responsabilidad técnica. La elección depende de tu equipo, tu catálogo y tu presupuesto de mantenimiento." },
+      { q: "¿Trabajáis con las dos plataformas?", a: "Sí. Conectamos Shopify, WooCommerce y PrestaShop por sus API oficiales y aplicamos la misma IA de auditoría, SEO, imágenes y precios." },
+      { q: "¿Qué cuesta automatizar mi tienda?", a: "Los packs parten de 49 €/mes más una puesta en marcha de pago único desde 150 €. En WooCommerce y PrestaShop se suma un recargo mensual de 20, 30 o 50 € según el pack. Precios sin IVA." },
+    ],
+    related: [
+      { href: "/automatizacion-shopify-ia", label: "Automatización Shopify con IA", desc: "Qué hacemos sobre tu tienda Shopify." },
+      { href: "/automatizacion-woocommerce-ia", label: "Automatización WooCommerce con IA", desc: "IA sobre tu WooCommerce sin migrar." },
+      { href: "/migrar-woocommerce-shopify", label: "Migrar WooCommerce a Shopify", desc: "Checklist por fases y redirecciones 301." },
+    ],
+    cta: { title: "¿No sabes qué plataforma te conviene?", text: "Cuéntanos tu catálogo y cómo trabajas y te damos una recomendación razonada, aunque no acabe en proyecto.", asunto: "Shopify o WooCommerce" },
   },
+
+  /* ───────────────────────── Shopify vs PrestaShop ───────────────────────── */
   {
     path: "/shopify-vs-prestashop",
     canonical: "https://shopycrafter.com/shopify-vs-prestashop",
-    metaTitle: "Shopify vs PrestaShop 2026: Comparativa para el mercado español — Shopy Crafter",
-    metaDescription: "PrestaShop tiene gran implantación en España. Shopify ha crecido masivamente. Comparamos ambas plataformas en costes reales, SEO, integraciones y automatización IA para el mercado español.",
-    badge: "Comparativa 2026",
+    metaTitle: "Shopify vs PrestaShop: comparativa para el mercado español — Shopy Crafter",
+    metaDescription: "PrestaShop y Shopify comparadas en coste, mantenimiento, SEO, integraciones y automatización con IA. Criterios para decidir si quedarte o migrar. Trabajamos con ambas.",
+    badge: "Comparativa",
+    group: "Comparativas",
     tag: "Shopify vs PrestaShop",
-    h1: "Shopify vs PrestaShop: la comparativa para el mercado español 2026",
-    subtitle: "PrestaShop es la plataforma eCommerce más usada en España. Shopify crece a doble dígito. ¿Cuál conviene más para tu tienda en 2026?",
-    body: `
-<h2>El contexto español: PrestaShop vs Shopify</h2>
-<p>PrestaShop nació en Francia en 2007 y tiene una penetración muy alta en España y Europa. Shopify ha acelerado su expansión española en 2024-2026 con soporte completo en español, Shopify Payments en EUR y un ecosistema de agencias locales creciente. La pregunta es legítima: para una tienda en España, ¿cuál es mejor?</p>
-
-<div style="overflow-x:auto;margin:32px 0">
-<table style="width:100%;border-collapse:collapse;font-size:14px">
-<thead>
-<tr style="background:rgba(200,168,75,0.1);border-bottom:2px solid rgba(200,168,75,0.3)">
-<th style="padding:12px 16px;text-align:left;color:#e6c668;font-weight:700">Criterio</th>
-<th style="padding:12px 16px;text-align:center;color:#e6c668;font-weight:700">Shopify</th>
-<th style="padding:12px 16px;text-align:center;color:#e6c668;font-weight:700">PrestaShop</th>
-</tr>
-</thead>
-<tbody>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Modelo de negocio</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">SaaS todo incluido</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">Open source (hosting propio)</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Coste mensual real</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">29-299 €/mes</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">50-250 €/mes (hosting + módulos)</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Curva de aprendizaje</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Baja — intuitu y visual</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">Media-alta — back-office complejo</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">SEO técnico</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">★★★★☆ Muy bueno de fábrica</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">★★★★☆ Bueno con módulos</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Stripe / pagos</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Integración nativa</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">Módulo oficial de Stripe (de pago)</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Automatización IA</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">★★★★★ Ecosistema IA maduro</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">★★☆☆☆ API limitada</td>
-</tr>
-<tr>
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Soporte 24/7</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Chat y email oficial</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">Comunidad + partners (coste)</td>
-</tr>
-</tbody>
-</table>
-</div>
-
-<h2>Pagos en España: Stripe y Bizum</h2>
-<p>Ambas plataformas soportan Stripe. En Shopify, la integración es nativa y permite activar Bizum (vía Stripe), Apple Pay y Google Pay en minutos. En PrestaShop, necesitas el módulo oficial de Stripe (módulo de pago, ~79€ + actualización anual) y la configuración es más técnica. Para el mercado español donde Bizum representa el 35%+ de los pagos online, la facilidad de integración de Shopify es una ventaja real.</p>
-
-<h2>SEO: ¿cuál posiciona mejor?</h2>
-<p>En teoría, PrestaShop tiene más control técnico (acceso al servidor, customización total de URLs). En la práctica, muchas instalaciones de PrestaShop tienen problemas históricos: URLs duplicadas en categorías, paginación mal configurada, y caídas de Core Web Vitals por hosting subóptimo. Shopify tiene Core Web Vitals optimizados de fábrica y CDN global incluido. Con herramientas como Shopy Crafter, el SEO de Shopify puede automatizarse completamente.</p>
-
-<h2>La ventaja de Shopify en 2026: el ecosistema IA</h2>
-<p>La API de Shopify es moderna, bien documentada y soporta webhooks en tiempo real. PrestaShop tiene una API más antigua (basada en XML, menos intuitiva) que limita las integraciones profundas. Plataformas de automatización como Shopy Crafter solo están disponibles para Shopify precisamente porque la automatización real (detección de nuevos productos, optimización automática, A/B testing) requiere la infraestructura moderna de Shopify.</p>
-
-<h2>Conclusión para el mercado español</h2>
-<p>PrestaShop sigue siendo válido para empresas con equipo técnico PHP dedicado y requisitos B2B complejos. Para la mayoría de PYMES y marcas D2C en España en 2026, Shopify ofrece mejor equilibrio entre funcionalidad, mantenimiento cero y capacidad de automatización IA. Si estás valorando migrar de PrestaShop a Shopify, la transición puede realizarse sin perder SEO y aprovecharse para optimizar todo el catálogo desde el primer día.</p>
-    `.trim(),
+    h1: "Shopify vs PrestaShop: cómo decidir en una tienda española",
+    subtitle: "PrestaShop es de código abierto y tiene mucha base instalada en España y Europa; Shopify es una plataforma alojada. Te contamos en qué se diferencian y qué conviene según tu situación.",
+    points: [
+      { t: "Dos modelos distintos", d: "PrestaShop se instala en tu hosting y la gestionas tú. Shopify se contrata como servicio y se actualiza sola." },
+      { t: "Curva de aprendizaje", d: "El back-office de PrestaShop da mucho control pero es más denso; el de Shopify es más guiado y limitado." },
+      { t: "Automatizamos ambas", d: "Conectamos PrestaShop por Webservice y Shopify por su API oficial. No necesitas cambiar de plataforma para usar IA." },
+    ],
+    table: {
+      caption: "Shopify frente a PrestaShop, criterio a criterio",
+      head: ["Criterio", "Shopify", "PrestaShop"],
+      rows: [
+        ["Modelo", "SaaS: cuota mensual, alojamiento incluido", "Código abierto: hosting propio"],
+        ["Mantenimiento", "Lo gestiona la plataforma", "Actualizaciones de versión y módulos a tu cargo"],
+        ["Curva de aprendizaje", "Más guiada", "Más densa; más control del back-office"],
+        ["Coste", "Cuota + apps + comisiones según pasarela", "Sin cuota de plataforma; hosting, módulos de pago y mantenimiento"],
+        ["Pagos", "Shopify Payments y pasarelas externas", "Módulos de pago de terceros u oficiales; configuración más técnica"],
+        ["SEO", "Buena base técnica de fábrica", "Muy configurable; depende del hosting, los módulos y la configuración"],
+        ["Automatización con IA", "API moderna con webhooks", "Webservice oficial: catálogo, SEO por producto, categorías, pedidos e inventario"],
+      ],
+      note: "Valoración de criterio técnico, no medición. Contrasta tarifas y módulos con sus proveedores.",
+    },
+    sections: [
+      {
+        id: "contexto", h: "El contexto en España",
+        paras: ["PrestaShop lleva años instalada en muchas tiendas españolas, y eso tiene un efecto práctico: hay agencias, módulos y soporte local abundantes. Shopify ofrece interfaz y soporte en español y un ecosistema de apps amplio. La pregunta útil no es cuál es «mejor», sino cuánto mantenimiento técnico quieres asumir."],
+      },
+      {
+        id: "mantenimiento", h: "Dónde suele doler PrestaShop",
+        bullets: [
+          "Actualizar de versión puede romper módulos que dependen de la anterior.",
+          "Los módulos premium de pago, SEO o envíos suman coste y trabajo de compatibilidad.",
+          "El rendimiento depende de tu hosting y de cómo esté configurado.",
+        ],
+        note: "Son los puntos que más veces vemos al auditar tiendas PrestaShop, no una estadística.",
+      },
+      {
+        id: "ia", h: "Qué automatizamos en cada plataforma",
+        paras: ["En PrestaShop: auditoría de fichas, rediseño de textos con IA, meta título y descripción escritos en tu tienda, categorías, pedidos con sus estados, inventario, imágenes y precios con coste real. En Shopify, además: colecciones, temas y tests A/B de imagen y precio. Detalle en [Automatización PrestaShop](/automatizacion-prestashop-ia) y [Automatización Shopify](/automatizacion-shopify-ia)."],
+      },
+      {
+        id: "decidir", h: "Cuándo quedarte y cuándo migrar",
+        cards: [
+          { t: "Quédate en PrestaShop si…", d: "tu tienda funciona, tienes quien la mantenga y tus módulos a medida son parte del negocio." },
+          { t: "Plantéate Shopify si…", d: "el mantenimiento te consume tiempo, las actualizaciones te dan miedo o quieres una cuota previsible." },
+        ],
+        note: "Si migras, la [guía de migración PrestaShop → Shopify](/migrar-prestashop-shopify) explica las redirecciones y las combinaciones de producto.",
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Puedo usar vuestra IA sin salir de PrestaShop?", a: "Sí. Basta una clave del Webservice de PrestaShop con los permisos adecuados; no instalamos módulos de terceros." },
+      { q: "¿Migrar mejora el SEO?", a: "No por sí mismo. Una migración bien hecha lo conserva con redirecciones 301 y aprovecha para limpiar fichas, pero no hay garantía de resultados." },
+      { q: "¿Cuánto cuesta?", a: "Los packs parten de 49 €/mes más puesta en marcha desde 150 €. En PrestaShop se suma un recargo mensual de 20, 30 o 50 € según el pack. Precios sin IVA." },
+    ],
+    related: [
+      { href: "/automatizacion-prestashop-ia", label: "Automatización PrestaShop con IA", desc: "Qué hacemos sobre tu PrestaShop." },
+      { href: "/migrar-prestashop-shopify", label: "Migrar PrestaShop a Shopify", desc: "Checklist y herramientas de migración." },
+      { href: "/shopify-vs-woocommerce", label: "Shopify vs WooCommerce", desc: "La otra gran comparativa." },
+    ],
+    cta: { title: "¿PrestaShop o Shopify? Lo vemos con tus datos", text: "Revisamos tu tienda actual y te decimos con franqueza si compensa quedarte, optimizarla o migrar.", asunto: "Shopify o PrestaShop" },
   },
+
+  /* ───────────────────────── Migrar WooCommerce → Shopify ───────────────────────── */
   {
     path: "/migrar-woocommerce-shopify",
     canonical: "https://shopycrafter.com/migrar-woocommerce-shopify",
-    metaTitle: "Migrar WooCommerce a Shopify 2026: Guía completa sin perder SEO — Shopy Crafter",
-    metaDescription: "Guía paso a paso para migrar de WooCommerce a Shopify en 2026: checklist de migración, redirecciones 301, migración de catálogo y cómo optimizar tu nueva tienda con IA desde el día 1.",
+    metaTitle: "Migrar WooCommerce a Shopify: guía y checklist cuidando el SEO — Shopy Crafter",
+    metaDescription: "Guía por fases para migrar de WooCommerce a Shopify: exportación, catálogo, redirecciones 301, pagos y puesta en marcha. Checklist y errores a evitar.",
     badge: "Guía de migración",
+    group: "Migración",
     tag: "WooCommerce → Shopify",
-    h1: "Cómo migrar de WooCommerce a Shopify sin perder SEO ni ventas",
-    subtitle: "La guía completa con checklist paso a paso, herramientas recomendadas y cómo aprovechar la migración para salir con una tienda mejor optimizada que la original.",
-    body: `
-<h2>¿Por qué migrar de WooCommerce a Shopify?</h2>
-<p>Las razones más frecuentes: fatiga del mantenimiento técnico de WordPress (actualizaciones constantes, vulnerabilidades de seguridad, caídas por hosting), querer escalar sin preocupaciones de infraestructura, y aprovechar la automatización con IA que la API de Shopify permite de forma nativa. La migración bien planificada no solo es posible — puede dejarte con una tienda mejor.</p>
-
-<h2>Checklist de migración WooCommerce → Shopify</h2>
-
-<h3>✅ Fase 1: Preparación (1 semana antes)</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Exportar inventario completo: productos, variantes, SKUs, precios, imágenes</li>
-<li>Exportar base de clientes y pedidos históricos</li>
-<li>Documentar todas las URLs actuales (para redirecciones 301)</li>
-<li>Contratar plan Shopify adecuado (mínimo Basic)</li>
-<li>Elegir y personalizar tema de Shopify</li>
-<li>Configurar dominio personalizado en Shopify</li>
-</ul>
-
-<h3>✅ Fase 2: Migración del catálogo</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Catálogos pequeños (&lt;100 productos): importar CSV nativo de Shopify</li>
-<li>Catálogos medios (100-500): usar Matrixify o LitExtension</li>
-<li>Catálogos grandes (&gt;500): Cart2Cart o desarrollo a medida</li>
-<li>Verificar variantes, precios de comparación y stock</li>
-<li>Importar imágenes de producto (o generar nuevas con IA)</li>
-</ul>
-
-<h3>✅ Fase 3: SEO — el paso más crítico</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Configurar redirecciones 301 de todas las URLs de WooCommerce a Shopify</li>
-<li>WooCommerce: /producto/slug → Shopify: /products/slug</li>
-<li>WooCommerce: /categoria/slug → Shopify: /collections/slug</li>
-<li>Verificar redirecciones en Shopify: Settings > URL Redirects</li>
-<li>Actualizar sitemap en Google Search Console</li>
-<li>Activar optimización IA del catálogo (oportunidad perfecta para partir de cero bien)</li>
-</ul>
-
-<h3>✅ Fase 4: Pagos y configuración</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Configurar Shopify Payments o Stripe</li>
-<li>Activar Bizum, Apple Pay, Google Pay</li>
-<li>Configurar zonas de envío e impuestos</li>
-<li>Probar checkout completo en modo test</li>
-<li>Configurar emails automáticos (confirmación de pedido, envío, etc.)</li>
-</ul>
-
-<h3>✅ Fase 5: Go Live</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Verificar que TODAS las redirecciones 301 funcionan</li>
-<li>Comprobar 0 errores 404 críticos</li>
-<li>Actualizar sitemap en Google Search Console</li>
-<li>Configurar Google Analytics 4 + Google Tag Manager</li>
-<li>Monitorizar tráfico orgánico los primeros 30 días</li>
-</ul>
-
-<h2>El superpoder oculto de la migración: SEO desde cero con IA</h2>
-<p>La mayoría de tiendas WooCommerce llevan años acumulando deuda técnica SEO: títulos sin optimizar, schemas JSON-LD incorrectos, imágenes de baja calidad, descripciones duplicadas. La migración a Shopify es la oportunidad perfecta para empezar con todo optimizado.</p>
-<p>Con Shopy Crafter, puedes procesar todo el catálogo en las primeras 48 horas post-migración: generación automática de imágenes profesionales, títulos SEO optimizados para Google Shopping, schemas JSON-LD correctos por producto, y configuración del auto-pilot para que cada nuevo producto salga optimizado desde el primer segundo.</p>
-
-<h2>Errores que debes evitar</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>No configurar redirecciones 301:</strong> es el error más costoso. Puedes perder el 50-80% del tráfico orgánico sin ellas.</li>
-<li><strong>Copiar el contenido sin mejorar:</strong> si el SEO de WooCommerce era malo, lo seguirá siendo en Shopify.</li>
-<li><strong>No probar el checkout antes del go live:</strong> especialmente con Stripe y métodos de pago alternativos.</li>
-<li><strong>Lanzar en temporada alta:</strong> planifica la migración en períodos de bajo tráfico.</li>
-</ul>
-    `.trim(),
+    h1: "Cómo migrar de WooCommerce a Shopify cuidando el SEO y las ventas",
+    subtitle: "Una guía por fases con la lista de comprobación que usamos: qué exportar, cómo mover el catálogo, qué redirecciones crear y qué probar antes de abrir al público.",
+    points: [
+      { t: "Las redirecciones 301 son lo crítico", d: "Cada URL antigua con tráfico debe apuntar a su equivalente nueva. Sin ellas se pierde posicionamiento." },
+      { t: "Se planifica por fases", d: "Preparación, catálogo, SEO, pagos y puesta en marcha, con pruebas antes de cambiar el dominio." },
+      { t: "Cotizamos tras auditar", d: "Cada migración depende de tu catálogo y de los datos; la auditamos primero y la presupuestamos aparte." },
+    ],
+    sections: [
+      {
+        id: "porque", h: "Por qué migran las tiendas WooCommerce",
+        paras: ["Los motivos que más oímos: cansancio del mantenimiento de WordPress (actualizaciones, plugins incompatibles, hosting), ganas de una cuota previsible y querer más automatización. No siempre compensa: si tu WooCommerce funciona y tienes quien lo cuide, [automatizarlo con IA](/automatizacion-woocommerce-ia) puede bastar. Compara antes en [Shopify vs WooCommerce](/shopify-vs-woocommerce)."],
+      },
+      {
+        id: "checklist", h: "Checklist de migración por fases",
+        steps: [
+          { t: "1. Preparación", d: "Exporta productos, variantes, SKUs, precios e imágenes; clientes y pedidos históricos; y documenta todas las URLs actuales. Elige plan de Shopify, tema y dominio." },
+          { t: "2. Catálogo", d: "En catálogos pequeños basta el CSV nativo de Shopify; para volúmenes mayores se usan apps de migración como Matrixify o LitExtension, o desarrollo a medida. Verifica variantes, precios de comparación y stock." },
+          { t: "3. SEO y redirecciones", d: "Crea las 301 de cada URL antigua (por ejemplo, `/producto/slug` → `/products/slug` y `/categoria/slug` → `/collections/slug`), revísalas en Shopify (Configuración → URL de redirección) y actualiza el sitemap en Google Search Console." },
+          { t: "4. Pagos y ajustes", d: "Configura la pasarela de pago, envíos, impuestos y correos transaccionales. Prueba un pedido completo en modo de prueba." },
+          { t: "5. Puesta en marcha", d: "Comprueba que las redirecciones responden, que no hay errores 404 críticos y que el análisis (GA4/Tag Manager) funciona; vigila el tráfico orgánico las primeras semanas." },
+        ],
+      },
+      {
+        id: "ia", h: "Aprovechar la migración para limpiar el catálogo",
+        paras: ["Un cambio de plataforma es buen momento para revisar títulos, descripciones, textos alternativos de imagen y datos estructurados. Con Shopy Crafter auditamos cada ficha, reescribimos con IA lo que lo necesite y generamos imágenes de producto donde falten, con tu aprobación antes de publicar. [Cómo lo hacemos en Shopify](/automatizacion-shopify-ia)."],
+      },
+      {
+        id: "errores", h: "Errores que conviene evitar",
+        cards: [
+          { t: "No crear las redirecciones 301", d: "Es el fallo más costoso: las URLs con enlaces y posicionamiento dejan de funcionar." },
+          { t: "Copiar el contenido sin revisarlo", d: "Si las fichas eran flojas en WooCommerce, lo seguirán siendo en Shopify." },
+          { t: "No probar el checkout", d: "Hay que probar el pedido completo con la pasarela real antes de abrir." },
+          { t: "Migrar en plena temporada alta", d: "Elige un periodo de poco tráfico para poder corregir con calma." },
+        ],
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Se pierde el posicionamiento al migrar?", a: "Si se planifican bien las redirecciones 301 y se mantienen los contenidos, el riesgo se reduce mucho, pero ninguna migración puede garantizar que el tráfico se mantenga idéntico." },
+      { q: "¿Hacéis la migración?", a: "Auditamos tu tienda y presupuestamos la migración aparte, según catálogo, variantes y datos. Escríbenos y lo valoramos." },
+      { q: "¿Se migran pedidos y clientes?", a: "Se pueden exportar e importar con herramientas de migración, aunque no todo se traslada igual. Lo revisamos en la auditoría previa." },
+    ],
+    related: [
+      { href: "/shopify-vs-woocommerce", label: "Shopify vs WooCommerce", desc: "Antes de migrar, compara." },
+      { href: "/automatizacion-shopify-ia", label: "Automatización Shopify con IA", desc: "Qué hacemos tras la migración." },
+      { href: "/tienda/rediseno-tienda", label: "Rediseño de tienda online", desc: "Servicio de la Tienda, desde 1.490 €." },
+    ],
+    cta: { title: "¿Quieres que auditemos tu migración?", text: "Revisamos tu WooCommerce, te decimos qué se puede mover tal cual y qué hay que rehacer, y te damos un presupuesto.", asunto: "Migración WooCommerce a Shopify" },
   },
+
+  /* ───────────────────────── Migrar PrestaShop → Shopify ───────────────────────── */
   {
     path: "/migrar-prestashop-shopify",
     canonical: "https://shopycrafter.com/migrar-prestashop-shopify",
-    metaTitle: "Migrar PrestaShop a Shopify 2026: Guía paso a paso — Shopy Crafter",
-    metaDescription: "Cómo migrar de PrestaShop a Shopify manteniendo el SEO y sin perder ventas. Checklist completo, herramientas de migración recomendadas y cómo optimizar tu nueva tienda Shopify con IA.",
+    metaTitle: "Migrar PrestaShop a Shopify: guía por fases y redirecciones 301 — Shopy Crafter",
+    metaDescription: "Cómo migrar de PrestaShop a Shopify cuidando el SEO: diferencias de URLs y combinaciones, herramientas de migración, redirecciones 301, pagos y puesta en marcha.",
     badge: "Guía de migración",
+    group: "Migración",
     tag: "PrestaShop → Shopify",
-    h1: "Cómo migrar de PrestaShop a Shopify sin perder SEO",
-    subtitle: "Guía completa para tiendas PrestaShop que quieren pasarse a Shopify: checklist de migración, gestión de redirecciones, pasarelas de pago y optimización con IA desde el día 1.",
-    body: `
-<h2>¿Por qué migrar de PrestaShop a Shopify?</h2>
-<p>Las razones más habituales que escuchamos de tiendas PrestaShop: mantenimiento técnico cada vez más exigente (actualizaciones de versión complejas, incompatibilidades de módulos), coste creciente de módulos premium, dificultad para adoptar nuevas tecnologías como la automatización con IA, y el deseo de reducir la dependencia de desarrolladores PHP. Shopify resuelve todos estos puntos.</p>
-
-<h2>Las diferencias técnicas que debes conocer</h2>
-<p>PrestaShop y Shopify tienen estructuras de datos y URLs muy diferentes. Antes de migrar, es importante entender estas diferencias para planificar bien las redirecciones y la migración de datos.</p>
-
-<h3>Estructura de URLs</h3>
-<p>PrestaShop usa: <code>/categoria/nombre-producto.html</code> o <code>/nombre-producto-id.html</code><br>
-Shopify usa: <code>/products/nombre-producto</code> y <code>/collections/nombre-coleccion</code><br>
-Necesitarás redirecciones 301 para TODAS las URLs de producto y categoría.</p>
-
-<h3>Estructura de datos de producto</h3>
-<p>PrestaShop tiene "combinaciones" (lo que Shopify llama "variantes"). La migración de combinaciones complejas (múltiples atributos: talla + color + material) requiere herramientas específicas o desarrollo a medida.</p>
-
-<h2>Herramientas de migración recomendadas</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>LitExtension:</strong> La mejor opción para PrestaShop → Shopify. Maneja combinaciones/variantes, imágenes, clientes, pedidos y páginas de contenido.</li>
-<li><strong>Cart2Cart:</strong> Alternativa robusta con soporte para catálogos grandes (+5.000 productos).</li>
-<li><strong>Matrixify (Excelify):</strong> Más técnico, pero el más flexible para catálogos con atributos complejos.</li>
-</ul>
-
-<h2>Checklist de migración PrestaShop → Shopify</h2>
-
-<h3>✅ Preparación</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Exportar todos los productos con combinaciones/variantes, precios, imágenes y stock</li>
-<li>Documentar todas las URLs de producto y categoría activas</li>
-<li>Exportar base de clientes (datos, historial de pedidos)</li>
-<li>Contratar plan Shopify adecuado para el tamaño de tu catálogo</li>
-<li>Elegir tema y configurar la tienda base en Shopify</li>
-</ul>
-
-<h3>✅ Migración de catálogo</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Usar LitExtension o Cart2Cart para migración automática</li>
-<li>Verificar que las variantes se importan correctamente</li>
-<li>Verificar precios de coste y comparación</li>
-<li>Comprobar imágenes (tamaño, resolución, nombres de fichero)</li>
-<li>Migrar páginas de contenido (sobre nosotros, política de envíos, etc.)</li>
-</ul>
-
-<h3>✅ SEO — redirecciones 301</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Generar mapa completo de URLs antiguas → URLs nuevas</li>
-<li>Importar redirecciones en Shopify (Settings > URL Redirects, importación CSV)</li>
-<li>Verificar que Googlebot puede rastrear la nueva estructura</li>
-<li>Actualizar sitemap.xml en Google Search Console</li>
-<li>Monitorizar errores 404 los primeros 30 días</li>
-</ul>
-
-<h3>✅ Pagos y configuración</h3>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li>Configurar Shopify Payments (EUR nativo) o Stripe</li>
-<li>Activar Bizum, Apple Pay, Google Pay</li>
-<li>Verificar impuestos IVA (configuración en Shopify Markets)</li>
-<li>Probar checkout completo con tarjeta real en modo test</li>
-</ul>
-
-<h2>La oportunidad: optimizar todo con IA desde el primer día</h2>
-<p>La migración de PrestaShop a Shopify es la oportunidad perfecta para hacer un reset completo del SEO y las imágenes de producto. Muchas tiendas PrestaShop llevan años con fichas de producto que nunca se han optimizado correctamente.</p>
-<p>Con Shopy Crafter, en las primeras 48 horas en Shopify puedes tener: imágenes profesionales generadas con IA para todo el catálogo, títulos SEO optimizados para Google Shopping, schemas JSON-LD correctos y el auto-pilot activado para que cada nuevo producto salga optimizado automáticamente.</p>
-    `.trim(),
+    h1: "Cómo migrar de PrestaShop a Shopify cuidando el SEO",
+    subtitle: "Qué cambia entre las dos plataformas, qué herramientas existen y qué lista de comprobación seguir para migrar el catálogo, las URLs y los pagos sin sorpresas.",
+    points: [
+      { t: "URLs y combinaciones distintas", d: "PrestaShop usa `.html` y «combinaciones»; Shopify usa `/products/` y variantes. Hay que mapearlo." },
+      { t: "Herramientas, no magia", d: "Existen apps de migración, pero las combinaciones complejas y los datos sucios requieren revisión manual." },
+      { t: "Se cotiza tras auditar", d: "El esfuerzo depende de tu catálogo; lo auditamos y presupuestamos aparte." },
+    ],
+    sections: [
+      {
+        id: "porque", h: "Por qué se migra desde PrestaShop",
+        paras: ["Los motivos habituales: actualizaciones de versión que rompen módulos, coste creciente de módulos premium y dependencia de desarrolladores PHP. Antes de decidir, compara en [Shopify vs PrestaShop](/shopify-vs-prestashop); si prefieres quedarte, [automatizamos PrestaShop](/automatizacion-prestashop-ia) tal como está."],
+      },
+      {
+        id: "diferencias", h: "Diferencias técnicas que condicionan la migración",
+        cards: [
+          { t: "Estructura de URLs", d: "PrestaShop: `/categoria/nombre-producto.html` o `/nombre-producto-id.html`. Shopify: `/products/nombre-producto` y `/collections/nombre`. Necesitarás una 301 por cada URL de producto y categoría." },
+          { t: "Combinaciones y variantes", d: "Lo que PrestaShop llama «combinaciones» es una «variante» en Shopify. Con varios atributos (talla, color, material) hay que revisar los límites de opciones de Shopify." },
+        ],
+      },
+      {
+        id: "herramientas", h: "Herramientas de migración habituales",
+        bullets: [
+          "**LitExtension** y **Cart2Cart**: migración automatizada de productos, clientes, pedidos y páginas.",
+          "**Matrixify**: importación y exportación por hojas, más flexible para catálogos con atributos complejos.",
+        ],
+        note: "Son herramientas de terceros, ajenas a Shopy Crafter. Compara sus condiciones y alcance antes de elegir.",
+      },
+      {
+        id: "checklist", h: "Checklist por fases",
+        steps: [
+          { t: "Preparación", d: "Exporta productos con combinaciones, precios, imágenes y stock; lista las URLs activas; exporta clientes y pedidos. Elige plan y tema de Shopify." },
+          { t: "Catálogo", d: "Migra con una herramienta, verifica variantes, precios de coste y comparación, imágenes y páginas de contenido (envíos, sobre nosotros…)." },
+          { t: "SEO y redirecciones", d: "Genera el mapa de URLs antiguas → nuevas, impórtalo en Shopify (Configuración → URL de redirección, por CSV), actualiza el sitemap y vigila los 404 las primeras semanas." },
+          { t: "Pagos e impuestos", d: "Configura la pasarela, comprueba el IVA en Shopify Markets y prueba un pedido completo en modo de prueba." },
+        ],
+      },
+      {
+        id: "ia", h: "Después: fichas limpias con IA",
+        paras: ["Con el catálogo ya en Shopify, auditamos cada ficha, reescribimos títulos y descripciones, generamos las imágenes que falten y preparamos los datos estructurados, siempre con tu aprobación antes de publicar. [Ver qué automatizamos en Shopify](/automatizacion-shopify-ia)."],
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Se pueden migrar las combinaciones de PrestaShop?", a: "Sí, como variantes, pero con varios atributos hay que revisar las limitaciones de Shopify y comprobar el resultado ficha a ficha." },
+      { q: "¿Cuánto cuesta migrar?", a: "Se audita y se presupuesta aparte, según catálogo y datos. Los packs de IA son independientes y parten de 49 €/mes." },
+      { q: "¿Y si prefiero no migrar?", a: "Puedes usar la IA sobre tu PrestaShop actual por Webservice, sin cambiar de plataforma." },
+    ],
+    related: [
+      { href: "/shopify-vs-prestashop", label: "Shopify vs PrestaShop", desc: "Compara antes de decidir." },
+      { href: "/automatizacion-prestashop-ia", label: "Automatización PrestaShop con IA", desc: "Quedarte y optimizar." },
+      { href: "/automatizacion-shopify-ia", label: "Automatización Shopify con IA", desc: "Lo que hacemos tras migrar." },
+    ],
+    cta: { title: "¿Valoras migrar tu PrestaShop?", text: "Auditamos tu catálogo y tus URLs y te decimos qué esfuerzo supone y cuánto costaría.", asunto: "Migración PrestaShop a Shopify" },
   },
+
+  /* ───────────────────────── Stripe + Shopify ───────────────────────── */
   {
     path: "/shopify-stripe-pagos",
     canonical: "https://shopycrafter.com/shopify-stripe-pagos",
-    metaTitle: "Stripe + Shopify: Configuración, comisiones y mejores prácticas 2026 — Shopy Crafter",
-    metaDescription: "Todo sobre integrar Stripe en tu tienda Shopify: configuración paso a paso, comisiones reales, comparativa con Shopify Payments, Bizum, Apple Pay y optimización del checkout para España.",
+    metaTitle: "Stripe y Shopify: qué conviene saber de los pagos — Shopy Crafter",
+    metaDescription: "Shopify Payments o Stripe: diferencias de funcionamiento, qué comprobar (comisiones, métodos de pago, suscripciones) y cómo gestionamos tu cuenta Stripe con IA.",
     badge: "Guía de pagos",
+    group: "Guías",
     tag: "Stripe + Shopify",
-    h1: "Stripe + Shopify: la guía completa de pagos para tiendas españolas",
-    subtitle: "Cómo configurar Stripe en tu tienda Shopify, cuánto cuesta realmente, qué métodos de pago activar para el mercado español y cómo reducir el abandono de carrito.",
-    body: `
-<h2>¿Stripe o Shopify Payments?</h2>
-<p>Esta es la primera pregunta que todo comerciante español se hace. La respuesta corta: Shopify Payments si está disponible en tu país y no necesitas features avanzadas de Stripe. Stripe si necesitas: Radar para detección de fraude personalizada, Billing para suscripciones complejas, o integración vía API con sistemas externos.</p>
-
-<div style="overflow-x:auto;margin:32px 0">
-<table style="width:100%;border-collapse:collapse;font-size:14px">
-<thead>
-<tr style="background:rgba(200,168,75,0.1);border-bottom:2px solid rgba(200,168,75,0.3)">
-<th style="padding:12px 16px;text-align:left;color:#e6c668;font-weight:700">Concepto</th>
-<th style="padding:12px 16px;text-align:center;color:#e6c668;font-weight:700">Shopify Payments</th>
-<th style="padding:12px 16px;text-align:center;color:#e6c668;font-weight:700">Stripe directo</th>
-</tr>
-</thead>
-<tbody>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Comisión Shopify adicional</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">0% (eliminada)</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">0,5-2% según plan</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Comisión tarjeta EU (Visa/MC)</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">~1,6% + 0,25€</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">1,5% + 0,25€</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Bizum</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Disponible</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Disponible (vía Stripe)</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Apple Pay / Google Pay</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Incluido</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Incluido</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Shop Pay (1-clic)</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Sí (+18% conversión)</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">No disponible</td>
-</tr>
-<tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02)">
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Suscripciones / pagos recurrentes</td>
-<td style="padding:12px 16px;text-align:center;color:rgba(255,255,255,0.5)">Vía app de suscripciones</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Stripe Billing nativo</td>
-</tr>
-<tr>
-<td style="padding:12px 16px;color:rgba(255,255,255,0.8)">Dashboard de analytics</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Integrado en Shopify</td>
-<td style="padding:12px 16px;text-align:center;color:#2dd49f">Dashboard Stripe separado</td>
-</tr>
-</tbody>
-</table>
-</div>
-
-<h2>Cómo configurar Stripe en Shopify: paso a paso</h2>
-
-<h3>Paso 1: Crear y verificar tu cuenta Stripe</h3>
-<p>Ve a stripe.com/es y crea una cuenta de empresa o autónomo. Necesitas: CIF/NIF, cuenta bancaria en EUR, y documentación de identidad. La verificación KYC tarda 1-3 días hábiles. Hasta que se verifica, puedes usar Stripe en modo test.</p>
-
-<h3>Paso 2: Conectar Stripe con Shopify</h3>
-<p>En tu Shopify: Configuración > Pagos > Proveedores externos > Stripe. Haz clic en "Conectar con Stripe" — esto usa OAuth y no requiere copiar API keys manualmente. Una vez conectado, verás el botón verde de "Activo".</p>
-
-<h3>Paso 3: Activar métodos de pago para España</h3>
-<p>En el panel de Stripe, activa: Tarjetas (Visa, Mastercard, Amex), Bizum, Apple Pay, Google Pay, y opcionalmente Klarna o Afterpay para compras a plazos. En Shopify, ve a Pagos > Accelerated checkouts para activar Shop Pay, Apple Pay y Google Pay en el botón de checkout rápido.</p>
-
-<h3>Paso 4: Configurar detección de fraude</h3>
-<p>Stripe Radar está incluido y activo por defecto. Revisa las reglas en el panel de Stripe para asegurarte de que no bloquea pagos legítimos de tarjetas españolas. El ajuste más común: reducir el umbral de bloqueo de tarjetas con dirección de facturación diferente al envío (habitual en regalos).</p>
-
-<h2>Reducir el abandono de carrito con Stripe en Shopify</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>Shop Pay:</strong> +18% de conversión media en mobile. Actívalo si usas Shopify Payments.</li>
-<li><strong>Apple Pay / Google Pay:</strong> En mobile, eliminar la introducción de datos de tarjeta aumenta la conversión un 12-20%.</li>
-<li><strong>Bizum:</strong> Imprescindible en España. Representa hasta el 35% de los pagos en algunas tiendas.</li>
-<li><strong>Preautorización de tarjeta:</strong> Para productos de alta demanda, activa la captura diferida para reservar stock sin cobrar hasta el envío.</li>
-</ul>
-
-<h2>Stripe + Shopy Crafter: pricing inteligente compatible</h2>
-<p>El motor de pricing de Shopy Crafter calcula el precio óptimo de cada producto basándose en el COGS real (incluyendo las comisiones de Stripe y Shopify Payments) y los precios de competencia. El resultado: precios que maximizan la conversión sin sacrificar margen. Totalmente compatible con cualquier configuración de Stripe — el motor trabaja sobre los datos de producto, no interfiere con la pasarela de pago.</p>
-    `.trim(),
+    h1: "Stripe y Shopify: qué comprobar antes de elegir cómo cobrar",
+    subtitle: "Shopify Payments y Stripe no son lo mismo. Te explicamos en qué se parecen, qué criterios usar para elegir y dónde encaja nuestra gestión de cuentas Stripe.",
+    points: [
+      { t: "Compara el coste total", d: "Comisión de la pasarela, posible comisión adicional de Shopify y coste de los métodos locales. Las tarifas cambian: consúltalas en cada proveedor." },
+      { t: "Comprueba la disponibilidad", d: "Qué pasarelas y métodos de pago están disponibles depende de tu país y de tu plan de Shopify." },
+      { t: "Stripe más allá del checkout", d: "Facturas, suscripciones, reembolsos y payouts se gestionan en Stripe; ahí es donde ayudamos." },
+    ],
+    table: {
+      caption: "Qué mirar al comparar Shopify Payments y Stripe",
+      head: ["Aspecto", "Shopify Payments", "Stripe"],
+      rows: [
+        ["Integración", "Nativa en Shopify, sin cuenta externa", "Cuenta propia en Stripe; la conexión con Shopify depende de la disponibilidad en tu país"],
+        ["Comisiones", "Tarifa de procesamiento de la plataforma", "Tarifa de Stripe, y puede haber comisión adicional de Shopify al usar una pasarela externa"],
+        ["Métodos de pago", "Según país y configuración", "Muy amplios, según país y activación en tu cuenta"],
+        ["Suscripciones y facturación", "Mediante apps de suscripción", "Stripe Billing y facturas propias"],
+        ["Panel de datos", "Dentro de Shopify", "Panel de Stripe, con informes de cobros, payouts y disputas"],
+      ],
+      note: "Comprueba siempre tarifas y disponibilidad en la documentación vigente de Shopify y de Stripe: cambian con el tiempo y por país.",
+    },
+    sections: [
+      {
+        id: "elegir", h: "Cómo elegir",
+        paras: ["Si Shopify Payments está disponible en tu país y no necesitas funciones específicas de Stripe, suele ser lo más simple: todo en un solo panel. Considera Stripe si necesitas facturación y suscripciones avanzadas, integraciones por API con otros sistemas o un solo panel de cobros para varios canales."],
+      },
+      {
+        id: "optimizar", h: "Qué ayuda a que más pedidos acaben en cobro",
+        bullets: [
+          "Ofrecer pago acelerado (Apple Pay, Google Pay) en móvil, donde evita teclear la tarjeta.",
+          "Activar los métodos locales que tus clientes ya usan, si tu proveedor los ofrece.",
+          "Revisar las reglas antifraude para no bloquear compras legítimas, por ejemplo regalos con dirección de envío distinta a la de facturación.",
+          "Probar un pedido completo en modo de prueba tras cada cambio de configuración.",
+        ],
+        note: "No prometemos porcentajes de mejora: depende de tu tienda y de tu público.",
+      },
+      {
+        id: "gestion", h: "Cómo ayudamos con Stripe",
+        paras: ["Conectamos tu cuenta Stripe a tu portal y gestionamos clientes, cobros, suscripciones, facturas, reembolsos y payouts desde un solo panel, con alertas de pagos fallidos y disputas. Más en [Gestión de Stripe con IA](/gestion-stripe-ia)."],
+      },
+      {
+        id: "pricing", h: "Precios con las comisiones dentro",
+        paras: ["En nuestras tiendas con [pricing con COGS real](/automatizacion-shopify-ia) el cálculo de márgenes incluye las comisiones de pago, para que cada precio deje el margen que esperas. El motor trabaja sobre los datos del producto y no toca tu pasarela de pago."],
+      },
+    ],
+    packs: "stripe",
+    faqs: [
+      { q: "¿Puedo usar Stripe con Shopify?", a: "Depende de tu país y de tu configuración de Shopify. Comprueba la disponibilidad en la documentación vigente de Shopify; nosotros gestionamos tu cuenta Stripe independientemente de dónde la uses." },
+      { q: "¿Qué comisiones pagaré?", a: "Las que publiquen Shopify y Stripe en cada momento para tu país y plan. No las fijamos nosotros, por eso no las cifra esta página." },
+      { q: "¿Qué cuesta vuestra gestión de Stripe?", a: "Los packs de Stripe parten de 39 €/mes más puesta en marcha desde 90 €, sin IVA." },
+    ],
+    related: [
+      { href: "/gestion-stripe-ia", label: "Gestión de Stripe con IA", desc: "Cobros, suscripciones y facturas en un panel." },
+      { href: "/automatizacion-shopify-ia", label: "Automatización Shopify con IA", desc: "Catálogo, SEO y precios." },
+      { href: "/tienda", label: "Tienda de Shopy Crafter", desc: "Servicios web y productos con pago por Stripe." },
+    ],
+    cta: { title: "¿Quieres poner orden en tus cobros?", text: "Revisamos tu cuenta Stripe y tu configuración de pago y te proponemos qué automatizar.", asunto: "Gestión de Stripe" },
   },
+
+  /* ───────────────────────── Agencias ───────────────────────── */
   {
     path: "/agencia-shopify-ia",
     canonical: "https://shopycrafter.com/agencia-shopify-ia",
-    metaTitle: "Shopy Crafter para Agencias Shopify: Gestiona múltiples tiendas con IA — Shopy Crafter",
-    metaDescription: "Solución para agencias que gestionan múltiples tiendas Shopify. Automatiza imágenes IA, SEO técnico y A/B testing para todos tus clientes desde un único panel centralizado.",
+    metaTitle: "IA para agencias y freelancers de eCommerce — Shopy Crafter",
+    metaDescription: "Para agencias que llevan tiendas Shopify, WooCommerce o PrestaShop: auditoría, SEO, imágenes, pricing y tests A/B con IA, con aprobación del cliente y portal propio. Hablamos de alcance, no de promesas.",
     badge: "Para agencias",
-    tag: "Agencias Shopify",
-    h1: "Shopy Crafter para agencias: gestiona múltiples tiendas Shopify con IA",
-    subtitle: "La plataforma IA que las agencias usan para entregar mejores resultados en menos tiempo. Catálogos ilimitados, optimización en masa y reporting automático para tus clientes.",
-    body: `
-<h2>El reto de las agencias Shopify en 2026</h2>
-<p>Las agencias digitales que gestionan tiendas Shopify se enfrentan a un reto creciente: los clientes exigen más resultados con los mismos presupuestos, la competencia ha aumentado, y las tareas de optimización (imágenes, SEO, pricing, tests A/B) consumen una cantidad desproporcionada de tiempo humano. Shopy Crafter resuelve este problema poniendo en piloto automático las tareas más repetitivas y escalables.</p>
-
-<h2>¿Qué hace Shopy Crafter diferente para agencias?</h2>
-
-<h3>Panel centralizado multi-tienda</h3>
-<p>Desde un único panel, gestiona todos tus clientes Shopify: audita el estado de cada catálogo, lanza optimizaciones en masa, monitoriza el rendimiento de tests A/B y descarga informes de resultados para cada cliente. Sin cambiar de cuenta ni de contraseña.</p>
-
-<h3>Optimización en masa de catálogos</h3>
-<p>El motor de Shopy Crafter puede procesar catálogos completos en paralelo. Para una agencia con 10 clientes y 200 productos cada uno: genera 2.000 imágenes IA, optimiza 2.000 títulos SEO e implementa 2.000 schemas JSON-LD en menos de 48 horas. Lo que antes requería semanas de trabajo manual.</p>
-
-<h3>White label y branding de agencia</h3>
-<p>Los informes de optimización pueden llevar el logo y branding de tu agencia. Los clientes reciben los resultados como si fueran generados por tu equipo, con la calidad y profundidad que Shopy Crafter garantiza automáticamente.</p>
-
-<h2>Los 6 motores IA que más valor aportan a agencias</h2>
-
-<h3>1. Imágenes IA en masa</h3>
-<p>Genera imágenes de producto profesionales para todos los productos de todos tus clientes a €0,25/producto. Fondo blanco para Google Shopping, lifestyle shots por nicho, múltiples ángulos. La calidad es consistente porque usa flux-1.1-pro con el Visual DNA de cada marca.</p>
-
-<h3>2. SEO técnico automatizado</h3>
-<p>Schemas JSON-LD correctos, meta titles/descriptions optimizados, análisis de Core Web Vitals y generación de contenido para páginas de colección — para todo el catálogo de cada cliente, sin intervención manual.</p>
-
-<h3>3. A/B Testing estadístico</h3>
-<p>Tests de imagen, precio y descripción con auto-winner al 95% de confianza. Los resultados llegan como informe mensual por cliente: qué variante ganó, cuánto mejoró la conversión, y los próximos tests recomendados.</p>
-
-<h3>4. Pricing con márgenes reales</h3>
-<p>El motor de COGS calcula el coste real de cada producto (incluyendo Stripe, Shopify Payments, logística y packaging) y propone el precio óptimo. Para agencias que tienen acceso a los datos financieros del cliente, esto genera insights de márgenes que antes requerirían un análisis manual de horas.</p>
-
-<h3>5. Análisis de competencia</h3>
-<p>El motor de análisis de competencia usa Gemini Search para monitorizar precios, posicionamiento y estrategia de contenido de los competidores de cada cliente. Informes semanales automáticos sin trabajo manual adicional.</p>
-
-<h3>6. Informes mensuales automáticos</h3>
-<p>El plan Agency Pro incluye 3 informes mensuales por cliente con: resumen de optimizaciones aplicadas, resultados de A/B tests, métricas de SEO orgánico, y recomendaciones prioritarias para el mes siguiente. Listos para enviar al cliente sin edición.</p>
-
-<h2>ROI para la agencia</h2>
-<p>Una agencia típica gestiona 8-15 clientes Shopify. Sin Shopy Crafter, la optimización de catálogos (imágenes, SEO, pricing) consume 40-60 horas/mes de trabajo humano. Con Shopy Crafter, ese trabajo se reduce a 4-6 horas de supervisión. La diferencia: 35-55 horas/mes recuperadas para trabajo de mayor valor (estrategia, nuevos clientes, desarrollo creativo).</p>
-<p>Al precio del plan Agency Pro (149 €/mes), el coste por hora recuperada es de 2,7-4,3 €/hora. Cualquier agencia que facture más de 30 €/hora tiene un ROI positivo inmediato.</p>
-
-<h2>Casos de uso típicos en agencias</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>Onboarding de nuevo cliente:</strong> Auditoría completa del catálogo + plan de optimización en 24h, en lugar de 1 semana de análisis manual.</li>
-<li><strong>Reporting mensual:</strong> Informes automáticos con métricas reales para cada cliente, en lugar de compilar datos manualmente de 6 fuentes diferentes.</li>
-<li><strong>Lanzamiento de nuevos productos:</strong> Auto-pilot activo garantiza que cada nuevo producto del cliente sale optimizado sin que la agencia tenga que hacer nada.</li>
-<li><strong>Mejora de conversión:</strong> A/B testing estadístico continuo sin configuración manual para cada test.</li>
-</ul>
-    `.trim(),
+    group: "Servicios",
+    tag: "Agencias",
+    h1: "IA para agencias que llevan tiendas Shopify, WooCommerce y PrestaShop",
+    subtitle: "Las tareas repetitivas de catálogo (auditar fichas, reescribir textos, generar imágenes, vigilar precios) hechas con IA y con la aprobación del cliente antes de publicar. Cada tienda de cliente es un proyecto aislado.",
+    points: [
+      { t: "Un proyecto por tienda", d: "Cada cliente tiene su portal, sus archivos y sus datos, aislados del resto." },
+      { t: "Nada se publica sin visto bueno", d: "Las propuestas pasan por el panel de aprobaciones: el cliente las ve, las aprueba o las rechaza." },
+      { t: "Cuotas claras", d: "Cada pack tiene cupos mensuales definidos (productos, imágenes, auditorías, tests). Sin «ilimitado» que luego no lo es." },
+    ],
+    sections: [
+      {
+        id: "que", h: "Qué puede quitarse de encima una agencia",
+        cards: [
+          { t: "Auditoría de catálogo", d: "Puntuación por ficha de título, descripción, SEO, imágenes y precio, con la lista de problemas concretos." },
+          { t: "Textos e imágenes con IA", d: "Títulos, descripciones y meta tags nuevos, e imágenes de producto con consistencia de marca (Visual DNA), listos para aprobar." },
+          { t: "SEO técnico de producto", d: "Datos estructurados, textos alternativos y análisis de rendimiento por producto." },
+          { t: "Pricing con coste real", d: "Coste por producto con comisiones, envío y embalaje; márgenes y precio recomendado." },
+          { t: "Tests A/B (Shopify)", d: "Tests de imagen y de precio con decisión estadística: el ganador se declara a partir del 95 % de confianza." },
+          { t: "Competencia e informes", d: "Análisis de competencia con IA e informes periódicos según el pack." },
+        ],
+      },
+      {
+        id: "portal", h: "Portal de cliente",
+        paras: ["Tus clientes ven sus aprobaciones, mensajes directos con su gestor, informes y los archivos de su proyecto. Lo que hacemos queda registrado junto a los datos reales de su tienda (ingresos y pedidos diarios)."],
+      },
+      {
+        id: "plataformas", h: "Tres plataformas, un mismo método",
+        paras: ["Trabajamos con [Shopify](/automatizacion-shopify-ia), [WooCommerce](/automatizacion-woocommerce-ia) y [PrestaShop](/automatizacion-prestashop-ia). Los packs y precios son los mismos; cambia el conector y, en WooCommerce y PrestaShop, un recargo mensual por los plugins o módulos que mantenemos."],
+      },
+      {
+        id: "alcance", h: "Lo que no prometemos",
+        bullets: [
+          "No ofrecemos marca blanca ni informes con tu logotipo: los informes salen con el portal de Shopy Crafter.",
+          "No hay catálogos ilimitados: los cupos mensuales dependen del pack.",
+          "No garantizamos resultados comerciales concretos: dependen de la tienda y del mercado.",
+        ],
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Puedo llevar varias tiendas de clientes?", a: "Cada tienda es un proyecto con su pack. Para varias, hablamos de un acuerdo según volumen; escríbenos con el número de tiendas y plataformas." },
+      { q: "¿Los clientes ven vuestro nombre?", a: "Sí, el portal es el de Shopy Crafter. No ofrecemos marca blanca." },
+      { q: "¿Cuánto cuesta?", a: "Cada tienda parte de 49 €/mes más una puesta en marcha desde 150 €, sin IVA. En WooCommerce y PrestaShop hay un recargo mensual de 20, 30 o 50 € según pack." },
+    ],
+    related: [
+      { href: "/automatizacion-shopify-ia", label: "Automatización Shopify con IA", desc: "El detalle por plataforma." },
+      { href: "/ecommerce-ia-automatizacion", label: "eCommerce con IA", desc: "Qué se automatiza y qué no." },
+      { href: "/faq", label: "Preguntas frecuentes", desc: "Packs, portal y funcionamiento." },
+    ],
+    cta: { title: "Cuéntanos tu cartera de tiendas", text: "Dinos cuántas tiendas llevas y en qué plataformas y te proponemos un esquema de packs.", asunto: "Colaboración con agencia" },
   },
+
+  /* ───────────────────────── eCommerce con IA ───────────────────────── */
   {
     path: "/ecommerce-ia-automatizacion",
     canonical: "https://shopycrafter.com/ecommerce-ia-automatizacion",
-    metaTitle: "eCommerce con IA 2026: Automatización completa para tiendas Shopify — Shopy Crafter",
-    metaDescription: "Cómo la IA está transformando el eCommerce en 2026: automatización de imágenes, SEO, pricing y A/B testing para tiendas Shopify. Los resultados reales y cómo empezar.",
-    badge: "eCommerce IA 2026",
+    metaTitle: "eCommerce con IA: qué se puede automatizar en una tienda online — Shopy Crafter",
+    metaDescription: "Qué tareas de una tienda online hace bien la IA (fichas, SEO, imágenes, precios, tests A/B, competencia) y cuáles siguen necesitando a una persona. Con aprobación previa.",
+    badge: "eCommerce con IA",
+    group: "Guías",
     tag: "eCommerce + IA",
-    h1: "eCommerce con inteligencia artificial: la automatización que cambia las reglas",
-    subtitle: "En 2026, las tiendas online que crecen más rápido no son las que trabajan más — son las que han automatizado más con IA. Así funciona la revolución del eCommerce inteligente.",
-    body: `
-<h2>El eCommerce ha cambiado más en 2025-2026 que en los 10 años anteriores</h2>
-<p>La adopción masiva de modelos de IA generativa (Claude, Gemini, GPT-4) y de visión artificial (flux, Midjourney) ha creado una brecha creciente entre las tiendas que automatizan y las que no. Las primeras crecen con la mitad del equipo y el doble de velocidad. Las segundas pierden competitividad cada trimestre que pasa.</p>
-
-<h2>Las 5 áreas donde la IA ya ha superado al trabajo manual</h2>
-
-<h3>1. Generación de imágenes de producto</h3>
-<p>Hasta 2024, una sesión de fotos profesional para un producto costaba 150-400€ y tardaba 1-2 semanas (incluida edición). En 2026, la IA genera imágenes de calidad profesional en 90 segundos a ~0,25€/imagen. La calidad visual es comparable en el 80% de los casos. Para catálogos de 100+ productos, el ahorro es de decenas de miles de euros anuales.</p>
-
-<h3>2. SEO técnico de catálogo</h3>
-<p>Optimizar manualmente los títulos, meta descriptions, schemas y descripciones de 500 productos puede llevar semanas de trabajo. Un motor de IA como el de Shopy Crafter procesa 500 productos en 2-3 horas con resultados más consistentes que los humanos (no se cansa, no omite campos, sigue siempre la misma estructura óptima).</p>
-
-<h3>3. Fijación de precios inteligente</h3>
-<p>Muchas tiendas fijan precios una vez y no vuelven a tocarlos. Con IA, el pricing se apoya en datos: coste real de cada producto (COGS con comisiones, envío y embalaje), precios de la competencia y tests A/B de precio. Así cada cambio de precio se decide sabiendo el margen que deja.</p>
-
-<h3>4. Tests A/B estadísticos</h3>
-<p>El A/B testing tradicional requería: configuración técnica, esperar semanas para resultados estadísticos, interpretación manual y aplicación manual del ganador. En 2026, el A/B testing con IA es completamente automático: se configura solo, declara ganador al llegar al 95% de confianza, y aplica el cambio automáticamente. El tiempo de ciclo pasa de semanas a días.</p>
-
-<h3>5. Análisis de competencia</h3>
-<p>Monitorizar precios y estrategias de 10-20 competidores manualmente requería horas semanales. Gemini Search analiza el panorama competitivo de cualquier nicho en minutos y genera un informe accionable automáticamente. Las tiendas con monitorización de competencia en tiempo real reaccionan más rápido a cambios de mercado.</p>
-
-<h2>El stack IA de una tienda Shopify en 2026</h2>
-<p>Las tiendas más avanzadas usan en 2026 una combinación de:</p>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>Shopify</strong> como plataforma base (API moderna, webhooks en tiempo real)</li>
-<li><strong>Shopy Crafter</strong> para optimización de catálogo (imágenes, SEO, pricing, A/B testing)</li>
-<li><strong>Stripe o Shopify Payments</strong> para pagos optimizados</li>
-<li><strong>Klaviyo</strong> para email marketing con segmentación IA</li>
-<li><strong>Google Analytics 4 + Looker Studio</strong> para análisis de datos</li>
-</ul>
-
-<h2>¿Cuánto se puede automatizar realmente?</h2>
-<p>Tanto como quieras: los cambios pueden aplicarse solos o pasar antes por el panel de aprobaciones del cliente. Lo habitual es empezar revisando cada propuesta y automatizar lo que ya se ha comprobado.</p>
-<p>Las tareas que siguen requiriendo intervención humana: estrategia de colecciones y categorías, fotografías de producto para lanzamientos premium, atención al cliente, y decisiones estratégicas de pricing en momentos críticos (rebajas, Black Friday).</p>
-
-<h2>Por qué Shopify es la plataforma IA-first en 2026</h2>
-<p>La elección de plataforma determina cuánto puedes automatizar. Shopify tiene la API más moderna y el ecosistema de herramientas IA más rico. La diferencia con WooCommerce o PrestaShop no es solo de features: es de arquitectura. Los webhooks en tiempo real de Shopify permiten que la automatización sea instantánea; en plataformas alternativas, habría que desarrollar esta infraestructura desde cero. Aun así, Shopy Crafter también se conecta de forma nativa a WooCommerce (REST API v3) y PrestaShop (Webservice), con auditoría, SEO, imágenes, pricing, pedidos e inventario.</p>
-
-<h2>Cómo empezar con IA en tu tienda Shopify</h2>
-<p>El camino más sencillo: conecta tu tienda Shopify a Shopy Crafter (requiere solo el Access Token de Shopify, no código ni instalaciones), lanza una auditoría completa del catálogo (gratuita), y activa los motores que más valor aportan para tu nicho. En 48 horas, tu catálogo estará optimizado con IA y el auto-pilot activado para todos los productos futuros.</p>
-    `.trim(),
+    h1: "eCommerce con IA: qué se puede automatizar y qué no",
+    subtitle: "Una guía sin humo: las cinco tareas de catálogo donde la IA ahorra trabajo real, cómo se controla lo que publica y qué decisiones siguen siendo humanas.",
+    points: [
+      { t: "Ahorra trabajo repetitivo", d: "Auditar fichas, reescribir textos o generar variantes de imagen son tareas donde la IA acelera mucho." },
+      { t: "Tú decides qué se publica", d: "Los cambios pueden pasar por un panel de aprobaciones antes de aplicarse en tu tienda." },
+      { t: "La estrategia sigue siendo tuya", d: "Colecciones, fotografía de lanzamiento, atención al cliente y decisiones de rebajas no se delegan." },
+    ],
+    sections: [
+      {
+        id: "cinco", h: "Cinco áreas donde la IA ayuda de verdad",
+        cards: [
+          { t: "1. Fichas de producto", d: "Auditoría con puntuación y reescritura de títulos, descripciones y meta tags con el tono de tu marca." },
+          { t: "2. Imágenes de producto", d: "Fondos limpios, escenas y variantes con consistencia visual. Para lanzamientos premium, una sesión de fotos real sigue siendo mejor." },
+          { t: "3. SEO técnico", d: "Datos estructurados, textos alternativos y revisión de rendimiento, aplicados de forma consistente en todo el catálogo." },
+          { t: "4. Precios con coste real", d: "El precio se decide sabiendo el margen: coste del producto con comisiones, envío y embalaje, y precios de la competencia." },
+          { t: "5. Tests A/B y competencia", d: "Tests de imagen y precio con decisión estadística (Shopify) y análisis de competencia con IA para detectar movimientos de mercado." },
+        ],
+      },
+      {
+        id: "control", h: "Cómo se controla lo que hace la IA",
+        paras: ["Cada propuesta puede aprobarse o rechazarse desde tu portal antes de aplicarse. Lo habitual es empezar revisando todo y automatizar solo lo que ya has comprobado que sale bien. Todo cambio queda registrado."],
+      },
+      {
+        id: "humano", h: "Lo que sigue necesitando a una persona",
+        bullets: [
+          "Estrategia de colecciones y categorías.",
+          "Fotografía de producto para lanzamientos premium.",
+          "Atención al cliente.",
+          "Decisiones de precio en momentos críticos (rebajas, campañas).",
+        ],
+      },
+      {
+        id: "plataforma", h: "¿Importa la plataforma?",
+        paras: ["Shopify permite lo más completo (colecciones, temas, tests A/B y webhooks), pero no hace falta cambiar de plataforma: también conectamos [WooCommerce](/automatizacion-woocommerce-ia) por REST API y [PrestaShop](/automatizacion-prestashop-ia) por Webservice, con auditoría, SEO, imágenes, precios, pedidos e inventario."],
+      },
+      {
+        id: "empezar", h: "Cómo empezar",
+        steps: [
+          { t: "Conectar la tienda", d: "Con las credenciales de la API oficial de tu plataforma. Sin instalar nada en tu servidor." },
+          { t: "Auditar el catálogo", d: "Puntuación por producto y lista priorizada de problemas." },
+          { t: "Elegir el pack", d: "Según cuántos productos e imágenes quieras trabajar al mes." },
+        ],
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Sustituye la IA a mi equipo?", a: "No. Quita trabajo repetitivo, pero la estrategia, la marca y la relación con el cliente siguen siendo tuyas." },
+      { q: "¿Las imágenes con IA son tan buenas como una sesión de fotos?", a: "Sirven muy bien para fondos limpios, variantes y escenas. Para producto estrella o lanzamientos premium, recomendamos fotografía real." },
+      { q: "¿Puedo revisar los cambios antes de que se publiquen?", a: "Sí. Las propuestas pasan por el panel de aprobaciones de tu portal." },
+    ],
+    related: [
+      { href: "/automatizacion-shopify-ia", label: "Automatización Shopify", desc: "Detalle para Shopify." },
+      { href: "/automatizacion-woocommerce-ia", label: "Automatización WooCommerce", desc: "Detalle para WooCommerce." },
+      { href: "/automatizacion-prestashop-ia", label: "Automatización PrestaShop", desc: "Detalle para PrestaShop." },
+    ],
+    cta: STORE_CTA,
   },
+
+  /* ───────────────────────── Automatización Shopify ───────────────────────── */
   {
     path: "/automatizacion-shopify-ia",
     canonical: "https://shopycrafter.com/automatizacion-shopify-ia",
     metaTitle: "Automatización de tiendas Shopify con IA — Shopy Crafter",
     metaDescription: "Automatiza tu tienda Shopify con IA: auditoría de catálogo, SEO de fichas, imágenes de producto, pricing con COGS real, A/B testing, inventario y pedidos. Conexión nativa con la API de Shopify.",
     badge: "Shopify + IA",
+    group: "Servicios",
     tag: "Shopify",
     h1: "Automatización de tiendas Shopify con inteligencia artificial",
     subtitle: "Conectamos tu tienda Shopify por API y ponemos a trabajar la IA sobre tu catálogo, tus precios y tus pedidos, con aprobación previa de cada cambio si así lo quieres.",
-    body: `
-<h2>Qué automatizamos en Shopify</h2>
-<p>Shopy Crafter se conecta a tu tienda con la API oficial de Shopify (app con Client ID y Client Secret, o token de acceso) y trabaja directamente sobre tus datos reales:</p>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>Auditoría de catálogo:</strong> puntuación por producto de título, descripción, SEO, imágenes y precio, con la lista de problemas concretos de cada ficha.</li>
-<li><strong>Rediseño de fichas con IA:</strong> nuevos títulos, descripciones, etiquetas, meta title y meta description, listos para aplicar en Shopify.</li>
-<li><strong>Imágenes de producto con IA:</strong> fondos limpios, lifestyle y variantes, con consistencia visual de marca (Visual DNA).</li>
-<li><strong>SEO técnico:</strong> datos estructurados, textos alternativos y análisis de rendimiento por producto.</li>
-<li><strong>Pricing con COGS real:</strong> coste por producto con comisiones, envío y embalaje; márgenes y precio recomendado; simulador de escenarios.</li>
-<li><strong>A/B testing:</strong> tests de imagen y de precio con decisión estadística.</li>
-<li><strong>Colecciones, temas, inventario y pedidos:</strong> gestión desde el mismo panel.</li>
-</ul>
-
-<h2>Datos reales, no estimaciones</h2>
-<p>La plataforma registra cada día los ingresos y pedidos de tu tienda (día cerrado, sin contar cancelados ni reembolsos) y recibe los webhooks de Shopify de pedidos pagados, cancelados y reembolsos. Con eso ves la evolución real de tu negocio junto a cada cambio que aplicamos.</p>
-
-<h2>Tú decides qué se publica</h2>
-<p>Cada propuesta puede pasar por el panel de aprobaciones de tu portal de cliente: la ves, la apruebas o la rechazas, y solo entonces se aplica. En el mismo portal tienes mensajes directos con tu gestor, informes y todos los archivos de tu proyecto, aislados del resto de clientes.</p>
-
-<h2>¿Tienes WooCommerce o PrestaShop?</h2>
-<p>La misma plataforma trabaja también con <a href="/automatizacion-woocommerce-ia" style="color:#e6c668">WooCommerce</a> y <a href="/automatizacion-prestashop-ia" style="color:#e6c668">PrestaShop</a>, y gestiona pagos con <a href="/gestion-stripe-ia" style="color:#e6c668">Stripe</a>.</p>
-    `.trim(),
+    points: [
+      { t: "Conexión oficial", d: "Una app con Client ID y Client Secret (o token de acceso) a la API de Shopify. Trabajamos sobre tus datos reales." },
+      { t: "Todo en un panel", d: "Catálogo, SEO, imágenes, precios, A/B, colecciones, temas, inventario y pedidos." },
+      { t: "Tú apruebas", d: "Cada propuesta pasa por el panel de aprobaciones de tu portal antes de aplicarse." },
+    ],
+    sections: [
+      {
+        id: "que", h: "Qué automatizamos en Shopify",
+        cards: [
+          { t: "Auditoría de catálogo", d: "Puntuación por producto de título, descripción, SEO, imágenes y precio, con la lista de problemas de cada ficha." },
+          { t: "Rediseño de fichas con IA", d: "Nuevos títulos, descripciones, etiquetas, meta title y meta description, listos para aplicar." },
+          { t: "Imágenes de producto", d: "Fondos limpios, lifestyle y variantes, con consistencia visual de marca (Visual DNA)." },
+          { t: "SEO técnico", d: "Datos estructurados, textos alternativos y análisis de rendimiento por producto." },
+          { t: "Pricing con COGS real", d: "Coste por producto con comisiones, envío y embalaje; márgenes, precio recomendado y simulador de escenarios." },
+          { t: "A/B testing", d: "Tests de imagen y de precio con decisión estadística." },
+          { t: "Colecciones, temas, inventario y pedidos", d: "Gestión desde el mismo panel." },
+        ],
+      },
+      {
+        id: "datos", h: "Datos reales, no estimaciones",
+        paras: ["La plataforma registra cada día los ingresos y pedidos de tu tienda (día cerrado, sin contar cancelados ni reembolsados) y recibe los webhooks de Shopify de pedidos pagados, cancelados y reembolsos. Así ves la evolución real junto a cada cambio que aplicamos."],
+      },
+      {
+        id: "aprobacion", h: "Tú decides qué se publica",
+        paras: ["Cada propuesta puede pasar por el panel de aprobaciones de tu portal: la ves, la apruebas o la rechazas, y solo entonces se aplica. En el mismo portal tienes mensajes directos con tu gestor, informes y los archivos de tu proyecto, aislados del resto de clientes."],
+      },
+      {
+        id: "otras", h: "¿Tienes WooCommerce o PrestaShop?",
+        paras: ["La misma plataforma trabaja con [WooCommerce](/automatizacion-woocommerce-ia) y [PrestaShop](/automatizacion-prestashop-ia), y gestiona cobros con [Stripe](/gestion-stripe-ia)."],
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Necesito instalar algo en mi tienda?", a: "No hace falta ninguna instalación de código: la conexión se hace con las credenciales de la app de Shopify." },
+      { q: "¿Puedo revisar los cambios antes de que se apliquen?", a: "Sí. Las propuestas pasan por tu panel de aprobaciones y solo se aplican cuando las apruebas." },
+      { q: "¿Qué cuesta?", a: "Los packs parten de 49 €/mes, con puesta en marcha de pago único desde 150 €. Precios sin IVA." },
+    ],
+    related: [
+      { href: "/automatizacion-woocommerce-ia", label: "WooCommerce con IA", desc: "La misma IA sobre WooCommerce." },
+      { href: "/gestion-stripe-ia", label: "Gestión de Stripe", desc: "Cobros, suscripciones y facturas." },
+      { href: "/tienda/rediseno-tienda", label: "Rediseño de tienda", desc: "Portada, colección y ficha, desde 1.490 €." },
+    ],
+    cta: STORE_CTA,
   },
+
+  /* ───────────────────────── Automatización WooCommerce ───────────────────────── */
   {
     path: "/automatizacion-woocommerce-ia",
     canonical: "https://shopycrafter.com/automatizacion-woocommerce-ia",
     metaTitle: "Automatización WooCommerce con IA: SEO, pedidos e inventario — Shopy Crafter",
-    metaDescription: "Conecta tu WooCommerce por REST API y automatiza con IA la auditoría de productos, el SEO, las imágenes, los precios, pedidos, clientes, cupones e inventario. Sin plugins pesados.",
+    metaDescription: "Conecta tu WooCommerce por REST API y automatiza con IA la auditoría de productos, el SEO, las imágenes, los precios, pedidos, clientes, cupones e inventario. Sin plugins adicionales.",
     badge: "WooCommerce + IA",
+    group: "Servicios",
     tag: "WooCommerce",
     h1: "Automatización de tiendas WooCommerce con inteligencia artificial",
     subtitle: "Optimiza tu tienda WooCommerce sin migrar de plataforma: conexión directa por REST API v3 y la IA trabajando sobre tu catálogo real.",
-    body: `
-<h2>Conexión directa con la REST API de WooCommerce</h2>
-<p>Solo necesitamos una Consumer Key (ck_) y un Consumer Secret (cs_) de tu WooCommerce. Sin instalar plugins adicionales en tu WordPress: la plataforma lee y escribe a través de la API oficial.</p>
-
-<h2>Qué gestionamos en WooCommerce</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>Productos:</strong> auditoría por ficha, rediseño de títulos y descripciones con IA, edición y precios.</li>
-<li><strong>Pedidos y clientes:</strong> listado, estado y datos de cliente para entender quién compra.</li>
-<li><strong>Cupones:</strong> consulta de los cupones activos y sus condiciones.</li>
-<li><strong>Inventario:</strong> stock por producto y variante, con alertas de rotura.</li>
-<li><strong>Informes de ventas:</strong> ingresos y pedidos por periodo.</li>
-<li><strong>Imágenes, SEO y pricing con IA:</strong> imágenes de producto generadas con IA, textos SEO de cada ficha y precio con COGS real. El A/B testing automático está disponible solo para Shopify.</li>
-</ul>
-
-<h2>Ingresos contados una sola vez</h2>
-<p>Los webhooks de pedidos de WooCommerce alimentan tus métricas diarias: cada pedido cuenta una sola vez y se descuenta si se cancela, se reembolsa o se elimina. Así tus informes cuadran con tu contabilidad.</p>
-
-<h2>WooCommerce o Shopify</h2>
-<p>No hace falta cambiar de plataforma para usar IA. Si aun así estás valorando el cambio, lee nuestra <a href="/shopify-vs-woocommerce" style="color:#e6c668">comparativa Shopify vs WooCommerce</a> y la <a href="/migrar-woocommerce-shopify" style="color:#e6c668">guía de migración</a>.</p>
-    `.trim(),
+    points: [
+      { t: "Sin plugins adicionales", d: "Solo una Consumer Key (ck_) y un Consumer Secret (cs_). La plataforma lee y escribe por la API oficial." },
+      { t: "Sin migrar", d: "Mejoras tu catálogo en el WooCommerce que ya tienes." },
+      { t: "Ingresos contados una vez", d: "Los webhooks de pedidos alimentan tus métricas diarias sin duplicar." },
+    ],
+    sections: [
+      {
+        id: "que", h: "Qué gestionamos en WooCommerce",
+        cards: [
+          { t: "Productos", d: "Auditoría por ficha, rediseño de títulos y descripciones con IA, edición y precios." },
+          { t: "Pedidos y clientes", d: "Listado, estado y datos de cliente para entender quién compra." },
+          { t: "Cupones", d: "Consulta de los cupones activos y sus condiciones." },
+          { t: "Inventario", d: "Stock por producto y variante, con alertas de rotura." },
+          { t: "Informes de ventas", d: "Ingresos y pedidos por periodo." },
+          { t: "Imágenes, SEO y pricing con IA", d: "Imágenes de producto generadas con IA, textos SEO de cada ficha y precio con COGS real." },
+        ],
+        note: "El A/B testing automático, las colecciones y los temas están disponibles solo para Shopify.",
+      },
+      {
+        id: "ingresos", h: "Ingresos contados una sola vez",
+        paras: ["Los webhooks de pedidos de WooCommerce alimentan tus métricas diarias: cada pedido cuenta una sola vez y se descuenta si se cancela, se reembolsa o se elimina. Así tus informes cuadran con tu contabilidad."],
+      },
+      {
+        id: "recargo", h: "Por qué WooCommerce lleva un recargo",
+        paras: ["En WooCommerce y PrestaShop se suma un recargo mensual de 20, 30 o 50 € según el pack: cubre los plugins y módulos de pago y SEO que actualizamos y probamos cada mes, y las copias que restauramos si algo se rompe. En Shopify lo hace la plataforma."],
+      },
+      {
+        id: "otras", h: "WooCommerce o Shopify",
+        paras: ["No hace falta cambiar de plataforma para usar IA. Si aun así estás valorando el cambio, lee la [comparativa Shopify vs WooCommerce](/shopify-vs-woocommerce) y la [guía de migración](/migrar-woocommerce-shopify)."],
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Tengo que instalar un plugin?", a: "No. Basta una Consumer Key y un Consumer Secret de la API REST de WooCommerce." },
+      { q: "¿Qué no hacéis en WooCommerce?", a: "No gestionamos temas ni colecciones, y los tests A/B automáticos son solo de Shopify." },
+      { q: "¿Cuánto cuesta?", a: "Packs desde 49 €/mes más recargo mensual de 20, 30 o 50 € según pack, y puesta en marcha desde 150 €. Sin IVA." },
+    ],
+    related: [
+      { href: "/shopify-vs-woocommerce", label: "Shopify vs WooCommerce", desc: "Comparativa de criterio." },
+      { href: "/migrar-woocommerce-shopify", label: "Migrar a Shopify", desc: "Guía por fases." },
+      { href: "/gestion-stripe-ia", label: "Gestión de Stripe", desc: "Cobros y suscripciones." },
+    ],
+    cta: STORE_CTA,
   },
+
+  /* ───────────────────────── Automatización PrestaShop ───────────────────────── */
   {
     path: "/automatizacion-prestashop-ia",
     canonical: "https://shopycrafter.com/automatizacion-prestashop-ia",
     metaTitle: "Automatización PrestaShop con IA: SEO, catálogo y pedidos — Shopy Crafter",
     metaDescription: "Conecta PrestaShop por Webservice y automatiza con IA el SEO de productos, categorías, imágenes, precios, pedidos e inventario. Para tiendas PrestaShop en España y Latinoamérica.",
     badge: "PrestaShop + IA",
+    group: "Servicios",
     tag: "PrestaShop",
     h1: "Automatización de tiendas PrestaShop con inteligencia artificial",
     subtitle: "Tu PrestaShop, optimizado con IA a través del Webservice oficial: catálogo, SEO, categorías, pedidos e inventario desde un único panel.",
-    body: `
-<h2>Conexión por el Webservice de PrestaShop</h2>
-<p>Basta con una clave del Webservice de PrestaShop (32 caracteres) con los permisos adecuados. La plataforma trabaja con la API oficial, sin módulos de terceros.</p>
-
-<h2>Qué gestionamos en PrestaShop</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>Productos:</strong> auditoría de fichas, rediseño con IA y edición.</li>
-<li><strong>SEO por producto:</strong> meta título y meta descripción escritos directamente en tu tienda.</li>
-<li><strong>Categorías:</strong> estructura del catálogo.</li>
-<li><strong>Pedidos:</strong> con los estados de PrestaShop (cancelado, reembolsado o error de pago no cuentan como venta).</li>
-<li><strong>Inventario:</strong> stock y alertas.</li>
-<li><strong>Imágenes y pricing con IA:</strong> imágenes de producto generadas con IA y precio con COGS real. El A/B testing automático está disponible solo para Shopify.</li>
-</ul>
-
-<h2>Pensado para el mercado hispanohablante</h2>
-<p>Todo el panel, los informes y el contenido que genera la IA están en español, y la plataforma trabaja en la zona horaria de Madrid para los cortes diarios de ventas.</p>
-
-<h2>¿Valorando otra plataforma?</h2>
-<p>Consulta la <a href="/shopify-vs-prestashop" style="color:#e6c668">comparativa Shopify vs PrestaShop</a> y la <a href="/migrar-prestashop-shopify" style="color:#e6c668">guía de migración PrestaShop → Shopify</a>.</p>
-    `.trim(),
+    points: [
+      { t: "Webservice oficial", d: "Una clave de 32 caracteres con los permisos adecuados. Sin módulos de terceros." },
+      { t: "SEO escrito en tu tienda", d: "Meta título y meta descripción por producto, directamente en PrestaShop." },
+      { t: "Panel en español", d: "Panel, informes y contenido de la IA en español, con cortes diarios en zona horaria de Madrid." },
+    ],
+    sections: [
+      {
+        id: "que", h: "Qué gestionamos en PrestaShop",
+        cards: [
+          { t: "Productos", d: "Auditoría de fichas, rediseño con IA y edición." },
+          { t: "SEO por producto", d: "Meta título y meta descripción escritos directamente en tu tienda." },
+          { t: "Categorías", d: "Estructura del catálogo." },
+          { t: "Pedidos", d: "Con los estados de PrestaShop: cancelado, reembolsado o error de pago no cuentan como venta." },
+          { t: "Inventario", d: "Stock y alertas." },
+          { t: "Imágenes y pricing con IA", d: "Imágenes de producto generadas con IA y precio con COGS real." },
+        ],
+        note: "El A/B testing automático, las colecciones y los temas están disponibles solo para Shopify.",
+      },
+      {
+        id: "recargo", h: "Por qué PrestaShop lleva un recargo",
+        paras: ["En PrestaShop y WooCommerce se suma un recargo mensual de 20, 30 o 50 € según el pack: cubre la actualización y prueba mensual de módulos y las copias que restauramos si algo se rompe. En Shopify lo hace la plataforma."],
+      },
+      {
+        id: "otras", h: "¿Valorando otra plataforma?",
+        paras: ["Consulta la [comparativa Shopify vs PrestaShop](/shopify-vs-prestashop) y la [guía de migración PrestaShop → Shopify](/migrar-prestashop-shopify)."],
+      },
+    ],
+    packs: "store",
+    faqs: [
+      { q: "¿Necesito instalar un módulo?", a: "No. Usamos el Webservice oficial de PrestaShop con una clave y los permisos que tú le des." },
+      { q: "¿Funciona con versiones antiguas?", a: "Depende de que tu Webservice esté disponible y activo. Lo comprobamos al conectar." },
+      { q: "¿Cuánto cuesta?", a: "Packs desde 49 €/mes más recargo mensual de 20, 30 o 50 € según pack, y puesta en marcha desde 150 €. Sin IVA." },
+    ],
+    related: [
+      { href: "/shopify-vs-prestashop", label: "Shopify vs PrestaShop", desc: "Comparativa de criterio." },
+      { href: "/migrar-prestashop-shopify", label: "Migrar a Shopify", desc: "Guía por fases." },
+      { href: "/gestion-stripe-ia", label: "Gestión de Stripe", desc: "Cobros y suscripciones." },
+    ],
+    cta: STORE_CTA,
   },
+
+  /* ───────────────────────── Gestión de Stripe ───────────────────────── */
   {
     path: "/gestion-stripe-ia",
     canonical: "https://shopycrafter.com/gestion-stripe-ia",
     metaTitle: "Gestión de Stripe con IA: cobros, suscripciones y facturas — Shopy Crafter",
-    metaDescription: "Gestiona tu cuenta Stripe desde un panel con IA: clientes, cobros, suscripciones, facturas, reembolsos, pagos a banco y balance. Stripe Connect y portal de cliente incluidos.",
+    metaDescription: "Gestiona tu cuenta Stripe desde un panel con IA: clientes, cobros, suscripciones, facturas, reembolsos, pagos a banco y balance. Stripe Connect y portal de cliente.",
     badge: "Stripe",
+    group: "Servicios",
     tag: "Stripe",
-    h1: "Gestión de pagos con Stripe: cobros, suscripciones y facturación en un solo panel",
+    h1: "Gestión de Stripe: cobros, suscripciones y facturación en un solo panel",
     subtitle: "Conecta tu cuenta Stripe y gestiona clientes, cobros, suscripciones y facturas sin entrar en cinco pantallas distintas.",
-    body: `
-<h2>Qué gestionamos en Stripe</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>Clientes:</strong> alta y consulta de clientes.</li>
-<li><strong>Cobros y payment intents:</strong> cobros puntuales desde el panel.</li>
-<li><strong>Suscripciones:</strong> consulta y cancelación.</li>
-<li><strong>Facturas:</strong> creación, envío y anulación.</li>
-<li><strong>Reembolsos:</strong> totales o parciales.</li>
-<li><strong>Pagos a banco (payouts) y balance:</strong> qué tienes disponible y qué está en camino.</li>
-<li><strong>Productos de Stripe:</strong> alta y baja de productos y precios.</li>
-<li><strong>Transacciones:</strong> historial completo.</li>
-</ul>
-
-<h2>Stripe Connect y claves seguras</h2>
-<p>Puedes conectar tu cuenta mediante Stripe Connect (OAuth) o con tu clave secreta. Las claves se guardan cifradas y se pueden rotar desde el panel. Los webhooks de Stripe se verifican con firma.</p>
-
-<h2>Portal de cliente con vista de Stripe</h2>
-<p>Si trabajamos para ti, ves en tu portal la actividad de tu cuenta Stripe: cobros, clientes, facturas, suscripciones y pagos, en modo solo lectura.</p>
-
-<h2>Stripe con tu tienda online</h2>
-<p>Stripe se combina con <a href="/automatizacion-shopify-ia" style="color:#e6c668">Shopify</a>, <a href="/automatizacion-woocommerce-ia" style="color:#e6c668">WooCommerce</a> o <a href="/automatizacion-prestashop-ia" style="color:#e6c668">PrestaShop</a>. Para Shopify en concreto, lee la <a href="/shopify-stripe-pagos" style="color:#e6c668">guía de Stripe + Shopify</a>.</p>
-    `.trim(),
+    points: [
+      { t: "Todo en un panel", d: "Clientes, cobros, suscripciones, facturas, reembolsos, payouts y balance." },
+      { t: "Conexión segura", d: "Stripe Connect (OAuth) o clave secreta, guardada cifrada y rotable desde el panel." },
+      { t: "Vista en tu portal", d: "Ves la actividad de tu cuenta en modo solo lectura." },
+    ],
+    sections: [
+      {
+        id: "que", h: "Qué gestionamos en Stripe",
+        cards: [
+          { t: "Clientes", d: "Alta y consulta de clientes." },
+          { t: "Cobros", d: "Cobros puntuales desde el panel." },
+          { t: "Suscripciones", d: "Consulta y cancelación." },
+          { t: "Facturas", d: "Creación, envío y anulación." },
+          { t: "Reembolsos", d: "Totales o parciales." },
+          { t: "Payouts y balance", d: "Qué tienes disponible y qué está en camino." },
+          { t: "Productos y transacciones", d: "Alta y baja de productos y precios, e historial de transacciones." },
+        ],
+      },
+      {
+        id: "seguridad", h: "Stripe Connect y claves seguras",
+        paras: ["Puedes conectar tu cuenta mediante Stripe Connect (OAuth) o con tu clave secreta. Las claves se guardan cifradas y se pueden rotar desde el panel. Los webhooks de Stripe se verifican con firma."],
+      },
+      {
+        id: "portal", h: "Portal de cliente con vista de Stripe",
+        paras: ["Si trabajamos para ti, ves en tu portal la actividad de tu cuenta Stripe: cobros, clientes, facturas, suscripciones y pagos, en modo solo lectura. Los packs incluyen alertas de pagos fallidos y disputas."],
+      },
+      {
+        id: "tienda", h: "Stripe con tu tienda online",
+        paras: ["Stripe se combina con [Shopify](/automatizacion-shopify-ia), [WooCommerce](/automatizacion-woocommerce-ia) o [PrestaShop](/automatizacion-prestashop-ia). Para Shopify en concreto, lee la [guía de Stripe y Shopify](/shopify-stripe-pagos)."],
+      },
+    ],
+    packs: "stripe",
+    faqs: [
+      { q: "¿Podéis mover dinero de mi cuenta?", a: "Gestionamos cobros, facturas y reembolsos dentro de lo que tú autorices. Los payouts a tu banco los ejecuta Stripe según tu configuración; nosotros los consultamos y conciliamos." },
+      { q: "¿Qué datos ve mi equipo en el portal?", a: "Cobros, clientes, facturas, suscripciones y pagos de tu cuenta, en solo lectura." },
+      { q: "¿Cuánto cuesta?", a: "Los packs de Stripe parten de 39 €/mes con puesta en marcha desde 90 €. Sin IVA." },
+    ],
+    related: [
+      { href: "/shopify-stripe-pagos", label: "Stripe y Shopify", desc: "Qué comprobar al elegir cómo cobrar." },
+      { href: "/automatizacion-shopify-ia", label: "Automatización Shopify", desc: "Catálogo, SEO y precios." },
+      { href: "/tienda", label: "Tienda", desc: "Pago por Stripe en nuestros productos." },
+    ],
+    cta: { title: "¿Quieres ordenar tu cuenta Stripe?", text: "Revisamos tu cuenta y te proponemos un pack con lo que hay que vigilar y automatizar.", asunto: "Gestión de Stripe" },
   },
+
+  /* ───────────────────────── Diseño web ───────────────────────── */
   {
     path: "/diseno-web-profesional",
     canonical: "https://shopycrafter.com/diseno-web-profesional",
     metaTitle: "Diseño web profesional con 3D, animación e IA — Shopy Crafter",
-    metaDescription: "Diseñamos y desarrollamos webs y landings a medida: 3D con Three.js, animaciones con GSAP y diseño basado en el ADN de tu marca.",
+    metaDescription: "Diseñamos y desarrollamos webs y landings a medida: 3D con Three.js, animaciones con GSAP y diseño basado en el ADN de tu marca. Precios de partida en la Tienda.",
     badge: "Diseño web",
+    group: "Servicios",
     tag: "Diseño y desarrollo web",
     h1: "Diseño y desarrollo web a medida, con 3D, animación e IA",
-    subtitle: "Webs y landings que se sienten de otro nivel: diseño a partir del ADN de tu marca, 3D en tiempo real y animaciones fluidas, sin plantillas.",
-    body: `
-<h2>Cómo diseñamos</h2>
-<p>Partimos del ADN de tu marca: colores, tipografías, tono y referencias visuales. Nuestro estudio de diseño con IA genera la propuesta en HTML real, que vemos en vivo y afinamos contigo antes de publicarla.</p>
-
-<h2>Tecnologías que dominamos</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>3D en tiempo real:</strong> Three.js y React Three Fiber, modelos GLB, vistas explosionadas y visores de producto.</li>
-<li><strong>Animación:</strong> GSAP, ScrollTrigger, SplitType y scroll suave con Lenis.</li>
-<li><strong>Efectos:</strong> shaders, partículas, degradados animados, cursor magnético y transiciones de página.</li>
-<li><strong>Componentes premium:</strong> bento grids, carruseles 3D, visualización de datos y secciones hero.</li>
-</ul>
-
-<h2>Proyectos reales</h2>
-<p>Diseñamos cada experiencia según la marca y el objetivo del proyecto. Puedes ver algunos de nuestros trabajos en la sección de <a href="/#fp-projects" style="color:#e6c668">proyectos realizados</a>.</p>
-
-<h2>Webs para tiendas online</h2>
-<p>Si tu web es una tienda, la combinamos con la optimización de catálogo con IA para <a href="/automatizacion-shopify-ia" style="color:#e6c668">Shopify</a>, <a href="/automatizacion-woocommerce-ia" style="color:#e6c668">WooCommerce</a> o <a href="/automatizacion-prestashop-ia" style="color:#e6c668">PrestaShop</a>.</p>
-    `.trim(),
+    subtitle: "Webs y landings diseñadas a partir del ADN de tu marca, con 3D en tiempo real y animaciones fluidas, sin plantillas genéricas.",
+    points: [
+      { t: "Parte de tu marca", d: "Colores, tipografías, tono y referencias visuales. Nada de plantilla repetida." },
+      { t: "3D y animación con criterio", d: "Three.js y GSAP donde aportan, con la web rápida y adaptada a móvil." },
+      { t: "Precio de partida claro", d: "Landing desde 990 €, web corporativa desde 1.690 €. El precio final depende del alcance." },
+    ],
+    sections: [
+      {
+        id: "como", h: "Cómo diseñamos",
+        paras: ["Partimos del ADN de tu marca. Nuestro estudio de diseño con IA genera la propuesta en HTML real, que vemos en vivo y afinamos contigo antes de publicarla en tu dominio."],
+      },
+      {
+        id: "tech", h: "Tecnologías que usamos",
+        cards: [
+          { t: "3D en tiempo real", d: "Three.js y React Three Fiber, modelos GLB y visores de producto." },
+          { t: "Animación", d: "GSAP, ScrollTrigger, SplitType y scroll suave con Lenis." },
+          { t: "Efectos", d: "Shaders, partículas, degradados animados y transiciones de página." },
+          { t: "Componentes", d: "Bento grids, carruseles 3D, visualización de datos y secciones hero." },
+        ],
+      },
+      {
+        id: "servicios", h: "Qué puedes contratar",
+        cards: [
+          { t: "Landing con 3D y animación", d: "Una página de venta de hasta 6 secciones. Desde 990 €.", },
+          { t: "Web corporativa", d: "Hasta 5 páginas con formulario y SEO técnico de base. Desde 1.690 €." },
+          { t: "Rediseño de tienda online", d: "Portada, colección y ficha en Shopify, WooCommerce o PrestaShop. Desde 1.490 €." },
+        ],
+        note: "Precios de partida sin IVA; el presupuesto final se cierra según el alcance. Puedes pedirlos desde la [Tienda](/tienda).",
+      },
+      {
+        id: "proyectos", h: "Proyectos reales",
+        paras: ["Puedes ver algunos de nuestros trabajos en la sección de [proyectos realizados](/#fp-projects). Si tu web es una tienda, la combinamos con la optimización de catálogo con IA para [Shopify](/automatizacion-shopify-ia), [WooCommerce](/automatizacion-woocommerce-ia) o [PrestaShop](/automatizacion-prestashop-ia)."],
+      },
+    ],
+    packs: "none",
+    faqs: [
+      { q: "¿Cuánto cuesta una web?", a: "Una landing parte de 990 € y una web corporativa de hasta 5 páginas de 1.690 €, sin IVA. El precio final depende del alcance, los idiomas y el material que aportes." },
+      { q: "¿Cuánto se tarda?", a: "Depende del servicio; en la Tienda indicamos el plazo orientativo de cada uno y lo confirmamos en el presupuesto." },
+      { q: "¿Puedo editar la web después?", a: "Lo acordamos al presupuestar: dejamos claro qué parte puedes editar tú y qué parte mantenemos nosotros." },
+    ],
+    related: [
+      { href: "/tienda/landing-3d", label: "Landing con 3D y animación", desc: "Desde 990 €." },
+      { href: "/tienda/web-corporativa", label: "Web corporativa", desc: "Desde 1.690 €." },
+      { href: "/desarrollo-apps-nativas", label: "Apps nativas", desc: "Tu web como app." },
+    ],
+    cta: { title: "Cuéntanos qué web necesitas", text: "Dinos tu marca, tu objetivo y tus referencias y te enviamos un presupuesto cerrado.", asunto: "Diseño web" },
   },
+
+  /* ───────────────────────── Apps nativas ───────────────────────── */
   {
     path: "/desarrollo-apps-nativas",
     canonical: "https://shopycrafter.com/desarrollo-apps-nativas",
     metaTitle: "Desarrollo de apps nativas Android e iOS — Shopy Crafter",
-    metaDescription: "Convertimos tu web o tu tienda en app nativa para Android e iOS con Capacitor: una sola base de código, notificaciones push y acceso al dispositivo. Nuestra propia app Android es el ejemplo.",
+    metaDescription: "Convertimos tu web o tu tienda en app para Android e iOS con Capacitor: una sola base de código, notificaciones push y acceso al dispositivo. Nuestra propia app Android es el ejemplo.",
     badge: "Apps nativas",
+    group: "Servicios",
     tag: "Apps móviles",
-    h1: "Desarrollo de apps nativas para Android e iOS",
+    h1: "Desarrollo de apps para Android e iOS",
     subtitle: "Tu web o tu tienda como app instalable, con notificaciones push y experiencia nativa, a partir de una sola base de código.",
-    body: `
-<h2>Nuestra propia app como prueba</h2>
-<p>Shopy Crafter tiene su propia app Android, construida con Capacitor sobre la misma base de código que la plataforma web. Puedes descargarla desde nuestra <a href="/" style="color:#e6c668">página principal</a>.</p>
-
-<h2>Cómo construimos las apps</h2>
-<ul style="padding-left:24px;color:rgba(255,255,255,0.7);line-height:2">
-<li><strong>Capacitor:</strong> una sola base de código web (React) empaquetada como app nativa para Android e iOS.</li>
-<li><strong>Notificaciones push:</strong> avisos en el móvil para pedidos, mensajes o novedades.</li>
-<li><strong>Acceso al dispositivo:</strong> cámara, archivos y almacenamiento cuando la app lo necesita.</li>
-<li><strong>Actualizaciones:</strong> los cambios de la web se reflejan en la app sin rehacerla.</li>
-</ul>
-
-<h2>Para qué tipo de proyectos</h2>
-<p>Tiendas online que quieren fidelizar con una app, paneles internos para equipos y portales de cliente. Si ya tienes web, partimos de ella; si no, la <a href="/diseno-web-profesional" style="color:#e6c668">diseñamos</a> pensando desde el principio en web y app.</p>
-    `.trim(),
+    points: [
+      { t: "Una sola base de código", d: "Tu web (React) empaquetada con Capacitor para Android e iOS." },
+      { t: "Notificaciones push", d: "Avisos en el móvil de pedidos, mensajes o novedades." },
+      { t: "Presupuesto cerrado", d: "Antes de empezar acordamos alcance y precio; no hay tarifa publicada porque depende del proyecto." },
+    ],
+    sections: [
+      {
+        id: "prueba", h: "Nuestra propia app como prueba",
+        paras: ["Shopy Crafter tiene su propia app Android, construida con Capacitor sobre la misma base de código que la plataforma web. Puedes verla desde nuestra [página principal](/)."],
+      },
+      {
+        id: "como", h: "Cómo construimos las apps",
+        cards: [
+          { t: "Capacitor", d: "Una sola base de código web empaquetada como app nativa." },
+          { t: "Notificaciones push", d: "Avisos en el móvil para pedidos, mensajes o novedades." },
+          { t: "Acceso al dispositivo", d: "Cámara, archivos y almacenamiento cuando la app lo necesita." },
+          { t: "Publicación", d: "Preparamos la app para Google Play y App Store." },
+        ],
+      },
+      {
+        id: "para", h: "Para qué proyectos encaja",
+        paras: ["Tiendas online que quieren fidelizar con una app, paneles internos para equipos y portales de cliente. Si ya tienes web, partimos de ella; si no, la [diseñamos](/diseno-web-profesional) pensando desde el principio en web y app."],
+      },
+    ],
+    packs: "none",
+    faqs: [
+      { q: "¿Cuánto cuesta una app?", a: "Depende del proyecto, así que se presupuesta antes de empezar y el presupuesto es cerrado. Puedes pedirlo desde la Tienda o por el formulario de contacto." },
+      { q: "¿Android e iOS?", a: "Con Capacitor la misma base sirve para ambas. Publicar en App Store requiere una cuenta de desarrollador de Apple, que se acuerda al presupuestar." },
+      { q: "¿La app se actualiza con la web?", a: "Depende de cómo se empaquete; lo definimos contigo en el presupuesto." },
+    ],
+    related: [
+      { href: "/tienda/app-nativa", label: "App nativa en la Tienda", desc: "Pide presupuesto." },
+      { href: "/diseno-web-profesional", label: "Diseño web profesional", desc: "Web y landing a medida." },
+      { href: "/sobre-nosotros", label: "Sobre nosotros", desc: "Quiénes somos." },
+    ],
+    cta: { title: "¿Tienes una idea de app?", text: "Cuéntanos qué quieres que haga y te enviamos un presupuesto cerrado.", asunto: "App nativa" },
   },
 ];
+
+/* ── HTML para el prerender (rastreadores sin JS): mismo contenido que ve la persona, sin estilos. ── */
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const inline = (t: string) =>
+  esc(t)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+function toHtml(p: PageSource): string {
+  const out: string[] = [];
+  out.push(...p.points.map(x => `<p><strong>${esc(x.t)}.</strong> ${inline(x.d)}</p>`));
+  if (p.table) {
+    const t = p.table;
+    out.push(`<table><caption>${esc(t.caption)}</caption><thead><tr>${t.head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>`
+      + t.rows.map(r => `<tr><th>${esc(r[0])}</th><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join("") + "</tbody></table>");
+    if (t.note) out.push(`<p>${esc(t.note)}</p>`);
+  }
+  for (const s of p.sections) {
+    out.push(`<h2>${esc(s.h)}</h2>`);
+    if (s.intro) out.push(`<p>${inline(s.intro)}</p>`);
+    s.paras?.forEach(x => out.push(`<p>${inline(x)}</p>`));
+    if (s.cards) out.push("<ul>" + s.cards.map(c => `<li><strong>${esc(c.t)}:</strong> ${inline(c.d)}</li>`).join("") + "</ul>");
+    if (s.steps) out.push("<ol>" + s.steps.map(c => `<li><strong>${esc(c.t)}:</strong> ${inline(c.d)}</li>`).join("") + "</ol>");
+    if (s.bullets) out.push("<ul>" + s.bullets.map(b => `<li>${inline(b)}</li>`).join("") + "</ul>");
+    if (s.note) out.push(`<p>${inline(s.note)}</p>`);
+  }
+  if (p.faqs.length) {
+    out.push("<h2>Preguntas frecuentes</h2>");
+    p.faqs.forEach(f => out.push(`<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`));
+  }
+  out.push("<h2>Sigue leyendo</h2><ul>" + p.related.map(r => `<li><a href="${r.href}">${esc(r.label)}</a>: ${esc(r.desc)}</li>`).join("") + "</ul>");
+  return out.join("\n");
+}
+
+const COMPARISON_PAGES: ComparisonPage[] = PAGE_SOURCES.map(p => ({ ...p, body: toHtml(p) }));
 
 export const COMPARISON_DATA: Record<string, ComparisonPage> = Object.fromEntries(
   COMPARISON_PAGES.map(p => [p.path, p])
