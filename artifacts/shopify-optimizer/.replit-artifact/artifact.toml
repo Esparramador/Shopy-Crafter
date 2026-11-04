@@ -35,6 +35,16 @@ to = "/regalo/index.html"
 from = "/regalo"
 to = "/regalo/index.html"
 
+# /instagram/ (escena 3D del QR CEO-IG de las tarjetas): sin esta regla la
+# carpeta cae en el comodín /* y sale la home (visto en producción el 04/11/2026).
+[[services.production.rewrites]]
+from = "/instagram/"
+to = "/instagram/index.html"
+
+[[services.production.rewrites]]
+from = "/instagram"
+to = "/instagram/index.html"
+
 [[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
