@@ -205,6 +205,13 @@ export default function Landing() {
   const isAdmin = !isPreview && user?.role === "admin";
   const [content, setContent] = useState<CMSContent>(LANDING_FALLBACK);
   const [currentSection, setCurrentSection] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
   const [animatedSections, setAnimatedSections] = useState<Set<string>>(new Set(["fp-hero"]));
   const packs = usePacks();
   const [contactPrefill, setContactPrefill] = useState<ContactPrefill | null>(null);
@@ -572,7 +579,20 @@ export default function Landing() {
               <a href="#fp-contact" className="l-btn-gold" onClick={e => { e.preventDefault(); if (isPreview) { cmsNotify("nav.ctaPrimary.label", e); } else { goToSection(FP_SECTION_IDS.indexOf("fp-contact")); setHashRobust("fp-contact"); } }} {...cmsData("nav.ctaPrimary.label")}>{content.nav.ctaPrimary.label}</a>
             </>
           )}
+          <button type="button" className="lxk-burger" aria-label={menuOpen ? "Cerrar el menú" : "Abrir el menú"} aria-expanded={menuOpen} aria-controls="lxk-menu" onClick={() => setMenuOpen(o => !o)}>
+            <span aria-hidden="true" />
+          </button>
         </div>
+        {menuOpen && (
+          <div id="lxk-menu" className="lxk-menu" role="menu">
+            <Link href="/tienda" className="lxk-menu-shop" role="menuitem" onClick={() => setMenuOpen(false)}>Tienda <small>tarjetas, placas QR, webs y Google</small></Link>
+            {FP_SECTIONS.map((sec, i) => (
+              <a key={sec.id} href={`#${sec.id}`} role="menuitem" className={currentSection === i ? "on" : ""}
+                onClick={e => { e.preventDefault(); setMenuOpen(false); goToSection(i); setHashRobust(sec.id); }}>{sec.nav}</a>
+            ))}
+            {!isAdmin && <Link href="/login" role="menuitem" onClick={() => setMenuOpen(false)}>Iniciar sesión</Link>}
+          </div>
+        )}
       </nav>
 
 

@@ -323,7 +323,6 @@
   .lxk-tabs button { justify-content: center; }
   .lxk-extra { grid-template-columns: auto minmax(0, 1fr) auto; }
   .lxk-extra-ico { display: none; }
-  .lxk-nav-shop { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .lxk-skeleton { animation: none; } }
 @media (max-width: 720px) {
@@ -633,3 +632,22 @@
 @media (max-width: 720px) {
   #fp-pricing.fp-section { padding: 84px 16px 56px; }
 }
+
+/* ── Menú móvil de la portada: aquí vive la Tienda cuando el header no cabe ── */
+.lxk-burger { display: none; width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.04); cursor: pointer; align-items: center; justify-content: center; flex: none; }
+.lxk-burger span, .lxk-burger span::before, .lxk-burger span::after { display: block; width: 18px; height: 2px; border-radius: 2px; background: var(--l-t, #f2f0ff); transition: transform .25s, opacity .25s; content: ""; position: relative; }
+.lxk-burger span::before { position: absolute; top: -6px; } .lxk-burger span::after { position: absolute; top: 6px; }
+.lxk-burger[aria-expanded="true"] span { background: transparent; }
+.lxk-burger[aria-expanded="true"] span::before { top: 0; transform: rotate(45deg); }
+.lxk-burger[aria-expanded="true"] span::after { top: 0; transform: rotate(-45deg); }
+.lxk-menu { position: fixed; top: 100%; left: 0; right: 0; max-height: calc(100dvh - 60px); overflow-y: auto; padding: 10px 16px 20px; display: flex; flex-direction: column; gap: 2px;
+  background: rgba(8,8,16,.97); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(200,168,75,.18); box-shadow: 0 30px 60px -20px rgba(0,0,0,.8); }
+.lxk-menu a { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 14px 12px; border-radius: 12px; font-size: 16px; font-weight: 600; color: var(--l-t, #f2f0ff); text-decoration: none; }
+.lxk-menu a:hover, .lxk-menu a.on { background: rgba(255,255,255,.05); color: var(--l-gold2, #d9bb62); }
+.lxk-menu small { font-size: 11.5px; font-weight: 400; color: var(--l-t2); }
+.lxk-menu .lxk-menu-shop { margin-bottom: 6px; background: linear-gradient(180deg, rgba(200,168,75,.16), rgba(200,168,75,.06)); border: 1px solid rgba(200,168,75,.35); }
+@media (max-width: 900px) {
+  .lxk-burger { display: inline-flex; }
+  .lxk-nav-shop { display: none; }
+}
+@media (min-width: 901px) { .lxk-menu { display: none; } }
