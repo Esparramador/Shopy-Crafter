@@ -19,7 +19,7 @@ run = "pnpm --filter @workspace/shopify-optimizer run dev"
 
 [services.production]
 publicDir = "artifacts/shopify-optimizer/dist/public"
-serve = "static"
+run = [ "node", "artifacts/shopify-optimizer/server.mjs" ]
 
 [services.production.build]
 args = [ "pnpm", "--filter", "@workspace/shopify-optimizer", "run", "build" ]

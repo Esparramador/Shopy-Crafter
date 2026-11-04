@@ -565,12 +565,18 @@ importers:
       canvas-confetti:
         specifier: ^1.9.4
         version: 1.9.4
+      compression:
+        specifier: ^1.8.0
+        version: 1.8.2
       d3:
         specifier: ^7.9.0
         version: 7.9.0
       dompurify:
         specifier: ^3.4.17
         version: 3.4.17
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1
       fabric:
         specifier: ^7.4.0
         version: 7.4.0
