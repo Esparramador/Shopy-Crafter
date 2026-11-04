@@ -15,9 +15,9 @@ export const RELEASES: Release[] = [
     title: "ShopyBrain OmniCore v3",
     description: "La mayor actualización del motor de memoria e inteligencia acumulada de Shopy Crafter. OmniCore v3 introduce aprendizaje continuo entre proyectos, sincronización de conocimiento multi-cuenta y un sistema de dominios de conocimiento especializado por sector de eCommerce.",
     changes: [
-      "Nuevo motor de aprendizaje continuo con 46.890+ insights acumulados",
+      "Nuevo motor de aprendizaje continuo",
       "Brain Sync: sincronización automática de conocimiento entre proyectos",
-      "Sistema de dominios de conocimiento (43 dominios activos)",
+      "Sistema de dominios de conocimiento especializados",
       "Dashboard de memorias con búsqueda semántica avanzada",
     ],
   },
@@ -96,8 +96,8 @@ export const RELEASES: Release[] = [
     changes: [
       "Centro de control unificado con overview del sistema",
       "Búsqueda universal cross-project y cross-módulo",
-      "Vault mejorado con 7 categorías y 95+ archivos",
-      "Inteligencia competitiva con 24 competidores trackeados",
+      "Vault mejorado con categorías de archivos",
+      "Inteligencia competitiva con seguimiento de competidores",
     ],
   },
 ];

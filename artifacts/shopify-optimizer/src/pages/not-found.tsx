@@ -1,101 +1,66 @@
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
+import PublicLayout from "@/components/PublicLayout";
+import PageMeta from "@/components/PageMeta";
+import "@/pages/public/public-pages.css";
+import "@/pages/public/legal.css";
 
-const ERROR_CONFIG: Record<string, { title: string; subtitle: string; icon: string }> = {
-  "400": { title: "Solicitud Incorrecta", subtitle: "La solicitud no pudo ser procesada. Revisa los datos enviados.", icon: "⚠️" },
-  "401": { title: "No Autorizado", subtitle: "Necesitas iniciar sesión para acceder a esta página.", icon: "🔐" },
-  "402": { title: "Pago Requerido", subtitle: "Esta funcionalidad requiere una suscripción activa.", icon: "💳" },
-  "403": { title: "Acceso Denegado", subtitle: "No tienes permisos para acceder a este recurso.", icon: "🚫" },
-  "404": { title: "Página No Encontrada", subtitle: "La página que buscas no existe o ha sido movida.", icon: "🔍" },
-  "429": { title: "Demasiadas Solicitudes", subtitle: "Has excedido el límite de peticiones. Espera un momento e inténtalo de nuevo.", icon: "⏳" },
-  "500": { title: "Error Interno", subtitle: "Algo salió mal en el servidor. Estamos trabajando para solucionarlo.", icon: "🔧" },
-  "502": { title: "Bad Gateway", subtitle: "El servidor de respaldo no respondió correctamente.", icon: "🌐" },
-  "503": { title: "Servicio No Disponible", subtitle: "El servicio está temporalmente fuera de línea por mantenimiento.", icon: "🔄" },
-  "504": { title: "Timeout del Servidor", subtitle: "La solicitud tardó demasiado en procesarse. Inténtalo de nuevo.", icon: "⏰" },
+const ERROR_CONFIG: Record<string, { title: string; subtitle: string }> = {
+  "400": { title: "Solicitud incorrecta", subtitle: "La solicitud no pudo procesarse. Revisa los datos enviados." },
+  "401": { title: "Necesitas iniciar sesión", subtitle: "Inicia sesión para acceder a esta página." },
+  "402": { title: "Pago requerido", subtitle: "Esta funcionalidad requiere una suscripción activa." },
+  "403": { title: "Acceso denegado", subtitle: "No tienes permisos para acceder a este recurso." },
+  "404": { title: "Esta página no existe", subtitle: "Puede que el enlace esté mal escrito o que la página haya cambiado de sitio. Estos son los caminos más habituales." },
+  "429": { title: "Demasiadas solicitudes", subtitle: "Has superado el límite de peticiones. Espera un momento e inténtalo de nuevo." },
+  "500": { title: "Error interno", subtitle: "Algo ha fallado en el servidor. Inténtalo de nuevo en unos minutos." },
+  "502": { title: "Servidor sin respuesta", subtitle: "El servidor de respaldo no ha respondido correctamente." },
+  "503": { title: "Servicio no disponible", subtitle: "El servicio está temporalmente fuera de línea por mantenimiento." },
+  "504": { title: "Tiempo de espera agotado", subtitle: "La solicitud ha tardado demasiado. Inténtalo de nuevo." },
 };
 
+const WAYS = [
+  { href: "/tienda", tag: "Tienda", t: "Tienda", d: "Tarjetas, placas QR, regalos 3D y servicios web con pago seguro." },
+  { href: "/automatizacion-shopify-ia", tag: "Servicios", t: "Automatización con IA", d: "Shopify, WooCommerce, PrestaShop y Stripe." },
+  { href: "/diseno-web-profesional", tag: "Servicios", t: "Diseño web profesional", d: "Webs y landings con 3D y animación." },
+  { href: "/blog", tag: "Blog", t: "Blog", d: "Guías y novedades de eCommerce." },
+  { href: "/faq", tag: "Ayuda", t: "Preguntas frecuentes", d: "Packs, portal y cómo trabajamos." },
+  { href: "/contacto", tag: "Contacto", t: "Hablar con nosotros", d: "Cuéntanos qué buscas." },
+];
+
 export default function NotFound({ code }: { code?: string }) {
-  const [, navigate] = useLocation();
+  const [location] = useLocation();
   const errorCode = code ?? "404";
   const config = ERROR_CONFIG[errorCode] ?? ERROR_CONFIG["404"];
 
   return (
-    <div style={{
-      minHeight: "100vh", width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "linear-gradient(135deg, #080810 0%, #0d0d1a 50%, #080810 100%)",
-      fontFamily: "'Geist', system-ui, sans-serif",
-    }}>
-      <div style={{
-        maxWidth: 520, width: "100%", margin: "0 24px", textAlign: "center",
-        background: "rgba(255,255,255,0.03)", border: "1px solid rgba(200,168,75,0.15)",
-        borderRadius: 16, padding: "48px 40px", backdropFilter: "blur(20px)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(200,168,75,0.08)",
-      }}>
-        <div style={{ fontSize: 48, marginBottom: 16, lineHeight: 1 }}>{config.icon}</div>
-
-        <div style={{
-          fontSize: 72, fontWeight: 800, lineHeight: 1,
-          background: "linear-gradient(135deg, #c8a84b 0%, #e8d48b 50%, #c8a84b 100%)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-          marginBottom: 8, letterSpacing: -2,
-        }}>
-          {errorCode}
+    <PublicLayout>
+      <PageMeta title={`${config.title} — Shopy Crafter`} description={config.subtitle} canonical={`https://shopycrafter.com${location}`} noindex />
+      <header className="pp-hero lg-hero">
+        <div className="pp-wrap" style={{ textAlign: "center" }}>
+          <span className="pp-eyebrow">Error {errorCode}</span>
+          <h1 className="pp-h1" style={{ margin: "0 auto 18px" }}>{config.title}</h1>
+          <p className="pp-lead" style={{ margin: "0 auto" }}>{config.subtitle}</p>
+          <div className="pp-actions" style={{ justifyContent: "center" }}>
+            <Link href="/" className="pp-btn pp-btn-gold">Ir al inicio</Link>
+            <button type="button" className="pp-btn" onClick={() => window.history.back()}>Volver atrás</button>
+          </div>
         </div>
-
-        <h1 style={{
-          fontSize: 22, fontWeight: 700, color: "#f0f0f5", marginBottom: 12,
-          fontFamily: "'Instrument Serif', Georgia, serif",
-        }}>
-          {config.title}
-        </h1>
-
-        <p style={{ fontSize: 15, color: "rgba(240,240,245,0.55)", lineHeight: 1.6, marginBottom: 32 }}>
-          {config.subtitle}
-        </p>
-
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <button
-            onClick={() => navigate("/")}
-            style={{
-              padding: "12px 28px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: "linear-gradient(135deg, #c8a84b, #a08838)", color: "#080810",
-              fontSize: 14, fontWeight: 600, letterSpacing: 0.3,
-              transition: "transform 0.2s, box-shadow 0.2s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(200,168,75,0.4)"; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}
-          >
-            Ir al Inicio
-          </button>
-          <button
-            onClick={() => window.history.back()}
-            style={{
-              padding: "12px 28px", borderRadius: 8, cursor: "pointer",
-              background: "transparent", border: "1px solid rgba(200,168,75,0.3)",
-              color: "#c8a84b", fontSize: 14, fontWeight: 500,
-              transition: "border-color 0.2s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(200,168,75,0.6)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(200,168,75,0.3)"; }}
-          >
-            Volver Atrás
-          </button>
+      </header>
+      {errorCode === "404" && (
+        <div className="pp-wrap">
+          <section className="pp-section" aria-labelledby="h-ways">
+            <h2 className="pp-h2" id="h-ways">Quizá buscabas</h2>
+            <div className="pp-grid">
+              {WAYS.map(w => (
+                <Link key={w.href} href={w.href} className="pp-card">
+                  <span className="pp-tag">{w.tag}</span>
+                  <h3>{w.t}</h3>
+                  <p>{w.d}</p>
+                </Link>
+              ))}
+            </div>
+          </section>
         </div>
-
-        <div style={{
-          marginTop: 40, paddingTop: 20,
-          borderTop: "1px solid rgba(200,168,75,0.1)",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        }}>
-          <span style={{
-            fontSize: 12, fontWeight: 700, color: "#c8a84b", letterSpacing: 1.5,
-          }}>
-            SHOPY CRAFTER
-          </span>
-          <span style={{ fontSize: 11, color: "rgba(240,240,245,0.3)" }}>
-            — IA para tu eCommerce
-          </span>
-        </div>
-      </div>
-    </div>
+      )}
+    </PublicLayout>
   );
 }

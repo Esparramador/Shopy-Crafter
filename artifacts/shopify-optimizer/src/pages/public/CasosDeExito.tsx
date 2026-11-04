@@ -1,82 +1,145 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
-import { CASES } from "@/lib/casos-data";
+import { CASES, CASE_CATEGORIES, type Caso } from "@/lib/casos-data";
+import "./casos.css";
+
+const SITE = "https://shopycrafter.com";
+
+/** Zona visual de la tarjeta: panorámica, tira de móviles o ficha tipográfica (sin imagen inventada). */
+function Media({ c }: { c: Caso }) {
+  const tall = c.images.filter(i => i.h > i.w * 1.2).slice(0, 3);
+  const wide = c.images.find(i => i.w >= i.h * 0.9);
+  if (wide && (c.images[0] === wide || tall.length < 2)) {
+    return (
+      <div className="cs-media cs-media--wide">
+        <img src={wide.src} alt={wide.alt} width={wide.w} height={wide.h} loading="lazy" decoding="async" />
+      </div>
+    );
+  }
+  if (tall.length) {
+    return (
+      <div className="cs-media cs-media--phones">
+        {tall.map(i => <img key={i.src} src={i.src} alt={i.alt} width={i.w} height={i.h} loading="lazy" decoding="async" />)}
+      </div>
+    );
+  }
+  return <div className="cs-media cs-media--text" aria-hidden="true"><span>{c.name}</span></div>;
+}
 
 export default function CasosDeExito() {
+  const [cat, setCat] = useState<string>("Todos");
+  const visibles = cat === "Todos" ? CASES : CASES.filter(c => c.category === cat);
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "@id": `${SITE}/casos-de-exito`,
+        url: `${SITE}/casos-de-exito`,
+        name: "Casos de éxito — Shopy Crafter",
+        hasPart: CASES.map(c => ({ "@type": "CreativeWork", name: c.name, description: c.summary })),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: `${SITE}/` },
+          { "@type": "ListItem", position: 2, name: "Casos de éxito", item: `${SITE}/casos-de-exito` },
+        ],
+      },
+    ],
+  };
+
   return (
     <>
       <PageMeta {...metaFor("/casos-de-exito")} />
       <PublicLayout>
-      <div style={{ padding: "80px 24px", maxWidth: 980, margin: "0 auto" }}>
-        <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(45,212,159,0.12)", color: "var(--jade, #2dd49f)", border: "1px solid rgba(45,212,159,0.25)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Casos de éxito</div>
-        <h1 style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 16, lineHeight: 1.1 }}>
-          Resultados reales de tiendas que ya usan <em style={{ color: "var(--jade, #2dd49f)", fontStyle: "normal" }}>Shopy Crafter</em>.
-        </h1>
-        <p style={{ fontSize: 16, color: "var(--t3, #999)", lineHeight: 1.7, marginBottom: 48, maxWidth: 720 }}>
-          Cifras verificadas con permiso de los clientes. Cada caso usa nuestros motores estándar — sin trucos, sin tráfico pagado adicional.
-        </p>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 24, marginBottom: 60 }}>
-          {CASES.map(c => (
-            <Link key={c.slug} href={`/casos-de-exito/${c.slug}`} style={{ textDecoration: "none", display: "block" }}>
-              <div style={{
-                padding: 32, background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)", borderRadius: 20,
-                display: "grid", gridTemplateColumns: "1fr auto", gap: 24, alignItems: "start",
-                transition: "border-color 0.2s, transform 0.2s",
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(45,212,159,0.3)";
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--ink3, #1e1e22)";
-                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-              }}
-              >
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-                    <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--t, #eee)", margin: 0 }}>{c.name}</h2>
-                    <span style={{ fontSize: 12, color: "#e6c668", background: "rgba(200,168,75,0.12)", padding: "3px 10px", borderRadius: 6 }}>{c.niche}</span>
-                    <span style={{ fontSize: 11, color: "var(--t4, #666)" }}>⏱ {c.time}</span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-                    <div style={{ padding: 16, background: "rgba(232,69,88,0.06)", border: "1px solid rgba(232,69,88,0.15)", borderRadius: 12 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--t4, #666)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Antes</div>
-                      <p style={{ fontSize: 14, color: "var(--t3, #999)", lineHeight: 1.5, margin: 0 }}>{c.before}</p>
-                    </div>
-                    <div style={{ padding: 16, background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 12 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--jade, #2dd49f)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>Después</div>
-                      <p style={{ fontSize: 14, color: "var(--t, #eee)", lineHeight: 1.5, margin: 0 }}>{c.after}</p>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    {c.engines.map(e => (
-                      <span key={e} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, background: "var(--ink, #0a0a0c)", border: "1px solid var(--ink3, #1e1e22)", color: "var(--t3, #999)" }}>{e}</span>
-                    ))}
-                    <span style={{ fontSize: 12, color: "var(--jade, #2dd49f)", fontWeight: 600, marginLeft: "auto" }}>Ver caso completo →</span>
-                  </div>
-                </div>
-                <div style={{ textAlign: "center", padding: "16px 20px", background: "rgba(45,212,159,0.08)", borderRadius: 14, minWidth: 90 }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: "var(--jade, #2dd49f)" }}>{c.highlight}</div>
-                  <div style={{ fontSize: 10, color: "var(--t4, #666)", textTransform: "uppercase" }}>resultado</div>
-                </div>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+        <section className="pp-hero">
+          <div className="pp-wrap">
+            <nav className="pp-crumbs" aria-label="Migas de pan" style={{ padding: 0, marginBottom: 28 }}>
+              <Link href="/">Inicio</Link><span aria-hidden="true">/</span><span aria-current="page">Casos de éxito</span>
+            </nav>
+            <div className="cs-rise">
+              <span className="pp-eyebrow">Casos de éxito</span>
+              <h1 className="pp-h1">Casos de éxito: <em>proyectos reales</em> que hemos construido</h1>
+              <p className="pp-lead">
+                Restaurantes, marcas, apps y un taller láser. En cada ficha contamos qué problema resolvía, qué hace el sistema, con qué
+                está hecho y en qué estado está hoy. Sin cifras que no podamos demostrar: lo que ves son las pantallas reales.
+              </p>
+              <div className="pp-actions">
+                <Link href="/contacto" className="pp-btn pp-btn-gold">Quiero algo parecido</Link>
+                <Link href="/tienda" className="pp-btn">Ver la tienda</Link>
               </div>
-            </Link>
-          ))}
-        </div>
+            </div>
+          </div>
+        </section>
 
-        <div style={{ padding: 32, background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 16, textAlign: "center" }}>
-          <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 8 }}>¿Tu tienda puede ser el próximo caso de éxito?</h3>
-          <p style={{ fontSize: 14, color: "var(--t3, #999)", marginBottom: 16 }}>Cuéntanos sobre tu negocio y te decimos qué podemos hacer por ti.</p>
-          <a href="/contacto" style={{
-            display: "inline-block", padding: "12px 28px", borderRadius: 10,
-            background: "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000",
-            fontWeight: 700, fontSize: 14, textDecoration: "none",
-          }}>Solicitar análisis gratuito →</a>
+        <section className="pp-section" aria-labelledby="cs-lista" style={{ paddingTop: 12 }}>
+          <div className="pp-wrap">
+            <h2 className="pp-h2" id="cs-lista">{CASES.length} proyectos, de la idea al sistema funcionando</h2>
+            <p className="pp-sub">Filtra por tipo de trabajo o abre cualquier ficha para ver las capturas y las funciones.</p>
+
+            <ul className="cs-filters" aria-label="Filtrar por tipo de proyecto">
+              {["Todos", ...CASE_CATEGORIES].map(c => (
+                <li key={c}>
+                  <button type="button" className="cs-chip" aria-pressed={cat === c} onClick={() => setCat(c)}>
+                    {c}{c === "Todos" ? ` (${CASES.length})` : ` (${CASES.filter(x => x.category === c).length})`}
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div className="cs-grid">
+              {visibles.map((c, i) => (
+                <Link key={c.slug} href={`/casos-de-exito/${c.slug}`} className="cs-card cs-rise" style={{ "--i": Math.min(i, 6) } as React.CSSProperties}>
+                  <div style={{ position: "relative" }}>
+                    <span className="cs-badge" data-s={c.status}>{c.status}</span>
+                    <Media c={c} />
+                  </div>
+                  <div className="cs-body">
+                    <small>{c.niche}</small>
+                    <h3>{c.name}</h3>
+                    <p>{c.summary}</p>
+                    <ul className="cs-tags" aria-label="Tecnología">
+                      {c.tech.slice(0, 4).map(t => <li key={t}>{t}</li>)}
+                    </ul>
+                    <span className="cs-go">Ver el proyecto <span aria-hidden="true">→</span></span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <p className="cs-note">
+              <span aria-hidden="true">ℹ</span>
+              <span><strong>Cómo leer estas fichas.</strong> Describimos lo que hace cada sistema y su estado actual (en producción, entregado, en pruebas o en desarrollo). No publicamos porcentajes de mejora ni testimonios que no podamos documentar.</span>
+            </p>
+          </div>
+        </section>
+
+        <section className="pp-section" aria-labelledby="cs-mas">
+          <div className="pp-wrap">
+            <h2 className="pp-h2" id="cs-mas">Sigue explorando</h2>
+            <div className="pp-grid">
+              <Link href="/tienda" className="pp-card hover"><span className="pp-tag">Tienda</span><h3>Productos y servicios</h3><p>Tarjetas de aluminio, placas QR de madera, webs y rediseño de tiendas, con precios «a partir de».</p></Link>
+              <Link href="/blog" className="pp-card hover"><span className="pp-tag">Blog</span><h3>Guías de eCommerce e IA</h3><p>SEO de producto, migraciones, pagos y automatización explicados paso a paso.</p></Link>
+              <Link href="/sobre-nosotros" className="pp-card hover"><span className="pp-tag">Estudio</span><h3>Cómo trabajamos</h3><p>El método, las reglas y las tres líneas de trabajo de Shopy Crafter.</p></Link>
+            </div>
+          </div>
+        </section>
+
+        <div className="pp-wrap">
+          <section className="pp-cta" aria-labelledby="cs-cta">
+            <h2 id="cs-cta">¿Qué problema te gustaría quitarte de encima?</h2>
+            <p>Cuéntanos cómo trabajas hoy y te proponemos qué construir, con presupuesto por escrito antes de empezar.</p>
+            <div className="pp-actions" style={{ justifyContent: "center" }}>
+              <Link href="/contacto" className="pp-btn pp-btn-gold">Pedir una propuesta</Link>
+            </div>
+          </section>
         </div>
-      </div>
-    </PublicLayout>
+      </PublicLayout>
     </>
   );
 }

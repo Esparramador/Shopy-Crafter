@@ -1,81 +1,147 @@
+import { Link } from "wouter";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
+import "./afiliados.css";
+
+const SITE = "https://shopycrafter.com";
+
+const WHO = [
+  { t: "Agencias y estudios", d: "Tienes un cliente que pide algo que no haces: un asistente de WhatsApp, un TPV, una app." },
+  { t: "Freelancers y consultores", d: "Trabajas con tiendas online y ves a diario lo que les falta: SEO, velocidad, rediseño, automatización." },
+  { t: "Gestorías, imprentas y proveedores", d: "Tus clientes te preguntan quién les puede hacer la web, la carta con QR o las tarjetas." },
+];
+
+const STEPS = [
+  { t: "Cuéntanos quién eres", d: "Escríbenos desde el formulario de contacto indicando que te interesa el programa y qué tipo de clientes tienes." },
+  { t: "Acordamos las condiciones por escrito", d: "No publicamos porcentajes ni plazos cerrados: fijamos contigo, antes de empezar, cómo se registra cada recomendación y cuánto y cuándo se cobra." },
+  { t: "Nos presentas al cliente", d: "Del diagnóstico al presupuesto y al proyecto nos encargamos nosotros. Tú no tienes que vender ni dar soporte técnico." },
+];
+
+const OFFER = [
+  { t: "Tiendas online y webs", d: "Diseño y rediseño de tiendas, landings con 3D, SEO y velocidad.", href: "/diseno-web-profesional" },
+  { t: "Automatización con IA", d: "Asistentes de WhatsApp y teléfono, agentes y flujos de trabajo.", href: "/ecommerce-ia-automatizacion" },
+  { t: "Software y apps a medida", d: "TPV, cartas con QR, paneles de gestión y apps Android.", href: "/desarrollo-apps-nativas" },
+  { t: "Taller láser", d: "Tarjetas de aluminio, placas QR de madera y QR artísticos, en la tienda.", href: "/tienda" },
+];
+
+const FAQ = [
+  { q: "¿Cuánto se cobra por recomendar?", a: "Depende de lo que se recomiende y de cómo trabajemos juntos. Por eso no ponemos una cifra única en esta página: la acordamos por escrito antes de que hagas la primera recomendación." },
+  { q: "¿Qué puedo recomendar?", a: "Cualquiera de nuestros servicios: tiendas y webs, automatización con IA, software y apps a medida, y los productos del taller láser. En los proyectos puedes ver ejemplos reales de cada uno." },
+  { q: "¿Qué hacéis vosotros con el cliente que recomiendo?", a: "Lo atendemos como a cualquier otro: entender su problema, presupuesto por escrito con la puesta en marcha y la mensualidad separadas, construcción, pruebas y entrega." },
+  { q: "¿Cómo pido acceso?", a: "Con el formulario de contacto. Indica que te interesa el programa de afiliados, quién eres y qué clientes tienes, y te contestamos con las condiciones." },
+];
 
 export default function ProgramaAfiliados() {
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "FAQPage",
+        mainEntity: FAQ.map(f => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: `${SITE}/` },
+          { "@type": "ListItem", position: 2, name: "Programa de afiliados", item: `${SITE}/programa-de-afiliados` },
+        ],
+      },
+    ],
+  };
+
   return (
     <>
       <PageMeta {...metaFor("/programa-de-afiliados")} />
       <PublicLayout>
-      <div style={{ padding: "80px 24px", maxWidth: 980, margin: "0 auto" }}>
-        <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Programa de afiliados</div>
-        <h1 style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 16, lineHeight: 1.1 }}>
-          Recomienda Shopy Crafter y gana <em style={{ color: "#e6c668", fontStyle: "normal" }}>30% recurrente</em>.
-        </h1>
-        <p style={{ fontSize: 16, color: "var(--t3, #999)", lineHeight: 1.7, marginBottom: 40, maxWidth: 720 }}>
-          Nuestro programa está pensado para freelancers, agencias y consultores que ya trabajan con eCommerce. Cobra por cada cliente que recomiendes mientras siga activo.
-        </p>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20, marginBottom: 48 }}>
-          {[
-            { v: "30%", l: "Comisión recurrente sobre cada cuota mensual" },
-            { v: "90 días", l: "Ventana de cookie de atribución" },
-            { v: "60€", l: "Mínimo de retiro (Stripe / transferencia)" },
-            { v: "24h", l: "Tiempo medio de aprobación de la solicitud" },
-          ].map(s => (
-            <div key={s.l} style={{ padding: 24, background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)", borderRadius: 14, textAlign: "center" }}>
-              <div style={{ fontSize: 32, fontWeight: 800, color: "#e6c668", marginBottom: 8 }}>{s.v}</div>
-              <div style={{ fontSize: 13, color: "var(--t3, #999)", lineHeight: 1.5 }}>{s.l}</div>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+        <section className="pp-hero">
+          <div className="pp-wrap">
+            <nav className="pp-crumbs" aria-label="Migas de pan" style={{ padding: 0, marginBottom: 28 }}>
+              <Link href="/">Inicio</Link><span aria-hidden="true">/</span><span aria-current="page">Programa de afiliados</span>
+            </nav>
+            <div className="af-rise">
+              <span className="pp-eyebrow">Programa de afiliados</span>
+              <h1 className="pp-h1">Recomienda Shopy Crafter y <em>cobra por ello</em></h1>
+              <p className="pp-lead">
+                Para agencias, freelancers y consultores que ya trabajan con tiendas y negocios. Tú nos presentas a quien necesita una web, una
+                automatización con IA, un software a medida o piezas del taller láser; nosotros hacemos el proyecto. Las condiciones se acuerdan
+                por escrito, contigo, antes de empezar.
+              </p>
+              <div className="pp-actions">
+                <Link href="/contacto" className="pp-btn pp-btn-gold">Solicitar acceso al programa</Link>
+                <Link href="/casos-de-exito" className="pp-btn">Ver qué construimos</Link>
+              </div>
             </div>
-          ))}
-        </div>
-
-        <div style={{ padding: 32, background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)", borderRadius: 16, marginBottom: 48 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, color: "var(--t, #eee)" }}>Cómo funciona</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 24 }}>
-            {[
-              { num: "01", title: "Solicita acceso", text: "Rellena el formulario de contacto indicando que quieres ser afiliado. Te respondemos en menos de 24h con tu enlace único." },
-              { num: "02", title: "Comparte tu enlace", text: "Envía tu enlace de afiliado a tus clientes, lectores o seguidores. Cada visita queda registrada durante 90 días." },
-              { num: "03", title: "Cobra cada mes", text: "Cuando alguien se suscribe a través de tu enlace, ganas el 30% de su cuota mensual de forma recurrente mientras siga activo." },
-            ].map(step => (
-              <div key={step.num} style={{ display: "flex", gap: 14 }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "rgba(200,168,75,0.3)", flexShrink: 0, lineHeight: 1 }}>{step.num}</div>
-                <div>
-                  <h4 style={{ fontSize: 15, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 6 }}>{step.title}</h4>
-                  <p style={{ fontSize: 14, color: "var(--t3, #999)", lineHeight: 1.6, margin: 0 }}>{step.text}</p>
-                </div>
-              </div>
-            ))}
           </div>
-        </div>
+        </section>
 
-        <div style={{ padding: 32, background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)", borderRadius: 16, marginBottom: 48 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, color: "var(--t, #eee)" }}>Preguntas frecuentes del programa</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {[
-              { q: "¿Necesito ser cliente de Shopy Crafter para ser afiliado?", a: "No. Cualquier persona o empresa puede solicitar acceso al programa, aunque recomendamos que conozcas el producto para recomendar con confianza." },
-              { q: "¿Cuándo y cómo cobro?", a: "Los pagos se procesan el día 15 de cada mes por Stripe o transferencia bancaria. El mínimo de retiro es 60€." },
-              { q: "¿Hay límite de referidos?", a: "No. Puedes referir tantos clientes como quieras. Más referidos = más ingresos recurrentes." },
-              { q: "¿La comisión es para siempre?", a: "Mientras tu referido mantenga su suscripción activa, tú cobras el 30% cada mes. Sin límite de tiempo." },
-            ].map(faq => (
-              <div key={faq.q} style={{ padding: 16, background: "var(--ink, #0a0a0c)", borderRadius: 12, border: "1px solid var(--ink3, #1e1e22)" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 6 }}>{faq.q}</div>
-                <div style={{ fontSize: 13, color: "var(--t3, #999)", lineHeight: 1.6 }}>{faq.a}</div>
-              </div>
-            ))}
+        <section className="pp-section" aria-labelledby="af-quien">
+          <div className="pp-wrap">
+            <h2 className="pp-h2" id="af-quien">Para quién es</h2>
+            <p className="pp-sub">Para quien ya tiene la confianza de otros negocios y quiere poder decirles «conozco a quien lo hace».</p>
+            <ul className="af-who">
+              {WHO.map(w => <li key={w.t} className="af-scroll"><b>{w.t}</b><span>{w.d}</span></li>)}
+            </ul>
           </div>
-        </div>
+        </section>
 
-        <div style={{ padding: 32, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.15)", borderRadius: 16, textAlign: "center" }}>
-          <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 8 }}>¿Listo para empezar a ganar?</h3>
-          <p style={{ fontSize: 14, color: "var(--t3, #999)", marginBottom: 16 }}>Solicita tu acceso al programa y empieza a cobrar comisiones recurrentes.</p>
-          <a href="/contacto" style={{
-            display: "inline-block", padding: "12px 28px", borderRadius: 10,
-            background: "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000",
-            fontWeight: 700, fontSize: 14, textDecoration: "none",
-          }}>Solicitar acceso al programa →</a>
+        <section className="pp-section" aria-labelledby="af-como">
+          <div className="pp-wrap">
+            <h2 className="pp-h2" id="af-como">Cómo funciona</h2>
+            <p className="pp-sub">Tres pasos, sin enlaces de seguimiento ni letra pequeña.</p>
+            <ol className="af-steps">
+              {STEPS.map(s => <li key={s.t} className="af-step af-scroll"><h3>{s.t}</h3><p>{s.d}</p></li>)}
+            </ol>
+          </div>
+        </section>
+
+        <section className="pp-section" aria-labelledby="af-oferta">
+          <div className="pp-wrap">
+            <h2 className="pp-h2" id="af-oferta">Qué puedes recomendar</h2>
+            <p className="pp-sub">Servicios reales, con proyectos que lo demuestran. Los precios de la tienda son siempre «a partir de».</p>
+            <div className="af-offer">
+              {OFFER.map(o => (
+                <Link key={o.t} href={o.href} className="af-scroll"><b>{o.t}</b><span>{o.d}</span></Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="pp-section" aria-labelledby="af-cond">
+          <div className="pp-wrap">
+            <div className="af-terms">
+              <h2 id="af-cond">Las condiciones, siempre por escrito</h2>
+              <p>No anunciamos un porcentaje ni un plazo en esta página porque no queremos prometer algo que luego no encaje con el servicio que recomiendas. Cada acuerdo recoge, antes de la primera recomendación, cómo se registra de dónde viene cada cliente, qué se cobra y cuándo.</p>
+              <p>Si prefieres ver primero lo que hacemos, repasa los <Link href="/casos-de-exito" style={{ color: "var(--pp-gold2)" }}>proyectos</Link> o la <Link href="/tienda" style={{ color: "var(--pp-gold2)" }}>tienda</Link>.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="pp-section" aria-labelledby="af-faq">
+          <div className="pp-narrow">
+            <h2 className="pp-h2" id="af-faq">Preguntas frecuentes del programa</h2>
+            <div className="af-faq" style={{ marginTop: 24 }}>
+              {FAQ.map(f => (
+                <details key={f.q}>
+                  <summary>{f.q}</summary>
+                  <p>{f.a}</p>
+                </details>
+              ))}
+            </div>
+            <p className="pp-sub" style={{ marginTop: 22, marginBottom: 0 }}>¿Otra duda? Mira las <Link href="/faq" style={{ color: "var(--pp-gold2)" }}>preguntas frecuentes</Link> generales.</p>
+          </div>
+        </section>
+
+        <div className="pp-wrap">
+          <section className="pp-cta" aria-labelledby="af-cta">
+            <h2 id="af-cta">¿Hablamos?</h2>
+            <p>Escríbenos desde el formulario de contacto indicando que te interesa el programa de afiliados y te contestamos con las condiciones.</p>
+            <div className="pp-actions" style={{ justifyContent: "center" }}>
+              <Link href="/contacto" className="pp-btn pp-btn-gold">Solicitar acceso</Link>
+            </div>
+          </section>
         </div>
-      </div>
-    </PublicLayout>
+      </PublicLayout>
     </>
   );
 }

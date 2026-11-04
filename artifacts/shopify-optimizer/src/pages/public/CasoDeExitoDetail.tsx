@@ -2,6 +2,9 @@ import { useParams, Link } from "wouter";
 import PublicLayout from "@/components/PublicLayout";
 import PageMeta from "@/components/PageMeta";
 import { CASES } from "@/lib/casos-data";
+import "./casos.css";
+
+const SITE = "https://shopycrafter.com";
 
 export default function CasoDeExitoDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -10,98 +13,149 @@ export default function CasoDeExitoDetail() {
   if (!caso) {
     return (
       <PublicLayout>
-        <div style={{ padding: "120px 24px", maxWidth: 820, margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ fontSize: 32, color: "var(--t, #eee)", marginBottom: 16 }}>Caso no encontrado</h1>
-          <p style={{ color: "var(--t3, #999)", marginBottom: 24 }}>El caso de éxito que buscas no existe o ha sido eliminado.</p>
-          <Link href="/casos-de-exito" style={{ color: "#2dd49f", textDecoration: "none", fontWeight: 700 }}>← Ver todos los casos</Link>
-        </div>
+        <PageMeta title="Caso no encontrado — Shopy Crafter" description="El caso que buscas no existe." canonical={`${SITE}/casos-de-exito`} noindex />
+        <section className="pp-hero">
+          <div className="pp-narrow" style={{ textAlign: "center" }}>
+            <h1 className="pp-h1">Caso no encontrado</h1>
+            <p className="pp-lead" style={{ margin: "0 auto" }}>El proyecto que buscas no existe o ha cambiado de dirección.</p>
+            <div className="pp-actions" style={{ justifyContent: "center" }}>
+              <Link href="/casos-de-exito" className="pp-btn pp-btn-gold">Ver todos los proyectos</Link>
+            </div>
+          </div>
+        </section>
       </PublicLayout>
     );
   }
 
-  const caseSchema = {
+  const url = `${SITE}/casos-de-exito/${caso.slug}`;
+  const wide = caso.images.filter(i => i.w >= i.h * 0.9);
+  const gallery = caso.images;
+  const galleryIsWide = wide.length >= gallery.length / 2;
+  const relacionados = [
+    ...CASES.filter(c => c.slug !== caso.slug && c.category === caso.category),
+    ...CASES.filter(c => c.slug !== caso.slug && c.category !== caso.category),
+  ].slice(0, 3);
+
+  const schema = {
     "@context": "https://schema.org",
-    "@type": "Article",
-    "@id": `https://shopycrafter.com/casos-de-exito/${caso.slug}`,
-    headline: `Caso de éxito: ${caso.name} — ${caso.highlight} con Shopy Crafter`,
-    description: `${caso.name} (${caso.niche}): antes ${caso.before}. Después: ${caso.after}. En ${caso.time}.`,
-    author: { "@type": "Organization", name: "Shopy Crafter" },
-    publisher: { "@type": "Organization", name: "Shopy Crafter", url: "https://shopycrafter.com" },
+    "@graph": [
+      {
+        "@type": "CreativeWork",
+        "@id": url,
+        url,
+        name: caso.headline,
+        description: caso.summary,
+        keywords: caso.tech.join(", "),
+        creator: { "@type": "Organization", name: "Shopy Crafter", url: SITE },
+        ...(caso.images[0] ? { image: `${SITE}${caso.images[0].src}` } : {}),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: `${SITE}/` },
+          { "@type": "ListItem", position: 2, name: "Casos de éxito", item: `${SITE}/casos-de-exito` },
+          { "@type": "ListItem", position: 3, name: caso.name, item: url },
+        ],
+      },
+    ],
   };
+
+  const [problema, ...resto] = caso.paragraphs;
 
   return (
     <PublicLayout>
       <PageMeta
         title={`${caso.name} — Caso de éxito · Shopy Crafter`}
-        description={`${caso.name} (${caso.niche}): ${caso.before}. Resultado: ${caso.after}. En ${caso.time}.`}
-        canonical={`https://shopycrafter.com/casos-de-exito/${caso.slug}`}
+        description={caso.summary}
+        canonical={url}
+        ogImage={caso.images[0] ? `${SITE}${caso.images[0].src}` : undefined}
         noindex
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(caseSchema) }}
-      />
-      <div style={{ padding: "80px 24px", maxWidth: 820, margin: "0 auto" }}>
-        <Link href="/casos-de-exito" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--t4, #666)", fontSize: 13, textDecoration: "none", marginBottom: 32 }}>
-          ← Casos de éxito
-        </Link>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
 
-        <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(45,212,159,0.12)", color: "var(--jade, #2dd49f)", border: "1px solid rgba(45,212,159,0.25)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>
-          Caso de éxito
+      <section className="pp-hero">
+        <div className="pp-wrap">
+          <nav className="pp-crumbs" aria-label="Migas de pan" style={{ padding: 0, marginBottom: 28 }}>
+            <Link href="/">Inicio</Link><span aria-hidden="true">/</span>
+            <Link href="/casos-de-exito">Casos de éxito</Link><span aria-hidden="true">/</span>
+            <span aria-current="page">{caso.name}</span>
+          </nav>
+          <div className="cs-detail-top">
+            <div className="cs-rise">
+              <span className="pp-eyebrow">{caso.category}</span>
+              <h1 className="pp-h1">{caso.name}</h1>
+              <p className="pp-lead">{caso.summary}</p>
+              <div className="pp-actions">
+                <Link href={caso.cta.href} className="pp-btn pp-btn-gold">{caso.cta.label}</Link>
+                <Link href="/casos-de-exito" className="pp-btn">Ver todos los proyectos</Link>
+              </div>
+            </div>
+            <dl className="cs-facts cs-rise" style={{ "--i": 2 } as React.CSSProperties}>
+              <div><dt>Tipo de trabajo</dt><dd>{caso.niche}</dd></div>
+              <div><dt>Estado</dt><dd>{caso.status}</dd></div>
+              {caso.client && <div><dt>Para</dt><dd>{caso.client}</dd></div>}
+              <div><dt>Hecho con</dt><dd>{caso.tech.join(" · ")}</dd></div>
+            </dl>
+          </div>
         </div>
+      </section>
 
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 32, flexWrap: "wrap" }}>
+      {gallery.length > 0 && (
+        <section className="pp-section" aria-labelledby="cd-capturas" style={{ paddingTop: 12 }}>
+          <div className="pp-wrap">
+            <h2 className="pp-h2" id="cd-capturas">Así se ve</h2>
+            <p className="pp-sub">Capturas reales del sistema funcionando.</p>
+            <div className={`cs-gallery${galleryIsWide ? " cs-gallery--wide" : ""}`}>
+              {gallery.map(i => (
+                <figure key={i.src} className="cs-shot cs-scroll">
+                  <img src={i.src} alt={i.alt} width={i.w} height={i.h} loading="lazy" decoding="async" />
+                  <figcaption>{i.alt}</figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="pp-section" aria-labelledby="cd-que">
+        <div className="pp-wrap cs-two">
+          <div className="pp-prose">
+            <h2 id="cd-que" style={{ marginTop: 0 }}>El problema y la solución</h2>
+            {problema && <p><strong>{problema}</strong></p>}
+            {resto.map(p => <p key={p}>{p}</p>)}
+          </div>
           <div>
-            <h1 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "var(--t, #eee)", lineHeight: 1.15, marginBottom: 8 }}>
-              {caso.name}
-            </h1>
-            <p style={{ fontSize: 15, color: "var(--t3, #999)", margin: 0 }}>{caso.niche} · {caso.time}</p>
-          </div>
-          <div style={{ padding: "20px 28px", background: "rgba(45,212,159,0.08)", border: "1px solid rgba(45,212,159,0.2)", borderRadius: 16, textAlign: "center", flexShrink: 0 }}>
-            <div style={{ fontSize: 36, fontWeight: 800, color: "var(--jade, #2dd49f)" }}>{caso.highlight}</div>
-            <div style={{ fontSize: 11, color: "var(--t4, #666)", textTransform: "uppercase", letterSpacing: "0.5px" }}>resultado</div>
+            <h2 className="pp-h2" style={{ fontSize: 24 }}>Qué hace</h2>
+            <ul className="cs-list">
+              {caso.features.map(f => <li key={f}>{f}</li>)}
+            </ul>
           </div>
         </div>
+      </section>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 40 }}>
-          <div style={{ padding: 20, background: "rgba(232,69,88,0.06)", border: "1px solid rgba(232,69,88,0.15)", borderRadius: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--t4, #666)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Antes</div>
-            <p style={{ fontSize: 14, color: "var(--t3, #999)", lineHeight: 1.5, margin: 0 }}>{caso.before}</p>
+      <section className="pp-section" aria-labelledby="cd-mas">
+        <div className="pp-wrap">
+          <h2 className="pp-h2" id="cd-mas">Otros proyectos</h2>
+          <div className="cs-related">
+            {relacionados.map(c => (
+              <Link key={c.slug} href={`/casos-de-exito/${c.slug}`}>
+                <small>{c.niche}</small>
+                <b>{c.name}</b>
+              </Link>
+            ))}
           </div>
-          <div style={{ padding: 20, background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--jade, #2dd49f)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Después</div>
-            <p style={{ fontSize: 14, color: "var(--t, #eee)", lineHeight: 1.5, margin: 0 }}>{caso.after}</p>
+        </div>
+      </section>
+
+      <div className="pp-wrap">
+        <section className="pp-cta" aria-labelledby="cd-cta">
+          <h2 id="cd-cta">¿Necesitas algo parecido a {caso.name}?</h2>
+          <p>Cuéntanos tu caso y te proponemos qué construir. El presupuesto se cierra por escrito antes de empezar.</p>
+          <div className="pp-actions" style={{ justifyContent: "center" }}>
+            <Link href="/contacto" className="pp-btn pp-btn-gold">Pedir una propuesta</Link>
+            <Link href="/tienda" className="pp-btn">Ver la tienda</Link>
           </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 40 }}>
-          <span style={{ fontSize: 11, color: "var(--t4, #666)", alignSelf: "center" }}>Motores usados:</span>
-          {caso.engines.map(e => (
-            <span key={e} style={{ fontSize: 12, padding: "4px 12px", borderRadius: 6, background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)", color: "var(--t3, #999)" }}>{e}</span>
-          ))}
-        </div>
-
-        <div
-          className="blog-body"
-          dangerouslySetInnerHTML={{ __html: caso.body }}
-          style={{ color: "var(--t2, #ccc)", lineHeight: 1.8, fontSize: 15 }}
-        />
-
-        <div style={{ marginTop: 56, padding: 28, background: "rgba(45,212,159,0.06)", border: "1px solid rgba(45,212,159,0.15)", borderRadius: 16, textAlign: "center" }}>
-          <p style={{ fontSize: 15, color: "var(--t, #eee)", fontWeight: 600, marginBottom: 8 }}>
-            ¿Tu tienda puede ser el próximo caso de éxito?
-          </p>
-          <p style={{ fontSize: 13, color: "var(--t3, #999)", marginBottom: 16 }}>Cuéntanos sobre tu negocio y te decimos qué podemos hacer.</p>
-          <a href="/contacto" style={{
-            display: "inline-block", padding: "12px 28px", borderRadius: 10,
-            background: "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000",
-            fontWeight: 700, fontSize: 14, textDecoration: "none",
-          }}>Solicitar análisis gratuito →</a>
-        </div>
-
-        <div style={{ marginTop: 40, paddingTop: 32, borderTop: "1px solid var(--ink3, #1e1e22)" }}>
-          <Link href="/casos-de-exito" style={{ color: "#2dd49f", textDecoration: "none", fontWeight: 600, fontSize: 14 }}>← Ver todos los casos</Link>
-        </div>
+        </section>
       </div>
     </PublicLayout>
   );

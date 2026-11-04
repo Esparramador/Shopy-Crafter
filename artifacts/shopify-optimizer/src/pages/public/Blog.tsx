@@ -1,56 +1,102 @@
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 import { POSTS } from "@/lib/blog-data";
+import { fechaLarga, tonoEtiqueta } from "./blog-utils";
+import "./blog.css";
+
+const ALL = "Todos";
 
 export default function Blog() {
+  const [tema, setTema] = useState(ALL);
+  const sorted = useMemo(() => [...POSTS].sort((a, b) => b.date.localeCompare(a.date)), []);
+  const [featured, ...rest] = sorted;
+  const temas = useMemo(() => {
+    const count = new Map<string, number>();
+    sorted.forEach(p => count.set(p.tag, (count.get(p.tag) ?? 0) + 1));
+    return [...count.entries()];
+  }, [sorted]);
+  const visible = (tag: string) => tema === ALL || tema === tag;
+  const showFeatured = visible(featured.tag);
+  const shown = rest.filter(p => visible(p.tag)).length + (showFeatured ? 1 : 0);
+
   return (
     <>
       <PageMeta {...metaFor("/blog")} />
       <PublicLayout>
-      <div style={{ padding: "80px 24px", maxWidth: 980, margin: "0 auto" }}>
-        <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Blog</div>
-        <h1 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 16, lineHeight: 1.1 }}>
-          Blog de <em style={{ color: "#e6c668", fontStyle: "normal" }}>Shopy Crafter</em>
-        </h1>
-        <p style={{ fontSize: 16, color: "var(--t3, #999)", lineHeight: 1.7, marginBottom: 48 }}>
-          Estrategias, tutoriales y casos reales para hacer crecer tu eCommerce con IA.
-        </p>
+        <header className="pp-hero bl-hero">
+          <div className="pp-wrap">
+            <nav className="bl-crumbs" aria-label="Migas de pan">
+              <Link href="/">Inicio</Link><span className="sep" aria-hidden="true">/</span><span aria-current="page">Blog</span>
+            </nav>
+            <span className="pp-eyebrow">Blog</span>
+            <h1 className="pp-h1">Guías de eCommerce, <em>SEO e IA</em> para tu tienda</h1>
+            <p className="pp-lead">
+              Comparativas de plataformas, migraciones, pagos, pricing y automatización con IA, escritas por el equipo que monta y opera estas tiendas. Cuando hablamos de cifras, te decimos de dónde salen o te pedimos que mires las tuyas.
+            </p>
+          </div>
+        </header>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
-          {POSTS.map(post => (
-            <Link key={post.slug} href={`/blog/${post.slug}`} style={{ textDecoration: "none", display: "block" }}>
-              <article style={{
-                padding: 28, background: "var(--ink2, #111113)", border: "1px solid var(--ink3, #1e1e22)",
-                borderRadius: 16, display: "flex", flexDirection: "column", gap: 12,
-                height: "100%", boxSizing: "border-box",
-                transition: "border-color 0.2s, transform 0.2s",
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(200,168,75,0.3)";
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--ink3, #1e1e22)";
-                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-              }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, background: "rgba(200,168,75,0.1)", color: "#e6c668", fontWeight: 600 }}>{post.tag}</span>
-                  <span style={{ fontSize: 11, color: "var(--t4, #666)" }}>{post.readTime}</span>
+        <section className="pp-section" style={{ paddingTop: 8 }} aria-label="Artículos">
+          <div className="pp-wrap">
+            <div className="bl-filter" role="group" aria-label="Filtrar por tema">
+              <button type="button" className="bl-chip" aria-pressed={tema === ALL} onClick={() => setTema(ALL)}>
+                Todos<span className="n">{sorted.length}</span>
+              </button>
+              {temas.map(([tag, n]) => (
+                <button key={tag} type="button" className="bl-chip" aria-pressed={tema === tag} onClick={() => setTema(tag)}>
+                  {tag}<span className="n">{n}</span>
+                </button>
+              ))}
+            </div>
+            <p className="pp-sub" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", margin: -1 }} aria-live="polite">
+              {shown} {shown === 1 ? "artículo" : "artículos"}
+            </p>
+
+            {showFeatured && (
+              <Link href={`/blog/${featured.slug}`} className="bl-featured">
+                <span className="kicker">Lo último</span>
+                <div className="bl-meta">
+                  <span className={`bl-tag ${tonoEtiqueta(featured.tag)}`}>{featured.tag}</span>
+                  <time dateTime={featured.date}>{fechaLarga(featured.date)}</time><span className="dot" aria-hidden="true" />
+                  <span>{featured.readTime} de lectura</span>
                 </div>
-                <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--t, #eee)", lineHeight: 1.3, margin: 0 }}>{post.title}</h2>
-                <p style={{ fontSize: 13, color: "var(--t3, #999)", lineHeight: 1.6, margin: 0, flex: 1 }}>{post.excerpt}</p>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTop: "1px solid var(--ink3, #1e1e22)" }}>
-                  <span style={{ fontSize: 12, color: "var(--t4, #666)" }}>{new Date(post.date).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}</span>
-                  <span style={{ fontSize: 12, color: "#e6c668", fontWeight: 600 }}>Leer →</span>
-                </div>
-              </article>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </PublicLayout>
+                <h2>{featured.title}</h2>
+                <p>{featured.excerpt}</p>
+                <span className="bl-more">Leer el artículo <i aria-hidden="true">→</i></span>
+              </Link>
+            )}
+
+            <div className="bl-grid">
+              {rest.map(post => (
+                <Link key={post.slug} href={`/blog/${post.slug}`} className="bl-card" hidden={!visible(post.tag)}>
+                  <div className="bl-meta">
+                    <span className={`bl-tag ${tonoEtiqueta(post.tag)}`}>{post.tag}</span>
+                    <span>{post.readTime}</span>
+                  </div>
+                  <h3>{post.title}</h3>
+                  <p>{post.excerpt}</p>
+                  <div className="foot">
+                    <time className="bl-meta" dateTime={post.date}>{fechaLarga(post.date)}</time>
+                    <span className="bl-more">Leer <i aria-hidden="true">→</i></span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {shown === 0 && <p className="bl-empty">No hay artículos en este tema todavía.</p>}
+
+            <aside className="pp-cta" aria-labelledby="blog-cta">
+              <h2 id="blog-cta">¿Prefieres que lo hagamos nosotros?</h2>
+              <p>Cuéntanos tu tienda y te preparamos una propuesta con lo que haríamos, en qué orden y desde cuánto. Y si lo tuyo es el taller, mira la Tienda.</p>
+              <div className="pp-actions" style={{ justifyContent: "center" }}>
+                <Link href="/contacto" className="pp-btn pp-btn-gold">Pedir propuesta</Link>
+                <Link href="/tienda" className="pp-btn">Ver la Tienda</Link>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </PublicLayout>
     </>
   );
 }

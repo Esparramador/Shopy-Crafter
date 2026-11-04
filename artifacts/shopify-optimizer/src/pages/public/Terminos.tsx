@@ -1,5 +1,5 @@
 import PageMeta, { metaFor } from "@/components/PageMeta";
-import PublicLayout from "@/components/PublicLayout";
+import LegalDoc from "./LegalDoc";
 
 const SECTIONS = [
   { h: "1. Objeto", p: "Estos términos regulan el uso de la plataforma Shopy Crafter, una suite de herramientas con IA para optimización de eCommerce. Al usar el servicio aceptas estos términos en su totalidad." },
@@ -17,26 +17,13 @@ export default function Terminos() {
   return (
     <>
       <PageMeta {...metaFor("/terminos")} />
-      <PublicLayout>
-      <div style={{ padding: "80px 24px", maxWidth: 820, margin: "0 auto" }}>
-        <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Legal</div>
-        <h1 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 12, lineHeight: 1.15 }}>Términos y Condiciones</h1>
-        <p style={{ fontSize: 14, color: "var(--t4, #666)", marginBottom: 40 }}>Última actualización: mayo 2026</p>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-          {SECTIONS.map(s => (
-            <div key={s.h}>
-              <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 8 }}>{s.h}</h2>
-              <p style={{ fontSize: 15, color: "var(--t3, #999)", lineHeight: 1.8, margin: 0 }}>{s.p}</p>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 48, padding: 20, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.15)", borderRadius: 12, fontSize: 13, color: "var(--t3, #999)", lineHeight: 1.6 }}>
-          Para cualquier consulta sobre estos términos, escríbenos a <a href="mailto:craftershopy@gmail.com" style={{ color: "#e6c668" }}>craftershopy@gmail.com</a>.
-        </div>
-      </div>
-    </PublicLayout>
+      <LegalDoc
+        current="/terminos"
+        title="Términos y Condiciones"
+        lead="Las reglas del servicio: cuentas, planes y pago, uso aceptable, responsabilidad y cancelación."
+        updated="mayo 2026"
+        sections={SECTIONS}
+      />
     </>
   );
 }

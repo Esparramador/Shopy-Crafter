@@ -1,5 +1,5 @@
 import PageMeta, { metaFor } from "@/components/PageMeta";
-import PublicLayout from "@/components/PublicLayout";
+import LegalDoc from "./LegalDoc";
 
 const SECTIONS = [
   { h: "1. Qué son las cookies", p: "Las cookies son pequeños archivos de texto que se almacenan en tu navegador cuando visitas un sitio web. Se usan para hacer funcionar la web, recordar tus preferencias y, en algunos casos, medir el uso." },
@@ -17,53 +17,36 @@ const COOKIE_TABLE = [
   { name: "lang", type: "Preferencia", duration: "1 año", purpose: "Idioma de la interfaz" },
 ];
 
+const TABLE = (
+  <section className="lg-table" id="detalle" aria-labelledby="h-detalle">
+    <h2 id="h-detalle">Detalle de cookies utilizadas</h2>
+    <div className="lg-scroll" role="region" aria-labelledby="h-detalle" tabIndex={0}>
+      <table>
+        <thead>
+          <tr>{["Cookie", "Tipo", "Duración", "Finalidad"].map(h => <th key={h} scope="col">{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {COOKIE_TABLE.map(c => (
+            <tr key={c.name}><td>{c.name}</td><td>{c.type}</td><td>{c.duration}</td><td>{c.purpose}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+);
+
 export default function Cookies() {
   return (
     <>
       <PageMeta {...metaFor("/cookies")} />
-      <PublicLayout>
-      <div style={{ padding: "80px 24px", maxWidth: 820, margin: "0 auto" }}>
-        <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "rgba(200,168,75,0.12)", color: "#e6c668", border: "1px solid rgba(200,168,75,0.2)", fontSize: 12, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 16 }}>Legal</div>
-        <h1 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "var(--t, #eee)", marginBottom: 12, lineHeight: 1.15 }}>Política de Cookies</h1>
-        <p style={{ fontSize: 14, color: "var(--t4, #666)", marginBottom: 40 }}>Última actualización: mayo 2026</p>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 28, marginBottom: 48 }}>
-          {SECTIONS.map(s => (
-            <div key={s.h}>
-              <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 8 }}>{s.h}</h2>
-              <p style={{ fontSize: 15, color: "var(--t3, #999)", lineHeight: 1.8, margin: 0 }}>{s.p}</p>
-            </div>
-          ))}
-        </div>
-
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--t, #eee)", marginBottom: 16 }}>Detalle de cookies utilizadas</h2>
-        <div style={{ overflowX: "auto", marginBottom: 40 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--ink3, #1e1e22)" }}>
-                {["Cookie", "Tipo", "Duración", "Finalidad"].map(h => (
-                  <th key={h} style={{ textAlign: "left", padding: "10px 12px", color: "var(--t4, #666)", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.5px" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {COOKIE_TABLE.map(c => (
-                <tr key={c.name} style={{ borderBottom: "1px solid var(--ink3, #1e1e22)" }}>
-                  <td style={{ padding: "10px 12px", color: "#e6c668", fontFamily: "monospace", fontSize: 12 }}>{c.name}</td>
-                  <td style={{ padding: "10px 12px", color: "var(--t3, #999)" }}>{c.type}</td>
-                  <td style={{ padding: "10px 12px", color: "var(--t3, #999)" }}>{c.duration}</td>
-                  <td style={{ padding: "10px 12px", color: "var(--t3, #999)" }}>{c.purpose}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ padding: 20, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.15)", borderRadius: 12, fontSize: 13, color: "var(--t3, #999)", lineHeight: 1.6 }}>
-          Para cualquier consulta sobre esta política, escríbenos a <a href="mailto:craftershopy@gmail.com" style={{ color: "#e6c668" }}>craftershopy@gmail.com</a>.
-        </div>
-      </div>
-    </PublicLayout>
+      <LegalDoc
+        current="/cookies"
+        title="Política de Cookies"
+        lead="Qué cookies usamos, para qué sirven y cómo puedes gestionarlas desde tu navegador."
+        updated="mayo 2026"
+        sections={SECTIONS}
+        extra={TABLE}
+      />
     </>
   );
 }

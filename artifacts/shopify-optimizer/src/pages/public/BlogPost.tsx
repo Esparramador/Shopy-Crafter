@@ -1,34 +1,68 @@
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "wouter";
 import PublicLayout from "@/components/PublicLayout";
 import PageMeta from "@/components/PageMeta";
 import { POSTS } from "@/lib/blog-data";
+import { fechaLarga, prepararCuerpo, tonoEtiqueta } from "./blog-utils";
+import "./blog.css";
 
-const tagColors: Record<string, string> = {
-  SEO: "#e6c668",
-  IA: "#2dd49f",
-  Pricing: "#6495ed",
-  "A/B Testing": "#e88",
-  "Caso de éxito": "#2dd49f",
-  Herramientas: "#e6c668",
+const SERVICIOS: Record<string, { href: string; label: string }[]> = {
+  default: [
+    { href: "/ecommerce-ia-automatizacion", label: "eCommerce con IA" },
+    { href: "/diseno-web-profesional", label: "Diseño web profesional" },
+    { href: "/tienda", label: "La Tienda" },
+  ],
+  Migración: [
+    { href: "/migrar-woocommerce-shopify", label: "Migrar WooCommerce a Shopify" },
+    { href: "/migrar-prestashop-shopify", label: "Migrar PrestaShop a Shopify" },
+    { href: "/diseno-web-profesional", label: "Diseño web profesional" },
+  ],
+  Pagos: [
+    { href: "/shopify-stripe-pagos", label: "Stripe + Shopify" },
+    { href: "/ecommerce-ia-automatizacion", label: "eCommerce con IA" },
+    { href: "/tienda", label: "La Tienda" },
+  ],
+  Comparativa: [
+    { href: "/shopify-vs-woocommerce", label: "Shopify vs WooCommerce" },
+    { href: "/shopify-vs-prestashop", label: "Shopify vs PrestaShop" },
+    { href: "/tienda", label: "La Tienda" },
+  ],
 };
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
   const post = POSTS.find(p => p.slug === slug);
+  const prepared = useMemo(() => (post ? prepararCuerpo(post.body) : null), [post]);
+  const [active, setActive] = useState<string>("");
 
-  if (!post) {
+  useEffect(() => {
+    if (!prepared || prepared.toc.length === 0 || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) setActive(e.target.id); }),
+      { rootMargin: "-90px 0px -65% 0px" },
+    );
+    prepared.toc.forEach(t => { const el = document.getElementById(t.id); if (el) obs.observe(el); });
+    return () => obs.disconnect();
+  }, [prepared]);
+
+  if (!post || !prepared) {
     return (
       <PublicLayout>
-        <div style={{ padding: "120px 24px", maxWidth: 820, margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ fontSize: 32, color: "var(--t, #eee)", marginBottom: 16 }}>Artículo no encontrado</h1>
-          <p style={{ color: "var(--t3, #999)", marginBottom: 24 }}>El artículo que buscas no existe o ha sido eliminado.</p>
-          <Link href="/blog" style={{ color: "#e6c668", textDecoration: "none", fontWeight: 700 }}>← Volver al blog</Link>
+        <PageMeta title="Artículo no encontrado — Blog de Shopy Crafter" description="El artículo que buscas no existe o ha cambiado de dirección." canonical="https://shopycrafter.com/blog" noindex />
+        <div className="pp-wrap bl-nf">
+          <h1 className="pp-h1">Artículo no encontrado</h1>
+          <p>El artículo que buscas no existe o ha cambiado de dirección. Mira los demás en el blog.</p>
+          <Link href="/blog" className="pp-btn pp-btn-gold">Ver todos los artículos</Link>
         </div>
       </PublicLayout>
     );
   }
 
-  const tagColor = tagColors[post.tag] ?? "#e6c668";
+  const related = [
+    ...POSTS.filter(p => p.slug !== post.slug && p.tag === post.tag),
+    ...POSTS.filter(p => p.slug !== post.slug && p.tag !== post.tag),
+  ].slice(0, 3);
+  const enlaces = SERVICIOS[post.tag] ?? SERVICIOS.default;
 
   const articleSchema = {
     "@context": "https://schema.org",
@@ -37,13 +71,11 @@ export default function BlogPost() {
     description: post.excerpt,
     datePublished: post.date,
     author: { "@type": "Organization", name: "Shopy Crafter" },
-    publisher: {
-      "@type": "Organization",
-      name: "Shopy Crafter",
-      url: "https://shopycrafter.com",
-    },
+    publisher: { "@type": "Organization", name: "Shopy Crafter", url: "https://shopycrafter.com" },
     mainEntityOfPage: { "@type": "WebPage", "@id": `https://shopycrafter.com/blog/${post.slug}` },
   };
+
+  const toc = prepared.toc;
 
   return (
     <PublicLayout>
@@ -51,52 +83,85 @@ export default function BlogPost() {
         title={`${post.title} — Blog de Shopy Crafter`}
         description={post.excerpt}
         canonical={`https://shopycrafter.com/blog/${post.slug}`}
-        noindex={post.slug === "comic-crafter-caso-exito"}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
-      />
-      <div style={{ padding: "80px 24px", maxWidth: 820, margin: "0 auto" }}>
-        <Link href="/blog" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--t4, #666)", fontSize: 13, textDecoration: "none", marginBottom: 32 }}>
-          ← Blog
-        </Link>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
+      <div className="bl-progress" aria-hidden="true" />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, background: `${tagColor}1a`, color: tagColor, fontWeight: 700 }}>{post.tag}</span>
-          <span style={{ fontSize: 12, color: "var(--t4, #666)" }}>{new Date(post.date).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}</span>
-          <span style={{ fontSize: 12, color: "var(--t4, #666)" }}>· {post.readTime} de lectura</span>
+      <header className="bl-article-head">
+        <div className="pp-wrap">
+          <nav className="bl-crumbs" aria-label="Migas de pan">
+            <Link href="/">Inicio</Link><span className="sep" aria-hidden="true">/</span>
+            <Link href="/blog">Blog</Link><span className="sep" aria-hidden="true">/</span>
+            <span aria-current="page">{post.tag}</span>
+          </nav>
+          <div className="bl-meta">
+            <span className={`bl-tag ${tonoEtiqueta(post.tag)}`}>{post.tag}</span>
+            <span>{post.readTime} de lectura</span>
+          </div>
+          <h1>{post.title}</h1>
+          <p className="bl-standfirst">{post.excerpt}</p>
+          <div className="bl-byline">
+            <span className="bl-avatar" aria-hidden="true">SC</span>
+            <div>
+              <strong>Equipo de Shopy Crafter</strong>
+              Publicado el <time dateTime={post.date}>{fechaLarga(post.date)}</time>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="pp-wrap">
+        <div className="bl-layout">
+          {toc.length > 1 && (
+            <>
+              <nav className="bl-toc-d" aria-label="Contenido del artículo">
+                <h2>En este artículo</h2>
+                <ol>
+                  {toc.map(t => (
+                    <li key={t.id}><a href={`#${t.id}`} className={active === t.id ? "on" : ""} aria-current={active === t.id ? "location" : undefined}>{t.text}</a></li>
+                  ))}
+                </ol>
+              </nav>
+              <details className="bl-toc-m">
+                <summary>En este artículo</summary>
+                <ol>{toc.map(t => <li key={t.id}><a href={`#${t.id}`}>{t.text}</a></li>)}</ol>
+              </details>
+            </>
+          )}
+          <article className="bl-prose-wrap">
+            <div className="pp-prose bl-prose" dangerouslySetInnerHTML={{ __html: prepared.html }} />
+            <p className="bl-note">
+              Las cifras de terceros (tarifas de plataformas y pasarelas) cambian: confírmalas en la fuente antes de decidir. Si quieres que miremos tu caso concreto, <Link href="/contacto">escríbenos</Link>.
+            </p>
+            <div className="bl-links" aria-label="Te puede interesar">
+              {enlaces.map(l => <Link key={l.href} href={l.href}>{l.label}</Link>)}
+            </div>
+          </article>
         </div>
 
-        <h1 style={{ fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 800, color: "var(--t, #eee)", lineHeight: 1.2, marginBottom: 20 }}>
-          {post.title}
-        </h1>
+        <aside className="pp-cta" aria-labelledby="post-cta">
+          <h2 id="post-cta">¿Quieres aplicarlo a tu tienda?</h2>
+          <p>Cuéntanos qué vendes y dónde, y te preparamos una propuesta por escrito, con la puesta en marcha aparte de la mensualidad y precios «desde».</p>
+          <div className="pp-actions" style={{ justifyContent: "center" }}>
+            <Link href="/contacto" className="pp-btn pp-btn-gold">Pedir propuesta</Link>
+            <Link href="/tienda" className="pp-btn">Ver la Tienda</Link>
+          </div>
+        </aside>
 
-        <p style={{ fontSize: 17, color: "var(--t3, #999)", lineHeight: 1.7, marginBottom: 40, borderBottom: "1px solid var(--ink3, #1e1e22)", paddingBottom: 32 }}>
-          {post.excerpt}
-        </p>
-
-        <div
-          className="blog-body"
-          dangerouslySetInnerHTML={{ __html: post.body }}
-          style={{ color: "var(--t2, #ccc)", lineHeight: 1.8, fontSize: 15 }}
-        />
-
-        <div style={{ marginTop: 56, padding: 28, background: "rgba(200,168,75,0.06)", border: "1px solid rgba(200,168,75,0.15)", borderRadius: 16, textAlign: "center" }}>
-          <p style={{ fontSize: 15, color: "var(--t, #eee)", fontWeight: 600, marginBottom: 8 }}>
-            ¿Listo para optimizar tu tienda con IA?
-          </p>
-          <p style={{ fontSize: 13, color: "var(--t3, #999)", marginBottom: 16 }}>Cuéntanos tu proyecto y te preparamos una propuesta sin compromiso.</p>
-          <a href="/contacto" style={{
-            display: "inline-block", padding: "12px 28px", borderRadius: 10,
-            background: "linear-gradient(135deg, #d4a843, #b8860b)", color: "#000",
-            fontWeight: 700, fontSize: 14, textDecoration: "none",
-          }}>Contactar →</a>
-        </div>
-
-        <div style={{ marginTop: 40, paddingTop: 32, borderTop: "1px solid var(--ink3, #1e1e22)" }}>
-          <Link href="/blog" style={{ color: "#e6c668", textDecoration: "none", fontWeight: 600, fontSize: 14 }}>← Ver todos los artículos</Link>
-        </div>
+        {related.length > 0 && (
+          <section className="bl-related pp-section" aria-labelledby="rel-h" style={{ paddingTop: 0 }}>
+            <h2 id="rel-h">Sigue leyendo</h2>
+            <div className="bl-grid">
+              {related.map(r => (
+                <Link key={r.slug} href={`/blog/${r.slug}`} className="bl-card">
+                  <div className="bl-meta"><span className={`bl-tag ${tonoEtiqueta(r.tag)}`}>{r.tag}</span><span>{r.readTime}</span></div>
+                  <h3>{r.title}</h3>
+                  <div className="foot"><time className="bl-meta" dateTime={r.date}>{fechaLarga(r.date)}</time><span className="bl-more">Leer <i aria-hidden="true">→</i></span></div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </PublicLayout>
   );

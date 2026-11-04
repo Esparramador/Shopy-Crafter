@@ -11,6 +11,7 @@
  *
  * Sin imports de navegador: solo datos puros.
  */
+import { FAQ_FLAT } from "./lib/faq-data";
 import {
   getSeoRoutes, seoFor, canonicalUrl, SITE_URL, SITE_NAME, CONTACT_EMAIL,
   SITE_LINK_GROUPS, type SeoRoute,
@@ -112,6 +113,18 @@ function structuredData(route: SeoRoute): string {
       ],
     });
   }
+  if (route.path === "/faq") {
+    return jsonLd({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "FAQPage", "@id": `${url}#faq`, inLanguage: "es", mainEntity: FAQ_FLAT.map(f => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
+        { "@type": "BreadcrumbList", itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: `${SITE_URL}/` },
+          { "@type": "ListItem", position: 2, name: "Preguntas frecuentes", item: url },
+        ] },
+      ],
+    });
+  }
   if (route.path === "/tienda") {
     const items = getSeoRoutes().filter(r => r.product).map((r, i) => ({ "@type": "ListItem", position: i + 1, name: r.h1, url: canonicalUrl(r) }));
     return jsonLd({
@@ -176,6 +189,7 @@ function linksHtml(): string {
 }
 
 function extraForRoute(route: SeoRoute): string {
+  if (route.path === "/faq") return `<article>${FAQ_FLAT.map(f => `<h2>${esc(f.q)}</h2><p>${esc(f.a)}</p>`).join("")}</article>`;
   if (route.bodyHtml) return `<article style="line-height:1.7;color:#c9c7e0">${route.bodyHtml}</article>`;
   if (route.path === "/") {
     return `<ul>${SERVICES.map(([name, path]) => `<li><a href="${path}" style="color:#e6c668">${esc(name)}</a></li>`).join("")}</ul>`;
