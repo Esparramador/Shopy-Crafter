@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { useAuth, getLastRoute, clearLastRoute } from "@/contexts/AuthContext";
 import { useCmsSection } from "@/contexts/CmsContext";
 import { Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import "./login.css";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -35,115 +36,61 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login-page">
-      {/* Back to landing */}
-      <Link href="/" style={{
-        position: "absolute", top: 20, left: 20,
-        display: "flex", alignItems: "center", gap: 6,
-        fontSize: 13, color: "var(--t3)", textDecoration: "none",
-        padding: "7px 14px", borderRadius: 20,
-        background: "rgba(255,255,255,0.05)", border: "1px solid var(--bdr)",
-        transition: "all 0.2s", fontWeight: 500,
-      }}>
-        <ArrowLeft size={14} /> Volver al inicio
-      </Link>
-
-      <div style={{ width: "100%", maxWidth: 400 }}>
-        <div className="login-logo">
-          <div className="logo-gem">⚡</div>
-          <h1>Shopy<em>Crafter</em></h1>
-          <p>{t("subtitle", "Plataforma de agencia premium")}</p>
+    <div className="lg-page">
+      <aside className="lg-brand" aria-label="Qué encontrarás dentro">
+        <Link href="/" className="lg-brand-logo" aria-label="Shopy Crafter, volver al inicio">
+          <span className="lg-gem" aria-hidden="true">SC</span>
+          <span>Shopy<em>Crafter</em></span>
+        </Link>
+        <div className="lg-brand-copy">
+          <p className="lg-eyebrow">Portal de cliente</p>
+          <h2>Tu proyecto, <em>a la vista.</em></h2>
+          <ul>
+            <li><b>Aprobaciones</b><span>Nada se publica sin tu visto bueno.</span></li>
+            <li><b>Informes</b><span>Resultados y próximos pasos en un solo sitio.</span></li>
+            <li><b>Mensajes</b><span>Hablas con el equipo sin perder el hilo.</span></li>
+          </ul>
         </div>
+        <p className="lg-brand-foot">Shopy Crafter &copy; {new Date().getFullYear()}</p>
+      </aside>
 
-        <div className="login-card">
-          <p className="login-title">{t("heading", "Iniciar sesión")}</p>
+      <main className="lg-main">
+        <Link href="/" className="lg-back"><ArrowLeft size={14} aria-hidden="true" /> Volver al inicio</Link>
+        <div className="lg-card">
+          <h1>{t("heading", "Iniciar sesión")}</h1>
+          <p className="lg-sub">{t("subtitle2", "Accede a tu panel con tu email y tu contraseña.")}</p>
 
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">{t("email", "Email")}</label>
-              <input
-                type="email"
-                className="form-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="username"
-                placeholder={t("emailPlaceholder", "tu@email.com")}
-              />
-            </div>
+          <form onSubmit={handleSubmit} noValidate={false}>
+            <label className="lg-field" htmlFor="lg-email">
+              <span>{t("email", "Email")}</span>
+              <input id="lg-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus
+                autoComplete="username" inputMode="email" placeholder={t("emailPlaceholder", "tu@email.com")} />
+            </label>
 
-            <div className="form-group">
-              <label className="form-label">{t("password", "Contraseña")}</label>
-              <div style={{ position: "relative" }}>
-                <input
-                  type={showPw ? "text" : "password"}
-                  className="form-input"
-                  style={{ paddingRight: 40 }}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(!showPw)}
-                  style={{
-                    position: "absolute", right: 10, top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none", border: "none",
-                    cursor: "pointer", color: "var(--t3)",
-                    display: "flex", alignItems: "center",
-                  }}
-                >
-                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+            <label className="lg-field" htmlFor="lg-pw">
+              <span className="lg-pw-row">{t("password", "Contraseña")}
+                <Link href="/forgot-password" className="lg-forgot">{t("forgotPassword", "¿Olvidaste tu contraseña?")}</Link>
+              </span>
+              <span className="lg-pw">
+                <input id="lg-pw" type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required
+                  autoComplete="current-password" placeholder="••••••••" />
+                <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? "Ocultar la contraseña" : "Mostrar la contraseña"} aria-pressed={showPw}>
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
-              </div>
-            </div>
+              </span>
+            </label>
 
-            {error && (
-              <div
-                style={{
-                  background: "rgba(232,69,88,0.08)",
-                  border: "1px solid rgba(232,69,88,0.2)",
-                  borderRadius: "var(--r)",
-                  padding: "10px 12px",
-                  color: "var(--crim)",
-                  fontSize: 13,
-                  marginBottom: 14,
-                }}
-              >
-                {error}
-              </div>
-            )}
+            {error && <div className="lg-error" role="alert">{error}</div>}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className={`btn btn-gold${loading ? " loading" : ""}`}
-              style={{ width: "100%", justifyContent: "center", marginTop: 4, padding: "11px 16px" }}
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+            <button type="submit" disabled={loading} className="lg-submit">
+              {loading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
               {loading ? t("loggingIn", "Iniciando sesión...") : t("loginBtn", "Entrar")}
             </button>
           </form>
 
-          <div style={{ textAlign: "center", marginTop: 12 }}>
-            <Link
-              href="/forgot-password"
-              style={{ fontSize: 12, color: "var(--t3)", textDecoration: "none" }}
-            >
-              {t("forgotPassword", "¿Olvidaste tu contraseña?")}
-            </Link>
-          </div>
-
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--bdr)", textAlign: "center" }}>
-            <p style={{ fontSize: 10, color: "var(--t3)", opacity: 0.6 }}>
-              Shopy Crafter &copy; {new Date().getFullYear()}
-            </p>
-          </div>
+          <p className="lg-help">¿Aún no eres cliente? <Link href="/contacto">Solicita acceso</Link></p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

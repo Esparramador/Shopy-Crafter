@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@workspace/db", () => ({ db: {} }));
 vi.mock("@workspace/db/schema", () => ({ projectsTable: {}, planCreditPacksTable: {} }));
 
-const { PLAN_CATALOG, SELLABLE_PLANS, planFeatures, plansForPlatform, quotaFor, PACK_PLATFORMS } = await import("./plan-catalog");
+const { PLAN_CATALOG, SELLABLE_PLANS, planFeatures, plansForPlatform, quotaFor, PACK_PLATFORMS, platformSurcharge } = await import("./plan-catalog");
 const { PLAN_LIMITS } = await import("./plan-limits");
 
 describe("catálogo de planes", () => {
@@ -98,6 +98,25 @@ describe("rentabilidad garantizada de cada plan", () => {
       // así que sumarlo de nuevo es un margen extra de seguridad).
       const costeMax = planAiBudgetEur(p.id) + p.imagesPerMonth * IMAGE_UNIT_COST_EUR + p.productsPerMonth * TEXT_COST_PER_PRODUCT_EUR;
       expect(costeMax).toBeLessThan(ingresoMes);
+    }
+  });
+});
+
+describe("recargo por plataforma y puesta en marcha", () => {
+  it("WooCommerce y PrestaShop suman 20/30/50 €/mes según el pack (×10 al año); Shopify y Stripe, nada", () => {
+    expect(platformSurcharge("woocommerce", "month", "starter")).toBe(20);
+    expect(platformSurcharge("prestashop", "month", "agency_pro")).toBe(30);
+    expect(platformSurcharge("woocommerce", "year", "enterprise")).toBe(500);
+    expect(platformSurcharge("shopify", "month", "starter")).toBe(0);
+    expect(platformSurcharge("stripe", "year", "stripe_growth")).toBe(0);
+    expect(platformSurcharge(null)).toBe(0);
+  });
+
+  it("todo pack que se vende lleva puesta en marcha «desde» y sube con el pack", () => {
+    for (const platform of PACK_PLATFORMS) {
+      const packs = plansForPlatform(platform);
+      for (const p of packs) expect(p.setupFromEur).toBeGreaterThan(0);
+      for (let i = 1; i < packs.length; i++) expect(packs[i].setupFromEur).toBeGreaterThan(packs[i - 1].setupFromEur);
     }
   });
 });

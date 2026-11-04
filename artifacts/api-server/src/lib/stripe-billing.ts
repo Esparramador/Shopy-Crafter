@@ -17,7 +17,7 @@ import Stripe from "stripe";
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger.js";
-import { catalogPlan, planQuotaLines } from "./plan-catalog.js";
+import { catalogPlan, planQuotaLines, platformSurcharge } from "./plan-catalog.js";
 import { syncLocalSubscriptionFromStripeEvent } from "./subscription-cancel.js";
 
 export const STRIPE_API_VERSION = "2026-05-27.dahlia" as const;
@@ -87,7 +87,7 @@ function addInterval(from: Date, interval: BillingInterval): Date {
 }
 
 /** Precio vigente del plan: el configurado en billing_plans (lo que ve el cliente) o el del catálogo. */
-export async function planPriceCents(planId: string, interval: BillingInterval): Promise<{ cents: number; name: string } | null> {
+export async function planPriceCents(planId: string, interval: BillingInterval, platform?: string | null): Promise<{ cents: number; name: string } | null> {
   const cat = catalogPlan(planId);
   if (!cat) return null;
   let monthly = cat.priceMonthly;
@@ -102,7 +102,8 @@ export async function planPriceCents(planId: string, interval: BillingInterval):
       name = row.name || name;
     }
   } catch { /* sin tabla: catálogo */ }
-  const amount = interval === "year" ? annual : monthly;
+  // Solo packs de tienda: el recargo de WooCommerce/PrestaShop se suma al precio vigente.
+  const amount = (interval === "year" ? annual : monthly) + (cat.family === "store" ? platformSurcharge(platform, interval, planId) : 0);
   return amount > 0 ? { cents: Math.round(amount * 100), name } : null;
 }
 
@@ -178,8 +179,10 @@ function customerOptions(customerId?: string | null, email?: string | null) {
 
 export async function createPlanCheckout(stripe: Stripe, p: {
   userId: string; email?: string | null; planId: string; interval: BillingInterval; customerId?: string | null;
+  /** Plataforma del proyecto del cliente (woocommerce | prestashop llevan recargo). */
+  platform?: string | null;
 } & CheckoutUrls): Promise<string> {
-  const price = await planPriceCents(p.planId, p.interval);
+  const price = await planPriceCents(p.planId, p.interval, p.platform);
   if (!price) throw new Error("Plan no contratable");
   const cat = catalogPlan(p.planId)!;
   const metadata = { kind: "plan", userId: p.userId, planId: p.planId, interval: p.interval };

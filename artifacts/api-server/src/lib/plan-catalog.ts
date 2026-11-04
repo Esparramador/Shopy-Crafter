@@ -76,6 +76,13 @@ interface CatalogPlanBase {
   callMinutes: number;
   /** Plazo de respuesta en el portal, en horas laborables. */
   responseHours: number;
+  /**
+   * Puesta en marcha inicial (pago único, sin IVA), siempre «desde»: conectar la tienda, configurar
+   * los motores, importar el catálogo y formar al cliente. Se presupuesta en la propuesta según lo que
+   * haya que montar y se factura aparte de la mensualidad (no entra en el cobro de Stripe del pack).
+   * Cifras pendientes del OK del dueño (ver Agente/TARIFAS.md).
+   */
+  setupFromEur: number;
 }
 
 export interface StorePlan extends CatalogPlanBase {
@@ -99,7 +106,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "emprendedor", family: "store", name: "Emprendedor", priceMonthly: 19, priceAnnual: 190,
     productsPerMonth: 5, imagesPerMonth: 15,
     quotas: { seoAudits: 1, competitorAnalyses: 5, abTests: 0, blogPosts: 0, pagespeed: { cadence: "monthly", urls: 1 }, report: "monthly" },
-    callMinutes: 0, responseHours: 48,
+    callMinutes: 0, responseHours: 48, setupFromEur: 90,
     summary: "Plan heredado para tiendas pequeñas.",
     featured: false, badge: null, ctaLabel: "Empezar", sortOrder: 0, sellable: false,
   },
@@ -107,7 +114,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "starter", family: "store", name: "Starter", priceMonthly: 49, priceAnnual: 490,
     productsPerMonth: 15, imagesPerMonth: 45,
     quotas: { seoAudits: 1, competitorAnalyses: 10, abTests: 1, blogPosts: 0, pagespeed: { cadence: "monthly", urls: 3 }, report: "monthly" },
-    callMinutes: 0, responseHours: 48,
+    callMinutes: 0, responseHours: 48, setupFromEur: 150,
     summary: "Para catálogos que crecen cada mes.",
     featured: false, badge: null, ctaLabel: "Elegir Starter", sortOrder: 1, sellable: true,
   },
@@ -115,7 +122,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "agency_pro", family: "store", name: "Growth", priceMonthly: 149, priceAnnual: 1490,
     productsPerMonth: 60, imagesPerMonth: 300,
     quotas: { seoAudits: 2, competitorAnalyses: 30, abTests: 3, blogPosts: 2, pagespeed: { cadence: "weekly", urls: 10 }, report: "biweekly" },
-    callMinutes: 30, responseHours: 24,
+    callMinutes: 30, responseHours: 24, setupFromEur: 350,
     summary: "Para tiendas con rotación de producto constante.",
     featured: true, badge: "Recomendado", ctaLabel: "Elegir Growth", sortOrder: 2, sellable: true,
   },
@@ -123,7 +130,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "enterprise", family: "store", name: "Enterprise", priceMonthly: 399, priceAnnual: 3990,
     productsPerMonth: 200, imagesPerMonth: 1200,
     quotas: { seoAudits: 4, competitorAnalyses: 100, abTests: 8, blogPosts: 6, pagespeed: { cadence: "daily", urls: 25 }, report: "weekly" },
-    callMinutes: 60, responseHours: 8,
+    callMinutes: 60, responseHours: 8, setupFromEur: 750,
     summary: "Para catálogos grandes.",
     featured: false, badge: null, ctaLabel: "Elegir Enterprise", sortOrder: 3, sellable: true,
   },
@@ -131,7 +138,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "stripe_starter", family: "stripe", name: "Starter", priceMonthly: 39, priceAnnual: 390,
     productsPerMonth: 0, imagesPerMonth: 0,
     quotas: { invoices: 20, coupons: 2, subscriptionChanges: 0, report: "monthly", payouts: null },
-    callMinutes: 0, responseHours: 48,
+    callMinutes: 0, responseHours: 48, setupFromEur: 90,
     summary: "Tus cobros vigilados y un informe al mes.",
     featured: false, badge: null, ctaLabel: "Elegir Starter", sortOrder: 11, sellable: true,
   },
@@ -139,7 +146,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "stripe_growth", family: "stripe", name: "Growth", priceMonthly: 99, priceAnnual: 990,
     productsPerMonth: 0, imagesPerMonth: 0,
     quotas: { invoices: 100, coupons: 10, subscriptionChanges: 50, report: "biweekly", payouts: "monthly" },
-    callMinutes: 30, responseHours: 24,
+    callMinutes: 30, responseHours: 24, setupFromEur: 190,
     summary: "Llevamos tu facturación y tus suscripciones.",
     featured: true, badge: "Recomendado", ctaLabel: "Elegir Growth", sortOrder: 12, sellable: true,
   },
@@ -147,7 +154,7 @@ export const PLAN_CATALOG: CatalogPlan[] = [
     id: "stripe_enterprise", family: "stripe", name: "Enterprise", priceMonthly: 249, priceAnnual: 2490,
     productsPerMonth: 0, imagesPerMonth: 0,
     quotas: { invoices: 400, coupons: 40, subscriptionChanges: 300, report: "weekly", payouts: "weekly" },
-    callMinutes: 60, responseHours: 8,
+    callMinutes: 60, responseHours: 8, setupFromEur: 390,
     summary: "Para negocios con mucho volumen de cobros.",
     featured: false, badge: null, ctaLabel: "Elegir Enterprise", sortOrder: 13, sellable: true,
   },
@@ -184,6 +191,43 @@ export const PLATFORM_EXTRAS: Record<StorePlatform, string[]> = {
 export const PLATFORM_LABELS: Record<PackPlatform, string> = {
   shopify: "Shopify", woocommerce: "WooCommerce", prestashop: "PrestaShop", stripe: "Stripe",
 };
+
+/**
+ * Recargo por plataforma, por nivel de pack (€/mes sin IVA; el anual suma 10 meses de recargo).
+ * WooCommerce y PrestaShop llevan plugins o módulos de pago y de SEO que actualizamos y probamos cada
+ * mes, y copias que restauramos si algo se rompe; en Shopify la plataforma se encarga de todo eso, así
+ * que el recargo sube con las horas de soporte que cada nivel incluye (Starter 20, Growth 30, Enterprise 50).
+ * Mercado (03/11/2026, tarifas publicadas en España): mantenimiento Shopify 39–159 €/mes frente a
+ * WooCommerce/PrestaShop 59–199 €/mes; la diferencia entre plataformas en la misma agencia es de 20 a 75 €.
+ */
+export const PLATFORM_SURCHARGE_EUR: Record<string, Record<PackPlatform, number>> = {
+  starter:    { shopify: 0, woocommerce: 20, prestashop: 20, stripe: 0 },
+  agency_pro: { shopify: 0, woocommerce: 30, prestashop: 30, stripe: 0 },
+  enterprise: { shopify: 0, woocommerce: 50, prestashop: 50, stripe: 0 },
+};
+
+export function platformSurcharge(platform: string | null | undefined, interval: "month" | "year" = "month", planId?: string | null): number {
+  const m = PLATFORM_SURCHARGE_EUR[planId ?? ""]?.[platform as PackPlatform] ?? 0;
+  return interval === "year" ? m * 10 : m;
+}
+
+/** Recargo de la puesta en marcha en WooCommerce/PrestaShop: conector, módulos, copias y pruebas de compra. */
+export const SETUP_SURCHARGE_EUR: Record<PackPlatform, number> = { shopify: 0, woocommerce: 100, prestashop: 100, stripe: 0 };
+
+/**
+ * La puesta en marcha NO es una cifra fija: depende del servicio que se haga de primeras. Cada línea es
+ * «desde» y se cierra por escrito. Los multiplicadores son los de Agente/TARIFAS.md §3.
+ */
+export interface SetupLine { key: string; name: string; fromEur: number | null; note: string }
+export const SETUP_LINES: SetupLine[] = [
+  { key: "conexion", name: "Conexión y configuración de los motores", fromEur: null, note: "Va en el «desde» de tu pack: conectar la tienda, activar los motores, formación y primera revisión." },
+  { key: "catalogo", name: "Carga y optimización inicial del catálogo", fromEur: 150, note: "Desde 150 € por cada 100 productos. Con más de 500 referencias o datos sucios, la limpieza se presupuesta antes." },
+  { key: "rediseno", name: "Rediseño de portada, colección y ficha de producto", fromEur: 1490, note: "Es el servicio de la Tienda. Depende de las plantillas, las colecciones y los rediseños que haya que hacer." },
+  { key: "marca", name: "Identidad de marca (si no tienes)", fromEur: 300, note: "De 300 a 800 €: hay que crearla antes de poder diseñar nada." },
+  { key: "idioma", name: "Idioma adicional", fromEur: null, note: "+10 % sobre la puesta en marcha (en una tienda, también cada ficha de producto)." },
+  { key: "integracion", name: "Integración con un sistema que ya tienes", fromEur: null, note: "De +20 % a +50 %: el riesgo lo pone tu software." },
+  { key: "urgencia", name: "Urgencia (menos de 10 días)", fromEur: null, note: "+25 %: reordena el trabajo de los demás." },
+];
 
 /** Periodo de prueba al activar la cuenta. */
 export const TRIAL = { days: 14, productsPerMonth: 3, imagesPerMonth: 6 };

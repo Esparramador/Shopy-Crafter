@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from "wouter";
 import gsap from "gsap";
 import PageMeta from "@/components/PageMeta";
 import ShopLayout from "./ShopLayout";
-import { API, apiJson, assetUrl, cart, coverOf, euros, fromPrice, loadCatalog, minQty, suggestions, unitPrice, type Field, type Media, type Product } from "./shop-api";
+import { API, apiJson, assetUrl, cart, coverOf, euros, loadCatalog, minQty, priceLabel, serviceMark, suggestions, unitPrice, type Field, type Media, type Product } from "./shop-api";
 import { bindMagnetic, burst, flyToCart, openCartDrawer, prefersReduced, pulse, useTweened } from "./shop-motion";
 import { SITE_URL } from "@/seo/meta";
 import type { PreviewShape } from "@/components/shop/Shop3D";
@@ -279,7 +279,7 @@ export default function ShopProduct() {
             name={p.name}
             preview={preview}
             serviceArt={p.kind === "quote" ? {
-              mark: p.slug === "auditoria-seo" ? "SEO" : p.slug === "optimizacion-pagespeed" ? "CWV" : p.slug === "informes-mensuales" ? "INFORME" : "WEB",
+              mark: serviceMark(p.slug),
               label: p.categoryLabel,
             } : undefined}
           />
@@ -289,8 +289,9 @@ export default function ShopProduct() {
             <p className="shop-pd-tag">{p.tagline}</p>
             {p.kind === "quote" ? (
               <div className="shop-pd-quote">
-                <p>Este servicio se hace a medida: te preparamos un presupuesto cerrado antes de empezar.</p>
-                <Link href="/contacto" className="shop-btn shop-btn-gold">Pedir presupuesto</Link>
+                {priceLabel(p) && <div className="shop-price"><strong>A partir de {euros(priceLabel(p)!.cents)}</strong><small>IVA incluido · es el precio de partida, no el final</small></div>}
+                <p>Cada proyecto es distinto: el importe final depende de lo que haya que hacer (páginas, productos, idiomas, rediseños). Te enviamos un presupuesto por escrito antes de empezar, y no se cobra nada sin tu visto bueno.</p>
+                <Link href={`/contacto?asunto=${encodeURIComponent(p.name)}`} className="shop-btn shop-btn-gold">Pedir presupuesto</Link>
               </div>
             ) : (
               <form className="shop-pd-form" onSubmit={e => { e.preventDefault(); addToCart(true); }} noValidate>
@@ -417,11 +418,11 @@ export default function ShopProduct() {
             <div className="shop-related-grid">
               {related.map(r => {
                 const cover = coverOf(r);
-                const fp = fromPrice(r);
+                const rl = priceLabel(r);
                 return (
                   <Link key={r.slug} href={`/tienda/${r.slug}`} className="shop-related-card">
                     {cover ? <img src={cover} alt="" loading="lazy" /> : <span className="shop-card-noimg" />}
-                    <span><b>{r.name}</b><small>{r.kind === "quote" ? "Presupuesto" : `${fp.perUnit ? "Desde " : ""}${euros(fp.cents)}${fp.perUnit ? " / ud." : ""}`}</small></span>
+                    <span><b>{r.name}</b><small>{rl ? `${rl.prefix}${euros(rl.cents)}${rl.suffix}` : "Presupuesto"}</small></span>
                     <em>Ver →</em>
                   </Link>
                 );

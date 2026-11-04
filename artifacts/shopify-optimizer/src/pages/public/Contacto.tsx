@@ -362,6 +362,12 @@ export default function Contacto() {
   const [services, setServices] = useState<string[]>([]);
   const [status, setStatus] = useState<"idle"|"sending"|"sent"|"error">("idle");
   const [error, setError] = useState("");
+
+  // Desde la Tienda: «Pedir presupuesto» llega con el servicio ya escrito (solo rellena el mensaje, no envía nada).
+  useEffect(() => {
+    const asunto = new URLSearchParams(window.location.search).get("asunto")?.trim().slice(0, 120);
+    if (asunto) setForm(f => (f.message ? f : { ...f, message: `Me interesa: ${asunto}. ` }));
+  }, []);
   const [cardPhase, setCardPhase] = useState(0);
   const [formReady, setFormReady] = useState(false);
 

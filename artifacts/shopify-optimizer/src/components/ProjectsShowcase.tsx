@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState, useCallback, type CSSProperties } from "react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -259,7 +260,10 @@ export default function ProjectsShowcase({ onContact }: Props) {
       if (e.key === "ArrowLeft") setImgIdx(i => Math.max(i - 1, 0));
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // El visor cuelga de <body> (fuera de la sección con tarjetas apiladas y del header) y la página de detrás no se mueve.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
   }, [open, close]);
 
   const contact = (p: PortfolioProject | null) => { setOpen(null); onContact?.(p); };
@@ -385,10 +389,10 @@ export default function ProjectsShowcase({ onContact }: Props) {
         <button type="button" className="lxp-btn lxp-btn-main lxp-btn-big" onClick={() => contact(null)}>Hablar de mi proyecto <span aria-hidden="true">→</span></button>
       </div>
 
-      {open && (
+      {open && createPortal(
         <div className="lx-project-modal" role="dialog" aria-modal="true" aria-label={open.title} onClick={close}>
           <div className="lx-project-modal-card" onClick={e => e.stopPropagation()}>
-            <button type="button" className="lx-project-close" onClick={close} aria-label="Cerrar">×</button>
+            <button type="button" className="lx-project-close" onClick={close} aria-label="Cerrar" autoFocus>×</button>
             {open.images.length > 0 && (
               <div className="lx-project-gallery">
                 <img src={mediaSrc(open.images[imgIdx].url)} alt={open.images[imgIdx].alt || open.title} />
@@ -418,7 +422,7 @@ export default function ProjectsShowcase({ onContact }: Props) {
             </div>
           </div>
         </div>
-      )}
+        , document.body)}
     </div>
   );
 }

@@ -178,6 +178,15 @@ function PageLoader() {
   );
 }
 
+/** Mientras llega el chunk de la portada: la misma pantalla de marca que el prerender, sin texto. */
+function BrandSplash() {
+  return (
+    <div style={{ minHeight: "100vh", background: "#080810", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div aria-hidden style={{ width: 44, height: 44, borderRadius: 12, border: "1px solid #c8a84b", boxShadow: "0 0 32px rgba(200,168,75,.35)", animation: "pulseGold 1.5s ease-in-out infinite" }} />
+    </div>
+  );
+}
+
 function LoadingScreen() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -220,7 +229,7 @@ function HomeRedirect() {
   // Instead: render Landing immediately; once auth resolves redirect if needed.
   if (!loading && user?.role === "admin") return <Redirect to="/home" />;
   if (!loading && user?.role === "client") return <Redirect to="/client" />;
-  return <Suspense fallback={<PageLoader />}><Landing /></Suspense>;
+  return <Suspense fallback={<BrandSplash />}><Landing /></Suspense>;
 }
 
 function ImpersonationBanner() {

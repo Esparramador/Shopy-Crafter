@@ -1,0 +1,47 @@
+/* Login: dos columnas en escritorio, una en móvil. Usa los colores de marca de la portada. */
+.lg-page { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); background: #080810; color: #f2f0ff; font-family: var(--fb, 'Geist', sans-serif); }
+.lg-brand { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; padding: clamp(28px, 4vw, 56px); overflow: hidden; border-right: 1px solid rgba(255,255,255,.07);
+  background: radial-gradient(90% 70% at 10% 0%, rgba(200,168,75,.22), transparent 60%), radial-gradient(70% 60% at 100% 100%, rgba(45,212,159,.12), transparent 60%), #0b0b16; }
+.lg-brand-logo { display: inline-flex; align-items: center; gap: 12px; color: #f2f0ff; text-decoration: none; font-weight: 800; font-size: 20px; letter-spacing: -.3px; }
+.lg-brand-logo em { font-family: var(--fh, 'Instrument Serif', serif); font-style: italic; font-weight: 400; color: #d9bb62; margin-left: 2px; }
+.lg-gem { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; font-size: 14px; font-weight: 800; color: #14110a; background: linear-gradient(180deg, #e6c668, #c8a84b); box-shadow: 0 8px 24px -8px rgba(200,168,75,.7); }
+.lg-brand-copy h2 { margin: 6px 0 22px; font-family: var(--fh, 'Instrument Serif', serif); font-weight: 400; font-size: clamp(34px, 4.2vw, 56px); line-height: 1.05; letter-spacing: -1px; }
+.lg-brand-copy h2 em { color: #d9bb62; }
+.lg-eyebrow { margin: 0; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #9896ba; }
+.lg-brand-copy ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; max-width: 420px; }
+.lg-brand-copy li { padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); display: flex; flex-direction: column; gap: 2px; }
+.lg-brand-copy li b { font-size: 14px; } .lg-brand-copy li span { font-size: 13px; color: #9896ba; }
+.lg-brand-foot { margin: 0; font-size: 12px; color: #6f6d8f; }
+.lg-main { position: relative; display: flex; align-items: center; justify-content: center; padding: 88px 20px 40px; }
+.lg-back { position: absolute; top: 22px; right: 22px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #9896ba; text-decoration: none; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); transition: color .2s, border-color .2s; }
+.lg-back:hover { color: #f2f0ff; border-color: rgba(200,168,75,.5); }
+.lg-card { width: 100%; max-width: 400px; animation: lg-in .5s cubic-bezier(.2,.8,.2,1) both; }
+.lg-card h1 { margin: 0 0 6px; font-size: 30px; font-weight: 800; letter-spacing: -.8px; }
+.lg-sub { margin: 0 0 26px; font-size: 14px; color: #9896ba; line-height: 1.5; }
+.lg-field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.lg-field > span:first-child { font-size: 13px; font-weight: 600; color: #cfcde6; }
+.lg-pw-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.lg-forgot { font-size: 12px; font-weight: 500; color: #d9bb62; text-decoration: none; }
+.lg-forgot:hover { text-decoration: underline; }
+.lg-field input { width: 100%; box-sizing: border-box; height: 48px; padding: 0 14px; font: inherit; font-size: 16px; color: #f2f0ff; background: #11111d; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; outline: none; transition: border-color .2s, box-shadow .2s; }
+.lg-field input::placeholder { color: #5f5d80; }
+.lg-field input:focus { border-color: #c8a84b; box-shadow: 0 0 0 4px rgba(200,168,75,.16); }
+.lg-pw { position: relative; display: block; } .lg-pw input { padding-right: 48px; }
+.lg-pw button { position: absolute; top: 4px; right: 4px; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: #9896ba; cursor: pointer; }
+.lg-pw button:hover { color: #f2f0ff; background: rgba(255,255,255,.05); }
+.lg-pw button:focus-visible, .lg-submit:focus-visible, .lg-back:focus-visible, .lg-forgot:focus-visible { outline: 2px solid #d9bb62; outline-offset: 2px; }
+.lg-error { margin: -4px 0 16px; padding: 11px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; color: #ff8a98; background: rgba(232,69,88,.09); border: 1px solid rgba(232,69,88,.3); }
+.lg-submit { width: 100%; height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 12px; cursor: pointer; font: inherit; font-size: 15px; font-weight: 700; color: #14110a; background: linear-gradient(180deg, #e6c668, #c8a84b); box-shadow: 0 12px 28px -12px rgba(200,168,75,.8); transition: transform .2s, box-shadow .2s, opacity .2s; }
+.lg-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 16px 32px -12px rgba(200,168,75,.95); }
+.lg-submit:disabled { opacity: .7; cursor: progress; }
+.lg-help { margin: 22px 0 0; text-align: center; font-size: 13px; color: #9896ba; } .lg-help a { color: #d9bb62; font-weight: 600; text-decoration: none; } .lg-help a:hover { text-decoration: underline; }
+@keyframes lg-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (max-width: 900px) {
+  .lg-page { grid-template-columns: 1fr; }
+  .lg-brand { padding: 20px 20px 22px; gap: 0; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .lg-brand-copy, .lg-brand-foot { display: none; }
+  .lg-main { align-items: flex-start; padding: 36px 20px 40px; }
+  .lg-back { position: static; align-self: flex-start; margin-bottom: 22px; }
+  .lg-main { flex-direction: column; align-items: stretch; } .lg-card { margin: 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) { .lg-card { animation: none; } .lg-submit { transition: none; } }

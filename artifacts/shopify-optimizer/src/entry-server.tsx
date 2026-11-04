@@ -142,14 +142,21 @@ function extraForRoute(route: SeoRoute): string {
 export function render(url: string): { html: string; head: string } {
   const route = seoFor(url);
   if (!route) return { html: '<div id="sc-ssr-shell"></div>', head: "" };
-  const html = `<div id="sc-ssr-shell" style="background:#080810;color:#f2f0ff;min-height:100vh;font-family:Geist,'Helvetica Neue',Arial,sans-serif">
-<header style="padding:18px 24px;border-bottom:1px solid #1c1c2e"><a href="/" style="color:#c8a84b;font-weight:700;text-decoration:none">${SITE_NAME}</a></header>
-<main style="max-width:880px;margin:0 auto;padding:48px 24px">
-<h1 style="font-size:34px;line-height:1.2;margin:0 0 16px">${esc(route.h1)}</h1>
-<p style="font-size:17px;color:#9896ba;line-height:1.6">${esc(route.intro)}</p>
+  // Lo que ve la persona: pantalla de marca (mismo fondo que la app, sin texto en fuente de
+  // sistema que luego salte). Lo que lee un rastreador: el contenido real, recortado
+  // visualmente (técnica "visually hidden"), que React sustituye al montar.
+  const hidden = "position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0";
+  const html = `<div id="sc-ssr-shell" style="background:#080810;min-height:100vh;display:flex;align-items:center;justify-content:center">
+<div aria-hidden="true" style="width:44px;height:44px;border-radius:12px;border:1px solid #c8a84b;box-shadow:0 0 32px rgba(200,168,75,.35)"></div>
+<div style="${hidden}">
+<header><a href="/">${SITE_NAME}</a></header>
+<main>
+<h1>${esc(route.h1)}</h1>
+<p>${esc(route.intro)}</p>
 ${extraForRoute(route)}
 </main>
-<footer style="max-width:880px;margin:0 auto;padding:32px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px">${linksHtml()}</footer>
+<footer>${linksHtml()}</footer>
+</div>
 </div>`;
   return { html, head: renderHead(url) };
 }
