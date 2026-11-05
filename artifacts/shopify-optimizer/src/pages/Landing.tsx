@@ -9,6 +9,7 @@ import SiteLinks from "@/components/SiteLinks";
 import { metaFor } from "@/components/PageMeta";
 import { HERO, SERVICES, PLATFORMS, PROCESS, PORTAL_FEATURES } from "@/lib/landing-content";
 import "./landing-2026.css";
+import { sendContactRequest } from "@/lib/contact-request";
 
 function SectionVideoBg({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -68,7 +69,7 @@ function MagnetInstagramButton() {
       const dist = Math.hypot(dx, dy);
       if (dist < RADIUS) {
         const pull = (1 - dist / RADIUS) * STRENGTH * 60;
-        targetRef.current = { x: (dx / dist) * pull, y: (dy / dist) * pull };
+        targetRef.current = { x: (dx / (dist || 1)) * pull, y: (dy / (dist || 1)) * pull };
         setHovered(true);
       } else {
         targetRef.current = { x: 0, y: 0 };
@@ -269,23 +270,20 @@ export default function Landing() {
     setContactStatus("sending");
     setContactError("");
     try {
-      let res: Response;
       if (refImageFile) {
         const fd = new FormData();
         Object.entries(contactForm).forEach(([k, v]) => fd.append(k, v));
         fd.append("services", JSON.stringify(contactServices));
         fd.append("referenceImage", refImageFile);
-        res = await fetch(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
+        await sendContactRequest(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
       } else {
-        res = await fetch(`${BASE_URL}/api/contact`, {
+        await sendContactRequest(`${BASE_URL}/api/contact`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...contactForm, services: contactServices }),
         });
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? (content?.errorMessages?.sendFail ?? "Error al enviar"));
       setContactStatus("sent");
     } catch (err: unknown) {
       setContactStatus("error");

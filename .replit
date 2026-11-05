@@ -24,14 +24,6 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "API Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "web"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "typecheck-api"
 
 [[workflows.workflow.tasks]]
@@ -45,28 +37,6 @@ args = "test-api"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "test-frontend"
-
-[[workflows.workflow]]
-name = "API Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=3000 pnpm --filter @workspace/api-server run dev"
-
-[[workflows.workflow]]
-name = "web"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/shopify-optimizer run dev"
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow]]
 name = "typecheck-api"

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
+import { sendContactRequest } from "@/lib/contact-request";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const VIDEO_SRC = `${API_BASE}/assets/videos/alec_landing.mp4`;
@@ -492,13 +493,11 @@ export default function Contacto() {
     if (status === "sending") return;
     setStatus("sending"); setError("");
     try {
-      const res = await fetch(`${API_BASE}/api/contact`, {
+      await sendContactRequest(`${API_BASE}/api/contact`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, services }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Error al enviar");
       setStatus("sent");
     } catch (err: unknown) {
       setStatus("error");
@@ -609,9 +608,9 @@ export default function Contacto() {
                         marginBottom:14,
                       }}>Trabaja con nosotros</span>
                     )}
-                    <h2 style={{ fontSize:"clamp(22px,3.2vw,34px)", fontWeight:800, color:"#eee", lineHeight:1.15, marginBottom:10 }}>
+                    <h1 style={{ fontSize:"clamp(22px,3.2vw,34px)", fontWeight:800, color:"#eee", lineHeight:1.15, margin:"0 0 10px" }}>
                       {demoActive ? <>Viendo cómo funciona…</> : <>Cuéntanos sobre<br />tu negocio.</>}
-                    </h2>
+                    </h1>
                     <p style={{ fontSize:13.5, color:"#777", lineHeight:1.65 }}>
                       {demoActive
                         ? "La IA rellena un ejemplo real. El formulario es tuyo cuando acabe."
@@ -620,7 +619,7 @@ export default function Contacto() {
                     </p>
                   </div>
 
-                  <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                  <form onSubmit={submit} onFocusCapture={skipDemo} onPointerDownCapture={skipDemo} style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
                     {/* Nombre + Email */}
                     <div className="ctc-field">

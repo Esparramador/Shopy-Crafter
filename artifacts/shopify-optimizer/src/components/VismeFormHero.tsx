@@ -20,6 +20,7 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
+import { sendContactRequest } from "@/lib/contact-request";
 
 const BASE_URL   = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const VIDEO_SRC  = `${BASE_URL}/assets/videos/alec_landing.mp4`;
@@ -119,7 +120,7 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
     const v = videoRef.current;
     if (!v) return;
     if (isActive) {
-      v.play().catch(() => {});
+      v.play().catch(() => setFormReady(true));
     } else {
       v.pause();
     }
@@ -131,13 +132,21 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
       ([entry]) => {
         const v = videoRef.current;
         if (!v) return;
-        entry.isIntersecting ? v.play().catch(() => {}) : v.pause();
+        entry.isIntersecting ? v.play().catch(() => setFormReady(true)) : v.pause();
       },
       { threshold: 0.10 }
     );
     if (rootRef.current) obs.observe(rootRef.current);
     return () => obs.disconnect();
   }, []);
+
+  // Media is decorative: blocked autoplay, a stalled download or a short video
+  // must never prevent a visitor from reaching the actual contact form.
+  useEffect(() => {
+    if (!isActive || formReady) return;
+    const timer = setTimeout(() => setFormReady(true), 6500);
+    return () => clearTimeout(timer);
+  }, [isActive, formReady]);
 
   // timeupdate — trigger form at t=4.5s
   useEffect(() => {
@@ -182,22 +191,19 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
     if (status === "sending") return;
     setStatus("sending"); setErrMsg("");
     try {
-      let res: Response;
       if (refFile) {
         const fd = new FormData();
         Object.entries(form).forEach(([k, v]) => fd.append(k, v));
         fd.append("services", JSON.stringify(services));
         fd.append("referenceImage", refFile);
-        res = await fetch(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
+        await sendContactRequest(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
       } else {
-        res = await fetch(`${BASE_URL}/api/contact`, {
+        await sendContactRequest(`${BASE_URL}/api/contact`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...form, services }),
         });
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Error al enviar");
       setStatus("sent");
     } catch (err: unknown) {
       setStatus("error");
@@ -440,6 +446,7 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
           muted
           playsInline
           preload="metadata"
+          onError={() => setFormReady(true)}
         />
 
         {/* ── Gradient overlay ──────────────────────────────────────────────── */}
@@ -494,6 +501,9 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
               <p style={{ margin: 0, fontSize: 12.5, fontStyle: "italic", lineHeight: 1.55 }}>
                 Observa cómo Alec<br />sale del cuadro…
               </p>
+              <button type="button" onClick={() => setFormReady(true)} style={{ color: "var(--gold, #c8a84b)", background: "none", border: 0, cursor: "pointer", minHeight: 44, textDecoration: "underline" }}>
+                Abrir formulario sin esperar
+              </button>
             </div>
           )}
 
