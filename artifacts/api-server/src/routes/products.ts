@@ -3,7 +3,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, seoDataTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
-import { shopifyRequest, shopifyRequestPaged, shopifyGraphQL } from "../lib/shopify";
+import { shopifyRequest, shopifyRequestPaged, shopifyGraphQL, mensajeShopifyUsuario, ShopifyAuthError } from "../lib/shopify";
 import { auditProduct, scoreToGrade } from "../lib/audit";
 import { askClaudeJsonWithBrain, SHOPIFY_EXPERT_SYSTEM, learnFromOperation } from "../lib/claude";
 import { createBulkJob, updateJobProgress, completeJob, failJob, runAsync } from "../lib/bulk-queue";
@@ -536,7 +536,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
             logger.error({ projectId: id, error: msg, status }, "Shopify sync: API request failed");
-            res.status(502).json({ error: `Error al conectar con Shopify: ${msg}` });
+            res.status(err instanceof ShopifyAuthError ? 422 : 502).json({ error: mensajeShopifyUsuario(err, project.shopDomain), shopify_auth_error: err instanceof ShopifyAuthError });
             return;
           }
   
@@ -579,7 +579,7 @@ router.post("/projects/:projectId/products/sync", async (req, res): Promise<void
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
             logger.error({ projectId: id, error: msg, status }, "Shopify sync: API request failed");
-            res.status(502).json({ error: `Error al conectar con Shopify: ${msg}` });
+            res.status(err instanceof ShopifyAuthError ? 422 : 502).json({ error: mensajeShopifyUsuario(err, project.shopDomain), shopify_auth_error: err instanceof ShopifyAuthError });
             return;
           }
   

@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { db } from "@workspace/db";
 import { projectsTable, productsTable, cogsTable, priceHistoryTable, abTestsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
-import { shopifyRequest } from "../lib/shopify";
+import { shopifyRequest, mensajeShopifyUsuario, resumenRespuestaShopify } from "../lib/shopify";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude";
 import { askGeminiWithSearch, isGeminiSearchBlocked } from "../lib/gemini.js";
 import { updateCogsBenchmark } from "../lib/cogs-benchmarks.js";
@@ -651,7 +651,9 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
         }
       }
     } catch (err) {
-      ordersError = err instanceof Error ? err.message : String(err);
+      ordersError = ((project as any).platformType || "shopify") === "shopify"
+        ? mensajeShopifyUsuario(err, project.shopDomain)
+        : resumenRespuestaShopify(err instanceof Error ? err.message : String(err));
       logger.warn({ err, projectId }, "financial-dashboard: no se pudieron leer los pedidos");
     }
 
@@ -706,7 +708,7 @@ router.get("/projects/:projectId/financial-dashboard", async (req, res): Promise
     const ltvCacRatio = customerValue30d !== null && avgCac ? Math.round((customerValue30d / avgCac) * 100) / 100 : null;
 
     const alerts: string[] = [];
-    if (ordersError) alerts.push(`No se pudieron leer los pedidos de la tienda: ${ordersError}`);
+    if (ordersError) alerts.push(`No se pudieron leer los pedidos de la tienda. ${ordersError}`);
     if (cogsCoveragePct !== null && cogsCoveragePct < 100) {
       alerts.push(`Solo el ${cogsCoveragePct}% de las ventas tiene COGS registrado — los márgenes se calculan sobre esa parte`);
     }
