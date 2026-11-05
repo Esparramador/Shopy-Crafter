@@ -1,9 +1,9 @@
-// Shopy Crafter Service Worker — v7
+// Shopy Crafter Service Worker — v8
 // CRITICAL: HTML is NEVER cached. Only assets with content-hash get cached.
 // This prevents stale index.html from breaking deploys when bundle hash changes.
-const STATIC_CACHE  = 'sc-static-v7';
-const FONT_CACHE    = 'sc-fonts-v7';
-const IMAGE_CACHE   = 'sc-images-v7';
+const STATIC_CACHE  = 'sc-static-v8';
+const FONT_CACHE    = 'sc-fonts-v8';
+const IMAGE_CACHE   = 'sc-images-v8';
 
 const PRECACHE = [
   '/icons/icon-192.png',
@@ -57,7 +57,7 @@ self.addEventListener('fetch', e => {
 
   // 4. HTML navigations: ALWAYS network-only, NEVER cache
   //    Caching index.html breaks deploys — Vite changes bundle hash each build.
-  if (e.request.headers.get('accept')?.includes('text/html')) {
+  if (e.request.mode === 'navigate') {
     e.respondWith(networkOnlyWithOfflineFallback(e.request));
     return;
   }
@@ -79,13 +79,24 @@ self.addEventListener('fetch', e => {
   return;
 });
 
+// El hosting devuelve 200 con HTML para un archivo que ya no existe: eso nunca se guarda como JS o imagen.
+function cacheable(request, res) {
+  if (!res.ok || res.redirected) return false;
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('text/html')) return false;
+  const p = new URL(request.url).pathname;
+  if (/\.(js)$/.test(p)) return ct.includes('javascript');
+  if (/\.css$/.test(p)) return ct.includes('css');
+  return true;
+}
+
 // ── Strategies ─────────────────────────────────────────────────────────────
 async function cacheFirst(request, cacheName) {
   const cache  = await caches.open(cacheName);
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (response.ok) cache.put(request, response.clone());
+  if (cacheable(request, response)) cache.put(request, response.clone());
   return response;
 }
 
@@ -93,7 +104,7 @@ async function staleWhileRevalidate(request, cacheName) {
   const cache      = await caches.open(cacheName);
   const cached     = await cache.match(request);
   const networkReq = fetch(request).then(res => {
-    if (res.ok) cache.put(request, res.clone());
+    if (cacheable(request, res)) cache.put(request, res.clone());
     return res;
   }).catch(() => cached);
   return cached || networkReq;

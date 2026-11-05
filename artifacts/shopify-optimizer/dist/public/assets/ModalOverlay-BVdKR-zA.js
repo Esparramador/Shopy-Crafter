@@ -1,0 +1,1 @@
+import{j as l}from"./vendor-react-7UxssXty.js";import{u as t}from"./use-modal-lock-BFRYlj9J.js";function d({className:o,children:r,...a}){t();const s=o?`modal-overlay ${o}`:"modal-overlay";return l.jsx("div",{...a,className:s,children:r})}export{d as M};

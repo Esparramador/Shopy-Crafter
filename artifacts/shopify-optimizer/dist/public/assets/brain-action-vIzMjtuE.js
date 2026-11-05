@@ -1,0 +1,3 @@
+function t(n){return n.replace(/\*\*/g,"").replace(/`/g,"").replace(/[#>]/g,"").trim()}async function i(n,a={}){const e=await fetch(n,a);if(!e.ok||typeof window>"u")return e;const r=await e.clone().json().catch(()=>null);if(!r?.requiresConfirmation||!r.confirmToken)return e;if(!window.confirm(`${t(r.message??"¿Confirmas esta acción?")}
+
+Pulsa Aceptar para aplicarla.`))return new Response(JSON.stringify({error:!0,cancelled:!0,message:"Acción cancelada: no se ha hecho ningún cambio."}),{status:200,headers:{"Content-Type":"application/json"}});let o={};try{o=JSON.parse(String(a.body??"{}"))}catch{return e}return fetch(n,{...a,body:JSON.stringify({...o,params:{...o.params??{},confirmed:!0,confirmToken:r.confirmToken}})})}export{i as f};

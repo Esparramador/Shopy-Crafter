@@ -7,19 +7,9 @@ export default function SCCursor() {
   const mx = useRef(0), my = useRef(0), rx = useRef(0), ry = useRef(0);
 
   useEffect(() => {
-    const finePointer = window.matchMedia("(any-hover: hover) and (any-pointer: fine)");
     const root = document.documentElement;
-    let enabled = false;
     let raf = 0;
-
-    const move = (e: PointerEvent) => {
-      if (e.pointerType === "touch") return;
-      mx.current = e.clientX;
-      my.current = e.clientY;
-      root.classList.add("sc-cursor-on");
-      dotRef.current?.classList.add("sc-cursor-visible");
-      ringRef.current?.classList.add("sc-cursor-visible");
-    };
+    let animating = false;
 
     const isInteractive = (target: EventTarget | null) =>
       target instanceof Element && Boolean(target.closest("a, button, [role='button'], input, select, textarea, label"));
@@ -36,6 +26,7 @@ export default function SCCursor() {
       ringRef.current?.classList.remove("sc-ring-hover");
     };
     const anim = () => {
+      if (!animating) return;
       if (dotRef.current) {
         dotRef.current.style.transform = `translate3d(${mx.current - 14}px, ${my.current - 14}px, 0)`;
       }
@@ -47,42 +38,50 @@ export default function SCCursor() {
       raf = requestAnimationFrame(anim);
     };
 
-    const onWindowBlur = () => {
-      root.classList.remove("sc-cursor-on");
-      dotRef.current?.classList.remove("sc-cursor-visible");
-      ringRef.current?.classList.remove("sc-cursor-visible");
+    const stopAnimation = () => {
+      if (!animating) return;
+      animating = false;
+      cancelAnimationFrame(raf);
     };
 
-    const enable = () => {
-      if (enabled) return;
-      enabled = true;
-      document.addEventListener("pointermove", move, { passive: true });
-      document.addEventListener("pointerover", onOver);
-      document.addEventListener("pointerout", onOut);
-      window.addEventListener("blur", onWindowBlur);
-      raf = requestAnimationFrame(anim);
-    };
-    const disable = () => {
-      if (enabled) {
-        enabled = false;
-        document.removeEventListener("pointermove", move);
-        document.removeEventListener("pointerover", onOver);
-        document.removeEventListener("pointerout", onOut);
-        window.removeEventListener("blur", onWindowBlur);
-        cancelAnimationFrame(raf);
-      }
+    const hideCursor = () => {
       root.classList.remove("sc-cursor-on");
       dotRef.current?.classList.remove("sc-cursor-visible", "sc-cursor-hover");
       ringRef.current?.classList.remove("sc-cursor-visible", "sc-ring-hover");
+      stopAnimation();
     };
 
-    const syncPointer = () => finePointer.matches ? enable() : disable();
-    syncPointer();
-    finePointer.addEventListener("change", syncPointer);
+    const move = (e: PointerEvent) => {
+      if (e.pointerType === "touch") {
+        hideCursor();
+        return;
+      }
+      mx.current = e.clientX;
+      my.current = e.clientY;
+      root.classList.add("sc-cursor-on");
+      dotRef.current?.classList.add("sc-cursor-visible");
+      ringRef.current?.classList.add("sc-cursor-visible");
+      if (!animating) {
+        animating = true;
+        raf = requestAnimationFrame(anim);
+      }
+    };
+
+    const onWindowBlur = () => {
+      hideCursor();
+    };
+
+    document.addEventListener("pointermove", move, { passive: true });
+    document.addEventListener("pointerover", onOver);
+    document.addEventListener("pointerout", onOut);
+    window.addEventListener("blur", onWindowBlur);
 
     return () => {
-      finePointer.removeEventListener("change", syncPointer);
-      disable();
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerover", onOver);
+      document.removeEventListener("pointerout", onOut);
+      window.removeEventListener("blur", onWindowBlur);
+      hideCursor();
     };
   }, []);
 

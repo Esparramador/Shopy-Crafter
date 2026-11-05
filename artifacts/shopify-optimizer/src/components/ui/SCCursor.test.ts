@@ -68,7 +68,47 @@ describe("SCCursor", () => {
     document.body.append(host);
     const root = createRoot(host);
     act(() => root.render(createElement(SCCursor)));
+
+    const move = new Event("pointermove", { bubbles: true });
+    Object.defineProperty(move, "pointerType", { value: "touch" });
+    act(() => document.dispatchEvent(move));
+
     expect(document.documentElement.classList.contains("sc-cursor-on")).toBe(false);
+    act(() => root.unmount());
+    host.remove();
+  });
+
+  it("activates from an actual mouse event when the dev preview reports no fine pointer", () => {
+    const media = {
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    } as unknown as MediaQueryList;
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue(media));
+    let frame: FrameRequestCallback | undefined;
+    vi.stubGlobal("requestAnimationFrame", vi.fn().mockImplementation(callback => {
+      frame = callback;
+      return 1;
+    }));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => root.render(createElement(SCCursor)));
+
+    const move = new Event("pointermove", { bubbles: true });
+    Object.defineProperties(move, {
+      clientX: { value: 120 },
+      clientY: { value: 80 },
+      pointerType: { value: "mouse" },
+    });
+    act(() => document.dispatchEvent(move));
+    act(() => frame?.(0));
+
+    expect(document.documentElement.classList.contains("sc-cursor-on")).toBe(true);
+    expect(document.body.querySelector(".sc-cursor")?.classList.contains("sc-cursor-visible")).toBe(true);
+
     act(() => root.unmount());
     host.remove();
   });

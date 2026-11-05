@@ -1,0 +1,1 @@
+function o(t){return t<1024?`${t} B`:t<1024*1024?`${(t/1024).toFixed(1)} KB`:`${(t/(1024*1024)).toFixed(1)} MB`}function i(t,n=new Date){const e=new Date(t),r=Math.floor((n.getTime()-e.getTime())/6e4);return r<1?"ahora":r<60?`${r}m`:r<1440?`${Math.floor(r/60)}h`:e.toLocaleDateString("es-ES",{day:"2-digit",month:"short"})}export{i as a,o as f};

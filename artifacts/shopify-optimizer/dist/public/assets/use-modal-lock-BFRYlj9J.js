@@ -1,0 +1,1 @@
+import{r}from"./vendor-react-7UxssXty.js";let t=0;const o="data-modal-open";function n(e=!0){r.useEffect(()=>{if(!(!e||typeof document>"u"))return t+=1,document.body.setAttribute(o,"true"),()=>{t=Math.max(0,t-1),t===0&&document.body.removeAttribute(o)}},[e])}export{n as u};

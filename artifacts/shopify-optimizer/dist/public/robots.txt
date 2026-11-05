@@ -1,26 +1,32 @@
+# Shopy Crafter — robots.txt
+# Las demos antiguas se sirven únicamente mediante una ruta autenticada de admin.
+
 User-agent: *
 Allow: /
 
-# Marketing & public pages
-Allow: /sobre-nosotros
-Allow: /casos-de-exito
-Allow: /programa-de-afiliados
-Allow: /faq
-Allow: /preguntas-frecuentes
-Allow: /blog
-Allow: /changelog
-Allow: /privacidad
-Allow: /terminos
-Allow: /cookies
-Allow: /contacto
-
-# Block private / authenticated areas
-Disallow: /admin/
 Disallow: /api/
+Allow: /api/shop/products-sitemap.xml
+Disallow: /admin
+Disallow: /client
+Disallow: /project/
+Disallow: /projects/
+Disallow: /dashboard
+Disallow: /new-project
+Disallow: /invite/
+Disallow: /reset-password
+Disallow: /oauth-success
 Disallow: /shopify/
-
-# Block dev/test paths
 Disallow: /web-demos/
+Disallow: /informes/
+Disallow: /informe-profesional.html
+Disallow: /monologuista-preview.html
+Disallow: /regalo-demo/
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /tienda/carrito
+Disallow: /tienda/gracias
+Disallow: /*?asunto=
+Disallow: /*?session_id=
+Disallow: /api/web-designer/demo-page/
 
-# Sitemaps
 Sitemap: https://shopycrafter.com/sitemap.xml
