@@ -23,6 +23,8 @@ import {
 import { db as _db, clientKnowledgeTable } from "@workspace/db";
 import { eq as _eq, desc as _desc } from "drizzle-orm";
 import { sendPushToAdmins, sendPushToClientByProject } from "../lib/push-helper.js";
+import { WooClient } from "../lib/woo-client.js";
+import { wooOverview } from "../lib/woo-metrics.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -1006,6 +1008,21 @@ router.get("/platform-data", async (req, res): Promise<void> => {
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
     const platformType: string = project.platformType ?? "shopify";
+
+    if (platformType === "woocommerce") {
+      const live = await wooOverview(new WooClient(project));
+      res.json({
+        platformType, ...live,
+        revenue: { total30d: live.revenue30d, orders30d: live.orders30d, aov: live.aov, trend: null, dailyChart: live.dailyChart },
+        lastDataDate: live.fetchedAt,
+        topProducts: [], events: [], cogsData: [],
+        inventoryAlerts: [...live.outOfStock,...live.backorder,...live.lowStock].map(p=>({
+          product_title:p.name,variant_title:"",current_stock:p.stockQuantity,days_remaining:null,
+          status:p.stockStatus==="outofstock"?"critical":"warning",sku:p.sku,
+        })),
+      });
+      return;
+    }
 
     // Ingresos: snapshots diarios de los últimos 30 días frente a los 30 anteriores,
     // una fila por día (antes los duplicados de un mismo día se sumaban dos veces).

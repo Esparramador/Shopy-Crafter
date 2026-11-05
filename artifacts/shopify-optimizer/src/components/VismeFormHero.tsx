@@ -66,7 +66,13 @@ const EMPTY: ContactForm = {
 };
 const NICHES   = ["Moda y ropa","Electrónica y gadgets","Hogar y decoración","Belleza y cosmética","Deporte y fitness","Alimentación y gourmet","Arte y coleccionismo","Mascotas","Joyería y accesorios","Otro"];
 const REVENUES = ["Menos de €1.000","€1.000 – €5.000","€5.000 – €15.000","€15.000 – €50.000","Más de €50.000"];
-const SERVICES = ["SEO y contenido","Rediseño de producto","Imágenes IA","Pricing y márgenes","Email marketing","A/B Testing","Auditoría completa"];
+const SERVICES = [
+  "SEO y contenido", "Rediseño de producto", "Imágenes IA", "Pricing y márgenes",
+  "Email marketing", "A/B Testing", "Auditoría completa",
+  "Asistente virtual para WhatsApp y teléfono", "Chatbot para landing o web",
+  "Agente de IA a medida con skills", "App personalizada para el agente",
+  "Perfil de Empresa de Google", "Campañas de Google Ads",
+];
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const labelSt: React.CSSProperties = {
@@ -105,6 +111,7 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
   // Video / build state
   const [formReady,  setFormReady]  = useState(false);
   const [buildPhase, setBuildPhase] = useState(0);   // 0..5
+  const formFallbackRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef  = useRef<HTMLDivElement>(null);
 
@@ -114,6 +121,16 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
     setForm(f => (f.message.includes(prefill.message) ? f : { ...f, message: f.message ? `${f.message}\n${prefill.message}` : prefill.message }));
     setStatus(st => (st === "sent" ? "idle" : st));
   }, [prefill?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // El formulario no debe quedar oculto si el vídeo no carga o no puede avanzar.
+  useEffect(() => {
+    if (formReady) return;
+    const timeout = window.setTimeout(() => {
+      formFallbackRef.current = true;
+      setFormReady(true);
+    }, 6500);
+    return () => window.clearTimeout(timeout);
+  }, [formReady]);
 
   // isActive prop — play/pause based on whether the landing section is active
   useEffect(() => {
@@ -169,6 +186,10 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
   // Build phases cascade (starts when formReady becomes true)
   useEffect(() => {
     if (!formReady) return;
+    if (formFallbackRef.current) {
+      setBuildPhase(5);
+      return;
+    }
     setBuildPhase(1);
     const t2 = setTimeout(() => setBuildPhase(2), 1450);  // Name+Email
     const t3 = setTimeout(() => setBuildPhase(3), 2150);  // Phone

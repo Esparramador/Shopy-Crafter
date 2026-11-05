@@ -35,7 +35,13 @@ const BUILD_STEPS = [
 
 const nicheOptions = ["Moda y ropa","Electrónica y gadgets","Hogar y decoración","Belleza y cosmética","Deporte y fitness","Alimentación y gourmet","Arte y coleccionismo","Mascotas","Joyería y accesorios","Otro"];
 const revenueOptions = ["Menos de €1.000","€1.000 – €5.000","€5.000 – €15.000","€15.000 – €50.000","Más de €50.000"];
-const serviceOptions = ["Auditoría completa","Generación de imágenes IA","SEO y schemas","A/B Testing","Pricing y COGS","Rediseño web","Programa de afiliados","Plan personalizado"];
+const serviceOptions = [
+  "Auditoría completa", "Generación de imágenes IA", "SEO y schemas", "A/B Testing",
+  "Pricing y COGS", "Rediseño web", "Programa de afiliados", "Plan personalizado",
+  "Asistente virtual para WhatsApp y teléfono", "Chatbot para landing o web",
+  "Agente de IA a medida con skills", "App personalizada para el agente",
+  "Perfil de Empresa de Google", "Campañas de Google Ads",
+];
 
 const EMPTY_FORM = { name:"", email:"", phone:"", storeUrl:"", niche:"", customNiche:"", revenue:"", socialMedia:"", message:"" };
 
@@ -129,6 +135,7 @@ const CSS = `
   opacity: 0; transform: translateY(32px) scale(.95);
   transition: opacity 0.6s cubic-bezier(.22,1,.36,1), transform 0.6s cubic-bezier(.22,1,.36,1);
 }
+.ctc-card:first-child { flex-basis: 220px; max-width: 220px; }
 .ctc-card-in { opacity: 1; transform: translateY(0) scale(1); }
 .ctc-card:nth-child(1) { transition-delay: 0ms; }
 .ctc-card:nth-child(2) { transition-delay: 90ms; }
@@ -140,7 +147,7 @@ const CSS = `
 }
 .ctc-card-value {
   display: block; font-size: 12px; font-weight: 700; color: #ccc;
-  text-decoration: none; word-break: break-word;
+  text-decoration: none; overflow-wrap: anywhere; word-break: normal; line-height: 1.45;
 }
 .ctc-card-value:hover { text-decoration: underline; }
 
@@ -296,6 +303,7 @@ const CSS = `
   }
   .ctc-left { order: 1; align-items: center; justify-content: center; padding: 8px 16px 48px; }
   .ctc-card { flex: 1 1 120px; max-width: 160px; padding: 16px 10px 14px; }
+  .ctc-card:first-child { flex-basis: 220px; max-width: 240px; }
   .ctc-card-icon { font-size: 20px; margin-bottom: 6px; }
   .ctc-card-label { font-size: 8px; }
   .ctc-card-value { font-size: 11px; }
@@ -344,6 +352,7 @@ const CSS = `
 @media (max-width: 480px) {
   .ctc-panel { padding: 56px 14px 24px; }
   .ctc-card { flex: 1 1 100%; max-width: none; }
+  .ctc-card:first-child { flex-basis: 100%; max-width: none; }
   .ctc-cards-row { flex-direction: column; gap: 8px; }
   .ctc-card { padding: 14px 16px; text-align: left; flex-direction: row; align-items: center; gap: 12px; }
   .ctc-card-icon { font-size: 22px; flex-shrink: 0; margin-bottom: 0; }

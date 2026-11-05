@@ -1,8 +1,8 @@
 import type { Project } from "@workspace/db";
 import { db, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { safeDecrypt } from "../crypto.js";
 import { logger } from "../logger";
+import { resolveWooCredentials, WooClient } from "../woo-client.js";
 import type {
   IPlatformConnector,
   ConnectionTestResult,
@@ -45,8 +45,7 @@ export class WooCommerceConnector implements IPlatformConnector {
     this.storeDomain = project.shopDomain;
     this.baseUrl = `${normalizeWooUrl(project.shopDomain)}/wp-json/wc/v3`;
 
-    const consumerKey = safeDecrypt(project.clientId) || project.clientId;
-    const consumerSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
+    const { consumerKey, consumerSecret } = resolveWooCredentials(project);
     this.authHeader = `Basic ${Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64")}`;
   }
 
@@ -175,10 +174,7 @@ export class WooCommerceConnector implements IPlatformConnector {
     const product = await this.wcRequest<WCProduct>("GET", `/products/${platformProductId}`);
 
     if (product.type === "variable") {
-      try {
-        const variations = await this.wcRequest<WCVariation[]>("GET", `/products/${platformProductId}/variations?per_page=100`);
-        product._variations = variations;
-      } catch { /* ignore */ }
+      product._variations = await new WooClient(this.project).all<WCVariation>(`/products/${platformProductId}/variations`);
     }
 
     return mapWooProduct(product);
@@ -251,20 +247,17 @@ export class WooCommerceConnector implements IPlatformConnector {
       }
 
       const updatedProduct = await this.wcRequest<WCProduct>("GET", `/products/${created.id}`);
-      try {
-        const variations = await this.wcRequest<WCVariation[]>("GET", `/products/${created.id}/variations?per_page=100`);
-        updatedProduct._variations = variations;
-      } catch { /* ignore */ }
+      updatedProduct._variations = await new WooClient(this.project).all<WCVariation>(`/products/${created.id}/variations`);
       return mapWooProduct(updatedProduct);
     }
 
-    return mapWooProduct(created);
+    return this.getProduct(String(created.id));
   }
 
   async updateProduct(platformProductId: string, data: Partial<PlatformProduct>): Promise<PlatformProduct> {
     const payload = mapToWooPayload(data);
-    const updated = await this.wcRequest<WCProduct>("PUT", `/products/${platformProductId}`, payload);
-    return mapWooProduct(updated);
+    await this.wcRequest<WCProduct>("PUT", `/products/${platformProductId}`, payload);
+    return this.getProduct(platformProductId);
   }
 
   async deleteProduct(platformProductId: string): Promise<void> {
@@ -275,9 +268,11 @@ export class WooCommerceConnector implements IPlatformConnector {
     const product = await this.wcRequest<WCProduct>("GET", `/products/${platformProductId}`);
     const existingImages = product.images ?? [];
     const newImages = [...existingImages, { src: imageSource, alt: alt ?? "" }];
-    const updated = await this.wcRequest<WCProduct>("PUT", `/products/${platformProductId}`, { images: newImages });
+    await this.wcRequest<WCProduct>("PUT", `/products/${platformProductId}`, { images: newImages });
+    const updated = await this.wcRequest<WCProduct>("GET", `/products/${platformProductId}`);
     const lastImage = updated.images?.[updated.images.length - 1];
-    return { src: lastImage?.src ?? imageSource, id: lastImage?.id ? String(lastImage.id) : undefined };
+    if (!lastImage?.id || !lastImage.src) throw new Error("WooCommerce no confirmó una imagen persistente");
+    return { src: lastImage.src, id: String(lastImage.id) };
   }
 
   async getOrders(params?: { page?: number; limit?: number; after?: string; before?: string }): Promise<PlatformOrder[]> {
@@ -317,7 +312,8 @@ export class WooCommerceConnector implements IPlatformConnector {
 
     const resp = await this.wcRawRequest("GET", path);
     const total = resp.headers.get("X-WP-Total");
-    return total ? parseInt(total, 10) : 0;
+    if (total === null || !Number.isSafeInteger(Number(total))) throw new Error("WooCommerce no confirmó el total de productos");
+    return Number(total);
   }
 
   async getSeoData(platformProductId: string): Promise<SeoData | null> {
@@ -421,14 +417,12 @@ export class WooCommerceConnector implements IPlatformConnector {
 
     let variants: Array<{ variantId: string; quantity: number | null; sku?: string }> = [];
     if (product.type === "variable") {
-      try {
-        const variations = await this.wcRequest<WCVariation[]>("GET", `/products/${platformProductId}/variations?per_page=100`);
+        const variations = await new WooClient(this.project).all<WCVariation>(`/products/${platformProductId}/variations`);
         variants = variations.map(v => ({
           variantId: String(v.id),
           quantity: v.stock_quantity ?? null,
           sku: v.sku ?? undefined,
         }));
-      } catch { /* ignore */ }
     }
 
     return {
@@ -454,28 +448,7 @@ export class WooCommerceConnector implements IPlatformConnector {
   }
 
   async getAllProducts(): Promise<WCProduct[]> {
-    const allProducts: WCProduct[] = [];
-    let page = 1;
-    const perPage = 100;
-
-    while (true) {
-      const resp = await this.wcRawRequest("GET", `/products?per_page=${perPage}&page=${page}`);
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`WooCommerce API error ${resp.status}: ${text}`);
-      }
-
-      const products = await resp.json() as WCProduct[];
-      if (!products.length) break;
-      allProducts.push(...products);
-
-      const totalPages = parseInt(resp.headers.get("X-WP-TotalPages") ?? "1", 10);
-      if (page >= totalPages) break;
-      page++;
-      await new Promise(r => setTimeout(r, 300));
-    }
-
-    return allProducts;
+    return new WooClient(this.project).all<WCProduct>("/products");
   }
 
   private async wcRawRequest(method: string, path: string, body?: unknown): Promise<Response> {
@@ -486,22 +459,7 @@ export class WooCommerceConnector implements IPlatformConnector {
     }
     wcLastRequestTime = Date.now();
 
-    const url = `${this.baseUrl}${path}`;
-
-    const init: RequestInit = {
-      method,
-      headers: {
-        Authorization: this.authHeader,
-        "Content-Type": "application/json",
-      },
-      signal: AbortSignal.timeout(WC_FETCH_TIMEOUT),
-    };
-
-    if (body && method !== "GET" && method !== "HEAD") {
-      init.body = JSON.stringify(body);
-    }
-
-    return fetch(url, init);
+    return new WooClient(this.project).raw(method,path,body);
   }
 
   private async wcRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -510,7 +468,7 @@ export class WooCommerceConnector implements IPlatformConnector {
     for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
       const resp = await this.wcRawRequest(method, path, body);
 
-      if (resp.status === 429 || (resp.status >= 500 && resp.status !== 501)) {
+      if (method === "GET" && (resp.status === 429 || (resp.status >= 500 && resp.status !== 501))) {
         lastResp = resp;
         if (attempt < RETRY_DELAYS.length) {
           const delay = RETRY_DELAYS[attempt];

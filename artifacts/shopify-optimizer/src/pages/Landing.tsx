@@ -230,7 +230,26 @@ export default function Landing() {
   const [formProgress, setFormProgress] = useState(0);
   const contactSectionRef = useRef<HTMLElement>(null);
   const heroSectionRef = useRef<HTMLElement>(null);
+  const cursorGlowRef = useRef<HTMLDivElement>(null);
   const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const el = cursorGlowRef.current;
+    if (!el || window.matchMedia("(hover: none), (pointer: coarse), (prefers-reduced-motion: reduce)").matches) return;
+    const move = (e: MouseEvent) => {
+      el.style.setProperty("--cursor-x", `${e.clientX}px`);
+      el.style.setProperty("--cursor-y", `${e.clientY}px`);
+      el.classList.add("is-visible");
+    };
+    const leave = () => el.classList.remove("is-visible");
+    window.addEventListener("mousemove", move, { passive: true });
+    document.addEventListener("mouseleave", leave);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseleave", leave);
+      el.classList.remove("is-visible");
+    };
+  }, []);
 
   // Las etiquetas del CMS iban por índice de las secciones antiguas: con la nueva
   // estructura se usan las propias.
@@ -545,19 +564,7 @@ export default function Landing() {
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
       {/* ── CURSOR GLOW SPOTLIGHT ── */}
-      <div
-        className="fp-cursor-glow"
-        ref={(el) => {
-          if (!el) return;
-          const move = (e: MouseEvent) => {
-            el.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%))`;
-          };
-          // React llama a este ref en cada render: sin esto se acumulan listeners.
-          (el as any).__cleanup?.();
-          window.addEventListener("mousemove", move, { passive: true });
-          (el as any).__cleanup = () => window.removeEventListener("mousemove", move);
-        }}
-      />
+      <div className="fp-cursor-glow" ref={cursorGlowRef} aria-hidden="true" />
       <PageMeta {...metaFor("/")} />
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">

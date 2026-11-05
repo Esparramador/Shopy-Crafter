@@ -3,6 +3,11 @@ import { useState, useEffect } from "react";
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
 interface PlatformData {
+  currency?: string;
+  source?: string;
+  fetchedAt?: string;
+  definition?: string;
+  period?: {from:string;to:string;timezone:string};
   platformType: string;
   revenue: { total30d: number; orders30d: number; aov: number; trend: number | null; dailyChart: Array<{ date: string; revenue: number; orders: number }> };
   lastDataDate?: string | null;
@@ -76,20 +81,27 @@ export default function StoreDashboard({ apid, theme }: { apid: (url: string) =>
   const t = theme;
   const [data, setData] = useState<PlatformData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const url = apid(`${API}/client/platform-data`);
 
   useEffect(() => {
-    fetch(apid(`${API}/client/platform-data`), { credentials: "include" })
+    const controller = new AbortController();
+    setData(null); setLoading(true); setError(null);
+    fetch(url, { credentials: "include",signal:controller.signal })
       // Si el API falla, sin datos (antes se guardaba el cuerpo de error y la
       // página se caía al leer data.revenue).
-      .then(async r => { const d = await r.json().catch(() => null); setData(r.ok && d?.revenue ? d : null); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+      .then(async r => { const d = await r.json().catch(() => null); if(!r.ok || !d?.revenue) throw new Error(d?.error ?? "Datos no disponibles"); setData(d); setLoading(false); })
+      .catch(e => {if (!controller.signal.aborted) {setError(e.message);setLoading(false);}});
+    return ()=>controller.abort();
+  }, [url]);
+
+  const money = (value: number | null | undefined) => value == null ? "—" : data?.currency ? new Intl.NumberFormat("es-ES",{style:"currency",currency:data.currency}).format(value) : `${value.toLocaleString("es-ES")} (moneda no disponible)`;
 
   const kpis = [
-    { label: "Revenue 30d", value: loading ? "—" : `€${(data?.revenue.total30d ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, icon: t.kpiIcons[0], color: t.c1, trend: data?.revenue.trend },
-    { label: "Pedidos 30d", value: loading ? "—" : String(data?.revenue.orders30d ?? 0), icon: t.kpiIcons[1], color: t.c2, trend: null },
-    { label: "Ticket Medio", value: loading ? "—" : `€${(data?.revenue.aov ?? 0).toFixed(2)}`, icon: t.kpiIcons[2], color: t.c3, trend: null },
-    { label: "Alertas Stock", value: loading ? "—" : String(data?.inventoryAlerts.length ?? 0), icon: "⚠️", color: (data?.inventoryAlerts.length ?? 0) > 0 ? "#f59e0b" : "#34d399", trend: null },
+    { label: "Ingresos netos 30d", value: money(data?.revenue.total30d), icon: t.kpiIcons[0], color: t.c1, trend: data?.revenue.trend },
+    { label: "Pedidos 30d", value: data ? String(data.revenue.orders30d) : "—", icon: t.kpiIcons[1], color: t.c2, trend: null },
+    { label: "Ticket Medio", value: money(data?.revenue.aov), icon: t.kpiIcons[2], color: t.c3, trend: null },
+    { label: "Alertas Stock", value: data ? String(data.inventoryAlerts.length) : "—", icon: "⚠️", color: (data?.inventoryAlerts.length ?? 0) > 0 ? "#f59e0b" : "#34d399", trend: null },
   ];
 
   return (
@@ -119,6 +131,12 @@ export default function StoreDashboard({ apid, theme }: { apid: (url: string) =>
         </div>
       </div>
 
+      {error && <p role="alert" style={{color:"#f87171"}}>{error}. No se han confirmado cifras de la tienda.</p>}
+      {data?.source && <div style={{fontSize:12,marginBottom:16,color:"var(--t2)"}}>
+        <p>Origen: {data.source} · {data.currency} · Actualizado: {new Date(data.fetchedAt!).toLocaleString("es-ES")}</p>
+        {data.period && <p>{data.period.from} — {data.period.to} ({data.period.timezone})</p>}
+        <p>{data.definition}</p>
+      </div>}
       {/* ── KPI GRID ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12, marginBottom: 16 }}>
         {kpis.map((k, i) => (
@@ -140,7 +158,7 @@ export default function StoreDashboard({ apid, theme }: { apid: (url: string) =>
         <div style={{ background: "var(--srf)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "18px 20px" }}>
           <p style={{ margin: "0 0 4px", fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Revenue Diario — 30 días</p>
           <p style={{ margin: "0 0 12px", fontSize: 22, fontWeight: 800, color: t.c1 }}>
-            €{(data?.revenue.total30d ?? 0).toLocaleString("es-ES")}
+             {money(data?.revenue.total30d)}
             <span style={{ marginLeft: 8 }}>{data && data.revenue.trend !== null && <TrendBadge value={data.revenue.trend} />}</span>
           </p>
           <MiniChart data={data?.revenue.dailyChart ?? []} color={t.c1} gradId={`${t.key}-g1`} />
@@ -168,7 +186,7 @@ export default function StoreDashboard({ apid, theme }: { apid: (url: string) =>
           <p style={{ margin: "0 0 12px", fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em" }}>⚠️ Alertas de Inventario</p>
           {loading ? <div style={{ color: "var(--t3)", fontSize: 12 }}>Cargando...</div>
             : (data?.inventoryAlerts.length ?? 0) === 0 ? (
-              <div style={{ color: "#34d399", fontSize: 12, display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>✅ Stock saludable en todos los productos</div>
+               <div style={{ color: data ? "#34d399" : "var(--t3)", fontSize: 12, display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>{data ? "Sin alertas en el inventario comprobado" : "Inventario no disponible"}</div>
             ) : data?.inventoryAlerts.map((a, i) => (
               <div key={i} className={`${t.key}-row`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 6px", borderRadius: 8, borderBottom: i < (data.inventoryAlerts.length - 1) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -177,7 +195,7 @@ export default function StoreDashboard({ apid, theme }: { apid: (url: string) =>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: a.status === "critical" ? "#f43f5e" : "#f59e0b" }}>{a.current_stock} uds</div>
-                  <div style={{ fontSize: 10, color: "var(--t3)" }}>{a.days_remaining ? `${a.days_remaining}d` : "0d"} restante</div>
+                   <div style={{ fontSize: 10, color: "var(--t3)" }}>{a.days_remaining != null ? `${a.days_remaining}d restante` : "Sin estimación de días"}</div>
                 </div>
               </div>
             ))}
