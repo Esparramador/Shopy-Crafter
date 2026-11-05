@@ -8,6 +8,23 @@ export interface ContactSubmissionRecord {
   details: string | null;
 }
 
+export interface ContactLeadData {
+  name: string;
+  email: string;
+  phone: string | null;
+  storeUrl: string | null;
+  niche: string | null;
+  revenue: string | null;
+  services: string[];
+  socialMedia: string | null;
+  message: string | null;
+  extraInfo: string | null;
+  productImageUrl: string | null;
+  suppliers: string | null;
+  submittedAt: string;
+  company?: string;
+}
+
 export interface ContactSubmissionStore {
   find(id: string): Promise<ContactSubmissionRecord | undefined>;
   insert(record: { id: string; action: string; details: string }): Promise<boolean>;

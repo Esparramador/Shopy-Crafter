@@ -1,15 +1,18 @@
 import { Router } from "express";
 import { renderHtmlOrText } from "../lib/html-escape.js";
-import { db, auditLogTable } from "@workspace/db";
+import { db, auditLogTable, contactPrereportJobsTable } from "@workspace/db";
 import { projectFilesTable } from "@workspace/db/schema";
 import { eq, desc, isNull, and } from "drizzle-orm";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   claimContactSubmission,
   isValidContactIdempotencyKey,
   IDEMPOTENCY_KEY_REUSED,
+  type ContactLeadData,
   type ContactSubmissionRecord,
 } from "../lib/contact-idempotency.js";
+import { PostgresContactPrereportStore } from "../lib/contact-prereport-store.js";
+import { startContactPrereportWorker as startWorker } from "../lib/contact-prereport-worker.js";
 import multer from "multer";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
@@ -32,6 +35,11 @@ const contactUpload = multer({ storage: multer.memoryStorage(), limits: { fileSi
 
 const ADMIN_EMAIL = "craftershopy@gmail.com";
 
+function safeErrorCode(error: unknown): string {
+  const name = error instanceof Error ? error.name : "UnknownError";
+  return /^[A-Za-z][A-Za-z0-9]{0,59}$/.test(name) ? name : "UnknownError";
+}
+
 const contactRateMap = new Map<string, { count: number; resetAt: number }>();
 function checkContactRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -45,22 +53,7 @@ function checkContactRateLimit(ip: string): boolean {
   return true;
 }
 
-interface LeadData {
-  name: string;
-  email: string;
-  phone: string | null;
-  storeUrl: string | null;
-  niche: string | null;
-  revenue: string | null;
-  services: string[];
-  socialMedia: string | null;
-  message: string | null;
-  extraInfo: string | null;
-  productImageUrl: string | null;
-  suppliers: string | null;
-  submittedAt: string;
-  company?: string;
-}
+type LeadData = ContactLeadData;
 
 interface MarketMetrics {
   conversionRate?: number;
@@ -651,7 +644,7 @@ async function scrapeLeadUrl(lead: LeadData): Promise<WebScrapingResult | null> 
     const url = lead.storeUrl.startsWith("http") ? lead.storeUrl : `https://${lead.storeUrl}`;
     return await scrapeWebsite(url);
   } catch (err) {
-    logger.warn({ err, url: lead.storeUrl }, "Failed to scrape lead URL (non-critical)");
+    logger.warn({ errorCode: safeErrorCode(err), hasUrl: Boolean(lead.storeUrl) }, "Failed to scrape lead URL (non-critical)");
     return null;
   }
 }
@@ -675,7 +668,7 @@ async function researchSection(
     if (text.trim()) return text;
     logger.warn({ label }, "[contact] pre-informe: Claude devolvió texto vacío — probando Gemini");
   } catch (err) {
-    logger.warn({ label, err: err instanceof Error ? err.message : String(err) }, "[contact] pre-informe: Claude falló — probando Gemini");
+    logger.warn({ label, errorCode: safeErrorCode(err) }, "[contact] pre-informe: Claude falló — probando Gemini");
   }
   const text = await askGeminiChat([{ role: "user", content }], system, { useProModel: true, maxOutputTokens: 8192 });
   if (!text.trim()) throw new Error(`pre-informe (${label}): sin respuesta de Claude ni de Gemini`);
@@ -835,7 +828,7 @@ REGLAS:
   const extractText = (r: PromiseSettledResult<string>, fallback: string): string => {
     if (r.status === "fulfilled" && r.value) return r.value;
     if (r.status === "rejected") {
-      logger.error({ err: r.reason instanceof Error ? r.reason.message : String(r.reason) }, `[contact] pre-informe: sección sin generar — ${fallback}`);
+      logger.error({ errorCode: safeErrorCode(r.reason) }, `[contact] pre-informe: sección sin generar — ${fallback}`);
     }
     return fallback;
   };
@@ -848,15 +841,15 @@ REGLAS:
   };
 }
 
-async function generateAIPreReport(lead: LeadData): Promise<string> {
+async function generateAIPreReport(lead: LeadData, submissionId: string): Promise<string> {
   const entityName = lead.storeUrl || lead.name;
   const nicheInfo = lead.niche || "ecommerce general";
 
-  logger.info({ entityName, niche: nicheInfo, hasUrl: !!lead.storeUrl, hasSuppliers: !!lead.suppliers }, "Starting Claude-powered pre-report");
+  logger.info({ submissionId, hasUrl: !!lead.storeUrl, hasSuppliers: !!lead.suppliers }, "Starting Claude-powered pre-report");
 
   const scrapedData = await scrapeLeadUrl(lead);
   if (scrapedData) {
-    logger.info({ url: scrapedData.url, title: scrapedData.title, statusCode: scrapedData.statusCode, wordCount: scrapedData.wordCount, images: scrapedData.images.total }, "Successfully scraped lead URL");
+    logger.info({ submissionId, statusCode: scrapedData.statusCode, wordCount: scrapedData.wordCount, images: scrapedData.images.total }, "Successfully scraped lead URL");
   }
 
   const [researchResults, productSampleResult] = await Promise.allSettled([
@@ -887,6 +880,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
       content: `Lead: ${lead.name}, Email: ${lead.email}, Nicho: ${lead.niche}, Facturacion: ${lead.revenue}, Servicios: ${(lead.services || []).join(", ")}, URL: ${lead.storeUrl || "N/A"}, Redes: ${lead.socialMedia || "N/A"}, Proveedores: ${lead.suppliers || "N/A"}, Info extra: ${lead.extraInfo || "N/A"}. Motor: Claude (Anthropic). Scraping: ${scrapedData ? "OK" : "no disponible"}.`,
       confidence: 0.85,
       tags: ["lead", "prereport", "claude", lead.niche || "general"],
+      idempotencyKey: `${submissionId}:prereport`,
     });
 
     if (research.business && research.business.length > 100) {
@@ -897,6 +891,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
         content: research.business.slice(0, 6000),
         confidence: 0.85,
         tags: ["lead_research", "business_intel", "claude", lead.niche || "general", entityName],
+        idempotencyKey: `${submissionId}:business`,
       });
     }
 
@@ -908,6 +903,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
         content: research.market.slice(0, 6000),
         confidence: 0.85,
         tags: ["lead_research", "market_intel", "claude", lead.niche || "general"],
+        idempotencyKey: `${submissionId}:market`,
       });
     }
 
@@ -919,6 +915,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
         content: research.seo.slice(0, 6000),
         confidence: 0.85,
         tags: ["lead_research", "seo_audit", "claude", lead.niche || "general"],
+        idempotencyKey: `${submissionId}:seo`,
       });
     }
 
@@ -930,6 +927,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
         content: `Lead ${lead.name} proporcionó redes sociales: ${lead.socialMedia}. Nicho: ${lead.niche || "general"}. URL tienda: ${lead.storeUrl || "N/A"}. Facturación: ${lead.revenue || "N/A"}.`,
         confidence: 0.75,
         tags: ["lead", "social_media", lead.niche || "general"],
+        idempotencyKey: `${submissionId}:social`,
       });
     }
   } catch {};
@@ -942,7 +940,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
       seo: research.seo,
     });
   } catch (err) {
-    logger.warn({ err }, "Claude structuring failed, using raw research text");
+    logger.warn({ errorCode: safeErrorCode(err) }, "Claude structuring failed, using raw research text");
     structuredResearch = {
       business: research.business,
       market: research.market,
@@ -955,7 +953,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
     const supplierHtml = await structureSupplierResearch(lead, research.suppliers);
     supplierStructured = supplierHtml;
   } catch (err) {
-    logger.warn({ err }, "Supplier structuring failed, using raw text");
+    logger.warn({ errorCode: safeErrorCode(err) }, "Supplier structuring failed, using raw text");
     supplierStructured = research.suppliers;
   }
 
@@ -965,7 +963,7 @@ async function generateAIPreReport(lead: LeadData): Promise<string> {
       marketMetrics = await extractMarketMetrics(lead, research.market, research.business);
     }
   } catch (err) {
-    logger.warn({ err }, "Market metrics extraction failed (non-critical)");
+    logger.warn({ errorCode: safeErrorCode(err) }, "Market metrics extraction failed (non-critical)");
   }
 
   return await buildReportHtml(lead, {
@@ -1397,6 +1395,78 @@ async function buildReportHtml(
   );
 }
 
+let stopContactPrereportWorker: (() => void) | null = null;
+
+export function startContactPrereportRecoveryWorker(): void {
+  if (stopContactPrereportWorker) return;
+  stopContactPrereportWorker = startWorker(
+    new PostgresContactPrereportStore(),
+    {
+      generateReport: (lead, submissionId) => generateAIPreReport(lead, submissionId),
+      sendEmail: async (lead, reportHtml) => {
+        if (!isGmailAvailable()) return "skipped";
+        let emailHtml = reportHtml;
+        try {
+          emailHtml = juice(reportHtml, {
+            removeStyleTags: true,
+            preserveMediaQueries: false,
+            preserveFontFaces: false,
+            applyStyleTags: true,
+            insertPreservedExtraCss: false,
+          });
+        } catch (error) {
+          logger.warn({ errorCode: safeErrorCode(error) }, "Pre-report CSS inlining failed; using raw HTML");
+        }
+        return await sendEmail(
+          ADMIN_EMAIL,
+          `Nuevo Lead: ${lead.name} — ${lead.niche || "eCommerce"} — Pre-Informe AI`,
+          emailHtml,
+        ) ? "sent" : "failed";
+      },
+      sendKlaviyo: async lead => {
+        if (!process.env.KLAVIYO_API_KEY) return "skipped";
+        const response = await fetch("https://a.klaviyo.com/api/events/", {
+          method: "POST",
+          headers: getKlaviyoHeaders(),
+          signal: AbortSignal.timeout(15_000),
+          body: JSON.stringify({
+            data: {
+              type: "event",
+              attributes: {
+                properties: { ...lead, servicesStr: lead.services.join(", ") },
+                metric: { data: { type: "metric", attributes: { name: "Lead Form Submitted" } } },
+                profile: {
+                  data: {
+                    type: "profile",
+                    attributes: {
+                      email: lead.email,
+                      first_name: lead.name.split(" ")[0],
+                      last_name: lead.name.split(" ").slice(1).join(" ") || "",
+                      phone_number: lead.phone ?? undefined,
+                      properties: {
+                        storeUrl: lead.storeUrl,
+                        niche: lead.niche,
+                        revenue: lead.revenue,
+                        services: lead.services.join(", "),
+                        source: "Landing Form",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          }),
+        });
+        if (!response.ok) {
+          logger.warn({ statusCode: response.status }, "Klaviyo lead event was rejected");
+          return "failed";
+        }
+        return "sent";
+      },
+    },
+  );
+}
+
 router.post("/contact", contactUpload.single("referenceImage"), async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
@@ -1469,14 +1539,18 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
           return existing as ContactSubmissionRecord | undefined;
         },
         insert: async record => {
-          const inserted = await db.insert(auditLogTable).values({
-            id: record.id,
-            userId: "public",
-            action: record.action,
-            details: record.details,
-            ipAddress: req.ip ?? "unknown",
-          }).onConflictDoNothing().returning({ id: auditLogTable.id });
-          return inserted.length > 0;
+          return db.transaction(async tx => {
+            const [inserted] = await tx.insert(auditLogTable).values({
+              id: record.id,
+              userId: "public",
+              action: record.action,
+              details: record.details,
+              ipAddress: req.ip ?? "unknown",
+            }).onConflictDoNothing().returning({ id: auditLogTable.id });
+            if (!inserted) return false;
+            await tx.insert(contactPrereportJobsTable).values({ submissionId: record.id });
+            return true;
+          });
         },
       },
       () => checkContactRateLimit(req.ip ?? "unknown"),
@@ -1502,138 +1576,10 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
     }
 
     res.json({ success: true, message: "¡Solicitud recibida! Estamos analizando tu negocio con IA. Recibirás noticias nuestras muy pronto." });
-  
-    (async () => {
-      try {
-        logger.info({ name: leadData.name, email: leadData.email }, "Starting AI pre-report generation for lead");
-  
-        let reportHtml: string;
-        reportHtml = await generateAIPreReport(leadData);
-  
-        let savedFileId: number | null = null;
-        try {
-          const htmlBuffer = Buffer.from(reportHtml, "utf-8");
-          const dateStr = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
-          const timeStr = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-          const [saved] = await db.insert(projectFilesTable).values({
-            projectId: null,
-            fileType: "report",
-            category: "lead_prereport",
-            title: `Pre-Informe AI — ${leadData.name} — ${leadData.niche || "eCommerce"}`,
-            description: `Pre-informe generado automáticamente el ${dateStr} a las ${timeStr} para el lead ${leadData.name} (${leadData.email})`,
-            objectPath: null,
-            originalUrl: null,
-            mimeType: "text/html",
-            fileSizeBytes: htmlBuffer.length,
-            productId: null,
-            productTitle: null,
-            generatedBy: "lead_contact_form",
-            metadata: JSON.stringify({
-              generatedAt: new Date().toISOString(),
-              leadEmail: leadData.email,
-              leadName: leadData.name,
-              leadNiche: leadData.niche,
-              leadRevenue: leadData.revenue,
-              leadStoreUrl: leadData.storeUrl,
-              leadPhone: leadData.phone,
-              leadServices: leadData.services,
-            }),
-            content: reportHtml,
-            isPublic: 0,
-            entityName: leadData.name,
-            entityUrl: leadData.storeUrl || leadData.email,
-          }).returning();
-          savedFileId = saved.id;
-          logger.info({ fileId: saved.id, leadName: leadData.name, sizeKB: Math.round(htmlBuffer.length / 1024) }, "Pre-report saved to vault");
-        } catch (saveErr) {
-          logger.error({ err: saveErr }, "Failed to save pre-report to vault (non-critical)");
-        }
-  
-        if (isGmailAvailable()) {
-          const subject = `Nuevo Lead: ${leadData.name} — ${leadData.niche || "eCommerce"} — Pre-Informe AI`;
-          let emailHtml: string;
-          try {
-            emailHtml = juice(reportHtml, {
-              removeStyleTags: true,
-              preserveMediaQueries: false,
-              preserveFontFaces: false,
-              applyStyleTags: true,
-              insertPreservedExtraCss: false,
-            });
-          } catch (juiceErr) {
-            logger.warn({ err: juiceErr }, "CSS inlining failed, sending raw HTML");
-            emailHtml = reportHtml;
-          }
-          const sent = await sendEmail(ADMIN_EMAIL, subject, emailHtml);
-          if (sent) {
-            logger.info({ to: ADMIN_EMAIL, lead: leadData.email }, "Pre-report email sent to admin (CSS inlined)");
-          } else {
-            logger.error({ to: ADMIN_EMAIL }, "Failed to send pre-report email");
-          }
-        } else {
-          logger.warn("Gmail not available — pre-report NOT sent by email");
-        }
-  
-        await db.insert(auditLogTable).values({
-          id: randomBytes(8).toString("hex"),
-          userId: "system",
-          action: "lead_prereport_generated",
-          details: JSON.stringify({
-            leadEmail: leadData.email,
-            leadName: leadData.name,
-            emailSent: isGmailAvailable(),
-            aiEngine: "claude-anthropic",
-            savedFileId,
-            generatedAt: new Date().toISOString(),
-          }),
-          ipAddress: "system",
-        }).catch(() => {});
-      } catch (err) {
-        logger.error({ err, lead: leadData.email }, "Background AI pre-report generation failed");
-      }
-    })();
-  
-    const klaviyoKey = process.env.KLAVIYO_API_KEY;
-    if (klaviyoKey) {
-      try {
-        await fetch("https://a.klaviyo.com/api/events/", {
-          method: "POST",
-          headers: getKlaviyoHeaders(),
-          body: JSON.stringify({
-            data: {
-              type: "event",
-              attributes: {
-                properties: { ...leadData, servicesStr: (services ?? []).join(", ") },
-                metric: { data: { type: "metric", attributes: { name: "Lead Form Submitted" } } },
-                profile: {
-                  data: {
-                    type: "profile",
-                    attributes: {
-                      email: leadData.email,
-                      first_name: leadData.name.split(" ")[0],
-                      last_name: leadData.name.split(" ").slice(1).join(" ") || "",
-                      phone_number: leadData.phone ?? undefined,
-                      properties: {
-                        storeUrl: leadData.storeUrl,
-                        niche: leadData.niche,
-                        revenue: leadData.revenue,
-                        services: Array.isArray(leadData.services) ? leadData.services.join(", ") : (leadData.services ?? ""),
-                        source: "Landing Form",
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          }),
-        });
-      } catch (err) {
-        logger.warn({ err }, "Klaviyo lead event failed (non-critical)");
-      }
-    }
+    return;
   } catch (err: any) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    res.status(500).json({ error: msg });
+    logger.error({ errorCode: safeErrorCode(err) }, "Public contact submission could not be accepted");
+    res.status(500).json({ error: "No se pudo registrar la solicitud. Inténtalo de nuevo." });
   }
 });
 

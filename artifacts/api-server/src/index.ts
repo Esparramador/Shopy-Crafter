@@ -358,6 +358,15 @@ const server = app.listen(port, (err?: Error) => {
 
   logger.info({ port }, "Server listening");
 
+  import("./routes/contact.js")
+    .then((m) => m.startContactPrereportRecoveryWorker())
+    .catch((err) => {
+      logger.error(
+        { errorCode: err instanceof Error ? err.name : "UnknownError" },
+        "Contact pre-report worker could not start",
+      );
+    });
+
   // Inject DB-stored API keys into process.env (non-blocking)
   injectDbApiKeys().catch(() => {}).then(() => {
     // Solo en el despliegue: en local la URL pública no es la de producción.
