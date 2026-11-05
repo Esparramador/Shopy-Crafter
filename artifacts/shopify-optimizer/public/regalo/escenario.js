@@ -22,7 +22,7 @@ export const PALETA = {
   cesped: "#7f9a45", sol: "#ffc690",
 };
 
-export function crearEscenario(escena, { movil = false, calidad = movil ? 1 : 2, posCaja = new THREE.Vector3(0.9, 0, 0.7), zonaLibre = { x: -0.25, z: -1.0, r: 3.4 } } = {}) {
+export function crearEscenario(escena, { movil = false, calidad = movil ? 1 : 2, sombras = calidad >= 1, posCaja = new THREE.Vector3(0.9, 0, 0.7), zonaLibre = { x: -0.25, z: -1.0, r: 3.4 } } = {}) {
   const rnd = azar(20261029);
   const Q = (bajo, medio, alto) => (calidad <= 0 ? bajo : calidad === 1 ? medio : alto);
   const actualizables = [];
@@ -78,7 +78,7 @@ export function crearEscenario(escena, { movil = false, calidad = movil ? 1 : 2,
   const hemi = new THREE.HemisphereLight(0xa9c0e0, 0x5e6b35, 0.85); escena.add(hemi);
   const sol = new THREE.DirectionalLight(PALETA.sol, 2.7);
   sol.position.set(DIR_SOL.x * 14, 7.5, DIR_SOL.z * 14);           // misma dirección que el sol del cielo, más alto para sombras útiles
-  sol.castShadow = calidad >= 1;
+  sol.castShadow = sombras;
   sol.shadow.mapSize.set(Q(512, 1024, 2048), Q(512, 1024, 2048));
   Object.assign(sol.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 40 });
   sol.shadow.bias = -0.0005; sol.shadow.normalBias = 0.025;
