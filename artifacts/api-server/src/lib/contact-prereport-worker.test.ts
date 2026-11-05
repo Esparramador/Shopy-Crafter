@@ -199,6 +199,21 @@ describe("contact pre-report recovery worker", () => {
     expect(store.status).toBe("needs_review");
   });
 
+  it("does not resend a Klaviyo event after an uncertain outcome", async () => {
+    const store = new FakeContactPrereportStore();
+    const services = createServices();
+    services.sendKlaviyo.mockRejectedValueOnce(new Error("Simulated interrupted event"));
+
+    await expect(processNextContactPrereportJob(store, services)).resolves.toBe("processed");
+    await expect(processNextContactPrereportJob(store, services)).resolves.toBe("idle");
+
+    expect(services.sendKlaviyo).toHaveBeenCalledTimes(1);
+    expect(services.generateReport).toHaveBeenCalledTimes(1);
+    expect(services.sendEmail).toHaveBeenCalledTimes(1);
+    expect(store.klaviyoStatus).toBe("unknown");
+    expect(store.status).toBe("needs_review");
+  });
+
   it("allows only one concurrent worker to claim a pending report", async () => {
     const store = new FakeContactPrereportStore();
     const services = createServices();
