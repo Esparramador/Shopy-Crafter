@@ -30,8 +30,8 @@ export function resumenRespuestaShopify(texto: string): string {
   const t = String(texto || "");
   if (/<html|<!doctype/i.test(t)) {
     if (/shop-404|store unavailable|there(?:'|’)s no store|this store is unavailable|tienda no disponible/i.test(t)) return "store unavailable";
-    if (/password|opening soon|coming soon/i.test(t)) return "store password protected";
     const titulo = (t.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1];
+    if (titulo && /password|opening soon|coming soon/i.test(titulo)) return "store password protected";
     return titulo ? titulo.trim().slice(0, 120) : "Shopify devolvió una página HTML";
   }
   return t.replace(/\s+/g, " ").trim().slice(0, 300);
@@ -149,12 +149,12 @@ async function shopifyRetry<T>(fn: () => Promise<Response>, path: string, projec
     }
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
+      throw new Error(`Shopify API error ${resp.status} at ${path}: ${resumenRespuestaShopify(text)}`);
     }
     return resp.json() as Promise<T>;
   }
   const text = lastResp ? await lastResp.text() : "Max retries exceeded";
-  throw new Error(`Shopify API error after retries at ${path}: ${text}`);
+  throw new Error(`Shopify API error after retries at ${path}: ${resumenRespuestaShopify(text)}`);
 }
 
 /**
@@ -245,7 +245,7 @@ export async function shopifyRequestPaged<T>(
 
       if (!resp.ok) {
         const text = await resp.text();
-        throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
+        throw new Error(`Shopify API error ${resp.status} at ${path}: ${resumenRespuestaShopify(text)}`);
       }
 
       const linkHeader = resp.headers.get("Link") ?? "";
@@ -257,7 +257,7 @@ export async function shopifyRequestPaged<T>(
       return { data, nextPageInfo };
     }
     const text = lastResp ? await lastResp.text() : "Max retries exceeded";
-    throw new Error(`Shopify API error after retries at ${path}: ${text}`);
+    throw new Error(`Shopify API error after retries at ${path}: ${resumenRespuestaShopify(text)}`);
   };
 
   return doPagedFetch(hdrs);
@@ -292,7 +292,7 @@ export async function rotateToken(
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`Token rotation failed (${resp.status}): ${text}`);
+    throw new Error(`Token rotation failed (${resp.status}): ${resumenRespuestaShopify(text)}`);
   }
 
   const data = (await resp.json()) as { access_token: string; expires_in?: number };
@@ -346,7 +346,7 @@ export async function shopifyGraphQL<T = Record<string, unknown>>(
 
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`Shopify GraphQL error ${resp.status}: ${text}`);
+      throw new Error(`Shopify GraphQL error ${resp.status}: ${resumenRespuestaShopify(text)}`);
     }
 
     const result = await resp.json() as { data?: T; errors?: Array<{ message: string }> };
