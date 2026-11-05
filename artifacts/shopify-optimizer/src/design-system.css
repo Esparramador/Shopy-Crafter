@@ -121,6 +121,8 @@ body::after {
   background: linear-gradient(135deg, var(--gold), var(--gold2, #e6c668));
   border-radius: 50%;
   position: fixed;
+  top: 0;
+  left: 0;
   pointer-events: none;
   z-index: 2147483647;
   display: flex; align-items: center; justify-content: center;
@@ -138,6 +140,8 @@ body::after {
   border: 1.5px solid rgba(200,168,75,0.35);
   border-radius: 50%;
   position: fixed;
+  top: 0;
+  left: 0;
   pointer-events: none;
   z-index: 2147483646;
   opacity: 0;
